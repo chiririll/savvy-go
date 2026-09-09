@@ -27,6 +27,8 @@ type Server struct {
 	accounts   domain.Accounts
 	categories domain.Categories
 	tags       domain.Tags
+	txs        domain.Transactions
+	debts      domain.Debts
 }
 
 func New(cfg config.Config, sqlDB *sql.DB) *Server {
@@ -42,6 +44,8 @@ func New(cfg config.Config, sqlDB *sql.DB) *Server {
 		accounts:   domain.Accounts{DB: sqlDB},
 		categories: domain.Categories{DB: sqlDB},
 		tags:       domain.Tags{DB: sqlDB},
+		txs:        domain.Transactions{DB: sqlDB},
+		debts:      domain.Debts{Accounts: domain.Accounts{DB: sqlDB}, Transactions: domain.Transactions{DB: sqlDB}},
 	}
 	s.mux = s.routes()
 	return s
@@ -68,6 +72,7 @@ func (s *Server) routes() *chi.Mux {
 		r.Get("/auth/password/{token}", s.passwordPreview)
 		r.Post("/auth/password/{token}", s.passwordAccept)
 		r.Post("/auth/2fa/verify", s.twoFactorVerify)
+		r.Get("/auth/sso/providers", s.ssoProviders)
 
 		r.Group(func(r chi.Router) {
 			r.Use(s.requireSession)
@@ -87,6 +92,8 @@ func (s *Server) routes() *chi.Mux {
 				r.Put("/users/{id}", s.usersUpdate)
 				r.Patch("/users/{id}", s.usersUpdate)
 				r.Delete("/users/{id}", s.usersDestroy)
+				r.Get("/auth/sso/presets", s.ssoPresets)
+				r.Get("/identity-providers", s.emptyList)
 			})
 
 			r.Group(func(r chi.Router) {
@@ -129,6 +136,56 @@ func (s *Server) routes() *chi.Mux {
 				r.Put("/tags/{id}", s.tagsUpdate)
 				r.Patch("/tags/{id}", s.tagsUpdate)
 				r.Delete("/tags/{id}", s.tagsDestroy)
+
+				r.Get("/transactions", s.transactionsIndex)
+				r.Post("/transactions", s.transactionsStore)
+				r.Get("/transactions/{id}", s.transactionsShow)
+				r.Put("/transactions/{id}", s.transactionsUpdate)
+				r.Patch("/transactions/{id}", s.transactionsUpdate)
+				r.Delete("/transactions/{id}", s.transactionsDestroy)
+				r.Post("/transactions/{id}/duplicate", s.transactionsDuplicate)
+				r.Post("/transactions/{id}/confirm", s.transactionsConfirm)
+				r.Post("/transactions/{id}/skip", s.transactionsSkip)
+				r.Get("/transactions-summary", s.transactionsSummary)
+				r.Get("/transactions-pending-summary", s.transactionsPendingSummary)
+
+				r.Get("/debts", s.debtsIndex)
+				r.Post("/debts", s.debtsStore)
+				r.Get("/debts/{id}", s.debtsShow)
+				r.Put("/debts/{id}", s.debtsUpdate)
+				r.Patch("/debts/{id}", s.debtsUpdate)
+				r.Delete("/debts/{id}", s.debtsDestroy)
+				r.Post("/debts/{id}/payment", s.debtsPayment)
+				r.Post("/debts/{id}/collect", s.debtsCollect)
+				r.Post("/debts/{id}/reopen", s.debtsReopen)
+				r.Get("/debts-summary", s.debtsSummary)
+
+				r.Get("/reports/overview", s.reportsOverview)
+				r.Get("/reports/money-flow", s.reportsMoneyFlow)
+				r.Get("/reports/expense-pace", s.reportsExpensePace)
+				r.Get("/reports/expenses-by-category", s.reportsByCategory)
+				r.Get("/reports/cash-flow-over-time", s.reportsCashFlow)
+				r.Get("/reports/activity-heatmap", s.reportsHeatmap)
+				r.Get("/reports/transactions/summary", s.reportsTxSummary)
+				r.Get("/reports/transactions/by-category", s.reportsTxByCategory)
+				r.Get("/reports/transactions/dynamics", s.reportsTxDynamics)
+				r.Get("/reports/transactions/top", s.reportsTxTop)
+				r.Get("/reports/net-worth", s.reportsNetWorth)
+				r.Get("/reports/net-worth-history", s.reportsNetWorthHistory)
+				r.Get("/monitoring/storage", s.monitoringStorage)
+				r.Get("/monitoring/resources", s.monitoringResources)
+
+				r.Get("/recurring", s.emptyList)
+				r.Get("/recurring-upcoming", s.recurringUpcoming)
+				r.Post("/recurring", s.emptyCreated)
+				r.Get("/budgets", s.emptyList)
+				r.Post("/budgets", s.emptyCreated)
+				r.Get("/automation-rules", s.emptyList)
+				r.Get("/automation-rules/triggers", s.automationTriggers)
+				r.Post("/automation-rules", s.emptyCreated)
+				r.Get("/backups", s.emptyList)
+				r.Post("/backups", s.emptyCreated)
+				r.Get("/s3/multipart/{upload}", s.emptyList)
 			})
 		})
 	})
