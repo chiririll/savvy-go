@@ -10,23 +10,24 @@ import (
 
 // Config is process-wide runtime configuration loaded from the environment.
 type Config struct {
-	AppURL      string
-	AppEnv      string
-	ListenAddr  string
-	DataDir     string
-	Database    string
-	UploadsDir  string
-	BackupsDir  string
-	PublicDir   string
-	TZ          string
-	Location    *time.Location
-	SessionTTL  time.Duration
-	RememberTTL time.Duration
-	ChallengeTTL time.Duration
+	AppURL        string
+	AppEnv        string
+	ListenAddr    string
+	DataDir       string
+	Database      string
+	UploadsDir    string
+	BackupsDir    string
+	PublicDir     string
+	TZ            string
+	Location      *time.Location
+	SessionTTL    time.Duration
+	RememberTTL   time.Duration
+	ChallengeTTL  time.Duration
 	SessionCookie string
 	CSRFCookie    string
 	CSRFHeader    string
 	SeedDemo      bool
+	AppKey        string
 }
 
 // FromEnv loads configuration. DATA_DIR defaults to /data or /var/lib/savvy
@@ -59,7 +60,45 @@ func FromEnv() Config {
 		CSRFHeader:    firstNonEmpty(os.Getenv("AUTH_SESSION_CSRF_HEADER"), "X-CSRF-Token"),
 		SeedDemo:      truthy(os.Getenv("SEED_DEMO")),
 	}
+	cfg.AppKey = loadAppKey(dataDir)
 	return cfg
+}
+
+func loadAppKey(dataDir string) string {
+	if v := strings.TrimSpace(os.Getenv("APP_KEY")); v != "" {
+		return v
+	}
+	for _, p := range []string{
+		filepath.Join(dataDir, ".env_config"),
+		filepath.Join(dataDir, ".env"),
+		".env",
+	} {
+		if k := appKeyFromDotenv(p); k != "" {
+			return k
+		}
+	}
+	return ""
+}
+
+func appKeyFromDotenv(path string) string {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	for _, line := range strings.Split(string(raw), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		key, val, ok := strings.Cut(line, "=")
+		if !ok || strings.TrimSpace(key) != "APP_KEY" {
+			continue
+		}
+		val = strings.TrimSpace(val)
+		val = strings.Trim(val, `"'`)
+		return val
+	}
+	return ""
 }
 
 func detectDataDir() string {

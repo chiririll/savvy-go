@@ -65,7 +65,7 @@ func New(cfg config.Config, sqlDB *sql.DB) *Server {
 		reports:    domain.Reports{DB: sqlDB, Loc: cfg.Location},
 		uploads:    domain.Uploads{DB: sqlDB, Root: cfg.UploadsDir, AppURL: cfg.AppURL, SignSecret: cfg.AppURL + "|upload"},
 		backups:    domain.Backups{DB: sqlDB, Dir: cfg.BackupsDir, Database: cfg.Database},
-		twoFactor:  auth.TwoFactor{DB: sqlDB, Users: auth.Users{DB: sqlDB}},
+		twoFactor:  auth.TwoFactor{DB: sqlDB, Users: auth.Users{DB: sqlDB}, AppKey: cfg.AppKey},
 		webauthn:   auth.WebAuthn{DB: sqlDB, Cfg: cfg},
 	}
 	s.sso = domain.SSO{DB: sqlDB, Users: s.users, Settings: s.settings, AppURL: cfg.AppURL}

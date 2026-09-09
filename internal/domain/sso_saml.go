@@ -65,6 +65,9 @@ func (s SSO) HandleACS(ctx context.Context, p IdentityProvider, samlResponse, re
 	if err != nil || len(raw) == 0 {
 		return NormalizedIdentity{}, ssoErr("saml_invalid", "The SAML response is invalid.", 401)
 	}
+	if err := VerifySAMLXML(raw, idpCerts(p)); err != nil {
+		return NormalizedIdentity{}, err
+	}
 	nameID, inResponseTo, attrs, ok := parseSAMLResponse(string(raw))
 	if !ok {
 		return NormalizedIdentity{}, ssoErr("saml_invalid", "The SAML assertion is invalid.", 401)

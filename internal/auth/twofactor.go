@@ -11,8 +11,9 @@ import (
 const recoveryChars = "abcdefghjkmnpqrstuvwxyz23456789"
 
 type TwoFactor struct {
-	DB    *sql.DB
-	Users Users
+	DB     *sql.DB
+	Users  Users
+	AppKey string
 }
 
 func (t TwoFactor) Enable(ctx context.Context, u *User) (secret, uri string, err error) {
@@ -57,7 +58,7 @@ func (t TwoFactor) Disable(ctx context.Context, u *User, code string) error {
 }
 
 func (t TwoFactor) VerifyAny(ctx context.Context, u *User, code string) bool {
-	if u.TwoFactorSecret != nil && VerifyTOTP(*u.TwoFactorSecret, code) {
+	if t.verifyTOTP(ctx, u, code) {
 		return true
 	}
 	return t.ConsumeRecovery(ctx, u.ID, code)
@@ -102,7 +103,7 @@ func (t TwoFactor) Regenerate(ctx context.Context, u *User, code string) ([]stri
 	if !u.HasTwoFactor() {
 		return nil, fmtErr("not enabled")
 	}
-	if u.TwoFactorSecret == nil || !VerifyTOTP(*u.TwoFactorSecret, code) {
+	if !t.verifyTOTP(ctx, u, code) {
 		return nil, fmtErr("invalid code")
 	}
 	now := time.Now().UTC().Format(time.RFC3339)

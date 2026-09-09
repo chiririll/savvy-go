@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/chiririll/savvy-plus/internal/auth"
 	"github.com/chiririll/savvy-plus/internal/config"
 	"github.com/chiririll/savvy-plus/internal/db"
 	"github.com/chiririll/savvy-plus/internal/domain"
@@ -53,6 +54,10 @@ func main() {
 	}
 	if err := legacy.UpgradeInPlace(ctx, sqlDB); err != nil {
 		slog.Error("legacy import", "err", err)
+		os.Exit(1)
+	}
+	if err := auth.UnwrapLegacyTOTPSecrets(ctx, sqlDB, cfg.AppKey); err != nil {
+		slog.Error("unwrap two-factor secrets", "err", err)
 		os.Exit(1)
 	}
 

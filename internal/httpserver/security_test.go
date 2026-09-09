@@ -2,6 +2,8 @@ package httpserver
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -86,6 +88,46 @@ func TestTwoFactorEnableConfirmLoginAndRecovery(t *testing.T) {
 	off := a.do("POST", "/api/auth/2fa/disable", map[string]string{"code": auth.TOTPNow(secret)}, iss.Token, iss.CSRF)
 	if off.StatusCode != 200 {
 		t.Fatalf("disable %d %v", off.StatusCode, decodeJSON(t, off))
+	}
+}
+
+func TestLegacyLaravelTOTPStillVerifies(t *testing.T) {
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err != nil {
+		t.Fatal(err)
+	}
+	appKey := "base64:" + base64.StdEncoding.EncodeToString(key)
+	secret, err := auth.NewTOTPSecret()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ct, err := auth.EncryptLaravel(appKey, secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	a := newTestApp(t)
+	a.s.twoFactor.AppKey = appKey
+	u := a.createUser("legacy2fa@test.com", "secret1", auth.RoleReadWrite)
+	_, _ = a.db.Exec(`UPDATE users SET two_factor_enabled=1, two_factor_confirmed=1, two_factor_secret=? WHERE id=?`, ct, u.ID)
+
+	login := a.do("POST", "/api/auth/login", map[string]string{"email": "legacy2fa@test.com", "password": "secret1"}, "", "")
+	tok, _ := decodeJSON(t, login)["two_factor_token"].(string)
+	if tok == "" {
+		t.Fatal("expected 2fa challenge")
+	}
+	res := a.do("POST", "/api/auth/2fa/verify", map[string]any{
+		"two_factor_token": tok, "code": auth.TOTPNow(secret),
+	}, "", "")
+	if res.StatusCode != 200 {
+		t.Fatalf("legacy verify %d %v", res.StatusCode, decodeJSON(t, res))
+	}
+	res.Body.Close()
+
+	var stored string
+	_ = a.db.QueryRow(`SELECT two_factor_secret FROM users WHERE id=?`, u.ID).Scan(&stored)
+	if stored != secret {
+		t.Fatalf("secret not persisted plaintext %q", stored)
 	}
 }
 

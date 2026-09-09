@@ -202,14 +202,12 @@ func (s SSO) oidcIdentity(ctx context.Context, p IdentityProvider, code, verifie
 		IDToken     string `json:"id_token"`
 	}
 	_ = json.NewDecoder(res.Body).Decode(&tok)
-	claims := map[string]any{}
-	if tok.IDToken != "" {
-		if payload, err := jwtPayload(tok.IDToken); err == nil {
-			claims = payload
-			if disco.Issuer != "" && !MatchesIssuer(p.Preset, disco.Issuer, claims) {
-				return NormalizedIdentity{}, ssoErr("issuer_mismatch", "The token issuer does not match the discovery document.", 401)
-			}
-		}
+	if tok.IDToken == "" {
+		return NormalizedIdentity{}, ssoErr("id_token_missing", "The identity provider did not return an ID token.", 401)
+	}
+	claims, err := s.verifyIDToken(ctx, disco, p, tok.IDToken)
+	if err != nil {
+		return NormalizedIdentity{}, err
 	}
 	if tok.AccessToken != "" && disco.UserinfoEndpoint != "" {
 		if extra, err := s.getJSON(ctx, disco.UserinfoEndpoint, tok.AccessToken); err == nil {
@@ -219,9 +217,6 @@ func (s SSO) oidcIdentity(ctx context.Context, p IdentityProvider, code, verifie
 				}
 			}
 		}
-	}
-	if len(claims) == 0 {
-		return NormalizedIdentity{}, ssoErr("userinfo_failed", "Unable to load the user profile.", 502)
 	}
 	return extractIdentity(p, claims, nil), nil
 }
@@ -344,22 +339,6 @@ func pkce() (verifier, challenge string) {
 	sum := sha256.Sum256([]byte(verifier))
 	challenge = base64.RawURLEncoding.EncodeToString(sum[:])
 	return verifier, challenge
-}
-
-func jwtPayload(tok string) (map[string]any, error) {
-	parts := strings.Split(tok, ".")
-	if len(parts) < 2 {
-		return nil, fmt.Errorf("jwt")
-	}
-	raw, err := base64.RawURLEncoding.DecodeString(parts[1])
-	if err != nil {
-		raw, err = base64.URLEncoding.DecodeString(parts[1])
-		if err != nil {
-			return nil, err
-		}
-	}
-	var out map[string]any
-	return out, json.Unmarshal(raw, &out)
 }
 
 func oidcScopes(p IdentityProvider) []string {
