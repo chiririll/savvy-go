@@ -2,81 +2,105 @@ package httpserver
 
 import (
 	"net/http"
+	"strconv"
+	"strings"
+
+	"github.com/chiririll/savvy-plus/internal/domain"
 )
 
-func emptyMetric() map[string]any {
-	return map[string]any{"value": 0, "previous": nil, "sparkline": []float64{}}
+func (s *Server) reportFilter(r *http.Request) domain.ReportFilter {
+	q := r.URL.Query()
+	return domain.ReportFilter{
+		PeriodType:  firstQuery(q.Get("period_type"), "last_30_days"),
+		PeriodValue: q.Get("period_value"),
+		StartDate:   q.Get("start_date"),
+		EndDate:     q.Get("end_date"),
+		CompareWith: firstQuery(q.Get("compare_with"), "none"),
+		AccountIDs:  queryIDs(q, "account_ids"),
+		CategoryIDs: queryIDs(q, "category_ids"),
+		TagIDs:      queryIDs(q, "tag_ids"),
+	}
+}
+
+func firstQuery(v, fallback string) string {
+	if strings.TrimSpace(v) == "" {
+		return fallback
+	}
+	return v
+}
+
+func queryIDs(q map[string][]string, key string) []int64 {
+	var raw []string
+	raw = append(raw, q[key]...)
+	raw = append(raw, q[key+"[]"]...)
+	var out []int64
+	for _, v := range raw {
+		for _, part := range strings.Split(v, ",") {
+			part = strings.TrimSpace(part)
+			if part == "" {
+				continue
+			}
+			n, err := strconv.ParseInt(part, 10, 64)
+			if err == nil {
+				out = append(out, n)
+			}
+		}
+	}
+	return out
 }
 
 func (s *Server) reportsOverview(w http.ResponseWriter, r *http.Request) {
-	sum := s.txs.Summary(r.Context(), false)
-	income, _ := sum["income"].(float64)
-	expense, _ := sum["expense"].(float64)
-	writeJSON(w, http.StatusOK, map[string]any{
-		"income":      map[string]any{"value": income, "previous": nil, "sparkline": []float64{}},
-		"expenses":    map[string]any{"value": expense, "previous": nil, "sparkline": []float64{}},
-		"netCashFlow": map[string]any{"value": income - expense, "previous": nil, "sparkline": []float64{}},
-		"savingsRate": emptyMetric(),
-		"currency":    sum["currency"],
-	})
+	writeJSON(w, http.StatusOK, s.reports.Overview(r.Context(), s.reportFilter(r)))
 }
 
 func (s *Server) reportsMoneyFlow(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{
-		"nodes": []any{}, "links": []any{},
-		"totals": map[string]any{"income": 0, "expenses": 0, "savings": 0},
-		"currency": nil,
-	})
+	writeJSON(w, http.StatusOK, s.reports.MoneyFlow(r.Context(), s.reportFilter(r)))
 }
 
 func (s *Server) reportsExpensePace(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"months": []any{}})
+	writeJSON(w, http.StatusOK, s.reports.ExpensePace(r.Context(), s.reportFilter(r)))
 }
 
 func (s *Server) reportsByCategory(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"data": []any{}, "total": 0, "currency": nil})
+	writeJSON(w, http.StatusOK, s.reports.ExpensesByCategory(r.Context(), s.reportFilter(r)))
 }
 
 func (s *Server) reportsCashFlow(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"periods": []any{}, "currency": nil})
+	group := firstQuery(r.URL.Query().Get("group_by"), "day")
+	writeJSON(w, http.StatusOK, s.reports.CashFlowOverTime(r.Context(), s.reportFilter(r), group))
 }
 
 func (s *Server) reportsHeatmap(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"days": []any{}, "currency": nil})
+	writeJSON(w, http.StatusOK, s.reports.Heatmap(r.Context(), s.reportFilter(r)))
 }
 
 func (s *Server) reportsTxSummary(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, s.txs.Summary(r.Context(), false))
+	typ := firstQuery(r.URL.Query().Get("type"), "expense")
+	writeJSON(w, http.StatusOK, s.reports.TxSummary(r.Context(), s.reportFilter(r), typ))
 }
 
 func (s *Server) reportsTxByCategory(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"data": []any{}})
+	typ := firstQuery(r.URL.Query().Get("type"), "expense")
+	writeJSON(w, http.StatusOK, s.reports.TxByCategory(r.Context(), s.reportFilter(r), typ))
 }
 
 func (s *Server) reportsTxDynamics(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"data": []any{}})
+	typ := firstQuery(r.URL.Query().Get("type"), "expense")
+	group := firstQuery(r.URL.Query().Get("group_by"), "day")
+	writeJSON(w, http.StatusOK, s.reports.TxDynamics(r.Context(), s.reportFilter(r), typ, group))
 }
 
 func (s *Server) reportsTxTop(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"data": []any{}})
+	typ := firstQuery(r.URL.Query().Get("type"), "expense")
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	writeJSON(w, http.StatusOK, s.reports.TxTop(r.Context(), s.reportFilter(r), typ, limit))
 }
 
 func (s *Server) reportsNetWorth(w http.ResponseWriter, r *http.Request) {
-	base, _ := s.currencies.Base(r.Context())
-	sum := s.accounts.Summary(r.Context(), base)
-	writeJSON(w, http.StatusOK, map[string]any{
-		"net_worth": sum["total_balance"], "currency": sum["currency"], "decimals": sum["decimals"],
-	})
+	writeJSON(w, http.StatusOK, s.reports.NetWorth(r.Context(), s.reportFilter(r)))
 }
 
 func (s *Server) reportsNetWorthHistory(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"dates": []any{}, "values": []any{}, "currency": nil})
-}
-
-func (s *Server) monitoringStorage(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"used_bytes": 0, "total_bytes": nil, "database_bytes": 0})
-}
-
-func (s *Server) monitoringResources(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"cpu_percent": nil, "memory_bytes": nil})
+	group := firstQuery(r.URL.Query().Get("group_by"), "day")
+	writeJSON(w, http.StatusOK, s.reports.NetWorthHistory(r.Context(), s.reportFilter(r), group))
 }

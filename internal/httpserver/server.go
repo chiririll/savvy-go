@@ -32,6 +32,7 @@ type Server struct {
 	recurring  domain.RecurringStore
 	budgets    domain.Budgets
 	automation domain.Automation
+	reports    domain.Reports
 }
 
 func New(cfg config.Config, sqlDB *sql.DB) *Server {
@@ -52,6 +53,7 @@ func New(cfg config.Config, sqlDB *sql.DB) *Server {
 		recurring:  domain.RecurringStore{DB: sqlDB, Txs: domain.Transactions{DB: sqlDB}},
 		budgets:    domain.Budgets{DB: sqlDB},
 		automation: domain.Automation{DB: sqlDB, Txs: domain.Transactions{DB: sqlDB}},
+		reports:    domain.Reports{DB: sqlDB, Loc: cfg.Location},
 	}
 	s.mux = s.routes()
 	return s
