@@ -5,20 +5,35 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/chiririll/savvy-plus/internal/auth"
 	"github.com/chiririll/savvy-plus/internal/config"
+	"github.com/chiririll/savvy-plus/internal/settings"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
 
 // Server is the HTTP front door: health probes, /api, and the Vite SPA.
 type Server struct {
-	cfg config.Config
-	db  *sql.DB
-	mux *chi.Mux
+	cfg        config.Config
+	db         *sql.DB
+	mux        *chi.Mux
+	users      auth.Users
+	sessions   auth.Sessions
+	tokens     auth.PasswordTokens
+	challenges auth.Challenges
+	settings   settings.Store
 }
 
 func New(cfg config.Config, sqlDB *sql.DB) *Server {
-	s := &Server{cfg: cfg, db: sqlDB}
+	s := &Server{
+		cfg:        cfg,
+		db:         sqlDB,
+		users:      auth.Users{DB: sqlDB},
+		sessions:   auth.Sessions{DB: sqlDB, Cfg: cfg},
+		tokens:     auth.PasswordTokens{DB: sqlDB},
+		challenges: auth.Challenges{DB: sqlDB, Cfg: cfg},
+		settings:   settings.Store{DB: sqlDB},
+	}
 	s.mux = s.routes()
 	return s
 }
@@ -37,8 +52,40 @@ func (s *Server) routes() *chi.Mux {
 	r.Get("/readyz", s.readyz)
 
 	r.Route("/api", func(r chi.Router) {
-		r.Get("/health", s.livez)
-		// Domain routes are registered as slices land (auth, CRUD, …).
+		r.Get("/auth/status", s.authStatus)
+		r.Get("/auth/me", s.authMe)
+		r.Post("/auth/register", s.authRegister)
+		r.Post("/auth/login", s.authLogin)
+		r.Get("/auth/password/{token}", s.passwordPreview)
+		r.Post("/auth/password/{token}", s.passwordAccept)
+		r.Post("/auth/2fa/verify", s.twoFactorVerify)
+
+		r.Group(func(r chi.Router) {
+			r.Use(s.requireSession)
+			r.Use(s.requireCSRF)
+
+			r.Post("/auth/logout", s.authLogout)
+			r.Post("/auth/logout-others", s.authLogoutOthers)
+			r.Put("/auth/password", s.authChangePassword)
+			r.Get("/auth/2fa/status", s.twoFactorStatus)
+
+			r.Get("/users", s.usersIndex)
+			r.Get("/users/{id}", s.usersShow)
+			r.Group(func(r chi.Router) {
+				r.Use(s.requireAdmin)
+				r.Post("/users", s.usersStore)
+				r.Post("/users/{id}/password-token", s.usersIssueToken)
+				r.Put("/users/{id}", s.usersUpdate)
+				r.Patch("/users/{id}", s.usersUpdate)
+				r.Delete("/users/{id}", s.usersDestroy)
+			})
+
+			r.Group(func(r chi.Router) {
+				r.Use(s.requireWrite)
+				r.Get("/settings", s.settingsIndex)
+				r.Patch("/settings", s.settingsUpdate)
+			})
+		})
 	})
 
 	r.Get("/*", s.spa)

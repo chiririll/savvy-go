@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/chiririll/savvy-plus/internal/config"
 	"github.com/chiririll/savvy-plus/internal/db"
@@ -24,10 +25,16 @@ func testConfig(t *testing.T) (config.Config, string) {
 		t.Fatal(err)
 	}
 	cfg := config.Config{
-		AppEnv:    "testing",
-		PublicDir: public,
-		DataDir:   dir,
-		Database:  filepath.Join(dir, "database.sqlite"),
+		AppEnv:        "testing",
+		PublicDir:     public,
+		DataDir:       dir,
+		Database:      filepath.Join(dir, "database.sqlite"),
+		SessionTTL:    24 * time.Hour,
+		RememberTTL:   7 * 24 * time.Hour,
+		ChallengeTTL:  5 * time.Minute,
+		SessionCookie: "svy_session",
+		CSRFCookie:    "svy_csrf",
+		CSRFHeader:    "X-CSRF-Token",
 	}
 	return cfg, dir
 }
