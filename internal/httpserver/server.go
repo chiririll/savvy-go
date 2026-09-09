@@ -3,11 +3,13 @@ package httpserver
 import (
 	"database/sql"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/chiririll/savvy-plus/internal/auth"
 	"github.com/chiririll/savvy-plus/internal/config"
 	"github.com/chiririll/savvy-plus/internal/domain"
+	"github.com/chiririll/savvy-plus/internal/jobs"
 	"github.com/chiririll/savvy-plus/internal/settings"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -33,6 +35,10 @@ type Server struct {
 	budgets    domain.Budgets
 	automation domain.Automation
 	reports    domain.Reports
+	uploads    domain.Uploads
+	imports    domain.Imports
+	backups    domain.Backups
+	queue      *jobs.Queue
 }
 
 func New(cfg config.Config, sqlDB *sql.DB) *Server {
@@ -53,8 +59,13 @@ func New(cfg config.Config, sqlDB *sql.DB) *Server {
 		recurring:  domain.RecurringStore{DB: sqlDB, Txs: domain.Transactions{DB: sqlDB}},
 		budgets:    domain.Budgets{DB: sqlDB},
 		automation: domain.Automation{DB: sqlDB, Txs: domain.Transactions{DB: sqlDB}},
-		reports:    domain.Reports{DB: sqlDB, Loc: cfg.Location},
+		reports: domain.Reports{DB: sqlDB, Loc: cfg.Location},
+		uploads: domain.Uploads{DB: sqlDB, Root: cfg.UploadsDir, AppURL: cfg.AppURL, SignSecret: cfg.AppURL + "|upload"},
+		backups: domain.Backups{DB: sqlDB, Dir: cfg.BackupsDir, Database: cfg.Database},
 	}
+	s.imports = domain.Imports{DB: sqlDB, Uploads: s.uploads, Txs: s.txs}
+	_ = os.MkdirAll(cfg.UploadsDir, 0o775)
+	_ = os.MkdirAll(cfg.BackupsDir, 0o775)
 	s.mux = s.routes()
 	return s
 }
@@ -81,6 +92,7 @@ func (s *Server) routes() *chi.Mux {
 		r.Post("/auth/password/{token}", s.passwordAccept)
 		r.Post("/auth/2fa/verify", s.twoFactorVerify)
 		r.Get("/auth/sso/providers", s.ssoProviders)
+		r.Put("/uploads/{id}/parts/{part}", s.uploadPart)
 
 		r.Group(func(r chi.Router) {
 			r.Use(s.requireSession)
@@ -209,9 +221,24 @@ func (s *Server) routes() *chi.Mux {
 				r.Post("/automation-rules/{id}/toggle", s.automationToggle)
 				r.Post("/automation-rules/{id}/test", s.automationTest)
 				r.Get("/automation-rules/{id}/logs", s.automationLogs)
-				r.Get("/backups", s.emptyList)
-				r.Post("/backups", s.emptyCreated)
-				r.Get("/s3/multipart/{upload}", s.emptyList)
+				r.Post("/s3/multipart", s.uploadCreate)
+				r.Get("/s3/multipart/{upload}", s.uploadListParts)
+				r.Get("/s3/multipart/{upload}/{part}", s.uploadSignPart)
+				r.Post("/s3/multipart/{upload}/complete", s.uploadComplete)
+				r.Delete("/s3/multipart/{upload}", s.uploadAbort)
+
+				r.Post("/transactions/import/parse", s.importParse)
+				r.Post("/transactions/import/preview", s.importPreview)
+				r.Post("/transactions/import/execute", s.importExecute)
+				r.Get("/transactions/import/{import}", s.importShow)
+
+				r.Get("/backups", s.backupsIndex)
+				r.Post("/backups", s.backupsStore)
+				r.Post("/backups/upload", s.backupsUpload)
+				r.Get("/backups/{id}/download", s.backupsDownload)
+				r.Get("/backups/{id}/inspect", s.backupsInspect)
+				r.Post("/backups/{id}/restore", s.backupsRestore)
+				r.Delete("/backups/{id}", s.backupsDestroy)
 			})
 		})
 	})

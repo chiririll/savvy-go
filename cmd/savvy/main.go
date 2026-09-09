@@ -60,11 +60,11 @@ func main() {
 	schedCtx, schedCancel := context.WithCancel(context.Background())
 	defer schedCancel()
 	recurring := domain.RecurringStore{DB: sqlDB, Txs: domain.Transactions{DB: sqlDB}}
-	schedule.New(schedule.Job{
-		Name:     "recurring:ensure-upcoming",
-		Interval: time.Hour,
-		Run:      recurring.EnsureUpcoming,
-	}).Start(schedCtx)
+	uploads := domain.Uploads{DB: sqlDB, Root: cfg.UploadsDir, AppURL: cfg.AppURL, SignSecret: cfg.AppURL + "|upload"}
+	schedule.New(
+		schedule.Job{Name: "recurring:ensure-upcoming", Interval: time.Hour, Run: recurring.EnsureUpcoming},
+		schedule.Job{Name: "uploads:prune", Interval: time.Hour, Run: uploads.PruneExpired},
+	).Start(schedCtx)
 	_ = queue
 
 	srv := &http.Server{

@@ -26,9 +26,12 @@ func testConfig(t *testing.T) (config.Config, string) {
 	}
 	cfg := config.Config{
 		AppEnv:        "testing",
+		AppURL:        "http://localhost:8080",
 		PublicDir:     public,
 		DataDir:       dir,
 		Database:      filepath.Join(dir, "database.sqlite"),
+		UploadsDir:    filepath.Join(dir, "uploads"),
+		BackupsDir:    filepath.Join(dir, "backups"),
 		SessionTTL:    24 * time.Hour,
 		RememberTTL:   7 * 24 * time.Hour,
 		ChallengeTTL:  5 * time.Minute,
