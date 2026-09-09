@@ -13,6 +13,7 @@ import (
 	"github.com/chiririll/savvy-plus/internal/db"
 	"github.com/chiririll/savvy-plus/internal/httpserver"
 	"github.com/chiririll/savvy-plus/internal/jobs"
+	"github.com/chiririll/savvy-plus/internal/legacy"
 	"github.com/chiririll/savvy-plus/internal/migrate"
 	"github.com/chiririll/savvy-plus/internal/schedule"
 	"github.com/chiririll/savvy-plus/internal/version"
@@ -41,8 +42,16 @@ func main() {
 	defer sqlDB.Close()
 
 	ctx := context.Background()
+	if err := legacy.EnsureColumns(ctx, sqlDB); err != nil {
+		slog.Error("legacy columns", "err", err)
+		os.Exit(1)
+	}
 	if err := migrate.Up(ctx, sqlDB); err != nil {
 		slog.Error("migrate", "err", err)
+		os.Exit(1)
+	}
+	if err := legacy.UpgradeInPlace(ctx, sqlDB); err != nil {
+		slog.Error("legacy import", "err", err)
 		os.Exit(1)
 	}
 
