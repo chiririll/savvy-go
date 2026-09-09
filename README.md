@@ -258,9 +258,9 @@ Your data stays with you. SQLite database stored in `/data` volume — no extern
 
 ## ⚙️ How It Works
 
-One container runs everything under Supervisor — Nginx, PHP-FPM, the scheduler (recurring transactions, automatic exchange-rate updates) and a queue worker for background jobs. SQLite lives in `/data`; no external database, cache, or queue service is required. Migrations run automatically on startup.
+One container runs a single Go process — HTTP API, Vite SPA, scheduler, and in-process workers. SQLite lives in `/data`; no PHP, nginx, or queue sqlite files are required. Migrations and Laravel-era imports run automatically on startup.
 
-The Debian package runs the same app without Docker: nginx and php-fpm from the distro, queue and scheduler as systemd units, SQLite in `/var/lib/savvy`.
+The Debian package ships the same binary: a systemd unit and SQLite in `/var/lib/savvy`.
 
 ## 🛠 Stack
 

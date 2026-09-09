@@ -8,27 +8,16 @@ on:
   workflow_dispatch:
 
 jobs:
-  pest:
-    name: Pest (unit + feature)
+  go:
+    name: Go tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up PHP
-        uses: shivammathur/setup-php@v2
+      - name: Set up Go
+        uses: actions/setup-go@v5
         with:
-          php-version: '8.4'
-          extensions: pdo, sqlite, pdo_sqlite, bcmath, openssl
-          coverage: none
+          go-version: '1.26.x'
 
-      - name: Prepare environment
-        run: cp .env.example .env
-
-      - name: Install dependencies
-        run: composer install --no-interaction --prefer-dist --no-progress
-
-      - name: Generate app key
-        run: php artisan key:generate
-
-      - name: Run Pest
-        run: ./vendor/bin/pest
+      - name: Test
+        run: go test ./...

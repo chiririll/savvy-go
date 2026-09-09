@@ -1,12 +1,10 @@
 # =============================================================================
 # Savvy — production-grade Helm values
 # -----------------------------------------------------------------------------
-# Savvy is a single-container, SQLite-only application: nginx + php-fpm + queue
-# worker + scheduler run together under supervisord, and the database is a
-# single SQLite file on a persistent volume. This is the design — not a
-# limitation to work around. The chart does not offer external databases,
-# sidecar datastores, or horizontal scaling; the database is single-writer and
-# always runs as exactly one pod. It "just works" on any conformant cluster.
+# Savvy is a single-container, SQLite-only Go process (HTTP + scheduler +
+# in-process workers). The database is a single SQLite file on a persistent
+# volume. This is the design — not a limitation to work around. The chart does
+# not offer external databases, sidecar datastores, or horizontal scaling.
 # =============================================================================
 
 # -- Number of application replicas. Must be 1 — SQLite is single-writer and the
@@ -101,7 +99,7 @@ extraEnvFrom: []
 #  - secretRef:
 #      name: savvy-extra
 
-# -- Port the application container listens on (nginx in the image binds :80).
+# -- Port the application container listens on (the Go binary binds :80).
 containerPort: 80
 
 # =============================================================================
@@ -138,11 +136,11 @@ securityContext:
 
 resources:
   requests:
-    cpu: 100m
-    memory: 256Mi
+    cpu: 50m
+    memory: 64Mi
   limits:
-    cpu: "1"
-    memory: 512Mi
+    cpu: 500m
+    memory: 256Mi
 
 # -- Liveness probe — /livez reports process health (does not touch the DB).
 livenessProbe:
