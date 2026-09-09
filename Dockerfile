@@ -26,10 +26,10 @@ ENV APP_VERSION=${APP_VERSION} \
     PUBLIC_DIR=/public \
     LISTEN_ADDR=:80 \
     APP_ENV=production
+# Alpine already ships the www-data group (gid 82); only the user is missing.
 # hadolint ignore=DL3018
 RUN apk upgrade --no-cache \
     && apk add --no-cache ca-certificates tzdata libcap wget \
-    && addgroup -g 82 -S www-data \
     && adduser -u 82 -S -G www-data -H -D www-data \
     && mkdir -p /data /public \
     && chown www-data:www-data /data
