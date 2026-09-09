@@ -62,7 +62,7 @@ func (s *Server) indexHTML() string {
     <link rel="manifest" href="/site.webmanifest">
     <meta name="theme-color" content="#ffffff">
     <meta name="app-version" content="` + html.EscapeString(version.Value) + `">
-    <meta name="app-env" content="` + html.EscapeString(s.cfg.AppEnv) + `">
+    <meta name="app-env" content="` + html.EscapeString(version.Env) + `">
     <script>
         (function () {
             try {

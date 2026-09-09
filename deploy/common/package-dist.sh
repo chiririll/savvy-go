@@ -7,7 +7,7 @@ VERSION="${APP_VERSION:-$(git -C "$ROOT" rev-parse --short HEAD)}"
 BIN="${OUT_DIR}/savvy"
 
 if [[ ! -f "$BIN" ]]; then
-    echo "missing $BIN — build with: go build -o dist/savvy ./cmd/savvy" >&2
+    echo "missing $BIN — build with: go build -ldflags \"-X github.com/chiririll/savvy-plus/internal/version.Value=\$APP_VERSION -X github.com/chiririll/savvy-plus/internal/version.Env=production\" -o dist/savvy ./cmd/savvy" >&2
     exit 1
 fi
 

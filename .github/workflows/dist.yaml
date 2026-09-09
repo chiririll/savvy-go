@@ -84,10 +84,11 @@ jobs:
       - name: Build Go binary
         env:
           APP_VERSION: ${{ steps.ver.outputs.tag }}
+          APP_ENV: production
         run: |
           mkdir -p dist
           CGO_ENABLED=0 go build -trimpath \
-            -ldflags="-s -w -X github.com/chiririll/savvy-plus/internal/version.Value=${APP_VERSION}" \
+            -ldflags="-s -w -X github.com/chiririll/savvy-plus/internal/version.Value=${APP_VERSION} -X github.com/chiririll/savvy-plus/internal/version.Env=${APP_ENV}" \
             -o dist/savvy ./cmd/savvy
 
       - name: Build frontend

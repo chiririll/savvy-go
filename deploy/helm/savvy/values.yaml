@@ -68,7 +68,6 @@ env:
   # Keep DB_CONNECTION=sqlite — Savvy is SQLite-only by design.
   values:
     APP_NAME: Savvy
-    APP_ENV: production
     APP_URL: http://localhost
     DB_DATABASE: /data/database.sqlite
     BACKUP_PATH: /data/backups

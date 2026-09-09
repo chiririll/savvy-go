@@ -25,9 +25,6 @@ func main() {
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
 
 	cfg := config.FromEnv()
-	if v := os.Getenv("APP_VERSION"); v != "" {
-		version.Value = v
-	}
 
 	if err := os.MkdirAll(cfg.DataDir, 0o775); err != nil {
 		slog.Error("create data dir", "err", err)

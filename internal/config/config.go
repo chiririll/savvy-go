@@ -11,7 +11,6 @@ import (
 // Config is process-wide runtime configuration loaded from the environment.
 type Config struct {
 	AppURL        string
-	AppEnv        string
 	ListenAddr    string
 	DataDir       string
 	Database      string
@@ -43,7 +42,6 @@ func FromEnv() Config {
 
 	cfg := Config{
 		AppURL:        strings.TrimRight(firstNonEmpty(os.Getenv("APP_URL"), "http://localhost:8080"), "/"),
-		AppEnv:        firstNonEmpty(os.Getenv("APP_ENV"), "development"),
 		ListenAddr:    firstNonEmpty(os.Getenv("LISTEN_ADDR"), os.Getenv("HTTP_ADDR"), ":8080"),
 		DataDir:       dataDir,
 		Database:      firstNonEmpty(os.Getenv("DB_DATABASE"), filepath.Join(dataDir, "database.sqlite")),

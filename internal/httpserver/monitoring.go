@@ -125,7 +125,7 @@ func (s *Server) monitoringResources(w http.ResponseWriter, r *http.Request) {
 		"queue":   map[string]any{"pending": nil, "reserved": nil, "failed": nil},
 		"runtime": map[string]any{
 			"php_version": runtime.Version(), "laravel_version": version.Value,
-			"environment": s.cfg.AppEnv, "uptime_seconds": int(time.Since(processStarted).Seconds()),
+			"environment": version.Env, "uptime_seconds": int(time.Since(processStarted).Seconds()),
 		},
 	})
 }

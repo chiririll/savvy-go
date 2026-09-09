@@ -10,22 +10,20 @@ RUN npm run build
 
 FROM golang:1.26-alpine AS gobuild
 ARG APP_VERSION=dev
+ARG APP_ENV=production
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY cmd ./cmd
 COPY internal ./internal
 RUN CGO_ENABLED=0 go build -trimpath \
-    -ldflags="-s -w -X github.com/chiririll/savvy-plus/internal/version.Value=${APP_VERSION}" \
+    -ldflags="-s -w -X github.com/chiririll/savvy-plus/internal/version.Value=${APP_VERSION} -X github.com/chiririll/savvy-plus/internal/version.Env=${APP_ENV}" \
     -o /out/savvy ./cmd/savvy
 
 FROM alpine:3.22
-ARG APP_VERSION=dev
-ENV APP_VERSION=${APP_VERSION} \
-    DATA_DIR=/data \
+ENV DATA_DIR=/data \
     PUBLIC_DIR=/public \
-    LISTEN_ADDR=:80 \
-    APP_ENV=production
+    LISTEN_ADDR=:80
 # Alpine already ships the www-data group (gid 82); only the user is missing.
 # hadolint ignore=DL3018
 RUN apk upgrade --no-cache \

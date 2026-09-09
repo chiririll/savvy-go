@@ -25,7 +25,6 @@ func testConfig(t *testing.T) (config.Config, string) {
 		t.Fatal(err)
 	}
 	cfg := config.Config{
-		AppEnv:        "testing",
 		AppURL:        "http://localhost:8080",
 		PublicDir:     public,
 		DataDir:       dir,
