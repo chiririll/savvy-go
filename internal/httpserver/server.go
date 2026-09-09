@@ -38,6 +38,9 @@ type Server struct {
 	uploads    domain.Uploads
 	imports    domain.Imports
 	backups    domain.Backups
+	sso        domain.SSO
+	twoFactor  auth.TwoFactor
+	webauthn   auth.WebAuthn
 	queue      *jobs.Queue
 }
 
@@ -59,10 +62,13 @@ func New(cfg config.Config, sqlDB *sql.DB) *Server {
 		recurring:  domain.RecurringStore{DB: sqlDB, Txs: domain.Transactions{DB: sqlDB}},
 		budgets:    domain.Budgets{DB: sqlDB},
 		automation: domain.Automation{DB: sqlDB, Txs: domain.Transactions{DB: sqlDB}},
-		reports: domain.Reports{DB: sqlDB, Loc: cfg.Location},
-		uploads: domain.Uploads{DB: sqlDB, Root: cfg.UploadsDir, AppURL: cfg.AppURL, SignSecret: cfg.AppURL + "|upload"},
-		backups: domain.Backups{DB: sqlDB, Dir: cfg.BackupsDir, Database: cfg.Database},
+		reports:    domain.Reports{DB: sqlDB, Loc: cfg.Location},
+		uploads:    domain.Uploads{DB: sqlDB, Root: cfg.UploadsDir, AppURL: cfg.AppURL, SignSecret: cfg.AppURL + "|upload"},
+		backups:    domain.Backups{DB: sqlDB, Dir: cfg.BackupsDir, Database: cfg.Database},
+		twoFactor:  auth.TwoFactor{DB: sqlDB, Users: auth.Users{DB: sqlDB}},
+		webauthn:   auth.WebAuthn{DB: sqlDB, Cfg: cfg},
 	}
+	s.sso = domain.SSO{DB: sqlDB, Users: s.users, Settings: s.settings, AppURL: cfg.AppURL}
 	s.imports = domain.Imports{DB: sqlDB, Uploads: s.uploads, Txs: s.txs}
 	_ = os.MkdirAll(cfg.UploadsDir, 0o775)
 	_ = os.MkdirAll(cfg.BackupsDir, 0o775)
@@ -92,6 +98,13 @@ func (s *Server) routes() *chi.Mux {
 		r.Post("/auth/password/{token}", s.passwordAccept)
 		r.Post("/auth/2fa/verify", s.twoFactorVerify)
 		r.Get("/auth/sso/providers", s.ssoProviders)
+		r.Post("/auth/sso/exchange", s.ssoExchange)
+		r.Get("/auth/sso/{slug}/redirect", s.ssoRedirect)
+		r.Get("/auth/sso/{slug}/callback", s.ssoCallback)
+		r.Post("/auth/sso/{slug}/acs", s.ssoACS)
+		r.Get("/auth/sso/{slug}/metadata", s.ssoMetadata)
+		r.Post("/auth/webauthn/login/options", s.webauthnLoginOptions)
+		r.Post("/auth/webauthn/login/verify", s.webauthnLoginVerify)
 		r.Put("/uploads/{id}/parts/{part}", s.uploadPart)
 
 		r.Group(func(r chi.Router) {
@@ -102,6 +115,7 @@ func (s *Server) routes() *chi.Mux {
 			r.Post("/auth/logout-others", s.authLogoutOthers)
 			r.Put("/auth/password", s.authChangePassword)
 			r.Get("/auth/2fa/status", s.twoFactorStatus)
+			r.Get("/auth/webauthn/credentials", s.webauthnIndex)
 
 			r.Get("/users", s.usersIndex)
 			r.Get("/users/{id}", s.usersShow)
@@ -113,13 +127,29 @@ func (s *Server) routes() *chi.Mux {
 				r.Patch("/users/{id}", s.usersUpdate)
 				r.Delete("/users/{id}", s.usersDestroy)
 				r.Get("/auth/sso/presets", s.ssoPresets)
-				r.Get("/identity-providers", s.emptyList)
+				r.Get("/identity-providers", s.idpIndex)
+				r.Post("/identity-providers", s.idpStore)
+				r.Get("/identity-providers/{id}", s.idpShow)
+				r.Put("/identity-providers/{id}", s.idpUpdate)
+				r.Patch("/identity-providers/{id}", s.idpUpdate)
+				r.Delete("/identity-providers/{id}", s.idpDestroy)
+				r.Post("/identity-providers/{id}/test", s.idpTest)
 			})
 
 			r.Group(func(r chi.Router) {
 				r.Use(s.requireWrite)
 				r.Get("/settings", s.settingsIndex)
 				r.Patch("/settings", s.settingsUpdate)
+
+				r.Post("/auth/2fa/enable", s.twoFactorEnable)
+				r.Post("/auth/2fa/confirm", s.twoFactorConfirm)
+				r.Post("/auth/2fa/disable", s.twoFactorDisable)
+				r.Get("/auth/2fa/recovery-codes", s.twoFactorRecoveryCodes)
+				r.Post("/auth/2fa/recovery-codes/regenerate", s.twoFactorRegenerate)
+				r.Post("/auth/webauthn/register/options", s.webauthnRegisterOptions)
+				r.Post("/auth/webauthn/register/verify", s.webauthnRegisterVerify)
+				r.Patch("/auth/webauthn/credentials/{id}", s.webauthnUpdate)
+				r.Delete("/auth/webauthn/credentials/{id}", s.webauthnDestroy)
 
 				r.Get("/currencies/catalog", s.currenciesCatalog)
 				r.Get("/currencies", s.currenciesIndex)

@@ -14,17 +14,17 @@ const (
 )
 
 type User struct {
-	ID                  int64
-	Name                string
-	Email               string
-	Password            *string
-	Role                string
-	IsSSOOnly           bool
-	TwoFactorSecret     *string
-	TwoFactorEnabled    bool
-	TwoFactorConfirmed  bool
-	CreatedAt           *time.Time
-	UpdatedAt           *time.Time
+	ID                 int64
+	Name               string
+	Email              string
+	Password           *string
+	Role               string
+	IsSSOOnly          bool
+	TwoFactorSecret    *string
+	TwoFactorEnabled   bool
+	TwoFactorConfirmed bool
+	CreatedAt          *time.Time
+	UpdatedAt          *time.Time
 }
 
 func (u User) IsInactive() bool {
@@ -82,7 +82,7 @@ func (s Users) ByID(ctx context.Context, id int64) (*User, error) {
 }
 
 func (s Users) ByEmail(ctx context.Context, email string) (*User, error) {
-	return scanUser(s.DB.QueryRowContext(ctx, userSelect+` WHERE email = ?`, strings.ToLower(email)))
+	return scanUser(s.DB.QueryRowContext(ctx, userSelect+` WHERE lower(email) = ?`, strings.ToLower(email)))
 }
 
 func (s Users) All(ctx context.Context) ([]User, error) {
@@ -182,6 +182,33 @@ func (s Users) Update(ctx context.Context, id int64, name, email, role *string, 
 		return nil, err
 	}
 	return s.ByID(ctx, id)
+}
+
+func (s Users) MarkSSOOnly(ctx context.Context, id int64) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+	_, err := s.DB.ExecContext(ctx, `UPDATE users SET is_sso_only=1, updated_at=? WHERE id=?`, now, id)
+	return err
+}
+
+func (s Users) SetRole(ctx context.Context, id int64, role string) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+	_, err := s.DB.ExecContext(ctx, `UPDATE users SET role=?, updated_at=? WHERE id=?`, role, now, id)
+	return err
+}
+
+func (s Users) SetTwoFactor(ctx context.Context, id int64, secret *string, enabled, confirmed bool) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+	_, err := s.DB.ExecContext(ctx, `
+		UPDATE users SET two_factor_secret=?, two_factor_enabled=?, two_factor_confirmed=?, updated_at=? WHERE id=?`,
+		secret, boolToInt(enabled), boolToInt(confirmed), now, id)
+	return err
+}
+
+func boolToInt(v bool) int {
+	if v {
+		return 1
+	}
+	return 0
 }
 
 func (s Users) Delete(ctx context.Context, id int64) error {

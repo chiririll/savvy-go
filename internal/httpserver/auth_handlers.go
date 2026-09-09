@@ -141,8 +141,8 @@ func (s *Server) authChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Current             string `json:"current_password"`
-		Password            string `json:"password"`
+		Current              string `json:"current_password"`
+		Password             string `json:"password"`
 		PasswordConfirmation string `json:"password_confirmation"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -236,42 +236,6 @@ func (s *Server) passwordAccept(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.issueSession(w, r, u, http.StatusOK, true)
-}
-
-func (s *Server) twoFactorVerify(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		Token      string `json:"two_factor_token"`
-		Code       string `json:"code"`
-		RememberMe bool   `json:"remember_me"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Token == "" || body.Code == "" {
-		writeValidation(w, map[string][]string{"code": {"The given data was invalid."}})
-		return
-	}
-	u, err := s.challenges.Resolve(r.Context(), body.Token)
-	if err != nil || u == nil {
-		writeMessage(w, http.StatusUnauthorized, "Invalid two-factor token.")
-		return
-	}
-	// TOTP verification lands in the 2FA stage; reject codes until then.
-	writeMessage(w, http.StatusUnprocessableEntity, "Invalid two-factor code.")
-	_ = body.RememberMe
-}
-
-func (s *Server) twoFactorStatus(w http.ResponseWriter, r *http.Request) {
-	u := userFrom(r)
-	var remaining any
-	if u.HasTwoFactor() {
-		var n int
-		_ = s.db.QueryRowContext(r.Context(),
-			`SELECT COUNT(*) FROM two_factor_recovery_codes WHERE user_id = ? AND used_at IS NULL`, u.ID).Scan(&n)
-		remaining = n
-	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"enabled":                  u.HasTwoFactor(),
-		"pending_confirmation":     u.TwoFactorEnabled && !u.TwoFactorConfirmed,
-		"recovery_codes_remaining": remaining,
-	})
 }
 
 func (s *Server) issueSession(w http.ResponseWriter, r *http.Request, u *auth.User, status int, remember bool) {

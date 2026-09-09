@@ -16,13 +16,3 @@ func (s *Server) emptyCreated(w http.ResponseWriter, r *http.Request) {
 		"message": "This endpoint is not implemented in the Go backend yet.",
 	})
 }
-
-func (s *Server) ssoProviders(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"data": []any{}})
-}
-
-func (s *Server) ssoPresets(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"data": []string{
-		"github", "google", "oidc", "saml", "keycloak", "authentik", "okta", "entra", "gitlab",
-	}})
-}
