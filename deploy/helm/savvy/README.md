@@ -1,8 +1,8 @@
 # Savvy Helm chart
 
-Production-grade Helm chart for **Savvy** — a self-contained Laravel personal-finance
-application. The container image bundles nginx, php-fpm, a queue worker and the
-scheduler under supervisord, and ships with health endpoints (`/livez`, `/readyz`).
+Production-grade Helm chart for **Savvy** — a self-contained personal-finance
+application. The container image is a single Go process (HTTP API, Vite SPA,
+in-process scheduler and workers) with health endpoints (`/livez`, `/readyz`).
 
 ## Install
 
@@ -33,9 +33,8 @@ helm install savvy ./deploy/helm/savvy -n savvy --create-namespace \
 
 ## Design: single container, SQLite-only
 
-Savvy runs as **one pod** — nginx, php-fpm, the queue worker and the scheduler
-together under supervisord — backed by a **single SQLite file** on a persistent
-volume. This is the application's design, and the chart honours it:
+Savvy runs as **one pod** — one Go binary — backed by a **single SQLite file**
+on a persistent volume. This is the application's design, and the chart honours it:
 
 - **`replicaCount` is fixed at 1.** SQLite is single-writer; the chart rejects
   any other value to prevent silent database corruption. No HPA, no external
@@ -45,31 +44,26 @@ volume. This is the application's design, and the chart honours it:
 - Zero external dependencies — works on any conformant cluster (k3s, EKS, GKE,
   AKS, kind).
 
-### Who owns the `.env`
+### Who owns the env
 
-By default (`env.manage=false`) the container self-bootstraps its `.env` on the
-volume: it generates a random `APP_KEY`, provisions the SQLite file and runs
-migrations + seeders on first boot. Simple, but the `APP_KEY` is tied to the
-volume — recreate the PVC and every encrypted value / signed cookie breaks.
+By default (`env.manage=false`) the container reads `APP_URL` / `TZ` / `DATA_DIR`
+from the process environment and provisions SQLite on first boot.
 
-Set `env.manage=true` to let Helm own the `.env` (rendered into a Secret and
-seeded onto the volume by an init container). Use it for a **stable,
-GitOps-controlled `APP_KEY`** and app settings (name, URL, log level, mail) —
-the database stays SQLite-on-volume; this does not change the topology.
+Set `env.manage=true` to let Helm own a dotenv file (rendered into a Secret and
+seeded onto the volume by an init container). Use it for GitOps-controlled
+`APP_URL` and related settings — the database stays SQLite-on-volume; this does
+not change the topology.
 
 ```yaml
 env:
   manage: true
   values:
-    APP_KEY: "base64:...."          # stable; better via env.existingSecret
     APP_URL: https://savvy.example.com
-    LOG_LEVEL: warning
     # DB_CONNECTION stays sqlite — SQLite-only by design
 ```
 
-For the `APP_KEY`, prefer `env.existingSecret` (a Secret with a single
-`.env_config` key holding the full env file) populated by External Secrets
-Operator / Vault / SOPS rather than putting it in values.
+Prefer `env.existingSecret` (a Secret with a single `.env_config` key) populated
+by External Secrets Operator / Vault / SOPS rather than putting values in git.
 
 ## Ingress vs Gateway API
 
@@ -83,7 +77,7 @@ Enable **exactly one** of:
 
 - Runs as non-root `www-data` (uid/gid 82), `seccompProfile: RuntimeDefault`.
 - `allowPrivilegeEscalation: false`, all capabilities dropped except
-  `NET_BIND_SERVICE` (needed for non-root nginx to bind `:80`).
+  `NET_BIND_SERVICE` (needed for non-root process to bind `:80`).
 - ServiceAccount token is not mounted (the app never calls the Kubernetes API).
 - Optional default-deny `NetworkPolicy`, `PodDisruptionBudget`, and
   `ServiceMonitor`.
@@ -96,9 +90,9 @@ Enable **exactly one** of:
 | `image.repository` | `docker.io/truenormis/savvy` | Image repo (Docker Hub). |
 | `image.tag` | `""` (→ `appVersion`) | Image tag. |
 | `image.digest` | `""` | Pin by digest; overrides tag. |
-| `env.manage` | `false` | Let Helm own the `.env` (stable APP_KEY). |
+| `env.manage` | `false` | Let Helm own a dotenv file on the volume. |
 | `env.existingSecret` | `""` | Use an external Secret (`.env_config` key). |
-| `persistence.enabled` | `true` | Persist `/data` (SQLite + .env + backups). |
+| `persistence.enabled` | `true` | Persist `/data` (SQLite + backups). |
 | `persistence.size` | `2Gi` | PVC size. |
 | `persistence.storageClass` | `""` | StorageClass (`-` disables provisioning). |
 | `updateStrategy.type` | `Recreate` | Fixed — single-attach PVC. |

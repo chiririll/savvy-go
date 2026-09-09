@@ -49,17 +49,13 @@ serviceAccount:
 # =============================================================================
 # Application configuration / .env
 # -----------------------------------------------------------------------------
-# By default (`manage: false`) the container self-bootstraps its own .env on the
-# persistent volume: it generates a random APP_KEY, provisions the SQLite file
-# and runs migrations + seeders on first start. Convenient, but the APP_KEY is
-# ephemeral and tied to the volume — recreate the PVC and every encrypted value
-# / signed cookie is invalidated.
+# By default (`manage: false`) the Go process reads APP_URL / TZ / DATA_DIR from
+# the container environment and provisions SQLite on first start.
 #
-# Set `manage: true` to make Helm the source of truth for the .env: the chart
-# renders a Secret and an init container seeds it onto the data volume before
-# the app starts. This is for a stable, GitOps-controlled APP_KEY and app
-# settings (name, URL, log level, mail) — the database stays SQLite-on-volume.
-# This does NOT introduce external databases or change the single-pod topology.
+# Set `manage: true` to make Helm the source of truth for a dotenv file seeded
+# onto the data volume (optional GitOps-controlled APP_URL and related settings).
+# The database stays SQLite-on-volume. This does NOT introduce external databases
+# or change the single-pod topology.
 # =============================================================================
 env:
   # -- Let Helm own the application .env (writes /data/.env_config via init container).
@@ -73,16 +69,8 @@ env:
   values:
     APP_NAME: Savvy
     APP_ENV: production
-    APP_DEBUG: "false"
     APP_URL: http://localhost
-    # APP_KEY: "base64:CHANGE_ME"   # generate with: php artisan key:generate --show
-    LOG_CHANNEL: stderr
-    LOG_LEVEL: warning
-    DB_CONNECTION: sqlite
     DB_DATABASE: /data/database.sqlite
-    SESSION_DRIVER: file
-    CACHE_STORE: file
-    QUEUE_CONNECTION: database
     BACKUP_PATH: /data/backups
   # -- Seed policy for the managed .env on the volume: `always` (Helm wins on
   # every start) or `ifNotPresent` (only seed an empty volume).
@@ -91,8 +79,8 @@ env:
 # -- Extra environment variables injected directly into the container
 # (independent of the .env file). Useful for runtime-only overrides.
 extraEnv: []
-#  - name: PHP_OPCACHE_ENABLE
-#    value: "1"
+#  - name: TZ
+#    value: Europe/Kyiv
 
 # -- Extra env sourced from existing ConfigMaps/Secrets.
 extraEnvFrom: []

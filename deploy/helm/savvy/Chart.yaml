@@ -11,8 +11,8 @@ home: https://github.com/truenormis/savvy
 sources:
   - https://github.com/truenormis/savvy
 keywords:
-  - laravel
-  - php
+  - go
+  - sqlite
   - finance
   - savvy
   - web

@@ -207,7 +207,7 @@ design notes.
 
 ### Debian package
 
-On Debian 13 (Trixie) or another release with PHP 8.4, install the `.deb` from the GitHub release:
+On Debian 13 (Trixie) or later, install the `.deb` from the GitHub release:
 
 ```bash
 curl -fsSLO https://github.com/truenormis/savvy/releases/latest/download/savvy.deb
@@ -215,6 +215,17 @@ sudo apt install ./savvy.deb
 ```
 
 Data lives in `/var/lib/savvy`. Optional settings (`APP_URL`, `TZ`) go in `/etc/savvy/install.env`. `apt purge savvy` removes the data directory.
+
+### LXC / tarball
+
+Release `savvy.tar.gz` is the Go binary plus static SPA assets (`public/`). On an LXC guest or any Linux host:
+
+```bash
+tar -C /opt/savvy -xzf savvy.tar.gz
+DATA_DIR=/var/lib/savvy PUBLIC_DIR=/opt/savvy/public LISTEN_ADDR=:8080 APP_URL=https://savvy.example.com /opt/savvy/savvy
+```
+
+Point a reverse proxy at `:8080`. There is no php-fpm or nginx inside the archive.
 
 ## 🔄 Updating
 ```bash
@@ -236,7 +247,9 @@ Backups can be managed directly from the UI (Settings → Backups).
 Manual backup:
 ```bash
 # Fold the WAL into the main file, then copy
-docker exec savvy php artisan tinker --execute="DB::statement('PRAGMA wal_checkpoint(TRUNCATE);');"
+docker exec savvy wget -q -O /dev/null http://127.0.0.1/livez
+# Prefer Settings → Backups in the UI. A raw copy after the process is stopped:
+docker compose down
 docker cp savvy:/data/database.sqlite ./backup-$(date +%Y%m%d).sqlite
 ```
 
@@ -269,8 +282,7 @@ Go • SQLite • React (Vite) • Docker • ShadCN/UI • Tailwind CSS
 ### Local backend (Go)
 
 ```bash
-# GOFLAGS=-mod=mod: Composer also uses vendor/; Go must not treat that tree as a module vendor dir.
-GOFLAGS=-mod=mod go test ./...
+go test ./...
 go run ./cmd/savvy
 ```
 

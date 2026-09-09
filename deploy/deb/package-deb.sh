@@ -3,11 +3,14 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 OUT_DIR="${OUT_DIR:-$ROOT/dist}"
-TARBALL="${TARBALL:-$OUT_DIR/savvy.tar.gz}"
 VERSION="${APP_VERSION:-}"
 
-if [[ ! -f "$TARBALL" ]]; then
-    echo "missing $TARBALL — run deploy/common/package-dist.sh first" >&2
+if [[ ! -f "$OUT_DIR/savvy" ]]; then
+    echo "missing $OUT_DIR/savvy — build the Go binary first" >&2
+    exit 1
+fi
+if [[ ! -d "$OUT_DIR/public" ]]; then
+    echo "missing $OUT_DIR/public — run deploy/common/package-dist.sh first" >&2
     exit 1
 fi
 
@@ -17,21 +20,9 @@ if ! command -v nfpm >/dev/null 2>&1; then
 fi
 
 if [[ -z "$VERSION" ]]; then
-    VERSION="$(tar -xOf "$TARBALL" VERSION 2>/dev/null | tr -d '[:space:]' || true)"
-fi
-
-if [[ -z "$VERSION" ]]; then
-    echo "APP_VERSION is required (or the tarball must contain VERSION)" >&2
+    echo "APP_VERSION is required" >&2
     exit 1
 fi
-
-mkdir -p "$ROOT/dist"
-STAGE="$ROOT/dist/deb-root"
-rm -rf "$STAGE"
-mkdir -p "$STAGE"
-trap 'rm -rf "$STAGE"' EXIT
-tar -C "$STAGE" -xzf "$TARBALL"
-rm -rf "$STAGE/deploy"
 
 mkdir -p "$OUT_DIR"
 OUT_DIR="$(cd "$OUT_DIR" && pwd)"
@@ -45,7 +36,6 @@ export APP_VERSION="$VERSION"
     nfpm package --config nfpm.yaml --packager deb --target "$OUT_DIR"
 )
 
-# Stable name for GitHub latest/download/savvy.deb
 deb="$(ls -1t "$OUT_DIR"/savvy_*.deb | head -n1)"
 cp -f "$deb" "$OUT_DIR/savvy.deb"
 

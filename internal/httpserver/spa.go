@@ -92,6 +92,9 @@ func (s *Server) indexHTML() string {
 func (s *Server) viteAssets() (js []string, css []string) {
 	raw, err := os.ReadFile(filepath.Join(s.cfg.PublicDir, "build", "manifest.json"))
 	if err != nil {
+		raw, err = os.ReadFile(filepath.Join(s.cfg.PublicDir, "build", ".vite", "manifest.json"))
+	}
+	if err != nil {
 		return nil, nil
 	}
 	var manifest map[string]viteChunk

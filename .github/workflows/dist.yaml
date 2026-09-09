@@ -59,7 +59,7 @@ jobs:
             echo
             echo "Tarball: \`https://github.com/${REPO}/releases/latest/download/savvy.tar.gz\`"
             echo
-            echo "Debian 13+ / PHP 8.4:"
+            echo "Debian:"
             echo
             echo '```bash'
             echo "curl -fsSLO https://github.com/${REPO}/releases/latest/download/savvy.deb"
@@ -70,12 +70,10 @@ jobs:
           cat RELEASE_NOTES.md
           echo "::endgroup::"
 
-      - name: Set up PHP
-        uses: shivammathur/setup-php@v2
+      - name: Set up Go
+        uses: actions/setup-go@v5
         with:
-          php-version: '8.4'
-          extensions: pdo, sqlite, pdo_sqlite, bcmath
-          coverage: none
+          go-version: '1.26.x'
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -83,8 +81,14 @@ jobs:
           node-version: '24'
           cache: npm
 
-      - name: Install PHP dependencies
-        run: composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-progress
+      - name: Build Go binary
+        env:
+          APP_VERSION: ${{ steps.ver.outputs.tag }}
+        run: |
+          mkdir -p dist
+          CGO_ENABLED=0 go build -trimpath \
+            -ldflags="-s -w -X github.com/chiririll/savvy-plus/internal/version.Value=${APP_VERSION}" \
+            -o dist/savvy ./cmd/savvy
 
       - name: Build frontend
         env:

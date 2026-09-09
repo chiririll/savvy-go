@@ -124,8 +124,8 @@ Fail fast on obviously dangerous configurations.
 {{- if gt (int .Values.replicaCount) 1 -}}
 {{- fail "savvy: replicaCount must be 1. Savvy is a single-container, SQLite-only application — its database is single-writer and cannot be shared across pods." -}}
 {{- end -}}
-{{- if and .Values.env.manage (not .Values.env.existingSecret) (not (hasKey .Values.env.values "APP_KEY")) -}}
-{{- fail "savvy: env.manage=true bypasses the container's APP_KEY auto-generation, so you must supply env.values.APP_KEY (or env.existingSecret). Generate one with: php artisan key:generate --show" -}}
+{{- if and .Values.env.manage (not .Values.env.existingSecret) (not (hasKey .Values.env.values "APP_URL")) -}}
+{{- fail "savvy: env.manage=true requires env.values.APP_URL (or env.existingSecret) so the Go process can issue cookies and SSO callbacks." -}}
 {{- end -}}
 {{- if and .Values.env.manage (not .Values.env.existingSecret) (hasKey .Values.env.values "DB_CONNECTION") (ne (toString (get .Values.env.values "DB_CONNECTION")) "sqlite") -}}
 {{- fail "savvy: DB_CONNECTION must be sqlite. Savvy is SQLite-only by design — this chart does not wire external databases." -}}
