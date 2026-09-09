@@ -7,6 +7,7 @@ import (
 
 	"github.com/chiririll/savvy-plus/internal/auth"
 	"github.com/chiririll/savvy-plus/internal/config"
+	"github.com/chiririll/savvy-plus/internal/domain"
 	"github.com/chiririll/savvy-plus/internal/settings"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -22,6 +23,10 @@ type Server struct {
 	tokens     auth.PasswordTokens
 	challenges auth.Challenges
 	settings   settings.Store
+	currencies domain.Currencies
+	accounts   domain.Accounts
+	categories domain.Categories
+	tags       domain.Tags
 }
 
 func New(cfg config.Config, sqlDB *sql.DB) *Server {
@@ -33,6 +38,10 @@ func New(cfg config.Config, sqlDB *sql.DB) *Server {
 		tokens:     auth.PasswordTokens{DB: sqlDB},
 		challenges: auth.Challenges{DB: sqlDB, Cfg: cfg},
 		settings:   settings.Store{DB: sqlDB},
+		currencies: domain.Currencies{DB: sqlDB},
+		accounts:   domain.Accounts{DB: sqlDB},
+		categories: domain.Categories{DB: sqlDB},
+		tags:       domain.Tags{DB: sqlDB},
 	}
 	s.mux = s.routes()
 	return s
@@ -84,6 +93,42 @@ func (s *Server) routes() *chi.Mux {
 				r.Use(s.requireWrite)
 				r.Get("/settings", s.settingsIndex)
 				r.Patch("/settings", s.settingsUpdate)
+
+				r.Get("/currencies/catalog", s.currenciesCatalog)
+				r.Get("/currencies", s.currenciesIndex)
+				r.Post("/currencies", s.currenciesStore)
+				r.Get("/currencies/{id}", s.currenciesShow)
+				r.Put("/currencies/{id}", s.currenciesUpdate)
+				r.Patch("/currencies/{id}", s.currenciesUpdate)
+				r.Delete("/currencies/{id}", s.currenciesDestroy)
+				r.Post("/currencies/{id}/set-base", s.currenciesSetBase)
+				r.Post("/currencies/convert", s.currenciesConvert)
+
+				r.Post("/accounts/reorder", s.accountsReorder)
+				r.Get("/accounts", s.accountsIndex)
+				r.Post("/accounts", s.accountsStore)
+				r.Get("/accounts/{id}", s.accountsShow)
+				r.Put("/accounts/{id}", s.accountsUpdate)
+				r.Patch("/accounts/{id}", s.accountsUpdate)
+				r.Delete("/accounts/{id}", s.accountsDestroy)
+				r.Get("/accounts-balance-history", s.accountsBalanceHistory)
+				r.Get("/accounts-balance-comparison", s.accountsBalanceComparison)
+
+				r.Get("/categories", s.categoriesIndex)
+				r.Post("/categories", s.categoriesStore)
+				r.Get("/categories/{id}", s.categoriesShow)
+				r.Put("/categories/{id}", s.categoriesUpdate)
+				r.Patch("/categories/{id}", s.categoriesUpdate)
+				r.Delete("/categories/{id}", s.categoriesDestroy)
+				r.Get("/categories/{id}/statistics", s.categoriesStatistics)
+				r.Get("/categories-summary", s.categoriesSummary)
+
+				r.Get("/tags", s.tagsIndex)
+				r.Post("/tags", s.tagsStore)
+				r.Get("/tags/{id}", s.tagsShow)
+				r.Put("/tags/{id}", s.tagsUpdate)
+				r.Patch("/tags/{id}", s.tagsUpdate)
+				r.Delete("/tags/{id}", s.tagsDestroy)
 			})
 		})
 	})
