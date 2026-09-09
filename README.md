@@ -264,7 +264,17 @@ The Debian package runs the same app without Docker: nginx and php-fpm from the 
 
 ## 🛠 Stack
 
-Laravel • SQLite • Docker • ShadCN/UI • Tailwind CSS
+Go • SQLite • React (Vite) • Docker • ShadCN/UI • Tailwind CSS
+
+### Local backend (Go)
+
+```bash
+# GOFLAGS=-mod=mod: Composer also uses vendor/; Go must not treat that tree as a module vendor dir.
+GOFLAGS=-mod=mod go test ./...
+go run ./cmd/savvy
+```
+
+Listens on `:8080` by default (`LISTEN_ADDR`). SQLite and uploads go under `DATA_DIR` (`./data` locally, `/data` or `/var/lib/savvy` in deploy). The SPA is served from `public/` (Vite output in `public/build`). Env: `APP_URL`, `TZ`, `DATA_DIR`, `LISTEN_ADDR`.
 
 ## 🤝 Contributing
 
