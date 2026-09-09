@@ -98,6 +98,7 @@ type TxInput struct {
 	Description *string
 	Date        *string
 	Status      *string
+	RecurringID *int64
 	TagIDs      []int64
 	Items       []TxItem
 }
@@ -126,10 +127,10 @@ func (s Transactions) Create(ctx context.Context, in TxInput) (*Transaction, err
 	now := time.Now().UTC().Format(time.RFC3339)
 	res, err := s.DB.ExecContext(ctx, `
 		INSERT INTO transactions (type, account_id, to_account_id, category_id, amount, to_amount, exchange_rate,
-			description, date, status, created_at, updated_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+			description, date, status, recurring_transaction_id, created_at, updated_at)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		in.Type, in.AccountID, in.ToAccountID, in.CategoryID, in.Amount, in.ToAmount, in.ExchangeRate,
-		in.Description, in.Date, status, now, now)
+		in.Description, in.Date, status, in.RecurringID, now, now)
 	if err != nil {
 		return nil, err
 	}

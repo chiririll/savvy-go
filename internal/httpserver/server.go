@@ -29,6 +29,9 @@ type Server struct {
 	tags       domain.Tags
 	txs        domain.Transactions
 	debts      domain.Debts
+	recurring  domain.RecurringStore
+	budgets    domain.Budgets
+	automation domain.Automation
 }
 
 func New(cfg config.Config, sqlDB *sql.DB) *Server {
@@ -46,6 +49,9 @@ func New(cfg config.Config, sqlDB *sql.DB) *Server {
 		tags:       domain.Tags{DB: sqlDB},
 		txs:        domain.Transactions{DB: sqlDB},
 		debts:      domain.Debts{Accounts: domain.Accounts{DB: sqlDB}, Transactions: domain.Transactions{DB: sqlDB}},
+		recurring:  domain.RecurringStore{DB: sqlDB, Txs: domain.Transactions{DB: sqlDB}},
+		budgets:    domain.Budgets{DB: sqlDB},
+		automation: domain.Automation{DB: sqlDB, Txs: domain.Transactions{DB: sqlDB}},
 	}
 	s.mux = s.routes()
 	return s
@@ -175,14 +181,32 @@ func (s *Server) routes() *chi.Mux {
 				r.Get("/monitoring/storage", s.monitoringStorage)
 				r.Get("/monitoring/resources", s.monitoringResources)
 
-				r.Get("/recurring", s.emptyList)
+				r.Get("/recurring", s.recurringIndex)
 				r.Get("/recurring-upcoming", s.recurringUpcoming)
-				r.Post("/recurring", s.emptyCreated)
-				r.Get("/budgets", s.emptyList)
-				r.Post("/budgets", s.emptyCreated)
-				r.Get("/automation-rules", s.emptyList)
+				r.Post("/recurring", s.recurringStore)
+				r.Get("/recurring/{id}", s.recurringShow)
+				r.Put("/recurring/{id}", s.recurringUpdate)
+				r.Patch("/recurring/{id}", s.recurringUpdate)
+				r.Delete("/recurring/{id}", s.recurringDestroy)
+
+				r.Get("/budgets", s.budgetsIndex)
+				r.Post("/budgets", s.budgetsStore)
+				r.Get("/budgets/{id}", s.budgetsShow)
+				r.Put("/budgets/{id}", s.budgetsUpdate)
+				r.Patch("/budgets/{id}", s.budgetsUpdate)
+				r.Delete("/budgets/{id}", s.budgetsDestroy)
+
 				r.Get("/automation-rules/triggers", s.automationTriggers)
-				r.Post("/automation-rules", s.emptyCreated)
+				r.Post("/automation-rules/reorder", s.automationReorder)
+				r.Get("/automation-rules", s.automationIndex)
+				r.Post("/automation-rules", s.automationStore)
+				r.Get("/automation-rules/{id}", s.automationShow)
+				r.Put("/automation-rules/{id}", s.automationUpdate)
+				r.Patch("/automation-rules/{id}", s.automationUpdate)
+				r.Delete("/automation-rules/{id}", s.automationDestroy)
+				r.Post("/automation-rules/{id}/toggle", s.automationToggle)
+				r.Post("/automation-rules/{id}/test", s.automationTest)
+				r.Get("/automation-rules/{id}/logs", s.automationLogs)
 				r.Get("/backups", s.emptyList)
 				r.Post("/backups", s.emptyCreated)
 				r.Get("/s3/multipart/{upload}", s.emptyList)

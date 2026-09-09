@@ -17,19 +17,6 @@ func (s *Server) emptyCreated(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) recurringUpcoming(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"data": []any{}})
-}
-
-func (s *Server) automationTriggers(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{
-		"data": []map[string]string{
-			{"value": "on_transaction_create", "label": "On transaction create"},
-			{"value": "on_transaction_update", "label": "On transaction update"},
-		},
-	})
-}
-
 func (s *Server) ssoProviders(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"data": []any{}})
 }

@@ -75,6 +75,12 @@ func (s *Server) transactionsStore(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
+	if tx.Status == "confirmed" {
+		s.automation.Process(r.Context(), "on_transaction_create", tx)
+		if fresh, e := s.txs.ByID(r.Context(), tx.ID); e == nil && fresh != nil {
+			tx = fresh
+		}
+	}
 	writeData(w, http.StatusCreated, tx.JSON())
 }
 
@@ -109,6 +115,12 @@ func (s *Server) transactionsUpdate(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
+	if tx.Status == "confirmed" {
+		s.automation.Process(r.Context(), "on_transaction_update", tx)
+		if fresh, e := s.txs.ByID(r.Context(), tx.ID); e == nil && fresh != nil {
+			tx = fresh
+		}
+	}
 	writeData(w, http.StatusOK, tx.JSON())
 }
 
@@ -142,6 +154,13 @@ func (s *Server) transactionsConfirm(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
+	if out.RecurringID != nil {
+		_ = s.recurring.AdvanceAfterOccurrence(r.Context(), *out.RecurringID)
+	}
+	s.automation.Process(r.Context(), "on_transaction_create", out)
+	if fresh, e := s.txs.ByID(r.Context(), out.ID); e == nil && fresh != nil {
+		out = fresh
+	}
 	writeData(w, http.StatusOK, out.JSON())
 }
 
@@ -154,6 +173,9 @@ func (s *Server) transactionsSkip(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeMessage(w, 422, "Only a pending scheduled transaction can be skipped.")
 		return
+	}
+	if out.RecurringID != nil {
+		_ = s.recurring.AdvanceAfterOccurrence(r.Context(), *out.RecurringID)
 	}
 	writeData(w, http.StatusOK, out.JSON())
 }

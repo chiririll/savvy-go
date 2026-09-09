@@ -11,6 +11,7 @@ import (
 
 	"github.com/chiririll/savvy-plus/internal/config"
 	"github.com/chiririll/savvy-plus/internal/db"
+	"github.com/chiririll/savvy-plus/internal/domain"
 	"github.com/chiririll/savvy-plus/internal/httpserver"
 	"github.com/chiririll/savvy-plus/internal/jobs"
 	"github.com/chiririll/savvy-plus/internal/legacy"
@@ -58,7 +59,12 @@ func main() {
 	queue := jobs.New(2)
 	schedCtx, schedCancel := context.WithCancel(context.Background())
 	defer schedCancel()
-	schedule.New().Start(schedCtx)
+	recurring := domain.RecurringStore{DB: sqlDB, Txs: domain.Transactions{DB: sqlDB}}
+	schedule.New(schedule.Job{
+		Name:     "recurring:ensure-upcoming",
+		Interval: time.Hour,
+		Run:      recurring.EnsureUpcoming,
+	}).Start(schedCtx)
 	_ = queue
 
 	srv := &http.Server{
