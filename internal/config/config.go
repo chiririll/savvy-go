@@ -100,7 +100,7 @@ func appKeyFromDotenv(path string) string {
 }
 
 func detectDataDir() string {
-	for _, candidate := range []string{"/data", "/var/lib/savvy"} {
+	for _, candidate := range []string{"/data", "/var/lib/savvy-go"} {
 		if st, err := os.Stat(candidate); err == nil && st.IsDir() {
 			return candidate
 		}

@@ -1,6 +1,6 @@
 {
     "$schema": "https://www.schemastore.org/package.json",
-    "name": "savvy",
+    "name": "savvy-go",
     "private": true,
     "type": "module",
     "scripts": {

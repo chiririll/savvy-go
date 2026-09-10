@@ -9,15 +9,15 @@ reload_nginx() {
 
 case "$1" in
     remove)
-        rm -f /etc/nginx/sites-enabled/savvy
+        rm -f /etc/nginx/sites-enabled/savvy-go
         reload_nginx
         if [ -d /run/systemd/system ]; then
             systemctl daemon-reload || true
         fi
         ;;
     purge)
-        rm -f /etc/nginx/sites-enabled/savvy
-        rm -rf /etc/savvy /var/lib/savvy
+        rm -f /etc/nginx/sites-enabled/savvy-go
+        rm -rf /etc/savvy-go /var/lib/savvy-go
         reload_nginx
         if [ -d /run/systemd/system ]; then
             systemctl daemon-reload || true

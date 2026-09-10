@@ -1,16 +1,16 @@
 [Unit]
-Description=Savvy expense tracker
+Description=Go Savvy - expense tracker
 After=network.target
 
 [Service]
 Type=simple
 User=www-data
 Group=www-data
-Environment=DATA_DIR=/var/lib/savvy
-Environment=PUBLIC_DIR=/opt/savvy/public
+Environment=DATA_DIR=/var/lib/savvy-go
+Environment=PUBLIC_DIR=/opt/savvy-go/public
 Environment=LISTEN_ADDR=:8080
-EnvironmentFile=-/etc/savvy/install.env
-ExecStart=/usr/bin/savvy
+EnvironmentFile=-/etc/savvy-go/install.env
+ExecStart=/usr/bin/savvy-go
 Restart=always
 RestartSec=3
 

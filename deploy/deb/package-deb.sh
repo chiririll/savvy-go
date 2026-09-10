@@ -5,8 +5,8 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 OUT_DIR="${OUT_DIR:-$ROOT/dist}"
 VERSION="${APP_VERSION:-}"
 
-if [[ ! -f "$OUT_DIR/savvy" ]]; then
-    echo "missing $OUT_DIR/savvy — build the Go binary first" >&2
+if [[ ! -f "$OUT_DIR/savvy-go" ]]; then
+    echo "missing $OUT_DIR/savvy-go — build the Go binary first" >&2
     exit 1
 fi
 if [[ ! -d "$OUT_DIR/public" ]]; then
@@ -36,7 +36,7 @@ export APP_VERSION="$VERSION"
     nfpm package --config nfpm.yaml --packager deb --target "$OUT_DIR"
 )
 
-deb="$(ls -1t "$OUT_DIR"/savvy_*.deb | head -n1)"
-cp -f "$deb" "$OUT_DIR/savvy.deb"
+deb="$(ls -1t "$OUT_DIR"/savvy-go_*.deb | head -n1)"
+cp -f "$deb" "$OUT_DIR/savvy-go.deb"
 
-echo "Wrote $deb and $OUT_DIR/savvy.deb (VERSION=$VERSION)"
+echo "Wrote $deb and $OUT_DIR/savvy-go.deb (VERSION=$VERSION)"

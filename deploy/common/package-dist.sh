@@ -4,15 +4,15 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 OUT_DIR="${OUT_DIR:-$ROOT/dist}"
 VERSION="${APP_VERSION:-$(git -C "$ROOT" rev-parse --short HEAD)}"
-BIN="${OUT_DIR}/savvy"
+BIN="${OUT_DIR}/savvy-go"
 
 if [[ ! -f "$BIN" ]]; then
-    echo "missing $BIN — build with: go build -ldflags \"-X github.com/chiririll/savvy-plus/internal/version.Value=\$APP_VERSION -X github.com/chiririll/savvy-plus/internal/version.Env=production\" -o dist/savvy ./cmd/savvy" >&2
+    echo "missing $BIN" >&2
     exit 1
 fi
 
 if [[ ! -d "$ROOT/public/build" ]]; then
-    echo "public/build is missing. Run: npm ci && npm run build" >&2
+    echo "public/build is missing" >&2
     exit 1
 fi
 
@@ -20,8 +20,8 @@ STAGE=$(mktemp -d)
 trap 'rm -rf "$STAGE"' EXIT
 
 mkdir -p "$STAGE/public"
-cp -a "$BIN" "$STAGE/savvy"
-chmod +x "$STAGE/savvy"
+cp -a "$BIN" "$STAGE/savvy-go"
+chmod +x "$STAGE/savvy-go"
 cp -a "$ROOT/public/build" "$STAGE/public/build"
 for f in favicon.svg robots.txt site.webmanifest; do
     if [[ -f "$ROOT/public/$f" ]]; then
@@ -34,6 +34,6 @@ rm -rf "$OUT_DIR/public"
 mkdir -p "$OUT_DIR"
 cp -a "$STAGE/public" "$OUT_DIR/public"
 
-TARBALL="$OUT_DIR/savvy.tar.gz"
+TARBALL="$OUT_DIR/savvy-go.tar.gz"
 tar -C "$STAGE" -czf "$TARBALL" .
 echo "Wrote $TARBALL (VERSION=$VERSION)"
