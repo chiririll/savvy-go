@@ -18,6 +18,7 @@ import (
 	"github.com/chiririll/savvy-plus/internal/legacy"
 	"github.com/chiririll/savvy-plus/internal/migrate"
 	"github.com/chiririll/savvy-plus/internal/schedule"
+	"github.com/chiririll/savvy-plus/internal/seed"
 	"github.com/chiririll/savvy-plus/internal/version"
 )
 
@@ -51,6 +52,10 @@ func main() {
 	}
 	if err := legacy.UpgradeInPlace(ctx, sqlDB); err != nil {
 		slog.Error("legacy import", "err", err)
+		os.Exit(1)
+	}
+	if err := seed.Demo(ctx, sqlDB, cfg.SeedDemo, cfg.Location); err != nil {
+		slog.Error("seed demo", "err", err)
 		os.Exit(1)
 	}
 	if err := auth.UnwrapLegacyTOTPSecrets(ctx, sqlDB, cfg.AppKey); err != nil {

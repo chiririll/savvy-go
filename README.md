@@ -97,10 +97,11 @@ volumes:
 
 ### Environment Variables
 
-| Variable  | Description                 | Default            |
-|-----------|-----------------------------|--------------------|
-| `APP_URL` | Public URL of your instance | `http://localhost` |
-| `TZ`      | Timezone                    | `UTC`              |
+| Variable    | Description                                                                 | Default            |
+|-------------|-----------------------------------------------------------------------------|--------------------|
+| `APP_URL`   | Public URL of your instance                                                 | `http://localhost` |
+| `TZ`        | Timezone                                                                    | `UTC`              |
+| `SEED_DEMO` | First boot only: seed demo users, accounts, and ~12 months of transactions | `false`            |
 
 ### Behind a Reverse Proxy
 
@@ -286,7 +287,7 @@ go test ./...
 go run ./cmd/savvy
 ```
 
-Listens on `:8080` by default (`LISTEN_ADDR`). SQLite and uploads go under `DATA_DIR` (`./data` locally, `/data` or `/var/lib/savvy` in deploy). The SPA is served from `public/` (Vite output in `public/build`). Env: `APP_URL`, `TZ`, `DATA_DIR`, `LISTEN_ADDR`.
+Listens on `:8080` by default (`LISTEN_ADDR`). SQLite and uploads go under `DATA_DIR` (`./data` locally, `/data` or `/var/lib/savvy` in deploy). The SPA is served from `public/` (Vite output in `public/build`). Env: `APP_URL`, `TZ`, `DATA_DIR`, `LISTEN_ADDR`, `SEED_DEMO`.
 
 ## 🤝 Contributing
 
