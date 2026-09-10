@@ -42,7 +42,7 @@ func FromEnv() Config {
 
 	cfg := Config{
 		AppURL:        strings.TrimRight(firstNonEmpty(os.Getenv("APP_URL"), "http://localhost:8080"), "/"),
-		ListenAddr:    firstNonEmpty(os.Getenv("LISTEN_ADDR"), os.Getenv("HTTP_ADDR"), ":8080"),
+		ListenAddr:    firstNonEmpty(os.Getenv("LISTEN_ADDR"), os.Getenv("HTTP_ADDR"), "localhost:8080"),
 		DataDir:       dataDir,
 		Database:      firstNonEmpty(os.Getenv("DB_DATABASE"), filepath.Join(dataDir, "database.sqlite")),
 		UploadsDir:    firstNonEmpty(os.Getenv("UPLOAD_ROOT"), filepath.Join(dataDir, "uploads")),
