@@ -283,6 +283,7 @@ Go • SQLite • React (Vite) • Docker • ShadCN/UI • Tailwind CSS
 ### Local backend (Go)
 
 ```bash
+go generate ./internal/db   # sqlc: internal/db/queries → internal/db/sqlc
 go test ./...
 go run ./cmd/savvy
 ```
