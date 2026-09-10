@@ -5,6 +5,10 @@ import (
 	"database/sql"
 	"math"
 	"time"
+
+	"github.com/chiririll/savvy-plus/internal/db"
+	"github.com/chiririll/savvy-plus/internal/db/filter"
+	"github.com/chiririll/savvy-plus/internal/db/sqlc"
 )
 
 type BudgetProgress struct {
@@ -94,11 +98,11 @@ type BudgetInput struct {
 type Budgets struct{ DB *sql.DB }
 
 func (s Budgets) All(ctx context.Context) ([]Budget, error) {
-	return s.list(ctx, ``)
+	return s.list(ctx, sql.NullInt64{})
 }
 
 func (s Budgets) ByID(ctx context.Context, id int64) (*Budget, error) {
-	list, err := s.list(ctx, `WHERE b.id = ?`, id)
+	list, err := s.list(ctx, db.NI(id))
 	if err != nil || len(list) == 0 {
 		return nil, err
 	}
@@ -115,12 +119,12 @@ func (s Budgets) Create(ctx context.Context, in BudgetInput) (*Budget, error) {
 		global = *in.IsGlobal
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	res, err := s.DB.ExecContext(ctx, `
-		INSERT INTO budgets (name, amount, currency_id, period, start_date, end_date,
-			is_global, notify_at_percent, is_active, created_at, updated_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-		in.Name, in.Amount, in.CurrencyID, in.Period, in.StartDate, in.EndDate,
-		boolInt(global), in.NotifyAtPercent, boolInt(active), now, now)
+	res, err := db.Q(s.DB).InsertBudget(ctx, sqlc.InsertBudgetParams{
+		Name: in.Name, Amount: in.Amount, CurrencyID: db.NullInt64(in.CurrencyID), Period: in.Period,
+		StartDate: db.NullString(in.StartDate), EndDate: db.NullString(in.EndDate),
+		IsGlobal: db.BoolInt(global), NotifyAtPercent: db.NullInt(in.NotifyAtPercent),
+		IsActive: db.BoolInt(active), CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -170,11 +174,12 @@ func (s Budgets) Update(ctx context.Context, id int64, in BudgetInput) (*Budget,
 		notify = in.NotifyAtPercent
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, err = s.DB.ExecContext(ctx, `
-		UPDATE budgets SET name=?, amount=?, currency_id=?, period=?, start_date=?, end_date=?,
-			is_global=?, notify_at_percent=?, is_active=?, updated_at=? WHERE id=?`,
-		in.Name, in.Amount, in.CurrencyID, in.Period, in.StartDate, in.EndDate,
-		boolInt(global), notify, boolInt(active), now, id)
+	err = db.Q(s.DB).UpdateBudget(ctx, sqlc.UpdateBudgetParams{
+		Name: in.Name, Amount: in.Amount, CurrencyID: db.NullInt64(in.CurrencyID), Period: in.Period,
+		StartDate: db.NullString(in.StartDate), EndDate: db.NullString(in.EndDate),
+		IsGlobal: db.BoolInt(global), NotifyAtPercent: db.NullInt(notify),
+		IsActive: db.BoolInt(active), UpdatedAt: db.NS(now), ID: id,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -192,8 +197,7 @@ func (s Budgets) Update(ctx context.Context, id int64, in BudgetInput) (*Budget,
 }
 
 func (s Budgets) Delete(ctx context.Context, id int64) error {
-	_, err := s.DB.ExecContext(ctx, `DELETE FROM budgets WHERE id = ?`, id)
-	return err
+	return db.Q(s.DB).DeleteBudget(ctx, id)
 }
 
 func (s Budgets) CalculateProgress(ctx context.Context, b *Budget) BudgetProgress {
@@ -221,49 +225,27 @@ func (s Budgets) spent(ctx context.Context, b *Budget, start, end time.Time) flo
 		}
 	}
 
-	q := `
-		SELECT COALESCE(SUM(t.amount * c.rate), 0)
-		FROM transactions t
-		JOIN accounts a ON a.id = t.account_id
-		JOIN currencies c ON c.id = a.currency_id
-		WHERE t.status = 'confirmed' AND t.type = 'expense'
-			AND t.date >= ? AND t.date <= ?`
-	args := []any{start.Format("2006-01-02"), end.Format("2006-01-02")}
+	var catIDs []int64
 	if !b.IsGlobal {
 		if len(b.Categories) == 0 {
 			return 0
 		}
-		q += ` AND t.category_id IN (`
-		for i, c := range b.Categories {
-			if i > 0 {
-				q += `,`
-			}
-			q += `?`
-			args = append(args, c.ID)
+		for _, c := range b.Categories {
+			catIDs = append(catIDs, c.ID)
 		}
-		q += `)`
 	}
-	if len(b.Tags) > 0 {
-		q += ` AND EXISTS (
-			SELECT 1 FROM transaction_tag tt
-			WHERE tt.transaction_id = t.id AND tt.tag_id IN (`
-		for i, t := range b.Tags {
-			if i > 0 {
-				q += `,`
-			}
-			q += `?`
-			args = append(args, t.ID)
-		}
-		q += `))`
+	var tagIDs []int64
+	for _, t := range b.Tags {
+		tagIDs = append(tagIDs, t.ID)
 	}
-	var total sql.NullFloat64
-	if err := s.DB.QueryRowContext(ctx, q, args...).Scan(&total); err != nil {
+	total, err := filter.BudgetSpent(ctx, s.DB, start.Format("2006-01-02"), end.Format("2006-01-02"), catIDs, tagIDs)
+	if err != nil {
 		return 0
 	}
 	if targetRate > 0 {
-		return total.Float64 / targetRate
+		return total / targetRate
 	}
-	return total.Float64
+	return total
 }
 
 func budgetPeriodDates(b Budget) (time.Time, time.Time) {
@@ -317,26 +299,15 @@ func endOfWeek(t time.Time) time.Time {
 	return startOfWeek(t).AddDate(0, 0, 6)
 }
 
-func (s Budgets) list(ctx context.Context, where string, args ...any) ([]Budget, error) {
-	q := `SELECT b.id, b.name, b.amount, b.currency_id, b.period, b.start_date, b.end_date,
-		b.is_global, b.notify_at_percent, b.is_active FROM budgets b ` + where + ` ORDER BY b.id`
-	rows, err := s.DB.QueryContext(ctx, q, args...)
+func (s Budgets) list(ctx context.Context, id sql.NullInt64) ([]Budget, error) {
+	rows, err := db.Q(s.DB).ListBudgets(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []Budget
-	for rows.Next() {
-		b, err := scanBudget(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, b)
+	out := make([]Budget, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, budgetFromRow(r))
 	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	rows.Close()
 	curs := Currencies{DB: s.DB}
 	for i := range out {
 		if out[i].CurrencyID != nil {
@@ -353,50 +324,35 @@ func (s Budgets) list(ctx context.Context, where string, args ...any) ([]Budget,
 }
 
 func (s Budgets) cats(ctx context.Context, id int64) ([]Category, error) {
-	rows, err := s.DB.QueryContext(ctx, `
-		SELECT c.id, c.name, c.type, c.icon, c.color, 0
-		FROM categories c JOIN budget_category bc ON bc.category_id = c.id
-		WHERE bc.budget_id = ?`, id)
+	rows, err := db.Q(s.DB).ListBudgetCategories(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []Category
-	for rows.Next() {
-		c, err := scanCategory(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, c)
+	out := make([]Category, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, categoryFrom(r.ID, r.Name, r.Type, r.Icon, r.Color, r.TransactionsCount))
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 func (s Budgets) tags(ctx context.Context, id int64) ([]Tag, error) {
-	rows, err := s.DB.QueryContext(ctx, `
-		SELECT tags.id, tags.name, tags.created_at, 0 FROM tags
-		JOIN budget_tag bt ON bt.tag_id = tags.id WHERE bt.budget_id = ?`, id)
+	rows, err := db.Q(s.DB).ListBudgetTags(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []Tag
-	for rows.Next() {
-		t, err := scanTag(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, t)
+	out := make([]Tag, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, tagFromList(r.ID, r.Name, r.CreatedAt, r.TransactionsCount))
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 func (s Budgets) saveCats(ctx context.Context, id int64, ids []int64) error {
-	if _, err := s.DB.ExecContext(ctx, `DELETE FROM budget_category WHERE budget_id = ?`, id); err != nil {
+	if err := db.Q(s.DB).DeleteBudgetCategories(ctx, id); err != nil {
 		return err
 	}
 	for _, catID := range ids {
-		if _, err := s.DB.ExecContext(ctx, `INSERT OR IGNORE INTO budget_category (budget_id, category_id) VALUES (?,?)`, id, catID); err != nil {
+		if err := db.Q(s.DB).InsertBudgetCategory(ctx, sqlc.InsertBudgetCategoryParams{BudgetID: id, CategoryID: catID}); err != nil {
 			return err
 		}
 	}
@@ -404,37 +360,31 @@ func (s Budgets) saveCats(ctx context.Context, id int64, ids []int64) error {
 }
 
 func (s Budgets) saveTags(ctx context.Context, id int64, ids []int64) error {
-	if _, err := s.DB.ExecContext(ctx, `DELETE FROM budget_tag WHERE budget_id = ?`, id); err != nil {
+	if err := db.Q(s.DB).DeleteBudgetTags(ctx, id); err != nil {
 		return err
 	}
 	for _, tagID := range ids {
-		if _, err := s.DB.ExecContext(ctx, `INSERT OR IGNORE INTO budget_tag (budget_id, tag_id) VALUES (?,?)`, id, tagID); err != nil {
+		if err := db.Q(s.DB).InsertBudgetTag(ctx, sqlc.InsertBudgetTagParams{BudgetID: id, TagID: tagID}); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func scanBudget(row interface{ Scan(...any) error }) (Budget, error) {
-	var b Budget
-	var curID, notify sql.NullInt64
-	var start, end sql.NullString
-	var global, active int
-	err := row.Scan(&b.ID, &b.Name, &b.Amount, &curID, &b.Period, &start, &end, &global, &notify, &active)
-	if curID.Valid {
-		b.CurrencyID = &curID.Int64
+func budgetFromRow(r sqlc.ListBudgetsRow) Budget {
+	b := Budget{ID: r.ID, Name: r.Name, Amount: r.Amount, Period: r.Period, IsGlobal: r.IsGlobal != 0, IsActive: r.IsActive != 0}
+	if r.CurrencyID.Valid {
+		b.CurrencyID = &r.CurrencyID.Int64
 	}
-	if start.Valid {
-		b.StartDate = &start.String
+	if r.StartDate.Valid {
+		b.StartDate = &r.StartDate.String
 	}
-	if end.Valid {
-		b.EndDate = &end.String
+	if r.EndDate.Valid {
+		b.EndDate = &r.EndDate.String
 	}
-	if notify.Valid {
-		v := int(notify.Int64)
+	if r.NotifyAtPercent.Valid {
+		v := int(r.NotifyAtPercent.Int64)
 		b.NotifyAtPercent = &v
 	}
-	b.IsGlobal = global != 0
-	b.IsActive = active != 0
-	return b, err
+	return b
 }

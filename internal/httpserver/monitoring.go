@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/chiririll/savvy-plus/internal/db"
 	"github.com/chiririll/savvy-plus/internal/version"
 )
 
@@ -37,17 +38,11 @@ func (s *Server) monitoringStorage(w http.ResponseWriter, r *http.Request) {
 		Count  int
 		Bytes  int64
 	}
-	rows, err := s.db.QueryContext(r.Context(), `
-		SELECT bucket, status, COUNT(*), COALESCE(SUM(size), 0)
-		FROM uploads GROUP BY bucket, status`)
+	rows, err := db.Q(s.db).UploadUsageByBucket(r.Context())
 	var usage []bucketRow
 	if err == nil {
-		defer rows.Close()
-		for rows.Next() {
-			var b bucketRow
-			if rows.Scan(&b.Bucket, &b.Status, &b.Count, &b.Bytes) == nil {
-				usage = append(usage, b)
-			}
+		for _, row := range rows {
+			usage = append(usage, bucketRow{row.Bucket, row.Status, int(row.Count), coalesceInt64(row.Coalesce)})
 		}
 	}
 
@@ -90,15 +85,10 @@ func (s *Server) monitoringStorage(w http.ResponseWriter, r *http.Request) {
 
 	importBy := map[string]int{}
 	importTotal := 0
-	if irows, err := s.db.QueryContext(r.Context(), `SELECT status, COUNT(*) FROM transaction_imports GROUP BY status`); err == nil {
-		defer irows.Close()
-		for irows.Next() {
-			var st string
-			var n int
-			if irows.Scan(&st, &n) == nil {
-				importBy[st] = n
-				importTotal += n
-			}
+	if irows, err := db.Q(s.db).ImportCountsByStatus(r.Context()); err == nil {
+		for _, row := range irows {
+			importBy[row.Status] = int(row.Count)
+			importTotal += int(row.Count)
 		}
 	}
 
@@ -128,6 +118,19 @@ func (s *Server) monitoringResources(w http.ResponseWriter, r *http.Request) {
 			"environment": version.Env, "uptime_seconds": int(time.Since(processStarted).Seconds()),
 		},
 	})
+}
+
+func coalesceInt64(v any) int64 {
+	switch t := v.(type) {
+	case int64:
+		return t
+	case int:
+		return int64(t)
+	case float64:
+		return int64(t)
+	default:
+		return 0
+	}
 }
 
 func volumeSpace(path string) (total, free int64, ok bool) {

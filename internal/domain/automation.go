@@ -4,6 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+
+	"github.com/chiririll/savvy-plus/internal/db"
+	"github.com/chiririll/savvy-plus/internal/db/sqlc"
 	"fmt"
 	"log/slog"
 	"math"
@@ -102,11 +105,11 @@ type Automation struct {
 }
 
 func (s Automation) All(ctx context.Context) ([]AutomationRule, error) {
-	return s.list(ctx, `ORDER BY priority, id`)
+	return s.list(ctx, sqlc.ListAutomationRulesParams{})
 }
 
 func (s Automation) ByID(ctx context.Context, id int64) (*AutomationRule, error) {
-	list, err := s.list(ctx, `WHERE id = ?`, id)
+	list, err := s.list(ctx, sqlc.ListAutomationRulesParams{ID: db.NI(id)})
 	if err != nil || len(list) == 0 {
 		return nil, err
 	}
@@ -131,12 +134,11 @@ func (s Automation) Create(ctx context.Context, in AutomationInput) (*Automation
 		acts = []byte("[]")
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	res, err := s.DB.ExecContext(ctx, `
-		INSERT INTO automation_rules (name, description, trigger_type, priority, conditions, actions,
-			is_active, stop_processing, created_at, updated_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?)`,
-		in.Name, in.Description, in.TriggerType, in.Priority, string(cond), string(acts),
-		boolInt(active), boolInt(stop), now, now)
+	res, err := db.Q(s.DB).InsertAutomationRule(ctx, sqlc.InsertAutomationRuleParams{
+		Name: in.Name, Description: db.NullString(in.Description), TriggerType: in.TriggerType,
+		Priority: int64(in.Priority), Conditions: string(cond), Actions: string(acts),
+		IsActive: db.BoolInt(active), StopProcessing: db.BoolInt(stop), CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -178,11 +180,11 @@ func (s Automation) Update(ctx context.Context, id int64, in AutomationInput) (*
 	cond, _ := json.Marshal(normalizeConditions(in.Conditions))
 	acts, _ := json.Marshal(in.Actions)
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, err = s.DB.ExecContext(ctx, `
-		UPDATE automation_rules SET name=?, description=?, trigger_type=?, priority=?,
-			conditions=?, actions=?, is_active=?, stop_processing=?, updated_at=? WHERE id=?`,
-		in.Name, in.Description, in.TriggerType, in.Priority, string(cond), string(acts),
-		boolInt(active), boolInt(stop), now, id)
+	err = db.Q(s.DB).UpdateAutomationRule(ctx, sqlc.UpdateAutomationRuleParams{
+		Name: in.Name, Description: db.NullString(in.Description), TriggerType: in.TriggerType,
+		Priority: int64(in.Priority), Conditions: string(cond), Actions: string(acts),
+		IsActive: db.BoolInt(active), StopProcessing: db.BoolInt(stop), UpdatedAt: db.NS(now), ID: id,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -190,8 +192,7 @@ func (s Automation) Update(ctx context.Context, id int64, in AutomationInput) (*
 }
 
 func (s Automation) Delete(ctx context.Context, id int64) error {
-	_, err := s.DB.ExecContext(ctx, `DELETE FROM automation_rules WHERE id = ?`, id)
-	return err
+	return db.Q(s.DB).DeleteAutomationRule(ctx, id)
 }
 
 func (s Automation) Toggle(ctx context.Context, id int64) (*AutomationRule, error) {
@@ -200,8 +201,7 @@ func (s Automation) Toggle(ctx context.Context, id int64) (*AutomationRule, erro
 		return cur, err
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, err = s.DB.ExecContext(ctx, `UPDATE automation_rules SET is_active=?, updated_at=? WHERE id=?`,
-		boolInt(!cur.IsActive), now, id)
+	err = db.Q(s.DB).ToggleAutomationRule(ctx, sqlc.ToggleAutomationRuleParams{IsActive: db.BoolInt(!cur.IsActive), UpdatedAt: db.NS(now), ID: id})
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +213,7 @@ func (s Automation) Reorder(ctx context.Context, rules []struct {
 	Priority int   `json:"priority"`
 }) error {
 	for _, r := range rules {
-		if _, err := s.DB.ExecContext(ctx, `UPDATE automation_rules SET priority=? WHERE id=?`, r.Priority, r.ID); err != nil {
+		if err := db.Q(s.DB).SetAutomationPriority(ctx, sqlc.SetAutomationPriorityParams{Priority: int64(r.Priority), ID: r.ID}); err != nil {
 			return err
 		}
 	}
@@ -221,42 +221,33 @@ func (s Automation) Reorder(ctx context.Context, rules []struct {
 }
 
 func (s Automation) Logs(ctx context.Context, ruleID int64) ([]AutomationLog, error) {
-	rows, err := s.DB.QueryContext(ctx, `
-		SELECT id, rule_id, trigger_entity_type, trigger_entity_id, actions_executed, status, error_message, created_at
-		FROM automation_rule_logs WHERE rule_id = ? ORDER BY created_at DESC LIMIT 50`, ruleID)
+	rows, err := db.Q(s.DB).ListAutomationLogs(ctx, ruleID)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []AutomationLog
-	for rows.Next() {
-		var l AutomationLog
-		var typ, acts, errMsg sql.NullString
-		var entID sql.NullInt64
-		var created string
-		if err := rows.Scan(&l.ID, &l.RuleID, &typ, &entID, &acts, &l.Status, &errMsg, &created); err != nil {
-			return nil, err
+	out := make([]AutomationLog, 0, len(rows))
+	for _, r := range rows {
+		l := AutomationLog{ID: r.ID, RuleID: r.RuleID, Status: r.Status}
+		if r.TriggerEntityType.Valid {
+			l.TriggerEntityType = &r.TriggerEntityType.String
 		}
-		if typ.Valid {
-			l.TriggerEntityType = &typ.String
+		if r.TriggerEntityID.Valid {
+			l.TriggerEntityID = &r.TriggerEntityID.Int64
 		}
-		if entID.Valid {
-			l.TriggerEntityID = &entID.Int64
-		}
-		if acts.Valid && acts.String != "" {
+		if r.ActionsExecuted.Valid && r.ActionsExecuted.String != "" {
 			var v any
-			_ = json.Unmarshal([]byte(acts.String), &v)
+			_ = json.Unmarshal([]byte(r.ActionsExecuted.String), &v)
 			l.ActionsExecuted = v
 		}
-		if errMsg.Valid {
-			l.ErrorMessage = &errMsg.String
+		if r.ErrorMessage.Valid {
+			l.ErrorMessage = &r.ErrorMessage.String
 		}
-		if tm, ok := parseNullTime(sql.NullString{String: created, Valid: true}); ok {
+		if tm, ok := parseNullTime(sql.NullString{String: r.CreatedAt, Valid: true}); ok {
 			l.CreatedAt = tm
 		}
 		out = append(out, l)
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 func (s Automation) Test(ctx context.Context, ruleID, txID int64) (map[string]any, error) {
@@ -280,7 +271,7 @@ func (s Automation) Process(ctx context.Context, trigger string, tx *Transaction
 	if tx == nil || tx.Status != "confirmed" {
 		return
 	}
-	rules, err := s.list(ctx, `WHERE is_active = 1 AND trigger_type = ? ORDER BY priority, id`, trigger)
+	rules, err := s.list(ctx, sqlc.ListAutomationRulesParams{ActiveOnly: db.Flag(true), TriggerType: db.NullStringVal(trigger)})
 	if err != nil {
 		slog.Error("automation load", "err", err)
 		return
@@ -306,23 +297,20 @@ func (s Automation) Process(ctx context.Context, trigger string, tx *Transaction
 
 func (s Automation) incrementRuns(ctx context.Context, id int64) {
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, _ = s.DB.ExecContext(ctx, `UPDATE automation_rules SET runs_count = runs_count + 1, last_run_at=?, updated_at=? WHERE id=?`, now, now, id)
+	_ = db.Q(s.DB).IncrementAutomationRuns(ctx, sqlc.IncrementAutomationRunsParams{LastRunAt: db.NS(now), UpdatedAt: db.NS(now), ID: id})
 }
 
 func (s Automation) log(ctx context.Context, rule *AutomationRule, tx *Transaction, status string, actions any, errMsg string) {
-	raw, _ := json.Marshal(actions)
-	var acts any
-	if actions != nil {
-		acts = string(raw)
-	}
-	var msg any
-	if errMsg != "" {
-		msg = errMsg
-	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, _ = s.DB.ExecContext(ctx, `
-		INSERT INTO automation_rule_logs (rule_id, trigger_entity_type, trigger_entity_id, actions_executed, status, error_message, created_at)
-		VALUES (?,?,?,?,?,?,?)`, rule.ID, "Transaction", tx.ID, acts, status, msg, now)
+	var actsS sql.NullString
+	if actions != nil {
+		raw, _ := json.Marshal(actions)
+		actsS = db.NS(string(raw))
+	}
+	_ = db.Q(s.DB).InsertAutomationLog(ctx, sqlc.InsertAutomationLogParams{
+		RuleID: rule.ID, TriggerEntityType: db.NS("Transaction"), TriggerEntityID: db.NI(tx.ID),
+		ActionsExecuted: actsS, Status: status, ErrorMessage: db.NullStringVal(errMsg), CreatedAt: now,
+	})
 }
 
 func (s Automation) executeActions(ctx context.Context, actions []map[string]any, tx *Transaction) ([]map[string]any, error) {
@@ -361,7 +349,7 @@ func (s Automation) actionSetCategory(ctx context.Context, action map[string]any
 		return false, nil
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, err := s.DB.ExecContext(ctx, `UPDATE transactions SET category_id=?, updated_at=? WHERE id=?`, id, now, tx.ID)
+	err := db.Q(s.DB).UpdateTransactionCategory(ctx, sqlc.UpdateTransactionCategoryParams{CategoryID: db.NI(id), UpdatedAt: db.NS(now), ID: tx.ID})
 	return err == nil, err
 }
 
@@ -411,7 +399,7 @@ func (s Automation) actionSetDescription(ctx context.Context, action map[string]
 	}
 	desc := parseTemplate(tmpl, tx)
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, err := s.DB.ExecContext(ctx, `UPDATE transactions SET description=?, updated_at=? WHERE id=?`, desc, now, tx.ID)
+	err := db.Q(s.DB).UpdateTransactionDescription(ctx, sqlc.UpdateTransactionDescriptionParams{Description: db.NS(desc), UpdatedAt: db.NS(now), ID: tx.ID})
 	return err == nil, err
 }
 
@@ -447,56 +435,45 @@ func (s Automation) actionCreateTransfer(ctx context.Context, action map[string]
 	return created.ID, nil
 }
 
-func (s Automation) list(ctx context.Context, where string, args ...any) ([]AutomationRule, error) {
-	rows, err := s.DB.QueryContext(ctx, `
-		SELECT id, name, description, trigger_type, priority, conditions, actions,
-			is_active, stop_processing, runs_count, last_run_at, created_at, updated_at
-		FROM automation_rules `+where, args...)
+func (s Automation) list(ctx context.Context, arg sqlc.ListAutomationRulesParams) ([]AutomationRule, error) {
+	rows, err := db.Q(s.DB).ListAutomationRules(ctx, arg)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []AutomationRule
-	for rows.Next() {
-		r, err := scanAutomation(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, r)
+	out := make([]AutomationRule, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, automationFrom(r))
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
-func scanAutomation(row interface{ Scan(...any) error }) (AutomationRule, error) {
-	var r AutomationRule
-	var desc, cond, acts, last, created, updated sql.NullString
-	var active, stop int
-	err := row.Scan(&r.ID, &r.Name, &desc, &r.TriggerType, &r.Priority, &cond, &acts,
-		&active, &stop, &r.RunsCount, &last, &created, &updated)
-	if desc.Valid {
-		r.Description = &desc.String
+func automationFrom(row sqlc.AutomationRule) AutomationRule {
+	r := AutomationRule{
+		ID: row.ID, Name: row.Name, TriggerType: row.TriggerType, Priority: int(row.Priority),
+		RunsCount: int(row.RunsCount), IsActive: row.IsActive != 0, StopProcessing: row.StopProcessing != 0,
 	}
-	if cond.Valid && cond.String != "" {
-		_ = json.Unmarshal([]byte(cond.String), &r.Conditions)
+	if row.Description.Valid {
+		r.Description = &row.Description.String
+	}
+	if row.Conditions != "" {
+		_ = json.Unmarshal([]byte(row.Conditions), &r.Conditions)
 	}
 	if r.Conditions == nil {
 		r.Conditions = map[string]any{}
 	}
-	if acts.Valid && acts.String != "" {
-		_ = json.Unmarshal([]byte(acts.String), &r.Actions)
+	if row.Actions != "" {
+		_ = json.Unmarshal([]byte(row.Actions), &r.Actions)
 	}
-	r.IsActive = active != 0
-	r.StopProcessing = stop != 0
-	if tm, ok := parseNullTime(last); ok {
+	if tm, ok := parseNullTime(row.LastRunAt); ok {
 		r.LastRunAt = &tm
 	}
-	if tm, ok := parseNullTime(created); ok {
+	if tm, ok := parseNullTime(row.CreatedAt); ok {
 		r.CreatedAt = &tm
 	}
-	if tm, ok := parseNullTime(updated); ok {
+	if tm, ok := parseNullTime(row.UpdatedAt); ok {
 		r.UpdatedAt = &tm
 	}
-	return r, err
+	return r
 }
 
 func normalizeConditions(in map[string]any) map[string]any {

@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/chiririll/savvy-plus/internal/config"
+	"github.com/chiririll/savvy-plus/internal/db"
+	"github.com/chiririll/savvy-plus/internal/db/sqlc"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 )
@@ -72,41 +74,33 @@ func (w WebAuthn) engine() (*webauthn.WebAuthn, error) {
 }
 
 func (w WebAuthn) List(ctx context.Context, userID int64) ([]WebAuthnCred, error) {
-	rows, err := w.DB.QueryContext(ctx, `
-		SELECT id, name, aaguid, last_used_at, created_at
-		FROM webauthn_credentials WHERE user_id=? ORDER BY id DESC`, userID)
+	rows, err := db.Q(w.DB).ListWebAuthnCredentials(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []WebAuthnCred
-	for rows.Next() {
-		var c WebAuthnCred
-		var name, aaguid, used, created sql.NullString
-		if err := rows.Scan(&c.ID, &name, &aaguid, &used, &created); err != nil {
-			return nil, err
+	out := make([]WebAuthnCred, 0, len(rows))
+	for _, r := range rows {
+		c := WebAuthnCred{ID: r.ID}
+		if r.Name.Valid {
+			c.Name = &r.Name.String
 		}
-		if name.Valid {
-			c.Name = &name.String
+		if r.Aaguid.Valid {
+			c.AAGUID = &r.Aaguid.String
 		}
-		if aaguid.Valid {
-			c.AAGUID = &aaguid.String
+		if r.LastUsedAt.Valid {
+			c.LastUsedAt = &r.LastUsedAt.String
 		}
-		if used.Valid {
-			c.LastUsedAt = &used.String
-		}
-		if created.Valid {
-			c.CreatedAt = &created.String
+		if r.CreatedAt.Valid {
+			c.CreatedAt = &r.CreatedAt.String
 		}
 		out = append(out, c)
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 func (w WebAuthn) Count(ctx context.Context, userID int64) (int, error) {
-	var n int
-	err := w.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM webauthn_credentials WHERE user_id=?`, userID).Scan(&n)
-	return n, err
+	n, err := db.Q(w.DB).CountWebAuthnCredentials(ctx, userID)
+	return int(n), err
 }
 
 func (w WebAuthn) BeginRegistration(ctx context.Context, u *User) (token string, options any, err error) {
@@ -159,10 +153,10 @@ func (w WebAuthn) FinishRegistration(ctx context.Context, u *User, token, name s
 	rec, _ := json.Marshal(cred)
 	now := time.Now().UTC().Format(time.RFC3339)
 	aaguid := fmt.Sprintf("%x", cred.Authenticator.AAGUID)
-	res, err := w.DB.ExecContext(ctx, `
-		INSERT INTO webauthn_credentials (user_id, credential_id, name, aaguid, record, counter, created_at, updated_at)
-		VALUES (?,?,?,?,?,?,?,?)`,
-		u.ID, b64(cred.ID), name, aaguid, string(rec), cred.Authenticator.SignCount, now, now)
+	res, err := db.Q(w.DB).InsertWebAuthnCredential(ctx, sqlc.InsertWebAuthnCredentialParams{
+		UserID: u.ID, CredentialID: b64(cred.ID), Name: db.NS(name), Aaguid: db.NS(aaguid),
+		Record: string(rec), Counter: int64(cred.Authenticator.SignCount), CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -238,8 +232,9 @@ func (w WebAuthn) FinishLogin(ctx context.Context, token string, response json.R
 }
 
 func (w WebAuthn) Rename(ctx context.Context, userID, id int64, name string) error {
-	res, err := w.DB.ExecContext(ctx, `UPDATE webauthn_credentials SET name=?, updated_at=? WHERE id=? AND user_id=?`,
-		name, time.Now().UTC().Format(time.RFC3339), id, userID)
+	res, err := db.Q(w.DB).RenameWebAuthnCredential(ctx, sqlc.RenameWebAuthnCredentialParams{
+		Name: db.NS(name), UpdatedAt: db.NS(time.Now().UTC().Format(time.RFC3339)), ID: id, UserID: userID,
+	})
 	if err != nil {
 		return err
 	}
@@ -251,7 +246,7 @@ func (w WebAuthn) Rename(ctx context.Context, userID, id int64, name string) err
 }
 
 func (w WebAuthn) Delete(ctx context.Context, userID, id int64) error {
-	res, err := w.DB.ExecContext(ctx, `DELETE FROM webauthn_credentials WHERE id=? AND user_id=?`, id, userID)
+	res, err := db.Q(w.DB).DeleteWebAuthnCredential(ctx, sqlc.DeleteWebAuthnCredentialParams{ID: id, UserID: userID})
 	if err != nil {
 		return err
 	}
@@ -270,14 +265,11 @@ func (w WebAuthn) issueChallenge(ctx context.Context, userID *int64, typ string,
 	if err != nil {
 		return "", nil, err
 	}
-	var uid any
-	if userID != nil {
-		uid = *userID
-	}
-	_, err = w.DB.ExecContext(ctx, `
-		INSERT INTO webauthn_challenges (user_id, token_hash, type, options, expires_at, created_at, updated_at)
-		VALUES (?,?,?,?,?,?,?)`, uid, HashToken(token), typ, string(raw), now.Add(5*time.Minute).Format(time.RFC3339),
-		now.Format(time.RFC3339), now.Format(time.RFC3339))
+	err = db.Q(w.DB).InsertWebAuthnChallenge(ctx, sqlc.InsertWebAuthnChallengeParams{
+		UserID: db.NullInt64(userID), TokenHash: HashToken(token), Type: typ, Options: string(raw),
+		ExpiresAt: now.Add(5 * time.Minute).Format(time.RFC3339),
+		CreatedAt: db.NS(now.Format(time.RFC3339)), UpdatedAt: db.NS(now.Format(time.RFC3339)),
+	})
 	return token, options, err
 }
 
@@ -294,16 +286,17 @@ func (w WebAuthn) consumeChallenge(ctx context.Context, token, typ string, userI
 
 func (w WebAuthn) consumeChallengeAny(ctx context.Context, token, typ string) (*webauthn.SessionData, int64, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
-	var raw string
-	var uid sql.NullInt64
-	err := w.DB.QueryRowContext(ctx, `
-		SELECT user_id, options FROM webauthn_challenges
-		WHERE token_hash=? AND type=? AND consumed_at IS NULL AND expires_at > ?`,
-		HashToken(token), typ, now).Scan(&uid, &raw)
+	row, err := db.Q(w.DB).GetOpenWebAuthnChallenge(ctx, sqlc.GetOpenWebAuthnChallengeParams{
+		TokenHash: HashToken(token), Type: typ, ExpiresAt: now,
+	})
 	if err != nil {
 		return nil, 0, nil
 	}
-	_, _ = w.DB.ExecContext(ctx, `UPDATE webauthn_challenges SET consumed_at=?, updated_at=? WHERE token_hash=?`, now, now, HashToken(token))
+	_ = db.Q(w.DB).ConsumeWebAuthnChallenge(ctx, sqlc.ConsumeWebAuthnChallengeParams{
+		ConsumedAt: db.NS(now), UpdatedAt: db.NS(now), TokenHash: HashToken(token),
+	})
+	raw := row.Options
+	uid := row.UserID
 	var wrap struct {
 		Session webauthn.SessionData `json:"session"`
 	}
@@ -314,23 +307,18 @@ func (w WebAuthn) consumeChallengeAny(ctx context.Context, token, typ string) (*
 }
 
 func (w WebAuthn) loadCreds(ctx context.Context, userID int64) ([]webauthn.Credential, error) {
-	rows, err := w.DB.QueryContext(ctx, `SELECT record FROM webauthn_credentials WHERE user_id=?`, userID)
+	recs, err := db.Q(w.DB).ListWebAuthnRecords(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 	var out []webauthn.Credential
-	for rows.Next() {
-		var raw string
-		if err := rows.Scan(&raw); err != nil {
-			return nil, err
-		}
+	for _, raw := range recs {
 		var c webauthn.Credential
 		if json.Unmarshal([]byte(raw), &c) == nil {
 			out = append(out, c)
 		}
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 func (w WebAuthn) userForHandle(ctx context.Context, handle, rawID []byte) (*User, []webauthn.Credential, error) {
@@ -348,8 +336,7 @@ func (w WebAuthn) userForHandle(ctx context.Context, handle, rawID []byte) (*Use
 	if len(rawID) == 0 {
 		return nil, nil, nil
 	}
-	var userID int64
-	err := w.DB.QueryRowContext(ctx, `SELECT user_id FROM webauthn_credentials WHERE credential_id=?`, b64(rawID)).Scan(&userID)
+	userID, err := db.Q(w.DB).GetWebAuthnUserIDByCredential(ctx, b64(rawID))
 	if err != nil {
 		return nil, nil, nil
 	}
@@ -363,8 +350,9 @@ func (w WebAuthn) userForHandle(ctx context.Context, handle, rawID []byte) (*Use
 
 func (w WebAuthn) touchCred(ctx context.Context, rawID []byte) {
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, _ = w.DB.ExecContext(ctx, `UPDATE webauthn_credentials SET last_used_at=?, updated_at=? WHERE credential_id=?`,
-		now, now, b64(rawID))
+	_ = db.Q(w.DB).TouchWebAuthnCredential(ctx, sqlc.TouchWebAuthnCredentialParams{
+		LastUsedAt: db.NS(now), UpdatedAt: db.NS(now), CredentialID: b64(rawID),
+	})
 }
 
 func descriptors(creds []webauthn.Credential) []protocol.CredentialDescriptor {

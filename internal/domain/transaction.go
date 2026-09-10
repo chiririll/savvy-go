@@ -5,6 +5,10 @@ import (
 	"database/sql"
 	"fmt"
 	"time"
+
+	"github.com/chiririll/savvy-plus/internal/db"
+	"github.com/chiririll/savvy-plus/internal/db/filter"
+	"github.com/chiririll/savvy-plus/internal/db/sqlc"
 )
 
 type TxItem struct {
@@ -125,12 +129,13 @@ func (s Transactions) Create(ctx context.Context, in TxInput) (*Transaction, err
 		in.ToAmount = &amt
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	res, err := s.DB.ExecContext(ctx, `
-		INSERT INTO transactions (type, account_id, to_account_id, category_id, amount, to_amount, exchange_rate,
-			description, date, status, recurring_transaction_id, created_at, updated_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		in.Type, in.AccountID, in.ToAccountID, in.CategoryID, in.Amount, in.ToAmount, in.ExchangeRate,
-		in.Description, in.Date, status, in.RecurringID, now, now)
+	res, err := db.Q(s.DB).InsertTransaction(ctx, sqlc.InsertTransactionParams{
+		Type: in.Type, AccountID: in.AccountID, ToAccountID: db.NullInt64(in.ToAccountID),
+		CategoryID: db.NullInt64(in.CategoryID), Amount: in.Amount, ToAmount: db.NullFloat64(in.ToAmount),
+		ExchangeRate: db.NullFloat64(in.ExchangeRate), Description: db.NullString(in.Description),
+		Date: db.NullString(in.Date), Status: status, RecurringTransactionID: db.NullInt64(in.RecurringID),
+		CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -153,16 +158,17 @@ func (s Transactions) Update(ctx context.Context, id int64, in TxInput) (*Transa
 		return nil, fmt.Errorf("cannot edit")
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, err = s.DB.ExecContext(ctx, `
-		UPDATE transactions SET type=?, account_id=?, to_account_id=?, category_id=?, amount=?, to_amount=?,
-			exchange_rate=?, description=?, date=?, updated_at=? WHERE id=?`,
-		in.Type, in.AccountID, in.ToAccountID, in.CategoryID, in.Amount, in.ToAmount,
-		in.ExchangeRate, in.Description, in.Date, now, id)
+	err = db.Q(s.DB).UpdateTransaction(ctx, sqlc.UpdateTransactionParams{
+		Type: in.Type, AccountID: in.AccountID, ToAccountID: db.NullInt64(in.ToAccountID),
+		CategoryID: db.NullInt64(in.CategoryID), Amount: in.Amount, ToAmount: db.NullFloat64(in.ToAmount),
+		ExchangeRate: db.NullFloat64(in.ExchangeRate), Description: db.NullString(in.Description),
+		Date: db.NullString(in.Date), UpdatedAt: db.NS(now), ID: id,
+	})
 	if err != nil {
 		return nil, err
 	}
 	if in.Items != nil {
-		_, _ = s.DB.ExecContext(ctx, `DELETE FROM transaction_items WHERE transaction_id = ?`, id)
+		_ = db.Q(s.DB).DeleteTransactionItems(ctx, id)
 		if err := s.saveItems(ctx, id, in.Items); err != nil {
 			return nil, err
 		}
@@ -183,8 +189,7 @@ func (s Transactions) Delete(ctx context.Context, id int64) error {
 	if cur.RecurringID != nil {
 		return fmt.Errorf("cannot delete recurring")
 	}
-	_, err = s.DB.ExecContext(ctx, `DELETE FROM transactions WHERE id = ?`, id)
-	return err
+	return db.Q(s.DB).DeleteTransaction(ctx, id)
 }
 
 func (s Transactions) Confirm(ctx context.Context, id int64, date string) (*Transaction, error) {
@@ -205,7 +210,7 @@ func (s Transactions) Confirm(ctx context.Context, id int64, date string) (*Tran
 		return nil, fmt.Errorf("future")
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, err = s.DB.ExecContext(ctx, `UPDATE transactions SET status='confirmed', date=?, updated_at=? WHERE id=?`, date, now, id)
+	err = db.Q(s.DB).ConfirmTransaction(ctx, sqlc.ConfirmTransactionParams{Date: db.NS(date), UpdatedAt: db.NS(now), ID: id})
 	if err != nil {
 		return nil, err
 	}
@@ -221,7 +226,7 @@ func (s Transactions) Skip(ctx context.Context, id int64) (*Transaction, error) 
 		return nil, fmt.Errorf("cannot skip")
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, err = s.DB.ExecContext(ctx, `UPDATE transactions SET status='skipped', updated_at=? WHERE id=?`, now, id)
+	err = db.Q(s.DB).SkipTransaction(ctx, sqlc.SkipTransactionParams{UpdatedAt: db.NS(now), ID: id})
 	if err != nil {
 		return nil, err
 	}
@@ -252,28 +257,34 @@ func (s Transactions) Duplicate(ctx context.Context, id int64) (*Transaction, er
 }
 
 func (s Transactions) ByID(ctx context.Context, id int64) (*Transaction, error) {
-	list, err := s.list(ctx, `WHERE t.id = ?`, id)
+	list, err := s.list(ctx, sqlc.ListTransactionsParams{ID: db.NI(id), Limit: 1, Offset: 0})
 	if err != nil || len(list) == 0 {
 		return nil, err
 	}
 	return &list[0], nil
 }
 
-func (s Transactions) Filtered(ctx context.Context, q string, args []any, page, perPage int) ([]Transaction, int, error) {
+func (s Transactions) Filtered(ctx context.Context, f filter.TxFilter, page, perPage int) ([]Transaction, int, error) {
 	if perPage <= 0 {
 		perPage = 25
 	}
 	if page <= 0 {
 		page = 1
 	}
-	var total int
-	countQ := `SELECT COUNT(*) FROM transactions t ` + q
-	if err := s.DB.QueryRowContext(ctx, countQ, args...).Scan(&total); err != nil {
+	arg := sqlc.CountTransactionsParams{
+		Type: db.Narg(f.Type), AccountID: db.NullInt64If(f.AccountID), CategoryID: db.NullInt64If(f.CategoryID),
+		Status: db.Narg(f.Status), StartDate: db.Narg(f.StartDate), EndDate: db.Narg(f.EndDate),
+	}
+	total, err := db.Q(s.DB).CountTransactions(ctx, arg)
+	if err != nil {
 		return nil, 0, err
 	}
-	list, err := s.list(ctx, q+` ORDER BY t.date DESC, t.id DESC LIMIT ? OFFSET ?`,
-		append(args, perPage, (page-1)*perPage)...)
-	return list, total, err
+	list, err := s.list(ctx, sqlc.ListTransactionsParams{
+		Type: arg.Type, AccountID: arg.AccountID, CategoryID: arg.CategoryID,
+		Status: arg.Status, StartDate: arg.StartDate, EndDate: arg.EndDate,
+		Limit: int64(perPage), Offset: int64((page - 1) * perPage),
+	})
+	return list, int(total), err
 }
 
 func (s Transactions) Summary(ctx context.Context, pendingOnly bool) map[string]any {
@@ -281,62 +292,40 @@ func (s Transactions) Summary(ctx context.Context, pendingOnly bool) map[string]
 	if pendingOnly {
 		status = "pending"
 	}
-	rows, err := s.DB.QueryContext(ctx, `
-		SELECT t.type, t.amount, c.rate, c.is_base
-		FROM transactions t
-		JOIN accounts a ON a.id = t.account_id
-		JOIN currencies c ON c.id = a.currency_id
-		WHERE t.status = ? AND t.type IN ('income','expense')`, status)
+	rows, err := db.Q(s.DB).ListTransactionSummaryRows(ctx, status)
 	if err != nil {
 		return map[string]any{"income": 0, "expense": 0, "balance": 0, "transactions_count": 0, "currency": nil}
 	}
-	defer rows.Close()
 	var income, expense float64
 	n := 0
-	for rows.Next() {
-		var typ string
-		var amount, rate float64
-		var base int
-		_ = rows.Scan(&typ, &amount, &rate, &base)
-		if base == 0 && rate != 0 {
-			amount *= rate
+	for _, r := range rows {
+		amount := r.Amount
+		if r.IsBase == 0 && r.Rate != 0 {
+			amount *= r.Rate
 		}
-		if typ == "income" {
+		if r.Type == "income" {
 			income += amount
 		} else {
 			expense += amount
 		}
 		n++
 	}
-	var code sql.NullString
-	_ = s.DB.QueryRowContext(ctx, `SELECT code FROM currencies WHERE is_base = 1`).Scan(&code)
+	code, _ := db.Q(s.DB).GetBaseCurrencyCode(ctx)
 	return map[string]any{
 		"income": income, "expense": expense, "balance": income - expense,
-		"transactions_count": n, "currency": nilOr(code.String),
+		"transactions_count": n, "currency": nilOr(code),
 	}
 }
 
-func (s Transactions) list(ctx context.Context, where string, args ...any) ([]Transaction, error) {
-	rows, err := s.DB.QueryContext(ctx, `
-		SELECT t.id, t.type, t.account_id, t.to_account_id, t.category_id, t.amount, t.to_amount, t.exchange_rate,
-			t.description, t.date, t.status, t.recurring_transaction_id, t.created_at
-		FROM transactions t `+where, args...)
+func (s Transactions) list(ctx context.Context, arg sqlc.ListTransactionsParams) ([]Transaction, error) {
+	rows, err := db.Q(s.DB).ListTransactions(ctx, arg)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []Transaction
-	for rows.Next() {
-		t, err := scanTx(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, t)
+	out := make([]Transaction, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, txFromRow(r))
 	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	rows.Close()
 	accts := Accounts{DB: s.DB}
 	cats := Categories{DB: s.DB}
 	for i := range out {
@@ -360,39 +349,27 @@ func (s Transactions) list(ctx context.Context, where string, args ...any) ([]Tr
 }
 
 func (s Transactions) items(ctx context.Context, id int64) ([]TxItem, error) {
-	rows, err := s.DB.QueryContext(ctx, `SELECT id, name, quantity, price_per_unit, total_price FROM transaction_items WHERE transaction_id = ?`, id)
+	rows, err := db.Q(s.DB).ListTransactionItems(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []TxItem
-	for rows.Next() {
-		var i TxItem
-		if err := rows.Scan(&i.ID, &i.Name, &i.Quantity, &i.PricePerUnit, &i.TotalPrice); err != nil {
-			return nil, err
-		}
-		out = append(out, i)
+	out := make([]TxItem, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, TxItem{ID: r.ID, Name: r.Name, Quantity: r.Quantity, PricePerUnit: r.PricePerUnit, TotalPrice: r.TotalPrice})
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 func (s Transactions) tags(ctx context.Context, id int64) ([]Tag, error) {
-	rows, err := s.DB.QueryContext(ctx, `
-		SELECT tags.id, tags.name, tags.created_at, 0 FROM tags
-		JOIN transaction_tag tt ON tt.tag_id = tags.id WHERE tt.transaction_id = ?`, id)
+	rows, err := db.Q(s.DB).ListTransactionTags(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []Tag
-	for rows.Next() {
-		t, err := scanTag(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, t)
+	out := make([]Tag, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, tagFromList(r.ID, r.Name, r.CreatedAt, r.TransactionsCount))
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 func (s Transactions) saveItems(ctx context.Context, txID int64, items []TxItem) error {
@@ -401,9 +378,10 @@ func (s Transactions) saveItems(ctx context.Context, txID int64, items []TxItem)
 		if it.TotalPrice == 0 {
 			it.TotalPrice = it.Quantity * it.PricePerUnit
 		}
-		if _, err := s.DB.ExecContext(ctx, `
-			INSERT INTO transaction_items (transaction_id, name, quantity, price_per_unit, total_price, created_at, updated_at)
-			VALUES (?,?,?,?,?,?,?)`, txID, it.Name, it.Quantity, it.PricePerUnit, it.TotalPrice, now, now); err != nil {
+		if err := db.Q(s.DB).InsertTransactionItem(ctx, sqlc.InsertTransactionItemParams{
+			TransactionID: txID, Name: it.Name, Quantity: it.Quantity, PricePerUnit: it.PricePerUnit,
+			TotalPrice: it.TotalPrice, CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
+		}); err != nil {
 			return err
 		}
 	}
@@ -411,46 +389,42 @@ func (s Transactions) saveItems(ctx context.Context, txID int64, items []TxItem)
 }
 
 func (s Transactions) saveTags(ctx context.Context, txID int64, ids []int64) error {
-	_, _ = s.DB.ExecContext(ctx, `DELETE FROM transaction_tag WHERE transaction_id = ?`, txID)
+	_ = db.Q(s.DB).DeleteTransactionTags(ctx, txID)
 	for _, id := range ids {
-		if _, err := s.DB.ExecContext(ctx, `INSERT OR IGNORE INTO transaction_tag (transaction_id, tag_id) VALUES (?,?)`, txID, id); err != nil {
+		if err := db.Q(s.DB).InsertTransactionTag(ctx, sqlc.InsertTransactionTagParams{TransactionID: txID, TagID: id}); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func scanTx(row interface{ Scan(...any) error }) (Transaction, error) {
-	var t Transaction
-	var toAcc, cat, rec sql.NullInt64
-	var toAmt, rate sql.NullFloat64
-	var desc, date, created sql.NullString
-	err := row.Scan(&t.ID, &t.Type, &t.AccountID, &toAcc, &cat, &t.Amount, &toAmt, &rate, &desc, &date, &t.Status, &rec, &created)
-	if toAcc.Valid {
-		t.ToAccountID = &toAcc.Int64
+func txFromRow(r sqlc.ListTransactionsRow) Transaction {
+	t := Transaction{ID: r.ID, Type: r.Type, AccountID: r.AccountID, Amount: r.Amount, Status: r.Status}
+	if r.ToAccountID.Valid {
+		t.ToAccountID = &r.ToAccountID.Int64
 	}
-	if cat.Valid {
-		t.CategoryID = &cat.Int64
+	if r.CategoryID.Valid {
+		t.CategoryID = &r.CategoryID.Int64
 	}
-	if toAmt.Valid {
-		t.ToAmount = &toAmt.Float64
+	if r.ToAmount.Valid {
+		t.ToAmount = &r.ToAmount.Float64
 	}
-	if rate.Valid {
-		t.ExchangeRate = &rate.Float64
+	if r.ExchangeRate.Valid {
+		t.ExchangeRate = &r.ExchangeRate.Float64
 	}
-	if desc.Valid {
-		t.Description = &desc.String
+	if r.Description.Valid {
+		t.Description = &r.Description.String
 	}
-	if date.Valid {
-		t.Date = &date.String
+	if r.Date.Valid {
+		t.Date = &r.Date.String
 	}
-	if rec.Valid {
-		t.RecurringID = &rec.Int64
+	if r.RecurringTransactionID.Valid {
+		t.RecurringID = &r.RecurringTransactionID.Int64
 	}
-	if tm, ok := parseNullTime(created); ok {
+	if tm, ok := parseNullTime(r.CreatedAt); ok {
 		t.CreatedAt = &tm
 	}
-	return t, err
+	return t
 }
 
 func isFuture(date string) bool {

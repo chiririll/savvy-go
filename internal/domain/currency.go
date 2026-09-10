@@ -7,6 +7,9 @@ import (
 	"math"
 	"strings"
 	"time"
+
+	"github.com/chiririll/savvy-plus/internal/db"
+	"github.com/chiririll/savvy-plus/internal/db/sqlc"
 )
 
 type Currency struct {
@@ -55,22 +58,30 @@ func Convert(amount float64, from, to Currency) float64 {
 type Currencies struct{ DB *sql.DB }
 
 func (s Currencies) All(ctx context.Context) ([]Currency, error) {
-	return s.query(ctx, `SELECT id, code, name, symbol, decimals, is_base, rate FROM currencies ORDER BY code`)
+	rows, err := db.Q(s.DB).ListCurrencies(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Currency, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, currencyFrom(r.ID, r.Code, r.Name, r.Symbol, r.Decimals, r.IsBase, r.Rate))
+	}
+	return out, nil
 }
 
 func (s Currencies) ByID(ctx context.Context, id int64) (*Currency, error) {
-	return scanCurrency(s.DB.QueryRowContext(ctx,
-		`SELECT id, code, name, symbol, decimals, is_base, rate FROM currencies WHERE id = ?`, id))
+	r, err := db.Q(s.DB).GetCurrency(ctx, id)
+	return currencyFromRow(r.ID, r.Code, r.Name, r.Symbol, r.Decimals, r.IsBase, r.Rate, err)
 }
 
 func (s Currencies) ByCode(ctx context.Context, code string) (*Currency, error) {
-	return scanCurrency(s.DB.QueryRowContext(ctx,
-		`SELECT id, code, name, symbol, decimals, is_base, rate FROM currencies WHERE code = ?`, strings.ToUpper(code)))
+	r, err := db.Q(s.DB).GetCurrencyByCode(ctx, strings.ToUpper(code))
+	return currencyFromRow(r.ID, r.Code, r.Name, r.Symbol, r.Decimals, r.IsBase, r.Rate, err)
 }
 
 func (s Currencies) Base(ctx context.Context) (*Currency, error) {
-	return scanCurrency(s.DB.QueryRowContext(ctx,
-		`SELECT id, code, name, symbol, decimals, is_base, rate FROM currencies WHERE is_base = 1 LIMIT 1`))
+	r, err := db.Q(s.DB).GetBaseCurrency(ctx)
+	return currencyFromRow(r.ID, r.Code, r.Name, r.Symbol, r.Decimals, r.IsBase, r.Rate, err)
 }
 
 func (s Currencies) Create(ctx context.Context, c Currency) (*Currency, error) {
@@ -82,16 +93,16 @@ func (s Currencies) Create(ctx context.Context, c Currency) (*Currency, error) {
 		c.Rate = 1
 	}
 	if c.IsBase {
-		if _, err := s.DB.ExecContext(ctx, `UPDATE currencies SET is_base = 0 WHERE is_base = 1`); err != nil {
+		if err := db.Q(s.DB).ClearBaseCurrency(ctx); err != nil {
 			return nil, err
 		}
 		c.Rate = 1
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	res, err := s.DB.ExecContext(ctx, `
-		INSERT INTO currencies (code, name, symbol, decimals, is_base, rate, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		c.Code, c.Name, c.Symbol, c.Decimals, boolInt(c.IsBase), c.Rate, now, now)
+	res, err := db.Q(s.DB).InsertCurrency(ctx, sqlc.InsertCurrencyParams{
+		Code: c.Code, Name: c.Name, Symbol: c.Symbol, Decimals: int64(c.Decimals),
+		IsBase: db.BoolInt(c.IsBase), Rate: c.Rate, CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -111,15 +122,16 @@ func (s Currencies) Update(ctx context.Context, id int64, c Currency) (*Currency
 		return nil, fmt.Errorf("base rate")
 	}
 	if c.IsBase && !cur.IsBase {
-		if _, err := s.DB.ExecContext(ctx, `UPDATE currencies SET is_base = 0 WHERE is_base = 1`); err != nil {
+		if err := db.Q(s.DB).ClearBaseCurrency(ctx); err != nil {
 			return nil, err
 		}
 		c.Rate = 1
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, err = s.DB.ExecContext(ctx, `
-		UPDATE currencies SET name=?, symbol=?, decimals=?, is_base=?, rate=?, updated_at=? WHERE id=?`,
-		c.Name, c.Symbol, c.Decimals, boolInt(c.IsBase), c.Rate, now, id)
+	err = db.Q(s.DB).UpdateCurrency(ctx, sqlc.UpdateCurrencyParams{
+		Name: c.Name, Symbol: c.Symbol, Decimals: int64(c.Decimals), IsBase: db.BoolInt(c.IsBase),
+		Rate: c.Rate, UpdatedAt: db.NS(now), ID: id,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -131,21 +143,18 @@ func (s Currencies) Delete(ctx context.Context, id int64) error {
 	if err != nil || cur == nil {
 		return err
 	}
-	var used int
-	_ = s.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM accounts WHERE currency_id = ?`, id).Scan(&used)
+	used, _ := db.Q(s.DB).CountAccountsForCurrency(ctx, id)
 	if used > 0 {
 		return fmt.Errorf("in use")
 	}
 	if cur.IsBase {
 		return fmt.Errorf("base")
 	}
-	var n int
-	_ = s.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM currencies`).Scan(&n)
+	n, _ := db.Q(s.DB).CountCurrencies(ctx)
 	if n <= 1 {
 		return fmt.Errorf("last")
 	}
-	_, err = s.DB.ExecContext(ctx, `DELETE FROM currencies WHERE id = ?`, id)
-	return err
+	return db.Q(s.DB).DeleteCurrency(ctx, id)
 }
 
 func (s Currencies) SetBase(ctx context.Context, id int64) (*Currency, error) {
@@ -160,23 +169,17 @@ func (s Currencies) SetBase(ctx context.Context, id int64) (*Currency, error) {
 	if newRate == 0 {
 		newRate = 1
 	}
-	rows, err := s.DB.QueryContext(ctx, `SELECT id, rate FROM currencies WHERE id != ?`, id)
+	rows, err := db.Q(s.DB).ListOtherCurrencyRates(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	for rows.Next() {
-		var oid int64
-		var rate float64
-		if err := rows.Scan(&oid, &rate); err != nil {
-			return nil, err
-		}
-		if _, err := s.DB.ExecContext(ctx, `UPDATE currencies SET rate = ?, is_base = 0 WHERE id = ?`, rate/newRate, oid); err != nil {
+	for _, r := range rows {
+		if err := db.Q(s.DB).UpdateCurrencyRate(ctx, sqlc.UpdateCurrencyRateParams{Rate: r.Rate / newRate, ID: r.ID}); err != nil {
 			return nil, err
 		}
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, err = s.DB.ExecContext(ctx, `UPDATE currencies SET is_base = 1, rate = 1, updated_at = ? WHERE id = ?`, now, id)
+	err = db.Q(s.DB).SetCurrencyBase(ctx, sqlc.SetCurrencyBaseParams{UpdatedAt: db.NS(now), ID: id})
 	if err != nil {
 		return nil, err
 	}
@@ -191,8 +194,7 @@ func (s Currencies) FindOrCreateByCode(ctx context.Context, code string) (*Curre
 	if item == nil {
 		return nil, fmt.Errorf("unknown code")
 	}
-	var n int
-	_ = s.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM currencies`).Scan(&n)
+	n, _ := db.Q(s.DB).CountCurrencies(ctx)
 	item.IsBase = n == 0
 	if item.IsBase {
 		item.Rate = 1
@@ -202,12 +204,8 @@ func (s Currencies) FindOrCreateByCode(ctx context.Context, code string) (*Curre
 
 func (s Currencies) Catalog(ctx context.Context) []map[string]any {
 	existing := map[string]bool{}
-	rows, err := s.DB.QueryContext(ctx, `SELECT code FROM currencies`)
-	if err == nil {
-		defer rows.Close()
-		for rows.Next() {
-			var code string
-			_ = rows.Scan(&code)
+	if rows, err := db.Q(s.DB).ListCurrencyCodes(ctx); err == nil {
+		for _, code := range rows {
 			existing[strings.ToUpper(code)] = true
 		}
 	}
@@ -224,38 +222,18 @@ func (s Currencies) Catalog(ctx context.Context) []map[string]any {
 	return out
 }
 
-func (s Currencies) query(ctx context.Context, q string, args ...any) ([]Currency, error) {
-	rows, err := s.DB.QueryContext(ctx, q, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []Currency
-	for rows.Next() {
-		c, err := scanCurrencyRow(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, *c)
-	}
-	return out, rows.Err()
+func currencyFrom(id int64, code, name, symbol string, decimals, isBase int64, rate float64) Currency {
+	return Currency{ID: id, Code: code, Name: name, Symbol: symbol, Decimals: int(decimals), IsBase: isBase != 0, Rate: rate}
 }
 
-func scanCurrency(row interface{ Scan(...any) error }) (*Currency, error) {
-	c, err := scanCurrencyRow(row)
+func currencyFromRow(id int64, code, name, symbol string, decimals, isBase int64, rate float64, err error) (*Currency, error) {
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
-	return c, err
-}
-
-func scanCurrencyRow(row interface{ Scan(...any) error }) (*Currency, error) {
-	var c Currency
-	var base int
-	if err := row.Scan(&c.ID, &c.Code, &c.Name, &c.Symbol, &c.Decimals, &base, &c.Rate); err != nil {
+	if err != nil {
 		return nil, err
 	}
-	c.IsBase = base != 0
+	c := currencyFrom(id, code, name, symbol, decimals, isBase, rate)
 	return &c, nil
 }
 

@@ -4,6 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"time"
+
+	"github.com/chiririll/savvy-plus/internal/db"
+	"github.com/chiririll/savvy-plus/internal/db/sqlc"
 )
 
 const passwordTokenTTL = 7 * 24 * time.Hour
@@ -26,11 +29,10 @@ func (p PasswordTokens) Issue(ctx context.Context, user *User) (token string, ex
 	token = RandomString(64)
 	now := time.Now().UTC()
 	expires = now.Add(passwordTokenTTL)
-	_, err = p.DB.ExecContext(ctx, `
-		INSERT INTO password_tokens (user_id, token_hash, expires_at, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?)`,
-		user.ID, HashToken(token), fmtTime(expires), fmtTime(now), fmtTime(now),
-	)
+	err = db.Q(p.DB).InsertPasswordToken(ctx, sqlc.InsertPasswordTokenParams{
+		UserID: user.ID, TokenHash: HashToken(token), ExpiresAt: fmtTime(expires),
+		CreatedAt: db.NS(fmtTime(now)), UpdatedAt: db.NS(fmtTime(now)),
+	})
 	return token, expires, err
 }
 
@@ -40,11 +42,9 @@ func (p PasswordTokens) Preview(ctx context.Context, token string) (*PasswordTok
 
 func (p PasswordTokens) Consume(ctx context.Context, token string) (*PasswordToken, error) {
 	now := fmtTime(time.Now().UTC())
-	res, err := p.DB.ExecContext(ctx, `
-		UPDATE password_tokens SET consumed_at = ?, updated_at = ?
-		WHERE token_hash = ? AND consumed_at IS NULL AND expires_at > ?`,
-		now, now, HashToken(token), now,
-	)
+	res, err := db.Q(p.DB).ConsumePasswordToken(ctx, sqlc.ConsumePasswordTokenParams{
+		ConsumedAt: db.NS(now), UpdatedAt: db.NS(now), TokenHash: HashToken(token), ExpiresAt: now,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -57,39 +57,36 @@ func (p PasswordTokens) Consume(ctx context.Context, token string) (*PasswordTok
 
 func (p PasswordTokens) RevokeActive(ctx context.Context, userID int64) error {
 	now := fmtTime(time.Now().UTC())
-	_, err := p.DB.ExecContext(ctx, `
-		UPDATE password_tokens SET consumed_at = ?, updated_at = ?
-		WHERE user_id = ? AND consumed_at IS NULL`, now, now, userID)
-	return err
+	return db.Q(p.DB).RevokeActivePasswordTokens(ctx, sqlc.RevokeActivePasswordTokensParams{
+		ConsumedAt: db.NS(now), UpdatedAt: db.NS(now), UserID: userID,
+	})
 }
 
 func (p PasswordTokens) findValid(ctx context.Context, token string) (*PasswordToken, error) {
-	return p.scan(ctx, `
-		SELECT id, user_id, expires_at FROM password_tokens
-		WHERE token_hash = ? AND consumed_at IS NULL AND expires_at > ?`,
-		HashToken(token), fmtTime(time.Now().UTC()),
-	)
+	row, err := db.Q(p.DB).GetValidPasswordToken(ctx, sqlc.GetValidPasswordTokenParams{
+		TokenHash: HashToken(token), ExpiresAt: fmtTime(time.Now().UTC()),
+	})
+	return p.fromValid(ctx, row.ID, row.UserID, row.ExpiresAt, err)
 }
 
 func (p PasswordTokens) findHash(ctx context.Context, hash string) (*PasswordToken, error) {
-	return p.scan(ctx, `SELECT id, user_id, expires_at FROM password_tokens WHERE token_hash = ?`, hash)
+	row, err := db.Q(p.DB).GetPasswordTokenByHash(ctx, hash)
+	return p.fromValid(ctx, row.ID, row.UserID, row.ExpiresAt, err)
 }
 
-func (p PasswordTokens) scan(ctx context.Context, q string, args ...any) (*PasswordToken, error) {
-	var row PasswordToken
-	var exp string
-	err := p.DB.QueryRowContext(ctx, q, args...).Scan(&row.ID, &row.UserID, &exp)
+func (p PasswordTokens) fromValid(ctx context.Context, id, userID int64, exp string, err error) (*PasswordToken, error) {
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	row.ExpiresAt, _ = parseTime(sql.NullString{String: exp, Valid: true})
-	u, err := Users{DB: p.DB}.ByID(ctx, row.UserID)
+	out := &PasswordToken{ID: id, UserID: userID}
+	out.ExpiresAt, _ = parseTime(sql.NullString{String: exp, Valid: true})
+	u, err := Users{DB: p.DB}.ByID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	row.User = u
-	return &row, nil
+	out.User = u
+	return out, nil
 }

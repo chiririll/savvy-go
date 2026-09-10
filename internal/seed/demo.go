@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/chiririll/savvy-plus/internal/auth"
+	appdb "github.com/chiririll/savvy-plus/internal/db"
+	"github.com/chiririll/savvy-plus/internal/db/sqlc"
 	"github.com/chiririll/savvy-plus/internal/domain"
 )
 
@@ -496,9 +498,10 @@ func (s *seeder) seedTransactionItems() error {
 		}
 		items := s.randomItems(cand.amount, catName)
 		for _, it := range items {
-			if _, err := s.db.ExecContext(s.ctx, `
-				INSERT INTO transaction_items (transaction_id, name, quantity, price_per_unit, total_price, created_at, updated_at)
-				VALUES (?,?,?,?,?,?,?)`, cand.id, it.Name, it.Quantity, it.PricePerUnit, it.TotalPrice, now, now); err != nil {
+			if err := appdb.Q(s.db).InsertTransactionItem(s.ctx, sqlc.InsertTransactionItemParams{
+				TransactionID: cand.id, Name: it.Name, Quantity: it.Quantity, PricePerUnit: it.PricePerUnit,
+				TotalPrice: it.TotalPrice, CreatedAt: appdb.NS(now), UpdatedAt: appdb.NS(now),
+			}); err != nil {
 				return err
 			}
 		}
@@ -730,9 +733,8 @@ func (s *seeder) addTx(typ string, accountID int64, catID *int64, amount float64
 }
 
 func (s *seeder) countTx() int {
-	var n int
-	_ = s.db.QueryRowContext(s.ctx, `SELECT COUNT(*) FROM transactions`).Scan(&n)
-	return n
+	n, _ := appdb.Q(s.db).CountTransactions(s.ctx, sqlc.CountTransactionsParams{})
+	return int(n)
 }
 
 func (s *seeder) inRange(d time.Time) bool {

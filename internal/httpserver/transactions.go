@@ -5,40 +5,25 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/chiririll/savvy-plus/internal/db/filter"
 	"github.com/chiririll/savvy-plus/internal/domain"
 	"github.com/go-chi/chi/v5"
 )
 
 func (s *Server) transactionsIndex(w http.ResponseWriter, r *http.Request) {
-	q := "WHERE 1=1"
-	var args []any
-	if v := r.URL.Query().Get("type"); v != "" {
-		q += " AND t.type = ?"
-		args = append(args, v)
+	f := filter.TxFilter{
+		Type: r.URL.Query().Get("type"), Status: r.URL.Query().Get("status"),
+		StartDate: r.URL.Query().Get("start_date"), EndDate: r.URL.Query().Get("end_date"),
 	}
 	if v := r.URL.Query().Get("account_id"); v != "" {
-		q += " AND t.account_id = ?"
-		args = append(args, v)
+		f.AccountID, _ = strconv.ParseInt(v, 10, 64)
 	}
 	if v := r.URL.Query().Get("category_id"); v != "" {
-		q += " AND t.category_id = ?"
-		args = append(args, v)
-	}
-	if v := r.URL.Query().Get("status"); v != "" {
-		q += " AND t.status = ?"
-		args = append(args, v)
-	}
-	if v := r.URL.Query().Get("start_date"); v != "" {
-		q += " AND t.date >= ?"
-		args = append(args, v)
-	}
-	if v := r.URL.Query().Get("end_date"); v != "" {
-		q += " AND t.date <= ?"
-		args = append(args, v)
+		f.CategoryID, _ = strconv.ParseInt(v, 10, 64)
 	}
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	per, _ := strconv.Atoi(r.URL.Query().Get("per_page"))
-	list, total, err := s.txs.Filtered(r.Context(), q, args, page, per)
+	list, total, err := s.txs.Filtered(r.Context(), f, page, per)
 	if err != nil {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return

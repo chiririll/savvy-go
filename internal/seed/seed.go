@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/chiririll/savvy-plus/internal/auth"
+	appdb "github.com/chiririll/savvy-plus/internal/db"
+	"github.com/chiririll/savvy-plus/internal/db/sqlc"
 	"github.com/chiririll/savvy-plus/internal/domain"
 	"github.com/chiririll/savvy-plus/internal/settings"
 )
@@ -46,9 +48,8 @@ func Demo(ctx context.Context, db *sql.DB, enabled bool, loc *time.Location) err
 		return fmt.Errorf("mark demo seeded: %w", err)
 	}
 
-	var txs, accts int
-	_ = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM transactions`).Scan(&txs)
-	_ = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM accounts`).Scan(&accts)
+	txs, _ := appdb.Q(db).CountTransactions(ctx, sqlc.CountTransactionsParams{})
+	accts, _ := appdb.Q(db).CountAccounts(ctx)
 	slog.Info("demo data seeded", "transactions", txs, "accounts", accts)
 	return nil
 }

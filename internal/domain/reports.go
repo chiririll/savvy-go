@@ -7,8 +7,10 @@ import (
 	"math"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
+
+	"github.com/chiririll/savvy-plus/internal/db"
+	"github.com/chiririll/savvy-plus/internal/db/filter"
 )
 
 type ReportFilter struct {
@@ -42,9 +44,15 @@ func (s Reports) loc() *time.Location {
 func (s Reports) now() time.Time { return time.Now().In(s.loc()) }
 
 func (s Reports) baseCode(ctx context.Context) any {
-	var code sql.NullString
-	_ = s.DB.QueryRowContext(ctx, `SELECT code FROM currencies WHERE is_base = 1 LIMIT 1`).Scan(&code)
-	return nilOr(code.String)
+	code, _ := db.Q(s.DB).GetBaseCurrencyCode(ctx)
+	return nilOr(code)
+}
+
+func (s Reports) where(typ string, r dateRange, f ReportFilter, categoryID int64) filter.ReportWhere {
+	return filter.ReportWhere{
+		Type: typ, Start: r.Start.Format("2006-01-02"), End: r.End.Format("2006-01-02"),
+		CategoryID: categoryID, AccountIDs: f.AccountIDs, CategoryIDs: f.CategoryIDs, TagIDs: f.TagIDs,
+	}
 }
 
 func (f ReportFilter) Range(now time.Time) dateRange {
@@ -510,41 +518,19 @@ func (s Reports) TxTop(ctx context.Context, f ReportFilter, typ string, limit in
 		limit = 10
 	}
 	r := f.Range(s.now())
-	q, args := s.filteredQuery(typ, r, f, 0)
-	q = `
-		SELECT t.id, t.description, t.date, t.amount * c.rate,
-			cat.id, cat.name, cat.icon, cat.color, a.id, a.name
-		FROM transactions t
-		JOIN accounts a ON a.id = t.account_id
-		JOIN currencies c ON c.id = a.currency_id
-		LEFT JOIN categories cat ON cat.id = t.category_id
-		` + q + ` ORDER BY t.amount * c.rate DESC LIMIT ?`
-	args = append(args, limit)
-	rows, err := s.DB.QueryContext(ctx, q, args...)
-	if err != nil {
-		return map[string]any{"items": []any{}, "currency": s.baseCode(ctx)}
-	}
-	defer rows.Close()
+	rows := filter.TopTransactions(ctx, s.DB, s.where(typ, r, f, 0), limit)
 	var items []map[string]any
-	for rows.Next() {
-		var id, accID int64
-		var desc, date, accName sql.NullString
-		var amount float64
-		var catID sql.NullInt64
-		var catName, icon, color sql.NullString
-		if err := rows.Scan(&id, &desc, &date, &amount, &catID, &catName, &icon, &color, &accID, &accName); err != nil {
-			continue
-		}
+	for _, x := range rows {
 		var cat any
-		if catID.Valid {
+		if x.CatID.Valid {
 			cat = map[string]any{
-				"id": catID.Int64, "name": catName.String,
-				"icon": coalesce(icon.String, "circle"), "color": coalesce(color.String, "#64748b"),
+				"id": x.CatID.Int64, "name": x.CatName.String,
+				"icon": coalesce(x.Icon.String, "circle"), "color": coalesce(x.Color.String, "#64748b"),
 			}
 		}
 		items = append(items, map[string]any{
-			"id": id, "description": nilOr(desc.String), "amount": round2(amount), "date": date.String,
-			"category": cat, "account": map[string]any{"id": accID, "name": accName.String},
+			"id": x.ID, "description": nilOr(x.Description.String), "amount": round2(x.Amount), "date": x.Date.String,
+			"category": cat, "account": map[string]any{"id": x.AccID, "name": x.AccName.String},
 		})
 	}
 	if items == nil {
@@ -629,24 +615,22 @@ type nwAccount struct {
 }
 
 func (s Reports) netWorthAt(ctx context.Context, at time.Time, f ReportFilter) []nwAccount {
-	q := accountSelect + ` WHERE a.is_active = 1 AND a.type IN ('bank','crypto','cash')`
-	var args []any
-	if len(f.AccountIDs) > 0 {
-		q += ` AND a.id IN (` + placeholders(len(f.AccountIDs)) + `)`
-		for _, id := range f.AccountIDs {
-			args = append(args, id)
-		}
-	}
-	q += ` ORDER BY a.sort_order, a.id`
 	accts := Accounts{DB: s.DB}
-	list, err := accts.list(ctx, q, args...)
+	list, err := accts.All(ctx, true, true)
 	if err != nil {
 		return nil
+	}
+	want := map[int64]bool{}
+	for _, id := range f.AccountIDs {
+		want[id] = true
 	}
 	cutoff := at.Format("2006-01-02")
 	var out []nwAccount
 	for _, a := range list {
-		bal := s.balanceAt(ctx, a, cutoff)
+		if len(want) > 0 && !want[a.ID] {
+			continue
+		}
+		bal, _ := accts.balance(ctx, a, cutoff)
 		rate := 1.0
 		if a.Currency != nil {
 			rate = a.Currency.Rate
@@ -657,17 +641,6 @@ func (s Reports) netWorthAt(ctx context.Context, at time.Time, f ReportFilter) [
 		out = append(out, nwAccount{ID: a.ID, Name: a.Name, Type: a.Type, Balance: bal * rate})
 	}
 	return out
-}
-
-func (s Reports) balanceAt(ctx context.Context, a Account, date string) float64 {
-	var income, expense, tout, tin, dIn, dOut sql.NullFloat64
-	_ = s.DB.QueryRowContext(ctx, `SELECT COALESCE(SUM(amount),0) FROM transactions WHERE account_id=? AND status='confirmed' AND type='income' AND date<=?`, a.ID, date).Scan(&income)
-	_ = s.DB.QueryRowContext(ctx, `SELECT COALESCE(SUM(amount),0) FROM transactions WHERE account_id=? AND status='confirmed' AND type='expense' AND date<=?`, a.ID, date).Scan(&expense)
-	_ = s.DB.QueryRowContext(ctx, `SELECT COALESCE(SUM(amount),0) FROM transactions WHERE account_id=? AND status='confirmed' AND type='transfer' AND date<=?`, a.ID, date).Scan(&tout)
-	_ = s.DB.QueryRowContext(ctx, `SELECT COALESCE(SUM(to_amount),0) FROM transactions WHERE to_account_id=? AND status='confirmed' AND date<=?`, a.ID, date).Scan(&tin)
-	_ = s.DB.QueryRowContext(ctx, `SELECT COALESCE(SUM(amount),0) FROM transactions WHERE account_id=? AND status='confirmed' AND type IN ('debt_collection','debt_borrow') AND date<=?`, a.ID, date).Scan(&dIn)
-	_ = s.DB.QueryRowContext(ctx, `SELECT COALESCE(SUM(amount),0) FROM transactions WHERE account_id=? AND status='confirmed' AND type IN ('debt_payment','debt_lend') AND date<=?`, a.ID, date).Scan(&dOut)
-	return a.InitialBalance + income.Float64 - expense.Float64 - tout.Float64 + tin.Float64 + dIn.Float64 - dOut.Float64
 }
 
 type catTotal struct {
@@ -685,94 +658,33 @@ type dayTotal struct {
 }
 
 func (s Reports) sumByType(ctx context.Context, typ string, r dateRange, f ReportFilter, categoryID int64) float64 {
-	where, args := s.filteredQuery(typ, r, f, categoryID)
-	var total sql.NullFloat64
-	_ = s.DB.QueryRowContext(ctx, `
-		SELECT COALESCE(SUM(t.amount * c.rate), 0)
-		FROM transactions t
-		JOIN accounts a ON a.id = t.account_id
-		JOIN currencies c ON c.id = a.currency_id
-		`+where, args...).Scan(&total)
-	return total.Float64
+	return filter.SumByType(ctx, s.DB, s.where(typ, r, f, categoryID))
 }
 
 func (s Reports) sumGroupedByCategory(ctx context.Context, typ string, r dateRange, f ReportFilter) []catTotal {
-	where, args := s.filteredQuery(typ, r, f, 0)
-	where += ` AND t.category_id IS NOT NULL`
-	rows, err := s.DB.QueryContext(ctx, `
-		SELECT cat.id, cat.name, cat.icon, cat.color, SUM(t.amount * c.rate) as total
-		FROM transactions t
-		JOIN accounts a ON a.id = t.account_id
-		JOIN currencies c ON c.id = a.currency_id
-		JOIN categories cat ON cat.id = t.category_id
-		`+where+`
-		GROUP BY cat.id, cat.name, cat.icon, cat.color
-		ORDER BY total DESC`, args...)
-	if err != nil {
-		return nil
-	}
-	defer rows.Close()
+	rows := filter.SumGroupedByCategory(ctx, s.DB, s.where(typ, r, f, 0))
 	var out []catTotal
-	for rows.Next() {
-		var x catTotal
-		var icon, color sql.NullString
-		if err := rows.Scan(&x.ID, &x.Name, &icon, &color, &x.Total); err != nil {
-			return nil
-		}
-		x.Icon = coalesce(icon.String, "circle")
-		x.Color = coalesce(color.String, "#64748b")
-		x.Total = round2(x.Total)
-		out = append(out, x)
+	for _, x := range rows {
+		out = append(out, catTotal{
+			ID: x.ID, Name: x.Name, Icon: coalesce(x.Icon.String, "circle"),
+			Color: coalesce(x.Color.String, "#64748b"), Total: round2(x.Total),
+		})
 	}
 	return out
 }
 
 func (s Reports) dailyTotals(ctx context.Context, typ string, r dateRange, f ReportFilter) map[string]dayTotal {
-	where, args := s.filteredQuery(typ, r, f, 0)
-	rows, err := s.DB.QueryContext(ctx, `
-		SELECT DATE(t.date), SUM(t.amount * c.rate), COUNT(*)
-		FROM transactions t
-		JOIN accounts a ON a.id = t.account_id
-		JOIN currencies c ON c.id = a.currency_id
-		`+where+` GROUP BY DATE(t.date)`, args...)
 	out := map[string]dayTotal{}
-	if err != nil {
-		return out
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var day string
-		var total float64
-		var count int
-		if err := rows.Scan(&day, &total, &count); err != nil {
-			return out
-		}
-		out[day] = dayTotal{Total: round2(total), Count: count}
+	for _, x := range filter.DailyTotals(ctx, s.DB, s.where(typ, r, f, 0)) {
+		out[x.Day] = dayTotal{Total: round2(x.Total), Count: x.Count}
 	}
 	return out
 }
 
 func (s Reports) groupedByPeriod(ctx context.Context, typ string, r dateRange, f ReportFilter, groupBy string, categoryID int64) map[string]float64 {
-	where, args := s.filteredQuery(typ, r, f, categoryID)
-	fmtSQL := periodSQL(groupBy)
-	rows, err := s.DB.QueryContext(ctx, `
-		SELECT `+fmtSQL+` as period_date, SUM(t.amount * c.rate)
-		FROM transactions t
-		JOIN accounts a ON a.id = t.account_id
-		JOIN currencies c ON c.id = a.currency_id
-		`+where+` GROUP BY period_date`, args...)
 	out := map[string]float64{}
-	if err != nil {
-		return out
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var key string
-		var total float64
-		if err := rows.Scan(&key, &total); err != nil {
-			return out
-		}
-		out[key] = total
+	for _, x := range filter.GroupedByPeriod(ctx, s.DB, s.where(typ, r, f, categoryID), groupBy) {
+		out[x.Key] = x.Total
 	}
 	return out
 }
@@ -782,53 +694,37 @@ func (s Reports) monthlyBudget(ctx context.Context, f ReportFilter) any {
 	if !scoped && len(f.AccountIDs) > 0 {
 		return nil
 	}
-	q := `SELECT b.amount, c.rate, c.is_base FROM budgets b
-		LEFT JOIN currencies c ON c.id = b.currency_id
-		WHERE b.is_active = 1 AND b.period = 'monthly'`
-	var args []any
 	if !scoped {
-		// Prefer a single global monthly budget, else sum all monthly.
-		var amount, rate sql.NullFloat64
-		var base sql.NullInt64
-		err := s.DB.QueryRowContext(ctx, q+` AND b.is_global = 1 LIMIT 1`).Scan(&amount, &rate, &base)
+		row, err := db.Q(s.DB).GetGlobalMonthlyBudget(ctx)
 		if err == nil {
-			return budgetToBase(amount.Float64, rate.Float64, base.Int64 != 0)
+			return budgetToBase(row.Amount, nullRate(row.Rate), row.IsBase.Valid && row.IsBase.Int64 != 0)
 		}
-	} else {
-		q += ` AND b.is_global = 0 AND (`
-		parts := []string{}
-		if len(f.CategoryIDs) > 0 {
-			parts = append(parts, `EXISTS (SELECT 1 FROM budget_category bc WHERE bc.budget_id = b.id AND bc.category_id IN (`+placeholders(len(f.CategoryIDs))+`))`)
-			for _, id := range f.CategoryIDs {
-				args = append(args, id)
-			}
-		}
-		if len(f.TagIDs) > 0 {
-			parts = append(parts, `EXISTS (SELECT 1 FROM budget_tag bt WHERE bt.budget_id = b.id AND bt.tag_id IN (`+placeholders(len(f.TagIDs))+`))`)
-			for _, id := range f.TagIDs {
-				args = append(args, id)
-			}
-		}
-		q += strings.Join(parts, " OR ") + `)`
-	}
-	rows, err := s.DB.QueryContext(ctx, q, args...)
-	if err != nil {
-		return nil
-	}
-	defer rows.Close()
-	total := 0.0
-	for rows.Next() {
-		var amount, rate sql.NullFloat64
-		var base sql.NullInt64
-		if err := rows.Scan(&amount, &rate, &base); err != nil {
+		rows, err := db.Q(s.DB).ListMonthlyBudgets(ctx)
+		if err != nil {
 			return nil
 		}
-		total += budgetToBase(amount.Float64, rate.Float64, base.Valid && base.Int64 != 0)
+		total := 0.0
+		for _, r := range rows {
+			total += budgetToBase(r.Amount, nullRate(r.Rate), r.IsBase.Valid && r.IsBase.Int64 != 0)
+		}
+		if total > 0 {
+			return total
+		}
+		return nil
+	}
+	rows := filter.ScopedMonthlyBudgets(ctx, s.DB, f.CategoryIDs, f.TagIDs)
+	total := 0.0
+	for _, r := range rows {
+		total += budgetToBase(r.Amount, r.Rate, r.IsBase)
 	}
 	if total > 0 {
 		return total
 	}
 	return nil
+}
+
+func nullRate(v sql.NullFloat64) float64 {
+	return v.Float64
 }
 
 func budgetToBase(amount, rate float64, isBase bool) float64 {
@@ -838,33 +734,6 @@ func budgetToBase(amount, rate float64, isBase bool) float64 {
 	return amount * rate
 }
 
-func (s Reports) filteredQuery(typ string, r dateRange, f ReportFilter, categoryID int64) (string, []any) {
-	q := `WHERE t.status = 'confirmed' AND t.type = ? AND t.date >= ? AND t.date <= ?`
-	args := []any{typ, r.Start.Format("2006-01-02"), r.End.Format("2006-01-02")}
-	if categoryID > 0 {
-		q += ` AND t.category_id = ?`
-		args = append(args, categoryID)
-	}
-	if len(f.AccountIDs) > 0 {
-		q += ` AND t.account_id IN (` + placeholders(len(f.AccountIDs)) + `)`
-		for _, id := range f.AccountIDs {
-			args = append(args, id)
-		}
-	}
-	if len(f.CategoryIDs) > 0 {
-		q += ` AND t.category_id IN (` + placeholders(len(f.CategoryIDs)) + `)`
-		for _, id := range f.CategoryIDs {
-			args = append(args, id)
-		}
-	}
-	if len(f.TagIDs) > 0 {
-		q += ` AND EXISTS (SELECT 1 FROM transaction_tag tt WHERE tt.transaction_id = t.id AND tt.tag_id IN (` + placeholders(len(f.TagIDs)) + `))`
-		for _, id := range f.TagIDs {
-			args = append(args, id)
-		}
-	}
-	return q, args
-}
 
 type periodPoint struct{ Key, Label string }
 
@@ -887,17 +756,6 @@ func generatePeriods(start, end time.Time, groupBy string) []periodPoint {
 		}
 	}
 	return out
-}
-
-func periodSQL(groupBy string) string {
-	switch groupBy {
-	case "week":
-		return `DATE(t.date, '-' || strftime('%w', t.date) || ' days')`
-	case "month":
-		return `DATE(t.date, 'start of month')`
-	default:
-		return `DATE(t.date)`
-	}
 }
 
 func nextPeriod(cur time.Time, groupBy string) time.Time {
@@ -963,13 +821,6 @@ func parseYearQuarter(s string) (int, int, bool) {
 	y, err1 := strconv.Atoi(s[:4])
 	q, err2 := strconv.Atoi(s[6:])
 	return y, q, err1 == nil && err2 == nil && q >= 1 && q <= 4
-}
-
-func placeholders(n int) string {
-	if n <= 0 {
-		return ""
-	}
-	return strings.Repeat("?,", n-1) + "?"
 }
 
 func coalesce(v, fallback string) string {

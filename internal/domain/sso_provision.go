@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/chiririll/savvy-plus/internal/auth"
+	"github.com/chiririll/savvy-plus/internal/db"
+	"github.com/chiririll/savvy-plus/internal/db/sqlc"
 )
 
 func (s SSO) Provision(ctx context.Context, p IdentityProvider, id NormalizedIdentity) (*auth.User, bool, error) {
@@ -41,14 +43,12 @@ func (s SSO) Provision(ctx context.Context, p IdentityProvider, id NormalizedIde
 }
 
 func (s SSO) loginExisting(ctx context.Context, p IdentityProvider, id NormalizedIdentity) (*auth.User, bool, error) {
-	var userID int64
-	var linkID int64
-	err := s.DB.QueryRowContext(ctx, `
-		SELECT id, user_id FROM user_identities WHERE identity_provider_id=? AND subject=?`,
-		p.ID, id.Subject).Scan(&linkID, &userID)
+	link, err := db.Q(s.DB).GetUserIdentity(ctx, sqlc.GetUserIdentityParams{IdentityProviderID: p.ID, Subject: id.Subject})
 	if err != nil {
 		return nil, false, nil
 	}
+	userID := link.UserID
+	linkID := link.ID
 	user, err := s.Users.ByID(ctx, userID)
 	if err != nil || user == nil {
 		return nil, false, ssoErr("user_missing", "The linked user no longer exists.", 403)
@@ -59,8 +59,9 @@ func (s SSO) loginExisting(ctx context.Context, p IdentityProvider, id Normalize
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
 	raw, _ := json.Marshal(id.Raw)
-	_, _ = s.DB.ExecContext(ctx, `UPDATE user_identities SET last_login_at=?, claims=?, updated_at=? WHERE id=?`,
-		now, string(raw), now, linkID)
+	_ = db.Q(s.DB).TouchUserIdentity(ctx, sqlc.TouchUserIdentityParams{
+		LastLoginAt: db.NS(now), Claims: db.NS(string(raw)), UpdatedAt: db.NS(now), ID: linkID,
+	})
 	return user, true, nil
 }
 
@@ -117,10 +118,10 @@ func (s SSO) justInTime(ctx context.Context, p IdentityProvider, id NormalizedId
 func (s SSO) createLink(ctx context.Context, p IdentityProvider, id NormalizedIdentity, userID int64) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	raw, _ := json.Marshal(id.Raw)
-	_, err := s.DB.ExecContext(ctx, `
-		INSERT INTO user_identities (user_id, identity_provider_id, subject, last_login_at, claims, created_at, updated_at)
-		VALUES (?,?,?,?,?,?,?)`, userID, p.ID, id.Subject, now, string(raw), now, now)
-	return err
+	return db.Q(s.DB).InsertUserIdentity(ctx, sqlc.InsertUserIdentityParams{
+		UserID: userID, IdentityProviderID: p.ID, Subject: id.Subject,
+		LastLoginAt: db.NS(now), Claims: db.NS(string(raw)), CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
+	})
 }
 
 func (s SSO) syncRole(ctx context.Context, user *auth.User, p IdentityProvider, id NormalizedIdentity) error {

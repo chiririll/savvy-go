@@ -5,6 +5,9 @@ import (
 	"database/sql"
 	"log/slog"
 	"time"
+
+	"github.com/chiririll/savvy-plus/internal/db"
+	"github.com/chiririll/savvy-plus/internal/db/sqlc"
 )
 
 // UnwrapSecret returns a usable TOTP secret. Laravel-era rows store
@@ -47,34 +50,24 @@ func (t TwoFactor) verifyTOTP(ctx context.Context, u *User, code string) bool {
 
 // UnwrapLegacyTOTPSecrets decrypts every Laravel-encrypted two_factor_secret
 // and writes the plaintext secret back. Safe to run on every start.
-func UnwrapLegacyTOTPSecrets(ctx context.Context, db *sql.DB, appKey string) error {
-	if appKey == "" || db == nil {
+func UnwrapLegacyTOTPSecrets(ctx context.Context, sqlDB *sql.DB, appKey string) error {
+	if appKey == "" || sqlDB == nil {
 		return nil
 	}
-	rows, err := db.QueryContext(ctx, `SELECT id, two_factor_secret FROM users WHERE two_factor_secret IS NOT NULL AND two_factor_secret != ''`)
+	found, err := db.Q(sqlDB).ListUsersWithTwoFactorSecret(ctx)
 	if err != nil {
 		return err
 	}
-	type row struct {
-		id     int64
-		secret string
-	}
-	var found []row
-	for rows.Next() {
-		var r row
-		if rows.Scan(&r.id, &r.secret) == nil {
-			found = append(found, r)
-		}
-	}
-	rows.Close()
 	now := time.Now().UTC().Format(time.RFC3339)
 	n := 0
 	for _, r := range found {
-		plain, ok := UnwrapSecret(appKey, r.secret)
+		plain, ok := UnwrapSecret(appKey, r.TwoFactorSecret.String)
 		if !ok {
 			continue
 		}
-		if _, err := db.ExecContext(ctx, `UPDATE users SET two_factor_secret=?, updated_at=? WHERE id=?`, plain, now, r.id); err != nil {
+		if err := db.Q(sqlDB).UpdateUserTwoFactorSecret(ctx, sqlc.UpdateUserTwoFactorSecretParams{
+			TwoFactorSecret: db.NS(plain), UpdatedAt: db.NS(now), ID: r.ID,
+		}); err != nil {
 			return err
 		}
 		n++

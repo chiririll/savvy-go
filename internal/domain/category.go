@@ -5,6 +5,9 @@ import (
 	"database/sql"
 	"fmt"
 	"time"
+
+	"github.com/chiririll/savvy-plus/internal/db"
+	"github.com/chiririll/savvy-plus/internal/db/sqlc"
 )
 
 type Category struct {
@@ -37,47 +40,35 @@ func (c Category) JSON() map[string]any {
 type Categories struct{ DB *sql.DB }
 
 func (s Categories) All(ctx context.Context, typ string) ([]Category, error) {
-	q := `SELECT c.id, c.name, c.type, c.icon, c.color,
-		(SELECT COUNT(*) FROM transactions t WHERE t.category_id = c.id) 
-		FROM categories c`
-	var args []any
-	if typ != "" {
-		q += ` WHERE c.type = ?`
-		args = append(args, typ)
-	}
-	q += ` ORDER BY c.name`
-	rows, err := s.DB.QueryContext(ctx, q, args...)
+	rows, err := db.Q(s.DB).ListCategories(ctx, db.Narg(typ))
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []Category
-	for rows.Next() {
-		c, err := scanCategory(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, c)
+	out := make([]Category, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, categoryFrom(r.ID, r.Name, r.Type, r.Icon, r.Color, r.Count))
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 func (s Categories) ByID(ctx context.Context, id int64) (*Category, error) {
-	c, err := scanCategory(s.DB.QueryRowContext(ctx, `
-		SELECT id, name, type, icon, color,
-			(SELECT COUNT(*) FROM transactions t WHERE t.category_id = categories.id)
-		FROM categories WHERE id = ?`, id))
+	r, err := db.Q(s.DB).GetCategory(ctx, id)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
-	return &c, err
+	if err != nil {
+		return nil, err
+	}
+	c := categoryFrom(r.ID, r.Name, r.Type, r.Icon, r.Color, r.Count)
+	return &c, nil
 }
 
 func (s Categories) Create(ctx context.Context, c Category) (*Category, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
-	res, err := s.DB.ExecContext(ctx,
-		`INSERT INTO categories (name, type, icon, color, created_at, updated_at) VALUES (?,?,?,?,?,?)`,
-		c.Name, c.Type, c.Icon, c.Color, now, now)
+	res, err := db.Q(s.DB).InsertCategory(ctx, sqlc.InsertCategoryParams{
+		Name: c.Name, Type: c.Type, Icon: db.NullString(c.Icon), Color: db.NullString(c.Color),
+		CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -87,9 +78,10 @@ func (s Categories) Create(ctx context.Context, c Category) (*Category, error) {
 
 func (s Categories) Update(ctx context.Context, id int64, c Category) (*Category, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, err := s.DB.ExecContext(ctx,
-		`UPDATE categories SET name=?, type=?, icon=?, color=?, updated_at=? WHERE id=?`,
-		c.Name, c.Type, c.Icon, c.Color, now, id)
+	err := db.Q(s.DB).UpdateCategory(ctx, sqlc.UpdateCategoryParams{
+		Name: c.Name, Type: c.Type, Icon: db.NullString(c.Icon), Color: db.NullString(c.Color),
+		UpdatedAt: db.NS(now), ID: id,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -104,13 +96,11 @@ func (s Categories) Delete(ctx context.Context, id int64) error {
 	if c.TransactionsCount > 0 {
 		return fmt.Errorf("has transactions")
 	}
-	var n int
-	_ = s.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM categories WHERE type = ?`, c.Type).Scan(&n)
+	n, _ := db.Q(s.DB).CountCategoriesByType(ctx, c.Type)
 	if n <= 1 {
 		return fmt.Errorf("last")
 	}
-	_, err = s.DB.ExecContext(ctx, `DELETE FROM categories WHERE id = ?`, id)
-	return err
+	return db.Q(s.DB).DeleteCategory(ctx, id)
 }
 
 func (s Categories) Statistics(ctx context.Context, id int64, start, end string) (map[string]any, error) {
@@ -118,37 +108,37 @@ func (s Categories) Statistics(ctx context.Context, id int64, start, end string)
 	if err != nil || c == nil {
 		return nil, err
 	}
-	q := `SELECT COUNT(*), COALESCE(SUM(amount),0) FROM transactions WHERE category_id = ? AND status = 'confirmed'`
-	args := []any{id}
-	if start != "" {
-		q += ` AND date >= ?`
-		args = append(args, start)
-	}
-	if end != "" {
-		q += ` AND date <= ?`
-		args = append(args, end)
-	}
-	var count int
-	var total float64
-	_ = s.DB.QueryRowContext(ctx, q, args...).Scan(&count, &total)
+	row, _ := db.Q(s.DB).CategoryStatistics(ctx, sqlc.CategoryStatisticsParams{
+		CategoryID: db.NI(id), StartDate: db.Narg(start), EndDate: db.Narg(end),
+	})
 	return map[string]any{
-		"category_id":         c.ID,
-		"category_name":       c.Name,
-		"type":                c.Type,
-		"transactions_count":  count,
-		"total_amount":        total,
+		"category_id":        c.ID,
+		"category_name":      c.Name,
+		"type":               c.Type,
+		"transactions_count": int(row.Count),
+		"total_amount":       asFloat64(row.Coalesce),
 	}, nil
 }
 
-func scanCategory(row interface{ Scan(...any) error }) (Category, error) {
-	var c Category
-	var icon, color sql.NullString
-	err := row.Scan(&c.ID, &c.Name, &c.Type, &icon, &color, &c.TransactionsCount)
+func categoryFrom(id int64, name, typ string, icon, color sql.NullString, count int64) Category {
+	c := Category{ID: id, Name: name, Type: typ, TransactionsCount: int(count)}
 	if icon.Valid {
 		c.Icon = &icon.String
 	}
 	if color.Valid {
 		c.Color = &color.String
 	}
-	return c, err
+	return c
+}
+
+func asFloat64(v any) float64 {
+	switch n := v.(type) {
+	case float64:
+		return n
+	case int64:
+		return float64(n)
+	case int:
+		return float64(n)
+	}
+	return 0
 }

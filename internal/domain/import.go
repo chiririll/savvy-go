@@ -12,6 +12,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/chiririll/savvy-plus/internal/db"
+	"github.com/chiririll/savvy-plus/internal/db/sqlc"
 )
 
 type Imports struct {
@@ -40,9 +43,10 @@ type Import struct {
 func (s Imports) Create(ctx context.Context, userID int64, uploadID string) (*Import, error) {
 	id := newUploadID()
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, err := s.DB.ExecContext(ctx, `
-		INSERT INTO transaction_imports (id, user_id, upload_id, status, created_at, updated_at)
-		VALUES (?,?,?,?,?,?)`, id, userID, uploadID, "parsing", now, now)
+	err := db.Q(s.DB).InsertImport(ctx, sqlc.InsertImportParams{
+		ID: id, UserID: db.NI(userID), UploadID: db.NS(uploadID), Status: "parsing",
+		CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -50,51 +54,46 @@ func (s Imports) Create(ctx context.Context, userID int64, uploadID string) (*Im
 }
 
 func (s Imports) ByID(ctx context.Context, id string) (*Import, error) {
-	row := s.DB.QueryRowContext(ctx, `
-		SELECT id, user_id, upload_id, status, mapping, options, total_rows, processed_rows,
-			created_count, skipped_count, error_count, errors, meta, message
-		FROM transaction_imports WHERE id = ?`, id)
-	var im Import
-	var user sql.NullInt64
-	var upload, mapping, options, errors, meta, msg sql.NullString
-	var total sql.NullInt64
-	err := row.Scan(&im.ID, &user, &upload, &im.Status, &mapping, &options, &total, &im.ProcessedRows,
-		&im.CreatedCount, &im.SkippedCount, &im.ErrorCount, &errors, &meta, &msg)
+	row, err := db.Q(s.DB).GetImport(ctx, id)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	if user.Valid {
-		im.UserID = &user.Int64
+	im := Import{
+		ID: row.ID, Status: row.Status, ProcessedRows: int(row.ProcessedRows),
+		CreatedCount: int(row.CreatedCount), SkippedCount: int(row.SkippedCount), ErrorCount: int(row.ErrorCount),
 	}
-	if upload.Valid {
-		im.UploadID = &upload.String
+	if row.UserID.Valid {
+		im.UserID = &row.UserID.Int64
 	}
-	if total.Valid {
-		n := int(total.Int64)
+	if row.UploadID.Valid {
+		im.UploadID = &row.UploadID.String
+	}
+	if row.TotalRows.Valid {
+		n := int(row.TotalRows.Int64)
 		im.TotalRows = &n
 	}
-	if mapping.Valid {
-		_ = json.Unmarshal([]byte(mapping.String), &im.Mapping)
+	if row.Mapping.Valid {
+		_ = json.Unmarshal([]byte(row.Mapping.String), &im.Mapping)
 	}
-	if options.Valid {
-		_ = json.Unmarshal([]byte(options.String), &im.Options)
+	if row.Options.Valid {
+		_ = json.Unmarshal([]byte(row.Options.String), &im.Options)
 	}
-	if errors.Valid && errors.String != "" {
+	if row.Errors.Valid && row.Errors.String != "" {
 		var v any
-		_ = json.Unmarshal([]byte(errors.String), &v)
+		_ = json.Unmarshal([]byte(row.Errors.String), &v)
 		im.Errors = v
 	}
-	if meta.Valid && meta.String != "" {
-		_ = json.Unmarshal([]byte(meta.String), &im.Meta)
+	if row.Meta.Valid && row.Meta.String != "" {
+		_ = json.Unmarshal([]byte(row.Meta.String), &im.Meta)
 	}
 	if im.Meta == nil {
 		im.Meta = map[string]any{}
 	}
-	if msg.Valid {
-		im.Message = &msg.String
+	if row.Message.Valid {
+		im.Message = &row.Message.String
 	}
 	return &im, nil
 }
@@ -128,10 +127,9 @@ func (s Imports) Parse(ctx context.Context, importID, uploadID string) error {
 	}
 	rawMeta, _ := json.Marshal(meta)
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, err = s.DB.ExecContext(ctx, `
-		UPDATE transaction_imports SET status='parsed', total_rows=?, meta=?, updated_at=? WHERE id=?`,
-		len(rows), string(rawMeta), now, importID)
-	return err
+	return db.Q(s.DB).MarkImportParsed(ctx, sqlc.MarkImportParsedParams{
+		TotalRows: db.NI(int64(len(rows))), Meta: db.NS(string(rawMeta)), UpdatedAt: db.NS(now), ID: importID,
+	})
 }
 
 func (s Imports) Execute(ctx context.Context, importID string, mapping, options map[string]any) error {
@@ -149,10 +147,9 @@ func (s Imports) Execute(ctx context.Context, importID string, mapping, options 
 	mapJSON, _ := json.Marshal(mapping)
 	optJSON, _ := json.Marshal(options)
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, _ = s.DB.ExecContext(ctx, `
-		UPDATE transaction_imports SET status='importing', mapping=?, options=?, processed_rows=0,
-			created_count=0, skipped_count=0, error_count=0, errors=NULL, message=NULL, updated_at=? WHERE id=?`,
-		string(mapJSON), string(optJSON), now, importID)
+	_ = db.Q(s.DB).MarkImportImporting(ctx, sqlc.MarkImportImportingParams{
+		Mapping: db.NS(string(mapJSON)), Options: db.NS(string(optJSON)), UpdatedAt: db.NS(now), ID: importID,
+	})
 
 	raw, err := s.Uploads.ReadFile(up)
 	if err != nil {
@@ -175,10 +172,10 @@ func (s Imports) Execute(ctx context.Context, importID string, mapping, options 
 		}
 		hash := dedupHash(res.date, res.amount, res.desc)
 		st := "confirmed"
-		ins, err := s.DB.ExecContext(ctx, `
-			INSERT OR IGNORE INTO transactions (type, account_id, category_id, amount, description, date, status, dedup_hash, created_at, updated_at)
-			VALUES (?,?,?,?,?,?,?,?,?,?)`,
-			res.typ, accountID, nil, res.amount, res.desc, res.date, st, hash, now, now)
+		ins, err := db.Q(s.DB).InsertTransactionIgnoreDup(ctx, sqlc.InsertTransactionIgnoreDupParams{
+			Type: res.typ, AccountID: accountID, Amount: res.amount, Description: db.NS(res.desc),
+			Date: db.NS(res.date), Status: st, DedupHash: db.NS(hash), CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
+		})
 		if err != nil {
 			errs = append(errs, map[string]any{"row": i + 1, "message": err.Error()})
 			continue
@@ -199,10 +196,11 @@ func (s Imports) Execute(ctx context.Context, importID string, mapping, options 
 	meta["created_tags"] = []any{}
 	meta["created_categories"] = []any{}
 	metaJSON, _ := json.Marshal(meta)
-	_, err = s.DB.ExecContext(ctx, `
-		UPDATE transaction_imports SET status='completed', processed_rows=?, created_count=?, skipped_count=?,
-			error_count=?, errors=?, meta=?, updated_at=? WHERE id=?`,
-		created+skipped+len(errs), created, skipped, len(errs), string(errJSON), string(metaJSON), now, importID)
+	err = db.Q(s.DB).MarkImportCompleted(ctx, sqlc.MarkImportCompletedParams{
+		ProcessedRows: int64(created + skipped + len(errs)), CreatedCount: int64(created), SkippedCount: int64(skipped),
+		ErrorCount: int64(len(errs)), Errors: db.NS(string(errJSON)), Meta: db.NS(string(metaJSON)),
+		UpdatedAt: db.NS(now), ID: importID,
+	})
 	if err != nil {
 		return err
 	}
@@ -285,8 +283,7 @@ func (s Imports) Preview(ctx context.Context, im *Import, mapping, options map[s
 
 func (s Imports) fail(ctx context.Context, id, msg string) error {
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, err := s.DB.ExecContext(ctx, `UPDATE transaction_imports SET status='failed', message=?, updated_at=? WHERE id=?`, msg, now, id)
-	return err
+	return db.Q(s.DB).FailImport(ctx, sqlc.FailImportParams{Message: db.NS(msg), UpdatedAt: db.NS(now), ID: id})
 }
 
 func parseCSV(raw []byte) ([]string, [][]string, error) {

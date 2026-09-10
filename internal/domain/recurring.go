@@ -5,6 +5,9 @@ import (
 	"database/sql"
 	"fmt"
 	"time"
+
+	"github.com/chiririll/savvy-plus/internal/db"
+	"github.com/chiririll/savvy-plus/internal/db/sqlc"
 )
 
 type Recurring struct {
@@ -113,18 +116,18 @@ type RecurringStore struct {
 }
 
 func (s RecurringStore) All(ctx context.Context) ([]Recurring, error) {
-	return s.list(ctx, `ORDER BY next_run_date, id`)
+	return s.list(ctx, sqlc.ListRecurringParams{Limit: 1_000_000, Offset: 0})
 }
 
 func (s RecurringStore) Upcoming(ctx context.Context, limit int) ([]Recurring, error) {
 	if limit <= 0 {
 		limit = 5
 	}
-	return s.list(ctx, `WHERE is_active = 1 ORDER BY next_run_date, id LIMIT ?`, limit)
+	return s.list(ctx, sqlc.ListRecurringParams{ActiveOnly: db.Flag(true), Limit: int64(limit), Offset: 0})
 }
 
 func (s RecurringStore) ByID(ctx context.Context, id int64) (*Recurring, error) {
-	list, err := s.list(ctx, `WHERE id = ?`, id)
+	list, err := s.list(ctx, sqlc.ListRecurringParams{ID: db.NI(id), Limit: 1, Offset: 0})
 	if err != nil || len(list) == 0 {
 		return nil, err
 	}
@@ -140,15 +143,14 @@ func (s RecurringStore) Create(ctx context.Context, in RecurringInput) (*Recurri
 		active = *in.IsActive
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	res, err := s.DB.ExecContext(ctx, `
-		INSERT INTO recurring_transactions (
-			type, account_id, to_account_id, category_id, amount, to_amount, description,
-			frequency, interval, day_of_week, day_of_month, start_date, end_date,
-			next_run_date, is_active, created_at, updated_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		in.Type, in.AccountID, in.ToAccountID, in.CategoryID, in.Amount, in.ToAmount, in.Description,
-		in.Frequency, in.Interval, in.DayOfWeek, in.DayOfMonth, in.StartDate, in.EndDate,
-		in.StartDate, boolInt(active), now, now)
+	res, err := db.Q(s.DB).InsertRecurring(ctx, sqlc.InsertRecurringParams{
+		Type: in.Type, AccountID: in.AccountID, ToAccountID: db.NullInt64(in.ToAccountID),
+		CategoryID: db.NullInt64(in.CategoryID), Amount: in.Amount, ToAmount: db.NullFloat64(in.ToAmount),
+		Description: db.NullString(in.Description), Frequency: in.Frequency, Interval: int64(in.Interval),
+		DayOfWeek: db.NullInt(in.DayOfWeek), DayOfMonth: db.NullInt(in.DayOfMonth),
+		StartDate: in.StartDate, EndDate: db.NullString(in.EndDate), NextRunDate: in.StartDate,
+		IsActive: db.BoolInt(active), CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -200,14 +202,14 @@ func (s RecurringStore) Update(ctx context.Context, id int64, in RecurringInput)
 		active = *in.IsActive
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, err = s.DB.ExecContext(ctx, `
-		UPDATE recurring_transactions SET type=?, account_id=?, to_account_id=?, category_id=?,
-			amount=?, to_amount=?, description=?, frequency=?, interval=?, day_of_week=?,
-			day_of_month=?, start_date=?, end_date=?, next_run_date=?, is_active=?, updated_at=?
-		WHERE id=?`,
-		in.Type, in.AccountID, in.ToAccountID, in.CategoryID, in.Amount, in.ToAmount, in.Description,
-		in.Frequency, in.Interval, in.DayOfWeek, in.DayOfMonth, in.StartDate, in.EndDate,
-		next, boolInt(active), now, id)
+	err = db.Q(s.DB).UpdateRecurring(ctx, sqlc.UpdateRecurringParams{
+		Type: in.Type, AccountID: in.AccountID, ToAccountID: db.NullInt64(in.ToAccountID),
+		CategoryID: db.NullInt64(in.CategoryID), Amount: in.Amount, ToAmount: db.NullFloat64(in.ToAmount),
+		Description: db.NullString(in.Description), Frequency: in.Frequency, Interval: int64(in.Interval),
+		DayOfWeek: db.NullInt(in.DayOfWeek), DayOfMonth: db.NullInt(in.DayOfMonth),
+		StartDate: in.StartDate, EndDate: db.NullString(in.EndDate), NextRunDate: next,
+		IsActive: db.BoolInt(active), UpdatedAt: db.NS(now), ID: id,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -227,12 +229,10 @@ func (s RecurringStore) Update(ctx context.Context, id int64, in RecurringInput)
 }
 
 func (s RecurringStore) Delete(ctx context.Context, id int64) error {
-	_, err := s.DB.ExecContext(ctx, `DELETE FROM transactions WHERE recurring_transaction_id = ? AND status = 'pending'`, id)
-	if err != nil {
+	if err := db.Q(s.DB).DeletePendingForRecurring(ctx, db.NI(id)); err != nil {
 		return err
 	}
-	_, err = s.DB.ExecContext(ctx, `DELETE FROM recurring_transactions WHERE id = ?`, id)
-	return err
+	return db.Q(s.DB).DeleteRecurring(ctx, id)
 }
 
 func (s RecurringStore) AdvanceAfterOccurrence(ctx context.Context, id int64) error {
@@ -242,9 +242,10 @@ func (s RecurringStore) AdvanceAfterOccurrence(ctx context.Context, id int64) er
 	}
 	next := rec.calculateNextRunDate()
 	now := time.Now().UTC()
-	_, err = s.DB.ExecContext(ctx, `
-		UPDATE recurring_transactions SET last_run_date=?, next_run_date=?, updated_at=? WHERE id=?`,
-		now.Format("2006-01-02"), next, now.Format(time.RFC3339), id)
+	err = db.Q(s.DB).AdvanceRecurring(ctx, sqlc.AdvanceRecurringParams{
+		LastRunDate: db.NS(now.Format("2006-01-02")), NextRunDate: next,
+		UpdatedAt: db.NS(now.Format(time.RFC3339)), ID: id,
+	})
 	if err != nil {
 		return err
 	}
@@ -266,7 +267,7 @@ func (s RecurringStore) AdvanceAfterOccurrence(ctx context.Context, id int64) er
 // EnsureUpcoming creates a pending occurrence for every active template that
 // is still on schedule and has none (scheduler / crash recovery).
 func (s RecurringStore) EnsureUpcoming(ctx context.Context) error {
-	list, err := s.list(ctx, `WHERE is_active = 1`)
+	list, err := s.list(ctx, sqlc.ListRecurringParams{ActiveOnly: db.Flag(true), Limit: 1_000_000, Offset: 0})
 	if err != nil {
 		return err
 	}
@@ -343,11 +344,19 @@ func (s RecurringStore) syncOpenPending(ctx context.Context, rec *Recurring) err
 		toAmt = rec.ToAmount
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, err = s.DB.ExecContext(ctx, `
-		UPDATE transactions SET type=?, account_id=?, to_account_id=?, category_id=?,
-			amount=?, to_amount=?, description=?, date=?, updated_at=? WHERE id=?`,
-		rec.Type, rec.AccountID, rec.ToAccountID, rec.CategoryID, rec.Amount, toAmt,
-		rec.Description, rec.NextRunDate, now, pendingID)
+	var toAmtN sql.NullFloat64
+	switch v := toAmt.(type) {
+	case float64:
+		toAmtN = sql.NullFloat64{Float64: v, Valid: true}
+	case *float64:
+		toAmtN = db.NullFloat64(v)
+	}
+	err = db.Q(s.DB).UpdateTransaction(ctx, sqlc.UpdateTransactionParams{
+		Type: rec.Type, AccountID: rec.AccountID, ToAccountID: db.NullInt64(rec.ToAccountID),
+		CategoryID: db.NullInt64(rec.CategoryID), Amount: rec.Amount, ToAmount: toAmtN,
+		Description: db.NullString(rec.Description), Date: db.NS(rec.NextRunDate),
+		UpdatedAt: db.NS(now), ID: pendingID,
+	})
 	if err != nil {
 		return err
 	}
@@ -359,14 +368,11 @@ func (s RecurringStore) syncOpenPending(ctx context.Context, rec *Recurring) err
 }
 
 func (s RecurringStore) pendingID(ctx context.Context, recurringID int64) (int64, error) {
-	var id sql.NullInt64
-	err := s.DB.QueryRowContext(ctx,
-		`SELECT id FROM transactions WHERE recurring_transaction_id = ? AND status = 'pending' LIMIT 1`,
-		recurringID).Scan(&id)
+	id, err := db.Q(s.DB).GetPendingRecurringTx(ctx, db.NI(recurringID))
 	if err == sql.ErrNoRows {
 		return 0, nil
 	}
-	return id.Int64, err
+	return id, err
 }
 
 func (s RecurringStore) calculateToAmount(ctx context.Context, rec *Recurring) (float64, error) {
@@ -386,39 +392,26 @@ func (s RecurringStore) calculateToAmount(ctx context.Context, rec *Recurring) (
 }
 
 func (s RecurringStore) saveTags(ctx context.Context, id int64, tagIDs []int64) error {
-	if _, err := s.DB.ExecContext(ctx, `DELETE FROM recurring_transaction_tag WHERE recurring_transaction_id = ?`, id); err != nil {
+	if err := db.Q(s.DB).DeleteRecurringTags(ctx, id); err != nil {
 		return err
 	}
 	for _, tagID := range tagIDs {
-		if _, err := s.DB.ExecContext(ctx, `INSERT OR IGNORE INTO recurring_transaction_tag (recurring_transaction_id, tag_id) VALUES (?,?)`, id, tagID); err != nil {
+		if err := db.Q(s.DB).InsertRecurringTag(ctx, sqlc.InsertRecurringTagParams{RecurringTransactionID: id, TagID: tagID}); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (s RecurringStore) list(ctx context.Context, where string, args ...any) ([]Recurring, error) {
-	rows, err := s.DB.QueryContext(ctx, `
-		SELECT id, type, account_id, to_account_id, category_id, amount, to_amount, description,
-			frequency, interval, day_of_week, day_of_month, start_date, end_date,
-			next_run_date, last_run_date, is_active
-		FROM recurring_transactions `+where, args...)
+func (s RecurringStore) list(ctx context.Context, arg sqlc.ListRecurringParams) ([]Recurring, error) {
+	rows, err := db.Q(s.DB).ListRecurring(ctx, arg)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []Recurring
-	for rows.Next() {
-		r, err := scanRecurring(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, r)
+	out := make([]Recurring, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, recurringFromRow(r))
 	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	rows.Close()
 	accts := Accounts{DB: s.DB}
 	cats := Categories{DB: s.DB}
 	for i := range out {
@@ -441,23 +434,15 @@ func (s RecurringStore) list(ctx context.Context, where string, args ...any) ([]
 }
 
 func (s RecurringStore) tags(ctx context.Context, id int64) ([]Tag, error) {
-	rows, err := s.DB.QueryContext(ctx, `
-		SELECT tags.id, tags.name, tags.created_at, 0 FROM tags
-		JOIN recurring_transaction_tag rt ON rt.tag_id = tags.id
-		WHERE rt.recurring_transaction_id = ?`, id)
+	rows, err := db.Q(s.DB).ListRecurringTags(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []Tag
-	for rows.Next() {
-		t, err := scanTag(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, t)
+	out := make([]Tag, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, tagFromList(r.ID, r.Name, r.CreatedAt, r.TransactionsCount))
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 func (r Recurring) withinSchedule() bool {
@@ -528,41 +513,37 @@ func daysInMonth(t time.Time) int {
 	return time.Date(t.Year(), t.Month()+1, 0, 0, 0, 0, 0, time.UTC).Day()
 }
 
-func scanRecurring(row interface{ Scan(...any) error }) (Recurring, error) {
-	var r Recurring
-	var toAcc, cat sql.NullInt64
-	var toAmt sql.NullFloat64
-	var desc, end, last sql.NullString
-	var dow, dom sql.NullInt64
-	var active int
-	err := row.Scan(&r.ID, &r.Type, &r.AccountID, &toAcc, &cat, &r.Amount, &toAmt, &desc,
-		&r.Frequency, &r.Interval, &dow, &dom, &r.StartDate, &end, &r.NextRunDate, &last, &active)
-	if toAcc.Valid {
-		r.ToAccountID = &toAcc.Int64
+func recurringFromRow(row sqlc.ListRecurringRow) Recurring {
+	r := Recurring{
+		ID: row.ID, Type: row.Type, AccountID: row.AccountID, Amount: row.Amount,
+		Frequency: row.Frequency, Interval: int(row.Interval), StartDate: row.StartDate,
+		NextRunDate: row.NextRunDate, IsActive: row.IsActive != 0,
 	}
-	if cat.Valid {
-		r.CategoryID = &cat.Int64
+	if row.ToAccountID.Valid {
+		r.ToAccountID = &row.ToAccountID.Int64
 	}
-	if toAmt.Valid {
-		r.ToAmount = &toAmt.Float64
+	if row.CategoryID.Valid {
+		r.CategoryID = &row.CategoryID.Int64
 	}
-	if desc.Valid {
-		r.Description = &desc.String
+	if row.ToAmount.Valid {
+		r.ToAmount = &row.ToAmount.Float64
 	}
-	if dow.Valid {
-		v := int(dow.Int64)
+	if row.Description.Valid {
+		r.Description = &row.Description.String
+	}
+	if row.DayOfWeek.Valid {
+		v := int(row.DayOfWeek.Int64)
 		r.DayOfWeek = &v
 	}
-	if dom.Valid {
-		v := int(dom.Int64)
+	if row.DayOfMonth.Valid {
+		v := int(row.DayOfMonth.Int64)
 		r.DayOfMonth = &v
 	}
-	if end.Valid {
-		r.EndDate = &end.String
+	if row.EndDate.Valid {
+		r.EndDate = &row.EndDate.String
 	}
-	if last.Valid {
-		r.LastRunDate = &last.String
+	if row.LastRunDate.Valid {
+		r.LastRunDate = &row.LastRunDate.String
 	}
-	r.IsActive = active != 0
-	return r, err
+	return r
 }

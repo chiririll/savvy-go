@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/chiririll/savvy-plus/internal/db"
+	"github.com/chiririll/savvy-plus/internal/db/sqlc"
 	"github.com/chiririll/savvy-plus/internal/version"
 )
 
@@ -44,31 +45,26 @@ type Backups struct {
 }
 
 func (s Backups) All(ctx context.Context) ([]Backup, error) {
-	rows, err := s.DB.QueryContext(ctx, `SELECT id, filename, size, note, app_version, schema_migrations, created_at FROM backups ORDER BY created_at DESC, id DESC`)
+	rows, err := db.Q(s.DB).ListBackups(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []Backup
-	for rows.Next() {
-		b, err := scanBackup(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, b)
+	out := make([]Backup, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, backupFrom(r.ID, r.Filename, r.Size, r.Note, r.AppVersion, r.SchemaMigrations, r.CreatedAt))
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 func (s Backups) ByID(ctx context.Context, id int64) (*Backup, error) {
-	row := s.DB.QueryRowContext(ctx, `SELECT id, filename, size, note, app_version, schema_migrations, created_at FROM backups WHERE id = ?`, id)
-	b, err := scanBackup(row)
+	r, err := db.Q(s.DB).GetBackup(ctx, id)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
+	b := backupFrom(r.ID, r.Filename, r.Size, r.Note, r.AppVersion, r.SchemaMigrations, r.CreatedAt)
 	return &b, nil
 }
 
@@ -90,9 +86,10 @@ func (s Backups) Create(ctx context.Context, note *string) (*Backup, error) {
 	}
 	ver := version.Value
 	now := time.Now().UTC().Format(time.RFC3339)
-	res, err := s.DB.ExecContext(ctx, `
-		INSERT INTO backups (filename, size, note, app_version, created_at, updated_at) VALUES (?,?,?,?,?,?)`,
-		name, info.Size(), note, ver, now, now)
+	res, err := db.Q(s.DB).InsertBackup(ctx, sqlc.InsertBackupParams{
+		Filename: name, Size: info.Size(), Note: db.NullString(note), AppVersion: db.NS(ver),
+		CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -116,9 +113,10 @@ func (s Backups) Ingest(ctx context.Context, srcPath string, note *string) (*Bac
 	}
 	ver := version.Value
 	now := time.Now().UTC().Format(time.RFC3339)
-	res, err := s.DB.ExecContext(ctx, `
-		INSERT INTO backups (filename, size, note, app_version, created_at, updated_at) VALUES (?,?,?,?,?,?)`,
-		name, info.Size(), note, ver, now, now)
+	res, err := db.Q(s.DB).InsertBackup(ctx, sqlc.InsertBackupParams{
+		Filename: name, Size: info.Size(), Note: db.NullString(note), AppVersion: db.NS(ver),
+		CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -128,8 +126,7 @@ func (s Backups) Ingest(ctx context.Context, srcPath string, note *string) (*Bac
 
 func (s Backups) Delete(ctx context.Context, b Backup) error {
 	_ = os.Remove(filepath.Join(s.Dir, b.Filename))
-	_, err := s.DB.ExecContext(ctx, `DELETE FROM backups WHERE id = ?`, b.ID)
-	return err
+	return db.Q(s.DB).DeleteBackup(ctx, b.ID)
 }
 
 func (s Backups) Path(b Backup) string {
@@ -142,28 +139,8 @@ func (s Backups) Inspect(ctx context.Context, b Backup) (map[string]any, error) 
 		return nil, err
 	}
 	defer src.Close()
-	var ran []string
-	rows, err := src.QueryContext(ctx, `SELECT version FROM schema_migrations`)
-	if err == nil {
-		defer rows.Close()
-		for rows.Next() {
-			var v string
-			if rows.Scan(&v) == nil {
-				ran = append(ran, v)
-			}
-		}
-	}
-	var available []string
-	arows, err := s.DB.QueryContext(ctx, `SELECT version FROM schema_migrations`)
-	if err == nil {
-		defer arows.Close()
-		for arows.Next() {
-			var v string
-			if arows.Scan(&v) == nil {
-				available = append(available, v)
-			}
-		}
-	}
+	ran, _ := sqlc.New(src).ListSchemaMigrations(ctx)
+	available, _ := db.Q(s.DB).ListSchemaMigrations(ctx)
 	pending := diffStrings(available, ran)
 	unknown := diffStrings(ran, available)
 	return map[string]any{"pendingMigrations": pending, "unknownMigrations": unknown}, nil
@@ -185,10 +162,8 @@ func (s Backups) Restore(ctx context.Context, b Backup) error {
 	return nil
 }
 
-func scanBackup(row interface{ Scan(...any) error }) (Backup, error) {
-	var b Backup
-	var note, ver, mig, created sql.NullString
-	err := row.Scan(&b.ID, &b.Filename, &b.Size, &note, &ver, &mig, &created)
+func backupFrom(id int64, filename string, size int64, note, ver, mig, created sql.NullString) Backup {
+	b := Backup{ID: id, Filename: filename, Size: size}
 	if note.Valid {
 		b.Note = &note.String
 	}
@@ -201,7 +176,7 @@ func scanBackup(row interface{ Scan(...any) error }) (Backup, error) {
 	if tm, ok := parseNullTime(created); ok {
 		b.CreatedAt = &tm
 	}
-	return b, err
+	return b
 }
 
 func copyFile(src, dest string) error {

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/chiririll/savvy-plus/internal/auth"
+	"github.com/chiririll/savvy-plus/internal/db"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -17,9 +18,7 @@ func (s *Server) passwordLoginDisabled(r *http.Request) bool {
 }
 
 func (s *Server) enabledSSOExists(r *http.Request) bool {
-	var n int
-	_ = s.db.QueryRowContext(r.Context(),
-		`SELECT COUNT(*) FROM identity_providers WHERE enabled = 1`).Scan(&n)
+	n, _ := db.Q(s.db).CountEnabledIdentityProviders(r.Context())
 	return n > 0
 }
 

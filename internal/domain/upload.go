@@ -17,6 +17,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/chiririll/savvy-plus/internal/db"
+	"github.com/chiririll/savvy-plus/internal/db/sqlc"
 )
 
 const (
@@ -75,19 +78,21 @@ func (s Uploads) Create(ctx context.Context, userID int64, bucket, filename stri
 	key := buildObjectKey(b.Prefix, id, filename)
 	now := time.Now().UTC()
 	exp := now.Add(time.Duration(uploadURLTTL) * time.Second)
-	var total any
+	var totalParts sql.NullInt64
 	if size != nil {
 		n := int((*size + int64(partSize) - 1) / int64(partSize))
 		if n < 1 {
 			n = 1
 		}
-		total = n
+		totalParts = db.NI(int64(n))
 	}
-	_, err := s.DB.ExecContext(ctx, `
-		INSERT INTO uploads (id, user_id, bucket, object_key, disk, original_name, mime_type, size, part_size, total_parts, status, expires_at, created_at, updated_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		id, userID, bucket, key, "local", filename, mime, size, partSize, total, uploadPending,
-		exp.Format(time.RFC3339), now.Format(time.RFC3339), now.Format(time.RFC3339))
+	err := db.Q(s.DB).InsertUpload(ctx, sqlc.InsertUploadParams{
+		ID: id, UserID: db.NI(userID), Bucket: bucket, ObjectKey: key, Disk: "local",
+		OriginalName: filename, MimeType: db.NullString(mime), Size: db.NullInt64(size),
+		PartSize: db.NI(int64(partSize)), TotalParts: totalParts, Status: uploadPending,
+		ExpiresAt: db.NS(exp.Format(time.RFC3339)), CreatedAt: db.NS(now.Format(time.RFC3339)),
+		UpdatedAt: db.NS(now.Format(time.RFC3339)),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -95,38 +100,37 @@ func (s Uploads) Create(ctx context.Context, userID int64, bucket, filename stri
 }
 
 func (s Uploads) ByID(ctx context.Context, id string) (*Upload, error) {
-	row := s.DB.QueryRowContext(ctx, `
-		SELECT id, user_id, bucket, object_key, disk, path, original_name, mime_type, size, part_size, total_parts, status, expires_at
-		FROM uploads WHERE id = ?`, id)
-	var u Upload
-	var user sql.NullInt64
-	var path, mime, exp sql.NullString
-	var size sql.NullInt64
-	var parts sql.NullInt64
-	err := row.Scan(&u.ID, &user, &u.Bucket, &u.ObjectKey, &u.Disk, &path, &u.OriginalName, &mime, &size, &u.PartSize, &parts, &u.Status, &exp)
+	row, err := db.Q(s.DB).GetUpload(ctx, id)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	if user.Valid {
-		u.UserID = &user.Int64
+	u := Upload{
+		ID: row.ID, Bucket: row.Bucket, ObjectKey: row.ObjectKey, Disk: row.Disk,
+		OriginalName: row.OriginalName, Status: row.Status,
 	}
-	if path.Valid {
-		u.Path = &path.String
+	if row.PartSize.Valid {
+		u.PartSize = int(row.PartSize.Int64)
 	}
-	if mime.Valid {
-		u.MimeType = &mime.String
+	if row.UserID.Valid {
+		u.UserID = &row.UserID.Int64
 	}
-	if size.Valid {
-		u.Size = &size.Int64
+	if row.Path.Valid {
+		u.Path = &row.Path.String
 	}
-	if parts.Valid {
-		n := int(parts.Int64)
+	if row.MimeType.Valid {
+		u.MimeType = &row.MimeType.String
+	}
+	if row.Size.Valid {
+		u.Size = &row.Size.Int64
+	}
+	if row.TotalParts.Valid {
+		n := int(row.TotalParts.Int64)
 		u.TotalParts = &n
 	}
-	if tm, ok := parseNullTime(exp); ok {
+	if tm, ok := parseNullTime(row.ExpiresAt); ok {
 		u.ExpiresAt = &tm
 	}
 	return &u, nil
@@ -245,9 +249,10 @@ func (s Uploads) Complete(ctx context.Context, u *Upload, parts []struct {
 		}
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, err = s.DB.ExecContext(ctx, `
-		UPDATE uploads SET path=?, total_parts=?, status=?, completed_at=?, updated_at=? WHERE id=?`,
-		u.ObjectKey, len(parts), uploadCompleted, now, now, u.ID)
+	err = db.Q(s.DB).CompleteUpload(ctx, sqlc.CompleteUploadParams{
+		Path: db.NS(u.ObjectKey), TotalParts: db.NI(int64(len(parts))), Status: uploadCompleted,
+		CompletedAt: db.NS(now), UpdatedAt: db.NS(now), ID: u.ID,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -261,8 +266,7 @@ func (s Uploads) Abort(ctx context.Context, u *Upload) error {
 		_ = os.Remove(filepath.Join(s.Root, filepath.FromSlash(*u.Path)))
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, err := s.DB.ExecContext(ctx, `UPDATE uploads SET status=?, updated_at=? WHERE id=?`, uploadAborted, now, u.ID)
-	return err
+	return db.Q(s.DB).SetUploadStatus(ctx, sqlc.SetUploadStatusParams{Status: uploadAborted, UpdatedAt: db.NS(now), ID: u.ID})
 }
 
 func (s Uploads) ReadFile(u *Upload) ([]byte, error) {
@@ -278,8 +282,7 @@ func (s Uploads) Discard(ctx context.Context, u *Upload) error {
 	}
 	_ = os.RemoveAll(filepath.Join(s.Root, u.ID))
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, err := s.DB.ExecContext(ctx, `UPDATE uploads SET status=?, updated_at=? WHERE id=?`, uploadConsumed, now, u.ID)
-	return err
+	return db.Q(s.DB).SetUploadStatus(ctx, sqlc.SetUploadStatusParams{Status: uploadConsumed, UpdatedAt: db.NS(now), ID: u.ID})
 }
 
 func (s Uploads) Location(u *Upload) string {
@@ -289,18 +292,10 @@ func (s Uploads) Location(u *Upload) string {
 
 func (s Uploads) PruneExpired(ctx context.Context) error {
 	now := time.Now().UTC().Format(time.RFC3339)
-	rows, err := s.DB.QueryContext(ctx, `SELECT id FROM uploads WHERE status = 'pending' AND expires_at IS NOT NULL AND expires_at < ?`, now)
+	ids, err := db.Q(s.DB).ListExpiredPendingUploads(ctx, db.NS(now))
 	if err != nil {
 		return err
 	}
-	var ids []string
-	for rows.Next() {
-		var id string
-		if rows.Scan(&id) == nil {
-			ids = append(ids, id)
-		}
-	}
-	rows.Close()
 	for _, id := range ids {
 		if u, _ := s.ByID(ctx, id); u != nil {
 			_ = s.Abort(ctx, u)

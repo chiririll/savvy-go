@@ -6,6 +6,9 @@ import (
 	"database/sql"
 	"strings"
 	"time"
+
+	"github.com/chiririll/savvy-plus/internal/db"
+	"github.com/chiririll/savvy-plus/internal/db/sqlc"
 )
 
 const recoveryChars = "abcdefghjkmnpqrstuvwxyz23456789"
@@ -53,7 +56,7 @@ func (t TwoFactor) Disable(ctx context.Context, u *User, code string) error {
 	if err := t.Users.SetTwoFactor(ctx, u.ID, nil, false, false); err != nil {
 		return err
 	}
-	_, _ = t.DB.ExecContext(ctx, `DELETE FROM two_factor_recovery_codes WHERE user_id = ?`, u.ID)
+	_ = db.Q(t.DB).DeleteRecoveryCodes(ctx, u.ID)
 	return nil
 }
 
@@ -66,27 +69,14 @@ func (t TwoFactor) VerifyAny(ctx context.Context, u *User, code string) bool {
 
 func (t TwoFactor) ConsumeRecovery(ctx context.Context, userID int64, code string) bool {
 	code = strings.ToLower(strings.TrimSpace(code))
-	rows, err := t.DB.QueryContext(ctx, `SELECT id, code FROM two_factor_recovery_codes WHERE user_id = ? AND used_at IS NULL`, userID)
+	found, err := db.Q(t.DB).ListUnusedRecoveryCodes(ctx, userID)
 	if err != nil {
 		return false
 	}
-	defer rows.Close()
-	type row struct {
-		id   int64
-		hash string
-	}
-	var found []row
-	for rows.Next() {
-		var r row
-		if rows.Scan(&r.id, &r.hash) == nil {
-			found = append(found, r)
-		}
-	}
-	rows.Close()
 	for _, r := range found {
-		if CheckPassword(r.hash, code) {
+		if CheckPassword(r.Code, code) {
 			now := time.Now().UTC().Format(time.RFC3339)
-			_, _ = t.DB.ExecContext(ctx, `UPDATE two_factor_recovery_codes SET used_at=? WHERE id=?`, now, r.id)
+			_ = db.Q(t.DB).MarkRecoveryCodeUsed(ctx, sqlc.MarkRecoveryCodeUsedParams{UsedAt: db.NS(now), ID: r.ID})
 			return true
 		}
 	}
@@ -94,9 +84,8 @@ func (t TwoFactor) ConsumeRecovery(ctx context.Context, userID int64, code strin
 }
 
 func (t TwoFactor) Remaining(ctx context.Context, userID int64) int {
-	var n int
-	_ = t.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM two_factor_recovery_codes WHERE user_id = ? AND used_at IS NULL`, userID).Scan(&n)
-	return n
+	n, _ := db.Q(t.DB).CountUnusedRecoveryCodes(ctx, userID)
+	return int(n)
 }
 
 func (t TwoFactor) Regenerate(ctx context.Context, u *User, code string) ([]string, error) {
@@ -107,7 +96,7 @@ func (t TwoFactor) Regenerate(ctx context.Context, u *User, code string) ([]stri
 		return nil, fmtErr("invalid code")
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, _ = t.DB.ExecContext(ctx, `UPDATE two_factor_recovery_codes SET used_at=? WHERE user_id=? AND used_at IS NULL`, now, u.ID)
+	_ = db.Q(t.DB).InvalidateUnusedRecoveryCodes(ctx, sqlc.InvalidateUnusedRecoveryCodesParams{UsedAt: db.NS(now), UserID: u.ID})
 	return t.generateCodes(ctx, u.ID)
 }
 
@@ -120,7 +109,7 @@ func (t TwoFactor) generateCodes(ctx context.Context, userID int64) ([]string, e
 		if err != nil {
 			return nil, err
 		}
-		if _, err := t.DB.ExecContext(ctx, `INSERT INTO two_factor_recovery_codes (user_id, code, created_at) VALUES (?,?,?)`, userID, h, now); err != nil {
+		if err := db.Q(t.DB).InsertRecoveryCode(ctx, sqlc.InsertRecoveryCodeParams{UserID: userID, Code: h, CreatedAt: db.NS(now)}); err != nil {
 			return nil, err
 		}
 		codes = append(codes, plain)

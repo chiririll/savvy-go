@@ -6,6 +6,9 @@ import (
 	"encoding/json"
 	"strconv"
 	"strings"
+
+	"github.com/chiririll/savvy-plus/internal/db"
+	"github.com/chiririll/savvy-plus/internal/db/sqlc"
 )
 
 var defaults = map[string]any{
@@ -21,7 +24,7 @@ type Store struct {
 
 func (s Store) Get(ctx context.Context, key string, fallback any) any {
 	var raw sql.NullString
-	err := s.DB.QueryRowContext(ctx, `SELECT value FROM settings WHERE key = ?`, key).Scan(&raw)
+	raw, err := db.Q(s.DB).GetSetting(ctx, key)
 	if err != nil || !raw.Valid {
 		if fallback != nil {
 			return fallback
@@ -55,10 +58,7 @@ func (s Store) Set(ctx context.Context, key string, value any) error {
 	if err != nil {
 		return err
 	}
-	_, err = s.DB.ExecContext(ctx, `
-		INSERT INTO settings(key, value) VALUES(?, ?)
-		ON CONFLICT(key) DO UPDATE SET value = excluded.value`, key, string(raw))
-	return err
+	return db.Q(s.DB).UpsertSetting(ctx, sqlc.UpsertSettingParams{Key: key, Value: db.NS(string(raw))})
 }
 
 func (s Store) All(ctx context.Context) (map[string]any, error) {
@@ -66,25 +66,19 @@ func (s Store) All(ctx context.Context) (map[string]any, error) {
 	for k, v := range defaults {
 		out[k] = v
 	}
-	rows, err := s.DB.QueryContext(ctx, `SELECT key, value FROM settings`)
+	rows, err := db.Q(s.DB).ListSettings(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	for rows.Next() {
-		var k string
-		var raw sql.NullString
-		if err := rows.Scan(&k, &raw); err != nil {
-			return nil, err
-		}
-		if strings.HasPrefix(k, "legacy_") {
+	for _, r := range rows {
+		if strings.HasPrefix(r.Key, "legacy_") {
 			continue
 		}
-		if raw.Valid {
-			out[k] = decode(raw.String)
+		if r.Value.Valid {
+			out[r.Key] = decode(r.Value.String)
 		}
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 func decode(raw string) any {

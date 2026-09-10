@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"github.com/chiririll/savvy-plus/internal/auth"
+	"github.com/chiririll/savvy-plus/internal/db"
+	"github.com/chiririll/savvy-plus/internal/db/sqlc"
 	"github.com/chiririll/savvy-plus/internal/settings"
 )
 
@@ -131,15 +133,15 @@ func (s SSO) client() *http.Client {
 }
 
 func (s SSO) All(ctx context.Context) ([]IdentityProvider, error) {
-	return s.list(ctx, `ORDER BY sort_order, id`)
+	return s.list(ctx, sqlc.ListIdentityProvidersParams{})
 }
 
 func (s SSO) Enabled(ctx context.Context) ([]IdentityProvider, error) {
-	return s.list(ctx, `WHERE enabled = 1 ORDER BY sort_order, id`)
+	return s.list(ctx, sqlc.ListIdentityProvidersParams{EnabledOnly: db.Flag(true)})
 }
 
 func (s SSO) ByID(ctx context.Context, id int64) (*IdentityProvider, error) {
-	list, err := s.list(ctx, `WHERE id = ?`, id)
+	list, err := s.list(ctx, sqlc.ListIdentityProvidersParams{ID: db.NI(id)})
 	if err != nil || len(list) == 0 {
 		return nil, err
 	}
@@ -147,7 +149,7 @@ func (s SSO) ByID(ctx context.Context, id int64) (*IdentityProvider, error) {
 }
 
 func (s SSO) BySlug(ctx context.Context, slug string) (*IdentityProvider, error) {
-	list, err := s.list(ctx, `WHERE slug = ?`, slug)
+	list, err := s.list(ctx, sqlc.ListIdentityProvidersParams{Slug: db.NullStringVal(slug)})
 	if err != nil || len(list) == 0 {
 		return nil, err
 	}
@@ -222,12 +224,14 @@ func (s SSO) Create(ctx context.Context, in IdPWrite) (*IdentityProvider, error)
 	claimJSON, _ := json.Marshal(claims)
 	roleJSON, _ := json.Marshal(roles)
 	now := time.Now().UTC().Format(time.RFC3339)
-	res, err := s.DB.ExecContext(ctx, `
-		INSERT INTO identity_providers (name, slug, protocol, preset, enabled, sort_order, config, secrets,
-			claim_mappings, role_mapping, default_role, allow_jit, sync_role_on_login, link_by_email, created_at, updated_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		in.Name, in.Slug, preset.Protocol, preset.Key, boolInt(enabled), sort, string(cfgJSON), string(secJSON),
-		string(claimJSON), string(roleJSON), role, boolInt(allowJIT), boolInt(sync), boolInt(link), now, now)
+	res, err := db.Q(s.DB).InsertIdentityProvider(ctx, sqlc.InsertIdentityProviderParams{
+		Name: in.Name, Slug: in.Slug, Protocol: preset.Protocol, Preset: preset.Key,
+		Enabled: db.BoolInt(enabled), SortOrder: int64(sort),
+		Config: db.NS(string(cfgJSON)), Secrets: db.NS(string(secJSON)),
+		ClaimMappings: db.NS(string(claimJSON)), RoleMapping: db.NS(string(roleJSON)),
+		DefaultRole: role, AllowJit: db.BoolInt(allowJIT), SyncRoleOnLogin: db.BoolInt(sync),
+		LinkByEmail: db.BoolInt(link), CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -292,12 +296,15 @@ func (s SSO) Update(ctx context.Context, id int64, in IdPWrite) (*IdentityProvid
 	claimJSON, _ := json.Marshal(cur.ClaimMappings)
 	roleJSON, _ := json.Marshal(cur.RoleMapping)
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, err = s.DB.ExecContext(ctx, `
-		UPDATE identity_providers SET name=?, slug=?, protocol=?, preset=?, enabled=?, sort_order=?, config=?, secrets=?,
-			claim_mappings=?, role_mapping=?, default_role=?, allow_jit=?, sync_role_on_login=?, link_by_email=?, updated_at=?
-		WHERE id=?`,
-		cur.Name, cur.Slug, cur.Protocol, cur.Preset, boolInt(cur.Enabled), cur.SortOrder, string(cfgJSON), string(secJSON),
-		string(claimJSON), string(roleJSON), cur.DefaultRole, boolInt(cur.AllowJIT), boolInt(cur.SyncRoleOnLogin), boolInt(cur.LinkByEmail), now, id)
+	err = db.Q(s.DB).UpdateIdentityProvider(ctx, sqlc.UpdateIdentityProviderParams{
+		Name: cur.Name, Slug: cur.Slug, Protocol: cur.Protocol, Preset: cur.Preset,
+		Enabled: db.BoolInt(cur.Enabled), SortOrder: int64(cur.SortOrder),
+		Config: db.NS(string(cfgJSON)), Secrets: db.NS(string(secJSON)),
+		ClaimMappings: db.NS(string(claimJSON)), RoleMapping: db.NS(string(roleJSON)),
+		DefaultRole: cur.DefaultRole, AllowJit: db.BoolInt(cur.AllowJIT),
+		SyncRoleOnLogin: db.BoolInt(cur.SyncRoleOnLogin), LinkByEmail: db.BoolInt(cur.LinkByEmail),
+		UpdatedAt: db.NS(now), ID: id,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -305,18 +312,11 @@ func (s SSO) Update(ctx context.Context, id int64, in IdPWrite) (*IdentityProvid
 }
 
 func (s SSO) Delete(ctx context.Context, id int64) error {
-	var orphans int
-	_ = s.DB.QueryRowContext(ctx, `
-		SELECT COUNT(*) FROM users u
-		WHERE u.is_sso_only = 1
-		  AND EXISTS (SELECT 1 FROM user_identities i WHERE i.user_id = u.id AND i.identity_provider_id = ?)
-		  AND NOT EXISTS (SELECT 1 FROM user_identities i WHERE i.user_id = u.id AND i.identity_provider_id != ?)`,
-		id, id).Scan(&orphans)
+	orphans, _ := db.Q(s.DB).CountSSOOnlyOrphans(ctx, id)
 	if orphans > 0 {
 		return fmt.Errorf("Cannot delete: SSO-only users would be left without a way to sign in.")
 	}
-	_, err := s.DB.ExecContext(ctx, `DELETE FROM identity_providers WHERE id = ?`, id)
-	return err
+	return db.Q(s.DB).DeleteIdentityProvider(ctx, id)
 }
 
 func assembleFields(preset SSOPreset, input map[string]any, existing *IdentityProvider) (cfg, sec map[string]any, err error) {
@@ -382,18 +382,19 @@ func (s SSO) IssueTicket(ctx context.Context, userID int64, requires2FA bool) (s
 	_, _ = rand.Read(b)
 	ticket := hex.EncodeToString(b)
 	now := time.Now().UTC()
-	_, err := s.DB.ExecContext(ctx, `
-		INSERT INTO sso_login_tickets (ticket, user_id, requires_2fa, expires_at, created_at, updated_at)
-		VALUES (?,?,?,?,?,?)`, ticket, userID, boolInt(requires2FA), now.Add(2*time.Minute).Format(time.RFC3339),
-		now.Format(time.RFC3339), now.Format(time.RFC3339))
+	err := db.Q(s.DB).InsertSSOTicket(ctx, sqlc.InsertSSOTicketParams{
+		Ticket: ticket, UserID: userID, Requires2fa: db.BoolInt(requires2FA),
+		ExpiresAt: now.Add(2 * time.Minute).Format(time.RFC3339),
+		CreatedAt: db.NS(now.Format(time.RFC3339)), UpdatedAt: db.NS(now.Format(time.RFC3339)),
+	})
 	return ticket, err
 }
 
 func (s SSO) ConsumeTicket(ctx context.Context, ticket string) (userID int64, requires2FA bool, ok bool) {
 	now := time.Now().UTC().Format(time.RFC3339)
-	res, err := s.DB.ExecContext(ctx, `
-		UPDATE sso_login_tickets SET consumed_at=?, updated_at=?
-		WHERE ticket=? AND consumed_at IS NULL AND expires_at > ?`, now, now, ticket, now)
+	res, err := db.Q(s.DB).ConsumeSSOTicket(ctx, sqlc.ConsumeSSOTicketParams{
+		ConsumedAt: db.NS(now), UpdatedAt: db.NS(now), Ticket: ticket, ExpiresAt: now,
+	})
 	if err != nil {
 		return 0, false, false
 	}
@@ -401,11 +402,11 @@ func (s SSO) ConsumeTicket(ctx context.Context, ticket string) (userID int64, re
 	if n != 1 {
 		return 0, false, false
 	}
-	var req int
-	if err := s.DB.QueryRowContext(ctx, `SELECT user_id, requires_2fa FROM sso_login_tickets WHERE ticket=?`, ticket).Scan(&userID, &req); err != nil {
+	row, err := db.Q(s.DB).GetSSOTicket(ctx, ticket)
+	if err != nil {
 		return 0, false, false
 	}
-	return userID, req != 0, true
+	return row.UserID, row.Requires2fa != 0, true
 }
 
 func (s SSO) SaveState(ctx context.Context, st IdPState) (string, error) {
@@ -413,94 +414,73 @@ func (s SSO) SaveState(ctx context.Context, st IdPState) (string, error) {
 	_, _ = rand.Read(b)
 	state := hex.EncodeToString(b)
 	now := time.Now().UTC()
-	_, err := s.DB.ExecContext(ctx, `
-		INSERT INTO sso_login_states (state, identity_provider_id, nonce, code_verifier, saml_request_id, redirect_after, expires_at, created_at, updated_at)
-		VALUES (?,?,?,?,?,?,?,?,?)`, state, st.ProviderID, nullIfEmpty(st.Nonce), nullIfEmpty(st.CodeVerifier),
-		nullIfEmpty(st.SAMLRequestID), nullIfEmpty(st.RedirectAfter), now.Add(10*time.Minute).Format(time.RFC3339),
-		now.Format(time.RFC3339), now.Format(time.RFC3339))
+	err := db.Q(s.DB).InsertSSOState(ctx, sqlc.InsertSSOStateParams{
+		State: state, IdentityProviderID: st.ProviderID,
+		Nonce: db.NullStringVal(st.Nonce), CodeVerifier: db.NullStringVal(st.CodeVerifier),
+		SamlRequestID: db.NullStringVal(st.SAMLRequestID), RedirectAfter: db.NullStringVal(st.RedirectAfter),
+		ExpiresAt: now.Add(10 * time.Minute).Format(time.RFC3339),
+		CreatedAt: db.NS(now.Format(time.RFC3339)), UpdatedAt: db.NS(now.Format(time.RFC3339)),
+	})
 	return state, err
 }
 
 func (s SSO) AttachSAMLRequestID(ctx context.Context, state, requestID string) error {
-	_, err := s.DB.ExecContext(ctx, `UPDATE sso_login_states SET saml_request_id=? WHERE state=?`, requestID, state)
-	return err
+	return db.Q(s.DB).AttachSAMLRequestID(ctx, sqlc.AttachSAMLRequestIDParams{SamlRequestID: db.NS(requestID), State: state})
 }
 
 func (s SSO) ConsumeState(ctx context.Context, state string) (*IdPState, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
-	var row IdPState
-	var nonce, verifier, saml, after sql.NullString
-	var exp string
-	err := s.DB.QueryRowContext(ctx, `
-		SELECT identity_provider_id, nonce, code_verifier, saml_request_id, redirect_after, expires_at
-		FROM sso_login_states WHERE state=?`, state).Scan(&row.ProviderID, &nonce, &verifier, &saml, &after, &exp)
+	row, err := db.Q(s.DB).GetSSOState(ctx, state)
 	if err != nil {
 		return nil, nil
 	}
-	_, _ = s.DB.ExecContext(ctx, `DELETE FROM sso_login_states WHERE state=?`, state)
-	if exp <= now {
+	_ = db.Q(s.DB).DeleteSSOState(ctx, state)
+	if row.ExpiresAt <= now {
 		return nil, nil
 	}
-	row.Nonce, row.CodeVerifier, row.SAMLRequestID, row.RedirectAfter = nonce.String, verifier.String, saml.String, after.String
-	return &row, nil
+	return &IdPState{
+		ProviderID: row.IdentityProviderID, Nonce: row.Nonce.String, CodeVerifier: row.CodeVerifier.String,
+		SAMLRequestID: row.SamlRequestID.String, RedirectAfter: row.RedirectAfter.String,
+	}, nil
 }
 
-func (s SSO) list(ctx context.Context, where string, args ...any) ([]IdentityProvider, error) {
-	rows, err := s.DB.QueryContext(ctx, `
-		SELECT id, name, slug, protocol, preset, enabled, sort_order, config, secrets,
-			claim_mappings, role_mapping, default_role, allow_jit, sync_role_on_login, link_by_email, created_at, updated_at
-		FROM identity_providers `+where, args...)
+func (s SSO) list(ctx context.Context, arg sqlc.ListIdentityProvidersParams) ([]IdentityProvider, error) {
+	rows, err := db.Q(s.DB).ListIdentityProviders(ctx, arg)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []IdentityProvider
-	for rows.Next() {
-		p, err := scanIdP(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, p)
+	out := make([]IdentityProvider, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, idpFrom(r))
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
-func scanIdP(row interface{ Scan(...any) error }) (IdentityProvider, error) {
-	var p IdentityProvider
-	var cfg, sec, claims, roles, created, updated sql.NullString
-	var enabled, jit, sync, link int
-	err := row.Scan(&p.ID, &p.Name, &p.Slug, &p.Protocol, &p.Preset, &enabled, &p.SortOrder, &cfg, &sec,
-		&claims, &roles, &p.DefaultRole, &jit, &sync, &link, &created, &updated)
-	p.Enabled = enabled != 0
-	p.AllowJIT = jit != 0
-	p.SyncRoleOnLogin = sync != 0
-	p.LinkByEmail = link != 0
-	if cfg.Valid {
-		_ = json.Unmarshal([]byte(cfg.String), &p.Config)
+func idpFrom(row sqlc.IdentityProvider) IdentityProvider {
+	p := IdentityProvider{
+		ID: row.ID, Name: row.Name, Slug: row.Slug, Protocol: row.Protocol, Preset: row.Preset,
+		Enabled: row.Enabled != 0, SortOrder: int(row.SortOrder), DefaultRole: row.DefaultRole,
+		AllowJIT: row.AllowJit != 0, SyncRoleOnLogin: row.SyncRoleOnLogin != 0, LinkByEmail: row.LinkByEmail != 0,
 	}
-	if sec.Valid {
-		_ = json.Unmarshal([]byte(sec.String), &p.Secrets)
+	if row.Config.Valid {
+		_ = json.Unmarshal([]byte(row.Config.String), &p.Config)
 	}
-	if claims.Valid {
-		_ = json.Unmarshal([]byte(claims.String), &p.ClaimMappings)
+	if row.Secrets.Valid {
+		_ = json.Unmarshal([]byte(row.Secrets.String), &p.Secrets)
 	}
-	if roles.Valid {
-		_ = json.Unmarshal([]byte(roles.String), &p.RoleMapping)
+	if row.ClaimMappings.Valid {
+		_ = json.Unmarshal([]byte(row.ClaimMappings.String), &p.ClaimMappings)
 	}
-	if tm, ok := parseNullTime(created); ok {
+	if row.RoleMapping.Valid {
+		_ = json.Unmarshal([]byte(row.RoleMapping.String), &p.RoleMapping)
+	}
+	if tm, ok := parseNullTime(row.CreatedAt); ok {
 		p.CreatedAt = &tm
 	}
-	if tm, ok := parseNullTime(updated); ok {
+	if tm, ok := parseNullTime(row.UpdatedAt); ok {
 		p.UpdatedAt = &tm
 	}
-	return p, err
-}
-
-func nullIfEmpty(s string) any {
-	if s == "" {
-		return nil
-	}
-	return s
+	return p
 }
 
 func cfgString(m map[string]any, key string) string {

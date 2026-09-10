@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/chiririll/savvy-plus/internal/config"
+	"github.com/chiririll/savvy-plus/internal/db"
+	"github.com/chiririll/savvy-plus/internal/db/sqlc"
 )
 
 type Session struct {
@@ -50,15 +52,13 @@ func (s Sessions) Issue(ctx context.Context, user *User, ip, ua string, remember
 	ttl := s.ttl(remember)
 	now := time.Now().UTC()
 	exp := now.Add(ttl)
-	res, err := s.DB.ExecContext(ctx, `
-		INSERT INTO auth_sessions (
-			user_id, token_hash, csrf, ip, user_agent, remember_me,
-			last_used_at, refreshed_at, idle_expires_at, absolute_expires_at,
-			created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		user.ID, HashToken(token), csrf, nullStr(ip), truncate(ua, 500), boolInt(remember),
-		fmtTime(now), fmtTime(now), fmtTime(exp), fmtTime(exp), fmtTime(now), fmtTime(now),
-	)
+	res, err := db.Q(s.DB).InsertSession(ctx, sqlc.InsertSessionParams{
+		UserID: user.ID, TokenHash: HashToken(token), Csrf: csrf,
+		Ip: db.NullStringVal(ip), UserAgent: db.NS(truncate(ua, 500)), RememberMe: int64(boolInt(remember)),
+		LastUsedAt: fmtTime(now), RefreshedAt: db.NS(fmtTime(now)),
+		IdleExpiresAt: fmtTime(exp), AbsoluteExpiresAt: fmtTime(exp),
+		CreatedAt: db.NS(fmtTime(now)), UpdatedAt: db.NS(fmtTime(now)),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -77,11 +77,8 @@ func (s Sessions) Resolve(ctx context.Context, token string) (*Session, error) {
 	if token == "" {
 		return nil, nil
 	}
-	row := s.DB.QueryRowContext(ctx, `
-		SELECT id, user_id, token_hash, csrf, remember_me, last_used_at, refreshed_at,
-		       idle_expires_at, absolute_expires_at, revoked_at, created_at
-		FROM auth_sessions WHERE token_hash = ?`, HashToken(token))
-	sess, err := scanSession(row)
+	row, err := db.Q(s.DB).GetSessionByTokenHash(ctx, HashToken(token))
+	sess, err := sessionFromRow(row, err)
 	if err != nil || sess == nil {
 		return sess, err
 	}
@@ -104,10 +101,9 @@ func (s Sessions) Touch(ctx context.Context, sess *Session) error {
 	}
 	sess.LastUsedAt = now
 	sess.IdleExpiresAt = idle
-	_, err := s.DB.ExecContext(ctx, `
-		UPDATE auth_sessions SET last_used_at = ?, idle_expires_at = ?, updated_at = ?
-		WHERE id = ?`, fmtTime(now), fmtTime(idle), fmtTime(now), sess.ID)
-	return err
+	return db.Q(s.DB).TouchSession(ctx, sqlc.TouchSessionParams{
+		LastUsedAt: fmtTime(now), IdleExpiresAt: fmtTime(idle), UpdatedAt: db.NS(fmtTime(now)), ID: sess.ID,
+	})
 }
 
 // MaybeRefresh rotates remember-me tokens once a day. Returns new raw token+csrf or nil.
@@ -131,12 +127,11 @@ func (s Sessions) Refresh(ctx context.Context, sess *Session) (*Issued, error) {
 	now := time.Now().UTC()
 	ttl := s.ttl(true)
 	exp := now.Add(ttl)
-	_, err := s.DB.ExecContext(ctx, `
-		UPDATE auth_sessions SET token_hash=?, csrf=?, last_used_at=?, refreshed_at=?,
-			idle_expires_at=?, absolute_expires_at=?, updated_at=?
-		WHERE id=?`,
-		HashToken(token), csrf, fmtTime(now), fmtTime(now), fmtTime(exp), fmtTime(exp), fmtTime(now), sess.ID,
-	)
+	err := db.Q(s.DB).RefreshSession(ctx, sqlc.RefreshSessionParams{
+		TokenHash: HashToken(token), Csrf: csrf, LastUsedAt: fmtTime(now),
+		RefreshedAt: db.NS(fmtTime(now)), IdleExpiresAt: fmtTime(exp),
+		AbsoluteExpiresAt: fmtTime(exp), UpdatedAt: db.NS(fmtTime(now)), ID: sess.ID,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -168,26 +163,23 @@ func (s Sessions) ClientTimes(sess *Session) (expiresAt string, refreshAt *strin
 
 func (s Sessions) Revoke(ctx context.Context, sess *Session) error {
 	now := time.Now().UTC()
-	_, err := s.DB.ExecContext(ctx,
-		`UPDATE auth_sessions SET revoked_at = ?, updated_at = ? WHERE id = ?`,
-		fmtTime(now), fmtTime(now), sess.ID)
-	return err
+	return db.Q(s.DB).RevokeSession(ctx, sqlc.RevokeSessionParams{
+		RevokedAt: db.NS(fmtTime(now)), UpdatedAt: db.NS(fmtTime(now)), ID: sess.ID,
+	})
 }
 
 func (s Sessions) RevokeAll(ctx context.Context, userID int64) error {
 	now := time.Now().UTC()
-	_, err := s.DB.ExecContext(ctx,
-		`UPDATE auth_sessions SET revoked_at = ?, updated_at = ? WHERE user_id = ? AND revoked_at IS NULL`,
-		fmtTime(now), fmtTime(now), userID)
-	return err
+	return db.Q(s.DB).RevokeUserSessions(ctx, sqlc.RevokeUserSessionsParams{
+		RevokedAt: db.NS(fmtTime(now)), UpdatedAt: db.NS(fmtTime(now)), UserID: userID,
+	})
 }
 
 func (s Sessions) RevokeOthers(ctx context.Context, userID, keepID int64) (int, error) {
 	now := time.Now().UTC()
-	res, err := s.DB.ExecContext(ctx, `
-		UPDATE auth_sessions SET revoked_at = ?, updated_at = ?
-		WHERE user_id = ? AND id != ? AND revoked_at IS NULL`,
-		fmtTime(now), fmtTime(now), userID, keepID)
+	res, err := db.Q(s.DB).RevokeOtherSessions(ctx, sqlc.RevokeOtherSessionsParams{
+		RevokedAt: db.NS(fmtTime(now)), UpdatedAt: db.NS(fmtTime(now)), UserID: userID, ID: keepID,
+	})
 	if err != nil {
 		return 0, err
 	}
@@ -202,37 +194,30 @@ func (s Sessions) ttl(remember bool) time.Duration {
 	return s.Cfg.SessionTTL
 }
 
-func scanSession(row rowScanner) (*Session, error) {
-	var (
-		sess       Session
-		remember   int
-		lastUsed   string
-		refreshed  sql.NullString
-		idle       string
-		absolute   string
-		revoked    sql.NullString
-		created    string
-	)
-	err := row.Scan(&sess.ID, &sess.UserID, &sess.TokenHash, &sess.CSRF, &remember,
-		&lastUsed, &refreshed, &idle, &absolute, &revoked, &created)
+func sessionFromRow(r sqlc.GetSessionByTokenHashRow, err error) (*Session, error) {
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	sess.RememberMe = remember != 0
-	sess.LastUsedAt, _ = parseTime(sql.NullString{String: lastUsed, Valid: true})
-	if t, ok := parseTime(refreshed); ok {
+	sess := &Session{
+		ID: r.ID, UserID: r.UserID, TokenHash: r.TokenHash, CSRF: r.Csrf,
+		RememberMe: r.RememberMe != 0,
+	}
+	sess.LastUsedAt, _ = parseTime(sql.NullString{String: r.LastUsedAt, Valid: true})
+	if t, ok := parseTime(r.RefreshedAt); ok {
 		sess.RefreshedAt = &t
 	}
-	sess.IdleExpiresAt, _ = parseTime(sql.NullString{String: idle, Valid: true})
-	sess.AbsoluteExpiresAt, _ = parseTime(sql.NullString{String: absolute, Valid: true})
-	if t, ok := parseTime(revoked); ok {
+	sess.IdleExpiresAt, _ = parseTime(sql.NullString{String: r.IdleExpiresAt, Valid: true})
+	sess.AbsoluteExpiresAt, _ = parseTime(sql.NullString{String: r.AbsoluteExpiresAt, Valid: true})
+	if t, ok := parseTime(r.RevokedAt); ok {
 		sess.RevokedAt = &t
 	}
-	sess.CreatedAt, _ = parseTime(sql.NullString{String: created, Valid: true})
-	return &sess, nil
+	if t, ok := parseTime(r.CreatedAt); ok {
+		sess.CreatedAt = t
+	}
+	return sess, nil
 }
 
 func fmtTime(t time.Time) string { return t.UTC().Format(time.RFC3339Nano) }

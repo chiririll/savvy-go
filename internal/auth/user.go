@@ -5,6 +5,9 @@ import (
 	"database/sql"
 	"strings"
 	"time"
+
+	"github.com/chiririll/savvy-plus/internal/db"
+	"github.com/chiririll/savvy-plus/internal/db/sqlc"
 )
 
 const (
@@ -72,34 +75,34 @@ type Users struct {
 }
 
 func (s Users) Count(ctx context.Context) (int, error) {
-	var n int
-	err := s.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM users`).Scan(&n)
-	return n, err
+	n, err := db.Q(s.DB).CountUsers(ctx)
+	return int(n), err
 }
 
 func (s Users) ByID(ctx context.Context, id int64) (*User, error) {
-	return scanUser(s.DB.QueryRowContext(ctx, userSelect+` WHERE id = ?`, id))
+	row, err := db.Q(s.DB).GetUser(ctx, id)
+	return userFromRow(row, err)
 }
 
 func (s Users) ByEmail(ctx context.Context, email string) (*User, error) {
-	return scanUser(s.DB.QueryRowContext(ctx, userSelect+` WHERE lower(email) = ?`, strings.ToLower(email)))
+	row, err := db.Q(s.DB).GetUserByEmail(ctx, strings.ToLower(email))
+	return userFromRow(row, err)
 }
 
 func (s Users) All(ctx context.Context) ([]User, error) {
-	rows, err := s.DB.QueryContext(ctx, userSelect+` ORDER BY name`)
+	rows, err := db.Q(s.DB).ListUsers(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []User
-	for rows.Next() {
-		u, err := scanUserRow(rows)
+	out := make([]User, 0, len(rows))
+	for _, r := range rows {
+		u, err := userFromRow(r, nil)
 		if err != nil {
 			return nil, err
 		}
 		out = append(out, *u)
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 func (s Users) Create(ctx context.Context, name, email string, password *string, role string) (*User, error) {
@@ -115,11 +118,14 @@ func (s Users) Create(ctx context.Context, name, email string, password *string,
 		}
 		hash = h
 	}
-	res, err := s.DB.ExecContext(ctx, `
-		INSERT INTO users (name, email, password, role, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?)`,
-		name, strings.ToLower(email), hash, role, now, now,
-	)
+	var pass sql.NullString
+	if h, ok := hash.(string); ok {
+		pass = db.NS(h)
+	}
+	res, err := db.Q(s.DB).InsertUser(ctx, sqlc.InsertUserParams{
+		Name: name, Email: strings.ToLower(email), Password: pass, Role: role,
+		CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -135,11 +141,9 @@ func (s Users) UpdatePassword(ctx context.Context, id int64, plain string) error
 	if err != nil {
 		return err
 	}
-	_, err = s.DB.ExecContext(ctx,
-		`UPDATE users SET password = ?, updated_at = ? WHERE id = ?`,
-		h, time.Now().UTC().Format(time.RFC3339), id,
-	)
-	return err
+	return db.Q(s.DB).UpdateUserPassword(ctx, sqlc.UpdateUserPasswordParams{
+		Password: db.NS(h), UpdatedAt: db.NS(time.Now().UTC().Format(time.RFC3339)), ID: id,
+	})
 }
 
 func (s Users) Update(ctx context.Context, id int64, name, email, role *string, password *string) (*User, error) {
@@ -167,16 +171,19 @@ func (s Users) Update(ctx context.Context, id int64, name, email, role *string, 
 		setPass = true
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
+	q := db.Q(s.DB)
 	if setPass {
-		_, err = s.DB.ExecContext(ctx, `
-			UPDATE users SET name=?, email=?, role=?, password=?, updated_at=? WHERE id=?`,
-			u.Name, u.Email, u.Role, pass, now, id,
-		)
+		var p sql.NullString
+		if h, ok := pass.(string); ok {
+			p = db.NS(h)
+		}
+		err = q.UpdateUserWithPassword(ctx, sqlc.UpdateUserWithPasswordParams{
+			Name: u.Name, Email: u.Email, Role: u.Role, Password: p, UpdatedAt: db.NS(now), ID: id,
+		})
 	} else {
-		_, err = s.DB.ExecContext(ctx, `
-			UPDATE users SET name=?, email=?, role=?, updated_at=? WHERE id=?`,
-			u.Name, u.Email, u.Role, now, id,
-		)
+		err = q.UpdateUserProfile(ctx, sqlc.UpdateUserProfileParams{
+			Name: u.Name, Email: u.Email, Role: u.Role, UpdatedAt: db.NS(now), ID: id,
+		})
 	}
 	if err != nil {
 		return nil, err
@@ -186,22 +193,20 @@ func (s Users) Update(ctx context.Context, id int64, name, email, role *string, 
 
 func (s Users) MarkSSOOnly(ctx context.Context, id int64) error {
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, err := s.DB.ExecContext(ctx, `UPDATE users SET is_sso_only=1, updated_at=? WHERE id=?`, now, id)
-	return err
+	return db.Q(s.DB).MarkUserSSOOnly(ctx, sqlc.MarkUserSSOOnlyParams{UpdatedAt: db.NS(now), ID: id})
 }
 
 func (s Users) SetRole(ctx context.Context, id int64, role string) error {
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, err := s.DB.ExecContext(ctx, `UPDATE users SET role=?, updated_at=? WHERE id=?`, role, now, id)
-	return err
+	return db.Q(s.DB).SetUserRole(ctx, sqlc.SetUserRoleParams{Role: role, UpdatedAt: db.NS(now), ID: id})
 }
 
 func (s Users) SetTwoFactor(ctx context.Context, id int64, secret *string, enabled, confirmed bool) error {
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, err := s.DB.ExecContext(ctx, `
-		UPDATE users SET two_factor_secret=?, two_factor_enabled=?, two_factor_confirmed=?, updated_at=? WHERE id=?`,
-		secret, boolToInt(enabled), boolToInt(confirmed), now, id)
-	return err
+	return db.Q(s.DB).SetUserTwoFactor(ctx, sqlc.SetUserTwoFactorParams{
+		TwoFactorSecret: db.NullString(secret), TwoFactorEnabled: int64(boolToInt(enabled)),
+		TwoFactorConfirmed: int64(boolToInt(confirmed)), UpdatedAt: db.NS(now), ID: id,
+	})
 }
 
 func boolToInt(v bool) int {
@@ -212,64 +217,38 @@ func boolToInt(v bool) int {
 }
 
 func (s Users) Delete(ctx context.Context, id int64) error {
-	_, err := s.DB.ExecContext(ctx, `DELETE FROM users WHERE id = ?`, id)
-	return err
+	return db.Q(s.DB).DeleteUser(ctx, id)
 }
 
 func (s Users) AdminCount(ctx context.Context) (int, error) {
-	var n int
-	err := s.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM users WHERE role = ?`, RoleAdmin).Scan(&n)
-	return n, err
+	n, err := db.Q(s.DB).CountAdmins(ctx, RoleAdmin)
+	return int(n), err
 }
 
-const userSelect = `SELECT id, name, email, password, role, is_sso_only,
-	two_factor_secret, two_factor_enabled, two_factor_confirmed, created_at, updated_at
-	FROM users`
-
-type rowScanner interface {
-	Scan(dest ...any) error
-}
-
-func scanUser(row rowScanner) (*User, error) {
-	u, err := scanUserRow(row)
+func userFromRow(r sqlc.User, err error) (*User, error) {
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
-	return u, err
-}
-
-func scanUserRow(row rowScanner) (*User, error) {
-	var (
-		u          User
-		password   sql.NullString
-		secret     sql.NullString
-		sso        int
-		tfEnabled  int
-		tfConfirm  int
-		createdRaw sql.NullString
-		updatedRaw sql.NullString
-	)
-	err := row.Scan(&u.ID, &u.Name, &u.Email, &password, &u.Role, &sso,
-		&secret, &tfEnabled, &tfConfirm, &createdRaw, &updatedRaw)
 	if err != nil {
 		return nil, err
 	}
-	if password.Valid {
-		u.Password = &password.String
+	u := &User{ID: r.ID, Name: r.Name, Email: r.Email, Role: r.Role}
+	if r.Password.Valid {
+		u.Password = &r.Password.String
 	}
-	if secret.Valid {
-		u.TwoFactorSecret = &secret.String
+	if r.TwoFactorSecret.Valid {
+		u.TwoFactorSecret = &r.TwoFactorSecret.String
 	}
-	u.IsSSOOnly = sso != 0
-	u.TwoFactorEnabled = tfEnabled != 0
-	u.TwoFactorConfirmed = tfConfirm != 0
-	if t, ok := parseTime(createdRaw); ok {
+	u.IsSSOOnly = r.IsSsoOnly != 0
+	u.TwoFactorEnabled = r.TwoFactorEnabled != 0
+	u.TwoFactorConfirmed = r.TwoFactorConfirmed != 0
+	if t, ok := parseTime(r.CreatedAt); ok {
 		u.CreatedAt = &t
 	}
-	if t, ok := parseTime(updatedRaw); ok {
+	if t, ok := parseTime(r.UpdatedAt); ok {
 		u.UpdatedAt = &t
 	}
-	return &u, nil
+	return u, nil
 }
 
 func parseTime(raw sql.NullString) (time.Time, bool) {

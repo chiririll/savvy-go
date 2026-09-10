@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/chiririll/savvy-plus/internal/db"
+	"github.com/chiririll/savvy-plus/internal/db/sqlc"
 )
 
 func (a Account) DebtJSON() map[string]any {
@@ -47,12 +50,7 @@ type Debts struct {
 }
 
 func (s Debts) All(ctx context.Context, includeCompleted bool) ([]Account, error) {
-	q := accountSelect + ` WHERE a.type = 'debt'`
-	if !includeCompleted {
-		q += ` AND a.is_paid_off = 0`
-	}
-	q += ` ORDER BY a.sort_order, a.id`
-	return s.Accounts.list(ctx, q)
+	return s.Accounts.Debts(ctx, includeCompleted)
 }
 
 func (s Debts) Create(ctx context.Context, name, debtType string, currencyID, accountID int64, amount float64, date, origin string, due, counter, desc *string) (*Account, error) {
@@ -129,7 +127,7 @@ func (s Debts) maybePayOff(ctx context.Context, debt *Account) {
 		return
 	}
 	if fresh.Balance <= 0.0001 {
-		_, _ = s.Accounts.DB.ExecContext(ctx, `UPDATE accounts SET is_paid_off = 1 WHERE id = ?`, debt.ID)
+		_ = db.Q(s.Accounts.DB).MarkAccountPaidOff(ctx, debt.ID)
 	}
 }
 
@@ -142,7 +140,7 @@ func (s Debts) Reopen(ctx context.Context, id int64) (*Account, error) {
 		return nil, fmt.Errorf("not paid off")
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, err = s.Accounts.DB.ExecContext(ctx, `UPDATE accounts SET is_paid_off = 0, updated_at = ? WHERE id = ?`, now, id)
+	err = db.Q(s.Accounts.DB).ReopenAccount(ctx, sqlc.ReopenAccountParams{UpdatedAt: db.NS(now), ID: id})
 	if err != nil {
 		return nil, err
 	}
@@ -170,13 +168,10 @@ func (s Debts) Summary(ctx context.Context) map[string]any {
 }
 
 func (s Debts) Delete(ctx context.Context, id int64) error {
-	var n int
-	_ = s.Accounts.DB.QueryRowContext(ctx, `
-		SELECT COUNT(*) FROM transactions WHERE to_account_id = ? AND type IN ('debt_payment','debt_collection')`, id).Scan(&n)
+	n, _ := db.Q(s.Accounts.DB).CountDebtHistory(ctx, db.NI(id))
 	if n > 0 {
 		return fmt.Errorf("has history")
 	}
-	_, _ = s.Accounts.DB.ExecContext(ctx, `DELETE FROM transactions WHERE to_account_id = ? AND type IN ('debt_lend','debt_borrow')`, id)
-	_, err := s.Accounts.DB.ExecContext(ctx, `DELETE FROM accounts WHERE id = ? AND type = 'debt'`, id)
-	return err
+	_ = db.Q(s.Accounts.DB).DeleteDebtIssuance(ctx, db.NI(id))
+	return db.Q(s.Accounts.DB).DeleteDebtAccount(ctx, id)
 }
