@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/chiririll/savvy-plus/internal/db"
-	"github.com/chiririll/savvy-plus/internal/db/sqlc"
-	"github.com/chiririll/savvy-plus/internal/version"
+	"savvy-go/internal/db"
+	"savvy-go/internal/db/sqlc"
+	"savvy-go/internal/version"
 )
 
 type Backup struct {

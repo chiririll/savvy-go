@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chiririll/savvy-plus/internal/auth"
+	"savvy-go/internal/auth"
 )
 
 func TestPendingAndConfirmedTransactions(t *testing.T) {

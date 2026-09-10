@@ -5,24 +5,24 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/chiririll/savvy-plus/internal/config"
-	"github.com/chiririll/savvy-plus/internal/db"
-	"github.com/chiririll/savvy-plus/internal/db/sqlc"
+	"savvy-go/internal/config"
+	"savvy-go/internal/db"
+	"savvy-go/internal/db/sqlc"
 )
 
 type Session struct {
-	ID                 int64
-	UserID             int64
-	TokenHash          string
-	CSRF               string
-	RememberMe         bool
-	LastUsedAt         time.Time
-	RefreshedAt        *time.Time
-	IdleExpiresAt      time.Time
-	AbsoluteExpiresAt  time.Time
-	RevokedAt          *time.Time
-	CreatedAt          time.Time
-	User               *User
+	ID                int64
+	UserID            int64
+	TokenHash         string
+	CSRF              string
+	RememberMe        bool
+	LastUsedAt        time.Time
+	RefreshedAt       *time.Time
+	IdleExpiresAt     time.Time
+	AbsoluteExpiresAt time.Time
+	RevokedAt         *time.Time
+	CreatedAt         time.Time
+	User              *User
 }
 
 func (s *Session) IsActive(now time.Time) bool {

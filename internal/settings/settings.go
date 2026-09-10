@@ -7,14 +7,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/chiririll/savvy-plus/internal/db"
-	"github.com/chiririll/savvy-plus/internal/db/sqlc"
+	"savvy-go/internal/db"
+	"savvy-go/internal/db/sqlc"
 )
 
 var defaults = map[string]any{
-	"auto_update_currencies":    true,
-	"sso_allow_signup":          true,
-	"password_login_enabled":    true,
+	"auto_update_currencies":     true,
+	"sso_allow_signup":           true,
+	"password_login_enabled":     true,
 	"sso_require_verified_email": false,
 }
 

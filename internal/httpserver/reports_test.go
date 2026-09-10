@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chiririll/savvy-plus/internal/auth"
+	"savvy-go/internal/auth"
 )
 
 func TestReportsOverview(t *testing.T) {

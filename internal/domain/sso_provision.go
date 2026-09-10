@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/chiririll/savvy-plus/internal/auth"
-	"github.com/chiririll/savvy-plus/internal/db"
-	"github.com/chiririll/savvy-plus/internal/db/sqlc"
+	"savvy-go/internal/auth"
+	"savvy-go/internal/db"
+	"savvy-go/internal/db/sqlc"
 )
 
 func (s SSO) Provision(ctx context.Context, p IdentityProvider, id NormalizedIdentity) (*auth.User, bool, error) {

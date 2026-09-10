@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/chiririll/savvy-plus/internal/db"
-	"github.com/chiririll/savvy-plus/internal/db/sqlc"
+	"savvy-go/internal/db"
+	"savvy-go/internal/db/sqlc"
 )
 
 type Imports struct {
@@ -24,20 +24,20 @@ type Imports struct {
 }
 
 type Import struct {
-	ID             string
-	UserID         *int64
-	UploadID       *string
-	Status         string
-	Mapping        map[string]any
-	Options        map[string]any
-	TotalRows      *int
-	ProcessedRows  int
-	CreatedCount   int
-	SkippedCount   int
-	ErrorCount     int
-	Errors         any
-	Meta           map[string]any
-	Message        *string
+	ID            string
+	UserID        *int64
+	UploadID      *string
+	Status        string
+	Mapping       map[string]any
+	Options       map[string]any
+	TotalRows     *int
+	ProcessedRows int
+	CreatedCount  int
+	SkippedCount  int
+	ErrorCount    int
+	Errors        any
+	Meta          map[string]any
+	Message       *string
 }
 
 func (s Imports) Create(ctx context.Context, userID int64, uploadID string) (*Import, error) {

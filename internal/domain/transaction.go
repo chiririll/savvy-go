@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/chiririll/savvy-plus/internal/db"
-	"github.com/chiririll/savvy-plus/internal/db/filter"
-	"github.com/chiririll/savvy-plus/internal/db/sqlc"
+	"savvy-go/internal/db"
+	"savvy-go/internal/db/filter"
+	"savvy-go/internal/db/sqlc"
 )
 
 type TxItem struct {
@@ -27,24 +27,24 @@ func (i TxItem) JSON() map[string]any {
 }
 
 type Transaction struct {
-	ID                     int64
-	Type                   string
-	AccountID              int64
-	ToAccountID            *int64
-	CategoryID             *int64
-	Amount                 float64
-	ToAmount               *float64
-	ExchangeRate           *float64
-	Description            *string
-	Date                   *string
-	Status                 string
-	RecurringID            *int64
-	CreatedAt              *time.Time
-	Account                *Account
-	ToAccount              *Account
-	Category               *Category
-	Items                  []TxItem
-	Tags                   []Tag
+	ID           int64
+	Type         string
+	AccountID    int64
+	ToAccountID  *int64
+	CategoryID   *int64
+	Amount       float64
+	ToAmount     *float64
+	ExchangeRate *float64
+	Description  *string
+	Date         *string
+	Status       string
+	RecurringID  *int64
+	CreatedAt    *time.Time
+	Account      *Account
+	ToAccount    *Account
+	Category     *Category
+	Items        []TxItem
+	Tags         []Tag
 }
 
 func (t Transaction) JSON() map[string]any {
@@ -92,19 +92,19 @@ func (t Transaction) actions() map[string]bool {
 }
 
 type TxInput struct {
-	Type        string
-	AccountID   int64
-	ToAccountID *int64
-	CategoryID  *int64
-	Amount      float64
-	ToAmount    *float64
+	Type         string
+	AccountID    int64
+	ToAccountID  *int64
+	CategoryID   *int64
+	Amount       float64
+	ToAmount     *float64
 	ExchangeRate *float64
-	Description *string
-	Date        *string
-	Status      *string
-	RecurringID *int64
-	TagIDs      []int64
-	Items       []TxItem
+	Description  *string
+	Date         *string
+	Status       *string
+	RecurringID  *int64
+	TagIDs       []int64
+	Items        []TxItem
 }
 
 type Transactions struct{ DB *sql.DB }
@@ -443,4 +443,3 @@ func mapSliceVal[T any](in []T, fn func(T) map[string]any) []any {
 	}
 	return out
 }
-

@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chiririll/savvy-plus/internal/auth"
-	"github.com/chiririll/savvy-plus/internal/db"
-	"github.com/chiririll/savvy-plus/internal/migrate"
-	"github.com/chiririll/savvy-plus/internal/settings"
+	"savvy-go/internal/auth"
+	"savvy-go/internal/db"
+	"savvy-go/internal/migrate"
+	"savvy-go/internal/settings"
 )
 
 type testApp struct {

@@ -18,8 +18,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/chiririll/savvy-plus/internal/db"
-	"github.com/chiririll/savvy-plus/internal/db/sqlc"
+	"savvy-go/internal/db"
+	"savvy-go/internal/db/sqlc"
 )
 
 const (
@@ -305,11 +305,11 @@ func (s Uploads) PruneExpired(ctx context.Context) error {
 }
 
 type uploadBucketCfg struct {
-	Prefix      string
-	MaxSize     int64
-	Exts        []string
-	Mimes       []string
-	PartSize    int
+	Prefix   string
+	MaxSize  int64
+	Exts     []string
+	Mimes    []string
+	PartSize int
 }
 
 func uploadBucket(name string) (uploadBucketCfg, bool) {

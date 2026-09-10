@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/chiririll/savvy-plus/internal/db"
+	"savvy-go/internal/db"
 )
 
 func TestUpCreatesDomainTables(t *testing.T) {

@@ -6,11 +6,12 @@ import (
 	"os"
 	"strings"
 
-	"github.com/chiririll/savvy-plus/internal/auth"
-	"github.com/chiririll/savvy-plus/internal/config"
-	"github.com/chiririll/savvy-plus/internal/domain"
-	"github.com/chiririll/savvy-plus/internal/jobs"
-	"github.com/chiririll/savvy-plus/internal/settings"
+	"savvy-go/internal/auth"
+	"savvy-go/internal/config"
+	"savvy-go/internal/domain"
+	"savvy-go/internal/jobs"
+	"savvy-go/internal/settings"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )

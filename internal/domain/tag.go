@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/chiririll/savvy-plus/internal/db"
-	"github.com/chiririll/savvy-plus/internal/db/sqlc"
+	"savvy-go/internal/db"
+	"savvy-go/internal/db/sqlc"
 )
 
 type Tag struct {
@@ -22,10 +22,10 @@ func (t Tag) JSON() map[string]any {
 		created = t.CreatedAt.UTC().Format(time.RFC3339Nano)
 	}
 	return map[string]any{
-		"id":                 t.ID,
-		"name":               t.Name,
-		"transactionsCount":  t.TransactionsCount,
-		"createdAt":          created,
+		"id":                t.ID,
+		"name":              t.Name,
+		"transactionsCount": t.TransactionsCount,
+		"createdAt":         created,
 	}
 }
 

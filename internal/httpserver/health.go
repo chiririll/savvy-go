@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/chiririll/savvy-plus/internal/db"
-	"github.com/chiririll/savvy-plus/internal/migrate"
-	"github.com/chiririll/savvy-plus/internal/version"
+	"savvy-go/internal/db"
+	"savvy-go/internal/migrate"
+	"savvy-go/internal/version"
 )
 
 type healthReport struct {

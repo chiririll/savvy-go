@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/chiririll/savvy-plus/internal/auth"
+	"savvy-go/internal/auth"
 )
 
 type ctxKey int

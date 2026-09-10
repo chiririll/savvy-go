@@ -1,4 +1,4 @@
-module github.com/chiririll/savvy-plus
+module savvy-go
 
 go 1.26.0
 

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/chiririll/savvy-plus/internal/auth"
+	"savvy-go/internal/auth"
 )
 
 func TestMultipartImportPipeline(t *testing.T) {

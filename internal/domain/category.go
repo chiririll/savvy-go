@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/chiririll/savvy-plus/internal/db"
-	"github.com/chiririll/savvy-plus/internal/db/sqlc"
+	"savvy-go/internal/db"
+	"savvy-go/internal/db/sqlc"
 )
 
 type Category struct {
@@ -22,10 +22,10 @@ type Category struct {
 
 func (c Category) JSON() map[string]any {
 	m := map[string]any{
-		"id":   c.ID,
-		"name": c.Name,
-		"type": c.Type,
-		"icon": c.Icon,
+		"id":    c.ID,
+		"name":  c.Name,
+		"type":  c.Type,
+		"icon":  c.Icon,
 		"color": c.Color,
 	}
 	if c.TransactionsCount > 0 || true {

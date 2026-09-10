@@ -7,7 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/chiririll/savvy-plus/internal/domain"
+	"savvy-go/internal/domain"
+
 	"github.com/go-chi/chi/v5"
 )
 
@@ -161,12 +162,12 @@ func (s *Server) accountsIndex(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) accountsStore(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Name           string   `json:"name"`
-		Type           string   `json:"type"`
-		CurrencyID     *int64   `json:"currency_id"`
-		CurrencyCode   string   `json:"currency_code"`
-		InitialBalance float64  `json:"initial_balance"`
-		IsActive       *bool    `json:"is_active"`
+		Name           string  `json:"name"`
+		Type           string  `json:"type"`
+		CurrencyID     *int64  `json:"currency_id"`
+		CurrencyCode   string  `json:"currency_code"`
+		InitialBalance float64 `json:"initial_balance"`
+		IsActive       *bool   `json:"is_active"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || strings.TrimSpace(body.Name) == "" {
 		writeValidation(w, map[string][]string{"name": {"The name field is required."}})

@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/chiririll/savvy-plus/internal/domain"
+	"savvy-go/internal/domain"
 )
 
 func (s *Server) reportFilter(r *http.Request) domain.ReportFilter {

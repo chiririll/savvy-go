@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/chiririll/savvy-plus/internal/config"
+	"savvy-go/internal/config"
 )
 
 func SessionCookieName(cfg config.Config, secure bool) string {

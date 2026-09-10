@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/chiririll/savvy-plus/internal/db"
-	"github.com/chiririll/savvy-plus/internal/migrate"
+	"savvy-go/internal/db"
+	"savvy-go/internal/migrate"
 )
 
 func TestCopyFromLaravelFixture(t *testing.T) {

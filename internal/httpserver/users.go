@@ -6,7 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/chiririll/savvy-plus/internal/auth"
+	"savvy-go/internal/auth"
+
 	"github.com/go-chi/chi/v5"
 )
 

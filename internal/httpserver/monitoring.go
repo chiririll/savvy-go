@@ -7,8 +7,8 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/chiririll/savvy-plus/internal/db"
-	"github.com/chiririll/savvy-plus/internal/version"
+	"savvy-go/internal/db"
+	"savvy-go/internal/version"
 )
 
 var processStarted = time.Now()

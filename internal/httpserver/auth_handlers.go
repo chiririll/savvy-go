@@ -5,8 +5,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/chiririll/savvy-plus/internal/auth"
-	"github.com/chiririll/savvy-plus/internal/db"
+	"savvy-go/internal/auth"
+	"savvy-go/internal/db"
+
 	"github.com/go-chi/chi/v5"
 )
 

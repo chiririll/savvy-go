@@ -9,19 +9,19 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/chiririll/savvy-plus/internal/db"
-	"github.com/chiririll/savvy-plus/internal/db/filter"
+	"savvy-go/internal/db"
+	"savvy-go/internal/db/filter"
 )
 
 type ReportFilter struct {
-	PeriodType   string
-	PeriodValue  string
-	StartDate    string
-	EndDate      string
-	CompareWith  string
-	AccountIDs   []int64
-	CategoryIDs  []int64
-	TagIDs       []int64
+	PeriodType  string
+	PeriodValue string
+	StartDate   string
+	EndDate     string
+	CompareWith string
+	AccountIDs  []int64
+	CategoryIDs []int64
+	TagIDs      []int64
 }
 
 type dateRange struct {
@@ -733,7 +733,6 @@ func budgetToBase(amount, rate float64, isBase bool) float64 {
 	}
 	return amount * rate
 }
-
 
 type periodPoint struct{ Key, Label string }
 

@@ -8,10 +8,10 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/chiririll/savvy-plus/internal/auth"
-	appdb "github.com/chiririll/savvy-plus/internal/db"
-	"github.com/chiririll/savvy-plus/internal/db/sqlc"
-	"github.com/chiririll/savvy-plus/internal/domain"
+	"savvy-go/internal/auth"
+	appdb "savvy-go/internal/db"
+	"savvy-go/internal/db/sqlc"
+	"savvy-go/internal/domain"
 )
 
 const (

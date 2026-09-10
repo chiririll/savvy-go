@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chiririll/savvy-plus/internal/auth"
+	"savvy-go/internal/auth"
 )
 
 func seedMoney(t *testing.T, a *testApp, sess *auth.Issued) (accID, catID int64) {

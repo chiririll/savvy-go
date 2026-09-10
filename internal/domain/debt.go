@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/chiririll/savvy-plus/internal/db"
-	"github.com/chiririll/savvy-plus/internal/db/sqlc"
+	"savvy-go/internal/db"
+	"savvy-go/internal/db/sqlc"
 )
 
 func (a Account) DebtJSON() map[string]any {

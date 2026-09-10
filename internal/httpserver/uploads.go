@@ -6,7 +6,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/chiririll/savvy-plus/internal/domain"
+	"savvy-go/internal/domain"
+
 	"github.com/go-chi/chi/v5"
 )
 

@@ -6,9 +6,9 @@ import (
 	"math"
 	"time"
 
-	"github.com/chiririll/savvy-plus/internal/db"
-	"github.com/chiririll/savvy-plus/internal/db/filter"
-	"github.com/chiririll/savvy-plus/internal/db/sqlc"
+	"savvy-go/internal/db"
+	"savvy-go/internal/db/filter"
+	"savvy-go/internal/db/sqlc"
 )
 
 type BudgetProgress struct {
@@ -66,7 +66,7 @@ func (b Budget) JSON() map[string]any {
 		"currencyId": b.CurrencyID, "period": b.Period, "periodLabel": periodLabel(b.Period),
 		"startDate": b.StartDate, "endDate": b.EndDate,
 		"isGlobal": b.IsGlobal, "notifyAtPercent": b.NotifyAtPercent,
-		"isActive": b.IsActive,
+		"isActive":   b.IsActive,
 		"categories": mapSliceVal(b.Categories, Category.JSON),
 		"tags":       mapSliceVal(b.Tags, Tag.JSON),
 	}

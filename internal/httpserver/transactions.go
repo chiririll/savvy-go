@@ -5,8 +5,9 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/chiririll/savvy-plus/internal/db/filter"
-	"github.com/chiririll/savvy-plus/internal/domain"
+	"savvy-go/internal/db/filter"
+	"savvy-go/internal/domain"
+
 	"github.com/go-chi/chi/v5"
 )
 

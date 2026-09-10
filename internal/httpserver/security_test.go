@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/chiririll/savvy-plus/internal/auth"
-	"github.com/chiririll/savvy-plus/internal/domain"
+	"savvy-go/internal/auth"
+	"savvy-go/internal/domain"
 )
 
 func TestTwoFactorEnableConfirmLoginAndRecovery(t *testing.T) {

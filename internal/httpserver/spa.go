@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/chiririll/savvy-plus/internal/version"
+	"savvy-go/internal/version"
 )
 
 type viteChunk struct {

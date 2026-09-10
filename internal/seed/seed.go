@@ -7,11 +7,11 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/chiririll/savvy-plus/internal/auth"
-	appdb "github.com/chiririll/savvy-plus/internal/db"
-	"github.com/chiririll/savvy-plus/internal/db/sqlc"
-	"github.com/chiririll/savvy-plus/internal/domain"
-	"github.com/chiririll/savvy-plus/internal/settings"
+	"savvy-go/internal/auth"
+	appdb "savvy-go/internal/db"
+	"savvy-go/internal/db/sqlc"
+	"savvy-go/internal/domain"
+	"savvy-go/internal/settings"
 )
 
 const demoSeededKey = "demo_seeded"

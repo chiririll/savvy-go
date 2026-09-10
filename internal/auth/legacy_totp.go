@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/chiririll/savvy-plus/internal/db"
-	"github.com/chiririll/savvy-plus/internal/db/sqlc"
+	"savvy-go/internal/db"
+	"savvy-go/internal/db/sqlc"
 )
 
 // UnwrapSecret returns a usable TOTP secret. Laravel-era rows store

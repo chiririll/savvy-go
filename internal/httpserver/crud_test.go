@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/chiririll/savvy-plus/internal/auth"
+	"savvy-go/internal/auth"
 )
 
 func TestCurrencyAccountCategoryTagCRUD(t *testing.T) {
