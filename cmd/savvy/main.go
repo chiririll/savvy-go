@@ -81,7 +81,7 @@ func main() {
 	}
 
 	go func() {
-		slog.Info("savvy listening", "addr", cfg.ListenAddr, "data", cfg.DataDir, "version", version.Value)
+		slog.Info("go savvy listening", "addr", cfg.ListenAddr, "data", cfg.DataDir, "version", version.Value)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			slog.Error("http server", "err", err)
 			os.Exit(1)

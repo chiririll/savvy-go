@@ -1,17 +1,17 @@
 <p align="center">
-  <img src="docs/images/logo-dark.svg#gh-light-mode-only" alt="Savvy" width="120">
-  <img src="docs/images/logo-light.svg#gh-dark-mode-only" alt="Savvy" width="120">
+  <img src="docs/images/logo-dark.svg#gh-light-mode-only" alt="Go Savvy" width="120">
+  <img src="docs/images/logo-light.svg#gh-dark-mode-only" alt="Go Savvy" width="120">
 </p>
 
-<h1 align="center">Savvy</h1>
+<h1 align="center">Go Savvy</h1>
 
 <p align="center">
-  Selfhosted expense tracker with full multi-currency support. One container — done.
+  Selfhosted expense tracker with full multi-currency support. Re-written in go.
 </p>
 
 <p align="center">
-<a href="https://hub.docker.com/r/truenormis/savvy"><img src="https://img.shields.io/badge/DOCKER-truenormis/savvy-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker"></a>
-<img src="https://img.shields.io/github/v/tag/truenormis/savvy?style=for-the-badge&color=orange" alt="Version">
+<a href="https://hub.docker.com/r/chiririll/savvy-go"><img src="https://img.shields.io/badge/DOCKER-chiririll/savvy-go-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker"></a>
+<img src="https://img.shields.io/github/v/tag/chiririll/savvy-go?style=for-the-badge&color=orange" alt="Version">
 <img src="https://img.shields.io/badge/LICENSE-MIT-green?style=for-the-badge" alt="License">
 </p>
 
@@ -30,12 +30,12 @@
 ---
 
 <p align="center">
-  <img src="docs/images/screenshot.png" alt="Savvy Screenshot" width="1920">
+  <img src="docs/images/screenshot.png" alt="Go Savvy Screenshot" width="1920">
 </p>
 
 ## ⚡ Quick Start
 ```bash
-docker run -d -p 3000:80 -v savvy-data:/data truenormis/savvy:latest
+docker run -d -p 3000:80 -v savvy-data:/data chiririll/savvy-go:latest
 ```
 
 Open `localhost:3000` and create your account.
@@ -56,7 +56,7 @@ Open `localhost:3000` and create your account.
 - **2FA** — two-factor authentication via TOTP (Google Authenticator, etc.)
 
 <p align="center">
-  <img src="docs/images/report.png" alt="Savvy Reports" width="1920">
+  <img src="docs/images/report.png" alt="Go Savvy Reports" width="1920">
 </p>
 
 ## 📱 Mobile-Friendly
@@ -74,7 +74,7 @@ Fully responsive design built with ShadCN/UI — track expenses from your phone 
 ```yaml
 services:
   savvy:
-    image: truenormis/savvy:latest
+    image: chiririll/savvy-go:latest
     container_name: savvy
     restart: unless-stopped
     ports:
@@ -122,7 +122,7 @@ Two probe endpoints are exposed for orchestrators and uptime monitoring (respons
 ```yaml
 services:
   savvy:
-    image: truenormis/savvy:latest
+    image: chiririll/savvy-go:latest
     container_name: savvy
     restart: unless-stopped
     volumes:
@@ -153,7 +153,7 @@ networks:
 ```yaml
 services:
   savvy:
-    image: truenormis/savvy:latest
+    image: chiririll/savvy-go:latest
     container_name: savvy
     restart: unless-stopped
     expose:
@@ -211,7 +211,7 @@ design notes.
 On Debian 13 (Trixie) or later, install the `.deb` from the GitHub release:
 
 ```bash
-curl -fsSLO https://github.com/truenormis/savvy/releases/latest/download/savvy.deb
+curl -fsSLO https://github.com/chiririll/savvy-go/releases/latest/download/savvy.deb
 sudo apt install ./savvy.deb
 ```
 
