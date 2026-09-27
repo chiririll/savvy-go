@@ -232,6 +232,7 @@ export default function DashboardPage() {
         return {
             tooltip: {
                 trigger: 'item',
+                confine: true,
                 backgroundColor: isDark ? '#1f2937' : '#ffffff',
                 borderColor: isDark ? '#374151' : '#e5e7eb',
                 textStyle: { color: isDark ? '#f3f4f6' : '#1f2937' },
