@@ -8,10 +8,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"savvy-go/internal/db"
 	"savvy-go/internal/db/sqlc"
+	"savvy-go/internal/migrate"
 	"savvy-go/internal/version"
 )
 
@@ -153,15 +155,88 @@ func (s Backups) Restore(ctx context.Context, b Backup) error {
 	if _, err := os.Stat(src); err != nil {
 		return fmt.Errorf("backup file missing")
 	}
-	if err := db.Checkpoint(ctx, s.DB); err != nil {
-		return err
+
+	// Copy backup to a temp file so the original is never modified.
+	tmp, err := os.CreateTemp(s.Dir, "restore-*.sqlite")
+	if err != nil {
+		return fmt.Errorf("create temp: %w", err)
 	}
-	if err := copyFile(src, s.Database); err != nil {
-		return err
+	tmp.Close()
+	tmpPath := tmp.Name()
+	cleanup := func() {
+		_ = os.Remove(tmpPath)
+		_ = os.Remove(tmpPath + "-wal")
+		_ = os.Remove(tmpPath + "-shm")
 	}
-	_ = os.Remove(s.Database + "-wal")
-	_ = os.Remove(s.Database + "-shm")
-	return nil
+	defer cleanup()
+
+	if err := copyFile(src, tmpPath); err != nil {
+		return fmt.Errorf("copy backup: %w", err)
+	}
+
+	// Apply any pending migrations to the temp copy so schema matches current.
+	tmpDB, err := db.Open(tmpPath)
+	if err != nil {
+		return fmt.Errorf("open backup: %w", err)
+	}
+	if err := migrate.Up(ctx, tmpDB); err != nil {
+		_ = tmpDB.Close()
+		return fmt.Errorf("migrate backup: %w", err)
+	}
+	_ = db.Checkpoint(ctx, tmpDB)
+	if err := tmpDB.Close(); err != nil {
+		return fmt.Errorf("close backup: %w", err)
+	}
+
+	// Build a file URI for the temp file (modernc.org/sqlite requires forward slashes).
+	tmpSlash := filepath.ToSlash(tmpPath)
+	if len(tmpSlash) > 1 && tmpSlash[1] == ':' {
+		tmpSlash = "/" + tmpSlash
+	}
+	attachURI := "file:" + tmpSlash + "?mode=ro"
+
+	// Turn off FK checks before any writes (must be outside a transaction in SQLite).
+	if _, err := s.DB.ExecContext(ctx, `PRAGMA foreign_keys=OFF`); err != nil {
+		return fmt.Errorf("fk off: %w", err)
+	}
+	defer s.DB.ExecContext(ctx, `PRAGMA foreign_keys=ON`) //nolint:errcheck
+
+	// Attach the migrated backup as a read-only secondary database.
+	if _, err := s.DB.ExecContext(ctx, `ATTACH DATABASE ? AS _restore`, attachURI); err != nil {
+		return fmt.Errorf("attach: %w", err)
+	}
+	defer s.DB.ExecContext(ctx, `DETACH DATABASE _restore`) //nolint:errcheck
+
+	// Enumerate user tables defined in the backup (creation order keeps FK deps right).
+	rows, err := s.DB.QueryContext(ctx,
+		`SELECT name FROM _restore.sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY rowid`)
+	if err != nil {
+		return fmt.Errorf("list tables: %w", err)
+	}
+	var tables []string
+	for rows.Next() {
+		var t string
+		_ = rows.Scan(&t)
+		tables = append(tables, t)
+	}
+	_ = rows.Close()
+
+	// Replace each table's content inside a single transaction.
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+	for _, table := range tables {
+		safe := strings.ReplaceAll(table, `"`, `""`)
+		if _, err := tx.ExecContext(ctx, `DELETE FROM main."`+safe+`"`); err != nil {
+			continue // table absent in current schema — skip
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO main."`+safe+`" SELECT * FROM _restore."`+safe+`"`); err != nil {
+			return fmt.Errorf("copy %s: %w", table, err)
+		}
+	}
+	return tx.Commit()
 }
 
 func backupFrom(id int64, filename string, size int64, note, ver, mig, created sql.NullString) Backup {
