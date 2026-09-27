@@ -301,6 +301,7 @@ func (s *Server) accountsBalanceHistory(w http.ResponseWriter, r *http.Request) 
 	accts, _ := s.accounts.All(r.Context(), true, true)
 	dates := dateRange(start, end)
 	series := []map[string]any{}
+	total := make([]float64, len(dates))
 	for _, a := range accts {
 		data := make([]float64, len(dates))
 		native := make([]float64, len(dates))
@@ -309,6 +310,7 @@ func (s *Server) accountsBalanceHistory(w http.ResponseWriter, r *http.Request) 
 			if a.Currency != nil {
 				data[i] = domain.Convert(a.Balance, *a.Currency, *base)
 			}
+			total[i] += data[i]
 		}
 		code := ""
 		if a.Currency != nil {
@@ -317,6 +319,9 @@ func (s *Server) accountsBalanceHistory(w http.ResponseWriter, r *http.Request) 
 		series = append(series, map[string]any{
 			"id": a.ID, "name": a.Name, "type": a.Type, "data": data, "native_data": native, "currency": code,
 		})
+	}
+	if len(accts) > 1 {
+		series = append([]map[string]any{{"id": nil, "name": "Total", "type": "total", "data": total, "currency": base.Code}}, series...)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"dates": dates, "series": series, "currency": base.Code, "decimals": base.Decimals,
