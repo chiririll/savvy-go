@@ -9,17 +9,16 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/chiririll/savvy-plus/internal/auth"
-	"github.com/chiririll/savvy-plus/internal/config"
-	"github.com/chiririll/savvy-plus/internal/db"
-	"github.com/chiririll/savvy-plus/internal/domain"
-	"github.com/chiririll/savvy-plus/internal/httpserver"
-	"github.com/chiririll/savvy-plus/internal/jobs"
-	"github.com/chiririll/savvy-plus/internal/legacy"
-	"github.com/chiririll/savvy-plus/internal/migrate"
-	"github.com/chiririll/savvy-plus/internal/schedule"
-	"github.com/chiririll/savvy-plus/internal/seed"
-	"github.com/chiririll/savvy-plus/internal/version"
+	"savvy-go/internal/config"
+	"savvy-go/internal/db"
+	"savvy-go/internal/domain"
+	"savvy-go/internal/httpserver"
+	"savvy-go/internal/jobs"
+	"savvy-go/internal/legacy"
+	"savvy-go/internal/migrate"
+	"savvy-go/internal/schedule"
+	"savvy-go/internal/seed"
+	"savvy-go/internal/version"
 )
 
 func main() {
@@ -50,16 +49,12 @@ func main() {
 		slog.Error("migrate", "err", err)
 		os.Exit(1)
 	}
-	if err := legacy.UpgradeInPlace(ctx, sqlDB); err != nil {
+	if err := legacy.UpgradeInPlace(ctx, sqlDB, cfg.AppKey); err != nil {
 		slog.Error("legacy import", "err", err)
 		os.Exit(1)
 	}
 	if err := seed.Demo(ctx, sqlDB, cfg.SeedDemo, cfg.Location); err != nil {
 		slog.Error("seed demo", "err", err)
-		os.Exit(1)
-	}
-	if err := auth.UnwrapLegacyTOTPSecrets(ctx, sqlDB, cfg.AppKey); err != nil {
-		slog.Error("unwrap two-factor secrets", "err", err)
 		os.Exit(1)
 	}
 

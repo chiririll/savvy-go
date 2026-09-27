@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"strings"
 	"time"
+
+	"savvy-go/internal/auth"
 )
 
 const importStampKey = "legacy_import_completed_at"
@@ -72,7 +74,8 @@ func AlreadyImported(ctx context.Context, db *sql.DB) bool {
 
 // UpgradeInPlace stamps a Laravel-era database.sqlite that already holds
 // domain tables (same names) so Go migrations and later starts are no-ops.
-func UpgradeInPlace(ctx context.Context, db *sql.DB) error {
+// appKey is the Laravel APP_KEY used to decrypt legacy encrypted TOTP secrets.
+func UpgradeInPlace(ctx context.Context, db *sql.DB, appKey string) error {
 	if !IsLaravel(ctx, db) {
 		return nil
 	}
@@ -81,6 +84,9 @@ func UpgradeInPlace(ctx context.Context, db *sql.DB) error {
 	}
 	if err := ensureSettings(ctx, db); err != nil {
 		return err
+	}
+	if err := auth.UnwrapLegacyTOTPSecrets(ctx, db, appKey); err != nil {
+		slog.Warn("could not unwrap legacy totp secrets", "err", err)
 	}
 	if err := stamp(ctx, db); err != nil {
 		return err

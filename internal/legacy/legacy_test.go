@@ -67,10 +67,10 @@ func TestUpgradeInPlace(t *testing.T) {
 	if err := migrate.Up(ctx, sqlDB); err != nil {
 		t.Fatal(err)
 	}
-	if err := UpgradeInPlace(ctx, sqlDB); err != nil {
+	if err := UpgradeInPlace(ctx, sqlDB, ""); err != nil {
 		t.Fatal(err)
 	}
-	if err := UpgradeInPlace(ctx, sqlDB); err != nil {
+	if err := UpgradeInPlace(ctx, sqlDB, ""); err != nil {
 		t.Fatal(err)
 	}
 	if !AlreadyImported(ctx, sqlDB) {
