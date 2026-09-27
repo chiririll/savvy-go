@@ -9,6 +9,7 @@ import (
 
 	"savvy-go/internal/domain"
 	"savvy-go/internal/httpserver/dto"
+	"savvy-go/internal/migrate"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -97,10 +98,17 @@ func (s *Server) backupsRestore(w http.ResponseWriter, r *http.Request) {
 	if b == nil {
 		return
 	}
-	if err := s.backups.Restore(r.Context(), *b); err != nil {
+	newDB, err := s.backups.Restore(r.Context(), *b)
+	if err != nil {
 		writeMessage(w, 422, err.Error())
 		return
 	}
+	if err := migrate.Up(r.Context(), newDB); err != nil {
+		_ = newDB.Close()
+		writeMessage(w, 422, "migrate: "+err.Error())
+		return
+	}
+	s.reconnect(newDB)
 	writeJSON(w, http.StatusOK, map[string]string{"message": "Backup restored."})
 }
 

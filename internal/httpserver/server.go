@@ -79,6 +79,38 @@ func New(cfg config.Config, sqlDB *sql.DB) *Server {
 
 func (s *Server) Handler() http.Handler { return s.mux }
 
+// reconnect replaces every domain object's DB pointer after a backup restore.
+func (s *Server) reconnect(sqlDB *sql.DB) {
+	s.db = sqlDB
+	s.users.DB = sqlDB
+	s.sessions.DB = sqlDB
+	s.tokens.DB = sqlDB
+	s.challenges.DB = sqlDB
+	s.settings.DB = sqlDB
+	s.currencies.DB = sqlDB
+	s.accounts.DB = sqlDB
+	s.categories.DB = sqlDB
+	s.tags.DB = sqlDB
+	s.txs.DB = sqlDB
+	s.debts.Accounts.DB = sqlDB
+	s.debts.Transactions.DB = sqlDB
+	s.recurring.DB = sqlDB
+	s.recurring.Txs.DB = sqlDB
+	s.budgets.DB = sqlDB
+	s.automation.DB = sqlDB
+	s.automation.Txs.DB = sqlDB
+	s.reports.DB = sqlDB
+	s.uploads.DB = sqlDB
+	s.imports.DB = sqlDB
+	s.imports.Uploads.DB = sqlDB
+	s.imports.Txs.DB = sqlDB
+	s.backups.DB = sqlDB
+	s.sso.DB = sqlDB
+	s.twoFactor.DB = sqlDB
+	s.twoFactor.Users.DB = sqlDB
+	s.webauthn.DB = sqlDB
+}
+
 func (s *Server) routes() *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
