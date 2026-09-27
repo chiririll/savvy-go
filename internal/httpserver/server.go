@@ -46,6 +46,7 @@ type Server struct {
 }
 
 func New(cfg config.Config, sqlDB *sql.DB) *Server {
+	domain.SetLocation(cfg.Location)
 	s := &Server{
 		cfg:        cfg,
 		db:         sqlDB,

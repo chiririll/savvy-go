@@ -11,6 +11,20 @@ import (
 	"savvy-go/internal/db/sqlc"
 )
 
+// appLocation is the timezone used for calendar-day concepts across this
+// package: "today", and whether a date is in the future. Configured once at
+// startup from the TZ env var (see config.Config.Location); defaults to UTC.
+// A raw time.Now().UTC() day boundary would disagree with a client whose
+// local day has already rolled over, wrongly flagging same-day dates as future.
+var appLocation = time.UTC
+
+// SetLocation configures appLocation. Call once during server startup.
+func SetLocation(loc *time.Location) {
+	if loc != nil {
+		appLocation = loc
+	}
+}
+
 type TxItem struct {
 	ID           int64
 	Name         string
@@ -190,7 +204,7 @@ func (s Transactions) Duplicate(ctx context.Context, id int64) (*Transaction, er
 	if cur.RecurringID != nil {
 		return nil, fmt.Errorf("cannot duplicate")
 	}
-	today := time.Now().UTC().Format("2006-01-02")
+	today := time.Now().In(appLocation).Format("2006-01-02")
 	in := TxInput{
 		Type: cur.Type, AccountID: cur.AccountID, ToAccountID: cur.ToAccountID,
 		CategoryID: cur.CategoryID, Amount: cur.Amount, ToAmount: cur.ToAmount,
@@ -376,12 +390,17 @@ func txFromRow(r sqlc.ListTransactionsRow) Transaction {
 	return t
 }
 
+// isFuture compares plain "YYYY-MM-DD" calendar dates as strings, using
+// appLocation's day as "today". A time.Time-based comparison would parse the
+// date at UTC midnight while "now" is truncated separately, so a client whose
+// local day has already rolled over (e.g. UTC+3 just after midnight) could
+// have a same-day date wrongly rejected as future. Only the first 10 chars
+// are used so legacy rows stored as "YYYY-MM-DD HH:MM:SS" still compare correctly.
 func isFuture(date string) bool {
-	d, err := time.Parse("2006-01-02", date)
-	if err != nil {
+	if len(date) < 10 {
 		return false
 	}
-	today := time.Now().UTC().Truncate(24 * time.Hour)
-	return d.After(today)
+	today := time.Now().In(appLocation).Format("2006-01-02")
+	return date[:10] > today
 }
 

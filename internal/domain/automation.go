@@ -379,7 +379,7 @@ func (s Automation) actionCreateTransfer(ctx context.Context, action map[string]
 		desc = "Auto-transfer by automation rule"
 	}
 	desc = parseTemplate(desc, tx)
-	today := time.Now().UTC().Format("2006-01-02")
+	today := time.Now().In(appLocation).Format("2006-01-02")
 	status := "confirmed"
 	created, err := s.Txs.Create(ctx, TxInput{
 		Type: "transfer", AccountID: fromID, ToAccountID: &toID, Amount: amount,

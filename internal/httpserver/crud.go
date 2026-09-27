@@ -289,10 +289,10 @@ func (s *Server) accountsBalanceHistory(w http.ResponseWriter, r *http.Request) 
 	start := r.URL.Query().Get("start_date")
 	end := r.URL.Query().Get("end_date")
 	if start == "" {
-		start = time.Now().AddDate(0, 0, -30).Format("2006-01-02")
+		start = time.Now().In(s.cfg.Location).AddDate(0, 0, -30).Format("2006-01-02")
 	}
 	if end == "" {
-		end = time.Now().Format("2006-01-02")
+		end = time.Now().In(s.cfg.Location).Format("2006-01-02")
 	}
 	if base == nil {
 		writeJSON(w, http.StatusOK, map[string]any{"dates": []string{}, "series": []any{}, "currency": nil, "decimals": 2})

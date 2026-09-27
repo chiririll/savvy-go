@@ -709,7 +709,7 @@ func (s *seeder) addTx(typ string, accountID int64, catID *int64, amount float64
 		return nil
 	}
 	d := date.Format("2006-01-02")
-	if isFutureUTC(d) {
+	if d > s.now.Format("2006-01-02") {
 		return nil
 	}
 	status := "confirmed"
@@ -815,15 +815,6 @@ func nextMonthOnDay(now time.Time, day int) time.Time {
 
 func monthsBetween(from, to time.Time) int {
 	return (to.Year()-from.Year())*12 + int(to.Month()) - int(from.Month())
-}
-
-func isFutureUTC(date string) bool {
-	d, err := time.Parse("2006-01-02", date)
-	if err != nil {
-		return false
-	}
-	today := time.Now().UTC().Truncate(24 * time.Hour)
-	return d.After(today)
 }
 
 func round2(v float64) float64 { return roundN(v, 2) }

@@ -399,7 +399,11 @@ func (r Recurring) withinSchedule() bool {
 }
 
 func (r Recurring) calculateNextRunDate() string {
-	cur, err := time.ParseInLocation("2006-01-02", r.NextRunDate, time.UTC)
+	dateOnly := r.NextRunDate
+	if len(dateOnly) > 10 {
+		dateOnly = dateOnly[:10]
+	}
+	cur, err := time.ParseInLocation("2006-01-02", dateOnly, time.UTC)
 	if err != nil {
 		return r.NextRunDate
 	}
