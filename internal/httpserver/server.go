@@ -298,6 +298,7 @@ func (s *Server) routes() *chi.Mux {
 				r.Get("/backups", s.backupsIndex)
 				r.Post("/backups", s.backupsStore)
 				r.Post("/backups/upload", s.backupsUpload)
+				r.Post("/backups/sync", s.backupsSync)
 				r.Get("/backups/{id}/download", s.backupsDownload)
 				r.Get("/backups/{id}/inspect", s.backupsInspect)
 				r.Post("/backups/{id}/restore", s.backupsRestore)

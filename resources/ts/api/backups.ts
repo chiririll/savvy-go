@@ -30,6 +30,9 @@ export const backupsApi = {
     restore: (id: number) =>
         api.post<{ message: string }, void>(`${ENDPOINT}/${id}/restore`, undefined),
 
+    sync: () =>
+        api.post<{ removed_dead: number; registered_orphans: number }, void>(`${ENDPOINT}/sync`, undefined),
+
     delete: (id: number) =>
         api.delete<void>(`${ENDPOINT}/${id}`),
 }

@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"savvy-go/internal/db"
@@ -111,6 +112,79 @@ func (s Backups) Ingest(ctx context.Context, srcPath string, note *string) (*Bac
 	}
 	id, _ := res.LastInsertId()
 	return s.ByID(ctx, id)
+}
+
+type SyncResult struct {
+	RemovedDead       int `json:"removed_dead"`
+	RegisteredOrphans int `json:"registered_orphans"`
+}
+
+// Sync removes DB records whose files are missing and registers .sqlite files
+// in the backup directory that have no DB record. Safe to call frequently.
+func (s Backups) Sync(ctx context.Context) (SyncResult, error) {
+	var result SyncResult
+
+	all, err := s.All(ctx)
+	if err != nil {
+		return result, err
+	}
+
+	known := make(map[string]bool, len(all))
+	for _, b := range all {
+		known[b.Filename] = true
+		if _, statErr := os.Stat(s.Path(b)); os.IsNotExist(statErr) {
+			if delErr := db.Q(s.DB).DeleteBackup(ctx, b.ID); delErr == nil {
+				result.RemovedDead++
+			}
+		}
+	}
+
+	entries, err := os.ReadDir(s.Dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return result, nil
+		}
+		return result, err
+	}
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasSuffix(name, ".sqlite") {
+			continue
+		}
+		if known[name] {
+			continue
+		}
+		if regErr := s.registerOrphan(ctx, name); regErr == nil {
+			result.RegisteredOrphans++
+		}
+	}
+
+	return result, nil
+}
+
+func (s Backups) registerOrphan(ctx context.Context, name string) error {
+	path := filepath.Join(s.Dir, name)
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	migsJSON := ""
+	if src, openErr := sql.Open("sqlite", "file:"+filepath.ToSlash(path)+"?mode=ro"); openErr == nil {
+		migsJSON = migrationsJSON(ctx, src)
+		_ = src.Close()
+	}
+	createdAt := info.ModTime().UTC().Format(time.RFC3339)
+	now := time.Now().UTC().Format(time.RFC3339)
+	_, err = db.Q(s.DB).InsertBackup(ctx, sqlc.InsertBackupParams{
+		Filename:         name,
+		Size:             info.Size(),
+		Note:             db.NullString(nil),
+		AppVersion:       db.NullString(nil),
+		SchemaMigrations: db.NS(migsJSON),
+		CreatedAt:        db.NS(createdAt),
+		UpdatedAt:        db.NS(now),
+	})
+	return err
 }
 
 func (s Backups) Delete(ctx context.Context, b Backup) error {

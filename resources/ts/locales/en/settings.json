@@ -313,6 +313,8 @@
         "restoreMigrationsDescription_one": "This backup is {{count}} migration behind. Savvy will apply it after restore — otherwise the app will not run. The backup file is not changed.",
         "restoreMigrationsDescription_other": "This backup is {{count}} migrations behind. Savvy will apply them after restore — otherwise the app will not run. The backup file is not changed.",
         "deleteTitle": "Delete Backup?",
-        "deleteDescription": "This will permanently delete the backup from {{date}}."
+        "deleteDescription": "This will permanently delete the backup from {{date}}.",
+        "scan": "Scan",
+        "scanDescription": "Scan the backup folder for orphan files and remove stale database entries"
     }
 }

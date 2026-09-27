@@ -23,6 +23,15 @@ func (s *Server) backupsIndex(w http.ResponseWriter, r *http.Request) {
 	writeData(w, http.StatusOK, mapSlice(list, dto.Backup))
 }
 
+func (s *Server) backupsSync(w http.ResponseWriter, r *http.Request) {
+	result, err := s.backups.Sync(r.Context())
+	if err != nil {
+		writeMessage(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
 func (s *Server) backupsStore(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Note *string `json:"note"`

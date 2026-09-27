@@ -33,8 +33,8 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { Download, RotateCcw, Trash2, Plus, Upload, Loader2 } from 'lucide-react'
-import { useBackups, useCreateBackup, useUploadBackup, useRestoreBackup, useDeleteBackup } from '@/hooks/use-backups'
+import { Download, RotateCcw, Trash2, Plus, Upload, Loader2, ScanSearch } from 'lucide-react'
+import { useBackups, useCreateBackup, useUploadBackup, useRestoreBackup, useDeleteBackup, useSyncBackups } from '@/hooks/use-backups'
 import { backupsApi } from '@/api/backups'
 import { Backup, BackupInspection, BackupSchemaStatus } from '@/types/backup'
 import { useReadOnly } from '@/components/providers/ReadOnlyProvider'
@@ -69,6 +69,7 @@ export default function BackupsPage() {
     const uploadBackup = useUploadBackup()
     const restoreBackup = useRestoreBackup()
     const deleteBackup = useDeleteBackup()
+    const syncBackups = useSyncBackups()
 
     const [createDialogOpen, setCreateDialogOpen] = useState(false)
     const [uploadDialogOpen, setUploadDialogOpen] = useState(false)
@@ -171,6 +172,17 @@ export default function BackupsPage() {
                 <Button variant="outline" onClick={() => setUploadDialogOpen(true)} disabled={isReadOnly}>
                     <Upload className="size-4 mr-2" />
                     {t('backups.upload')}
+                </Button>
+                <Button
+                    variant="outline"
+                    onClick={() => syncBackups.mutate()}
+                    disabled={isReadOnly || syncBackups.isPending}
+                    title={t('backups.scanDescription')}
+                >
+                    {syncBackups.isPending
+                        ? <Loader2 className="size-4 mr-2 animate-spin" />
+                        : <ScanSearch className="size-4 mr-2" />}
+                    {t('backups.scan')}
                 </Button>
             </div>
 

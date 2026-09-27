@@ -44,3 +44,19 @@ export function useDeleteBackup() {
         successMessage: i18n.t('toasts.backup.deleted'),
     })
 }
+
+export function useSyncBackups() {
+    return useResourceMutation({
+        mutationFn: () => backupsApi.sync(),
+        invalidateKeys: [QUERY_KEY],
+        successMessage: (data) => {
+            if (data.removed_dead === 0 && data.registered_orphans === 0) {
+                return i18n.t('toasts.backup.syncClean')
+            }
+            return i18n.t('toasts.backup.synced', {
+                removed: data.removed_dead,
+                found: data.registered_orphans,
+            })
+        },
+    })
+}
