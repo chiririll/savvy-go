@@ -16,6 +16,7 @@ type Category struct {
 	Type              string
 	Icon              *string
 	Color             *string
+	IsDefault         bool
 	TransactionsCount int
 	TotalAmount       *float64
 }
@@ -29,7 +30,7 @@ func (s Categories) All(ctx context.Context, typ string) ([]Category, error) {
 	}
 	out := make([]Category, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, categoryFrom(r.ID, r.Name, r.Type, r.Icon, r.Color, r.Count))
+		out = append(out, categoryFrom(r.ID, r.Name, r.Type, r.Icon, r.Color, r.IsDefault, r.Count))
 	}
 	return out, nil
 }
@@ -42,15 +43,20 @@ func (s Categories) ByID(ctx context.Context, id int64) (*Category, error) {
 	if err != nil {
 		return nil, err
 	}
-	c := categoryFrom(r.ID, r.Name, r.Type, r.Icon, r.Color, r.Count)
+	c := categoryFrom(r.ID, r.Name, r.Type, r.Icon, r.Color, r.IsDefault, r.Count)
 	return &c, nil
 }
 
 func (s Categories) Create(ctx context.Context, c Category) (*Category, error) {
+	if c.IsDefault {
+		if err := db.Q(s.DB).ClearDefaultCategory(ctx, c.Type); err != nil {
+			return nil, err
+		}
+	}
 	now := time.Now().UTC().Format(time.RFC3339)
 	res, err := db.Q(s.DB).InsertCategory(ctx, sqlc.InsertCategoryParams{
 		Name: c.Name, Type: c.Type, Icon: db.NullString(c.Icon), Color: db.NullString(c.Color),
-		CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
+		IsDefault: db.BoolInt(c.IsDefault), CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
 	})
 	if err != nil {
 		return nil, err
@@ -60,10 +66,25 @@ func (s Categories) Create(ctx context.Context, c Category) (*Category, error) {
 }
 
 func (s Categories) Update(ctx context.Context, id int64, c Category) (*Category, error) {
+	cur, err := s.ByID(ctx, id)
+	if err != nil || cur == nil {
+		return cur, err
+	}
+	if cur.IsDefault && c.Type != cur.Type {
+		return nil, fmt.Errorf("cannot change type of default category")
+	}
+	if cur.IsDefault && !c.IsDefault {
+		return nil, fmt.Errorf("cannot unset default")
+	}
+	if c.IsDefault && !cur.IsDefault {
+		if err := db.Q(s.DB).ClearDefaultCategory(ctx, c.Type); err != nil {
+			return nil, err
+		}
+	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	err := db.Q(s.DB).UpdateCategory(ctx, sqlc.UpdateCategoryParams{
+	err = db.Q(s.DB).UpdateCategory(ctx, sqlc.UpdateCategoryParams{
 		Name: c.Name, Type: c.Type, Icon: db.NullString(c.Icon), Color: db.NullString(c.Color),
-		UpdatedAt: db.NS(now), ID: id,
+		IsDefault: db.BoolInt(c.IsDefault), UpdatedAt: db.NS(now), ID: id,
 	})
 	if err != nil {
 		return nil, err
@@ -71,19 +92,64 @@ func (s Categories) Update(ctx context.Context, id int64, c Category) (*Category
 	return s.ByID(ctx, id)
 }
 
-func (s Categories) Delete(ctx context.Context, id int64) error {
+func (s Categories) Delete(ctx context.Context, id int64, successorID *int64) error {
 	c, err := s.ByID(ctx, id)
 	if err != nil || c == nil {
 		return err
 	}
+	if c.IsDefault {
+		return fmt.Errorf("default")
+	}
 	if c.TransactionsCount > 0 {
-		return fmt.Errorf("has transactions")
+		if successorID == nil {
+			return fmt.Errorf("has transactions")
+		}
+		successor, err := s.ByID(ctx, *successorID)
+		if err != nil {
+			return err
+		}
+		if successor == nil || successor.Type != c.Type || successor.ID == c.ID {
+			return fmt.Errorf("invalid successor")
+		}
+		tx, err := s.DB.BeginTx(ctx, nil)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = tx.Rollback() }()
+		q := db.Q(s.DB).WithTx(tx)
+		if err := q.ReassignCategoryTransactions(ctx, sqlc.ReassignCategoryTransactionsParams{
+			CategoryID: db.NI(*successorID), CategoryID_2: db.NI(id),
+		}); err != nil {
+			return err
+		}
+		if err := q.DeleteCategory(ctx, id); err != nil {
+			return err
+		}
+		return tx.Commit()
 	}
 	n, _ := db.Q(s.DB).CountCategoriesByType(ctx, c.Type)
 	if n <= 1 {
 		return fmt.Errorf("last")
 	}
 	return db.Q(s.DB).DeleteCategory(ctx, id)
+}
+
+func (s Categories) SetDefault(ctx context.Context, id int64) (*Category, error) {
+	c, err := s.ByID(ctx, id)
+	if err != nil || c == nil {
+		return c, err
+	}
+	if c.IsDefault {
+		return c, nil
+	}
+	if err := db.Q(s.DB).ClearDefaultCategory(ctx, c.Type); err != nil {
+		return nil, err
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	if err := db.Q(s.DB).SetCategoryDefault(ctx, sqlc.SetCategoryDefaultParams{UpdatedAt: db.NS(now), ID: id}); err != nil {
+		return nil, err
+	}
+	return s.ByID(ctx, id)
 }
 
 func (s Categories) Statistics(ctx context.Context, id int64, start, end string) (map[string]any, error) {
@@ -103,8 +169,8 @@ func (s Categories) Statistics(ctx context.Context, id int64, start, end string)
 	}, nil
 }
 
-func categoryFrom(id int64, name, typ string, icon, color sql.NullString, count int64) Category {
-	c := Category{ID: id, Name: name, Type: typ, TransactionsCount: int(count)}
+func categoryFrom(id int64, name, typ string, icon, color sql.NullString, isDefault, count int64) Category {
+	c := Category{ID: id, Name: name, Type: typ, IsDefault: isDefault != 0, TransactionsCount: int(count)}
 	if icon.Valid {
 		c.Icon = &icon.String
 	}

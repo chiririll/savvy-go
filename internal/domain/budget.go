@@ -288,7 +288,7 @@ func (s Budgets) cats(ctx context.Context, id int64) ([]Category, error) {
 	}
 	out := make([]Category, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, categoryFrom(r.ID, r.Name, r.Type, r.Icon, r.Color, r.TransactionsCount))
+		out = append(out, categoryFrom(r.ID, r.Name, r.Type, r.Icon, r.Color, r.IsDefault, r.TransactionsCount))
 	}
 	return out, nil
 }

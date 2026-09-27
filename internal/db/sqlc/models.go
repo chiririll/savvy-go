@@ -112,6 +112,7 @@ type Category struct {
 	Type      string
 	Icon      sql.NullString
 	Color     sql.NullString
+	IsDefault int64
 	CreatedAt sql.NullString
 	UpdatedAt sql.NullString
 }

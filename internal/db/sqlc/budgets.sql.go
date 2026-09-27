@@ -121,7 +121,7 @@ func (q *Queries) InsertBudgetTag(ctx context.Context, arg InsertBudgetTagParams
 }
 
 const listBudgetCategories = `-- name: ListBudgetCategories :many
-SELECT c.id, c.name, c.type, c.icon, c.color, 0 AS transactions_count
+SELECT c.id, c.name, c.type, c.icon, c.color, c.is_default, 0 AS transactions_count
 FROM categories c JOIN budget_category bc ON bc.category_id = c.id
 WHERE bc.budget_id = ?
 `
@@ -132,6 +132,7 @@ type ListBudgetCategoriesRow struct {
 	Type              string
 	Icon              sql.NullString
 	Color             sql.NullString
+	IsDefault         int64
 	TransactionsCount int64
 }
 
@@ -150,6 +151,7 @@ func (q *Queries) ListBudgetCategories(ctx context.Context, budgetID int64) ([]L
 			&i.Type,
 			&i.Icon,
 			&i.Color,
+			&i.IsDefault,
 			&i.TransactionsCount,
 		); err != nil {
 			return nil, err

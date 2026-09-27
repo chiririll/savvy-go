@@ -211,6 +211,7 @@ func (s *Server) routes() *chi.Mux {
 				r.Put("/categories/{id}", s.categoriesUpdate)
 				r.Patch("/categories/{id}", s.categoriesUpdate)
 				r.Delete("/categories/{id}", s.categoriesDestroy)
+				r.Post("/categories/{id}/set-default", s.categoriesSetDefault)
 				r.Get("/categories/{id}/statistics", s.categoriesStatistics)
 				r.Get("/categories-summary", s.categoriesSummary)
 

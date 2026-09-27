@@ -35,6 +35,15 @@ func (q *Queries) CategoryStatistics(ctx context.Context, arg CategoryStatistics
 	return i, err
 }
 
+const clearDefaultCategory = `-- name: ClearDefaultCategory :exec
+UPDATE categories SET is_default = 0 WHERE type = ? AND is_default = 1
+`
+
+func (q *Queries) ClearDefaultCategory(ctx context.Context, type_ string) error {
+	_, err := q.db.ExecContext(ctx, clearDefaultCategory, type_)
+	return err
+}
+
 const countCategoriesByType = `-- name: CountCategoriesByType :one
 SELECT COUNT(*) FROM categories WHERE type = ?
 `
@@ -56,18 +65,19 @@ func (q *Queries) DeleteCategory(ctx context.Context, id int64) error {
 }
 
 const getCategory = `-- name: GetCategory :one
-SELECT categories.id, categories.name, categories.type, categories.icon, categories.color,
+SELECT categories.id, categories.name, categories.type, categories.icon, categories.color, categories.is_default,
 	(SELECT COUNT(*) FROM transactions t WHERE t.category_id = categories.id)
 FROM categories WHERE categories.id = ?
 `
 
 type GetCategoryRow struct {
-	ID    int64
-	Name  string
-	Type  string
-	Icon  sql.NullString
-	Color sql.NullString
-	Count int64
+	ID        int64
+	Name      string
+	Type      string
+	Icon      sql.NullString
+	Color     sql.NullString
+	IsDefault int64
+	Count     int64
 }
 
 func (q *Queries) GetCategory(ctx context.Context, id int64) (GetCategoryRow, error) {
@@ -79,13 +89,45 @@ func (q *Queries) GetCategory(ctx context.Context, id int64) (GetCategoryRow, er
 		&i.Type,
 		&i.Icon,
 		&i.Color,
+		&i.IsDefault,
+		&i.Count,
+	)
+	return i, err
+}
+
+const getDefaultCategory = `-- name: GetDefaultCategory :one
+SELECT categories.id, categories.name, categories.type, categories.icon, categories.color, categories.is_default,
+	(SELECT COUNT(*) FROM transactions t WHERE t.category_id = categories.id)
+FROM categories WHERE categories.type = ? AND categories.is_default = 1 LIMIT 1
+`
+
+type GetDefaultCategoryRow struct {
+	ID        int64
+	Name      string
+	Type      string
+	Icon      sql.NullString
+	Color     sql.NullString
+	IsDefault int64
+	Count     int64
+}
+
+func (q *Queries) GetDefaultCategory(ctx context.Context, type_ string) (GetDefaultCategoryRow, error) {
+	row := q.db.QueryRowContext(ctx, getDefaultCategory, type_)
+	var i GetDefaultCategoryRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Type,
+		&i.Icon,
+		&i.Color,
+		&i.IsDefault,
 		&i.Count,
 	)
 	return i, err
 }
 
 const insertCategory = `-- name: InsertCategory :execresult
-INSERT INTO categories (name, type, icon, color, created_at, updated_at) VALUES (?,?,?,?,?,?)
+INSERT INTO categories (name, type, icon, color, is_default, created_at, updated_at) VALUES (?,?,?,?,?,?,?)
 `
 
 type InsertCategoryParams struct {
@@ -93,6 +135,7 @@ type InsertCategoryParams struct {
 	Type      string
 	Icon      sql.NullString
 	Color     sql.NullString
+	IsDefault int64
 	CreatedAt sql.NullString
 	UpdatedAt sql.NullString
 }
@@ -103,13 +146,14 @@ func (q *Queries) InsertCategory(ctx context.Context, arg InsertCategoryParams) 
 		arg.Type,
 		arg.Icon,
 		arg.Color,
+		arg.IsDefault,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
 }
 
 const listCategories = `-- name: ListCategories :many
-SELECT c.id, c.name, c.type, c.icon, c.color,
+SELECT c.id, c.name, c.type, c.icon, c.color, c.is_default,
 	(SELECT COUNT(*) FROM transactions t WHERE t.category_id = c.id)
 FROM categories c
 WHERE c.type = COALESCE(?1, c.type)
@@ -117,12 +161,13 @@ ORDER BY c.name
 `
 
 type ListCategoriesRow struct {
-	ID    int64
-	Name  string
-	Type  string
-	Icon  sql.NullString
-	Color sql.NullString
-	Count int64
+	ID        int64
+	Name      string
+	Type      string
+	Icon      sql.NullString
+	Color     sql.NullString
+	IsDefault int64
+	Count     int64
 }
 
 func (q *Queries) ListCategories(ctx context.Context, type_ sql.NullString) ([]ListCategoriesRow, error) {
@@ -140,6 +185,7 @@ func (q *Queries) ListCategories(ctx context.Context, type_ sql.NullString) ([]L
 			&i.Type,
 			&i.Icon,
 			&i.Color,
+			&i.IsDefault,
 			&i.Count,
 		); err != nil {
 			return nil, err
@@ -155,8 +201,36 @@ func (q *Queries) ListCategories(ctx context.Context, type_ sql.NullString) ([]L
 	return items, nil
 }
 
+const reassignCategoryTransactions = `-- name: ReassignCategoryTransactions :exec
+UPDATE transactions SET category_id = ? WHERE category_id = ?
+`
+
+type ReassignCategoryTransactionsParams struct {
+	CategoryID   sql.NullInt64
+	CategoryID_2 sql.NullInt64
+}
+
+func (q *Queries) ReassignCategoryTransactions(ctx context.Context, arg ReassignCategoryTransactionsParams) error {
+	_, err := q.db.ExecContext(ctx, reassignCategoryTransactions, arg.CategoryID, arg.CategoryID_2)
+	return err
+}
+
+const setCategoryDefault = `-- name: SetCategoryDefault :exec
+UPDATE categories SET is_default = 1, updated_at = ? WHERE id = ?
+`
+
+type SetCategoryDefaultParams struct {
+	UpdatedAt sql.NullString
+	ID        int64
+}
+
+func (q *Queries) SetCategoryDefault(ctx context.Context, arg SetCategoryDefaultParams) error {
+	_, err := q.db.ExecContext(ctx, setCategoryDefault, arg.UpdatedAt, arg.ID)
+	return err
+}
+
 const updateCategory = `-- name: UpdateCategory :exec
-UPDATE categories SET name=?, type=?, icon=?, color=?, updated_at=? WHERE id=?
+UPDATE categories SET name=?, type=?, icon=?, color=?, is_default=?, updated_at=? WHERE id=?
 `
 
 type UpdateCategoryParams struct {
@@ -164,6 +238,7 @@ type UpdateCategoryParams struct {
 	Type      string
 	Icon      sql.NullString
 	Color     sql.NullString
+	IsDefault int64
 	UpdatedAt sql.NullString
 	ID        int64
 }
@@ -174,6 +249,7 @@ func (q *Queries) UpdateCategory(ctx context.Context, arg UpdateCategoryParams) 
 		arg.Type,
 		arg.Icon,
 		arg.Color,
+		arg.IsDefault,
 		arg.UpdatedAt,
 		arg.ID,
 	)

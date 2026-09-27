@@ -6,7 +6,14 @@ import { FeedList, Page, PageHeader } from '@/components/shared'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { CategoryFormDialog, CategoryRow } from '@/components/features/categories'
-import { useCategories, useCreateCategory, useDeleteCategory, useUpdateCategory, useResourceFormDialog } from '@/hooks'
+import {
+    useCategories,
+    useCreateCategory,
+    useDeleteCategory,
+    useSetDefaultCategory,
+    useUpdateCategory,
+    useResourceFormDialog,
+} from '@/hooks'
 import { useReadOnly } from '@/components/providers/ReadOnlyProvider'
 import { Category, CategoryType } from '@/types'
 import { CategoryFormData } from '@/schemas'
@@ -18,6 +25,7 @@ export default function CategoriesPage() {
     const [type, setType] = useQueryState('type', categoryTypeParam)
     const { data: categories, isLoading } = useCategories()
     const deleteCategory = useDeleteCategory()
+    const setDefaultCategory = useSetDefaultCategory()
     const createCategory = useCreateCategory()
     const updateCategory = useUpdateCategory()
     const isReadOnly = useReadOnly()
@@ -84,9 +92,16 @@ export default function CategoriesPage() {
                         <CategoryRow
                             category={category}
                             onEdit={form.openEdit}
-                            onDelete={(id) => deleteCategory.mutate(id)}
+                            onDelete={(id, successorId) => deleteCategory.mutate({ id, successorId })}
+                            onSetDefault={(id) => setDefaultCategory.mutate(id)}
+                            isSettingDefault={setDefaultCategory.isPending}
                             isReadOnly={isReadOnly}
-                            deleteDisabled={typeCounts[category.type] <= 1}
+                            deleteDisabled={category.isDefault || typeCounts[category.type] <= 1}
+                            deleteDisabledLabel={
+                                category.isDefault
+                                    ? t('common:actions.cannotDeleteDefault')
+                                    : t('common:actions.cannotDeleteLast')
+                            }
                         />
                     )}
                 </FeedList>

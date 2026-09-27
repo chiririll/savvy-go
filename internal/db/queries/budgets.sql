@@ -18,7 +18,7 @@ WHERE b.id = COALESCE(sqlc.narg('id'), b.id)
 ORDER BY b.id;
 
 -- name: ListBudgetCategories :many
-SELECT c.id, c.name, c.type, c.icon, c.color, 0 AS transactions_count
+SELECT c.id, c.name, c.type, c.icon, c.color, c.is_default, 0 AS transactions_count
 FROM categories c JOIN budget_category bc ON bc.category_id = c.id
 WHERE bc.budget_id = ?;
 

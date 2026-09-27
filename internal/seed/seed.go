@@ -89,8 +89,9 @@ func seedCurrencies(ctx context.Context, curs domain.Currencies) error {
 func seedCategories(ctx context.Context, cats domain.Categories) error {
 	for _, c := range defaultCategories {
 		icon, color := c.icon, c.color
+		isDefault := c.name == "#OTHER" || c.name == "#OTHER_INCOME"
 		if _, err := cats.Create(ctx, domain.Category{
-			Name: c.name, Type: c.typ, Icon: &icon, Color: &color,
+			Name: c.name, Type: c.typ, Icon: &icon, Color: &color, IsDefault: isDefault,
 		}); err != nil {
 			return err
 		}

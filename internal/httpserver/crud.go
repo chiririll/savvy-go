@@ -394,10 +394,23 @@ func (s *Server) categoriesDestroy(w http.ResponseWriter, r *http.Request) {
 	if c == nil {
 		return
 	}
-	if err := s.categories.Delete(r.Context(), c.ID); err != nil {
+	var successorID *int64
+	if raw := r.URL.Query().Get("successor_id"); raw != "" {
+		id, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil {
+			writeValidation(w, map[string][]string{"successor_id": {"The successor id is invalid."}})
+			return
+		}
+		successorID = &id
+	}
+	if err := s.categories.Delete(r.Context(), c.ID, successorID); err != nil {
 		switch err.Error() {
+		case "default":
+			writeMessage(w, 422, "Cannot delete the default category. Set another category as default first.")
 		case "has transactions":
 			writeMessage(w, 422, "Cannot delete category that has transactions.")
+		case "invalid successor":
+			writeMessage(w, 422, "The selected replacement category is invalid.")
 		case "last":
 			writeMessage(w, 422, "Cannot delete the last category of this type.")
 		default:
@@ -406,6 +419,19 @@ func (s *Server) categoriesDestroy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) categoriesSetDefault(w http.ResponseWriter, r *http.Request) {
+	c := s.categoryParam(w, r)
+	if c == nil {
+		return
+	}
+	updated, err := s.categories.SetDefault(r.Context(), c.ID)
+	if err != nil {
+		writeMessage(w, 422, err.Error())
+		return
+	}
+	writeData(w, http.StatusOK, dto.Category(*updated))
 }
 
 func (s *Server) categoriesStatistics(w http.ResponseWriter, r *http.Request) {

@@ -23,6 +23,7 @@
         "viewLogs": "View logs",
         "setAsBase": "Set as base",
         "cannotDeleteLast": "Can't delete last",
+        "cannotDeleteDefault": "Can't delete default",
         "cannotDeleteSelf": "Can't delete yourself",
         "clear": "Clear",
         "processing": "Processing...",
@@ -189,9 +190,11 @@
             "created": "Category created",
             "updated": "Category updated",
             "deleted": "Category deleted",
+            "defaultUpdated": "Default category updated",
             "createFailed": "Failed to create category",
             "updateFailed": "Failed to update category",
-            "deleteFailed": "Failed to delete category"
+            "deleteFailed": "Failed to delete category",
+            "defaultFailed": "Failed to set default category"
         },
         "tag": {
             "created": "Tag created",

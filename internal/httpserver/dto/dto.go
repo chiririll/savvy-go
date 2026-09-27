@@ -46,11 +46,12 @@ func Tag(t domain.Tag) map[string]any {
 
 func Category(c domain.Category) map[string]any {
 	m := map[string]any{
-		"id":    c.ID,
-		"name":  c.Name,
-		"type":  c.Type,
-		"icon":  c.Icon,
-		"color": c.Color,
+		"id":        c.ID,
+		"name":      c.Name,
+		"type":      c.Type,
+		"icon":      c.Icon,
+		"color":     c.Color,
+		"isDefault": c.IsDefault,
 	}
 	m["transactionsCount"] = c.TransactionsCount
 	if c.TotalAmount != nil {
