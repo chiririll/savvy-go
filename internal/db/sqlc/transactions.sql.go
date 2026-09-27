@@ -33,8 +33,8 @@ WHERE t.id = COALESCE(?1, t.id)
   AND t.account_id = COALESCE(?3, t.account_id)
   AND IFNULL(t.category_id, -1) = IFNULL(?4, IFNULL(t.category_id, -1))
   AND t.status = COALESCE(?5, t.status)
-  AND t.date >= COALESCE(?6, t.date)
-  AND t.date <= COALESCE(?7, t.date)
+  AND (t.date IS NULL OR t.date >= COALESCE(?6, t.date))
+  AND (t.date IS NULL OR t.date <= COALESCE(?7, t.date))
 `
 
 type CountTransactionsParams struct {
@@ -339,8 +339,8 @@ WHERE t.id = COALESCE(?1, t.id)
   AND t.account_id = COALESCE(?3, t.account_id)
   AND IFNULL(t.category_id, -1) = IFNULL(?4, IFNULL(t.category_id, -1))
   AND t.status = COALESCE(?5, t.status)
-  AND t.date >= COALESCE(?6, t.date)
-  AND t.date <= COALESCE(?7, t.date)
+  AND (t.date IS NULL OR t.date >= COALESCE(?6, t.date))
+  AND (t.date IS NULL OR t.date <= COALESCE(?7, t.date))
 ORDER BY t.date DESC, t.id DESC
 LIMIT ?9 OFFSET ?8
 `

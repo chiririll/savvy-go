@@ -143,6 +143,10 @@ func (s Accounts) list(ctx context.Context, arg sqlc.ListAccountsParams) ([]Acco
 	return out, nil
 }
 
+func (s Accounts) BalanceAt(ctx context.Context, a Account, asOf string) (float64, error) {
+	return s.balance(ctx, a, asOf)
+}
+
 func (s Accounts) balance(ctx context.Context, a Account, asOf string) (float64, error) {
 	q := db.Q(s.DB)
 	if a.Type == "debt" {

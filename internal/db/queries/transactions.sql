@@ -29,8 +29,8 @@ WHERE t.id = COALESCE(sqlc.narg('id'), t.id)
   AND t.account_id = COALESCE(sqlc.narg('account_id'), t.account_id)
   AND IFNULL(t.category_id, -1) = IFNULL(sqlc.narg('category_id'), IFNULL(t.category_id, -1))
   AND t.status = COALESCE(sqlc.narg('status'), t.status)
-  AND t.date >= COALESCE(sqlc.narg('start_date'), t.date)
-  AND t.date <= COALESCE(sqlc.narg('end_date'), t.date);
+  AND (t.date IS NULL OR t.date >= COALESCE(sqlc.narg('start_date'), t.date))
+  AND (t.date IS NULL OR t.date <= COALESCE(sqlc.narg('end_date'), t.date));
 
 -- name: ListTransactions :many
 SELECT t.id, t.type, t.account_id, t.to_account_id, t.category_id, t.amount, t.to_amount, t.exchange_rate,
@@ -41,8 +41,8 @@ WHERE t.id = COALESCE(sqlc.narg('id'), t.id)
   AND t.account_id = COALESCE(sqlc.narg('account_id'), t.account_id)
   AND IFNULL(t.category_id, -1) = IFNULL(sqlc.narg('category_id'), IFNULL(t.category_id, -1))
   AND t.status = COALESCE(sqlc.narg('status'), t.status)
-  AND t.date >= COALESCE(sqlc.narg('start_date'), t.date)
-  AND t.date <= COALESCE(sqlc.narg('end_date'), t.date)
+  AND (t.date IS NULL OR t.date >= COALESCE(sqlc.narg('start_date'), t.date))
+  AND (t.date IS NULL OR t.date <= COALESCE(sqlc.narg('end_date'), t.date))
 ORDER BY t.date DESC, t.id DESC
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 

@@ -305,10 +305,11 @@ func (s *Server) accountsBalanceHistory(w http.ResponseWriter, r *http.Request) 
 	for _, a := range accts {
 		data := make([]float64, len(dates))
 		native := make([]float64, len(dates))
-		for i := range dates {
-			native[i] = a.Balance
+		for i, d := range dates {
+			bal, _ := s.accounts.BalanceAt(r.Context(), a, d)
+			native[i] = bal
 			if a.Currency != nil {
-				data[i] = domain.Convert(a.Balance, *a.Currency, *base)
+				data[i] = domain.Convert(bal, *a.Currency, *base)
 			}
 			total[i] += data[i]
 		}
