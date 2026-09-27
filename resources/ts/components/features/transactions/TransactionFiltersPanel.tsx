@@ -68,7 +68,7 @@ export function TransactionFiltersPanel({ list, categories, tags }: TransactionF
                 className="mb-4"
             >
                 <TabsList>
-                    <TabsTrigger value="all">{t('common:actions.all')}</TabsTrigger>
+                    <TabsTrigger value="all">{t('transactions.tabs.confirmed')}</TabsTrigger>
                     <TabsTrigger value="pending">{t('transactions.tabs.pending')}</TabsTrigger>
                 </TabsList>
             </Tabs>

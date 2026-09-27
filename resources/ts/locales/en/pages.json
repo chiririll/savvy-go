@@ -126,6 +126,7 @@
         "applyOriginal": "Original date",
         "applyOther": "Other",
         "tabs": {
+            "confirmed": "Confirmed",
             "pending": "Pending"
         },
         "status": {

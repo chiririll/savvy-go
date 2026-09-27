@@ -126,6 +126,7 @@
         "applyOriginal": "Исходную дату",
         "applyOther": "Другую",
         "tabs": {
+            "confirmed": "Подтверждённые",
             "pending": "Отложенные"
         },
         "status": {
