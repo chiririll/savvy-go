@@ -9,41 +9,6 @@ import (
 	"savvy-go/internal/db/sqlc"
 )
 
-func (a Account) DebtJSON() map[string]any {
-	target := 0.0
-	if a.TargetAmount != nil {
-		target = *a.TargetAmount
-	}
-	remaining := a.Balance
-	progress := 0.0
-	if target > 0 {
-		progress = (target - remaining) / target * 100
-		if progress < 0 {
-			progress = 0
-		}
-	}
-	label := ""
-	if a.DebtType != nil {
-		switch *a.DebtType {
-		case "i_owe":
-			label = "I owe"
-		case "owed_to_me":
-			label = "Owed to me"
-		}
-	}
-	m := a.JSON()
-	m["debtType"] = a.DebtType
-	m["debtTypeLabel"] = label
-	m["targetAmount"] = target
-	m["remainingDebt"] = remaining
-	m["paymentProgress"] = progress
-	m["dueDate"] = a.DueDate
-	m["counterparty"] = a.Counterparty
-	m["description"] = a.DebtDesc
-	m["isPaidOff"] = a.IsPaidOff
-	return m
-}
-
 type Debts struct {
 	Accounts     Accounts
 	Transactions Transactions

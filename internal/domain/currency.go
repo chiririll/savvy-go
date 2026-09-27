@@ -22,17 +22,6 @@ type Currency struct {
 	Rate     float64
 }
 
-func (c Currency) JSON() map[string]any {
-	return map[string]any{
-		"id":       c.ID,
-		"code":     c.Code,
-		"name":     c.Name,
-		"symbol":   c.Symbol,
-		"decimals": c.Decimals,
-		"isBase":   c.IsBase,
-		"rate":     c.Rate,
-	}
-}
 
 func (c Currency) ConvertToBase(amount float64) float64 {
 	if c.IsBase {

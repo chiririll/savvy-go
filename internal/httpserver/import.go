@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"savvy-go/internal/httpserver/dto"
+
 	"github.com/go-chi/chi/v5"
 )
 
@@ -31,7 +33,7 @@ func (s *Server) importParse(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	payload := im.JSON()
+	payload := dto.Import(*im)
 	s.runJob(func(ctx context.Context) {
 		_ = s.imports.Parse(ctx, im.ID, up.ID)
 	})
@@ -50,7 +52,7 @@ func (s *Server) importShow(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusForbidden, "Forbidden")
 		return
 	}
-	writeData(w, http.StatusOK, im.JSON())
+	writeData(w, http.StatusOK, dto.Import(*im))
 }
 
 func (s *Server) importPreview(w http.ResponseWriter, r *http.Request) {
@@ -96,7 +98,7 @@ func (s *Server) importExecute(w http.ResponseWriter, r *http.Request) {
 	im.Status = "importing"
 	im.Mapping = body.Mapping
 	im.Options = body.Options
-	payload := im.JSON()
+	payload := dto.Import(*im)
 	s.runJob(func(ctx context.Context) {
 		_ = s.imports.Execute(ctx, im.ID, body.Mapping, body.Options)
 	})

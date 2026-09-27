@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"savvy-go/internal/domain"
+	"savvy-go/internal/httpserver/dto"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -16,7 +17,7 @@ func (s *Server) automationIndex(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, mapSlice(list, domain.AutomationRule.JSON))
+	writeData(w, http.StatusOK, mapSlice(list, dto.AutomationRule))
 }
 
 func (s *Server) automationTriggers(w http.ResponseWriter, r *http.Request) {
@@ -49,7 +50,7 @@ func (s *Server) automationStore(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusCreated, rule.JSON())
+	writeData(w, http.StatusCreated, dto.AutomationRule(*rule))
 }
 
 func (s *Server) automationShow(w http.ResponseWriter, r *http.Request) {
@@ -57,7 +58,7 @@ func (s *Server) automationShow(w http.ResponseWriter, r *http.Request) {
 	if rule == nil {
 		return
 	}
-	writeData(w, http.StatusOK, rule.JSON())
+	writeData(w, http.StatusOK, dto.AutomationRule(*rule))
 }
 
 func (s *Server) automationUpdate(w http.ResponseWriter, r *http.Request) {
@@ -74,7 +75,7 @@ func (s *Server) automationUpdate(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, rule.JSON())
+	writeData(w, http.StatusOK, dto.AutomationRule(*rule))
 }
 
 func (s *Server) automationDestroy(w http.ResponseWriter, r *http.Request) {
@@ -99,7 +100,7 @@ func (s *Server) automationToggle(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, out.JSON())
+	writeData(w, http.StatusOK, dto.AutomationRule(*out))
 }
 
 func (s *Server) automationReorder(w http.ResponseWriter, r *http.Request) {
@@ -150,7 +151,7 @@ func (s *Server) automationLogs(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, mapSlice(logs, domain.AutomationLog.JSON))
+	writeData(w, http.StatusOK, mapSlice(logs, dto.AutomationLog))
 }
 
 func (s *Server) automationParam(w http.ResponseWriter, r *http.Request) *domain.AutomationRule {

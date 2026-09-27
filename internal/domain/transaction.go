@@ -19,13 +19,6 @@ type TxItem struct {
 	TotalPrice   float64
 }
 
-func (i TxItem) JSON() map[string]any {
-	return map[string]any{
-		"id": i.ID, "name": i.Name, "quantity": i.Quantity,
-		"pricePerUnit": i.PricePerUnit, "totalPrice": i.TotalPrice,
-	}
-}
-
 type Transaction struct {
 	ID           int64
 	Type         string
@@ -45,50 +38,6 @@ type Transaction struct {
 	Category     *Category
 	Items        []TxItem
 	Tags         []Tag
-}
-
-func (t Transaction) JSON() map[string]any {
-	m := map[string]any{
-		"id": t.ID, "type": t.Type, "amount": t.Amount,
-		"description": t.Description, "date": t.Date, "status": t.Status,
-		"recurringTransactionId": t.RecurringID,
-		"actions":                t.actions(),
-		"items":                  mapSliceVal(t.Items, TxItem.JSON),
-		"itemsCount":             len(t.Items),
-		"tags":                   mapSliceVal(t.Tags, Tag.JSON),
-	}
-	if t.ToAmount != nil {
-		m["toAmount"] = *t.ToAmount
-	}
-	if t.ExchangeRate != nil {
-		m["exchangeRate"] = *t.ExchangeRate
-	}
-	if t.Account != nil {
-		m["account"] = t.Account.JSON()
-	}
-	if t.ToAccount != nil {
-		m["toAccount"] = t.ToAccount.JSON()
-	}
-	if t.Category != nil {
-		m["category"] = t.Category.JSON()
-	}
-	if t.CreatedAt != nil {
-		m["createdAt"] = t.CreatedAt.UTC().Format(time.RFC3339Nano)
-	}
-	return m
-}
-
-func (t Transaction) actions() map[string]bool {
-	pending := t.Status == "pending"
-	skipped := t.Status == "skipped"
-	recurring := t.RecurringID != nil
-	return map[string]bool{
-		"edit":      !skipped && !recurring,
-		"delete":    !recurring,
-		"duplicate": !recurring && !skipped,
-		"confirm":   pending,
-		"skip":      pending && recurring,
-	}
 }
 
 type TxInput struct {
@@ -436,10 +385,3 @@ func isFuture(date string) bool {
 	return d.After(today)
 }
 
-func mapSliceVal[T any](in []T, fn func(T) map[string]any) []any {
-	out := make([]any, 0, len(in))
-	for _, v := range in {
-		out = append(out, fn(v))
-	}
-	return out
-}

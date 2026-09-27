@@ -29,29 +29,6 @@ type Account struct {
 	Balance        float64
 }
 
-func (a Account) JSON() map[string]any {
-	var created any
-	if a.CreatedAt != nil {
-		created = a.CreatedAt.UTC().Format(time.RFC3339Nano)
-	}
-	var cur any
-	if a.Currency != nil {
-		cur = a.Currency.JSON()
-	}
-	return map[string]any{
-		"id":             a.ID,
-		"name":           a.Name,
-		"type":           a.Type,
-		"currencyId":     a.CurrencyID,
-		"initialBalance": a.InitialBalance,
-		"currentBalance": a.Balance,
-		"isActive":       a.IsActive,
-		"sortOrder":      a.SortOrder,
-		"currency":       cur,
-		"createdAt":      created,
-	}
-}
-
 type Accounts struct{ DB *sql.DB }
 
 func (s Accounts) All(ctx context.Context, onlyActive, excludeDebts bool) ([]Account, error) {

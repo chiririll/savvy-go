@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"savvy-go/internal/domain"
+	"savvy-go/internal/httpserver/dto"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -18,7 +19,7 @@ func (s *Server) currenciesIndex(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, mapSlice(list, domain.Currency.JSON))
+	writeData(w, http.StatusOK, mapSlice(list, dto.Currency))
 }
 
 func (s *Server) currenciesCatalog(w http.ResponseWriter, r *http.Request) {
@@ -39,7 +40,7 @@ func (s *Server) currenciesStore(w http.ResponseWriter, r *http.Request) {
 		writeValidation(w, map[string][]string{"code": {"The code has already been taken."}})
 		return
 	}
-	writeData(w, http.StatusCreated, c.JSON())
+	writeData(w, http.StatusCreated, dto.Currency(*c))
 }
 
 func (s *Server) currenciesShow(w http.ResponseWriter, r *http.Request) {
@@ -47,7 +48,7 @@ func (s *Server) currenciesShow(w http.ResponseWriter, r *http.Request) {
 	if c == nil {
 		return
 	}
-	writeData(w, http.StatusOK, c.JSON())
+	writeData(w, http.StatusOK, dto.Currency(*c))
 }
 
 func (s *Server) currenciesUpdate(w http.ResponseWriter, r *http.Request) {
@@ -72,7 +73,7 @@ func (s *Server) currenciesUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	writeData(w, http.StatusOK, c.JSON())
+	writeData(w, http.StatusOK, dto.Currency(*c))
 }
 
 func (s *Server) currenciesDestroy(w http.ResponseWriter, r *http.Request) {
@@ -106,7 +107,7 @@ func (s *Server) currenciesSetBase(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, c.JSON())
+	writeData(w, http.StatusOK, dto.Currency(*c))
 }
 
 func (s *Server) currenciesConvert(w http.ResponseWriter, r *http.Request) {
@@ -128,8 +129,8 @@ func (s *Server) currenciesConvert(w http.ResponseWriter, r *http.Request) {
 	result := domain.Convert(body.Amount, *from, *to)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"amount": body.Amount,
-		"from":   from.JSON(),
-		"to":     to.JSON(),
+		"from":   dto.Currency(*from),
+		"to":     dto.Currency(*to),
 		"result": domainRound(result, to.Decimals),
 	})
 }
@@ -142,7 +143,7 @@ func (s *Server) accountsIndex(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	payload := envelope{Data: mapSlice(list, domain.Account.JSON)}
+	payload := envelope{Data: mapSlice(list, dto.Account)}
 	if r.URL.Query().Get("with_summary") == "1" || r.URL.Query().Get("with_summary") == "true" {
 		base, _ := s.currencies.Base(r.Context())
 		if id := r.URL.Query().Get("base_currency_id"); id != "" {
@@ -199,7 +200,7 @@ func (s *Server) accountsStore(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusCreated, a.JSON())
+	writeData(w, http.StatusCreated, dto.Account(*a))
 }
 
 func (s *Server) accountsShow(w http.ResponseWriter, r *http.Request) {
@@ -207,7 +208,7 @@ func (s *Server) accountsShow(w http.ResponseWriter, r *http.Request) {
 	if a == nil {
 		return
 	}
-	writeData(w, http.StatusOK, a.JSON())
+	writeData(w, http.StatusOK, dto.Account(*a))
 }
 
 func (s *Server) accountsUpdate(w http.ResponseWriter, r *http.Request) {
@@ -253,7 +254,7 @@ func (s *Server) accountsUpdate(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, a.JSON())
+	writeData(w, http.StatusOK, dto.Account(*a))
 }
 
 func (s *Server) accountsReorder(w http.ResponseWriter, r *http.Request) {
@@ -339,7 +340,7 @@ func (s *Server) categoriesIndex(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, mapSlice(list, domain.Category.JSON))
+	writeData(w, http.StatusOK, mapSlice(list, dto.Category))
 }
 
 func (s *Server) categoriesStore(w http.ResponseWriter, r *http.Request) {
@@ -353,7 +354,7 @@ func (s *Server) categoriesStore(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusCreated, c.JSON())
+	writeData(w, http.StatusCreated, dto.Category(*c))
 }
 
 func (s *Server) categoriesShow(w http.ResponseWriter, r *http.Request) {
@@ -361,7 +362,7 @@ func (s *Server) categoriesShow(w http.ResponseWriter, r *http.Request) {
 	if c == nil {
 		return
 	}
-	writeData(w, http.StatusOK, c.JSON())
+	writeData(w, http.StatusOK, dto.Category(*c))
 }
 
 func (s *Server) categoriesUpdate(w http.ResponseWriter, r *http.Request) {
@@ -379,7 +380,7 @@ func (s *Server) categoriesUpdate(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, c.JSON())
+	writeData(w, http.StatusOK, dto.Category(*c))
 }
 
 func (s *Server) categoriesDestroy(w http.ResponseWriter, r *http.Request) {
@@ -427,7 +428,7 @@ func (s *Server) categoriesSummary(w http.ResponseWriter, r *http.Request) {
 		code = base.Code
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"data":     mapSlice(list, domain.Category.JSON),
+		"data":     mapSlice(list, dto.Category),
 		"total":    0,
 		"currency": code,
 	})
@@ -439,7 +440,7 @@ func (s *Server) tagsIndex(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, mapSlice(list, domain.Tag.JSON))
+	writeData(w, http.StatusOK, mapSlice(list, dto.Tag))
 }
 
 func (s *Server) tagsStore(w http.ResponseWriter, r *http.Request) {
@@ -455,7 +456,7 @@ func (s *Server) tagsStore(w http.ResponseWriter, r *http.Request) {
 		writeValidation(w, map[string][]string{"name": {"The name has already been taken."}})
 		return
 	}
-	writeData(w, http.StatusCreated, t.JSON())
+	writeData(w, http.StatusCreated, dto.Tag(*t))
 }
 
 func (s *Server) tagsShow(w http.ResponseWriter, r *http.Request) {
@@ -463,7 +464,7 @@ func (s *Server) tagsShow(w http.ResponseWriter, r *http.Request) {
 	if t == nil {
 		return
 	}
-	writeData(w, http.StatusOK, t.JSON())
+	writeData(w, http.StatusOK, dto.Tag(*t))
 }
 
 func (s *Server) tagsUpdate(w http.ResponseWriter, r *http.Request) {
@@ -483,7 +484,7 @@ func (s *Server) tagsUpdate(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, t.JSON())
+	writeData(w, http.StatusOK, dto.Tag(*t))
 }
 
 func (s *Server) tagsDestroy(w http.ResponseWriter, r *http.Request) {

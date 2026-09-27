@@ -33,40 +33,6 @@ type AutomationRule struct {
 	UpdatedAt      *time.Time
 }
 
-func triggerLabel(t string) (string, string) {
-	switch t {
-	case "on_transaction_create":
-		return "On Transaction Create", "Triggers when a new transaction is created"
-	case "on_transaction_update":
-		return "On Transaction Update", "Triggers when a transaction is updated"
-	default:
-		return t, ""
-	}
-}
-
-func (r AutomationRule) JSON() map[string]any {
-	label, _ := triggerLabel(r.TriggerType)
-	m := map[string]any{
-		"id": r.ID, "name": r.Name, "description": r.Description,
-		"trigger_type": r.TriggerType, "trigger_label": label,
-		"priority": r.Priority, "conditions": r.Conditions, "actions": r.Actions,
-		"is_active": r.IsActive, "stop_processing": r.StopProcessing,
-		"runs_count": r.RunsCount,
-	}
-	if r.LastRunAt != nil {
-		m["last_run_at"] = r.LastRunAt.UTC().Format(time.RFC3339Nano)
-	} else {
-		m["last_run_at"] = nil
-	}
-	if r.CreatedAt != nil {
-		m["created_at"] = r.CreatedAt.UTC().Format(time.RFC3339Nano)
-	}
-	if r.UpdatedAt != nil {
-		m["updated_at"] = r.UpdatedAt.UTC().Format(time.RFC3339Nano)
-	}
-	return m
-}
-
 type AutomationLog struct {
 	ID                int64
 	RuleID            int64
@@ -76,16 +42,6 @@ type AutomationLog struct {
 	Status            string
 	ErrorMessage      *string
 	CreatedAt         time.Time
-}
-
-func (l AutomationLog) JSON() map[string]any {
-	return map[string]any{
-		"id": l.ID, "rule_id": l.RuleID,
-		"trigger_entity_type": l.TriggerEntityType, "trigger_entity_id": l.TriggerEntityID,
-		"actions_executed": l.ActionsExecuted, "status": l.Status,
-		"error_message": l.ErrorMessage,
-		"created_at":    l.CreatedAt.UTC().Format(time.RFC3339Nano),
-	}
 }
 
 type AutomationInput struct {

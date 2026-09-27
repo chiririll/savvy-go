@@ -16,19 +16,6 @@ type Tag struct {
 	CreatedAt         *time.Time
 }
 
-func (t Tag) JSON() map[string]any {
-	var created any
-	if t.CreatedAt != nil {
-		created = t.CreatedAt.UTC().Format(time.RFC3339Nano)
-	}
-	return map[string]any{
-		"id":                t.ID,
-		"name":              t.Name,
-		"transactionsCount": t.TransactionsCount,
-		"createdAt":         created,
-	}
-}
-
 type Tags struct{ DB *sql.DB }
 
 func (s Tags) All(ctx context.Context) ([]Tag, error) {

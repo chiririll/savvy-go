@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"savvy-go/internal/domain"
+	"savvy-go/internal/httpserver/dto"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -16,7 +17,7 @@ func (s *Server) recurringIndex(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, mapSlice(list, domain.Recurring.JSON))
+	writeData(w, http.StatusOK, mapSlice(list, dto.Recurring))
 }
 
 func (s *Server) recurringUpcoming(w http.ResponseWriter, r *http.Request) {
@@ -25,7 +26,7 @@ func (s *Server) recurringUpcoming(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, mapSlice(list, domain.Recurring.JSON))
+	writeData(w, http.StatusOK, mapSlice(list, dto.Recurring))
 }
 
 func (s *Server) recurringStore(w http.ResponseWriter, r *http.Request) {
@@ -38,7 +39,7 @@ func (s *Server) recurringStore(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusCreated, rec.JSON())
+	writeData(w, http.StatusCreated, dto.Recurring(*rec))
 }
 
 func (s *Server) recurringShow(w http.ResponseWriter, r *http.Request) {
@@ -46,7 +47,7 @@ func (s *Server) recurringShow(w http.ResponseWriter, r *http.Request) {
 	if rec == nil {
 		return
 	}
-	writeData(w, http.StatusOK, rec.JSON())
+	writeData(w, http.StatusOK, dto.Recurring(*rec))
 }
 
 func (s *Server) recurringUpdate(w http.ResponseWriter, r *http.Request) {
@@ -63,7 +64,7 @@ func (s *Server) recurringUpdate(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, rec.JSON())
+	writeData(w, http.StatusOK, dto.Recurring(*rec))
 }
 
 func (s *Server) recurringDestroy(w http.ResponseWriter, r *http.Request) {

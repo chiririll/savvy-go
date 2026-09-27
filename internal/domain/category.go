@@ -20,23 +20,6 @@ type Category struct {
 	TotalAmount       *float64
 }
 
-func (c Category) JSON() map[string]any {
-	m := map[string]any{
-		"id":    c.ID,
-		"name":  c.Name,
-		"type":  c.Type,
-		"icon":  c.Icon,
-		"color": c.Color,
-	}
-	if c.TransactionsCount > 0 || true {
-		m["transactionsCount"] = c.TransactionsCount
-	}
-	if c.TotalAmount != nil {
-		m["totalAmount"] = *c.TotalAmount
-	}
-	return m
-}
-
 type Categories struct{ DB *sql.DB }
 
 func (s Categories) All(ctx context.Context, typ string) ([]Category, error) {

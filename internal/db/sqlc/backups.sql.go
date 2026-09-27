@@ -50,16 +50,17 @@ func (q *Queries) GetBackup(ctx context.Context, id int64) (GetBackupRow, error)
 }
 
 const insertBackup = `-- name: InsertBackup :execresult
-INSERT INTO backups (filename, size, note, app_version, created_at, updated_at) VALUES (?,?,?,?,?,?)
+INSERT INTO backups (filename, size, note, app_version, schema_migrations, created_at, updated_at) VALUES (?,?,?,?,?,?,?)
 `
 
 type InsertBackupParams struct {
-	Filename   string
-	Size       int64
-	Note       sql.NullString
-	AppVersion sql.NullString
-	CreatedAt  sql.NullString
-	UpdatedAt  sql.NullString
+	Filename         string
+	Size             int64
+	Note             sql.NullString
+	AppVersion       sql.NullString
+	SchemaMigrations sql.NullString
+	CreatedAt        sql.NullString
+	UpdatedAt        sql.NullString
 }
 
 func (q *Queries) InsertBackup(ctx context.Context, arg InsertBackupParams) (sql.Result, error) {
@@ -68,6 +69,7 @@ func (q *Queries) InsertBackup(ctx context.Context, arg InsertBackupParams) (sql
 		arg.Size,
 		arg.Note,
 		arg.AppVersion,
+		arg.SchemaMigrations,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)

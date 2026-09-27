@@ -50,13 +50,6 @@ type WebAuthnCred struct {
 	CreatedAt  *string
 }
 
-func (c WebAuthnCred) JSON() map[string]any {
-	return map[string]any{
-		"id": c.ID, "name": c.Name, "aaguid": c.AAGUID,
-		"last_used_at": c.LastUsedAt, "created_at": c.CreatedAt,
-	}
-}
-
 func (w WebAuthn) engine() (*webauthn.WebAuthn, error) {
 	u, err := url.Parse(w.Cfg.AppURL)
 	if err != nil || u.Host == "" {

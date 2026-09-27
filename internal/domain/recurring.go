@@ -34,63 +34,6 @@ type Recurring struct {
 	Tags        []Tag
 }
 
-func frequencyLabel(f string) string {
-	switch f {
-	case "daily":
-		return "Daily"
-	case "weekly":
-		return "Weekly"
-	case "monthly":
-		return "Monthly"
-	case "yearly":
-		return "Yearly"
-	default:
-		return f
-	}
-}
-
-func (r Recurring) JSON() map[string]any {
-	m := map[string]any{
-		"id": r.ID, "type": r.Type, "accountId": r.AccountID,
-		"amount": r.Amount, "description": r.Description,
-		"frequency": r.Frequency, "frequencyLabel": frequencyLabel(r.Frequency),
-		"interval": r.Interval, "startDate": r.StartDate,
-		"nextRunDate": r.NextRunDate, "isActive": r.IsActive,
-		"tags": mapSliceVal(r.Tags, Tag.JSON),
-	}
-	if r.ToAccountID != nil {
-		m["toAccountId"] = *r.ToAccountID
-	}
-	if r.CategoryID != nil {
-		m["categoryId"] = *r.CategoryID
-	}
-	if r.ToAmount != nil {
-		m["toAmount"] = *r.ToAmount
-	}
-	if r.DayOfWeek != nil {
-		m["dayOfWeek"] = *r.DayOfWeek
-	}
-	if r.DayOfMonth != nil {
-		m["dayOfMonth"] = *r.DayOfMonth
-	}
-	if r.EndDate != nil {
-		m["endDate"] = *r.EndDate
-	}
-	if r.LastRunDate != nil {
-		m["lastRunDate"] = *r.LastRunDate
-	}
-	if r.Account != nil {
-		m["account"] = r.Account.JSON()
-	}
-	if r.ToAccount != nil {
-		m["toAccount"] = r.ToAccount.JSON()
-	}
-	if r.Category != nil {
-		m["category"] = r.Category.JSON()
-	}
-	return m
-}
-
 type RecurringInput struct {
 	Type        string
 	AccountID   int64

@@ -7,6 +7,7 @@ import (
 
 	"savvy-go/internal/db/filter"
 	"savvy-go/internal/domain"
+	"savvy-go/internal/httpserver/dto"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -40,7 +41,7 @@ func (s *Server) transactionsIndex(w http.ResponseWriter, r *http.Request) {
 		last = 1
 	}
 	payload := map[string]any{
-		"data": mapSlice(list, domain.Transaction.JSON),
+		"data": mapSlice(list, dto.Transaction),
 		"meta": map[string]any{
 			"current_page": page, "last_page": last, "per_page": per, "total": total,
 		},
@@ -67,7 +68,7 @@ func (s *Server) transactionsStore(w http.ResponseWriter, r *http.Request) {
 			tx = fresh
 		}
 	}
-	writeData(w, http.StatusCreated, tx.JSON())
+	writeData(w, http.StatusCreated, dto.Transaction(*tx))
 }
 
 func (s *Server) transactionsShow(w http.ResponseWriter, r *http.Request) {
@@ -75,7 +76,7 @@ func (s *Server) transactionsShow(w http.ResponseWriter, r *http.Request) {
 	if tx == nil {
 		return
 	}
-	writeData(w, http.StatusOK, tx.JSON())
+	writeData(w, http.StatusOK, dto.Transaction(*tx))
 }
 
 func (s *Server) transactionsUpdate(w http.ResponseWriter, r *http.Request) {
@@ -107,7 +108,7 @@ func (s *Server) transactionsUpdate(w http.ResponseWriter, r *http.Request) {
 			tx = fresh
 		}
 	}
-	writeData(w, http.StatusOK, tx.JSON())
+	writeData(w, http.StatusOK, dto.Transaction(*tx))
 }
 
 func (s *Server) transactionsDestroy(w http.ResponseWriter, r *http.Request) {
@@ -147,7 +148,7 @@ func (s *Server) transactionsConfirm(w http.ResponseWriter, r *http.Request) {
 	if fresh, e := s.txs.ByID(r.Context(), out.ID); e == nil && fresh != nil {
 		out = fresh
 	}
-	writeData(w, http.StatusOK, out.JSON())
+	writeData(w, http.StatusOK, dto.Transaction(*out))
 }
 
 func (s *Server) transactionsSkip(w http.ResponseWriter, r *http.Request) {
@@ -163,7 +164,7 @@ func (s *Server) transactionsSkip(w http.ResponseWriter, r *http.Request) {
 	if out.RecurringID != nil {
 		_ = s.recurring.AdvanceAfterOccurrence(r.Context(), *out.RecurringID)
 	}
-	writeData(w, http.StatusOK, out.JSON())
+	writeData(w, http.StatusOK, dto.Transaction(*out))
 }
 
 func (s *Server) transactionsDuplicate(w http.ResponseWriter, r *http.Request) {
@@ -176,7 +177,7 @@ func (s *Server) transactionsDuplicate(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusCreated, out.JSON())
+	writeData(w, http.StatusCreated, dto.Transaction(*out))
 }
 
 func (s *Server) transactionsSummary(w http.ResponseWriter, r *http.Request) {

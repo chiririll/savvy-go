@@ -3,6 +3,7 @@ package domain
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -22,20 +23,6 @@ type Backup struct {
 	AppVersion *string
 	Migrations *string
 	CreatedAt  *time.Time
-}
-
-func (b Backup) JSON() map[string]any {
-	status := "current"
-	return map[string]any{
-		"id": b.ID, "filename": b.Filename, "size": b.Size, "note": b.Note,
-		"schemaVersion": b.AppVersion, "schemaStatus": status,
-		"createdAt": func() any {
-			if b.CreatedAt == nil {
-				return nil
-			}
-			return b.CreatedAt.UTC().Format(time.RFC3339Nano)
-		}(),
-	}
 }
 
 type Backups struct {
@@ -85,10 +72,11 @@ func (s Backups) Create(ctx context.Context, note *string) (*Backup, error) {
 		return nil, err
 	}
 	ver := version.Value
+	migsJSON := migrationsJSON(ctx, s.DB)
 	now := time.Now().UTC().Format(time.RFC3339)
 	res, err := db.Q(s.DB).InsertBackup(ctx, sqlc.InsertBackupParams{
 		Filename: name, Size: info.Size(), Note: db.NullString(note), AppVersion: db.NS(ver),
-		CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
+		SchemaMigrations: db.NS(migsJSON), CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
 	})
 	if err != nil {
 		return nil, err
@@ -112,10 +100,11 @@ func (s Backups) Ingest(ctx context.Context, srcPath string, note *string) (*Bac
 		return nil, err
 	}
 	ver := version.Value
+	migsJSON := migrationsJSON(ctx, s.DB)
 	now := time.Now().UTC().Format(time.RFC3339)
 	res, err := db.Q(s.DB).InsertBackup(ctx, sqlc.InsertBackupParams{
 		Filename: name, Size: info.Size(), Note: db.NullString(note), AppVersion: db.NS(ver),
-		CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
+		SchemaMigrations: db.NS(migsJSON), CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
 	})
 	if err != nil {
 		return nil, err
@@ -143,7 +132,20 @@ func (s Backups) Inspect(ctx context.Context, b Backup) (map[string]any, error) 
 	available, _ := db.Q(s.DB).ListSchemaMigrations(ctx)
 	pending := diffStrings(available, ran)
 	unknown := diffStrings(ran, available)
-	return map[string]any{"pendingMigrations": pending, "unknownMigrations": unknown}, nil
+	return map[string]any{
+		"valid":             true,
+		"compatible":        len(unknown) == 0,
+		"pendingCount":      len(pending),
+		"pendingMigrations": pending,
+		"unknownCount":      len(unknown),
+		"unknownMigrations": unknown,
+	}, nil
+}
+
+func migrationsJSON(ctx context.Context, sqlDB *sql.DB) string {
+	migs, _ := db.Q(sqlDB).ListSchemaMigrations(ctx)
+	data, _ := json.Marshal(migs)
+	return string(data)
 }
 
 func (s Backups) Restore(ctx context.Context, b Backup) error {

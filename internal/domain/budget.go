@@ -20,14 +20,6 @@ type BudgetProgress struct {
 	IsExceeded  bool
 }
 
-func (p BudgetProgress) JSON() map[string]any {
-	return map[string]any{
-		"spent": p.Spent, "remaining": p.Remaining, "percent": p.Percent,
-		"period_start": p.PeriodStart, "period_end": p.PeriodEnd,
-		"is_exceeded": p.IsExceeded,
-	}
-}
-
 type Budget struct {
 	ID              int64
 	Name            string
@@ -43,40 +35,6 @@ type Budget struct {
 	Categories      []Category
 	Tags            []Tag
 	Progress        *BudgetProgress
-}
-
-func periodLabel(p string) string {
-	switch p {
-	case "weekly":
-		return "Weekly"
-	case "monthly":
-		return "Monthly"
-	case "yearly":
-		return "Yearly"
-	case "one_time":
-		return "One-time"
-	default:
-		return p
-	}
-}
-
-func (b Budget) JSON() map[string]any {
-	m := map[string]any{
-		"id": b.ID, "name": b.Name, "amount": b.Amount,
-		"currencyId": b.CurrencyID, "period": b.Period, "periodLabel": periodLabel(b.Period),
-		"startDate": b.StartDate, "endDate": b.EndDate,
-		"isGlobal": b.IsGlobal, "notifyAtPercent": b.NotifyAtPercent,
-		"isActive":   b.IsActive,
-		"categories": mapSliceVal(b.Categories, Category.JSON),
-		"tags":       mapSliceVal(b.Tags, Tag.JSON),
-	}
-	if b.Currency != nil {
-		m["currency"] = b.Currency.JSON()
-	}
-	if b.Progress != nil {
-		m["progress"] = b.Progress.JSON()
-	}
-	return m
 }
 
 type BudgetInput struct {

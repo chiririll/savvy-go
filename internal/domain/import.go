@@ -208,34 +208,6 @@ func (s Imports) Execute(ctx context.Context, importID string, mapping, options 
 	return nil
 }
 
-func (im Import) JSON() map[string]any {
-	parsed := im.Status == "parsed" || im.Status == "importing" || im.Status == "completed"
-	m := map[string]any{
-		"import_id": im.ID, "status": im.Status, "total_rows": im.TotalRows,
-		"processed_rows": im.ProcessedRows, "created": im.CreatedCount,
-		"skipped": im.SkippedCount, "errors": im.ErrorCount, "message": im.Message,
-	}
-	if parsed && im.Meta != nil {
-		m["parse"] = map[string]any{
-			"headers": im.Meta["headers"], "preview_rows": im.Meta["preview_rows"],
-			"total_rows": im.TotalRows, "detected_formats": im.Meta["detected_formats"],
-			"suggested_mapping": im.Meta["suggested_mapping"],
-		}
-	} else {
-		m["parse"] = nil
-	}
-	if im.Status == "completed" {
-		m["result"] = map[string]any{
-			"created": im.CreatedCount, "skipped_duplicates": im.SkippedCount,
-			"errors": im.Errors, "created_currencies": im.Meta["created_currencies"],
-			"created_tags": im.Meta["created_tags"], "created_categories": im.Meta["created_categories"],
-		}
-	} else {
-		m["result"] = nil
-	}
-	return m
-}
-
 func (s Imports) Preview(ctx context.Context, im *Import, mapping, options map[string]any) (map[string]any, error) {
 	if im.UploadID == nil {
 		return nil, fmt.Errorf("file gone")

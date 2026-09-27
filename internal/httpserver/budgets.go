@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"savvy-go/internal/domain"
+	"savvy-go/internal/httpserver/dto"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -16,7 +17,7 @@ func (s *Server) budgetsIndex(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, mapSlice(list, domain.Budget.JSON))
+	writeData(w, http.StatusOK, mapSlice(list, dto.Budget))
 }
 
 func (s *Server) budgetsStore(w http.ResponseWriter, r *http.Request) {
@@ -33,7 +34,7 @@ func (s *Server) budgetsStore(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusCreated, b.JSON())
+	writeData(w, http.StatusCreated, dto.Budget(*b))
 }
 
 func (s *Server) budgetsShow(w http.ResponseWriter, r *http.Request) {
@@ -41,7 +42,7 @@ func (s *Server) budgetsShow(w http.ResponseWriter, r *http.Request) {
 	if b == nil {
 		return
 	}
-	writeData(w, http.StatusOK, b.JSON())
+	writeData(w, http.StatusOK, dto.Budget(*b))
 }
 
 func (s *Server) budgetsUpdate(w http.ResponseWriter, r *http.Request) {
@@ -58,7 +59,7 @@ func (s *Server) budgetsUpdate(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, b.JSON())
+	writeData(w, http.StatusOK, dto.Budget(*b))
 }
 
 func (s *Server) budgetsDestroy(w http.ResponseWriter, r *http.Request) {

@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"savvy-go/internal/domain"
+	"savvy-go/internal/httpserver/dto"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -18,7 +19,7 @@ func (s *Server) backupsIndex(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, mapSlice(list, domain.Backup.JSON))
+	writeData(w, http.StatusOK, mapSlice(list, dto.Backup))
 }
 
 func (s *Server) backupsStore(w http.ResponseWriter, r *http.Request) {
@@ -31,7 +32,7 @@ func (s *Server) backupsStore(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusCreated, b.JSON())
+	writeData(w, http.StatusCreated, dto.Backup(*b))
 }
 
 func (s *Server) backupsUpload(w http.ResponseWriter, r *http.Request) {
@@ -64,7 +65,7 @@ func (s *Server) backupsUpload(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, b.JSON())
+	writeJSON(w, http.StatusOK, dto.Backup(*b))
 }
 
 func (s *Server) backupsDownload(w http.ResponseWriter, r *http.Request) {

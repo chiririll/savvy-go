@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"savvy-go/internal/httpserver/dto"
+
 	"github.com/go-chi/chi/v5"
 )
 
@@ -17,7 +19,7 @@ func (s *Server) webauthnIndex(w http.ResponseWriter, r *http.Request) {
 	}
 	data := make([]any, 0, len(list))
 	for _, c := range list {
-		data = append(data, c.JSON())
+		data = append(data, dto.WebAuthnCred(c))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"credentials": data})
 }
@@ -57,7 +59,7 @@ func (s *Server) webauthnRegisterVerify(w http.ResponseWriter, r *http.Request) 
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"message":    "Passkey registered.",
-		"credential": cred.JSON(),
+		"credential": dto.WebAuthnCred(*cred),
 	})
 }
 
