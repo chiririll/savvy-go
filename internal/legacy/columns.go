@@ -47,6 +47,9 @@ var extraColumns = map[string][]addColumn{
 	"budgets": {
 		{"currency_id", "INTEGER"},
 	},
+	"categories": {
+		{"is_default", "INTEGER NOT NULL DEFAULT 0"},
+	},
 	"backups": {
 		{"app_version", "TEXT"},
 		{"schema_migrations", "TEXT"},

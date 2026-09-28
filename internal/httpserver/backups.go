@@ -9,6 +9,7 @@ import (
 
 	"savvy-go/internal/domain"
 	"savvy-go/internal/httpserver/dto"
+	"savvy-go/internal/legacy"
 	"savvy-go/internal/migrate"
 
 	"github.com/go-chi/chi/v5"
@@ -112,9 +113,19 @@ func (s *Server) backupsRestore(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
+	if err := legacy.EnsureColumns(r.Context(), newDB); err != nil {
+		_ = newDB.Close()
+		writeMessage(w, 422, "legacy columns: "+err.Error())
+		return
+	}
 	if err := migrate.Up(r.Context(), newDB); err != nil {
 		_ = newDB.Close()
 		writeMessage(w, 422, "migrate: "+err.Error())
+		return
+	}
+	if err := legacy.UpgradeInPlace(r.Context(), newDB, s.cfg.AppKey); err != nil {
+		_ = newDB.Close()
+		writeMessage(w, 422, "legacy import: "+err.Error())
 		return
 	}
 	s.reconnect(newDB)
