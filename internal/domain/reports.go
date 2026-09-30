@@ -80,19 +80,22 @@ func (f ReportFilter) Range(now time.Time) dateRange {
 	case "ytd":
 		return dateRange{time.Date(now.Year(), 1, 1, 0, 0, 0, 0, now.Location()), dateOnly(now)}
 	case "custom":
-		start := startOfMonth(now)
-		end := endOfMonth(now)
-		if t, err := time.ParseInLocation("2006-01-02", f.StartDate, now.Location()); err == nil {
-			start = t
-		}
-		if t, err := time.ParseInLocation("2006-01-02", f.EndDate, now.Location()); err == nil {
-			end = t
+		start, errStart := time.ParseInLocation("2006-01-02", f.StartDate, now.Location())
+		end, errEnd := time.ParseInLocation("2006-01-02", f.EndDate, now.Location())
+		if errStart != nil || errEnd != nil {
+			return defaultRange(now)
 		}
 		return dateRange{start, end}
-	default: // last_30_days
-		end := dateOnly(now)
-		return dateRange{end.AddDate(0, 0, -29), end}
+	default:
+		return defaultRange(now)
 	}
+}
+
+// defaultRange is the period used whenever none (or an invalid one) is given:
+// the last 30 days including today.
+func defaultRange(now time.Time) dateRange {
+	end := dateOnly(now)
+	return dateRange{end.AddDate(0, 0, -29), end}
 }
 
 func (f ReportFilter) Comparison(now time.Time) *dateRange {
