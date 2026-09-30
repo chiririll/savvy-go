@@ -6,11 +6,13 @@ import {
     SelectValue,
 } from '@/components/ui/select'
 import { FormControl } from '@/components/ui/form'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useAccounts } from '@/hooks'
+import { useAccounts, useCreateAccount } from '@/hooks'
+import { AccountFormDialog } from '@/components/features/accounts'
 import { ACCOUNT_TYPE_CONFIG } from '@/constants'
 import { cn, formatCurrency } from '@/lib/utils'
-import { Wallet } from 'lucide-react'
+import { Plus, Wallet } from 'lucide-react'
 import type { AccountType } from '@/types'
 
 interface AccountSelectProps {
@@ -23,7 +25,10 @@ interface AccountSelectProps {
     disabled?: boolean
     plain?: boolean
     showBalance?: boolean
+    allowCreate?: boolean
 }
+
+const NEW_ACCOUNT_VALUE = '__new__'
 
 export function AccountSelect({
     value,
@@ -35,8 +40,11 @@ export function AccountSelect({
     disabled,
     plain,
     showBalance,
+    allowCreate,
 }: AccountSelectProps) {
-    const { t } = useTranslation('forms')
+    const { t } = useTranslation(['forms', 'pages'])
+    const [createOpen, setCreateOpen] = useState(false)
+    const createAccount = useCreateAccount()
     const { data: accounts } = useAccounts({ active: activeOnly, exclude_debts: excludeDebts })
 
     const selectedId = Number(value) > 0 ? Number(value) : null
@@ -52,14 +60,20 @@ export function AccountSelect({
 
     const trigger = (
         <SelectTrigger className="w-full">
-            <SelectValue placeholder={placeholder ?? t('selectAccount')} />
+            <SelectValue placeholder={placeholder ?? t('forms:selectAccount')} />
         </SelectTrigger>
     )
 
-    return (
+    const select = (
         <Select
             key={selectedId ?? 'empty'}
-            onValueChange={(val) => onChange(Number(val))}
+            onValueChange={(val) => {
+                if (val === NEW_ACCOUNT_VALUE) {
+                    setCreateOpen(true)
+                    return
+                }
+                onChange(Number(val))
+            }}
             value={selectedId ? String(selectedId) : undefined}
             disabled={disabled}
         >
@@ -89,7 +103,35 @@ export function AccountSelect({
                         </SelectItem>
                     )
                 })}
+                {allowCreate && (
+                    <SelectItem value={NEW_ACCOUNT_VALUE}>
+                        <div className="flex items-center gap-2">
+                            <Plus className="size-4" />
+                            <span>{t('pages:accounts.create')}</span>
+                        </div>
+                    </SelectItem>
+                )}
             </SelectContent>
         </Select>
+    )
+
+    if (!allowCreate) {
+        return select
+    }
+
+    return (
+        <>
+            {select}
+            <AccountFormDialog
+                open={createOpen}
+                onOpenChange={setCreateOpen}
+                isSubmitting={createAccount.isPending}
+                onSubmit={async (data) => {
+                    const account = await createAccount.mutateAsync(data)
+                    setCreateOpen(false)
+                    onChange(account.id)
+                }}
+            />
+        </>
     )
 }

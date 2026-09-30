@@ -184,6 +184,7 @@ export function MappingStep({ parseResult, onSubmit, isLoading }: MappingStepPro
                                     onChange={field.onChange}
                                     placeholder={tForms('import.targetAccountPlaceholder')}
                                     disabled={isLoading}
+                                    allowCreate
                                 />
                                 <FormDescription>
                                     {tForms('import.targetAccountHelp')}
