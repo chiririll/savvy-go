@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import EmojiPickerReact, { EmojiClickData, Theme } from 'emoji-picker-react'
+import EmojiPickerReact, { EmojiClickData, EmojiStyle, Theme } from 'emoji-picker-react'
 import { Popover, PopoverContent, PopoverTrigger } from './popover'
 import { Button } from './button'
 
@@ -20,7 +20,7 @@ export function EmojiPicker({ value, onChange, disabled }: EmojiPickerProps) {
     }
 
     return (
-        <Popover open={open} onOpenChange={setOpen}>
+        <Popover modal open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
                 <Button
                     type="button"
@@ -36,6 +36,8 @@ export function EmojiPicker({ value, onChange, disabled }: EmojiPickerProps) {
                 <EmojiPickerReact
                     onEmojiClick={handleEmojiClick}
                     theme={Theme.LIGHT}
+                    emojiStyle={EmojiStyle.NATIVE}
+                    lazyLoadEmojis
                     width={350}
                     height={400}
                     searchPlaceHolder={t('searchEmoji')}
