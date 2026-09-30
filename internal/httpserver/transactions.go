@@ -3,7 +3,9 @@ package httpserver
 import (
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"strconv"
+	"strings"
 
 	"savvy-go/internal/db/filter"
 	"savvy-go/internal/domain"
@@ -23,6 +25,10 @@ func (s *Server) transactionsIndex(w http.ResponseWriter, r *http.Request) {
 	if v := r.URL.Query().Get("category_id"); v != "" {
 		f.CategoryID, _ = strconv.ParseInt(v, 10, 64)
 	}
+	q := r.URL.Query()
+	f.SortBy, f.SortDir = q.Get("sort_by"), q.Get("sort_direction")
+	f.CategoryIDs = int64List(q, "category_ids")
+	f.TagIDs = int64List(q, "tag_ids")
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	per, _ := strconv.Atoi(r.URL.Query().Get("per_page"))
 	list, total, err := s.txs.Filtered(r.Context(), f, page, per)
@@ -50,6 +56,18 @@ func (s *Server) transactionsIndex(w http.ResponseWriter, r *http.Request) {
 		payload["summary"] = s.txs.Summary(r.Context(), false)
 	}
 	writeJSON(w, http.StatusOK, payload)
+}
+
+func int64List(q url.Values, key string) []int64 {
+	var out []int64
+	for _, raw := range append(q[key], q[key+"[]"]...) {
+		for _, part := range strings.Split(raw, ",") {
+			if id, err := strconv.ParseInt(strings.TrimSpace(part), 10, 64); err == nil && id > 0 {
+				out = append(out, id)
+			}
+		}
+	}
+	return out
 }
 
 func (s *Server) transactionsStore(w http.ResponseWriter, r *http.Request) {

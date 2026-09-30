@@ -6,17 +6,116 @@ import (
 	"context"
 	"database/sql"
 	"strings"
+
+	"savvy-go/internal/db/sqlc"
 )
 
 // TxFilter is the HTTP/list filter for transactions. Optional fields are
 // empty when unset; IDs use 0 as unset. Domain code maps this to sqlc nargs.
 type TxFilter struct {
-	Type       string
-	AccountID  int64
-	CategoryID int64
-	Status     string
-	StartDate  string
-	EndDate    string
+	Type        string
+	AccountID   int64
+	CategoryID  int64
+	CategoryIDs []int64
+	TagIDs      []int64
+	Status      string
+	StartDate   string
+	EndDate     string
+	SortBy      string
+	SortDir     string
+}
+
+func txWhere(f TxFilter) (string, []any) {
+	q := `WHERE 1=1`
+	var args []any
+	if f.Type != "" {
+		q += ` AND t.type = ?`
+		args = append(args, f.Type)
+	}
+	if f.AccountID > 0 {
+		q += ` AND t.account_id = ?`
+		args = append(args, f.AccountID)
+	}
+	if f.CategoryID > 0 {
+		q += ` AND t.category_id = ?`
+		args = append(args, f.CategoryID)
+	}
+	if len(f.CategoryIDs) > 0 {
+		q += ` AND t.category_id IN (` + Placeholders(len(f.CategoryIDs)) + `)`
+		for _, id := range f.CategoryIDs {
+			args = append(args, id)
+		}
+	}
+	if len(f.TagIDs) > 0 {
+		q += ` AND EXISTS (SELECT 1 FROM transaction_tag tt WHERE tt.transaction_id = t.id AND tt.tag_id IN (` + Placeholders(len(f.TagIDs)) + `))`
+		for _, id := range f.TagIDs {
+			args = append(args, id)
+		}
+	}
+	if f.Status != "" {
+		q += ` AND t.status = ?`
+		args = append(args, f.Status)
+	}
+	if f.StartDate != "" {
+		q += ` AND (t.date IS NULL OR t.date >= ?)`
+		args = append(args, f.StartDate)
+	}
+	if f.EndDate != "" {
+		q += ` AND (t.date IS NULL OR t.date <= ?)`
+		args = append(args, f.EndDate)
+	}
+	return q, args
+}
+
+// txOrderBy maps whitelisted sort keys to SQL; request strings never reach the query.
+func txOrderBy(sortBy, sortDir string) string {
+	dir := "DESC"
+	if sortDir == "asc" {
+		dir = "ASC"
+	}
+	switch sortBy {
+	case "amount":
+		return `t.amount * COALESCE(NULLIF(c.rate, 0), 1) ` + dir + `, t.id ` + dir
+	case "created_at":
+		return `t.created_at ` + dir + `, t.id ` + dir
+	default:
+		return `CASE WHEN t.date IS NULL THEN 1 ELSE 0 END, t.date ` + dir + `, t.id ` + dir
+	}
+}
+
+func CountTransactions(ctx context.Context, sqlDB *sql.DB, f TxFilter) (int64, error) {
+	where, args := txWhere(f)
+	var n int64
+	err := sqlDB.QueryRowContext(ctx, `SELECT COUNT(*) FROM transactions t `+where, args...).Scan(&n)
+	return n, err
+}
+
+func ListTransactions(ctx context.Context, sqlDB *sql.DB, f TxFilter, limit, offset int) ([]sqlc.ListTransactionsRow, error) {
+	where, args := txWhere(f)
+	args = append(args, limit, offset)
+	rows, err := sqlDB.QueryContext(ctx, `
+		SELECT t.id, t.type, t.account_id, t.to_account_id, t.category_id, t.amount, t.to_amount, t.exchange_rate,
+			t.description, t.date, t.status, t.recurring_transaction_id, t.created_at
+		FROM transactions t
+		LEFT JOIN accounts a ON a.id = t.account_id
+		LEFT JOIN currencies c ON c.id = a.currency_id
+		`+where+`
+		ORDER BY `+txOrderBy(f.SortBy, f.SortDir)+`
+		LIMIT ? OFFSET ?`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []sqlc.ListTransactionsRow{}
+	for rows.Next() {
+		var r sqlc.ListTransactionsRow
+		if err := rows.Scan(&r.ID, &r.Type, &r.AccountID, &r.ToAccountID, &r.CategoryID, &r.Amount, &r.ToAmount,
+			&r.ExchangeRate, &r.Description, &r.Date, &r.Status, &r.RecurringTransactionID, &r.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
 }
 
 // ReportWhere is the shared report/budget aggregation filter.

@@ -234,20 +234,15 @@ func (s Transactions) Filtered(ctx context.Context, f filter.TxFilter, page, per
 	if page <= 0 {
 		page = 1
 	}
-	arg := sqlc.CountTransactionsParams{
-		Type: db.Narg(f.Type), AccountID: db.NullInt64If(f.AccountID), CategoryID: db.NullInt64If(f.CategoryID),
-		Status: db.Narg(f.Status), StartDate: db.Narg(f.StartDate), EndDate: db.Narg(f.EndDate),
-	}
-	total, err := db.Q(s.DB).CountTransactions(ctx, arg)
+	total, err := filter.CountTransactions(ctx, s.DB, f)
 	if err != nil {
 		return nil, 0, err
 	}
-	list, err := s.list(ctx, sqlc.ListTransactionsParams{
-		Type: arg.Type, AccountID: arg.AccountID, CategoryID: arg.CategoryID,
-		Status: arg.Status, StartDate: arg.StartDate, EndDate: arg.EndDate,
-		Limit: int64(perPage), Offset: int64((page - 1) * perPage),
-	})
-	return list, int(total), err
+	rows, err := filter.ListTransactions(ctx, s.DB, f, perPage, (page-1)*perPage)
+	if err != nil {
+		return nil, 0, err
+	}
+	return s.hydrate(ctx, rows), int(total), nil
 }
 
 func (s Transactions) Summary(ctx context.Context, pendingOnly bool) map[string]any {
@@ -285,6 +280,10 @@ func (s Transactions) list(ctx context.Context, arg sqlc.ListTransactionsParams)
 	if err != nil {
 		return nil, err
 	}
+	return s.hydrate(ctx, rows), nil
+}
+
+func (s Transactions) hydrate(ctx context.Context, rows []sqlc.ListTransactionsRow) []Transaction {
 	out := make([]Transaction, 0, len(rows))
 	for _, r := range rows {
 		out = append(out, txFromRow(r))
@@ -308,7 +307,7 @@ func (s Transactions) list(ctx context.Context, arg sqlc.ListTransactionsParams)
 		out[i].Items, _ = s.items(ctx, out[i].ID)
 		out[i].Tags, _ = s.tags(ctx, out[i].ID)
 	}
-	return out, nil
+	return out
 }
 
 func (s Transactions) items(ctx context.Context, id int64) ([]TxItem, error) {
