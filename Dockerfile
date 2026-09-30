@@ -33,8 +33,8 @@ RUN apk upgrade --no-cache \
     && mkdir -p /data /public \
     && chown www-data:www-data /data
 COPY --from=gobuild /out/savvy-go /usr/local/bin/savvy-go
+COPY public /public
 COPY --from=frontend /app/public/build /public/build
-COPY public/favicon.svg public/robots.txt public/site.webmanifest /public/
 RUN setcap 'cap_net_bind_service=+ep' /usr/local/bin/savvy-go \
     && chown -R www-data:www-data /public
 VOLUME /data

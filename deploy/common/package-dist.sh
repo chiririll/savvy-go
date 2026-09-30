@@ -22,12 +22,9 @@ trap 'rm -rf "$STAGE"' EXIT
 mkdir -p "$STAGE/public"
 cp -a "$BIN" "$STAGE/savvy-go"
 chmod +x "$STAGE/savvy-go"
+# Static files (index.html, icons, manifest, robots.txt) plus the Vite build.
+find "$ROOT/public" -mindepth 1 -maxdepth 1 -type f -exec cp -a {} "$STAGE/public/" \;
 cp -a "$ROOT/public/build" "$STAGE/public/build"
-for f in favicon.svg robots.txt site.webmanifest; do
-    if [[ -f "$ROOT/public/$f" ]]; then
-        cp -a "$ROOT/public/$f" "$STAGE/public/$f"
-    fi
-done
 printf '%s\n' "$VERSION" > "$STAGE/VERSION"
 
 rm -rf "$OUT_DIR/public"
