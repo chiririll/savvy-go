@@ -111,10 +111,12 @@ func (s *Server) monitoringResources(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"cpu":     cpuSnapshot(),
 		"memory":  memorySnapshot(),
-		"process": map[string]any{"memory_bytes": ms.Alloc, "peak_bytes": ms.Sys, "limit_bytes": nil},
-		"queue":   map[string]any{"pending": nil, "reserved": nil, "failed": nil},
+		"process": map[string]any{
+			"memory_bytes": ms.Alloc, "peak_bytes": ms.Sys, "limit_bytes": nil,
+			"goroutines": runtime.NumGoroutine(), "gc_cycles": ms.NumGC,
+		},
 		"runtime": map[string]any{
-			"php_version": runtime.Version(), "laravel_version": version.Value,
+			"go_version": runtime.Version(), "app_version": version.Value,
 			"environment": version.Env, "uptime_seconds": int(time.Since(processStarted).Seconds()),
 		},
 	})
