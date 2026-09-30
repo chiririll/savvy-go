@@ -359,6 +359,20 @@ func (s Reports) ExpensesByCategory(ctx context.Context, f ReportFilter) map[str
 	return map[string]any{"categories": cats, "currency": s.baseCode(ctx)}
 }
 
+// CategorySummary returns per-category totals of the given type for the period
+// described by f, with the grand total.
+func (s Reports) CategorySummary(ctx context.Context, f ReportFilter, typ string) ([]Category, float64) {
+	var out []Category
+	var total float64
+	for _, x := range s.sumGroupedByCategory(ctx, typ, f.Range(s.now()), f) {
+		amount := x.Total
+		icon, color := x.Icon, x.Color
+		out = append(out, Category{ID: x.ID, Name: x.Name, Type: typ, Icon: &icon, Color: &color, TotalAmount: &amount})
+		total += amount
+	}
+	return out, round2(total)
+}
+
 func (s Reports) CashFlowOverTime(ctx context.Context, f ReportFilter, groupBy string) map[string]any {
 	now := s.now()
 	current := s.groupedCashFlow(ctx, f, f.Range(now), groupBy)

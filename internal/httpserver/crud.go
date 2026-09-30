@@ -451,7 +451,12 @@ func (s *Server) categoriesSummary(w http.ResponseWriter, r *http.Request) {
 		writeValidation(w, map[string][]string{"type": {"The type field is required."}})
 		return
 	}
-	list, _ := s.categories.All(r.Context(), typ)
+	q := r.URL.Query()
+	list, total := s.reports.CategorySummary(r.Context(), domain.ReportFilter{
+		PeriodType: "custom",
+		StartDate:  q.Get("start_date"),
+		EndDate:    q.Get("end_date"),
+	}, typ)
 	base, _ := s.currencies.Base(r.Context())
 	code := ""
 	if base != nil {
@@ -459,7 +464,7 @@ func (s *Server) categoriesSummary(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"data":     mapSlice(list, dto.Category),
-		"total":    0,
+		"total":    total,
 		"currency": code,
 	})
 }
