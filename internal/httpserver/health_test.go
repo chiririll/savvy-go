@@ -162,6 +162,10 @@ func TestSPAServesIndexAndStatic(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(cfg.PublicDir, "favicon.svg"), []byte("<svg/>"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	index := `<html><head></head><body><div id="app"></div><i>{{.Version}}</i></body></html>`
+	if err := os.WriteFile(filepath.Join(cfg.PublicDir, "index.html"), []byte(index), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	sqlDB, err := db.Open(cfg.Database)
 	if err != nil {
 		t.Fatal(err)
@@ -189,7 +193,7 @@ func TestSPAServesIndexAndStatic(t *testing.T) {
 	if htmlRes.StatusCode != http.StatusOK {
 		t.Fatalf("spa %d", htmlRes.StatusCode)
 	}
-	if !strings.Contains(string(raw), `id="app"`) {
+	if !strings.Contains(string(raw), `id="app"`) || strings.Contains(string(raw), "{{") {
 		t.Fatalf("spa html: %s", raw)
 	}
 	if !strings.Contains(htmlRes.Header.Get("Content-Type"), "text/html") {

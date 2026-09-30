@@ -1,8 +1,9 @@
 package httpserver
 
 import (
+	"bytes"
 	"encoding/json"
-	"html"
+	"html/template"
 	"net/http"
 	"os"
 	"path"
@@ -26,7 +27,7 @@ func (s *Server) spa(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rel := strings.TrimPrefix(path.Clean("/"+r.URL.Path), "/")
-	if rel != "" && !strings.Contains(rel, "..") {
+	if rel != "" && rel != "index.html" && !strings.Contains(rel, "..") {
 		full := filepath.Join(s.cfg.PublicDir, filepath.FromSlash(rel))
 		if info, err := os.Stat(full); err == nil && !info.IsDir() {
 			http.ServeFile(w, r, full)
@@ -34,59 +35,39 @@ func (s *Server) spa(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	page, err := s.renderIndex()
+	if err != nil {
+		http.Error(w, "index.html unavailable", http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	_, _ = w.Write([]byte(s.indexHTML()))
+	_, _ = w.Write(page)
 }
 
-func (s *Server) indexHTML() string {
-	js, css := s.viteAssets()
-	var assets strings.Builder
-	for _, href := range css {
-		assets.WriteString(`    <link rel="stylesheet" href="` + html.EscapeString(href) + `">` + "\n")
-	}
-	for _, src := range js {
-		assets.WriteString(`    <script type="module" src="` + html.EscapeString(src) + `"></script>` + "\n")
+// indexData is what public/index.html is rendered with.
+type indexData struct {
+	Version string
+	Env     string
+	JS      []string
+	CSS     []string
+}
+
+// renderIndex renders the public/index.html template.
+func (s *Server) renderIndex() ([]byte, error) {
+	tpl, err := template.ParseFiles(filepath.Join(s.cfg.PublicDir, "index.html"))
+	if err != nil {
+		return nil, err
 	}
 
-	return `<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Savvy</title>
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-    <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png">
-    <link rel="icon" type="image/x-icon" href="/favicon.ico">
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-    <link rel="manifest" href="/site.webmanifest">
-    <meta name="theme-color" content="#ffffff">
-    <meta name="app-version" content="` + html.EscapeString(version.Value) + `">
-    <meta name="app-env" content="` + html.EscapeString(version.Env) + `">
-    <script>
-        (function () {
-            try {
-                var stored = localStorage.getItem('theme');
-                var theme = stored === 'dark' || stored === 'light'
-                    ? stored
-                    : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-                var root = document.documentElement;
-                root.classList.add(theme);
-                root.style.colorScheme = theme;
-                var meta = document.querySelector('meta[name="theme-color"]');
-                if (meta) meta.setAttribute('content', theme === 'dark' ? '#1a1a1a' : '#ffffff');
-            } catch (e) {}
-        })();
-    </script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-` + assets.String() + `</head>
-<body>
-<div id="app"></div>
-</body>
-</html>
-`
+	data := indexData{Version: version.Value, Env: version.Env}
+	data.JS, data.CSS = s.viteAssets()
+
+	var buf bytes.Buffer
+	if err := tpl.Execute(&buf, data); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 func (s *Server) viteAssets() (js []string, css []string) {
