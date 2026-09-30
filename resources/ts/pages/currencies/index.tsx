@@ -3,7 +3,7 @@ import { Plus } from 'lucide-react'
 import { FeedList, Page, PageHeader } from '@/components/shared'
 import { CurrencyFormDialog, CurrencyRow } from '@/components/features/currencies'
 import { Button } from '@/components/ui/button'
-import { useCreateCurrency, useCurrencies, useDeleteCurrency, useSetBaseCurrency, useUpdateCurrency, useResourceFormDialog } from '@/hooks'
+import { useCreateCurrency, useCurrencies, useDeleteCurrency, useSetBaseCurrency, useUpdateCurrency, useResourceFormDialog, useSettings } from '@/hooks'
 import { useReadOnly } from '@/components/providers/ReadOnlyProvider'
 import { CurrencyFormData } from '@/schemas'
 import type { Currency } from '@/types'
@@ -15,6 +15,7 @@ export default function CurrenciesPage() {
     const setBaseCurrency = useSetBaseCurrency()
     const createCurrency = useCreateCurrency()
     const updateCurrency = useUpdateCurrency()
+    const { data: settings } = useSettings()
     const isReadOnly = useReadOnly()
     const items = currencies ?? []
     const form = useResourceFormDialog<Currency, CurrencyFormData>({
@@ -57,6 +58,7 @@ export default function CurrenciesPage() {
                             onDelete={(id) => deleteCurrency.mutate(id)}
                             onSetBase={(id) => setBaseCurrency.mutate(id)}
                             isSettingBase={setBaseCurrency.isPending}
+                            autoUpdated={settings?.auto_update_currencies ?? false}
                             isReadOnly={isReadOnly}
                             deleteDisabled={currency.isBase || isLast}
                             deleteDisabledLabel={isLast ? t('common:actions.cannotDeleteLast') : t('common:actions.delete')}

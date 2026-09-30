@@ -108,6 +108,8 @@
             "base": "Base"
         },
         "setAsBase": "Set as base",
+        "autoShort": "Auto",
+        "autoUpdated": "Rate is updated automatically",
         "emptyTitle": "No currencies yet",
         "emptyDescription": "Add a currency to record amounts and exchange rates",
         "deleteTitle": "Delete currency?",
