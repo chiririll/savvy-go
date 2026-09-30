@@ -30,6 +30,7 @@ const optionsToSnakeCase = (options: ImportOptions) => ({
     create_missing_currencies: options.createMissingCurrencies,
     create_missing_tags: options.createMissingTags,
     create_missing_categories: options.createMissingCategories,
+    category_map: options.categoryMap ?? {},
 })
 
 // Convert backend snake_case to frontend camelCase
@@ -70,6 +71,12 @@ const previewResultFromSnakeCase = (data: Record<string, unknown>): ImportPrevie
         currenciesToCreate: ((data.summary as Record<string, unknown>).currencies_to_create as string[] | undefined) ?? [],
         tagsToCreate: ((data.summary as Record<string, unknown>).tags_to_create as string[] | undefined) ?? [],
         categoriesToCreate: ((data.summary as Record<string, unknown>).categories_to_create as string[] | undefined) ?? [],
+        categories: (((data.summary as Record<string, unknown>).categories as Record<string, unknown>[] | undefined) ?? []).map((c) => ({
+            name: c.name as string,
+            type: c.type as 'income' | 'expense',
+            count: c.count as number,
+            matchId: (c.match_id as number | null) ?? null,
+        })),
     },
 })
 

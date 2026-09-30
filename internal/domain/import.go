@@ -9,7 +9,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -111,19 +110,23 @@ func (s Imports) Parse(ctx context.Context, importID, uploadID string) error {
 	if err != nil {
 		return s.fail(ctx, importID, err.Error())
 	}
-	headers, rows, err := parseCSV(raw)
+	delimiter, headers, rows, err := parseCSVWithDelimiter(raw)
 	if err != nil {
 		return s.fail(ctx, importID, err.Error())
 	}
+	detected := detectImport(headers, rows, delimiter)
 	preview := rows
 	if len(preview) > 10 {
 		preview = preview[:10]
 	}
 	meta := map[string]any{
 		"headers": headers, "preview_rows": preview,
-		"detected_formats":  map[string]any{"date": "ISO", "amount": "US"},
-		"suggested_mapping": suggestMapping(headers),
-		"parse_meta":        map[string]any{"delimiter": ",", "has_header": true, "encoding": "utf-8"},
+		"detected_formats": map[string]any{
+			"date_format": detected.dateFormat, "amount_format": detected.amountFormat,
+			"has_header": true, "delimiter": string(detected.delimiter),
+		},
+		"suggested_mapping": detected.mapping,
+		"parse_meta":        map[string]any{"delimiter": string(detected.delimiter), "has_header": true, "encoding": "utf-8"},
 	}
 	rawMeta, _ := json.Marshal(meta)
 	now := time.Now().UTC().Format(time.RFC3339)
@@ -162,6 +165,10 @@ func (s Imports) Execute(ctx context.Context, importID string, mapping, options 
 	created, skipped := 0, 0
 	var errs []map[string]any
 	accountID, _ := asInt64(options["default_account_id"])
+	resolver, err := s.newCategoryResolver(ctx, collectImportCategories(rows, mapping, options), options)
+	if err != nil {
+		return s.fail(ctx, importID, err.Error())
+	}
 	for i, row := range rows {
 		res := processImportRow(row, mapping, options, i+1)
 		if res.err != "" {
@@ -173,7 +180,7 @@ func (s Imports) Execute(ctx context.Context, importID string, mapping, options 
 		hash := dedupHash(res.date, res.amount, res.desc)
 		st := "confirmed"
 		ins, err := db.Q(s.DB).InsertTransactionIgnoreDup(ctx, sqlc.InsertTransactionIgnoreDupParams{
-			Type: res.typ, AccountID: accountID, Amount: res.amount, Description: db.NS(res.desc),
+			Type: res.typ, AccountID: accountID, CategoryID: resolver.resolve(res.category), Amount: res.amount, Description: db.NS(res.desc),
 			Date: db.NS(res.date), Status: st, DedupHash: db.NS(hash), CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
 		})
 		if err != nil {
@@ -194,7 +201,7 @@ func (s Imports) Execute(ctx context.Context, importID string, mapping, options 
 	}
 	meta["created_currencies"] = []any{}
 	meta["created_tags"] = []any{}
-	meta["created_categories"] = []any{}
+	meta["created_categories"] = resolver.created
 	metaJSON, _ := json.Marshal(meta)
 	err = db.Q(s.DB).MarkImportCompleted(ctx, sqlc.MarkImportCompletedParams{
 		ProcessedRows: int64(created + skipped + len(errs)), CreatedCount: int64(created), SkippedCount: int64(skipped),
@@ -224,6 +231,10 @@ func (s Imports) Preview(ctx context.Context, im *Import, mapping, options map[s
 	if err != nil {
 		return nil, err
 	}
+	cats := collectImportCategories(rows, mapping, options)
+	if err := s.matchImportCategories(ctx, cats); err != nil {
+		return nil, err
+	}
 	var preview []map[string]any
 	willCreate, willSkip, hasErrors := 0, 0, 0
 	for i, row := range rows {
@@ -239,17 +250,28 @@ func (s Imports) Preview(ctx context.Context, im *Import, mapping, options map[s
 			preview = append(preview, map[string]any{
 				"row": i + 1, "date": res.date, "type": res.typ, "amount": res.amount,
 				"description": res.desc, "status": status, "error": nilOr(res.err),
-				"category": nil, "tags": []string{}, "duplicate_of": nil, "warnings": []string{},
+				"category": nilOr(res.category), "tags": []string{}, "duplicate_of": nil, "warnings": []string{},
 			})
 		}
 	}
 	_ = willSkip
+	categories, categoriesToCreate := []map[string]any{}, []string{}
+	for _, c := range cats {
+		var matchID any
+		if c.MatchID != nil {
+			matchID = *c.MatchID
+		} else {
+			categoriesToCreate = append(categoriesToCreate, c.Name)
+		}
+		categories = append(categories, map[string]any{"name": c.Name, "type": c.Type, "count": c.Count, "match_id": matchID})
+	}
 	return map[string]any{
 		"preview_transactions": preview,
 		"summary": map[string]any{
 			"will_create": willCreate, "will_skip": willSkip, "has_errors": hasErrors,
 			"total_rows": im.TotalRows, "sampled": willCreate + willSkip + hasErrors,
-			"currencies_to_create": []any{}, "tags_to_create": []any{}, "categories_to_create": []any{},
+			"currencies_to_create": []any{}, "tags_to_create": []any{},
+			"categories_to_create": categoriesToCreate, "categories": categories,
 		},
 	}, nil
 }
@@ -260,43 +282,57 @@ func (s Imports) fail(ctx context.Context, id, msg string) error {
 }
 
 func parseCSV(raw []byte) ([]string, [][]string, error) {
+	_, headers, rows, err := parseCSVWithDelimiter(raw)
+	return headers, rows, err
+}
+
+func parseCSVWithDelimiter(raw []byte) (rune, []string, [][]string, error) {
+	raw = bytes.TrimPrefix(raw, []byte("ï»¿"))
+	delimiter := sniffDelimiter(raw)
 	r := csv.NewReader(bytes.NewReader(raw))
+	r.Comma = delimiter
 	r.FieldsPerRecord = -1
 	r.LazyQuotes = true
 	all, err := r.ReadAll()
 	if err != nil {
-		return nil, nil, err
+		return 0, nil, nil, err
 	}
 	if len(all) == 0 {
-		return nil, nil, fmt.Errorf("empty csv")
+		return 0, nil, nil, fmt.Errorf("empty csv")
 	}
-	return all[0], all[1:], nil
+	return delimiter, all[0], all[1:], nil
 }
 
 func suggestMapping(headers []string) map[string]int {
 	out := map[string]int{}
 	for i, h := range headers {
+		key := ""
 		switch strings.ToLower(strings.TrimSpace(h)) {
-		case "date":
-			out["date"] = i
-		case "amount":
-			out["amount"] = i
-		case "description", "memo", "details":
-			out["description"] = i
-		case "type":
-			out["type"] = i
-		case "category":
-			out["category"] = i
-		case "tags", "tag":
-			out["tags"] = i
+		case "date", "дата":
+			key = "date"
+		case "amount", "sum", "сумма":
+			key = "amount"
+		case "description", "memo", "details", "описание", "назначение":
+			key = "description"
+		case "type", "тип":
+			key = "type"
+		case "category", "категория":
+			key = "category"
+		case "tags", "tag", "теги", "тег":
+			key = "tags"
+		case "currency", "валюта":
+			key = "currency"
+		}
+		if _, taken := out[key]; key != "" && !taken {
+			out[key] = i
 		}
 	}
 	return out
 }
 
 type importRow struct {
-	date, typ, desc, err string
-	amount               float64
+	date, typ, desc, category, err string
+	amount                         float64
 }
 
 func processImportRow(row []string, mapping, options map[string]any, _ int) importRow {
@@ -309,7 +345,7 @@ func processImportRow(row []string, mapping, options map[string]any, _ int) impo
 		out.err = "Date column is not mapped."
 		return out
 	}
-	out.date = parseImportDate(row[di], fmt.Sprint(options["date_format"]))
+	out.date = parseImportDate(row[di], optString(options, "date_format"))
 	if out.date == "" {
 		out.err = "Invalid date: " + row[di]
 		return out
@@ -323,13 +359,19 @@ func processImportRow(row []string, mapping, options map[string]any, _ int) impo
 		out.err = "Amount column is not mapped."
 		return out
 	}
-	amt, err := parseImportAmount(row[ai])
+	amt, err := parseImportAmount(row[ai], optString(options, "amount_format"))
 	if err != nil {
 		out.err = "Invalid amount: " + row[ai]
 		return out
 	}
 	out.amount = amt
-	if _, hasType := mapping["type"]; !hasType {
+	typeKnown := false
+	if ti, ok := mappingIndex(mapping, "type"); ok && ti < len(row) {
+		if t := parseImportType(row[ti]); t != "" {
+			out.typ, typeKnown = t, true
+		}
+	}
+	if !typeKnown {
 		if amt < 0 {
 			out.typ = "expense"
 		} else if amt > 0 {
@@ -340,7 +382,15 @@ func processImportRow(row []string, mapping, options map[string]any, _ int) impo
 	if di, ok := mappingIndex(mapping, "description"); ok && di < len(row) {
 		out.desc = strings.TrimSpace(row[di])
 	}
+	if ci, ok := mappingIndex(mapping, "category"); ok && ci < len(row) {
+		out.category = strings.TrimSpace(row[ci])
+	}
 	return out
+}
+
+func optString(options map[string]any, key string) string {
+	v, _ := options[key].(string)
+	return v
 }
 
 func mappingIndex(mapping map[string]any, key string) (int, bool) {
@@ -350,23 +400,6 @@ func mappingIndex(mapping map[string]any, key string) (int, bool) {
 	}
 	n, ok := asInt64(v)
 	return int(n), ok
-}
-
-func parseImportDate(v, format string) string {
-	v = strings.TrimSpace(v)
-	for _, layout := range []string{"2006-01-02", "02/01/2006", "01/02/2006", "2 Jan 2006", time.RFC3339} {
-		if t, err := time.Parse(layout, v); err == nil {
-			return t.Format("2006-01-02")
-		}
-	}
-	return ""
-}
-
-func parseImportAmount(v string) (float64, error) {
-	v = strings.TrimSpace(v)
-	v = strings.ReplaceAll(v, ",", "")
-	v = strings.ReplaceAll(v, " ", "")
-	return strconv.ParseFloat(v, 64)
 }
 
 func absFloat(v float64) float64 {
