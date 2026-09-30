@@ -327,17 +327,6 @@ CREATE TABLE IF NOT EXISTS transaction_imports (
 CREATE INDEX IF NOT EXISTS transaction_imports_status_idx ON transaction_imports (status);
 CREATE INDEX IF NOT EXISTS transaction_imports_user_status_idx ON transaction_imports (user_id, status);
 
-CREATE TABLE IF NOT EXISTS backups (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    filename TEXT NOT NULL,
-    size INTEGER NOT NULL,
-    note TEXT,
-    app_version TEXT,
-    schema_migrations TEXT,
-    created_at TEXT,
-    updated_at TEXT
-);
-
 CREATE TABLE IF NOT EXISTS identity_providers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,

@@ -3,7 +3,6 @@ package httpserver
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"net/http"
 	"path/filepath"
 	"testing"
@@ -38,7 +37,7 @@ func TestRestoreLegacyLaravelBackup(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res := a.do("POST", fmt.Sprintf("/api/backups/%d/restore", backup.ID), nil, sess.Token, sess.CSRF)
+	res := a.do("POST", "/api/backups/"+backup.Filename+"/restore", nil, sess.Token, sess.CSRF)
 	body := decodeJSON(t, res)
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("restore %d %v", res.StatusCode, body)

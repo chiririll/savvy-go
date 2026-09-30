@@ -308,10 +308,7 @@
             "uploadFailed": "Failed to upload backup",
             "restoreFailed": "Failed to restore backup",
             "inspectFailed": "Failed to check the backup file",
-            "deleteFailed": "Failed to delete backup",
-            "synced": "Scan complete — removed {{removed}}, registered {{found}}",
-            "syncClean": "Storage is clean, nothing to fix",
-            "syncFailed": "Failed to scan storage"
+            "deleteFailed": "Failed to delete backup"
         },
         "import": {
             "success": "Successfully imported {{count}} transactions",

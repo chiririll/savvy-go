@@ -49,11 +49,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	backups := domain.Backups{DB: sqlDB, Dir: cfg.BackupsDir, Database: cfg.Database}
-	if _, err := backups.Sync(ctx); err != nil {
-		slog.Warn("backups sync", "err", err)
-	}
-
 	queue := jobs.New(2)
 	schedCtx, schedCancel := context.WithCancel(context.Background())
 	defer schedCancel()

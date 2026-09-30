@@ -315,7 +315,7 @@ func Import(im domain.Import) map[string]any {
 func Backup(b domain.Backup) map[string]any {
 	schemaVersion, status := backupVersionStatus(b.AppVersion)
 	return map[string]any{
-		"id": b.ID, "filename": b.Filename, "size": b.Size, "note": b.Note,
+		"filename": b.Filename, "size": b.Size, "note": b.Note,
 		"schemaVersion": schemaVersion, "schemaStatus": status,
 		"createdAt": func() any {
 			if b.CreatedAt == nil {

@@ -45,7 +45,7 @@ func TestUpCreatesDomainTables(t *testing.T) {
 		"transactions", "transaction_items", "transaction_tag", "budgets",
 		"recurring_transactions", "debts_placeholder_skip",
 		"automation_rules", "settings", "uploads", "transaction_imports",
-		"backups", "two_factor_challenges", "webauthn_credentials",
+		"two_factor_challenges", "webauthn_credentials",
 		"identity_providers", "password_tokens",
 	}
 	for _, table := range required {

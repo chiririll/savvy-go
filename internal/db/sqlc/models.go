@@ -70,17 +70,6 @@ type AutomationRuleLog struct {
 	CreatedAt         string
 }
 
-type Backup struct {
-	ID               int64
-	Filename         string
-	Size             int64
-	Note             sql.NullString
-	AppVersion       sql.NullString
-	SchemaMigrations sql.NullString
-	CreatedAt        sql.NullString
-	UpdatedAt        sql.NullString
-}
-
 type Budget struct {
 	ID              int64
 	Name            string

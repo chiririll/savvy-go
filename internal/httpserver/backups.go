@@ -3,10 +3,8 @@ package httpserver
 import (
 	"encoding/json"
 	"io"
-	"log/slog"
 	"net/http"
 	"os"
-	"strconv"
 
 	"savvy-go/internal/domain"
 	"savvy-go/internal/httpserver/dto"
@@ -23,15 +21,6 @@ func (s *Server) backupsIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeData(w, http.StatusOK, mapSlice(list, dto.Backup))
-}
-
-func (s *Server) backupsSync(w http.ResponseWriter, r *http.Request) {
-	result, err := s.backups.Sync(r.Context())
-	if err != nil {
-		writeMessage(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	writeJSON(w, http.StatusOK, result)
 }
 
 func (s *Server) backupsStore(w http.ResponseWriter, r *http.Request) {
@@ -130,10 +119,6 @@ func (s *Server) backupsRestore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.reconnect(newDB)
-	// The restored DB carries the backups table from backup time; re-align it with the files on disk.
-	if _, err := s.backups.Sync(r.Context()); err != nil {
-		slog.Warn("backups sync after restore", "err", err)
-	}
 	writeJSON(w, http.StatusOK, map[string]string{"message": "Backup restored."})
 }
 
@@ -150,8 +135,7 @@ func (s *Server) backupsDestroy(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) backupParam(w http.ResponseWriter, r *http.Request) *domain.Backup {
-	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	b, _ := s.backups.ByID(r.Context(), id)
+	b, _ := s.backups.ByName(r.Context(), chi.URLParam(r, "name"))
 	if b == nil {
 		writeMessage(w, http.StatusNotFound, "Not found.")
 	}

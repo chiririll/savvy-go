@@ -3,11 +3,11 @@ package domain
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -16,13 +16,22 @@ import (
 	"savvy-go/internal/version"
 )
 
+const backupExt = ".sqlite"
+
+// Backup metadata lives inside the backup file itself (table backup_meta), so
+// the directory is the single source of truth and metadata survives
+// download/upload. The live database never has this table.
+const (
+	metaNote       = "note"
+	metaAppVersion = "app_version"
+	metaCreatedAt  = "created_at"
+)
+
 type Backup struct {
-	ID         int64
 	Filename   string
 	Size       int64
 	Note       *string
 	AppVersion *string
-	Migrations *string
 	CreatedAt  *time.Time
 }
 
@@ -32,28 +41,72 @@ type Backups struct {
 	Database string
 }
 
+// All lists *.sqlite files in the backup directory, newest first.
 func (s Backups) All(ctx context.Context) ([]Backup, error) {
-	rows, err := db.Q(s.DB).ListBackups(ctx)
+	entries, err := os.ReadDir(s.Dir)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return []Backup{}, nil
+		}
 		return nil, err
 	}
-	out := make([]Backup, 0, len(rows))
-	for _, r := range rows {
-		out = append(out, backupFrom(r.ID, r.Filename, r.Size, r.Note, r.AppVersion, r.SchemaMigrations, r.CreatedAt))
+	out := make([]Backup, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), backupExt) {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+		out = append(out, s.describe(ctx, info))
 	}
+	sort.Slice(out, func(i, j int) bool {
+		a, b := out[i], out[j]
+		if a.CreatedAt != nil && b.CreatedAt != nil && !a.CreatedAt.Equal(*b.CreatedAt) {
+			return a.CreatedAt.After(*b.CreatedAt)
+		}
+		return a.Filename > b.Filename
+	})
 	return out, nil
 }
 
-func (s Backups) ByID(ctx context.Context, id int64) (*Backup, error) {
-	r, err := db.Q(s.DB).GetBackup(ctx, id)
-	if err == sql.ErrNoRows {
+// ByName returns the backup with the given file name, or nil if the name is
+// invalid or the file does not exist.
+func (s Backups) ByName(ctx context.Context, name string) (*Backup, error) {
+	if name == "" || filepath.Base(name) != name || !strings.HasSuffix(name, backupExt) {
 		return nil, nil
 	}
+	info, err := os.Stat(filepath.Join(s.Dir, name))
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
 		return nil, err
 	}
-	b := backupFrom(r.ID, r.Filename, r.Size, r.Note, r.AppVersion, r.SchemaMigrations, r.CreatedAt)
+	if info.IsDir() {
+		return nil, nil
+	}
+	b := s.describe(ctx, info)
 	return &b, nil
+}
+
+func (s Backups) describe(ctx context.Context, info os.FileInfo) Backup {
+	b := Backup{Filename: info.Name(), Size: info.Size()}
+	meta := readBackupMeta(ctx, filepath.Join(s.Dir, info.Name()))
+	if v, ok := meta[metaNote]; ok && v != "" {
+		b.Note = &v
+	}
+	if v, ok := meta[metaAppVersion]; ok && v != "" {
+		b.AppVersion = &v
+	}
+	if tm, ok := parseNullTime(sql.NullString{String: meta[metaCreatedAt], Valid: meta[metaCreatedAt] != ""}); ok {
+		b.CreatedAt = &tm
+	} else {
+		tm := info.ModTime().UTC()
+		b.CreatedAt = &tm
+	}
+	return b
 }
 
 func (s Backups) Create(ctx context.Context, note *string) (*Backup, error) {
@@ -63,133 +116,53 @@ func (s Backups) Create(ctx context.Context, note *string) (*Backup, error) {
 	if err := db.Checkpoint(ctx, s.DB); err != nil {
 		return nil, err
 	}
-	name := time.Now().UTC().Format("20060102-150405") + ".sqlite"
+	name := time.Now().UTC().Format("20060102-150405") + backupExt
 	dest := filepath.Join(s.Dir, name)
 	if err := copyFile(s.Database, dest); err != nil {
 		return nil, err
 	}
-	info, err := os.Stat(dest)
-	if err != nil {
+	meta := map[string]string{
+		metaAppVersion: version.Value,
+		metaCreatedAt:  time.Now().UTC().Format(time.RFC3339),
+	}
+	if note != nil && *note != "" {
+		meta[metaNote] = *note
+	}
+	if err := writeBackupMeta(ctx, dest, meta, true); err != nil {
+		_ = os.Remove(dest)
 		return nil, err
 	}
-	ver := version.Value
-	migsJSON := migrationsJSON(ctx, s.DB)
-	now := time.Now().UTC().Format(time.RFC3339)
-	res, err := db.Q(s.DB).InsertBackup(ctx, sqlc.InsertBackupParams{
-		Filename: name, Size: info.Size(), Note: db.NullString(note), AppVersion: db.NS(ver),
-		SchemaMigrations: db.NS(migsJSON), CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
-	})
-	if err != nil {
-		return nil, err
-	}
-	id, _ := res.LastInsertId()
-	return s.ByID(ctx, id)
+	return s.ByName(ctx, name)
 }
 
+// Ingest moves an uploaded file into the backup directory. Metadata already
+// present in the file (e.g. from a download of one of our backups) is kept.
 func (s Backups) Ingest(ctx context.Context, srcPath string, note *string) (*Backup, error) {
 	if err := os.MkdirAll(s.Dir, 0o775); err != nil {
 		return nil, err
 	}
-	name := time.Now().UTC().Format("20060102-150405") + "-upload.sqlite"
+	name := time.Now().UTC().Format("20060102-150405") + "-upload" + backupExt
 	dest := filepath.Join(s.Dir, name)
 	if err := copyFile(srcPath, dest); err != nil {
 		return nil, err
 	}
 	_ = os.Remove(srcPath)
-	info, err := os.Stat(dest)
+	if note != nil && *note != "" {
+		if err := writeBackupMeta(ctx, dest, map[string]string{metaNote: *note}, true); err != nil {
+			_ = os.Remove(dest)
+			return nil, err
+		}
+	}
+	err := writeBackupMeta(ctx, dest, map[string]string{metaCreatedAt: time.Now().UTC().Format(time.RFC3339)}, false)
 	if err != nil {
+		_ = os.Remove(dest)
 		return nil, err
 	}
-	ver := version.Value
-	migsJSON := migrationsJSON(ctx, s.DB)
-	now := time.Now().UTC().Format(time.RFC3339)
-	res, err := db.Q(s.DB).InsertBackup(ctx, sqlc.InsertBackupParams{
-		Filename: name, Size: info.Size(), Note: db.NullString(note), AppVersion: db.NS(ver),
-		SchemaMigrations: db.NS(migsJSON), CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
-	})
-	if err != nil {
-		return nil, err
-	}
-	id, _ := res.LastInsertId()
-	return s.ByID(ctx, id)
+	return s.ByName(ctx, name)
 }
 
-type SyncResult struct {
-	RemovedDead       int `json:"removed_dead"`
-	RegisteredOrphans int `json:"registered_orphans"`
-}
-
-// Sync removes DB records whose files are missing and registers .sqlite files
-// in the backup directory that have no DB record. Safe to call frequently.
-func (s Backups) Sync(ctx context.Context) (SyncResult, error) {
-	var result SyncResult
-
-	all, err := s.All(ctx)
-	if err != nil {
-		return result, err
-	}
-
-	known := make(map[string]bool, len(all))
-	for _, b := range all {
-		known[b.Filename] = true
-		if _, statErr := os.Stat(s.Path(b)); os.IsNotExist(statErr) {
-			if delErr := db.Q(s.DB).DeleteBackup(ctx, b.ID); delErr == nil {
-				result.RemovedDead++
-			}
-		}
-	}
-
-	entries, err := os.ReadDir(s.Dir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return result, nil
-		}
-		return result, err
-	}
-	for _, entry := range entries {
-		name := entry.Name()
-		if entry.IsDir() || !strings.HasSuffix(name, ".sqlite") {
-			continue
-		}
-		if known[name] {
-			continue
-		}
-		if regErr := s.registerOrphan(ctx, name); regErr == nil {
-			result.RegisteredOrphans++
-		}
-	}
-
-	return result, nil
-}
-
-func (s Backups) registerOrphan(ctx context.Context, name string) error {
-	path := filepath.Join(s.Dir, name)
-	info, err := os.Stat(path)
-	if err != nil {
-		return err
-	}
-	migsJSON := ""
-	if src, openErr := sql.Open("sqlite", "file:"+filepath.ToSlash(path)+"?mode=ro"); openErr == nil {
-		migsJSON = migrationsJSON(ctx, src)
-		_ = src.Close()
-	}
-	createdAt := info.ModTime().UTC().Format(time.RFC3339)
-	now := time.Now().UTC().Format(time.RFC3339)
-	_, err = db.Q(s.DB).InsertBackup(ctx, sqlc.InsertBackupParams{
-		Filename:         name,
-		Size:             info.Size(),
-		Note:             db.NullString(nil),
-		AppVersion:       db.NullString(nil),
-		SchemaMigrations: db.NS(migsJSON),
-		CreatedAt:        db.NS(createdAt),
-		UpdatedAt:        db.NS(now),
-	})
-	return err
-}
-
-func (s Backups) Delete(ctx context.Context, b Backup) error {
-	_ = os.Remove(filepath.Join(s.Dir, b.Filename))
-	return db.Q(s.DB).DeleteBackup(ctx, b.ID)
+func (s Backups) Delete(_ context.Context, b Backup) error {
+	return os.Remove(filepath.Join(s.Dir, b.Filename))
 }
 
 func (s Backups) Path(b Backup) string {
@@ -216,10 +189,51 @@ func (s Backups) Inspect(ctx context.Context, b Backup) (map[string]any, error) 
 	}, nil
 }
 
-func migrationsJSON(ctx context.Context, sqlDB *sql.DB) string {
-	migs, _ := db.Q(sqlDB).ListSchemaMigrations(ctx)
-	data, _ := json.Marshal(migs)
-	return string(data)
+// readBackupMeta returns backup_meta rows of a backup file; empty when the
+// file has no such table or cannot be opened.
+func readBackupMeta(ctx context.Context, path string) map[string]string {
+	out := map[string]string{}
+	src, err := sql.Open("sqlite", "file:"+filepath.ToSlash(path)+"?mode=ro")
+	if err != nil {
+		return out
+	}
+	defer src.Close()
+	rows, err := src.QueryContext(ctx, `SELECT key, value FROM backup_meta`)
+	if err != nil {
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var k, v string
+		if rows.Scan(&k, &v) == nil {
+			out[k] = v
+		}
+	}
+	return out
+}
+
+// writeBackupMeta stores key/value pairs in the backup file. Existing keys are
+// replaced only when overwrite is true. journal_mode=DELETE keeps the backup a
+// single self-contained file (no -wal/-shm left beside it).
+func writeBackupMeta(ctx context.Context, path string, kv map[string]string, overwrite bool) error {
+	dst, err := sql.Open("sqlite", "file:"+filepath.ToSlash(path)+"?_pragma=journal_mode(DELETE)")
+	if err != nil {
+		return err
+	}
+	defer dst.Close()
+	if _, err := dst.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS backup_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`); err != nil {
+		return fmt.Errorf("backup meta: %w", err)
+	}
+	conflict := `ON CONFLICT(key) DO NOTHING`
+	if overwrite {
+		conflict = `ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+	}
+	for k, v := range kv {
+		if _, err := dst.ExecContext(ctx, `INSERT INTO backup_meta (key, value) VALUES (?, ?) `+conflict, k, v); err != nil {
+			return fmt.Errorf("backup meta %s: %w", k, err)
+		}
+	}
+	return nil
 }
 
 // Restore replaces the live database with the given backup and returns a new
@@ -251,24 +265,13 @@ func (s Backups) Restore(ctx context.Context, b Backup) (*sql.DB, error) {
 		return nil, fmt.Errorf("reopen db: %w", err)
 	}
 
-	return newDB, nil
-}
+	// backup_meta only describes the backup file, not the live database.
+	if _, err := newDB.ExecContext(ctx, `DROP TABLE IF EXISTS backup_meta`); err != nil {
+		_ = newDB.Close()
+		return nil, fmt.Errorf("drop backup meta: %w", err)
+	}
 
-func backupFrom(id int64, filename string, size int64, note, ver, mig, created sql.NullString) Backup {
-	b := Backup{ID: id, Filename: filename, Size: size}
-	if note.Valid {
-		b.Note = &note.String
-	}
-	if ver.Valid {
-		b.AppVersion = &ver.String
-	}
-	if mig.Valid {
-		b.Migrations = &mig.String
-	}
-	if tm, ok := parseNullTime(created); ok {
-		b.CreatedAt = &tm
-	}
-	return b
+	return newDB, nil
 }
 
 func copyFile(src, dest string) error {

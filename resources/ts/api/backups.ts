@@ -21,18 +21,15 @@ export const backupsApi = {
         return response.data
     },
 
-    download: (id: number) =>
-        `${apiClient.defaults.baseURL}${ENDPOINT}/${id}/download`,
+    download: (filename: string) =>
+        `${apiClient.defaults.baseURL}${ENDPOINT}/${encodeURIComponent(filename)}/download`,
 
-    inspect: (id: number) =>
-        api.get<BackupInspection>(`${ENDPOINT}/${id}/inspect`),
+    inspect: (filename: string) =>
+        api.get<BackupInspection>(`${ENDPOINT}/${encodeURIComponent(filename)}/inspect`),
 
-    restore: (id: number) =>
-        api.post<{ message: string }, void>(`${ENDPOINT}/${id}/restore`, undefined),
+    restore: (filename: string) =>
+        api.post<{ message: string }, void>(`${ENDPOINT}/${encodeURIComponent(filename)}/restore`, undefined),
 
-    sync: () =>
-        api.post<{ removed_dead: number; registered_orphans: number }, void>(`${ENDPOINT}/sync`, undefined),
-
-    delete: (id: number) =>
-        api.delete<void>(`${ENDPOINT}/${id}`),
+    delete: (filename: string) =>
+        api.delete<void>(`${ENDPOINT}/${encodeURIComponent(filename)}`),
 }

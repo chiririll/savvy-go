@@ -45,7 +45,6 @@ var copyTables = []string{
 	"automation_rule_logs",
 	"uploads",
 	"transaction_imports",
-	"backups",
 	"auth_sessions",
 	"password_tokens",
 	"two_factor_challenges",

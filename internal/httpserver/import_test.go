@@ -5,6 +5,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -158,5 +160,27 @@ func TestBackupCreateAndList(t *testing.T) {
 	list := decodeJSON(t, res)
 	if res.StatusCode != 200 || len(list["data"].([]any)) != 1 {
 		t.Fatalf("list %d %v", res.StatusCode, list)
+	}
+	item := list["data"].([]any)[0].(map[string]any)
+	if item["note"] != "nightly" || item["schemaStatus"] != "current" {
+		t.Fatalf("metadata not read from backup file: %v", item)
+	}
+
+	// The directory is the source of truth: removing the file drops the backup,
+	// and a foreign .sqlite dropped into it shows up without any scan.
+	name := item["filename"].(string)
+	if err := os.Remove(filepath.Join(a.s.cfg.BackupsDir, name)); err != nil {
+		t.Fatal(err)
+	}
+	foreign := filepath.Join(a.s.cfg.BackupsDir, "foreign.sqlite")
+	if err := os.WriteFile(foreign, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	res = a.do("GET", "/api/backups", nil, sess.Token, "")
+	list = decodeJSON(t, res)
+	items := list["data"].([]any)
+	if len(items) != 1 || items[0].(map[string]any)["filename"] != "foreign.sqlite" ||
+		items[0].(map[string]any)["schemaStatus"] != "unknown" {
+		t.Fatalf("list after fs change: %v", list)
 	}
 }

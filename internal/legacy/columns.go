@@ -50,10 +50,6 @@ var extraColumns = map[string][]addColumn{
 	"categories": {
 		{"is_default", "INTEGER NOT NULL DEFAULT 0"},
 	},
-	"backups": {
-		{"app_version", "TEXT"},
-		{"schema_migrations", "TEXT"},
-	},
 }
 
 // EnsureColumns adds missing domain columns on a Laravel-era database so the
