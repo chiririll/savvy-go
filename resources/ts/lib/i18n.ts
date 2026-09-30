@@ -1,6 +1,7 @@
 import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import LanguageDetector from 'i18next-browser-languagedetector'
+import type { BackendModule } from 'i18next'
 
 import enCommon from '@/locales/en/common.json'
 import enNav from '@/locales/en/nav.json'
@@ -9,13 +10,6 @@ import enSettings from '@/locales/en/settings.json'
 import enPages from '@/locales/en/pages.json'
 import enForms from '@/locales/en/forms.json'
 import enDefaults from '@/locales/en/defaults.json'
-import ruCommon from '@/locales/ru/common.json'
-import ruNav from '@/locales/ru/nav.json'
-import ruAuth from '@/locales/ru/auth.json'
-import ruSettings from '@/locales/ru/settings.json'
-import ruPages from '@/locales/ru/pages.json'
-import ruForms from '@/locales/ru/forms.json'
-import ruDefaults from '@/locales/ru/defaults.json'
 
 export const SUPPORTED_LOCALES = ['en', 'ru'] as const
 export type AppLocale = (typeof SUPPORTED_LOCALES)[number]
@@ -57,14 +51,31 @@ function resolveDottedNamespaceKey(key: string): string {
     return key
 }
 
-void i18n
+// English is bundled (fallback language); other locales are loaded on demand.
+const localeLoaders = import.meta.glob<{ default: Record<string, unknown> }>('@/locales/*/*.json')
+
+const lazyLocaleBackend: BackendModule = {
+    type: 'backend',
+    init() {},
+    read(language, namespace, callback) {
+        const loader = localeLoaders[`/resources/ts/locales/${language}/${namespace}.json`]
+        if (!loader) {
+            callback(null, {})
+            return
+        }
+        loader().then((mod) => callback(null, mod.default), (err) => callback(err, false))
+    },
+}
+
+export const i18nReady = i18n
+    .use(lazyLocaleBackend)
     .use(LanguageDetector)
     .use(initReactI18next)
     .init({
         resources: {
             en: { common: enCommon, nav: enNav, auth: enAuth, settings: enSettings, pages: enPages, forms: enForms, defaults: enDefaults },
-            ru: { common: ruCommon, nav: ruNav, auth: ruAuth, settings: ruSettings, pages: ruPages, forms: ruForms, defaults: ruDefaults },
         },
+        partialBundledLanguages: true,
         fallbackLng: 'en',
         supportedLngs: [...SUPPORTED_LOCALES],
         nonExplicitSupportedLngs: true,

@@ -22,6 +22,7 @@ export default defineConfig(({ mode }) => {
             outDir: 'public/build',
             emptyOutDir: true,
             manifest: true,
+            chunkSizeWarningLimit: 800,
             rollupOptions: {
                 input: path.resolve(__dirname, 'resources/ts/main.tsx'),
                 output: {

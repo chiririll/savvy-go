@@ -38,7 +38,7 @@ import { TransactionRow, useCreateTransactionDialog } from '@/components/feature
 import { localizeDefaultName } from '@/lib/localized-name'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import ReactECharts from 'echarts-for-react'
+import ReactECharts from '@/components/shared/ReactECharts'
 import { useTheme } from '@/hooks/use-theme'
 import { Link } from 'react-router-dom'
 import { AccountType } from '@/types'
