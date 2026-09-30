@@ -55,10 +55,10 @@ const previewResultFromSnakeCase = (data: Record<string, unknown>): ImportPrevie
         amount: t.amount as number,
         description: t.description as string | null,
         category: t.category as string | null,
-        tags: t.tags as string[],
+        tags: (t.tags as string[] | undefined) ?? [],
         status: t.status as 'new' | 'duplicate' | 'error',
         duplicateOf: t.duplicate_of as number | null,
-        warnings: t.warnings as string[],
+        warnings: (t.warnings as string[] | undefined) ?? [],
         error: t.error as string | null,
     })),
     summary: {
@@ -67,9 +67,9 @@ const previewResultFromSnakeCase = (data: Record<string, unknown>): ImportPrevie
         hasErrors: (data.summary as Record<string, unknown>).has_errors as number,
         totalRows: ((data.summary as Record<string, unknown>).total_rows as number | null) ?? null,
         sampled: ((data.summary as Record<string, unknown>).sampled as number) ?? 0,
-        currenciesToCreate: (data.summary as Record<string, unknown>).currencies_to_create as string[],
-        tagsToCreate: (data.summary as Record<string, unknown>).tags_to_create as string[],
-        categoriesToCreate: (data.summary as Record<string, unknown>).categories_to_create as string[],
+        currenciesToCreate: ((data.summary as Record<string, unknown>).currencies_to_create as string[] | undefined) ?? [],
+        tagsToCreate: ((data.summary as Record<string, unknown>).tags_to_create as string[] | undefined) ?? [],
+        categoriesToCreate: ((data.summary as Record<string, unknown>).categories_to_create as string[] | undefined) ?? [],
     },
 })
 

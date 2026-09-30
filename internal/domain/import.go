@@ -239,6 +239,7 @@ func (s Imports) Preview(ctx context.Context, im *Import, mapping, options map[s
 			preview = append(preview, map[string]any{
 				"row": i + 1, "date": res.date, "type": res.typ, "amount": res.amount,
 				"description": res.desc, "status": status, "error": nilOr(res.err),
+				"category": nil, "tags": []string{}, "duplicate_of": nil, "warnings": []string{},
 			})
 		}
 	}
