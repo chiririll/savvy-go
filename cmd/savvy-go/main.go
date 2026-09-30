@@ -14,7 +14,6 @@ import (
 	"savvy-go/internal/domain"
 	"savvy-go/internal/httpserver"
 	"savvy-go/internal/jobs"
-	"savvy-go/internal/legacy"
 	"savvy-go/internal/migrate"
 	"savvy-go/internal/schedule"
 	"savvy-go/internal/seed"
@@ -41,21 +40,18 @@ func main() {
 	defer sqlDB.Close()
 
 	ctx := context.Background()
-	if err := legacy.EnsureColumns(ctx, sqlDB); err != nil {
-		slog.Error("legacy columns", "err", err)
-		os.Exit(1)
-	}
 	if err := migrate.Up(ctx, sqlDB); err != nil {
 		slog.Error("migrate", "err", err)
-		os.Exit(1)
-	}
-	if err := legacy.UpgradeInPlace(ctx, sqlDB, cfg.AppKey); err != nil {
-		slog.Error("legacy import", "err", err)
 		os.Exit(1)
 	}
 	if err := seed.Demo(ctx, sqlDB, cfg.SeedDemo, cfg.Location); err != nil {
 		slog.Error("seed demo", "err", err)
 		os.Exit(1)
+	}
+
+	backups := domain.Backups{DB: sqlDB, Dir: cfg.BackupsDir, Database: cfg.Database}
+	if _, err := backups.Sync(ctx); err != nil {
+		slog.Warn("backups sync", "err", err)
 	}
 
 	queue := jobs.New(2)

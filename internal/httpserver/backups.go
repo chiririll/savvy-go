@@ -3,6 +3,7 @@ package httpserver
 import (
 	"encoding/json"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"strconv"
@@ -129,6 +130,10 @@ func (s *Server) backupsRestore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.reconnect(newDB)
+	// The restored DB carries the backups table from backup time; re-align it with the files on disk.
+	if _, err := s.backups.Sync(r.Context()); err != nil {
+		slog.Warn("backups sync after restore", "err", err)
+	}
 	writeJSON(w, http.StatusOK, map[string]string{"message": "Backup restored."})
 }
 

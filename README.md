@@ -272,7 +272,7 @@ Your data stays with you. SQLite database stored in `/data` volume — no extern
 
 ## ⚙️ How It Works
 
-One container runs a single Go process — HTTP API, Vite SPA, scheduler, and in-process workers. SQLite lives in `/data`; no PHP, nginx, or queue sqlite files are required. Migrations and Laravel-era imports run automatically on startup.
+One container runs a single Go process — HTTP API, Vite SPA, scheduler, and in-process workers. SQLite lives in `/data`; no PHP, nginx, or queue sqlite files are required. Schema migrations run automatically on startup; Laravel-era databases are imported only by restoring them as a backup.
 
 The Debian package ships the same binary: a systemd unit and SQLite in `/var/lib/savvy`.
 
