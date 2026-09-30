@@ -1,8 +1,11 @@
 package httpserver
 
 import (
+	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
+	"time"
 )
 
 func (s *Server) settingsIndex(w http.ResponseWriter, r *http.Request) {
@@ -41,6 +44,15 @@ func (s *Server) settingsUpdate(w http.ResponseWriter, r *http.Request) {
 			writeMessage(w, http.StatusInternalServerError, err.Error())
 			return
 		}
+	}
+	if v, ok := body["auto_update_currencies"]; ok && asBool(v) {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+			defer cancel()
+			if _, _, err := s.currencies.UpdateRates(ctx); err != nil {
+				slog.Warn("refresh currency rates", "err", err)
+			}
+		}()
 	}
 	all, err := s.settings.All(r.Context())
 	if err != nil {

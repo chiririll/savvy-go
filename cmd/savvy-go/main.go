@@ -17,6 +17,7 @@ import (
 	"savvy-go/internal/migrate"
 	"savvy-go/internal/schedule"
 	"savvy-go/internal/seed"
+	"savvy-go/internal/settings"
 	"savvy-go/internal/version"
 )
 
@@ -54,7 +55,19 @@ func main() {
 	defer schedCancel()
 	recurring := domain.RecurringStore{DB: sqlDB, Txs: domain.Transactions{DB: sqlDB}}
 	uploads := domain.Uploads{DB: sqlDB, Root: cfg.UploadsDir, AppURL: cfg.AppURL, SignSecret: cfg.AppURL + "|upload"}
+	currencies := domain.Currencies{DB: sqlDB}
+	appSettings := settings.Store{DB: sqlDB}
 	schedule.New(
+		schedule.Job{Name: "currencies:update", Interval: 24 * time.Hour, Run: func(ctx context.Context) error {
+			if !appSettings.Bool(ctx, "auto_update_currencies", true) {
+				return nil
+			}
+			updated, skipped, err := currencies.UpdateRates(ctx)
+			if err == nil {
+				slog.Info("currency rates updated", "updated", updated, "skipped", skipped)
+			}
+			return err
+		}},
 		schedule.Job{Name: "recurring:ensure-upcoming", Interval: time.Hour, Run: recurring.EnsureUpcoming},
 		schedule.Job{Name: "uploads:prune", Interval: time.Hour, Run: uploads.PruneExpired},
 	).Start(schedCtx)

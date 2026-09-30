@@ -22,7 +22,6 @@ type Currency struct {
 	Rate     float64
 }
 
-
 func (c Currency) ConvertToBase(amount float64) float64 {
 	if c.IsBase {
 		return amount
@@ -179,11 +178,11 @@ func (s Currencies) FindOrCreateByCode(ctx context.Context, code string) (*Curre
 	if c, err := s.ByCode(ctx, code); err != nil || c != nil {
 		return c, err
 	}
-	item := catalogItem(code)
+	n, _ := db.Q(s.DB).CountCurrencies(ctx)
+	item := catalogItem(ctx, s.baseCode(ctx), code)
 	if item == nil {
 		return nil, fmt.Errorf("unknown code")
 	}
-	n, _ := db.Q(s.DB).CountCurrencies(ctx)
 	item.IsBase = n == 0
 	if item.IsBase {
 		item.Rate = 1
@@ -198,8 +197,8 @@ func (s Currencies) Catalog(ctx context.Context) []map[string]any {
 			existing[strings.ToUpper(code)] = true
 		}
 	}
-	var out []map[string]any
-	for _, item := range builtinCatalog {
+	out := []map[string]any{}
+	for _, item := range loadCatalog(ctx, s.baseCode(ctx)) {
 		if existing[item.Code] {
 			continue
 		}
@@ -209,6 +208,13 @@ func (s Currencies) Catalog(ctx context.Context) []map[string]any {
 		})
 	}
 	return out
+}
+
+func (s Currencies) baseCode(ctx context.Context) string {
+	if b, err := s.Base(ctx); err == nil && b != nil {
+		return b.Code
+	}
+	return "usd"
 }
 
 func currencyFrom(id int64, code, name, symbol string, decimals, isBase int64, rate float64) Currency {
@@ -238,24 +244,37 @@ func roundTo(v float64, decimals int) float64 {
 	return math.Round(v*p) / p
 }
 
-var builtinCatalog = []Currency{
-	{Code: "USD", Name: "US Dollar", Symbol: "$", Decimals: 2, Rate: 1},
-	{Code: "EUR", Name: "Euro", Symbol: "€", Decimals: 2, Rate: 0.92},
-	{Code: "GBP", Name: "British Pound", Symbol: "£", Decimals: 2, Rate: 0.79},
-	{Code: "UAH", Name: "Ukrainian Hryvnia", Symbol: "₴", Decimals: 2, Rate: 41},
-	{Code: "PLN", Name: "Polish Zloty", Symbol: "zł", Decimals: 2, Rate: 4},
-	{Code: "JPY", Name: "Japanese Yen", Symbol: "¥", Decimals: 0, Rate: 150},
-	{Code: "CHF", Name: "Swiss Franc", Symbol: "CHF", Decimals: 2, Rate: 0.88},
-	{Code: "BTC", Name: "Bitcoin", Symbol: "₿", Decimals: 8, Rate: 0.000015},
-}
-
-func catalogItem(code string) *Currency {
-	code = strings.ToUpper(code)
-	for _, c := range builtinCatalog {
-		if c.Code == code {
-			cp := c
-			return &cp
-		}
+// UpdateRates pulls fresh rates for every non-base currency from the exchange
+// API. Currencies the API does not know are left untouched.
+func (s Currencies) UpdateRates(ctx context.Context) (updated, skipped int, err error) {
+	base, err := s.Base(ctx)
+	if err != nil {
+		return 0, 0, err
 	}
-	return nil
+	if base == nil {
+		return 0, 0, fmt.Errorf("no base currency")
+	}
+	all, err := s.All(ctx)
+	if err != nil {
+		return 0, 0, err
+	}
+	rates := refreshedRates(ctx, base.Code, all)
+	if rates == nil {
+		return 0, 0, fmt.Errorf("currency rates unavailable")
+	}
+	for _, c := range all {
+		if c.ID == base.ID {
+			continue
+		}
+		rate := rates[strings.ToLower(c.Code)]
+		if rate <= 0 {
+			skipped++
+			continue
+		}
+		if err := db.Q(s.DB).UpdateCurrencyRate(ctx, sqlc.UpdateCurrencyRateParams{Rate: rate, ID: c.ID}); err != nil {
+			return updated, skipped, err
+		}
+		updated++
+	}
+	return updated, skipped, nil
 }
