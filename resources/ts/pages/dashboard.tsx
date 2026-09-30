@@ -175,7 +175,7 @@ export default function DashboardPage() {
     const { data: budgets } = useBudgets()
     const { data: debtsData } = useDebtsWithSummary()
     const { data: overviewData } = useOverviewMetrics(reportFilters)
-    const { data: balanceComparison } = useBalanceComparison()
+    const { data: balanceComparison } = useBalanceComparison(periodDates)
     const activeBudgets = useMemo(() => {
         return budgets?.filter(b => b.isActive).slice(0, 4) ?? []
     }, [budgets])

@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"encoding/json"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -284,14 +285,7 @@ func (s *Server) accountsDestroy(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) accountsBalanceHistory(w http.ResponseWriter, r *http.Request) {
 	base, _ := s.currencies.Base(r.Context())
-	start := r.URL.Query().Get("start_date")
-	end := r.URL.Query().Get("end_date")
-	if start == "" {
-		start = time.Now().In(s.cfg.Location).AddDate(0, 0, -30).Format("2006-01-02")
-	}
-	if end == "" {
-		end = time.Now().In(s.cfg.Location).Format("2006-01-02")
-	}
+	start, end := s.queryPeriod(r)
 	if base == nil {
 		writeJSON(w, http.StatusOK, map[string]any{"dates": []string{}, "series": []any{}, "currency": nil, "decimals": 2})
 		return
@@ -327,12 +321,43 @@ func (s *Server) accountsBalanceHistory(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
+// queryPeriod resolves start_date/end_date from the query, falling back to the
+// shared default report period when either is missing or invalid.
+func (s *Server) queryPeriod(r *http.Request) (start, end string) {
+	q := r.URL.Query()
+	rng := domain.ReportFilter{
+		PeriodType: "custom",
+		StartDate:  q.Get("start_date"),
+		EndDate:    q.Get("end_date"),
+	}.Range(time.Now().In(s.cfg.Location))
+	return rng.Start.Format("2006-01-02"), rng.End.Format("2006-01-02")
+}
+
+// accountsBalanceComparison returns the current total balance and the total
+// balance at the end of the day before the period starts.
 func (s *Server) accountsBalanceComparison(w http.ResponseWriter, r *http.Request) {
 	base, _ := s.currencies.Base(r.Context())
 	sum := s.accounts.Summary(r.Context(), base)
+	var previous any
+	if base != nil {
+		start, _ := s.queryPeriod(r)
+		if from, err := time.Parse("2006-01-02", start); err == nil {
+			cutoff := from.AddDate(0, 0, -1).Format("2006-01-02")
+			accts, _ := s.accounts.All(r.Context(), true, true)
+			total := 0.0
+			for _, a := range accts {
+				if a.Currency == nil {
+					continue
+				}
+				bal, _ := s.accounts.BalanceAt(r.Context(), a, cutoff)
+				total += domain.Convert(bal, *a.Currency, *base)
+			}
+			previous = math.Round(total*math.Pow10(base.Decimals)) / math.Pow10(base.Decimals)
+		}
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"current":  sum["total_balance"],
-		"previous": nil,
+		"previous": previous,
 		"currency": sum["currency"],
 		"decimals": sum["decimals"],
 	})
