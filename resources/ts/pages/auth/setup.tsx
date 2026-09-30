@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -33,6 +34,7 @@ type SetupFormValues = {
 export default function SetupPage() {
     const { t } = useTranslation('auth')
     const navigate = useNavigate()
+    const queryClient = useQueryClient()
     const register = useAuthStore((state) => state.register)
     const [isLoading, setIsLoading] = useState(false)
     const [checkingStatus, setCheckingStatus] = useState(true)
@@ -73,6 +75,8 @@ export default function SetupPage() {
                 email: data.email,
                 password: data.password,
             })
+            // AuthProvider caches the status forever; drop the stale needs_registration=true.
+            await queryClient.invalidateQueries({ queryKey: ['auth', 'status'] })
             toast.success(t('setup.created'))
             navigate('/setup-2fa')
         } catch (error: unknown) {
