@@ -1,6 +1,8 @@
 import type { SVGProps } from 'react'
 
-export function Logo({ className = 'size-6' }: LogoProps) {
+// Single source of truth for the logo: `npm run logos` renders this component
+// into the favicon, PNG/ICO icons and docs images.
+export function Logo(props: SVGProps<SVGSVGElement>) {
     return (
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" {...props}>
             {/* Speed lines */}
