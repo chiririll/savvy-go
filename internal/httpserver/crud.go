@@ -87,8 +87,6 @@ func (s *Server) currenciesDestroy(w http.ResponseWriter, r *http.Request) {
 			writeMessage(w, 422, "Cannot delete currency that is used by accounts.")
 		case "base":
 			writeMessage(w, 422, "Cannot delete base currency. Set another currency as base first.")
-		case "last":
-			writeMessage(w, 422, "Cannot delete the last currency.")
 		default:
 			writeMessage(w, 422, err.Error())
 		}

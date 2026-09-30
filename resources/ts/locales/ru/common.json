@@ -23,6 +23,7 @@
         "viewLogs": "Журнал",
         "setAsBase": "Сделать базовой",
         "cannotDeleteLast": "Нельзя удалить последнюю",
+        "cannotDeleteBase": "Нельзя удалить базовую валюту",
         "cannotDeleteDefault": "Нельзя удалить по умолчанию",
         "cannotDeleteSelf": "Нельзя удалить себя",
         "clear": "Сбросить",

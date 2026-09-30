@@ -80,6 +80,9 @@ func (s Currencies) Create(ctx context.Context, c Currency) (*Currency, error) {
 	if c.Rate == 0 {
 		c.Rate = 1
 	}
+	if n, err := db.Q(s.DB).CountCurrencies(ctx); err == nil && n == 0 {
+		c.IsBase = true
+	}
 	if c.IsBase {
 		if err := db.Q(s.DB).ClearBaseCurrency(ctx); err != nil {
 			return nil, err
@@ -137,10 +140,6 @@ func (s Currencies) Delete(ctx context.Context, id int64) error {
 	}
 	if cur.IsBase {
 		return fmt.Errorf("base")
-	}
-	n, _ := db.Q(s.DB).CountCurrencies(ctx)
-	if n <= 1 {
-		return fmt.Errorf("last")
 	}
 	return db.Q(s.DB).DeleteCurrency(ctx, id)
 }

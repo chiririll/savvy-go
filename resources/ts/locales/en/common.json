@@ -23,6 +23,7 @@
         "viewLogs": "View logs",
         "setAsBase": "Set as base",
         "cannotDeleteLast": "Can't delete last",
+        "cannotDeleteBase": "Can't delete base currency",
         "cannotDeleteDefault": "Can't delete default",
         "cannotDeleteSelf": "Can't delete yourself",
         "clear": "Clear",

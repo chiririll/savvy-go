@@ -24,7 +24,6 @@ export default function CurrenciesPage() {
         create: createCurrency,
         update: updateCurrency,
     })
-    const isLast = items.length <= 1
 
     return (
         <Page title={t('currencies.title')}>
@@ -60,8 +59,8 @@ export default function CurrenciesPage() {
                             isSettingBase={setBaseCurrency.isPending}
                             autoUpdated={settings?.auto_update_currencies ?? false}
                             isReadOnly={isReadOnly}
-                            deleteDisabled={currency.isBase || isLast}
-                            deleteDisabledLabel={isLast ? t('common:actions.cannotDeleteLast') : t('common:actions.delete')}
+                            deleteDisabled={currency.isBase}
+                            deleteDisabledLabel={currency.isBase ? t('common:actions.cannotDeleteBase') : t('common:actions.delete')}
                         />
                     )}
                 </FeedList>
