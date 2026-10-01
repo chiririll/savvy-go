@@ -1,7 +1,7 @@
 import { LogOut } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { UserAvatar } from '@/components/shared/UserAvatar'
 import { Button } from '@/components/ui/button'
 import {
     DropdownMenu,
@@ -10,18 +10,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { getUserAvatarUrl, getUserInitials } from '@/lib/avatar'
 import { useAuthStore } from '@/stores/auth'
-import type { User } from '@/types/auth'
-
-function UserAvatar({ user }: { user: User }) {
-    return (
-        <Avatar className="size-8">
-            <AvatarImage src={getUserAvatarUrl(user)} />
-            <AvatarFallback>{getUserInitials(user)}</AvatarFallback>
-        </Avatar>
-    )
-}
 
 export function UserMenu() {
     const { t } = useTranslation()
@@ -40,12 +29,12 @@ export function UserMenu() {
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="rounded-full">
-                    <UserAvatar user={user} />
+                    <UserAvatar user={user} className="size-8" />
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
                 <div className="flex items-center gap-2 px-2 py-1.5">
-                    <UserAvatar user={user} />
+                    <UserAvatar user={user} className="size-8" />
                     <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium">{user.name}</p>
                         <p className="truncate text-xs text-muted-foreground">{t(`roles.${user.role}`)}</p>

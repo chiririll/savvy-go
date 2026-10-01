@@ -1,0 +1,143 @@
+package httpserver
+
+import (
+	"encoding/json"
+	"io"
+	"net/http"
+	"os"
+
+	"savvy-go/internal/domain"
+	"savvy-go/internal/httpserver/dto"
+	"savvy-go/internal/legacy"
+	"savvy-go/internal/migrate"
+
+	"github.com/go-chi/chi/v5"
+)
+
+func (s *Server) backupsIndex(w http.ResponseWriter, r *http.Request) {
+	list, err := s.backups.All(r.Context())
+	if err != nil {
+		writeMessage(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeData(w, http.StatusOK, mapSlice(list, dto.Backup))
+}
+
+func (s *Server) backupsStore(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Note *string `json:"note"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	b, err := s.backups.Create(r.Context(), body.Note)
+	if err != nil {
+		writeMessage(w, 422, err.Error())
+		return
+	}
+	writeData(w, http.StatusCreated, dto.Backup(*b))
+}
+
+func (s *Server) backupsUpload(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseMultipartForm(100 << 20); err != nil {
+		writeValidation(w, map[string][]string{"file": {"The file field is required."}})
+		return
+	}
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		writeValidation(w, map[string][]string{"file": {"The file field is required."}})
+		return
+	}
+	defer file.Close()
+	tmp, err := os.CreateTemp(s.cfg.BackupsDir, "upload-*.sqlite")
+	if err != nil {
+		writeMessage(w, 422, err.Error())
+		return
+	}
+	_, _ = io.Copy(tmp, file)
+	tmp.Close()
+	note := r.FormValue("note")
+	var notePtr *string
+	if note != "" {
+		notePtr = &note
+	}
+	// Treat uploaded file as the next backup by copying through Create after replacing db?
+	// Store the uploaded sqlite as a backup file directly.
+	b, err := s.backups.Ingest(r.Context(), tmp.Name(), notePtr)
+	if err != nil {
+		writeMessage(w, 422, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, dto.Backup(*b))
+}
+
+func (s *Server) backupsDownload(w http.ResponseWriter, r *http.Request) {
+	b := s.backupParam(w, r)
+	if b == nil {
+		return
+	}
+	path := s.backups.Path(*b)
+	w.Header().Set("Content-Type", "application/x-sqlite3")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+b.Filename+`"`)
+	http.ServeFile(w, r, path)
+}
+
+func (s *Server) backupsInspect(w http.ResponseWriter, r *http.Request) {
+	b := s.backupParam(w, r)
+	if b == nil {
+		return
+	}
+	out, err := s.backups.Inspect(r.Context(), *b)
+	if err != nil {
+		writeMessage(w, 422, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (s *Server) backupsRestore(w http.ResponseWriter, r *http.Request) {
+	b := s.backupParam(w, r)
+	if b == nil {
+		return
+	}
+	newDB, err := s.backups.Restore(r.Context(), *b)
+	if err != nil {
+		writeMessage(w, 422, err.Error())
+		return
+	}
+	if err := legacy.EnsureColumns(r.Context(), newDB); err != nil {
+		_ = newDB.Close()
+		writeMessage(w, 422, "legacy columns: "+err.Error())
+		return
+	}
+	if err := migrate.Up(r.Context(), newDB); err != nil {
+		_ = newDB.Close()
+		writeMessage(w, 422, "migrate: "+err.Error())
+		return
+	}
+	if err := legacy.UpgradeInPlace(r.Context(), newDB, s.cfg.AppKey); err != nil {
+		_ = newDB.Close()
+		writeMessage(w, 422, "legacy import: "+err.Error())
+		return
+	}
+	s.reconnect(newDB)
+	writeJSON(w, http.StatusOK, map[string]string{"message": "Backup restored."})
+}
+
+func (s *Server) backupsDestroy(w http.ResponseWriter, r *http.Request) {
+	b := s.backupParam(w, r)
+	if b == nil {
+		return
+	}
+	if err := s.backups.Delete(r.Context(), *b); err != nil {
+		writeMessage(w, 422, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) backupParam(w http.ResponseWriter, r *http.Request) *domain.Backup {
+	b, _ := s.backups.ByName(r.Context(), chi.URLParam(r, "name"))
+	if b == nil {
+		writeMessage(w, http.StatusNotFound, "Not found.")
+	}
+	return b
+}

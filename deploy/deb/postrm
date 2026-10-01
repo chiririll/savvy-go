@@ -1,24 +1,11 @@
 #!/bin/sh
 set -e
 
-reload_nginx() {
-    if command -v nginx >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
-        nginx -t >/dev/null 2>&1 && systemctl reload nginx || true
-    fi
-}
-
 case "$1" in
-    remove)
-        rm -f /etc/nginx/sites-enabled/savvy
-        reload_nginx
-        if [ -d /run/systemd/system ]; then
-            systemctl daemon-reload || true
+    remove|purge)
+        if [ "$1" = purge ]; then
+            rm -rf /etc/savvy-go /var/lib/savvy-go
         fi
-        ;;
-    purge)
-        rm -f /etc/nginx/sites-enabled/savvy
-        rm -rf /etc/savvy /var/lib/savvy
-        reload_nginx
         if [ -d /run/systemd/system ]; then
             systemctl daemon-reload || true
         fi

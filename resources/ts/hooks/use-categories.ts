@@ -51,8 +51,17 @@ export function useUpdateCategory(redirectTo?: string) {
 
 export function useDeleteCategory() {
     return useResourceMutation({
-        mutationFn: (id: string | number) => categoriesApi.delete(id),
+        mutationFn: ({ id, successorId }: { id: string | number; successorId?: number }) =>
+            categoriesApi.delete(id, successorId),
         invalidateKeys: [QUERY_KEY],
         successMessage: i18n.t('toasts.category.deleted'),
+    })
+}
+
+export function useSetDefaultCategory() {
+    return useResourceMutation({
+        mutationFn: (id: string | number) => categoriesApi.setDefault(id),
+        invalidateKeys: [QUERY_KEY],
+        successMessage: i18n.t('toasts.category.defaultUpdated'),
     })
 }

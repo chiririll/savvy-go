@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import ReactECharts from 'echarts-for-react'
+import ReactECharts from '@/components/shared/ReactECharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useBalanceHistory } from '@/hooks'
@@ -94,6 +94,7 @@ export function BalanceDynamicsChart({ startDate, endDate, className }: BalanceD
             },
             tooltip: {
                 trigger: 'axis',
+                confine: true,
                 backgroundColor: isDark ? '#1f2937' : '#ffffff',
                 borderColor: isDark ? '#374151' : '#e5e7eb',
                 textStyle: { color: isDark ? '#f3f4f6' : '#1f2937' },

@@ -1,6 +1,7 @@
-/** Parse an ISO date key (YYYY-MM-DD) without UTC timezone shift. */
+/** Parse an ISO date key (YYYY-MM-DD) without UTC timezone shift. Ignores any trailing time
+ *  component (legacy-imported rows store dates as "YYYY-MM-DD HH:MM:SS"). */
 export function parseDateKey(dateKey: string): Date {
-    const [year, month, day] = dateKey.split('-').map(Number)
+    const [year, month, day] = dateKey.slice(0, 10).split('-').map(Number)
     return new Date(year, (month || 1) - 1, day || 1)
 }
 

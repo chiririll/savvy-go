@@ -29,6 +29,7 @@ interface CategoryFormProps {
     submitLabel?: string
     formId?: string
     hideSubmit?: boolean
+    isDefault?: boolean
 }
 
 export function CategoryForm({
@@ -39,6 +40,7 @@ export function CategoryForm({
     submitLabel,
     formId,
     hideSubmit,
+    isDefault,
 }: CategoryFormProps) {
     const { t } = useTranslation(['common', 'forms'])
     const form = useForm<CategoryFormData>({
@@ -97,6 +99,8 @@ export function CategoryForm({
                                 value={field.value}
                                 onChange={field.onChange}
                                 error={form.formState.errors.type?.message}
+                                disabled={isDefault}
+                                disabledHelp={t('forms:categories.typeDefaultHelp')}
                             />
                         </FormItem>
                     )}

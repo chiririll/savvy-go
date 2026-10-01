@@ -33,12 +33,12 @@ import { Progress } from '@/components/ui/progress'
 import { useTotalBalance, useTransactions, usePendingSummary, useAccounts, useCategorySummary, useBudgets, useDebtsWithSummary, useBalanceComparison } from '@/hooks'
 import { useOverviewMetrics } from '@/hooks/use-reports'
 import { cn, formatCurrency, formatDateLocal, formatYearMonth, addDaysLocal } from '@/lib/utils'
-import { BalanceDynamicsChart } from '@/components/features/accounts'
+import { BalanceDynamicsChart } from '@/components/features/accounts/BalanceDynamicsChart'
 import { TransactionRow, useCreateTransactionDialog } from '@/components/features/transactions'
 import { localizeDefaultName } from '@/lib/localized-name'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import ReactECharts from 'echarts-for-react'
+import ReactECharts from '@/components/shared/ReactECharts'
 import { useTheme } from '@/hooks/use-theme'
 import { Link } from 'react-router-dom'
 import { AccountType } from '@/types'
@@ -175,7 +175,7 @@ export default function DashboardPage() {
     const { data: budgets } = useBudgets()
     const { data: debtsData } = useDebtsWithSummary()
     const { data: overviewData } = useOverviewMetrics(reportFilters)
-    const { data: balanceComparison } = useBalanceComparison()
+    const { data: balanceComparison } = useBalanceComparison(periodDates)
     const activeBudgets = useMemo(() => {
         return budgets?.filter(b => b.isActive).slice(0, 4) ?? []
     }, [budgets])
@@ -232,6 +232,7 @@ export default function DashboardPage() {
         return {
             tooltip: {
                 trigger: 'item',
+                confine: true,
                 backgroundColor: isDark ? '#1f2937' : '#ffffff',
                 borderColor: isDark ? '#374151' : '#e5e7eb',
                 textStyle: { color: isDark ? '#f3f4f6' : '#1f2937' },

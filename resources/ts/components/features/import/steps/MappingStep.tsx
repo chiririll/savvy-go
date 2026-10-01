@@ -122,7 +122,7 @@ export function MappingStep({ parseResult, onSubmit, isLoading }: MappingStepPro
                                     <FormLabel>{tForms('import.dateColumn')}</FormLabel>
                                     <Select
                                         onValueChange={(val) => field.onChange(Number(val))}
-                                        value={field.value?.toString()}
+                                        value={field.value?.toString() ?? ''}
                                         disabled={isLoading}
                                     >
                                         <FormControl>
@@ -151,7 +151,7 @@ export function MappingStep({ parseResult, onSubmit, isLoading }: MappingStepPro
                                     <FormLabel>{tForms('import.amountColumn')}</FormLabel>
                                     <Select
                                         onValueChange={(val) => field.onChange(Number(val))}
-                                        value={field.value?.toString()}
+                                        value={field.value?.toString() ?? ''}
                                         disabled={isLoading}
                                     >
                                         <FormControl>
@@ -184,6 +184,7 @@ export function MappingStep({ parseResult, onSubmit, isLoading }: MappingStepPro
                                     onChange={field.onChange}
                                     placeholder={tForms('import.targetAccountPlaceholder')}
                                     disabled={isLoading}
+                                    allowCreate
                                 />
                                 <FormDescription>
                                     {tForms('import.targetAccountHelp')}

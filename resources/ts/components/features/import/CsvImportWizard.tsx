@@ -19,6 +19,7 @@ import type {
     ImportOptions,
     ImportPreviewResult,
     ImportResult,
+    ImportCategoryMap,
 } from '@/types/import'
 
 const STEP_IDS: ImportStep[] = ['upload', 'mapping', 'preview', 'result']
@@ -34,6 +35,7 @@ export function CsvImportWizard() {
     const [importResult, setImportResult] = useState<ImportResult | null>(null)
     const [mapping, setMapping] = useState<ColumnMapping | null>(null)
     const [options, setOptions] = useState<ImportOptions | null>(null)
+    const [categoryMap, setCategoryMap] = useState<ImportCategoryMap>({})
     const [error, setError] = useState<string | null>(null)
 
     const upload = useMultipartUpload()
@@ -71,6 +73,10 @@ export function CsvImportWizard() {
                 options: newOptions,
             })
             setPreviewResult(result)
+            // Existing categories are linked by default, missing ones are created.
+            setCategoryMap(Object.fromEntries(
+                result.summary.categories.map((c) => [c.name, c.matchId ?? 'create'])
+            ))
             setStep('preview')
         } catch (e) {
             setError(e instanceof Error ? e.message : tCommon('toasts.import.previewFailed'))
@@ -86,14 +92,14 @@ export function CsvImportWizard() {
             const result = await importMutation.mutateAsync({
                 importId: parseResult.importId,
                 mapping,
-                options,
+                options: { ...options, categoryMap },
             })
             setImportResult(result)
             setStep('result')
         } catch (e) {
             setError(e instanceof Error ? e.message : tCommon('toasts.import.executeFailed'))
         }
-    }, [parseResult, mapping, options, importMutation, tCommon])
+    }, [parseResult, mapping, options, categoryMap, importMutation, tCommon])
 
     const handleBack = useCallback(() => {
         if (step === 'mapping') {
@@ -116,6 +122,7 @@ export function CsvImportWizard() {
         setImportResult(null)
         setMapping(null)
         setOptions(null)
+        setCategoryMap({})
         setError(null)
         upload.reset()
     }, [upload])
@@ -176,6 +183,8 @@ export function CsvImportWizard() {
                 {step === 'preview' && previewResult && (
                     <PreviewStep
                         previewResult={previewResult}
+                        categoryMap={categoryMap}
+                        onCategoryMapChange={setCategoryMap}
                         isLoading={importMutation.isPending}
                     />
                 )}

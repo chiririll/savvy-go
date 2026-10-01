@@ -55,17 +55,13 @@ export interface ProcessStats {
     memory_bytes: number
     peak_bytes: number
     limit_bytes: number | null
-}
-
-export interface QueueStats {
-    pending: number | null
-    reserved: number | null
-    failed: number | null
+    goroutines: number
+    gc_cycles: number
 }
 
 export interface RuntimeStats {
-    php_version: string
-    laravel_version: string
+    go_version: string
+    app_version: string
     environment: string
     uptime_seconds: number | null
 }
@@ -74,6 +70,5 @@ export interface ResourceSnapshot {
     cpu: CpuStats
     memory: MemoryStats
     process: ProcessStats
-    queue: QueueStats
     runtime: RuntimeStats
 }

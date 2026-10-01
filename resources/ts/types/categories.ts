@@ -7,6 +7,7 @@ export interface Category extends BaseEntity {
     type: CategoryType
     icon: string
     color: string
+    isDefault: boolean
     transactionsCount?: number
     totalAmount?: number
 }

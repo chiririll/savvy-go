@@ -47,7 +47,9 @@ export function CategoryFormDialog({
                 color: item.color,
             })}
         >
-            {({ formKey, formProps }) => <CategoryForm key={formKey} {...formProps} />}
+            {({ formKey, formProps }) => (
+                <CategoryForm key={formKey} {...formProps} isDefault={category?.isDefault} />
+            )}
         </EntityFormDialog>
     )
 }

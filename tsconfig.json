@@ -16,5 +16,5 @@
         "allowImportingTsExtensions": true,
         "noEmit": true
     },
-    "include": ["resources/ts/**/*", "vite.config.ts"]
+    "include": ["resources/ts/**/*", "vite.config.ts", "scripts/**/*"]
 }

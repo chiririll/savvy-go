@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
@@ -24,10 +24,7 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Loader2, ArrowLeft, Key, Fingerprint } from 'lucide-react'
-import {
-    browserSupportsWebAuthn,
-    browserSupportsWebAuthnAutofill,
-} from '@simplewebauthn/browser'
+import { browserSupportsWebAuthn } from '@simplewebauthn/browser'
 import { useAuthStore } from '@/stores/auth'
 import { LanguageSwitcher } from '@/components/shared'
 import { Logo } from '@/components/shared/Logo'
@@ -79,7 +76,6 @@ export default function LoginPage() {
     const [passkeyLoading, setPasskeyLoading] = useState(false)
     const [rememberMe, setRememberMe] = useState(false)
     const [passkeySupported] = useState(() => browserSupportsWebAuthn() && isPasskeyDomainSupported())
-    const autofillStarted = useRef(false)
     const loginState = (location.state as LoginLocationState | null) ?? null
     const sessionExpiredNotice = Boolean(loginState?.sessionExpired)
     const afterLoginPath = safeReturnPath(loginState?.from)
@@ -111,25 +107,6 @@ export default function LoginPage() {
             toast.error(t('ssoFailed'))
         }
     }, [searchParams, t])
-
-    useEffect(() => {
-        if (checkingStatus || twoFactorToken || autofillStarted.current || !isPasskeyDomainSupported()) return
-        autofillStarted.current = true
-
-        let cancelled = false
-        browserSupportsWebAuthnAutofill().then((supported) => {
-            if (!supported || cancelled) return
-            loginWithPasskey({ useAutofill: true })
-                .then(() => {
-                    if (!cancelled) navigate(afterLoginPath)
-                })
-                .catch(() => {})
-        })
-
-        return () => {
-            cancelled = true
-        }
-    }, [checkingStatus, twoFactorToken, loginWithPasskey, navigate, afterLoginPath])
 
     const handlePasskeyLogin = async (stepUpToken?: string) => {
         setPasskeyLoading(true)
@@ -361,7 +338,7 @@ export default function LoginPage() {
                                             <Input
                                                 type="email"
                                                 placeholder={t('emailPlaceholder')}
-                                                autoComplete="username webauthn"
+                                                autoComplete="username"
                                                 {...field}
                                             />
                                         </FormControl>

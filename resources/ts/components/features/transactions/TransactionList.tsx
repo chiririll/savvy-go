@@ -20,6 +20,7 @@ interface TransactionListProps {
     onSkip?: (id: number) => void
     onEdit?: (transaction: Transaction) => void
     isReadOnly?: boolean
+    grouped?: boolean
 }
 
 export function TransactionList({
@@ -36,9 +37,10 @@ export function TransactionList({
     onSkip,
     onEdit,
     isReadOnly,
+    grouped = true,
 }: TransactionListProps) {
     const { t, i18n } = useTranslation('pages')
-    const groups = groupByDateKey(transactions)
+    const groups = grouped ? groupByDateKey(transactions) : []
 
     if (isLoading) {
         return (
@@ -59,6 +61,26 @@ export function TransactionList({
                 createLabel={createLabel}
                 isReadOnly={isReadOnly}
             />
+        )
+    }
+
+    if (!grouped) {
+        return (
+            <div className="divide-y divide-border/60">
+                {transactions.map((transaction) => (
+                    <TransactionRow
+                        key={transaction.id}
+                        transaction={transaction}
+                        onDelete={onDelete}
+                        onDuplicate={onDuplicate}
+                        onConfirm={onConfirm}
+                        onSkip={onSkip}
+                        onEdit={onEdit}
+                        isReadOnly={isReadOnly}
+                        showDate
+                    />
+                ))}
+            </div>
         )
     }
 

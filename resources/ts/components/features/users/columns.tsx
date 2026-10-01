@@ -1,11 +1,9 @@
 import { ColumnDef } from '@tanstack/react-table'
 import { KeyRound } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
-import { RowActions } from '@/components/shared'
+import { RowActions, UserAvatar } from '@/components/shared'
 import { User } from '@/types/users'
-import { getUserAvatarUrl, getUserInitials } from '@/lib/avatar'
 import i18n from '@/lib/i18n'
 
 export const createUserColumns = (
@@ -20,10 +18,7 @@ export const createUserColumns = (
         header: () => i18n.t('pages:users.columns.user'),
         cell: ({ row }) => (
             <div className="flex items-center gap-3">
-                <Avatar className="size-10">
-                    <AvatarImage src={getUserAvatarUrl(row.original)} alt={row.original.name} />
-                    <AvatarFallback>{getUserInitials(row.original)}</AvatarFallback>
-                </Avatar>
+                <UserAvatar user={row.original} className="size-10" />
                 <div>
                     <div className="flex items-center gap-2">
                         <p className="font-medium">{row.original.name}</p>

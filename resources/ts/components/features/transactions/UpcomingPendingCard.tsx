@@ -42,7 +42,7 @@ export function UpcomingPendingCard({
         : t('pages:transactions.noDate')
 
     return (
-        <div className="grid w-72 shrink-0 grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_auto_auto] gap-x-3 gap-y-2 rounded-lg border px-3 py-2.5">
+        <div className="grid w-72 shrink-0 lg:w-fullgrid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_auto_auto] gap-x-3 gap-y-2 rounded-lg border px-3 py-2.5">
             <div className="flex min-w-0 items-center gap-1.5">
                 <Icon className={`size-3.5 shrink-0 ${className}`} />
                 <p className="font-medium text-sm truncate">

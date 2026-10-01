@@ -3,14 +3,17 @@ import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import { cn, formatCurrency } from '@/lib/utils'
 import { intlLocale } from '@/lib/i18n'
-import type { ImportPreviewResult } from '@/types/import'
+import type { ImportCategoryMap, ImportPreviewResult } from '@/types/import'
+import { CategoryMapping } from './CategoryMapping'
 
 interface PreviewStepProps {
     previewResult: ImportPreviewResult
+    categoryMap: ImportCategoryMap
+    onCategoryMapChange: (value: ImportCategoryMap) => void
     isLoading: boolean
 }
 
-export function PreviewStep({ previewResult, isLoading }: PreviewStepProps) {
+export function PreviewStep({ previewResult, categoryMap, onCategoryMapChange, isLoading }: PreviewStepProps) {
     const { t } = useTranslation('settings')
     const { t: tPages } = useTranslation('pages')
     const { previewTransactions, summary } = previewResult
@@ -18,6 +21,8 @@ export function PreviewStep({ previewResult, isLoading }: PreviewStepProps) {
     const isSampled = summary.totalRows !== null && summary.sampled < summary.totalRows
     const createEstimate = isSampled ? (summary.totalRows as number) : summary.willCreate
     const nf = (n: number) => n.toLocaleString(intlLocale())
+    // With the category mapping panel, new categories are managed there instead.
+    const newCategories = summary.categories.length > 0 ? [] : summary.categoriesToCreate
 
     const statusConfig = {
         new: {
@@ -69,7 +74,14 @@ export function PreviewStep({ previewResult, isLoading }: PreviewStepProps) {
                 </p>
             )}
 
-            {(summary.categoriesToCreate.length > 0 ||
+            <CategoryMapping
+                candidates={summary.categories}
+                value={categoryMap}
+                onChange={onCategoryMapChange}
+                disabled={isLoading}
+            />
+
+            {(newCategories.length > 0 ||
                 summary.tagsToCreate.length > 0 ||
                 summary.currenciesToCreate.length > 0) && (
                 <div className="p-4 border rounded-lg bg-blue-500/10">
@@ -78,10 +90,10 @@ export function PreviewStep({ previewResult, isLoading }: PreviewStepProps) {
                         <span className="font-medium">{t('import.newEntities')}</span>
                     </div>
                     <div className="space-y-2 text-sm">
-                        {summary.categoriesToCreate.length > 0 && (
+                        {newCategories.length > 0 && (
                             <div className="flex flex-wrap gap-1">
                                 <span className="text-muted-foreground">{t('import.categories')}</span>
-                                {summary.categoriesToCreate.map((cat) => (
+                                {newCategories.map((cat) => (
                                     <Badge key={cat} variant="outline">{cat}</Badge>
                                 ))}
                             </div>

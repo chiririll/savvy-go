@@ -17,7 +17,7 @@ http:
     status: 200
     timeout: 10000
     body:
-      - 'Savvy'
+      - 'Go Savvy'
       - '/build/assets/'
 
   '{{.Vars.base}}/api/auth/status':

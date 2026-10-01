@@ -12,6 +12,8 @@ import {
 import { useTranslation } from 'react-i18next'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { FeedRow, FeedStatusBadge, RowActions } from '@/components/shared'
+import { formatTransactionGroupHeading } from '@/lib/dates'
+import { intlLocale } from '@/lib/i18n'
 import { cn, formatCurrency } from '@/lib/utils'
 import { displayTransactionDescription, transactionAmountAppearance, transactionSubtitle } from '@/lib/transaction-description'
 import { Transaction } from '@/types'
@@ -47,6 +49,7 @@ interface TransactionRowProps {
     onEdit?: (transaction: Transaction) => void
     isReadOnly?: boolean
     showActions?: boolean
+    showDate?: boolean
 }
 
 export function TransactionRow({
@@ -58,8 +61,16 @@ export function TransactionRow({
     onEdit,
     isReadOnly,
     showActions = true,
+    showDate = false,
 }: TransactionRowProps) {
-    const { t } = useTranslation(['common', 'pages'])
+    const { t, i18n } = useTranslation(['common', 'pages'])
+    const dateLabel = showDate
+        ? formatTransactionGroupHeading(transaction.date, intlLocale(i18n.language), {
+            today: t('pages:transactions.today'),
+            yesterday: t('pages:transactions.yesterday'),
+            noDate: t('pages:transactions.noDate'),
+        })
+        : null
     const [expanded, setExpanded] = useState(false)
     const itemsCount = transaction.itemsCount ?? transaction.items?.length ?? 0
     const canExpand = itemsCount > 1
@@ -102,6 +113,7 @@ export function TransactionRow({
             )}
             subtitle={(
                 <>
+                    {dateLabel && <span className="mr-1.5 font-medium">{dateLabel} ·</span>}
                     {transactionSubtitle(transaction)}
                     {canExpand && (
                         <button

@@ -7,9 +7,11 @@ interface TypeSelectorProps {
     value: CategoryType
     onChange: (value: CategoryType) => void
     error?: string
+    disabled?: boolean
+    disabledHelp?: string
 }
 
-export function TypeSelector({ value, onChange, error }: TypeSelectorProps) {
+export function TypeSelector({ value, onChange, error, disabled, disabledHelp }: TypeSelectorProps) {
     const { t } = useTranslation()
 
     return (
@@ -18,12 +20,16 @@ export function TypeSelector({ value, onChange, error }: TypeSelectorProps) {
             <SegmentedChoice
                 value={value}
                 onChange={onChange}
+                disabled={disabled}
                 options={CATEGORY_TYPE_OPTIONS.map((option) => ({
                     value: option.value,
                     label: t(`pages:categories.types.${option.value}`),
                     color: option.value === 'income' ? 'text-green-600' : 'text-red-600',
                 }))}
             />
+            {disabled && disabledHelp && (
+                <p className="text-sm text-muted-foreground">{disabledHelp}</p>
+            )}
             {error && <p className="text-sm text-destructive">{error}</p>}
         </div>
     )

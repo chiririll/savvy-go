@@ -24,7 +24,7 @@ import {
 } from '@/hooks'
 import { useReadOnly } from '@/components/providers/ReadOnlyProvider'
 import { warningsForConfirmedDuplicate } from '@/lib/negative-balance'
-import { addDaysLocal } from '@/lib/utils'
+import { addDaysLocal, cn } from '@/lib/utils'
 
 export default function TransactionsPage() {
     const { t } = useTranslation('pages')
@@ -66,7 +66,8 @@ export default function TransactionsPage() {
     }
 
     const highlight = upcomingPending?.data ?? []
-    const showHighlight = !list.params.status && highlight.length > 0
+    const showHighlightColumn = highlight.length > 0
+    const showHighlightItems = showHighlightColumn && !list.params.status
 
     return (
         <Page title={t('transactions.title')}>
@@ -77,16 +78,26 @@ export default function TransactionsPage() {
                 createLabel={t('transactions.create')}
             />
 
-            {showHighlight && (
-                <UpcomingPendingStrip
-                    transactions={highlight}
-                    isReadOnly={isReadOnly}
-                    onConfirm={setApplying}
-                    onSkip={(id) => skipTransaction.mutate(id)}
-                />
+            <div
+                className={cn(
+                    'mx-auto grid w-full max-w-[800px] gap-4',
+                    showHighlightColumn && 'lg:max-w-[1144px] lg:grid-cols-[minmax(0,800px)_320px] lg:justify-center',
+                )}
+            >
+            {showHighlightColumn && (
+                <div className="min-w-0 lg:col-start-2 lg:row-start-1">
+                    {showHighlightItems && (
+                        <UpcomingPendingStrip
+                            transactions={highlight}
+                            isReadOnly={isReadOnly}
+                            onConfirm={setApplying}
+                            onSkip={(id) => skipTransaction.mutate(id)}
+                        />
+                    )}
+                </div>
             )}
 
-            <div className="mx-auto w-full max-w-[800px]">
+            <div className="min-w-0 lg:col-start-1 lg:row-start-1">
                 <TransactionFiltersPanel
                     list={list}
                     categories={categories}
@@ -104,6 +115,7 @@ export default function TransactionsPage() {
                     <>
                         <TransactionList
                             transactions={transactions}
+                            grouped={list.params.sortBy === 'date'}
                             isLoading={isLoading}
                             emptyTitle={list.params.status === 'pending' ? t('transactions.emptyPendingTitle') : t('transactions.emptyTitle')}
                             emptyDescription={list.params.status === 'pending' ? t('transactions.emptyPendingDescription') : t('transactions.emptyDescription')}
@@ -167,6 +179,7 @@ export default function TransactionsPage() {
                         )}
                     </>
                 )}
+            </div>
             </div>
 
             {negativeBalanceDialog}

@@ -1,38 +1,17 @@
 #!/bin/sh
 set -e
 
-APP_DIR=/opt/savvy
-DATA_DIR=/var/lib/savvy
+DATA_DIR=/var/lib/savvy-go
 
 case "$1" in
     configure)
         mkdir -p "$DATA_DIR"
-        chmod +x "$APP_DIR/artisan" "$APP_DIR/scripts/bootstrap.sh"
-        chown -R www-data:www-data "$APP_DIR" "$DATA_DIR"
-
-        # Dedicated CT/VPS: take port 80. Enable the site here, not in the .deb —
-        # a packaged symlink can dangle while nginx is still being configured.
-        rm -f /etc/nginx/sites-enabled/default
-        ln -sfn /etc/nginx/sites-available/savvy /etc/nginx/sites-enabled/savvy
-
-        if [ -f /etc/savvy/install.env ]; then
-            set -a
-            # shellcheck disable=SC1091
-            . /etc/savvy/install.env
-            set +a
-        fi
-
-        runuser -u www-data -- env APP_DIR="$APP_DIR" DATA_DIR="$DATA_DIR" \
-            "$APP_DIR/scripts/bootstrap.sh"
-
-        chown -R www-data:www-data "$APP_DIR" "$DATA_DIR"
+        chown -R www-data:www-data "$DATA_DIR" /opt/savvy-go 2>/dev/null || true
 
         if [ -d /run/systemd/system ]; then
             systemctl daemon-reload
-            systemctl enable php8.4-fpm nginx savvy-queue.service savvy-scheduler.service >/dev/null
-            systemctl restart php8.4-fpm savvy-queue.service savvy-scheduler.service
-            nginx -t
-            systemctl reload nginx
+            systemctl enable savvy-go.service >/dev/null
+            systemctl restart savvy-go.service
         fi
         ;;
 esac

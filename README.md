@@ -1,41 +1,29 @@
 <p align="center">
-  <img src="docs/images/logo-dark.svg#gh-light-mode-only" alt="Savvy" width="120">
-  <img src="docs/images/logo-light.svg#gh-dark-mode-only" alt="Savvy" width="120">
+  <img src="docs/images/logo-dark.svg#gh-light-mode-only" alt="Go Savvy" width="120">
+  <img src="docs/images/logo-light.svg#gh-dark-mode-only" alt="Go Savvy" width="120">
 </p>
 
-<h1 align="center">Savvy</h1>
+<h1 align="center">Go Savvy</h1>
 
 <p align="center">
-  Selfhosted expense tracker with full multi-currency support. One container — done.
+  Selfhosted expense tracker with full multi-currency support. Re-written in go.
 </p>
 
 <p align="center">
-<a href="https://hub.docker.com/r/truenormis/savvy"><img src="https://img.shields.io/badge/DOCKER-truenormis/savvy-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker"></a>
-<img src="https://img.shields.io/github/v/tag/truenormis/savvy?style=for-the-badge&color=orange" alt="Version">
+<a href="https://hub.docker.com/r/chiririll/savvy-go"><img src="https://img.shields.io/badge/DOCKER-chiririll/savvy-go-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker"></a>
+<img src="https://img.shields.io/github/v/tag/chiririll/savvy-go?style=for-the-badge&color=orange" alt="Version">
 <img src="https://img.shields.io/badge/LICENSE-MIT-green?style=for-the-badge" alt="License">
 </p>
-
-<div align="center">
-
-### 🎮 Try it now!
-
-<a href="https://demo.savvy.whiteforge.ai">
-  <img src="https://img.shields.io/badge/🚀_LIVE_DEMO-demo.savvy.whiteforge.ai-blueviolet?style=for-the-badge" alt="Demo">
-</a>
-
-🔐 `demo@demo.com` / `demo`
-
-</div>
 
 ---
 
 <p align="center">
-  <img src="docs/images/screenshot.png" alt="Savvy Screenshot" width="1920">
+  <img src="docs/images/screenshot.png" alt="Go Savvy Screenshot" width="1920">
 </p>
 
 ## ⚡ Quick Start
 ```bash
-docker run -d -p 3000:80 -v savvy-data:/data truenormis/savvy:latest
+docker run -d -p 3000:80 -v savvy-data:/data chiririll/savvy-go:latest
 ```
 
 Open `localhost:3000` and create your account.
@@ -56,7 +44,7 @@ Open `localhost:3000` and create your account.
 - **2FA** — two-factor authentication via TOTP (Google Authenticator, etc.)
 
 <p align="center">
-  <img src="docs/images/report.png" alt="Savvy Reports" width="1920">
+  <img src="docs/images/report.png" alt="Go Savvy Reports" width="1920">
 </p>
 
 ## 📱 Mobile-Friendly
@@ -74,7 +62,7 @@ Fully responsive design built with ShadCN/UI — track expenses from your phone 
 ```yaml
 services:
   savvy:
-    image: truenormis/savvy:latest
+    image: chiririll/savvy-go:latest
     container_name: savvy
     restart: unless-stopped
     ports:
@@ -97,10 +85,11 @@ volumes:
 
 ### Environment Variables
 
-| Variable  | Description                 | Default            |
-|-----------|-----------------------------|--------------------|
-| `APP_URL` | Public URL of your instance | `http://localhost` |
-| `TZ`      | Timezone                    | `UTC`              |
+| Variable    | Description                                                                 | Default            |
+|-------------|-----------------------------------------------------------------------------|--------------------|
+| `APP_URL`   | Public URL of your instance                                                 | `http://localhost` |
+| `TZ`        | Timezone                                                                    | `UTC`              |
+| `SEED_DEMO` | First boot only: seed demo users, accounts, and ~12 months of transactions | `false`            |
 
 ### Behind a Reverse Proxy
 
@@ -121,7 +110,7 @@ Two probe endpoints are exposed for orchestrators and uptime monitoring (respons
 ```yaml
 services:
   savvy:
-    image: truenormis/savvy:latest
+    image: chiririll/savvy-go:latest
     container_name: savvy
     restart: unless-stopped
     volumes:
@@ -152,7 +141,7 @@ networks:
 ```yaml
 services:
   savvy:
-    image: truenormis/savvy:latest
+    image: chiririll/savvy-go:latest
     container_name: savvy
     restart: unless-stopped
     expose:
@@ -191,30 +180,27 @@ Deploy as a single-replica `Deployment` with a `PersistentVolumeClaim` mounted a
           periodSeconds: 10
 ```
 
-### Helm
-
-A production-grade chart is published to the ChartMuseum repository at
-`https://charts.trysavvy.dev`:
-
-```bash
-helm repo add savvy https://charts.trysavvy.dev
-helm repo update
-helm install savvy savvy/savvy -n savvy --create-namespace
-```
-
-See [`deploy/helm/savvy/README.md`](deploy/helm/savvy/README.md) for values and
-design notes.
-
 ### Debian package
 
-On Debian 13 (Trixie) or another release with PHP 8.4, install the `.deb` from the GitHub release:
+On Debian 13 (Trixie) or later, install the `.deb` from the GitHub release:
 
 ```bash
-curl -fsSLO https://github.com/truenormis/savvy/releases/latest/download/savvy.deb
-sudo apt install ./savvy.deb
+curl -fsSLO https://github.com/chiririll/savvy-go/releases/latest/download/savvy-go.deb
+sudo apt install ./savvy-go.deb
 ```
 
-Data lives in `/var/lib/savvy`. Optional settings (`APP_URL`, `TZ`) go in `/etc/savvy/install.env`. `apt purge savvy` removes the data directory.
+The binary is installed to `/usr/bin/savvy-go` and runs as the `savvy-go` systemd service. Data lives in `/var/lib/savvy-go`. Optional settings (`APP_URL`, `TZ`) go in `/etc/savvy-go/install.env`. `apt purge savvy-go` removes the data directory.
+
+### Tarball
+
+Release `savvy-go.tar.gz` contains the `savvy-go` binary and the static SPA assets (`public/`). On any Linux host:
+
+```bash
+mkdir -p /opt/savvy-go && tar -C /opt/savvy-go -xzf savvy-go.tar.gz
+DATA_DIR=/var/lib/savvy-go PUBLIC_DIR=/opt/savvy-go/public LISTEN_ADDR=:8080 APP_URL=https://savvy.example.com /opt/savvy-go/savvy-go
+```
+
+Point a reverse proxy at `:8080`.
 
 ## 🔄 Updating
 ```bash
@@ -224,7 +210,7 @@ docker compose up -d
 
 Your data is safe in the `/data` volume.
 
-Debian: install the newer `.deb`. Data stays in `/var/lib/savvy`.
+Debian: install the newer `.deb`. Data stays in `/var/lib/savvy-go`.
 
 ## 💾 Backups
 
@@ -233,16 +219,15 @@ Backups can be managed directly from the UI (Settings → Backups).
 > [!WARNING]
 > The database runs in **WAL mode**, so recent writes may still live in the `database.sqlite-wal` file and **won't be in `database.sqlite` yet**. Copying `database.sqlite` alone can silently lose the latest data. Always checkpoint the WAL into the main file first (or use the in-app backup, which handles this for you).
 
-Manual backup:
+Manual backup (stop the container first so the WAL is flushed):
 ```bash
-# Fold the WAL into the main file, then copy
-docker exec savvy php artisan tinker --execute="DB::statement('PRAGMA wal_checkpoint(TRUNCATE);');"
+docker compose down
 docker cp savvy:/data/database.sqlite ./backup-$(date +%Y%m%d).sqlite
 ```
 
 Debian package:
 ```bash
-sqlite3 /var/lib/savvy/database.sqlite ".backup savvy-$(date +%Y%m%d).sqlite"
+sqlite3 /var/lib/savvy-go/database.sqlite ".backup savvy-go-$(date +%Y%m%d).sqlite"
 ```
 
 Restore (stop writers first so the WAL doesn't fight the swap):
@@ -258,13 +243,23 @@ Your data stays with you. SQLite database stored in `/data` volume — no extern
 
 ## ⚙️ How It Works
 
-One container runs everything under Supervisor — Nginx, PHP-FPM, the scheduler (recurring transactions, automatic exchange-rate updates) and a queue worker for background jobs. SQLite lives in `/data`; no external database, cache, or queue service is required. Migrations run automatically on startup.
+One Go process serves the HTTP API, the React SPA, the scheduler and background workers. SQLite lives in `/data`. Schema migrations run automatically on startup.
 
-The Debian package runs the same app without Docker: nginx and php-fpm from the distro, queue and scheduler as systemd units, SQLite in `/var/lib/savvy`.
+The Debian package ships the same binary with a systemd unit and SQLite in `/var/lib/savvy-go`.
 
 ## 🛠 Stack
 
-Laravel • SQLite • Docker • ShadCN/UI • Tailwind CSS
+Go • SQLite • React (Vite) • Docker • ShadCN/UI • Tailwind CSS
+
+### Local backend (Go)
+
+```bash
+go generate ./internal/db   # sqlc: internal/db/queries → internal/db/sqlc
+go test ./...
+go run ./cmd/savvy-go
+```
+
+Listens on `:8080` by default (`LISTEN_ADDR`). SQLite and uploads go under `DATA_DIR` (`./data` locally, `/data` or `/var/lib/savvy-go` in deploy). The SPA is served from `public/` (Vite output in `public/build`). Env: `APP_URL`, `TZ`, `DATA_DIR`, `LISTEN_ADDR`, `SEED_DEMO`.
 
 ## 🤝 Contributing
 

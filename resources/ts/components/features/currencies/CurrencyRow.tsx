@@ -1,4 +1,4 @@
-import { Star } from 'lucide-react'
+import { RefreshCw, Star } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { FeedRow, FeedStatusBadge, RowActions } from '@/components/shared'
@@ -61,6 +61,7 @@ interface CurrencyRowProps {
     onSetBase?: (id: number) => void
     isSettingBase?: boolean
     isReadOnly?: boolean
+    autoUpdated?: boolean
     deleteDisabled?: boolean
     deleteDisabledLabel?: string
 }
@@ -72,6 +73,7 @@ export function CurrencyRow({
     onSetBase,
     isSettingBase,
     isReadOnly,
+    autoUpdated,
     deleteDisabled,
     deleteDisabledLabel,
 }: CurrencyRowProps) {
@@ -92,7 +94,19 @@ export function CurrencyRow({
                     aria-label={t('pages:currencies.columns.base')}
                 />
             ) : undefined}
-            meta={<FeedStatusBadge variant="secondary">{currency.code}</FeedStatusBadge>}
+            meta={(
+                <>
+                    <FeedStatusBadge variant="secondary">{currency.code}</FeedStatusBadge>
+                    {autoUpdated && !currency.isBase && (
+                        <span title={t('pages:currencies.autoUpdated')} className="inline-flex">
+                            <FeedStatusBadge variant="outline">
+                                <RefreshCw className="mr-1 size-3" />
+                                {t('pages:currencies.autoShort')}
+                            </FeedStatusBadge>
+                        </span>
+                    )}
+                </>
+            )}
             amount={rate.toFixed(6)}
             amountClassName={currency.isBase ? 'text-muted-foreground' : undefined}
             onOpen={canEdit ? () => onEdit(currency) : undefined}

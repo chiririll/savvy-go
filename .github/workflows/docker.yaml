@@ -1,10 +1,9 @@
-# Image publish is paused
 name: Build and Push to Docker Hub
 
 on:
-  # push:
-  #   branches: [main]
-  #   tags: ['v*']
+  push:
+    branches: [main]
+    tags: ['v*']
   workflow_dispatch:
 
 jobs:
@@ -26,7 +25,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: truenormis/savvy
+          images: chiririll/savvy-go
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=semver,pattern={{version}}
