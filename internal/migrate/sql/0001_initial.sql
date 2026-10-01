@@ -100,6 +100,20 @@ CREATE TABLE IF NOT EXISTS webauthn_challenges (
 CREATE INDEX IF NOT EXISTS webauthn_challenges_user_idx ON webauthn_challenges (user_id);
 CREATE INDEX IF NOT EXISTS webauthn_challenges_expires_idx ON webauthn_challenges (expires_at);
 
+CREATE TABLE IF NOT EXISTS api_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE,
+    prefix TEXT NOT NULL,
+    scope TEXT NOT NULL DEFAULT 'read' CHECK (scope IN ('read', 'read-write')),
+    expires_at TEXT,
+    last_used_at TEXT,
+    created_at TEXT,
+    updated_at TEXT
+) STRICT;
+CREATE INDEX IF NOT EXISTS api_tokens_user_idx ON api_tokens (user_id);
+
 CREATE TABLE IF NOT EXISTS currencies (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     code TEXT NOT NULL UNIQUE COLLATE NOCASE,
