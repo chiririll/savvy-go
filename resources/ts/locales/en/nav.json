@@ -11,6 +11,7 @@
     "system": "System",
     "monitoring": "Monitoring",
     "security": "Security",
+    "api": "API",
     "ssoProviders": "SSO Providers",
     "import": "Import",
     "backups": "Backups",
