@@ -381,3 +381,17 @@ func WebAuthnCred(c auth.WebAuthnCred) map[string]any {
 		"last_used_at": c.LastUsedAt, "created_at": c.CreatedAt,
 	}
 }
+
+func APIToken(t auth.APIToken) map[string]any {
+	return map[string]any{
+		"id": t.ID, "name": t.Name, "prefix": t.Prefix, "scope": t.Scope,
+		"expires_at": timePtr(t.ExpiresAt), "last_used_at": timePtr(t.LastUsedAt), "created_at": timePtr(t.CreatedAt),
+	}
+}
+
+func timePtr(t *time.Time) any {
+	if t == nil {
+		return nil
+	}
+	return t.UTC().Format(time.RFC3339)
+}
