@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { Home, FolderTree, Coins, CreditCard, Settings, ChevronDown, Receipt, PiggyBank, Hash, BarChart3, HandCoins, Users, Cog, Repeat, Zap, Shield, Upload, Database, LucideIcon, Github, ExternalLink, KeyRound, Activity } from 'lucide-react'
+import { Home, FolderTree, Coins, CreditCard, Settings, ChevronDown, Receipt, PiggyBank, Hash, BarChart3, HandCoins, Users, Cog, Repeat, Zap, Shield, Upload, Database, LucideIcon, Github, ExternalLink, KeyRound, Activity, Plug } from 'lucide-react'
 import { Logo } from '@/components/shared/Logo'
 import {
     Sidebar,
@@ -52,6 +52,7 @@ const settingsItems: MenuItem[] = [
     { to: '/settings/system', icon: Cog, labelKey: 'system' },
     { to: '/settings/monitoring', icon: Activity, labelKey: 'monitoring' },
     { to: '/settings/security', icon: Shield, labelKey: 'security' },
+    { to: '/settings/api', icon: Plug, labelKey: 'api' },
     { to: '/settings/providers', icon: KeyRound, labelKey: 'ssoProviders' },
     { to: '/settings/import', icon: Upload, labelKey: 'import' },
     { to: '/settings/backups', icon: Database, labelKey: 'backups' },

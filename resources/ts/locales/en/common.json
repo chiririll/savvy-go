@@ -338,6 +338,12 @@
             "passwordFailed": "Could not update the password",
             "loggedOutOthers": "Signed out of other devices",
             "logoutOthersFailed": "Could not sign out other devices"
+        },
+        "apiToken": {
+            "created": "API token created",
+            "revoked": "API token revoked",
+            "createFailed": "Failed to create API token",
+            "revokeFailed": "Failed to revoke API token"
         }
     }
 }

@@ -38,6 +38,7 @@ const ReportsPage = lazy(() => import('@/pages/reports'))
 const MonitoringPage = lazy(() => import('@/pages/settings/monitoring'))
 const SystemSettingsPage = lazy(() => import('@/pages/settings/system'))
 const SecuritySettingsPage = lazy(() => import('@/pages/settings/security'))
+const ApiSettingsPage = lazy(() => import('@/pages/settings/api'))
 const ImportSettingsPage = lazy(() => import('@/pages/settings/import'))
 const BackupsSettingsPage = lazy(() => import('@/pages/settings/backups'))
 const ProvidersPage = lazy(() => import('@/pages/settings/providers'))
@@ -106,6 +107,7 @@ export const router = createBrowserRouter([
                     { path: 'settings/system', element: withSuspense(SystemSettingsPage) },
                     { path: 'settings/monitoring', element: withSuspense(MonitoringPage) },
                     { path: 'settings/security', element: withSuspense(SecuritySettingsPage) },
+                    { path: 'settings/api', element: withSuspense(ApiSettingsPage) },
                     { path: 'settings/import', element: withSuspense(ImportSettingsPage) },
                     { path: 'settings/backups', element: withSuspense(BackupsSettingsPage) },
                     { path: 'settings/providers', element: withSuspense(ProvidersPage) },

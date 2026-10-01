@@ -338,6 +338,12 @@
             "passwordFailed": "Не удалось обновить пароль",
             "loggedOutOthers": "Вы вышли на других устройствах",
             "logoutOthersFailed": "Не удалось выйти на других устройствах"
+        },
+        "apiToken": {
+            "created": "API-токен создан",
+            "revoked": "API-токен отозван",
+            "createFailed": "Не удалось создать API-токен",
+            "revokeFailed": "Не удалось отозвать API-токен"
         }
     }
 }
