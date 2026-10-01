@@ -127,6 +127,9 @@ func (s *Server) routes() *chi.Mux {
 	r.Get("/readyz", s.readyz)
 
 	r.Route("/api", func(r chi.Router) {
+		r.Get("/docs", s.apiDocs)
+		r.Get("/openapi.yaml", s.apiSpec)
+
 		r.Get("/auth/status", s.authStatus)
 		r.Get("/auth/me", s.authMe)
 		r.Post("/auth/register", s.authRegister)
