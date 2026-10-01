@@ -126,6 +126,9 @@ func seedWorkspace(ctx context.Context, db *sql.DB, loc *time.Location) error {
 	if err := s.seedTransactionItems(); err != nil {
 		return err
 	}
+	if err := s.seedPending(accounts, expenses); err != nil {
+		return err
+	}
 	if err := s.createBudgets(usd, expenses, tags); err != nil {
 		return err
 	}
@@ -476,6 +479,43 @@ func (s *seeder) seedTransfersAndDebt(accounts map[string]*domain.Account) error
 		"Michael — partial repayment", d, &to, &amt, nil, nil)
 }
 
+// seedPending adds one overdue pending expense and several upcoming ones so the
+// pending strip on the transactions page has data. It does not use the rng, so
+// the rest of the seeded data stays unchanged.
+func (s *seeder) seedPending(accounts map[string]*domain.Account, expenses []domain.Category) error {
+	for _, p := range []struct {
+		offsetDays int
+		acct, cat  string
+		amount     float64
+		desc       string
+	}{
+		{-3, "checking", "#HEALTH", 85, "Dentist appointment — City Medical Clinic"},
+		{1, "credit", "#GIFTS", 55, "Birthday gift — Etsy"},
+		{3, "checking", "#UTILITIES", 112.40, "ConEdison — electricity bill"},
+		{5, "checking", "#TRANSPORT", 145, "Car insurance — GEICO"},
+		{9, "checking", "#SHOPPING", 64.50, "Amazon — scheduled order"},
+	} {
+		acct := accounts[p.acct]
+		if acct == nil {
+			continue
+		}
+		var catID *int64
+		if c := catByName(expenses, p.cat); c != nil {
+			catID = &c.ID
+		}
+		d := s.now.AddDate(0, 0, p.offsetDays).Format("2006-01-02")
+		desc := p.desc
+		status := "pending"
+		if _, err := s.txs.Create(s.ctx, domain.TxInput{
+			Type: "expense", AccountID: acct.ID, CategoryID: catID, Amount: p.amount,
+			Description: &desc, Date: &d, Status: &status,
+		}); err != nil {
+			return fmt.Errorf("pending %s: %w", p.desc, err)
+		}
+	}
+	return nil
+}
+
 func (s *seeder) seedTransactionItems() error {
 	if len(s.expenses) == 0 {
 		return nil
@@ -626,12 +666,14 @@ func (s *seeder) createRecurring(accounts map[string]*domain.Account, expenses, 
 		}
 	}
 	if subs := catByName(expenses, "#ENTERTAINMENT"); subs != nil {
-		day := 4
+		// Always due within the coming week so upcoming recurring is visible.
+		due := s.now.AddDate(0, 0, 2)
+		day := due.Day()
 		if _, err := s.recur.Create(s.ctx, domain.RecurringInput{
 			Type: "expense", AccountID: accounts["credit"].ID, CategoryID: &subs.ID,
 			Amount: 22.99, Description: strPtr("Netflix subscription"),
 			Frequency: "monthly", Interval: 1, DayOfMonth: &day,
-			StartDate: nextMonthOnDay(s.now, 4).Format("2006-01-02"),
+			StartDate: due.Format("2006-01-02"),
 		}); err != nil {
 			return err
 		}

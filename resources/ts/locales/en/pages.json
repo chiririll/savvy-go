@@ -143,6 +143,8 @@
             "skipped": "Skipped"
         },
         "upcomingTitle": "Due soon",
+        "soonTitle": "Due soon",
+        "overdueTitle": "Overdue",
         "skipTitle": "Skip this transaction?",
         "skipDescription": "This occurrence will be skipped. The next one will still be created on schedule.",
         "itemLabel": "transactions",
