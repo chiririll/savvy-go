@@ -278,7 +278,7 @@ export default function Setup2FAPage() {
                                     className="w-full"
                                 >
                                     <a
-                                        href="https://github.com/chiririll/savvy-plus"
+                                        href="https://github.com/chiririll/savvy-go"
                                         target="_blank"
                                         rel="noopener noreferrer"
                                     >

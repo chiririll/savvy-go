@@ -57,13 +57,13 @@ jobs:
             fi
             echo "---"
             echo
-            echo "Tarball: \`https://github.com/${REPO}/releases/latest/download/savvy.tar.gz\`"
+            echo "Tarball: \`https://github.com/${REPO}/releases/latest/download/savvy-go.tar.gz\`"
             echo
             echo "Debian:"
             echo
             echo '```bash'
-            echo "curl -fsSLO https://github.com/${REPO}/releases/latest/download/savvy.deb"
-            echo "sudo apt install ./savvy.deb"
+            echo "curl -fsSLO https://github.com/${REPO}/releases/latest/download/savvy-go.deb"
+            echo "sudo apt install ./savvy-go.deb"
             echo '```'
           } > RELEASE_NOTES.md
           echo "::group::Release notes"
@@ -120,6 +120,6 @@ jobs:
           tag_name: ${{ steps.ver.outputs.tag }}
           name: ${{ steps.ver.outputs.tag }}
           files: |
-            dist/savvy.tar.gz
+            dist/savvy-go.tar.gz
             dist/*.deb
           body_path: RELEASE_NOTES.md

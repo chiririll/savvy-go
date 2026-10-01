@@ -10,17 +10,16 @@ checkpoint_wal() {
 
 case "$1" in
     upgrade)
-        checkpoint_wal
         if [ -d /run/systemd/system ]; then
-            systemctl stop savvy-go-queue.service savvy-go-scheduler.service || true
+            systemctl stop savvy-go.service || true
         fi
+        checkpoint_wal
         ;;
     remove|deconfigure)
-        checkpoint_wal
-        rm -f /etc/nginx/sites-enabled/savvy-go
         if [ -d /run/systemd/system ]; then
-            systemctl disable --now savvy-go-queue.service savvy-go-scheduler.service || true
+            systemctl disable --now savvy-go.service || true
         fi
+        checkpoint_wal
         ;;
 esac
 

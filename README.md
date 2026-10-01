@@ -15,18 +15,6 @@
 <img src="https://img.shields.io/badge/LICENSE-MIT-green?style=for-the-badge" alt="License">
 </p>
 
-<div align="center">
-
-### 🎮 Try it now!
-
-<a href="https://demo.savvy.whiteforge.ai">
-  <img src="https://img.shields.io/badge/🚀_LIVE_DEMO-demo.savvy.whiteforge.ai-blueviolet?style=for-the-badge" alt="Demo">
-</a>
-
-🔐 `demo@demo.com` / `demo`
-
-</div>
-
 ---
 
 <p align="center">
@@ -192,41 +180,27 @@ Deploy as a single-replica `Deployment` with a `PersistentVolumeClaim` mounted a
           periodSeconds: 10
 ```
 
-### Helm
-
-A production-grade chart is published to the ChartMuseum repository at
-`https://charts.trysavvy.dev`:
-
-```bash
-helm repo add savvy https://charts.trysavvy.dev
-helm repo update
-helm install savvy savvy/savvy -n savvy --create-namespace
-```
-
-See [`deploy/helm/savvy/README.md`](deploy/helm/savvy/README.md) for values and
-design notes.
-
 ### Debian package
 
 On Debian 13 (Trixie) or later, install the `.deb` from the GitHub release:
 
 ```bash
-curl -fsSLO https://github.com/chiririll/savvy-go/releases/latest/download/savvy.deb
-sudo apt install ./savvy.deb
+curl -fsSLO https://github.com/chiririll/savvy-go/releases/latest/download/savvy-go.deb
+sudo apt install ./savvy-go.deb
 ```
 
-Data lives in `/var/lib/savvy`. Optional settings (`APP_URL`, `TZ`) go in `/etc/savvy/install.env`. `apt purge savvy` removes the data directory.
+The binary is installed to `/usr/bin/savvy-go` and runs as the `savvy-go` systemd service. Data lives in `/var/lib/savvy-go`. Optional settings (`APP_URL`, `TZ`) go in `/etc/savvy-go/install.env`. `apt purge savvy-go` removes the data directory.
 
-### LXC / tarball
+### Tarball
 
-Release `savvy.tar.gz` is the Go binary plus static SPA assets (`public/`). On an LXC guest or any Linux host:
+Release `savvy-go.tar.gz` contains the `savvy-go` binary and the static SPA assets (`public/`). On any Linux host:
 
 ```bash
-tar -C /opt/savvy -xzf savvy.tar.gz
-DATA_DIR=/var/lib/savvy PUBLIC_DIR=/opt/savvy/public LISTEN_ADDR=:8080 APP_URL=https://savvy.example.com /opt/savvy/savvy
+mkdir -p /opt/savvy-go && tar -C /opt/savvy-go -xzf savvy-go.tar.gz
+DATA_DIR=/var/lib/savvy-go PUBLIC_DIR=/opt/savvy-go/public LISTEN_ADDR=:8080 APP_URL=https://savvy.example.com /opt/savvy-go/savvy-go
 ```
 
-Point a reverse proxy at `:8080`. There is no php-fpm or nginx inside the archive.
+Point a reverse proxy at `:8080`.
 
 ## 🔄 Updating
 ```bash
@@ -236,7 +210,7 @@ docker compose up -d
 
 Your data is safe in the `/data` volume.
 
-Debian: install the newer `.deb`. Data stays in `/var/lib/savvy`.
+Debian: install the newer `.deb`. Data stays in `/var/lib/savvy-go`.
 
 ## 💾 Backups
 
@@ -245,18 +219,15 @@ Backups can be managed directly from the UI (Settings → Backups).
 > [!WARNING]
 > The database runs in **WAL mode**, so recent writes may still live in the `database.sqlite-wal` file and **won't be in `database.sqlite` yet**. Copying `database.sqlite` alone can silently lose the latest data. Always checkpoint the WAL into the main file first (or use the in-app backup, which handles this for you).
 
-Manual backup:
+Manual backup (stop the container first so the WAL is flushed):
 ```bash
-# Fold the WAL into the main file, then copy
-docker exec savvy wget -q -O /dev/null http://127.0.0.1/livez
-# Prefer Settings → Backups in the UI. A raw copy after the process is stopped:
 docker compose down
 docker cp savvy:/data/database.sqlite ./backup-$(date +%Y%m%d).sqlite
 ```
 
 Debian package:
 ```bash
-sqlite3 /var/lib/savvy/database.sqlite ".backup savvy-$(date +%Y%m%d).sqlite"
+sqlite3 /var/lib/savvy-go/database.sqlite ".backup savvy-go-$(date +%Y%m%d).sqlite"
 ```
 
 Restore (stop writers first so the WAL doesn't fight the swap):
@@ -272,9 +243,9 @@ Your data stays with you. SQLite database stored in `/data` volume — no extern
 
 ## ⚙️ How It Works
 
-One container runs a single Go process — HTTP API, Vite SPA, scheduler, and in-process workers. SQLite lives in `/data`; no PHP, nginx, or queue sqlite files are required. Schema migrations run automatically on startup; Laravel-era databases are imported only by restoring them as a backup.
+One Go process serves the HTTP API, the React SPA, the scheduler and background workers. SQLite lives in `/data`. Schema migrations run automatically on startup.
 
-The Debian package ships the same binary: a systemd unit and SQLite in `/var/lib/savvy`.
+The Debian package ships the same binary with a systemd unit and SQLite in `/var/lib/savvy-go`.
 
 ## 🛠 Stack
 
@@ -285,10 +256,10 @@ Go • SQLite • React (Vite) • Docker • ShadCN/UI • Tailwind CSS
 ```bash
 go generate ./internal/db   # sqlc: internal/db/queries → internal/db/sqlc
 go test ./...
-go run ./cmd/savvy
+go run ./cmd/savvy-go
 ```
 
-Listens on `:8080` by default (`LISTEN_ADDR`). SQLite and uploads go under `DATA_DIR` (`./data` locally, `/data` or `/var/lib/savvy` in deploy). The SPA is served from `public/` (Vite output in `public/build`). Env: `APP_URL`, `TZ`, `DATA_DIR`, `LISTEN_ADDR`, `SEED_DEMO`.
+Listens on `:8080` by default (`LISTEN_ADDR`). SQLite and uploads go under `DATA_DIR` (`./data` locally, `/data` or `/var/lib/savvy-go` in deploy). The SPA is served from `public/` (Vite output in `public/build`). Env: `APP_URL`, `TZ`, `DATA_DIR`, `LISTEN_ADDR`, `SEED_DEMO`.
 
 ## 🤝 Contributing
 
