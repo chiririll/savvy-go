@@ -237,6 +237,26 @@ docker cp ./backup.sqlite savvy:/data/database.sqlite
 docker compose up -d
 ```
 
+## 🔌 API
+
+Connect scripts and external apps with an API token.
+
+1. Open **Settings → API** and create a token (name, `read` or `read-write` access, optional expiration). The token is shown once.
+2. Send it as a bearer token:
+
+```bash
+curl -H "Authorization: Bearer svy_xxxxxxxx" https://your-savvy.example/api/accounts
+
+curl -X POST https://your-savvy.example/api/tags \
+  -H "Authorization: Bearer svy_xxxxxxxx" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "from-script"}'
+```
+
+A token acts as its owner, capped by the owner's role. `read` tokens can only make `GET` requests. Tokens cannot manage users, identity providers, passwords, 2FA, passkeys, API tokens, settings or backups. Revoke a token in the same screen to cut an app off immediately.
+
+Interactive reference (Swagger UI): `/api/docs`. Raw OpenAPI 3 spec: `/api/openapi.yaml`.
+
 ## 🔒 Privacy
 
 Your data stays with you. SQLite database stored in `/data` volume — no external services required.
