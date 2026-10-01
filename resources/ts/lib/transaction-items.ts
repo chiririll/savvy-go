@@ -43,11 +43,3 @@ export function quantityDecimalPlaces(value: number): number {
     const dot = text.indexOf('.')
     return dot === -1 ? 0 : text.length - dot - 1
 }
-
-export function priceInputStep(decimals: number): string {
-    if (decimals <= 0) {
-        return '1'
-    }
-
-    return (1 / 10 ** decimals).toFixed(decimals)
-}

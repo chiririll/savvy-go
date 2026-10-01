@@ -13,10 +13,8 @@ import {
 } from '@/components/ui/form'
 import { cn, formatCurrency } from '@/lib/utils'
 import {
-    ITEM_QTY_DECIMALS,
     currencyDecimals,
     itemContribution,
-    priceInputStep,
     sumTransactionItems,
 } from '@/lib/transaction-items'
 import type { TransactionFormValues } from '@/schemas/transactions'
@@ -97,6 +95,7 @@ export function TransactionFormItems({ form, currency }: TransactionFormItemsPro
                             form={form}
                             currency={currency}
                             decimals={decimals}
+                            quantity={Number(items?.[index]?.quantity) || 0}
                             lineTotal={itemContribution(
                                 Number(items?.[index]?.quantity) || 0,
                                 Number(items?.[index]?.price_per_unit) || 0,
@@ -160,6 +159,7 @@ function TransactionItemRow({
     form,
     currency,
     decimals,
+    quantity,
     lineTotal,
     expanded,
     onExpand,
@@ -174,6 +174,7 @@ function TransactionItemRow({
     form: UseFormReturn<TransactionFormValues>
     currency?: Currency | null
     decimals: number
+    quantity: number
     lineTotal: number
     expanded: boolean
     onExpand: () => void
@@ -275,7 +276,9 @@ function TransactionItemRow({
     }, [expandToPrice, index, onAddItem, onFocusField, onRemove, rowCount])
 
     const formattedTotal = formatCurrency(lineTotal, currency, { showSymbol: false })
-    const foldLabel = expanded ? t('actions.collapse') : t('actions.expand')
+    const formattedQuantity = Number(quantity.toFixed(2))
+    const showQuantity = !expanded && quantity > 0 && formattedQuantity !== 1
+    const foldLabel =expanded ? t('actions.collapse') : t('actions.expand')
 
     return (
         <div className="min-w-0 rounded-lg border px-2 py-1.5">
@@ -327,7 +330,10 @@ function TransactionItemRow({
                     )}
                 />
 
-                <div className="flex h-8 w-16 shrink-0 items-center justify-end font-mono text-sm text-muted-foreground tabular-nums">
+                <div className="flex h-8 min-w-16 shrink-0 items-center justify-end gap-1 font-mono text-sm text-muted-foreground tabular-nums">
+                    {showQuantity && (
+                        <span className="text-xs">×{formattedQuantity} =</span>
+                    )}
                     {formattedTotal}
                 </div>
 
@@ -353,7 +359,7 @@ function TransactionItemRow({
                 inert={!expanded}
             >
                 <div className="min-h-0 overflow-hidden">
-                    <div className="grid min-w-0 grid-cols-[minmax(0,7rem)_minmax(0,1fr)] items-start gap-3 py-1 pl-7">
+                    <div className="grid min-w-0 grid-cols-1 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)] items-start gap-3 py-1 pl-7">
                         <FormField
                             control={form.control}
                             name={`items.${index}.quantity`}
@@ -371,10 +377,9 @@ function TransactionItemRow({
                                                     quantityRef.current = element
                                                 }}
                                                 type="number"
-                                                step={priceInputStep(ITEM_QTY_DECIMALS)}
                                                 min={0}
                                                 placeholder="1"
-                                                className="h-8 min-w-0"
+                                                className="h-8 min-w-0 flex-1"
                                                 data-item-quantity
                                                 data-index={index}
                                                 value={field.value ?? ''}
@@ -412,10 +417,9 @@ function TransactionItemRow({
                                                     priceRef.current = element
                                                 }}
                                                 type="number"
-                                                step={priceInputStep(decimals)}
                                                 min={0}
                                                 placeholder={decimals <= 0 ? '0' : (0).toFixed(decimals)}
-                                                className="h-8 min-w-0"
+                                                className="h-8 min-w-0 flex-1"
                                                 data-item-price_per_unit
                                                 data-index={index}
                                                 value={field.value ?? ''}
