@@ -1,5 +1,8 @@
+ARG APP_VERSION=v0.0.0
+ARG APP_ENV=production
+
+# Build the frontend
 FROM node:24-alpine AS frontend
-ARG APP_VERSION=dev
 ENV APP_VERSION=${APP_VERSION}
 WORKDIR /app
 COPY package.json package-lock.json ./
@@ -8,54 +11,33 @@ COPY resources ./resources
 COPY vite.config.ts ./
 RUN npm run build
 
-FROM composer:2.8 AS backend
-WORKDIR /app
-COPY composer.json composer.lock ./
-RUN composer install --no-dev --no-scripts --no-autoloader
-COPY . .
-RUN composer dump-autoload --optimize
+# Build the backend
+FROM golang:1.26-alpine AS gobuild
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY cmd ./cmd
+COPY internal ./internal
+RUN CGO_ENABLED=0 go build -trimpath \
+    -ldflags="-s -w -X savvy-go/internal/version.Value=${APP_VERSION:-dev} -X savvy-go/internal/version.Env=${APP_ENV:-local}" \
+    -o /out/savvy-go ./cmd/savvy-go
 
-FROM php:8.4-fpm-alpine
-ARG APP_VERSION=dev
-ENV APP_VERSION=${APP_VERSION}
-
-# hadolint ignore=DL3018
+# Build the final image
+FROM alpine:3.22
+ENV DATA_DIR=/data \
+    PUBLIC_DIR=/public \
+    LISTEN_ADDR=:80
 RUN apk upgrade --no-cache \
-    && apk add --no-cache nginx supervisor sqlite \
-    && apk add --no-cache --virtual .build-deps sqlite-dev libcap \
-    && docker-php-ext-install pdo pdo_sqlite bcmath \
-    && setcap 'cap_net_bind_service=+ep' /usr/sbin/nginx \
-    && apk del .build-deps \
-    && rm -rf /var/cache/apk/* /tmp/*
-
-WORKDIR /var/www/html
-
-RUN chown www-data:www-data /var/www/html \
-    && chown -R www-data:www-data /var/lib/nginx /var/log/nginx \
-    && mkdir -p /data && chown www-data:www-data /data
-
-COPY --chown=www-data:www-data --from=backend /app/vendor ./vendor
-COPY --chown=www-data:www-data --from=backend /app/public ./public
-COPY --chown=www-data:www-data --from=backend /app/bootstrap ./bootstrap
-COPY --chown=www-data:www-data --from=backend /app/config ./config
-COPY --chown=www-data:www-data --from=backend /app/routes ./routes
-COPY --chown=www-data:www-data --from=backend /app/storage ./storage
-COPY --chown=www-data:www-data --from=backend /app/resources ./resources
-COPY --chown=www-data:www-data --from=backend /app/app ./app
-COPY --chown=www-data:www-data --from=backend /app/artisan ./artisan
-COPY --chown=www-data:www-data --from=backend /app/database ./database
-COPY --chown=www-data:www-data --from=backend /app/composer.json ./composer.json
-COPY --chown=www-data:www-data --from=backend /app/deploy/common/bootstrap.sh ./scripts/bootstrap.sh
-
-COPY --chown=www-data:www-data --from=frontend /app/public/build ./public/build
-
-COPY deploy/docker/nginx-main.conf /etc/nginx/nginx.conf
-COPY deploy/docker/nginx.conf /etc/nginx/http.d/default.conf
-COPY deploy/docker/supervisord.conf /etc/supervisord.conf
-COPY deploy/docker/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh /var/www/html/scripts/bootstrap.sh
-
+    && apk add --no-cache ca-certificates tzdata libcap wget \
+    && adduser -u 82 -S -G www-data -H -D www-data \
+    && mkdir -p /data /public \
+    && chown www-data:www-data /data
+COPY --from=gobuild /out/savvy-go /usr/local/bin/savvy-go
+COPY public /public
+COPY --from=frontend /app/public/build /public/build
+RUN setcap 'cap_net_bind_service=+ep' /usr/local/bin/savvy-go \
+    && chown -R www-data:www-data /public
 VOLUME /data
 EXPOSE 80
 USER www-data
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/usr/local/bin/savvy-go"]

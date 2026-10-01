@@ -104,6 +104,7 @@ export default function TransactionsPage() {
                     <>
                         <TransactionList
                             transactions={transactions}
+                            grouped={list.params.sortBy === 'date'}
                             isLoading={isLoading}
                             emptyTitle={list.params.status === 'pending' ? t('transactions.emptyPendingTitle') : t('transactions.emptyTitle')}
                             emptyDescription={list.params.status === 'pending' ? t('transactions.emptyPendingDescription') : t('transactions.emptyDescription')}

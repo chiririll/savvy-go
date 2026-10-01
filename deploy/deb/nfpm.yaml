@@ -1,5 +1,5 @@
-name: savvy
-arch: all
+name: savvy-go
+arch: amd64
 platform: linux
 version: ${APP_VERSION}
 version_schema: semver
@@ -12,42 +12,26 @@ license: MIT
 description: |-
   Selfhosted expense tracker with multi-currency support.
   .
-  Installs the Savvy app under /opt/savvy, SQLite data in /var/lib/savvy,
-  an nginx site, and systemd units for the queue worker and scheduler.
-  Requires PHP 8.4 (Debian 13 or a PHP 8.4 repository).
+  Installs the Savvy Go binary, static SPA assets, and a systemd unit.
+  SQLite data lives in /var/lib/savvy-go.
 
 depends:
-  - nginx
-  - openssl
-  - php8.4-bcmath
-  - php8.4-cli
-  - php8.4-curl
-  - php8.4-fpm
-  - php8.4-intl
-  - php8.4-mbstring
-  - php8.4-sqlite3
-  - php8.4-xml
-  - php8.4-zip
-  - sqlite3
-
-recommends:
-  - php8.4-opcache
+  - adduser
 
 contents:
-  - src: ../../dist/deb-root
-    dst: /opt/savvy
+  - src: ../../dist/savvy-go
+    dst: /usr/bin/savvy-go
+    file_info:
+      mode: 0755
+  - src: ../../dist/public
+    dst: /opt/savvy-go/public
     type: tree
-  - src: nginx.conf
-    dst: /etc/nginx/sites-available/savvy
-    type: config
-  - src: savvy-queue.service
-    dst: /usr/lib/systemd/system/savvy-queue.service
-  - src: savvy-scheduler.service
-    dst: /usr/lib/systemd/system/savvy-scheduler.service
+  - src: savvy-go.service
+    dst: /usr/lib/systemd/system/savvy-go.service
   - src: install.env
-    dst: /etc/savvy/install.env
+    dst: /etc/savvy-go/install.env
     type: config
-  - dst: /var/lib/savvy
+  - dst: /var/lib/savvy-go
     type: dir
     file_info:
       mode: 0775

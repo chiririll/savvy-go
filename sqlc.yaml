@@ -1,0 +1,15 @@
+version: "2"
+sql:
+  - engine: "sqlite"
+    schema: "internal/migrate/sql"
+    queries: "internal/db/queries"
+    gen:
+      go:
+        package: "sqlc"
+        out: "internal/db/sqlc"
+        sql_package: "database/sql"
+        emit_empty_slices: true
+        emit_pointers_for_null_types: false
+        emit_json_tags: false
+# sqlc sqlite emits ?NNN for nargs. modernc.org/sqlite + database/sql count
+# every '?' so reuse the same narg only once (COALESCE/CASE), never "OR col = ?N".

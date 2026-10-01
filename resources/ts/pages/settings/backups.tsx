@@ -76,7 +76,7 @@ export default function BackupsPage() {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
     const [selectedBackup, setSelectedBackup] = useState<Backup | null>(null)
     const [restorePreview, setRestorePreview] = useState<BackupInspection | null>(null)
-    const [inspectingId, setInspectingId] = useState<number | null>(null)
+    const [inspectingId, setInspectingId] = useState<string | null>(null)
     const [note, setNote] = useState('')
     const [uploadFile, setUploadFile] = useState<File | null>(null)
 
@@ -102,9 +102,9 @@ export default function BackupsPage() {
 
     const openRestore = async (backup: Backup) => {
         setSelectedBackup(backup)
-        setInspectingId(backup.id)
+        setInspectingId(backup.filename)
         try {
-            const preview = await backupsApi.inspect(backup.id)
+            const preview = await backupsApi.inspect(backup.filename)
             setRestorePreview(preview)
             setRestoreDialogOpen(true)
         } catch (error) {
@@ -124,14 +124,14 @@ export default function BackupsPage() {
 
     const handleRestore = () => {
         if (!selectedBackup || restorePreview?.compatible === false) return
-        restoreBackup.mutate(selectedBackup.id, {
+        restoreBackup.mutate(selectedBackup.filename, {
             onSuccess: closeRestore,
         })
     }
 
     const handleDelete = () => {
         if (!selectedBackup) return
-        deleteBackup.mutate(selectedBackup.id, {
+        deleteBackup.mutate(selectedBackup.filename, {
             onSuccess: () => {
                 setDeleteDialogOpen(false)
                 setSelectedBackup(null)
@@ -141,7 +141,7 @@ export default function BackupsPage() {
 
     const handleDownload = (backup: Backup) => {
         const token = localStorage.getItem('token')
-        const url = backupsApi.download(backup.id)
+        const url = backupsApi.download(backup.filename)
 
         fetch(url, {
             headers: { Authorization: `Bearer ${token}` }
@@ -204,7 +204,7 @@ export default function BackupsPage() {
                             </TableRow>
                         ) : (
                             backups?.map((backup) => (
-                                <TableRow key={backup.id}>
+                                <TableRow key={backup.filename}>
                                     <TableCell>{formatDate(backup.createdAt)}</TableCell>
                                     <TableCell>{formatBytes(backup.size)}</TableCell>
                                     <TableCell>
@@ -244,9 +244,9 @@ export default function BackupsPage() {
                                                 title={backup.schemaStatus === 'newer'
                                                     ? t('backups.schemaStatusHelp.newer')
                                                     : t('backups.restore')}
-                                                disabled={isReadOnly || backup.schemaStatus === 'newer' || inspectingId === backup.id}
+                                                disabled={isReadOnly || backup.schemaStatus === 'newer' || inspectingId === backup.filename}
                                             >
-                                                {inspectingId === backup.id
+                                                {inspectingId === backup.filename
                                                     ? <Loader2 className="size-4 animate-spin" />
                                                     : <RotateCcw className="size-4" />}
                                             </Button>

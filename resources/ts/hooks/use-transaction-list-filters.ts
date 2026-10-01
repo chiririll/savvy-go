@@ -29,7 +29,7 @@ export function useTransactionListFilters() {
         tag_ids: params.tagIds.length > 0 ? params.tagIds : undefined,
         start_date: params.startDate ?? undefined,
         end_date: params.endDate ?? undefined,
-        status: params.status ?? undefined,
+        status: params.status ?? 'confirmed',
     }
 
     const activeFiltersCount = [

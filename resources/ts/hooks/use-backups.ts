@@ -31,7 +31,7 @@ export function useUploadBackup() {
 
 export function useRestoreBackup() {
     return useResourceMutation({
-        mutationFn: (id: number) => backupsApi.restore(id),
+        mutationFn: (filename: string) => backupsApi.restore(filename),
         invalidateAll: true,
         successMessage: i18n.t('toasts.backup.restored'),
     })
@@ -39,7 +39,7 @@ export function useRestoreBackup() {
 
 export function useDeleteBackup() {
     return useResourceMutation({
-        mutationFn: (id: number) => backupsApi.delete(id),
+        mutationFn: (filename: string) => backupsApi.delete(filename),
         invalidateKeys: [QUERY_KEY],
         successMessage: i18n.t('toasts.backup.deleted'),
     })

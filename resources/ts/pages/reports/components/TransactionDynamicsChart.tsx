@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import ReactECharts from 'echarts-for-react'
+import ReactECharts from '@/components/shared/ReactECharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'

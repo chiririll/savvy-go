@@ -29,10 +29,10 @@ export function useBalanceHistory(params?: { start_date?: string; end_date?: str
     })
 }
 
-export function useBalanceComparison() {
+export function useBalanceComparison(params?: { start_date?: string; end_date?: string }) {
     return useQuery({
-        queryKey: [...QUERY_KEY, 'balance-comparison'],
-        queryFn: () => accountsApi.getBalanceComparison(),
+        queryKey: [...QUERY_KEY, 'balance-comparison', params],
+        queryFn: () => accountsApi.getBalanceComparison(params),
     })
 }
 

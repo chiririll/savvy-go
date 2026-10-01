@@ -35,7 +35,8 @@
         "editTitle": "Edit Category",
         "columns": {
             "category": "Category",
-            "type": "Type"
+            "type": "Type",
+            "default": "Default"
         },
         "types": {
             "income": "Income",
@@ -49,8 +50,14 @@
         "emptyIncomeDescription": "Create an income category to group incoming money",
         "emptyExpenseTitle": "No expense categories",
         "emptyExpenseDescription": "Create an expense category to group spending",
+        "setAsDefault": "Set as default",
         "deleteTitle": "Delete category?",
-        "deleteDescription": "This action cannot be undone. The category \"{{name}}\" will be permanently deleted."
+        "deleteDescription": "This action cannot be undone. The category \"{{name}}\" will be permanently deleted.",
+        "reassignTitle": "Delete category?",
+        "reassignDescription_one": "\"{{name}}\" has {{count}} transaction. Choose a category to move it to before deleting.",
+        "reassignDescription_other": "\"{{name}}\" has {{count}} transactions. Choose a category to move them to before deleting.",
+        "reassignPlaceholder": "Choose replacement category",
+        "reassignAndDelete": "Delete and reassign"
     },
     "tags": {
         "title": "Tags",
@@ -101,6 +108,8 @@
             "base": "Base"
         },
         "setAsBase": "Set as base",
+        "autoShort": "Auto",
+        "autoUpdated": "Rate is updated automatically",
         "emptyTitle": "No currencies yet",
         "emptyDescription": "Add a currency to record amounts and exchange rates",
         "deleteTitle": "Delete currency?",
@@ -126,6 +135,7 @@
         "applyOriginal": "Original date",
         "applyOther": "Other",
         "tabs": {
+            "confirmed": "Confirmed",
             "pending": "Pending"
         },
         "status": {

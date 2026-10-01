@@ -65,8 +65,8 @@ export const accountsApi = {
         return response.data
     },
 
-    getBalanceComparison: async (): Promise<BalanceComparisonResponse> => {
-        const response = await apiClient.get('/accounts-balance-comparison')
+    getBalanceComparison: async (params?: { start_date?: string; end_date?: string }): Promise<BalanceComparisonResponse> => {
+        const response = await apiClient.get(`/accounts-balance-comparison${toQueryString(params)}`)
         return response.data
     },
 }

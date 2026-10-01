@@ -11,7 +11,7 @@ import {
     MemoryStick,
     Layers,
     Clock,
-    XCircle,
+    Recycle,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -173,7 +173,7 @@ function RuntimeChip({ label, value }: { label: string; value: string }) {
 
 function ResourcePanel({ data }: { data: ResourceSnapshot }) {
     const { t } = useTranslation('settings')
-    const { cpu, memory, process, queue, runtime } = data
+    const { cpu, memory, process, runtime } = data
     const memSeverity = severityFor(memory.used_percent)
     const cpuSeverity = severityFor(cpu.load_percent)
     const procPercent =
@@ -192,8 +192,8 @@ function ResourcePanel({ data }: { data: ResourceSnapshot }) {
                     <p className="mt-1 text-xs text-muted-foreground">{t('monitoring.resourcesDescription')}</p>
                 </div>
                 <div className="ml-auto flex flex-wrap items-center gap-2">
-                    <RuntimeChip label="PHP" value={runtime.php_version} />
-                    <RuntimeChip label="Laravel" value={runtime.laravel_version} />
+                    <RuntimeChip label="Go" value={runtime.go_version.replace(/^go/, '')} />
+                    <RuntimeChip label="Savvy" value={runtime.app_version} />
                     <RuntimeChip label="env" value={runtime.environment} />
                 </div>
             </header>
@@ -273,16 +273,15 @@ function ResourcePanel({ data }: { data: ResourceSnapshot }) {
                 />
                 <StatCard
                     icon={Layers}
-                    label={t('monitoring.queueBacklog')}
-                    value={formatCount(queue.pending)}
-                    hint={t('monitoring.inProgress', { count: formatCount(queue.reserved ?? 0) })}
+                    label={t('monitoring.goroutines')}
+                    value={formatCount(process.goroutines)}
+                    hint={t('monitoring.goroutinesHint')}
                 />
                 <StatCard
-                    icon={XCircle}
-                    label={t('monitoring.failedJobs')}
-                    value={formatCount(queue.failed)}
-                    tone={(queue.failed ?? 0) > 0 ? 'crit' : 'ok'}
-                    hint={(queue.failed ?? 0) > 0 ? t('monitoring.needsAttention') : t('monitoring.allClear')}
+                    icon={Recycle}
+                    label={t('monitoring.gcCycles')}
+                    value={formatCount(process.gc_cycles)}
+                    hint={t('monitoring.gcCyclesHint')}
                 />
                 <StatCard
                     icon={Clock}

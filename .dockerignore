@@ -1,9 +1,24 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.wasm
+__debug_bin*
+*.out
+
+# Test binary, built with `go test -c`
+*.test
+
+# Go workspace file
+go.work
+go.work.sum
+
 /vendor
 /node_modules
 /.git
 /.env
-/storage/*.key
-/bootstrap/cache/*.php
 /.idea
 /.vscode
 public/build

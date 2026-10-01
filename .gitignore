@@ -1,34 +1,37 @@
-*.log
-.DS_Store
-.env
-.env.backup
-.env.production
-.phpactor.json
-.phpunit.result.cache
-/.fleet
-/.idea
-/.nova
-/.phpunit.cache
-/.vscode
-/.zed
-/auth.json
-/node_modules
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.wasm
+__debug_bin*
+*.out
+
+# Test binary, built with `go test -c`
+*.test
+
+# Go workspace file
+go.work
+go.work.sum
+
+# Build and package outputs
 /public/build
 /public/hot
-/public/storage
-/storage/*.key
-/storage/pail
-/vendor
-/dist
-Homestead.json
-Homestead.yaml
-Thumbs.db
-.claude
-.vite
 
-/.bin
+# Dependency and package-manager directories
+node_modules/
 
-/CLAUDE.md
+# env file
+.env
 
-# Large local test fixture
-transactions-500mb.csv
+# Development files
+/data/
+/testdata/
+
+# Other
+.DS_Store
+
+# Editor/IDE
+# .idea/
+# .vscode/

@@ -37,6 +37,11 @@ export interface ColumnMapping {
     currency: number | null
 }
 
+/** What to do with a category name from the file: an existing category id, create a new one, or none. */
+export type ImportCategoryChoice = number | 'create' | 'skip'
+
+export type ImportCategoryMap = Record<string, ImportCategoryChoice>
+
 export interface ImportOptions {
     dateFormat: DateFormat
     amountFormat: AmountFormat
@@ -46,6 +51,15 @@ export interface ImportOptions {
     createMissingCurrencies: boolean
     createMissingTags: boolean
     createMissingCategories: boolean
+    categoryMap?: ImportCategoryMap
+}
+
+export interface ImportCategoryCandidate {
+    name: string
+    type: 'income' | 'expense'
+    count: number
+    /** Existing category with the same name and type, if any. */
+    matchId: number | null
 }
 
 export interface PreviewTransaction {
@@ -71,6 +85,7 @@ export interface ImportPreviewSummary {
     currenciesToCreate: string[]
     tagsToCreate: string[]
     categoriesToCreate: string[]
+    categories: ImportCategoryCandidate[]
 }
 
 export interface ImportPreviewResult {

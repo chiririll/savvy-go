@@ -177,7 +177,7 @@ export function AppSidebar() {
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem asChild>
                                     <a
-                                        href="https://github.com/truenormis/savvy"
+                                        href="https://github.com/chiririll/savvy-plus"
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="cursor-pointer"

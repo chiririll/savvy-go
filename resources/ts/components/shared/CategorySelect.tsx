@@ -15,6 +15,7 @@ interface CategorySelectProps {
     value?: number | null
     onChange: (value: number) => void
     type?: 'income' | 'expense'
+    excludeIds?: number[]
     placeholder?: string
     disabled?: boolean
     sortByPopularity?: boolean
@@ -25,6 +26,7 @@ export function CategorySelect({
     value,
     onChange,
     type,
+    excludeIds,
     placeholder,
     disabled,
     sortByPopularity = true,
@@ -34,14 +36,17 @@ export function CategorySelect({
     const { data: categories } = useCategories()
 
     const filteredCategories = useMemo(() => {
-        const filtered = type
+        let filtered = type
             ? (categories?.filter((category) => category.type === type) ?? [])
             : [...(categories ?? [])]
+        if (excludeIds?.length) {
+            filtered = filtered.filter((category) => !excludeIds.includes(category.id))
+        }
         if (sortByPopularity) {
             return filtered.sort((a, b) => (b.transactionsCount ?? 0) - (a.transactionsCount ?? 0))
         }
         return filtered
-    }, [categories, type, sortByPopularity])
+    }, [categories, type, excludeIds, sortByPopularity])
 
     const trigger = (
         <SelectTrigger className="w-full">

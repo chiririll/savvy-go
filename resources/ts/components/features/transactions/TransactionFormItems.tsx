@@ -306,9 +306,6 @@ function TransactionItemRow({
                     render={({ field }) => (
                         <FormItem className="min-w-0 flex-1 space-y-1">
                             <div className="flex min-w-0 items-center gap-2">
-                                <FormLabel className="m-0 w-16 shrink-0 text-xs font-normal text-muted-foreground">
-                                    {t('fields.name')}
-                                </FormLabel>
                                 <FormControl>
                                     <Input
                                         {...field}
