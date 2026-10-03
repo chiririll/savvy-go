@@ -84,6 +84,7 @@ func TestUpgradeInPlace(t *testing.T) {
 	}
 	var email string
 	assertMinorUnits(t, sqlDB)
+	assertDateOnly(t, sqlDB)
 	if err := sqlDB.QueryRow(`SELECT email FROM users WHERE id = 1`).Scan(&email); err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +151,7 @@ func createLaravelShape(t *testing.T, sqlDB *sql.DB) {
 			updated_at TEXT
 		)`,
 		`INSERT INTO transactions (id, type, account_id, amount, description, date)
-		 VALUES (1, 'expense', 1, 12.5, 'Coffee', '2026-01-03')`,
+		 VALUES (1, 'expense', 1, 12.5, 'Coffee', '2026-01-03 00:00:00')`,
 		`INSERT INTO currencies (id, code, name, symbol, decimals, is_base, rate) VALUES (2, 'JPY', 'Yen', 'Y', 0, 0, 0.0067)`,
 		`INSERT INTO currencies (id, code, name, symbol, decimals, is_base, rate) VALUES (3, 'BTC', 'Bitcoin', 'B', 8, 0, 50000)`,
 		`INSERT INTO accounts (id, name, type, currency_id, initial_balance, is_active) VALUES (2, 'Yen', 'cash', 2, 3000, 1)`,
@@ -194,6 +195,7 @@ func assertCopied(t *testing.T, dest *sql.DB) {
 	assertCount(t, dest, "accounts", 3)
 	assertCount(t, dest, "transactions", 4)
 	assertMinorUnits(t, dest)
+	assertDateOnly(t, dest)
 	var name, code, desc string
 	if err := dest.QueryRow(`SELECT name FROM users`).Scan(&name); err != nil || name != "Ada" {
 		t.Fatalf("user %q %v", name, err)
@@ -203,6 +205,15 @@ func assertCopied(t *testing.T, dest *sql.DB) {
 	}
 	if err := dest.QueryRow(`SELECT description FROM transactions`).Scan(&desc); err != nil || desc != "Coffee" {
 		t.Fatalf("tx %q %v", desc, err)
+	}
+}
+
+// assertDateOnly checks Laravel "YYYY-MM-DD 00:00:00" dates were cut to YYYY-MM-DD.
+func assertDateOnly(t *testing.T, sqlDB *sql.DB) {
+	t.Helper()
+	var date string
+	if err := sqlDB.QueryRow(`SELECT date FROM transactions WHERE id = 1`).Scan(&date); err != nil || date != "2026-01-03" {
+		t.Fatalf("date %q %v", date, err)
 	}
 }
 

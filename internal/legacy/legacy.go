@@ -88,6 +88,11 @@ func UpgradeInPlace(ctx context.Context, db *sql.DB, appKey string) error {
 	if err := auth.UnwrapLegacyTOTPSecrets(ctx, db, appKey); err != nil {
 		slog.Warn("could not unwrap legacy totp secrets", "err", err)
 	}
+	// Before convertMoneyInPlace: a failure after it but before stamp would
+	// rerun the money conversion on next start and scale amounts twice.
+	if err := normalizeDates(ctx, db); err != nil {
+		return err
+	}
 	if err := convertMoneyInPlace(ctx, db); err != nil {
 		return fmt.Errorf("convert money to minor units: %w", err)
 	}
@@ -129,7 +134,38 @@ func Copy(ctx context.Context, dest, src *sql.DB) error {
 	if err := ensureSettings(ctx, dest); err != nil {
 		return err
 	}
+	if err := normalizeDates(ctx, dest); err != nil {
+		return err
+	}
 	return stamp(ctx, dest)
+}
+
+// Laravel date casts stored "YYYY-MM-DD 00:00:00"; Go compares these columns
+// as plain YYYY-MM-DD strings.
+var dateColumns = map[string][]string{
+	"transactions":           {"date"},
+	"recurring_transactions": {"start_date", "end_date", "next_run_date", "last_run_date"},
+	"budgets":                {"start_date", "end_date"},
+	"accounts":               {"due_date"},
+}
+
+func normalizeDates(ctx context.Context, db *sql.DB) error {
+	for table, cols := range dateColumns {
+		if !tableExists(ctx, db, table) {
+			continue
+		}
+		have, err := columns(ctx, db, table)
+		if err != nil {
+			return err
+		}
+		for _, c := range intersect(cols, have) {
+			q := fmt.Sprintf(`UPDATE %s SET %[2]s = substr(%[2]s, 1, 10) WHERE length(%[2]s) > 10`, table, quote(c))
+			if _, err := db.ExecContext(ctx, q); err != nil {
+				return fmt.Errorf("normalize %s.%s: %w", table, c, err)
+			}
+		}
+	}
+	return nil
 }
 
 func copyTable(ctx context.Context, dest, src *sql.DB, table string, sc *scales) (int, error) {
@@ -222,25 +258,15 @@ func copySequences(ctx context.Context, dest, src *sql.DB) error {
 		if !tableExists(ctx, dest, name) {
 			continue
 		}
-		if _, err := dest.ExecContext(ctx,
-			`INSERT INTO sqlite_sequence(name, seq) VALUES(?, ?)
-			 ON CONFLICT(name) DO UPDATE SET seq = MAX(seq, excluded.seq)`,
-			name, seq,
-		); err != nil {
-			// sqlite_sequence has no official UNIQUE(name) on all builds;
-			// fall back to update-or-insert.
-			var current int64
-			qerr := dest.QueryRowContext(ctx, `SELECT seq FROM sqlite_sequence WHERE name = ?`, name).Scan(&current)
-			if qerr == sql.ErrNoRows {
+		// sqlite_sequence has no UNIQUE(name), so ON CONFLICT upserts are rejected.
+		res, err := dest.ExecContext(ctx, `UPDATE sqlite_sequence SET seq = MAX(seq, ?) WHERE name = ?`, seq, name)
+		if err == nil {
+			if n, _ := res.RowsAffected(); n == 0 {
 				_, err = dest.ExecContext(ctx, `INSERT INTO sqlite_sequence(name, seq) VALUES(?, ?)`, name, seq)
-			} else if qerr == nil && seq > current {
-				_, err = dest.ExecContext(ctx, `UPDATE sqlite_sequence SET seq = ? WHERE name = ?`, seq, name)
-			} else {
-				err = qerr
 			}
-			if err != nil {
-				return fmt.Errorf("sqlite_sequence %s: %w", name, err)
-			}
+		}
+		if err != nil {
+			return fmt.Errorf("sqlite_sequence %s: %w", name, err)
 		}
 	}
 	return rows.Err()
@@ -265,9 +291,6 @@ func ensureSettings(ctx context.Context, db *sql.DB) error {
 
 func dropLaravelOnly(ctx context.Context, db *sql.DB) {
 	for _, table := range laravelOnlyTables {
-		if !tableExists(ctx, db, table) {
-			continue
-		}
 		if _, err := db.ExecContext(ctx, `DROP TABLE IF EXISTS `+table); err != nil {
 			slog.Warn("could not drop laravel table", "table", table, "err", err)
 		}
@@ -283,18 +306,15 @@ func tableExists(ctx context.Context, db *sql.DB, name string) bool {
 }
 
 func columns(ctx context.Context, db *sql.DB, table string) ([]string, error) {
-	rows, err := db.QueryContext(ctx, `PRAGMA table_info(`+table+`)`)
+	rows, err := db.QueryContext(ctx, `SELECT name FROM pragma_table_info(?)`, table)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	var out []string
 	for rows.Next() {
-		var cid int
-		var name, ctype string
-		var notnull, pk int
-		var dflt any
-		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+		var name string
+		if err := rows.Scan(&name); err != nil {
 			return nil, err
 		}
 		out = append(out, name)
@@ -319,7 +339,11 @@ func intersect(a, b []string) []string {
 func quoteAll(cols []string) []string {
 	out := make([]string, len(cols))
 	for i, c := range cols {
-		out[i] = `"` + strings.ReplaceAll(c, `"`, `""`) + `"`
+		out[i] = quote(c)
 	}
 	return out
+}
+
+func quote(ident string) string {
+	return `"` + strings.ReplaceAll(ident, `"`, `""`) + `"`
 }
