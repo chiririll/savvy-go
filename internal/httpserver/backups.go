@@ -1,7 +1,10 @@
 package httpserver
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -90,7 +93,39 @@ func (s *Server) backupsInspect(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
+	// Laravel backups have no schema_migrations, so the schema diff above says
+	// nothing about them; report whether the importer supports their version.
+	info, err := legacy.InspectFile(r.Context(), s.backups.Path(*b))
+	if err != nil {
+		writeMessage(w, 422, err.Error())
+		return
+	}
+	out["legacy"] = info.Laravel
+	if info.Laravel && !info.Supported {
+		out["compatible"] = false
+		out["incompatibleReason"] = "legacy_unsupported"
+	} else if out["compatible"] == false {
+		out["incompatibleReason"] = "newer"
+	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// upgradeBackup brings a staged backup copy up to the current schema before it
+// replaces the live database; unsupported Laravel versions fail here, early.
+func (s *Server) upgradeBackup(ctx context.Context, staged *sql.DB) error {
+	if err := legacy.CheckSupported(ctx, staged); err != nil {
+		return err
+	}
+	if err := legacy.EnsureColumns(ctx, staged); err != nil {
+		return fmt.Errorf("legacy columns: %w", err)
+	}
+	if err := migrate.Up(ctx, staged); err != nil {
+		return fmt.Errorf("migrate: %w", err)
+	}
+	if err := legacy.UpgradeInPlace(ctx, staged, s.cfg.AppKey); err != nil {
+		return fmt.Errorf("legacy import: %w", err)
+	}
+	return nil
 }
 
 func (s *Server) backupsRestore(w http.ResponseWriter, r *http.Request) {
@@ -98,24 +133,9 @@ func (s *Server) backupsRestore(w http.ResponseWriter, r *http.Request) {
 	if b == nil {
 		return
 	}
-	newDB, err := s.backups.Restore(r.Context(), *b)
+	newDB, err := s.backups.Restore(r.Context(), *b, s.upgradeBackup)
 	if err != nil {
 		writeMessage(w, 422, err.Error())
-		return
-	}
-	if err := legacy.EnsureColumns(r.Context(), newDB); err != nil {
-		_ = newDB.Close()
-		writeMessage(w, 422, "legacy columns: "+err.Error())
-		return
-	}
-	if err := migrate.Up(r.Context(), newDB); err != nil {
-		_ = newDB.Close()
-		writeMessage(w, 422, "migrate: "+err.Error())
-		return
-	}
-	if err := legacy.UpgradeInPlace(r.Context(), newDB, s.cfg.AppKey); err != nil {
-		_ = newDB.Close()
-		writeMessage(w, 422, "legacy import: "+err.Error())
 		return
 	}
 	s.reconnect(newDB)

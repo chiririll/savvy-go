@@ -172,7 +172,10 @@ func (s Imports) Execute(ctx context.Context, importID string, mapping, options 
 	if err != nil {
 		return s.fail(ctx, importID, err.Error())
 	}
-	dec := Accounts{DB: s.DB}.Decimals(ctx, accountID)
+	dec, err := Accounts{DB: s.DB}.Decimals(ctx, accountID)
+	if err != nil {
+		return s.fail(ctx, importID, err.Error())
+	}
 	for i, row := range rows {
 		res := processImportRow(row, mapping, options, i+1)
 		if res.err != "" {

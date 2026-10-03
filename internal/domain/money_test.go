@@ -3,6 +3,7 @@ package domain
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"path/filepath"
 	"testing"
 
@@ -248,7 +249,7 @@ func TestAccountCurrencyChangeRequiresSameDecimals(t *testing.T) {
 	for _, other := range []Currency{e.btc, e.jpy} {
 		cur, _ := accts.ByID(e.ctx, a.ID)
 		cur.CurrencyID = other.ID
-		if _, err := accts.Update(e.ctx, a.ID, *cur); err != ErrAccountDecimalsDiffer {
+		if _, err := accts.Update(e.ctx, a.ID, *cur); !errors.Is(err, ErrAccountDecimalsDiffer) {
 			t.Fatalf("switch to %s = %v, want ErrAccountDecimalsDiffer", other.Code, err)
 		}
 	}
@@ -277,7 +278,7 @@ func TestCurrencyDecimalsAreImmutable(t *testing.T) {
 	}
 	changed := *eur
 	changed.Decimals = 4
-	if _, err := curs.Update(e.ctx, eur.ID, changed); err != ErrDecimalsImmutable {
+	if _, err := curs.Update(e.ctx, eur.ID, changed); !errors.Is(err, ErrDecimalsImmutable) {
 		t.Fatalf("change decimals of unused currency = %v, want ErrDecimalsImmutable", err)
 	}
 	renamed := *eur
@@ -306,5 +307,16 @@ func TestCurrencyUsedByBudgetCannotBeDeleted(t *testing.T) {
 	}
 	if err := curs.Delete(e.ctx, eur.ID); err != nil {
 		t.Fatalf("delete when unused: %v", err)
+	}
+}
+
+func TestUnknownAccountOrCurrencyIsAnError(t *testing.T) {
+	e := newMoneyEnv(t)
+	if _, err := (Accounts{DB: e.db}).Create(e.ctx, Account{Name: "ghost", Type: "cash", CurrencyID: 999, IsActive: true}); !errors.Is(err, ErrUnknownCurrency) {
+		t.Fatalf("create with unknown currency = %v, want ErrUnknownCurrency", err)
+	}
+	date := "2024-01-15"
+	if _, err := e.txs.Create(e.ctx, TxInput{Type: "expense", AccountID: 999, Amount: dec("1"), Date: &date}); !errors.Is(err, ErrUnknownAccount) {
+		t.Fatalf("transaction on unknown account = %v, want ErrUnknownAccount", err)
 	}
 }

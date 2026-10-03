@@ -82,6 +82,9 @@ func UpgradeInPlace(ctx context.Context, db *sql.DB, appKey string) error {
 	if AlreadyImported(ctx, db) {
 		return nil
 	}
+	if err := CheckSupported(ctx, db); err != nil {
+		return err
+	}
 	if err := ensureSettings(ctx, db); err != nil {
 		return err
 	}
@@ -110,6 +113,9 @@ func UpgradeInPlace(ctx context.Context, db *sql.DB, appKey string) error {
 func Copy(ctx context.Context, dest, src *sql.DB) error {
 	if !IsLaravel(ctx, src) {
 		return fmt.Errorf("source is not a laravel-era database")
+	}
+	if err := CheckSupported(ctx, src); err != nil {
+		return err
 	}
 
 	sc, err := loadScales(ctx, src)

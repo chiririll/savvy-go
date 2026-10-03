@@ -55,6 +55,32 @@ func TestCopyFromLaravelFixture(t *testing.T) {
 	assertCopied(t, dest)
 }
 
+func TestUnsupportedLaravelVersionRejected(t *testing.T) {
+	ctx := context.Background()
+	sqlDB, err := db.Open(filepath.Join(t.TempDir(), "database.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = sqlDB.Close() })
+
+	createLaravelShape(t, sqlDB)
+	if _, err := sqlDB.Exec(`DELETE FROM migrations WHERE migration = ?`, LatestMigration); err != nil {
+		t.Fatal(err)
+	}
+	if info := Inspect(ctx, sqlDB); !info.Laravel || info.Supported {
+		t.Fatalf("inspect %+v", info)
+	}
+	if err := UpgradeInPlace(ctx, sqlDB, ""); err != ErrUnsupportedVersion {
+		t.Fatalf("UpgradeInPlace err %v", err)
+	}
+	if err := Copy(ctx, sqlDB, sqlDB); err != ErrUnsupportedVersion {
+		t.Fatalf("Copy err %v", err)
+	}
+	if AlreadyImported(ctx, sqlDB) {
+		t.Fatal("rejected database must not be stamped")
+	}
+}
+
 func TestUpgradeInPlace(t *testing.T) {
 	ctx := context.Background()
 	sqlDB, err := db.Open(filepath.Join(t.TempDir(), "database.sqlite"))
@@ -98,6 +124,7 @@ func createLaravelShape(t *testing.T, sqlDB *sql.DB) {
 	stmts := []string{
 		`CREATE TABLE migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, migration TEXT NOT NULL, batch INTEGER NOT NULL)`,
 		`INSERT INTO migrations (migration, batch) VALUES ('2014_10_12_000000_create_users_table', 1)`,
+		`INSERT INTO migrations (migration, batch) VALUES ('` + LatestMigration + `', 2)`,
 		`CREATE TABLE users (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			name TEXT NOT NULL,

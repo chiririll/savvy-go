@@ -12,6 +12,8 @@ export interface Backup {
 export interface BackupInspection {
     valid: boolean
     compatible: boolean
+    incompatibleReason?: 'newer' | 'legacy_unsupported'
+    legacy: boolean
     pendingCount: number
     pendingMigrations: string[]
     unknownCount: number

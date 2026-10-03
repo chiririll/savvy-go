@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -64,14 +65,16 @@ func (s *Server) currenciesUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c, err := s.currencies.Update(r.Context(), cur.ID, body)
+	if errors.Is(err, domain.ErrDecimalsImmutable) {
+		writeMessage(w, 422, "Currency decimals cannot be changed after creation.")
+		return
+	}
 	if err != nil {
 		switch err.Error() {
 		case "cannot unset base":
 			writeMessage(w, 422, "Cannot unset base currency. Set another currency as base first.")
 		case "base rate":
 			writeMessage(w, 422, "Base currency rate must always be 1.")
-		case domain.ErrDecimalsImmutable.Error():
-			writeMessage(w, 422, "Currency decimals cannot be changed after creation.")
 		default:
 			writeMessage(w, 422, err.Error())
 		}
@@ -199,7 +202,7 @@ func (s *Server) accountsStore(w http.ResponseWriter, r *http.Request) {
 		InitialBalance: body.InitialBalance, IsActive: active,
 	})
 	if err != nil {
-		writeMessage(w, 422, err.Error())
+		writeAccountError(w, err)
 		return
 	}
 	writeData(w, http.StatusCreated, dto.Account(*a))
@@ -253,10 +256,22 @@ func (s *Server) accountsUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	a, err := s.accounts.Update(r.Context(), cur.ID, *cur)
 	if err != nil {
-		writeMessage(w, 422, err.Error())
+		writeAccountError(w, err)
 		return
 	}
 	writeData(w, http.StatusOK, dto.Account(*a))
+}
+
+// writeAccountError maps account create/update failures to responses.
+func writeAccountError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, domain.ErrAccountDecimalsDiffer):
+		writeMessage(w, 422, "An account can only switch to a currency with the same number of decimals.")
+	case errors.Is(err, domain.ErrUnknownCurrency):
+		writeValidation(w, map[string][]string{"currency_id": {"The selected currency is invalid."}})
+	default:
+		writeMessage(w, 422, err.Error())
+	}
 }
 
 func (s *Server) accountsReorder(w http.ResponseWriter, r *http.Request) {

@@ -239,39 +239,72 @@ func writeBackupMeta(ctx context.Context, path string, kv map[string]string, ove
 // Restore replaces the live database with the given backup and returns a new
 // *sql.DB connected to the restored file. The caller must call Server.reconnect
 // with the returned DB so all domain objects switch to the new connection.
-func (s Backups) Restore(ctx context.Context, b Backup) (*sql.DB, error) {
+// Restore replaces the live database with the backup. The backup is first
+// copied aside and brought up to date by prepare (schema migrations, legacy
+// upgrade); only if that succeeds is the live database closed and replaced, so
+// a bad or unsupported backup leaves the current database and connection
+// untouched.
+func (s Backups) Restore(ctx context.Context, b Backup, prepare func(context.Context, *sql.DB) error) (*sql.DB, error) {
 	src := s.Path(b)
 	if _, err := os.Stat(src); err != nil {
 		return nil, fmt.Errorf("backup file missing")
+	}
+
+	staged := s.Database + ".restore"
+	defer removeSQLiteFiles(staged)
+	removeSQLiteFiles(staged)
+	if err := copyFile(src, staged); err != nil {
+		return nil, fmt.Errorf("copy backup: %w", err)
+	}
+	if err := prepareStaged(ctx, staged, prepare); err != nil {
+		return nil, err
 	}
 
 	// Close current connection before replacing the file.
 	if err := s.DB.Close(); err != nil {
 		return nil, fmt.Errorf("close db: %w", err)
 	}
-
-	// Remove WAL/SHM, copy backup, then clean up any WAL the backup had.
-	_ = os.Remove(s.Database + "-wal")
-	_ = os.Remove(s.Database + "-shm")
-	if err := copyFile(src, s.Database); err != nil {
+	removeSQLiteFiles(s.Database)
+	if err := copyFile(staged, s.Database); err != nil {
 		return nil, fmt.Errorf("copy backup: %w", err)
 	}
-	_ = os.Remove(s.Database + "-wal")
-	_ = os.Remove(s.Database + "-shm")
 
 	// Open a fresh connection to the restored file.
 	newDB, err := db.Open(s.Database)
 	if err != nil {
 		return nil, fmt.Errorf("reopen db: %w", err)
 	}
-
-	// backup_meta only describes the backup file, not the live database.
-	if _, err := newDB.ExecContext(ctx, `DROP TABLE IF EXISTS backup_meta`); err != nil {
-		_ = newDB.Close()
-		return nil, fmt.Errorf("drop backup meta: %w", err)
-	}
-
 	return newDB, nil
+}
+
+// prepareStaged opens the staged copy, runs prepare and drops backup_meta
+// (it only describes the backup file, not the live database), then closes it so
+// the file is self-contained again.
+func prepareStaged(ctx context.Context, path string, prepare func(context.Context, *sql.DB) error) error {
+	staged, err := db.Open(path)
+	if err != nil {
+		return fmt.Errorf("open backup: %w", err)
+	}
+	defer staged.Close()
+	if prepare != nil {
+		if err := prepare(ctx, staged); err != nil {
+			return err
+		}
+	}
+	if _, err := staged.ExecContext(ctx, `DROP TABLE IF EXISTS backup_meta`); err != nil {
+		return fmt.Errorf("drop backup meta: %w", err)
+	}
+	if err := db.Checkpoint(ctx, staged); err != nil {
+		return fmt.Errorf("checkpoint: %w", err)
+	}
+	return nil
+}
+
+// removeSQLiteFiles deletes a database file and its WAL/SHM side files.
+func removeSQLiteFiles(path string) {
+	for _, suffix := range []string{"", "-wal", "-shm"} {
+		_ = os.Remove(path + suffix)
+	}
 }
 
 func copyFile(src, dest string) error {

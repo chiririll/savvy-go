@@ -45,7 +45,7 @@ func (s *Server) debtsStore(w http.ResponseWriter, r *http.Request) {
 	}
 	d, err := s.debts.Create(r.Context(), body.Name, body.DebtType, body.CurrencyID, body.AccountID, body.Amount, body.Date, body.Origin, body.DueDate, body.Counterparty, body.Description)
 	if err != nil {
-		writeMessage(w, 422, err.Error())
+		writeAccountError(w, err)
 		return
 	}
 	writeData(w, http.StatusCreated, dto.AccountDebt(*d))
@@ -100,7 +100,7 @@ func (s *Server) debtsUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	updated, err := s.accounts.Update(r.Context(), cur.ID, *cur)
 	if err != nil {
-		writeMessage(w, 422, err.Error())
+		writeAccountError(w, err)
 		return
 	}
 	writeData(w, http.StatusOK, dto.AccountDebt(*updated))

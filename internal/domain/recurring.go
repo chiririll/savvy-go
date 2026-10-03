@@ -89,7 +89,10 @@ func (s RecurringStore) Create(ctx context.Context, in RecurringInput) (*Recurri
 		active = *in.IsActive
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	dec, toDec := s.decimalsFor(ctx, in.AccountID, in.ToAccountID)
+	dec, toDec, err := s.Txs.decimalsFor(ctx, in.AccountID, in.ToAccountID)
+	if err != nil {
+		return nil, err
+	}
 	res, err := db.Q(s.DB).InsertRecurring(ctx, sqlc.InsertRecurringParams{
 		Type: in.Type, AccountID: in.AccountID, ToAccountID: db.NullInt64(in.ToAccountID),
 		CategoryID: db.NullInt64(in.CategoryID), Amount: money.ToMinor(in.Amount, dec), ToAmount: money.ToNullMinor(in.ToAmount, toDec),
@@ -149,7 +152,10 @@ func (s RecurringStore) Update(ctx context.Context, id int64, in RecurringInput)
 		active = *in.IsActive
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	dec, toDec := s.decimalsFor(ctx, in.AccountID, in.ToAccountID)
+	dec, toDec, err := s.Txs.decimalsFor(ctx, in.AccountID, in.ToAccountID)
+	if err != nil {
+		return nil, err
+	}
 	err = db.Q(s.DB).UpdateRecurring(ctx, sqlc.UpdateRecurringParams{
 		Type: in.Type, AccountID: in.AccountID, ToAccountID: db.NullInt64(in.ToAccountID),
 		CategoryID: db.NullInt64(in.CategoryID), Amount: money.ToMinor(in.Amount, dec), ToAmount: money.ToNullMinor(in.ToAmount, toDec),
@@ -286,7 +292,10 @@ func (s RecurringStore) syncOpenPending(ctx context.Context, rec *Recurring) err
 		toAmt = &v
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	dec, toDec := s.decimalsFor(ctx, rec.AccountID, rec.ToAccountID)
+	dec, toDec, err := s.Txs.decimalsFor(ctx, rec.AccountID, rec.ToAccountID)
+	if err != nil {
+		return err
+	}
 	err = db.Q(s.DB).UpdateTransaction(ctx, sqlc.UpdateTransactionParams{
 		Type: rec.Type, AccountID: rec.AccountID, ToAccountID: db.NullInt64(rec.ToAccountID),
 		CategoryID: db.NullInt64(rec.CategoryID), Amount: money.ToMinor(rec.Amount, dec), ToAmount: money.ToNullMinor(toAmt, toDec),
@@ -325,10 +334,6 @@ func (s RecurringStore) calculateToAmount(ctx context.Context, rec *Recurring) (
 		return rec.Amount, err
 	}
 	return Convert(rec.Amount, *from.Currency, *to.Currency), nil
-}
-
-func (s RecurringStore) decimalsFor(ctx context.Context, accountID int64, toAccountID *int64) (int, int) {
-	return Transactions{DB: s.DB}.decimalsFor(ctx, accountID, toAccountID)
 }
 
 func (s RecurringStore) saveTags(ctx context.Context, id int64, tagIDs []int64) error {

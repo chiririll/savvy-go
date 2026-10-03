@@ -62,11 +62,57 @@ func TestRestoreLegacyLaravelBackup(t *testing.T) {
 	}
 }
 
+// TestRestoreOldLaravelBackupKeepsLiveDB verifies that a Laravel backup older
+// than legacy.LatestMigration is reported incompatible by inspect and rejected
+// by restore without touching the live database or its connection.
+func TestRestoreOldLaravelBackupKeepsLiveDB(t *testing.T) {
+	a := newTestApp(t)
+	u := a.createUser("rw@test.com", "secret1", auth.RoleReadWrite)
+	sess := a.issue(u, false)
+	ctx := context.Background()
+
+	oldPath := filepath.Join(t.TempDir(), "old.sqlite")
+	oldDB, err := db.Open(oldPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	createLaravelCategoriesFixture(t, oldDB)
+	if _, err := oldDB.Exec(`DELETE FROM migrations WHERE migration = ?`, legacy.LatestMigration); err != nil {
+		t.Fatal(err)
+	}
+	if err := oldDB.Close(); err != nil {
+		t.Fatal(err)
+	}
+	backup, err := a.s.backups.Ingest(ctx, oldPath, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res := a.do("GET", "/api/backups/"+backup.Filename+"/inspect", nil, sess.Token, sess.CSRF)
+	body := decodeJSON(t, res)
+	if res.StatusCode != http.StatusOK || body["compatible"] != false || body["incompatibleReason"] != "legacy_unsupported" {
+		t.Fatalf("inspect %d %v", res.StatusCode, body)
+	}
+
+	res = a.do("POST", "/api/backups/"+backup.Filename+"/restore", nil, sess.Token, sess.CSRF)
+	body = decodeJSON(t, res)
+	if res.StatusCode != http.StatusUnprocessableEntity {
+		t.Fatalf("restore %d %v", res.StatusCode, body)
+	}
+
+	// Live connection still works and still holds the original data.
+	var email string
+	if err := a.s.db.QueryRowContext(ctx, `SELECT email FROM users WHERE id = ?`, u.ID).Scan(&email); err != nil || email != "rw@test.com" {
+		t.Fatalf("live db damaged: %q %v", email, err)
+	}
+}
+
 func createLaravelCategoriesFixture(t *testing.T, sqlDB *sql.DB) {
 	t.Helper()
 	stmts := []string{
 		`CREATE TABLE migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, migration TEXT NOT NULL, batch INTEGER NOT NULL)`,
 		`INSERT INTO migrations (migration, batch) VALUES ('2014_10_12_000000_create_users_table', 1)`,
+		`INSERT INTO migrations (migration, batch) VALUES ('` + legacy.LatestMigration + `', 2)`,
 		`CREATE TABLE users (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			name TEXT NOT NULL,

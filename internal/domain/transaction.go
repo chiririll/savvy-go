@@ -95,7 +95,10 @@ func (s Transactions) Create(ctx context.Context, in TxInput) (*Transaction, err
 		in.ToAmount = &amt
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	dec, toDec := s.decimalsFor(ctx, in.AccountID, in.ToAccountID)
+	dec, toDec, err := s.decimalsFor(ctx, in.AccountID, in.ToAccountID)
+	if err != nil {
+		return nil, err
+	}
 	res, err := db.Q(s.DB).InsertTransaction(ctx, sqlc.InsertTransactionParams{
 		Type: in.Type, AccountID: in.AccountID, ToAccountID: db.NullInt64(in.ToAccountID),
 		CategoryID: db.NullInt64(in.CategoryID), Amount: money.ToMinor(in.Amount, dec), ToAmount: money.ToNullMinor(in.ToAmount, toDec),
@@ -125,7 +128,10 @@ func (s Transactions) Update(ctx context.Context, id int64, in TxInput) (*Transa
 		return nil, fmt.Errorf("cannot edit")
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	dec, toDec := s.decimalsFor(ctx, in.AccountID, in.ToAccountID)
+	dec, toDec, err := s.decimalsFor(ctx, in.AccountID, in.ToAccountID)
+	if err != nil {
+		return nil, err
+	}
 	err = db.Q(s.DB).UpdateTransaction(ctx, sqlc.UpdateTransactionParams{
 		Type: in.Type, AccountID: in.AccountID, ToAccountID: db.NullInt64(in.ToAccountID),
 		CategoryID: db.NullInt64(in.CategoryID), Amount: money.ToMinor(in.Amount, dec), ToAmount: money.ToNullMinor(in.ToAmount, toDec),
@@ -376,14 +382,20 @@ func (s Transactions) saveTags(ctx context.Context, txID int64, ids []int64) err
 
 // decimalsFor returns the currency decimals of the account and, when set, of
 // the to-account; the to-account falls back to the account decimals.
-func (s Transactions) decimalsFor(ctx context.Context, accountID int64, toAccountID *int64) (int, int) {
+func (s Transactions) decimalsFor(ctx context.Context, accountID int64, toAccountID *int64) (int, int, error) {
 	accts := Accounts{DB: s.DB}
-	dec := accts.Decimals(ctx, accountID)
-	toDec := dec
-	if toAccountID != nil {
-		toDec = accts.Decimals(ctx, *toAccountID)
+	dec, err := accts.Decimals(ctx, accountID)
+	if err != nil {
+		return 0, 0, err
 	}
-	return dec, toDec
+	if toAccountID == nil {
+		return dec, dec, nil
+	}
+	toDec, err := accts.Decimals(ctx, *toAccountID)
+	if err != nil {
+		return 0, 0, err
+	}
+	return dec, toDec, nil
 }
 
 func txFromRow(r sqlc.ListTransactionsRow) Transaction {

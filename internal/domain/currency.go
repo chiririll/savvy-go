@@ -17,8 +17,9 @@ import (
 
 var one = decimal.NewFromInt(1)
 
-// Stored minor units are only meaningful with the currency decimals, so a
-// currency decimals never change after creation.
+// ErrDecimalsImmutable is returned when an update changes currency decimals.
+// Stored minor units are only meaningful together with the decimals, so they
+// are fixed when the currency is created.
 var ErrDecimalsImmutable = errors.New("currency decimals cannot be changed")
 
 // rateDivPrecision is the number of fraction digits kept when dividing by a rate.

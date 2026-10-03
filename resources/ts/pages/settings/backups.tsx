@@ -362,7 +362,11 @@ export default function BackupsPage() {
                         <AlertDialogDescription asChild>
                             <div className="space-y-2">
                                 {restorePreview?.compatible === false ? (
-                                    <p>{t('backups.restoreNewerDescription')}</p>
+                                    <p>
+                                        {restorePreview?.incompatibleReason === 'legacy_unsupported'
+                                            ? t('backups.restoreLegacyUnsupportedDescription')
+                                            : t('backups.restoreNewerDescription')}
+                                    </p>
                                 ) : (
                                     <>
                                         <p>
