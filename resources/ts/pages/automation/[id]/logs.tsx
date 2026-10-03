@@ -63,19 +63,19 @@ export default function AutomationLogsPage() {
                                     >
                                         {t(`automation.logsStatus.${log.status}`)}
                                     </Badge>
-                                    {log.trigger_entity_type && (
+                                    {log.triggerEntityType && (
                                         <span className="text-sm text-muted-foreground">
-                                            {t('automation.logsEntity', { type: log.trigger_entity_type, id: log.trigger_entity_id })}
+                                            {t('automation.logsEntity', { type: log.triggerEntityType, id: log.triggerEntityId })}
                                         </span>
                                     )}
                                 </div>
-                                {log.error_message && (
-                                    <p className="text-sm text-destructive">{log.error_message}</p>
+                                {log.errorMessage && (
+                                    <p className="text-sm text-destructive">{log.errorMessage}</p>
                                 )}
-                                {log.actions_executed && log.actions_executed.length > 0 && (
+                                {log.actionsExecuted && log.actionsExecuted.length > 0 && (
                                     <p className="text-sm text-muted-foreground">
                                         {t('automation.logsActions', {
-                                            actions: log.actions_executed
+                                            actions: log.actionsExecuted
                                                 .map(a => t(`forms:automation.actionTypes.${a.type}`, { defaultValue: a.type }))
                                                 .join(', '),
                                         })}
@@ -83,7 +83,7 @@ export default function AutomationLogsPage() {
                                 )}
                             </div>
                             <span className="text-sm text-muted-foreground">
-                                {format(new Date(log.created_at), 'dd.MM.yyyy HH:mm:ss')}
+                                {format(new Date(log.createdAt), 'dd.MM.yyyy HH:mm:ss')}
                             </span>
                         </div>
                     ))}

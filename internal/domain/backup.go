@@ -169,24 +169,24 @@ func (s Backups) Path(b Backup) string {
 	return filepath.Join(s.Dir, b.Filename)
 }
 
-func (s Backups) Inspect(ctx context.Context, b Backup) (map[string]any, error) {
+// Migrations compares the Go schema migrations recorded in b with the ones
+// this app knows: pending ones restore will apply, unknown ones come from a
+// newer app. It fails for a file without a Go schema (not SQLite, or Laravel).
+func (s Backups) Migrations(ctx context.Context, b Backup) (pending, unknown []string, err error) {
 	src, err := db.OpenReadOnly(s.Path(b))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer src.Close()
-	ran, _ := sqlc.New(src).ListSchemaMigrations(ctx)
-	available, _ := db.Q(s.DB).ListSchemaMigrations(ctx)
-	pending := diffStrings(available, ran)
-	unknown := diffStrings(ran, available)
-	return map[string]any{
-		"valid":             true,
-		"compatible":        len(unknown) == 0,
-		"pendingCount":      len(pending),
-		"pendingMigrations": pending,
-		"unknownCount":      len(unknown),
-		"unknownMigrations": unknown,
-	}, nil
+	ran, err := sqlc.New(src).ListSchemaMigrations(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	available, err := db.Q(s.DB).ListSchemaMigrations(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	return diffStrings(available, ran), diffStrings(ran, available), nil
 }
 
 // Restore replaces the live database with the given backup and returns a new

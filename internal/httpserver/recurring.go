@@ -18,7 +18,7 @@ func (s *Server) recurringIndex(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, mapSlice(list, dto.Recurring))
+	writeData(w, http.StatusOK, dto.Map(list, dto.NewRecurring))
 }
 
 func (s *Server) recurringUpcoming(w http.ResponseWriter, r *http.Request) {
@@ -27,7 +27,7 @@ func (s *Server) recurringUpcoming(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, mapSlice(list, dto.Recurring))
+	writeData(w, http.StatusOK, dto.Map(list, dto.NewRecurring))
 }
 
 func (s *Server) recurringStore(w http.ResponseWriter, r *http.Request) {
@@ -40,7 +40,7 @@ func (s *Server) recurringStore(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusCreated, dto.Recurring(*rec))
+	writeData(w, http.StatusCreated, dto.NewRecurring(*rec))
 }
 
 func (s *Server) recurringShow(w http.ResponseWriter, r *http.Request) {
@@ -48,7 +48,7 @@ func (s *Server) recurringShow(w http.ResponseWriter, r *http.Request) {
 	if rec == nil {
 		return
 	}
-	writeData(w, http.StatusOK, dto.Recurring(*rec))
+	writeData(w, http.StatusOK, dto.NewRecurring(*rec))
 }
 
 func (s *Server) recurringUpdate(w http.ResponseWriter, r *http.Request) {
@@ -65,7 +65,7 @@ func (s *Server) recurringUpdate(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, dto.Recurring(*rec))
+	writeData(w, http.StatusOK, dto.NewRecurring(*rec))
 }
 
 func (s *Server) recurringDestroy(w http.ResponseWriter, r *http.Request) {

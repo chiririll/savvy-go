@@ -42,18 +42,3 @@ func Number(d decimal.Decimal, decimals int) json.Number {
 func Plain(d decimal.Decimal) json.Number {
 	return json.Number(d.String())
 }
-
-func NullDecimal(v *decimal.Decimal) decimal.NullDecimal {
-	if v == nil {
-		return decimal.NullDecimal{}
-	}
-	return decimal.NullDecimal{Decimal: *v, Valid: true}
-}
-
-func PtrDecimal(v decimal.NullDecimal) *decimal.Decimal {
-	if !v.Valid {
-		return nil
-	}
-	d := v.Decimal
-	return &d
-}

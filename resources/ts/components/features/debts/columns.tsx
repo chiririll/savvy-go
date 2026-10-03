@@ -99,13 +99,13 @@ export const createDebtColumns = (
         ),
     },
     {
-        accessorKey: 'remainingDebt',
+        accessorKey: 'currentBalance',
         header: () => i18n.t('pages:debts.columns.remaining'),
         cell: ({ row }) => (
             <div className={`font-mono text-right ${row.original.isPaidOff ? 'text-green-600' : 'text-orange-600'}`}>
                 {row.original.isPaidOff
                     ? i18n.t('pages:debts.paidOff')
-                    : formatCurrency(row.original.remainingDebt, row.original.currency)
+                    : formatCurrency(row.original.currentBalance, row.original.currency)
                 }
             </div>
         ),

@@ -115,6 +115,9 @@ func upgradeInPlace(ctx context.Context, db *sql.DB, appKey string) error {
 	if err := retypeDateColumns(ctx, db); err != nil {
 		return fmt.Errorf("convert dates to text: %w", err)
 	}
+	if err := dropColumns(ctx, db); err != nil {
+		return fmt.Errorf("drop legacy columns: %w", err)
+	}
 	if err := convertMoneyInPlace(ctx, db); err != nil {
 		return fmt.Errorf("convert money to minor units: %w", err)
 	}

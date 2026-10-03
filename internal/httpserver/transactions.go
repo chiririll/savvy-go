@@ -48,13 +48,13 @@ func (s *Server) transactionsIndex(w http.ResponseWriter, r *http.Request) {
 		last = 1
 	}
 	payload := map[string]any{
-		"data": mapSlice(list, dto.Transaction),
+		"data": dto.Map(list, dto.NewTransaction),
 		"meta": map[string]any{
 			"current_page": page, "last_page": last, "per_page": per, "total": total,
 		},
 	}
 	if r.URL.Query().Get("with_summary") == "1" || r.URL.Query().Get("with_summary") == "true" {
-		payload["summary"] = s.txs.Summary(r.Context(), false)
+		payload["summary"] = dto.NewTransactionSummary(s.txs.Summary(r.Context(), false))
 	}
 	writeJSON(w, http.StatusOK, payload)
 }
@@ -87,7 +87,7 @@ func (s *Server) transactionsStore(w http.ResponseWriter, r *http.Request) {
 			tx = fresh
 		}
 	}
-	writeData(w, http.StatusCreated, dto.Transaction(*tx))
+	writeData(w, http.StatusCreated, dto.NewTransaction(*tx))
 }
 
 func (s *Server) transactionsShow(w http.ResponseWriter, r *http.Request) {
@@ -95,7 +95,7 @@ func (s *Server) transactionsShow(w http.ResponseWriter, r *http.Request) {
 	if tx == nil {
 		return
 	}
-	writeData(w, http.StatusOK, dto.Transaction(*tx))
+	writeData(w, http.StatusOK, dto.NewTransaction(*tx))
 }
 
 func (s *Server) transactionsUpdate(w http.ResponseWriter, r *http.Request) {
@@ -127,7 +127,7 @@ func (s *Server) transactionsUpdate(w http.ResponseWriter, r *http.Request) {
 			tx = fresh
 		}
 	}
-	writeData(w, http.StatusOK, dto.Transaction(*tx))
+	writeData(w, http.StatusOK, dto.NewTransaction(*tx))
 }
 
 func (s *Server) transactionsDestroy(w http.ResponseWriter, r *http.Request) {
@@ -167,7 +167,7 @@ func (s *Server) transactionsConfirm(w http.ResponseWriter, r *http.Request) {
 	if fresh, e := s.txs.ByID(r.Context(), out.ID); e == nil && fresh != nil {
 		out = fresh
 	}
-	writeData(w, http.StatusOK, dto.Transaction(*out))
+	writeData(w, http.StatusOK, dto.NewTransaction(*out))
 }
 
 func (s *Server) transactionsSkip(w http.ResponseWriter, r *http.Request) {
@@ -183,7 +183,7 @@ func (s *Server) transactionsSkip(w http.ResponseWriter, r *http.Request) {
 	if out.RecurringID != nil {
 		_ = s.recurring.AdvanceAfterOccurrence(r.Context(), *out.RecurringID)
 	}
-	writeData(w, http.StatusOK, dto.Transaction(*out))
+	writeData(w, http.StatusOK, dto.NewTransaction(*out))
 }
 
 func (s *Server) transactionsDuplicate(w http.ResponseWriter, r *http.Request) {
@@ -196,15 +196,15 @@ func (s *Server) transactionsDuplicate(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusCreated, dto.Transaction(*out))
+	writeData(w, http.StatusCreated, dto.NewTransaction(*out))
 }
 
 func (s *Server) transactionsSummary(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, s.txs.Summary(r.Context(), false))
+	writeJSON(w, http.StatusOK, dto.NewTransactionSummary(s.txs.Summary(r.Context(), false)))
 }
 
 func (s *Server) transactionsPendingSummary(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, s.txs.Summary(r.Context(), true))
+	writeJSON(w, http.StatusOK, dto.NewTransactionSummary(s.txs.Summary(r.Context(), true)))
 }
 
 func (s *Server) txParam(w http.ResponseWriter, r *http.Request) *domain.Transaction {
@@ -218,17 +218,16 @@ func (s *Server) txParam(w http.ResponseWriter, r *http.Request) *domain.Transac
 
 func decodeTx(w http.ResponseWriter, r *http.Request) (domain.TxInput, bool) {
 	var body struct {
-		Type         string           `json:"type"`
-		AccountID    int64            `json:"account_id"`
-		ToAccountID  *int64           `json:"to_account_id"`
-		CategoryID   *int64           `json:"category_id"`
-		Amount       decimal.Decimal  `json:"amount"`
-		ToAmount     *decimal.Decimal `json:"to_amount"`
-		ExchangeRate *decimal.Decimal `json:"exchange_rate"`
-		Description  *string          `json:"description"`
-		Date         *string          `json:"date"`
-		TagIDs       []int64          `json:"tag_ids"`
-		Items        []struct {
+		Type        string           `json:"type"`
+		AccountID   int64            `json:"account_id"`
+		ToAccountID *int64           `json:"to_account_id"`
+		CategoryID  *int64           `json:"category_id"`
+		Amount      decimal.Decimal  `json:"amount"`
+		ToAmount    *decimal.Decimal `json:"to_amount"`
+		Description *string          `json:"description"`
+		Date        *string          `json:"date"`
+		TagIDs      []int64          `json:"tag_ids"`
+		Items       []struct {
 			Name         string          `json:"name"`
 			Quantity     decimal.Decimal `json:"quantity"`
 			PricePerUnit decimal.Decimal `json:"price_per_unit"`
@@ -241,7 +240,7 @@ func decodeTx(w http.ResponseWriter, r *http.Request) (domain.TxInput, bool) {
 	in := domain.TxInput{
 		Type: body.Type, AccountID: body.AccountID, ToAccountID: body.ToAccountID,
 		CategoryID: body.CategoryID, Amount: body.Amount, ToAmount: body.ToAmount,
-		ExchangeRate: body.ExchangeRate, Description: body.Description, Date: body.Date,
+		Description: body.Description, Date: body.Date,
 		TagIDs: body.TagIDs,
 	}
 	for _, it := range body.Items {

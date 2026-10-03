@@ -112,8 +112,8 @@ func TestAmountsAreStoredAsMinorUnitsPerCurrency(t *testing.T) {
 	base, _ := (Currencies{DB: e.db}).Base(e.ctx)
 	sum := (Accounts{DB: e.db}).Summary(e.ctx, base)
 	// USD 100-10.50=89.50, JPY 3000-1500=1500 -> 15.00, BTC 0.00012345*50000=6.1725
-	if got := sum["total_balance"].(interface{ String() string }).String(); got != "110.67" {
-		t.Fatalf("total_balance = %s, want 110.67", got)
+	if !sum.Total.Equal(dec("110.67")) {
+		t.Fatalf("total = %s, want 110.67", sum.Total)
 	}
 }
 
@@ -158,11 +158,11 @@ func TestCategoryStatisticsFoldsCurrencies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if stats["transactions_count"] != 2 {
-		t.Fatalf("count = %v", stats["transactions_count"])
+	if stats.Count != 2 {
+		t.Fatalf("count = %v", stats.Count)
 	}
-	if got := stats["total_amount"].(interface{ String() string }).String(); got != "15.00" {
-		t.Fatalf("total_amount = %s, want 15.00", got)
+	if !stats.Total.Equal(dec("15")) {
+		t.Fatalf("total = %s, want 15", stats.Total)
 	}
 }
 

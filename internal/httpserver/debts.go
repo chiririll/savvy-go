@@ -19,9 +19,9 @@ func (s *Server) debtsIndex(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	payload := map[string]any{"data": mapSlice(list, dto.AccountDebt)}
+	payload := map[string]any{"data": dto.Map(list, dto.NewDebt)}
 	if r.URL.Query().Get("with_summary") == "1" || r.URL.Query().Get("with_summary") == "true" {
-		payload["summary"] = s.debts.Summary(r.Context())
+		payload["summary"] = dto.NewDebtSummary(s.debts.Summary(r.Context()))
 	}
 	writeJSON(w, http.StatusOK, payload)
 }
@@ -48,7 +48,7 @@ func (s *Server) debtsStore(w http.ResponseWriter, r *http.Request) {
 		writeAccountError(w, err)
 		return
 	}
-	writeData(w, http.StatusCreated, dto.AccountDebt(*d))
+	writeData(w, http.StatusCreated, dto.NewDebt(*d))
 }
 
 func (s *Server) debtsShow(w http.ResponseWriter, r *http.Request) {
@@ -56,7 +56,7 @@ func (s *Server) debtsShow(w http.ResponseWriter, r *http.Request) {
 	if d == nil {
 		return
 	}
-	writeData(w, http.StatusOK, dto.AccountDebt(*d))
+	writeData(w, http.StatusOK, dto.NewDebt(*d))
 }
 
 func (s *Server) debtsUpdate(w http.ResponseWriter, r *http.Request) {
@@ -103,7 +103,7 @@ func (s *Server) debtsUpdate(w http.ResponseWriter, r *http.Request) {
 		writeAccountError(w, err)
 		return
 	}
-	writeData(w, http.StatusOK, dto.AccountDebt(*updated))
+	writeData(w, http.StatusOK, dto.NewDebt(*updated))
 }
 
 func (s *Server) debtsDestroy(w http.ResponseWriter, r *http.Request) {
@@ -146,7 +146,7 @@ func (s *Server) debtMove(w http.ResponseWriter, r *http.Request, collect bool) 
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, dto.Transaction(*tx))
+	writeData(w, http.StatusOK, dto.NewTransaction(*tx))
 }
 
 func (s *Server) debtsReopen(w http.ResponseWriter, r *http.Request) {
@@ -159,11 +159,11 @@ func (s *Server) debtsReopen(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, dto.AccountDebt(*out))
+	writeData(w, http.StatusOK, dto.NewDebt(*out))
 }
 
 func (s *Server) debtsSummary(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, s.debts.Summary(r.Context()))
+	writeJSON(w, http.StatusOK, dto.NewDebtSummary(s.debts.Summary(r.Context())))
 }
 
 func (s *Server) debtParam(w http.ResponseWriter, r *http.Request) *domain.Account {

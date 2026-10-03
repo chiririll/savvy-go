@@ -208,7 +208,11 @@ func (s Budgets) spent(ctx context.Context, b *Budget, start, end time.Time) dec
 	if err != nil {
 		return decimal.Zero
 	}
-	return total.DivRound(targetRate, rateDivPrecision)
+	spent := total.DivRound(targetRate, rateDivPrecision)
+	if b.Currency != nil {
+		spent = spent.Round(int32(b.Currency.Decimals))
+	}
+	return spent
 }
 
 // resolveCurrency returns the budget currency (base when unset) and its decimals.

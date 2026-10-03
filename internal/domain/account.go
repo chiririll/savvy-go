@@ -133,28 +133,27 @@ func (s Accounts) Reorder(ctx context.Context, ids []int64) error {
 	return nil
 }
 
-func (s Accounts) Summary(ctx context.Context, base *Currency) map[string]any {
+// AccountsSummary totals account balances in Currency (nil when there is
+// none), rounded to its decimals.
+type AccountsSummary struct {
+	Total    decimal.Decimal
+	Currency *Currency
+	Count    int
+}
+
+func (s Accounts) Summary(ctx context.Context, base *Currency) AccountsSummary {
 	accts, _ := s.All(ctx, true, true)
-	total := decimal.Zero
-	code := ""
-	decimals := 2
-	if base != nil {
-		code = base.Code
-		decimals = base.Decimals
-		for _, a := range accts {
-			if a.Currency == nil {
-				continue
-			}
-			total = total.Add(Convert(a.Balance, *a.Currency, *base))
+	out := AccountsSummary{Currency: base, Count: len(accts)}
+	if base == nil {
+		return out
+	}
+	for _, a := range accts {
+		if a.Currency != nil {
+			out.Total = out.Total.Add(Convert(a.Balance, *a.Currency, *base))
 		}
 	}
-	return map[string]any{
-		"total_balance":  money.Number(total, decimals),
-		"currency":       nilOr(code),
-		"currency_code":  code,
-		"decimals":       decimals,
-		"accounts_count": len(accts),
-	}
+	out.Total = out.Total.Round(int32(base.Decimals))
+	return out
 }
 
 func (s Accounts) list(ctx context.Context, arg sqlc.ListAccountsParams) ([]Account, error) {

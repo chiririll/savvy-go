@@ -3,7 +3,6 @@ package domain
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"math"
 	"sort"
 	"strconv"
@@ -331,7 +330,7 @@ func (s Reports) ExpensePace(ctx context.Context, f ReportFilter) map[string]any
 			spent = cumulative[len(cumulative)-1]
 		}
 		months = append(months, map[string]any{
-			"label": cursor.Format("Jan 2006"), "budget": budget, "dailyExpenses": cumulative,
+			"budget": budget, "dailyExpenses": cumulative,
 			"currentDay": currentDay, "daysInMonth": days, "totalSpent": spent,
 			"monthStart": cursor.Format("2006-01-02"), "monthEnd": endOfMonth(cursor).Format("2006-01-02"),
 		})
@@ -393,7 +392,7 @@ func (s Reports) CashFlowOverTime(ctx context.Context, f ReportFilter, groupBy s
 		exp, _ := item["expenses"].(float64)
 		bal += inc - exp
 		entry := map[string]any{
-			"label": item["label"], "date": item["date"],
+			"date":   item["date"],
 			"income": inc, "expenses": exp, "balance": round2(bal),
 		}
 		if i < len(comparison) {
@@ -419,7 +418,7 @@ func (s Reports) groupedCashFlow(ctx context.Context, f ReportFilter, r dateRang
 	var out []map[string]any
 	for _, p := range periods {
 		out = append(out, map[string]any{
-			"label": p.Label, "date": p.Key,
+			"date":   p.Key,
 			"income": round2(income[p.Key]), "expenses": round2(expenses[p.Key]),
 		})
 	}
@@ -501,9 +500,8 @@ func (s Reports) TxDynamics(ctx context.Context, f ReportFilter, typ, groupBy st
 	r := f.Range(s.now())
 	cats := s.sumGroupedByCategory(ctx, typ, r, f)
 	periods := generatePeriods(r.Start, r.End, groupBy)
-	var labels, dates []string
+	dates := make([]string, 0, len(periods))
 	for _, p := range periods {
-		labels = append(labels, p.Label)
 		dates = append(dates, p.Key)
 	}
 	totals := s.groupedByPeriod(ctx, typ, r, f, groupBy, 0)
@@ -524,13 +522,7 @@ func (s Reports) TxDynamics(ctx context.Context, f ReportFilter, typ, groupBy st
 		}
 		datasets = append(datasets, map[string]any{"id": c.ID, "name": c.Name, "color": c.Color, "data": data})
 	}
-	if labels == nil {
-		labels = []string{}
-	}
-	if dates == nil {
-		dates = []string{}
-	}
-	return map[string]any{"labels": labels, "dates": dates, "datasets": datasets, "currency": s.baseCode(ctx)}
+	return map[string]any{"dates": dates, "datasets": datasets, "currency": s.baseCode(ctx)}
 }
 
 func (s Reports) TxTop(ctx context.Context, f ReportFilter, typ string, limit int) map[string]any {
@@ -607,11 +599,9 @@ func (s Reports) NetWorth(ctx context.Context, f ReportFilter) map[string]any {
 
 func (s Reports) NetWorthHistory(ctx context.Context, f ReportFilter, groupBy string) map[string]any {
 	r := f.Range(s.now())
-	var labels, dates []string
-	var values []float64
+	dates, values := []string{}, []float64{}
 	for cur := r.Start; !cur.After(r.End); cur = nextPeriod(cur, groupBy) {
 		end := periodEnd(cur, r.End, groupBy)
-		labels = append(labels, reportPeriodLabel(cur, groupBy))
 		dates = append(dates, cur.Format("2006-01-02"))
 		var total float64
 		for _, a := range s.netWorthAt(ctx, end, f) {
@@ -619,12 +609,7 @@ func (s Reports) NetWorthHistory(ctx context.Context, f ReportFilter, groupBy st
 		}
 		values = append(values, round2(total))
 	}
-	if labels == nil {
-		labels = []string{}
-		dates = []string{}
-		values = []float64{}
-	}
-	return map[string]any{"labels": labels, "dates": dates, "values": values, "currency": s.baseCode(ctx)}
+	return map[string]any{"dates": dates, "values": values, "currency": s.baseCode(ctx)}
 }
 
 type nwAccount struct {
@@ -747,7 +732,7 @@ func budgetToBase(amount, rate decimal.Decimal, isBase bool) decimal.Decimal {
 	return amount.Mul(rate)
 }
 
-type periodPoint struct{ Key, Label string }
+type periodPoint struct{ Key string }
 
 func generatePeriods(start, end time.Time, groupBy string) []periodPoint {
 	var out []periodPoint
@@ -756,14 +741,14 @@ func generatePeriods(start, end time.Time, groupBy string) []periodPoint {
 		switch groupBy {
 		case "week":
 			wk := startOfWeekSunday(cur)
-			out = append(out, periodPoint{Key: wk.Format("2006-01-02"), Label: "Week " + wk.Format("Jan 2")})
+			out = append(out, periodPoint{Key: wk.Format("2006-01-02")})
 			cur = cur.AddDate(0, 0, 7)
 		case "month":
 			m := startOfMonth(cur)
-			out = append(out, periodPoint{Key: m.Format("2006-01-02"), Label: m.Format("Jan '06")})
+			out = append(out, periodPoint{Key: m.Format("2006-01-02")})
 			cur = addMonthsNoOverflow(cur, 1)
 		default:
-			out = append(out, periodPoint{Key: cur.Format("2006-01-02"), Label: cur.Format("Jan 2")})
+			out = append(out, periodPoint{Key: cur.Format("2006-01-02")})
 			cur = cur.AddDate(0, 0, 1)
 		}
 	}
@@ -795,18 +780,6 @@ func periodEnd(cur, max time.Time, groupBy string) time.Time {
 		return max
 	}
 	return end
-}
-
-func reportPeriodLabel(cur time.Time, groupBy string) string {
-	switch groupBy {
-	case "week":
-		_, week := cur.ISOWeek()
-		return fmt.Sprintf("W%d %s", week, cur.Format("Jan '06"))
-	case "month":
-		return cur.Format("Jan '06")
-	default:
-		return cur.Format("Jan 2")
-	}
 }
 
 func startOfWeekSunday(t time.Time) time.Time {

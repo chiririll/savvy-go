@@ -10,24 +10,20 @@ export type RecurringTransactionType = Extract<TransactionType, 'income' | 'expe
 
 export interface RecurringTransaction extends BaseEntity {
     type: RecurringTransactionType
-    accountId: number
-    toAccountId?: number
-    categoryId?: number
     amount: number
-    toAmount?: number
-    description?: string
+    toAmount: number | null
+    description: string | null
     frequency: RecurringFrequency
-    frequencyLabel: string
     interval: number
-    dayOfWeek?: number
-    dayOfMonth?: number
+    dayOfWeek: number | null
+    dayOfMonth: number | null
     startDate: string
-    endDate?: string
+    endDate: string | null
     nextRunDate: string
-    lastRunDate?: string
+    lastRunDate: string | null
     isActive: boolean
     account: Account
-    toAccount?: Account
-    category?: Category
+    toAccount: Account | null
+    category: Category | null
     tags: Tag[]
 }

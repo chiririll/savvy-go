@@ -43,8 +43,8 @@ export function CategoryFormDialog({
             toFormValues={(item) => ({
                 name: localizeDefaultName(item.name),
                 type: item.type,
-                icon: item.icon,
-                color: item.color,
+                icon: item.icon ?? undefined,
+                color: item.color ?? undefined,
             })}
         >
             {({ formKey, formProps }) => (

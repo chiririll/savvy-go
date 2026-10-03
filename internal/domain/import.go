@@ -255,9 +255,9 @@ func (s Imports) Preview(ctx context.Context, im *Import, mapping, options map[s
 		}
 		if len(preview) < 200 {
 			preview = append(preview, map[string]any{
-				"row": i + 1, "date": res.date, "type": res.typ, "amount": money.Plain(res.amount),
+				"row": i + 1, "date": res.date, "type": res.typ, "amount": res.amount,
 				"description": res.desc, "status": status, "error": nilOr(res.err),
-				"category": nilOr(res.category), "tags": []string{}, "duplicate_of": nil, "warnings": []string{},
+				"category": nilOr(res.category), "tags": []string{}, "duplicateOf": nil, "warnings": []string{},
 			})
 		}
 	}
@@ -270,15 +270,15 @@ func (s Imports) Preview(ctx context.Context, im *Import, mapping, options map[s
 		} else {
 			categoriesToCreate = append(categoriesToCreate, c.Name)
 		}
-		categories = append(categories, map[string]any{"name": c.Name, "type": c.Type, "count": c.Count, "match_id": matchID})
+		categories = append(categories, map[string]any{"name": c.Name, "type": c.Type, "count": c.Count, "matchId": matchID})
 	}
 	return map[string]any{
-		"preview_transactions": preview,
+		"previewTransactions": preview,
 		"summary": map[string]any{
-			"will_create": willCreate, "will_skip": willSkip, "has_errors": hasErrors,
-			"total_rows": im.TotalRows, "sampled": willCreate + willSkip + hasErrors,
-			"currencies_to_create": []any{}, "tags_to_create": []any{},
-			"categories_to_create": categoriesToCreate, "categories": categories,
+			"willCreate": willCreate, "willSkip": willSkip, "hasErrors": hasErrors,
+			"totalRows": im.TotalRows, "sampled": willCreate + willSkip + hasErrors,
+			"currenciesToCreate": []any{}, "tagsToCreate": []any{},
+			"categoriesToCreate": categoriesToCreate, "categories": categories,
 		},
 	}, nil
 }

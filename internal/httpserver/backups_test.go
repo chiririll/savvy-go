@@ -72,7 +72,7 @@ func TestRestoreLegacyLaravelBackup(t *testing.T) {
 }
 
 // TestRestoreOldLaravelBackupKeepsLiveDB verifies that a Laravel backup older
-// than legacy.LatestMigration is reported incompatible by inspect and rejected
+// than legacy.LatestMigration is listed as unsupported and rejected
 // by restore without touching the live database or its connection.
 func TestRestoreOldLaravelBackupKeepsLiveDB(t *testing.T) {
 	a := newTestApp(t)
@@ -97,14 +97,12 @@ func TestRestoreOldLaravelBackupKeepsLiveDB(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res := a.do("GET", "/api/backups/"+backup.Filename+"/inspect", nil, sess.Token, sess.CSRF)
-	body := decodeJSON(t, res)
-	if res.StatusCode != http.StatusOK || body["compatible"] != false || body["incompatibleReason"] != "legacy_unsupported" {
-		t.Fatalf("inspect %d %v", res.StatusCode, body)
+	if got := listedBackup(t, a, sess.Token, backup.Filename)["status"]; got != "legacyUnsupported" {
+		t.Fatalf("status %v, want legacyUnsupported", got)
 	}
 
-	res = a.do("POST", "/api/backups/"+backup.Filename+"/restore", nil, sess.Token, sess.CSRF)
-	body = decodeJSON(t, res)
+	res := a.do("POST", "/api/backups/"+backup.Filename+"/restore", nil, sess.Token, sess.CSRF)
+	body := decodeJSON(t, res)
 	if res.StatusCode != http.StatusUnprocessableEntity {
 		t.Fatalf("restore %d %v", res.StatusCode, body)
 	}
@@ -114,6 +112,67 @@ func TestRestoreOldLaravelBackupKeepsLiveDB(t *testing.T) {
 	if err := a.s.db.QueryRowContext(ctx, `SELECT email FROM users WHERE id = ?`, u.ID).Scan(&email); err != nil || email != "rw@test.com" {
 		t.Fatalf("live db damaged: %q %v", email, err)
 	}
+}
+
+// TestBackupStatus verifies the listed status follows the backup's schema
+// migrations and that restore refuses a backup made by a newer app.
+func TestBackupStatus(t *testing.T) {
+	a := newTestApp(t)
+	u := a.createUser("rw@test.com", "secret1", auth.RoleReadWrite)
+	sess := a.issue(u, false)
+	ctx := context.Background()
+
+	create := func(edit string) string {
+		t.Helper()
+		b, err := a.s.backups.Create(ctx, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if edit != "" {
+			f, err := sql.Open("sqlite", a.s.backups.Path(*b))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer f.Close()
+			if _, err := f.Exec(edit); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return b.Filename
+	}
+	current := create("")
+	outdated := create(`DELETE FROM schema_migrations WHERE version = (SELECT MAX(version) FROM schema_migrations)`)
+	newer := create(`INSERT INTO schema_migrations (version, applied_at) VALUES ('9999_from_the_future', '')`)
+
+	for name, want := range map[string]string{current: "current", outdated: "outdated", newer: "newer"} {
+		b := listedBackup(t, a, sess.Token, name)
+		if b["status"] != want {
+			t.Errorf("%s status %v, want %s", name, b["status"], want)
+		}
+		if wantPending := map[bool]float64{true: 1, false: 0}[want == "outdated"]; b["pendingCount"] != wantPending {
+			t.Errorf("%s pendingCount %v, want %v", name, b["pendingCount"], wantPending)
+		}
+	}
+
+	res := a.do("POST", "/api/backups/"+newer+"/restore", nil, sess.Token, sess.CSRF)
+	if body := decodeJSON(t, res); res.StatusCode != http.StatusUnprocessableEntity {
+		t.Fatalf("restore newer %d %v", res.StatusCode, body)
+	}
+}
+
+// listedBackup returns the backup named name from GET /api/backups.
+func listedBackup(t *testing.T, a *testApp, token, name string) map[string]any {
+	t.Helper()
+	res := a.do("GET", "/api/backups", nil, token, "")
+	body := decodeJSON(t, res)
+	list, _ := body["data"].([]any)
+	for _, item := range list {
+		if b, _ := item.(map[string]any); b["filename"] == name {
+			return b
+		}
+	}
+	t.Fatalf("backup %s not listed: %v", name, body)
+	return nil
 }
 
 // loadLaravelFixture loads testdata/laravel.sql and records the latest

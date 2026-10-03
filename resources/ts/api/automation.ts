@@ -1,6 +1,6 @@
 import { api } from './client'
 import { createCrudApi } from './crud'
-import type { AutomationRule, AutomationRuleLog, TriggerOption } from '@/types/automation'
+import type { AutomationRule, AutomationRuleLog, TriggerType } from '@/types/automation'
 import type { AutomationRuleFormData } from '@/schemas'
 
 const ENDPOINT = '/automation-rules'
@@ -16,7 +16,7 @@ export const automationApi = {
         api.post<{ success: boolean }, { rules: Array<{ id: number; priority: number }> }>(`${ENDPOINT}/reorder`, { rules }),
 
     test: (id: number | string, transactionId: number) =>
-        api.post<{ conditions_match: boolean; would_execute: boolean; actions: unknown[] }, { transaction_id: number }>(
+        api.post<{ conditionsMatch: boolean; actions: unknown[] }, { transaction_id: number }>(
             `${ENDPOINT}/${id}/test`,
             { transaction_id: transactionId }
         ),
@@ -25,5 +25,5 @@ export const automationApi = {
         api.get<AutomationRuleLog[]>(`${ENDPOINT}/${id}/logs`),
 
     getTriggers: () =>
-        api.get<TriggerOption[]>(`${ENDPOINT}/triggers`),
+        api.get<TriggerType[]>(`${ENDPOINT}/triggers`),
 }

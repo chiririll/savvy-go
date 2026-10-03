@@ -9,18 +9,16 @@ export interface BudgetProgress {
     spent: number
     remaining: number
     percent: number
-    period_start: string
-    period_end: string
-    is_exceeded: boolean
+    periodStart: string
+    periodEnd: string
+    isExceeded: boolean
 }
 
 export interface Budget extends BaseEntity {
     name: string
     amount: number
-    currencyId: number | null
-    currency?: Currency
+    currency: Currency | null
     period: BudgetPeriod
-    periodLabel: string
     startDate: string | null
     endDate: string | null
     isGlobal: boolean
@@ -28,5 +26,5 @@ export interface Budget extends BaseEntity {
     isActive: boolean
     categories: Category[]
     tags: Tag[]
-    progress?: BudgetProgress
+    progress: BudgetProgress | null
 }

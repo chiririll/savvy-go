@@ -57,7 +57,7 @@ export const createBudgetColumns = ({
             const progress = row.original.progress
             if (!progress) return null
 
-            const isExceeded = progress.is_exceeded
+            const isExceeded = progress.isExceeded
             const percent = Math.min(progress.percent, 100)
             return (
                 <div className="w-44 space-y-1">

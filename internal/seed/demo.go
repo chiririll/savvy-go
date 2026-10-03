@@ -246,7 +246,7 @@ func (s *seeder) seedIncome(accounts map[string]*domain.Account, incomes []domai
 				}
 				if err := s.addTx("income", accounts["checking"].ID, &salary.ID,
 					baseSalary+raise+float64(s.mtRand(-40, 40)),
-					"Acme Corp — Payroll", payday, nil, nil, nil, nil); err != nil {
+					"Acme Corp — Payroll", payday, nil, nil, nil); err != nil {
 					return err
 				}
 			}
@@ -261,7 +261,7 @@ func (s *seeder) seedIncome(accounts map[string]*domain.Account, incomes []domai
 					acct = accounts["eur"]
 				}
 				if err := s.addTx("income", acct.ID, &freelance.ID, float64(s.mtRand(450, 1900)),
-					vendors[s.mtRand(0, 2)], d, nil, nil, nil, nil); err != nil {
+					vendors[s.mtRand(0, 2)], d, nil, nil, nil); err != nil {
 					return err
 				}
 			}
@@ -271,7 +271,7 @@ func (s *seeder) seedIncome(accounts map[string]*domain.Account, incomes []domai
 			d := dateOn(cursor, minInt(15, daysInMonth(cursor)))
 			if s.inRange(d) {
 				if err := s.addTx("income", accounts["crypto"].ID, &investments.ID,
-					float64(s.mtRand(80, 420)), "Quarterly dividend payout", d, nil, nil, nil, nil); err != nil {
+					float64(s.mtRand(80, 420)), "Quarterly dividend payout", d, nil, nil, nil); err != nil {
 					return err
 				}
 			}
@@ -281,7 +281,7 @@ func (s *seeder) seedIncome(accounts map[string]*domain.Account, incomes []domai
 	if other != nil {
 		d := dateOn(s.now.AddDate(0, -2, 0), 12)
 		if err := s.addTx("income", accounts["checking"].ID, &other.ID,
-			float64(s.mtRand(900, 1400)), "Tax refund — IRS", d, nil, nil, nil, nil); err != nil {
+			float64(s.mtRand(900, 1400)), "Tax refund — IRS", d, nil, nil, nil); err != nil {
 			return err
 		}
 	}
@@ -305,7 +305,7 @@ func (s *seeder) seedFixedExpenses(accounts map[string]*domain.Account, expenses
 			d := startOfMonth(cursor)
 			if s.inRange(d) {
 				if err := s.addTx("expense", accounts["checking"].ID, &rent.ID, 2150,
-					"Rent — Greystar Apartments", d, nil, nil, nil, nil); err != nil {
+					"Rent — Greystar Apartments", d, nil, nil, nil); err != nil {
 					return err
 				}
 			}
@@ -328,7 +328,7 @@ func (s *seeder) seedFixedExpenses(accounts map[string]*domain.Account, expenses
 					winter = 1.4
 				}
 				amt := round2(float64(s.mtRand(u.lo, u.hi)) * winter)
-				if err := s.addTx("expense", accounts["checking"].ID, &utilities.ID, amt, u.name, d, nil, nil, nil, nil); err != nil {
+				if err := s.addTx("expense", accounts["checking"].ID, &utilities.ID, amt, u.name, d, nil, nil, nil); err != nil {
 					return err
 				}
 			}
@@ -340,7 +340,7 @@ func (s *seeder) seedFixedExpenses(accounts map[string]*domain.Account, expenses
 					continue
 				}
 				if err := s.addTx("expense", accounts["credit"].ID, &entertainment.ID, sub.price,
-					sub.name+" subscription", d, nil, nil, nil, nil); err != nil {
+					sub.name+" subscription", d, nil, nil, nil); err != nil {
 					return err
 				}
 			}
@@ -423,7 +423,7 @@ func (s *seeder) seedVariableExpenses(accounts map[string]*domain.Account, expen
 			if cat.Name == "#HOUSING" && business != nil && s.mtRand(1, 100) <= 20 {
 				tagIDs = append(tagIDs, business.ID)
 			}
-			if err := s.addTx("expense", acct.ID, &cat.ID, amount, merchant, cursor, nil, nil, nil, tagIDs); err != nil {
+			if err := s.addTx("expense", acct.ID, &cat.ID, amount, merchant, cursor, nil, nil, tagIDs); err != nil {
 				return err
 			}
 		}
@@ -438,7 +438,7 @@ func (s *seeder) seedTransfersAndDebt(accounts map[string]*domain.Account) error
 			to := accounts["savings"].ID
 			amt := 800.0
 			if err := s.addTx("transfer", accounts["checking"].ID, nil, amt,
-				"Automatic transfer to savings", d, &to, &amt, nil, nil); err != nil {
+				"Automatic transfer to savings", d, &to, &amt, nil); err != nil {
 				return err
 			}
 		}
@@ -448,7 +448,7 @@ func (s *seeder) seedTransfersAndDebt(accounts map[string]*domain.Account) error
 			pay := float64(s.mtRand(600, 1400))
 			to := accounts["credit"].ID
 			if err := s.addTx("debt_payment", accounts["checking"].ID, nil, pay,
-				"Amex statement payment", dCard, &to, &pay, nil, nil); err != nil {
+				"Amex statement payment", dCard, &to, &pay, nil); err != nil {
 				return err
 			}
 		}
@@ -458,7 +458,7 @@ func (s *seeder) seedTransfersAndDebt(accounts map[string]*domain.Account) error
 			to := accounts["mortgage"].ID
 			amt := 1680.00
 			if err := s.addTx("debt_payment", accounts["checking"].ID, nil, amt,
-				"Monthly mortgage payment", dMort, &to, &amt, nil, nil); err != nil {
+				"Monthly mortgage payment", dMort, &to, &amt, nil); err != nil {
 				return err
 			}
 		}
@@ -468,10 +468,9 @@ func (s *seeder) seedTransfersAndDebt(accounts map[string]*domain.Account) error
 			if s.inRange(dFx) {
 				usdOut := float64(s.mtRand(300, 600))
 				toAmt := round2(usdOut / eurUSDRate)
-				rate := roundN(1/eurUSDRate, 6)
 				to := accounts["eur"].ID
 				if err := s.addTx("transfer", accounts["checking"].ID, nil, usdOut,
-					"USD → EUR top-up", dFx, &to, &toAmt, &rate, nil); err != nil {
+					"USD → EUR top-up", dFx, &to, &toAmt, nil); err != nil {
 					return err
 				}
 			}
@@ -482,7 +481,7 @@ func (s *seeder) seedTransfersAndDebt(accounts map[string]*domain.Account) error
 	to := accounts["loan_out"].ID
 	amt := 400.0
 	return s.addTx("debt_collection", accounts["checking"].ID, nil, amt,
-		"Michael — partial repayment", d, &to, &amt, nil, nil)
+		"Michael — partial repayment", d, &to, &amt, nil)
 }
 
 // seedPending adds one overdue pending expense and several upcoming ones so the
@@ -752,7 +751,7 @@ func (s *seeder) createAutomation(tags []domain.Tag) error {
 	return nil
 }
 
-func (s *seeder) addTx(typ string, accountID int64, catID *int64, amount float64, desc string, date time.Time, toID *int64, toAmt *float64, rate *float64, tagIDs []int64) error {
+func (s *seeder) addTx(typ string, accountID int64, catID *int64, amount float64, desc string, date time.Time, toID *int64, toAmt *float64, tagIDs []int64) error {
 	if !s.inRange(date) {
 		return nil
 	}
@@ -763,7 +762,7 @@ func (s *seeder) addTx(typ string, accountID int64, catID *int64, amount float64
 	status := "confirmed"
 	in := domain.TxInput{
 		Type: typ, AccountID: accountID, ToAccountID: toID, CategoryID: catID,
-		Amount: decimal.NewFromFloat(amount), ToAmount: floatPtrDecimal(toAmt), ExchangeRate: floatPtrDecimal(rate),
+		Amount: decimal.NewFromFloat(amount), ToAmount: floatPtrDecimal(toAmt),
 		Description: &desc, Date: &d, Status: &status, TagIDs: tagIDs,
 	}
 	created, err := s.txs.Create(s.ctx, in)

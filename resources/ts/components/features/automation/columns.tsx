@@ -43,7 +43,7 @@ export function createAutomationColumns({ onDelete, onToggle, onEdit, isReadOnly
             accessorKey: 'trigger_type',
             header: () => i18n.t('pages:automation.columns.trigger'),
             cell: ({ row }) => (
-                <Badge variant="outline">{i18n.t(`forms:automation.triggers.${row.original.trigger_type}`)}</Badge>
+                <Badge variant="outline">{i18n.t(`forms:automation.triggers.${row.original.triggerType}`)}</Badge>
             ),
         },
         {
@@ -68,7 +68,7 @@ export function createAutomationColumns({ onDelete, onToggle, onEdit, isReadOnly
             accessorKey: 'runs_count',
             header: () => i18n.t('pages:automation.columns.runs'),
             cell: ({ row }) => (
-                <span className="text-sm">{row.original.runs_count}</span>
+                <span className="text-sm">{row.original.runsCount}</span>
             ),
         },
         {
@@ -76,7 +76,7 @@ export function createAutomationColumns({ onDelete, onToggle, onEdit, isReadOnly
             header: () => i18n.t('pages:automation.columns.active'),
             cell: ({ row }) => (
                 <Switch
-                    checked={row.original.is_active}
+                    checked={row.original.isActive}
                     disabled={isReadOnly}
                     onCheckedChange={() => onToggle(row.original.id)}
                 />

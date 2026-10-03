@@ -47,11 +47,7 @@ export function NetWorthChart({ filters }: NetWorthChartProps) {
             },
             xAxis: {
                 type: 'category',
-                data: (data.dates ?? data.labels).map((value, index) =>
-                    data.dates?.[index]
-                        ? formatReportPeriodLabel(value, groupBy, 'weekNum')
-                        : value
-                ),
+                data: data.dates.map((date) => formatReportPeriodLabel(date, groupBy, 'weekNum')),
                 axisLabel: {
                     fontSize: 11,
                     color: '#64748b',

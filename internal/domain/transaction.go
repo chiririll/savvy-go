@@ -37,40 +37,38 @@ type TxItem struct {
 }
 
 type Transaction struct {
-	ID           int64
-	Type         string
-	AccountID    int64
-	ToAccountID  *int64
-	CategoryID   *int64
-	Amount       decimal.Decimal
-	ToAmount     *decimal.Decimal
-	ExchangeRate *decimal.Decimal
-	Description  *string
-	Date         *string
-	Status       string
-	RecurringID  *int64
-	CreatedAt    *time.Time
-	Account      *Account
-	ToAccount    *Account
-	Category     *Category
-	Items        []TxItem
-	Tags         []Tag
+	ID          int64
+	Type        string
+	AccountID   int64
+	ToAccountID *int64
+	CategoryID  *int64
+	Amount      decimal.Decimal
+	ToAmount    *decimal.Decimal
+	Description *string
+	Date        *string
+	Status      string
+	RecurringID *int64
+	CreatedAt   *time.Time
+	Account     *Account
+	ToAccount   *Account
+	Category    *Category
+	Items       []TxItem
+	Tags        []Tag
 }
 
 type TxInput struct {
-	Type         string
-	AccountID    int64
-	ToAccountID  *int64
-	CategoryID   *int64
-	Amount       decimal.Decimal
-	ToAmount     *decimal.Decimal
-	ExchangeRate *decimal.Decimal
-	Description  *string
-	Date         *string
-	Status       *string
-	RecurringID  *int64
-	TagIDs       []int64
-	Items        []TxItem
+	Type        string
+	AccountID   int64
+	ToAccountID *int64
+	CategoryID  *int64
+	Amount      decimal.Decimal
+	ToAmount    *decimal.Decimal
+	Description *string
+	Date        *string
+	Status      *string
+	RecurringID *int64
+	TagIDs      []int64
+	Items       []TxItem
 }
 
 type Transactions struct{ DB *sql.DB }
@@ -102,8 +100,8 @@ func (s Transactions) Create(ctx context.Context, in TxInput) (*Transaction, err
 	res, err := db.Q(s.DB).InsertTransaction(ctx, sqlc.InsertTransactionParams{
 		Type: in.Type, AccountID: in.AccountID, ToAccountID: db.NullInt64(in.ToAccountID),
 		CategoryID: db.NullInt64(in.CategoryID), Amount: money.ToMinor(in.Amount, dec), ToAmount: money.ToNullMinor(in.ToAmount, toDec),
-		ExchangeRate: money.NullDecimal(in.ExchangeRate), Description: db.NullString(in.Description),
-		Date: db.NullString(in.Date), Status: status, RecurringTransactionID: db.NullInt64(in.RecurringID),
+		Description: db.NullString(in.Description),
+		Date:        db.NullString(in.Date), Status: status, RecurringTransactionID: db.NullInt64(in.RecurringID),
 		CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
 	})
 	if err != nil {
@@ -135,8 +133,8 @@ func (s Transactions) Update(ctx context.Context, id int64, in TxInput) (*Transa
 	err = db.Q(s.DB).UpdateTransaction(ctx, sqlc.UpdateTransactionParams{
 		Type: in.Type, AccountID: in.AccountID, ToAccountID: db.NullInt64(in.ToAccountID),
 		CategoryID: db.NullInt64(in.CategoryID), Amount: money.ToMinor(in.Amount, dec), ToAmount: money.ToNullMinor(in.ToAmount, toDec),
-		ExchangeRate: money.NullDecimal(in.ExchangeRate), Description: db.NullString(in.Description),
-		Date: db.NullString(in.Date), UpdatedAt: db.NS(now), ID: id,
+		Description: db.NullString(in.Description),
+		Date:        db.NullString(in.Date), UpdatedAt: db.NS(now), ID: id,
 	})
 	if err != nil {
 		return nil, err
@@ -219,7 +217,7 @@ func (s Transactions) Duplicate(ctx context.Context, id int64) (*Transaction, er
 	in := TxInput{
 		Type: cur.Type, AccountID: cur.AccountID, ToAccountID: cur.ToAccountID,
 		CategoryID: cur.CategoryID, Amount: cur.Amount, ToAmount: cur.ToAmount,
-		ExchangeRate: cur.ExchangeRate, Description: cur.Description, Date: &today,
+		Description: cur.Description, Date: &today,
 		Items: cur.Items,
 	}
 	for _, t := range cur.Tags {
@@ -256,39 +254,43 @@ func (s Transactions) Filtered(ctx context.Context, f filter.TxFilter, page, per
 	return s.hydrate(ctx, rows), int(total), nil
 }
 
-func (s Transactions) Summary(ctx context.Context, pendingOnly bool) map[string]any {
+// TransactionSummary totals transactions in the base currency (nil when there
+// is none), rounded to its decimals.
+type TransactionSummary struct {
+	Income   decimal.Decimal
+	Expense  decimal.Decimal
+	Count    int
+	Currency *Currency
+}
+
+func (s Transactions) Summary(ctx context.Context, pendingOnly bool) TransactionSummary {
 	status := "confirmed"
 	if pendingOnly {
 		status = "pending"
 	}
+	base, _ := (Currencies{DB: s.DB}).Base(ctx)
+	out := TransactionSummary{Currency: base}
 	rows, err := db.Q(s.DB).ListTransactionSummaryRows(ctx, status)
 	if err != nil {
-		return map[string]any{"income": 0, "expense": 0, "balance": 0, "transactions_count": 0, "currency": nil}
+		return out
 	}
-	income, expense := decimal.Zero, decimal.Zero
-	n := 0
 	for _, r := range rows {
 		amount := money.FromMinor(r.Amount, int(r.Decimals))
 		if r.IsBase == 0 && !r.Rate.IsZero() {
 			amount = amount.Mul(r.Rate)
 		}
 		if r.Type == "income" {
-			income = income.Add(amount)
+			out.Income = out.Income.Add(amount)
 		} else {
-			expense = expense.Add(amount)
+			out.Expense = out.Expense.Add(amount)
 		}
-		n++
+		out.Count++
 	}
-	code, _ := db.Q(s.DB).GetBaseCurrencyCode(ctx)
-	baseDec := 2
-	if base, _ := (Currencies{DB: s.DB}).Base(ctx); base != nil {
-		baseDec = base.Decimals
+	if base != nil {
+		out.Income = out.Income.Round(int32(base.Decimals))
+		out.Expense = out.Expense.Round(int32(base.Decimals))
 	}
-	return map[string]any{
-		"income": money.Number(income, baseDec), "expense": money.Number(expense, baseDec),
-		"balance":            money.Number(income.Sub(expense), baseDec),
-		"transactions_count": n, "currency": nilOr(code),
-	}
+	return out
 }
 
 func (s Transactions) list(ctx context.Context, arg sqlc.ListTransactionsParams) ([]Transaction, error) {
@@ -401,9 +403,8 @@ func (s Transactions) decimalsFor(ctx context.Context, accountID int64, toAccoun
 func txFromRow(r sqlc.ListTransactionsRow) Transaction {
 	t := Transaction{
 		ID: r.ID, Type: r.Type, AccountID: r.AccountID, Status: r.Status,
-		Amount:       money.FromMinor(r.Amount, int(r.Decimals)),
-		ToAmount:     money.FromNullMinor(r.ToAmount, int(r.ToDecimals)),
-		ExchangeRate: money.PtrDecimal(r.ExchangeRate),
+		Amount:   money.FromMinor(r.Amount, int(r.Decimals)),
+		ToAmount: money.FromNullMinor(r.ToAmount, int(r.ToDecimals)),
 	}
 	if r.ToAccountID.Valid {
 		t.ToAccountID = &r.ToAccountID.Int64

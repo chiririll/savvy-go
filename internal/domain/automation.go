@@ -220,9 +220,8 @@ func (s Automation) Test(ctx context.Context, ruleID, txID int64) (map[string]an
 	}
 	match := evaluateConditions(rule.Conditions, tx)
 	return map[string]any{
-		"conditions_match": match,
-		"would_execute":    match,
-		"actions":          rule.Actions,
+		"conditionsMatch": match,
+		"actions":         rule.Actions,
 	}, nil
 }
 

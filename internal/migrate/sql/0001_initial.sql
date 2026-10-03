@@ -185,7 +185,6 @@ CREATE TABLE IF NOT EXISTS transactions (
     category_id INTEGER REFERENCES categories(id),
     amount INTEGER NOT NULL,
     to_amount INTEGER,
-    exchange_rate TEXT,
     description TEXT,
     dedup_hash TEXT,
     date TEXT,

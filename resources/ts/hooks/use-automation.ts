@@ -66,7 +66,7 @@ export function useToggleAutomationRule() {
         mutationFn: (id: string | number) => automationApi.toggle(id),
         invalidateKeys: [QUERY_KEY],
         successMessage: (data: AutomationRule) =>
-            data.is_active
+            data.isActive
                 ? i18n.t('toasts.automation.enabled')
                 : i18n.t('toasts.automation.disabled'),
     })

@@ -12,7 +12,6 @@ import (
 
 	"savvy-go/internal/db"
 	"savvy-go/internal/db/sqlc"
-	"savvy-go/internal/money"
 )
 
 var one = decimal.NewFromInt(1)
@@ -225,7 +224,7 @@ func (s Currencies) Catalog(ctx context.Context) []map[string]any {
 		}
 		out = append(out, map[string]any{
 			"code": item.Code, "name": item.Name, "symbol": item.Symbol,
-			"decimals": item.Decimals, "rate": money.Plain(item.Rate),
+			"decimals": item.Decimals, "rate": item.Rate,
 		})
 	}
 	return out

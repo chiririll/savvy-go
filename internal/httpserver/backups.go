@@ -21,7 +21,11 @@ func (s *Server) backupsIndex(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, mapSlice(list, dto.Backup))
+	out := make([]dto.Backup, 0, len(list))
+	for _, b := range list {
+		out = append(out, s.backupView(r.Context(), b))
+	}
+	writeData(w, http.StatusOK, out)
 }
 
 func (s *Server) backupsStore(w http.ResponseWriter, r *http.Request) {
@@ -34,7 +38,7 @@ func (s *Server) backupsStore(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusCreated, dto.Backup(*b))
+	writeData(w, http.StatusCreated, s.backupView(r.Context(), *b))
 }
 
 func (s *Server) backupsUpload(w http.ResponseWriter, r *http.Request) {
@@ -67,7 +71,7 @@ func (s *Server) backupsUpload(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, dto.Backup(*b))
+	writeJSON(w, http.StatusOK, s.backupView(r.Context(), *b))
 }
 
 func (s *Server) backupsDownload(w http.ResponseWriter, r *http.Request) {
@@ -81,31 +85,35 @@ func (s *Server) backupsDownload(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, path)
 }
 
-func (s *Server) backupsInspect(w http.ResponseWriter, r *http.Request) {
-	b := s.backupParam(w, r)
-	if b == nil {
-		return
-	}
-	out, err := s.backups.Inspect(r.Context(), *b)
+// backupView describes b together with what restoring it here would do.
+func (s *Server) backupView(ctx context.Context, b domain.Backup) dto.Backup {
+	status, pending := s.backupStatus(ctx, b)
+	return dto.NewBackup(b, status, pending)
+}
+
+// backupStatus classifies b for restore and counts the migrations restore
+// would apply. It reads the file, so it matches what restore will do.
+func (s *Server) backupStatus(ctx context.Context, b domain.Backup) (string, int) {
+	info, err := legacy.InspectFile(ctx, s.backups.Path(b))
 	if err != nil {
-		writeMessage(w, 422, err.Error())
-		return
+		return dto.BackupInvalid, 0
 	}
-	// Laravel backups have no schema_migrations, so the schema diff above says
-	// nothing about them; report whether the importer supports their version.
-	info, err := legacy.InspectFile(r.Context(), s.backups.Path(*b))
-	if err != nil {
-		writeMessage(w, 422, err.Error())
-		return
+	if info.Laravel {
+		if !info.Supported {
+			return dto.BackupLegacyUnsupported, 0
+		}
+		return dto.BackupLegacy, 0
 	}
-	out["legacy"] = info.Laravel
-	if info.Laravel && !info.Supported {
-		out["compatible"] = false
-		out["incompatibleReason"] = "legacy_unsupported"
-	} else if out["compatible"] == false {
-		out["incompatibleReason"] = "newer"
+	pending, unknown, err := s.backups.Migrations(ctx, b)
+	switch {
+	case err != nil:
+		return dto.BackupInvalid, 0
+	case len(unknown) > 0:
+		return dto.BackupNewer, 0
+	case len(pending) > 0:
+		return dto.BackupOutdated, len(pending)
 	}
-	writeJSON(w, http.StatusOK, out)
+	return dto.BackupCurrent, 0
 }
 
 // upgradeBackup brings a staged backup copy up to the current schema before it
@@ -117,6 +125,10 @@ func (s *Server) upgradeBackup(ctx context.Context, staged *sql.DB) error {
 func (s *Server) backupsRestore(w http.ResponseWriter, r *http.Request) {
 	b := s.backupParam(w, r)
 	if b == nil {
+		return
+	}
+	if status, _ := s.backupStatus(r.Context(), *b); !dto.BackupRestorable(status) {
+		writeMessage(w, 422, "This backup cannot be restored by this version of the app.")
 		return
 	}
 	newDB, err := s.backups.Restore(r.Context(), *b, s.upgradeBackup)

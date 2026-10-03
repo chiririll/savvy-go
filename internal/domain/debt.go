@@ -9,7 +9,6 @@ import (
 
 	"savvy-go/internal/db"
 	"savvy-go/internal/db/sqlc"
-	"savvy-go/internal/money"
 )
 
 type Debts struct {
@@ -115,24 +114,35 @@ func (s Debts) Reopen(ctx context.Context, id int64) (*Account, error) {
 	return s.Accounts.ByID(ctx, id)
 }
 
-func (s Debts) Summary(ctx context.Context) map[string]any {
+// DebtSummary totals open debts in the base currency (nil when there is none),
+// rounded to its decimals.
+type DebtSummary struct {
+	IOwe     decimal.Decimal
+	OwedToMe decimal.Decimal
+	Count    int
+	Currency *Currency
+}
+
+func (s Debts) Summary(ctx context.Context) DebtSummary {
 	debts, _ := s.All(ctx, false)
-	iOwe, owed := decimal.Zero, decimal.Zero
+	base, _ := (Currencies{DB: s.Accounts.DB}).Base(ctx)
+	out := DebtSummary{Count: len(debts), Currency: base}
 	for _, d := range debts {
 		amt := d.Balance
 		if d.Currency != nil && !d.Currency.IsBase {
 			amt = d.Currency.ConvertToBase(amt)
 		}
 		if d.DebtType != nil && *d.DebtType == "i_owe" {
-			iOwe = iOwe.Add(amt)
+			out.IOwe = out.IOwe.Add(amt)
 		} else {
-			owed = owed.Add(amt)
+			out.OwedToMe = out.OwedToMe.Add(amt)
 		}
 	}
-	return map[string]any{
-		"total_i_owe": money.Number(iOwe, 2), "total_owed_to_me": money.Number(owed, 2), "net_debt": money.Number(owed.Sub(iOwe), 2),
-		"debts_count": len(debts), "currency": nil, "decimals": 2,
+	if base != nil {
+		out.IOwe = out.IOwe.Round(int32(base.Decimals))
+		out.OwedToMe = out.OwedToMe.Round(int32(base.Decimals))
 	}
+	return out
 }
 
 func (s Debts) Delete(ctx context.Context, id int64) error {

@@ -73,14 +73,14 @@ func TestMultipartImportPipeline(t *testing.T) {
 	if res.StatusCode != 200 {
 		t.Fatalf("parse %d %v", res.StatusCode, parsed)
 	}
-	importID := parsed["data"].(map[string]any)["import_id"].(string)
+	importID := parsed["data"].(map[string]any)["importId"].(string)
 
 	res = a.do("GET", "/api/transactions/import/"+importID, nil, sess.Token, "")
 	status := decodeJSON(t, res)["data"].(map[string]any)
 	if res.StatusCode != 200 || status["status"] != "parsed" {
 		t.Fatalf("parsed status %d %v", res.StatusCode, status)
 	}
-	if int(status["total_rows"].(float64)) != 2 {
+	if int(status["totalRows"].(float64)) != 2 {
 		t.Fatalf("rows %v", status)
 	}
 	headers := status["parse"].(map[string]any)["headers"].([]any)
@@ -162,7 +162,7 @@ func TestBackupCreateAndList(t *testing.T) {
 		t.Fatalf("list %d %v", res.StatusCode, list)
 	}
 	item := list["data"].([]any)[0].(map[string]any)
-	if item["note"] != "nightly" || item["schemaStatus"] != "current" {
+	if item["note"] != "nightly" || item["status"] != "current" {
 		t.Fatalf("metadata not read from backup file: %v", item)
 	}
 
@@ -180,7 +180,7 @@ func TestBackupCreateAndList(t *testing.T) {
 	list = decodeJSON(t, res)
 	items := list["data"].([]any)
 	if len(items) != 1 || items[0].(map[string]any)["filename"] != "foreign.sqlite" ||
-		items[0].(map[string]any)["schemaStatus"] != "unknown" {
+		items[0].(map[string]any)["status"] != "invalid" {
 		t.Fatalf("list after fs change: %v", list)
 	}
 }

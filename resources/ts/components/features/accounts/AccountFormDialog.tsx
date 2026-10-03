@@ -36,7 +36,7 @@ export function AccountFormDialog({
             toFormValues={(item) => ({
                 name: item.name,
                 type: item.type === 'debt' ? 'bank' : item.type,
-                currency: encodeAccountCurrency({ id: item.currencyId }),
+                currency: encodeAccountCurrency({ id: item.currency?.id }),
                 initial_balance: item.initialBalance,
                 is_active: item.isActive,
             })}

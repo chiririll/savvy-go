@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/shopspring/decimal"
@@ -95,6 +96,9 @@ func TestUpgrade(t *testing.T) {
 	}
 	if tableExists(ctx, sqlDB, "migrations") {
 		t.Fatal("laravel migrations table should be dropped")
+	}
+	if cols, _ := columns(ctx, sqlDB, "transactions"); slices.Contains(cols, "exchange_rate") {
+		t.Fatal("transactions.exchange_rate should be dropped")
 	}
 	assertMinorUnits(t, sqlDB)
 	assertDateOnly(t, sqlDB)

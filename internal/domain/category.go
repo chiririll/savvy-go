@@ -155,7 +155,15 @@ func (s Categories) SetDefault(ctx context.Context, id int64) (*Category, error)
 	return s.ByID(ctx, id)
 }
 
-func (s Categories) Statistics(ctx context.Context, id int64, start, end string) (map[string]any, error) {
+// CategoryStatistics totals a category's transactions in the base currency,
+// rounded to its decimals.
+type CategoryStatistics struct {
+	Category Category
+	Count    int
+	Total    decimal.Decimal
+}
+
+func (s Categories) Statistics(ctx context.Context, id int64, start, end string) (*CategoryStatistics, error) {
 	c, err := s.ByID(ctx, id)
 	if err != nil || c == nil {
 		return nil, err
@@ -163,23 +171,17 @@ func (s Categories) Statistics(ctx context.Context, id int64, start, end string)
 	rows, _ := db.Q(s.DB).CategoryStatistics(ctx, sqlc.CategoryStatisticsParams{
 		CategoryID: db.NI(id), StartDate: db.Narg(start), EndDate: db.Narg(end),
 	})
-	count := int64(0)
-	total := decimal.Zero
+	out := &CategoryStatistics{Category: *c}
 	for _, row := range rows {
-		count += row.Cnt
-		total = total.Add(money.FromMinor(row.Total, int(row.Decimals)).Mul(row.Rate))
+		out.Count += int(row.Cnt)
+		out.Total = out.Total.Add(money.FromMinor(row.Total, int(row.Decimals)).Mul(row.Rate))
 	}
 	baseDec := 2
 	if base, _ := (Currencies{DB: s.DB}).Base(ctx); base != nil {
 		baseDec = base.Decimals
 	}
-	return map[string]any{
-		"category_id":        c.ID,
-		"category_name":      c.Name,
-		"type":               c.Type,
-		"transactions_count": int(count),
-		"total_amount":       money.Number(total, baseDec),
-	}, nil
+	out.Total = out.Total.Round(int32(baseDec))
+	return out, nil
 }
 
 func categoryFrom(id int64, name, typ string, icon, color sql.NullString, isDefault, count int64) Category {

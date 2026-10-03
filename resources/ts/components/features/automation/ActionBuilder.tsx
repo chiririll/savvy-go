@@ -109,8 +109,8 @@ export function ActionBuilder({ value, onChange }: ActionBuilderProps) {
                                 </SelectTrigger>
                                 <SelectContent>
                                     {ACTION_TYPES.map(actionType => (
-                                        <SelectItem key={actionType.value} value={actionType.value}>
-                                            {t(`automation.actionTypes.${actionType.value}`)}
+                                        <SelectItem key={actionType} value={actionType}>
+                                            {t(`automation.actionTypes.${actionType}`)}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>

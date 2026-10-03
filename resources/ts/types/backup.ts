@@ -1,21 +1,18 @@
-export type BackupSchemaStatus = 'current' | 'outdated' | 'newer' | 'unknown'
+export type BackupStatus =
+    | 'current'
+    | 'outdated'
+    | 'newer'
+    | 'legacy'
+    | 'legacyUnsupported'
+    | 'invalid'
 
 export interface Backup {
     filename: string
     size: number
     note: string | null
-    schemaVersion: string | null
-    schemaStatus: BackupSchemaStatus
-    createdAt: string
-}
-
-export interface BackupInspection {
-    valid: boolean
-    compatible: boolean
-    incompatibleReason?: 'newer' | 'legacy_unsupported'
-    legacy: boolean
+    appVersion: string | null
+    status: BackupStatus
+    /** Migrations restore applies; non-zero only for 'outdated'. */
     pendingCount: number
-    pendingMigrations: string[]
-    unknownCount: number
-    unknownMigrations: string[]
+    createdAt: string
 }

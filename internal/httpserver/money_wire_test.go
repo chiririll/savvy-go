@@ -19,7 +19,7 @@ func rawBody(t *testing.T, res *http.Response) string {
 	return string(b)
 }
 
-func TestMoneyIsSerializedAsNumbersWithCurrencyDecimals(t *testing.T) {
+func TestMoneyIsSerializedAsNumbersAtCurrencyScale(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("wire@test.com", "secret1", auth.RoleReadWrite)
 	sess := a.issue(u, false)
@@ -60,10 +60,11 @@ func TestMoneyIsSerializedAsNumbersWithCurrencyDecimals(t *testing.T) {
 		amount any
 		want   string
 	}{
-		{"usd keeps two decimals", usdAcc, 12.5, `"amount":12.50`},
+		{"usd is a plain number", usdAcc, 12.5, `"amount":12.5,`},
 		{"usd rounds half away from zero", usdAcc, 10.005, `"amount":10.01`},
 		{"jpy has no decimals", jpyAcc, 1500, `"amount":1500,`},
-		{"btc keeps eight decimals", btcAcc, 0.00012345, `"amount":0.00012345`},
+		{"btc keeps eight decimals", btcAcc, 0.00012345, `"amount":0.00012345,`},
+		{"btc rounds to eight decimals", btcAcc, 0.000000015, `"amount":0.00000002,`},
 	}
 	for _, c := range cases {
 		if body := postTx(c.acc, c.amount); !strings.Contains(body, c.want) {
@@ -73,7 +74,7 @@ func TestMoneyIsSerializedAsNumbersWithCurrencyDecimals(t *testing.T) {
 
 	res := a.do("GET", "/api/accounts/"+itoa(usdAcc), nil, sess.Token, "")
 	body := rawBody(t, res)
-	for _, want := range []string{`"initialBalance":100.00`, `"currentBalance":122.51`} {
+	for _, want := range []string{`"initialBalance":100,`, `"currentBalance":122.51,`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("account response %s does not contain %s", body, want)
 		}

@@ -94,9 +94,9 @@ func (q *Queries) DeleteTransactionTags(ctx context.Context, transactionID int64
 }
 
 const insertTransaction = `-- name: InsertTransaction :execresult
-INSERT INTO transactions (type, account_id, to_account_id, category_id, amount, to_amount, exchange_rate,
+INSERT INTO transactions (type, account_id, to_account_id, category_id, amount, to_amount,
 	description, date, status, recurring_transaction_id, created_at, updated_at)
-VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
 `
 
 type InsertTransactionParams struct {
@@ -106,7 +106,6 @@ type InsertTransactionParams struct {
 	CategoryID             sql.NullInt64
 	Amount                 int64
 	ToAmount               sql.NullInt64
-	ExchangeRate           decimal.NullDecimal
 	Description            sql.NullString
 	Date                   sql.NullString
 	Status                 string
@@ -123,7 +122,6 @@ func (q *Queries) InsertTransaction(ctx context.Context, arg InsertTransactionPa
 		arg.CategoryID,
 		arg.Amount,
 		arg.ToAmount,
-		arg.ExchangeRate,
 		arg.Description,
 		arg.Date,
 		arg.Status,
@@ -335,7 +333,7 @@ func (q *Queries) ListTransactionTags(ctx context.Context, transactionID int64) 
 }
 
 const listTransactions = `-- name: ListTransactions :many
-SELECT t.id, t.type, t.account_id, t.to_account_id, t.category_id, t.amount, t.to_amount, t.exchange_rate,
+SELECT t.id, t.type, t.account_id, t.to_account_id, t.category_id, t.amount, t.to_amount,
 	t.description, t.date, t.status, t.recurring_transaction_id, t.created_at,
 	ca.decimals AS decimals, COALESCE(cb.decimals, ca.decimals) AS to_decimals
 FROM transactions t
@@ -374,7 +372,6 @@ type ListTransactionsRow struct {
 	CategoryID             sql.NullInt64
 	Amount                 int64
 	ToAmount               sql.NullInt64
-	ExchangeRate           decimal.NullDecimal
 	Description            sql.NullString
 	Date                   sql.NullString
 	Status                 string
@@ -411,7 +408,6 @@ func (q *Queries) ListTransactions(ctx context.Context, arg ListTransactionsPara
 			&i.CategoryID,
 			&i.Amount,
 			&i.ToAmount,
-			&i.ExchangeRate,
 			&i.Description,
 			&i.Date,
 			&i.Status,
@@ -449,21 +445,20 @@ func (q *Queries) SkipTransaction(ctx context.Context, arg SkipTransactionParams
 
 const updateTransaction = `-- name: UpdateTransaction :exec
 UPDATE transactions SET type=?, account_id=?, to_account_id=?, category_id=?, amount=?, to_amount=?,
-	exchange_rate=?, description=?, date=?, updated_at=? WHERE id=?
+	description=?, date=?, updated_at=? WHERE id=?
 `
 
 type UpdateTransactionParams struct {
-	Type         string
-	AccountID    int64
-	ToAccountID  sql.NullInt64
-	CategoryID   sql.NullInt64
-	Amount       int64
-	ToAmount     sql.NullInt64
-	ExchangeRate decimal.NullDecimal
-	Description  sql.NullString
-	Date         sql.NullString
-	UpdatedAt    sql.NullString
-	ID           int64
+	Type        string
+	AccountID   int64
+	ToAccountID sql.NullInt64
+	CategoryID  sql.NullInt64
+	Amount      int64
+	ToAmount    sql.NullInt64
+	Description sql.NullString
+	Date        sql.NullString
+	UpdatedAt   sql.NullString
+	ID          int64
 }
 
 func (q *Queries) UpdateTransaction(ctx context.Context, arg UpdateTransactionParams) error {
@@ -474,7 +469,6 @@ func (q *Queries) UpdateTransaction(ctx context.Context, arg UpdateTransactionPa
 		arg.CategoryID,
 		arg.Amount,
 		arg.ToAmount,
-		arg.ExchangeRate,
 		arg.Description,
 		arg.Date,
 		arg.UpdatedAt,

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"slices"
 )
 
 type addColumn struct {
@@ -50,6 +51,34 @@ var extraColumns = map[string][]addColumn{
 	"categories": {
 		{"is_default", "INTEGER NOT NULL DEFAULT 0"},
 	},
+}
+
+// Laravel columns the Go schema dropped. Copy skips them on its own (it copies
+// common columns only); an in-place upgrade removes them.
+var droppedColumns = map[string][]string{
+	// Derivable from amount and to_amount.
+	"transactions": {"exchange_rate"},
+}
+
+// dropColumns removes droppedColumns that are still present. Idempotent.
+func dropColumns(ctx context.Context, db *sql.DB) error {
+	for table, drop := range droppedColumns {
+		have, err := columns(ctx, db, table)
+		if err != nil {
+			return err
+		}
+		for _, col := range drop {
+			if !slices.Contains(have, col) {
+				continue
+			}
+			ddl := fmt.Sprintf(`ALTER TABLE %s DROP COLUMN %s`, table, quoteIdent(col))
+			if _, err := db.ExecContext(ctx, ddl); err != nil {
+				return fmt.Errorf("%s: %w", ddl, err)
+			}
+			slog.Info("legacy dropped column", "table", table, "column", col)
+		}
+	}
+	return nil
 }
 
 // ensureColumns adds missing domain columns on a Laravel-era database so the

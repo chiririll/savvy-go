@@ -17,27 +17,12 @@ func (s *Server) automationIndex(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, mapSlice(list, dto.AutomationRule))
+	writeData(w, http.StatusOK, dto.Map(list, dto.NewAutomationRule))
 }
 
+// automationTriggers lists the trigger types; the SPA localizes them.
 func (s *Server) automationTriggers(w http.ResponseWriter, r *http.Request) {
-	createL, createD := domainTriggerMeta("on_transaction_create")
-	updateL, updateD := domainTriggerMeta("on_transaction_update")
-	writeJSON(w, http.StatusOK, []map[string]string{
-		{"value": "on_transaction_create", "label": createL, "description": createD},
-		{"value": "on_transaction_update", "label": updateL, "description": updateD},
-	})
-}
-
-func domainTriggerMeta(v string) (string, string) {
-	switch v {
-	case "on_transaction_create":
-		return "On Transaction Create", "Triggers when a new transaction is created"
-	case "on_transaction_update":
-		return "On Transaction Update", "Triggers when a transaction is updated"
-	default:
-		return v, ""
-	}
+	writeJSON(w, http.StatusOK, []string{"on_transaction_create", "on_transaction_update"})
 }
 
 func (s *Server) automationStore(w http.ResponseWriter, r *http.Request) {
@@ -50,7 +35,7 @@ func (s *Server) automationStore(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusCreated, dto.AutomationRule(*rule))
+	writeData(w, http.StatusCreated, dto.NewAutomationRule(*rule))
 }
 
 func (s *Server) automationShow(w http.ResponseWriter, r *http.Request) {
@@ -58,7 +43,7 @@ func (s *Server) automationShow(w http.ResponseWriter, r *http.Request) {
 	if rule == nil {
 		return
 	}
-	writeData(w, http.StatusOK, dto.AutomationRule(*rule))
+	writeData(w, http.StatusOK, dto.NewAutomationRule(*rule))
 }
 
 func (s *Server) automationUpdate(w http.ResponseWriter, r *http.Request) {
@@ -75,7 +60,7 @@ func (s *Server) automationUpdate(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, dto.AutomationRule(*rule))
+	writeData(w, http.StatusOK, dto.NewAutomationRule(*rule))
 }
 
 func (s *Server) automationDestroy(w http.ResponseWriter, r *http.Request) {
@@ -100,7 +85,7 @@ func (s *Server) automationToggle(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, dto.AutomationRule(*out))
+	writeData(w, http.StatusOK, dto.NewAutomationRule(*out))
 }
 
 func (s *Server) automationReorder(w http.ResponseWriter, r *http.Request) {
@@ -151,7 +136,7 @@ func (s *Server) automationLogs(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, mapSlice(logs, dto.AutomationLog))
+	writeData(w, http.StatusOK, dto.Map(logs, dto.NewAutomationLog))
 }
 
 func (s *Server) automationParam(w http.ResponseWriter, r *http.Request) *domain.AutomationRule {
