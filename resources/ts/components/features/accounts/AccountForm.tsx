@@ -41,6 +41,7 @@ interface AccountFormProps {
     submitLabel?: string
     formId?: string
     hideSubmit?: boolean
+    isEdit?: boolean
 }
 
 function toPayload(data: AccountFormValues): AccountFormData {
@@ -67,6 +68,7 @@ export function AccountForm({
     submitLabel,
     formId,
     hideSubmit,
+    isEdit,
 }: AccountFormProps) {
     const { t } = useTranslation(['common', 'forms', 'pages'])
 
@@ -156,9 +158,12 @@ export function AccountForm({
                                     ))
                                 }}
                                 placeholder={t('forms:selectCurrency')}
+                                disabled={isEdit}
                             />
                             <FormDescription>
-                                {t('forms:accounts.currencyCatalogHelp')}
+                                {isEdit
+                                    ? t('forms:accounts.currencyLockedHelp')
+                                    : t('forms:accounts.currencyCatalogHelp')}
                             </FormDescription>
                             <FormMessage />
                         </FormItem>

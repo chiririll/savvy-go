@@ -34,10 +34,9 @@ type Account struct {
 }
 
 var (
-	// ErrAccountDecimalsDiffer is returned when an account would move to a
-	// currency with different decimals: its amounts are stored in minor units
-	// of its currency and would change meaning.
-	ErrAccountDecimalsDiffer = errors.New("account can only switch to a currency with the same decimals")
+	// ErrAccountCurrencyImmutable is returned when an update changes the currency
+	// of an account: its amounts are stored in minor units of that currency.
+	ErrAccountCurrencyImmutable = errors.New("account currency cannot be changed")
 	// ErrUnknownAccount is returned when an account referenced by id does not exist.
 	ErrUnknownAccount = errors.New("unknown account")
 	// ErrUnknownCurrency is returned when a currency referenced by id does not exist.
@@ -93,23 +92,20 @@ func (s Accounts) Create(ctx context.Context, a Account) (*Account, error) {
 }
 
 func (s Accounts) Update(ctx context.Context, id int64, a Account) (*Account, error) {
+	cur, err := s.ByID(ctx, id)
+	if err != nil || cur == nil {
+		return nil, err
+	}
+	if a.CurrencyID != cur.CurrencyID {
+		return nil, ErrAccountCurrencyImmutable
+	}
+	dec, err := s.currencyDecimals(ctx, cur.CurrencyID)
+	if err != nil {
+		return nil, err
+	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	dec, err := s.currencyDecimals(ctx, a.CurrencyID)
-	if err != nil {
-		return nil, err
-	}
-	current, err := s.Decimals(ctx, id)
-	if errors.Is(err, ErrUnknownAccount) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	if current != dec {
-		return nil, ErrAccountDecimalsDiffer
-	}
 	err = db.Q(s.DB).UpdateAccount(ctx, sqlc.UpdateAccountParams{
-		Name: a.Name, Type: a.Type, CurrencyID: a.CurrencyID, InitialBalance: money.ToMinor(a.InitialBalance, dec),
+		Name: a.Name, Type: a.Type, CurrencyID: cur.CurrencyID, InitialBalance: money.ToMinor(a.InitialBalance, dec),
 		IsActive: db.BoolInt(a.IsActive), DebtType: db.NullString(a.DebtType), TargetAmount: money.ToNullMinor(a.TargetAmount, dec),
 		DueDate: db.NullString(a.DueDate), IsPaidOff: db.BoolInt(a.IsPaidOff), Counterparty: db.NullString(a.Counterparty),
 		DebtDescription: db.NullString(a.DebtDesc), UpdatedAt: db.NS(now), ID: id,

@@ -233,24 +233,25 @@ func rawAmount(t *testing.T, e *moneyEnv, id int64) int64 {
 	return v
 }
 
-func TestAccountCurrencyChangeRequiresSameDecimals(t *testing.T) {
+func TestAccountCurrencyIsImmutable(t *testing.T) {
 	e := newMoneyEnv(t)
 	accts := Accounts{DB: e.db}
 	eur, err := (Currencies{DB: e.db}).Create(e.ctx, Currency{Code: "EUR", Name: "EUR", Symbol: "E", Decimals: 2, Rate: dec("1.1")})
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, err := accts.Create(e.ctx, Account{Name: "mover", Type: "cash", CurrencyID: e.usd.ID, InitialBalance: dec("100"), IsActive: true})
+	a, err := accts.Create(e.ctx, Account{Name: "fixed", Type: "cash", CurrencyID: e.usd.ID, InitialBalance: dec("100"), IsActive: true})
 	if err != nil {
 		t.Fatal(err)
 	}
 	tx := e.tx(t, "expense", a.ID, "10.50")
 
-	for _, other := range []Currency{e.btc, e.jpy} {
+	// Any other currency is rejected, even one with the same decimals.
+	for _, other := range []Currency{*eur, e.btc, e.jpy} {
 		cur, _ := accts.ByID(e.ctx, a.ID)
 		cur.CurrencyID = other.ID
-		if _, err := accts.Update(e.ctx, a.ID, *cur); !errors.Is(err, ErrAccountDecimalsDiffer) {
-			t.Fatalf("switch to %s = %v, want ErrAccountDecimalsDiffer", other.Code, err)
+		if _, err := accts.Update(e.ctx, a.ID, *cur); !errors.Is(err, ErrAccountCurrencyImmutable) {
+			t.Fatalf("switch to %s = %v, want ErrAccountCurrencyImmutable", other.Code, err)
 		}
 	}
 	unchanged, _ := accts.ByID(e.ctx, a.ID)
@@ -258,14 +259,12 @@ func TestAccountCurrencyChangeRequiresSameDecimals(t *testing.T) {
 		t.Fatalf("rejected switch must change nothing: currency=%d raw=%d", unchanged.CurrencyID, rawAmount(t, e, tx.ID))
 	}
 
+	// Other fields still update when the currency is left as is.
 	cur, _ := accts.ByID(e.ctx, a.ID)
-	cur.CurrencyID = eur.ID
+	cur.Name = "renamed"
 	got, err := accts.Update(e.ctx, a.ID, *cur)
-	if err != nil {
-		t.Fatalf("switch between equal decimals: %v", err)
-	}
-	if got.CurrencyID != eur.ID || !got.Balance.Equal(dec("89.5")) {
-		t.Fatalf("after USD->EUR: currency=%d balance=%s", got.CurrencyID, got.Balance)
+	if err != nil || got.Name != "renamed" || got.CurrencyID != e.usd.ID {
+		t.Fatalf("update without currency change: %+v, %v", got, err)
 	}
 }
 

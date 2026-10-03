@@ -18,7 +18,8 @@
         "initialBalance": "Начальный баланс",
         "initialBalanceHelp": "Стартовый баланс этого счёта",
         "activeHelp": "Неактивные счета скрыты в списках",
-        "currencyCatalogHelp": "Если валюты ещё нет в списке, она создастся вместе со счётом."
+        "currencyCatalogHelp": "Если валюты ещё нет в списке, она создастся вместе со счётом.",
+        "currencyLockedHelp": "Валюту существующего счёта изменить нельзя."
     },
     "categories": {
         "namePlaceholder": "Продукты",

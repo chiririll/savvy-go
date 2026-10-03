@@ -41,9 +41,10 @@ export function AccountFormDialog({
                 is_active: item.isActive,
             })}
         >
-            {({ formKey, formProps }) => (
+            {({ formKey, formProps, isEdit }) => (
                 <AccountForm
                     key={formKey}
+                    isEdit={isEdit}
                     defaultValues={formProps.defaultValues}
                     onSubmit={onSubmit}
                     onValuesChange={formProps.onValuesChange}

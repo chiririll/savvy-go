@@ -242,10 +242,12 @@ func (s *Server) accountsUpdate(w http.ResponseWriter, r *http.Request) {
 	if body.CurrencyID != nil {
 		cur.CurrencyID = *body.CurrencyID
 	}
+	// A code is only resolved, never created: the currency cannot change anyway.
 	if body.CurrencyCode != nil && *body.CurrencyCode != "" {
-		c, err := s.currencies.FindOrCreateByCode(r.Context(), *body.CurrencyCode)
-		if err == nil && c != nil {
-			cur.CurrencyID = c.ID
+		c, err := s.currencies.ByCode(r.Context(), *body.CurrencyCode)
+		if err != nil || c == nil || c.ID != cur.CurrencyID {
+			writeAccountError(w, domain.ErrAccountCurrencyImmutable)
+			return
 		}
 	}
 	if body.InitialBalance != nil {
@@ -265,8 +267,8 @@ func (s *Server) accountsUpdate(w http.ResponseWriter, r *http.Request) {
 // writeAccountError maps account create/update failures to responses.
 func writeAccountError(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, domain.ErrAccountDecimalsDiffer):
-		writeMessage(w, 422, "An account can only switch to a currency with the same number of decimals.")
+	case errors.Is(err, domain.ErrAccountCurrencyImmutable):
+		writeMessage(w, 422, "Account currency cannot be changed after creation.")
 	case errors.Is(err, domain.ErrUnknownCurrency):
 		writeValidation(w, map[string][]string{"currency_id": {"The selected currency is invalid."}})
 	default:
