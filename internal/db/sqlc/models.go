@@ -26,6 +26,19 @@ type Account struct {
 	UpdatedAt       sql.NullString
 }
 
+type ApiToken struct {
+	ID         int64
+	UserID     int64
+	Name       string
+	TokenHash  string
+	Prefix     string
+	Scope      string
+	ExpiresAt  sql.NullString
+	LastUsedAt sql.NullString
+	CreatedAt  sql.NullString
+	UpdatedAt  sql.NullString
+}
+
 type AuthSession struct {
 	ID                int64
 	UserID            int64

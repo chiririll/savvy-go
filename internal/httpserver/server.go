@@ -23,6 +23,7 @@ type Server struct {
 	mux        *chi.Mux
 	users      auth.Users
 	sessions   auth.Sessions
+	apiTokens  auth.APITokens
 	tokens     auth.PasswordTokens
 	challenges auth.Challenges
 	settings   settings.Store
@@ -52,6 +53,7 @@ func New(cfg config.Config, sqlDB *sql.DB) *Server {
 		db:         sqlDB,
 		users:      auth.Users{DB: sqlDB},
 		sessions:   auth.Sessions{DB: sqlDB, Cfg: cfg},
+		apiTokens:  auth.APITokens{DB: sqlDB},
 		tokens:     auth.PasswordTokens{DB: sqlDB},
 		challenges: auth.Challenges{DB: sqlDB, Cfg: cfg},
 		settings:   settings.Store{DB: sqlDB},
@@ -85,6 +87,7 @@ func (s *Server) reconnect(sqlDB *sql.DB) {
 	s.db = sqlDB
 	s.users.DB = sqlDB
 	s.sessions.DB = sqlDB
+	s.apiTokens.DB = sqlDB
 	s.tokens.DB = sqlDB
 	s.challenges.DB = sqlDB
 	s.settings.DB = sqlDB
@@ -124,6 +127,9 @@ func (s *Server) routes() *chi.Mux {
 	r.Get("/readyz", s.readyz)
 
 	r.Route("/api", func(r chi.Router) {
+		r.Get("/docs", s.apiDocs)
+		r.Get("/openapi.yaml", s.apiSpec)
+
 		r.Get("/auth/status", s.authStatus)
 		r.Get("/auth/me", s.authMe)
 		r.Post("/auth/register", s.authRegister)
@@ -145,11 +151,18 @@ func (s *Server) routes() *chi.Mux {
 			r.Use(s.requireSession)
 			r.Use(s.requireCSRF)
 
-			r.Post("/auth/logout", s.authLogout)
-			r.Post("/auth/logout-others", s.authLogoutOthers)
-			r.Put("/auth/password", s.authChangePassword)
-			r.Get("/auth/2fa/status", s.twoFactorStatus)
-			r.Get("/auth/webauthn/credentials", s.webauthnIndex)
+			// Credential management is limited to real sessions, never API tokens.
+			r.Group(func(r chi.Router) {
+				r.Use(s.sessionOnly)
+				r.Post("/auth/logout", s.authLogout)
+				r.Post("/auth/logout-others", s.authLogoutOthers)
+				r.Put("/auth/password", s.authChangePassword)
+				r.Get("/auth/2fa/status", s.twoFactorStatus)
+				r.Get("/auth/webauthn/credentials", s.webauthnIndex)
+				r.Get("/auth/api-tokens", s.apiTokensIndex)
+				r.Post("/auth/api-tokens", s.apiTokensStore)
+				r.Delete("/auth/api-tokens/{id}", s.apiTokensDestroy)
+			})
 
 			r.Get("/users", s.usersIndex)
 			r.Get("/users/{id}", s.usersShow)
@@ -173,17 +186,29 @@ func (s *Server) routes() *chi.Mux {
 			r.Group(func(r chi.Router) {
 				r.Use(s.requireWrite)
 				r.Get("/settings", s.settingsIndex)
-				r.Patch("/settings", s.settingsUpdate)
 
-				r.Post("/auth/2fa/enable", s.twoFactorEnable)
-				r.Post("/auth/2fa/confirm", s.twoFactorConfirm)
-				r.Post("/auth/2fa/disable", s.twoFactorDisable)
-				r.Get("/auth/2fa/recovery-codes", s.twoFactorRecoveryCodes)
-				r.Post("/auth/2fa/recovery-codes/regenerate", s.twoFactorRegenerate)
-				r.Post("/auth/webauthn/register/options", s.webauthnRegisterOptions)
-				r.Post("/auth/webauthn/register/verify", s.webauthnRegisterVerify)
-				r.Patch("/auth/webauthn/credentials/{id}", s.webauthnUpdate)
-				r.Delete("/auth/webauthn/credentials/{id}", s.webauthnDestroy)
+				r.Group(func(r chi.Router) {
+					r.Use(s.sessionOnly)
+					r.Patch("/settings", s.settingsUpdate)
+
+					r.Post("/auth/2fa/enable", s.twoFactorEnable)
+					r.Post("/auth/2fa/confirm", s.twoFactorConfirm)
+					r.Post("/auth/2fa/disable", s.twoFactorDisable)
+					r.Get("/auth/2fa/recovery-codes", s.twoFactorRecoveryCodes)
+					r.Post("/auth/2fa/recovery-codes/regenerate", s.twoFactorRegenerate)
+					r.Post("/auth/webauthn/register/options", s.webauthnRegisterOptions)
+					r.Post("/auth/webauthn/register/verify", s.webauthnRegisterVerify)
+					r.Patch("/auth/webauthn/credentials/{id}", s.webauthnUpdate)
+					r.Delete("/auth/webauthn/credentials/{id}", s.webauthnDestroy)
+
+					r.Get("/backups", s.backupsIndex)
+					r.Post("/backups", s.backupsStore)
+					r.Post("/backups/upload", s.backupsUpload)
+					r.Get("/backups/{name}/download", s.backupsDownload)
+					r.Get("/backups/{name}/inspect", s.backupsInspect)
+					r.Post("/backups/{name}/restore", s.backupsRestore)
+					r.Delete("/backups/{name}", s.backupsDestroy)
+				})
 
 				r.Get("/currencies/catalog", s.currenciesCatalog)
 				r.Get("/currencies", s.currenciesIndex)
@@ -297,13 +322,6 @@ func (s *Server) routes() *chi.Mux {
 				r.Post("/transactions/import/execute", s.importExecute)
 				r.Get("/transactions/import/{import}", s.importShow)
 
-				r.Get("/backups", s.backupsIndex)
-				r.Post("/backups", s.backupsStore)
-				r.Post("/backups/upload", s.backupsUpload)
-				r.Get("/backups/{name}/download", s.backupsDownload)
-				r.Get("/backups/{name}/inspect", s.backupsInspect)
-				r.Post("/backups/{name}/restore", s.backupsRestore)
-				r.Delete("/backups/{name}", s.backupsDestroy)
 			})
 		})
 	})

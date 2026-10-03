@@ -11,6 +11,7 @@
     "system": "Система",
     "monitoring": "Мониторинг",
     "security": "Безопасность",
+    "api": "API",
     "ssoProviders": "SSO-провайдеры",
     "import": "Импорт",
     "backups": "Резервные копии",

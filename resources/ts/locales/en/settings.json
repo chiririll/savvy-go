@@ -322,5 +322,50 @@
         "restoreMigrationsDescription_other": "This backup is {{count}} migrations behind. Savvy will apply them after restore — otherwise the app will not run. The backup file is not changed.",
         "deleteTitle": "Delete Backup?",
         "deleteDescription": "This will permanently delete the backup from {{date}}."
+    },
+    "api": {
+        "title": "API",
+        "heading": "API access",
+        "description": "Connect external apps and scripts to your Savvy instance",
+        "docs": "API docs",
+        "copyFailed": "Could not copy to clipboard",
+        "scope": {
+            "read": "Read only",
+            "read-write": "Read & write"
+        },
+        "tokens": {
+            "title": "API tokens",
+            "description": "Each connected app gets its own token. Revoke it any time.",
+            "add": "New token",
+            "empty": "No API tokens yet.",
+            "lastUsed": "Last used {{date}}",
+            "neverUsed": "Never used",
+            "expires": "Expires {{date}}",
+            "noExpiry": "No expiration",
+            "revokeAria": "Revoke token",
+            "revokeTitle": "Revoke API token",
+            "revokeDescription": "Apps using \"{{name}}\" will immediately lose access.",
+            "revoke": "Revoke"
+        },
+        "create": {
+            "title": "New API token",
+            "description": "Name the app that will use this token.",
+            "name": "Name",
+            "namePlaceholder": "e.g. Home automation",
+            "access": "Access",
+            "accessHint": {
+                "read": "The app can only read your data.",
+                "read-write": "The app can read and change your data, up to your own permissions."
+            },
+            "expiry": "Expiration",
+            "expiryNever": "Never",
+            "expiryDays": "{{count}} days"
+        },
+        "created": {
+            "title": "Copy your token",
+            "description": "This is the only time it is shown. Store it somewhere safe.",
+            "copy": "Copy token",
+            "done": "Done"
+        }
     }
 }
