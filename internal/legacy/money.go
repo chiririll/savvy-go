@@ -196,7 +196,7 @@ var inPlaceMoney = []struct {
 // column is swapped for a real INTEGER column, so later code can rely on
 // integer storage (Laravel columns are REAL/NUMERIC and read back as floats).
 // It avoids a table rebuild, which would cascade through foreign keys. One
-// transaction; UpgradeInPlace calls it once, guarded by the import stamp.
+// transaction; upgradeInPlace calls it once; Upgrade skips stamped databases.
 func convertMoneyInPlace(ctx context.Context, db *sql.DB) error {
 	type plan struct {
 		table string
@@ -206,9 +206,6 @@ func convertMoneyInPlace(ctx context.Context, db *sql.DB) error {
 	}
 	var plans []plan
 	for _, spec := range inPlaceMoney {
-		if !tableExists(ctx, db, spec.table) {
-			continue
-		}
 		have, err := columns(ctx, db, spec.table)
 		if err != nil {
 			return err

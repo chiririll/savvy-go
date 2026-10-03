@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"savvy-go/internal/auth"
+	"savvy-go/internal/migrate"
 )
 
 const importStampKey = "legacy_import_completed_at"
@@ -72,19 +73,36 @@ func AlreadyImported(ctx context.Context, db *sql.DB) bool {
 	return err == nil && v != ""
 }
 
-// UpgradeInPlace stamps a Laravel-era database.sqlite that already holds
-// domain tables (same names) so Go migrations and later starts are no-ops.
-// appKey is the Laravel APP_KEY used to decrypt legacy encrypted TOTP secrets.
-func UpgradeInPlace(ctx context.Context, db *sql.DB, appKey string) error {
-	if !IsLaravel(ctx, db) {
+// Upgrade brings a database file to the current Go schema, whether it is a
+// Go one or a Laravel-era one. A Laravel database must be at LatestMigration;
+// it gets the Go-only columns, the Go migrations and the in-place conversion,
+// and is stamped so a second call only runs migrations. appKey is the Laravel
+// APP_KEY used to decrypt legacy encrypted TOTP secrets.
+func Upgrade(ctx context.Context, db *sql.DB, appKey string) error {
+	info := Inspect(ctx, db)
+	if info.Laravel && !info.Supported {
+		return ErrUnsupportedVersion
+	}
+	if info.Laravel {
+		if err := ensureColumns(ctx, db); err != nil {
+			return fmt.Errorf("legacy columns: %w", err)
+		}
+	}
+	if err := migrate.Up(ctx, db); err != nil {
+		return fmt.Errorf("migrate: %w", err)
+	}
+	if !info.Laravel {
 		return nil
 	}
-	if AlreadyImported(ctx, db) {
-		return nil
+	if err := upgradeInPlace(ctx, db, appKey); err != nil {
+		return fmt.Errorf("legacy import: %w", err)
 	}
-	if err := CheckSupported(ctx, db); err != nil {
-		return err
-	}
+	return nil
+}
+
+// upgradeInPlace converts a supported, not yet imported Laravel database that
+// already holds the Go tables (same names) and stamps it.
+func upgradeInPlace(ctx context.Context, db *sql.DB, appKey string) error {
 	if err := ensureSettings(ctx, db); err != nil {
 		return err
 	}
@@ -92,9 +110,10 @@ func UpgradeInPlace(ctx context.Context, db *sql.DB, appKey string) error {
 		slog.Warn("could not unwrap legacy totp secrets", "err", err)
 	}
 	// Before convertMoneyInPlace: a failure after it but before stamp would
-	// rerun the money conversion on next start and scale amounts twice.
-	if err := normalizeDates(ctx, db); err != nil {
-		return err
+	// rerun the money conversion on next start and scale amounts twice. Date
+	// retyping is idempotent, so it is safe to repeat.
+	if err := retypeDateColumns(ctx, db); err != nil {
+		return fmt.Errorf("convert dates to text: %w", err)
 	}
 	if err := convertMoneyInPlace(ctx, db); err != nil {
 		return fmt.Errorf("convert money to minor units: %w", err)
@@ -111,21 +130,20 @@ func UpgradeInPlace(ctx context.Context, db *sql.DB, appKey string) error {
 // Idempotent: INSERT OR IGNORE on primary keys; sqlite_sequence is raised
 // so new IDs cannot collide.
 func Copy(ctx context.Context, dest, src *sql.DB) error {
-	if !IsLaravel(ctx, src) {
+	info := Inspect(ctx, src)
+	if !info.Laravel {
 		return fmt.Errorf("source is not a laravel-era database")
 	}
-	if err := CheckSupported(ctx, src); err != nil {
-		return err
+	if !info.Supported {
+		return ErrUnsupportedVersion
 	}
 
 	sc, err := loadScales(ctx, src)
 	if err != nil {
 		return fmt.Errorf("load currency scales: %w", err)
 	}
+	// A table missing on either side has no common columns; copyTable skips it.
 	for _, table := range copyTables {
-		if !tableExists(ctx, src, table) || !tableExists(ctx, dest, table) {
-			continue
-		}
 		n, err := copyTable(ctx, dest, src, table, sc)
 		if err != nil {
 			return fmt.Errorf("copy %s: %w", table, err)
@@ -144,34 +162,6 @@ func Copy(ctx context.Context, dest, src *sql.DB) error {
 		return err
 	}
 	return stamp(ctx, dest)
-}
-
-// Laravel date casts stored "YYYY-MM-DD 00:00:00"; Go compares these columns
-// as plain YYYY-MM-DD strings.
-var dateColumns = map[string][]string{
-	"transactions":           {"date"},
-	"recurring_transactions": {"start_date", "end_date", "next_run_date", "last_run_date"},
-	"budgets":                {"start_date", "end_date"},
-	"accounts":               {"due_date"},
-}
-
-func normalizeDates(ctx context.Context, db *sql.DB) error {
-	for table, cols := range dateColumns {
-		if !tableExists(ctx, db, table) {
-			continue
-		}
-		have, err := columns(ctx, db, table)
-		if err != nil {
-			return err
-		}
-		for _, c := range intersect(cols, have) {
-			q := fmt.Sprintf(`UPDATE %s SET %[2]s = substr(%[2]s, 1, 10) WHERE length(%[2]s) > 10`, table, quote(c))
-			if _, err := db.ExecContext(ctx, q); err != nil {
-				return fmt.Errorf("normalize %s.%s: %w", table, c, err)
-			}
-		}
-	}
-	return nil
 }
 
 func copyTable(ctx context.Context, dest, src *sql.DB, table string, sc *scales) (int, error) {
@@ -311,8 +301,8 @@ func tableExists(ctx context.Context, db *sql.DB, name string) bool {
 	return err == nil
 }
 
-func columns(ctx context.Context, db *sql.DB, table string) ([]string, error) {
-	rows, err := db.QueryContext(ctx, `SELECT name FROM pragma_table_info(?)`, table)
+func columns(ctx context.Context, q querier, table string) ([]string, error) {
+	rows, err := q.QueryContext(ctx, `SELECT name FROM pragma_table_info(?)`, table)
 	if err != nil {
 		return nil, err
 	}
@@ -345,11 +335,7 @@ func intersect(a, b []string) []string {
 func quoteAll(cols []string) []string {
 	out := make([]string, len(cols))
 	for i, c := range cols {
-		out[i] = quote(c)
+		out[i] = quoteIdent(c)
 	}
 	return out
-}
-
-func quote(ident string) string {
-	return `"` + strings.ReplaceAll(ident, `"`, `""`) + `"`
 }

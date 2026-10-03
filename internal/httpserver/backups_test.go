@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"net/http"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -27,7 +28,7 @@ func TestRestoreLegacyLaravelBackup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	createLaravelCategoriesFixture(t, legacyDB)
+	loadLaravelFixture(t, legacyDB)
 	if err := legacyDB.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -60,6 +61,14 @@ func TestRestoreLegacyLaravelBackup(t *testing.T) {
 	if !legacy.AlreadyImported(ctx, a.s.db) {
 		t.Fatal("expected legacy import stamp after restore")
 	}
+
+	// Regression: Laravel stored dates as "YYYY-MM-DD 00:00:00" in columns
+	// declared date, which the API returned as a timestamp, so the edit form's
+	// date input came up empty and saving wiped the date.
+	tx, err := a.s.txs.ByID(ctx, 1)
+	if err != nil || tx == nil || tx.Date == nil || *tx.Date != "2026-01-03" {
+		t.Fatalf("restored transaction date = %+v, %v; want 2026-01-03", tx, err)
+	}
 }
 
 // TestRestoreOldLaravelBackupKeepsLiveDB verifies that a Laravel backup older
@@ -76,7 +85,7 @@ func TestRestoreOldLaravelBackupKeepsLiveDB(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	createLaravelCategoriesFixture(t, oldDB)
+	loadLaravelFixture(t, oldDB)
 	if _, err := oldDB.Exec(`DELETE FROM migrations WHERE migration = ?`, legacy.LatestMigration); err != nil {
 		t.Fatal(err)
 	}
@@ -107,36 +116,18 @@ func TestRestoreOldLaravelBackupKeepsLiveDB(t *testing.T) {
 	}
 }
 
-func createLaravelCategoriesFixture(t *testing.T, sqlDB *sql.DB) {
+// loadLaravelFixture loads testdata/laravel.sql and records the latest
+// supported Laravel migration so the database counts as up to date.
+func loadLaravelFixture(t *testing.T, sqlDB *sql.DB) {
 	t.Helper()
-	stmts := []string{
-		`CREATE TABLE migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, migration TEXT NOT NULL, batch INTEGER NOT NULL)`,
-		`INSERT INTO migrations (migration, batch) VALUES ('2014_10_12_000000_create_users_table', 1)`,
-		`INSERT INTO migrations (migration, batch) VALUES ('` + legacy.LatestMigration + `', 2)`,
-		`CREATE TABLE users (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			name TEXT NOT NULL,
-			email TEXT NOT NULL UNIQUE,
-			password TEXT,
-			created_at TEXT,
-			updated_at TEXT
-		)`,
-		`INSERT INTO users (id, name, email, password) VALUES (1, 'Ada', 'ada@example.com', '$2y$10$legacyhash')`,
-		`CREATE TABLE categories (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			name TEXT NOT NULL,
-			type TEXT NOT NULL,
-			icon TEXT,
-			color TEXT,
-			created_at TEXT,
-			updated_at TEXT
-		)`,
-		`INSERT INTO categories (id, name, type) VALUES (1, 'Groceries', 'expense')`,
-		`CREATE TABLE jobs (id INTEGER PRIMARY KEY, queue TEXT)`,
+	script, err := os.ReadFile(filepath.Join("..", "..", "testdata", "laravel.sql"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	for _, s := range stmts {
-		if _, err := sqlDB.Exec(s); err != nil {
-			t.Fatalf("%s: %v", s, err)
-		}
+	if _, err := sqlDB.Exec(string(script)); err != nil {
+		t.Fatalf("load laravel.sql: %v", err)
+	}
+	if _, err := sqlDB.Exec(`INSERT INTO migrations (migration, batch) VALUES (?, 2)`, legacy.LatestMigration); err != nil {
+		t.Fatal(err)
 	}
 }

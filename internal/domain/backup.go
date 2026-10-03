@@ -93,7 +93,7 @@ func (s Backups) ByName(ctx context.Context, name string) (*Backup, error) {
 
 func (s Backups) describe(ctx context.Context, info os.FileInfo) Backup {
 	b := Backup{Filename: info.Name(), Size: info.Size()}
-	meta := readBackupMeta(ctx, filepath.Join(s.Dir, info.Name()))
+	meta := db.ReadBackupMeta(ctx, filepath.Join(s.Dir, info.Name()))
 	if v, ok := meta[metaNote]; ok && v != "" {
 		b.Note = &v
 	}
@@ -128,7 +128,7 @@ func (s Backups) Create(ctx context.Context, note *string) (*Backup, error) {
 	if note != nil && *note != "" {
 		meta[metaNote] = *note
 	}
-	if err := writeBackupMeta(ctx, dest, meta, true); err != nil {
+	if err := db.WriteBackupMeta(ctx, dest, meta, true); err != nil {
 		_ = os.Remove(dest)
 		return nil, err
 	}
@@ -148,12 +148,12 @@ func (s Backups) Ingest(ctx context.Context, srcPath string, note *string) (*Bac
 	}
 	_ = os.Remove(srcPath)
 	if note != nil && *note != "" {
-		if err := writeBackupMeta(ctx, dest, map[string]string{metaNote: *note}, true); err != nil {
+		if err := db.WriteBackupMeta(ctx, dest, map[string]string{metaNote: *note}, true); err != nil {
 			_ = os.Remove(dest)
 			return nil, err
 		}
 	}
-	err := writeBackupMeta(ctx, dest, map[string]string{metaCreatedAt: time.Now().UTC().Format(time.RFC3339)}, false)
+	err := db.WriteBackupMeta(ctx, dest, map[string]string{metaCreatedAt: time.Now().UTC().Format(time.RFC3339)}, false)
 	if err != nil {
 		_ = os.Remove(dest)
 		return nil, err
@@ -170,7 +170,7 @@ func (s Backups) Path(b Backup) string {
 }
 
 func (s Backups) Inspect(ctx context.Context, b Backup) (map[string]any, error) {
-	src, err := sql.Open("sqlite", "file:"+filepath.ToSlash(s.Path(b))+"?mode=ro")
+	src, err := db.OpenReadOnly(s.Path(b))
 	if err != nil {
 		return nil, err
 	}
@@ -187,53 +187,6 @@ func (s Backups) Inspect(ctx context.Context, b Backup) (map[string]any, error) 
 		"unknownCount":      len(unknown),
 		"unknownMigrations": unknown,
 	}, nil
-}
-
-// readBackupMeta returns backup_meta rows of a backup file; empty when the
-// file has no such table or cannot be opened.
-func readBackupMeta(ctx context.Context, path string) map[string]string {
-	out := map[string]string{}
-	src, err := sql.Open("sqlite", "file:"+filepath.ToSlash(path)+"?mode=ro")
-	if err != nil {
-		return out
-	}
-	defer src.Close()
-	rows, err := src.QueryContext(ctx, `SELECT key, value FROM backup_meta`)
-	if err != nil {
-		return out
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var k, v string
-		if rows.Scan(&k, &v) == nil {
-			out[k] = v
-		}
-	}
-	return out
-}
-
-// writeBackupMeta stores key/value pairs in the backup file. Existing keys are
-// replaced only when overwrite is true. journal_mode=DELETE keeps the backup a
-// single self-contained file (no -wal/-shm left beside it).
-func writeBackupMeta(ctx context.Context, path string, kv map[string]string, overwrite bool) error {
-	dst, err := sql.Open("sqlite", "file:"+filepath.ToSlash(path)+"?_pragma=journal_mode(DELETE)")
-	if err != nil {
-		return err
-	}
-	defer dst.Close()
-	if _, err := dst.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS backup_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`); err != nil {
-		return fmt.Errorf("backup meta: %w", err)
-	}
-	conflict := `ON CONFLICT(key) DO NOTHING`
-	if overwrite {
-		conflict = `ON CONFLICT(key) DO UPDATE SET value = excluded.value`
-	}
-	for k, v := range kv {
-		if _, err := dst.ExecContext(ctx, `INSERT INTO backup_meta (key, value) VALUES (?, ?) `+conflict, k, v); err != nil {
-			return fmt.Errorf("backup meta %s: %w", k, err)
-		}
-	}
-	return nil
 }
 
 // Restore replaces the live database with the given backup and returns a new
@@ -291,7 +244,7 @@ func prepareStaged(ctx context.Context, path string, prepare func(context.Contex
 			return err
 		}
 	}
-	if _, err := staged.ExecContext(ctx, `DROP TABLE IF EXISTS backup_meta`); err != nil {
+	if err := db.DropBackupMeta(ctx, staged); err != nil {
 		return fmt.Errorf("drop backup meta: %w", err)
 	}
 	if err := db.Checkpoint(ctx, staged); err != nil {

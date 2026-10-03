@@ -5,7 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"path/filepath"
+
+	"savvy-go/internal/db"
 )
 
 // LatestMigration is the last Laravel migration the importer was written
@@ -33,18 +34,9 @@ func Inspect(ctx context.Context, db *sql.DB) Info {
 	return Info{Laravel: true, Supported: err == nil}
 }
 
-// CheckSupported returns ErrUnsupportedVersion for a Laravel database that
-// does not contain LatestMigration.
-func CheckSupported(ctx context.Context, db *sql.DB) error {
-	if !Inspect(ctx, db).Supported {
-		return ErrUnsupportedVersion
-	}
-	return nil
-}
-
 // InspectFile is Inspect for a database file, opened read-only.
 func InspectFile(ctx context.Context, path string) (Info, error) {
-	src, err := sql.Open("sqlite", "file:"+filepath.ToSlash(path)+"?mode=ro")
+	src, err := db.OpenReadOnly(path)
 	if err != nil {
 		return Info{}, fmt.Errorf("open: %w", err)
 	}

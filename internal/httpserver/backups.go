@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -12,7 +11,6 @@ import (
 	"savvy-go/internal/domain"
 	"savvy-go/internal/httpserver/dto"
 	"savvy-go/internal/legacy"
-	"savvy-go/internal/migrate"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -111,21 +109,9 @@ func (s *Server) backupsInspect(w http.ResponseWriter, r *http.Request) {
 }
 
 // upgradeBackup brings a staged backup copy up to the current schema before it
-// replaces the live database; unsupported Laravel versions fail here, early.
+// replaces the live database.
 func (s *Server) upgradeBackup(ctx context.Context, staged *sql.DB) error {
-	if err := legacy.CheckSupported(ctx, staged); err != nil {
-		return err
-	}
-	if err := legacy.EnsureColumns(ctx, staged); err != nil {
-		return fmt.Errorf("legacy columns: %w", err)
-	}
-	if err := migrate.Up(ctx, staged); err != nil {
-		return fmt.Errorf("migrate: %w", err)
-	}
-	if err := legacy.UpgradeInPlace(ctx, staged, s.cfg.AppKey); err != nil {
-		return fmt.Errorf("legacy import: %w", err)
-	}
-	return nil
+	return legacy.Upgrade(ctx, staged, s.cfg.AppKey)
 }
 
 func (s *Server) backupsRestore(w http.ResponseWriter, r *http.Request) {
