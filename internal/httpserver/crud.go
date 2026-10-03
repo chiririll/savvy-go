@@ -2,7 +2,6 @@ package httpserver
 
 import (
 	"encoding/json"
-	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -10,8 +9,10 @@ import (
 
 	"savvy-go/internal/domain"
 	"savvy-go/internal/httpserver/dto"
+	"savvy-go/internal/money"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/shopspring/decimal"
 )
 
 func (s *Server) currenciesIndex(w http.ResponseWriter, r *http.Request) {
@@ -111,9 +112,9 @@ func (s *Server) currenciesSetBase(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) currenciesConvert(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Amount float64 `json:"amount"`
-		From   int64   `json:"from_currency_id"`
-		To     int64   `json:"to_currency_id"`
+		Amount decimal.Decimal `json:"amount"`
+		From   int64           `json:"from_currency_id"`
+		To     int64           `json:"to_currency_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeValidation(w, map[string][]string{"amount": {"The given data was invalid."}})
@@ -127,10 +128,10 @@ func (s *Server) currenciesConvert(w http.ResponseWriter, r *http.Request) {
 	}
 	result := domain.Convert(body.Amount, *from, *to)
 	writeJSON(w, http.StatusOK, map[string]any{
-		"amount": body.Amount,
+		"amount": money.Plain(body.Amount),
 		"from":   dto.Currency(*from),
 		"to":     dto.Currency(*to),
-		"result": domainRound(result, to.Decimals),
+		"result": money.Number(result, to.Decimals),
 	})
 }
 
@@ -162,12 +163,12 @@ func (s *Server) accountsIndex(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) accountsStore(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Name           string  `json:"name"`
-		Type           string  `json:"type"`
-		CurrencyID     *int64  `json:"currency_id"`
-		CurrencyCode   string  `json:"currency_code"`
-		InitialBalance float64 `json:"initial_balance"`
-		IsActive       *bool   `json:"is_active"`
+		Name           string          `json:"name"`
+		Type           string          `json:"type"`
+		CurrencyID     *int64          `json:"currency_id"`
+		CurrencyCode   string          `json:"currency_code"`
+		InitialBalance decimal.Decimal `json:"initial_balance"`
+		IsActive       *bool           `json:"is_active"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || strings.TrimSpace(body.Name) == "" {
 		writeValidation(w, map[string][]string{"name": {"The name field is required."}})
@@ -216,12 +217,12 @@ func (s *Server) accountsUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Name           *string  `json:"name"`
-		Type           *string  `json:"type"`
-		CurrencyID     *int64   `json:"currency_id"`
-		CurrencyCode   *string  `json:"currency_code"`
-		InitialBalance *float64 `json:"initial_balance"`
-		IsActive       *bool    `json:"is_active"`
+		Name           *string          `json:"name"`
+		Type           *string          `json:"type"`
+		CurrencyID     *int64           `json:"currency_id"`
+		CurrencyCode   *string          `json:"currency_code"`
+		InitialBalance *decimal.Decimal `json:"initial_balance"`
+		IsActive       *bool            `json:"is_active"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeValidation(w, map[string][]string{"name": {"The given data was invalid."}})
@@ -295,13 +296,17 @@ func (s *Server) accountsBalanceHistory(w http.ResponseWriter, r *http.Request) 
 	series := []map[string]any{}
 	total := make([]float64, len(dates))
 	for _, a := range accts {
+		nativeDec := 2
+		if a.Currency != nil {
+			nativeDec = a.Currency.Decimals
+		}
 		data := make([]float64, len(dates))
 		native := make([]float64, len(dates))
 		for i, d := range dates {
 			bal, _ := s.accounts.BalanceAt(r.Context(), a, d)
-			native[i] = bal
+			native[i] = bal.Round(int32(nativeDec)).InexactFloat64()
 			if a.Currency != nil {
-				data[i] = domain.Convert(bal, *a.Currency, *base)
+				data[i] = domain.Convert(bal, *a.Currency, *base).Round(int32(base.Decimals)).InexactFloat64()
 			}
 			total[i] += data[i]
 		}
@@ -344,15 +349,15 @@ func (s *Server) accountsBalanceComparison(w http.ResponseWriter, r *http.Reques
 		if from, err := time.Parse("2006-01-02", start); err == nil {
 			cutoff := from.AddDate(0, 0, -1).Format("2006-01-02")
 			accts, _ := s.accounts.All(r.Context(), true, true)
-			total := 0.0
+			total := decimal.Zero
 			for _, a := range accts {
 				if a.Currency == nil {
 					continue
 				}
 				bal, _ := s.accounts.BalanceAt(r.Context(), a, cutoff)
-				total += domain.Convert(bal, *a.Currency, *base)
+				total = total.Add(domain.Convert(bal, *a.Currency, *base))
 			}
-			previous = math.Round(total*math.Pow10(base.Decimals)) / math.Pow10(base.Decimals)
+			previous = money.Number(total, base.Decimals)
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -598,14 +603,6 @@ func mapSlice[T any](in []T, fn func(T) map[string]any) []any {
 		out = append(out, fn(v))
 	}
 	return out
-}
-
-func domainRound(v float64, decimals int) float64 {
-	p := 1.0
-	for i := 0; i < decimals; i++ {
-		p *= 10
-	}
-	return float64(int(v*p+0.5)) / p
 }
 
 func dateRange(start, end string) []string {

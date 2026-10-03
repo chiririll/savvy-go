@@ -12,6 +12,7 @@ import (
 	"savvy-go/internal/httpserver/dto"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/shopspring/decimal"
 )
 
 func (s *Server) transactionsIndex(w http.ResponseWriter, r *http.Request) {
@@ -112,7 +113,7 @@ func (s *Server) transactionsUpdate(w http.ResponseWriter, r *http.Request) {
 	if in.Type == "" {
 		in.Type = cur.Type
 	}
-	if in.Amount == 0 {
+	if in.Amount.IsZero() {
 		in.Amount = cur.Amount
 	}
 	tx, err := s.txs.Update(r.Context(), cur.ID, in)
@@ -217,20 +218,20 @@ func (s *Server) txParam(w http.ResponseWriter, r *http.Request) *domain.Transac
 
 func decodeTx(w http.ResponseWriter, r *http.Request) (domain.TxInput, bool) {
 	var body struct {
-		Type         string   `json:"type"`
-		AccountID    int64    `json:"account_id"`
-		ToAccountID  *int64   `json:"to_account_id"`
-		CategoryID   *int64   `json:"category_id"`
-		Amount       float64  `json:"amount"`
-		ToAmount     *float64 `json:"to_amount"`
-		ExchangeRate *float64 `json:"exchange_rate"`
-		Description  *string  `json:"description"`
-		Date         *string  `json:"date"`
-		TagIDs       []int64  `json:"tag_ids"`
+		Type         string           `json:"type"`
+		AccountID    int64            `json:"account_id"`
+		ToAccountID  *int64           `json:"to_account_id"`
+		CategoryID   *int64           `json:"category_id"`
+		Amount       decimal.Decimal  `json:"amount"`
+		ToAmount     *decimal.Decimal `json:"to_amount"`
+		ExchangeRate *decimal.Decimal `json:"exchange_rate"`
+		Description  *string          `json:"description"`
+		Date         *string          `json:"date"`
+		TagIDs       []int64          `json:"tag_ids"`
 		Items        []struct {
-			Name         string  `json:"name"`
-			Quantity     float64 `json:"quantity"`
-			PricePerUnit float64 `json:"price_per_unit"`
+			Name         string          `json:"name"`
+			Quantity     decimal.Decimal `json:"quantity"`
+			PricePerUnit decimal.Decimal `json:"price_per_unit"`
 		} `json:"items"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.AccountID == 0 {
@@ -245,8 +246,8 @@ func decodeTx(w http.ResponseWriter, r *http.Request) (domain.TxInput, bool) {
 	}
 	for _, it := range body.Items {
 		qty := it.Quantity
-		if qty == 0 {
-			qty = 1
+		if qty.IsZero() {
+			qty = decimal.NewFromInt(1)
 		}
 		in.Items = append(in.Items, domain.TxItem{Name: it.Name, Quantity: qty, PricePerUnit: it.PricePerUnit})
 	}

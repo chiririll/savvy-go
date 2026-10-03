@@ -9,8 +9,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/shopspring/decimal"
+
 	"savvy-go/internal/db"
 	"savvy-go/internal/db/filter"
+	"savvy-go/internal/money"
 )
 
 type ReportFilter struct {
@@ -368,10 +371,10 @@ func (s Reports) CategorySummary(ctx context.Context, f ReportFilter, typ string
 	var out []Category
 	var total float64
 	for _, x := range s.sumGroupedByCategory(ctx, typ, f.Range(s.now()), f) {
-		amount := x.Total
+		amount := decimal.NewFromFloat(x.Total)
 		icon, color := x.Icon, x.Color
 		out = append(out, Category{ID: x.ID, Name: x.Name, Type: typ, Icon: &icon, Color: &color, TotalAmount: &amount})
-		total += amount
+		total += x.Total
 	}
 	return out, round2(total)
 }
@@ -546,7 +549,7 @@ func (s Reports) TxTop(ctx context.Context, f ReportFilter, typ string, limit in
 			}
 		}
 		items = append(items, map[string]any{
-			"id": x.ID, "description": nilOr(x.Description.String), "amount": round2(x.Amount), "date": x.Date.String,
+			"id": x.ID, "description": nilOr(x.Description.String), "amount": round2(x.Amount.InexactFloat64()), "date": x.Date.String,
 			"category": cat, "account": map[string]any{"id": x.AccID, "name": x.AccName.String},
 		})
 	}
@@ -648,14 +651,11 @@ func (s Reports) netWorthAt(ctx context.Context, at time.Time, f ReportFilter) [
 			continue
 		}
 		bal, _ := accts.balance(ctx, a, cutoff)
-		rate := 1.0
-		if a.Currency != nil {
+		rate := one
+		if a.Currency != nil && !a.Currency.Rate.IsZero() {
 			rate = a.Currency.Rate
-			if rate == 0 {
-				rate = 1
-			}
 		}
-		out = append(out, nwAccount{ID: a.ID, Name: a.Name, Type: a.Type, Balance: bal * rate})
+		out = append(out, nwAccount{ID: a.ID, Name: a.Name, Type: a.Type, Balance: bal.Mul(rate).InexactFloat64()})
 	}
 	return out
 }
@@ -675,7 +675,7 @@ type dayTotal struct {
 }
 
 func (s Reports) sumByType(ctx context.Context, typ string, r dateRange, f ReportFilter, categoryID int64) float64 {
-	return filter.SumByType(ctx, s.DB, s.where(typ, r, f, categoryID))
+	return filter.SumByType(ctx, s.DB, s.where(typ, r, f, categoryID)).InexactFloat64()
 }
 
 func (s Reports) sumGroupedByCategory(ctx context.Context, typ string, r dateRange, f ReportFilter) []catTotal {
@@ -684,7 +684,7 @@ func (s Reports) sumGroupedByCategory(ctx context.Context, typ string, r dateRan
 	for _, x := range rows {
 		out = append(out, catTotal{
 			ID: x.ID, Name: x.Name, Icon: coalesce(x.Icon.String, "circle"),
-			Color: coalesce(x.Color.String, "#64748b"), Total: round2(x.Total),
+			Color: coalesce(x.Color.String, "#64748b"), Total: round2(x.Total.InexactFloat64()),
 		})
 	}
 	return out
@@ -693,7 +693,7 @@ func (s Reports) sumGroupedByCategory(ctx context.Context, typ string, r dateRan
 func (s Reports) dailyTotals(ctx context.Context, typ string, r dateRange, f ReportFilter) map[string]dayTotal {
 	out := map[string]dayTotal{}
 	for _, x := range filter.DailyTotals(ctx, s.DB, s.where(typ, r, f, 0)) {
-		out[x.Day] = dayTotal{Total: round2(x.Total), Count: x.Count}
+		out[x.Day] = dayTotal{Total: round2(x.Total.InexactFloat64()), Count: x.Count}
 	}
 	return out
 }
@@ -701,7 +701,7 @@ func (s Reports) dailyTotals(ctx context.Context, typ string, r dateRange, f Rep
 func (s Reports) groupedByPeriod(ctx context.Context, typ string, r dateRange, f ReportFilter, groupBy string, categoryID int64) map[string]float64 {
 	out := map[string]float64{}
 	for _, x := range filter.GroupedByPeriod(ctx, s.DB, s.where(typ, r, f, categoryID), groupBy) {
-		out[x.Key] = x.Total
+		out[x.Key] = x.Total.InexactFloat64()
 	}
 	return out
 }
@@ -714,41 +714,37 @@ func (s Reports) monthlyBudget(ctx context.Context, f ReportFilter) any {
 	if !scoped {
 		row, err := db.Q(s.DB).GetGlobalMonthlyBudget(ctx)
 		if err == nil {
-			return budgetToBase(row.Amount, nullRate(row.Rate), row.IsBase.Valid && row.IsBase.Int64 != 0)
+			return budgetToBase(money.FromMinor(row.Amount, int(row.Decimals)), row.Rate, row.IsBase != 0).InexactFloat64()
 		}
 		rows, err := db.Q(s.DB).ListMonthlyBudgets(ctx)
 		if err != nil {
 			return nil
 		}
-		total := 0.0
+		total := decimal.Zero
 		for _, r := range rows {
-			total += budgetToBase(r.Amount, nullRate(r.Rate), r.IsBase.Valid && r.IsBase.Int64 != 0)
+			total = total.Add(budgetToBase(money.FromMinor(r.Amount, int(r.Decimals)), r.Rate, r.IsBase != 0))
 		}
-		if total > 0 {
-			return total
+		if total.IsPositive() {
+			return total.InexactFloat64()
 		}
 		return nil
 	}
 	rows := filter.ScopedMonthlyBudgets(ctx, s.DB, f.CategoryIDs, f.TagIDs)
-	total := 0.0
+	total := decimal.Zero
 	for _, r := range rows {
-		total += budgetToBase(r.Amount, r.Rate, r.IsBase)
+		total = total.Add(budgetToBase(r.Amount, r.Rate, r.IsBase))
 	}
-	if total > 0 {
-		return total
+	if total.IsPositive() {
+		return total.InexactFloat64()
 	}
 	return nil
 }
 
-func nullRate(v sql.NullFloat64) float64 {
-	return v.Float64
-}
-
-func budgetToBase(amount, rate float64, isBase bool) float64 {
-	if isBase || rate == 0 {
+func budgetToBase(amount, rate decimal.Decimal, isBase bool) decimal.Decimal {
+	if isBase || rate.IsZero() {
 		return amount
 	}
-	return amount * rate
+	return amount.Mul(rate)
 }
 
 type periodPoint struct{ Key, Label string }

@@ -22,11 +22,15 @@ SELECT COUNT(*) FROM categories WHERE type = ?;
 -- name: DeleteCategory :exec
 DELETE FROM categories WHERE id = ?;
 
--- name: CategoryStatistics :one
-SELECT COUNT(*), COALESCE(SUM(amount),0) FROM transactions
-WHERE category_id = sqlc.arg('category_id') AND status = 'confirmed'
-  AND date >= COALESCE(sqlc.narg('start_date'), date)
-  AND date <= COALESCE(sqlc.narg('end_date'), date);
+-- name: CategoryStatistics :many
+SELECT COUNT(*) AS cnt, CAST(COALESCE(SUM(t.amount),0) AS INTEGER) AS total, c.decimals, c.rate
+FROM transactions t
+JOIN accounts a ON a.id = t.account_id
+JOIN currencies c ON c.id = a.currency_id
+WHERE t.category_id = sqlc.arg('category_id') AND t.status = 'confirmed'
+  AND t.date >= COALESCE(sqlc.narg('start_date'), t.date)
+  AND t.date <= COALESCE(sqlc.narg('end_date'), t.date)
+GROUP BY c.id;
 
 -- name: GetDefaultCategory :one
 SELECT categories.id, categories.name, categories.type, categories.icon, categories.color, categories.is_default,

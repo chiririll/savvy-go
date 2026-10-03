@@ -34,8 +34,13 @@ WHERE t.id = COALESCE(sqlc.narg('id'), t.id)
 
 -- name: ListTransactions :many
 SELECT t.id, t.type, t.account_id, t.to_account_id, t.category_id, t.amount, t.to_amount, t.exchange_rate,
-	t.description, t.date, t.status, t.recurring_transaction_id, t.created_at
+	t.description, t.date, t.status, t.recurring_transaction_id, t.created_at,
+	ca.decimals AS decimals, COALESCE(cb.decimals, ca.decimals) AS to_decimals
 FROM transactions t
+JOIN accounts a ON a.id = t.account_id
+JOIN currencies ca ON ca.id = a.currency_id
+LEFT JOIN accounts ta ON ta.id = t.to_account_id
+LEFT JOIN currencies cb ON cb.id = ta.currency_id
 WHERE t.id = COALESCE(sqlc.narg('id'), t.id)
   AND t.type = COALESCE(sqlc.narg('type'), t.type)
   AND t.account_id = COALESCE(sqlc.narg('account_id'), t.account_id)
@@ -47,7 +52,7 @@ ORDER BY t.date DESC, t.id DESC
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: ListTransactionSummaryRows :many
-SELECT t.type, t.amount, c.rate, c.is_base
+SELECT t.type, t.amount, c.rate, c.is_base, c.decimals
 FROM transactions t
 JOIN accounts a ON a.id = t.account_id
 JOIN currencies c ON c.id = a.currency_id

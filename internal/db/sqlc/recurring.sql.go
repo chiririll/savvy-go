@@ -82,8 +82,8 @@ type InsertRecurringParams struct {
 	AccountID   int64
 	ToAccountID sql.NullInt64
 	CategoryID  sql.NullInt64
-	Amount      float64
-	ToAmount    sql.NullFloat64
+	Amount      int64
+	ToAmount    sql.NullInt64
 	Description sql.NullString
 	Frequency   string
 	Interval    int64
@@ -134,13 +134,18 @@ func (q *Queries) InsertRecurringTag(ctx context.Context, arg InsertRecurringTag
 }
 
 const listRecurring = `-- name: ListRecurring :many
-SELECT id, type, account_id, to_account_id, category_id, amount, to_amount, description,
-	frequency, interval, day_of_week, day_of_month, start_date, end_date,
-	next_run_date, last_run_date, is_active
-FROM recurring_transactions
-WHERE id = COALESCE(?1, id)
-  AND is_active = COALESCE(?2, is_active)
-ORDER BY next_run_date, id
+SELECT r.id, r.type, r.account_id, r.to_account_id, r.category_id, r.amount, r.to_amount, r.description,
+	r.frequency, r.interval, r.day_of_week, r.day_of_month, r.start_date, r.end_date,
+	r.next_run_date, r.last_run_date, r.is_active,
+	ca.decimals AS decimals, COALESCE(cb.decimals, ca.decimals) AS to_decimals
+FROM recurring_transactions r
+JOIN accounts a ON a.id = r.account_id
+JOIN currencies ca ON ca.id = a.currency_id
+LEFT JOIN accounts ta ON ta.id = r.to_account_id
+LEFT JOIN currencies cb ON cb.id = ta.currency_id
+WHERE r.id = COALESCE(?1, r.id)
+  AND r.is_active = COALESCE(?2, r.is_active)
+ORDER BY r.next_run_date, r.id
 LIMIT ?4 OFFSET ?3
 `
 
@@ -157,8 +162,8 @@ type ListRecurringRow struct {
 	AccountID   int64
 	ToAccountID sql.NullInt64
 	CategoryID  sql.NullInt64
-	Amount      float64
-	ToAmount    sql.NullFloat64
+	Amount      int64
+	ToAmount    sql.NullInt64
 	Description sql.NullString
 	Frequency   string
 	Interval    int64
@@ -169,6 +174,8 @@ type ListRecurringRow struct {
 	NextRunDate string
 	LastRunDate sql.NullString
 	IsActive    int64
+	Decimals    int64
+	ToDecimals  int64
 }
 
 func (q *Queries) ListRecurring(ctx context.Context, arg ListRecurringParams) ([]ListRecurringRow, error) {
@@ -203,6 +210,8 @@ func (q *Queries) ListRecurring(ctx context.Context, arg ListRecurringParams) ([
 			&i.NextRunDate,
 			&i.LastRunDate,
 			&i.IsActive,
+			&i.Decimals,
+			&i.ToDecimals,
 		); err != nil {
 			return nil, err
 		}
@@ -270,8 +279,8 @@ type UpdateRecurringParams struct {
 	AccountID   int64
 	ToAccountID sql.NullInt64
 	CategoryID  sql.NullInt64
-	Amount      float64
-	ToAmount    sql.NullFloat64
+	Amount      int64
+	ToAmount    sql.NullInt64
 	Description sql.NullString
 	Frequency   string
 	Interval    int64

@@ -9,6 +9,7 @@ import (
 	"savvy-go/internal/httpserver/dto"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/shopspring/decimal"
 )
 
 func (s *Server) debtsIndex(w http.ResponseWriter, r *http.Request) {
@@ -27,16 +28,16 @@ func (s *Server) debtsIndex(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) debtsStore(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Origin       string  `json:"origin"`
-		Name         string  `json:"name"`
-		DebtType     string  `json:"debt_type"`
-		AccountID    int64   `json:"account_id"`
-		CurrencyID   int64   `json:"currency_id"`
-		Amount       float64 `json:"amount"`
-		Date         string  `json:"date"`
-		DueDate      *string `json:"due_date"`
-		Counterparty *string `json:"counterparty"`
-		Description  *string `json:"description"`
+		Origin       string          `json:"origin"`
+		Name         string          `json:"name"`
+		DebtType     string          `json:"debt_type"`
+		AccountID    int64           `json:"account_id"`
+		CurrencyID   int64           `json:"currency_id"`
+		Amount       decimal.Decimal `json:"amount"`
+		Date         string          `json:"date"`
+		DueDate      *string         `json:"due_date"`
+		Counterparty *string         `json:"counterparty"`
+		Description  *string         `json:"description"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Name == "" {
 		writeValidation(w, map[string][]string{"name": {"The name field is required."}})
@@ -64,13 +65,13 @@ func (s *Server) debtsUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Name         *string  `json:"name"`
-		DebtType     *string  `json:"debt_type"`
-		CurrencyID   *int64   `json:"currency_id"`
-		Amount       *float64 `json:"amount"`
-		DueDate      *string  `json:"due_date"`
-		Counterparty *string  `json:"counterparty"`
-		Description  *string  `json:"description"`
+		Name         *string          `json:"name"`
+		DebtType     *string          `json:"debt_type"`
+		CurrencyID   *int64           `json:"currency_id"`
+		Amount       *decimal.Decimal `json:"amount"`
+		DueDate      *string          `json:"due_date"`
+		Counterparty *string          `json:"counterparty"`
+		Description  *string          `json:"description"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeValidation(w, map[string][]string{"name": {"The given data was invalid."}})
@@ -131,10 +132,10 @@ func (s *Server) debtMove(w http.ResponseWriter, r *http.Request, collect bool) 
 		return
 	}
 	var body struct {
-		AccountID   int64   `json:"account_id"`
-		Amount      float64 `json:"amount"`
-		Date        string  `json:"date"`
-		Description *string `json:"description"`
+		AccountID   int64           `json:"account_id"`
+		Amount      decimal.Decimal `json:"amount"`
+		Date        string          `json:"date"`
+		Description *string         `json:"description"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeValidation(w, map[string][]string{"amount": {"The given data was invalid."}})

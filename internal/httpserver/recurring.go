@@ -9,6 +9,7 @@ import (
 	"savvy-go/internal/httpserver/dto"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/shopspring/decimal"
 )
 
 func (s *Server) recurringIndex(w http.ResponseWriter, r *http.Request) {
@@ -95,21 +96,21 @@ func decodeRecurring(w http.ResponseWriter, r *http.Request) (domain.RecurringIn
 		return domain.RecurringInput{}, false
 	}
 	var body struct {
-		Type        string   `json:"type"`
-		AccountID   int64    `json:"account_id"`
-		ToAccountID *int64   `json:"to_account_id"`
-		CategoryID  *int64   `json:"category_id"`
-		Amount      float64  `json:"amount"`
-		ToAmount    *float64 `json:"to_amount"`
-		Description *string  `json:"description"`
-		Frequency   string   `json:"frequency"`
-		Interval    int      `json:"interval"`
-		DayOfWeek   *int     `json:"day_of_week"`
-		DayOfMonth  *int     `json:"day_of_month"`
-		StartDate   string   `json:"start_date"`
-		EndDate     *string  `json:"end_date"`
-		IsActive    *bool    `json:"is_active"`
-		TagIDs      []int64  `json:"tag_ids"`
+		Type        string           `json:"type"`
+		AccountID   int64            `json:"account_id"`
+		ToAccountID *int64           `json:"to_account_id"`
+		CategoryID  *int64           `json:"category_id"`
+		Amount      decimal.Decimal  `json:"amount"`
+		ToAmount    *decimal.Decimal `json:"to_amount"`
+		Description *string          `json:"description"`
+		Frequency   string           `json:"frequency"`
+		Interval    int              `json:"interval"`
+		DayOfWeek   *int             `json:"day_of_week"`
+		DayOfMonth  *int             `json:"day_of_month"`
+		StartDate   string           `json:"start_date"`
+		EndDate     *string          `json:"end_date"`
+		IsActive    *bool            `json:"is_active"`
+		TagIDs      []int64          `json:"tag_ids"`
 	}
 	buf, _ := json.Marshal(raw)
 	if err := json.Unmarshal(buf, &body); err != nil {

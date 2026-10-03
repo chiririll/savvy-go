@@ -8,6 +8,8 @@ package sqlc
 import (
 	"context"
 	"database/sql"
+
+	"github.com/shopspring/decimal"
 )
 
 const deleteBudget = `-- name: DeleteBudget :exec
@@ -38,21 +40,27 @@ func (q *Queries) DeleteBudgetTags(ctx context.Context, budgetID int64) error {
 }
 
 const getGlobalMonthlyBudget = `-- name: GetGlobalMonthlyBudget :one
-SELECT b.amount, c.rate, c.is_base FROM budgets b
-LEFT JOIN currencies c ON c.id = b.currency_id
+SELECT b.amount, c.rate, c.is_base, c.decimals FROM budgets b
+JOIN currencies c ON c.id = b.currency_id
 WHERE b.is_active = 1 AND b.period = 'monthly' AND b.is_global = 1 LIMIT 1
 `
 
 type GetGlobalMonthlyBudgetRow struct {
-	Amount float64
-	Rate   sql.NullFloat64
-	IsBase sql.NullInt64
+	Amount   int64
+	Rate     decimal.Decimal
+	IsBase   int64
+	Decimals int64
 }
 
 func (q *Queries) GetGlobalMonthlyBudget(ctx context.Context) (GetGlobalMonthlyBudgetRow, error) {
 	row := q.db.QueryRowContext(ctx, getGlobalMonthlyBudget)
 	var i GetGlobalMonthlyBudgetRow
-	err := row.Scan(&i.Amount, &i.Rate, &i.IsBase)
+	err := row.Scan(
+		&i.Amount,
+		&i.Rate,
+		&i.IsBase,
+		&i.Decimals,
+	)
 	return i, err
 }
 
@@ -64,8 +72,8 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?)
 
 type InsertBudgetParams struct {
 	Name            string
-	Amount          float64
-	CurrencyID      sql.NullInt64
+	Amount          int64
+	CurrencyID      int64
 	Period          string
 	StartDate       sql.NullString
 	EndDate         sql.NullString
@@ -209,8 +217,9 @@ func (q *Queries) ListBudgetTags(ctx context.Context, budgetID int64) ([]ListBud
 
 const listBudgets = `-- name: ListBudgets :many
 SELECT b.id, b.name, b.amount, b.currency_id, b.period, b.start_date, b.end_date,
-	b.is_global, b.notify_at_percent, b.is_active
+	b.is_global, b.notify_at_percent, b.is_active, c.decimals
 FROM budgets b
+JOIN currencies c ON c.id = b.currency_id
 WHERE b.id = COALESCE(?1, b.id)
 ORDER BY b.id
 `
@@ -218,14 +227,15 @@ ORDER BY b.id
 type ListBudgetsRow struct {
 	ID              int64
 	Name            string
-	Amount          float64
-	CurrencyID      sql.NullInt64
+	Amount          int64
+	CurrencyID      int64
 	Period          string
 	StartDate       sql.NullString
 	EndDate         sql.NullString
 	IsGlobal        int64
 	NotifyAtPercent sql.NullInt64
 	IsActive        int64
+	Decimals        int64
 }
 
 func (q *Queries) ListBudgets(ctx context.Context, id sql.NullInt64) ([]ListBudgetsRow, error) {
@@ -248,6 +258,7 @@ func (q *Queries) ListBudgets(ctx context.Context, id sql.NullInt64) ([]ListBudg
 			&i.IsGlobal,
 			&i.NotifyAtPercent,
 			&i.IsActive,
+			&i.Decimals,
 		); err != nil {
 			return nil, err
 		}
@@ -263,15 +274,16 @@ func (q *Queries) ListBudgets(ctx context.Context, id sql.NullInt64) ([]ListBudg
 }
 
 const listMonthlyBudgets = `-- name: ListMonthlyBudgets :many
-SELECT b.amount, c.rate, c.is_base FROM budgets b
-LEFT JOIN currencies c ON c.id = b.currency_id
+SELECT b.amount, c.rate, c.is_base, c.decimals FROM budgets b
+JOIN currencies c ON c.id = b.currency_id
 WHERE b.is_active = 1 AND b.period = 'monthly'
 `
 
 type ListMonthlyBudgetsRow struct {
-	Amount float64
-	Rate   sql.NullFloat64
-	IsBase sql.NullInt64
+	Amount   int64
+	Rate     decimal.Decimal
+	IsBase   int64
+	Decimals int64
 }
 
 func (q *Queries) ListMonthlyBudgets(ctx context.Context) ([]ListMonthlyBudgetsRow, error) {
@@ -283,7 +295,12 @@ func (q *Queries) ListMonthlyBudgets(ctx context.Context) ([]ListMonthlyBudgetsR
 	items := []ListMonthlyBudgetsRow{}
 	for rows.Next() {
 		var i ListMonthlyBudgetsRow
-		if err := rows.Scan(&i.Amount, &i.Rate, &i.IsBase); err != nil {
+		if err := rows.Scan(
+			&i.Amount,
+			&i.Rate,
+			&i.IsBase,
+			&i.Decimals,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -304,8 +321,8 @@ UPDATE budgets SET name=?, amount=?, currency_id=?, period=?, start_date=?, end_
 
 type UpdateBudgetParams struct {
 	Name            string
-	Amount          float64
-	CurrencyID      sql.NullInt64
+	Amount          int64
+	CurrencyID      int64
 	Period          string
 	StartDate       sql.NullString
 	EndDate         sql.NullString

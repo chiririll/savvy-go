@@ -12,8 +12,9 @@ DELETE FROM budgets WHERE id = ?;
 
 -- name: ListBudgets :many
 SELECT b.id, b.name, b.amount, b.currency_id, b.period, b.start_date, b.end_date,
-	b.is_global, b.notify_at_percent, b.is_active
+	b.is_global, b.notify_at_percent, b.is_active, c.decimals
 FROM budgets b
+JOIN currencies c ON c.id = b.currency_id
 WHERE b.id = COALESCE(sqlc.narg('id'), b.id)
 ORDER BY b.id;
 
@@ -39,11 +40,11 @@ DELETE FROM budget_tag WHERE budget_id = ?;
 INSERT OR IGNORE INTO budget_tag (budget_id, tag_id) VALUES (?,?);
 
 -- name: GetGlobalMonthlyBudget :one
-SELECT b.amount, c.rate, c.is_base FROM budgets b
-LEFT JOIN currencies c ON c.id = b.currency_id
+SELECT b.amount, c.rate, c.is_base, c.decimals FROM budgets b
+JOIN currencies c ON c.id = b.currency_id
 WHERE b.is_active = 1 AND b.period = 'monthly' AND b.is_global = 1 LIMIT 1;
 
 -- name: ListMonthlyBudgets :many
-SELECT b.amount, c.rate, c.is_base FROM budgets b
-LEFT JOIN currencies c ON c.id = b.currency_id
+SELECT b.amount, c.rate, c.is_base, c.decimals FROM budgets b
+JOIN currencies c ON c.id = b.currency_id
 WHERE b.is_active = 1 AND b.period = 'monthly';

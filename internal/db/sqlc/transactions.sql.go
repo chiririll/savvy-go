@@ -8,6 +8,8 @@ package sqlc
 import (
 	"context"
 	"database/sql"
+
+	"github.com/shopspring/decimal"
 )
 
 const confirmTransaction = `-- name: ConfirmTransaction :exec
@@ -102,9 +104,9 @@ type InsertTransactionParams struct {
 	AccountID              int64
 	ToAccountID            sql.NullInt64
 	CategoryID             sql.NullInt64
-	Amount                 float64
-	ToAmount               sql.NullFloat64
-	ExchangeRate           sql.NullFloat64
+	Amount                 int64
+	ToAmount               sql.NullInt64
+	ExchangeRate           decimal.NullDecimal
 	Description            sql.NullString
 	Date                   sql.NullString
 	Status                 string
@@ -140,7 +142,7 @@ type InsertTransactionIgnoreDupParams struct {
 	Type        string
 	AccountID   int64
 	CategoryID  sql.NullInt64
-	Amount      float64
+	Amount      int64
 	Description sql.NullString
 	Date        sql.NullString
 	Status      string
@@ -172,9 +174,9 @@ VALUES (?,?,?,?,?,?,?)
 type InsertTransactionItemParams struct {
 	TransactionID int64
 	Name          string
-	Quantity      float64
-	PricePerUnit  float64
-	TotalPrice    float64
+	Quantity      decimal.Decimal
+	PricePerUnit  int64
+	TotalPrice    int64
 	CreatedAt     sql.NullString
 	UpdatedAt     sql.NullString
 }
@@ -213,9 +215,9 @@ SELECT id, name, quantity, price_per_unit, total_price FROM transaction_items WH
 type ListTransactionItemsRow struct {
 	ID           int64
 	Name         string
-	Quantity     float64
-	PricePerUnit float64
-	TotalPrice   float64
+	Quantity     decimal.Decimal
+	PricePerUnit int64
+	TotalPrice   int64
 }
 
 func (q *Queries) ListTransactionItems(ctx context.Context, transactionID int64) ([]ListTransactionItemsRow, error) {
@@ -248,7 +250,7 @@ func (q *Queries) ListTransactionItems(ctx context.Context, transactionID int64)
 }
 
 const listTransactionSummaryRows = `-- name: ListTransactionSummaryRows :many
-SELECT t.type, t.amount, c.rate, c.is_base
+SELECT t.type, t.amount, c.rate, c.is_base, c.decimals
 FROM transactions t
 JOIN accounts a ON a.id = t.account_id
 JOIN currencies c ON c.id = a.currency_id
@@ -256,10 +258,11 @@ WHERE t.status = ? AND t.type IN ('income','expense')
 `
 
 type ListTransactionSummaryRowsRow struct {
-	Type   string
-	Amount float64
-	Rate   float64
-	IsBase int64
+	Type     string
+	Amount   int64
+	Rate     decimal.Decimal
+	IsBase   int64
+	Decimals int64
 }
 
 func (q *Queries) ListTransactionSummaryRows(ctx context.Context, status string) ([]ListTransactionSummaryRowsRow, error) {
@@ -276,6 +279,7 @@ func (q *Queries) ListTransactionSummaryRows(ctx context.Context, status string)
 			&i.Amount,
 			&i.Rate,
 			&i.IsBase,
+			&i.Decimals,
 		); err != nil {
 			return nil, err
 		}
@@ -332,8 +336,13 @@ func (q *Queries) ListTransactionTags(ctx context.Context, transactionID int64) 
 
 const listTransactions = `-- name: ListTransactions :many
 SELECT t.id, t.type, t.account_id, t.to_account_id, t.category_id, t.amount, t.to_amount, t.exchange_rate,
-	t.description, t.date, t.status, t.recurring_transaction_id, t.created_at
+	t.description, t.date, t.status, t.recurring_transaction_id, t.created_at,
+	ca.decimals AS decimals, COALESCE(cb.decimals, ca.decimals) AS to_decimals
 FROM transactions t
+JOIN accounts a ON a.id = t.account_id
+JOIN currencies ca ON ca.id = a.currency_id
+LEFT JOIN accounts ta ON ta.id = t.to_account_id
+LEFT JOIN currencies cb ON cb.id = ta.currency_id
 WHERE t.id = COALESCE(?1, t.id)
   AND t.type = COALESCE(?2, t.type)
   AND t.account_id = COALESCE(?3, t.account_id)
@@ -363,14 +372,16 @@ type ListTransactionsRow struct {
 	AccountID              int64
 	ToAccountID            sql.NullInt64
 	CategoryID             sql.NullInt64
-	Amount                 float64
-	ToAmount               sql.NullFloat64
-	ExchangeRate           sql.NullFloat64
+	Amount                 int64
+	ToAmount               sql.NullInt64
+	ExchangeRate           decimal.NullDecimal
 	Description            sql.NullString
 	Date                   sql.NullString
 	Status                 string
 	RecurringTransactionID sql.NullInt64
 	CreatedAt              sql.NullString
+	Decimals               int64
+	ToDecimals             int64
 }
 
 func (q *Queries) ListTransactions(ctx context.Context, arg ListTransactionsParams) ([]ListTransactionsRow, error) {
@@ -406,6 +417,8 @@ func (q *Queries) ListTransactions(ctx context.Context, arg ListTransactionsPara
 			&i.Status,
 			&i.RecurringTransactionID,
 			&i.CreatedAt,
+			&i.Decimals,
+			&i.ToDecimals,
 		); err != nil {
 			return nil, err
 		}
@@ -444,9 +457,9 @@ type UpdateTransactionParams struct {
 	AccountID    int64
 	ToAccountID  sql.NullInt64
 	CategoryID   sql.NullInt64
-	Amount       float64
-	ToAmount     sql.NullFloat64
-	ExchangeRate sql.NullFloat64
+	Amount       int64
+	ToAmount     sql.NullInt64
+	ExchangeRate decimal.NullDecimal
 	Description  sql.NullString
 	Date         sql.NullString
 	UpdatedAt    sql.NullString

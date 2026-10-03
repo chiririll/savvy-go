@@ -6,8 +6,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/shopspring/decimal"
+
 	"savvy-go/internal/db"
 	"savvy-go/internal/db/sqlc"
+	"savvy-go/internal/money"
 )
 
 type Recurring struct {
@@ -16,8 +19,8 @@ type Recurring struct {
 	AccountID   int64
 	ToAccountID *int64
 	CategoryID  *int64
-	Amount      float64
-	ToAmount    *float64
+	Amount      decimal.Decimal
+	ToAmount    *decimal.Decimal
 	Description *string
 	Frequency   string
 	Interval    int
@@ -39,8 +42,8 @@ type RecurringInput struct {
 	AccountID   int64
 	ToAccountID *int64
 	CategoryID  *int64
-	Amount      float64
-	ToAmount    *float64
+	Amount      decimal.Decimal
+	ToAmount    *decimal.Decimal
 	Description *string
 	Frequency   string
 	Interval    int
@@ -86,9 +89,10 @@ func (s RecurringStore) Create(ctx context.Context, in RecurringInput) (*Recurri
 		active = *in.IsActive
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
+	dec, toDec := s.decimalsFor(ctx, in.AccountID, in.ToAccountID)
 	res, err := db.Q(s.DB).InsertRecurring(ctx, sqlc.InsertRecurringParams{
 		Type: in.Type, AccountID: in.AccountID, ToAccountID: db.NullInt64(in.ToAccountID),
-		CategoryID: db.NullInt64(in.CategoryID), Amount: in.Amount, ToAmount: db.NullFloat64(in.ToAmount),
+		CategoryID: db.NullInt64(in.CategoryID), Amount: money.ToMinor(in.Amount, dec), ToAmount: money.ToNullMinor(in.ToAmount, toDec),
 		Description: db.NullString(in.Description), Frequency: in.Frequency, Interval: int64(in.Interval),
 		DayOfWeek: db.NullInt(in.DayOfWeek), DayOfMonth: db.NullInt(in.DayOfMonth),
 		StartDate: in.StartDate, EndDate: db.NullString(in.EndDate), NextRunDate: in.StartDate,
@@ -124,7 +128,7 @@ func (s RecurringStore) Update(ctx context.Context, id int64, in RecurringInput)
 	if in.AccountID == 0 {
 		in.AccountID = cur.AccountID
 	}
-	if in.Amount == 0 {
+	if in.Amount.IsZero() {
 		in.Amount = cur.Amount
 	}
 	if in.Frequency == "" {
@@ -145,9 +149,10 @@ func (s RecurringStore) Update(ctx context.Context, id int64, in RecurringInput)
 		active = *in.IsActive
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
+	dec, toDec := s.decimalsFor(ctx, in.AccountID, in.ToAccountID)
 	err = db.Q(s.DB).UpdateRecurring(ctx, sqlc.UpdateRecurringParams{
 		Type: in.Type, AccountID: in.AccountID, ToAccountID: db.NullInt64(in.ToAccountID),
-		CategoryID: db.NullInt64(in.CategoryID), Amount: in.Amount, ToAmount: db.NullFloat64(in.ToAmount),
+		CategoryID: db.NullInt64(in.CategoryID), Amount: money.ToMinor(in.Amount, dec), ToAmount: money.ToNullMinor(in.ToAmount, toDec),
 		Description: db.NullString(in.Description), Frequency: in.Frequency, Interval: int64(in.Interval),
 		DayOfWeek: db.NullInt(in.DayOfWeek), DayOfMonth: db.NullInt(in.DayOfMonth),
 		StartDate: in.StartDate, EndDate: db.NullString(in.EndDate), NextRunDate: next,
@@ -234,7 +239,7 @@ func (s RecurringStore) EnsureUpcoming(ctx context.Context) error {
 }
 
 func (s RecurringStore) createPending(ctx context.Context, rec *Recurring) (*Transaction, error) {
-	var toAmt *float64
+	var toAmt *decimal.Decimal
 	if rec.Type == "transfer" {
 		if rec.ToAmount != nil {
 			v := *rec.ToAmount
@@ -272,31 +277,19 @@ func (s RecurringStore) syncOpenPending(ctx context.Context, rec *Recurring) err
 		}
 		return nil
 	}
-	var toAmt any
-	if rec.Type == "transfer" {
-		if rec.ToAmount != nil {
-			toAmt = *rec.ToAmount
-		} else {
-			v, err := s.calculateToAmount(ctx, rec)
-			if err != nil {
-				return err
-			}
-			toAmt = v
+	toAmt := rec.ToAmount
+	if rec.Type == "transfer" && toAmt == nil {
+		v, err := s.calculateToAmount(ctx, rec)
+		if err != nil {
+			return err
 		}
-	} else {
-		toAmt = rec.ToAmount
+		toAmt = &v
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	var toAmtN sql.NullFloat64
-	switch v := toAmt.(type) {
-	case float64:
-		toAmtN = sql.NullFloat64{Float64: v, Valid: true}
-	case *float64:
-		toAmtN = db.NullFloat64(v)
-	}
+	dec, toDec := s.decimalsFor(ctx, rec.AccountID, rec.ToAccountID)
 	err = db.Q(s.DB).UpdateTransaction(ctx, sqlc.UpdateTransactionParams{
 		Type: rec.Type, AccountID: rec.AccountID, ToAccountID: db.NullInt64(rec.ToAccountID),
-		CategoryID: db.NullInt64(rec.CategoryID), Amount: rec.Amount, ToAmount: toAmtN,
+		CategoryID: db.NullInt64(rec.CategoryID), Amount: money.ToMinor(rec.Amount, dec), ToAmount: money.ToNullMinor(toAmt, toDec),
 		Description: db.NullString(rec.Description), Date: db.NS(rec.NextRunDate),
 		UpdatedAt: db.NS(now), ID: pendingID,
 	})
@@ -318,7 +311,7 @@ func (s RecurringStore) pendingID(ctx context.Context, recurringID int64) (int64
 	return id, err
 }
 
-func (s RecurringStore) calculateToAmount(ctx context.Context, rec *Recurring) (float64, error) {
+func (s RecurringStore) calculateToAmount(ctx context.Context, rec *Recurring) (decimal.Decimal, error) {
 	if rec.ToAccountID == nil {
 		return rec.Amount, nil
 	}
@@ -332,6 +325,10 @@ func (s RecurringStore) calculateToAmount(ctx context.Context, rec *Recurring) (
 		return rec.Amount, err
 	}
 	return Convert(rec.Amount, *from.Currency, *to.Currency), nil
+}
+
+func (s RecurringStore) decimalsFor(ctx context.Context, accountID int64, toAccountID *int64) (int, int) {
+	return Transactions{DB: s.DB}.decimalsFor(ctx, accountID, toAccountID)
 }
 
 func (s RecurringStore) saveTags(ctx context.Context, id int64, tagIDs []int64) error {
@@ -462,7 +459,9 @@ func daysInMonth(t time.Time) int {
 
 func recurringFromRow(row sqlc.ListRecurringRow) Recurring {
 	r := Recurring{
-		ID: row.ID, Type: row.Type, AccountID: row.AccountID, Amount: row.Amount,
+		ID: row.ID, Type: row.Type, AccountID: row.AccountID,
+		Amount:    money.FromMinor(row.Amount, int(row.Decimals)),
+		ToAmount:  money.FromNullMinor(row.ToAmount, int(row.ToDecimals)),
 		Frequency: row.Frequency, Interval: int(row.Interval), StartDate: row.StartDate,
 		NextRunDate: row.NextRunDate, IsActive: row.IsActive != 0,
 	}
@@ -471,9 +470,6 @@ func recurringFromRow(row sqlc.ListRecurringRow) Recurring {
 	}
 	if row.CategoryID.Valid {
 		r.CategoryID = &row.CategoryID.Int64
-	}
-	if row.ToAmount.Valid {
-		r.ToAmount = &row.ToAmount.Float64
 	}
 	if row.Description.Valid {
 		r.Description = &row.Description.String

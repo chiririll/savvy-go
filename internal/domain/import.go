@@ -12,8 +12,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/shopspring/decimal"
+
 	"savvy-go/internal/db"
 	"savvy-go/internal/db/sqlc"
+	"savvy-go/internal/money"
 )
 
 type Imports struct {
@@ -169,6 +172,7 @@ func (s Imports) Execute(ctx context.Context, importID string, mapping, options 
 	if err != nil {
 		return s.fail(ctx, importID, err.Error())
 	}
+	dec := Accounts{DB: s.DB}.Decimals(ctx, accountID)
 	for i, row := range rows {
 		res := processImportRow(row, mapping, options, i+1)
 		if res.err != "" {
@@ -180,7 +184,7 @@ func (s Imports) Execute(ctx context.Context, importID string, mapping, options 
 		hash := dedupHash(res.date, res.amount, res.desc)
 		st := "confirmed"
 		ins, err := db.Q(s.DB).InsertTransactionIgnoreDup(ctx, sqlc.InsertTransactionIgnoreDupParams{
-			Type: res.typ, AccountID: accountID, CategoryID: resolver.resolve(res.category), Amount: res.amount, Description: db.NS(res.desc),
+			Type: res.typ, AccountID: accountID, CategoryID: resolver.resolve(res.category), Amount: money.ToMinor(res.amount, dec), Description: db.NS(res.desc),
 			Date: db.NS(res.date), Status: st, DedupHash: db.NS(hash), CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
 		})
 		if err != nil {
@@ -248,7 +252,7 @@ func (s Imports) Preview(ctx context.Context, im *Import, mapping, options map[s
 		}
 		if len(preview) < 200 {
 			preview = append(preview, map[string]any{
-				"row": i + 1, "date": res.date, "type": res.typ, "amount": res.amount,
+				"row": i + 1, "date": res.date, "type": res.typ, "amount": money.Plain(res.amount),
 				"description": res.desc, "status": status, "error": nilOr(res.err),
 				"category": nilOr(res.category), "tags": []string{}, "duplicate_of": nil, "warnings": []string{},
 			})
@@ -332,7 +336,7 @@ func suggestMapping(headers []string) map[string]int {
 
 type importRow struct {
 	date, typ, desc, category, err string
-	amount                         float64
+	amount                         decimal.Decimal
 }
 
 func processImportRow(row []string, mapping, options map[string]any, _ int) importRow {
@@ -372,13 +376,13 @@ func processImportRow(row []string, mapping, options map[string]any, _ int) impo
 		}
 	}
 	if !typeKnown {
-		if amt < 0 {
+		if amt.Sign() < 0 {
 			out.typ = "expense"
-		} else if amt > 0 {
+		} else if amt.Sign() > 0 {
 			out.typ = "income"
 		}
 	}
-	out.amount = absFloat(out.amount)
+	out.amount = out.amount.Abs()
 	if di, ok := mappingIndex(mapping, "description"); ok && di < len(row) {
 		out.desc = strings.TrimSpace(row[di])
 	}
@@ -402,15 +406,8 @@ func mappingIndex(mapping map[string]any, key string) (int, bool) {
 	return int(n), ok
 }
 
-func absFloat(v float64) float64 {
-	if v < 0 {
-		return -v
-	}
-	return v
-}
-
-func dedupHash(date string, amount float64, desc string) string {
+func dedupHash(date string, amount decimal.Decimal, desc string) string {
 	norm := strings.ToLower(strings.Join(strings.Fields(strings.TrimSpace(desc)), " "))
-	sum := md5.Sum([]byte(fmt.Sprintf("%s|%.2f|%s", date, amount, norm)))
+	sum := md5.Sum([]byte(fmt.Sprintf("%s|%s|%s", date, amount.StringFixed(2), norm)))
 	return hex.EncodeToString(sum[:])
 }

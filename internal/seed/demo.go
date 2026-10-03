@@ -8,10 +8,13 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/shopspring/decimal"
+
 	"savvy-go/internal/auth"
 	appdb "savvy-go/internal/db"
 	"savvy-go/internal/db/sqlc"
 	"savvy-go/internal/domain"
+	"savvy-go/internal/money"
 )
 
 const (
@@ -192,11 +195,14 @@ func (s *seeder) createAccounts(usd *domain.Currency, eur *domain.Currency) (map
 	for _, sp := range specs {
 		a := domain.Account{
 			Name: sp.name, Type: sp.typ, CurrencyID: sp.cur.ID,
-			InitialBalance: sp.bal, IsActive: true,
+			InitialBalance: decimal.NewFromFloat(sp.bal), IsActive: true,
 		}
 		if sp.debtType != "" {
 			a.DebtType = &sp.debtType
-			a.TargetAmount = sp.target
+			if sp.target != nil {
+				target := decimal.NewFromFloat(*sp.target)
+				a.TargetAmount = &target
+			}
 			a.DueDate = sp.due
 			a.Counterparty = strPtr(sp.counter)
 			a.DebtDesc = strPtr(sp.desc)
@@ -507,7 +513,7 @@ func (s *seeder) seedPending(accounts map[string]*domain.Account, expenses []dom
 		desc := p.desc
 		status := "pending"
 		if _, err := s.txs.Create(s.ctx, domain.TxInput{
-			Type: "expense", AccountID: acct.ID, CategoryID: catID, Amount: p.amount,
+			Type: "expense", AccountID: acct.ID, CategoryID: catID, Amount: decimal.NewFromFloat(p.amount),
 			Description: &desc, Date: &d, Status: &status,
 		}); err != nil {
 			return fmt.Errorf("pending %s: %w", p.desc, err)
@@ -539,8 +545,8 @@ func (s *seeder) seedTransactionItems() error {
 		items := s.randomItems(cand.amount, catName)
 		for _, it := range items {
 			if err := appdb.Q(s.db).InsertTransactionItem(s.ctx, sqlc.InsertTransactionItemParams{
-				TransactionID: cand.id, Name: it.Name, Quantity: it.Quantity, PricePerUnit: it.PricePerUnit,
-				TotalPrice: it.TotalPrice, CreatedAt: appdb.NS(now), UpdatedAt: appdb.NS(now),
+				TransactionID: cand.id, Name: it.Name, Quantity: it.Quantity, PricePerUnit: money.ToMinor(it.PricePerUnit, 2),
+				TotalPrice: money.ToMinor(it.TotalPrice, 2), CreatedAt: appdb.NS(now), UpdatedAt: appdb.NS(now),
 			}); err != nil {
 				return err
 			}
@@ -576,8 +582,8 @@ func (s *seeder) randomItems(amount float64, category string) []domain.TxItem {
 			if remainingCents < 1 {
 				break
 			}
-			price := round2(float64(remainingCents) / 100)
-			items = append(items, domain.TxItem{Name: name, Quantity: 1, PricePerUnit: price, TotalPrice: price})
+			price := decimal.New(int64(remainingCents), -2)
+			items = append(items, domain.TxItem{Name: name, Quantity: decimal.NewFromInt(1), PricePerUnit: price, TotalPrice: price})
 			break
 		}
 		maxShare := remainingCents - left
@@ -587,9 +593,9 @@ func (s *seeder) randomItems(amount float64, category string) []domain.TxItem {
 		lineCents = maxInt(qty, minInt(lineCents, (maxShare/qty)*qty))
 		remainingCents -= lineCents
 		items = append(items, domain.TxItem{
-			Name: name, Quantity: float64(qty),
-			PricePerUnit: round2(float64(lineCents) / float64(qty) / 100),
-			TotalPrice:   round2(float64(lineCents) / 100),
+			Name: name, Quantity: decimal.NewFromInt(int64(qty)),
+			PricePerUnit: decimal.New(int64(lineCents/qty), -2),
+			TotalPrice:   decimal.New(int64(lineCents), -2),
 		})
 	}
 	return items
@@ -614,7 +620,7 @@ func (s *seeder) createBudgets(usd *domain.Currency, expenses []domain.Category,
 		}
 		notify := b.notify
 		if _, err := s.budgets.Create(s.ctx, domain.BudgetInput{
-			Name: b.name, Amount: b.amount, CurrencyID: &usd.ID, Period: "monthly",
+			Name: b.name, Amount: decimal.NewFromFloat(b.amount), CurrencyID: &usd.ID, Period: "monthly",
 			StartDate: &start, NotifyAtPercent: &notify, CategoryIDs: []int64{cat.ID},
 		}); err != nil {
 			return err
@@ -623,7 +629,7 @@ func (s *seeder) createBudgets(usd *domain.Currency, expenses []domain.Category,
 	notify := 85
 	global := true
 	if _, err := s.budgets.Create(s.ctx, domain.BudgetInput{
-		Name: "Total Monthly Spending", Amount: 5500, CurrencyID: &usd.ID, Period: "monthly",
+		Name: "Total Monthly Spending", Amount: decimal.NewFromInt(5500), CurrencyID: &usd.ID, Period: "monthly",
 		StartDate: &start, IsGlobal: &global, NotifyAtPercent: &notify,
 	}); err != nil {
 		return err
@@ -633,7 +639,7 @@ func (s *seeder) createBudgets(usd *domain.Currency, expenses []domain.Category,
 		to := s.now.AddDate(0, 4, 0).Format("2006-01-02")
 		n := 75
 		if _, err := s.budgets.Create(s.ctx, domain.BudgetInput{
-			Name: "Italy Trip 2026", Amount: 3500, CurrencyID: &usd.ID, Period: "one_time",
+			Name: "Italy Trip 2026", Amount: decimal.NewFromInt(3500), CurrencyID: &usd.ID, Period: "one_time",
 			StartDate: &from, EndDate: &to, NotifyAtPercent: &n, TagIDs: []int64{vac.ID},
 		}); err != nil {
 			return err
@@ -647,7 +653,7 @@ func (s *seeder) createRecurring(accounts map[string]*domain.Account, expenses, 
 		day := 5
 		if _, err := s.recur.Create(s.ctx, domain.RecurringInput{
 			Type: "income", AccountID: accounts["checking"].ID, CategoryID: &salary.ID,
-			Amount: 7000, Description: strPtr("Acme Corp — Payroll"),
+			Amount: decimal.NewFromInt(7000), Description: strPtr("Acme Corp — Payroll"),
 			Frequency: "monthly", Interval: 1, DayOfMonth: &day,
 			StartDate: nextMonthOnDay(s.now, 5).Format("2006-01-02"),
 		}); err != nil {
@@ -659,7 +665,7 @@ func (s *seeder) createRecurring(accounts map[string]*domain.Account, expenses, 
 		next := startOfMonth(s.now.AddDate(0, 1, 0)).Format("2006-01-02")
 		if _, err := s.recur.Create(s.ctx, domain.RecurringInput{
 			Type: "expense", AccountID: accounts["checking"].ID, CategoryID: &rent.ID,
-			Amount: 2150, Description: strPtr("Rent — Greystar Apartments"),
+			Amount: decimal.NewFromInt(2150), Description: strPtr("Rent — Greystar Apartments"),
 			Frequency: "monthly", Interval: 1, DayOfMonth: &day, StartDate: next,
 		}); err != nil {
 			return err
@@ -671,7 +677,7 @@ func (s *seeder) createRecurring(accounts map[string]*domain.Account, expenses, 
 		day := due.Day()
 		if _, err := s.recur.Create(s.ctx, domain.RecurringInput{
 			Type: "expense", AccountID: accounts["credit"].ID, CategoryID: &subs.ID,
-			Amount: 22.99, Description: strPtr("Netflix subscription"),
+			Amount: decimal.RequireFromString("22.99"), Description: strPtr("Netflix subscription"),
 			Frequency: "monthly", Interval: 1, DayOfMonth: &day,
 			StartDate: due.Format("2006-01-02"),
 		}); err != nil {
@@ -679,7 +685,7 @@ func (s *seeder) createRecurring(accounts map[string]*domain.Account, expenses, 
 		}
 	}
 	toSav := accounts["savings"].ID
-	amt := 800.0
+	amt := decimal.NewFromInt(800)
 	day6 := 6
 	if _, err := s.recur.Create(s.ctx, domain.RecurringInput{
 		Type: "transfer", AccountID: accounts["checking"].ID, ToAccountID: &toSav,
@@ -690,7 +696,7 @@ func (s *seeder) createRecurring(accounts map[string]*domain.Account, expenses, 
 		return err
 	}
 	toMort := accounts["mortgage"].ID
-	mort := 1680.0
+	mort := decimal.NewFromInt(1680)
 	day2 := 2
 	if _, err := s.recur.Create(s.ctx, domain.RecurringInput{
 		Type: "transfer", AccountID: accounts["checking"].ID, ToAccountID: &toMort,
@@ -757,7 +763,7 @@ func (s *seeder) addTx(typ string, accountID int64, catID *int64, amount float64
 	status := "confirmed"
 	in := domain.TxInput{
 		Type: typ, AccountID: accountID, ToAccountID: toID, CategoryID: catID,
-		Amount: amount, ToAmount: toAmt, ExchangeRate: rate,
+		Amount: decimal.NewFromFloat(amount), ToAmount: floatPtrDecimal(toAmt), ExchangeRate: floatPtrDecimal(rate),
 		Description: &desc, Date: &d, Status: &status, TagIDs: tagIDs,
 	}
 	created, err := s.txs.Create(s.ctx, in)
@@ -772,6 +778,14 @@ func (s *seeder) addTx(typ string, accountID int64, catID *int64, amount float64
 		s.expenses = append(s.expenses, expenseCand{id: created.ID, amount: amount, catName: name})
 	}
 	return nil
+}
+
+func floatPtrDecimal(v *float64) *decimal.Decimal {
+	if v == nil {
+		return nil
+	}
+	d := decimal.NewFromFloat(*v)
+	return &d
 }
 
 func (s *seeder) countTx() int {
