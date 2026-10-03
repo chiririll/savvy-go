@@ -222,3 +222,91 @@ func TestCurrencyConversionIsExact(t *testing.T) {
 		t.Fatalf("USD->JPY = %s", got)
 	}
 }
+
+func rawAmount(t *testing.T, e *moneyEnv, id int64) int64 {
+	t.Helper()
+	var v int64
+	if err := e.db.QueryRow(`SELECT amount FROM transactions WHERE id = ?`, id).Scan(&v); err != nil {
+		t.Fatal(err)
+	}
+	return v
+}
+
+func TestAccountCurrencyChangeRescalesAmounts(t *testing.T) {
+	e := newMoneyEnv(t)
+	accts := Accounts{DB: e.db}
+	a, err := accts.Create(e.ctx, Account{Name: "mover", Type: "cash", CurrencyID: e.usd.ID, InitialBalance: dec("100"), IsActive: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx := e.tx(t, "expense", a.ID, "10.50")
+	cur, _ := accts.ByID(e.ctx, a.ID)
+	cur.CurrencyID = e.btc.ID
+	got, err := accts.Update(e.ctx, a.ID, *cur)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.Balance.Equal(dec("89.5")) {
+		t.Fatalf("balance after USD->BTC = %s, want 89.5", got.Balance)
+	}
+	if raw := rawAmount(t, e, tx.ID); raw != 1050000000 {
+		t.Fatalf("raw amount = %d, want 1050000000", raw)
+	}
+}
+
+func TestAccountCurrencyChangeToFewerDecimals(t *testing.T) {
+	e := newMoneyEnv(t)
+	accts := Accounts{DB: e.db}
+	a, _ := accts.Create(e.ctx, Account{Name: "whole", Type: "cash", CurrencyID: e.usd.ID, InitialBalance: dec("100"), IsActive: true})
+	whole := e.tx(t, "expense", a.ID, "10.00")
+	cur, _ := accts.ByID(e.ctx, a.ID)
+	cur.CurrencyID = e.jpy.ID
+	if _, err := accts.Update(e.ctx, a.ID, *cur); err != nil {
+		t.Fatalf("whole amounts should rescale: %v", err)
+	}
+	if raw := rawAmount(t, e, whole.ID); raw != 10 {
+		t.Fatalf("raw amount = %d, want 10", raw)
+	}
+
+	b, _ := accts.Create(e.ctx, Account{Name: "cents", Type: "cash", CurrencyID: e.usd.ID, IsActive: true})
+	cents := e.tx(t, "expense", b.ID, "10.50")
+	cur, _ = accts.ByID(e.ctx, b.ID)
+	cur.CurrencyID = e.jpy.ID
+	if _, err := accts.Update(e.ctx, b.ID, *cur); err != db.ErrLossyRescale {
+		t.Fatalf("lossy rescale error = %v, want ErrLossyRescale", err)
+	}
+	after, _ := accts.ByID(e.ctx, b.ID)
+	if after.CurrencyID != e.usd.ID || rawAmount(t, e, cents.ID) != 1050 {
+		t.Fatalf("rejected update must change nothing: currency=%d raw=%d", after.CurrencyID, rawAmount(t, e, cents.ID))
+	}
+}
+
+func TestCurrencyGuards(t *testing.T) {
+	e := newMoneyEnv(t)
+	curs := Currencies{DB: e.db}
+	eur, err := curs.Create(e.ctx, Currency{Code: "EUR", Name: "EUR", Symbol: "E", Decimals: 2, Rate: dec("1.1")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	budget, err := (Budgets{DB: e.db}).Create(e.ctx, BudgetInput{Name: "b", Amount: dec("100"), CurrencyID: &eur.ID, Period: "monthly"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := curs.Delete(e.ctx, eur.ID); err == nil || err.Error() != "in use" {
+		t.Fatalf("delete with budget = %v, want in use", err)
+	}
+	changed := *eur
+	changed.Decimals = 4
+	if _, err := curs.Update(e.ctx, eur.ID, changed); err == nil || err.Error() != "decimals in use" {
+		t.Fatalf("update decimals with budget = %v, want decimals in use", err)
+	}
+	if err := (Budgets{DB: e.db}).Delete(e.ctx, budget.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := curs.Update(e.ctx, eur.ID, changed); err != nil {
+		t.Fatalf("update decimals when unused: %v", err)
+	}
+	if err := curs.Delete(e.ctx, eur.ID); err != nil {
+		t.Fatalf("delete when unused: %v", err)
+	}
+}

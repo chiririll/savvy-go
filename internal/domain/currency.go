@@ -118,6 +118,13 @@ func (s Currencies) Update(ctx context.Context, id int64, c Currency) (*Currency
 	if err != nil || cur == nil {
 		return cur, err
 	}
+	if c.Decimals != cur.Decimals {
+		accounts, _ := db.Q(s.DB).CountAccountsForCurrency(ctx, id)
+		budgets, _ := db.Q(s.DB).CountBudgetsForCurrency(ctx, id)
+		if accounts > 0 || budgets > 0 {
+			return nil, fmt.Errorf("decimals in use")
+		}
+	}
 	if cur.IsBase && !c.IsBase {
 		return nil, fmt.Errorf("cannot unset base")
 	}
@@ -147,7 +154,8 @@ func (s Currencies) Delete(ctx context.Context, id int64) error {
 		return err
 	}
 	used, _ := db.Q(s.DB).CountAccountsForCurrency(ctx, id)
-	if used > 0 {
+	usedByBudgets, _ := db.Q(s.DB).CountBudgetsForCurrency(ctx, id)
+	if used > 0 || usedByBudgets > 0 {
 		return fmt.Errorf("in use")
 	}
 	if cur.IsBase {

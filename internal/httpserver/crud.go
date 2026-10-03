@@ -70,6 +70,8 @@ func (s *Server) currenciesUpdate(w http.ResponseWriter, r *http.Request) {
 			writeMessage(w, 422, "Cannot unset base currency. Set another currency as base first.")
 		case "base rate":
 			writeMessage(w, 422, "Base currency rate must always be 1.")
+		case "decimals in use":
+			writeMessage(w, 422, "Cannot change decimals of a currency that is used by accounts or budgets.")
 		default:
 			writeMessage(w, 422, err.Error())
 		}
@@ -86,7 +88,7 @@ func (s *Server) currenciesDestroy(w http.ResponseWriter, r *http.Request) {
 	if err := s.currencies.Delete(r.Context(), cur.ID); err != nil {
 		switch err.Error() {
 		case "in use":
-			writeMessage(w, 422, "Cannot delete currency that is used by accounts.")
+			writeMessage(w, 422, "Cannot delete currency that is used by accounts or budgets.")
 		case "base":
 			writeMessage(w, 422, "Cannot delete base currency. Set another currency as base first.")
 		default:

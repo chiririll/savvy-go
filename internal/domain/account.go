@@ -80,13 +80,32 @@ func (s Accounts) Create(ctx context.Context, a Account) (*Account, error) {
 func (s Accounts) Update(ctx context.Context, id int64, a Account) (*Account, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
 	dec := s.currencyDecimals(ctx, a.CurrencyID)
-	err := db.Q(s.DB).UpdateAccount(ctx, sqlc.UpdateAccountParams{
+	oldDec := dec
+	if cur, err := s.ByID(ctx, id); err == nil && cur != nil && cur.Currency != nil {
+		oldDec = cur.Currency.Decimals
+	}
+	if !a.InitialBalance.Round(int32(dec)).Equal(a.InitialBalance) ||
+		(a.TargetAmount != nil && !a.TargetAmount.Round(int32(dec)).Equal(*a.TargetAmount)) {
+		return nil, db.ErrLossyRescale
+	}
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := db.RescaleAccountAmounts(ctx, tx, id, oldDec, dec); err != nil {
+		return nil, err
+	}
+	err = db.Q(s.DB).WithTx(tx).UpdateAccount(ctx, sqlc.UpdateAccountParams{
 		Name: a.Name, Type: a.Type, CurrencyID: a.CurrencyID, InitialBalance: money.ToMinor(a.InitialBalance, dec),
 		IsActive: db.BoolInt(a.IsActive), DebtType: db.NullString(a.DebtType), TargetAmount: money.ToNullMinor(a.TargetAmount, dec),
 		DueDate: db.NullString(a.DueDate), IsPaidOff: db.BoolInt(a.IsPaidOff), Counterparty: db.NullString(a.Counterparty),
 		DebtDescription: db.NullString(a.DebtDesc), UpdatedAt: db.NS(now), ID: id,
 	})
 	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 	return s.ByID(ctx, id)

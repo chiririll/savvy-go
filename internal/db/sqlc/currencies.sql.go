@@ -32,6 +32,17 @@ func (q *Queries) CountAccountsForCurrency(ctx context.Context, currencyID int64
 	return count, err
 }
 
+const countBudgetsForCurrency = `-- name: CountBudgetsForCurrency :one
+SELECT COUNT(*) FROM budgets WHERE currency_id = ?
+`
+
+func (q *Queries) CountBudgetsForCurrency(ctx context.Context, currencyID int64) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countBudgetsForCurrency, currencyID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countCurrencies = `-- name: CountCurrencies :one
 SELECT COUNT(*) FROM currencies
 `
