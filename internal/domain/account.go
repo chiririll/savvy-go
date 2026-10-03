@@ -33,9 +33,16 @@ type Account struct {
 	Balance        decimal.Decimal
 }
 
-// ErrAccountDecimalsDiffer: an account keeps its amounts in minor units of its
-// currency, so it can only move to a currency with the same decimals.
-var ErrAccountDecimalsDiffer = errors.New("account can only switch to a currency with the same decimals")
+var (
+	// ErrAccountDecimalsDiffer is returned when an account would move to a
+	// currency with different decimals: its amounts are stored in minor units
+	// of its currency and would change meaning.
+	ErrAccountDecimalsDiffer = errors.New("account can only switch to a currency with the same decimals")
+	// ErrUnknownAccount is returned when an account referenced by id does not exist.
+	ErrUnknownAccount = errors.New("unknown account")
+	// ErrUnknownCurrency is returned when a currency referenced by id does not exist.
+	ErrUnknownCurrency = errors.New("unknown currency")
+)
 
 type Accounts struct{ DB *sql.DB }
 
@@ -66,7 +73,10 @@ func (s Accounts) Create(ctx context.Context, a Account) (*Account, error) {
 		a.Type = "cash"
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	dec := s.currencyDecimals(ctx, a.CurrencyID)
+	dec, err := s.currencyDecimals(ctx, a.CurrencyID)
+	if err != nil {
+		return nil, err
+	}
 	max, _ := db.Q(s.DB).MaxAccountSortOrder(ctx, db.Flag(a.Type == "debt"))
 	a.SortOrder = int(asFloat64(max)) + 1
 	res, err := db.Q(s.DB).InsertAccount(ctx, sqlc.InsertAccountParams{
@@ -84,11 +94,21 @@ func (s Accounts) Create(ctx context.Context, a Account) (*Account, error) {
 
 func (s Accounts) Update(ctx context.Context, id int64, a Account) (*Account, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
-	dec := s.currencyDecimals(ctx, a.CurrencyID)
-	if cur, err := s.ByID(ctx, id); err == nil && cur != nil && cur.Currency != nil && cur.Currency.Decimals != dec {
+	dec, err := s.currencyDecimals(ctx, a.CurrencyID)
+	if err != nil {
+		return nil, err
+	}
+	current, err := s.Decimals(ctx, id)
+	if errors.Is(err, ErrUnknownAccount) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if current != dec {
 		return nil, ErrAccountDecimalsDiffer
 	}
-	err := db.Q(s.DB).UpdateAccount(ctx, sqlc.UpdateAccountParams{
+	err = db.Q(s.DB).UpdateAccount(ctx, sqlc.UpdateAccountParams{
 		Name: a.Name, Type: a.Type, CurrencyID: a.CurrencyID, InitialBalance: money.ToMinor(a.InitialBalance, dec),
 		IsActive: db.BoolInt(a.IsActive), DebtType: db.NullString(a.DebtType), TargetAmount: money.ToNullMinor(a.TargetAmount, dec),
 		DueDate: db.NullString(a.DueDate), IsPaidOff: db.BoolInt(a.IsPaidOff), Counterparty: db.NullString(a.Counterparty),
@@ -185,21 +205,28 @@ func (s Accounts) balance(ctx context.Context, a Account, asOf string) (decimal.
 	return a.InitialBalance.Add(money.FromMinor(minor, dec)), nil
 }
 
-func (s Accounts) currencyDecimals(ctx context.Context, currencyID int64) int {
+func (s Accounts) currencyDecimals(ctx context.Context, currencyID int64) (int, error) {
 	c, err := db.Q(s.DB).GetCurrency(ctx, currencyID)
-	if err != nil {
-		return 2
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, ErrUnknownCurrency
 	}
-	return int(c.Decimals)
+	if err != nil {
+		return 0, err
+	}
+	return int(c.Decimals), nil
 }
 
-// Decimals is the decimals of the account's currency (2 when unknown).
-func (s Accounts) Decimals(ctx context.Context, accountID int64) int {
+// Decimals returns the decimals of the account currency, the scale of every
+// amount stored for that account.
+func (s Accounts) Decimals(ctx context.Context, accountID int64) (int, error) {
 	d, err := db.Q(s.DB).GetAccountDecimals(ctx, accountID)
-	if err != nil {
-		return 2
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, ErrUnknownAccount
 	}
-	return int(d)
+	if err != nil {
+		return 0, err
+	}
+	return int(d), nil
 }
 
 func accountFromRow(r sqlc.ListAccountsRow) Account {
