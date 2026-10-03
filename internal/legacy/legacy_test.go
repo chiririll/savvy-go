@@ -6,7 +6,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/shopspring/decimal"
+
 	"savvy-go/internal/db"
+	"savvy-go/internal/domain"
 	"savvy-go/internal/migrate"
 )
 
@@ -80,6 +83,7 @@ func TestUpgradeInPlace(t *testing.T) {
 		t.Fatal("laravel migrations table should be dropped")
 	}
 	var email string
+	assertMinorUnits(t, sqlDB)
 	if err := sqlDB.QueryRow(`SELECT email FROM users WHERE id = 1`).Scan(&email); err != nil {
 		t.Fatal(err)
 	}
@@ -147,6 +151,33 @@ func createLaravelShape(t *testing.T, sqlDB *sql.DB) {
 		)`,
 		`INSERT INTO transactions (id, type, account_id, amount, description, date)
 		 VALUES (1, 'expense', 1, 12.5, 'Coffee', '2026-01-03')`,
+		`INSERT INTO currencies (id, code, name, symbol, decimals, is_base, rate) VALUES (2, 'JPY', 'Yen', 'Y', 0, 0, 0.0067)`,
+		`INSERT INTO currencies (id, code, name, symbol, decimals, is_base, rate) VALUES (3, 'BTC', 'Bitcoin', 'B', 8, 0, 50000)`,
+		`INSERT INTO accounts (id, name, type, currency_id, initial_balance, is_active) VALUES (2, 'Yen', 'cash', 2, 3000, 1)`,
+		`INSERT INTO accounts (id, name, type, currency_id, initial_balance, is_active) VALUES (3, 'Wallet', 'cash', 3, 0.5, 1)`,
+		`INSERT INTO transactions (id, type, account_id, amount, description, date)
+		 VALUES (2, 'expense', 2, 1500, 'Ramen', '2026-01-04')`,
+		`INSERT INTO transactions (id, type, account_id, amount, description, date)
+		 VALUES (3, 'income', 3, 0.00012345, 'Mining', '2026-01-05')`,
+		`INSERT INTO transactions (id, type, account_id, to_account_id, amount, to_amount, exchange_rate, description, date)
+		 VALUES (4, 'transfer', 1, 2, 10.5, 1567, 149.2, 'Exchange', '2026-01-06')`,
+		`CREATE TABLE transaction_items (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			transaction_id INTEGER NOT NULL,
+			name TEXT NOT NULL,
+			quantity REAL NOT NULL DEFAULT 1,
+			price_per_unit REAL NOT NULL,
+			total_price REAL NOT NULL
+		)`,
+		`INSERT INTO transaction_items (id, transaction_id, name, quantity, price_per_unit, total_price)
+		 VALUES (1, 1, 'Beans', 5, 2.5, 12.5)`,
+		`CREATE TABLE budgets (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT NOT NULL,
+			amount REAL NOT NULL,
+			period TEXT NOT NULL
+		)`,
+		`INSERT INTO budgets (id, name, amount, period) VALUES (1, 'Food', 750.5, 'monthly')`,
 		`CREATE TABLE jobs (id INTEGER PRIMARY KEY, queue TEXT)`,
 	}
 	for _, s := range stmts {
@@ -159,14 +190,15 @@ func createLaravelShape(t *testing.T, sqlDB *sql.DB) {
 func assertCopied(t *testing.T, dest *sql.DB) {
 	t.Helper()
 	assertCount(t, dest, "users", 1)
-	assertCount(t, dest, "currencies", 1)
-	assertCount(t, dest, "accounts", 1)
-	assertCount(t, dest, "transactions", 1)
+	assertCount(t, dest, "currencies", 3)
+	assertCount(t, dest, "accounts", 3)
+	assertCount(t, dest, "transactions", 4)
+	assertMinorUnits(t, dest)
 	var name, code, desc string
 	if err := dest.QueryRow(`SELECT name FROM users`).Scan(&name); err != nil || name != "Ada" {
 		t.Fatalf("user %q %v", name, err)
 	}
-	if err := dest.QueryRow(`SELECT code FROM currencies`).Scan(&code); err != nil || code != "USD" {
+	if err := dest.QueryRow(`SELECT code FROM currencies WHERE id = 1`).Scan(&code); err != nil || code != "USD" {
 		t.Fatalf("currency %q %v", code, err)
 	}
 	if err := dest.QueryRow(`SELECT description FROM transactions`).Scan(&desc); err != nil || desc != "Coffee" {
@@ -182,5 +214,74 @@ func assertCount(t *testing.T, db *sql.DB, table string, want int) {
 	}
 	if n != want {
 		t.Fatalf("%s count %d want %d", table, n, want)
+	}
+}
+
+// assertMinorUnits checks Laravel major-unit money became integer minor units
+// scaled by each currency (USD 2, JPY 0, BTC 8) and that budgets got a currency.
+func assertMinorUnits(t *testing.T, sqlDB *sql.DB) {
+	t.Helper()
+	checks := []struct {
+		query string
+		want  int64
+	}{
+		{`SELECT initial_balance FROM accounts WHERE id = 1`, 10000},
+		{`SELECT initial_balance FROM accounts WHERE id = 2`, 3000},
+		{`SELECT initial_balance FROM accounts WHERE id = 3`, 50000000},
+		{`SELECT amount FROM transactions WHERE id = 1`, 1250},
+		{`SELECT amount FROM transactions WHERE id = 2`, 1500},
+		{`SELECT amount FROM transactions WHERE id = 3`, 12345},
+		{`SELECT amount FROM transactions WHERE id = 4`, 1050},
+		{`SELECT to_amount FROM transactions WHERE id = 4`, 1567},
+		{`SELECT price_per_unit FROM transaction_items WHERE id = 1`, 250},
+		{`SELECT total_price FROM transaction_items WHERE id = 1`, 1250},
+		{`SELECT amount FROM budgets WHERE id = 1`, 75050},
+		{`SELECT currency_id FROM budgets WHERE id = 1`, 1},
+	}
+	for _, c := range checks {
+		var got int64
+		if err := sqlDB.QueryRow(c.query).Scan(&got); err != nil {
+			t.Fatalf("%s: %v", c.query, err)
+		}
+		if got != c.want {
+			t.Errorf("%s = %d, want %d", c.query, got, c.want)
+		}
+	}
+}
+
+func TestUpgradeInPlaceLeavesGoSchemaUsable(t *testing.T) {
+	ctx := context.Background()
+	sqlDB, err := db.Open(filepath.Join(t.TempDir(), "database.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = sqlDB.Close() })
+	createLaravelShape(t, sqlDB)
+	if err := EnsureColumns(ctx, sqlDB); err != nil {
+		t.Fatal(err)
+	}
+	if err := migrate.Up(ctx, sqlDB); err != nil {
+		t.Fatal(err)
+	}
+	if err := UpgradeInPlace(ctx, sqlDB, ""); err != nil {
+		t.Fatal(err)
+	}
+
+	var typ string
+	if err := sqlDB.QueryRow(`SELECT type FROM pragma_table_info('transactions') WHERE name = 'amount'`).Scan(&typ); err != nil || typ != "INTEGER" {
+		t.Fatalf("transactions.amount type = %q, %v; want INTEGER", typ, err)
+	}
+	var idx int
+	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'transactions_account_type_date_amount_idx'`).Scan(&idx); err != nil || idx != 1 {
+		t.Fatalf("amount index restored = %d, %v", idx, err)
+	}
+
+	btc, err := (domain.Transactions{DB: sqlDB}).ByID(ctx, 3)
+	if err != nil || btc == nil || !btc.Amount.Equal(decimal.RequireFromString("0.00012345")) {
+		t.Fatalf("btc tx via domain = %+v, %v", btc, err)
+	}
+	acct, err := (domain.Accounts{DB: sqlDB}).ByID(ctx, 3)
+	if err != nil || acct == nil || !acct.Balance.Equal(decimal.RequireFromString("0.50012345")) {
+		t.Fatalf("btc account via domain = %+v, %v", acct, err)
 	}
 }

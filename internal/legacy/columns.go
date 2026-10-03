@@ -28,11 +28,11 @@ var extraColumns = map[string][]addColumn{
 	},
 	"currencies": {
 		{"is_base", "INTEGER NOT NULL DEFAULT 0"},
-		{"rate", "REAL NOT NULL DEFAULT 1"},
+		{"rate", "TEXT NOT NULL DEFAULT '1'"},
 	},
 	"accounts": {
 		{"debt_type", "TEXT"},
-		{"target_amount", "REAL"},
+		{"target_amount", "INTEGER"},
 		{"due_date", "TEXT"},
 		{"is_paid_off", "INTEGER NOT NULL DEFAULT 0"},
 		{"counterparty", "TEXT"},

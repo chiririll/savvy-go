@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 	"time"
 
@@ -87,6 +88,9 @@ func UpgradeInPlace(ctx context.Context, db *sql.DB, appKey string) error {
 	if err := auth.UnwrapLegacyTOTPSecrets(ctx, db, appKey); err != nil {
 		slog.Warn("could not unwrap legacy totp secrets", "err", err)
 	}
+	if err := convertMoneyInPlace(ctx, db); err != nil {
+		return fmt.Errorf("convert money to minor units: %w", err)
+	}
 	if err := stamp(ctx, db); err != nil {
 		return err
 	}
@@ -103,11 +107,15 @@ func Copy(ctx context.Context, dest, src *sql.DB) error {
 		return fmt.Errorf("source is not a laravel-era database")
 	}
 
+	sc, err := loadScales(ctx, src)
+	if err != nil {
+		return fmt.Errorf("load currency scales: %w", err)
+	}
 	for _, table := range copyTables {
 		if !tableExists(ctx, src, table) || !tableExists(ctx, dest, table) {
 			continue
 		}
-		n, err := copyTable(ctx, dest, src, table)
+		n, err := copyTable(ctx, dest, src, table, sc)
 		if err != nil {
 			return fmt.Errorf("copy %s: %w", table, err)
 		}
@@ -124,7 +132,7 @@ func Copy(ctx context.Context, dest, src *sql.DB) error {
 	return stamp(ctx, dest)
 }
 
-func copyTable(ctx context.Context, dest, src *sql.DB, table string) (int, error) {
+func copyTable(ctx context.Context, dest, src *sql.DB, table string, sc *scales) (int, error) {
 	srcCols, err := columns(ctx, src, table)
 	if err != nil {
 		return 0, err
@@ -138,8 +146,15 @@ func copyTable(ctx context.Context, dest, src *sql.DB, table string) (int, error
 		return 0, nil
 	}
 
+	// Laravel budgets may predate currency_id, which the Go schema requires;
+	// fixMoney fills it with the base currency.
+	selectCols := quoteAll(common)
+	if table == "budgets" && !slices.Contains(common, "currency_id") {
+		common = append(common, "currency_id")
+		selectCols = append(selectCols, "NULL")
+	}
 	quoted := quoteAll(common)
-	q := fmt.Sprintf("SELECT %s FROM %s", strings.Join(quoted, ", "), table)
+	q := fmt.Sprintf("SELECT %s FROM %s", strings.Join(selectCols, ", "), table)
 	rows, err := src.QueryContext(ctx, q)
 	if err != nil {
 		return 0, err
@@ -173,6 +188,9 @@ func copyTable(ctx context.Context, dest, src *sql.DB, table string) (int, error
 			ptrs[i] = &raw[i]
 		}
 		if err := rows.Scan(ptrs...); err != nil {
+			return 0, err
+		}
+		if err := sc.fixMoney(table, common, raw); err != nil {
 			return 0, err
 		}
 		if _, err := stmt.ExecContext(ctx, raw...); err != nil {

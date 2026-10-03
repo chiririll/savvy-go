@@ -57,6 +57,32 @@ func Up(ctx context.Context, db *sql.DB) error {
 	return nil
 }
 
+// EnsureIndexes creates every index declared by the embedded migrations (they
+// are all IF NOT EXISTS). Schema surgery on upgraded databases drops indexes
+// together with the columns they covered; this restores them.
+func EnsureIndexes(ctx context.Context, db *sql.DB) error {
+	names, err := migrationFiles()
+	if err != nil {
+		return err
+	}
+	for _, name := range names {
+		body, err := fs.ReadFile(files, "sql/"+name)
+		if err != nil {
+			return fmt.Errorf("read %s: %w", name, err)
+		}
+		for _, stmt := range splitSQL(string(body)) {
+			up := strings.ToUpper(strings.TrimSpace(stmt))
+			if !strings.HasPrefix(up, "CREATE INDEX") && !strings.HasPrefix(up, "CREATE UNIQUE INDEX") {
+				continue
+			}
+			if _, err := db.ExecContext(ctx, stmt); err != nil {
+				return fmt.Errorf("%s: %w", preview(stmt), err)
+			}
+		}
+	}
+	return nil
+}
+
 // PendingCount is the number of embedded migrations not yet recorded.
 // Returns -1 when schema_migrations is missing (never migrated).
 func PendingCount(ctx context.Context, db *sql.DB) (int, error) {
