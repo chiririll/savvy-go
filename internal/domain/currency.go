@@ -3,6 +3,7 @@ package domain
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -15,6 +16,10 @@ import (
 )
 
 var one = decimal.NewFromInt(1)
+
+// Stored minor units are only meaningful with the currency decimals, so a
+// currency decimals never change after creation.
+var ErrDecimalsImmutable = errors.New("currency decimals cannot be changed")
 
 // rateDivPrecision is the number of fraction digits kept when dividing by a rate.
 const rateDivPrecision = 16
@@ -119,11 +124,7 @@ func (s Currencies) Update(ctx context.Context, id int64, c Currency) (*Currency
 		return cur, err
 	}
 	if c.Decimals != cur.Decimals {
-		accounts, _ := db.Q(s.DB).CountAccountsForCurrency(ctx, id)
-		budgets, _ := db.Q(s.DB).CountBudgetsForCurrency(ctx, id)
-		if accounts > 0 || budgets > 0 {
-			return nil, fmt.Errorf("decimals in use")
-		}
+		return nil, ErrDecimalsImmutable
 	}
 	if cur.IsBase && !c.IsBase {
 		return nil, fmt.Errorf("cannot unset base")

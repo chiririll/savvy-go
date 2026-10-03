@@ -70,8 +70,8 @@ func (s *Server) currenciesUpdate(w http.ResponseWriter, r *http.Request) {
 			writeMessage(w, 422, "Cannot unset base currency. Set another currency as base first.")
 		case "base rate":
 			writeMessage(w, 422, "Base currency rate must always be 1.")
-		case "decimals in use":
-			writeMessage(w, 422, "Cannot change decimals of a currency that is used by accounts or budgets.")
+		case domain.ErrDecimalsImmutable.Error():
+			writeMessage(w, 422, "Currency decimals cannot be changed after creation.")
 		default:
 			writeMessage(w, 422, err.Error())
 		}
