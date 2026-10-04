@@ -195,6 +195,11 @@ func NewTransaction(t domain.Transaction) Transaction {
 }
 
 func transactionActions(t domain.Transaction) TxActions {
+	// One side of a transfer between spaces changes only through the
+	// transfer (in the space settings), never as a transaction.
+	if t.Type == "transfer_out" || t.Type == "transfer_in" {
+		return TxActions{}
+	}
 	pending := t.Status == "pending"
 	skipped := t.Status == "skipped"
 	recurring := t.RecurringID != nil
@@ -485,21 +490,37 @@ func NewWebAuthnCred(c auth.WebAuthnCred) WebAuthnCred {
 	return WebAuthnCred{ID: c.ID, Name: c.Name, AAGUID: c.AAGUID, LastUsedAt: c.LastUsedAt, CreatedAt: c.CreatedAt}
 }
 
+// Backup status: "current" is a backup signed by this server (or a key it
+// trusts), "unsigned" one made elsewhere or edited, "raw" a bare database file
+// (single-file layout or Laravel-era) and "invalid" one that cannot be read.
 type Backup struct {
-	Filename     string     `json:"filename"`
-	Size         int64      `json:"size"`
-	Note         *string    `json:"note"`
-	AppVersion   *string    `json:"appVersion"`
-	Status       string     `json:"status"`
-	Restorable   bool       `json:"restorable"`
-	PendingCount int        `json:"pendingCount"`
-	CreatedAt    *time.Time `json:"createdAt"`
+	Filename   string     `json:"filename"`
+	Size       int64      `json:"size"`
+	Kind       string     `json:"kind"`
+	Note       *string    `json:"note"`
+	AppVersion *string    `json:"appVersion"`
+	SpaceName  string     `json:"spaceName,omitempty"`
+	Status     string     `json:"status"`
+	Signature  string     `json:"signature"`
+	Restorable bool       `json:"restorable"`
+	CreatedAt  *time.Time `json:"createdAt"`
 }
 
-func NewBackup(b domain.Backup, status string, restorable bool, pendingCount int) Backup {
+func NewBackup(b domain.Backup) Backup {
+	status := "invalid"
+	switch {
+	case !b.Valid:
+	case b.Kind == "":
+		status = "raw"
+	case b.Signature == domain.SignedHere || b.Signature == domain.SignedTrusted:
+		status = "current"
+	default:
+		status = "unsigned"
+	}
 	return Backup{
-		Filename: b.Filename, Size: b.Size, Note: b.Note, AppVersion: b.AppVersion,
-		Status: status, Restorable: restorable, PendingCount: pendingCount, CreatedAt: utc(b.CreatedAt),
+		Filename: b.Filename, Size: b.Size, Kind: b.Kind, Note: b.Note, AppVersion: b.AppVersion,
+		SpaceName: b.SpaceName, Status: status, Signature: string(b.Signature), Restorable: b.Valid,
+		CreatedAt: utc(b.CreatedAt),
 	}
 }
 

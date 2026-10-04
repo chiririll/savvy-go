@@ -47,11 +47,10 @@ func (s *Server) apiTokensStore(w http.ResponseWriter, r *http.Request) {
 	if scope == "" {
 		scope = auth.APIScopeRead
 	}
-	switch {
-	case !auth.ValidAPIScope(scope):
+	// A read-write token still writes only where its owner may: the request
+	// is limited by the token scope and the owner's role in the space.
+	if !auth.ValidAPIScope(scope) {
 		errs["scope"] = []string{"The scope must be read or read-write."}
-	case scope == auth.APIScopeReadWrite && !u.CanWrite():
-		errs["scope"] = []string{"Read-only users can only create read tokens."}
 	}
 	var expires *time.Time
 	if body.ExpiresAt != nil && *body.ExpiresAt != "" {

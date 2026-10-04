@@ -51,10 +51,23 @@ var undocumented = []string{
 	"/api/auth/password", "/api/auth/logout", "/api/auth/logout-others",
 	"/api/auth/2fa", "/api/auth/sso", "/api/auth/webauthn",
 	"/api/uploads", "/api/s3/multipart", "/api/transactions/import",
-	"/api/backups", "/api/identity-providers",
+	"/api/backups", "/api/identity-providers", "/api/spaces/import",
+	"/api/admin", "/api/monitoring", "/api/invitations",
 }
 
+// undocumentedInSpace lists routes under /api/spaces/{space} that are
+// absent for the same reasons: uploads, imports, backups, invitations and the
+// audit log are session-only.
+var undocumentedInSpace = []string{"/s3/multipart", "/transactions/import", "/backups", "/invitations", "/audit"}
+
 func isUndocumented(path string) bool {
+	if rest, ok := strings.CutPrefix(path, "/api/spaces/{space}"); ok {
+		for _, p := range undocumentedInSpace {
+			if strings.HasPrefix(rest, p) {
+				return true
+			}
+		}
+	}
 	for _, p := range undocumented {
 		if path == p || strings.HasPrefix(path, p+"/") {
 			return true

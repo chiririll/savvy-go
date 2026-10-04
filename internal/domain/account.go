@@ -12,6 +12,7 @@ import (
 	"savvy-go/internal/db"
 	"savvy-go/internal/db/sqlc"
 	"savvy-go/internal/money"
+	"savvy-go/internal/store"
 )
 
 // Account is an account as stored; every amount is in its Currency. A debt is
@@ -77,7 +78,7 @@ var (
 	ErrUnknownCurrency = errors.New("unknown currency")
 )
 
-type Accounts struct{ DB *sql.DB }
+type Accounts struct{ DB store.DB }
 
 func (s Accounts) All(ctx context.Context, onlyActive, excludeDebts bool) ([]Account, error) {
 	return s.list(ctx, sqlc.ListAccountsParams{

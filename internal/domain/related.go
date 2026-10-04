@@ -2,7 +2,7 @@ package domain
 
 import (
 	"context"
-	"database/sql"
+	"savvy-go/internal/store"
 )
 
 // related loads the accounts and categories that a page of rows points at,
@@ -16,7 +16,7 @@ type related struct {
 	categories map[int64]*Category
 }
 
-func newRelated(ctx context.Context, sqlDB *sql.DB) *related {
+func newRelated(ctx context.Context, sqlDB store.DB) *related {
 	return &related{
 		ctx: ctx, accts: Accounts{DB: sqlDB}, cats: Categories{DB: sqlDB},
 		accounts: map[int64]*Account{}, categories: map[int64]*Category{},

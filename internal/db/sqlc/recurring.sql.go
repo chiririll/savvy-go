@@ -192,7 +192,7 @@ func (q *Queries) InsertRecurring(ctx context.Context, arg InsertRecurringParams
 }
 
 const insertRecurringTag = `-- name: InsertRecurringTag :exec
-INSERT OR IGNORE INTO recurring_transaction_tag (recurring_transaction_id, tag_id) VALUES (?,?)
+INSERT INTO recurring_transaction_tag (recurring_transaction_id, tag_id) VALUES (?,?) ON CONFLICT DO NOTHING
 `
 
 type InsertRecurringTagParams struct {

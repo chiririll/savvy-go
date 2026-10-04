@@ -1,14 +1,14 @@
 import { z } from 'zod'
 import i18n from '@/lib/i18n'
 
-export const roleSchema = z.enum(['admin', 'read-write', 'read-only'])
+export const roleSchema = z.enum(['admin', 'user', 'guest'])
 
 export const createUserSchema = z.object({
     name: z.string().min(1, i18n.t('validation.nameRequired')).max(255),
     email: z.string().min(1, i18n.t('validation.emailRequired')).email(i18n.t('validation.emailInvalid')),
     setPassword: z.boolean(),
     password: z.string().optional().or(z.literal('')),
-    role: roleSchema.default('read-only'),
+    role: roleSchema.default('user'),
 }).superRefine((data, ctx) => {
     if (data.setPassword && (!data.password || data.password.length < 8)) {
         ctx.addIssue({

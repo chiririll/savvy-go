@@ -7,6 +7,7 @@ import (
 
 	"savvy-go/internal/db"
 	"savvy-go/internal/db/sqlc"
+	"savvy-go/internal/store"
 )
 
 type Tag struct {
@@ -16,7 +17,7 @@ type Tag struct {
 	CreatedAt         *time.Time
 }
 
-type Tags struct{ DB *sql.DB }
+type Tags struct{ DB store.DB }
 
 func (s Tags) All(ctx context.Context) ([]Tag, error) {
 	rows, err := db.Q(s.DB).ListTags(ctx)

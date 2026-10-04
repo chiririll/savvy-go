@@ -9,7 +9,7 @@ import (
 
 func TestPendingAndConfirmedTransactions(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("rw@test.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("rw@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 
 	res := a.do("POST", "/api/currencies", map[string]any{
@@ -62,7 +62,7 @@ func TestPendingAndConfirmedTransactions(t *testing.T) {
 
 func TestDebtCreateLendAndBorrow(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("d@test.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("d@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 
 	res := a.do("POST", "/api/currencies", map[string]any{
@@ -120,7 +120,7 @@ func listTxIDs(t *testing.T, a *testApp, sess *auth.Issued, query string) (ids [
 
 func TestTransactionsListSortAndFilters(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("sort@test.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("sort@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 	mk := func(path string, payload map[string]any) int64 {
 		res := a.do("POST", path, payload, sess.Token, sess.CSRF)

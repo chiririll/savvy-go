@@ -9,6 +9,7 @@ import (
 
 	"savvy-go/internal/db"
 	"savvy-go/internal/db/sqlc"
+	"savvy-go/internal/store"
 )
 
 const (
@@ -47,7 +48,7 @@ func (t *APIToken) Expired(now time.Time) bool {
 }
 
 type APITokens struct {
-	DB *sql.DB
+	DB store.DB
 }
 
 // Issue creates a token and returns the raw value, which is never stored.

@@ -175,8 +175,9 @@ func (q *Queries) InsertTransaction(ctx context.Context, arg InsertTransactionPa
 }
 
 const insertTransactionIgnoreDup = `-- name: InsertTransactionIgnoreDup :execresult
-INSERT OR IGNORE INTO transactions (type, account_id, category_id, amount, description, date, status, dedup_hash, created_at, updated_at)
+INSERT INTO transactions (type, account_id, category_id, amount, description, date, status, dedup_hash, created_at, updated_at)
 VALUES (?,?,?,?,?,?,?,?,?,?)
+ON CONFLICT DO NOTHING
 `
 
 type InsertTransactionIgnoreDupParams struct {
@@ -236,7 +237,7 @@ func (q *Queries) InsertTransactionItem(ctx context.Context, arg InsertTransacti
 }
 
 const insertTransactionTag = `-- name: InsertTransactionTag :exec
-INSERT OR IGNORE INTO transaction_tag (transaction_id, tag_id) VALUES (?,?)
+INSERT INTO transaction_tag (transaction_id, tag_id) VALUES (?,?) ON CONFLICT DO NOTHING
 `
 
 type InsertTransactionTagParams struct {

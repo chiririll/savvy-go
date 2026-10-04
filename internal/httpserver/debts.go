@@ -14,14 +14,14 @@ import (
 
 func (s *Server) debtsIndex(w http.ResponseWriter, r *http.Request) {
 	include := r.URL.Query().Get("include_completed") == "1" || r.URL.Query().Get("include_completed") == "true"
-	list, err := s.debts.All(r.Context(), include)
+	list, err := sp(r).debts.All(r.Context(), include)
 	if err != nil {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	payload := map[string]any{"data": dto.Map(list, dto.NewDebt)}
 	if r.URL.Query().Get("with_summary") == "1" || r.URL.Query().Get("with_summary") == "true" {
-		payload["summary"] = dto.NewDebtSummary(s.debts.Summary(r.Context()))
+		payload["summary"] = dto.NewDebtSummary(sp(r).debts.Summary(r.Context()))
 	}
 	writeJSON(w, http.StatusOK, payload)
 }
@@ -43,7 +43,7 @@ func (s *Server) debtsStore(w http.ResponseWriter, r *http.Request) {
 		writeValidation(w, map[string][]string{"name": {"The name field is required."}})
 		return
 	}
-	d, err := s.debts.Create(r.Context(), body.Name, body.DebtType, body.CurrencyID, body.AccountID, body.Amount, body.Date, body.Origin, body.DueDate, body.Counterparty, body.Description)
+	d, err := sp(r).debts.Create(r.Context(), body.Name, body.DebtType, body.CurrencyID, body.AccountID, body.Amount, body.Date, body.Origin, body.DueDate, body.Counterparty, body.Description)
 	if err != nil {
 		writeAccountError(w, err)
 		return
@@ -99,7 +99,7 @@ func (s *Server) debtsUpdate(w http.ResponseWriter, r *http.Request) {
 	if body.Description != nil {
 		in.DebtDesc = body.Description
 	}
-	updated, err := s.accounts.Update(r.Context(), cur.ID, in)
+	updated, err := sp(r).accounts.Update(r.Context(), cur.ID, in)
 	if err != nil {
 		writeAccountError(w, err)
 		return
@@ -112,7 +112,7 @@ func (s *Server) debtsDestroy(w http.ResponseWriter, r *http.Request) {
 	if d == nil {
 		return
 	}
-	if err := s.debts.Delete(r.Context(), d.ID); err != nil {
+	if err := sp(r).debts.Delete(r.Context(), d.ID); err != nil {
 		writeMessage(w, 422, err.Error())
 		return
 	}
@@ -142,7 +142,7 @@ func (s *Server) debtMove(w http.ResponseWriter, r *http.Request, collect bool) 
 		writeValidation(w, map[string][]string{"amount": {"The given data was invalid."}})
 		return
 	}
-	tx, err := s.debts.Payment(r.Context(), d.ID, body.AccountID, body.Amount, body.Date, body.Description, collect)
+	tx, err := sp(r).debts.Payment(r.Context(), d.ID, body.AccountID, body.Amount, body.Date, body.Description, collect)
 	if err != nil {
 		writeMessage(w, 422, err.Error())
 		return
@@ -155,7 +155,7 @@ func (s *Server) debtsReopen(w http.ResponseWriter, r *http.Request) {
 	if d == nil {
 		return
 	}
-	out, err := s.debts.Reopen(r.Context(), d.ID)
+	out, err := sp(r).debts.Reopen(r.Context(), d.ID)
 	if err != nil {
 		writeMessage(w, 422, err.Error())
 		return
@@ -164,12 +164,12 @@ func (s *Server) debtsReopen(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) debtsSummary(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, dto.NewDebtSummary(s.debts.Summary(r.Context())))
+	writeJSON(w, http.StatusOK, dto.NewDebtSummary(sp(r).debts.Summary(r.Context())))
 }
 
 func (s *Server) debtParam(w http.ResponseWriter, r *http.Request) *domain.Account {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	a, _ := s.accounts.ByID(r.Context(), id)
+	a, _ := sp(r).accounts.ByID(r.Context(), id)
 	if a == nil || a.Type != "debt" {
 		writeMessage(w, http.StatusNotFound, "Not a debt.")
 		return nil

@@ -5,7 +5,7 @@ export const roleMappingRuleSchema = z.object({
     claim: z.string().min(1, i18n.t('validation.claimRequired')),
     operator: z.enum(['equals', 'contains', 'one_of']),
     value: z.string().min(1, i18n.t('validation.valueRequired')),
-    role: z.enum(['admin', 'read-write', 'read-only']),
+    role: z.enum(['admin', 'user', 'guest']),
 })
 
 export const identityProviderSchema = z.object({
@@ -19,7 +19,7 @@ export const identityProviderSchema = z.object({
     enabled: z.boolean().default(false),
     fields: z.record(z.string(), z.string()).default({}),
     role_mapping: z.array(roleMappingRuleSchema).default([]),
-    default_role: z.enum(['read-write', 'read-only']).default('read-only'),
+    default_role: z.enum(['user', 'guest']).default('user'),
     allow_jit: z.boolean().default(true),
     sync_role_on_login: z.boolean().default(false),
     link_by_email: z.boolean().default(true),

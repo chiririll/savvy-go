@@ -3,13 +3,11 @@ package httpserver
 import (
 	"net/http"
 	"testing"
-
-	"savvy-go/internal/auth"
 )
 
 func TestCurrencyAccountCategoryTagCRUD(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("rw@test.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("rw@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 
 	res := a.do("POST", "/api/currencies", map[string]any{
@@ -94,7 +92,7 @@ func TestCurrencyAccountCategoryTagCRUD(t *testing.T) {
 		res.Body.Close()
 	}
 
-	ro := a.createUser("ro@test.com", "secret1", auth.RoleReadOnly)
+	ro := a.createUser("ro@test.com", "secret1", roleViewer)
 	ros := a.issue(ro, false)
 	res = a.do("POST", "/api/tags", map[string]any{"name": "blocked"}, ros.Token, ros.CSRF)
 	if res.StatusCode != http.StatusForbidden {

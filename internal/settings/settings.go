@@ -9,27 +9,70 @@ import (
 
 	"savvy-go/internal/db"
 	"savvy-go/internal/db/sqlc"
+	"savvy-go/internal/store"
 )
 
-var defaults = map[string]any{
-	"auto_update_currencies":     true,
+// serverDefaults are the instance settings, kept in the server database.
+var serverDefaults = map[string]any{
 	"sso_allow_signup":           true,
 	"password_login_enabled":     true,
 	"sso_require_verified_email": false,
+	// Size limit of a space in MB; 0 means unlimited.
+	"space_quota_mb": 0,
+	// Backups a space keeps; older ones are removed. 0 keeps all.
+	"space_backups_max": 10,
+	// How many spaces a user may administer; null is unlimited, 0 none.
+	"max_spaces_per_user": nil,
+	// Whether an invitation link may create an account.
+	"space_invites_can_register": true,
 }
 
+// spaceDefaults are the settings of one space, kept in its own database.
+var spaceDefaults = map[string]any{
+	"auto_update_currencies": true,
+}
+
+// IsSpaceKey reports whether key is a per-space setting.
+func IsSpaceKey(key string) bool {
+	_, ok := spaceDefaults[key]
+	return ok
+}
+
+// IsServerKey reports whether key is an instance setting.
+func IsServerKey(key string) bool {
+	_, ok := serverDefaults[key]
+	return ok
+}
+
+// Store reads and writes settings: the instance settings of the server
+// database, or with Space set the settings of the space database DB.
 type Store struct {
-	DB *sql.DB
+	DB    store.DB
+	Space bool
+}
+
+func (s Store) defaults() map[string]any {
+	if s.Space {
+		return spaceDefaults
+	}
+	return serverDefaults
+}
+
+func (s Store) get(ctx context.Context, key string) (sql.NullString, error) {
+	if s.Space {
+		return db.Q(s.DB).GetSpaceSetting(ctx, key)
+	}
+	return db.Q(s.DB).GetSetting(ctx, key)
 }
 
 func (s Store) Get(ctx context.Context, key string, fallback any) any {
 	var raw sql.NullString
-	raw, err := db.Q(s.DB).GetSetting(ctx, key)
+	raw, err := s.get(ctx, key)
 	if err != nil || !raw.Valid {
 		if fallback != nil {
 			return fallback
 		}
-		if v, ok := defaults[key]; ok {
+		if v, ok := s.defaults()[key]; ok {
 			return v
 		}
 		return nil
@@ -58,24 +101,47 @@ func (s Store) Set(ctx context.Context, key string, value any) error {
 	if err != nil {
 		return err
 	}
+	if s.Space {
+		return db.Q(s.DB).UpsertSpaceSetting(ctx, sqlc.UpsertSpaceSettingParams{Key: key, Value: db.NS(string(raw))})
+	}
 	return db.Q(s.DB).UpsertSetting(ctx, sqlc.UpsertSettingParams{Key: key, Value: db.NS(string(raw))})
 }
 
 func (s Store) All(ctx context.Context) (map[string]any, error) {
+	defaults := s.defaults()
 	out := make(map[string]any, len(defaults))
 	for k, v := range defaults {
 		out[k] = v
 	}
-	rows, err := db.Q(s.DB).ListSettings(ctx)
-	if err != nil {
-		return nil, err
+	type kv struct {
+		key   string
+		value sql.NullString
+	}
+	var rows []kv
+	if s.Space {
+		list, err := db.Q(s.DB).ListSpaceSettings(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, r := range list {
+			rows = append(rows, kv{r.Key, r.Value})
+		}
+	} else {
+		list, err := db.Q(s.DB).ListSettings(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, r := range list {
+			rows = append(rows, kv{r.Key, r.Value})
+		}
 	}
 	for _, r := range rows {
-		if strings.HasPrefix(r.Key, "legacy_") {
+		// Only known keys: internal markers (legacy_*, space_uuid) stay private.
+		if _, known := defaults[r.key]; !known || strings.HasPrefix(r.key, "legacy_") {
 			continue
 		}
-		if r.Value.Valid {
-			out[r.Key] = decode(r.Value.String)
+		if r.value.Valid {
+			out[r.key] = decode(r.value.String)
 		}
 	}
 	return out, nil
@@ -87,4 +153,34 @@ func decode(raw string) any {
 		return v
 	}
 	return raw
+}
+
+// Int reads a numeric setting.
+func (s Store) Int(ctx context.Context, key string, fallback int64) int64 {
+	switch t := s.Get(ctx, key, nil).(type) {
+	case float64:
+		return int64(t)
+	case int:
+		return int64(t)
+	case string:
+		if n, err := strconv.ParseInt(t, 10, 64); err == nil {
+			return n
+		}
+	}
+	return fallback
+}
+
+// SpaceQuota is the size limit of a space in bytes, 0 when unlimited.
+func SpaceQuota(ctx context.Context, server store.DB) int64 {
+	var mb float64
+	switch t := (Store{DB: server}).Get(ctx, "space_quota_mb", nil).(type) {
+	case float64:
+		mb = t
+	case string:
+		mb, _ = strconv.ParseFloat(t, 64)
+	}
+	if mb <= 0 {
+		return 0
+	}
+	return int64(mb * (1 << 20))
 }

@@ -101,8 +101,9 @@ func (s SSO) justInTime(ctx context.Context, p IdentityProvider, id NormalizedId
 	if role == "" {
 		role = p.DefaultRole
 	}
-	if role == "" {
-		role = auth.RoleReadOnly
+	role = auth.NormalizeRole(role)
+	if !auth.ValidRole(role) {
+		role = auth.RoleUser
 	}
 	pass := auth.RandomString(40)
 	user, err := s.Users.Create(ctx, name, id.Email, &pass, role)
@@ -110,6 +111,9 @@ func (s SSO) justInTime(ctx context.Context, p IdentityProvider, id NormalizedId
 		return nil, err
 	}
 	if err := s.Users.MarkSSOOnly(ctx, user.ID); err != nil {
+		return nil, err
+	}
+	if _, err := s.Spaces.Provision(ctx, user); err != nil {
 		return nil, err
 	}
 	return s.Users.ByID(ctx, user.ID)
@@ -176,8 +180,7 @@ func matchRoleRule(rule map[string]any, id NormalizedIdentity) string {
 		actual = id.Raw[claim]
 	}
 	if ruleMatches(op, actual, rule["value"]) {
-		switch role {
-		case auth.RoleAdmin, auth.RoleReadWrite, auth.RoleReadOnly:
+		if role = auth.NormalizeRole(role); auth.ValidRole(role) {
 			return role
 		}
 	}

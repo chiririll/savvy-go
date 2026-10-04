@@ -13,7 +13,7 @@ import (
 )
 
 func (s *Server) budgetsIndex(w http.ResponseWriter, r *http.Request) {
-	list, err := s.budgets.All(r.Context())
+	list, err := sp(r).budgets.All(r.Context())
 	if err != nil {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
@@ -30,7 +30,7 @@ func (s *Server) budgetsStore(w http.ResponseWriter, r *http.Request) {
 		writeValidation(w, map[string][]string{"name": {"The name field is required."}})
 		return
 	}
-	b, err := s.budgets.Create(r.Context(), in)
+	b, err := sp(r).budgets.Create(r.Context(), in)
 	if err != nil {
 		writeMessage(w, 422, err.Error())
 		return
@@ -55,7 +55,7 @@ func (s *Server) budgetsUpdate(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	b, err := s.budgets.Update(r.Context(), cur.ID, in)
+	b, err := sp(r).budgets.Update(r.Context(), cur.ID, in)
 	if err != nil {
 		writeMessage(w, 422, err.Error())
 		return
@@ -68,7 +68,7 @@ func (s *Server) budgetsDestroy(w http.ResponseWriter, r *http.Request) {
 	if b == nil {
 		return
 	}
-	if err := s.budgets.Delete(r.Context(), b.ID); err != nil {
+	if err := sp(r).budgets.Delete(r.Context(), b.ID); err != nil {
 		writeMessage(w, 422, err.Error())
 		return
 	}
@@ -77,7 +77,7 @@ func (s *Server) budgetsDestroy(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) budgetParam(w http.ResponseWriter, r *http.Request) *domain.Budget {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	b, _ := s.budgets.ByID(r.Context(), id)
+	b, _ := sp(r).budgets.ByID(r.Context(), id)
 	if b == nil {
 		writeMessage(w, http.StatusNotFound, "Not found.")
 	}

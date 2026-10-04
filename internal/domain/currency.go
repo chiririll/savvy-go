@@ -14,6 +14,7 @@ import (
 	"savvy-go/internal/db"
 	"savvy-go/internal/db/sqlc"
 	"savvy-go/internal/money"
+	"savvy-go/internal/store"
 )
 
 var one = decimal.NewFromInt(1)
@@ -116,7 +117,7 @@ func convertedDecimal(m money.Money, from, to Currency) decimal.Decimal {
 	return to.ConvertFromBase(from.ConvertToBase(m.Decimal()))
 }
 
-type Currencies struct{ DB *sql.DB }
+type Currencies struct{ DB store.DB }
 
 func (s Currencies) All(ctx context.Context) ([]Currency, error) {
 	rows, err := db.Q(s.DB).ListCurrencies(ctx)

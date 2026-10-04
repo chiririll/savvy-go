@@ -28,5 +28,12 @@
         "title": "About Savvy",
         "body": "Self-hosted personal finance tracker. Track expenses, manage budgets, and take control of your money.",
         "github": "GitHub Repository"
-    }
+    },
+    "space": "Space",
+    "user": "User",
+    "administration": "Administration",
+    "systemBackups": "System backups",
+    "spaces": "Spaces",
+    "transfer_out": "To another space",
+    "sso": "SSO"
 }

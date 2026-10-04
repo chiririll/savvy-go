@@ -20,7 +20,7 @@ func (a *testApp) bearer(method, path string, body any, token string) *http.Resp
 	if body != nil {
 		_ = json.NewEncoder(&buf).Encode(body)
 	}
-	req, err := http.NewRequest(method, a.srv.URL+path, &buf)
+	req, err := http.NewRequest(method, a.srv.URL+a.apiPath(path), &buf)
 	if err != nil {
 		a.t.Fatal(err)
 	}
@@ -52,7 +52,7 @@ func status(t *testing.T, res *http.Response, want int, label string) {
 
 func TestAPITokenCreateListRevoke(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("rw@a.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("rw@a.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 
 	res := a.do("POST", "/api/auth/api-tokens", map[string]any{"name": "Zapier", "scope": "read-write"}, sess.Token, sess.CSRF)
@@ -90,7 +90,7 @@ func TestAPITokenCreateListRevoke(t *testing.T) {
 
 func TestAPITokenBearerSkipsCSRF(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("rw@a.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("rw@a.com", "secret1", roleEditor)
 	raw, _ := a.issueToken(u, auth.APIScopeReadWrite, nil)
 
 	status(t, a.bearer("GET", "/api/accounts", nil, raw), 200, "bearer GET")
@@ -107,25 +107,27 @@ func TestAPITokenBearerSkipsCSRF(t *testing.T) {
 
 func TestAPITokenReadScopeBlocksWrites(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("rw@a.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("rw@a.com", "secret1", roleEditor)
 	raw, _ := a.issueToken(u, auth.APIScopeRead, nil)
 
 	status(t, a.bearer("GET", "/api/tags", nil, raw), 200, "read GET")
 	status(t, a.bearer("POST", "/api/tags", map[string]any{"name": "nope"}, raw), 403, "read POST")
 }
 
-func TestAPITokenReadOnlyUserCannotMintReadWrite(t *testing.T) {
+// P4: a token never writes more than its owner may in the space, whatever
+// its scope; a viewer's read-write token reads but cannot write there.
+func TestP4ViewerReadWriteTokenCannotWrite(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("ro@a.com", "secret1", auth.RoleReadOnly)
-	sess := a.issue(u, false)
+	u := a.createUser("ro@a.com", "secret1", roleViewer)
+	raw, _ := a.issueToken(u, auth.APIScopeReadWrite, nil)
 
-	status(t, a.do("POST", "/api/auth/api-tokens", map[string]any{"name": "x", "scope": "read-write"}, sess.Token, sess.CSRF), 422, "rw token")
-	status(t, a.do("POST", "/api/auth/api-tokens", map[string]any{"name": "x", "scope": "read"}, sess.Token, sess.CSRF), 201, "read token")
+	status(t, a.bearer("GET", "/api/tags", nil, raw), 200, "viewer token GET")
+	status(t, a.bearer("POST", "/api/tags", map[string]any{"name": "nope"}, raw), 403, "viewer token POST")
 }
 
 func TestAPITokenInvalidExpiredAndNoCookieFallback(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("rw@a.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("rw@a.com", "secret1", roleEditor)
 	past := time.Now().Add(-time.Hour)
 	expired, _ := a.issueToken(u, auth.APIScopeRead, &past)
 
@@ -135,7 +137,7 @@ func TestAPITokenInvalidExpiredAndNoCookieFallback(t *testing.T) {
 
 	// A valid session cookie must not rescue a bad bearer.
 	sess := a.issue(u, false)
-	req, _ := http.NewRequest("GET", a.srv.URL+"/api/accounts", nil)
+	req, _ := http.NewRequest("GET", a.srv.URL+a.apiPath("/api/accounts"), nil)
 	req.AddCookie(&http.Cookie{Name: "svy_session", Value: sess.Token})
 	req.Header.Set("Authorization", "Bearer svy_garbage")
 	res, err := a.client.Do(req)
@@ -161,7 +163,7 @@ func TestAPITokenForbiddenOnSessionOnlyAndAdminRoutes(t *testing.T) {
 
 func TestAPITokensDeletedWithUser(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("rw@a.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("rw@a.com", "secret1", roleEditor)
 	a.issueToken(u, auth.APIScopeRead, nil)
 	if _, err := a.db.Exec(`PRAGMA foreign_keys = ON`); err != nil {
 		t.Fatal(err)
@@ -178,8 +180,8 @@ func TestAPITokensDeletedWithUser(t *testing.T) {
 
 func TestAPITokenRevokeAndListAreScopedToOwner(t *testing.T) {
 	a := newTestApp(t)
-	alice := a.createUser("alice@a.com", "secret1", auth.RoleReadWrite)
-	bob := a.createUser("bob@a.com", "secret1", auth.RoleReadWrite)
+	alice := a.createUser("alice@a.com", "secret1", roleEditor)
+	bob := a.createUser("bob@a.com", "secret1", roleEditor)
 	aliceRaw, aliceTok := a.issueToken(alice, auth.APIScopeRead, nil)
 	a.issueToken(bob, auth.APIScopeRead, nil)
 	sess := a.issue(bob, false)
@@ -195,9 +197,9 @@ func TestAPITokenRevokeAndListAreScopedToOwner(t *testing.T) {
 
 func TestAPITokenDemotedUserLosesWrite(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("rw@a.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("rw@a.com", "secret1", roleEditor)
 	raw, _ := a.issueToken(u, auth.APIScopeReadWrite, nil)
-	if err := a.s.users.SetRole(context.Background(), u.ID, auth.RoleReadOnly); err != nil {
+	if err := a.s.spaces.SetMember(context.Background(), a.space.ID, u, roleViewer); err != nil {
 		t.Fatal(err)
 	}
 
@@ -207,7 +209,7 @@ func TestAPITokenDemotedUserLosesWrite(t *testing.T) {
 
 func TestAPITokenStoreValidation(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("rw@a.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("rw@a.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 	long := make([]byte, 101)
 	for i := range long {
@@ -247,7 +249,7 @@ func TestAPITokenStoreValidation(t *testing.T) {
 
 func TestAPITokenDefaultScopeAndFutureExpiry(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("rw@a.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("rw@a.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 	exp := time.Now().Add(24 * time.Hour).Truncate(time.Second)
 
@@ -267,7 +269,7 @@ func TestAPITokenDefaultScopeAndFutureExpiry(t *testing.T) {
 
 func TestAPITokenLimit(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("rw@a.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("rw@a.com", "secret1", roleEditor)
 	for range 50 {
 		a.issueToken(u, auth.APIScopeRead, nil)
 	}
@@ -281,7 +283,7 @@ func TestAPITokenLimit(t *testing.T) {
 
 func TestAPITokenTouchesLastUsed(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("rw@a.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("rw@a.com", "secret1", roleEditor)
 	raw, tok := a.issueToken(u, auth.APIScopeRead, nil)
 	lastUsed := func() string {
 		var v sql.NullString
@@ -318,11 +320,11 @@ func TestAPITokenTouchesLastUsed(t *testing.T) {
 
 func TestAPITokenMalformedAuthorizationHeader(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("rw@a.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("rw@a.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 
 	for _, h := range []string{"Basic dXNlcjpwYXNz", "Bearer", "Bearer   ", "svy_nobearerprefix"} {
-		req, _ := http.NewRequest("GET", a.srv.URL+"/api/accounts", nil)
+		req, _ := http.NewRequest("GET", a.srv.URL+a.apiPath("/api/accounts"), nil)
 		req.AddCookie(&http.Cookie{Name: "svy_session", Value: sess.Token})
 		req.Header.Set("Authorization", h)
 		res, err := a.client.Do(req)
@@ -335,7 +337,7 @@ func TestAPITokenMalformedAuthorizationHeader(t *testing.T) {
 
 func TestAPITokenForbiddenOnCredentialRoutes(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("rw@a.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("rw@a.com", "secret1", roleEditor)
 	raw, _ := a.issueToken(u, auth.APIScopeReadWrite, nil)
 	sess := a.issue(u, false)
 

@@ -28,21 +28,21 @@ func (s *Server) importParse(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, "The uploaded file is not ready.")
 		return
 	}
-	im, err := s.imports.Create(r.Context(), u.ID, up.ID)
+	im, err := sp(r).imports.Create(r.Context(), u.ID, up.ID)
 	if err != nil {
 		writeMessage(w, 422, err.Error())
 		return
 	}
 	payload := dto.NewImport(*im)
 	s.runJob(func(ctx context.Context) {
-		_ = s.imports.Parse(ctx, im.ID, up.ID)
+		_ = sp(r).imports.Parse(ctx, im.ID, up.ID)
 	})
 	writeData(w, http.StatusOK, payload)
 }
 
 func (s *Server) importShow(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "import")
-	im, _ := s.imports.ByID(r.Context(), id)
+	im, _ := sp(r).imports.ByID(r.Context(), id)
 	u := userFrom(r)
 	if im == nil {
 		writeMessage(w, http.StatusNotFound, "Not found.")
@@ -65,13 +65,13 @@ func (s *Server) importPreview(w http.ResponseWriter, r *http.Request) {
 		writeValidation(w, map[string][]string{"import_id": {"The import id field is required."}})
 		return
 	}
-	im, _ := s.imports.ByID(r.Context(), body.ImportID)
+	im, _ := sp(r).imports.ByID(r.Context(), body.ImportID)
 	u := userFrom(r)
 	if im == nil || im.UserID == nil || *im.UserID != u.ID {
 		writeMessage(w, http.StatusForbidden, "Forbidden")
 		return
 	}
-	result, err := s.imports.Preview(r.Context(), im, body.Mapping, body.Options)
+	result, err := sp(r).imports.Preview(r.Context(), im, body.Mapping, body.Options)
 	if err != nil {
 		writeMessage(w, 422, err.Error())
 		return
@@ -89,7 +89,7 @@ func (s *Server) importExecute(w http.ResponseWriter, r *http.Request) {
 		writeValidation(w, map[string][]string{"import_id": {"The import id field is required."}})
 		return
 	}
-	im, _ := s.imports.ByID(r.Context(), body.ImportID)
+	im, _ := sp(r).imports.ByID(r.Context(), body.ImportID)
 	u := userFrom(r)
 	if im == nil || im.UserID == nil || *im.UserID != u.ID {
 		writeMessage(w, http.StatusForbidden, "Forbidden")
@@ -100,7 +100,7 @@ func (s *Server) importExecute(w http.ResponseWriter, r *http.Request) {
 	im.Options = body.Options
 	payload := dto.NewImport(*im)
 	s.runJob(func(ctx context.Context) {
-		_ = s.imports.Execute(ctx, im.ID, body.Mapping, body.Options)
+		_ = sp(r).imports.Execute(ctx, im.ID, body.Mapping, body.Options)
 	})
 	writeData(w, http.StatusOK, payload)
 }

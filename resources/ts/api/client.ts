@@ -3,6 +3,8 @@ import { toast } from 'sonner'
 import i18n from '@/lib/i18n'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { ApiError } from '@/types'
+import { spacePath } from '@/lib/space-path'
+import { currentSpaceId } from '@/stores/space'
 
 interface WrappedResponse<T> {
     data: T
@@ -57,6 +59,9 @@ const createApiClient = (baseURL: string): AxiosInstance => {
 
     client.interceptors.request.use((config) => {
         config.headers['X-Locale'] = i18n.resolvedLanguage ?? i18n.language
+        // Data of a space lives under /spaces/{id}; SpaceGate renders pages
+        // only once the current space is known.
+        if (config.url) config.url = spacePath(config.url, currentSpaceId())
         return config
     })
 

@@ -1,15 +1,14 @@
 package httpserver
 
 import (
+	"savvy-go/internal/auth"
 	"testing"
 	"time"
-
-	"savvy-go/internal/auth"
 )
 
 func TestReportsOverview(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("r@test.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("r@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 	accID, catID := seedMoney(t, a, sess)
 	today := time.Now().UTC().Format("2006-01-02")
@@ -44,7 +43,7 @@ func TestReportsOverview(t *testing.T) {
 
 func TestReportsNetWorth(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("nw@test.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("nw@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 	accID, catID := seedMoney(t, a, sess)
 	today := time.Now().UTC().Format("2006-01-02")
@@ -78,7 +77,7 @@ func TestReportsNetWorth(t *testing.T) {
 
 func TestReportsTransactionSummary(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("txr@test.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("txr@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 	accID, catID := seedMoney(t, a, sess)
 	today := time.Now().UTC().Format("2006-01-02")
@@ -105,6 +104,9 @@ func TestReportsTransactionSummary(t *testing.T) {
 		t.Fatalf("by-cat %d %v", res.StatusCode, cats)
 	}
 
+	// P2: monitoring is the server admins'.
+	status(t, a.do("GET", "/api/monitoring/storage", nil, sess.Token, ""), 403, "editor monitoring")
+	sess = a.issue(a.createUser("monitor@test.com", "secret1", auth.RoleAdmin), false)
 	res = a.do("GET", "/api/monitoring/storage", nil, sess.Token, "")
 	st := decodeJSON(t, res)
 	if res.StatusCode != 200 || st["volume"] == nil || st["managed"] == nil {

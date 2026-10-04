@@ -103,7 +103,7 @@ func (q *Queries) InsertBudget(ctx context.Context, arg InsertBudgetParams) (sql
 }
 
 const insertBudgetCategory = `-- name: InsertBudgetCategory :exec
-INSERT OR IGNORE INTO budget_category (budget_id, category_id) VALUES (?,?)
+INSERT INTO budget_category (budget_id, category_id) VALUES (?,?) ON CONFLICT DO NOTHING
 `
 
 type InsertBudgetCategoryParams struct {
@@ -117,7 +117,7 @@ func (q *Queries) InsertBudgetCategory(ctx context.Context, arg InsertBudgetCate
 }
 
 const insertBudgetTag = `-- name: InsertBudgetTag :exec
-INSERT OR IGNORE INTO budget_tag (budget_id, tag_id) VALUES (?,?)
+INSERT INTO budget_tag (budget_id, tag_id) VALUES (?,?) ON CONFLICT DO NOTHING
 `
 
 type InsertBudgetTagParams struct {

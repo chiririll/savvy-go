@@ -24,7 +24,7 @@ func seedMoney(t *testing.T, a *testApp, sess *auth.Issued) (accID, catID int64)
 
 func TestRecurringInactiveCreatesNoPending(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("rw@test.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("rw@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 	accID, catID := seedMoney(t, a, sess)
 
@@ -49,7 +49,7 @@ func TestRecurringInactiveCreatesNoPending(t *testing.T) {
 
 func TestRecurringCreatesPendingAndConfirmSpawnsNext(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("rw2@test.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("rw2@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 	accID, catID := seedMoney(t, a, sess)
 	today := time.Now().UTC().Format("2006-01-02")
@@ -94,7 +94,7 @@ func TestRecurringCreatesPendingAndConfirmSpawnsNext(t *testing.T) {
 
 func TestEstimatedAmountCarriesToPendingAndConfirmReplacesIt(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("est@test.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("est@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 	accID, catID := seedMoney(t, a, sess)
 	today := time.Now().UTC().Format("2006-01-02")
@@ -136,7 +136,7 @@ func TestEstimatedAmountCarriesToPendingAndConfirmReplacesIt(t *testing.T) {
 
 func TestEstimatedFlagOnlyKeptForPendingTransactions(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("est2@test.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("est2@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 	accID, catID := seedMoney(t, a, sess)
 	today := time.Now().UTC().Format("2006-01-02")
@@ -183,7 +183,7 @@ func TestEstimatedFlagOnlyKeptForPendingTransactions(t *testing.T) {
 
 func TestRecurringEndDateStopsNextPending(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("rw3@test.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("rw3@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 	accID, catID := seedMoney(t, a, sess)
 	today := time.Now().UTC().Format("2006-01-02")
@@ -205,7 +205,7 @@ func TestRecurringEndDateStopsNextPending(t *testing.T) {
 
 func TestRecurringSkipSpawnsNextWithoutBalanceChange(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("rw4@test.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("rw4@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 	accID, catID := seedMoney(t, a, sess)
 	today := time.Now().UTC().Format("2006-01-02")
@@ -234,7 +234,7 @@ func TestRecurringSkipSpawnsNextWithoutBalanceChange(t *testing.T) {
 
 func TestBudgetProgressCountsConfirmedExpenses(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("b@test.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("b@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 	accID, catID := seedMoney(t, a, sess)
 	today := time.Now().UTC().Format("2006-01-02")
@@ -260,7 +260,7 @@ func TestBudgetProgressCountsConfirmedExpenses(t *testing.T) {
 
 func TestAutomationSetsCategoryOnCreate(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("auto@test.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("auto@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 	accID, catID := seedMoney(t, a, sess)
 	res := a.do("POST", "/api/categories", map[string]any{"name": "Auto", "type": "expense"}, sess.Token, sess.CSRF)

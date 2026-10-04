@@ -7,6 +7,7 @@ import (
 
 	"savvy-go/internal/db"
 	"savvy-go/internal/db/sqlc"
+	"savvy-go/internal/store"
 )
 
 const passwordTokenTTL = 7 * 24 * time.Hour
@@ -19,7 +20,7 @@ type PasswordToken struct {
 }
 
 type PasswordTokens struct {
-	DB *sql.DB
+	DB store.DB
 }
 
 func (p PasswordTokens) Issue(ctx context.Context, user *User) (token string, expires time.Time, err error) {

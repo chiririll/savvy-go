@@ -3,7 +3,9 @@ import { Plus } from 'lucide-react'
 import { FeedList, Page, PageHeader } from '@/components/shared'
 import { CurrencyFormDialog, CurrencyRow } from '@/components/features/currencies'
 import { Button } from '@/components/ui/button'
-import { useCreateCurrency, useCurrencies, useDeleteCurrency, useSetBaseCurrency, useUpdateCurrency, useResourceFormDialog, useSettings } from '@/hooks'
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
+import { useCreateCurrency, useCurrencies, useDeleteCurrency, useSetBaseCurrency, useUpdateCurrency, useResourceFormDialog, useSettings, useUpdateSettings, useIsSpaceAdmin } from '@/hooks'
 import { useReadOnly } from '@/components/providers/ReadOnlyProvider'
 import { CurrencyFormData } from '@/schemas'
 import type { Currency } from '@/types'
@@ -16,6 +18,8 @@ export default function CurrenciesPage() {
     const createCurrency = useCreateCurrency()
     const updateCurrency = useUpdateCurrency()
     const { data: settings } = useSettings()
+    const updateSettings = useUpdateSettings()
+    const isSpaceAdmin = useIsSpaceAdmin()
     const isReadOnly = useReadOnly()
     const items = currencies ?? []
     const form = useResourceFormDialog<Currency, CurrencyFormData>({
@@ -35,6 +39,20 @@ export default function CurrenciesPage() {
             />
 
             <div className="mx-auto w-full max-w-[800px]">
+                <div className="mb-4 flex items-center justify-between gap-4 rounded-xl border bg-card px-4 py-3">
+                    <div className="space-y-0.5">
+                        <Label htmlFor="auto-update" className="text-sm font-medium">{t('settings:system.currencyRates.autoUpdate')}</Label>
+                        <p className="text-xs text-muted-foreground">
+                            {isSpaceAdmin ? t('settings:system.currencyRates.autoUpdateDescription') : t('settings:spaces.currencies.adminOnly')}
+                        </p>
+                    </div>
+                    <Switch
+                        id="auto-update"
+                        checked={settings?.auto_update_currencies ?? true}
+                        disabled={!isSpaceAdmin || updateSettings.isPending}
+                        onCheckedChange={(checked) => updateSettings.mutate({ auto_update_currencies: checked })}
+                    />
+                </div>
                 <FeedList
                     items={items}
                     isLoading={isLoading}

@@ -13,6 +13,7 @@ import (
 	"savvy-go/internal/db/filter"
 	"savvy-go/internal/db/sqlc"
 	"savvy-go/internal/money"
+	"savvy-go/internal/store"
 )
 
 // appLocation is the timezone used for calendar-day concepts across this
@@ -84,9 +85,16 @@ type TxInput struct {
 	Items       []TxItemInput
 }
 
-type Transactions struct{ DB *sql.DB }
+type Transactions struct{ DB store.DB }
+
+// transferSideType reports the types reserved for a transfer between spaces;
+// they are written only by Transfers.
+func transferSideType(typ string) bool { return typ == "transfer_out" || typ == "transfer_in" }
 
 func (s Transactions) Create(ctx context.Context, in TxInput) (*Transaction, error) {
+	if transferSideType(in.Type) {
+		return nil, ErrTransferRow
+	}
 	status := "confirmed"
 	if in.Status != nil {
 		status = *in.Status
@@ -132,6 +140,12 @@ func (s Transactions) Create(ctx context.Context, in TxInput) (*Transaction, err
 }
 
 func (s Transactions) Update(ctx context.Context, id int64, in TxInput) (*Transaction, error) {
+	if err := s.guardTransfer(ctx, id); err != nil {
+		return nil, err
+	}
+	if transferSideType(in.Type) {
+		return nil, ErrTransferRow
+	}
 	cur, err := s.ByID(ctx, id)
 	if err != nil || cur == nil {
 		return cur, err
@@ -176,7 +190,20 @@ func (s Transactions) Update(ctx context.Context, id int64, in TxInput) (*Transa
 	return s.ByID(ctx, id)
 }
 
+// guardTransfer refuses changing a transaction that mirrors a transfer
+// between spaces (P31): such rows change only through the transfer.
+func (s Transactions) guardTransfer(ctx context.Context, id int64) error {
+	v, err := db.Q(s.DB).GetTransactionTransferUUID(ctx, id)
+	if err == nil && v.Valid {
+		return ErrTransferRow
+	}
+	return nil
+}
+
 func (s Transactions) Delete(ctx context.Context, id int64) error {
+	if err := s.guardTransfer(ctx, id); err != nil {
+		return err
+	}
 	cur, err := s.ByID(ctx, id)
 	if err != nil || cur == nil {
 		return err
@@ -191,6 +218,9 @@ func (s Transactions) Delete(ctx context.Context, id int64) error {
 // with stand; only an estimate can be replaced by the real amounts, and a
 // transfer given only amount delivers it converted at the current rates.
 func (s Transactions) Confirm(ctx context.Context, id int64, date string, amount, toAmount *decimal.Decimal) (*Transaction, error) {
+	if err := s.guardTransfer(ctx, id); err != nil {
+		return nil, err
+	}
 	cur, err := s.ByID(ctx, id)
 	if err != nil || cur == nil {
 		return cur, err
@@ -232,6 +262,9 @@ func (s Transactions) Confirm(ctx context.Context, id int64, date string, amount
 }
 
 func (s Transactions) Skip(ctx context.Context, id int64) (*Transaction, error) {
+	if err := s.guardTransfer(ctx, id); err != nil {
+		return nil, err
+	}
 	cur, err := s.ByID(ctx, id)
 	if err != nil || cur == nil {
 		return cur, err
@@ -248,6 +281,9 @@ func (s Transactions) Skip(ctx context.Context, id int64) (*Transaction, error) 
 }
 
 func (s Transactions) Duplicate(ctx context.Context, id int64) (*Transaction, error) {
+	if err := s.guardTransfer(ctx, id); err != nil {
+		return nil, err
+	}
 	cur, err := s.ByID(ctx, id)
 	if err != nil || cur == nil {
 		return cur, err

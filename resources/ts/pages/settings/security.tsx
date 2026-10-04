@@ -1,3 +1,4 @@
+import { UserSettingsTabs } from '@/components/features/spaces/UserSettingsTabs'
 import { ReactNode, useMemo, useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -343,6 +344,7 @@ export default function SecuritySettingsPage() {
     return (
         <Page title={t('security.title')}>
             <PageHeader title={t('security.heading')} description={t('security.description')} />
+            <UserSettingsTabs />
 
             <FormWrapper>
                 <div className="grid items-start gap-6 lg:grid-cols-2">

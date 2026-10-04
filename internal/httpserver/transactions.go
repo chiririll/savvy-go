@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -32,7 +33,7 @@ func (s *Server) transactionsIndex(w http.ResponseWriter, r *http.Request) {
 	f.TagIDs = int64List(q, "tag_ids")
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	per, _ := strconv.Atoi(r.URL.Query().Get("per_page"))
-	list, total, err := s.txs.Filtered(r.Context(), f, page, per)
+	list, total, err := sp(r).txs.Filtered(r.Context(), f, page, per)
 	if err != nil {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
@@ -54,7 +55,7 @@ func (s *Server) transactionsIndex(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 	if r.URL.Query().Get("with_summary") == "1" || r.URL.Query().Get("with_summary") == "true" {
-		payload["summary"] = dto.NewTransactionSummary(s.txs.Summary(r.Context(), false))
+		payload["summary"] = dto.NewTransactionSummary(sp(r).txs.Summary(r.Context(), false))
 	}
 	writeJSON(w, http.StatusOK, payload)
 }
@@ -76,14 +77,14 @@ func (s *Server) transactionsStore(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	tx, err := s.txs.Create(r.Context(), in)
+	tx, err := sp(r).txs.Create(r.Context(), in)
 	if err != nil {
 		writeMessage(w, 422, err.Error())
 		return
 	}
 	if tx.Status == "confirmed" {
-		s.automation.Process(r.Context(), "on_transaction_create", tx)
-		if fresh, e := s.txs.ByID(r.Context(), tx.ID); e == nil && fresh != nil {
+		sp(r).automation.Process(r.Context(), "on_transaction_create", tx)
+		if fresh, e := sp(r).txs.ByID(r.Context(), tx.ID); e == nil && fresh != nil {
 			tx = fresh
 		}
 	}
@@ -116,14 +117,14 @@ func (s *Server) transactionsUpdate(w http.ResponseWriter, r *http.Request) {
 	if in.Amount.IsZero() {
 		in.Amount = cur.Amount.Decimal()
 	}
-	tx, err := s.txs.Update(r.Context(), cur.ID, in)
+	tx, err := sp(r).txs.Update(r.Context(), cur.ID, in)
 	if err != nil {
 		writeMessage(w, 422, err.Error())
 		return
 	}
 	if tx.Status == "confirmed" {
-		s.automation.Process(r.Context(), "on_transaction_update", tx)
-		if fresh, e := s.txs.ByID(r.Context(), tx.ID); e == nil && fresh != nil {
+		sp(r).automation.Process(r.Context(), "on_transaction_update", tx)
+		if fresh, e := sp(r).txs.ByID(r.Context(), tx.ID); e == nil && fresh != nil {
 			tx = fresh
 		}
 	}
@@ -135,7 +136,11 @@ func (s *Server) transactionsDestroy(w http.ResponseWriter, r *http.Request) {
 	if tx == nil {
 		return
 	}
-	if err := s.txs.Delete(r.Context(), tx.ID); err != nil {
+	if err := sp(r).txs.Delete(r.Context(), tx.ID); err != nil {
+		if errors.Is(err, domain.ErrTransferRow) {
+			writeMessage(w, 422, err.Error())
+			return
+		}
 		writeMessage(w, 422, "Scheduled occurrences cannot be deleted. Skip or confirm them instead.")
 		return
 	}
@@ -157,16 +162,16 @@ func (s *Server) transactionsConfirm(w http.ResponseWriter, r *http.Request) {
 	if body.Date != nil {
 		date = *body.Date
 	}
-	out, err := s.txs.Confirm(r.Context(), tx.ID, date, body.Amount, body.ToAmount)
+	out, err := sp(r).txs.Confirm(r.Context(), tx.ID, date, body.Amount, body.ToAmount)
 	if err != nil {
 		writeMessage(w, 422, err.Error())
 		return
 	}
 	if out.RecurringID != nil {
-		_ = s.recurring.AdvanceAfterOccurrence(r.Context(), *out.RecurringID)
+		_ = sp(r).recurring.AdvanceAfterOccurrence(r.Context(), *out.RecurringID)
 	}
-	s.automation.Process(r.Context(), "on_transaction_create", out)
-	if fresh, e := s.txs.ByID(r.Context(), out.ID); e == nil && fresh != nil {
+	sp(r).automation.Process(r.Context(), "on_transaction_create", out)
+	if fresh, e := sp(r).txs.ByID(r.Context(), out.ID); e == nil && fresh != nil {
 		out = fresh
 	}
 	writeData(w, http.StatusOK, dto.NewTransaction(*out))
@@ -177,13 +182,17 @@ func (s *Server) transactionsSkip(w http.ResponseWriter, r *http.Request) {
 	if tx == nil {
 		return
 	}
-	out, err := s.txs.Skip(r.Context(), tx.ID)
+	out, err := sp(r).txs.Skip(r.Context(), tx.ID)
 	if err != nil {
+		if errors.Is(err, domain.ErrTransferRow) {
+			writeMessage(w, 422, err.Error())
+			return
+		}
 		writeMessage(w, 422, "Only a pending scheduled transaction can be skipped.")
 		return
 	}
 	if out.RecurringID != nil {
-		_ = s.recurring.AdvanceAfterOccurrence(r.Context(), *out.RecurringID)
+		_ = sp(r).recurring.AdvanceAfterOccurrence(r.Context(), *out.RecurringID)
 	}
 	writeData(w, http.StatusOK, dto.NewTransaction(*out))
 }
@@ -193,7 +202,7 @@ func (s *Server) transactionsDuplicate(w http.ResponseWriter, r *http.Request) {
 	if tx == nil {
 		return
 	}
-	out, err := s.txs.Duplicate(r.Context(), tx.ID)
+	out, err := sp(r).txs.Duplicate(r.Context(), tx.ID)
 	if err != nil {
 		writeMessage(w, 422, err.Error())
 		return
@@ -202,16 +211,16 @@ func (s *Server) transactionsDuplicate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) transactionsSummary(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, dto.NewTransactionSummary(s.txs.Summary(r.Context(), false)))
+	writeJSON(w, http.StatusOK, dto.NewTransactionSummary(sp(r).txs.Summary(r.Context(), false)))
 }
 
 func (s *Server) transactionsPendingSummary(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, dto.NewTransactionSummary(s.txs.Summary(r.Context(), true)))
+	writeJSON(w, http.StatusOK, dto.NewTransactionSummary(sp(r).txs.Summary(r.Context(), true)))
 }
 
 func (s *Server) txParam(w http.ResponseWriter, r *http.Request) *domain.Transaction {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	tx, _ := s.txs.ByID(r.Context(), id)
+	tx, _ := sp(r).txs.ByID(r.Context(), id)
 	if tx == nil {
 		writeMessage(w, http.StatusNotFound, "Not found.")
 	}

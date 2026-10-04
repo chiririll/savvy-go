@@ -11,16 +11,43 @@ import (
 	"time"
 )
 
-//go:embed sql/*.sql
+//go:embed sql/server/*.sql sql/space/*.sql
 var files embed.FS
+
+// Set is one family of migrations: the server database or a space database.
+// Versions are recorded as "<set>/<file>", so both sets can be applied to one
+// file (a Laravel-era database before it is split) without clashing.
+type Set string
+
+const (
+	Server Set = "server"
+	Space  Set = "space"
+)
+
+// all is every set, for a database that still holds everything in one file.
+var all = []Set{Server, Space}
+
+// Up applies the pending migrations of this set.
+func (s Set) Up(ctx context.Context, db *sql.DB) error { return up(ctx, db, s) }
+
+// EnsureIndexes creates the indexes this set declares.
+func (s Set) EnsureIndexes(ctx context.Context, db *sql.DB) error { return ensureIndexes(ctx, db, s) }
+
+// PendingCount is the number of this set's migrations not yet applied.
+func (s Set) PendingCount(ctx context.Context, db *sql.DB) (int, error) {
+	return pendingCount(ctx, db, s)
+}
 
 const tableSQL = `CREATE TABLE IF NOT EXISTS schema_migrations (
     version TEXT PRIMARY KEY,
     applied_at TEXT NOT NULL
 ) STRICT`
 
-// Up applies every pending SQL file in internal/migrate/sql.
-func Up(ctx context.Context, db *sql.DB) error {
+// Up applies every set to one database. Only a database that has not been
+// split into server and space files (a Laravel-era one) needs this.
+func Up(ctx context.Context, db *sql.DB) error { return up(ctx, db, all...) }
+
+func up(ctx context.Context, db *sql.DB, sets ...Set) error {
 	if _, err := db.ExecContext(ctx, tableSQL); err != nil {
 		return fmt.Errorf("create schema_migrations: %w", err)
 	}
@@ -34,7 +61,7 @@ func Up(ctx context.Context, db *sql.DB) error {
 		return err
 	}
 
-	names, err := migrationFiles()
+	names, err := migrationFiles(sets...)
 	if err != nil {
 		return err
 	}
@@ -64,8 +91,10 @@ func Up(ctx context.Context, db *sql.DB) error {
 // EnsureIndexes creates every index declared by the embedded migrations (they
 // are all IF NOT EXISTS). Schema surgery on upgraded databases drops indexes
 // together with the columns they covered; this restores them.
-func EnsureIndexes(ctx context.Context, db *sql.DB) error {
-	names, err := migrationFiles()
+func EnsureIndexes(ctx context.Context, db *sql.DB) error { return ensureIndexes(ctx, db, all...) }
+
+func ensureIndexes(ctx context.Context, db *sql.DB, sets ...Set) error {
+	names, err := migrationFiles(sets...)
 	if err != nil {
 		return err
 	}
@@ -89,13 +118,15 @@ func EnsureIndexes(ctx context.Context, db *sql.DB) error {
 
 // PendingCount is the number of embedded migrations not yet recorded.
 // Returns -1 when schema_migrations is missing (never migrated).
-func PendingCount(ctx context.Context, db *sql.DB) (int, error) {
+func PendingCount(ctx context.Context, db *sql.DB) (int, error) { return pendingCount(ctx, db, all...) }
+
+func pendingCount(ctx context.Context, db *sql.DB, sets ...Set) (int, error) {
 	var name string
 	err := db.QueryRowContext(ctx,
 		`SELECT name FROM sqlite_master WHERE type='table' AND name='schema_migrations'`,
 	).Scan(&name)
 	if err == sql.ErrNoRows {
-		names, listErr := migrationFiles()
+		names, listErr := migrationFiles(sets...)
 		if listErr != nil {
 			return 0, listErr
 		}
@@ -112,7 +143,7 @@ func PendingCount(ctx context.Context, db *sql.DB) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	names, err := migrationFiles()
+	names, err := migrationFiles(sets...)
 	if err != nil {
 		return 0, err
 	}
@@ -143,19 +174,25 @@ func appliedVersions(ctx context.Context, db *sql.DB) (map[string]bool, error) {
 	return out, rows.Err()
 }
 
-func migrationFiles() ([]string, error) {
-	entries, err := fs.ReadDir(files, "sql")
-	if err != nil {
-		return nil, err
-	}
+// migrationFiles lists the files of the sets as "<set>/<file>", each set in
+// file order and the sets in the order given.
+func migrationFiles(sets ...Set) ([]string, error) {
 	var names []string
-	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".sql") {
-			continue
+	for _, set := range sets {
+		entries, err := fs.ReadDir(files, "sql/"+string(set))
+		if err != nil {
+			return nil, err
 		}
-		names = append(names, e.Name())
+		var own []string
+		for _, e := range entries {
+			if e.IsDir() || !strings.HasSuffix(e.Name(), ".sql") {
+				continue
+			}
+			own = append(own, string(set)+"/"+e.Name())
+		}
+		sort.Strings(own)
+		names = append(names, own...)
 	}
-	sort.Strings(names)
 	return names, nil
 }
 
@@ -207,4 +244,16 @@ func preview(stmt string) string {
 		return stmt[:80] + "…"
 	}
 	return stmt
+}
+
+// Versions lists the versions of this set's migrations, as recorded.
+func (s Set) Versions() ([]string, error) {
+	names, err := migrationFiles(s)
+	if err != nil {
+		return nil, err
+	}
+	for i, n := range names {
+		names[i] = strings.TrimSuffix(n, ".sql")
+	}
+	return names, nil
 }

@@ -5,17 +5,14 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
-	"path/filepath"
+	"savvy-go/internal/auth"
 	"strings"
 	"testing"
-
-	"savvy-go/internal/auth"
 )
 
 func TestMultipartImportPipeline(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("imp@test.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("imp@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 	accID, _ := seedMoney(t, a, sess)
 
@@ -119,7 +116,7 @@ func TestMultipartImportPipeline(t *testing.T) {
 
 func TestUploadUnknownBucket(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("bkt@test.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("bkt@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 	res := a.do("POST", "/api/s3/multipart", map[string]any{
 		"bucket": "nope", "filename": "x.csv", "size": 10,
@@ -132,8 +129,8 @@ func TestUploadUnknownBucket(t *testing.T) {
 
 func TestUploadSignForbiddenForOtherUser(t *testing.T) {
 	a := newTestApp(t)
-	u1 := a.createUser("o1@test.com", "secret1", auth.RoleReadWrite)
-	u2 := a.createUser("o2@test.com", "secret1", auth.RoleReadWrite)
+	u1 := a.createUser("o1@test.com", "secret1", roleEditor)
+	u2 := a.createUser("o2@test.com", "secret1", roleEditor)
 	s1 := a.issue(u1, false)
 	s2 := a.issue(u2, false)
 	res := a.do("POST", "/api/s3/multipart", map[string]any{
@@ -147,40 +144,18 @@ func TestUploadSignForbiddenForOtherUser(t *testing.T) {
 	res.Body.Close()
 }
 
-func TestBackupCreateAndList(t *testing.T) {
+// P1: backups hold every space, so only server admins reach them; space
+// admins, editors, viewers and API tokens are refused.
+func TestP1BackupsAreServerAdminOnly(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("bk@test.com", "secret1", auth.RoleReadWrite)
-	sess := a.issue(u, false)
-	res := a.do("POST", "/api/backups", map[string]any{"note": "nightly"}, sess.Token, sess.CSRF)
-	body := decodeJSON(t, res)
-	if res.StatusCode != 201 {
-		t.Fatalf("create %d %v", res.StatusCode, body)
+	for _, role := range []string{roleEditor, roleViewer} {
+		u := a.createUser(role+"@test.com", "secret1", role)
+		sess := a.issue(u, false)
+		status(t, a.do("GET", "/api/backups", nil, sess.Token, ""), 403, role+" list")
+		status(t, a.do("POST", "/api/backups", map[string]any{}, sess.Token, sess.CSRF), 403, role+" create")
+		status(t, a.do("POST", "/api/backups/x.sqlite/restore", nil, sess.Token, sess.CSRF), 403, role+" restore")
 	}
-	res = a.do("GET", "/api/backups", nil, sess.Token, "")
-	list := decodeJSON(t, res)
-	if res.StatusCode != 200 || len(list["data"].([]any)) != 1 {
-		t.Fatalf("list %d %v", res.StatusCode, list)
-	}
-	item := list["data"].([]any)[0].(map[string]any)
-	if item["note"] != "nightly" || item["status"] != "current" {
-		t.Fatalf("metadata not read from backup file: %v", item)
-	}
-
-	// The directory is the source of truth: removing the file drops the backup,
-	// and a foreign .sqlite dropped into it shows up without any scan.
-	name := item["filename"].(string)
-	if err := os.Remove(filepath.Join(a.s.cfg.BackupsDir, name)); err != nil {
-		t.Fatal(err)
-	}
-	foreign := filepath.Join(a.s.cfg.BackupsDir, "foreign.sqlite")
-	if err := os.WriteFile(foreign, nil, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	res = a.do("GET", "/api/backups", nil, sess.Token, "")
-	list = decodeJSON(t, res)
-	items := list["data"].([]any)
-	if len(items) != 1 || items[0].(map[string]any)["filename"] != "foreign.sqlite" ||
-		items[0].(map[string]any)["status"] != "invalid" {
-		t.Fatalf("list after fs change: %v", list)
-	}
+	admin := a.createUser("admin@test.com", "secret1", auth.RoleAdmin)
+	raw, _ := a.issueToken(admin, auth.APIScopeReadWrite, nil)
+	status(t, a.bearer("GET", "/api/backups", nil, raw), 403, "admin API token")
 }

@@ -5,8 +5,6 @@ import (
 	"net/http"
 	"strings"
 	"testing"
-
-	"savvy-go/internal/auth"
 )
 
 func rawBody(t *testing.T, res *http.Response) string {
@@ -21,7 +19,7 @@ func rawBody(t *testing.T, res *http.Response) string {
 
 func TestMoneyIsSerializedAsNumbersAtCurrencyScale(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("wire@test.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("wire@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 
 	mkCurrency := func(code string, decimals int, rate any, base bool) int64 {

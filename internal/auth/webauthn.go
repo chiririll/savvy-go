@@ -14,6 +14,7 @@ import (
 	"savvy-go/internal/config"
 	"savvy-go/internal/db"
 	"savvy-go/internal/db/sqlc"
+	"savvy-go/internal/store"
 
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
@@ -26,7 +27,7 @@ const (
 )
 
 type WebAuthn struct {
-	DB  *sql.DB
+	DB  store.DB
 	Cfg config.Config
 }
 

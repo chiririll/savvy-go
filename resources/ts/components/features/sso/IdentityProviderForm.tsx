@@ -133,7 +133,7 @@ export function IdentityProviderForm({
             enabled: true,
             fields: {},
             role_mapping: [],
-            default_role: 'read-only',
+            default_role: 'user',
             allow_jit: true,
             sync_role_on_login: false,
             link_by_email: true,
@@ -266,8 +266,8 @@ export function IdentityProviderForm({
                                             </SelectTrigger>
                                         </FormControl>
                                         <SelectContent>
-                                            <SelectItem value="read-only">{t('roles.read-only')}</SelectItem>
-                                            <SelectItem value="read-write">{t('roles.read-write')}</SelectItem>
+                                            <SelectItem value="user">{t('roles.user')}</SelectItem>
+                                            <SelectItem value="guest">{t('roles.guest')}</SelectItem>
                                         </SelectContent>
                                     </Select>
                                     <FormDescription>{t('forms:sso.defaultRoleHelp')}</FormDescription>
@@ -337,13 +337,13 @@ export function IdentityProviderForm({
                                 />
                                 <Select
                                     value={form.watch(`role_mapping.${index}.role`)}
-                                    onValueChange={(v) => form.setValue(`role_mapping.${index}.role`, v as 'admin' | 'read-write' | 'read-only')}
+                                    onValueChange={(v) => form.setValue(`role_mapping.${index}.role`, v as 'admin' | 'user' | 'guest')}
                                 >
                                     <SelectTrigger><SelectValue /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="admin">{t('roles.admin')}</SelectItem>
-                                        <SelectItem value="read-write">{t('roles.read-write')}</SelectItem>
-                                        <SelectItem value="read-only">{t('roles.read-only')}</SelectItem>
+                                        <SelectItem value="user">{t('roles.user')}</SelectItem>
+                                        <SelectItem value="guest">{t('roles.guest')}</SelectItem>
                                     </SelectContent>
                                 </Select>
                                 <Button
@@ -369,7 +369,7 @@ export function IdentityProviderForm({
                             variant="outline"
                             size="sm"
                             className="w-full sm:w-auto"
-                            onClick={() => append({ claim: 'groups', operator: 'contains', value: '', role: 'read-only' })}
+                            onClick={() => append({ claim: 'groups', operator: 'contains', value: '', role: 'user' })}
                         >
                             <Plus className="mr-2 size-4" />
                             {t('forms:sso.addRule')}
