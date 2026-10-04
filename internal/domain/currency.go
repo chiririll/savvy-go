@@ -22,9 +22,6 @@ var one = decimal.NewFromInt(1)
 // are fixed when the currency is created.
 var ErrDecimalsImmutable = errors.New("currency decimals cannot be changed")
 
-// rateDivPrecision is the number of fraction digits kept when dividing by a rate.
-const rateDivPrecision = 16
-
 // rateFromFloat converts an externally supplied (API) float rate to a decimal.
 func rateFromFloat(v float64) decimal.Decimal {
 	return decimal.NewFromFloat(v).Round(12)
@@ -51,7 +48,7 @@ func (c Currency) ConvertFromBase(amount decimal.Decimal) decimal.Decimal {
 	if c.IsBase || c.Rate.IsZero() {
 		return amount
 	}
-	return amount.DivRound(c.Rate, rateDivPrecision)
+	return amount.DivRound(c.Rate, money.RateDivPrecision)
 }
 
 // Unit is the scale amounts in this currency are stored in.
@@ -190,7 +187,7 @@ func (s Currencies) SetBase(ctx context.Context, id int64) (*Currency, error) {
 		return nil, err
 	}
 	for _, r := range rows {
-		if err := db.Q(s.DB).UpdateCurrencyRate(ctx, sqlc.UpdateCurrencyRateParams{Rate: r.Rate.DivRound(newRate, rateDivPrecision), ID: r.ID}); err != nil {
+		if err := db.Q(s.DB).UpdateCurrencyRate(ctx, sqlc.UpdateCurrencyRateParams{Rate: r.Rate.DivRound(newRate, money.RateDivPrecision), ID: r.ID}); err != nil {
 			return nil, err
 		}
 	}

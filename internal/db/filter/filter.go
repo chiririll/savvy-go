@@ -11,11 +11,13 @@ import (
 	"github.com/shopspring/decimal"
 
 	"savvy-go/internal/db/sqlc"
+	"savvy-go/internal/money"
 )
 
-// The aggregates below fold several currencies into base-currency major units.
-// Their results stay unrounded decimals so a sum over groups rounds once, at
-// the end, into a money.Money of the base currency (money.FromDecimal).
+// The aggregates below fold amounts of several currencies into one currency.
+// Each row is converted at its currency's rate and the converted values are
+// added unrounded, so a total rounds once, into a money.Money, instead of once
+// per currency group.
 
 // major is minor units of a currency with the given decimals in major units.
 func major(minor, decimals int64) decimal.Decimal {
@@ -200,7 +202,8 @@ func PeriodExpr(groupBy string) string {
 	}
 }
 
-func SumByType(ctx context.Context, sqlDB *sql.DB, w ReportWhere) decimal.Decimal {
+// SumByType is the total of the matching transactions in the base currency.
+func SumByType(ctx context.Context, sqlDB *sql.DB, w ReportWhere, base money.Unit) money.Money {
 	where, args := Clause(w)
 	total := decimal.Zero
 	rows, err := sqlDB.QueryContext(ctx, `
@@ -210,18 +213,18 @@ func SumByType(ctx context.Context, sqlDB *sql.DB, w ReportWhere) decimal.Decima
 		JOIN currencies c ON c.id = a.currency_id
 		`+where+` GROUP BY c.id`, args...)
 	if err != nil {
-		return total
+		return money.Zero(base)
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var minor, decimals int64
 		var rate decimal.Decimal
 		if err := rows.Scan(&minor, &decimals, &rate); err != nil {
-			return decimal.Zero
+			return money.Zero(base)
 		}
 		total = total.Add(toBase(minor, decimals, rate))
 	}
-	return total
+	return money.FromDecimal(total, base)
 }
 
 type CatTotal struct {
@@ -229,10 +232,12 @@ type CatTotal struct {
 	Name  string
 	Icon  sql.NullString
 	Color sql.NullString
-	Total decimal.Decimal
+	Total money.Money
 }
 
-func SumGroupedByCategory(ctx context.Context, sqlDB *sql.DB, w ReportWhere) []CatTotal {
+// SumGroupedByCategory is the total per category in the base currency, largest
+// first.
+func SumGroupedByCategory(ctx context.Context, sqlDB *sql.DB, w ReportWhere, base money.Unit) []CatTotal {
 	where, args := Clause(w)
 	where += ` AND t.category_id IS NOT NULL`
 	rows, err := sqlDB.QueryContext(ctx, `
@@ -248,6 +253,7 @@ func SumGroupedByCategory(ctx context.Context, sqlDB *sql.DB, w ReportWhere) []C
 	}
 	defer rows.Close()
 	var out []CatTotal
+	sums := map[int64]decimal.Decimal{}
 	idx := map[int64]int{}
 	for rows.Next() {
 		var x CatTotal
@@ -256,26 +262,28 @@ func SumGroupedByCategory(ctx context.Context, sqlDB *sql.DB, w ReportWhere) []C
 		if err := rows.Scan(&x.ID, &x.Name, &x.Icon, &x.Color, &minor, &decimals, &rate); err != nil {
 			return nil
 		}
-		base := toBase(minor, decimals, rate)
-		if i, ok := idx[x.ID]; ok {
-			out[i].Total = out[i].Total.Add(base)
-			continue
+		if _, ok := idx[x.ID]; !ok {
+			idx[x.ID] = len(out)
+			out = append(out, x)
 		}
-		x.Total = base
-		idx[x.ID] = len(out)
-		out = append(out, x)
+		sums[x.ID] = sums[x.ID].Add(toBase(minor, decimals, rate))
 	}
-	sort.SliceStable(out, func(i, j int) bool { return out[i].Total.GreaterThan(out[j].Total) })
+	for i := range out {
+		out[i].Total = money.FromDecimal(sums[out[i].ID], base)
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Total.Cmp(out[j].Total) > 0 })
 	return out
 }
 
 type DayTotal struct {
 	Day   string
-	Total decimal.Decimal
+	Total money.Money
 	Count int
 }
 
-func DailyTotals(ctx context.Context, sqlDB *sql.DB, w ReportWhere) []DayTotal {
+// DailyTotals is the total and the number of transactions per day in the base
+// currency.
+func DailyTotals(ctx context.Context, sqlDB *sql.DB, w ReportWhere, base money.Unit) []DayTotal {
 	where, args := Clause(w)
 	rows, err := sqlDB.QueryContext(ctx, `
 		SELECT DATE(t.date), SUM(t.amount), COUNT(*), c.decimals, c.rate
@@ -288,6 +296,7 @@ func DailyTotals(ctx context.Context, sqlDB *sql.DB, w ReportWhere) []DayTotal {
 	}
 	defer rows.Close()
 	var out []DayTotal
+	sums := map[string]decimal.Decimal{}
 	idx := map[string]int{}
 	for rows.Next() {
 		var day string
@@ -297,24 +306,29 @@ func DailyTotals(ctx context.Context, sqlDB *sql.DB, w ReportWhere) []DayTotal {
 		if err := rows.Scan(&day, &minor, &count, &decimals, &rate); err != nil {
 			return nil
 		}
-		base := toBase(minor, decimals, rate)
-		if i, ok := idx[day]; ok {
-			out[i].Total = out[i].Total.Add(base)
-			out[i].Count += count
-			continue
+		i, ok := idx[day]
+		if !ok {
+			i = len(out)
+			idx[day] = i
+			out = append(out, DayTotal{Day: day})
 		}
-		idx[day] = len(out)
-		out = append(out, DayTotal{Day: day, Total: base, Count: count})
+		out[i].Count += count
+		sums[day] = sums[day].Add(toBase(minor, decimals, rate))
+	}
+	for i := range out {
+		out[i].Total = money.FromDecimal(sums[out[i].Day], base)
 	}
 	return out
 }
 
 type PeriodTotal struct {
 	Key   string
-	Total decimal.Decimal
+	Total money.Money
 }
 
-func GroupedByPeriod(ctx context.Context, sqlDB *sql.DB, w ReportWhere, groupBy string) []PeriodTotal {
+// GroupedByPeriod is the total per period (see PeriodExpr) in the base
+// currency.
+func GroupedByPeriod(ctx context.Context, sqlDB *sql.DB, w ReportWhere, groupBy string, base money.Unit) []PeriodTotal {
 	where, args := Clause(w)
 	rows, err := sqlDB.QueryContext(ctx, `
 		SELECT `+PeriodExpr(groupBy)+` as period_date, SUM(t.amount), c.decimals, c.rate
@@ -327,6 +341,7 @@ func GroupedByPeriod(ctx context.Context, sqlDB *sql.DB, w ReportWhere, groupBy 
 	}
 	defer rows.Close()
 	var out []PeriodTotal
+	sums := map[string]decimal.Decimal{}
 	idx := map[string]int{}
 	for rows.Next() {
 		var key string
@@ -335,22 +350,24 @@ func GroupedByPeriod(ctx context.Context, sqlDB *sql.DB, w ReportWhere, groupBy 
 		if err := rows.Scan(&key, &minor, &decimals, &rate); err != nil {
 			return nil
 		}
-		base := toBase(minor, decimals, rate)
-		if i, ok := idx[key]; ok {
-			out[i].Total = out[i].Total.Add(base)
-			continue
+		if _, ok := idx[key]; !ok {
+			idx[key] = len(out)
+			out = append(out, PeriodTotal{Key: key})
 		}
-		idx[key] = len(out)
-		out = append(out, PeriodTotal{Key: key, Total: base})
+		sums[key] = sums[key].Add(toBase(minor, decimals, rate))
+	}
+	for i := range out {
+		out[i].Total = money.FromDecimal(sums[out[i].Key], base)
 	}
 	return out
 }
 
+// TopRow is one transaction; Amount is converted to the base currency.
 type TopRow struct {
 	ID          int64
 	Description sql.NullString
 	Date        sql.NullString
-	Amount      decimal.Decimal
+	Amount      money.Money
 	CatID       sql.NullInt64
 	CatName     sql.NullString
 	Icon        sql.NullString
@@ -359,7 +376,8 @@ type TopRow struct {
 	AccName     sql.NullString
 }
 
-func TopTransactions(ctx context.Context, sqlDB *sql.DB, w ReportWhere, limit int) []TopRow {
+// TopTransactions are the largest transactions by value in the base currency.
+func TopTransactions(ctx context.Context, sqlDB *sql.DB, w ReportWhere, limit int, base money.Unit) []TopRow {
 	where, args := Clause(w)
 	args = append(args, limit)
 	rows, err := sqlDB.QueryContext(ctx, `
@@ -382,22 +400,22 @@ func TopTransactions(ctx context.Context, sqlDB *sql.DB, w ReportWhere, limit in
 		if err := rows.Scan(&x.ID, &x.Description, &x.Date, &minor, &decimals, &rate, &x.CatID, &x.CatName, &x.Icon, &x.Color, &x.AccID, &x.AccName); err != nil {
 			continue
 		}
-		x.Amount = toBase(minor, decimals, rate)
+		x.Amount = money.FromDecimal(toBase(minor, decimals, rate), base)
 		out = append(out, x)
 	}
 	return out
 }
 
-// BudgetAmount is a budget limit in major units of its own currency plus that
-// currency's rate to base.
+// BudgetAmount is a budget limit in the budget's own currency. Rate is that
+// currency's rate to the base currency, for callers that fold budgets together.
 type BudgetAmount struct {
-	Amount decimal.Decimal
+	Amount money.Money
 	Rate   decimal.Decimal
 	IsBase bool
 }
 
 func ScopedMonthlyBudgets(ctx context.Context, sqlDB *sql.DB, categoryIDs, tagIDs []int64) []BudgetAmount {
-	q := `SELECT b.amount, c.rate, c.is_base, c.decimals FROM budgets b
+	q := `SELECT b.amount, c.rate, c.is_base, c.id, c.decimals FROM budgets b
 		JOIN currencies c ON c.id = b.currency_id
 		WHERE b.is_active = 1 AND b.period = 'monthly' AND b.is_global = 0 AND (`
 	var args []any
@@ -426,20 +444,23 @@ func scanBudgetAmounts(ctx context.Context, sqlDB *sql.DB, q string, args []any)
 	defer rows.Close()
 	var out []BudgetAmount
 	for rows.Next() {
-		var minor, base, decimals int64
+		var minor, base, currencyID, decimals int64
 		var rate decimal.Decimal
-		if err := rows.Scan(&minor, &rate, &base, &decimals); err != nil {
+		if err := rows.Scan(&minor, &rate, &base, &currencyID, &decimals); err != nil {
 			return nil
 		}
-		out = append(out, BudgetAmount{Amount: major(minor, decimals), Rate: rate, IsBase: base != 0})
+		unit := money.Unit{ID: currencyID, Decimals: int(decimals)}
+		out = append(out, BudgetAmount{Amount: money.New(minor, unit), Rate: rate, IsBase: base != 0})
 	}
 	return out
 }
 
-// BudgetSpent sums confirmed expenses in [start,end] converted to base,
-// optionally scoped by category/tag IN lists. Variable-length IN cannot be a
+// BudgetSpent sums confirmed expenses in [start,end], optionally scoped by
+// category/tag IN lists, expressed in the currency `in` whose rate to the base
+// currency is inRate (1 when it is the base). Variable-length IN cannot be a
 // single sqlc query.
-func BudgetSpent(ctx context.Context, sqlDB *sql.DB, start, end string, categoryIDs, tagIDs []int64) (decimal.Decimal, error) {
+func BudgetSpent(ctx context.Context, sqlDB *sql.DB, start, end string, categoryIDs, tagIDs []int64, in money.Unit, inRate decimal.Decimal) (money.Money, error) {
+	zero := money.Zero(in)
 	q := `
 		SELECT COALESCE(SUM(t.amount), 0), c.decimals, c.rate
 		FROM transactions t
@@ -450,7 +471,7 @@ func BudgetSpent(ctx context.Context, sqlDB *sql.DB, start, end string, category
 	args := []any{start, end}
 	if categoryIDs != nil {
 		if len(categoryIDs) == 0 {
-			return decimal.Zero, nil
+			return zero, nil
 		}
 		q += ` AND t.category_id IN (` + Placeholders(len(categoryIDs)) + `)`
 		for _, id := range categoryIDs {
@@ -468,7 +489,7 @@ func BudgetSpent(ctx context.Context, sqlDB *sql.DB, start, end string, category
 	q += ` GROUP BY c.id`
 	rows, err := sqlDB.QueryContext(ctx, q, args...)
 	if err != nil {
-		return decimal.Zero, err
+		return zero, err
 	}
 	defer rows.Close()
 	total := decimal.Zero
@@ -476,9 +497,12 @@ func BudgetSpent(ctx context.Context, sqlDB *sql.DB, start, end string, category
 		var minor, decimals int64
 		var rate decimal.Decimal
 		if err := rows.Scan(&minor, &decimals, &rate); err != nil {
-			return decimal.Zero, err
+			return zero, err
 		}
 		total = total.Add(toBase(minor, decimals, rate))
 	}
-	return total, rows.Err()
+	if err := rows.Err(); err != nil {
+		return zero, err
+	}
+	return money.FromDecimal(total.DivRound(inRate, money.RateDivPrecision), in), nil
 }

@@ -208,11 +208,11 @@ func (s Budgets) spent(ctx context.Context, b *Budget, start, end time.Time) mon
 	for _, t := range b.Tags {
 		tagIDs = append(tagIDs, t.ID)
 	}
-	total, err := filter.BudgetSpent(ctx, s.DB, start.Format("2006-01-02"), end.Format("2006-01-02"), catIDs, tagIDs)
+	spent, err := filter.BudgetSpent(ctx, s.DB, start.Format("2006-01-02"), end.Format("2006-01-02"), catIDs, tagIDs, unit, targetRate)
 	if err != nil {
 		return money.Zero(unit)
 	}
-	return money.FromDecimal(total.DivRound(targetRate, rateDivPrecision), unit)
+	return spent
 }
 
 // resolveCurrency returns the unit of the budget currency (base when unset).

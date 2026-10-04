@@ -821,7 +821,7 @@ func (p *arithParser) parseTerm() (decimal.Decimal, error) {
 		} else if r.IsZero() {
 			return decimal.Zero, fmt.Errorf("div0")
 		} else {
-			v = v.DivRound(r, rateDivPrecision)
+			v = v.DivRound(r, money.RateDivPrecision)
 		}
 	}
 }

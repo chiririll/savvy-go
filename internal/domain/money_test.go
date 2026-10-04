@@ -124,18 +124,55 @@ func TestCrossCurrencyReportSumsFoldToBase(t *testing.T) {
 	e.tx(t, "expense", e.jpyAcc.ID, "500")
 	e.tx(t, "expense", e.btcAcc.ID, "0.0001")
 
+	base := e.usd.Unit()
 	w := filter.ReportWhere{Type: "expense", Start: "2024-01-01", End: "2024-01-31"}
 	// 10.00 + 500*0.01 + 0.0001*50000 = 20
-	if got := filter.SumByType(e.ctx, e.db, w); !got.Equal(dec("20")) {
-		t.Fatalf("SumByType = %s, want 20", got)
+	if got := filter.SumByType(e.ctx, e.db, w, base); !got.Equal(money.FromDecimal(dec("20"), base)) {
+		t.Fatalf("SumByType = %s (%+v), want 20 in the base currency", got, got.Unit())
 	}
-	days := filter.DailyTotals(e.ctx, e.db, w)
-	if len(days) != 1 || !days[0].Total.Equal(dec("20")) || days[0].Count != 3 {
+	days := filter.DailyTotals(e.ctx, e.db, w, base)
+	if len(days) != 1 || !days[0].Total.Equal(money.FromDecimal(dec("20"), base)) || days[0].Count != 3 {
 		t.Fatalf("DailyTotals = %+v", days)
 	}
-	top := filter.TopTransactions(e.ctx, e.db, w, 2)
-	if len(top) != 2 || !top[0].Amount.Equal(dec("10")) || !top[1].Amount.Equal(dec("5")) {
+	top := filter.TopTransactions(e.ctx, e.db, w, 2, base)
+	if len(top) != 2 || !top[0].Amount.Equal(money.FromDecimal(dec("10"), base)) || !top[1].Amount.Equal(money.FromDecimal(dec("5"), base)) {
 		t.Fatalf("TopTransactions = %+v", top)
+	}
+}
+
+// Currencies are folded unrounded and rounded once: three JPY amounts of 0.004
+// USD each are worth 0.012 together (0.01), but 0 when rounded one by one.
+func TestReportSumRoundsOnceAfterFolding(t *testing.T) {
+	e := newMoneyEnv(t)
+	cheap, err := (Currencies{DB: e.db}).Create(e.ctx, Currency{Code: "XXX", Name: "XXX", Symbol: "X", Decimals: 3, Rate: dec("0.001")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	acct, err := (Accounts{DB: e.db}).Create(e.ctx, AccountInput{Name: "x", Type: "cash", CurrencyID: cheap.ID, IsActive: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 3; i++ {
+		e.tx(t, "expense", acct.ID, "4.000") // 0.004 USD each
+	}
+	base := e.usd.Unit()
+	w := filter.ReportWhere{Type: "expense", Start: "2024-01-01", End: "2024-01-31"}
+	if got := filter.SumByType(e.ctx, e.db, w, base); got.Minor() != 1 {
+		t.Fatalf("SumByType = %s, want 0.01", got)
+	}
+}
+
+func TestBudgetSpentIsInTheBudgetCurrency(t *testing.T) {
+	e := newMoneyEnv(t)
+	e.tx(t, "expense", e.usdAcc.ID, "10.00") // 10 USD
+	e.tx(t, "expense", e.jpyAcc.ID, "500")   // 5 USD
+	spent, err := filter.BudgetSpent(e.ctx, e.db, "2024-01-01", "2024-01-31", nil, nil, e.jpy.Unit(), e.jpy.Rate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 15 USD at 0.01 USD per JPY is 1500 JPY.
+	if !spent.Equal(money.FromDecimal(dec("1500"), e.jpy.Unit())) {
+		t.Fatalf("spent = %s (%+v), want 1500 JPY", spent, spent.Unit())
 	}
 }
 

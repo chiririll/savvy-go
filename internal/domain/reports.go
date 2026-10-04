@@ -370,8 +370,8 @@ func (s Reports) CategorySummary(ctx context.Context, f ReportFilter, typ string
 	unit := s.baseUnit(ctx)
 	out := []Category{}
 	total := money.Zero(unit)
-	for _, x := range filter.SumGroupedByCategory(ctx, s.DB, s.where(typ, f.Range(s.now()), f, 0)) {
-		amount := money.FromDecimal(x.Total, unit)
+	for _, x := range filter.SumGroupedByCategory(ctx, s.DB, s.where(typ, f.Range(s.now()), f, 0), unit) {
+		amount := x.Total
 		out = append(out, Category{
 			ID: x.ID, Name: x.Name, Type: typ,
 			Icon: ptrTo(coalesce(x.Icon.String, "circle")), Color: ptrTo(coalesce(x.Color.String, "#64748b")),
@@ -544,7 +544,7 @@ func (s Reports) TxTop(ctx context.Context, f ReportFilter, typ string, limit in
 		limit = 10
 	}
 	r := f.Range(s.now())
-	rows := filter.TopTransactions(ctx, s.DB, s.where(typ, r, f, 0), limit)
+	rows := filter.TopTransactions(ctx, s.DB, s.where(typ, r, f, 0), limit, s.baseUnit(ctx))
 	var items []map[string]any
 	for _, x := range rows {
 		var cat any
@@ -555,7 +555,7 @@ func (s Reports) TxTop(ctx context.Context, f ReportFilter, typ string, limit in
 			}
 		}
 		items = append(items, map[string]any{
-			"id": x.ID, "description": nilOr(x.Description.String), "amount": round2(x.Amount.InexactFloat64()), "date": x.Date.String,
+			"id": x.ID, "description": nilOr(x.Description.String), "amount": x.Amount.Decimal().InexactFloat64(), "date": x.Date.String,
 			"category": cat, "account": map[string]any{"id": x.AccID, "name": x.AccName.String},
 		})
 	}
@@ -674,16 +674,16 @@ type dayTotal struct {
 }
 
 func (s Reports) sumByType(ctx context.Context, typ string, r dateRange, f ReportFilter, categoryID int64) float64 {
-	return filter.SumByType(ctx, s.DB, s.where(typ, r, f, categoryID)).InexactFloat64()
+	return filter.SumByType(ctx, s.DB, s.where(typ, r, f, categoryID), s.baseUnit(ctx)).Decimal().InexactFloat64()
 }
 
 func (s Reports) sumGroupedByCategory(ctx context.Context, typ string, r dateRange, f ReportFilter) []catTotal {
-	rows := filter.SumGroupedByCategory(ctx, s.DB, s.where(typ, r, f, 0))
+	rows := filter.SumGroupedByCategory(ctx, s.DB, s.where(typ, r, f, 0), s.baseUnit(ctx))
 	var out []catTotal
 	for _, x := range rows {
 		out = append(out, catTotal{
 			ID: x.ID, Name: x.Name, Icon: coalesce(x.Icon.String, "circle"),
-			Color: coalesce(x.Color.String, "#64748b"), Total: round2(x.Total.InexactFloat64()),
+			Color: coalesce(x.Color.String, "#64748b"), Total: x.Total.Decimal().InexactFloat64(),
 		})
 	}
 	return out
@@ -691,16 +691,16 @@ func (s Reports) sumGroupedByCategory(ctx context.Context, typ string, r dateRan
 
 func (s Reports) dailyTotals(ctx context.Context, typ string, r dateRange, f ReportFilter) map[string]dayTotal {
 	out := map[string]dayTotal{}
-	for _, x := range filter.DailyTotals(ctx, s.DB, s.where(typ, r, f, 0)) {
-		out[x.Day] = dayTotal{Total: round2(x.Total.InexactFloat64()), Count: x.Count}
+	for _, x := range filter.DailyTotals(ctx, s.DB, s.where(typ, r, f, 0), s.baseUnit(ctx)) {
+		out[x.Day] = dayTotal{Total: x.Total.Decimal().InexactFloat64(), Count: x.Count}
 	}
 	return out
 }
 
 func (s Reports) groupedByPeriod(ctx context.Context, typ string, r dateRange, f ReportFilter, groupBy string, categoryID int64) map[string]float64 {
 	out := map[string]float64{}
-	for _, x := range filter.GroupedByPeriod(ctx, s.DB, s.where(typ, r, f, categoryID), groupBy) {
-		out[x.Key] = x.Total.InexactFloat64()
+	for _, x := range filter.GroupedByPeriod(ctx, s.DB, s.where(typ, r, f, categoryID), groupBy, s.baseUnit(ctx)) {
+		out[x.Key] = x.Total.Decimal().InexactFloat64()
 	}
 	return out
 }
@@ -731,7 +731,7 @@ func (s Reports) monthlyBudget(ctx context.Context, f ReportFilter) any {
 	rows := filter.ScopedMonthlyBudgets(ctx, s.DB, f.CategoryIDs, f.TagIDs)
 	total := decimal.Zero
 	for _, r := range rows {
-		total = total.Add(budgetToBase(r.Amount, r.Rate, r.IsBase))
+		total = total.Add(budgetToBase(r.Amount.Decimal(), r.Rate, r.IsBase))
 	}
 	if total.IsPositive() {
 		return total.InexactFloat64()

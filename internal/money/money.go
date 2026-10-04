@@ -14,6 +14,10 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+// RateDivPrecision is the number of fraction digits kept when dividing an
+// amount by a currency rate.
+const RateDivPrecision = 16
+
 // Unit identifies a currency and its scale: 10^Decimals minor units make one
 // major unit. Two amounts are in the same currency exactly when their units
 // are equal.
