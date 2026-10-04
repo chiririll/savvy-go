@@ -3,6 +3,7 @@ package httpserver
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -173,4 +174,181 @@ func TestAPITokensDeletedWithUser(t *testing.T) {
 	if n != 0 {
 		t.Fatalf("tokens left: %d", n)
 	}
+}
+
+func TestAPITokenRevokeAndListAreScopedToOwner(t *testing.T) {
+	a := newTestApp(t)
+	alice := a.createUser("alice@a.com", "secret1", auth.RoleReadWrite)
+	bob := a.createUser("bob@a.com", "secret1", auth.RoleReadWrite)
+	aliceRaw, aliceTok := a.issueToken(alice, auth.APIScopeRead, nil)
+	a.issueToken(bob, auth.APIScopeRead, nil)
+	sess := a.issue(bob, false)
+
+	items := decodeJSON(t, a.do("GET", "/api/auth/api-tokens", nil, sess.Token, ""))["data"].([]any)
+	if len(items) != 1 {
+		t.Fatalf("bob sees %d tokens", len(items))
+	}
+	id := strconv.FormatInt(aliceTok.ID, 10)
+	status(t, a.do("DELETE", "/api/auth/api-tokens/"+id, nil, sess.Token, sess.CSRF), 404, "revoke foreign token")
+	status(t, a.bearer("GET", "/api/accounts", nil, aliceRaw), 200, "foreign token still valid")
+}
+
+func TestAPITokenDemotedUserLosesWrite(t *testing.T) {
+	a := newTestApp(t)
+	u := a.createUser("rw@a.com", "secret1", auth.RoleReadWrite)
+	raw, _ := a.issueToken(u, auth.APIScopeReadWrite, nil)
+	if err := a.s.users.SetRole(context.Background(), u.ID, auth.RoleReadOnly); err != nil {
+		t.Fatal(err)
+	}
+
+	status(t, a.bearer("GET", "/api/tags", nil, raw), 200, "demoted GET")
+	status(t, a.bearer("POST", "/api/tags", map[string]any{"name": "nope"}, raw), 403, "demoted POST")
+}
+
+func TestAPITokenStoreValidation(t *testing.T) {
+	a := newTestApp(t)
+	u := a.createUser("rw@a.com", "secret1", auth.RoleReadWrite)
+	sess := a.issue(u, false)
+	long := make([]byte, 101)
+	for i := range long {
+		long[i] = 'x'
+	}
+
+	cases := []struct {
+		label string
+		body  any
+		field string
+	}{
+		{"empty name", map[string]any{"name": "  "}, "name"},
+		{"long name", map[string]any{"name": string(long)}, "name"},
+		{"unknown scope", map[string]any{"name": "x", "scope": "admin"}, "scope"},
+		{"past expiry", map[string]any{"name": "x", "expires_at": time.Now().Add(-time.Hour).Format(time.RFC3339)}, "expires_at"},
+		{"bad expiry", map[string]any{"name": "x", "expires_at": "2030-01-01"}, "expires_at"},
+		{"malformed body", "not an object", "name"},
+	}
+	for _, c := range cases {
+		res := a.do("POST", "/api/auth/api-tokens", c.body, sess.Token, sess.CSRF)
+		if res.StatusCode != http.StatusUnprocessableEntity {
+			res.Body.Close()
+			t.Fatalf("%s: got %d want 422", c.label, res.StatusCode)
+		}
+		errs, _ := decodeJSON(t, res)["errors"].(map[string]any)
+		if _, ok := errs[c.field]; !ok {
+			t.Fatalf("%s: no error for %q in %v", c.label, c.field, errs)
+		}
+	}
+
+	var n int
+	_ = a.db.QueryRow(`SELECT COUNT(*) FROM api_tokens`).Scan(&n)
+	if n != 0 {
+		t.Fatalf("invalid requests created %d tokens", n)
+	}
+}
+
+func TestAPITokenDefaultScopeAndFutureExpiry(t *testing.T) {
+	a := newTestApp(t)
+	u := a.createUser("rw@a.com", "secret1", auth.RoleReadWrite)
+	sess := a.issue(u, false)
+	exp := time.Now().Add(24 * time.Hour).Truncate(time.Second)
+
+	res := a.do("POST", "/api/auth/api-tokens", map[string]any{"name": "ci", "expires_at": exp.Format(time.RFC3339)}, sess.Token, sess.CSRF)
+	if res.StatusCode != http.StatusCreated {
+		t.Fatalf("create %d", res.StatusCode)
+	}
+	data := decodeJSON(t, res)["data"].(map[string]any)
+	if data["scope"] != auth.APIScopeRead {
+		t.Fatalf("default scope %v", data["scope"])
+	}
+	if data["expires_at"] != exp.UTC().Format(time.RFC3339) {
+		t.Fatalf("expires_at %v", data["expires_at"])
+	}
+	status(t, a.bearer("GET", "/api/accounts", nil, data["token"].(string)), 200, "unexpired token")
+}
+
+func TestAPITokenLimit(t *testing.T) {
+	a := newTestApp(t)
+	u := a.createUser("rw@a.com", "secret1", auth.RoleReadWrite)
+	for range 50 {
+		a.issueToken(u, auth.APIScopeRead, nil)
+	}
+	sess := a.issue(u, false)
+
+	status(t, a.do("POST", "/api/auth/api-tokens", map[string]any{"name": "51st"}, sess.Token, sess.CSRF), 422, "over limit")
+	if _, _, err := a.s.apiTokens.Issue(context.Background(), u, "x", auth.APIScopeRead, nil); err != auth.ErrTokenLimit {
+		t.Fatalf("issue over limit: %v", err)
+	}
+}
+
+func TestAPITokenTouchesLastUsed(t *testing.T) {
+	a := newTestApp(t)
+	u := a.createUser("rw@a.com", "secret1", auth.RoleReadWrite)
+	raw, tok := a.issueToken(u, auth.APIScopeRead, nil)
+	lastUsed := func() string {
+		var v sql.NullString
+		if err := a.db.QueryRow(`SELECT last_used_at FROM api_tokens WHERE id = ?`, tok.ID).Scan(&v); err != nil {
+			t.Fatal(err)
+		}
+		return v.String
+	}
+	setLastUsed := func(ago time.Duration) string {
+		v := time.Now().Add(-ago).UTC().Format(time.RFC3339Nano)
+		if _, err := a.db.Exec(`UPDATE api_tokens SET last_used_at = ? WHERE id = ?`, v, tok.ID); err != nil {
+			t.Fatal(err)
+		}
+		return v
+	}
+
+	status(t, a.bearer("GET", "/api/accounts", nil, raw), 200, "first use")
+	if lastUsed() == "" {
+		t.Fatal("last_used_at not set on first use")
+	}
+
+	recent := setLastUsed(30 * time.Second)
+	status(t, a.bearer("GET", "/api/accounts", nil, raw), 200, "recent use")
+	if lastUsed() != recent {
+		t.Fatal("last_used_at rewritten within the touch interval")
+	}
+
+	stale := setLastUsed(2 * time.Minute)
+	status(t, a.bearer("GET", "/api/accounts", nil, raw), 200, "stale use")
+	if lastUsed() == stale {
+		t.Fatal("last_used_at not refreshed after the touch interval")
+	}
+}
+
+func TestAPITokenMalformedAuthorizationHeader(t *testing.T) {
+	a := newTestApp(t)
+	u := a.createUser("rw@a.com", "secret1", auth.RoleReadWrite)
+	sess := a.issue(u, false)
+
+	for _, h := range []string{"Basic dXNlcjpwYXNz", "Bearer", "Bearer   ", "svy_nobearerprefix"} {
+		req, _ := http.NewRequest("GET", a.srv.URL+"/api/accounts", nil)
+		req.AddCookie(&http.Cookie{Name: "svy_session", Value: sess.Token})
+		req.Header.Set("Authorization", h)
+		res, err := a.client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		status(t, res, 401, "Authorization: "+h)
+	}
+}
+
+func TestAPITokenForbiddenOnCredentialRoutes(t *testing.T) {
+	a := newTestApp(t)
+	u := a.createUser("rw@a.com", "secret1", auth.RoleReadWrite)
+	raw, _ := a.issueToken(u, auth.APIScopeReadWrite, nil)
+	sess := a.issue(u, false)
+
+	status(t, a.bearer("POST", "/api/auth/logout", nil, raw), 403, "logout")
+	status(t, a.bearer("POST", "/api/auth/logout-others", nil, raw), 403, "logout others")
+	status(t, a.bearer("PUT", "/api/auth/password", map[string]any{"current_password": "secret1", "password": "secret2", "password_confirmation": "secret2"}, raw), 403, "change password")
+	status(t, a.bearer("GET", "/api/auth/2fa/status", nil, raw), 403, "2fa status")
+	status(t, a.bearer("GET", "/api/auth/webauthn/credentials", nil, raw), 403, "webauthn list")
+	status(t, a.bearer("DELETE", "/api/auth/webauthn/credentials/1", nil, raw), 403, "webauthn delete")
+	status(t, a.bearer("DELETE", "/api/auth/api-tokens/1", nil, raw), 403, "revoke via token")
+	status(t, a.bearer("POST", "/api/backups", nil, raw), 403, "backup create")
+	status(t, a.bearer("DELETE", "/api/backups/x.sqlite", nil, raw), 403, "backup delete")
+
+	// The blocked logout-others must have left existing sessions intact.
+	status(t, a.do("GET", "/api/accounts", nil, sess.Token, ""), 200, "session still valid")
 }
