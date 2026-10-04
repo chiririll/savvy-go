@@ -291,17 +291,23 @@
         "note": "Note",
         "actions": "Actions",
         "versionUnknown": "Unknown",
-        "schemaStatus": {
+        "versionLaravel": "Laravel",
+        "status": {
             "current": "Matches this app",
             "outdated": "From an older version",
             "newer": "Needs a newer app",
-            "unknown": "Version unknown"
+            "legacy": "Laravel backup",
+            "legacyUnsupported": "Old Laravel backup",
+            "invalid": "Unreadable"
         },
-        "schemaStatusHelp": {
+        "statusHelp": {
             "current": "This backup’s schema matches the running app.",
-            "outdated": "This backup is older. Restore will apply pending migrations.",
-            "newer": "This backup was made with a newer app and cannot be restored here.",
-            "unknown": "Could not determine this backup’s schema."
+            "outdated_one": "This backup is {{count}} migration behind. Savvy will apply it after restore — otherwise the app will not run. The backup file is not changed.",
+            "outdated_other": "This backup is {{count}} migrations behind. Savvy will apply them after restore — otherwise the app will not run. The backup file is not changed.",
+            "newer": "This backup is from a newer version of the app. Restore it on that version, or upgrade Savvy first.",
+            "legacy": "This backup comes from the Laravel app. Savvy will convert it during restore. The backup file is not changed.",
+            "legacyUnsupported": "This backup is from an older version of the Laravel app. Update the Laravel app to its latest version, create a new backup and restore that one.",
+            "invalid": "This file is not a database Savvy can read."
         },
         "empty": "No backups yet. Create your first backup to get started.",
         "download": "Download",
@@ -316,10 +322,6 @@
         "uploadNotePlaceholder": "e.g., Backup from old device",
         "restoreTitle": "Restore Backup?",
         "restoreDescription": "This will replace all current data with the backup from {{date}}. This action cannot be undone.",
-        "restoreNewerTitle": "Cannot restore this backup",
-        "restoreNewerDescription": "This backup is from a newer version of the app. Restore it on that version, or upgrade Savvy first.",
-        "restoreMigrationsDescription_one": "This backup is {{count}} migration behind. Savvy will apply it after restore — otherwise the app will not run. The backup file is not changed.",
-        "restoreMigrationsDescription_other": "This backup is {{count}} migrations behind. Savvy will apply them after restore — otherwise the app will not run. The backup file is not changed.",
         "deleteTitle": "Delete Backup?",
         "deleteDescription": "This will permanently delete the backup from {{date}}."
     }

@@ -3,12 +3,16 @@ package domain
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
+
+	"github.com/shopspring/decimal"
 
 	"savvy-go/internal/db"
 	"savvy-go/internal/db/filter"
 	"savvy-go/internal/db/sqlc"
+	"savvy-go/internal/money"
 )
 
 // appLocation is the timezone used for calendar-day concepts across this
@@ -25,49 +29,57 @@ func SetLocation(loc *time.Location) {
 	}
 }
 
+// TxItem is a line of a transaction, priced in the currency of its account.
 type TxItem struct {
 	ID           int64
 	Name         string
-	Quantity     float64
-	PricePerUnit float64
-	TotalPrice   float64
+	Quantity     decimal.Decimal
+	PricePerUnit money.Money
+	TotalPrice   money.Money
+}
+
+// TxItemInput is a line as entered. TotalPrice is Quantity times PricePerUnit
+// when zero.
+type TxItemInput struct {
+	Name         string
+	Quantity     decimal.Decimal
+	PricePerUnit decimal.Decimal
+	TotalPrice   decimal.Decimal
 }
 
 type Transaction struct {
-	ID           int64
-	Type         string
-	AccountID    int64
-	ToAccountID  *int64
-	CategoryID   *int64
-	Amount       float64
-	ToAmount     *float64
-	ExchangeRate *float64
-	Description  *string
-	Date         *string
-	Status       string
-	RecurringID  *int64
-	CreatedAt    *time.Time
-	Account      *Account
-	ToAccount    *Account
-	Category     *Category
-	Items        []TxItem
-	Tags         []Tag
+	ID          int64
+	Type        string
+	AccountID   int64
+	ToAccountID *int64
+	CategoryID  *int64
+	Amount      money.Money  // in the currency of Account
+	ToAmount    *money.Money // in the currency of ToAccount
+	Description *string
+	Date        *string
+	Status      string
+	RecurringID *int64
+	CreatedAt   *time.Time
+	Account     *Account
+	ToAccount   *Account
+	Category    *Category
+	Items       []TxItem
+	Tags        []Tag
 }
 
 type TxInput struct {
-	Type         string
-	AccountID    int64
-	ToAccountID  *int64
-	CategoryID   *int64
-	Amount       float64
-	ToAmount     *float64
-	ExchangeRate *float64
-	Description  *string
-	Date         *string
-	Status       *string
-	RecurringID  *int64
-	TagIDs       []int64
-	Items        []TxItem
+	Type        string
+	AccountID   int64
+	ToAccountID *int64
+	CategoryID  *int64
+	Amount      decimal.Decimal
+	ToAmount    *decimal.Decimal
+	Description *string
+	Date        *string
+	Status      *string
+	RecurringID *int64
+	TagIDs      []int64
+	Items       []TxItemInput
 }
 
 type Transactions struct{ DB *sql.DB }
@@ -87,23 +99,27 @@ func (s Transactions) Create(ctx context.Context, in TxInput) (*Transaction, err
 			return nil, fmt.Errorf("future")
 		}
 	}
-	if in.Type == "transfer" && in.ToAccountID != nil && in.ToAmount == nil {
-		amt := in.Amount
-		in.ToAmount = &amt
-	}
 	now := time.Now().UTC().Format(time.RFC3339)
+	amount, toAmount, err := s.amounts(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	items, err := itemRows(in.Items, amount.Unit())
+	if err != nil {
+		return nil, err
+	}
 	res, err := db.Q(s.DB).InsertTransaction(ctx, sqlc.InsertTransactionParams{
 		Type: in.Type, AccountID: in.AccountID, ToAccountID: db.NullInt64(in.ToAccountID),
-		CategoryID: db.NullInt64(in.CategoryID), Amount: in.Amount, ToAmount: db.NullFloat64(in.ToAmount),
-		ExchangeRate: db.NullFloat64(in.ExchangeRate), Description: db.NullString(in.Description),
-		Date: db.NullString(in.Date), Status: status, RecurringTransactionID: db.NullInt64(in.RecurringID),
+		CategoryID: db.NullInt64(in.CategoryID), Amount: amount.Minor(), ToAmount: money.ToNullMinor(toAmount),
+		Description: db.NullString(in.Description),
+		Date:        db.NullString(in.Date), Status: status, RecurringTransactionID: db.NullInt64(in.RecurringID),
 		CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
 	})
 	if err != nil {
 		return nil, err
 	}
 	id, _ := res.LastInsertId()
-	if err := s.saveItems(ctx, id, in.Items); err != nil {
+	if err := s.saveItems(ctx, id, items); err != nil {
 		return nil, err
 	}
 	if err := s.saveTags(ctx, id, in.TagIDs); err != nil {
@@ -121,18 +137,26 @@ func (s Transactions) Update(ctx context.Context, id int64, in TxInput) (*Transa
 		return nil, fmt.Errorf("cannot edit")
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
+	amount, toAmount, err := s.amounts(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	items, err := itemRows(in.Items, amount.Unit())
+	if err != nil {
+		return nil, err
+	}
 	err = db.Q(s.DB).UpdateTransaction(ctx, sqlc.UpdateTransactionParams{
 		Type: in.Type, AccountID: in.AccountID, ToAccountID: db.NullInt64(in.ToAccountID),
-		CategoryID: db.NullInt64(in.CategoryID), Amount: in.Amount, ToAmount: db.NullFloat64(in.ToAmount),
-		ExchangeRate: db.NullFloat64(in.ExchangeRate), Description: db.NullString(in.Description),
-		Date: db.NullString(in.Date), UpdatedAt: db.NS(now), ID: id,
+		CategoryID: db.NullInt64(in.CategoryID), Amount: amount.Minor(), ToAmount: money.ToNullMinor(toAmount),
+		Description: db.NullString(in.Description),
+		Date:        db.NullString(in.Date), UpdatedAt: db.NS(now), ID: id,
 	})
 	if err != nil {
 		return nil, err
 	}
 	if in.Items != nil {
 		_ = db.Q(s.DB).DeleteTransactionItems(ctx, id)
-		if err := s.saveItems(ctx, id, in.Items); err != nil {
+		if err := s.saveItems(ctx, id, items); err != nil {
 			return nil, err
 		}
 	}
@@ -207,9 +231,18 @@ func (s Transactions) Duplicate(ctx context.Context, id int64) (*Transaction, er
 	today := time.Now().In(appLocation).Format("2006-01-02")
 	in := TxInput{
 		Type: cur.Type, AccountID: cur.AccountID, ToAccountID: cur.ToAccountID,
-		CategoryID: cur.CategoryID, Amount: cur.Amount, ToAmount: cur.ToAmount,
-		ExchangeRate: cur.ExchangeRate, Description: cur.Description, Date: &today,
-		Items: cur.Items,
+		CategoryID: cur.CategoryID, Amount: cur.Amount.Decimal(),
+		Description: cur.Description, Date: &today,
+	}
+	if cur.ToAmount != nil {
+		d := cur.ToAmount.Decimal()
+		in.ToAmount = &d
+	}
+	for _, it := range cur.Items {
+		in.Items = append(in.Items, TxItemInput{
+			Name: it.Name, Quantity: it.Quantity,
+			PricePerUnit: it.PricePerUnit.Decimal(), TotalPrice: it.TotalPrice.Decimal(),
+		})
 	}
 	for _, t := range cur.Tags {
 		in.TagIDs = append(in.TagIDs, t.ID)
@@ -220,8 +253,15 @@ func (s Transactions) Duplicate(ctx context.Context, id int64) (*Transaction, er
 }
 
 func (s Transactions) ByID(ctx context.Context, id int64) (*Transaction, error) {
-	list, err := s.list(ctx, sqlc.ListTransactionsParams{ID: db.NI(id), Limit: 1, Offset: 0})
-	if err != nil || len(list) == 0 {
+	r, err := db.Q(s.DB).GetTransaction(ctx, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	list, err := s.hydrate(ctx, []sqlc.GetTransactionRow{r})
+	if err != nil {
 		return nil, err
 	}
 	return &list[0], nil
@@ -242,107 +282,132 @@ func (s Transactions) Filtered(ctx context.Context, f filter.TxFilter, page, per
 	if err != nil {
 		return nil, 0, err
 	}
-	return s.hydrate(ctx, rows), int(total), nil
+	list, err := s.hydrate(ctx, rows)
+	return list, int(total), err
 }
 
-func (s Transactions) Summary(ctx context.Context, pendingOnly bool) map[string]any {
+// TransactionSummary totals transactions in the base currency (nil when there
+// is none), rounded to its decimals.
+type TransactionSummary struct {
+	Income   money.Money
+	Expense  money.Money
+	Count    int
+	Currency *Currency
+}
+
+func (s Transactions) Summary(ctx context.Context, pendingOnly bool) TransactionSummary {
 	status := "confirmed"
 	if pendingOnly {
 		status = "pending"
 	}
+	base, _ := (Currencies{DB: s.DB}).Base(ctx)
+	out := TransactionSummary{Currency: base}
+	var unit money.Unit // no base currency means no transactions either
+	if base != nil {
+		unit = base.Unit()
+	}
+	out.Income, out.Expense = money.Zero(unit), money.Zero(unit)
 	rows, err := db.Q(s.DB).ListTransactionSummaryRows(ctx, status)
 	if err != nil {
-		return map[string]any{"income": 0, "expense": 0, "balance": 0, "transactions_count": 0, "currency": nil}
+		return out
 	}
-	var income, expense float64
-	n := 0
+	// Sum in base major units and round once: rounding each row would drift.
+	income, expense := decimal.Zero, decimal.Zero
 	for _, r := range rows {
-		amount := r.Amount
-		if r.IsBase == 0 && r.Rate != 0 {
-			amount *= r.Rate
+		amount := decimal.New(r.Amount, -int32(r.Decimals))
+		if r.IsBase == 0 && !r.Rate.IsZero() {
+			amount = amount.Mul(r.Rate)
 		}
 		if r.Type == "income" {
-			income += amount
+			income = income.Add(amount)
 		} else {
-			expense += amount
+			expense = expense.Add(amount)
 		}
-		n++
+		out.Count++
 	}
-	code, _ := db.Q(s.DB).GetBaseCurrencyCode(ctx)
-	return map[string]any{
-		"income": income, "expense": expense, "balance": income - expense,
-		"transactions_count": n, "currency": nilOr(code),
-	}
-}
-
-func (s Transactions) list(ctx context.Context, arg sqlc.ListTransactionsParams) ([]Transaction, error) {
-	rows, err := db.Q(s.DB).ListTransactions(ctx, arg)
-	if err != nil {
-		return nil, err
-	}
-	return s.hydrate(ctx, rows), nil
-}
-
-func (s Transactions) hydrate(ctx context.Context, rows []sqlc.ListTransactionsRow) []Transaction {
-	out := make([]Transaction, 0, len(rows))
-	for _, r := range rows {
-		out = append(out, txFromRow(r))
-	}
-	accts := Accounts{DB: s.DB}
-	cats := Categories{DB: s.DB}
-	for i := range out {
-		if a, _ := accts.ByID(ctx, out[i].AccountID); a != nil {
-			out[i].Account = a
-		}
-		if out[i].ToAccountID != nil {
-			if a, _ := accts.ByID(ctx, *out[i].ToAccountID); a != nil {
-				out[i].ToAccount = a
-			}
-		}
-		if out[i].CategoryID != nil {
-			if c, _ := cats.ByID(ctx, *out[i].CategoryID); c != nil {
-				out[i].Category = c
-			}
-		}
-		out[i].Items, _ = s.items(ctx, out[i].ID)
-		out[i].Tags, _ = s.tags(ctx, out[i].ID)
-	}
+	out.Income, out.Expense = money.FromDecimal(income, unit), money.FromDecimal(expense, unit)
 	return out
 }
 
-func (s Transactions) items(ctx context.Context, id int64) ([]TxItem, error) {
-	rows, err := db.Q(s.DB).ListTransactionItems(ctx, id)
+// hydrate turns rows into transactions with their accounts, category, items
+// and tags: one lookup per distinct account and category, and one query each
+// for the items and tags of the whole page.
+func (s Transactions) hydrate(ctx context.Context, rows []sqlc.GetTransactionRow) ([]Transaction, error) {
+	out := make([]Transaction, 0, len(rows))
+	ids := make([]int64, 0, len(rows))
+	at := make(map[int64]int, len(rows))
+	rel := newRelated(ctx, s.DB)
+	for _, r := range rows {
+		t := txFromRow(r)
+		t.Account = rel.account(t.AccountID)
+		t.ToAccount = rel.optionalAccount(t.ToAccountID)
+		t.Category = rel.category(t.CategoryID)
+		t.Items, t.Tags = []TxItem{}, []Tag{}
+		at[t.ID] = len(out)
+		ids = append(ids, t.ID)
+		out = append(out, t)
+	}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	items, err := db.Q(s.DB).ListItemsOfTransactions(ctx, ids)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]TxItem, 0, len(rows))
-	for _, r := range rows {
-		out = append(out, TxItem{ID: r.ID, Name: r.Name, Quantity: r.Quantity, PricePerUnit: r.PricePerUnit, TotalPrice: r.TotalPrice})
+	for _, r := range items {
+		t := &out[at[r.TransactionID]]
+		unit := t.Amount.Unit() // items are priced in the account currency
+		t.Items = append(t.Items, TxItem{
+			ID: r.ID, Name: r.Name, Quantity: r.Quantity,
+			PricePerUnit: money.New(r.PricePerUnit, unit), TotalPrice: money.New(r.TotalPrice, unit),
+		})
+	}
+	tags, err := db.Q(s.DB).ListTagsOfTransactions(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range tags {
+		t := &out[at[r.TransactionID]]
+		t.Tags = append(t.Tags, tagFromList(r.ID, r.Name, r.CreatedAt, 0))
 	}
 	return out, nil
 }
 
-func (s Transactions) tags(ctx context.Context, id int64) ([]Tag, error) {
-	rows, err := db.Q(s.DB).ListTransactionTags(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]Tag, 0, len(rows))
-	for _, r := range rows {
-		out = append(out, tagFromList(r.ID, r.Name, r.CreatedAt, r.TransactionsCount))
-	}
-	return out, nil
+// itemRow is a transaction line ready to store.
+type itemRow struct {
+	name        string
+	quantity    decimal.Decimal
+	price, line money.Money
 }
 
-func (s Transactions) saveItems(ctx context.Context, txID int64, items []TxItem) error {
-	now := time.Now().UTC().Format(time.RFC3339)
+// itemRows checks the lines entered for a transaction against the range and
+// rounds them into unit, so nothing is written for a transaction with a bad
+// line. A line without a total costs quantity times price.
+func itemRows(items []TxItemInput, unit money.Unit) ([]itemRow, error) {
+	rows := make([]itemRow, 0, len(items))
 	for _, it := range items {
-		if it.TotalPrice == 0 {
-			it.TotalPrice = it.Quantity * it.PricePerUnit
+		if it.TotalPrice.IsZero() {
+			it.TotalPrice = it.Quantity.Mul(it.PricePerUnit)
 		}
+		price, err := money.FromInput(it.PricePerUnit, unit)
+		if err != nil {
+			return nil, err
+		}
+		line, err := money.FromInput(it.TotalPrice, unit)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, itemRow{name: it.Name, quantity: it.Quantity, price: price, line: line})
+	}
+	return rows, nil
+}
+
+func (s Transactions) saveItems(ctx context.Context, txID int64, rows []itemRow) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+	for _, it := range rows {
 		if err := db.Q(s.DB).InsertTransactionItem(ctx, sqlc.InsertTransactionItemParams{
-			TransactionID: txID, Name: it.Name, Quantity: it.Quantity, PricePerUnit: it.PricePerUnit,
-			TotalPrice: it.TotalPrice, CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
+			TransactionID: txID, Name: it.name, Quantity: it.quantity,
+			PricePerUnit: it.price.Minor(), TotalPrice: it.line.Minor(), CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
 		}); err != nil {
 			return err
 		}
@@ -360,19 +425,72 @@ func (s Transactions) saveTags(ctx context.Context, txID int64, ids []int64) err
 	return nil
 }
 
-func txFromRow(r sqlc.ListTransactionsRow) Transaction {
-	t := Transaction{ID: r.ID, Type: r.Type, AccountID: r.AccountID, Amount: r.Amount, Status: r.Status}
+// unitsFor returns the unit of the account and, when set, of the to-account;
+// the to-account falls back to the account's unit.
+func (s Transactions) unitsFor(ctx context.Context, accountID int64, toAccountID *int64) (money.Unit, money.Unit, error) {
+	accts := Accounts{DB: s.DB}
+	unit, err := accts.Unit(ctx, accountID)
+	if err != nil {
+		return money.Unit{}, money.Unit{}, err
+	}
+	if toAccountID == nil {
+		return unit, unit, nil
+	}
+	toUnit, err := accts.Unit(ctx, *toAccountID)
+	if err != nil {
+		return money.Unit{}, money.Unit{}, err
+	}
+	return unit, toUnit, nil
+}
+
+// amounts turns the entered amounts into money in the currencies of the
+// accounts. A transfer without a destination amount delivers the amount
+// converted at the current rates, never the same number reinterpreted in
+// another currency.
+func (s Transactions) amounts(ctx context.Context, in TxInput) (amount money.Money, toAmount *money.Money, err error) {
+	unit, toUnit, err := s.unitsFor(ctx, in.AccountID, in.ToAccountID)
+	if err != nil {
+		return money.Money{}, nil, err
+	}
+	if amount, err = money.FromInput(in.Amount, unit); err != nil {
+		return money.Money{}, nil, err
+	}
+	if toAmount, err = money.FromNullInput(in.ToAmount, toUnit); err != nil {
+		return money.Money{}, nil, err
+	}
+	if toAmount != nil || in.Type != "transfer" || in.ToAccountID == nil {
+		return amount, toAmount, nil
+	}
+	if unit == toUnit {
+		return amount, &amount, nil
+	}
+	accts := Accounts{DB: s.DB}
+	from, err := accts.ByID(ctx, in.AccountID)
+	if err != nil || from == nil {
+		return money.Money{}, nil, ErrUnknownAccount
+	}
+	to, err := accts.ByID(ctx, *in.ToAccountID)
+	if err != nil || to == nil {
+		return money.Money{}, nil, ErrUnknownAccount
+	}
+	converted, err := TryConvert(amount, *from.Currency, *to.Currency)
+	if err != nil {
+		return money.Money{}, nil, err
+	}
+	return amount, &converted, nil
+}
+
+func txFromRow(r sqlc.GetTransactionRow) Transaction {
+	t := Transaction{
+		ID: r.ID, Type: r.Type, AccountID: r.AccountID, Status: r.Status,
+		Amount:   money.New(r.Amount, money.Unit{ID: r.CurrencyID, Decimals: int(r.Decimals)}),
+		ToAmount: money.FromNullMinor(r.ToAmount, money.Unit{ID: r.ToCurrencyID, Decimals: int(r.ToDecimals)}),
+	}
 	if r.ToAccountID.Valid {
 		t.ToAccountID = &r.ToAccountID.Int64
 	}
 	if r.CategoryID.Valid {
 		t.CategoryID = &r.CategoryID.Int64
-	}
-	if r.ToAmount.Valid {
-		t.ToAmount = &r.ToAmount.Float64
-	}
-	if r.ExchangeRate.Valid {
-		t.ExchangeRate = &r.ExchangeRate.Float64
 	}
 	if r.Description.Valid {
 		t.Description = &r.Description.String
@@ -402,4 +520,3 @@ func isFuture(date string) bool {
 	today := time.Now().In(appLocation).Format("2006-01-02")
 	return date[:10] > today
 }
-

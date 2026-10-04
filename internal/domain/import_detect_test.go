@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/shopspring/decimal"
+
 	"savvy-go/internal/db"
 	"savvy-go/internal/migrate"
 )
@@ -54,18 +56,18 @@ func TestDetectAmountFormat(t *testing.T) {
 func TestParseImportAmount(t *testing.T) {
 	cases := []struct {
 		in, format string
-		want       float64
+		want       string
 	}{
-		{"1,234.56", "US", 1234.56},
-		{"1.234,56", "EU", 1234.56},
-		{"-12,50", "EU", -12.5},
-		{"(12.50)", "US", -12.5},
-		{"12.50-", "US", -12.5},
-		{"1 234,5 ₽", "EU", 1234.5},
+		{"1,234.56", "US", "1234.56"},
+		{"1.234,56", "EU", "1234.56"},
+		{"-12,50", "EU", "-12.5"},
+		{"(12.50)", "US", "-12.5"},
+		{"12.50-", "US", "-12.5"},
+		{"1 234,5 ₽", "EU", "1234.5"},
 	}
 	for _, c := range cases {
 		got, err := parseImportAmount(c.in, c.format)
-		if err != nil || got != c.want {
+		if err != nil || !got.Equal(decimal.RequireFromString(c.want)) {
 			t.Errorf("%q (%s): got %v, %v want %v", c.in, c.format, got, err, c.want)
 		}
 	}

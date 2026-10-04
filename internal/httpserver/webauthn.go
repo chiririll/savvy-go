@@ -17,11 +17,7 @@ func (s *Server) webauthnIndex(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	data := make([]any, 0, len(list))
-	for _, c := range list {
-		data = append(data, dto.WebAuthnCred(c))
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"credentials": data})
+	writeJSON(w, http.StatusOK, map[string]any{"credentials": dto.Map(list, dto.NewWebAuthnCred)})
 }
 
 func (s *Server) webauthnRegisterOptions(w http.ResponseWriter, r *http.Request) {
@@ -59,7 +55,7 @@ func (s *Server) webauthnRegisterVerify(w http.ResponseWriter, r *http.Request) 
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"message":    "Passkey registered.",
-		"credential": dto.WebAuthnCred(*cred),
+		"credential": dto.NewWebAuthnCred(*cred),
 	})
 }
 

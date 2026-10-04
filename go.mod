@@ -5,6 +5,7 @@ go 1.26.0
 require (
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/go-webauthn/webauthn v0.18.0
+	github.com/shopspring/decimal v1.4.0
 	golang.org/x/crypto v0.57.0
 	golang.org/x/sys v0.48.0
 	modernc.org/sqlite v1.40.1

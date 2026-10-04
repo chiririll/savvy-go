@@ -100,7 +100,7 @@ export default function DebtsPage() {
                             <div>
                                 <p className="text-sm text-muted-foreground">{t('debts.types.i_owe')}</p>
                                 <p className="text-2xl font-bold text-red-600">
-                                    {formatCurrency(summary.total_i_owe, summary.currency)}
+                                    {formatCurrency(summary.totalIOwe, summary.currency)}
                                 </p>
                             </div>
                         </div>
@@ -113,15 +113,15 @@ export default function DebtsPage() {
                             <div>
                                 <p className="text-sm text-muted-foreground">{t('debts.types.owed_to_me')}</p>
                                 <p className="text-2xl font-bold text-green-600">
-                                    {formatCurrency(summary.total_owed_to_me, summary.currency)}
+                                    {formatCurrency(summary.totalOwedToMe, summary.currency)}
                                 </p>
                             </div>
                         </div>
                     </div>
                     <div className="rounded-lg border bg-card p-4">
                         <div className="flex items-center gap-2">
-                            <div className={`p-2 rounded-lg ${summary.net_debt >= 0 ? 'bg-green-100' : 'bg-red-100'}`}>
-                                {summary.net_debt >= 0 ? (
+                            <div className={`p-2 rounded-lg ${summary.netDebt >= 0 ? 'bg-green-100' : 'bg-red-100'}`}>
+                                {summary.netDebt >= 0 ? (
                                     <HandCoins className="size-5 text-green-600" />
                                 ) : (
                                     <Banknote className="size-5 text-red-600" />
@@ -129,9 +129,9 @@ export default function DebtsPage() {
                             </div>
                             <div>
                                 <p className="text-sm text-muted-foreground">{t('debts.netPosition')}</p>
-                                <p className={`text-2xl font-bold ${summary.net_debt >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                    {formatCurrency(Math.abs(summary.net_debt), summary.currency)}
-                                    {' '}{summary.net_debt >= 0 ? t('debts.inYourFavor') : t('debts.youOwe')}
+                                <p className={`text-2xl font-bold ${summary.netDebt >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    {formatCurrency(Math.abs(summary.netDebt), summary.currency)}
+                                    {' '}{summary.netDebt >= 0 ? t('debts.inYourFavor') : t('debts.youOwe')}
                                 </p>
                             </div>
                         </div>

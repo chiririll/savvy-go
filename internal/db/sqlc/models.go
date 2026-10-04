@@ -6,6 +6,8 @@ package sqlc
 
 import (
 	"database/sql"
+
+	"github.com/shopspring/decimal"
 )
 
 type Account struct {
@@ -14,8 +16,8 @@ type Account struct {
 	Type            string
 	DebtType        sql.NullString
 	CurrencyID      int64
-	InitialBalance  float64
-	TargetAmount    sql.NullFloat64
+	InitialBalance  int64
+	TargetAmount    sql.NullInt64
 	DueDate         sql.NullString
 	IsPaidOff       int64
 	Counterparty    sql.NullString
@@ -73,8 +75,8 @@ type AutomationRuleLog struct {
 type Budget struct {
 	ID              int64
 	Name            string
-	Amount          float64
-	CurrencyID      sql.NullInt64
+	Amount          int64
+	CurrencyID      int64
 	Period          string
 	StartDate       sql.NullString
 	EndDate         sql.NullString
@@ -113,7 +115,7 @@ type Currency struct {
 	Symbol    string
 	Decimals  int64
 	IsBase    int64
-	Rate      float64
+	Rate      decimal.Decimal
 	CreatedAt sql.NullString
 	UpdatedAt sql.NullString
 }
@@ -154,8 +156,8 @@ type RecurringTransaction struct {
 	AccountID   int64
 	ToAccountID sql.NullInt64
 	CategoryID  sql.NullInt64
-	Amount      float64
-	ToAmount    sql.NullFloat64
+	Amount      int64
+	ToAmount    sql.NullInt64
 	Description sql.NullString
 	Frequency   string
 	Interval    int64
@@ -223,9 +225,8 @@ type Transaction struct {
 	AccountID              int64
 	ToAccountID            sql.NullInt64
 	CategoryID             sql.NullInt64
-	Amount                 float64
-	ToAmount               sql.NullFloat64
-	ExchangeRate           sql.NullFloat64
+	Amount                 int64
+	ToAmount               sql.NullInt64
 	Description            sql.NullString
 	DedupHash              sql.NullString
 	Date                   sql.NullString
@@ -258,10 +259,9 @@ type TransactionItem struct {
 	ID            int64
 	TransactionID int64
 	Name          string
-	Quantity      float64
-	Unit          sql.NullString
-	PricePerUnit  float64
-	TotalPrice    float64
+	Quantity      decimal.Decimal
+	PricePerUnit  int64
+	TotalPrice    int64
 	CreatedAt     sql.NullString
 	UpdatedAt     sql.NullString
 }
@@ -352,7 +352,6 @@ type WebauthnCredential struct {
 	Name         sql.NullString
 	Aaguid       sql.NullString
 	Record       string
-	Transports   sql.NullString
 	Counter      int64
 	LastUsedAt   sql.NullString
 	CreatedAt    sql.NullString

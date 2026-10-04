@@ -10,10 +10,9 @@ export type RegularAccountType = 'bank' | 'crypto' | 'cash'
 export interface Account extends BaseEntity {
     name: string
     type: AccountType
-    currencyId: number
     initialBalance: number
     currentBalance: number
     isActive: boolean
     sortOrder: number
-    currency?: Currency
+    currency: Currency | null
 }

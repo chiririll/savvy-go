@@ -220,7 +220,7 @@ func TestAutomationSetsCategoryOnCreate(t *testing.T) {
 		"transaction_id": int64(tx["data"].(map[string]any)["id"].(float64)),
 	}, sess.Token, sess.CSRF)
 	testBody := decodeJSON(t, res)
-	if res.StatusCode != 200 || testBody["conditions_match"] != true {
+	if res.StatusCode != 200 || testBody["conditionsMatch"] != true {
 		t.Fatalf("test %d %v", res.StatusCode, testBody)
 	}
 }

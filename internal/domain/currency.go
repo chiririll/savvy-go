@@ -3,14 +3,62 @@ package domain
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
-	"math"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/shopspring/decimal"
+
 	"savvy-go/internal/db"
 	"savvy-go/internal/db/sqlc"
+	"savvy-go/internal/money"
 )
+
+var one = decimal.NewFromInt(1)
+
+// ErrDecimalsImmutable is returned when an update changes currency decimals.
+// Stored minor units are only meaningful together with the decimals, so they
+// are fixed when the currency is created.
+var ErrDecimalsImmutable = errors.New("currency decimals cannot be changed")
+
+// rateFromFloat converts an externally supplied (API) float rate to a decimal
+// of 12 significant digits. Rounding to a fixed number of fraction places would
+// turn a small rate (a token worth 3e-13 of the base) into zero.
+func rateFromFloat(v float64) decimal.Decimal {
+	d, err := decimal.NewFromString(strconv.FormatFloat(v, 'g', 12, 64))
+	if err != nil {
+		return decimal.Zero
+	}
+	return d
+}
+
+const (
+	// MaxDecimals is how many fraction digits a currency may have: the schema
+	// allows 0 to 12, which keeps MaxMinor amounts within int64.
+	MaxDecimals = 12
+	// rebasePrecision is the fraction digits kept when rates are re-expressed
+	// against a new base currency. It is far finer than money.RateDivPrecision:
+	// a rate of 1e-13 still needs several significant digits.
+	rebasePrecision = 32
+)
+
+// Rates outside this range cannot be told from zero or overflow an amount
+// converted at them.
+var (
+	minRate = decimal.New(1, -15)
+	maxRate = decimal.New(1, 15)
+)
+
+var (
+	// ErrInvalidDecimals is returned for a currency with decimals out of range.
+	ErrInvalidDecimals = errors.New("currency decimals must be between 0 and 12")
+	// ErrInvalidRate is returned for a rate that is not within [1e-15, 1e15].
+	ErrInvalidRate = errors.New("currency rate must be between 0.000000000000001 and 1000000000000000")
+)
+
+func validRate(r decimal.Decimal) bool { return !r.LessThan(minRate) && !r.GreaterThan(maxRate) }
 
 type Currency struct {
 	ID       int64
@@ -19,28 +67,53 @@ type Currency struct {
 	Symbol   string
 	Decimals int
 	IsBase   bool
-	Rate     float64
+	Rate     decimal.Decimal
 }
 
-func (c Currency) ConvertToBase(amount float64) float64 {
+func (c Currency) ConvertToBase(amount decimal.Decimal) decimal.Decimal {
 	if c.IsBase {
 		return amount
 	}
-	return amount * c.Rate
+	return amount.Mul(c.Rate)
 }
 
-func (c Currency) ConvertFromBase(amount float64) float64 {
-	if c.IsBase || c.Rate == 0 {
+func (c Currency) ConvertFromBase(amount decimal.Decimal) decimal.Decimal {
+	if c.IsBase || c.Rate.IsZero() {
 		return amount
 	}
-	return amount / c.Rate
+	return amount.DivRound(c.Rate, money.RateDivPrecision)
 }
 
-func Convert(amount float64, from, to Currency) float64 {
+// Unit is the scale amounts in this currency are stored in.
+func (c Currency) Unit() money.Unit { return money.Unit{ID: c.ID, Decimals: c.Decimals} }
+
+// Convert re-expresses m, an amount in from, in to, rounded to the scale of to.
+// It panics with money.ErrOutOfRange when the result does not fit; TryConvert
+// reports that as an error, for amounts a user chose.
+func Convert(m money.Money, from, to Currency) money.Money {
+	if m.Unit() != from.Unit() {
+		panic(fmt.Sprintf("domain: converting %+v from currency %+v", m.Unit(), from.Unit()))
+	}
 	if from.ID == to.ID {
-		return amount
+		return m
 	}
-	return to.ConvertFromBase(from.ConvertToBase(amount))
+	return money.FromDecimal(convertedDecimal(m, from, to), to.Unit())
+}
+
+// TryConvert is Convert with the range as an error: money.ErrOutOfRange when
+// the result is beyond money.MaxMinor.
+func TryConvert(m money.Money, from, to Currency) (money.Money, error) {
+	if m.Unit() != from.Unit() {
+		panic(fmt.Sprintf("domain: converting %+v from currency %+v", m.Unit(), from.Unit()))
+	}
+	if from.ID == to.ID {
+		return m, nil
+	}
+	return money.FromInput(convertedDecimal(m, from, to), to.Unit())
+}
+
+func convertedDecimal(m money.Money, from, to Currency) decimal.Decimal {
+	return to.ConvertFromBase(from.ConvertToBase(m.Decimal()))
 }
 
 type Currencies struct{ DB *sql.DB }
@@ -77,8 +150,14 @@ func (s Currencies) Create(ctx context.Context, c Currency) (*Currency, error) {
 	if c.Decimals < 0 {
 		c.Decimals = 2
 	}
-	if c.Rate == 0 {
-		c.Rate = 1
+	if c.Decimals > MaxDecimals {
+		return nil, ErrInvalidDecimals
+	}
+	if c.Rate.IsZero() {
+		c.Rate = one
+	}
+	if !validRate(c.Rate) {
+		return nil, ErrInvalidRate
 	}
 	if n, err := db.Q(s.DB).CountCurrencies(ctx); err == nil && n == 0 {
 		c.IsBase = true
@@ -87,7 +166,7 @@ func (s Currencies) Create(ctx context.Context, c Currency) (*Currency, error) {
 		if err := db.Q(s.DB).ClearBaseCurrency(ctx); err != nil {
 			return nil, err
 		}
-		c.Rate = 1
+		c.Rate = one
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
 	res, err := db.Q(s.DB).InsertCurrency(ctx, sqlc.InsertCurrencyParams{
@@ -106,17 +185,23 @@ func (s Currencies) Update(ctx context.Context, id int64, c Currency) (*Currency
 	if err != nil || cur == nil {
 		return cur, err
 	}
+	if c.Decimals != cur.Decimals {
+		return nil, ErrDecimalsImmutable
+	}
+	if !c.IsBase && !cur.IsBase && !validRate(c.Rate) {
+		return nil, ErrInvalidRate
+	}
 	if cur.IsBase && !c.IsBase {
 		return nil, fmt.Errorf("cannot unset base")
 	}
-	if cur.IsBase && c.Rate != 1 {
+	if cur.IsBase && !c.Rate.Equal(one) {
 		return nil, fmt.Errorf("base rate")
 	}
 	if c.IsBase && !cur.IsBase {
 		if err := db.Q(s.DB).ClearBaseCurrency(ctx); err != nil {
 			return nil, err
 		}
-		c.Rate = 1
+		c.Rate = one
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
 	err = db.Q(s.DB).UpdateCurrency(ctx, sqlc.UpdateCurrencyParams{
@@ -135,7 +220,8 @@ func (s Currencies) Delete(ctx context.Context, id int64) error {
 		return err
 	}
 	used, _ := db.Q(s.DB).CountAccountsForCurrency(ctx, id)
-	if used > 0 {
+	usedByBudgets, _ := db.Q(s.DB).CountBudgetsForCurrency(ctx, id)
+	if used > 0 || usedByBudgets > 0 {
 		return fmt.Errorf("in use")
 	}
 	if cur.IsBase {
@@ -153,15 +239,22 @@ func (s Currencies) SetBase(ctx context.Context, id int64) (*Currency, error) {
 		return cur, nil
 	}
 	newRate := cur.Rate
-	if newRate == 0 {
-		newRate = 1
+	if newRate.IsZero() {
+		newRate = one
 	}
 	rows, err := db.Q(s.DB).ListOtherCurrencyRates(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	for _, r := range rows {
-		if err := db.Q(s.DB).UpdateCurrencyRate(ctx, sqlc.UpdateCurrencyRateParams{Rate: r.Rate / newRate, ID: r.ID}); err != nil {
+	rebased := make([]decimal.Decimal, len(rows))
+	for i, r := range rows {
+		rebased[i] = r.Rate.DivRound(newRate, rebasePrecision)
+		if !validRate(rebased[i]) {
+			return nil, ErrInvalidRate // nothing is written: rates stay as they were
+		}
+	}
+	for i, r := range rows {
+		if err := db.Q(s.DB).UpdateCurrencyRate(ctx, sqlc.UpdateCurrencyRateParams{Rate: rebased[i], ID: r.ID}); err != nil {
 			return nil, err
 		}
 	}
@@ -184,7 +277,7 @@ func (s Currencies) FindOrCreateByCode(ctx context.Context, code string) (*Curre
 	}
 	item.IsBase = n == 0
 	if item.IsBase {
-		item.Rate = 1
+		item.Rate = one
 	}
 	return s.Create(ctx, *item)
 }
@@ -216,11 +309,11 @@ func (s Currencies) baseCode(ctx context.Context) string {
 	return "usd"
 }
 
-func currencyFrom(id int64, code, name, symbol string, decimals, isBase int64, rate float64) Currency {
+func currencyFrom(id int64, code, name, symbol string, decimals, isBase int64, rate decimal.Decimal) Currency {
 	return Currency{ID: id, Code: code, Name: name, Symbol: symbol, Decimals: int(decimals), IsBase: isBase != 0, Rate: rate}
 }
 
-func currencyFromRow(id int64, code, name, symbol string, decimals, isBase int64, rate float64, err error) (*Currency, error) {
+func currencyFromRow(id int64, code, name, symbol string, decimals, isBase int64, rate decimal.Decimal, err error) (*Currency, error) {
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -236,11 +329,6 @@ func boolInt(v bool) int {
 		return 1
 	}
 	return 0
-}
-
-func roundTo(v float64, decimals int) float64 {
-	p := math.Pow(10, float64(decimals))
-	return math.Round(v*p) / p
 }
 
 // UpdateRates pulls fresh rates for every non-base currency from the exchange
@@ -265,8 +353,8 @@ func (s Currencies) UpdateRates(ctx context.Context) (updated, skipped int, err 
 		if c.ID == base.ID {
 			continue
 		}
-		rate := rates[strings.ToLower(c.Code)]
-		if rate <= 0 {
+		rate := rateFromFloat(rates[strings.ToLower(c.Code)])
+		if !validRate(rate) {
 			skipped++
 			continue
 		}

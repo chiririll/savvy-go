@@ -38,7 +38,6 @@ export interface MoneyFlowData {
 }
 
 export interface ExpensePaceMonth {
-    label: string
     budget: number | null
     dailyExpenses: number[]
     currentDay: number | null
@@ -68,8 +67,7 @@ export interface ExpensesByCategoryData {
 }
 
 export interface CashFlowDataPoint {
-    label: string
-    date?: string
+    date: string
     income: number
     expenses: number
     balance: number
@@ -134,8 +132,7 @@ export interface TransactionDynamicsDataset {
 }
 
 export interface TransactionDynamicsData {
-    labels: string[]
-    dates?: string[]
+    dates: string[]
     datasets: TransactionDynamicsDataset[]
     currency: string | null
 }
@@ -181,8 +178,7 @@ export interface NetWorthData {
 }
 
 export interface NetWorthHistoryData {
-    labels: string[]
-    dates?: string[]
+    dates: string[]
     values: number[]
     currency: string | null
 }

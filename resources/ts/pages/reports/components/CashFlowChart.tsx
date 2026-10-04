@@ -55,9 +55,7 @@ export function CashFlowChart({ filters }: CashFlowChartProps) {
         const chartData = data.items
         const currency = data.currency
 
-        const labels = chartData.map(d =>
-            d.date ? formatReportPeriodLabel(d.date, groupBy) : d.label
-        )
+        const labels = chartData.map(d => formatReportPeriodLabel(d.date, groupBy))
         const incomeData = chartData.map(d => d.income)
         const expensesData = chartData.map(d => -d.expenses) // Negative for downward bars
         const balanceData = chartData.map(d => d.balance)

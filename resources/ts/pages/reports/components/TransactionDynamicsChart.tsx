@@ -72,11 +72,7 @@ export function TransactionDynamicsChart({ filters, type }: TransactionDynamicsC
         if (!data) return { labels: [], datasets: [] }
 
         return {
-            labels: (data.dates ?? data.labels).map((value, index) =>
-                data.dates?.[index]
-                    ? formatReportPeriodLabel(value, groupBy)
-                    : value
-            ),
+            labels: data.dates.map((date) => formatReportPeriodLabel(date, groupBy)),
             datasets: data.datasets
                 .filter((dataset) => enabledSeries.some((item) => item.id === dataset.id))
                 .map((dataset) => ({

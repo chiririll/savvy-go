@@ -109,28 +109,20 @@ function derivedTransferRate(amount: number, toAmount: number): number | null {
     return roundTo(toAmount / amount, RATE_DECIMALS)
 }
 
-function storedTransferRate(rate?: number | null): number | null {
-    const value = Number(rate)
-    return value > 0 ? roundTo(value, RATE_DECIMALS) : null
-}
-
 function resolveOpeningTransferRate(values?: Partial<TransactionFormValues>): number | null {
     if (values?.type && values.type !== 'transfer') return null
     return derivedTransferRate(Number(values?.amount) || 0, Number(values?.to_amount) || 0)
-        ?? storedTransferRate(values?.exchange_rate)
 }
 
 function resolveTransferRate(options: {
     sameCurrency: boolean
     amount: number
     toAmount: number
-    storedRate?: number | null
     fromRate?: number | null
     toRate?: number | null
 }): number {
     if (options.sameCurrency) return 1
     return derivedTransferRate(options.amount, options.toAmount)
-        ?? storedTransferRate(options.storedRate)
         ?? catalogTransferRate(options.fromRate, options.toRate)
         ?? 1
 }
@@ -284,7 +276,7 @@ export function TransactionForm({
     const sameTransferCurrency = Boolean(
         selectedAccount
         && selectedToAccount
-        && selectedAccount.currencyId === selectedToAccount.currencyId
+        && selectedAccount.currency?.id === selectedToAccount.currency?.id
     )
     const rateEditable = Boolean(
         transactionType === 'transfer'
@@ -374,7 +366,6 @@ export function TransactionForm({
                 sameCurrency: false,
                 amount: sourceAmount,
                 toAmount: destAmount,
-                storedRate: defaultValues?.exchange_rate,
                 fromRate: selectedAccount.currency?.rate,
                 toRate: selectedToAccount.currency?.rate,
             })
@@ -419,7 +410,6 @@ export function TransactionForm({
         transferPairKey,
         selectedAccount,
         selectedToAccount,
-        defaultValues?.exchange_rate,
         form,
         applyReceiveFromRate,
     ])
@@ -538,7 +528,8 @@ export function TransactionForm({
                         {
                             ...data,
                             to_amount: next.to_amount,
-                            exchange_rate: next.exchange_rate,
+                            // UI-only helper; the server derives it from the amounts.
+                            exchange_rate: undefined,
                         },
                         negativeBalanceWarnings,
                         onSubmit,

@@ -7,9 +7,10 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/shopspring/decimal"
+
 	"savvy-go/internal/auth"
 	appdb "savvy-go/internal/db"
-	"savvy-go/internal/db/sqlc"
 	"savvy-go/internal/domain"
 	"savvy-go/internal/settings"
 )
@@ -48,7 +49,7 @@ func Demo(ctx context.Context, db *sql.DB, enabled bool, loc *time.Location) err
 		return fmt.Errorf("mark demo seeded: %w", err)
 	}
 
-	txs, _ := appdb.Q(db).CountTransactions(ctx, sqlc.CountTransactionsParams{})
+	txs, _ := appdb.Q(db).CountAllTransactions(ctx)
 	accts, _ := appdb.Q(db).CountAccounts(ctx)
 	slog.Info("demo data seeded", "transactions", txs, "accounts", accts)
 	return nil
@@ -69,8 +70,8 @@ func seedReference(ctx context.Context, db *sql.DB) error {
 
 func seedCurrencies(ctx context.Context, curs domain.Currencies) error {
 	for _, c := range []domain.Currency{
-		{Code: "USD", Name: "US Dollar", Symbol: "$", Decimals: 2, IsBase: true, Rate: 1},
-		{Code: "EUR", Name: "Euro", Symbol: "€", Decimals: 2, Rate: 1.08},
+		{Code: "USD", Name: "US Dollar", Symbol: "$", Decimals: 2, IsBase: true, Rate: decimal.NewFromInt(1)},
+		{Code: "EUR", Name: "Euro", Symbol: "€", Decimals: 2, Rate: decimal.RequireFromString("1.08")},
 	} {
 		existing, err := curs.ByCode(ctx, c.Code)
 		if err != nil {

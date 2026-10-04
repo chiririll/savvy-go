@@ -82,7 +82,7 @@ func TestDebtCreateLendAndBorrow(t *testing.T) {
 	if res.StatusCode != 201 {
 		t.Fatalf("lend %d %v", res.StatusCode, body)
 	}
-	if body["data"].(map[string]any)["remainingDebt"].(float64) != 200 {
+	if body["data"].(map[string]any)["currentBalance"].(float64) != 200 {
 		t.Fatalf("remaining %v", body)
 	}
 	res = a.do("GET", "/api/accounts/"+itoa(accID), nil, sess.Token, "")
@@ -98,7 +98,7 @@ func TestDebtCreateLendAndBorrow(t *testing.T) {
 	if res.StatusCode != 201 {
 		t.Fatalf("borrow %d %v", res.StatusCode, body)
 	}
-	if body["data"].(map[string]any)["remainingDebt"].(float64) != 300 {
+	if body["data"].(map[string]any)["currentBalance"].(float64) != 300 {
 		t.Fatalf("borrow remaining %v", body)
 	}
 	res = a.do("GET", "/api/accounts/"+itoa(accID), nil, sess.Token, "")

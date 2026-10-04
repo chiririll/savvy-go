@@ -45,7 +45,7 @@ export function HeaderBalance() {
                 >
                     <Wallet className="size-4 text-muted-foreground" />
                     <span className="font-mono font-medium">
-                        {formatCurrency(balance.total_balance ?? 0, balance.currency)}
+                        {formatCurrency(balance.totalBalance ?? 0, balance.currency)}
                     </span>
                 </Button>
             </DropdownMenuTrigger>

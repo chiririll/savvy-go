@@ -72,7 +72,7 @@ export function TransactionRow({
         })
         : null
     const [expanded, setExpanded] = useState(false)
-    const itemsCount = transaction.itemsCount ?? transaction.items?.length ?? 0
+    const itemsCount = transaction.items.length
     const canExpand = itemsCount > 1
     const { sign, className } = transactionAmountAppearance(transaction.type, transaction.status)
     const isTransfer = transaction.type === 'transfer'

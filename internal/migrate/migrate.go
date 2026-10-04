@@ -17,12 +17,16 @@ var files embed.FS
 const tableSQL = `CREATE TABLE IF NOT EXISTS schema_migrations (
     version TEXT PRIMARY KEY,
     applied_at TEXT NOT NULL
-)`
+) STRICT`
 
 // Up applies every pending SQL file in internal/migrate/sql.
 func Up(ctx context.Context, db *sql.DB) error {
 	if _, err := db.ExecContext(ctx, tableSQL); err != nil {
 		return fmt.Errorf("create schema_migrations: %w", err)
+	}
+	// Before any CREATE UNIQUE INDEX / NOCASE rebuild sees the data.
+	if err := DedupeNames(ctx, db); err != nil {
+		return err
 	}
 
 	applied, err := appliedVersions(ctx, db)
@@ -52,6 +56,32 @@ func Up(ctx context.Context, db *sql.DB) error {
 			version, time.Now().UTC().Format(time.RFC3339),
 		); err != nil {
 			return fmt.Errorf("record %s: %w", name, err)
+		}
+	}
+	return nil
+}
+
+// EnsureIndexes creates every index declared by the embedded migrations (they
+// are all IF NOT EXISTS). Schema surgery on upgraded databases drops indexes
+// together with the columns they covered; this restores them.
+func EnsureIndexes(ctx context.Context, db *sql.DB) error {
+	names, err := migrationFiles()
+	if err != nil {
+		return err
+	}
+	for _, name := range names {
+		body, err := fs.ReadFile(files, "sql/"+name)
+		if err != nil {
+			return fmt.Errorf("read %s: %w", name, err)
+		}
+		for _, stmt := range splitSQL(string(body)) {
+			up := strings.ToUpper(strings.TrimSpace(stmt))
+			if !strings.HasPrefix(up, "CREATE INDEX") && !strings.HasPrefix(up, "CREATE UNIQUE INDEX") {
+				continue
+			}
+			if _, err := db.ExecContext(ctx, stmt); err != nil {
+				return fmt.Errorf("%s: %w", preview(stmt), err)
+			}
 		}
 	}
 	return nil

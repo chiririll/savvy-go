@@ -78,8 +78,8 @@ export interface WebauthnCredentialSummary {
     id: number
     name: string | null
     aaguid: string | null
-    last_used_at: string | null
-    created_at: string
+    lastUsedAt: string | null
+    createdAt: string
 }
 
 export interface WebauthnRegisterOptions {
