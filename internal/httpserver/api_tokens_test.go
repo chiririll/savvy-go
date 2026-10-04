@@ -20,7 +20,7 @@ func (a *testApp) bearer(method, path string, body any, token string) *http.Resp
 	if body != nil {
 		_ = json.NewEncoder(&buf).Encode(body)
 	}
-	req, err := http.NewRequest(method, a.srv.URL+path, &buf)
+	req, err := http.NewRequest(method, a.srv.URL+a.apiPath(path), &buf)
 	if err != nil {
 		a.t.Fatal(err)
 	}
@@ -137,7 +137,7 @@ func TestAPITokenInvalidExpiredAndNoCookieFallback(t *testing.T) {
 
 	// A valid session cookie must not rescue a bad bearer.
 	sess := a.issue(u, false)
-	req, _ := http.NewRequest("GET", a.srv.URL+"/api/accounts", nil)
+	req, _ := http.NewRequest("GET", a.srv.URL+a.apiPath("/api/accounts"), nil)
 	req.AddCookie(&http.Cookie{Name: "svy_session", Value: sess.Token})
 	req.Header.Set("Authorization", "Bearer svy_garbage")
 	res, err := a.client.Do(req)
@@ -324,7 +324,7 @@ func TestAPITokenMalformedAuthorizationHeader(t *testing.T) {
 	sess := a.issue(u, false)
 
 	for _, h := range []string{"Basic dXNlcjpwYXNz", "Bearer", "Bearer   ", "svy_nobearerprefix"} {
-		req, _ := http.NewRequest("GET", a.srv.URL+"/api/accounts", nil)
+		req, _ := http.NewRequest("GET", a.srv.URL+a.apiPath("/api/accounts"), nil)
 		req.AddCookie(&http.Cookie{Name: "svy_session", Value: sess.Token})
 		req.Header.Set("Authorization", h)
 		res, err := a.client.Do(req)

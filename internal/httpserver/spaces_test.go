@@ -4,18 +4,16 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"strconv"
 	"testing"
 
 	"savvy-go/internal/auth"
 	"savvy-go/internal/domain"
 )
 
-// inSpace sends a request with an explicit X-Space-ID.
+// inSpace sends a data request to a given space.
 func (a *testApp) inSpace(spaceID int64, method, path string, body any, sess *auth.Issued) *http.Response {
 	a.t.Helper()
-	req := a.request(method, path, body, sess.Token, sess.CSRF)
-	req.Header.Set(spaceHeader, strconv.FormatInt(spaceID, 10))
+	req := a.request(method, spacedPath(a.s, spaceID, path), body, sess.Token, sess.CSRF)
 	res, err := a.client.Do(req)
 	if err != nil {
 		a.t.Fatal(err)
@@ -59,8 +57,8 @@ func TestP3SpacesAreIsolated(t *testing.T) {
 	if names := tagNames(t, a.inSpace(aliceSpace.ID, "GET", "/api/tags", nil, as)); len(names) != 1 || names[0] != "alice-only" {
 		t.Fatalf("alice sees %v", names)
 	}
-	if names := tagNames(t, a.do("GET", "/api/tags", nil, bs.Token, "")); len(names) != 1 || names[0] != "bob-only" {
-		t.Fatalf("bob's default space shows %v", names)
+	if names := tagNames(t, a.inSpace(bobSpace.ID, "GET", "/api/tags", nil, bs)); len(names) != 1 || names[0] != "bob-only" {
+		t.Fatalf("bob's space shows %v", names)
 	}
 	status(t, a.inSpace(aliceSpace.ID, "GET", "/api/tags", nil, bs), 404, "bob reads alice's space")
 	status(t, a.inSpace(aliceSpace.ID, "POST", "/api/tags", map[string]any{"name": "x"}, bs), 404, "bob writes alice's space")
@@ -80,7 +78,7 @@ func TestUserWithoutSpaceGets404ForData(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("lonely@test.com", "secret1", auth.RoleUser)
 	sess := a.issue(u, false)
-	status(t, a.do("GET", "/api/accounts", nil, sess.Token, ""), 404, "no space")
+	status(t, a.do("GET", "/api/accounts", nil, sess.Token, ""), 404, "not in the space")
 	status(t, a.do("GET", "/api/settings", nil, sess.Token, ""), 200, "instance settings need no space")
 }
 
@@ -97,7 +95,8 @@ func TestRegistrationProvisionsPersonalSpace(t *testing.T) {
 	if len(list) != 1 || list[0].(map[string]any)["role"] != domain.SpaceAdmin || list[0].(map[string]any)["name"] != "Owner" {
 		t.Fatalf("spaces %v", list)
 	}
-	status(t, a.do("GET", "/api/accounts", nil, session.Value, ""), 200, "personal space works")
+	id := int64(list[0].(map[string]any)["id"].(float64))
+	status(t, a.do("GET", spacedPath(a.s, id, "/api/accounts"), nil, session.Value, ""), 200, "personal space works")
 }
 
 // P8: a guest cannot administer a space and gets no personal space.
@@ -120,18 +119,24 @@ func TestP8GuestCannotBeSpaceAdmin(t *testing.T) {
 }
 
 // Only server admins change instance settings; only space admins change the
-// space's own settings.
+// space's own settings, which live in the space.
 func TestSettingsUpdateRoles(t *testing.T) {
 	a := newTestApp(t)
 	editor := a.issue(a.createUser("e@test.com", "secret1", roleEditor), false)
 	admin := a.issue(a.createUser("a@test.com", "secret1", auth.RoleAdmin), false)
+	spaceSettings := spacePath(a.space.ID, "/settings")
 
 	status(t, a.do("PATCH", "/api/settings", map[string]any{"sso_allow_signup": false}, editor.Token, editor.CSRF), 403, "editor instance key")
-	status(t, a.do("PATCH", "/api/settings", map[string]any{"auto_update_currencies": false}, editor.Token, editor.CSRF), 403, "editor space key")
-	res := a.do("PATCH", "/api/settings", map[string]any{"auto_update_currencies": false, "sso_allow_signup": false}, admin.Token, admin.CSRF)
-	body := decodeJSON(t, res)
-	if res.StatusCode != 200 || body["auto_update_currencies"] != false || body["sso_allow_signup"] != false {
-		t.Fatalf("admin update %d %v", res.StatusCode, body)
+	status(t, a.do("PATCH", spaceSettings, map[string]any{"auto_update_currencies": false}, editor.Token, editor.CSRF), 403, "editor space key")
+	status(t, a.do("GET", "/api/settings", nil, editor.Token, ""), 200, "instance settings are readable")
+
+	res := a.do("PATCH", "/api/settings", map[string]any{"sso_allow_signup": false}, admin.Token, admin.CSRF)
+	if body := decodeJSON(t, res); res.StatusCode != 200 || body["sso_allow_signup"] != false {
+		t.Fatalf("admin instance update %d %v", res.StatusCode, body)
+	}
+	res = a.do("PATCH", spaceSettings, map[string]any{"auto_update_currencies": false}, admin.Token, admin.CSRF)
+	if body := decodeJSON(t, res); res.StatusCode != 200 || body["auto_update_currencies"] != false {
+		t.Fatalf("admin space update %d %v", res.StatusCode, body)
 	}
 	if v, _ := sp0(t, a).settings.All(context.Background()); v["auto_update_currencies"] != false {
 		t.Fatalf("space setting not stored in the space: %v", v)

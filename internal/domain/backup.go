@@ -326,6 +326,53 @@ func (s Backups) ingest(dir, src, original string) (*Backup, error) {
 	return s.find(dir, name)
 }
 
+// deletedDir holds the final backups of deleted spaces, for server admins.
+func (s Backups) deletedDir() string { return filepath.Join(s.Dir, "deleted") }
+
+// deletedKeep is how long final backups of deleted spaces are kept.
+const deletedKeep = 30 * 24 * time.Hour
+
+// FinalBackup backs up a space about to be deleted (P41).
+func (s Backups) FinalBackup(ctx context.Context, sp Space) (*Backup, error) {
+	work, err := s.workDir()
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(work)
+	dbFile := filepath.Join(work, "space.sqlite")
+	if err := s.Store.ExportSpace(ctx, sp.ID, dbFile); err != nil {
+		return nil, err
+	}
+	return s.write(s.deletedDir(), Manifest{Kind: kindSpace, Note: "deleted", SpaceUUID: sp.UUID, SpaceName: sp.Name},
+		map[string]string{"space.sqlite": dbFile})
+}
+
+// DeletedBackups lists the final backups of deleted spaces, removing those
+// older than deletedKeep.
+func (s Backups) DeletedBackups() ([]Backup, error) {
+	list, err := s.list(s.deletedDir())
+	if err != nil {
+		return nil, err
+	}
+	out := list[:0]
+	for _, b := range list {
+		if b.CreatedAt != nil && time.Since(*b.CreatedAt) > deletedKeep {
+			_ = s.remove(s.deletedDir(), b.Filename)
+			continue
+		}
+		out = append(out, b)
+	}
+	return out, nil
+}
+
+// DeletedPath is the file of a final backup.
+func (s Backups) DeletedPath(name string) (string, error) {
+	if _, err := s.find(s.deletedDir(), name); err != nil {
+		return "", err
+	}
+	return filepath.Join(s.deletedDir(), name), nil
+}
+
 // --- restoring -------------------------------------------------------------
 
 // prepareSpaceFrom unpacks a space backup (or takes a raw database file) and

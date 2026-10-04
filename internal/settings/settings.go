@@ -21,6 +21,10 @@ var serverDefaults = map[string]any{
 	"space_quota_mb": 0,
 	// Backups a space keeps; older ones are removed. 0 keeps all.
 	"space_backups_max": 10,
+	// How many spaces a user may administer; null is unlimited, 0 none.
+	"max_spaces_per_user": nil,
+	// Whether an invitation link may create an account.
+	"space_invites_can_register": true,
 }
 
 // spaceDefaults are the settings of one space, kept in its own database.

@@ -28,6 +28,16 @@ type Account struct {
 	UpdatedAt       sql.NullString
 }
 
+type AdminAudit struct {
+	ID           int64
+	ActorID      sql.NullInt64
+	Action       string
+	SpaceID      sql.NullInt64
+	TargetUserID sql.NullInt64
+	Details      sql.NullString
+	CreatedAt    string
+}
+
 type ApiToken struct {
 	ID         int64
 	UserID     int64
@@ -202,12 +212,27 @@ type Setting struct {
 }
 
 type Space struct {
-	ID        int64
-	Uuid      string
-	Name      string
-	CreatedBy sql.NullInt64
-	CreatedAt sql.NullString
-	UpdatedAt sql.NullString
+	ID         int64
+	Uuid       string
+	Name       string
+	QuotaBytes sql.NullInt64
+	CreatedBy  sql.NullInt64
+	CreatedAt  sql.NullString
+	UpdatedAt  sql.NullString
+}
+
+type SpaceInvitation struct {
+	ID                   int64
+	SpaceID              int64
+	Email                sql.NullString
+	Role                 string
+	TokenHash            string
+	InvitedBy            sql.NullInt64
+	InvitedByServerAdmin int64
+	ExpiresAt            string
+	AcceptedAt           sql.NullString
+	AcceptedBy           sql.NullInt64
+	CreatedAt            sql.NullString
 }
 
 type SpaceMember struct {
@@ -354,6 +379,7 @@ type User struct {
 	TwoFactorSecret    sql.NullString
 	TwoFactorEnabled   int64
 	TwoFactorConfirmed int64
+	DeletedAt          sql.NullString
 	CreatedAt          sql.NullString
 	UpdatedAt          sql.NullString
 }

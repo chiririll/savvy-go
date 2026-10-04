@@ -52,10 +52,13 @@ var undocumented = []string{
 	"/api/auth/2fa", "/api/auth/sso", "/api/auth/webauthn",
 	"/api/uploads", "/api/s3/multipart", "/api/transactions/import",
 	"/api/backups", "/api/identity-providers", "/api/spaces/import",
+	"/api/admin", "/api/monitoring", "/api/invitations",
 }
 
-// undocumentedInSpace lists session-only routes under /api/spaces/{space}.
-var undocumentedInSpace = []string{"/backups"}
+// undocumentedInSpace lists routes under /api/spaces/{space} that are
+// absent for the same reasons: uploads, imports, backups, invitations and the
+// audit log are session-only.
+var undocumentedInSpace = []string{"/s3/multipart", "/transactions/import", "/backups", "/invitations", "/audit"}
 
 func isUndocumented(path string) bool {
 	if rest, ok := strings.CutPrefix(path, "/api/spaces/{space}"); ok {

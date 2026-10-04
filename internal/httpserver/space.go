@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"savvy-go/internal/domain"
 	"savvy-go/internal/settings"
@@ -64,22 +63,10 @@ func sp(r *http.Request) *spaceScope {
 	return scope
 }
 
-// spaceHeader names the space a request works in until the routes move under
-// /api/spaces/{space}; without it the caller's first space is used.
-const spaceHeader = "X-Space-ID"
-
-// withSpace resolves the space of the request and the caller's role in it.
-// Membership is checked before availability, so a space the caller does not
-// belong to is a 404 whether or not it is broken.
-func (s *Server) withSpace(next http.Handler) http.Handler { return s.resolveSpace(next, true) }
-
-// withOptionalSpace resolves the space like withSpace but lets a caller who
-// belongs to no space through without one (sp(r) is then nil).
-func (s *Server) withOptionalSpace(next http.Handler) http.Handler {
-	return s.resolveSpace(next, false)
-}
-
-func (s *Server) resolveSpace(next http.Handler, required bool) http.Handler {
+// withSpace resolves the space named by {space} and the caller's role in
+// it. Membership is checked before availability, so a space the caller does
+// not belong to is a 404 whether or not it is broken (P42).
+func (s *Server) withSpace(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		u := userFrom(r)
 		if u == nil {
@@ -87,35 +74,15 @@ func (s *Server) resolveSpace(next http.Handler, required bool) http.Handler {
 			return
 		}
 		ctx := r.Context()
-		var id int64
+		id, err := strconv.ParseInt(chi.URLParam(r, "space"), 10, 64)
 		var role string
-		raw := chi.URLParam(r, "space")
-		if raw == "" {
-			raw = strings.TrimSpace(r.Header.Get(spaceHeader))
-		}
-		if raw != "" {
-			if parsed, err := strconv.ParseInt(raw, 10, 64); err == nil {
-				id = parsed
-				if role, err = s.spaces.Role(ctx, id, u.ID); err != nil {
-					writeMessage(w, http.StatusInternalServerError, err.Error())
-					return
-				}
-			}
-		} else {
-			mine, err := s.spaces.ForUser(ctx, u.ID)
-			if err != nil {
+		if err == nil {
+			if role, err = s.spaces.Role(ctx, id, u.ID); err != nil {
 				writeMessage(w, http.StatusInternalServerError, err.Error())
 				return
 			}
-			if len(mine) > 0 {
-				id, role = mine[0].ID, mine[0].Role
-			}
 		}
 		if role == "" {
-			if !required && raw == "" {
-				next.ServeHTTP(w, r)
-				return
-			}
 			writeMessage(w, http.StatusNotFound, "Space not found.")
 			return
 		}

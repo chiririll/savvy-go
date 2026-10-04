@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -19,6 +20,8 @@ import (
 	"savvy-go/internal/signing"
 	"savvy-go/internal/store"
 	"savvy-go/internal/store/sqlite"
+
+	"github.com/go-chi/chi/v5"
 )
 
 // Test roles for createUser: admin is a server admin and admin of the shared
@@ -119,8 +122,40 @@ func (a *testApp) issue(u *auth.User, remember bool) *auth.Issued {
 	return issued
 }
 
+// dataRoots are the first path segments of the space data routes.
+func dataRoots(s *Server) map[string]bool {
+	r := chi.NewRouter()
+	dataRoutes(s, r)
+	roots := map[string]bool{}
+	_ = chi.Walk(r, func(_, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
+		roots[strings.SplitN(strings.TrimPrefix(route, "/"), "/", 2)[0]] = true
+		return nil
+	})
+	return roots
+}
+
+// apiPath sends data requests written as /api/<data> to the shared test
+// space, /api/spaces/{id}/<data>.
+func (a *testApp) apiPath(path string) string {
+	return spacedPath(a.s, a.space.ID, path)
+}
+
+func spacedPath(s *Server, spaceID int64, path string) string {
+	rest, ok := strings.CutPrefix(path, "/api/")
+	if !ok {
+		return path
+	}
+	root, _, _ := strings.Cut(rest, "/")
+	root, _, _ = strings.Cut(root, "?")
+	if dataRoots(s)[root] {
+		return "/api/spaces/" + strconv.FormatInt(spaceID, 10) + "/" + rest
+	}
+	return path
+}
+
 func (a *testApp) request(method, path string, body any, token, csrf string) *http.Request {
 	a.t.Helper()
+	path = a.apiPath(path)
 	var rdr io.Reader
 	if body != nil {
 		raw, err := json.Marshal(body)

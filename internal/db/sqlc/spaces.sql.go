@@ -10,6 +10,86 @@ import (
 	"database/sql"
 )
 
+const acceptInvitation = `-- name: AcceptInvitation :execresult
+UPDATE space_invitations SET accepted_at = ?, accepted_by = ?
+WHERE id = ? AND accepted_at IS NULL
+`
+
+type AcceptInvitationParams struct {
+	AcceptedAt sql.NullString
+	AcceptedBy sql.NullInt64
+	ID         int64
+}
+
+func (q *Queries) AcceptInvitation(ctx context.Context, arg AcceptInvitationParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, acceptInvitation, arg.AcceptedAt, arg.AcceptedBy, arg.ID)
+}
+
+const countSpaceMembers = `-- name: CountSpaceMembers :one
+SELECT COUNT(*) FROM space_members WHERE space_id = ?
+`
+
+func (q *Queries) CountSpaceMembers(ctx context.Context, spaceID int64) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countSpaceMembers, spaceID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countSpaceRole = `-- name: CountSpaceRole :one
+SELECT COUNT(*) FROM space_members WHERE space_id = ? AND role = ?
+`
+
+type CountSpaceRoleParams struct {
+	SpaceID int64
+	Role    string
+}
+
+func (q *Queries) CountSpaceRole(ctx context.Context, arg CountSpaceRoleParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countSpaceRole, arg.SpaceID, arg.Role)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countUserAdminSpaces = `-- name: CountUserAdminSpaces :one
+SELECT COUNT(*) FROM space_members WHERE user_id = ? AND role = 'admin'
+`
+
+func (q *Queries) CountUserAdminSpaces(ctx context.Context, userID int64) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countUserAdminSpaces, userID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const deleteInvitation = `-- name: DeleteInvitation :execresult
+DELETE FROM space_invitations WHERE id = ? AND space_id = ?
+`
+
+type DeleteInvitationParams struct {
+	ID      int64
+	SpaceID int64
+}
+
+func (q *Queries) DeleteInvitation(ctx context.Context, arg DeleteInvitationParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, deleteInvitation, arg.ID, arg.SpaceID)
+}
+
+const deleteSpaceMember = `-- name: DeleteSpaceMember :exec
+DELETE FROM space_members WHERE space_id = ? AND user_id = ?
+`
+
+type DeleteSpaceMemberParams struct {
+	SpaceID int64
+	UserID  int64
+}
+
+func (q *Queries) DeleteSpaceMember(ctx context.Context, arg DeleteSpaceMemberParams) error {
+	_, err := q.db.ExecContext(ctx, deleteSpaceMember, arg.SpaceID, arg.UserID)
+	return err
+}
+
 const deleteSpaceRow = `-- name: DeleteSpaceRow :exec
 DELETE FROM spaces WHERE id = ?
 `
@@ -17,6 +97,51 @@ DELETE FROM spaces WHERE id = ?
 func (q *Queries) DeleteSpaceRow(ctx context.Context, id int64) error {
 	_, err := q.db.ExecContext(ctx, deleteSpaceRow, id)
 	return err
+}
+
+const deleteUserMemberships = `-- name: DeleteUserMemberships :exec
+DELETE FROM space_members WHERE user_id = ?
+`
+
+func (q *Queries) DeleteUserMemberships(ctx context.Context, userID int64) error {
+	_, err := q.db.ExecContext(ctx, deleteUserMemberships, userID)
+	return err
+}
+
+const getInvitationByHash = `-- name: GetInvitationByHash :one
+SELECT i.id, i.space_id, s.name AS space_name, i.email, i.role, i.invited_by_server_admin,
+	i.expires_at, i.accepted_at, COALESCE(u.name, '') AS inviter
+FROM space_invitations i JOIN spaces s ON s.id = i.space_id LEFT JOIN users u ON u.id = i.invited_by
+WHERE i.token_hash = ?
+`
+
+type GetInvitationByHashRow struct {
+	ID                   int64
+	SpaceID              int64
+	SpaceName            string
+	Email                sql.NullString
+	Role                 string
+	InvitedByServerAdmin int64
+	ExpiresAt            string
+	AcceptedAt           sql.NullString
+	Inviter              string
+}
+
+func (q *Queries) GetInvitationByHash(ctx context.Context, tokenHash string) (GetInvitationByHashRow, error) {
+	row := q.db.QueryRowContext(ctx, getInvitationByHash, tokenHash)
+	var i GetInvitationByHashRow
+	err := row.Scan(
+		&i.ID,
+		&i.SpaceID,
+		&i.SpaceName,
+		&i.Email,
+		&i.Role,
+		&i.InvitedByServerAdmin,
+		&i.ExpiresAt,
+		&i.AcceptedAt,
+		&i.Inviter,
+	)
+	return i, err
 }
 
 const getMemberRole = `-- name: GetMemberRole :one
@@ -36,7 +161,7 @@ func (q *Queries) GetMemberRole(ctx context.Context, arg GetMemberRoleParams) (s
 }
 
 const getSpace = `-- name: GetSpace :one
-SELECT id, uuid, name, created_by, created_at, updated_at FROM spaces WHERE id = ?
+SELECT id, uuid, name, quota_bytes, created_by, created_at, updated_at FROM spaces WHERE id = ?
 `
 
 func (q *Queries) GetSpace(ctx context.Context, id int64) (Space, error) {
@@ -46,11 +171,82 @@ func (q *Queries) GetSpace(ctx context.Context, id int64) (Space, error) {
 		&i.ID,
 		&i.Uuid,
 		&i.Name,
+		&i.QuotaBytes,
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const getSpaceQuota = `-- name: GetSpaceQuota :one
+SELECT quota_bytes FROM spaces WHERE id = ?
+`
+
+func (q *Queries) GetSpaceQuota(ctx context.Context, id int64) (sql.NullInt64, error) {
+	row := q.db.QueryRowContext(ctx, getSpaceQuota, id)
+	var quota_bytes sql.NullInt64
+	err := row.Scan(&quota_bytes)
+	return quota_bytes, err
+}
+
+const insertAudit = `-- name: InsertAudit :exec
+INSERT INTO admin_audit (actor_id, action, space_id, target_user_id, details, created_at)
+VALUES (?, ?, ?, ?, ?, ?)
+`
+
+type InsertAuditParams struct {
+	ActorID      sql.NullInt64
+	Action       string
+	SpaceID      sql.NullInt64
+	TargetUserID sql.NullInt64
+	Details      sql.NullString
+	CreatedAt    string
+}
+
+func (q *Queries) InsertAudit(ctx context.Context, arg InsertAuditParams) error {
+	_, err := q.db.ExecContext(ctx, insertAudit,
+		arg.ActorID,
+		arg.Action,
+		arg.SpaceID,
+		arg.TargetUserID,
+		arg.Details,
+		arg.CreatedAt,
+	)
+	return err
+}
+
+const insertInvitation = `-- name: InsertInvitation :one
+INSERT INTO space_invitations (space_id, email, role, token_hash, invited_by, invited_by_server_admin, expires_at, created_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+RETURNING id
+`
+
+type InsertInvitationParams struct {
+	SpaceID              int64
+	Email                sql.NullString
+	Role                 string
+	TokenHash            string
+	InvitedBy            sql.NullInt64
+	InvitedByServerAdmin int64
+	ExpiresAt            string
+	CreatedAt            sql.NullString
+}
+
+func (q *Queries) InsertInvitation(ctx context.Context, arg InsertInvitationParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, insertInvitation,
+		arg.SpaceID,
+		arg.Email,
+		arg.Role,
+		arg.TokenHash,
+		arg.InvitedBy,
+		arg.InvitedByServerAdmin,
+		arg.ExpiresAt,
+		arg.CreatedAt,
+	)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
 }
 
 const insertSpace = `-- name: InsertSpace :one
@@ -80,6 +276,145 @@ func (q *Queries) InsertSpace(ctx context.Context, arg InsertSpaceParams) (int64
 	return id, err
 }
 
+const listInvitations = `-- name: ListInvitations :many
+SELECT i.id, i.email, i.role, i.expires_at, i.accepted_at, i.created_at, COALESCE(u.name, '') AS inviter
+FROM space_invitations i LEFT JOIN users u ON u.id = i.invited_by
+WHERE i.space_id = ?
+ORDER BY i.id DESC
+`
+
+type ListInvitationsRow struct {
+	ID         int64
+	Email      sql.NullString
+	Role       string
+	ExpiresAt  string
+	AcceptedAt sql.NullString
+	CreatedAt  sql.NullString
+	Inviter    string
+}
+
+func (q *Queries) ListInvitations(ctx context.Context, spaceID int64) ([]ListInvitationsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listInvitations, spaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListInvitationsRow{}
+	for rows.Next() {
+		var i ListInvitationsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Email,
+			&i.Role,
+			&i.ExpiresAt,
+			&i.AcceptedAt,
+			&i.CreatedAt,
+			&i.Inviter,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listMembers = `-- name: ListMembers :many
+SELECT m.user_id, u.name, u.email, m.role, m.created_at
+FROM space_members m JOIN users u ON u.id = m.user_id
+WHERE m.space_id = ?
+ORDER BY u.name
+`
+
+type ListMembersRow struct {
+	UserID    int64
+	Name      string
+	Email     string
+	Role      string
+	CreatedAt sql.NullString
+}
+
+func (q *Queries) ListMembers(ctx context.Context, spaceID int64) ([]ListMembersRow, error) {
+	rows, err := q.db.QueryContext(ctx, listMembers, spaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListMembersRow{}
+	for rows.Next() {
+		var i ListMembersRow
+		if err := rows.Scan(
+			&i.UserID,
+			&i.Name,
+			&i.Email,
+			&i.Role,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSpaceAudit = `-- name: ListSpaceAudit :many
+SELECT a.id, a.action, a.target_user_id, a.details, a.created_at, COALESCE(u.name, '') AS actor
+FROM admin_audit a LEFT JOIN users u ON u.id = a.actor_id
+WHERE a.space_id = ?
+ORDER BY a.id DESC
+LIMIT 200
+`
+
+type ListSpaceAuditRow struct {
+	ID           int64
+	Action       string
+	TargetUserID sql.NullInt64
+	Details      sql.NullString
+	CreatedAt    string
+	Actor        string
+}
+
+func (q *Queries) ListSpaceAudit(ctx context.Context, spaceID sql.NullInt64) ([]ListSpaceAuditRow, error) {
+	rows, err := q.db.QueryContext(ctx, listSpaceAudit, spaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListSpaceAuditRow{}
+	for rows.Next() {
+		var i ListSpaceAuditRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Action,
+			&i.TargetUserID,
+			&i.Details,
+			&i.CreatedAt,
+			&i.Actor,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSpaceIDs = `-- name: ListSpaceIDs :many
 SELECT id FROM spaces ORDER BY id
 `
@@ -97,6 +432,81 @@ func (q *Queries) ListSpaceIDs(ctx context.Context) ([]int64, error) {
 			return nil, err
 		}
 		items = append(items, id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSpacesOverview = `-- name: ListSpacesOverview :many
+SELECT s.id, s.uuid, s.name, s.quota_bytes, s.created_at,
+	(SELECT COUNT(*) FROM space_members m WHERE m.space_id = s.id) AS members,
+	(SELECT COUNT(*) FROM space_members m WHERE m.space_id = s.id AND m.role = 'admin') AS admins
+FROM spaces s ORDER BY s.id
+`
+
+type ListSpacesOverviewRow struct {
+	ID         int64
+	Uuid       string
+	Name       string
+	QuotaBytes sql.NullInt64
+	CreatedAt  sql.NullString
+	Members    int64
+	Admins     int64
+}
+
+func (q *Queries) ListSpacesOverview(ctx context.Context) ([]ListSpacesOverviewRow, error) {
+	rows, err := q.db.QueryContext(ctx, listSpacesOverview)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListSpacesOverviewRow{}
+	for rows.Next() {
+		var i ListSpacesOverviewRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Uuid,
+			&i.Name,
+			&i.QuotaBytes,
+			&i.CreatedAt,
+			&i.Members,
+			&i.Admins,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listUserAdminSpaces = `-- name: ListUserAdminSpaces :many
+SELECT space_id FROM space_members WHERE user_id = ? AND role = 'admin' ORDER BY space_id
+`
+
+func (q *Queries) ListUserAdminSpaces(ctx context.Context, userID int64) ([]int64, error) {
+	rows, err := q.db.QueryContext(ctx, listUserAdminSpaces, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var space_id int64
+		if err := rows.Scan(&space_id); err != nil {
+			return nil, err
+		}
+		items = append(items, space_id)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err
@@ -147,6 +557,36 @@ func (q *Queries) ListUserSpaces(ctx context.Context, userID int64) ([]ListUserS
 		return nil, err
 	}
 	return items, nil
+}
+
+const renameSpace = `-- name: RenameSpace :exec
+UPDATE spaces SET name = ?, updated_at = ? WHERE id = ?
+`
+
+type RenameSpaceParams struct {
+	Name      string
+	UpdatedAt sql.NullString
+	ID        int64
+}
+
+func (q *Queries) RenameSpace(ctx context.Context, arg RenameSpaceParams) error {
+	_, err := q.db.ExecContext(ctx, renameSpace, arg.Name, arg.UpdatedAt, arg.ID)
+	return err
+}
+
+const setSpaceQuota = `-- name: SetSpaceQuota :exec
+UPDATE spaces SET quota_bytes = ?, updated_at = ? WHERE id = ?
+`
+
+type SetSpaceQuotaParams struct {
+	QuotaBytes sql.NullInt64
+	UpdatedAt  sql.NullString
+	ID         int64
+}
+
+func (q *Queries) SetSpaceQuota(ctx context.Context, arg SetSpaceQuotaParams) error {
+	_, err := q.db.ExecContext(ctx, setSpaceQuota, arg.QuotaBytes, arg.UpdatedAt, arg.ID)
+	return err
 }
 
 const spaceIDByUUID = `-- name: SpaceIDByUUID :one

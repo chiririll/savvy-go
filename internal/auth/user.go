@@ -46,6 +46,7 @@ type User struct {
 	TwoFactorSecret    *string
 	TwoFactorEnabled   bool
 	TwoFactorConfirmed bool
+	Deleted            bool
 	CreatedAt          *time.Time
 	UpdatedAt          *time.Time
 }
@@ -234,8 +235,24 @@ func boolToInt(v bool) int {
 	return 0
 }
 
+// Delete tombstones a user: the row stays (ids in space databases still
+// resolve to "Deleted user") but loses its email, password, second factors,
+// sessions, tokens, passkeys, SSO links and space memberships.
 func (s Users) Delete(ctx context.Context, id int64) error {
-	return db.Q(s.DB).DeleteUser(ctx, id)
+	now := time.Now().UTC().Format(time.RFC3339)
+	return store.Tx(ctx, s.DB, func(tx store.DB) error {
+		q := db.Q(tx)
+		for _, del := range []func(context.Context, int64) error{
+			q.DeleteUserCredentials, q.DeleteUserAPITokens, q.DeleteUserPasskeys,
+			q.DeleteUserIdentities, q.DeleteUserPasswordTokens, q.DeleteUserRecoveryCodes,
+			q.DeleteUserMemberships,
+		} {
+			if err := del(ctx, id); err != nil {
+				return err
+			}
+		}
+		return q.TombstoneUser(ctx, sqlc.TombstoneUserParams{Now: db.NS(now), ID: id})
+	})
 }
 
 func (s Users) AdminCount(ctx context.Context) (int, error) {
@@ -260,6 +277,7 @@ func userFromRow(r sqlc.User, err error) (*User, error) {
 	u.IsSSOOnly = r.IsSsoOnly != 0
 	u.TwoFactorEnabled = r.TwoFactorEnabled != 0
 	u.TwoFactorConfirmed = r.TwoFactorConfirmed != 0
+	u.Deleted = r.DeletedAt.Valid
 	if t, ok := parseTime(r.CreatedAt); ok {
 		u.CreatedAt = &t
 	}

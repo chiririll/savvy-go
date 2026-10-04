@@ -85,10 +85,17 @@ func (s *Server) monitoringStorage(w http.ResponseWriter, r *http.Request) {
 
 	importBy := map[string]int{}
 	importTotal := 0
-	if irows, err := db.Q(sp(r).db).ImportCountsByStatus(r.Context()); err == nil {
-		for _, row := range irows {
-			importBy[row.Status] = int(row.Count)
-			importTotal += int(row.Count)
+	ids, _ := s.store.Spaces(r.Context())
+	for _, id := range ids {
+		d, err := s.store.Space(r.Context(), id)
+		if err != nil {
+			continue
+		}
+		if irows, err := db.Q(d).ImportCountsByStatus(r.Context()); err == nil {
+			for _, row := range irows {
+				importBy[row.Status] += int(row.Count)
+				importTotal += int(row.Count)
+			}
 		}
 	}
 

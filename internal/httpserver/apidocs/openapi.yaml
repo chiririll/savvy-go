@@ -19,8 +19,8 @@ info:
 
     ## Spaces
     Finances live in spaces; a user may belong to several, as `admin`, `editor` or `viewer`.
-    Data endpoints work in one space: the one named by the `X-Space-ID` header, otherwise the
-    caller's first space (`GET /spaces`). A space the caller does not belong to answers `404`.
+    Data endpoints live under `/spaces/{space}` (ids from `GET /spaces`). A space the caller
+    does not belong to answers `404`.
 
     Tokens cannot call administrator endpoints (users, identity providers) or credential and
     instance endpoints (passwords, 2FA, passkeys, API tokens, settings updates, backups).
@@ -40,6 +40,7 @@ security:
   - bearerAuth: []
 tags:
   - name: API tokens
+  - name: Spaces
   - name: Currencies
   - name: Accounts
   - name: Categories
@@ -137,24 +138,117 @@ paths:
         "404": {$ref: "#/components/responses/NotFound"}
   /spaces:
     get:
-      tags: [Other]
+      tags: [Spaces]
       summary: List the caller's spaces
       description: Each space with the caller's role in it (`admin`, `editor`, `viewer`).
       responses:
         "200": {$ref: "#/components/responses/Data"}
         "401": {$ref: "#/components/responses/Unauthenticated"}
+    post:
+      tags: [Spaces]
+      summary: Create a space administered by the caller
+      description: Session only. Guests cannot create spaces; `max_spaces_per_user` limits how many a user administers.
+      security: [{cookieAuth: []}]
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses:
+        "201": {$ref: "#/components/responses/Data"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "422": {$ref: "#/components/responses/Validation"}
 
+  /spaces/{space}:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Spaces]
+      summary: Get a space with the caller's role, its size and quota
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "404": {$ref: "#/components/responses/NotFound"}
+    patch:
+      tags: [Spaces]
+      summary: Rename a space
+      description: Space admins only, session only.
+      security: [{cookieAuth: []}]
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+    delete:
+      tags: [Spaces]
+      summary: Delete a space
+      description: Space admins only, session only. A final backup is kept for the server administrators.
+      security: [{cookieAuth: []}]
+      responses:
+        "204": {description: Deleted}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+  /spaces/{space}/members:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Spaces]
+      summary: List the members of a space
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "404": {$ref: "#/components/responses/NotFound"}
+  /spaces/{space}/members/{user}:
+    parameters: [{$ref: "#/components/parameters/Space"}, {name: user, in: path, required: true, schema: {type: integer}}]
+    patch:
+      tags: [Spaces]
+      summary: Change a member's role
+      description: Space admins only, session only. A space keeps at least one admin; guests cannot be admins.
+      security: [{cookieAuth: []}]
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "422": {$ref: "#/components/responses/Validation"}
+    delete:
+      tags: [Spaces]
+      summary: Remove a member
+      description: Space admins only, session only.
+      security: [{cookieAuth: []}]
+      responses:
+        "204": {description: Removed}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "422": {$ref: "#/components/responses/Validation"}
+  /spaces/{space}/leave:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    post:
+      tags: [Spaces]
+      summary: Leave a space
+      description: Session only. The last admin of a space with other members cannot leave.
+      security: [{cookieAuth: []}]
+      responses:
+        "204": {description: Left}
+        "422": {$ref: "#/components/responses/Validation"}
+  /spaces/{space}/settings:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Spaces]
+      summary: Read the settings of a space
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "404": {$ref: "#/components/responses/NotFound"}
+    patch:
+      tags: [Spaces]
+      summary: Update the settings of a space
+      description: Space admins only, session only.
+      security: [{cookieAuth: []}]
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "403": {$ref: "#/components/responses/Forbidden"}
   /settings:
     get:
       tags: [Other]
-      summary: Read instance settings and those of the current space
+      summary: Read instance settings
       responses:
         "200": {$ref: "#/components/responses/Data"}
         "401": {$ref: "#/components/responses/Unauthenticated"}
     patch:
       tags: [Other]
-      summary: Update instance settings and those of the current space
-      description: Session only. Instance settings need a server admin, space settings a space admin.
+      summary: Update instance settings
+      description: Server administrators only, session only.
       security: [{cookieAuth: []}]
       requestBody: {$ref: "#/components/requestBodies/Object"}
       responses:
@@ -162,7 +256,8 @@ paths:
         "403": {$ref: "#/components/responses/Forbidden"}
         "422": {$ref: "#/components/responses/Validation"}
 
-  /currencies:
+  /spaces/{space}/currencies:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     get:
       tags: [Currencies]
       summary: List currencies
@@ -178,12 +273,14 @@ paths:
         "401": {$ref: "#/components/responses/Unauthenticated"}
         "403": {$ref: "#/components/responses/Forbidden"}
         "422": {$ref: "#/components/responses/Validation"}
-  /currencies/catalog:
+  /spaces/{space}/currencies/catalog:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     get:
       tags: [Currencies]
       summary: Catalog of currencies that can be added
       responses: *list-ok
-  /currencies/convert:
+  /spaces/{space}/currencies/convert:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     post:
       tags: [Currencies]
       summary: Convert an amount between currencies
@@ -203,8 +300,8 @@ paths:
         "403": {$ref: "#/components/responses/Forbidden"}
         "404": {$ref: "#/components/responses/NotFound"}
         "422": {$ref: "#/components/responses/Validation"}
-  /currencies/{id}:
-    parameters: [{$ref: "#/components/parameters/Id"}]
+  /spaces/{space}/currencies/{id}:
+    parameters: [{$ref: "#/components/parameters/Space"}, {$ref: "#/components/parameters/Id"}]
     get:
       tags: [Currencies]
       summary: Get a currency
@@ -231,14 +328,16 @@ paths:
         "403": {$ref: "#/components/responses/Forbidden"}
         "404": {$ref: "#/components/responses/NotFound"}
         "422": {$ref: "#/components/responses/Validation"}
-  /currencies/{id}/set-base:
+  /spaces/{space}/currencies/{id}/set-base:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     post:
       tags: [Currencies]
       summary: Make this the base currency
       parameters: [{$ref: "#/components/parameters/Id"}]
       responses: *action-ok
 
-  /accounts:
+  /spaces/{space}/accounts:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     get:
       tags: [Accounts]
       summary: List accounts
@@ -257,7 +356,8 @@ paths:
           application/json:
             schema: {$ref: "#/components/schemas/AccountInput"}
       responses: *create-ok
-  /accounts/reorder:
+  /spaces/{space}/accounts/reorder:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     post:
       tags: [Accounts]
       summary: Reorder accounts
@@ -270,18 +370,20 @@ paths:
               properties:
                 ids: {type: array, items: {type: integer}}
       responses: *action-ok
-  /accounts-balance-history:
+  /spaces/{space}/accounts-balance-history:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     get:
       tags: [Accounts]
       summary: Balance history of accounts
       responses: *list-ok
-  /accounts-balance-comparison:
+  /spaces/{space}/accounts-balance-comparison:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     get:
       tags: [Accounts]
       summary: Compare balances between two dates
       responses: *list-ok
-  /accounts/{id}:
-    parameters: [{$ref: "#/components/parameters/Id"}]
+  /spaces/{space}/accounts/{id}:
+    parameters: [{$ref: "#/components/parameters/Space"}, {$ref: "#/components/parameters/Id"}]
     get:
       tags: [Accounts]
       summary: Get an account
@@ -307,7 +409,8 @@ paths:
       summary: Delete an account
       responses: *delete-ok
 
-  /categories:
+  /spaces/{space}/categories:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     get:
       tags: [Categories]
       summary: List categories
@@ -319,7 +422,8 @@ paths:
       summary: Create a category
       requestBody: {$ref: "#/components/requestBodies/Object"}
       responses: *create-ok
-  /categories-summary:
+  /spaces/{space}/categories-summary:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     get:
       tags: [Categories]
       summary: Totals per category
@@ -328,8 +432,8 @@ paths:
         - {name: start_date, in: query, schema: {type: string, format: date}}
         - {name: end_date, in: query, schema: {type: string, format: date}}
       responses: *list-ok
-  /categories/{id}:
-    parameters: [{$ref: "#/components/parameters/Id"}]
+  /spaces/{space}/categories/{id}:
+    parameters: [{$ref: "#/components/parameters/Space"}, {$ref: "#/components/parameters/Id"}]
     get:
       tags: [Categories]
       summary: Get a category
@@ -350,13 +454,15 @@ paths:
       parameters:
         - {name: successor_id, in: query, schema: {type: integer}, description: Category that inherits the transactions}
       responses: *delete-ok
-  /categories/{id}/set-default:
+  /spaces/{space}/categories/{id}/set-default:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     post:
       tags: [Categories]
       summary: Make this the default category
       parameters: [{$ref: "#/components/parameters/Id"}]
       responses: *action-ok
-  /categories/{id}/statistics:
+  /spaces/{space}/categories/{id}/statistics:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     get:
       tags: [Categories]
       summary: Category statistics
@@ -366,7 +472,8 @@ paths:
         - {name: end_date, in: query, schema: {type: string, format: date}}
       responses: *show-ok
 
-  /tags:
+  /spaces/{space}/tags:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     get:
       tags: [Tags]
       summary: List tags
@@ -384,8 +491,8 @@ paths:
               properties:
                 name: {type: string}
       responses: *create-ok
-  /tags/{id}:
-    parameters: [{$ref: "#/components/parameters/Id"}]
+  /spaces/{space}/tags/{id}:
+    parameters: [{$ref: "#/components/parameters/Space"}, {$ref: "#/components/parameters/Id"}]
     get:
       tags: [Tags]
       summary: Get a tag
@@ -405,7 +512,8 @@ paths:
       summary: Delete a tag
       responses: *delete-ok
 
-  /transactions:
+  /spaces/{space}/transactions:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     get:
       tags: [Transactions]
       summary: List transactions
@@ -451,18 +559,20 @@ paths:
           application/json:
             schema: {$ref: "#/components/schemas/TransactionInput"}
       responses: *create-ok
-  /transactions-summary:
+  /spaces/{space}/transactions-summary:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     get:
       tags: [Transactions]
       summary: Totals for the current filter
       responses: *list-ok
-  /transactions-pending-summary:
+  /spaces/{space}/transactions-pending-summary:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     get:
       tags: [Transactions]
       summary: Pending (not yet confirmed) transactions summary
       responses: *list-ok
-  /transactions/{id}:
-    parameters: [{$ref: "#/components/parameters/Id"}]
+  /spaces/{space}/transactions/{id}:
+    parameters: [{$ref: "#/components/parameters/Space"}, {$ref: "#/components/parameters/Id"}]
     get:
       tags: [Transactions]
       summary: Get a transaction
@@ -487,26 +597,30 @@ paths:
       tags: [Transactions]
       summary: Delete a transaction
       responses: *delete-ok
-  /transactions/{id}/duplicate:
+  /spaces/{space}/transactions/{id}/duplicate:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     post:
       tags: [Transactions]
       summary: Duplicate a transaction
       parameters: [{$ref: "#/components/parameters/Id"}]
       responses: *action-ok
-  /transactions/{id}/confirm:
+  /spaces/{space}/transactions/{id}/confirm:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     post:
       tags: [Transactions]
       summary: Confirm a pending transaction
       parameters: [{$ref: "#/components/parameters/Id"}]
       responses: *action-ok
-  /transactions/{id}/skip:
+  /spaces/{space}/transactions/{id}/skip:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     post:
       tags: [Transactions]
       summary: Skip a pending recurring transaction
       parameters: [{$ref: "#/components/parameters/Id"}]
       responses: *action-ok
 
-  /debts:
+  /spaces/{space}/debts:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     get:
       tags: [Debts]
       summary: List debts
@@ -535,13 +649,14 @@ paths:
                 counterparty: {type: string, nullable: true}
                 description: {type: string, nullable: true}
       responses: *create-ok
-  /debts-summary:
+  /spaces/{space}/debts-summary:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     get:
       tags: [Debts]
       summary: Debts summary
       responses: *list-ok
-  /debts/{id}:
-    parameters: [{$ref: "#/components/parameters/Id"}]
+  /spaces/{space}/debts/{id}:
+    parameters: [{$ref: "#/components/parameters/Space"}, {$ref: "#/components/parameters/Id"}]
     get:
       tags: [Debts]
       summary: Get a debt
@@ -560,7 +675,8 @@ paths:
       tags: [Debts]
       summary: Delete a debt
       responses: *delete-ok
-  /debts/{id}/payment:
+  /spaces/{space}/debts/{id}/payment:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     post:
       tags: [Debts]
       summary: Register a payment
@@ -577,21 +693,24 @@ paths:
                 date: {type: string, format: date}
                 description: {type: string, nullable: true}
       responses: *action-ok
-  /debts/{id}/collect:
+  /spaces/{space}/debts/{id}/collect:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     post:
       tags: [Debts]
       summary: Collect a debt
       parameters: [{$ref: "#/components/parameters/Id"}]
       requestBody: {$ref: "#/components/requestBodies/Object"}
       responses: *action-ok
-  /debts/{id}/reopen:
+  /spaces/{space}/debts/{id}/reopen:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     post:
       tags: [Debts]
       summary: Reopen a closed debt
       parameters: [{$ref: "#/components/parameters/Id"}]
       responses: *action-ok
 
-  /recurring:
+  /spaces/{space}/recurring:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     get:
       tags: [Recurring]
       summary: List recurring transactions
@@ -622,13 +741,14 @@ paths:
                 is_active: {type: boolean}
                 tag_ids: {type: array, items: {type: integer}}
       responses: *create-ok
-  /recurring-upcoming:
+  /spaces/{space}/recurring-upcoming:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     get:
       tags: [Recurring]
       summary: Upcoming runs
       responses: *list-ok
-  /recurring/{id}:
-    parameters: [{$ref: "#/components/parameters/Id"}]
+  /spaces/{space}/recurring/{id}:
+    parameters: [{$ref: "#/components/parameters/Space"}, {$ref: "#/components/parameters/Id"}]
     get:
       tags: [Recurring]
       summary: Get a recurring transaction
@@ -648,7 +768,8 @@ paths:
       summary: Delete a recurring transaction
       responses: *delete-ok
 
-  /budgets:
+  /spaces/{space}/budgets:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     get:
       tags: [Budgets]
       summary: List budgets
@@ -662,8 +783,8 @@ paths:
           application/json:
             schema: {$ref: "#/components/schemas/BudgetInput"}
       responses: *create-ok
-  /budgets/{id}:
-    parameters: [{$ref: "#/components/parameters/Id"}]
+  /spaces/{space}/budgets/{id}:
+    parameters: [{$ref: "#/components/parameters/Space"}, {$ref: "#/components/parameters/Id"}]
     get:
       tags: [Budgets]
       summary: Get a budget
@@ -689,7 +810,8 @@ paths:
       summary: Delete a budget
       responses: *delete-ok
 
-  /automation-rules:
+  /spaces/{space}/automation-rules:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     get:
       tags: [Automation rules]
       summary: List automation rules
@@ -699,12 +821,14 @@ paths:
       summary: Create a rule
       requestBody: {$ref: "#/components/requestBodies/AutomationRule"}
       responses: *create-ok
-  /automation-rules/triggers:
+  /spaces/{space}/automation-rules/triggers:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     get:
       tags: [Automation rules]
       summary: Available triggers
       responses: *list-ok
-  /automation-rules/reorder:
+  /spaces/{space}/automation-rules/reorder:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     post:
       tags: [Automation rules]
       summary: Reorder rules
@@ -723,8 +847,8 @@ paths:
                       id: {type: integer}
                       priority: {type: integer}
       responses: *action-ok
-  /automation-rules/{id}:
-    parameters: [{$ref: "#/components/parameters/Id"}]
+  /spaces/{space}/automation-rules/{id}:
+    parameters: [{$ref: "#/components/parameters/Space"}, {$ref: "#/components/parameters/Id"}]
     get:
       tags: [Automation rules]
       summary: Get a rule
@@ -743,13 +867,15 @@ paths:
       tags: [Automation rules]
       summary: Delete a rule
       responses: *delete-ok
-  /automation-rules/{id}/toggle:
+  /spaces/{space}/automation-rules/{id}/toggle:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     post:
       tags: [Automation rules]
       summary: Enable or disable a rule
       parameters: [{$ref: "#/components/parameters/Id"}]
       responses: *action-ok
-  /automation-rules/{id}/test:
+  /spaces/{space}/automation-rules/{id}/test:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     post:
       tags: [Automation rules]
       summary: Test a rule against a transaction
@@ -763,14 +889,16 @@ paths:
               properties:
                 transaction_id: {type: integer}
       responses: *action-ok
-  /automation-rules/{id}/logs:
+  /spaces/{space}/automation-rules/{id}/logs:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     get:
       tags: [Automation rules]
       summary: Rule execution log
       parameters: [{$ref: "#/components/parameters/Id"}]
       responses: *show-ok
 
-  /reports/overview:
+  /spaces/{space}/reports/overview:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     get:
       tags: [Reports]
       summary: Overview
@@ -781,55 +909,64 @@ paths:
         - {name: end_date, in: query, schema: {type: string, format: date}}
         - {name: compare_with, in: query, schema: {type: string, default: none}}
       responses: *list-ok
-  /reports/money-flow:
+  /spaces/{space}/reports/money-flow:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     get:
       tags: [Reports]
       summary: Money flow
       parameters: *report-period
       responses: *list-ok
-  /reports/expense-pace:
+  /spaces/{space}/reports/expense-pace:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     get:
       tags: [Reports]
       summary: Expense pace
       parameters: *report-period
       responses: *list-ok
-  /reports/expenses-by-category:
+  /spaces/{space}/reports/expenses-by-category:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     get:
       tags: [Reports]
       summary: Expenses by category
       parameters: *report-period
       responses: *list-ok
-  /reports/cash-flow-over-time:
+  /spaces/{space}/reports/cash-flow-over-time:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     get:
       tags: [Reports]
       summary: Cash flow over time
       parameters: *report-period
       responses: *list-ok
-  /reports/activity-heatmap:
+  /spaces/{space}/reports/activity-heatmap:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     get:
       tags: [Reports]
       summary: Activity heatmap
       parameters: *report-period
       responses: *list-ok
-  /reports/transactions/summary:
+  /spaces/{space}/reports/transactions/summary:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     get:
       tags: [Reports]
       summary: Transactions summary
       parameters: *report-period
       responses: *list-ok
-  /reports/transactions/by-category:
+  /spaces/{space}/reports/transactions/by-category:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     get:
       tags: [Reports]
       summary: Transactions by category
       parameters: *report-period
       responses: *list-ok
-  /reports/transactions/dynamics:
+  /spaces/{space}/reports/transactions/dynamics:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     get:
       tags: [Reports]
       summary: Transactions dynamics
       parameters: *report-period
       responses: *list-ok
-  /reports/transactions/top:
+  /spaces/{space}/reports/transactions/top:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     get:
       tags: [Reports]
       summary: Top transactions
@@ -837,27 +974,18 @@ paths:
         - {name: limit, in: query, schema: {type: integer}}
         - {name: type, in: query, schema: {type: string, default: expense}}
       responses: *list-ok
-  /reports/net-worth:
+  /spaces/{space}/reports/net-worth:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     get:
       tags: [Reports]
       summary: Net worth
       responses: *list-ok
-  /reports/net-worth-history:
+  /spaces/{space}/reports/net-worth-history:
+    parameters: [{$ref: "#/components/parameters/Space"}]
     get:
       tags: [Reports]
       summary: Net worth history
       responses: *list-ok
-  /monitoring/storage:
-    get:
-      tags: [Other]
-      summary: Storage usage
-      responses: *list-ok
-  /monitoring/resources:
-    get:
-      tags: [Other]
-      summary: Resource usage
-      responses: *list-ok
-
 components:
   securitySchemes:
     bearerAuth:
@@ -870,6 +998,12 @@ components:
       name: svy_session
       description: Browser session. Non-GET requests also need the `X-CSRF-Token` header.
   parameters:
+    Space:
+      name: space
+      in: path
+      required: true
+      description: Space id (see `GET /spaces`).
+      schema: {type: integer}
     Id:
       name: id
       in: path

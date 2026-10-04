@@ -307,8 +307,8 @@ func (s *Store) SpaceSize(ctx context.Context, id int64) (int64, error) {
 	return pages * size, nil
 }
 
-// SetQuota reopens a space so a changed quota takes effect.
-func (s *Store) SetQuota(ctx context.Context, id int64) error {
+// ApplyQuota reopens a space so a changed quota takes effect.
+func (s *Store) ApplyQuota(ctx context.Context, id int64) error {
 	sp, err := s.lookup(id)
 	if err != nil {
 		return err
@@ -455,6 +455,11 @@ func mapErr(err error) error {
 func OpenApp(ctx context.Context, dir, appKey string) (*Store, error) {
 	return Open(ctx, Options{
 		Dir: dir, AppKey: appKey, MigrateServer: migrate.Server.Up, MigrateSpace: migrate.Space.Up,
-		Quota: func(server store.DB, _ int64) int64 { return settings.SpaceQuota(ctx, server) },
+		Quota: func(server store.DB, id int64) int64 {
+			if q, err := db.Q(server).GetSpaceQuota(ctx, id); err == nil && q.Valid {
+				return q.Int64
+			}
+			return settings.SpaceQuota(ctx, server)
+		},
 	})
 }

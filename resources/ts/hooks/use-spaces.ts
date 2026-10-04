@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { spacesApi } from '@/api/spaces'
 import { useUser } from '@/stores/auth'
+import { useCurrentSpaceId } from '@/stores/space'
 
 export function useSpaces() {
     const user = useUser()
@@ -11,7 +12,8 @@ export function useSpaces() {
     })
 }
 
-/** The space data requests work in: the server uses the caller's first space. */
+/** The space data requests go to. */
 export function useCurrentSpace() {
-    return useSpaces().data?.[0] ?? null
+    const id = useCurrentSpaceId()
+    return useSpaces().data?.find((space) => space.id === id) ?? null
 }

@@ -11,7 +11,7 @@ import (
 )
 
 const countAdmins = `-- name: CountAdmins :one
-SELECT COUNT(*) FROM users WHERE role = ?
+SELECT COUNT(*) FROM users WHERE role = ? AND deleted_at IS NULL
 `
 
 func (q *Queries) CountAdmins(ctx context.Context, role string) (int64, error) {
@@ -22,7 +22,7 @@ func (q *Queries) CountAdmins(ctx context.Context, role string) (int64, error) {
 }
 
 const countUsers = `-- name: CountUsers :one
-SELECT COUNT(*) FROM users
+SELECT COUNT(*) FROM users WHERE deleted_at IS NULL
 `
 
 func (q *Queries) CountUsers(ctx context.Context) (int64, error) {
@@ -32,18 +32,63 @@ func (q *Queries) CountUsers(ctx context.Context) (int64, error) {
 	return count, err
 }
 
-const deleteUser = `-- name: DeleteUser :exec
-DELETE FROM users WHERE id = ?
+const deleteUserAPITokens = `-- name: DeleteUserAPITokens :exec
+DELETE FROM api_tokens WHERE user_id = ?
 `
 
-func (q *Queries) DeleteUser(ctx context.Context, id int64) error {
-	_, err := q.db.ExecContext(ctx, deleteUser, id)
+func (q *Queries) DeleteUserAPITokens(ctx context.Context, userID int64) error {
+	_, err := q.db.ExecContext(ctx, deleteUserAPITokens, userID)
+	return err
+}
+
+const deleteUserCredentials = `-- name: DeleteUserCredentials :exec
+DELETE FROM auth_sessions WHERE user_id = ?
+`
+
+func (q *Queries) DeleteUserCredentials(ctx context.Context, userID int64) error {
+	_, err := q.db.ExecContext(ctx, deleteUserCredentials, userID)
+	return err
+}
+
+const deleteUserIdentities = `-- name: DeleteUserIdentities :exec
+DELETE FROM user_identities WHERE user_id = ?
+`
+
+func (q *Queries) DeleteUserIdentities(ctx context.Context, userID int64) error {
+	_, err := q.db.ExecContext(ctx, deleteUserIdentities, userID)
+	return err
+}
+
+const deleteUserPasskeys = `-- name: DeleteUserPasskeys :exec
+DELETE FROM webauthn_credentials WHERE user_id = ?
+`
+
+func (q *Queries) DeleteUserPasskeys(ctx context.Context, userID int64) error {
+	_, err := q.db.ExecContext(ctx, deleteUserPasskeys, userID)
+	return err
+}
+
+const deleteUserPasswordTokens = `-- name: DeleteUserPasswordTokens :exec
+DELETE FROM password_tokens WHERE user_id = ?
+`
+
+func (q *Queries) DeleteUserPasswordTokens(ctx context.Context, userID int64) error {
+	_, err := q.db.ExecContext(ctx, deleteUserPasswordTokens, userID)
+	return err
+}
+
+const deleteUserRecoveryCodes = `-- name: DeleteUserRecoveryCodes :exec
+DELETE FROM two_factor_recovery_codes WHERE user_id = ?
+`
+
+func (q *Queries) DeleteUserRecoveryCodes(ctx context.Context, userID int64) error {
+	_, err := q.db.ExecContext(ctx, deleteUserRecoveryCodes, userID)
 	return err
 }
 
 const getUser = `-- name: GetUser :one
 SELECT id, name, email, password, role, is_sso_only,
-	two_factor_secret, two_factor_enabled, two_factor_confirmed, created_at, updated_at
+	two_factor_secret, two_factor_enabled, two_factor_confirmed, deleted_at, created_at, updated_at
 FROM users WHERE id = ?
 `
 
@@ -60,6 +105,7 @@ func (q *Queries) GetUser(ctx context.Context, id int64) (User, error) {
 		&i.TwoFactorSecret,
 		&i.TwoFactorEnabled,
 		&i.TwoFactorConfirmed,
+		&i.DeletedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -68,7 +114,7 @@ func (q *Queries) GetUser(ctx context.Context, id int64) (User, error) {
 
 const getUserByEmail = `-- name: GetUserByEmail :one
 SELECT id, name, email, password, role, is_sso_only,
-	two_factor_secret, two_factor_enabled, two_factor_confirmed, created_at, updated_at
+	two_factor_secret, two_factor_enabled, two_factor_confirmed, deleted_at, created_at, updated_at
 FROM users WHERE lower(email) = ?
 `
 
@@ -85,6 +131,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.TwoFactorSecret,
 		&i.TwoFactorEnabled,
 		&i.TwoFactorConfirmed,
+		&i.DeletedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -116,10 +163,43 @@ func (q *Queries) InsertUser(ctx context.Context, arg InsertUserParams) (sql.Res
 	)
 }
 
+const listUserNames = `-- name: ListUserNames :many
+SELECT id, name, deleted_at FROM users
+`
+
+type ListUserNamesRow struct {
+	ID        int64
+	Name      string
+	DeletedAt sql.NullString
+}
+
+func (q *Queries) ListUserNames(ctx context.Context) ([]ListUserNamesRow, error) {
+	rows, err := q.db.QueryContext(ctx, listUserNames)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListUserNamesRow{}
+	for rows.Next() {
+		var i ListUserNamesRow
+		if err := rows.Scan(&i.ID, &i.Name, &i.DeletedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listUsers = `-- name: ListUsers :many
 SELECT id, name, email, password, role, is_sso_only,
-	two_factor_secret, two_factor_enabled, two_factor_confirmed, created_at, updated_at
-FROM users ORDER BY name
+	two_factor_secret, two_factor_enabled, two_factor_confirmed, deleted_at, created_at, updated_at
+FROM users WHERE deleted_at IS NULL ORDER BY name
 `
 
 func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
@@ -141,6 +221,7 @@ func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
 			&i.TwoFactorSecret,
 			&i.TwoFactorEnabled,
 			&i.TwoFactorConfirmed,
+			&i.DeletedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -239,6 +320,25 @@ func (q *Queries) SetUserTwoFactor(ctx context.Context, arg SetUserTwoFactorPara
 		arg.UpdatedAt,
 		arg.ID,
 	)
+	return err
+}
+
+const tombstoneUser = `-- name: TombstoneUser :exec
+UPDATE users SET name = 'Deleted user', email = 'deleted-' || id || '@invalid', password = NULL,
+	is_sso_only = 0, two_factor_secret = NULL, two_factor_enabled = 0, two_factor_confirmed = 0,
+	deleted_at = ?1, updated_at = ?1
+WHERE id = ?2
+`
+
+type TombstoneUserParams struct {
+	Now sql.NullString
+	ID  int64
+}
+
+// A deleted user keeps their row (ids in space databases still resolve) but
+// loses everything that identifies them or lets them sign in.
+func (q *Queries) TombstoneUser(ctx context.Context, arg TombstoneUserParams) error {
+	_, err := q.db.ExecContext(ctx, tombstoneUser, arg.Now, arg.ID)
 	return err
 }
 

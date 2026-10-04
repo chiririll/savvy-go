@@ -5,33 +5,13 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"savvy-go/internal/domain"
 	"savvy-go/internal/settings"
 	"time"
 )
 
-// allSettings merges the instance settings with those of the request's space.
-// Instance settings move to their own admin endpoint with the space routes.
-func (s *Server) allSettings(r *http.Request) (map[string]any, error) {
-	all, err := s.settings.All(r.Context())
-	if err != nil {
-		return nil, err
-	}
-	if sp(r) == nil {
-		return all, nil
-	}
-	own, err := sp(r).settings.All(r.Context())
-	if err != nil {
-		return nil, err
-	}
-	for k, v := range own {
-		all[k] = v
-	}
-	return all, nil
-}
-
+// settingsIndex lists the instance settings.
 func (s *Server) settingsIndex(w http.ResponseWriter, r *http.Request) {
-	all, err := s.allSettings(r)
+	all, err := s.settings.All(r.Context())
 	if err != nil {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
@@ -39,27 +19,12 @@ func (s *Server) settingsIndex(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, all)
 }
 
-// settingsUpdate changes instance settings (server admins only) and settings
-// of the request's space (its admins only).
+// settingsUpdate changes instance settings (server admins only, by route).
 func (s *Server) settingsUpdate(w http.ResponseWriter, r *http.Request) {
 	var body map[string]any
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeValidation(w, map[string][]string{"settings": {"The given data was invalid."}})
 		return
-	}
-	u := userFrom(r)
-	for k := range body {
-		switch {
-		case settings.IsServerKey(k) && !u.IsAdmin():
-			writeMessage(w, http.StatusForbidden, "Only server administrators can change this setting.")
-			return
-		case settings.IsSpaceKey(k) && sp(r) == nil:
-			writeMessage(w, http.StatusNotFound, "Space not found.")
-			return
-		case settings.IsSpaceKey(k) && sp(r).role != domain.SpaceAdmin:
-			writeMessage(w, http.StatusForbidden, "Only space administrators can change this setting.")
-			return
-		}
 	}
 	if v, ok := body["password_login_enabled"]; ok && !asBool(v) && !s.enabledSSOExists(r) {
 		writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
@@ -69,20 +34,36 @@ func (s *Server) settingsUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for k, v := range body {
-		var err error
-		switch {
-		case settings.IsServerKey(k):
-			err = s.settings.Set(r.Context(), k, v)
-		case settings.IsSpaceKey(k):
-			err = sp(r).settings.Set(r.Context(), k, v)
+		if !settings.IsServerKey(k) {
+			continue
 		}
-		if err != nil {
+		if err := s.settings.Set(r.Context(), k, v); err != nil {
+			writeMessage(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+	}
+	s.settingsIndex(w, r)
+}
+
+// spaceSettingsUpdate changes the settings of a space (its admins, by route).
+func (s *Server) spaceSettingsUpdate(w http.ResponseWriter, r *http.Request) {
+	var body map[string]any
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeValidation(w, map[string][]string{"settings": {"The given data was invalid."}})
+		return
+	}
+	scope := sp(r)
+	for k, v := range body {
+		if !settings.IsSpaceKey(k) {
+			continue
+		}
+		if err := scope.settings.Set(r.Context(), k, v); err != nil {
 			writeMessage(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 	}
 	if v, ok := body["auto_update_currencies"]; ok && asBool(v) {
-		currencies := sp(r).currencies
+		currencies := scope.currencies
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 			defer cancel()
@@ -91,12 +72,7 @@ func (s *Server) settingsUpdate(w http.ResponseWriter, r *http.Request) {
 			}
 		}()
 	}
-	all, err := s.allSettings(r)
-	if err != nil {
-		writeMessage(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	writeJSON(w, http.StatusOK, all)
+	s.spaceSettingsIndex(w, r)
 }
 
 func asBool(v any) bool {

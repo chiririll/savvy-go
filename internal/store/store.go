@@ -79,6 +79,8 @@ type Store interface {
 	Spaces(ctx context.Context) ([]int64, error)
 	// SpaceSize is the storage a space occupies, in bytes.
 	SpaceSize(ctx context.Context, id int64) (int64, error)
+	// ApplyQuota makes a changed size limit of a space take effect.
+	ApplyQuota(ctx context.Context, id int64) error
 	// Status reports startup progress and spaces that are unavailable.
 	Status() Status
 	Close() error

@@ -26,7 +26,12 @@ func (s *Server) backupsService(r *http.Request) domain.Backups {
 	return b
 }
 
+// spaceQuota is the size limit of the request's space, or the default limit
+// for a new space outside one.
 func (s *Server) spaceQuota(r *http.Request) int64 {
+	if scope := sp(r); scope != nil {
+		return s.spaces.Quota(r.Context(), scope.id)
+	}
 	return settings.SpaceQuota(r.Context(), s.store.Server())
 }
 

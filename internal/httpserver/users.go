@@ -107,8 +107,22 @@ func (s *Server) usersUpdate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if body.Role != nil {
+		if !validRole(*body.Role) {
+			writeValidation(w, map[string][]string{"role": {"The selected role is invalid."}})
+			return
+		}
+		// P9: whoever administers a space stays able to.
+		if err := s.spaces.SetRoleAllowed(r.Context(), u, *body.Role); err != nil {
+			writeMessage(w, http.StatusUnprocessableEntity, "This user administers a space; make someone else its admin first.")
+			return
+		}
+	}
 	if body.Password != nil && *body.Password != "" {
 		_ = s.tokens.RevokeActive(r.Context(), u.ID)
+	}
+	if body.Role != nil && u.IsGuest() && *body.Role != auth.RoleGuest {
+		_ = s.spaces.Audit(r.Context(), userFrom(r), "promote_guest", nil, &u.ID, *body.Role)
 	}
 	updated, err := s.users.Update(r.Context(), u.ID, body.Name, body.Email, body.Role, body.Password)
 	if err != nil {
@@ -135,8 +149,8 @@ func (s *Server) usersDestroy(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if err := s.users.Delete(r.Context(), u.ID); err != nil {
-		writeMessage(w, http.StatusInternalServerError, err.Error())
+	if err := s.spaces.DeleteUser(r.Context(), s.users, u, s.backups); err != nil {
+		writeSpaceError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -174,7 +188,7 @@ func (s *Server) userParam(w http.ResponseWriter, r *http.Request) *auth.User {
 		return nil
 	}
 	u, err := s.users.ByID(r.Context(), id)
-	if err != nil || u == nil {
+	if err != nil || u == nil || u.Deleted {
 		writeMessage(w, http.StatusNotFound, "Not found.")
 		return nil
 	}

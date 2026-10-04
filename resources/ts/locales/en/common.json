@@ -345,5 +345,12 @@
             "createFailed": "Failed to create API token",
             "revokeFailed": "Failed to revoke API token"
         }
+    },
+    "spaces": {
+        "noneTitle": "No space yet",
+        "noneText": "Your finances live in spaces. Create one to start, or join one through an invitation link.",
+        "noneGuest": "You are not in any space. Ask for an invitation link.",
+        "create": "Create a space",
+        "defaultName": "My space"
     }
 }

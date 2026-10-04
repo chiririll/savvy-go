@@ -18,6 +18,9 @@ CREATE TABLE IF NOT EXISTS users (
     two_factor_secret TEXT,
     two_factor_enabled INTEGER NOT NULL DEFAULT 0 CHECK (two_factor_enabled IN (0, 1)),
     two_factor_confirmed INTEGER NOT NULL DEFAULT 0 CHECK (two_factor_confirmed IN (0, 1)),
+    -- Deleted users are kept anonymised, so ids recorded in space databases
+    -- (created_by) still resolve.
+    deleted_at TEXT,
     created_at TEXT,
     updated_at TEXT
 ) STRICT;
@@ -200,6 +203,8 @@ CREATE TABLE IF NOT EXISTS spaces (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     uuid TEXT NOT NULL UNIQUE,
     name TEXT NOT NULL,
+    -- Size limit in bytes set by a server admin; NULL uses space_quota_mb.
+    quota_bytes INTEGER CHECK (quota_bytes > 0),
     created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
     created_at TEXT,
     updated_at TEXT
@@ -214,3 +219,38 @@ CREATE TABLE IF NOT EXISTS space_members (
     PRIMARY KEY (space_id, user_id)
 ) STRICT;
 CREATE INDEX IF NOT EXISTS space_members_user_idx ON space_members (user_id);
+
+CREATE TABLE IF NOT EXISTS space_invitations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    space_id INTEGER NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,
+    -- When set, only a user with this email may accept.
+    email TEXT COLLATE NOCASE,
+    role TEXT NOT NULL CHECK (role IN ('admin', 'editor', 'viewer')),
+    token_hash TEXT NOT NULL UNIQUE,
+    invited_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    -- Who registers through an invitation from a server admin becomes a user,
+    -- through anyone else's a guest.
+    invited_by_server_admin INTEGER NOT NULL DEFAULT 0 CHECK (invited_by_server_admin IN (0, 1)),
+    expires_at TEXT NOT NULL,
+    accepted_at TEXT,
+    accepted_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at TEXT
+) STRICT;
+CREATE INDEX IF NOT EXISTS space_invitations_space_idx ON space_invitations (space_id);
+CREATE INDEX IF NOT EXISTS space_invitations_invited_by_idx ON space_invitations (invited_by);
+CREATE INDEX IF NOT EXISTS space_invitations_accepted_by_idx ON space_invitations (accepted_by);
+
+-- Actions of server admins that reach into spaces (assigning an admin,
+-- deleting or restoring a space, quotas, keys). The admins of the space see
+-- the rows about it. space_id has no foreign key: the row outlives the space.
+CREATE TABLE IF NOT EXISTS admin_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    action TEXT NOT NULL,
+    space_id INTEGER,
+    target_user_id INTEGER,
+    details TEXT,
+    created_at TEXT NOT NULL
+) STRICT;
+CREATE INDEX IF NOT EXISTS admin_audit_space_idx ON admin_audit (space_id, created_at);
+CREATE INDEX IF NOT EXISTS admin_audit_actor_idx ON admin_audit (actor_id);

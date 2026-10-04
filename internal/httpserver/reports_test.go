@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"savvy-go/internal/auth"
 	"testing"
 	"time"
 )
@@ -103,6 +104,9 @@ func TestReportsTransactionSummary(t *testing.T) {
 		t.Fatalf("by-cat %d %v", res.StatusCode, cats)
 	}
 
+	// P2: monitoring is the server admins'.
+	status(t, a.do("GET", "/api/monitoring/storage", nil, sess.Token, ""), 403, "editor monitoring")
+	sess = a.issue(a.createUser("monitor@test.com", "secret1", auth.RoleAdmin), false)
 	res = a.do("GET", "/api/monitoring/storage", nil, sess.Token, "")
 	st := decodeJSON(t, res)
 	if res.StatusCode != 200 || st["volume"] == nil || st["managed"] == nil {
