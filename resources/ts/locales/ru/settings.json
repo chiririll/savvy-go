@@ -301,13 +301,11 @@
         "note": "Заметка",
         "actions": "Действия",
         "versionUnknown": "Неизвестно",
-        "versionLaravel": "Laravel",
+        "versionRaw": "Файл базы данных",
         "status": {
-            "current": "Совпадает с приложением",
-            "outdated": "От предыдущей версии",
-            "newer": "Нужна более новая версия",
-            "legacy": "Копия Laravel",
-            "legacyUnsupported": "Старая копия Laravel",
+            "current": "Подписана этим сервером",
+            "unsigned": "Не подписана здесь",
+            "raw": "Файл базы данных",
             "invalid": "Не читается"
         },
         "statusHelp": {
@@ -329,7 +327,7 @@
         "noteOptional": "Заметка (необязательно)",
         "notePlaceholder": "напр. Перед обновлением",
         "uploadTitle": "Загрузить копию",
-        "uploadDescription": "Загрузите файл резервной копии SQLite.",
+        "uploadDescription": "Загрузите архив копии (.zip) или файл базы данных (.sqlite).",
         "backupFile": "Файл копии",
         "uploadNotePlaceholder": "напр. Копия со старого устройства",
         "restoreTitle": "Восстановить копию?",

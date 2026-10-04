@@ -149,6 +149,17 @@ func (q *Queries) ListUserSpaces(ctx context.Context, userID int64) ([]ListUserS
 	return items, nil
 }
 
+const spaceIDByUUID = `-- name: SpaceIDByUUID :one
+SELECT id FROM spaces WHERE uuid = ?
+`
+
+func (q *Queries) SpaceIDByUUID(ctx context.Context, uuid string) (int64, error) {
+	row := q.db.QueryRowContext(ctx, spaceIDByUUID, uuid)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const upsertSpaceMember = `-- name: UpsertSpaceMember :exec
 INSERT INTO space_members (space_id, user_id, role, created_at) VALUES (?, ?, ?, ?)
 ON CONFLICT (space_id, user_id) DO UPDATE SET role = excluded.role

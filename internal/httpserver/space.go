@@ -10,6 +10,8 @@ import (
 	"savvy-go/internal/domain"
 	"savvy-go/internal/settings"
 	"savvy-go/internal/store"
+
+	"github.com/go-chi/chi/v5"
 )
 
 const ctxSpace ctxKey = 100
@@ -87,16 +89,17 @@ func (s *Server) resolveSpace(next http.Handler, required bool) http.Handler {
 		ctx := r.Context()
 		var id int64
 		var role string
-		raw := strings.TrimSpace(r.Header.Get(spaceHeader))
+		raw := chi.URLParam(r, "space")
+		if raw == "" {
+			raw = strings.TrimSpace(r.Header.Get(spaceHeader))
+		}
 		if raw != "" {
-			parsed, err := strconv.ParseInt(raw, 10, 64)
-			if err == nil {
+			if parsed, err := strconv.ParseInt(raw, 10, 64); err == nil {
 				id = parsed
-				role, err = s.spaces.Role(ctx, id, u.ID)
-			}
-			if err != nil {
-				writeMessage(w, http.StatusInternalServerError, err.Error())
-				return
+				if role, err = s.spaces.Role(ctx, id, u.ID); err != nil {
+					writeMessage(w, http.StatusInternalServerError, err.Error())
+					return
+				}
 			}
 		} else {
 			mine, err := s.spaces.ForUser(ctx, u.ID)

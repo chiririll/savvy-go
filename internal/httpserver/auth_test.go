@@ -16,6 +16,7 @@ import (
 	"savvy-go/internal/config"
 	"savvy-go/internal/domain"
 	"savvy-go/internal/settings"
+	"savvy-go/internal/signing"
 	"savvy-go/internal/store"
 	"savvy-go/internal/store/sqlite"
 )
@@ -40,7 +41,7 @@ type testApp struct {
 // openTestStore opens a store in cfg.DataDir with the embedded migrations.
 func openTestStore(t *testing.T, cfg config.Config) *sqlite.Store {
 	t.Helper()
-	st, err := sqlite.OpenApp(context.Background(), cfg.DataDir)
+	st, err := sqlite.OpenApp(context.Background(), cfg.DataDir, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,18 +49,28 @@ func openTestStore(t *testing.T, cfg config.Config) *sqlite.Store {
 	return st
 }
 
+// testKeys is a signing key in the test's data directory.
+func testKeys(t *testing.T, cfg config.Config) *signing.Holder {
+	t.Helper()
+	key, err := signing.Load(cfg.DataDir, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return signing.NewHolder(key)
+}
+
 func newTestApp(t *testing.T) *testApp {
 	t.Helper()
 	cfg, _ := testConfig(t)
 	st := openTestStore(t, cfg)
-	s := New(cfg, st)
+	s := New(cfg, st, testKeys(t, cfg))
 	space, err := s.spaces.Create(context.Background(), "Test", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ts := httptest.NewServer(s.Handler())
 	t.Cleanup(ts.Close)
-	return &testApp{t: t, db: st.Server().(*sql.DB), store: st, space: space, srv: ts, s: s, client: ts.Client()}
+	return &testApp{t: t, db: st.SQL(), store: st, space: space, srv: ts, s: s, client: ts.Client()}
 }
 
 // spaceDB is the database of the shared test space.
@@ -216,7 +227,7 @@ func TestSessionSmokeRegisterMeLogout(t *testing.T) {
 
 func TestHostPrefixedCookieOverTLS(t *testing.T) {
 	cfg, _ := testConfig(t)
-	s := New(cfg, openTestStore(t, cfg))
+	s := New(cfg, openTestStore(t, cfg), testKeys(t, cfg))
 	ts := httptest.NewTLSServer(s.Handler())
 	t.Cleanup(ts.Close)
 	client := ts.Client()

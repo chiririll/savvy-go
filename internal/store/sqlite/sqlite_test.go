@@ -137,7 +137,7 @@ func failFor(ctx context.Context, d *sql.DB) error {
 // P14: the quota stops writes with ErrQuotaExceeded; other spaces go on.
 func TestP14QuotaExceeded(t *testing.T) {
 	ctx := context.Background()
-	s := openTest(t, Options{Quota: func(id int64) int64 {
+	s := openTest(t, Options{Quota: func(_ store.DB, id int64) int64 {
 		if id == 1 {
 			return 64 * 1024
 		}
@@ -166,7 +166,7 @@ func TestP14QuotaExceeded(t *testing.T) {
 // P39: the quota is in the DSN, so a connection opened later enforces it too.
 func TestP39QuotaAppliesToEveryConnection(t *testing.T) {
 	ctx := context.Background()
-	s := openTest(t, Options{Quota: func(int64) int64 { return 40960 }})
+	s := openTest(t, Options{Quota: func(store.DB, int64) int64 { return 40960 }})
 	_ = s.CreateSpace(ctx, 1)
 	sp, _ := s.lookup(1)
 	sp.db.SetMaxOpenConns(2)
@@ -223,7 +223,7 @@ func TestP22InSpacesRollsBackAll(t *testing.T) {
 // P22/P29: a quota failure on one side writes neither.
 func TestP29QuotaOnOneSideWritesNeither(t *testing.T) {
 	ctx := context.Background()
-	s := openTest(t, Options{Quota: func(id int64) int64 {
+	s := openTest(t, Options{Quota: func(_ store.DB, id int64) int64 {
 		if id == 2 {
 			return 40960
 		}

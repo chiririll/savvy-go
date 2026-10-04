@@ -40,7 +40,7 @@ func testConfig(t *testing.T) (config.Config, string) {
 
 func TestLivezPass(t *testing.T) {
 	cfg, _ := testConfig(t)
-	srv := httptest.NewServer(New(cfg, openTestStore(t, cfg)).Handler())
+	srv := httptest.NewServer(New(cfg, openTestStore(t, cfg), testKeys(t, cfg)).Handler())
 	t.Cleanup(srv.Close)
 
 	res, err := http.Get(srv.URL + "/livez")
@@ -78,7 +78,7 @@ func (brokenSpaceStore) Status() store.Status {
 func readyz(t *testing.T, st store.Store) (int, map[string]any) {
 	t.Helper()
 	cfg, _ := testConfig(t)
-	srv := httptest.NewServer(New(cfg, st).Handler())
+	srv := httptest.NewServer(New(cfg, st, testKeys(t, cfg)).Handler())
 	t.Cleanup(srv.Close)
 	res, err := http.Get(srv.URL + "/readyz")
 	if err != nil {
@@ -153,7 +153,7 @@ func TestSPAServesIndexAndStatic(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(cfg.PublicDir, "index.html"), []byte(index), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	srv := httptest.NewServer(New(cfg, openTestStore(t, cfg)).Handler())
+	srv := httptest.NewServer(New(cfg, openTestStore(t, cfg), testKeys(t, cfg)).Handler())
 	t.Cleanup(srv.Close)
 
 	res, err := http.Get(srv.URL + "/favicon.svg")

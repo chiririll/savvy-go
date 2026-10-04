@@ -194,8 +194,8 @@ export default function BackupsPage() {
                                         <div className="flex flex-col items-start gap-1">
                                             <span className="font-mono text-sm">
                                                 {backup.appVersion
-                                                    || (backup.status === 'legacy' || backup.status === 'legacyUnsupported'
-                                                        ? t('backups.versionLaravel')
+                                                    || (backup.status === 'raw'
+                                                        ? t('backups.versionRaw')
                                                         : t('backups.versionUnknown'))}
                                             </span>
                                             <Tooltip>
@@ -205,7 +205,7 @@ export default function BackupsPage() {
                                                     </Badge>
                                                 </TooltipTrigger>
                                                 <TooltipContent>
-                                                    {t(`backups.statusHelp.${backup.status}`, { count: backup.pendingCount })}
+                                                    {t(`backups.statusHelp.${backup.status}`)}
                                                 </TooltipContent>
                                             </Tooltip>
                                         </div>
@@ -300,7 +300,7 @@ export default function BackupsPage() {
                             <Input
                                 id="file"
                                 type="file"
-                                accept=".sqlite,.db"
+                                accept=".zip,.sqlite"
                                 onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
                             />
                         </div>
@@ -348,9 +348,7 @@ export default function BackupsPage() {
                                 </p>
                                 {selectedBackup && selectedBackup.status !== 'current' && (
                                     <p>
-                                        {t(`backups.statusHelp.${selectedBackup.status}`, {
-                                            count: selectedBackup.pendingCount,
-                                        })}
+                                        {t(`backups.statusHelp.${selectedBackup.status}`)}
                                     </p>
                                 )}
                             </div>

@@ -291,13 +291,11 @@
         "note": "Note",
         "actions": "Actions",
         "versionUnknown": "Unknown",
-        "versionLaravel": "Laravel",
+        "versionRaw": "Database file",
         "status": {
-            "current": "Matches this app",
-            "outdated": "From an older version",
-            "newer": "Needs a newer app",
-            "legacy": "Laravel backup",
-            "legacyUnsupported": "Old Laravel backup",
+            "current": "Signed by this server",
+            "unsigned": "Not signed here",
+            "raw": "Database file",
             "invalid": "Unreadable"
         },
         "statusHelp": {
@@ -317,7 +315,7 @@
         "noteOptional": "Note (optional)",
         "notePlaceholder": "e.g., Before major update",
         "uploadTitle": "Upload Backup",
-        "uploadDescription": "Upload a SQLite backup file.",
+        "uploadDescription": "Upload a backup archive (.zip) or a database file (.sqlite).",
         "backupFile": "Backup File",
         "uploadNotePlaceholder": "e.g., Backup from old device",
         "restoreTitle": "Restore Backup?",

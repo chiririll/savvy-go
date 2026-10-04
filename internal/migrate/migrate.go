@@ -245,3 +245,15 @@ func preview(stmt string) string {
 	}
 	return stmt
 }
+
+// Versions lists the versions of this set's migrations, as recorded.
+func (s Set) Versions() ([]string, error) {
+	names, err := migrationFiles(s)
+	if err != nil {
+		return nil, err
+	}
+	for i, n := range names {
+		names[i] = strings.TrimSuffix(n, ".sql")
+	}
+	return names, nil
+}

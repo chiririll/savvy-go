@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"savvy-go/internal/auth"
 	"savvy-go/internal/config"
 	"savvy-go/internal/domain"
 	"savvy-go/internal/httpserver"
@@ -19,6 +20,7 @@ import (
 	"savvy-go/internal/schedule"
 	"savvy-go/internal/seed"
 	"savvy-go/internal/settings"
+	"savvy-go/internal/signing"
 	"savvy-go/internal/store"
 	"savvy-go/internal/store/sqlite"
 	"savvy-go/internal/version"
@@ -37,15 +39,21 @@ func main() {
 	_ = os.MkdirAll(cfg.BackupsDir, 0o775)
 
 	ctx := context.Background()
-	if _, err := os.Stat(filepath.Join(cfg.DataDir, "database.sqlite")); err == nil {
-		slog.Warn("database.sqlite is the single-file layout; it is not read anymore (data now lives in server.sqlite and spaces/)")
-	}
-	st, err := sqlite.OpenApp(ctx, cfg.DataDir)
+	st, err := sqlite.OpenApp(ctx, cfg.DataDir, cfg.AppKey)
 	if err != nil {
 		slog.Error("open store", "err", err)
 		os.Exit(1)
 	}
 	defer st.Close()
+	if err := migrateSingleFile(ctx, cfg.DataDir, st); err != nil {
+		slog.Error("migrate database.sqlite", "err", err)
+		os.Exit(1)
+	}
+	keys, err := loadSigningKey(ctx, cfg.DataDir, st)
+	if err != nil {
+		slog.Error("signing key", "err", err)
+		os.Exit(1)
+	}
 	for id, why := range st.Status().Unavailable {
 		slog.Error("space unavailable", "space", id, "reason", why)
 	}
@@ -100,7 +108,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,
-		Handler:           httpserver.New(cfg, st).Handler(),
+		Handler:           httpserver.New(cfg, st, keys).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
@@ -123,4 +131,49 @@ func main() {
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		slog.Error("shutdown", "err", err)
 	}
+}
+
+// migrateSingleFile moves a database.sqlite of the single-file layout (or a
+// Laravel-era one) into server.sqlite and space 1, once: only while the server
+// has no users, and the old file is kept renamed.
+func migrateSingleFile(ctx context.Context, dataDir string, st *sqlite.Store) error {
+	old := filepath.Join(dataDir, "database.sqlite")
+	if _, err := os.Stat(old); err != nil {
+		return nil
+	}
+	n, err := (auth.Users{DB: st.Server()}).Count(ctx)
+	if err != nil || n > 0 {
+		slog.Warn("database.sqlite is ignored: the server already has data", "file", old)
+		return err
+	}
+	p, err := st.PrepareServer(ctx, old)
+	if err != nil {
+		return err
+	}
+	if err := st.ReplaceServer(ctx, p); err != nil {
+		return err
+	}
+	slog.Info("database.sqlite split into server.sqlite and spaces/")
+	return os.Rename(old, old+".migrated")
+}
+
+// signingKeyUsedKey records the key id once the server has a key, so a key
+// file that disappears later is noticed instead of silently replaced.
+const signingKeyUsedKey = "signing_kid"
+
+func loadSigningKey(ctx context.Context, dataDir string, st *sqlite.Store) (*signing.Holder, error) {
+	server := settings.Store{DB: st.Server()}
+	kid, _ := server.Get(ctx, signingKeyUsedKey, "").(string)
+	key, err := signing.Load(dataDir, kid != "")
+	if err != nil {
+		return nil, err
+	}
+	if kid == "" {
+		if err := server.Set(ctx, signingKeyUsedKey, key.KID()); err != nil {
+			return nil, err
+		}
+	} else if kid != key.KID() {
+		slog.Warn("the signing key file is not the key this server used before", "recorded", kid, "file", key.KID())
+	}
+	return signing.NewHolder(key), nil
 }

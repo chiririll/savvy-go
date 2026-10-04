@@ -21,6 +21,7 @@ import (
 
 	"savvy-go/internal/db"
 	"savvy-go/internal/migrate"
+	"savvy-go/internal/settings"
 	"savvy-go/internal/store"
 )
 
@@ -41,18 +42,29 @@ type Options struct {
 	Dir           string
 	MigrateServer Migrate
 	MigrateSpace  Migrate
-	// Quota is the size limit of a space in bytes; 0 means unlimited.
-	Quota func(id int64) int64
+	// Quota is the size limit of a space in bytes; 0 means unlimited. It may
+	// read the server database it is given.
+	Quota func(server store.DB, id int64) int64
 	// BetweenCommits, when set, runs after each commit of InSpaces except the
 	// last. An error stops the remaining commits, simulating a crash between
 	// them; tests use it to check that a later merge reconciles the spaces.
 	BetweenCommits func(committed int) error
+	// AppKey is the Laravel APP_KEY, for converting Laravel-era databases.
+	AppKey string
 }
 
 // Store is the SQLite store.Store.
 type Store struct {
-	opts   Options
-	server *sql.DB
+	opts Options
+
+	// serverGate guards server: shared for statements, exclusive while a
+	// server restore swaps the file.
+	serverGate sync.RWMutex
+	server     *sql.DB
+
+	// layout is held shared while a space is created, removed or imported and
+	// exclusively while the whole store is exported or replaced.
+	layout sync.RWMutex
 
 	mu          sync.Mutex
 	spaces      map[int64]*space
@@ -80,22 +92,36 @@ func Open(ctx context.Context, opts Options) (*Store, error) {
 	if err := os.MkdirAll(filepath.Join(opts.Dir, spacesDir), 0o775); err != nil {
 		return nil, fmt.Errorf("create spaces dir: %w", err)
 	}
-	server, err := db.Open(filepath.Join(opts.Dir, serverFile))
-	if err != nil {
+	s := &Store{opts: opts, spaces: map[int64]*space{}, unavailable: map[int64]string{}}
+	if err := s.openAll(ctx); err != nil {
 		return nil, err
 	}
-	if opts.MigrateServer != nil {
-		if err := opts.MigrateServer(ctx, server); err != nil {
+	s.ready.Store(true)
+	return s, nil
+}
+
+// openAll opens and migrates the server file and every space file.
+func (s *Store) openAll(ctx context.Context) error {
+	server, err := db.Open(filepath.Join(s.opts.Dir, serverFile))
+	if err != nil {
+		return err
+	}
+	if s.opts.MigrateServer != nil {
+		if err := s.opts.MigrateServer(ctx, server); err != nil {
 			_ = server.Close()
-			return nil, fmt.Errorf("migrate server: %w", err)
+			return fmt.Errorf("migrate server: %w", err)
 		}
 	}
-	s := &Store{opts: opts, server: server, spaces: map[int64]*space{}, unavailable: map[int64]string{}}
 	ids, err := s.spaceFiles()
 	if err != nil {
 		_ = server.Close()
-		return nil, err
+		return err
 	}
+	s.server = server
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.spaces = map[int64]*space{}
+	s.unavailable = map[int64]string{}
 	for _, id := range ids {
 		sdb, err := s.openSpace(ctx, id)
 		if err != nil {
@@ -105,8 +131,7 @@ func Open(ctx context.Context, opts Options) (*Store, error) {
 		}
 		s.spaces[id] = &space{id: id, db: sdb}
 	}
-	s.ready.Store(true)
-	return s, nil
+	return nil
 }
 
 func (s *Store) spacePath(id int64) string {
@@ -151,7 +176,10 @@ func (s *Store) openSpace(ctx context.Context, id int64) (*sql.DB, error) {
 	}
 	quota := int64(0)
 	if s.opts.Quota != nil {
-		quota = s.opts.Quota(id)
+		// s.server without the gate: openSpace runs while opening the store,
+		// under ReplaceServer (which holds the gate) or under a lock that
+		// excludes ReplaceServer.
+		quota = s.opts.Quota(s.server, id)
 	}
 	if quota <= 0 {
 		return sdb, nil
@@ -165,7 +193,8 @@ func (s *Store) openSpace(ctx context.Context, id int64) (*sql.DB, error) {
 	return db.Open(path, fmt.Sprintf("max_page_count(%d)", max(quota/pageSize, 1)))
 }
 
-func (s *Store) Server() store.DB { return s.server }
+// Server returns a handle that stays valid across a server restore.
+func (s *Store) Server() store.DB { return serverHandle{s} }
 
 func (s *Store) lookup(id int64) (*space, error) {
 	s.mu.Lock()
@@ -188,6 +217,8 @@ func (s *Store) Space(_ context.Context, id int64) (store.DB, error) {
 }
 
 func (s *Store) CreateSpace(ctx context.Context, id int64) error {
+	s.layout.RLock()
+	defer s.layout.RUnlock()
 	s.mu.Lock()
 	_, exists := s.spaces[id]
 	_, broken := s.unavailable[id]
@@ -210,6 +241,8 @@ func (s *Store) CreateSpace(ctx context.Context, id int64) error {
 }
 
 func (s *Store) DeleteSpace(ctx context.Context, id int64) error {
+	s.layout.RLock()
+	defer s.layout.RUnlock()
 	s.mu.Lock()
 	sp, ok := s.spaces[id]
 	_, broken := s.unavailable[id]
@@ -319,7 +352,9 @@ func (s *Store) Close() error {
 		sp.gate.Unlock()
 	}
 	s.spaces = map[int64]*space{}
+	s.serverGate.Lock()
 	errs = append(errs, s.server.Close())
+	s.serverGate.Unlock()
 	return errors.Join(errs...)
 }
 
@@ -417,6 +452,9 @@ func mapErr(err error) error {
 
 // OpenApp opens the store of the application in dir with the embedded server
 // and space migrations.
-func OpenApp(ctx context.Context, dir string) (*Store, error) {
-	return Open(ctx, Options{Dir: dir, MigrateServer: migrate.Server.Up, MigrateSpace: migrate.Space.Up})
+func OpenApp(ctx context.Context, dir, appKey string) (*Store, error) {
+	return Open(ctx, Options{
+		Dir: dir, AppKey: appKey, MigrateServer: migrate.Server.Up, MigrateSpace: migrate.Space.Up,
+		Quota: func(server store.DB, _ int64) int64 { return settings.SpaceQuota(ctx, server) },
+	})
 }

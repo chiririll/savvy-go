@@ -10,6 +10,7 @@ import (
 	"savvy-go/internal/domain"
 	"savvy-go/internal/jobs"
 	"savvy-go/internal/settings"
+	"savvy-go/internal/signing"
 	"savvy-go/internal/store"
 
 	"github.com/go-chi/chi/v5"
@@ -30,6 +31,7 @@ type Server struct {
 	challenges auth.Challenges
 	settings   settings.Store
 	spaces     domain.Spaces
+	backups    domain.Backups
 	uploads    domain.Uploads
 	sso        domain.SSO
 	twoFactor  auth.TwoFactor
@@ -37,7 +39,7 @@ type Server struct {
 	queue      *jobs.Queue
 }
 
-func New(cfg config.Config, st store.Store) *Server {
+func New(cfg config.Config, st store.Store, keys *signing.Holder) *Server {
 	domain.SetLocation(cfg.Location)
 	srv := st.Server()
 	s := &Server{
@@ -54,6 +56,7 @@ func New(cfg config.Config, st store.Store) *Server {
 		twoFactor:  auth.TwoFactor{DB: srv, Users: auth.Users{DB: srv}, AppKey: cfg.AppKey},
 		webauthn:   auth.WebAuthn{DB: srv, Cfg: cfg},
 	}
+	s.backups = domain.Backups{Store: st, Keys: domain.KeyRing{Holder: keys}, Dir: cfg.BackupsDir, DataDir: cfg.DataDir}
 	s.sso = domain.SSO{DB: srv, Users: s.users, Settings: s.settings, Spaces: s.spaces, AppURL: cfg.AppURL}
 	_ = os.MkdirAll(cfg.UploadsDir, 0o775)
 	_ = os.MkdirAll(cfg.BackupsDir, 0o775)
@@ -122,6 +125,21 @@ func (s *Server) routes() *chi.Mux {
 			})
 
 			r.Get("/spaces", s.spacesIndex)
+			r.With(s.sessionOnly).Post("/spaces/import", s.spacesImport)
+			r.Route("/spaces/{space}", func(r chi.Router) {
+				r.Use(s.withSpace)
+				// P1: a space's backups are for its admins, never for API tokens.
+				r.Group(func(r chi.Router) {
+					r.Use(s.requireSpaceAdmin)
+					r.Use(s.sessionOnly)
+					r.Get("/backups", s.spaceBackupsIndex)
+					r.Post("/backups", s.spaceBackupsStore)
+					r.Post("/backups/upload", s.spaceBackupsUpload)
+					r.Get("/backups/{name}/download", s.spaceBackupsDownload)
+					r.Post("/backups/{name}/restore", s.spaceBackupsRestore)
+					r.Delete("/backups/{name}", s.spaceBackupsDestroy)
+				})
+			})
 
 			r.Get("/users", s.usersIndex)
 			r.Get("/users/{id}", s.usersShow)
@@ -145,6 +163,7 @@ func (s *Server) routes() *chi.Mux {
 			// P1: backups hold every space, so only server admins reach them.
 			r.Group(func(r chi.Router) {
 				r.Use(s.requireAdmin)
+				r.Use(s.sessionOnly)
 				r.Get("/backups", s.backupsIndex)
 				r.Post("/backups", s.backupsStore)
 				r.Post("/backups/upload", s.backupsUpload)

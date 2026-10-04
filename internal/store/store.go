@@ -82,6 +82,46 @@ type Store interface {
 	// Status reports startup progress and spaces that are unavailable.
 	Status() Status
 	Close() error
+
+	// Backups move whole databases in and out. Files from outside are never
+	// used as they are: Prepare* rebuilds them from the store's own schema
+	// and validates them, and only a prepared artifact can replace or create
+	// a database. Discard removes a prepared artifact that was not used.
+
+	// ExportSpace writes a consistent copy of a space database to dest.
+	ExportSpace(ctx context.Context, id int64, dest string) error
+	// ExportServer writes the server database and every space database into
+	// dir; spaces cannot be created or removed meanwhile.
+	ExportServer(ctx context.Context, dir string) error
+	// PrepareSpace validates a space database (a space backup, a single-file
+	// or Laravel-era database) for ReplaceSpace or ImportSpace.
+	PrepareSpace(ctx context.Context, src string) (*PreparedSpace, error)
+	// PrepareServer validates a server backup: a directory written by
+	// ExportServer, or a single-file or Laravel-era database, which is split.
+	PrepareServer(ctx context.Context, src string) (*PreparedServer, error)
+	// ReplaceSpace swaps a space's database for a prepared one.
+	ReplaceSpace(ctx context.Context, id int64, p *PreparedSpace) error
+	// ImportSpace creates space id from a prepared database.
+	ImportSpace(ctx context.Context, id int64, p *PreparedSpace) error
+	// ReplaceServer swaps the server database and every space for a prepared
+	// server backup.
+	ReplaceServer(ctx context.Context, p *PreparedServer) error
+	// Discard removes a prepared artifact that will not be used.
+	Discard(artifact string)
+}
+
+// PreparedSpace is a validated space database. Artifact belongs to the store;
+// callers only hand it back.
+type PreparedSpace struct {
+	Artifact string
+	UUID     string // the space_uuid recorded in the database, "" if none
+	Size     int64  // bytes
+}
+
+// PreparedServer is a validated server backup.
+type PreparedServer struct {
+	Artifact string
+	Spaces   []int64
 }
 
 // Status is what the readiness probe and the admin overview show.

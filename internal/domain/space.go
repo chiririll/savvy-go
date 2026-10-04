@@ -96,6 +96,69 @@ func (s Spaces) Create(ctx context.Context, name string, owner *auth.User) (*Spa
 	return sp, nil
 }
 
+// createFrom registers a space whose database is a prepared backup. It keeps
+// the backup's uuid unless another space here has it.
+func (s Spaces) createFrom(ctx context.Context, name string, owner *auth.User, p *store.PreparedSpace) (*Space, error) {
+	if owner != nil && owner.IsGuest() {
+		s.Store.Discard(p.Artifact)
+		return nil, ErrGuestCannotAdmin
+	}
+	id7 := p.UUID
+	if _, err := s.server().SpaceIDByUUID(ctx, id7); id7 == "" || err == nil {
+		fresh, err := uuid.NewV7()
+		if err != nil {
+			s.Store.Discard(p.Artifact)
+			return nil, err
+		}
+		id7 = fresh.String()
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	var createdBy sql.NullInt64
+	if owner != nil {
+		createdBy = db.NI(owner.ID)
+	}
+	id, err := s.server().InsertSpace(ctx, sqlc.InsertSpaceParams{
+		Uuid: id7, Name: name, CreatedBy: createdBy, CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
+	})
+	if err != nil {
+		s.Store.Discard(p.Artifact)
+		return nil, err
+	}
+	if err := s.Store.ImportSpace(ctx, id, p); err != nil {
+		_ = s.server().DeleteSpaceRow(ctx, id)
+		return nil, err
+	}
+	if id7 != p.UUID {
+		spaceDB, err := s.Store.Space(ctx, id)
+		if err == nil {
+			err = db.Q(spaceDB).UpsertSpaceSetting(ctx, sqlc.UpsertSpaceSettingParams{Key: spaceUUIDKey, Value: db.NS(id7)})
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+	sp := &Space{ID: id, UUID: id7, Name: name}
+	if owner != nil {
+		if err := s.SetMember(ctx, id, owner, SpaceAdmin); err != nil {
+			return nil, err
+		}
+		sp.Role = SpaceAdmin
+	}
+	return sp, nil
+}
+
+// Get is a space by id, without a role.
+func (s Spaces) Get(ctx context.Context, id int64) (*Space, error) {
+	row, err := s.server().GetSpace(ctx, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &Space{ID: row.ID, UUID: row.Uuid, Name: row.Name}, nil
+}
+
 // Provision gives a new user their personal space. Guests get none: they
 // only take part in spaces they were invited to.
 func (s Spaces) Provision(ctx context.Context, u *auth.User) (*Space, error) {

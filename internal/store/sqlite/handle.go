@@ -101,3 +101,58 @@ func (t txHandle) QueryRowContext(ctx context.Context, q string, args ...any) *s
 func (t txHandle) Tx(_ context.Context, fn func(store.DB) error) error {
 	return fn(t)
 }
+
+// serverHandle is the store.DB of the server database. Like a space handle it
+// reads the current *sql.DB per statement, so services built at startup keep
+// working after a server restore replaces the file.
+type serverHandle struct{ s *Store }
+
+func (h serverHandle) db() (*sql.DB, func()) {
+	h.s.serverGate.RLock()
+	return h.s.server, h.s.serverGate.RUnlock
+}
+
+func (h serverHandle) ExecContext(ctx context.Context, q string, args ...any) (sql.Result, error) {
+	d, done := h.db()
+	defer done()
+	return d.ExecContext(ctx, q, args...)
+}
+
+func (h serverHandle) PrepareContext(ctx context.Context, q string) (*sql.Stmt, error) {
+	d, done := h.db()
+	defer done()
+	return d.PrepareContext(ctx, q)
+}
+
+func (h serverHandle) QueryContext(ctx context.Context, q string, args ...any) (*sql.Rows, error) {
+	d, done := h.db()
+	defer done()
+	return d.QueryContext(ctx, q, args...)
+}
+
+func (h serverHandle) QueryRowContext(ctx context.Context, q string, args ...any) *sql.Row {
+	d, done := h.db()
+	defer done()
+	return d.QueryRowContext(ctx, q, args...)
+}
+
+func (h serverHandle) Tx(ctx context.Context, fn func(store.DB) error) error {
+	d, done := h.db()
+	defer done()
+	tx, err := d.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := fn(txHandle{tx}); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// SQL is the server *sql.DB, for tests that run raw statements.
+func (s *Store) SQL() *sql.DB {
+	s.serverGate.RLock()
+	defer s.serverGate.RUnlock()
+	return s.server
+}

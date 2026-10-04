@@ -17,6 +17,10 @@ var serverDefaults = map[string]any{
 	"sso_allow_signup":           true,
 	"password_login_enabled":     true,
 	"sso_require_verified_email": false,
+	// Size limit of a space in MB; 0 means unlimited.
+	"space_quota_mb": 0,
+	// Backups a space keeps; older ones are removed. 0 keeps all.
+	"space_backups_max": 10,
 }
 
 // spaceDefaults are the settings of one space, kept in its own database.
@@ -145,4 +149,34 @@ func decode(raw string) any {
 		return v
 	}
 	return raw
+}
+
+// Int reads a numeric setting.
+func (s Store) Int(ctx context.Context, key string, fallback int64) int64 {
+	switch t := s.Get(ctx, key, nil).(type) {
+	case float64:
+		return int64(t)
+	case int:
+		return int64(t)
+	case string:
+		if n, err := strconv.ParseInt(t, 10, 64); err == nil {
+			return n
+		}
+	}
+	return fallback
+}
+
+// SpaceQuota is the size limit of a space in bytes, 0 when unlimited.
+func SpaceQuota(ctx context.Context, server store.DB) int64 {
+	var mb float64
+	switch t := (Store{DB: server}).Get(ctx, "space_quota_mb", nil).(type) {
+	case float64:
+		mb = t
+	case string:
+		mb, _ = strconv.ParseFloat(t, 64)
+	}
+	if mb <= 0 {
+		return 0
+	}
+	return int64(mb * (1 << 20))
 }

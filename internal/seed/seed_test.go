@@ -13,7 +13,7 @@ import (
 
 func openStore(t *testing.T) *sqlite.Store {
 	t.Helper()
-	st, err := sqlite.OpenApp(context.Background(), t.TempDir())
+	st, err := sqlite.OpenApp(context.Background(), t.TempDir(), "")
 	if err != nil {
 		t.Fatal(err)
 	}

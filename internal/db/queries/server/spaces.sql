@@ -24,3 +24,6 @@ SELECT role FROM space_members WHERE space_id = ? AND user_id = ?;
 -- name: UpsertSpaceMember :exec
 INSERT INTO space_members (space_id, user_id, role, created_at) VALUES (?, ?, ?, ?)
 ON CONFLICT (space_id, user_id) DO UPDATE SET role = excluded.role;
+
+-- name: SpaceIDByUUID :one
+SELECT id FROM spaces WHERE uuid = ?;
