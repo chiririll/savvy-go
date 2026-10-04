@@ -1,11 +1,11 @@
 -- name: InsertTransaction :execresult
-INSERT INTO transactions (type, account_id, to_account_id, category_id, amount, to_amount, exchange_rate,
+INSERT INTO transactions (type, account_id, to_account_id, category_id, amount, to_amount,
 	description, date, status, recurring_transaction_id, created_at, updated_at)
-VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?);
+VALUES (?,?,?,?,?,?,?,?,?,?,?,?);
 
 -- name: UpdateTransaction :exec
 UPDATE transactions SET type=?, account_id=?, to_account_id=?, category_id=?, amount=?, to_amount=?,
-	exchange_rate=?, description=?, date=?, updated_at=? WHERE id=?;
+	description=?, date=?, updated_at=? WHERE id=?;
 
 -- name: DeleteTransactionItems :exec
 DELETE FROM transaction_items WHERE transaction_id = ?;
@@ -33,9 +33,14 @@ WHERE t.id = COALESCE(sqlc.narg('id'), t.id)
   AND (t.date IS NULL OR t.date <= COALESCE(sqlc.narg('end_date'), t.date));
 
 -- name: ListTransactions :many
-SELECT t.id, t.type, t.account_id, t.to_account_id, t.category_id, t.amount, t.to_amount, t.exchange_rate,
-	t.description, t.date, t.status, t.recurring_transaction_id, t.created_at
+SELECT t.id, t.type, t.account_id, t.to_account_id, t.category_id, t.amount, t.to_amount,
+	t.description, t.date, t.status, t.recurring_transaction_id, t.created_at,
+	ca.decimals AS decimals, COALESCE(cb.decimals, ca.decimals) AS to_decimals
 FROM transactions t
+JOIN accounts a ON a.id = t.account_id
+JOIN currencies ca ON ca.id = a.currency_id
+LEFT JOIN accounts ta ON ta.id = t.to_account_id
+LEFT JOIN currencies cb ON cb.id = ta.currency_id
 WHERE t.id = COALESCE(sqlc.narg('id'), t.id)
   AND t.type = COALESCE(sqlc.narg('type'), t.type)
   AND t.account_id = COALESCE(sqlc.narg('account_id'), t.account_id)
@@ -47,7 +52,7 @@ ORDER BY t.date DESC, t.id DESC
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: ListTransactionSummaryRows :many
-SELECT t.type, t.amount, c.rate, c.is_base
+SELECT t.type, t.amount, c.rate, c.is_base, c.decimals
 FROM transactions t
 JOIN accounts a ON a.id = t.account_id
 JOIN currencies c ON c.id = a.currency_id

@@ -5,11 +5,10 @@ import { Account } from '@/types'
 import { AccountFormData } from '@/schemas'
 
 export interface AccountsSummary {
-    total_balance: number
+    totalBalance: number
     currency: string | null
-    currency_code: string
     decimals: number
-    accounts_count: number
+    accountsCount: number
 }
 
 export interface AccountsResponse {

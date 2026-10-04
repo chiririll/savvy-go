@@ -6,8 +6,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/shopspring/decimal"
+
 	"savvy-go/internal/db"
 	"savvy-go/internal/db/sqlc"
+	"savvy-go/internal/money"
 )
 
 type Category struct {
@@ -18,7 +21,7 @@ type Category struct {
 	Color             *string
 	IsDefault         bool
 	TransactionsCount int
-	TotalAmount       *float64
+	TotalAmount       *decimal.Decimal
 }
 
 type Categories struct{ DB *sql.DB }
@@ -152,21 +155,33 @@ func (s Categories) SetDefault(ctx context.Context, id int64) (*Category, error)
 	return s.ByID(ctx, id)
 }
 
-func (s Categories) Statistics(ctx context.Context, id int64, start, end string) (map[string]any, error) {
+// CategoryStatistics totals a category's transactions in the base currency,
+// rounded to its decimals.
+type CategoryStatistics struct {
+	Category Category
+	Count    int
+	Total    decimal.Decimal
+}
+
+func (s Categories) Statistics(ctx context.Context, id int64, start, end string) (*CategoryStatistics, error) {
 	c, err := s.ByID(ctx, id)
 	if err != nil || c == nil {
 		return nil, err
 	}
-	row, _ := db.Q(s.DB).CategoryStatistics(ctx, sqlc.CategoryStatisticsParams{
+	rows, _ := db.Q(s.DB).CategoryStatistics(ctx, sqlc.CategoryStatisticsParams{
 		CategoryID: db.NI(id), StartDate: db.Narg(start), EndDate: db.Narg(end),
 	})
-	return map[string]any{
-		"category_id":        c.ID,
-		"category_name":      c.Name,
-		"type":               c.Type,
-		"transactions_count": int(row.Count),
-		"total_amount":       asFloat64(row.Coalesce),
-	}, nil
+	out := &CategoryStatistics{Category: *c}
+	for _, row := range rows {
+		out.Count += int(row.Cnt)
+		out.Total = out.Total.Add(money.FromMinor(row.Total, int(row.Decimals)).Mul(row.Rate))
+	}
+	baseDec := 2
+	if base, _ := (Currencies{DB: s.DB}).Base(ctx); base != nil {
+		baseDec = base.Decimals
+	}
+	out.Total = out.Total.Round(int32(baseDec))
+	return out, nil
 }
 
 func categoryFrom(id int64, name, typ string, icon, color sql.NullString, isDefault, count int64) Category {

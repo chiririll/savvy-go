@@ -5,10 +5,12 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 	"time"
 
 	"savvy-go/internal/auth"
+	"savvy-go/internal/migrate"
 )
 
 const importStampKey = "legacy_import_completed_at"
@@ -58,12 +60,12 @@ var copyTables = []string{
 
 // IsLaravel reports a Laravel-era database (migration tracker present).
 func IsLaravel(ctx context.Context, db *sql.DB) bool {
-	return tableExists(ctx, db, "migrations")
+	return migrate.TableExists(ctx, db, "migrations")
 }
 
 // AlreadyImported is true when this file was already upgraded or never Laravel.
 func AlreadyImported(ctx context.Context, db *sql.DB) bool {
-	if !tableExists(ctx, db, "settings") {
+	if !migrate.TableExists(ctx, db, "settings") {
 		return false
 	}
 	var v string
@@ -71,21 +73,54 @@ func AlreadyImported(ctx context.Context, db *sql.DB) bool {
 	return err == nil && v != ""
 }
 
-// UpgradeInPlace stamps a Laravel-era database.sqlite that already holds
-// domain tables (same names) so Go migrations and later starts are no-ops.
-// appKey is the Laravel APP_KEY used to decrypt legacy encrypted TOTP secrets.
-func UpgradeInPlace(ctx context.Context, db *sql.DB, appKey string) error {
-	if !IsLaravel(ctx, db) {
-		return nil
+// Upgrade brings a database file to the current Go schema, whether it is a
+// Go one or a Laravel-era one. A Laravel database must be at LatestMigration;
+// it gets the Go-only columns, the Go migrations and the in-place conversion,
+// and is stamped so a second call only runs migrations. appKey is the Laravel
+// APP_KEY used to decrypt legacy encrypted TOTP secrets.
+func Upgrade(ctx context.Context, db *sql.DB, appKey string) error {
+	info := Inspect(ctx, db)
+	if info.Laravel && !info.Supported {
+		return ErrUnsupportedVersion
 	}
-	if AlreadyImported(ctx, db) {
-		return nil
+	if info.Laravel {
+		if err := ensureColumns(ctx, db); err != nil {
+			return fmt.Errorf("legacy columns: %w", err)
+		}
 	}
+	if err := migrate.Up(ctx, db); err != nil {
+		return fmt.Errorf("migrate: %w", err)
+	}
+	if info.Laravel {
+		if err := upgradeInPlace(ctx, db, appKey); err != nil {
+			return fmt.Errorf("legacy import: %w", err)
+		}
+	}
+	// Old Go databases and converted Laravel ones keep their old table
+	// definitions; bring them up to the current constraints.
+	if err := migrate.Conform(ctx, db); err != nil {
+		return fmt.Errorf("conform schema: %w", err)
+	}
+	return nil
+}
+
+// upgradeInPlace converts a supported, not yet imported Laravel database that
+// already holds the Go tables (same names) and stamps it.
+func upgradeInPlace(ctx context.Context, db *sql.DB, appKey string) error {
 	if err := ensureSettings(ctx, db); err != nil {
 		return err
 	}
 	if err := auth.UnwrapLegacyTOTPSecrets(ctx, db, appKey); err != nil {
 		slog.Warn("could not unwrap legacy totp secrets", "err", err)
+	}
+	// Before convertMoneyInPlace: a failure after it but before stamp would
+	// rerun the money conversion on next start and scale amounts twice. Date
+	// retyping is idempotent, so it is safe to repeat.
+	if err := retypeDateColumns(ctx, db); err != nil {
+		return fmt.Errorf("convert dates to text: %w", err)
+	}
+	if err := convertMoneyInPlace(ctx, db); err != nil {
+		return fmt.Errorf("convert money to minor units: %w", err)
 	}
 	if err := stamp(ctx, db); err != nil {
 		return err
@@ -99,15 +134,21 @@ func UpgradeInPlace(ctx context.Context, db *sql.DB, appKey string) error {
 // Idempotent: INSERT OR IGNORE on primary keys; sqlite_sequence is raised
 // so new IDs cannot collide.
 func Copy(ctx context.Context, dest, src *sql.DB) error {
-	if !IsLaravel(ctx, src) {
+	info := Inspect(ctx, src)
+	if !info.Laravel {
 		return fmt.Errorf("source is not a laravel-era database")
 	}
+	if !info.Supported {
+		return ErrUnsupportedVersion
+	}
 
+	sc, err := loadScales(ctx, src)
+	if err != nil {
+		return fmt.Errorf("load currency scales: %w", err)
+	}
+	// A table missing on either side has no common columns; copyTable skips it.
 	for _, table := range copyTables {
-		if !tableExists(ctx, src, table) || !tableExists(ctx, dest, table) {
-			continue
-		}
-		n, err := copyTable(ctx, dest, src, table)
+		n, err := copyTable(ctx, dest, src, table, sc)
 		if err != nil {
 			return fmt.Errorf("copy %s: %w", table, err)
 		}
@@ -121,15 +162,18 @@ func Copy(ctx context.Context, dest, src *sql.DB) error {
 	if err := ensureSettings(ctx, dest); err != nil {
 		return err
 	}
+	if err := normalizeDates(ctx, dest); err != nil {
+		return err
+	}
 	return stamp(ctx, dest)
 }
 
-func copyTable(ctx context.Context, dest, src *sql.DB, table string) (int, error) {
-	srcCols, err := columns(ctx, src, table)
+func copyTable(ctx context.Context, dest, src *sql.DB, table string, sc *scales) (int, error) {
+	srcCols, err := migrate.Columns(ctx, src, table)
 	if err != nil {
 		return 0, err
 	}
-	destCols, err := columns(ctx, dest, table)
+	destCols, err := migrate.Columns(ctx, dest, table)
 	if err != nil {
 		return 0, err
 	}
@@ -138,8 +182,22 @@ func copyTable(ctx context.Context, dest, src *sql.DB, table string) (int, error
 		return 0, nil
 	}
 
+	// Laravel budgets may predate currency_id, which the Go schema requires;
+	// fixMoney fills it with the base currency.
+	selectCols := quoteAll(common)
+	if table == "budgets" && !slices.Contains(common, "currency_id") {
+		common = append(common, "currency_id")
+		selectCols = append(selectCols, "NULL")
+	}
 	quoted := quoteAll(common)
-	q := fmt.Sprintf("SELECT %s FROM %s", strings.Join(quoted, ", "), table)
+	q := fmt.Sprintf("SELECT %s FROM %s", strings.Join(selectCols, ", "), table)
+	names, err := newNameFixer(ctx, src, table, common)
+	if err != nil {
+		return 0, err
+	}
+	if names != nil {
+		q += " ORDER BY id"
+	}
 	rows, err := src.QueryContext(ctx, q)
 	if err != nil {
 		return 0, err
@@ -175,6 +233,10 @@ func copyTable(ctx context.Context, dest, src *sql.DB, table string) (int, error
 		if err := rows.Scan(ptrs...); err != nil {
 			return 0, err
 		}
+		if err := sc.fixMoney(table, common, raw); err != nil {
+			return 0, err
+		}
+		names.fix(raw)
 		if _, err := stmt.ExecContext(ctx, raw...); err != nil {
 			return 0, err
 		}
@@ -187,7 +249,7 @@ func copyTable(ctx context.Context, dest, src *sql.DB, table string) (int, error
 }
 
 func copySequences(ctx context.Context, dest, src *sql.DB) error {
-	if !tableExists(ctx, src, "sqlite_sequence") || !tableExists(ctx, dest, "sqlite_sequence") {
+	if !migrate.TableExists(ctx, src, "sqlite_sequence") || !migrate.TableExists(ctx, dest, "sqlite_sequence") {
 		return nil
 	}
 	rows, err := src.QueryContext(ctx, `SELECT name, seq FROM sqlite_sequence`)
@@ -201,28 +263,18 @@ func copySequences(ctx context.Context, dest, src *sql.DB) error {
 		if err := rows.Scan(&name, &seq); err != nil {
 			return err
 		}
-		if !tableExists(ctx, dest, name) {
+		if !migrate.TableExists(ctx, dest, name) {
 			continue
 		}
-		if _, err := dest.ExecContext(ctx,
-			`INSERT INTO sqlite_sequence(name, seq) VALUES(?, ?)
-			 ON CONFLICT(name) DO UPDATE SET seq = MAX(seq, excluded.seq)`,
-			name, seq,
-		); err != nil {
-			// sqlite_sequence has no official UNIQUE(name) on all builds;
-			// fall back to update-or-insert.
-			var current int64
-			qerr := dest.QueryRowContext(ctx, `SELECT seq FROM sqlite_sequence WHERE name = ?`, name).Scan(&current)
-			if qerr == sql.ErrNoRows {
+		// sqlite_sequence has no UNIQUE(name), so ON CONFLICT upserts are rejected.
+		res, err := dest.ExecContext(ctx, `UPDATE sqlite_sequence SET seq = MAX(seq, ?) WHERE name = ?`, seq, name)
+		if err == nil {
+			if n, _ := res.RowsAffected(); n == 0 {
 				_, err = dest.ExecContext(ctx, `INSERT INTO sqlite_sequence(name, seq) VALUES(?, ?)`, name, seq)
-			} else if qerr == nil && seq > current {
-				_, err = dest.ExecContext(ctx, `UPDATE sqlite_sequence SET seq = ? WHERE name = ?`, seq, name)
-			} else {
-				err = qerr
 			}
-			if err != nil {
-				return fmt.Errorf("sqlite_sequence %s: %w", name, err)
-			}
+		}
+		if err != nil {
+			return fmt.Errorf("sqlite_sequence %s: %w", name, err)
 		}
 	}
 	return rows.Err()
@@ -238,7 +290,7 @@ func stamp(ctx context.Context, db *sql.DB) error {
 }
 
 func ensureSettings(ctx context.Context, db *sql.DB) error {
-	if tableExists(ctx, db, "settings") {
+	if migrate.TableExists(ctx, db, "settings") {
 		return nil
 	}
 	_, err := db.ExecContext(ctx, `CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT)`)
@@ -247,41 +299,10 @@ func ensureSettings(ctx context.Context, db *sql.DB) error {
 
 func dropLaravelOnly(ctx context.Context, db *sql.DB) {
 	for _, table := range laravelOnlyTables {
-		if !tableExists(ctx, db, table) {
-			continue
-		}
 		if _, err := db.ExecContext(ctx, `DROP TABLE IF EXISTS `+table); err != nil {
 			slog.Warn("could not drop laravel table", "table", table, "err", err)
 		}
 	}
-}
-
-func tableExists(ctx context.Context, db *sql.DB, name string) bool {
-	var found string
-	err := db.QueryRowContext(ctx,
-		`SELECT name FROM sqlite_master WHERE type='table' AND name=?`, name,
-	).Scan(&found)
-	return err == nil
-}
-
-func columns(ctx context.Context, db *sql.DB, table string) ([]string, error) {
-	rows, err := db.QueryContext(ctx, `PRAGMA table_info(`+table+`)`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []string
-	for rows.Next() {
-		var cid int
-		var name, ctype string
-		var notnull, pk int
-		var dflt any
-		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
-			return nil, err
-		}
-		out = append(out, name)
-	}
-	return out, rows.Err()
 }
 
 func intersect(a, b []string) []string {
@@ -301,7 +322,7 @@ func intersect(a, b []string) []string {
 func quoteAll(cols []string) []string {
 	out := make([]string, len(cols))
 	for i, c := range cols {
-		out[i] = `"` + strings.ReplaceAll(c, `"`, `""`) + `"`
+		out[i] = quoteIdent(c)
 	}
 	return out
 }

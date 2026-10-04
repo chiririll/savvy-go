@@ -395,10 +395,10 @@ export default function SecuritySettingsPage() {
                                                         {passkey.name || t('security.passkeys.unnamed')}
                                                     </div>
                                                     <p className="text-sm leading-relaxed text-muted-foreground">
-                                                        {t('security.passkeys.added', { date: formatDate(passkey.created_at) })}
+                                                        {t('security.passkeys.added', { date: formatDate(passkey.createdAt) })}
                                                         {' · '}
-                                                        {passkey.last_used_at
-                                                            ? t('security.passkeys.lastUsed', { date: formatDate(passkey.last_used_at) })
+                                                        {passkey.lastUsedAt
+                                                            ? t('security.passkeys.lastUsed', { date: formatDate(passkey.lastUsedAt) })
                                                             : t('security.passkeys.neverUsed')}
                                                     </p>
                                                 </div>

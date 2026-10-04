@@ -18,7 +18,8 @@
         "initialBalance": "Initial Balance",
         "initialBalanceHelp": "Starting balance for this account",
         "activeHelp": "Inactive accounts are hidden from lists",
-        "currencyCatalogHelp": "A currency that is not in your list yet will be added automatically."
+        "currencyCatalogHelp": "A currency that is not in your list yet will be added automatically.",
+        "currencyLockedHelp": "The currency of an existing account cannot be changed."
     },
     "categories": {
         "namePlaceholder": "Groceries",

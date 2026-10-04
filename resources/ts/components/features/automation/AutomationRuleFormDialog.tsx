@@ -37,12 +37,12 @@ export function AutomationRuleFormDialog({
             toFormValues={(item) => ({
                 name: item.name,
                 description: item.description,
-                trigger_type: item.trigger_type,
+                trigger_type: item.triggerType,
                 priority: item.priority,
                 conditions: item.conditions,
                 actions: item.actions,
-                is_active: item.is_active,
-                stop_processing: item.stop_processing,
+                is_active: item.isActive,
+                stop_processing: item.stopProcessing,
             })}
         >
             {({ formKey, formProps }) => (

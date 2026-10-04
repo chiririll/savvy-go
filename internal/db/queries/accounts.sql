@@ -39,38 +39,41 @@ DELETE FROM accounts WHERE id = ?;
 UPDATE accounts SET sort_order = ? WHERE id = ?;
 
 -- name: SumDebtPayments :one
-SELECT COALESCE(SUM(to_amount),0) FROM transactions
+SELECT CAST(COALESCE(SUM(to_amount),0) AS INTEGER) FROM transactions
 WHERE to_account_id = ? AND status = 'confirmed' AND type IN ('debt_payment','debt_collection');
 
 -- name: SumAccountIncome :one
-SELECT COALESCE(SUM(amount),0) FROM transactions
+SELECT CAST(COALESCE(SUM(amount),0) AS INTEGER) FROM transactions
 WHERE account_id=? AND status='confirmed' AND type='income'
   AND date <= COALESCE(sqlc.narg('as_of'), date);
 
 -- name: SumAccountExpense :one
-SELECT COALESCE(SUM(amount),0) FROM transactions
+SELECT CAST(COALESCE(SUM(amount),0) AS INTEGER) FROM transactions
 WHERE account_id=? AND status='confirmed' AND type='expense'
   AND date <= COALESCE(sqlc.narg('as_of'), date);
 
 -- name: SumAccountTransferOut :one
-SELECT COALESCE(SUM(amount),0) FROM transactions
+SELECT CAST(COALESCE(SUM(amount),0) AS INTEGER) FROM transactions
 WHERE account_id=? AND status='confirmed' AND type='transfer'
   AND date <= COALESCE(sqlc.narg('as_of'), date);
 
 -- name: SumAccountTransferIn :one
-SELECT COALESCE(SUM(to_amount),0) FROM transactions
+SELECT CAST(COALESCE(SUM(to_amount),0) AS INTEGER) FROM transactions
 WHERE to_account_id=? AND status='confirmed'
   AND date <= COALESCE(sqlc.narg('as_of'), date);
 
 -- name: SumAccountDebtIn :one
-SELECT COALESCE(SUM(amount),0) FROM transactions
+SELECT CAST(COALESCE(SUM(amount),0) AS INTEGER) FROM transactions
 WHERE account_id=? AND status='confirmed' AND type IN ('debt_collection','debt_borrow')
   AND date <= COALESCE(sqlc.narg('as_of'), date);
 
 -- name: SumAccountDebtOut :one
-SELECT COALESCE(SUM(amount),0) FROM transactions
+SELECT CAST(COALESCE(SUM(amount),0) AS INTEGER) FROM transactions
 WHERE account_id=? AND status='confirmed' AND type IN ('debt_payment','debt_lend')
   AND date <= COALESCE(sqlc.narg('as_of'), date);
+
+-- name: GetAccountDecimals :one
+SELECT c.decimals FROM accounts a JOIN currencies c ON c.id = a.currency_id WHERE a.id = ?;
 
 -- name: MarkAccountPaidOff :exec
 UPDATE accounts SET is_paid_off = 1 WHERE id = ?;

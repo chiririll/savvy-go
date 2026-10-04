@@ -9,6 +9,7 @@ import (
 	"savvy-go/internal/httpserver/dto"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/shopspring/decimal"
 )
 
 func (s *Server) budgetsIndex(w http.ResponseWriter, r *http.Request) {
@@ -17,7 +18,7 @@ func (s *Server) budgetsIndex(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, mapSlice(list, dto.Budget))
+	writeData(w, http.StatusOK, dto.Map(list, dto.NewBudget))
 }
 
 func (s *Server) budgetsStore(w http.ResponseWriter, r *http.Request) {
@@ -25,7 +26,7 @@ func (s *Server) budgetsStore(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if in.Name == "" || in.Amount <= 0 || in.Period == "" {
+	if in.Name == "" || !in.Amount.IsPositive() || in.Period == "" {
 		writeValidation(w, map[string][]string{"name": {"The name field is required."}})
 		return
 	}
@@ -34,7 +35,7 @@ func (s *Server) budgetsStore(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusCreated, dto.Budget(*b))
+	writeData(w, http.StatusCreated, dto.NewBudget(*b))
 }
 
 func (s *Server) budgetsShow(w http.ResponseWriter, r *http.Request) {
@@ -42,7 +43,7 @@ func (s *Server) budgetsShow(w http.ResponseWriter, r *http.Request) {
 	if b == nil {
 		return
 	}
-	writeData(w, http.StatusOK, dto.Budget(*b))
+	writeData(w, http.StatusOK, dto.NewBudget(*b))
 }
 
 func (s *Server) budgetsUpdate(w http.ResponseWriter, r *http.Request) {
@@ -59,7 +60,7 @@ func (s *Server) budgetsUpdate(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, dto.Budget(*b))
+	writeData(w, http.StatusOK, dto.NewBudget(*b))
 }
 
 func (s *Server) budgetsDestroy(w http.ResponseWriter, r *http.Request) {
@@ -90,17 +91,17 @@ func decodeBudget(w http.ResponseWriter, r *http.Request) (domain.BudgetInput, b
 		return domain.BudgetInput{}, false
 	}
 	var body struct {
-		Name            string  `json:"name"`
-		Amount          float64 `json:"amount"`
-		CurrencyID      *int64  `json:"currency_id"`
-		Period          string  `json:"period"`
-		StartDate       *string `json:"start_date"`
-		EndDate         *string `json:"end_date"`
-		IsGlobal        *bool   `json:"is_global"`
-		NotifyAtPercent *int    `json:"notify_at_percent"`
-		IsActive        *bool   `json:"is_active"`
-		CategoryIDs     []int64 `json:"category_ids"`
-		TagIDs          []int64 `json:"tag_ids"`
+		Name            string          `json:"name"`
+		Amount          decimal.Decimal `json:"amount"`
+		CurrencyID      *int64          `json:"currency_id"`
+		Period          string          `json:"period"`
+		StartDate       *string         `json:"start_date"`
+		EndDate         *string         `json:"end_date"`
+		IsGlobal        *bool           `json:"is_global"`
+		NotifyAtPercent *int            `json:"notify_at_percent"`
+		IsActive        *bool           `json:"is_active"`
+		CategoryIDs     []int64         `json:"category_ids"`
+		TagIDs          []int64         `json:"tag_ids"`
 	}
 	buf, _ := json.Marshal(raw)
 	if err := json.Unmarshal(buf, &body); err != nil {

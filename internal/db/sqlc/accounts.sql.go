@@ -8,6 +8,8 @@ package sqlc
 import (
 	"context"
 	"database/sql"
+
+	"github.com/shopspring/decimal"
 )
 
 const countAccountTransactions = `-- name: CountAccountTransactions :one
@@ -76,6 +78,17 @@ func (q *Queries) DeleteDebtIssuance(ctx context.Context, toAccountID sql.NullIn
 	return err
 }
 
+const getAccountDecimals = `-- name: GetAccountDecimals :one
+SELECT c.decimals FROM accounts a JOIN currencies c ON c.id = a.currency_id WHERE a.id = ?
+`
+
+func (q *Queries) GetAccountDecimals(ctx context.Context, id int64) (int64, error) {
+	row := q.db.QueryRowContext(ctx, getAccountDecimals, id)
+	var decimals int64
+	err := row.Scan(&decimals)
+	return decimals, err
+}
+
 const insertAccount = `-- name: InsertAccount :execresult
 INSERT INTO accounts (name, type, debt_type, currency_id, initial_balance, target_amount, due_date,
 	is_paid_off, counterparty, debt_description, is_active, sort_order, created_at, updated_at)
@@ -87,8 +100,8 @@ type InsertAccountParams struct {
 	Type            string
 	DebtType        sql.NullString
 	CurrencyID      int64
-	InitialBalance  float64
-	TargetAmount    sql.NullFloat64
+	InitialBalance  int64
+	TargetAmount    sql.NullInt64
 	DueDate         sql.NullString
 	IsPaidOff       int64
 	Counterparty    sql.NullString
@@ -146,11 +159,11 @@ type ListAccountsRow struct {
 	Name            string
 	Type            string
 	CurrencyID      int64
-	InitialBalance  float64
+	InitialBalance  int64
 	IsActive        int64
 	SortOrder       int64
 	DebtType        sql.NullString
-	TargetAmount    sql.NullFloat64
+	TargetAmount    sql.NullInt64
 	DueDate         sql.NullString
 	IsPaidOff       int64
 	Counterparty    sql.NullString
@@ -162,7 +175,7 @@ type ListAccountsRow struct {
 	Symbol          string
 	Decimals        int64
 	IsBase          int64
-	Rate            float64
+	Rate            decimal.Decimal
 }
 
 func (q *Queries) ListAccounts(ctx context.Context, arg ListAccountsParams) ([]ListAccountsRow, error) {
@@ -266,7 +279,7 @@ func (q *Queries) SetAccountSortOrder(ctx context.Context, arg SetAccountSortOrd
 }
 
 const sumAccountDebtIn = `-- name: SumAccountDebtIn :one
-SELECT COALESCE(SUM(amount),0) FROM transactions
+SELECT CAST(COALESCE(SUM(amount),0) AS INTEGER) FROM transactions
 WHERE account_id=? AND status='confirmed' AND type IN ('debt_collection','debt_borrow')
   AND date <= COALESCE(?2, date)
 `
@@ -276,15 +289,15 @@ type SumAccountDebtInParams struct {
 	AsOf      sql.NullString
 }
 
-func (q *Queries) SumAccountDebtIn(ctx context.Context, arg SumAccountDebtInParams) (interface{}, error) {
+func (q *Queries) SumAccountDebtIn(ctx context.Context, arg SumAccountDebtInParams) (int64, error) {
 	row := q.db.QueryRowContext(ctx, sumAccountDebtIn, arg.AccountID, arg.AsOf)
-	var coalesce interface{}
-	err := row.Scan(&coalesce)
-	return coalesce, err
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const sumAccountDebtOut = `-- name: SumAccountDebtOut :one
-SELECT COALESCE(SUM(amount),0) FROM transactions
+SELECT CAST(COALESCE(SUM(amount),0) AS INTEGER) FROM transactions
 WHERE account_id=? AND status='confirmed' AND type IN ('debt_payment','debt_lend')
   AND date <= COALESCE(?2, date)
 `
@@ -294,15 +307,15 @@ type SumAccountDebtOutParams struct {
 	AsOf      sql.NullString
 }
 
-func (q *Queries) SumAccountDebtOut(ctx context.Context, arg SumAccountDebtOutParams) (interface{}, error) {
+func (q *Queries) SumAccountDebtOut(ctx context.Context, arg SumAccountDebtOutParams) (int64, error) {
 	row := q.db.QueryRowContext(ctx, sumAccountDebtOut, arg.AccountID, arg.AsOf)
-	var coalesce interface{}
-	err := row.Scan(&coalesce)
-	return coalesce, err
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const sumAccountExpense = `-- name: SumAccountExpense :one
-SELECT COALESCE(SUM(amount),0) FROM transactions
+SELECT CAST(COALESCE(SUM(amount),0) AS INTEGER) FROM transactions
 WHERE account_id=? AND status='confirmed' AND type='expense'
   AND date <= COALESCE(?2, date)
 `
@@ -312,15 +325,15 @@ type SumAccountExpenseParams struct {
 	AsOf      sql.NullString
 }
 
-func (q *Queries) SumAccountExpense(ctx context.Context, arg SumAccountExpenseParams) (interface{}, error) {
+func (q *Queries) SumAccountExpense(ctx context.Context, arg SumAccountExpenseParams) (int64, error) {
 	row := q.db.QueryRowContext(ctx, sumAccountExpense, arg.AccountID, arg.AsOf)
-	var coalesce interface{}
-	err := row.Scan(&coalesce)
-	return coalesce, err
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const sumAccountIncome = `-- name: SumAccountIncome :one
-SELECT COALESCE(SUM(amount),0) FROM transactions
+SELECT CAST(COALESCE(SUM(amount),0) AS INTEGER) FROM transactions
 WHERE account_id=? AND status='confirmed' AND type='income'
   AND date <= COALESCE(?2, date)
 `
@@ -330,15 +343,15 @@ type SumAccountIncomeParams struct {
 	AsOf      sql.NullString
 }
 
-func (q *Queries) SumAccountIncome(ctx context.Context, arg SumAccountIncomeParams) (interface{}, error) {
+func (q *Queries) SumAccountIncome(ctx context.Context, arg SumAccountIncomeParams) (int64, error) {
 	row := q.db.QueryRowContext(ctx, sumAccountIncome, arg.AccountID, arg.AsOf)
-	var coalesce interface{}
-	err := row.Scan(&coalesce)
-	return coalesce, err
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const sumAccountTransferIn = `-- name: SumAccountTransferIn :one
-SELECT COALESCE(SUM(to_amount),0) FROM transactions
+SELECT CAST(COALESCE(SUM(to_amount),0) AS INTEGER) FROM transactions
 WHERE to_account_id=? AND status='confirmed'
   AND date <= COALESCE(?2, date)
 `
@@ -348,15 +361,15 @@ type SumAccountTransferInParams struct {
 	AsOf        sql.NullString
 }
 
-func (q *Queries) SumAccountTransferIn(ctx context.Context, arg SumAccountTransferInParams) (interface{}, error) {
+func (q *Queries) SumAccountTransferIn(ctx context.Context, arg SumAccountTransferInParams) (int64, error) {
 	row := q.db.QueryRowContext(ctx, sumAccountTransferIn, arg.ToAccountID, arg.AsOf)
-	var coalesce interface{}
-	err := row.Scan(&coalesce)
-	return coalesce, err
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const sumAccountTransferOut = `-- name: SumAccountTransferOut :one
-SELECT COALESCE(SUM(amount),0) FROM transactions
+SELECT CAST(COALESCE(SUM(amount),0) AS INTEGER) FROM transactions
 WHERE account_id=? AND status='confirmed' AND type='transfer'
   AND date <= COALESCE(?2, date)
 `
@@ -366,23 +379,23 @@ type SumAccountTransferOutParams struct {
 	AsOf      sql.NullString
 }
 
-func (q *Queries) SumAccountTransferOut(ctx context.Context, arg SumAccountTransferOutParams) (interface{}, error) {
+func (q *Queries) SumAccountTransferOut(ctx context.Context, arg SumAccountTransferOutParams) (int64, error) {
 	row := q.db.QueryRowContext(ctx, sumAccountTransferOut, arg.AccountID, arg.AsOf)
-	var coalesce interface{}
-	err := row.Scan(&coalesce)
-	return coalesce, err
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const sumDebtPayments = `-- name: SumDebtPayments :one
-SELECT COALESCE(SUM(to_amount),0) FROM transactions
+SELECT CAST(COALESCE(SUM(to_amount),0) AS INTEGER) FROM transactions
 WHERE to_account_id = ? AND status = 'confirmed' AND type IN ('debt_payment','debt_collection')
 `
 
-func (q *Queries) SumDebtPayments(ctx context.Context, toAccountID sql.NullInt64) (interface{}, error) {
+func (q *Queries) SumDebtPayments(ctx context.Context, toAccountID sql.NullInt64) (int64, error) {
 	row := q.db.QueryRowContext(ctx, sumDebtPayments, toAccountID)
-	var coalesce interface{}
-	err := row.Scan(&coalesce)
-	return coalesce, err
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const updateAccount = `-- name: UpdateAccount :exec
@@ -395,10 +408,10 @@ type UpdateAccountParams struct {
 	Name            string
 	Type            string
 	CurrencyID      int64
-	InitialBalance  float64
+	InitialBalance  int64
 	IsActive        int64
 	DebtType        sql.NullString
-	TargetAmount    sql.NullFloat64
+	TargetAmount    sql.NullInt64
 	DueDate         sql.NullString
 	IsPaidOff       int64
 	Counterparty    sql.NullString

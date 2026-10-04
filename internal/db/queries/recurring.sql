@@ -30,13 +30,18 @@ DELETE FROM recurring_transaction_tag WHERE recurring_transaction_id = ?;
 INSERT OR IGNORE INTO recurring_transaction_tag (recurring_transaction_id, tag_id) VALUES (?,?);
 
 -- name: ListRecurring :many
-SELECT id, type, account_id, to_account_id, category_id, amount, to_amount, description,
-	frequency, interval, day_of_week, day_of_month, start_date, end_date,
-	next_run_date, last_run_date, is_active
-FROM recurring_transactions
-WHERE id = COALESCE(sqlc.narg('id'), id)
-  AND is_active = COALESCE(sqlc.narg('active_only'), is_active)
-ORDER BY next_run_date, id
+SELECT r.id, r.type, r.account_id, r.to_account_id, r.category_id, r.amount, r.to_amount, r.description,
+	r.frequency, r.interval, r.day_of_week, r.day_of_month, r.start_date, r.end_date,
+	r.next_run_date, r.last_run_date, r.is_active,
+	ca.decimals AS decimals, COALESCE(cb.decimals, ca.decimals) AS to_decimals
+FROM recurring_transactions r
+JOIN accounts a ON a.id = r.account_id
+JOIN currencies ca ON ca.id = a.currency_id
+LEFT JOIN accounts ta ON ta.id = r.to_account_id
+LEFT JOIN currencies cb ON cb.id = ta.currency_id
+WHERE r.id = COALESCE(sqlc.narg('id'), r.id)
+  AND r.is_active = COALESCE(sqlc.narg('active_only'), r.is_active)
+ORDER BY r.next_run_date, r.id
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: ListRecurringTags :many

@@ -26,6 +26,9 @@ UPDATE currencies SET name=?, symbol=?, decimals=?, is_base=?, rate=?, updated_a
 -- name: CountAccountsForCurrency :one
 SELECT COUNT(*) FROM accounts WHERE currency_id = ?;
 
+-- name: CountBudgetsForCurrency :one
+SELECT COUNT(*) FROM budgets WHERE currency_id = ?;
+
 -- name: CountCurrencies :one
 SELECT COUNT(*) FROM currencies;
 

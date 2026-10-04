@@ -93,7 +93,7 @@ func (s Backups) ByName(ctx context.Context, name string) (*Backup, error) {
 
 func (s Backups) describe(ctx context.Context, info os.FileInfo) Backup {
 	b := Backup{Filename: info.Name(), Size: info.Size()}
-	meta := readBackupMeta(ctx, filepath.Join(s.Dir, info.Name()))
+	meta := db.ReadBackupMeta(ctx, filepath.Join(s.Dir, info.Name()))
 	if v, ok := meta[metaNote]; ok && v != "" {
 		b.Note = &v
 	}
@@ -128,7 +128,7 @@ func (s Backups) Create(ctx context.Context, note *string) (*Backup, error) {
 	if note != nil && *note != "" {
 		meta[metaNote] = *note
 	}
-	if err := writeBackupMeta(ctx, dest, meta, true); err != nil {
+	if err := db.WriteBackupMeta(ctx, dest, meta, true); err != nil {
 		_ = os.Remove(dest)
 		return nil, err
 	}
@@ -148,12 +148,12 @@ func (s Backups) Ingest(ctx context.Context, srcPath string, note *string) (*Bac
 	}
 	_ = os.Remove(srcPath)
 	if note != nil && *note != "" {
-		if err := writeBackupMeta(ctx, dest, map[string]string{metaNote: *note}, true); err != nil {
+		if err := db.WriteBackupMeta(ctx, dest, map[string]string{metaNote: *note}, true); err != nil {
 			_ = os.Remove(dest)
 			return nil, err
 		}
 	}
-	err := writeBackupMeta(ctx, dest, map[string]string{metaCreatedAt: time.Now().UTC().Format(time.RFC3339)}, false)
+	err := db.WriteBackupMeta(ctx, dest, map[string]string{metaCreatedAt: time.Now().UTC().Format(time.RFC3339)}, false)
 	if err != nil {
 		_ = os.Remove(dest)
 		return nil, err
@@ -169,109 +169,90 @@ func (s Backups) Path(b Backup) string {
 	return filepath.Join(s.Dir, b.Filename)
 }
 
-func (s Backups) Inspect(ctx context.Context, b Backup) (map[string]any, error) {
-	src, err := sql.Open("sqlite", "file:"+filepath.ToSlash(s.Path(b))+"?mode=ro")
+// Migrations compares the Go schema migrations recorded in src, an opened
+// backup, with the ones this app knows: pending ones restore will apply,
+// unknown ones come from a newer app. It fails for a file without a Go schema
+// (not SQLite, or Laravel).
+func (s Backups) Migrations(ctx context.Context, src *sql.DB) (pending, unknown []string, err error) {
+	ran, err := sqlc.New(src).ListSchemaMigrations(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	defer src.Close()
-	ran, _ := sqlc.New(src).ListSchemaMigrations(ctx)
-	available, _ := db.Q(s.DB).ListSchemaMigrations(ctx)
-	pending := diffStrings(available, ran)
-	unknown := diffStrings(ran, available)
-	return map[string]any{
-		"valid":             true,
-		"compatible":        len(unknown) == 0,
-		"pendingCount":      len(pending),
-		"pendingMigrations": pending,
-		"unknownCount":      len(unknown),
-		"unknownMigrations": unknown,
-	}, nil
+	available, err := db.Q(s.DB).ListSchemaMigrations(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	return diffStrings(available, ran), diffStrings(ran, available), nil
 }
 
-// readBackupMeta returns backup_meta rows of a backup file; empty when the
-// file has no such table or cannot be opened.
-func readBackupMeta(ctx context.Context, path string) map[string]string {
-	out := map[string]string{}
-	src, err := sql.Open("sqlite", "file:"+filepath.ToSlash(path)+"?mode=ro")
-	if err != nil {
-		return out
-	}
-	defer src.Close()
-	rows, err := src.QueryContext(ctx, `SELECT key, value FROM backup_meta`)
-	if err != nil {
-		return out
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var k, v string
-		if rows.Scan(&k, &v) == nil {
-			out[k] = v
-		}
-	}
-	return out
-}
-
-// writeBackupMeta stores key/value pairs in the backup file. Existing keys are
-// replaced only when overwrite is true. journal_mode=DELETE keeps the backup a
-// single self-contained file (no -wal/-shm left beside it).
-func writeBackupMeta(ctx context.Context, path string, kv map[string]string, overwrite bool) error {
-	dst, err := sql.Open("sqlite", "file:"+filepath.ToSlash(path)+"?_pragma=journal_mode(DELETE)")
-	if err != nil {
-		return err
-	}
-	defer dst.Close()
-	if _, err := dst.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS backup_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`); err != nil {
-		return fmt.Errorf("backup meta: %w", err)
-	}
-	conflict := `ON CONFLICT(key) DO NOTHING`
-	if overwrite {
-		conflict = `ON CONFLICT(key) DO UPDATE SET value = excluded.value`
-	}
-	for k, v := range kv {
-		if _, err := dst.ExecContext(ctx, `INSERT INTO backup_meta (key, value) VALUES (?, ?) `+conflict, k, v); err != nil {
-			return fmt.Errorf("backup meta %s: %w", k, err)
-		}
-	}
-	return nil
-}
-
-// Restore replaces the live database with the given backup and returns a new
-// *sql.DB connected to the restored file. The caller must call Server.reconnect
-// with the returned DB so all domain objects switch to the new connection.
-func (s Backups) Restore(ctx context.Context, b Backup) (*sql.DB, error) {
+// Restore replaces the live database with the backup and returns a new *sql.DB
+// connected to the restored file; the caller must call Server.reconnect with
+// it so all domain objects switch to the new connection. The backup is first
+// copied aside and brought up to date by prepare (schema migrations, legacy
+// upgrade); only if that succeeds is the live database closed and replaced, so
+// a bad or unsupported backup leaves the current database and connection
+// untouched.
+func (s Backups) Restore(ctx context.Context, b Backup, prepare func(context.Context, *sql.DB) error) (*sql.DB, error) {
 	src := s.Path(b)
 	if _, err := os.Stat(src); err != nil {
 		return nil, fmt.Errorf("backup file missing")
+	}
+
+	staged := s.Database + ".restore"
+	defer removeSQLiteFiles(staged)
+	removeSQLiteFiles(staged)
+	if err := copyFile(src, staged); err != nil {
+		return nil, fmt.Errorf("copy backup: %w", err)
+	}
+	if err := prepareStaged(ctx, staged, prepare); err != nil {
+		return nil, err
 	}
 
 	// Close current connection before replacing the file.
 	if err := s.DB.Close(); err != nil {
 		return nil, fmt.Errorf("close db: %w", err)
 	}
-
-	// Remove WAL/SHM, copy backup, then clean up any WAL the backup had.
-	_ = os.Remove(s.Database + "-wal")
-	_ = os.Remove(s.Database + "-shm")
-	if err := copyFile(src, s.Database); err != nil {
+	removeSQLiteFiles(s.Database)
+	if err := copyFile(staged, s.Database); err != nil {
 		return nil, fmt.Errorf("copy backup: %w", err)
 	}
-	_ = os.Remove(s.Database + "-wal")
-	_ = os.Remove(s.Database + "-shm")
 
 	// Open a fresh connection to the restored file.
 	newDB, err := db.Open(s.Database)
 	if err != nil {
 		return nil, fmt.Errorf("reopen db: %w", err)
 	}
-
-	// backup_meta only describes the backup file, not the live database.
-	if _, err := newDB.ExecContext(ctx, `DROP TABLE IF EXISTS backup_meta`); err != nil {
-		_ = newDB.Close()
-		return nil, fmt.Errorf("drop backup meta: %w", err)
-	}
-
 	return newDB, nil
+}
+
+// prepareStaged opens the staged copy, runs prepare and drops backup_meta
+// (it only describes the backup file, not the live database), then closes it so
+// the file is self-contained again.
+func prepareStaged(ctx context.Context, path string, prepare func(context.Context, *sql.DB) error) error {
+	staged, err := db.Open(path)
+	if err != nil {
+		return fmt.Errorf("open backup: %w", err)
+	}
+	defer staged.Close()
+	if prepare != nil {
+		if err := prepare(ctx, staged); err != nil {
+			return err
+		}
+	}
+	if err := db.DropBackupMeta(ctx, staged); err != nil {
+		return fmt.Errorf("drop backup meta: %w", err)
+	}
+	if err := db.Checkpoint(ctx, staged); err != nil {
+		return fmt.Errorf("checkpoint: %w", err)
+	}
+	return nil
+}
+
+// removeSQLiteFiles deletes a database file and its WAL/SHM side files.
+func removeSQLiteFiles(path string) {
+	for _, suffix := range []string{"", "-wal", "-shm"} {
+		_ = os.Remove(path + suffix)
+	}
 }
 
 func copyFile(src, dest string) error {

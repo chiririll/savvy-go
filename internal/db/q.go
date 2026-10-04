@@ -40,13 +40,6 @@ func NullInt64If(v int64) sql.NullInt64 {
 	return sql.NullInt64{Int64: v, Valid: true}
 }
 
-func NullFloat64(v *float64) sql.NullFloat64 {
-	if v == nil {
-		return sql.NullFloat64{}
-	}
-	return sql.NullFloat64{Float64: *v, Valid: true}
-}
-
 func NullInt(v *int) sql.NullInt64 {
 	if v == nil {
 		return sql.NullInt64{}

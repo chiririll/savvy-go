@@ -3,10 +3,11 @@ package domain
 import (
 	"bytes"
 	"math/rand"
-	"strconv"
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/shopspring/decimal"
 )
 
 const detectSampleSize = 300
@@ -251,7 +252,7 @@ func parseImportDate(v, format string) string {
 	return ""
 }
 
-func parseImportAmount(v, format string) (float64, error) {
+func parseImportAmount(v, format string) (decimal.Decimal, error) {
 	c := cleanAmount(v)
 	if format == "EU" {
 		c = strings.ReplaceAll(c, ".", "")
@@ -259,7 +260,7 @@ func parseImportAmount(v, format string) (float64, error) {
 	} else {
 		c = strings.ReplaceAll(c, ",", "")
 	}
-	return strconv.ParseFloat(c, 64)
+	return decimal.NewFromString(c)
 }
 
 // parseImportType maps a type cell to income/expense, or "" when unknown.

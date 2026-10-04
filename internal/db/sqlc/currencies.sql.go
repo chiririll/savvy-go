@@ -8,6 +8,8 @@ package sqlc
 import (
 	"context"
 	"database/sql"
+
+	"github.com/shopspring/decimal"
 )
 
 const clearBaseCurrency = `-- name: ClearBaseCurrency :exec
@@ -25,6 +27,17 @@ SELECT COUNT(*) FROM accounts WHERE currency_id = ?
 
 func (q *Queries) CountAccountsForCurrency(ctx context.Context, currencyID int64) (int64, error) {
 	row := q.db.QueryRowContext(ctx, countAccountsForCurrency, currencyID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countBudgetsForCurrency = `-- name: CountBudgetsForCurrency :one
+SELECT COUNT(*) FROM budgets WHERE currency_id = ?
+`
+
+func (q *Queries) CountBudgetsForCurrency(ctx context.Context, currencyID int64) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countBudgetsForCurrency, currencyID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -61,7 +74,7 @@ type GetBaseCurrencyRow struct {
 	Symbol   string
 	Decimals int64
 	IsBase   int64
-	Rate     float64
+	Rate     decimal.Decimal
 }
 
 func (q *Queries) GetBaseCurrency(ctx context.Context) (GetBaseCurrencyRow, error) {
@@ -101,7 +114,7 @@ type GetCurrencyRow struct {
 	Symbol   string
 	Decimals int64
 	IsBase   int64
-	Rate     float64
+	Rate     decimal.Decimal
 }
 
 func (q *Queries) GetCurrency(ctx context.Context, id int64) (GetCurrencyRow, error) {
@@ -130,7 +143,7 @@ type GetCurrencyByCodeRow struct {
 	Symbol   string
 	Decimals int64
 	IsBase   int64
-	Rate     float64
+	Rate     decimal.Decimal
 }
 
 func (q *Queries) GetCurrencyByCode(ctx context.Context, code string) (GetCurrencyByCodeRow, error) {
@@ -159,7 +172,7 @@ type InsertCurrencyParams struct {
 	Symbol    string
 	Decimals  int64
 	IsBase    int64
-	Rate      float64
+	Rate      decimal.Decimal
 	CreatedAt sql.NullString
 	UpdatedAt sql.NullString
 }
@@ -188,7 +201,7 @@ type ListCurrenciesRow struct {
 	Symbol   string
 	Decimals int64
 	IsBase   int64
-	Rate     float64
+	Rate     decimal.Decimal
 }
 
 func (q *Queries) ListCurrencies(ctx context.Context) ([]ListCurrenciesRow, error) {
@@ -255,7 +268,7 @@ SELECT id, rate FROM currencies WHERE id != ?
 
 type ListOtherCurrencyRatesRow struct {
 	ID   int64
-	Rate float64
+	Rate decimal.Decimal
 }
 
 func (q *Queries) ListOtherCurrencyRates(ctx context.Context, id int64) ([]ListOtherCurrencyRatesRow, error) {
@@ -304,7 +317,7 @@ type UpdateCurrencyParams struct {
 	Symbol    string
 	Decimals  int64
 	IsBase    int64
-	Rate      float64
+	Rate      decimal.Decimal
 	UpdatedAt sql.NullString
 	ID        int64
 }
@@ -327,7 +340,7 @@ UPDATE currencies SET rate = ?, is_base = 0 WHERE id = ?
 `
 
 type UpdateCurrencyRateParams struct {
-	Rate float64
+	Rate decimal.Decimal
 	ID   int64
 }
 

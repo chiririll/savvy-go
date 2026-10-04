@@ -1,0 +1,33 @@
+// Package money converts between exact decimal amounts and the integer
+// minor units stored in SQLite (scale = the owning currency's decimals).
+package money
+
+import (
+	"database/sql"
+
+	"github.com/shopspring/decimal"
+)
+
+func FromMinor(v int64, decimals int) decimal.Decimal {
+	return decimal.New(v, -int32(decimals))
+}
+
+// ToMinor rounds half away from zero to the currency's scale.
+func ToMinor(d decimal.Decimal, decimals int) int64 {
+	return d.Round(int32(decimals)).Shift(int32(decimals)).IntPart()
+}
+
+func FromNullMinor(v sql.NullInt64, decimals int) *decimal.Decimal {
+	if !v.Valid {
+		return nil
+	}
+	d := FromMinor(v.Int64, decimals)
+	return &d
+}
+
+func ToNullMinor(d *decimal.Decimal, decimals int) sql.NullInt64 {
+	if d == nil {
+		return sql.NullInt64{}
+	}
+	return sql.NullInt64{Int64: ToMinor(*d, decimals), Valid: true}
+}

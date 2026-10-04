@@ -2,7 +2,7 @@ package httpserver
 
 import (
 	"encoding/json"
-	"math"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -12,6 +12,7 @@ import (
 	"savvy-go/internal/httpserver/dto"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/shopspring/decimal"
 )
 
 func (s *Server) currenciesIndex(w http.ResponseWriter, r *http.Request) {
@@ -20,7 +21,7 @@ func (s *Server) currenciesIndex(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, mapSlice(list, dto.Currency))
+	writeData(w, http.StatusOK, dto.Map(list, dto.NewCurrency))
 }
 
 func (s *Server) currenciesCatalog(w http.ResponseWriter, r *http.Request) {
@@ -41,7 +42,7 @@ func (s *Server) currenciesStore(w http.ResponseWriter, r *http.Request) {
 		writeValidation(w, map[string][]string{"code": {"The code has already been taken."}})
 		return
 	}
-	writeData(w, http.StatusCreated, dto.Currency(*c))
+	writeData(w, http.StatusCreated, dto.NewCurrency(*c))
 }
 
 func (s *Server) currenciesShow(w http.ResponseWriter, r *http.Request) {
@@ -49,7 +50,7 @@ func (s *Server) currenciesShow(w http.ResponseWriter, r *http.Request) {
 	if c == nil {
 		return
 	}
-	writeData(w, http.StatusOK, dto.Currency(*c))
+	writeData(w, http.StatusOK, dto.NewCurrency(*c))
 }
 
 func (s *Server) currenciesUpdate(w http.ResponseWriter, r *http.Request) {
@@ -63,6 +64,10 @@ func (s *Server) currenciesUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c, err := s.currencies.Update(r.Context(), cur.ID, body)
+	if errors.Is(err, domain.ErrDecimalsImmutable) {
+		writeMessage(w, 422, "Currency decimals cannot be changed after creation.")
+		return
+	}
 	if err != nil {
 		switch err.Error() {
 		case "cannot unset base":
@@ -74,7 +79,7 @@ func (s *Server) currenciesUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	writeData(w, http.StatusOK, dto.Currency(*c))
+	writeData(w, http.StatusOK, dto.NewCurrency(*c))
 }
 
 func (s *Server) currenciesDestroy(w http.ResponseWriter, r *http.Request) {
@@ -85,7 +90,7 @@ func (s *Server) currenciesDestroy(w http.ResponseWriter, r *http.Request) {
 	if err := s.currencies.Delete(r.Context(), cur.ID); err != nil {
 		switch err.Error() {
 		case "in use":
-			writeMessage(w, 422, "Cannot delete currency that is used by accounts.")
+			writeMessage(w, 422, "Cannot delete currency that is used by accounts or budgets.")
 		case "base":
 			writeMessage(w, 422, "Cannot delete base currency. Set another currency as base first.")
 		default:
@@ -106,14 +111,14 @@ func (s *Server) currenciesSetBase(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, dto.Currency(*c))
+	writeData(w, http.StatusOK, dto.NewCurrency(*c))
 }
 
 func (s *Server) currenciesConvert(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Amount float64 `json:"amount"`
-		From   int64   `json:"from_currency_id"`
-		To     int64   `json:"to_currency_id"`
+		Amount decimal.Decimal `json:"amount"`
+		From   int64           `json:"from_currency_id"`
+		To     int64           `json:"to_currency_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeValidation(w, map[string][]string{"amount": {"The given data was invalid."}})
@@ -128,9 +133,9 @@ func (s *Server) currenciesConvert(w http.ResponseWriter, r *http.Request) {
 	result := domain.Convert(body.Amount, *from, *to)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"amount": body.Amount,
-		"from":   dto.Currency(*from),
-		"to":     dto.Currency(*to),
-		"result": domainRound(result, to.Decimals),
+		"from":   dto.NewCurrency(*from),
+		"to":     dto.NewCurrency(*to),
+		"result": result.Round(int32(to.Decimals)),
 	})
 }
 
@@ -142,7 +147,7 @@ func (s *Server) accountsIndex(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	payload := envelope{Data: mapSlice(list, dto.Account)}
+	payload := envelope{Data: dto.Map(list, dto.NewAccount)}
 	if r.URL.Query().Get("with_summary") == "1" || r.URL.Query().Get("with_summary") == "true" {
 		base, _ := s.currencies.Base(r.Context())
 		if id := r.URL.Query().Get("base_currency_id"); id != "" {
@@ -153,7 +158,7 @@ func (s *Server) accountsIndex(w http.ResponseWriter, r *http.Request) {
 		payload.Meta = nil
 		writeJSON(w, http.StatusOK, map[string]any{
 			"data":    payload.Data,
-			"summary": s.accounts.Summary(r.Context(), base),
+			"summary": dto.NewAccountsSummary(s.accounts.Summary(r.Context(), base)),
 		})
 		return
 	}
@@ -162,12 +167,12 @@ func (s *Server) accountsIndex(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) accountsStore(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Name           string  `json:"name"`
-		Type           string  `json:"type"`
-		CurrencyID     *int64  `json:"currency_id"`
-		CurrencyCode   string  `json:"currency_code"`
-		InitialBalance float64 `json:"initial_balance"`
-		IsActive       *bool   `json:"is_active"`
+		Name           string          `json:"name"`
+		Type           string          `json:"type"`
+		CurrencyID     *int64          `json:"currency_id"`
+		CurrencyCode   string          `json:"currency_code"`
+		InitialBalance decimal.Decimal `json:"initial_balance"`
+		IsActive       *bool           `json:"is_active"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || strings.TrimSpace(body.Name) == "" {
 		writeValidation(w, map[string][]string{"name": {"The name field is required."}})
@@ -196,10 +201,10 @@ func (s *Server) accountsStore(w http.ResponseWriter, r *http.Request) {
 		InitialBalance: body.InitialBalance, IsActive: active,
 	})
 	if err != nil {
-		writeMessage(w, 422, err.Error())
+		writeAccountError(w, err)
 		return
 	}
-	writeData(w, http.StatusCreated, dto.Account(*a))
+	writeData(w, http.StatusCreated, dto.NewAccount(*a))
 }
 
 func (s *Server) accountsShow(w http.ResponseWriter, r *http.Request) {
@@ -207,7 +212,7 @@ func (s *Server) accountsShow(w http.ResponseWriter, r *http.Request) {
 	if a == nil {
 		return
 	}
-	writeData(w, http.StatusOK, dto.Account(*a))
+	writeData(w, http.StatusOK, dto.NewAccount(*a))
 }
 
 func (s *Server) accountsUpdate(w http.ResponseWriter, r *http.Request) {
@@ -216,12 +221,12 @@ func (s *Server) accountsUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Name           *string  `json:"name"`
-		Type           *string  `json:"type"`
-		CurrencyID     *int64   `json:"currency_id"`
-		CurrencyCode   *string  `json:"currency_code"`
-		InitialBalance *float64 `json:"initial_balance"`
-		IsActive       *bool    `json:"is_active"`
+		Name           *string          `json:"name"`
+		Type           *string          `json:"type"`
+		CurrencyID     *int64           `json:"currency_id"`
+		CurrencyCode   *string          `json:"currency_code"`
+		InitialBalance *decimal.Decimal `json:"initial_balance"`
+		IsActive       *bool            `json:"is_active"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeValidation(w, map[string][]string{"name": {"The given data was invalid."}})
@@ -236,10 +241,12 @@ func (s *Server) accountsUpdate(w http.ResponseWriter, r *http.Request) {
 	if body.CurrencyID != nil {
 		cur.CurrencyID = *body.CurrencyID
 	}
+	// A code is only resolved, never created: the currency cannot change anyway.
 	if body.CurrencyCode != nil && *body.CurrencyCode != "" {
-		c, err := s.currencies.FindOrCreateByCode(r.Context(), *body.CurrencyCode)
-		if err == nil && c != nil {
-			cur.CurrencyID = c.ID
+		c, err := s.currencies.ByCode(r.Context(), *body.CurrencyCode)
+		if err != nil || c == nil || c.ID != cur.CurrencyID {
+			writeAccountError(w, domain.ErrAccountCurrencyImmutable)
+			return
 		}
 	}
 	if body.InitialBalance != nil {
@@ -250,10 +257,22 @@ func (s *Server) accountsUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	a, err := s.accounts.Update(r.Context(), cur.ID, *cur)
 	if err != nil {
-		writeMessage(w, 422, err.Error())
+		writeAccountError(w, err)
 		return
 	}
-	writeData(w, http.StatusOK, dto.Account(*a))
+	writeData(w, http.StatusOK, dto.NewAccount(*a))
+}
+
+// writeAccountError maps account create/update failures to responses.
+func writeAccountError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, domain.ErrAccountCurrencyImmutable):
+		writeMessage(w, 422, "Account currency cannot be changed after creation.")
+	case errors.Is(err, domain.ErrUnknownCurrency):
+		writeValidation(w, map[string][]string{"currency_id": {"The selected currency is invalid."}})
+	default:
+		writeMessage(w, 422, err.Error())
+	}
 }
 
 func (s *Server) accountsReorder(w http.ResponseWriter, r *http.Request) {
@@ -295,13 +314,17 @@ func (s *Server) accountsBalanceHistory(w http.ResponseWriter, r *http.Request) 
 	series := []map[string]any{}
 	total := make([]float64, len(dates))
 	for _, a := range accts {
+		nativeDec := 2
+		if a.Currency != nil {
+			nativeDec = a.Currency.Decimals
+		}
 		data := make([]float64, len(dates))
 		native := make([]float64, len(dates))
 		for i, d := range dates {
 			bal, _ := s.accounts.BalanceAt(r.Context(), a, d)
-			native[i] = bal
+			native[i] = bal.Round(int32(nativeDec)).InexactFloat64()
 			if a.Currency != nil {
-				data[i] = domain.Convert(bal, *a.Currency, *base)
+				data[i] = domain.Convert(bal, *a.Currency, *base).Round(int32(base.Decimals)).InexactFloat64()
 			}
 			total[i] += data[i]
 		}
@@ -337,29 +360,20 @@ func (s *Server) queryPeriod(r *http.Request) (start, end string) {
 // balance at the end of the day before the period starts.
 func (s *Server) accountsBalanceComparison(w http.ResponseWriter, r *http.Request) {
 	base, _ := s.currencies.Base(r.Context())
-	sum := s.accounts.Summary(r.Context(), base)
-	var previous any
+	sum := dto.NewAccountsSummary(s.accounts.Summary(r.Context(), base))
+	var previous *decimal.Decimal
 	if base != nil {
 		start, _ := s.queryPeriod(r)
 		if from, err := time.Parse("2006-01-02", start); err == nil {
-			cutoff := from.AddDate(0, 0, -1).Format("2006-01-02")
-			accts, _ := s.accounts.All(r.Context(), true, true)
-			total := 0.0
-			for _, a := range accts {
-				if a.Currency == nil {
-					continue
-				}
-				bal, _ := s.accounts.BalanceAt(r.Context(), a, cutoff)
-				total += domain.Convert(bal, *a.Currency, *base)
-			}
-			previous = math.Round(total*math.Pow10(base.Decimals)) / math.Pow10(base.Decimals)
+			total := s.accounts.TotalAt(r.Context(), *base, from.AddDate(0, 0, -1).Format("2006-01-02"))
+			previous = &total
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"current":  sum["total_balance"],
+		"current":  sum.TotalBalance,
 		"previous": previous,
-		"currency": sum["currency"],
-		"decimals": sum["decimals"],
+		"currency": sum.Currency,
+		"decimals": sum.Decimals,
 	})
 }
 
@@ -369,7 +383,7 @@ func (s *Server) categoriesIndex(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, mapSlice(list, dto.Category))
+	writeData(w, http.StatusOK, dto.Map(list, dto.NewCategory))
 }
 
 func (s *Server) categoriesStore(w http.ResponseWriter, r *http.Request) {
@@ -383,7 +397,7 @@ func (s *Server) categoriesStore(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusCreated, dto.Category(*c))
+	writeData(w, http.StatusCreated, dto.NewCategory(*c))
 }
 
 func (s *Server) categoriesShow(w http.ResponseWriter, r *http.Request) {
@@ -391,7 +405,7 @@ func (s *Server) categoriesShow(w http.ResponseWriter, r *http.Request) {
 	if c == nil {
 		return
 	}
-	writeData(w, http.StatusOK, dto.Category(*c))
+	writeData(w, http.StatusOK, dto.NewCategory(*c))
 }
 
 func (s *Server) categoriesUpdate(w http.ResponseWriter, r *http.Request) {
@@ -409,7 +423,7 @@ func (s *Server) categoriesUpdate(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, dto.Category(*c))
+	writeData(w, http.StatusOK, dto.NewCategory(*c))
 }
 
 func (s *Server) categoriesDestroy(w http.ResponseWriter, r *http.Request) {
@@ -454,7 +468,7 @@ func (s *Server) categoriesSetDefault(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, dto.Category(*updated))
+	writeData(w, http.StatusOK, dto.NewCategory(*updated))
 }
 
 func (s *Server) categoriesStatistics(w http.ResponseWriter, r *http.Request) {
@@ -463,11 +477,11 @@ func (s *Server) categoriesStatistics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	stats, err := s.categories.Statistics(r.Context(), c.ID, r.URL.Query().Get("start_date"), r.URL.Query().Get("end_date"))
-	if err != nil {
-		writeMessage(w, 422, err.Error())
+	if err != nil || stats == nil {
+		writeMessage(w, 422, "Could not compute category statistics.")
 		return
 	}
-	writeJSON(w, http.StatusOK, stats)
+	writeJSON(w, http.StatusOK, dto.NewCategoryStatistics(*stats))
 }
 
 func (s *Server) categoriesSummary(w http.ResponseWriter, r *http.Request) {
@@ -488,7 +502,7 @@ func (s *Server) categoriesSummary(w http.ResponseWriter, r *http.Request) {
 		code = base.Code
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"data":     mapSlice(list, dto.Category),
+		"data":     dto.Map(list, dto.NewCategory),
 		"total":    total,
 		"currency": code,
 	})
@@ -500,7 +514,7 @@ func (s *Server) tagsIndex(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, mapSlice(list, dto.Tag))
+	writeData(w, http.StatusOK, dto.Map(list, dto.NewTag))
 }
 
 func (s *Server) tagsStore(w http.ResponseWriter, r *http.Request) {
@@ -516,7 +530,7 @@ func (s *Server) tagsStore(w http.ResponseWriter, r *http.Request) {
 		writeValidation(w, map[string][]string{"name": {"The name has already been taken."}})
 		return
 	}
-	writeData(w, http.StatusCreated, dto.Tag(*t))
+	writeData(w, http.StatusCreated, dto.NewTag(*t))
 }
 
 func (s *Server) tagsShow(w http.ResponseWriter, r *http.Request) {
@@ -524,7 +538,7 @@ func (s *Server) tagsShow(w http.ResponseWriter, r *http.Request) {
 	if t == nil {
 		return
 	}
-	writeData(w, http.StatusOK, dto.Tag(*t))
+	writeData(w, http.StatusOK, dto.NewTag(*t))
 }
 
 func (s *Server) tagsUpdate(w http.ResponseWriter, r *http.Request) {
@@ -544,7 +558,7 @@ func (s *Server) tagsUpdate(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, dto.Tag(*t))
+	writeData(w, http.StatusOK, dto.NewTag(*t))
 }
 
 func (s *Server) tagsDestroy(w http.ResponseWriter, r *http.Request) {
@@ -590,22 +604,6 @@ func (s *Server) tagParam(w http.ResponseWriter, r *http.Request) *domain.Tag {
 		writeMessage(w, http.StatusNotFound, "Not found.")
 	}
 	return t
-}
-
-func mapSlice[T any](in []T, fn func(T) map[string]any) []any {
-	out := make([]any, 0, len(in))
-	for _, v := range in {
-		out = append(out, fn(v))
-	}
-	return out
-}
-
-func domainRound(v float64, decimals int) float64 {
-	p := 1.0
-	for i := 0; i < decimals; i++ {
-		p *= 10
-	}
-	return float64(int(v*p+0.5)) / p
 }
 
 func dateRange(start, end string) []string {

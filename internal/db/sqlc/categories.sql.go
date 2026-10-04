@@ -8,13 +8,19 @@ package sqlc
 import (
 	"context"
 	"database/sql"
+
+	"github.com/shopspring/decimal"
 )
 
-const categoryStatistics = `-- name: CategoryStatistics :one
-SELECT COUNT(*), COALESCE(SUM(amount),0) FROM transactions
-WHERE category_id = ?1 AND status = 'confirmed'
-  AND date >= COALESCE(?2, date)
-  AND date <= COALESCE(?3, date)
+const categoryStatistics = `-- name: CategoryStatistics :many
+SELECT COUNT(*) AS cnt, CAST(COALESCE(SUM(t.amount),0) AS INTEGER) AS total, c.decimals, c.rate
+FROM transactions t
+JOIN accounts a ON a.id = t.account_id
+JOIN currencies c ON c.id = a.currency_id
+WHERE t.category_id = ?1 AND t.status = 'confirmed'
+  AND t.date >= COALESCE(?2, t.date)
+  AND t.date <= COALESCE(?3, t.date)
+GROUP BY c.id
 `
 
 type CategoryStatisticsParams struct {
@@ -24,15 +30,38 @@ type CategoryStatisticsParams struct {
 }
 
 type CategoryStatisticsRow struct {
-	Count    int64
-	Coalesce interface{}
+	Cnt      int64
+	Total    int64
+	Decimals int64
+	Rate     decimal.Decimal
 }
 
-func (q *Queries) CategoryStatistics(ctx context.Context, arg CategoryStatisticsParams) (CategoryStatisticsRow, error) {
-	row := q.db.QueryRowContext(ctx, categoryStatistics, arg.CategoryID, arg.StartDate, arg.EndDate)
-	var i CategoryStatisticsRow
-	err := row.Scan(&i.Count, &i.Coalesce)
-	return i, err
+func (q *Queries) CategoryStatistics(ctx context.Context, arg CategoryStatisticsParams) ([]CategoryStatisticsRow, error) {
+	rows, err := q.db.QueryContext(ctx, categoryStatistics, arg.CategoryID, arg.StartDate, arg.EndDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CategoryStatisticsRow{}
+	for rows.Next() {
+		var i CategoryStatisticsRow
+		if err := rows.Scan(
+			&i.Cnt,
+			&i.Total,
+			&i.Decimals,
+			&i.Rate,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const clearDefaultCategory = `-- name: ClearDefaultCategory :exec

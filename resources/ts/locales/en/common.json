@@ -308,7 +308,6 @@
             "createFailed": "Failed to create backup",
             "uploadFailed": "Failed to upload backup",
             "restoreFailed": "Failed to restore backup",
-            "inspectFailed": "Failed to check the backup file",
             "deleteFailed": "Failed to delete backup"
         },
         "import": {

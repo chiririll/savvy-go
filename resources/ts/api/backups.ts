@@ -1,5 +1,5 @@
 import { api, apiClient } from './client'
-import { Backup, BackupInspection } from '@/types/backup'
+import { Backup } from '@/types/backup'
 
 const ENDPOINT = '/backups'
 
@@ -23,9 +23,6 @@ export const backupsApi = {
 
     download: (filename: string) =>
         `${apiClient.defaults.baseURL}${ENDPOINT}/${encodeURIComponent(filename)}/download`,
-
-    inspect: (filename: string) =>
-        api.get<BackupInspection>(`${ENDPOINT}/${encodeURIComponent(filename)}/inspect`),
 
     restore: (filename: string) =>
         api.post<{ message: string }, void>(`${ENDPOINT}/${encodeURIComponent(filename)}/restore`, undefined),

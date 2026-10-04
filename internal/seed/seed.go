@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/shopspring/decimal"
+
 	"savvy-go/internal/auth"
 	appdb "savvy-go/internal/db"
 	"savvy-go/internal/db/sqlc"
@@ -69,8 +71,8 @@ func seedReference(ctx context.Context, db *sql.DB) error {
 
 func seedCurrencies(ctx context.Context, curs domain.Currencies) error {
 	for _, c := range []domain.Currency{
-		{Code: "USD", Name: "US Dollar", Symbol: "$", Decimals: 2, IsBase: true, Rate: 1},
-		{Code: "EUR", Name: "Euro", Symbol: "€", Decimals: 2, Rate: 1.08},
+		{Code: "USD", Name: "US Dollar", Symbol: "$", Decimals: 2, IsBase: true, Rate: decimal.NewFromInt(1)},
+		{Code: "EUR", Name: "Euro", Symbol: "€", Decimals: 2, Rate: decimal.RequireFromString("1.08")},
 	} {
 		existing, err := curs.ByCode(ctx, c.Code)
 		if err != nil {

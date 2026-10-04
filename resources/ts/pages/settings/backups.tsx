@@ -36,11 +36,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Download, RotateCcw, Trash2, Plus, Upload, Loader2 } from 'lucide-react'
 import { useBackups, useCreateBackup, useUploadBackup, useRestoreBackup, useDeleteBackup } from '@/hooks/use-backups'
 import { backupsApi } from '@/api/backups'
-import { Backup, BackupInspection, BackupSchemaStatus } from '@/types/backup'
+import { Backup } from '@/types/backup'
 import { useReadOnly } from '@/components/providers/ReadOnlyProvider'
 import { intlLocale } from '@/lib/i18n'
-import { getApiErrorMessage } from '@/lib/api-error'
-import { toast } from 'sonner'
 
 function formatBytes(bytes: number): string {
     if (bytes === 0) return '0 B'
@@ -54,10 +52,9 @@ function formatDate(dateString: string): string {
     return new Date(dateString).toLocaleString(intlLocale())
 }
 
-function schemaBadgeVariant(status: BackupSchemaStatus): 'secondary' | 'outline' | 'destructive' {
-    if (status === 'current') return 'secondary'
-    if (status === 'newer') return 'destructive'
-    return 'outline'
+function statusBadgeVariant(backup: Backup): 'secondary' | 'outline' | 'destructive' {
+    if (backup.status === 'current') return 'secondary'
+    return backup.restorable ? 'outline' : 'destructive'
 }
 
 export default function BackupsPage() {
@@ -75,8 +72,6 @@ export default function BackupsPage() {
     const [restoreDialogOpen, setRestoreDialogOpen] = useState(false)
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
     const [selectedBackup, setSelectedBackup] = useState<Backup | null>(null)
-    const [restorePreview, setRestorePreview] = useState<BackupInspection | null>(null)
-    const [inspectingId, setInspectingId] = useState<string | null>(null)
     const [note, setNote] = useState('')
     const [uploadFile, setUploadFile] = useState<File | null>(null)
 
@@ -100,30 +95,18 @@ export default function BackupsPage() {
         })
     }
 
-    const openRestore = async (backup: Backup) => {
+    const openRestore = (backup: Backup) => {
         setSelectedBackup(backup)
-        setInspectingId(backup.filename)
-        try {
-            const preview = await backupsApi.inspect(backup.filename)
-            setRestorePreview(preview)
-            setRestoreDialogOpen(true)
-        } catch (error) {
-            toast.error(getApiErrorMessage(error, tCommon('toasts.backup.inspectFailed')))
-            setSelectedBackup(null)
-            setRestorePreview(null)
-        } finally {
-            setInspectingId(null)
-        }
+        setRestoreDialogOpen(true)
     }
 
     const closeRestore = () => {
         setRestoreDialogOpen(false)
         setSelectedBackup(null)
-        setRestorePreview(null)
     }
 
     const handleRestore = () => {
-        if (!selectedBackup || restorePreview?.compatible === false) return
+        if (!selectedBackup?.restorable) return
         restoreBackup.mutate(selectedBackup.filename, {
             onSuccess: closeRestore,
         })
@@ -210,16 +193,19 @@ export default function BackupsPage() {
                                     <TableCell>
                                         <div className="flex flex-col items-start gap-1">
                                             <span className="font-mono text-sm">
-                                                {backup.schemaVersion || t('backups.versionUnknown')}
+                                                {backup.appVersion
+                                                    || (backup.status === 'legacy' || backup.status === 'legacyUnsupported'
+                                                        ? t('backups.versionLaravel')
+                                                        : t('backups.versionUnknown'))}
                                             </span>
                                             <Tooltip>
                                                 <TooltipTrigger asChild>
-                                                    <Badge variant={schemaBadgeVariant(backup.schemaStatus)}>
-                                                        {t(`backups.schemaStatus.${backup.schemaStatus}`)}
+                                                    <Badge variant={statusBadgeVariant(backup)}>
+                                                        {t(`backups.status.${backup.status}`)}
                                                     </Badge>
                                                 </TooltipTrigger>
                                                 <TooltipContent>
-                                                    {t(`backups.schemaStatusHelp.${backup.schemaStatus}`)}
+                                                    {t(`backups.statusHelp.${backup.status}`, { count: backup.pendingCount })}
                                                 </TooltipContent>
                                             </Tooltip>
                                         </div>
@@ -241,14 +227,12 @@ export default function BackupsPage() {
                                                 variant="ghost"
                                                 size="icon"
                                                 onClick={() => openRestore(backup)}
-                                                title={backup.schemaStatus === 'newer'
-                                                    ? t('backups.schemaStatusHelp.newer')
-                                                    : t('backups.restore')}
-                                                disabled={isReadOnly || backup.schemaStatus === 'newer' || inspectingId === backup.filename}
+                                                title={backup.restorable
+                                                    ? t('backups.restore')
+                                                    : t(`backups.statusHelp.${backup.status}`)}
+                                                disabled={isReadOnly || !backup.restorable}
                                             >
-                                                {inspectingId === backup.filename
-                                                    ? <Loader2 className="size-4 animate-spin" />
-                                                    : <RotateCcw className="size-4" />}
+                                                <RotateCcw className="size-4" />
                                             </Button>
                                             <Button
                                                 variant="ghost"
@@ -354,51 +338,37 @@ export default function BackupsPage() {
             >
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>
-                            {restorePreview?.compatible === false
-                                ? t('backups.restoreNewerTitle')
-                                : t('backups.restoreTitle')}
-                        </AlertDialogTitle>
+                        <AlertDialogTitle>{t('backups.restoreTitle')}</AlertDialogTitle>
                         <AlertDialogDescription asChild>
                             <div className="space-y-2">
-                                {restorePreview?.compatible === false ? (
-                                    <p>{t('backups.restoreNewerDescription')}</p>
-                                ) : (
-                                    <>
-                                        <p>
-                                            {t('backups.restoreDescription', {
-                                                date: selectedBackup ? formatDate(selectedBackup.createdAt) : '',
-                                            })}
-                                        </p>
-                                        {restorePreview && restorePreview.pendingCount > 0 && (
-                                            <p>
-                                                {t('backups.restoreMigrationsDescription', {
-                                                    count: restorePreview.pendingCount,
-                                                })}
-                                            </p>
-                                        )}
-                                    </>
+                                <p>
+                                    {t('backups.restoreDescription', {
+                                        date: selectedBackup ? formatDate(selectedBackup.createdAt) : '',
+                                    })}
+                                </p>
+                                {selectedBackup && selectedBackup.status !== 'current' && (
+                                    <p>
+                                        {t(`backups.statusHelp.${selectedBackup.status}`, {
+                                            count: selectedBackup.pendingCount,
+                                        })}
+                                    </p>
                                 )}
                             </div>
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel disabled={restoreBackup.isPending}>
-                            {restorePreview?.compatible === false
-                                ? tCommon('actions.done')
-                                : tCommon('actions.cancel')}
+                            {tCommon('actions.cancel')}
                         </AlertDialogCancel>
-                        {restorePreview?.compatible !== false && (
-                            <Button
-                                type="button"
-                                variant="destructive"
-                                disabled={restoreBackup.isPending}
-                                onClick={handleRestore}
-                            >
-                                {restoreBackup.isPending && <Loader2 className="size-4 mr-2 animate-spin" />}
-                                {t('backups.restore')}
-                            </Button>
-                        )}
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            disabled={restoreBackup.isPending}
+                            onClick={handleRestore}
+                        >
+                            {restoreBackup.isPending && <Loader2 className="size-4 mr-2 animate-spin" />}
+                            {t('backups.restore')}
+                        </Button>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>

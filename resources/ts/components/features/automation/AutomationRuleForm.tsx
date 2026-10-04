@@ -111,14 +111,14 @@ export function AutomationRuleForm({
                         control={form.control}
                         name="trigger_type"
                         render={({ field }) => {
-                            const selectedTrigger = triggers?.find(tr => tr.value === field.value)
+                            const selectedTrigger = triggers?.find(tr => tr === field.value)
                             return (
                                 <FormItem className="min-w-0">
                                     <FormLabel className="flex items-center gap-1.5">
                                         {t('forms:automation.trigger')}
                                         {selectedTrigger && (
                                             <FieldHelp>
-                                                {t(`forms:automation.triggerDescriptions.${selectedTrigger.value}`)}
+                                                {t(`forms:automation.triggerDescriptions.${selectedTrigger}`)}
                                             </FieldHelp>
                                         )}
                                     </FormLabel>
@@ -130,8 +130,8 @@ export function AutomationRuleForm({
                                         </FormControl>
                                         <SelectContent>
                                             {triggers?.map((trigger) => (
-                                                <SelectItem key={trigger.value} value={trigger.value}>
-                                                    {t(`forms:automation.triggers.${trigger.value}`)}
+                                                <SelectItem key={trigger} value={trigger}>
+                                                    {t(`forms:automation.triggers.${trigger}`)}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>

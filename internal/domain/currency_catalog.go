@@ -22,7 +22,13 @@ var catalogHTTP = &http.Client{Timeout: 10 * time.Second}
 
 // fallbackCatalog is used only when the remote currency data is unreachable.
 // Rate here is units of the currency per 1 USD; loadCatalog rebases it.
-var fallbackCatalog = []Currency{
+type fallbackCurrency struct {
+	Code, Name, Symbol string
+	Decimals           int
+	Rate               float64
+}
+
+var fallbackCatalog = []fallbackCurrency{
 	{Code: "USD", Name: "US Dollar", Symbol: "$", Decimals: 2, Rate: 1},
 	{Code: "EUR", Name: "Euro", Symbol: "€", Decimals: 2, Rate: 0.92},
 	{Code: "GBP", Name: "British Pound", Symbol: "£", Decimals: 2, Rate: 0.79},
@@ -32,6 +38,14 @@ var fallbackCatalog = []Currency{
 	{Code: "CHF", Name: "Swiss Franc", Symbol: "CHF", Decimals: 2, Rate: 0.88},
 	{Code: "RUB", Name: "Russian Ruble", Symbol: "₽", Decimals: 2, Rate: 84.51},
 	{Code: "BTC", Name: "Bitcoin", Symbol: "₿", Decimals: 8, Rate: 0.000015},
+}
+
+func fallbackMeta() []Currency {
+	out := make([]Currency, len(fallbackCatalog))
+	for i, c := range fallbackCatalog {
+		out[i] = Currency{Code: c.Code, Name: c.Name, Symbol: c.Symbol, Decimals: c.Decimals}
+	}
+	return out
 }
 
 type remoteCurrency struct {
@@ -75,7 +89,7 @@ func catalogMeta(ctx context.Context) []Currency {
 	var raw map[string]remoteCurrency
 	if err := fetchJSON(ctx, currencyMetaURL, &raw); err != nil || len(raw) == 0 {
 		if catalogCache.meta == nil {
-			catalogCache.meta = fallbackCatalog
+			catalogCache.meta = fallbackMeta()
 		}
 		catalogCache.metaUntil = time.Now().Add(catalogRetry)
 		return catalogCache.meta
@@ -166,7 +180,7 @@ func loadCatalog(ctx context.Context, baseCode string) []Currency {
 	}
 	out := make([]Currency, len(meta))
 	for i, c := range meta {
-		c.Rate = rates[strings.ToLower(c.Code)]
+		c.Rate = rateFromFloat(rates[strings.ToLower(c.Code)])
 		out[i] = c
 	}
 	return out

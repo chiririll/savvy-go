@@ -36,7 +36,7 @@ export function BudgetFormDialog({
             toFormValues={(item) => ({
                 name: item.name,
                 amount: item.amount,
-                currency_id: item.currencyId,
+                currency_id: item.currency?.id,
                 period: item.period,
                 start_date: item.startDate,
                 end_date: item.endDate,

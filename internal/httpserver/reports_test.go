@@ -71,7 +71,7 @@ func TestReportsNetWorth(t *testing.T) {
 	if res.StatusCode != 200 {
 		t.Fatalf("history %d %v", res.StatusCode, hist)
 	}
-	if hist["values"] == nil || hist["labels"] == nil {
+	if hist["values"] == nil || hist["dates"] == nil {
 		t.Fatalf("history shape %v", hist)
 	}
 }

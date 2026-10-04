@@ -107,7 +107,7 @@ export function DebtPaymentDialog({
                         </div>
                         <div className="flex justify-between text-sm">
                             <span className="text-muted-foreground">{t('pages:debts.columns.remaining')}</span>
-                            <span className="font-mono">{formatCurrency(debt.remainingDebt, debt.currency)}</span>
+                            <span className="font-mono">{formatCurrency(debt.currentBalance, debt.currency)}</span>
                         </div>
                         {debt.counterparty && (
                             <div className="flex justify-between text-sm">
@@ -155,7 +155,7 @@ export function DebtPaymentDialog({
                                             type="number"
                                             step="0.01"
                                             min={0}
-                                            max={debt?.remainingDebt}
+                                            max={debt?.currentBalance}
                                             placeholder="0.00"
                                             {...field}
                                         />
@@ -166,7 +166,7 @@ export function DebtPaymentDialog({
                                                 type="button"
                                                 variant="outline"
                                                 size="sm"
-                                                onClick={() => form.setValue('amount', debt.remainingDebt)}
+                                                onClick={() => form.setValue('amount', debt.currentBalance)}
                                             >
                                                 {t('debts.payment.fullAmount')}
                                             </Button>
@@ -174,7 +174,7 @@ export function DebtPaymentDialog({
                                                 type="button"
                                                 variant="outline"
                                                 size="sm"
-                                                onClick={() => form.setValue('amount', Math.round(debt.remainingDebt / 2 * 100) / 100)}
+                                                onClick={() => form.setValue('amount', Math.round(debt.currentBalance / 2 * 100) / 100)}
                                             >
                                                 {t('debts.payment.half')}
                                             </Button>

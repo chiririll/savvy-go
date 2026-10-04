@@ -9,6 +9,7 @@ import (
 	"savvy-go/internal/httpserver/dto"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/shopspring/decimal"
 )
 
 func (s *Server) debtsIndex(w http.ResponseWriter, r *http.Request) {
@@ -18,25 +19,25 @@ func (s *Server) debtsIndex(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	payload := map[string]any{"data": mapSlice(list, dto.AccountDebt)}
+	payload := map[string]any{"data": dto.Map(list, dto.NewDebt)}
 	if r.URL.Query().Get("with_summary") == "1" || r.URL.Query().Get("with_summary") == "true" {
-		payload["summary"] = s.debts.Summary(r.Context())
+		payload["summary"] = dto.NewDebtSummary(s.debts.Summary(r.Context()))
 	}
 	writeJSON(w, http.StatusOK, payload)
 }
 
 func (s *Server) debtsStore(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Origin       string  `json:"origin"`
-		Name         string  `json:"name"`
-		DebtType     string  `json:"debt_type"`
-		AccountID    int64   `json:"account_id"`
-		CurrencyID   int64   `json:"currency_id"`
-		Amount       float64 `json:"amount"`
-		Date         string  `json:"date"`
-		DueDate      *string `json:"due_date"`
-		Counterparty *string `json:"counterparty"`
-		Description  *string `json:"description"`
+		Origin       string          `json:"origin"`
+		Name         string          `json:"name"`
+		DebtType     string          `json:"debt_type"`
+		AccountID    int64           `json:"account_id"`
+		CurrencyID   int64           `json:"currency_id"`
+		Amount       decimal.Decimal `json:"amount"`
+		Date         string          `json:"date"`
+		DueDate      *string         `json:"due_date"`
+		Counterparty *string         `json:"counterparty"`
+		Description  *string         `json:"description"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Name == "" {
 		writeValidation(w, map[string][]string{"name": {"The name field is required."}})
@@ -44,10 +45,10 @@ func (s *Server) debtsStore(w http.ResponseWriter, r *http.Request) {
 	}
 	d, err := s.debts.Create(r.Context(), body.Name, body.DebtType, body.CurrencyID, body.AccountID, body.Amount, body.Date, body.Origin, body.DueDate, body.Counterparty, body.Description)
 	if err != nil {
-		writeMessage(w, 422, err.Error())
+		writeAccountError(w, err)
 		return
 	}
-	writeData(w, http.StatusCreated, dto.AccountDebt(*d))
+	writeData(w, http.StatusCreated, dto.NewDebt(*d))
 }
 
 func (s *Server) debtsShow(w http.ResponseWriter, r *http.Request) {
@@ -55,7 +56,7 @@ func (s *Server) debtsShow(w http.ResponseWriter, r *http.Request) {
 	if d == nil {
 		return
 	}
-	writeData(w, http.StatusOK, dto.AccountDebt(*d))
+	writeData(w, http.StatusOK, dto.NewDebt(*d))
 }
 
 func (s *Server) debtsUpdate(w http.ResponseWriter, r *http.Request) {
@@ -64,13 +65,13 @@ func (s *Server) debtsUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Name         *string  `json:"name"`
-		DebtType     *string  `json:"debt_type"`
-		CurrencyID   *int64   `json:"currency_id"`
-		Amount       *float64 `json:"amount"`
-		DueDate      *string  `json:"due_date"`
-		Counterparty *string  `json:"counterparty"`
-		Description  *string  `json:"description"`
+		Name         *string          `json:"name"`
+		DebtType     *string          `json:"debt_type"`
+		CurrencyID   *int64           `json:"currency_id"`
+		Amount       *decimal.Decimal `json:"amount"`
+		DueDate      *string          `json:"due_date"`
+		Counterparty *string          `json:"counterparty"`
+		Description  *string          `json:"description"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeValidation(w, map[string][]string{"name": {"The given data was invalid."}})
@@ -99,10 +100,10 @@ func (s *Server) debtsUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	updated, err := s.accounts.Update(r.Context(), cur.ID, *cur)
 	if err != nil {
-		writeMessage(w, 422, err.Error())
+		writeAccountError(w, err)
 		return
 	}
-	writeData(w, http.StatusOK, dto.AccountDebt(*updated))
+	writeData(w, http.StatusOK, dto.NewDebt(*updated))
 }
 
 func (s *Server) debtsDestroy(w http.ResponseWriter, r *http.Request) {
@@ -131,10 +132,10 @@ func (s *Server) debtMove(w http.ResponseWriter, r *http.Request, collect bool) 
 		return
 	}
 	var body struct {
-		AccountID   int64   `json:"account_id"`
-		Amount      float64 `json:"amount"`
-		Date        string  `json:"date"`
-		Description *string `json:"description"`
+		AccountID   int64           `json:"account_id"`
+		Amount      decimal.Decimal `json:"amount"`
+		Date        string          `json:"date"`
+		Description *string         `json:"description"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeValidation(w, map[string][]string{"amount": {"The given data was invalid."}})
@@ -145,7 +146,7 @@ func (s *Server) debtMove(w http.ResponseWriter, r *http.Request, collect bool) 
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, dto.Transaction(*tx))
+	writeData(w, http.StatusOK, dto.NewTransaction(*tx))
 }
 
 func (s *Server) debtsReopen(w http.ResponseWriter, r *http.Request) {
@@ -158,11 +159,11 @@ func (s *Server) debtsReopen(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, dto.AccountDebt(*out))
+	writeData(w, http.StatusOK, dto.NewDebt(*out))
 }
 
 func (s *Server) debtsSummary(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, s.debts.Summary(r.Context()))
+	writeJSON(w, http.StatusOK, dto.NewDebtSummary(s.debts.Summary(r.Context())))
 }
 
 func (s *Server) debtParam(w http.ResponseWriter, r *http.Request) *domain.Account {

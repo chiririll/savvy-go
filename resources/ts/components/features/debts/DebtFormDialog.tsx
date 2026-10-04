@@ -36,7 +36,7 @@ export function DebtFormDialog({
             toFormValues={(item) => ({
                 name: item.name,
                 debt_type: item.debtType,
-                currency_id: item.currencyId,
+                currency_id: item.currency?.id,
                 amount: item.targetAmount,
                 due_date: item.dueDate ?? '',
                 counterparty: item.counterparty ?? '',

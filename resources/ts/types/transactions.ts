@@ -25,18 +25,16 @@ export interface TransactionActions {
 export interface Transaction extends BaseEntity {
     type: TransactionType
     amount: number
-    toAmount?: number
-    exchangeRate?: number
-    description?: string
+    toAmount: number | null
+    description: string | null
     date: string | null
     status: TransactionStatus
-    recurringTransactionId?: number | null
+    recurringTransactionId: number | null
     actions: TransactionActions
     account: Account
-    toAccount?: Account
-    category?: Category
+    toAccount: Account | null
+    category: Category | null
     items: TransactionItem[]
-    itemsCount?: number
     tags: Tag[]
 }
 
@@ -59,6 +57,6 @@ export interface TransactionSummary {
     income: number
     expense: number
     balance: number
-    transactions_count: number
+    transactionsCount: number
     currency: string | null
 }

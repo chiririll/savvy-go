@@ -1,383 +1,500 @@
-// Package dto converts domain types to HTTP response maps.
+// Package dto converts domain types to HTTP response bodies.
 // Keeping serialization here lets domain types stay free of JSON/HTTP concerns.
+//
+// Conventions: keys are camelCase; optional values are always present and null
+// when unset; money is a JSON number at the scale the domain stored it with.
 package dto
 
 import (
-	"strings"
 	"time"
+
+	"github.com/shopspring/decimal"
 
 	"savvy-go/internal/auth"
 	"savvy-go/internal/domain"
-	"savvy-go/internal/version"
 )
 
-func MapSlice[T any](in []T, fn func(T) map[string]any) []any {
-	out := make([]any, 0, len(in))
+func init() {
+	// Money goes over the wire as a JSON number, not a string. Values read from
+	// storage already carry their currency's scale; computed totals are rounded
+	// to it in the domain.
+	decimal.MarshalJSONWithoutQuotes = true
+}
+
+// Map converts every element of in with fn. It never returns nil, so empty
+// lists serialize as [].
+func Map[T, R any](in []T, fn func(T) R) []R {
+	out := make([]R, 0, len(in))
 	for _, v := range in {
 		out = append(out, fn(v))
 	}
 	return out
 }
 
-func Currency(c domain.Currency) map[string]any {
-	return map[string]any{
-		"id":       c.ID,
-		"code":     c.Code,
-		"name":     c.Name,
-		"symbol":   c.Symbol,
-		"decimals": c.Decimals,
-		"isBase":   c.IsBase,
-		"rate":     c.Rate,
+// ptr converts an optional domain value; nil stays nil.
+func ptr[T, R any](v *T, fn func(T) R) *R {
+	if v == nil {
+		return nil
+	}
+	r := fn(*v)
+	return &r
+}
+
+func utc(t *time.Time) *time.Time {
+	if t == nil {
+		return nil
+	}
+	u := t.UTC()
+	return &u
+}
+
+type Currency struct {
+	ID       int64           `json:"id"`
+	Code     string          `json:"code"`
+	Name     string          `json:"name"`
+	Symbol   string          `json:"symbol"`
+	Decimals int             `json:"decimals"`
+	IsBase   bool            `json:"isBase"`
+	Rate     decimal.Decimal `json:"rate"`
+}
+
+func NewCurrency(c domain.Currency) Currency {
+	return Currency{ID: c.ID, Code: c.Code, Name: c.Name, Symbol: c.Symbol, Decimals: c.Decimals, IsBase: c.IsBase, Rate: c.Rate}
+}
+
+type Tag struct {
+	ID                int64      `json:"id"`
+	Name              string     `json:"name"`
+	TransactionsCount int        `json:"transactionsCount"`
+	CreatedAt         *time.Time `json:"createdAt"`
+}
+
+func NewTag(t domain.Tag) Tag {
+	return Tag{ID: t.ID, Name: t.Name, TransactionsCount: t.TransactionsCount, CreatedAt: utc(t.CreatedAt)}
+}
+
+type Category struct {
+	ID                int64            `json:"id"`
+	Name              string           `json:"name"`
+	Type              string           `json:"type"`
+	Icon              *string          `json:"icon"`
+	Color             *string          `json:"color"`
+	IsDefault         bool             `json:"isDefault"`
+	TransactionsCount int              `json:"transactionsCount"`
+	TotalAmount       *decimal.Decimal `json:"totalAmount"`
+}
+
+func NewCategory(c domain.Category) Category {
+	return Category{
+		ID: c.ID, Name: c.Name, Type: c.Type, Icon: c.Icon, Color: c.Color, IsDefault: c.IsDefault,
+		TransactionsCount: c.TransactionsCount, TotalAmount: c.TotalAmount,
 	}
 }
 
-func Tag(t domain.Tag) map[string]any {
-	var created any
-	if t.CreatedAt != nil {
-		created = t.CreatedAt.UTC().Format(time.RFC3339Nano)
-	}
-	return map[string]any{
-		"id":                t.ID,
-		"name":              t.Name,
-		"transactionsCount": t.TransactionsCount,
-		"createdAt":         created,
+type Account struct {
+	ID             int64           `json:"id"`
+	Name           string          `json:"name"`
+	Type           string          `json:"type"`
+	InitialBalance decimal.Decimal `json:"initialBalance"`
+	CurrentBalance decimal.Decimal `json:"currentBalance"`
+	IsActive       bool            `json:"isActive"`
+	SortOrder      int             `json:"sortOrder"`
+	Currency       *Currency       `json:"currency"`
+	CreatedAt      *time.Time      `json:"createdAt"`
+}
+
+func NewAccount(a domain.Account) Account {
+	return Account{
+		ID: a.ID, Name: a.Name, Type: a.Type,
+		InitialBalance: a.InitialBalance, CurrentBalance: a.Balance,
+		IsActive: a.IsActive, SortOrder: a.SortOrder,
+		Currency: ptr(a.Currency, NewCurrency), CreatedAt: utc(a.CreatedAt),
 	}
 }
 
-func Category(c domain.Category) map[string]any {
-	m := map[string]any{
-		"id":        c.ID,
-		"name":      c.Name,
-		"type":      c.Type,
-		"icon":      c.Icon,
-		"color":     c.Color,
-		"isDefault": c.IsDefault,
-	}
-	m["transactionsCount"] = c.TransactionsCount
-	if c.TotalAmount != nil {
-		m["totalAmount"] = *c.TotalAmount
-	}
-	return m
+// Debt is a debt account. CurrentBalance is the amount still owed.
+type Debt struct {
+	Account
+	DebtType        *string         `json:"debtType"`
+	TargetAmount    decimal.Decimal `json:"targetAmount"`
+	PaymentProgress float64         `json:"paymentProgress"`
+	DueDate         *string         `json:"dueDate"`
+	Counterparty    *string         `json:"counterparty"`
+	Description     *string         `json:"description"`
+	IsPaidOff       bool            `json:"isPaidOff"`
 }
 
-func Account(a domain.Account) map[string]any {
-	var created any
-	if a.CreatedAt != nil {
-		created = a.CreatedAt.UTC().Format(time.RFC3339Nano)
-	}
-	var cur any
-	if a.Currency != nil {
-		cur = Currency(*a.Currency)
-	}
-	return map[string]any{
-		"id":             a.ID,
-		"name":           a.Name,
-		"type":           a.Type,
-		"currencyId":     a.CurrencyID,
-		"initialBalance": a.InitialBalance,
-		"currentBalance": a.Balance,
-		"isActive":       a.IsActive,
-		"sortOrder":      a.SortOrder,
-		"currency":       cur,
-		"createdAt":      created,
-	}
-}
-
-func TxItem(i domain.TxItem) map[string]any {
-	return map[string]any{
-		"id": i.ID, "name": i.Name, "quantity": i.Quantity,
-		"pricePerUnit": i.PricePerUnit, "totalPrice": i.TotalPrice,
-	}
-}
-
-func Transaction(t domain.Transaction) map[string]any {
-	m := map[string]any{
-		"id": t.ID, "type": t.Type, "amount": t.Amount,
-		"description": t.Description, "date": t.Date, "status": t.Status,
-		"recurringTransactionId": t.RecurringID,
-		"actions":                transactionActions(t),
-		"items":                  MapSlice(t.Items, TxItem),
-		"itemsCount":             len(t.Items),
-		"tags":                   MapSlice(t.Tags, Tag),
-	}
-	if t.ToAmount != nil {
-		m["toAmount"] = *t.ToAmount
-	}
-	if t.ExchangeRate != nil {
-		m["exchangeRate"] = *t.ExchangeRate
-	}
-	if t.Account != nil {
-		m["account"] = Account(*t.Account)
-	}
-	if t.ToAccount != nil {
-		m["toAccount"] = Account(*t.ToAccount)
-	}
-	if t.Category != nil {
-		m["category"] = Category(*t.Category)
-	}
-	if t.CreatedAt != nil {
-		m["createdAt"] = t.CreatedAt.UTC().Format(time.RFC3339Nano)
-	}
-	return m
-}
-
-func transactionActions(t domain.Transaction) map[string]bool {
-	pending := t.Status == "pending"
-	skipped := t.Status == "skipped"
-	recurring := t.RecurringID != nil
-	return map[string]bool{
-		"edit":      !skipped && !recurring,
-		"delete":    !recurring,
-		"duplicate": !recurring && !skipped,
-		"confirm":   pending,
-		"skip":      pending && recurring,
-	}
-}
-
-func BudgetProgress(p domain.BudgetProgress) map[string]any {
-	return map[string]any{
-		"spent": p.Spent, "remaining": p.Remaining, "percent": p.Percent,
-		"period_start": p.PeriodStart, "period_end": p.PeriodEnd,
-		"is_exceeded": p.IsExceeded,
-	}
-}
-
-func Budget(b domain.Budget) map[string]any {
-	m := map[string]any{
-		"id": b.ID, "name": b.Name, "amount": b.Amount,
-		"currencyId": b.CurrencyID, "period": b.Period, "periodLabel": budgetPeriodLabel(b.Period),
-		"startDate": b.StartDate, "endDate": b.EndDate,
-		"isGlobal": b.IsGlobal, "notifyAtPercent": b.NotifyAtPercent,
-		"isActive":   b.IsActive,
-		"categories": MapSlice(b.Categories, Category),
-		"tags":       MapSlice(b.Tags, Tag),
-	}
-	if b.Currency != nil {
-		m["currency"] = Currency(*b.Currency)
-	}
-	if b.Progress != nil {
-		p := BudgetProgress(*b.Progress)
-		m["progress"] = p
-	}
-	return m
-}
-
-func budgetPeriodLabel(p string) string {
-	switch p {
-	case "weekly":
-		return "Weekly"
-	case "monthly":
-		return "Monthly"
-	case "quarterly":
-		return "Quarterly"
-	case "yearly":
-		return "Yearly"
-	case "one_time":
-		return "One-time"
-	default:
-		return p
-	}
-}
-
-func Recurring(r domain.Recurring) map[string]any {
-	m := map[string]any{
-		"id": r.ID, "type": r.Type, "accountId": r.AccountID,
-		"amount": r.Amount, "description": r.Description,
-		"frequency": r.Frequency, "frequencyLabel": recurringFrequencyLabel(r.Frequency),
-		"interval": r.Interval, "startDate": r.StartDate,
-		"nextRunDate": r.NextRunDate, "isActive": r.IsActive,
-		"tags": MapSlice(r.Tags, Tag),
-	}
-	if r.ToAccountID != nil {
-		m["toAccountId"] = *r.ToAccountID
-	}
-	if r.CategoryID != nil {
-		m["categoryId"] = *r.CategoryID
-	}
-	if r.ToAmount != nil {
-		m["toAmount"] = *r.ToAmount
-	}
-	if r.DayOfWeek != nil {
-		m["dayOfWeek"] = *r.DayOfWeek
-	}
-	if r.DayOfMonth != nil {
-		m["dayOfMonth"] = *r.DayOfMonth
-	}
-	if r.EndDate != nil {
-		m["endDate"] = *r.EndDate
-	}
-	if r.LastRunDate != nil {
-		m["lastRunDate"] = *r.LastRunDate
-	}
-	if r.Account != nil {
-		m["account"] = Account(*r.Account)
-	}
-	if r.ToAccount != nil {
-		m["toAccount"] = Account(*r.ToAccount)
-	}
-	if r.Category != nil {
-		m["category"] = Category(*r.Category)
-	}
-	return m
-}
-
-func recurringFrequencyLabel(f string) string {
-	switch f {
-	case "daily":
-		return "Daily"
-	case "weekly":
-		return "Weekly"
-	case "biweekly":
-		return "Biweekly"
-	case "monthly":
-		return "Monthly"
-	case "quarterly":
-		return "Quarterly"
-	case "yearly":
-		return "Yearly"
-	default:
-		return f
-	}
-}
-
-func AutomationRule(r domain.AutomationRule) map[string]any {
-	label, _ := automationTriggerLabel(r.TriggerType)
-	m := map[string]any{
-		"id": r.ID, "name": r.Name, "description": r.Description,
-		"trigger_type": r.TriggerType, "trigger_label": label,
-		"priority": r.Priority, "conditions": r.Conditions, "actions": r.Actions,
-		"is_active": r.IsActive, "stop_processing": r.StopProcessing,
-		"runs_count": r.RunsCount,
-	}
-	if r.LastRunAt != nil {
-		m["last_run_at"] = r.LastRunAt.UTC().Format(time.RFC3339Nano)
-	} else {
-		m["last_run_at"] = nil
-	}
-	if r.CreatedAt != nil {
-		m["created_at"] = r.CreatedAt.UTC().Format(time.RFC3339Nano)
-	}
-	if r.UpdatedAt != nil {
-		m["updated_at"] = r.UpdatedAt.UTC().Format(time.RFC3339Nano)
-	}
-	return m
-}
-
-func automationTriggerLabel(t string) (string, string) {
-	switch t {
-	case "on_transaction_create":
-		return "On Transaction Create", "Triggers when a new transaction is created"
-	case "on_transaction_update":
-		return "On Transaction Update", "Triggers when a transaction is updated"
-	default:
-		return t, ""
-	}
-}
-
-func AutomationLog(l domain.AutomationLog) map[string]any {
-	return map[string]any{
-		"id": l.ID, "rule_id": l.RuleID,
-		"trigger_entity_type": l.TriggerEntityType, "trigger_entity_id": l.TriggerEntityID,
-		"actions_executed": l.ActionsExecuted, "status": l.Status,
-		"error_message": l.ErrorMessage,
-		"created_at":    l.CreatedAt.UTC().Format(time.RFC3339Nano),
-	}
-}
-
-func Import(im domain.Import) map[string]any {
-	parsed := im.Status == "parsed" || im.Status == "importing" || im.Status == "completed"
-	m := map[string]any{
-		"import_id": im.ID, "status": im.Status, "total_rows": im.TotalRows,
-		"processed_rows": im.ProcessedRows, "created": im.CreatedCount,
-		"skipped": im.SkippedCount, "errors": im.ErrorCount, "message": im.Message,
-	}
-	if parsed && im.Meta != nil {
-		m["parse"] = map[string]any{
-			"headers": im.Meta["headers"], "preview_rows": im.Meta["preview_rows"],
-			"total_rows": im.TotalRows, "detected_formats": im.Meta["detected_formats"],
-			"suggested_mapping": im.Meta["suggested_mapping"],
-		}
-	} else {
-		m["parse"] = nil
-	}
-	if im.Status == "completed" {
-		m["result"] = map[string]any{
-			"created": im.CreatedCount, "skipped_duplicates": im.SkippedCount,
-			"errors": im.Errors, "created_currencies": im.Meta["created_currencies"],
-			"created_tags": im.Meta["created_tags"], "created_categories": im.Meta["created_categories"],
-		}
-	} else {
-		m["result"] = nil
-	}
-	return m
-}
-
-func Backup(b domain.Backup) map[string]any {
-	schemaVersion, status := backupVersionStatus(b.AppVersion)
-	return map[string]any{
-		"filename": b.Filename, "size": b.Size, "note": b.Note,
-		"schemaVersion": schemaVersion, "schemaStatus": status,
-		"createdAt": func() any {
-			if b.CreatedAt == nil {
-				return nil
-			}
-			return b.CreatedAt.UTC().Format(time.RFC3339Nano)
-		}(),
-	}
-}
-
-func backupVersionStatus(appVersion *string) (any, string) {
-	if appVersion == nil {
-		return nil, "unknown"
-	}
-	v := *appVersion
-	if v == "" || strings.Contains(v, "${") {
-		return nil, "unknown"
-	}
-	if v == version.Value {
-		return v, "current"
-	}
-	return v, "outdated"
-}
-
-func AccountDebt(a domain.Account) map[string]any {
-	target := 0.0
+func NewDebt(a domain.Account) Debt {
+	target := decimal.Zero
 	if a.TargetAmount != nil {
 		target = *a.TargetAmount
 	}
-	remaining := a.Balance
 	progress := 0.0
-	if target > 0 {
-		progress = (target - remaining) / target * 100
-		if progress < 0 {
-			progress = 0
-		}
+	if target.IsPositive() {
+		progress = max(0, target.Sub(a.Balance).Div(target).Mul(decimal.NewFromInt(100)).InexactFloat64())
 	}
-	label := ""
-	if a.DebtType != nil {
-		switch *a.DebtType {
-		case "i_owe":
-			label = "I owe"
-		case "owed_to_me":
-			label = "Owed to me"
-		}
+	return Debt{
+		Account: NewAccount(a), DebtType: a.DebtType, TargetAmount: target, PaymentProgress: progress,
+		DueDate: a.DueDate, Counterparty: a.Counterparty, Description: a.DebtDesc, IsPaidOff: a.IsPaidOff,
 	}
-	m := Account(a)
-	m["debtType"] = a.DebtType
-	m["debtTypeLabel"] = label
-	m["targetAmount"] = target
-	m["remainingDebt"] = remaining
-	m["paymentProgress"] = progress
-	m["dueDate"] = a.DueDate
-	m["counterparty"] = a.Counterparty
-	m["description"] = a.DebtDesc
-	m["isPaidOff"] = a.IsPaidOff
-	return m
 }
 
-func WebAuthnCred(c auth.WebAuthnCred) map[string]any {
-	return map[string]any{
-		"id": c.ID, "name": c.Name, "aaguid": c.AAGUID,
-		"last_used_at": c.LastUsedAt, "created_at": c.CreatedAt,
+type TxItem struct {
+	ID           int64           `json:"id"`
+	Name         string          `json:"name"`
+	Quantity     decimal.Decimal `json:"quantity"`
+	PricePerUnit decimal.Decimal `json:"pricePerUnit"`
+	TotalPrice   decimal.Decimal `json:"totalPrice"`
+}
+
+func NewTxItem(i domain.TxItem) TxItem {
+	return TxItem{ID: i.ID, Name: i.Name, Quantity: i.Quantity, PricePerUnit: i.PricePerUnit, TotalPrice: i.TotalPrice}
+}
+
+type TxActions struct {
+	Edit      bool `json:"edit"`
+	Delete    bool `json:"delete"`
+	Duplicate bool `json:"duplicate"`
+	Confirm   bool `json:"confirm"`
+	Skip      bool `json:"skip"`
+}
+
+type Transaction struct {
+	ID                     int64            `json:"id"`
+	Type                   string           `json:"type"`
+	Amount                 decimal.Decimal  `json:"amount"`
+	ToAmount               *decimal.Decimal `json:"toAmount"`
+	Description            *string          `json:"description"`
+	Date                   *string          `json:"date"`
+	Status                 string           `json:"status"`
+	RecurringTransactionID *int64           `json:"recurringTransactionId"`
+	Actions                TxActions        `json:"actions"`
+	Account                *Account         `json:"account"`
+	ToAccount              *Account         `json:"toAccount"`
+	Category               *Category        `json:"category"`
+	Items                  []TxItem         `json:"items"`
+	Tags                   []Tag            `json:"tags"`
+	CreatedAt              *time.Time       `json:"createdAt"`
+}
+
+func NewTransaction(t domain.Transaction) Transaction {
+	return Transaction{
+		ID: t.ID, Type: t.Type, Amount: t.Amount, ToAmount: t.ToAmount,
+		Description: t.Description, Date: t.Date, Status: t.Status, RecurringTransactionID: t.RecurringID,
+		Actions:   transactionActions(t),
+		Account:   ptr(t.Account, NewAccount),
+		ToAccount: ptr(t.ToAccount, NewAccount),
+		Category:  ptr(t.Category, NewCategory),
+		Items:     Map(t.Items, NewTxItem),
+		Tags:      Map(t.Tags, NewTag),
+		CreatedAt: utc(t.CreatedAt),
+	}
+}
+
+func transactionActions(t domain.Transaction) TxActions {
+	pending := t.Status == "pending"
+	skipped := t.Status == "skipped"
+	recurring := t.RecurringID != nil
+	return TxActions{
+		Edit:      !skipped && !recurring,
+		Delete:    !recurring,
+		Duplicate: !recurring && !skipped,
+		Confirm:   pending,
+		Skip:      pending && recurring,
+	}
+}
+
+type TransactionSummary struct {
+	Income            decimal.Decimal `json:"income"`
+	Expense           decimal.Decimal `json:"expense"`
+	Balance           decimal.Decimal `json:"balance"`
+	TransactionsCount int             `json:"transactionsCount"`
+	Currency          *string         `json:"currency"`
+}
+
+func NewTransactionSummary(s domain.TransactionSummary) TransactionSummary {
+	return TransactionSummary{
+		Income: s.Income, Expense: s.Expense, Balance: s.Income.Sub(s.Expense),
+		TransactionsCount: s.Count, Currency: currencyCode(s.Currency),
+	}
+}
+
+type BudgetProgress struct {
+	Spent       decimal.Decimal `json:"spent"`
+	Remaining   decimal.Decimal `json:"remaining"`
+	Percent     float64         `json:"percent"`
+	PeriodStart string          `json:"periodStart"`
+	PeriodEnd   string          `json:"periodEnd"`
+	IsExceeded  bool            `json:"isExceeded"`
+}
+
+func NewBudgetProgress(p domain.BudgetProgress) BudgetProgress {
+	return BudgetProgress{
+		Spent: p.Spent, Remaining: p.Remaining, Percent: p.Percent,
+		PeriodStart: p.PeriodStart, PeriodEnd: p.PeriodEnd, IsExceeded: p.IsExceeded,
+	}
+}
+
+type Budget struct {
+	ID              int64           `json:"id"`
+	Name            string          `json:"name"`
+	Amount          decimal.Decimal `json:"amount"`
+	Currency        *Currency       `json:"currency"`
+	Period          string          `json:"period"`
+	StartDate       *string         `json:"startDate"`
+	EndDate         *string         `json:"endDate"`
+	IsGlobal        bool            `json:"isGlobal"`
+	NotifyAtPercent *int            `json:"notifyAtPercent"`
+	IsActive        bool            `json:"isActive"`
+	Categories      []Category      `json:"categories"`
+	Tags            []Tag           `json:"tags"`
+	Progress        *BudgetProgress `json:"progress"`
+}
+
+func NewBudget(b domain.Budget) Budget {
+	return Budget{
+		ID: b.ID, Name: b.Name, Amount: b.Amount, Currency: ptr(b.Currency, NewCurrency),
+		Period: b.Period, StartDate: b.StartDate, EndDate: b.EndDate,
+		IsGlobal: b.IsGlobal, NotifyAtPercent: b.NotifyAtPercent, IsActive: b.IsActive,
+		Categories: Map(b.Categories, NewCategory),
+		Tags:       Map(b.Tags, NewTag),
+		Progress:   ptr(b.Progress, NewBudgetProgress),
+	}
+}
+
+type Recurring struct {
+	ID          int64            `json:"id"`
+	Type        string           `json:"type"`
+	Amount      decimal.Decimal  `json:"amount"`
+	ToAmount    *decimal.Decimal `json:"toAmount"`
+	Description *string          `json:"description"`
+	Frequency   string           `json:"frequency"`
+	Interval    int              `json:"interval"`
+	DayOfWeek   *int             `json:"dayOfWeek"`
+	DayOfMonth  *int             `json:"dayOfMonth"`
+	StartDate   string           `json:"startDate"`
+	EndDate     *string          `json:"endDate"`
+	NextRunDate string           `json:"nextRunDate"`
+	LastRunDate *string          `json:"lastRunDate"`
+	IsActive    bool             `json:"isActive"`
+	Account     *Account         `json:"account"`
+	ToAccount   *Account         `json:"toAccount"`
+	Category    *Category        `json:"category"`
+	Tags        []Tag            `json:"tags"`
+}
+
+func NewRecurring(r domain.Recurring) Recurring {
+	return Recurring{
+		ID: r.ID, Type: r.Type, Amount: r.Amount, ToAmount: r.ToAmount, Description: r.Description,
+		Frequency: r.Frequency, Interval: r.Interval, DayOfWeek: r.DayOfWeek, DayOfMonth: r.DayOfMonth,
+		StartDate: r.StartDate, EndDate: r.EndDate, NextRunDate: r.NextRunDate, LastRunDate: r.LastRunDate,
+		IsActive:  r.IsActive,
+		Account:   ptr(r.Account, NewAccount),
+		ToAccount: ptr(r.ToAccount, NewAccount),
+		Category:  ptr(r.Category, NewCategory),
+		Tags:      Map(r.Tags, NewTag),
+	}
+}
+
+type AutomationRule struct {
+	ID             int64            `json:"id"`
+	Name           string           `json:"name"`
+	Description    *string          `json:"description"`
+	TriggerType    string           `json:"triggerType"`
+	Priority       int              `json:"priority"`
+	Conditions     map[string]any   `json:"conditions"`
+	Actions        []map[string]any `json:"actions"`
+	IsActive       bool             `json:"isActive"`
+	StopProcessing bool             `json:"stopProcessing"`
+	RunsCount      int              `json:"runsCount"`
+	LastRunAt      *time.Time       `json:"lastRunAt"`
+	CreatedAt      *time.Time       `json:"createdAt"`
+	UpdatedAt      *time.Time       `json:"updatedAt"`
+}
+
+func NewAutomationRule(r domain.AutomationRule) AutomationRule {
+	return AutomationRule{
+		ID: r.ID, Name: r.Name, Description: r.Description, TriggerType: r.TriggerType, Priority: r.Priority,
+		Conditions: r.Conditions, Actions: r.Actions, IsActive: r.IsActive, StopProcessing: r.StopProcessing,
+		RunsCount: r.RunsCount, LastRunAt: utc(r.LastRunAt), CreatedAt: utc(r.CreatedAt), UpdatedAt: utc(r.UpdatedAt),
+	}
+}
+
+type AutomationLog struct {
+	ID                int64     `json:"id"`
+	RuleID            int64     `json:"ruleId"`
+	TriggerEntityType *string   `json:"triggerEntityType"`
+	TriggerEntityID   *int64    `json:"triggerEntityId"`
+	ActionsExecuted   any       `json:"actionsExecuted"`
+	Status            string    `json:"status"`
+	ErrorMessage      *string   `json:"errorMessage"`
+	CreatedAt         time.Time `json:"createdAt"`
+}
+
+func NewAutomationLog(l domain.AutomationLog) AutomationLog {
+	return AutomationLog{
+		ID: l.ID, RuleID: l.RuleID, TriggerEntityType: l.TriggerEntityType, TriggerEntityID: l.TriggerEntityID,
+		ActionsExecuted: l.ActionsExecuted, Status: l.Status, ErrorMessage: l.ErrorMessage, CreatedAt: l.CreatedAt.UTC(),
+	}
+}
+
+type AccountsSummary struct {
+	TotalBalance  decimal.Decimal `json:"totalBalance"`
+	Currency      *string         `json:"currency"`
+	Decimals      int             `json:"decimals"`
+	AccountsCount int             `json:"accountsCount"`
+}
+
+func NewAccountsSummary(s domain.AccountsSummary) AccountsSummary {
+	return AccountsSummary{
+		TotalBalance: s.Total, Currency: currencyCode(s.Currency), Decimals: currencyDecimals(s.Currency), AccountsCount: s.Count,
+	}
+}
+
+type DebtSummary struct {
+	TotalIOwe     decimal.Decimal `json:"totalIOwe"`
+	TotalOwedToMe decimal.Decimal `json:"totalOwedToMe"`
+	NetDebt       decimal.Decimal `json:"netDebt"`
+	DebtsCount    int             `json:"debtsCount"`
+	Currency      *string         `json:"currency"`
+	Decimals      int             `json:"decimals"`
+}
+
+func NewDebtSummary(s domain.DebtSummary) DebtSummary {
+	return DebtSummary{
+		TotalIOwe: s.IOwe, TotalOwedToMe: s.OwedToMe, NetDebt: s.OwedToMe.Sub(s.IOwe), DebtsCount: s.Count,
+		Currency: currencyCode(s.Currency), Decimals: currencyDecimals(s.Currency),
+	}
+}
+
+type CategoryStatistics struct {
+	CategoryID        int64           `json:"categoryId"`
+	CategoryName      string          `json:"categoryName"`
+	Type              string          `json:"type"`
+	TransactionsCount int             `json:"transactionsCount"`
+	TotalAmount       decimal.Decimal `json:"totalAmount"`
+}
+
+func NewCategoryStatistics(s domain.CategoryStatistics) CategoryStatistics {
+	return CategoryStatistics{
+		CategoryID: s.Category.ID, CategoryName: s.Category.Name, Type: s.Category.Type,
+		TransactionsCount: s.Count, TotalAmount: s.Total,
+	}
+}
+
+func currencyCode(c *domain.Currency) *string {
+	if c == nil {
+		return nil
+	}
+	return &c.Code
+}
+
+// currencyDecimals is the scale totals in c are rounded to (2 without one).
+func currencyDecimals(c *domain.Currency) int {
+	if c == nil {
+		return 2
+	}
+	return c.Decimals
+}
+
+type ImportFormats struct {
+	DateFormat   any  `json:"dateFormat"`
+	AmountFormat any  `json:"amountFormat"`
+	HasHeader    bool `json:"hasHeader"`
+	Delimiter    any  `json:"delimiter"`
+}
+
+type ImportParse struct {
+	Headers          any           `json:"headers"`
+	PreviewRows      any           `json:"previewRows"`
+	TotalRows        *int          `json:"totalRows"`
+	DetectedFormats  ImportFormats `json:"detectedFormats"`
+	SuggestedMapping any           `json:"suggestedMapping"`
+}
+
+type ImportResult struct {
+	Created           int `json:"created"`
+	SkippedDuplicates int `json:"skippedDuplicates"`
+	Errors            any `json:"errors"`
+	CreatedCurrencies any `json:"createdCurrencies"`
+	CreatedTags       any `json:"createdTags"`
+	CreatedCategories any `json:"createdCategories"`
+}
+
+type Import struct {
+	ImportID      string        `json:"importId"`
+	Status        string        `json:"status"`
+	TotalRows     *int          `json:"totalRows"`
+	ProcessedRows int           `json:"processedRows"`
+	Created       int           `json:"created"`
+	Skipped       int           `json:"skipped"`
+	Errors        int           `json:"errors"`
+	Message       *string       `json:"message"`
+	Parse         *ImportParse  `json:"parse"`
+	Result        *ImportResult `json:"result"`
+}
+
+// NewImport reads the parse/result details from im.Meta, which the domain
+// stores as JSON with snake_case keys.
+func NewImport(im domain.Import) Import {
+	out := Import{
+		ImportID: im.ID, Status: im.Status, TotalRows: im.TotalRows, ProcessedRows: im.ProcessedRows,
+		Created: im.CreatedCount, Skipped: im.SkippedCount, Errors: im.ErrorCount, Message: im.Message,
+	}
+	parsed := im.Status == "parsed" || im.Status == "importing" || im.Status == "completed"
+	if parsed && im.Meta != nil {
+		formats, _ := im.Meta["detected_formats"].(map[string]any)
+		hasHeader, _ := formats["has_header"].(bool)
+		out.Parse = &ImportParse{
+			Headers:     im.Meta["headers"],
+			PreviewRows: im.Meta["preview_rows"],
+			TotalRows:   im.TotalRows,
+			DetectedFormats: ImportFormats{
+				DateFormat: formats["date_format"], AmountFormat: formats["amount_format"],
+				HasHeader: hasHeader, Delimiter: formats["delimiter"],
+			},
+			SuggestedMapping: im.Meta["suggested_mapping"],
+		}
+	}
+	if im.Status == "completed" {
+		out.Result = &ImportResult{
+			Created:           im.CreatedCount,
+			SkippedDuplicates: im.SkippedCount,
+			Errors:            im.Errors,
+			CreatedCurrencies: im.Meta["created_currencies"],
+			CreatedTags:       im.Meta["created_tags"],
+			CreatedCategories: im.Meta["created_categories"],
+		}
+	}
+	return out
+}
+
+type WebAuthnCred struct {
+	ID         int64   `json:"id"`
+	Name       *string `json:"name"`
+	AAGUID     *string `json:"aaguid"`
+	LastUsedAt *string `json:"lastUsedAt"`
+	CreatedAt  *string `json:"createdAt"`
+}
+
+func NewWebAuthnCred(c auth.WebAuthnCred) WebAuthnCred {
+	return WebAuthnCred{ID: c.ID, Name: c.Name, AAGUID: c.AAGUID, LastUsedAt: c.LastUsedAt, CreatedAt: c.CreatedAt}
+}
+
+type Backup struct {
+	Filename     string     `json:"filename"`
+	Size         int64      `json:"size"`
+	Note         *string    `json:"note"`
+	AppVersion   *string    `json:"appVersion"`
+	Status       string     `json:"status"`
+	Restorable   bool       `json:"restorable"`
+	PendingCount int        `json:"pendingCount"`
+	CreatedAt    *time.Time `json:"createdAt"`
+}
+
+func NewBackup(b domain.Backup, status string, restorable bool, pendingCount int) Backup {
+	return Backup{
+		Filename: b.Filename, Size: b.Size, Note: b.Note, AppVersion: b.AppVersion,
+		Status: status, Restorable: restorable, PendingCount: pendingCount, CreatedAt: utc(b.CreatedAt),
 	}
 }

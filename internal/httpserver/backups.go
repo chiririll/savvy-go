@@ -1,15 +1,17 @@
 package httpserver
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"io"
 	"net/http"
 	"os"
 
+	"savvy-go/internal/db"
 	"savvy-go/internal/domain"
 	"savvy-go/internal/httpserver/dto"
 	"savvy-go/internal/legacy"
-	"savvy-go/internal/migrate"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -20,7 +22,9 @@ func (s *Server) backupsIndex(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, mapSlice(list, dto.Backup))
+	writeData(w, http.StatusOK, dto.Map(list, func(b domain.Backup) dto.Backup {
+		return s.backupView(r.Context(), b)
+	}))
 }
 
 func (s *Server) backupsStore(w http.ResponseWriter, r *http.Request) {
@@ -33,7 +37,7 @@ func (s *Server) backupsStore(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusCreated, dto.Backup(*b))
+	writeData(w, http.StatusCreated, s.backupView(r.Context(), *b))
 }
 
 func (s *Server) backupsUpload(w http.ResponseWriter, r *http.Request) {
@@ -66,7 +70,7 @@ func (s *Server) backupsUpload(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, dto.Backup(*b))
+	writeJSON(w, http.StatusOK, s.backupView(r.Context(), *b))
 }
 
 func (s *Server) backupsDownload(w http.ResponseWriter, r *http.Request) {
@@ -80,17 +84,58 @@ func (s *Server) backupsDownload(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, path)
 }
 
-func (s *Server) backupsInspect(w http.ResponseWriter, r *http.Request) {
-	b := s.backupParam(w, r)
-	if b == nil {
-		return
-	}
-	out, err := s.backups.Inspect(r.Context(), *b)
+// backupStatus says what restoring a backup here would do.
+type backupStatus string
+
+const (
+	backupCurrent           backupStatus = "current"           // same schema as this app
+	backupOutdated          backupStatus = "outdated"          // restore applies pending migrations
+	backupNewer             backupStatus = "newer"             // made by a newer app
+	backupLegacy            backupStatus = "legacy"            // Laravel backup; restore converts it
+	backupLegacyUnsupported backupStatus = "legacyUnsupported" // Laravel backup too old to convert
+	backupInvalid           backupStatus = "invalid"           // not a readable database
+)
+
+func (st backupStatus) restorable() bool {
+	return st == backupCurrent || st == backupOutdated || st == backupLegacy
+}
+
+// backupView describes b together with what restoring it here would do.
+func (s *Server) backupView(ctx context.Context, b domain.Backup) dto.Backup {
+	status, pending := s.backupStatus(ctx, b)
+	return dto.NewBackup(b, string(status), status.restorable(), pending)
+}
+
+// backupStatus classifies b for restore and counts the migrations restore
+// would apply. It reads the file, so it matches what restore will do.
+func (s *Server) backupStatus(ctx context.Context, b domain.Backup) (backupStatus, int) {
+	src, err := db.OpenReadOnly(s.backups.Path(b))
 	if err != nil {
-		writeMessage(w, 422, err.Error())
-		return
+		return backupInvalid, 0
 	}
-	writeJSON(w, http.StatusOK, out)
+	defer src.Close()
+	if info := legacy.Inspect(ctx, src); info.Laravel {
+		if !info.Supported {
+			return backupLegacyUnsupported, 0
+		}
+		return backupLegacy, 0
+	}
+	pending, unknown, err := s.backups.Migrations(ctx, src)
+	switch {
+	case err != nil:
+		return backupInvalid, 0
+	case len(unknown) > 0:
+		return backupNewer, 0
+	case len(pending) > 0:
+		return backupOutdated, len(pending)
+	}
+	return backupCurrent, 0
+}
+
+// upgradeBackup brings a staged backup copy up to the current schema before it
+// replaces the live database.
+func (s *Server) upgradeBackup(ctx context.Context, staged *sql.DB) error {
+	return legacy.Upgrade(ctx, staged, s.cfg.AppKey)
 }
 
 func (s *Server) backupsRestore(w http.ResponseWriter, r *http.Request) {
@@ -98,24 +143,13 @@ func (s *Server) backupsRestore(w http.ResponseWriter, r *http.Request) {
 	if b == nil {
 		return
 	}
-	newDB, err := s.backups.Restore(r.Context(), *b)
+	if status, _ := s.backupStatus(r.Context(), *b); !status.restorable() {
+		writeMessage(w, 422, "This backup cannot be restored by this version of the app.")
+		return
+	}
+	newDB, err := s.backups.Restore(r.Context(), *b, s.upgradeBackup)
 	if err != nil {
 		writeMessage(w, 422, err.Error())
-		return
-	}
-	if err := legacy.EnsureColumns(r.Context(), newDB); err != nil {
-		_ = newDB.Close()
-		writeMessage(w, 422, "legacy columns: "+err.Error())
-		return
-	}
-	if err := migrate.Up(r.Context(), newDB); err != nil {
-		_ = newDB.Close()
-		writeMessage(w, 422, "migrate: "+err.Error())
-		return
-	}
-	if err := legacy.UpgradeInPlace(r.Context(), newDB, s.cfg.AppKey); err != nil {
-		_ = newDB.Close()
-		writeMessage(w, 422, "legacy import: "+err.Error())
 		return
 	}
 	s.reconnect(newDB)

@@ -183,7 +183,7 @@ export default function DashboardPage() {
     const activeDebts = debtsData?.data?.filter(d => !d.isPaidOff).slice(0, 4) ?? []
     const debtSummary = debtsData?.summary
 
-    const totalBalance = balance?.total_balance ?? 0
+    const totalBalance = balance?.totalBalance ?? 0
     const currency = balance?.currency
     const periodIncome = overviewData?.income.value ?? 0
     const periodExpense = overviewData?.expenses.value ?? 0
@@ -428,8 +428,8 @@ export default function DashboardPage() {
                                 {formatCurrency(pendingSummary?.balance ?? 0, pendingSummary?.currency ?? currency)}
                             </div>
                             <p className="text-xs text-muted-foreground mt-1">
-                                {(pendingSummary?.transactions_count ?? 0) > 0
-                                    ? t('dashboard.pendingCount', { count: pendingSummary?.transactions_count ?? 0 })
+                                {(pendingSummary?.transactionsCount ?? 0) > 0
+                                    ? t('dashboard.pendingCount', { count: pendingSummary?.transactionsCount ?? 0 })
                                     : t('dashboard.pendingEmpty')}
                             </p>
                         </Link>
@@ -598,7 +598,7 @@ export default function DashboardPage() {
                             {activeBudgets.map((budget) => {
                                 const progress = budget.progress
                                 const percent = progress ? Math.min(progress.percent, 100) : 0
-                                const isExceeded = progress?.is_exceeded ?? false
+                                const isExceeded = progress?.isExceeded ?? false
 
                                 return (
                                     <Link
@@ -658,7 +658,7 @@ export default function DashboardPage() {
                     </Button>
                 </CardHeader>
                 <CardContent className="min-w-0">
-                    {debtSummary && (debtSummary.total_i_owe > 0 || debtSummary.total_owed_to_me > 0) ? (
+                    {debtSummary && (debtSummary.totalIOwe > 0 || debtSummary.totalOwedToMe > 0) ? (
                         <div className="min-w-0 space-y-4">
                             <div className="grid min-w-0 gap-4 sm:grid-cols-3">
                                 <div className="flex items-center gap-3 p-3 rounded-lg bg-red-50 dark:bg-red-950/20">
@@ -668,7 +668,7 @@ export default function DashboardPage() {
                                     <div>
                                         <p className="text-xs text-muted-foreground">{t('debts.types.i_owe')}</p>
                                         <p className="font-mono font-semibold text-red-600 break-all">
-                                            {formatCurrency(debtSummary.total_i_owe, debtSummary.currency)}
+                                            {formatCurrency(debtSummary.totalIOwe, debtSummary.currency)}
                                         </p>
                                     </div>
                                 </div>
@@ -679,13 +679,13 @@ export default function DashboardPage() {
                                     <div>
                                         <p className="text-xs text-muted-foreground">{t('debts.types.owed_to_me')}</p>
                                         <p className="font-mono font-semibold text-green-600 break-all">
-                                            {formatCurrency(debtSummary.total_owed_to_me, debtSummary.currency)}
+                                            {formatCurrency(debtSummary.totalOwedToMe, debtSummary.currency)}
                                         </p>
                                     </div>
                                 </div>
-                                <div className={`flex items-center gap-3 p-3 rounded-lg ${debtSummary.net_debt >= 0 ? 'bg-green-50 dark:bg-green-950/20' : 'bg-red-50 dark:bg-red-950/20'}`}>
-                                    <div className={`p-2 rounded-lg ${debtSummary.net_debt >= 0 ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30'}`}>
-                                        {debtSummary.net_debt >= 0 ? (
+                                <div className={`flex items-center gap-3 p-3 rounded-lg ${debtSummary.netDebt >= 0 ? 'bg-green-50 dark:bg-green-950/20' : 'bg-red-50 dark:bg-red-950/20'}`}>
+                                    <div className={`p-2 rounded-lg ${debtSummary.netDebt >= 0 ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30'}`}>
+                                        {debtSummary.netDebt >= 0 ? (
                                             <HandCoins className="size-4 text-green-600" />
                                         ) : (
                                             <Banknote className="size-4 text-red-600" />
@@ -693,8 +693,8 @@ export default function DashboardPage() {
                                     </div>
                                     <div>
                                         <p className="text-xs text-muted-foreground">{t('debts.netPosition')}</p>
-                                        <p className={`font-mono font-semibold break-all ${debtSummary.net_debt >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                            {formatCurrency(Math.abs(debtSummary.net_debt), debtSummary.currency)}
+                                        <p className={`font-mono font-semibold break-all ${debtSummary.netDebt >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                            {formatCurrency(Math.abs(debtSummary.netDebt), debtSummary.currency)}
                                         </p>
                                     </div>
                                 </div>
@@ -725,7 +725,7 @@ export default function DashboardPage() {
                                                     {t('dashboard.percentPaid', { percent: debt.paymentProgress.toFixed(0) })}
                                                 </span>
                                                 <span className={debt.debtType === 'i_owe' ? 'text-red-600' : 'text-green-600'}>
-                                                    {formatCurrency(debt.remainingDebt, debt.currency)}
+                                                    {formatCurrency(debt.currentBalance, debt.currency)}
                                                 </span>
                                             </div>
                                             {debt.counterparty && (

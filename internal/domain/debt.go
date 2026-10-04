@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/shopspring/decimal"
+
 	"savvy-go/internal/db"
 	"savvy-go/internal/db/sqlc"
 )
@@ -18,7 +20,7 @@ func (s Debts) All(ctx context.Context, includeCompleted bool) ([]Account, error
 	return s.Accounts.Debts(ctx, includeCompleted)
 }
 
-func (s Debts) Create(ctx context.Context, name, debtType string, currencyID, accountID int64, amount float64, date, origin string, due, counter, desc *string) (*Account, error) {
+func (s Debts) Create(ctx context.Context, name, debtType string, currencyID, accountID int64, amount decimal.Decimal, date, origin string, due, counter, desc *string) (*Account, error) {
 	if origin == "new" && accountID != 0 {
 		src, err := s.Accounts.ByID(ctx, accountID)
 		if err != nil || src == nil {
@@ -31,7 +33,7 @@ func (s Debts) Create(ctx context.Context, name, debtType string, currencyID, ac
 	}
 	debt, err := s.Accounts.Create(ctx, Account{
 		Name: name, Type: "debt", CurrencyID: currencyID,
-		InitialBalance: 0, TargetAmount: &amount, DueDate: due,
+		InitialBalance: decimal.Zero, TargetAmount: &amount, DueDate: due,
 		Counterparty: counter, DebtDesc: desc, IsActive: true, DebtType: &debtType,
 	})
 	if err != nil {
@@ -49,7 +51,7 @@ func (s Debts) Create(ctx context.Context, name, debtType string, currencyID, ac
 	return debt, nil
 }
 
-func (s Debts) recordIssuance(ctx context.Context, debt Account, accountID int64, debtType string, amount float64, date string, desc *string) error {
+func (s Debts) recordIssuance(ctx context.Context, debt Account, accountID int64, debtType string, amount decimal.Decimal, date string, desc *string) error {
 	typ := "debt_lend"
 	amt := amount
 	toAmt := amount
@@ -63,7 +65,7 @@ func (s Debts) recordIssuance(ctx context.Context, debt Account, accountID int64
 	return err
 }
 
-func (s Debts) Payment(ctx context.Context, debtID, accountID int64, amount float64, date string, desc *string, collect bool) (*Transaction, error) {
+func (s Debts) Payment(ctx context.Context, debtID, accountID int64, amount decimal.Decimal, date string, desc *string, collect bool) (*Transaction, error) {
 	debt, err := s.Accounts.ByID(ctx, debtID)
 	if err != nil || debt == nil || debt.Type != "debt" {
 		return nil, fmt.Errorf("not a debt")
@@ -91,7 +93,7 @@ func (s Debts) maybePayOff(ctx context.Context, debt *Account) {
 	if err != nil || fresh == nil {
 		return
 	}
-	if fresh.Balance <= 0.0001 {
+	if !fresh.Balance.IsPositive() {
 		_ = db.Q(s.Accounts.DB).MarkAccountPaidOff(ctx, debt.ID)
 	}
 }
@@ -112,24 +114,35 @@ func (s Debts) Reopen(ctx context.Context, id int64) (*Account, error) {
 	return s.Accounts.ByID(ctx, id)
 }
 
-func (s Debts) Summary(ctx context.Context) map[string]any {
+// DebtSummary totals open debts in the base currency (nil when there is none),
+// rounded to its decimals.
+type DebtSummary struct {
+	IOwe     decimal.Decimal
+	OwedToMe decimal.Decimal
+	Count    int
+	Currency *Currency
+}
+
+func (s Debts) Summary(ctx context.Context) DebtSummary {
 	debts, _ := s.All(ctx, false)
-	var iOwe, owed float64
+	base, _ := (Currencies{DB: s.Accounts.DB}).Base(ctx)
+	out := DebtSummary{Count: len(debts), Currency: base}
 	for _, d := range debts {
 		amt := d.Balance
 		if d.Currency != nil && !d.Currency.IsBase {
 			amt = d.Currency.ConvertToBase(amt)
 		}
 		if d.DebtType != nil && *d.DebtType == "i_owe" {
-			iOwe += amt
+			out.IOwe = out.IOwe.Add(amt)
 		} else {
-			owed += amt
+			out.OwedToMe = out.OwedToMe.Add(amt)
 		}
 	}
-	return map[string]any{
-		"total_i_owe": iOwe, "total_owed_to_me": owed, "net_debt": owed - iOwe,
-		"debts_count": len(debts), "currency": nil, "decimals": 2,
+	if base != nil {
+		out.IOwe = out.IOwe.Round(int32(base.Decimals))
+		out.OwedToMe = out.OwedToMe.Round(int32(base.Decimals))
 	}
+	return out
 }
 
 func (s Debts) Delete(ctx context.Context, id int64) error {
