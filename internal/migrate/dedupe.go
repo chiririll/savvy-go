@@ -61,11 +61,63 @@ func asciiLower(s string) string {
 	}, s)
 }
 
-// uniqueNames lists the tables whose names the schema keeps unique, with the
+// nameScopes lists the tables whose names the schema keeps unique, with the
 // column that scopes the uniqueness ("" for none).
-var uniqueNames = []struct{ table, scope string }{
-	{"categories", "type"},
-	{"tags", ""},
+var nameScopes = map[string]string{
+	"categories": "type",
+	"tags":       "",
+}
+
+// NameScope reports whether table keeps its names unique and which column
+// scopes that uniqueness ("" for none).
+func NameScope(table string) (scope string, ok bool) {
+	scope, ok = nameScopes[table]
+	return scope, ok
+}
+
+type nameRow struct {
+	id int64
+	NameKey
+}
+
+// nameRows reads every row's (scope, name) of a table from NameScope, in id
+// order.
+func nameRows(ctx context.Context, q Querier, table string) ([]nameRow, error) {
+	scopeExpr := "''"
+	if scope := nameScopes[table]; scope != "" {
+		scopeExpr = scope
+	}
+	rows, err := q.QueryContext(ctx, fmt.Sprintf(`SELECT id, %s, name FROM %s ORDER BY id`, scopeExpr, table))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []nameRow
+	for rows.Next() {
+		var r nameRow
+		if err := rows.Scan(&r.id, &r.Scope, &r.Name); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+func keysOf(rows []nameRow) []NameKey {
+	keys := make([]NameKey, len(rows))
+	for i, r := range rows {
+		keys[i] = r.NameKey
+	}
+	return keys
+}
+
+// LoadDeduper returns a Deduper that knows every name already in table.
+func LoadDeduper(ctx context.Context, q Querier, table string) (*Deduper, error) {
+	rows, err := nameRows(ctx, q, table)
+	if err != nil {
+		return nil, err
+	}
+	return NewDeduper(keysOf(rows)), nil
 }
 
 // DedupeNames renames repeated category and tag names in place (the lowest id
@@ -73,60 +125,29 @@ var uniqueNames = []struct{ table, scope string }{
 // data written before they existed. Missing tables are skipped. It is cheap
 // and a no-op on clean data, so every migration run starts with it.
 func DedupeNames(ctx context.Context, db *sql.DB) error {
-	for _, u := range uniqueNames {
-		if !tableExists(ctx, db, u.table) {
+	for table := range nameScopes {
+		if !TableExists(ctx, db, table) {
 			continue
 		}
-		if err := dedupeTable(ctx, db, u.table, u.scope); err != nil {
-			return fmt.Errorf("dedupe %s: %w", u.table, err)
+		if err := dedupeTable(ctx, db, table); err != nil {
+			return fmt.Errorf("dedupe %s: %w", table, err)
 		}
 	}
 	return nil
 }
 
-func dedupeTable(ctx context.Context, db *sql.DB, table, scope string) error {
-	scopeExpr := "''"
-	if scope != "" {
-		scopeExpr = scope
-	}
-	rows, err := db.QueryContext(ctx, fmt.Sprintf(`SELECT id, %s, name FROM %s ORDER BY id`, scopeExpr, table))
+func dedupeTable(ctx context.Context, db *sql.DB, table string) error {
+	rows, err := nameRows(ctx, db, table)
 	if err != nil {
 		return err
 	}
-	type row struct {
-		id          int64
-		scope, name string
-	}
-	var all []row
-	var keys []NameKey
-	for rows.Next() {
-		var r row
-		if err := rows.Scan(&r.id, &r.scope, &r.name); err != nil {
-			_ = rows.Close()
-			return err
-		}
-		all = append(all, r)
-		keys = append(keys, NameKey{r.scope, r.name})
-	}
-	if err := rows.Err(); err != nil {
-		_ = rows.Close()
-		return err
-	}
-	_ = rows.Close()
-
-	d := NewDeduper(keys)
-	for _, r := range all {
-		if name := d.Unique(r.scope, r.name); name != r.name {
+	d := NewDeduper(keysOf(rows))
+	for _, r := range rows {
+		if name := d.Unique(r.Scope, r.Name); name != r.Name {
 			if _, err := db.ExecContext(ctx, fmt.Sprintf(`UPDATE %s SET name = ? WHERE id = ?`, table), name, r.id); err != nil {
 				return err
 			}
 		}
 	}
 	return nil
-}
-
-func tableExists(ctx context.Context, db *sql.DB, name string) bool {
-	var found string
-	err := db.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name=?`, name).Scan(&found)
-	return err == nil
 }

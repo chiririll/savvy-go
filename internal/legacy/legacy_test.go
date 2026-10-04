@@ -94,10 +94,10 @@ func TestUpgrade(t *testing.T) {
 	if !AlreadyImported(ctx, sqlDB) {
 		t.Fatal("expected stamp")
 	}
-	if tableExists(ctx, sqlDB, "migrations") {
+	if migrate.TableExists(ctx, sqlDB, "migrations") {
 		t.Fatal("laravel migrations table should be dropped")
 	}
-	if cols, _ := columns(ctx, sqlDB, "transactions"); slices.Contains(cols, "exchange_rate") {
+	if cols, _ := migrate.Columns(ctx, sqlDB, "transactions"); slices.Contains(cols, "exchange_rate") {
 		t.Fatal("transactions.exchange_rate should be dropped")
 	}
 	assertMinorUnits(t, sqlDB)

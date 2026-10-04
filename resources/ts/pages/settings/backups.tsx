@@ -36,7 +36,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Download, RotateCcw, Trash2, Plus, Upload, Loader2 } from 'lucide-react'
 import { useBackups, useCreateBackup, useUploadBackup, useRestoreBackup, useDeleteBackup } from '@/hooks/use-backups'
 import { backupsApi } from '@/api/backups'
-import { Backup, BackupStatus } from '@/types/backup'
+import { Backup } from '@/types/backup'
 import { useReadOnly } from '@/components/providers/ReadOnlyProvider'
 import { intlLocale } from '@/lib/i18n'
 
@@ -52,11 +52,9 @@ function formatDate(dateString: string): string {
     return new Date(dateString).toLocaleString(intlLocale())
 }
 
-const RESTORABLE: ReadonlySet<BackupStatus> = new Set(['current', 'outdated', 'legacy'])
-
-function statusBadgeVariant(status: BackupStatus): 'secondary' | 'outline' | 'destructive' {
-    if (status === 'current') return 'secondary'
-    return RESTORABLE.has(status) ? 'outline' : 'destructive'
+function statusBadgeVariant(backup: Backup): 'secondary' | 'outline' | 'destructive' {
+    if (backup.status === 'current') return 'secondary'
+    return backup.restorable ? 'outline' : 'destructive'
 }
 
 export default function BackupsPage() {
@@ -108,7 +106,7 @@ export default function BackupsPage() {
     }
 
     const handleRestore = () => {
-        if (!selectedBackup || !RESTORABLE.has(selectedBackup.status)) return
+        if (!selectedBackup?.restorable) return
         restoreBackup.mutate(selectedBackup.filename, {
             onSuccess: closeRestore,
         })
@@ -202,7 +200,7 @@ export default function BackupsPage() {
                                             </span>
                                             <Tooltip>
                                                 <TooltipTrigger asChild>
-                                                    <Badge variant={statusBadgeVariant(backup.status)}>
+                                                    <Badge variant={statusBadgeVariant(backup)}>
                                                         {t(`backups.status.${backup.status}`)}
                                                     </Badge>
                                                 </TooltipTrigger>
@@ -229,10 +227,10 @@ export default function BackupsPage() {
                                                 variant="ghost"
                                                 size="icon"
                                                 onClick={() => openRestore(backup)}
-                                                title={RESTORABLE.has(backup.status)
+                                                title={backup.restorable
                                                     ? t('backups.restore')
                                                     : t(`backups.statusHelp.${backup.status}`)}
-                                                disabled={isReadOnly || !RESTORABLE.has(backup.status)}
+                                                disabled={isReadOnly || !backup.restorable}
                                             >
                                                 <RotateCcw className="size-4" />
                                             </Button>

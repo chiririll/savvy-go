@@ -9,16 +9,6 @@ import type {
 const ENDPOINT = '/transactions/import'
 
 // Requests stay snake_case like the rest of the API input.
-const toSnakeCase = (mapping: ColumnMapping) => ({
-    date: mapping.date,
-    amount: mapping.amount,
-    description: mapping.description,
-    type: mapping.type,
-    category: mapping.category,
-    tags: mapping.tags,
-    currency: mapping.currency,
-})
-
 const optionsToSnakeCase = (options: ImportOptions) => ({
     date_format: options.dateFormat,
     amount_format: options.amountFormat,
@@ -53,7 +43,7 @@ export const importApi = {
     ): Promise<ImportPreviewResult> => {
         const response = await apiClient.post(`${ENDPOINT}/preview`, {
             import_id: importId,
-            mapping: toSnakeCase(mapping),
+            mapping,
             options: optionsToSnakeCase(options),
         })
 
@@ -67,7 +57,7 @@ export const importApi = {
     ): Promise<ImportState> => {
         const response = await apiClient.post(`${ENDPOINT}/execute`, {
             import_id: importId,
-            mapping: toSnakeCase(mapping),
+            mapping,
             options: optionsToSnakeCase(options),
         })
 

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 
+	"savvy-go/internal/db"
 	"savvy-go/internal/domain"
 	"savvy-go/internal/httpserver/dto"
 	"savvy-go/internal/legacy"
@@ -21,11 +22,9 @@ func (s *Server) backupsIndex(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	out := make([]dto.Backup, 0, len(list))
-	for _, b := range list {
-		out = append(out, s.backupView(r.Context(), b))
-	}
-	writeData(w, http.StatusOK, out)
+	writeData(w, http.StatusOK, dto.Map(list, func(b domain.Backup) dto.Backup {
+		return s.backupView(r.Context(), b)
+	}))
 }
 
 func (s *Server) backupsStore(w http.ResponseWriter, r *http.Request) {
@@ -85,35 +84,52 @@ func (s *Server) backupsDownload(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, path)
 }
 
+// backupStatus says what restoring a backup here would do.
+type backupStatus string
+
+const (
+	backupCurrent           backupStatus = "current"           // same schema as this app
+	backupOutdated          backupStatus = "outdated"          // restore applies pending migrations
+	backupNewer             backupStatus = "newer"             // made by a newer app
+	backupLegacy            backupStatus = "legacy"            // Laravel backup; restore converts it
+	backupLegacyUnsupported backupStatus = "legacyUnsupported" // Laravel backup too old to convert
+	backupInvalid           backupStatus = "invalid"           // not a readable database
+)
+
+func (st backupStatus) restorable() bool {
+	return st == backupCurrent || st == backupOutdated || st == backupLegacy
+}
+
 // backupView describes b together with what restoring it here would do.
 func (s *Server) backupView(ctx context.Context, b domain.Backup) dto.Backup {
 	status, pending := s.backupStatus(ctx, b)
-	return dto.NewBackup(b, status, pending)
+	return dto.NewBackup(b, string(status), status.restorable(), pending)
 }
 
 // backupStatus classifies b for restore and counts the migrations restore
 // would apply. It reads the file, so it matches what restore will do.
-func (s *Server) backupStatus(ctx context.Context, b domain.Backup) (string, int) {
-	info, err := legacy.InspectFile(ctx, s.backups.Path(b))
+func (s *Server) backupStatus(ctx context.Context, b domain.Backup) (backupStatus, int) {
+	src, err := db.OpenReadOnly(s.backups.Path(b))
 	if err != nil {
-		return dto.BackupInvalid, 0
+		return backupInvalid, 0
 	}
-	if info.Laravel {
+	defer src.Close()
+	if info := legacy.Inspect(ctx, src); info.Laravel {
 		if !info.Supported {
-			return dto.BackupLegacyUnsupported, 0
+			return backupLegacyUnsupported, 0
 		}
-		return dto.BackupLegacy, 0
+		return backupLegacy, 0
 	}
-	pending, unknown, err := s.backups.Migrations(ctx, b)
+	pending, unknown, err := s.backups.Migrations(ctx, src)
 	switch {
 	case err != nil:
-		return dto.BackupInvalid, 0
+		return backupInvalid, 0
 	case len(unknown) > 0:
-		return dto.BackupNewer, 0
+		return backupNewer, 0
 	case len(pending) > 0:
-		return dto.BackupOutdated, len(pending)
+		return backupOutdated, len(pending)
 	}
-	return dto.BackupCurrent, 0
+	return backupCurrent, 0
 }
 
 // upgradeBackup brings a staged backup copy up to the current schema before it
@@ -127,7 +143,7 @@ func (s *Server) backupsRestore(w http.ResponseWriter, r *http.Request) {
 	if b == nil {
 		return
 	}
-	if status, _ := s.backupStatus(r.Context(), *b); !dto.BackupRestorable(status) {
+	if status, _ := s.backupStatus(r.Context(), *b); !status.restorable() {
 		writeMessage(w, 422, "This backup cannot be restored by this version of the app.")
 		return
 	}

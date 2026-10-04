@@ -144,16 +144,33 @@ type AccountsSummary struct {
 func (s Accounts) Summary(ctx context.Context, base *Currency) AccountsSummary {
 	accts, _ := s.All(ctx, true, true)
 	out := AccountsSummary{Currency: base, Count: len(accts)}
-	if base == nil {
-		return out
+	if base != nil {
+		out.Total = s.total(ctx, accts, *base, "")
 	}
-	for _, a := range accts {
-		if a.Currency != nil {
-			out.Total = out.Total.Add(Convert(a.Balance, *a.Currency, *base))
-		}
-	}
-	out.Total = out.Total.Round(int32(base.Decimals))
 	return out
+}
+
+// TotalAt is Summary's total as of the end of asOf (YYYY-MM-DD).
+func (s Accounts) TotalAt(ctx context.Context, base Currency, asOf string) decimal.Decimal {
+	accts, _ := s.All(ctx, true, true)
+	return s.total(ctx, accts, base, asOf)
+}
+
+// total converts the balances of accts as of asOf ("" for now, which reuses
+// the loaded balances) to base and rounds the sum to its decimals.
+func (s Accounts) total(ctx context.Context, accts []Account, base Currency, asOf string) decimal.Decimal {
+	sum := decimal.Zero
+	for _, a := range accts {
+		if a.Currency == nil {
+			continue
+		}
+		bal := a.Balance
+		if asOf != "" {
+			bal, _ = s.balance(ctx, a, asOf)
+		}
+		sum = sum.Add(Convert(bal, *a.Currency, base))
+	}
+	return sum.Round(int32(base.Decimals))
 }
 
 func (s Accounts) list(ctx context.Context, arg sqlc.ListAccountsParams) ([]Account, error) {

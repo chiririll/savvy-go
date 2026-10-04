@@ -405,7 +405,6 @@ type ImportFormats struct {
 }
 
 type ImportParse struct {
-	ImportID         string        `json:"importId"`
 	Headers          any           `json:"headers"`
 	PreviewRows      any           `json:"previewRows"`
 	TotalRows        *int          `json:"totalRows"`
@@ -447,7 +446,6 @@ func NewImport(im domain.Import) Import {
 		formats, _ := im.Meta["detected_formats"].(map[string]any)
 		hasHeader, _ := formats["has_header"].(bool)
 		out.Parse = &ImportParse{
-			ImportID:    im.ID,
 			Headers:     im.Meta["headers"],
 			PreviewRows: im.Meta["preview_rows"],
 			TotalRows:   im.TotalRows,
@@ -483,38 +481,20 @@ func NewWebAuthnCred(c auth.WebAuthnCred) WebAuthnCred {
 	return WebAuthnCred{ID: c.ID, Name: c.Name, AAGUID: c.AAGUID, LastUsedAt: c.LastUsedAt, CreatedAt: c.CreatedAt}
 }
 
-// Backup restore statuses.
-const (
-	BackupCurrent           = "current"           // same schema as this app
-	BackupOutdated          = "outdated"          // restore applies pending migrations
-	BackupNewer             = "newer"             // made by a newer app; not restorable
-	BackupLegacy            = "legacy"            // Laravel backup; restore converts it
-	BackupLegacyUnsupported = "legacyUnsupported" // Laravel backup too old to convert
-	BackupInvalid           = "invalid"           // not a readable database
-)
-
-// BackupRestorable reports whether restore accepts a backup with status.
-func BackupRestorable(status string) bool {
-	switch status {
-	case BackupCurrent, BackupOutdated, BackupLegacy:
-		return true
-	}
-	return false
-}
-
 type Backup struct {
 	Filename     string     `json:"filename"`
 	Size         int64      `json:"size"`
 	Note         *string    `json:"note"`
 	AppVersion   *string    `json:"appVersion"`
 	Status       string     `json:"status"`
+	Restorable   bool       `json:"restorable"`
 	PendingCount int        `json:"pendingCount"`
 	CreatedAt    *time.Time `json:"createdAt"`
 }
 
-func NewBackup(b domain.Backup, status string, pendingCount int) Backup {
+func NewBackup(b domain.Backup, status string, restorable bool, pendingCount int) Backup {
 	return Backup{
 		Filename: b.Filename, Size: b.Size, Note: b.Note, AppVersion: b.AppVersion,
-		Status: status, PendingCount: pendingCount, CreatedAt: utc(b.CreatedAt),
+		Status: status, Restorable: restorable, PendingCount: pendingCount, CreatedAt: utc(b.CreatedAt),
 	}
 }

@@ -97,8 +97,8 @@ func TestRestoreOldLaravelBackupKeepsLiveDB(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got := listedBackup(t, a, sess.Token, backup.Filename)["status"]; got != "legacyUnsupported" {
-		t.Fatalf("status %v, want legacyUnsupported", got)
+	if got := listedBackup(t, a, sess.Token, backup.Filename); got["status"] != "legacyUnsupported" || got["restorable"] != false {
+		t.Fatalf("listed %v, want legacyUnsupported and not restorable", got)
 	}
 
 	res := a.do("POST", "/api/backups/"+backup.Filename+"/restore", nil, sess.Token, sess.CSRF)
@@ -148,6 +148,9 @@ func TestBackupStatus(t *testing.T) {
 		b := listedBackup(t, a, sess.Token, name)
 		if b["status"] != want {
 			t.Errorf("%s status %v, want %s", name, b["status"], want)
+		}
+		if b["restorable"] != (want != "newer") {
+			t.Errorf("%s restorable %v", name, b["restorable"])
 		}
 		if wantPending := map[bool]float64{true: 1, false: 0}[want == "outdated"]; b["pendingCount"] != wantPending {
 			t.Errorf("%s pendingCount %v, want %v", name, b["pendingCount"], wantPending)

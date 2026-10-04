@@ -2,7 +2,6 @@ package legacy
 
 import (
 	"context"
-	"fmt"
 	"slices"
 
 	"savvy-go/internal/migrate"
@@ -18,43 +17,25 @@ type nameFixer struct {
 
 // newNameFixer returns nil for tables whose names need no fixing; a nil
 // fixer's fix is a no-op.
-func newNameFixer(ctx context.Context, src querier, table string, cols []string) (*nameFixer, error) {
-	scopeCol := ""
-	switch table {
-	case "categories":
-		scopeCol = "type"
-	case "tags":
-	default:
+func newNameFixer(ctx context.Context, src migrate.Querier, table string, cols []string) (*nameFixer, error) {
+	scopeCol, ok := migrate.NameScope(table)
+	if !ok {
 		return nil, nil
 	}
 	f := &nameFixer{name: slices.Index(cols, "name"), scope: -1}
 	if scopeCol != "" {
-		f.scope = slices.Index(cols, scopeCol)
+		if f.scope = slices.Index(cols, scopeCol); f.scope < 0 {
+			return nil, nil
+		}
 	}
-	if f.name < 0 || (scopeCol != "" && f.scope < 0) {
+	if f.name < 0 {
 		return nil, nil
 	}
-	scopeExpr := "''"
-	if scopeCol != "" {
-		scopeExpr = scopeCol
-	}
-	rows, err := src.QueryContext(ctx, fmt.Sprintf("SELECT %s, name FROM %s", scopeExpr, table))
+	d, err := migrate.LoadDeduper(ctx, src, table)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var keys []migrate.NameKey
-	for rows.Next() {
-		var k migrate.NameKey
-		if err := rows.Scan(&k.Scope, &k.Name); err != nil {
-			return nil, err
-		}
-		keys = append(keys, k)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	f.dedupe = migrate.NewDeduper(keys)
+	f.dedupe = d
 	return f, nil
 }
 

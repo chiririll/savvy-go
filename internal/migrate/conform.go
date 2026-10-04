@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"regexp"
+	"slices"
 	"strings"
 
 	_ "modernc.org/sqlite"
@@ -41,7 +42,7 @@ type tableDef struct {
 // is not converted yet (its money columns are still REAL), so run it after
 // the legacy conversion. A conforming database costs one metadata query.
 func Conform(ctx context.Context, db *sql.DB) error {
-	if tableExists(ctx, db, "migrations") {
+	if TableExists(ctx, db, "migrations") {
 		return nil
 	}
 	target, err := targetTables(ctx)
@@ -170,21 +171,18 @@ func rebuildTable(ctx context.Context, tx *sql.Tx, t tableDef) error {
 	if _, err := tx.ExecContext(ctx, ddl); err != nil {
 		return err
 	}
-	oldCols, err := tableColumns(ctx, tx, t.name)
+	oldCols, err := Columns(ctx, tx, t.name)
 	if err != nil {
 		return err
 	}
-	newCols, err := tableColumns(ctx, tx, staging)
+	newCols, err := Columns(ctx, tx, staging)
 	if err != nil {
 		return err
 	}
 	var common []string
 	for _, c := range newCols {
-		for _, o := range oldCols {
-			if c == o {
-				common = append(common, `"`+c+`"`)
-				break
-			}
+		if slices.Contains(oldCols, c) {
+			common = append(common, `"`+c+`"`)
 		}
 	}
 	list := strings.Join(common, ", ")
@@ -217,21 +215,4 @@ func rebuildTable(ctx context.Context, tx *sql.Tx, t tableDef) error {
 		}
 	}
 	return nil
-}
-
-func tableColumns(ctx context.Context, tx *sql.Tx, table string) ([]string, error) {
-	rows, err := tx.QueryContext(ctx, `SELECT name FROM pragma_table_info(?)`, table)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []string
-	for rows.Next() {
-		var name string
-		if err := rows.Scan(&name); err != nil {
-			return nil, err
-		}
-		out = append(out, name)
-	}
-	return out, rows.Err()
 }

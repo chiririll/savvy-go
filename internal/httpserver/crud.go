@@ -365,17 +365,7 @@ func (s *Server) accountsBalanceComparison(w http.ResponseWriter, r *http.Reques
 	if base != nil {
 		start, _ := s.queryPeriod(r)
 		if from, err := time.Parse("2006-01-02", start); err == nil {
-			cutoff := from.AddDate(0, 0, -1).Format("2006-01-02")
-			accts, _ := s.accounts.All(r.Context(), true, true)
-			total := decimal.Zero
-			for _, a := range accts {
-				if a.Currency == nil {
-					continue
-				}
-				bal, _ := s.accounts.BalanceAt(r.Context(), a, cutoff)
-				total = total.Add(domain.Convert(bal, *a.Currency, *base))
-			}
-			total = total.Round(int32(base.Decimals))
+			total := s.accounts.TotalAt(r.Context(), *base, from.AddDate(0, 0, -1).Format("2006-01-02"))
 			previous = &total
 		}
 	}

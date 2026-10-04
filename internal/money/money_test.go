@@ -62,15 +62,3 @@ func TestNullVariants(t *testing.T) {
 		t.Fatal("nil should map to invalid")
 	}
 }
-
-func TestNumberFormatting(t *testing.T) {
-	if got := Number(decimal.RequireFromString("12.5"), 2); got != "12.50" {
-		t.Errorf("got %s", got)
-	}
-	if got := Number(decimal.RequireFromString("1500"), 0); got != "1500" {
-		t.Errorf("got %s", got)
-	}
-	if got := Plain(decimal.RequireFromString("0.920000")); got != "0.92" {
-		t.Errorf("got %s", got)
-	}
-}

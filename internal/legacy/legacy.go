@@ -60,12 +60,12 @@ var copyTables = []string{
 
 // IsLaravel reports a Laravel-era database (migration tracker present).
 func IsLaravel(ctx context.Context, db *sql.DB) bool {
-	return tableExists(ctx, db, "migrations")
+	return migrate.TableExists(ctx, db, "migrations")
 }
 
 // AlreadyImported is true when this file was already upgraded or never Laravel.
 func AlreadyImported(ctx context.Context, db *sql.DB) bool {
-	if !tableExists(ctx, db, "settings") {
+	if !migrate.TableExists(ctx, db, "settings") {
 		return false
 	}
 	var v string
@@ -169,11 +169,11 @@ func Copy(ctx context.Context, dest, src *sql.DB) error {
 }
 
 func copyTable(ctx context.Context, dest, src *sql.DB, table string, sc *scales) (int, error) {
-	srcCols, err := columns(ctx, src, table)
+	srcCols, err := migrate.Columns(ctx, src, table)
 	if err != nil {
 		return 0, err
 	}
-	destCols, err := columns(ctx, dest, table)
+	destCols, err := migrate.Columns(ctx, dest, table)
 	if err != nil {
 		return 0, err
 	}
@@ -249,7 +249,7 @@ func copyTable(ctx context.Context, dest, src *sql.DB, table string, sc *scales)
 }
 
 func copySequences(ctx context.Context, dest, src *sql.DB) error {
-	if !tableExists(ctx, src, "sqlite_sequence") || !tableExists(ctx, dest, "sqlite_sequence") {
+	if !migrate.TableExists(ctx, src, "sqlite_sequence") || !migrate.TableExists(ctx, dest, "sqlite_sequence") {
 		return nil
 	}
 	rows, err := src.QueryContext(ctx, `SELECT name, seq FROM sqlite_sequence`)
@@ -263,7 +263,7 @@ func copySequences(ctx context.Context, dest, src *sql.DB) error {
 		if err := rows.Scan(&name, &seq); err != nil {
 			return err
 		}
-		if !tableExists(ctx, dest, name) {
+		if !migrate.TableExists(ctx, dest, name) {
 			continue
 		}
 		// sqlite_sequence has no UNIQUE(name), so ON CONFLICT upserts are rejected.
@@ -290,7 +290,7 @@ func stamp(ctx context.Context, db *sql.DB) error {
 }
 
 func ensureSettings(ctx context.Context, db *sql.DB) error {
-	if tableExists(ctx, db, "settings") {
+	if migrate.TableExists(ctx, db, "settings") {
 		return nil
 	}
 	_, err := db.ExecContext(ctx, `CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT)`)
@@ -303,31 +303,6 @@ func dropLaravelOnly(ctx context.Context, db *sql.DB) {
 			slog.Warn("could not drop laravel table", "table", table, "err", err)
 		}
 	}
-}
-
-func tableExists(ctx context.Context, db *sql.DB, name string) bool {
-	var found string
-	err := db.QueryRowContext(ctx,
-		`SELECT name FROM sqlite_master WHERE type='table' AND name=?`, name,
-	).Scan(&found)
-	return err == nil
-}
-
-func columns(ctx context.Context, q querier, table string) ([]string, error) {
-	rows, err := q.QueryContext(ctx, `SELECT name FROM pragma_table_info(?)`, table)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []string
-	for rows.Next() {
-		var name string
-		if err := rows.Scan(&name); err != nil {
-			return nil, err
-		}
-		out = append(out, name)
-	}
-	return out, rows.Err()
 }
 
 func intersect(a, b []string) []string {

@@ -92,9 +92,9 @@ func retypeDateColumns(ctx context.Context, db *sql.DB) error {
 }
 
 // eachDateColumn calls fn for every date column that exists in q's database.
-func eachDateColumn(ctx context.Context, q querier, fn func(table, col string) error) error {
+func eachDateColumn(ctx context.Context, q migrate.Querier, fn func(table, col string) error) error {
 	for table, cols := range dateColumns {
-		have, err := columns(ctx, q, table)
+		have, err := migrate.Columns(ctx, q, table)
 		if err != nil {
 			return err
 		}

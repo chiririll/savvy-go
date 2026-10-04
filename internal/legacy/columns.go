@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+
+	"savvy-go/internal/migrate"
 )
 
 type addColumn struct {
@@ -57,7 +59,7 @@ var extraColumns = map[string][]addColumn{
 // migrations create them.
 func ensureColumns(ctx context.Context, db *sql.DB) error {
 	for table, cols := range extraColumns {
-		have, err := columns(ctx, db, table)
+		have, err := migrate.Columns(ctx, db, table)
 		if err != nil {
 			return err
 		}

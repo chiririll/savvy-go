@@ -4,9 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
-
-	"savvy-go/internal/db"
 )
 
 // LatestMigration is the last Laravel migration the importer was written
@@ -32,14 +29,4 @@ func Inspect(ctx context.Context, db *sql.DB) Info {
 	var found int
 	err := db.QueryRowContext(ctx, `SELECT 1 FROM migrations WHERE migration = ? LIMIT 1`, LatestMigration).Scan(&found)
 	return Info{Laravel: true, Supported: err == nil}
-}
-
-// InspectFile is Inspect for a database file, opened read-only.
-func InspectFile(ctx context.Context, path string) (Info, error) {
-	src, err := db.OpenReadOnly(path)
-	if err != nil {
-		return Info{}, fmt.Errorf("open: %w", err)
-	}
-	defer src.Close()
-	return Inspect(ctx, src), nil
 }

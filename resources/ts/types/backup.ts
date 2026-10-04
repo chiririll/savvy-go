@@ -12,6 +12,8 @@ export interface Backup {
     note: string | null
     appVersion: string | null
     status: BackupStatus
+    /** Whether this app can restore it; decided by the server. */
+    restorable: boolean
     /** Migrations restore applies; non-zero only for 'outdated'. */
     pendingCount: number
     createdAt: string

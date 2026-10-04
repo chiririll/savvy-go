@@ -169,15 +169,11 @@ func (s Backups) Path(b Backup) string {
 	return filepath.Join(s.Dir, b.Filename)
 }
 
-// Migrations compares the Go schema migrations recorded in b with the ones
-// this app knows: pending ones restore will apply, unknown ones come from a
-// newer app. It fails for a file without a Go schema (not SQLite, or Laravel).
-func (s Backups) Migrations(ctx context.Context, b Backup) (pending, unknown []string, err error) {
-	src, err := db.OpenReadOnly(s.Path(b))
-	if err != nil {
-		return nil, nil, err
-	}
-	defer src.Close()
+// Migrations compares the Go schema migrations recorded in src, an opened
+// backup, with the ones this app knows: pending ones restore will apply,
+// unknown ones come from a newer app. It fails for a file without a Go schema
+// (not SQLite, or Laravel).
+func (s Backups) Migrations(ctx context.Context, src *sql.DB) (pending, unknown []string, err error) {
 	ran, err := sqlc.New(src).ListSchemaMigrations(ctx)
 	if err != nil {
 		return nil, nil, err
@@ -189,10 +185,9 @@ func (s Backups) Migrations(ctx context.Context, b Backup) (pending, unknown []s
 	return diffStrings(available, ran), diffStrings(ran, available), nil
 }
 
-// Restore replaces the live database with the given backup and returns a new
-// *sql.DB connected to the restored file. The caller must call Server.reconnect
-// with the returned DB so all domain objects switch to the new connection.
-// Restore replaces the live database with the backup. The backup is first
+// Restore replaces the live database with the backup and returns a new *sql.DB
+// connected to the restored file; the caller must call Server.reconnect with
+// it so all domain objects switch to the new connection. The backup is first
 // copied aside and brought up to date by prepare (schema migrations, legacy
 // upgrade); only if that succeeds is the live database closed and replaced, so
 // a bad or unsupported backup leaves the current database and connection
