@@ -30,7 +30,16 @@ func (s *Server) spa(w http.ResponseWriter, r *http.Request) {
 	if rel != "" && rel != "index.html" && !strings.Contains(rel, "..") {
 		full := filepath.Join(s.cfg.PublicDir, filepath.FromSlash(rel))
 		if info, err := os.Stat(full); err == nil && !info.IsDir() {
+			if strings.HasPrefix(rel, "build/assets/") {
+				w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+			}
 			http.ServeFile(w, r, full)
+			return
+		}
+		// A missing asset must 404: answering with index.html makes the
+		// browser reject a stale chunk with a MIME error instead of a clean miss.
+		if strings.HasPrefix(rel, "build/") || path.Ext(rel) != "" {
+			http.NotFound(w, r)
 			return
 		}
 	}
