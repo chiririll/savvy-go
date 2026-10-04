@@ -17,7 +17,7 @@ var files embed.FS
 const tableSQL = `CREATE TABLE IF NOT EXISTS schema_migrations (
     version TEXT PRIMARY KEY,
     applied_at TEXT NOT NULL
-)`
+) STRICT`
 
 // Up applies every pending SQL file in internal/migrate/sql.
 func Up(ctx context.Context, db *sql.DB) error {
