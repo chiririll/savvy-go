@@ -61,6 +61,14 @@ func (m Money) Sub(o Money) Money { m.mustMatch(o); m.minor -= o.minor; return m
 
 func (m Money) Neg() Money { m.minor = -m.minor; return m }
 
+// Abs is the amount without its sign.
+func (m Money) Abs() Money {
+	if m.minor < 0 {
+		m.minor = -m.minor
+	}
+	return m
+}
+
 func (m Money) IsZero() bool     { return m.minor == 0 }
 func (m Money) IsPositive() bool { return m.minor > 0 }
 func (m Money) IsNegative() bool { return m.minor < 0 }

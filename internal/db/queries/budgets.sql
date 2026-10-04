@@ -40,11 +40,11 @@ DELETE FROM budget_tag WHERE budget_id = ?;
 INSERT OR IGNORE INTO budget_tag (budget_id, tag_id) VALUES (?,?);
 
 -- name: GetGlobalMonthlyBudget :one
-SELECT b.amount, c.rate, c.is_base, c.decimals FROM budgets b
+SELECT b.amount, c.id AS currency_id, c.rate, c.is_base, c.decimals FROM budgets b
 JOIN currencies c ON c.id = b.currency_id
 WHERE b.is_active = 1 AND b.period = 'monthly' AND b.is_global = 1 LIMIT 1;
 
 -- name: ListMonthlyBudgets :many
-SELECT b.amount, c.rate, c.is_base, c.decimals FROM budgets b
+SELECT b.amount, c.id AS currency_id, c.rate, c.is_base, c.decimals FROM budgets b
 JOIN currencies c ON c.id = b.currency_id
 WHERE b.is_active = 1 AND b.period = 'monthly';

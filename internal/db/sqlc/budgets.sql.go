@@ -40,16 +40,17 @@ func (q *Queries) DeleteBudgetTags(ctx context.Context, budgetID int64) error {
 }
 
 const getGlobalMonthlyBudget = `-- name: GetGlobalMonthlyBudget :one
-SELECT b.amount, c.rate, c.is_base, c.decimals FROM budgets b
+SELECT b.amount, c.id AS currency_id, c.rate, c.is_base, c.decimals FROM budgets b
 JOIN currencies c ON c.id = b.currency_id
 WHERE b.is_active = 1 AND b.period = 'monthly' AND b.is_global = 1 LIMIT 1
 `
 
 type GetGlobalMonthlyBudgetRow struct {
-	Amount   int64
-	Rate     decimal.Decimal
-	IsBase   int64
-	Decimals int64
+	Amount     int64
+	CurrencyID int64
+	Rate       decimal.Decimal
+	IsBase     int64
+	Decimals   int64
 }
 
 func (q *Queries) GetGlobalMonthlyBudget(ctx context.Context) (GetGlobalMonthlyBudgetRow, error) {
@@ -57,6 +58,7 @@ func (q *Queries) GetGlobalMonthlyBudget(ctx context.Context) (GetGlobalMonthlyB
 	var i GetGlobalMonthlyBudgetRow
 	err := row.Scan(
 		&i.Amount,
+		&i.CurrencyID,
 		&i.Rate,
 		&i.IsBase,
 		&i.Decimals,
@@ -274,16 +276,17 @@ func (q *Queries) ListBudgets(ctx context.Context, id sql.NullInt64) ([]ListBudg
 }
 
 const listMonthlyBudgets = `-- name: ListMonthlyBudgets :many
-SELECT b.amount, c.rate, c.is_base, c.decimals FROM budgets b
+SELECT b.amount, c.id AS currency_id, c.rate, c.is_base, c.decimals FROM budgets b
 JOIN currencies c ON c.id = b.currency_id
 WHERE b.is_active = 1 AND b.period = 'monthly'
 `
 
 type ListMonthlyBudgetsRow struct {
-	Amount   int64
-	Rate     decimal.Decimal
-	IsBase   int64
-	Decimals int64
+	Amount     int64
+	CurrencyID int64
+	Rate       decimal.Decimal
+	IsBase     int64
+	Decimals   int64
 }
 
 func (q *Queries) ListMonthlyBudgets(ctx context.Context) ([]ListMonthlyBudgetsRow, error) {
@@ -297,6 +300,7 @@ func (q *Queries) ListMonthlyBudgets(ctx context.Context) ([]ListMonthlyBudgetsR
 		var i ListMonthlyBudgetsRow
 		if err := rows.Scan(
 			&i.Amount,
+			&i.CurrencyID,
 			&i.Rate,
 			&i.IsBase,
 			&i.Decimals,
