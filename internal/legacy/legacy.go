@@ -91,13 +91,14 @@ func Upgrade(ctx context.Context, db *sql.DB, appKey string) error {
 	if err := migrate.Up(ctx, db); err != nil {
 		return fmt.Errorf("migrate: %w", err)
 	}
-	if info.Laravel {
-		if err := upgradeInPlace(ctx, db, appKey); err != nil {
-			return fmt.Errorf("legacy import: %w", err)
-		}
+	if !info.Laravel {
+		return nil
 	}
-	// Old Go databases and converted Laravel ones keep their old table
-	// definitions; bring them up to the current constraints.
+	if err := upgradeInPlace(ctx, db, appKey); err != nil {
+		return fmt.Errorf("legacy import: %w", err)
+	}
+	// The conversion keeps the Laravel table definitions; rebuild them to the
+	// Go ones (STRICT, CHECK, NOCASE, no Laravel-only columns).
 	if err := migrate.Conform(ctx, db); err != nil {
 		return fmt.Errorf("conform schema: %w", err)
 	}

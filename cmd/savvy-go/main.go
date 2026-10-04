@@ -45,10 +45,6 @@ func main() {
 		slog.Error("migrate", "err", err)
 		os.Exit(1)
 	}
-	if err := migrate.Conform(ctx, sqlDB); err != nil {
-		slog.Error("conform schema", "err", err)
-		os.Exit(1)
-	}
 	if err := seed.Demo(ctx, sqlDB, cfg.SeedDemo, cfg.Location); err != nil {
 		slog.Error("seed demo", "err", err)
 		os.Exit(1)
