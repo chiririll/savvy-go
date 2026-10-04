@@ -109,8 +109,8 @@ func (s *Server) monitoringResources(w http.ResponseWriter, r *http.Request) {
 	var ms runtime.MemStats
 	runtime.ReadMemStats(&ms)
 	writeJSON(w, http.StatusOK, map[string]any{
-		"cpu":     cpuSnapshot(),
-		"memory":  memorySnapshot(),
+		"cpu":    cpuSnapshot(),
+		"memory": memorySnapshot(),
 		"process": map[string]any{
 			"memory_bytes": ms.Alloc, "peak_bytes": ms.Sys, "limit_bytes": nil,
 			"goroutines": runtime.NumGoroutine(), "gc_cycles": ms.NumGC,
