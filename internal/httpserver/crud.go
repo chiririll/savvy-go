@@ -3,6 +3,7 @@ package httpserver
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -30,16 +31,31 @@ func (s *Server) currenciesCatalog(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) currenciesStore(w http.ResponseWriter, r *http.Request) {
+	raw, _ := io.ReadAll(r.Body)
 	var body domain.Currency
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || strings.TrimSpace(body.Code) == "" {
+	var given struct {
+		Decimals *int `json:"decimals"`
+	}
+	if err := json.Unmarshal(raw, &body); err != nil || strings.TrimSpace(body.Code) == "" {
 		writeValidation(w, map[string][]string{"code": {"The code field is required."}})
 		return
 	}
-	if body.Decimals == 0 && body.Code != "JPY" {
+	_ = json.Unmarshal(raw, &given)
+	if given.Decimals == nil { // absent, not zero: zero decimals is a real choice
 		body.Decimals = 2
+		if strings.EqualFold(body.Code, "JPY") {
+			body.Decimals = 0
+		}
 	}
 	c, err := s.currencies.Create(r.Context(), body)
-	if err != nil {
+	switch {
+	case errors.Is(err, domain.ErrInvalidDecimals):
+		writeValidation(w, map[string][]string{"decimals": {err.Error()}})
+		return
+	case errors.Is(err, domain.ErrInvalidRate):
+		writeValidation(w, map[string][]string{"rate": {err.Error()}})
+		return
+	case err != nil:
 		writeValidation(w, map[string][]string{"code": {"The code has already been taken."}})
 		return
 	}
@@ -131,12 +147,20 @@ func (s *Server) currenciesConvert(w http.ResponseWriter, r *http.Request) {
 		writeValidation(w, map[string][]string{"from_currency_id": {"The selected currency is invalid."}})
 		return
 	}
-	amount := money.FromDecimal(body.Amount, from.Unit())
+	amount, err := money.FromInput(body.Amount, from.Unit())
+	var result money.Money
+	if err == nil {
+		result, err = domain.TryConvert(amount, *from, *to)
+	}
+	if err != nil {
+		writeValidation(w, map[string][]string{"amount": {"The amount is out of range."}})
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"amount": amount,
 		"from":   dto.NewCurrency(*from),
 		"to":     dto.NewCurrency(*to),
-		"result": domain.Convert(amount, *from, *to),
+		"result": result,
 	})
 }
 

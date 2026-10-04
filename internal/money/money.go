@@ -9,10 +9,22 @@ package money
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
+	"math"
 
 	"github.com/shopspring/decimal"
 )
+
+// MaxMinor bounds the amounts users may enter, in minor units of any currency.
+// It keeps sums over many rows far from int64 overflow (which SQLite SUM
+// reports as an error that would zero a balance) and below 2^53, so the number
+// a client receives is still an exact integer for JavaScript.
+const MaxMinor int64 = 1_000_000_000_000_000
+
+// ErrOutOfRange is returned for an input amount beyond MaxMinor, and is the
+// value of the panic when arithmetic leaves int64.
+var ErrOutOfRange = errors.New("amount is out of range")
 
 // RateDivPrecision is the number of fraction digits kept when dividing an
 // amount by a currency rate.
@@ -40,8 +52,36 @@ func New(minor int64, unit Unit) Money { return Money{minor: minor, unit: unit} 
 func Zero(unit Unit) Money { return Money{unit: unit} }
 
 // FromDecimal rounds d (major units) half away from zero to the unit's scale.
+// It is for values the program computed: one that does not fit int64 panics
+// with ErrOutOfRange instead of wrapping around. Use FromInput for user input.
 func FromDecimal(d decimal.Decimal, unit Unit) Money {
-	return Money{minor: d.Round(int32(unit.Decimals)).Shift(int32(unit.Decimals)).IntPart(), unit: unit}
+	scaled := d.Round(int32(unit.Decimals)).Shift(int32(unit.Decimals)).BigInt()
+	if !scaled.IsInt64() {
+		panic(ErrOutOfRange)
+	}
+	return Money{minor: scaled.Int64(), unit: unit}
+}
+
+// FromInput is FromDecimal for an amount a user entered: beyond MaxMinor in
+// either direction it is an ErrOutOfRange error, not a stored value.
+func FromInput(d decimal.Decimal, unit Unit) (Money, error) {
+	scaled := d.Round(int32(unit.Decimals)).Shift(int32(unit.Decimals)).BigInt()
+	if !scaled.IsInt64() || scaled.Int64() > MaxMinor || scaled.Int64() < -MaxMinor {
+		return Money{}, ErrOutOfRange
+	}
+	return Money{minor: scaled.Int64(), unit: unit}, nil
+}
+
+// FromNullInput is FromInput for an optional amount; nil stays nil.
+func FromNullInput(d *decimal.Decimal, unit Unit) (*Money, error) {
+	if d == nil {
+		return nil, nil
+	}
+	m, err := FromInput(*d, unit)
+	if err != nil {
+		return nil, err
+	}
+	return &m, nil
 }
 
 // Minor is the stored integer.
@@ -54,17 +94,41 @@ func (m Money) Unit() Unit { return m.unit }
 // leaves the currency (rates, quantities) and convert back with FromDecimal.
 func (m Money) Decimal() decimal.Decimal { return decimal.New(m.minor, -int32(m.unit.Decimals)) }
 
-// Add and Sub panic when the units differ: mixing currencies is a bug in the
-// caller, and converting is an explicit step that needs a rate.
-func (m Money) Add(o Money) Money { m.mustMatch(o); m.minor += o.minor; return m }
-func (m Money) Sub(o Money) Money { m.mustMatch(o); m.minor -= o.minor; return m }
+// Add and Sub panic when the units differ (mixing currencies is a bug in the
+// caller, and converting is an explicit step that needs a rate) and with
+// ErrOutOfRange when the result leaves int64.
+func (m Money) Add(o Money) Money {
+	m.mustMatch(o)
+	sum := m.minor + o.minor
+	if (m.minor^sum)&(o.minor^sum) < 0 {
+		panic(ErrOutOfRange)
+	}
+	m.minor = sum
+	return m
+}
 
-func (m Money) Neg() Money { m.minor = -m.minor; return m }
+func (m Money) Sub(o Money) Money {
+	m.mustMatch(o)
+	diff := m.minor - o.minor
+	if (m.minor^o.minor)&(m.minor^diff) < 0 {
+		panic(ErrOutOfRange)
+	}
+	m.minor = diff
+	return m
+}
+
+func (m Money) Neg() Money {
+	if m.minor == math.MinInt64 {
+		panic(ErrOutOfRange)
+	}
+	m.minor = -m.minor
+	return m
+}
 
 // Abs is the amount without its sign.
 func (m Money) Abs() Money {
 	if m.minor < 0 {
-		m.minor = -m.minor
+		return m.Neg()
 	}
 	return m
 }

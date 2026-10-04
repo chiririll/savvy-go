@@ -184,10 +184,17 @@ func (s Imports) Execute(ctx context.Context, importID string, mapping, options 
 			}
 			continue
 		}
+		amount, err := money.FromInput(res.amount, unit)
+		if err != nil {
+			if len(errs) < 200 {
+				errs = append(errs, map[string]any{"row": i + 1, "message": err.Error()})
+			}
+			continue
+		}
 		hash := dedupHash(res.date, res.amount, res.desc)
 		st := "confirmed"
 		ins, err := db.Q(s.DB).InsertTransactionIgnoreDup(ctx, sqlc.InsertTransactionIgnoreDupParams{
-			Type: res.typ, AccountID: accountID, CategoryID: resolver.resolve(res.category), Amount: money.FromDecimal(res.amount, unit).Minor(), Description: db.NS(res.desc),
+			Type: res.typ, AccountID: accountID, CategoryID: resolver.resolve(res.category), Amount: amount.Minor(), Description: db.NS(res.desc),
 			Date: db.NS(res.date), Status: st, DedupHash: db.NS(hash), CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
 		})
 		if err != nil {

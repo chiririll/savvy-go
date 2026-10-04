@@ -110,11 +110,15 @@ func (s Accounts) Create(ctx context.Context, a AccountInput) (*Account, error) 
 	if err != nil {
 		return nil, err
 	}
+	initial, target, err := accountAmounts(a, unit)
+	if err != nil {
+		return nil, err
+	}
 	last, _ := db.Q(s.DB).MaxAccountSortOrder(ctx, db.Flag(a.Type == "debt"))
 	res, err := db.Q(s.DB).InsertAccount(ctx, sqlc.InsertAccountParams{
 		Name: a.Name, Type: a.Type, DebtType: db.NullString(a.DebtType), CurrencyID: a.CurrencyID,
-		InitialBalance: money.FromDecimal(a.InitialBalance, unit).Minor(),
-		TargetAmount:   money.ToNullMinor(money.FromNullDecimal(a.TargetAmount, unit)), DueDate: db.NullString(a.DueDate),
+		InitialBalance: initial.Minor(),
+		TargetAmount:   money.ToNullMinor(target), DueDate: db.NullString(a.DueDate),
 		IsPaidOff: db.BoolInt(a.IsPaidOff), Counterparty: db.NullString(a.Counterparty), DebtDescription: db.NullString(a.DebtDesc),
 		IsActive: db.BoolInt(a.IsActive), SortOrder: int64(asFloat64(last)) + 1, CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
 	})
@@ -133,12 +137,15 @@ func (s Accounts) Update(ctx context.Context, id int64, a AccountInput) (*Accoun
 	if a.CurrencyID != cur.CurrencyID {
 		return nil, ErrAccountCurrencyImmutable
 	}
-	unit := cur.Currency.Unit()
+	initial, target, err := accountAmounts(a, cur.Currency.Unit())
+	if err != nil {
+		return nil, err
+	}
 	now := time.Now().UTC().Format(time.RFC3339)
 	err = db.Q(s.DB).UpdateAccount(ctx, sqlc.UpdateAccountParams{
-		Name: a.Name, Type: a.Type, CurrencyID: cur.CurrencyID, InitialBalance: money.FromDecimal(a.InitialBalance, unit).Minor(),
+		Name: a.Name, Type: a.Type, CurrencyID: cur.CurrencyID, InitialBalance: initial.Minor(),
 		IsActive: db.BoolInt(a.IsActive), DebtType: db.NullString(a.DebtType),
-		TargetAmount: money.ToNullMinor(money.FromNullDecimal(a.TargetAmount, unit)),
+		TargetAmount: money.ToNullMinor(target),
 		DueDate:      db.NullString(a.DueDate), IsPaidOff: db.BoolInt(a.IsPaidOff), Counterparty: db.NullString(a.Counterparty),
 		DebtDescription: db.NullString(a.DebtDesc), UpdatedAt: db.NS(now), ID: id,
 	})
@@ -146,6 +153,16 @@ func (s Accounts) Update(ctx context.Context, id int64, a AccountInput) (*Accoun
 		return nil, err
 	}
 	return s.ByID(ctx, id)
+}
+
+// accountAmounts checks the amounts entered for an account against the range
+// and rounds them into the account currency.
+func accountAmounts(a AccountInput, unit money.Unit) (initial money.Money, target *money.Money, err error) {
+	if initial, err = money.FromInput(a.InitialBalance, unit); err != nil {
+		return money.Money{}, nil, err
+	}
+	target, err = money.FromNullInput(a.TargetAmount, unit)
+	return initial, target, err
 }
 
 func (s Accounts) Delete(ctx context.Context, id int64) error {

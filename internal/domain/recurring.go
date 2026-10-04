@@ -93,10 +93,14 @@ func (s RecurringStore) Create(ctx context.Context, in RecurringInput) (*Recurri
 	if err != nil {
 		return nil, err
 	}
+	amount, toAmount, err := recurringAmounts(in, unit, toUnit)
+	if err != nil {
+		return nil, err
+	}
 	res, err := db.Q(s.DB).InsertRecurring(ctx, sqlc.InsertRecurringParams{
 		Type: in.Type, AccountID: in.AccountID, ToAccountID: db.NullInt64(in.ToAccountID),
-		CategoryID: db.NullInt64(in.CategoryID), Amount: money.FromDecimal(in.Amount, unit).Minor(),
-		ToAmount:    money.ToNullMinor(money.FromNullDecimal(in.ToAmount, toUnit)),
+		CategoryID: db.NullInt64(in.CategoryID), Amount: amount.Minor(),
+		ToAmount:    money.ToNullMinor(toAmount),
 		Description: db.NullString(in.Description), Frequency: in.Frequency, Interval: int64(in.Interval),
 		DayOfWeek: db.NullInt(in.DayOfWeek), DayOfMonth: db.NullInt(in.DayOfMonth),
 		StartDate: in.StartDate, EndDate: db.NullString(in.EndDate), NextRunDate: in.StartDate,
@@ -157,10 +161,14 @@ func (s RecurringStore) Update(ctx context.Context, id int64, in RecurringInput)
 	if err != nil {
 		return nil, err
 	}
+	amount, toAmount, err := recurringAmounts(in, unit, toUnit)
+	if err != nil {
+		return nil, err
+	}
 	err = db.Q(s.DB).UpdateRecurring(ctx, sqlc.UpdateRecurringParams{
 		Type: in.Type, AccountID: in.AccountID, ToAccountID: db.NullInt64(in.ToAccountID),
-		CategoryID: db.NullInt64(in.CategoryID), Amount: money.FromDecimal(in.Amount, unit).Minor(),
-		ToAmount:    money.ToNullMinor(money.FromNullDecimal(in.ToAmount, toUnit)),
+		CategoryID: db.NullInt64(in.CategoryID), Amount: amount.Minor(),
+		ToAmount:    money.ToNullMinor(toAmount),
 		Description: db.NullString(in.Description), Frequency: in.Frequency, Interval: int64(in.Interval),
 		DayOfWeek: db.NullInt(in.DayOfWeek), DayOfMonth: db.NullInt(in.DayOfMonth),
 		StartDate: in.StartDate, EndDate: db.NullString(in.EndDate), NextRunDate: next,
@@ -244,6 +252,16 @@ func (s RecurringStore) EnsureUpcoming(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// recurringAmounts checks the amounts entered for a recurrence against the
+// range and rounds them into the currencies of its accounts.
+func recurringAmounts(in RecurringInput, unit, toUnit money.Unit) (amount money.Money, toAmount *money.Money, err error) {
+	if amount, err = money.FromInput(in.Amount, unit); err != nil {
+		return money.Money{}, nil, err
+	}
+	toAmount, err = money.FromNullInput(in.ToAmount, toUnit)
+	return amount, toAmount, err
 }
 
 func (s RecurringStore) createPending(ctx context.Context, rec *Recurring) (*Transaction, error) {

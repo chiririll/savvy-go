@@ -103,6 +103,10 @@ func (s Transactions) Create(ctx context.Context, in TxInput) (*Transaction, err
 	if err != nil {
 		return nil, err
 	}
+	items, err := itemRows(in.Items, amount.Unit())
+	if err != nil {
+		return nil, err
+	}
 	res, err := db.Q(s.DB).InsertTransaction(ctx, sqlc.InsertTransactionParams{
 		Type: in.Type, AccountID: in.AccountID, ToAccountID: db.NullInt64(in.ToAccountID),
 		CategoryID: db.NullInt64(in.CategoryID), Amount: amount.Minor(), ToAmount: money.ToNullMinor(toAmount),
@@ -114,7 +118,7 @@ func (s Transactions) Create(ctx context.Context, in TxInput) (*Transaction, err
 		return nil, err
 	}
 	id, _ := res.LastInsertId()
-	if err := s.saveItems(ctx, id, in.Items, amount.Unit()); err != nil {
+	if err := s.saveItems(ctx, id, items); err != nil {
 		return nil, err
 	}
 	if err := s.saveTags(ctx, id, in.TagIDs); err != nil {
@@ -136,6 +140,10 @@ func (s Transactions) Update(ctx context.Context, id int64, in TxInput) (*Transa
 	if err != nil {
 		return nil, err
 	}
+	items, err := itemRows(in.Items, amount.Unit())
+	if err != nil {
+		return nil, err
+	}
 	err = db.Q(s.DB).UpdateTransaction(ctx, sqlc.UpdateTransactionParams{
 		Type: in.Type, AccountID: in.AccountID, ToAccountID: db.NullInt64(in.ToAccountID),
 		CategoryID: db.NullInt64(in.CategoryID), Amount: amount.Minor(), ToAmount: money.ToNullMinor(toAmount),
@@ -147,7 +155,7 @@ func (s Transactions) Update(ctx context.Context, id int64, in TxInput) (*Transa
 	}
 	if in.Items != nil {
 		_ = db.Q(s.DB).DeleteTransactionItems(ctx, id)
-		if err := s.saveItems(ctx, id, in.Items, amount.Unit()); err != nil {
+		if err := s.saveItems(ctx, id, items); err != nil {
 			return nil, err
 		}
 	}
@@ -371,16 +379,41 @@ func (s Transactions) tags(ctx context.Context, id int64) ([]Tag, error) {
 	return out, nil
 }
 
-func (s Transactions) saveItems(ctx context.Context, txID int64, items []TxItemInput, unit money.Unit) error {
-	now := time.Now().UTC().Format(time.RFC3339)
+// itemRow is a transaction line ready to store.
+type itemRow struct {
+	name        string
+	quantity    decimal.Decimal
+	price, line money.Money
+}
+
+// itemRows checks the lines entered for a transaction against the range and
+// rounds them into unit, so nothing is written for a transaction with a bad
+// line. A line without a total costs quantity times price.
+func itemRows(items []TxItemInput, unit money.Unit) ([]itemRow, error) {
+	rows := make([]itemRow, 0, len(items))
 	for _, it := range items {
 		if it.TotalPrice.IsZero() {
 			it.TotalPrice = it.Quantity.Mul(it.PricePerUnit)
 		}
+		price, err := money.FromInput(it.PricePerUnit, unit)
+		if err != nil {
+			return nil, err
+		}
+		line, err := money.FromInput(it.TotalPrice, unit)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, itemRow{name: it.Name, quantity: it.Quantity, price: price, line: line})
+	}
+	return rows, nil
+}
+
+func (s Transactions) saveItems(ctx context.Context, txID int64, rows []itemRow) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+	for _, it := range rows {
 		if err := db.Q(s.DB).InsertTransactionItem(ctx, sqlc.InsertTransactionItemParams{
-			TransactionID: txID, Name: it.Name, Quantity: it.Quantity,
-			PricePerUnit: money.FromDecimal(it.PricePerUnit, unit).Minor(),
-			TotalPrice:   money.FromDecimal(it.TotalPrice, unit).Minor(), CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
+			TransactionID: txID, Name: it.name, Quantity: it.quantity,
+			PricePerUnit: it.price.Minor(), TotalPrice: it.line.Minor(), CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
 		}); err != nil {
 			return err
 		}
@@ -425,8 +458,12 @@ func (s Transactions) amounts(ctx context.Context, in TxInput) (amount money.Mon
 	if err != nil {
 		return money.Money{}, nil, err
 	}
-	amount = money.FromDecimal(in.Amount, unit)
-	toAmount = money.FromNullDecimal(in.ToAmount, toUnit)
+	if amount, err = money.FromInput(in.Amount, unit); err != nil {
+		return money.Money{}, nil, err
+	}
+	if toAmount, err = money.FromNullInput(in.ToAmount, toUnit); err != nil {
+		return money.Money{}, nil, err
+	}
 	if toAmount != nil || in.Type != "transfer" || in.ToAccountID == nil {
 		return amount, toAmount, nil
 	}
@@ -442,7 +479,10 @@ func (s Transactions) amounts(ctx context.Context, in TxInput) (amount money.Mon
 	if err != nil || to == nil {
 		return money.Money{}, nil, ErrUnknownAccount
 	}
-	converted := Convert(amount, *from.Currency, *to.Currency)
+	converted, err := TryConvert(amount, *from.Currency, *to.Currency)
+	if err != nil {
+		return money.Money{}, nil, err
+	}
 	return amount, &converted, nil
 }
 

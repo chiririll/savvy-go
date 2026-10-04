@@ -87,8 +87,12 @@ func (s Budgets) Create(ctx context.Context, in BudgetInput) (*Budget, error) {
 	if err != nil {
 		return nil, err
 	}
+	amount, err := money.FromInput(in.Amount, unit)
+	if err != nil {
+		return nil, err
+	}
 	res, err := db.Q(s.DB).InsertBudget(ctx, sqlc.InsertBudgetParams{
-		Name: in.Name, Amount: money.FromDecimal(in.Amount, unit).Minor(), CurrencyID: unit.ID, Period: in.Period,
+		Name: in.Name, Amount: amount.Minor(), CurrencyID: unit.ID, Period: in.Period,
 		StartDate: db.NullString(in.StartDate), EndDate: db.NullString(in.EndDate),
 		IsGlobal: db.BoolInt(global), NotifyAtPercent: db.NullInt(in.NotifyAtPercent),
 		IsActive: db.BoolInt(active), CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
@@ -146,8 +150,12 @@ func (s Budgets) Update(ctx context.Context, id int64, in BudgetInput) (*Budget,
 	if err != nil {
 		return nil, err
 	}
+	amount, err := money.FromInput(in.Amount, unit)
+	if err != nil {
+		return nil, err
+	}
 	err = db.Q(s.DB).UpdateBudget(ctx, sqlc.UpdateBudgetParams{
-		Name: in.Name, Amount: money.FromDecimal(in.Amount, unit).Minor(), CurrencyID: unit.ID, Period: in.Period,
+		Name: in.Name, Amount: amount.Minor(), CurrencyID: unit.ID, Period: in.Period,
 		StartDate: db.NullString(in.StartDate), EndDate: db.NullString(in.EndDate),
 		IsGlobal: db.BoolInt(global), NotifyAtPercent: db.NullInt(notify),
 		IsActive: db.BoolInt(active), UpdatedAt: db.NS(now), ID: id,
