@@ -62,11 +62,12 @@ VALUES (?,?,?,?,?,?,?);
 DELETE FROM transaction_tag WHERE transaction_id = ?;
 
 -- name: InsertTransactionTag :exec
-INSERT OR IGNORE INTO transaction_tag (transaction_id, tag_id) VALUES (?,?);
+INSERT INTO transaction_tag (transaction_id, tag_id) VALUES (?,?) ON CONFLICT DO NOTHING;
 
 -- name: InsertTransactionIgnoreDup :execresult
-INSERT OR IGNORE INTO transactions (type, account_id, category_id, amount, description, date, status, dedup_hash, created_at, updated_at)
-VALUES (?,?,?,?,?,?,?,?,?,?);
+INSERT INTO transactions (type, account_id, category_id, amount, description, date, status, dedup_hash, created_at, updated_at)
+VALUES (?,?,?,?,?,?,?,?,?,?)
+ON CONFLICT DO NOTHING;
 
 -- name: UpdateTransactionCategory :exec
 UPDATE transactions SET category_id=?, updated_at=? WHERE id=?;

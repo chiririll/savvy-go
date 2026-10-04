@@ -3,7 +3,6 @@ package domain
 import (
 	"context"
 	"crypto/rand"
-	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -16,6 +15,7 @@ import (
 	"savvy-go/internal/db"
 	"savvy-go/internal/db/sqlc"
 	"savvy-go/internal/settings"
+	"savvy-go/internal/store"
 )
 
 type SSOError struct {
@@ -118,7 +118,7 @@ type NormalizedIdentity struct {
 }
 
 type SSO struct {
-	DB       *sql.DB
+	DB       store.DB
 	Users    auth.Users
 	Settings settings.Store
 	AppURL   string

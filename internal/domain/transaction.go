@@ -13,6 +13,7 @@ import (
 	"savvy-go/internal/db/filter"
 	"savvy-go/internal/db/sqlc"
 	"savvy-go/internal/money"
+	"savvy-go/internal/store"
 )
 
 // appLocation is the timezone used for calendar-day concepts across this
@@ -84,7 +85,7 @@ type TxInput struct {
 	Items       []TxItemInput
 }
 
-type Transactions struct{ DB *sql.DB }
+type Transactions struct{ DB store.DB }
 
 func (s Transactions) Create(ctx context.Context, in TxInput) (*Transaction, error) {
 	status := "confirmed"

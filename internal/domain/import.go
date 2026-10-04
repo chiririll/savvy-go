@@ -17,10 +17,11 @@ import (
 	"savvy-go/internal/db"
 	"savvy-go/internal/db/sqlc"
 	"savvy-go/internal/money"
+	"savvy-go/internal/store"
 )
 
 type Imports struct {
-	DB      *sql.DB
+	DB      store.DB
 	Uploads Uploads
 	Txs     Transactions
 }

@@ -13,13 +13,18 @@ import (
 )
 
 // Open creates the parent directory, opens SQLite with WAL and a single
-// connection (one writer), and applies the usual pragmas.
-func Open(path string) (*sql.DB, error) {
+// connection (one writer), and applies the usual pragmas. Extra pragmas
+// (e.g. "max_page_count(2560)") go into the DSN, so every connection the pool
+// opens gets them, not only the first.
+func Open(path string, pragmas ...string) (*sql.DB, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o775); err != nil {
 		return nil, fmt.Errorf("create data dir: %w", err)
 	}
 
 	dsn := sqliteDSN(path)
+	for _, p := range pragmas {
+		dsn += "&_pragma=" + p
+	}
 	sqlDB, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)

@@ -13,6 +13,7 @@ import (
 	"savvy-go/internal/db/filter"
 	"savvy-go/internal/db/sqlc"
 	"savvy-go/internal/money"
+	"savvy-go/internal/store"
 )
 
 // BudgetProgress is how much of a budget is used; the amounts are in the
@@ -59,7 +60,7 @@ type BudgetInput struct {
 	HasTagIDs       bool
 }
 
-type Budgets struct{ DB *sql.DB }
+type Budgets struct{ DB store.DB }
 
 func (s Budgets) All(ctx context.Context) ([]Budget, error) {
 	return s.list(ctx, sql.NullInt64{})

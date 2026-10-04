@@ -27,7 +27,7 @@ SELECT id FROM transactions WHERE recurring_transaction_id = ? AND status = 'pen
 DELETE FROM recurring_transaction_tag WHERE recurring_transaction_id = ?;
 
 -- name: InsertRecurringTag :exec
-INSERT OR IGNORE INTO recurring_transaction_tag (recurring_transaction_id, tag_id) VALUES (?,?);
+INSERT INTO recurring_transaction_tag (recurring_transaction_id, tag_id) VALUES (?,?) ON CONFLICT DO NOTHING;
 
 -- name: GetRecurring :one
 -- The same columns as ListRecurring, so its row converts to ListRecurringRow.

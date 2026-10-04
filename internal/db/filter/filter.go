@@ -12,6 +12,7 @@ import (
 
 	"savvy-go/internal/db/sqlc"
 	"savvy-go/internal/money"
+	"savvy-go/internal/store"
 )
 
 // The aggregates below fold amounts of several currencies into one currency.
@@ -103,14 +104,14 @@ func txOrderBy(sortBy, sortDir string) string {
 	}
 }
 
-func CountTransactions(ctx context.Context, sqlDB *sql.DB, f TxFilter) (int64, error) {
+func CountTransactions(ctx context.Context, sqlDB store.DB, f TxFilter) (int64, error) {
 	where, args := txWhere(f)
 	var n int64
 	err := sqlDB.QueryRowContext(ctx, `SELECT COUNT(*) FROM transactions t `+where, args...).Scan(&n)
 	return n, err
 }
 
-func ListTransactions(ctx context.Context, sqlDB *sql.DB, f TxFilter, limit, offset int) ([]sqlc.GetTransactionRow, error) {
+func ListTransactions(ctx context.Context, sqlDB store.DB, f TxFilter, limit, offset int) ([]sqlc.GetTransactionRow, error) {
 	where, args := txWhere(f)
 	args = append(args, limit, offset)
 	rows, err := sqlDB.QueryContext(ctx, `
@@ -203,7 +204,7 @@ func PeriodExpr(groupBy string) string {
 }
 
 // SumByType is the total of the matching transactions in the base currency.
-func SumByType(ctx context.Context, sqlDB *sql.DB, w ReportWhere, base money.Unit) money.Money {
+func SumByType(ctx context.Context, sqlDB store.DB, w ReportWhere, base money.Unit) money.Money {
 	where, args := Clause(w)
 	total := decimal.Zero
 	rows, err := sqlDB.QueryContext(ctx, `
@@ -237,7 +238,7 @@ type CatTotal struct {
 
 // SumGroupedByCategory is the total per category in the base currency, largest
 // first.
-func SumGroupedByCategory(ctx context.Context, sqlDB *sql.DB, w ReportWhere, base money.Unit) []CatTotal {
+func SumGroupedByCategory(ctx context.Context, sqlDB store.DB, w ReportWhere, base money.Unit) []CatTotal {
 	where, args := Clause(w)
 	where += ` AND t.category_id IS NOT NULL`
 	rows, err := sqlDB.QueryContext(ctx, `
@@ -283,7 +284,7 @@ type DayTotal struct {
 
 // DailyTotals is the total and the number of transactions per day in the base
 // currency.
-func DailyTotals(ctx context.Context, sqlDB *sql.DB, w ReportWhere, base money.Unit) []DayTotal {
+func DailyTotals(ctx context.Context, sqlDB store.DB, w ReportWhere, base money.Unit) []DayTotal {
 	where, args := Clause(w)
 	rows, err := sqlDB.QueryContext(ctx, `
 		SELECT DATE(t.date), SUM(t.amount), COUNT(*), c.decimals, c.rate
@@ -328,7 +329,7 @@ type PeriodTotal struct {
 
 // GroupedByPeriod is the total per period (see PeriodExpr) in the base
 // currency.
-func GroupedByPeriod(ctx context.Context, sqlDB *sql.DB, w ReportWhere, groupBy string, base money.Unit) []PeriodTotal {
+func GroupedByPeriod(ctx context.Context, sqlDB store.DB, w ReportWhere, groupBy string, base money.Unit) []PeriodTotal {
 	where, args := Clause(w)
 	rows, err := sqlDB.QueryContext(ctx, `
 		SELECT `+PeriodExpr(groupBy)+` as period_date, SUM(t.amount), c.decimals, c.rate
@@ -377,7 +378,7 @@ type TopRow struct {
 }
 
 // TopTransactions are the largest transactions by value in the base currency.
-func TopTransactions(ctx context.Context, sqlDB *sql.DB, w ReportWhere, limit int, base money.Unit) []TopRow {
+func TopTransactions(ctx context.Context, sqlDB store.DB, w ReportWhere, limit int, base money.Unit) []TopRow {
 	where, args := Clause(w)
 	args = append(args, limit)
 	rows, err := sqlDB.QueryContext(ctx, `
@@ -414,7 +415,7 @@ type BudgetAmount struct {
 	IsBase bool
 }
 
-func ScopedMonthlyBudgets(ctx context.Context, sqlDB *sql.DB, categoryIDs, tagIDs []int64) []BudgetAmount {
+func ScopedMonthlyBudgets(ctx context.Context, sqlDB store.DB, categoryIDs, tagIDs []int64) []BudgetAmount {
 	q := `SELECT b.amount, c.rate, c.is_base, c.id, c.decimals FROM budgets b
 		JOIN currencies c ON c.id = b.currency_id
 		WHERE b.is_active = 1 AND b.period = 'monthly' AND b.is_global = 0 AND (`
@@ -436,7 +437,7 @@ func ScopedMonthlyBudgets(ctx context.Context, sqlDB *sql.DB, categoryIDs, tagID
 	return scanBudgetAmounts(ctx, sqlDB, q, args)
 }
 
-func scanBudgetAmounts(ctx context.Context, sqlDB *sql.DB, q string, args []any) []BudgetAmount {
+func scanBudgetAmounts(ctx context.Context, sqlDB store.DB, q string, args []any) []BudgetAmount {
 	rows, err := sqlDB.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil
@@ -459,7 +460,7 @@ func scanBudgetAmounts(ctx context.Context, sqlDB *sql.DB, q string, args []any)
 // category/tag IN lists, expressed in the currency `in` whose rate to the base
 // currency is inRate (1 when it is the base). Variable-length IN cannot be a
 // single sqlc query.
-func BudgetSpent(ctx context.Context, sqlDB *sql.DB, start, end string, categoryIDs, tagIDs []int64, in money.Unit, inRate decimal.Decimal) (money.Money, error) {
+func BudgetSpent(ctx context.Context, sqlDB store.DB, start, end string, categoryIDs, tagIDs []int64, in money.Unit, inRate decimal.Decimal) (money.Money, error) {
 	zero := money.Zero(in)
 	q := `
 		SELECT COALESCE(SUM(t.amount), 0), c.decimals, c.rate

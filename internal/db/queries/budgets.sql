@@ -31,13 +31,13 @@ JOIN budget_tag bt ON bt.tag_id = tags.id WHERE bt.budget_id = ?;
 DELETE FROM budget_category WHERE budget_id = ?;
 
 -- name: InsertBudgetCategory :exec
-INSERT OR IGNORE INTO budget_category (budget_id, category_id) VALUES (?,?);
+INSERT INTO budget_category (budget_id, category_id) VALUES (?,?) ON CONFLICT DO NOTHING;
 
 -- name: DeleteBudgetTags :exec
 DELETE FROM budget_tag WHERE budget_id = ?;
 
 -- name: InsertBudgetTag :exec
-INSERT OR IGNORE INTO budget_tag (budget_id, tag_id) VALUES (?,?);
+INSERT INTO budget_tag (budget_id, tag_id) VALUES (?,?) ON CONFLICT DO NOTHING;
 
 -- name: GetGlobalMonthlyBudget :one
 SELECT b.amount, c.id AS currency_id, c.rate, c.is_base, c.decimals FROM budgets b

@@ -11,6 +11,7 @@ import (
 	"savvy-go/internal/db"
 	"savvy-go/internal/db/sqlc"
 	"savvy-go/internal/money"
+	"savvy-go/internal/store"
 )
 
 type Category struct {
@@ -24,7 +25,7 @@ type Category struct {
 	TotalAmount       *money.Money
 }
 
-type Categories struct{ DB *sql.DB }
+type Categories struct{ DB store.DB }
 
 func (s Categories) All(ctx context.Context, typ string) ([]Category, error) {
 	rows, err := db.Q(s.DB).ListCategories(ctx, db.Narg(typ))
@@ -114,21 +115,15 @@ func (s Categories) Delete(ctx context.Context, id int64, successorID *int64) er
 		if successor == nil || successor.Type != c.Type || successor.ID == c.ID {
 			return fmt.Errorf("invalid successor")
 		}
-		tx, err := s.DB.BeginTx(ctx, nil)
-		if err != nil {
-			return err
-		}
-		defer func() { _ = tx.Rollback() }()
-		q := db.Q(s.DB).WithTx(tx)
-		if err := q.ReassignCategoryTransactions(ctx, sqlc.ReassignCategoryTransactionsParams{
-			CategoryID: db.NI(*successorID), CategoryID_2: db.NI(id),
-		}); err != nil {
-			return err
-		}
-		if err := q.DeleteCategory(ctx, id); err != nil {
-			return err
-		}
-		return tx.Commit()
+		return store.Tx(ctx, s.DB, func(tx store.DB) error {
+			q := db.Q(tx)
+			if err := q.ReassignCategoryTransactions(ctx, sqlc.ReassignCategoryTransactionsParams{
+				CategoryID: db.NI(*successorID), CategoryID_2: db.NI(id),
+			}); err != nil {
+				return err
+			}
+			return q.DeleteCategory(ctx, id)
+		})
 	}
 	n, _ := db.Q(s.DB).CountCategoriesByType(ctx, c.Type)
 	if n <= 1 {

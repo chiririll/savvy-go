@@ -8,6 +8,7 @@ import (
 
 	"savvy-go/internal/db"
 	"savvy-go/internal/db/sqlc"
+	"savvy-go/internal/store"
 )
 
 const (
@@ -71,7 +72,7 @@ func (u User) ResourceJSON() map[string]any {
 }
 
 type Users struct {
-	DB *sql.DB
+	DB store.DB
 }
 
 func (s Users) Count(ctx context.Context) (int, error) {

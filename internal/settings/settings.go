@@ -9,6 +9,7 @@ import (
 
 	"savvy-go/internal/db"
 	"savvy-go/internal/db/sqlc"
+	"savvy-go/internal/store"
 )
 
 var defaults = map[string]any{
@@ -19,7 +20,7 @@ var defaults = map[string]any{
 }
 
 type Store struct {
-	DB *sql.DB
+	DB store.DB
 }
 
 func (s Store) Get(ctx context.Context, key string, fallback any) any {

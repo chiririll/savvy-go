@@ -1,7 +1,7 @@
 package domain
 
 import (
-	"database/sql"
+	"savvy-go/internal/store"
 	"strconv"
 	"time"
 )
@@ -23,7 +23,7 @@ type dateRange struct {
 }
 
 type Reports struct {
-	DB  *sql.DB
+	DB  store.DB
 	Loc *time.Location
 }
 
