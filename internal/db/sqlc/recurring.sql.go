@@ -137,7 +137,8 @@ const listRecurring = `-- name: ListRecurring :many
 SELECT r.id, r.type, r.account_id, r.to_account_id, r.category_id, r.amount, r.to_amount, r.description,
 	r.frequency, r.interval, r.day_of_week, r.day_of_month, r.start_date, r.end_date,
 	r.next_run_date, r.last_run_date, r.is_active,
-	ca.decimals AS decimals, COALESCE(cb.decimals, ca.decimals) AS to_decimals
+	ca.id AS currency_id, ca.decimals AS decimals,
+	COALESCE(cb.id, ca.id) AS to_currency_id, COALESCE(cb.decimals, ca.decimals) AS to_decimals
 FROM recurring_transactions r
 JOIN accounts a ON a.id = r.account_id
 JOIN currencies ca ON ca.id = a.currency_id
@@ -157,25 +158,27 @@ type ListRecurringParams struct {
 }
 
 type ListRecurringRow struct {
-	ID          int64
-	Type        string
-	AccountID   int64
-	ToAccountID sql.NullInt64
-	CategoryID  sql.NullInt64
-	Amount      int64
-	ToAmount    sql.NullInt64
-	Description sql.NullString
-	Frequency   string
-	Interval    int64
-	DayOfWeek   sql.NullInt64
-	DayOfMonth  sql.NullInt64
-	StartDate   string
-	EndDate     sql.NullString
-	NextRunDate string
-	LastRunDate sql.NullString
-	IsActive    int64
-	Decimals    int64
-	ToDecimals  int64
+	ID           int64
+	Type         string
+	AccountID    int64
+	ToAccountID  sql.NullInt64
+	CategoryID   sql.NullInt64
+	Amount       int64
+	ToAmount     sql.NullInt64
+	Description  sql.NullString
+	Frequency    string
+	Interval     int64
+	DayOfWeek    sql.NullInt64
+	DayOfMonth   sql.NullInt64
+	StartDate    string
+	EndDate      sql.NullString
+	NextRunDate  string
+	LastRunDate  sql.NullString
+	IsActive     int64
+	CurrencyID   int64
+	Decimals     int64
+	ToCurrencyID int64
+	ToDecimals   int64
 }
 
 func (q *Queries) ListRecurring(ctx context.Context, arg ListRecurringParams) ([]ListRecurringRow, error) {
@@ -210,7 +213,9 @@ func (q *Queries) ListRecurring(ctx context.Context, arg ListRecurringParams) ([
 			&i.NextRunDate,
 			&i.LastRunDate,
 			&i.IsActive,
+			&i.CurrencyID,
 			&i.Decimals,
+			&i.ToCurrencyID,
 			&i.ToDecimals,
 		); err != nil {
 			return nil, err

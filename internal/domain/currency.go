@@ -12,6 +12,7 @@ import (
 
 	"savvy-go/internal/db"
 	"savvy-go/internal/db/sqlc"
+	"savvy-go/internal/money"
 )
 
 var one = decimal.NewFromInt(1)
@@ -53,11 +54,18 @@ func (c Currency) ConvertFromBase(amount decimal.Decimal) decimal.Decimal {
 	return amount.DivRound(c.Rate, rateDivPrecision)
 }
 
-func Convert(amount decimal.Decimal, from, to Currency) decimal.Decimal {
-	if from.ID == to.ID {
-		return amount
+// Unit is the scale amounts in this currency are stored in.
+func (c Currency) Unit() money.Unit { return money.Unit{ID: c.ID, Decimals: c.Decimals} }
+
+// Convert re-expresses m, an amount in from, in to, rounded to the scale of to.
+func Convert(m money.Money, from, to Currency) money.Money {
+	if m.Unit() != from.Unit() {
+		panic(fmt.Sprintf("domain: converting %+v from currency %+v", m.Unit(), from.Unit()))
 	}
-	return to.ConvertFromBase(from.ConvertToBase(amount))
+	if from.ID == to.ID {
+		return m
+	}
+	return money.FromDecimal(to.ConvertFromBase(from.ConvertToBase(m.Decimal())), to.Unit())
 }
 
 type Currencies struct{ DB *sql.DB }

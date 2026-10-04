@@ -15,9 +15,11 @@ import (
 	"savvy-go/internal/money"
 )
 
+// BudgetProgress is how much of a budget is used; the amounts are in the
+// budget's currency.
 type BudgetProgress struct {
-	Spent       decimal.Decimal
-	Remaining   decimal.Decimal
+	Spent       money.Money
+	Remaining   money.Money
 	Percent     float64
 	PeriodStart string
 	PeriodEnd   string
@@ -27,7 +29,7 @@ type BudgetProgress struct {
 type Budget struct {
 	ID              int64
 	Name            string
-	Amount          decimal.Decimal
+	Amount          money.Money
 	CurrencyID      *int64
 	Period          string
 	StartDate       *string
@@ -81,12 +83,12 @@ func (s Budgets) Create(ctx context.Context, in BudgetInput) (*Budget, error) {
 		global = *in.IsGlobal
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	currencyID, dec, err := s.resolveCurrency(ctx, in.CurrencyID)
+	unit, err := s.resolveCurrency(ctx, in.CurrencyID)
 	if err != nil {
 		return nil, err
 	}
 	res, err := db.Q(s.DB).InsertBudget(ctx, sqlc.InsertBudgetParams{
-		Name: in.Name, Amount: money.ToMinor(in.Amount, dec), CurrencyID: currencyID, Period: in.Period,
+		Name: in.Name, Amount: money.FromDecimal(in.Amount, unit).Minor(), CurrencyID: unit.ID, Period: in.Period,
 		StartDate: db.NullString(in.StartDate), EndDate: db.NullString(in.EndDate),
 		IsGlobal: db.BoolInt(global), NotifyAtPercent: db.NullInt(in.NotifyAtPercent),
 		IsActive: db.BoolInt(active), CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
@@ -113,7 +115,7 @@ func (s Budgets) Update(ctx context.Context, id int64, in BudgetInput) (*Budget,
 		in.Name = cur.Name
 	}
 	if in.Amount.IsZero() {
-		in.Amount = cur.Amount
+		in.Amount = cur.Amount.Decimal()
 	}
 	if in.Period == "" {
 		in.Period = cur.Period
@@ -140,12 +142,12 @@ func (s Budgets) Update(ctx context.Context, id int64, in BudgetInput) (*Budget,
 		notify = in.NotifyAtPercent
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	currencyID, dec, err := s.resolveCurrency(ctx, in.CurrencyID)
+	unit, err := s.resolveCurrency(ctx, in.CurrencyID)
 	if err != nil {
 		return nil, err
 	}
 	err = db.Q(s.DB).UpdateBudget(ctx, sqlc.UpdateBudgetParams{
-		Name: in.Name, Amount: money.ToMinor(in.Amount, dec), CurrencyID: currencyID, Period: in.Period,
+		Name: in.Name, Amount: money.FromDecimal(in.Amount, unit).Minor(), CurrencyID: unit.ID, Period: in.Period,
 		StartDate: db.NullString(in.StartDate), EndDate: db.NullString(in.EndDate),
 		IsGlobal: db.BoolInt(global), NotifyAtPercent: db.NullInt(notify),
 		IsActive: db.BoolInt(active), UpdatedAt: db.NS(now), ID: id,
@@ -173,19 +175,21 @@ func (s Budgets) Delete(ctx context.Context, id int64) error {
 func (s Budgets) CalculateProgress(ctx context.Context, b *Budget) BudgetProgress {
 	start, end := budgetPeriodDates(*b)
 	spent := s.spent(ctx, b, start, end)
-	remaining := decimal.Max(decimal.Zero, b.Amount.Sub(spent))
+	remaining := money.Max(money.Zero(b.Amount.Unit()), b.Amount.Sub(spent))
 	percent := 0.0
 	if b.Amount.IsPositive() {
-		percent = math.Round(spent.Div(b.Amount).InexactFloat64()*1000) / 10
+		percent = math.Round(spent.Decimal().Div(b.Amount.Decimal()).InexactFloat64()*1000) / 10
 	}
 	return BudgetProgress{
 		Spent: spent, Remaining: remaining, Percent: percent,
 		PeriodStart: start.Format("2006-01-02"), PeriodEnd: end.Format("2006-01-02"),
-		IsExceeded: spent.GreaterThan(b.Amount),
+		IsExceeded: spent.Cmp(b.Amount) > 0,
 	}
 }
 
-func (s Budgets) spent(ctx context.Context, b *Budget, start, end time.Time) decimal.Decimal {
+// spent is what the budget's scope spent in [start, end], in its currency.
+func (s Budgets) spent(ctx context.Context, b *Budget, start, end time.Time) money.Money {
+	unit := b.Amount.Unit()
 	targetRate := one
 	if b.Currency != nil && b.Currency.Rate.IsPositive() {
 		targetRate = b.Currency.Rate
@@ -194,7 +198,7 @@ func (s Budgets) spent(ctx context.Context, b *Budget, start, end time.Time) dec
 	var catIDs []int64
 	if !b.IsGlobal {
 		if len(b.Categories) == 0 {
-			return decimal.Zero
+			return money.Zero(unit)
 		}
 		for _, c := range b.Categories {
 			catIDs = append(catIDs, c.ID)
@@ -206,17 +210,13 @@ func (s Budgets) spent(ctx context.Context, b *Budget, start, end time.Time) dec
 	}
 	total, err := filter.BudgetSpent(ctx, s.DB, start.Format("2006-01-02"), end.Format("2006-01-02"), catIDs, tagIDs)
 	if err != nil {
-		return decimal.Zero
+		return money.Zero(unit)
 	}
-	spent := total.DivRound(targetRate, rateDivPrecision)
-	if b.Currency != nil {
-		spent = spent.Round(int32(b.Currency.Decimals))
-	}
-	return spent
+	return money.FromDecimal(total.DivRound(targetRate, rateDivPrecision), unit)
 }
 
-// resolveCurrency returns the budget currency (base when unset) and its decimals.
-func (s Budgets) resolveCurrency(ctx context.Context, id *int64) (int64, int, error) {
+// resolveCurrency returns the unit of the budget currency (base when unset).
+func (s Budgets) resolveCurrency(ctx context.Context, id *int64) (money.Unit, error) {
 	curs := Currencies{DB: s.DB}
 	var c *Currency
 	var err error
@@ -226,12 +226,12 @@ func (s Budgets) resolveCurrency(ctx context.Context, id *int64) (int64, int, er
 		c, err = curs.Base(ctx)
 	}
 	if err != nil {
-		return 0, 0, err
+		return money.Unit{}, err
 	}
 	if c == nil {
-		return 0, 0, fmt.Errorf("currency required")
+		return money.Unit{}, fmt.Errorf("currency required")
 	}
-	return c.ID, c.Decimals, nil
+	return c.Unit(), nil
 }
 
 func budgetPeriodDates(b Budget) (time.Time, time.Time) {
@@ -358,7 +358,8 @@ func (s Budgets) saveTags(ctx context.Context, id int64, ids []int64) error {
 }
 
 func budgetFromRow(r sqlc.ListBudgetsRow) Budget {
-	b := Budget{ID: r.ID, Name: r.Name, Amount: money.FromMinor(r.Amount, int(r.Decimals)), Period: r.Period, IsGlobal: r.IsGlobal != 0, IsActive: r.IsActive != 0}
+	unit := money.Unit{ID: r.CurrencyID, Decimals: int(r.Decimals)}
+	b := Budget{ID: r.ID, Name: r.Name, Amount: money.New(r.Amount, unit), Period: r.Period, IsGlobal: r.IsGlobal != 0, IsActive: r.IsActive != 0}
 	currencyID := r.CurrencyID
 	b.CurrencyID = &currencyID
 	if r.StartDate.Valid {

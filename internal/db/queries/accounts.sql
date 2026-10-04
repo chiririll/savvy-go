@@ -72,8 +72,8 @@ SELECT CAST(COALESCE(SUM(amount),0) AS INTEGER) FROM transactions
 WHERE account_id=? AND status='confirmed' AND type IN ('debt_payment','debt_lend')
   AND date <= COALESCE(sqlc.narg('as_of'), date);
 
--- name: GetAccountDecimals :one
-SELECT c.decimals FROM accounts a JOIN currencies c ON c.id = a.currency_id WHERE a.id = ?;
+-- name: GetAccountUnit :one
+SELECT c.id, c.decimals FROM accounts a JOIN currencies c ON c.id = a.currency_id WHERE a.id = ?;
 
 -- name: MarkAccountPaidOff :exec
 UPDATE accounts SET is_paid_off = 1 WHERE id = ?;

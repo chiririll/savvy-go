@@ -11,13 +11,21 @@ import (
 	"github.com/shopspring/decimal"
 
 	"savvy-go/internal/db/sqlc"
-	"savvy-go/internal/money"
 )
+
+// The aggregates below fold several currencies into base-currency major units.
+// Their results stay unrounded decimals so a sum over groups rounds once, at
+// the end, into a money.Money of the base currency (money.FromDecimal).
+
+// major is minor units of a currency with the given decimals in major units.
+func major(minor, decimals int64) decimal.Decimal {
+	return decimal.New(minor, -int32(decimals))
+}
 
 // toBase converts minor units of a currency (given its decimals and rate to
 // the base currency) into base-currency major units.
 func toBase(minor, decimals int64, rate decimal.Decimal) decimal.Decimal {
-	return money.FromMinor(minor, int(decimals)).Mul(rate)
+	return major(minor, decimals).Mul(rate)
 }
 
 // TxFilter is the HTTP/list filter for transactions. Optional fields are
@@ -106,7 +114,7 @@ func ListTransactions(ctx context.Context, sqlDB *sql.DB, f TxFilter, limit, off
 	rows, err := sqlDB.QueryContext(ctx, `
 		SELECT t.id, t.type, t.account_id, t.to_account_id, t.category_id, t.amount, t.to_amount,
 			t.description, t.date, t.status, t.recurring_transaction_id, t.created_at,
-			c.decimals, COALESCE(cb.decimals, c.decimals)
+			c.id, c.decimals, COALESCE(cb.id, c.id), COALESCE(cb.decimals, c.decimals)
 		FROM transactions t
 		LEFT JOIN accounts a ON a.id = t.account_id
 		LEFT JOIN currencies c ON c.id = a.currency_id
@@ -124,7 +132,7 @@ func ListTransactions(ctx context.Context, sqlDB *sql.DB, f TxFilter, limit, off
 		var r sqlc.ListTransactionsRow
 		if err := rows.Scan(&r.ID, &r.Type, &r.AccountID, &r.ToAccountID, &r.CategoryID, &r.Amount, &r.ToAmount,
 			&r.Description, &r.Date, &r.Status, &r.RecurringTransactionID, &r.CreatedAt,
-			&r.Decimals, &r.ToDecimals); err != nil {
+			&r.CurrencyID, &r.Decimals, &r.ToCurrencyID, &r.ToDecimals); err != nil {
 			return nil, err
 		}
 		out = append(out, r)
@@ -423,7 +431,7 @@ func scanBudgetAmounts(ctx context.Context, sqlDB *sql.DB, q string, args []any)
 		if err := rows.Scan(&minor, &rate, &base, &decimals); err != nil {
 			return nil
 		}
-		out = append(out, BudgetAmount{Amount: money.FromMinor(minor, int(decimals)), Rate: rate, IsBase: base != 0})
+		out = append(out, BudgetAmount{Amount: major(minor, decimals), Rate: rate, IsBase: base != 0})
 	}
 	return out
 }

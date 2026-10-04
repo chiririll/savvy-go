@@ -366,17 +366,31 @@ func (s Reports) ExpensesByCategory(ctx context.Context, f ReportFilter) map[str
 
 // CategorySummary returns per-category totals of the given type for the period
 // described by f, with the grand total.
-func (s Reports) CategorySummary(ctx context.Context, f ReportFilter, typ string) ([]Category, float64) {
-	var out []Category
-	var total float64
-	for _, x := range s.sumGroupedByCategory(ctx, typ, f.Range(s.now()), f) {
-		amount := decimal.NewFromFloat(x.Total)
-		icon, color := x.Icon, x.Color
-		out = append(out, Category{ID: x.ID, Name: x.Name, Type: typ, Icon: &icon, Color: &color, TotalAmount: &amount})
-		total += x.Total
+func (s Reports) CategorySummary(ctx context.Context, f ReportFilter, typ string) ([]Category, money.Money) {
+	unit := s.baseUnit(ctx)
+	out := []Category{}
+	total := money.Zero(unit)
+	for _, x := range filter.SumGroupedByCategory(ctx, s.DB, s.where(typ, f.Range(s.now()), f, 0)) {
+		amount := money.FromDecimal(x.Total, unit)
+		out = append(out, Category{
+			ID: x.ID, Name: x.Name, Type: typ,
+			Icon: ptrTo(coalesce(x.Icon.String, "circle")), Color: ptrTo(coalesce(x.Color.String, "#64748b")),
+			TotalAmount: &amount,
+		})
+		total = total.Add(amount)
 	}
-	return out, round2(total)
+	return out, total
 }
+
+// baseUnit is the unit of the base currency; the zero Unit without one.
+func (s Reports) baseUnit(ctx context.Context) money.Unit {
+	if base, _ := (Currencies{DB: s.DB}).Base(ctx); base != nil {
+		return base.Unit()
+	}
+	return money.Unit{}
+}
+
+func ptrTo[T any](v T) *T { return &v }
 
 func (s Reports) CashFlowOverTime(ctx context.Context, f ReportFilter, groupBy string) map[string]any {
 	now := s.now()
@@ -640,7 +654,7 @@ func (s Reports) netWorthAt(ctx context.Context, at time.Time, f ReportFilter) [
 		if a.Currency != nil && !a.Currency.Rate.IsZero() {
 			rate = a.Currency.Rate
 		}
-		out = append(out, nwAccount{ID: a.ID, Name: a.Name, Type: a.Type, Balance: bal.Mul(rate).InexactFloat64()})
+		out = append(out, nwAccount{ID: a.ID, Name: a.Name, Type: a.Type, Balance: bal.Decimal().Mul(rate).InexactFloat64()})
 	}
 	return out
 }
@@ -699,7 +713,7 @@ func (s Reports) monthlyBudget(ctx context.Context, f ReportFilter) any {
 	if !scoped {
 		row, err := db.Q(s.DB).GetGlobalMonthlyBudget(ctx)
 		if err == nil {
-			return budgetToBase(money.FromMinor(row.Amount, int(row.Decimals)), row.Rate, row.IsBase != 0).InexactFloat64()
+			return budgetToBase(decimal.New(row.Amount, -int32(row.Decimals)), row.Rate, row.IsBase != 0).InexactFloat64()
 		}
 		rows, err := db.Q(s.DB).ListMonthlyBudgets(ctx)
 		if err != nil {
@@ -707,7 +721,7 @@ func (s Reports) monthlyBudget(ctx context.Context, f ReportFilter) any {
 		}
 		total := decimal.Zero
 		for _, r := range rows {
-			total = total.Add(budgetToBase(money.FromMinor(r.Amount, int(r.Decimals)), r.Rate, r.IsBase != 0))
+			total = total.Add(budgetToBase(decimal.New(r.Amount, -int32(r.Decimals)), r.Rate, r.IsBase != 0))
 		}
 		if total.IsPositive() {
 			return total.InexactFloat64()

@@ -12,6 +12,7 @@ import (
 
 	"savvy-go/internal/auth"
 	"savvy-go/internal/domain"
+	"savvy-go/internal/money"
 )
 
 func init() {
@@ -74,14 +75,14 @@ func NewTag(t domain.Tag) Tag {
 }
 
 type Category struct {
-	ID                int64            `json:"id"`
-	Name              string           `json:"name"`
-	Type              string           `json:"type"`
-	Icon              *string          `json:"icon"`
-	Color             *string          `json:"color"`
-	IsDefault         bool             `json:"isDefault"`
-	TransactionsCount int              `json:"transactionsCount"`
-	TotalAmount       *decimal.Decimal `json:"totalAmount"`
+	ID                int64        `json:"id"`
+	Name              string       `json:"name"`
+	Type              string       `json:"type"`
+	Icon              *string      `json:"icon"`
+	Color             *string      `json:"color"`
+	IsDefault         bool         `json:"isDefault"`
+	TransactionsCount int          `json:"transactionsCount"`
+	TotalAmount       *money.Money `json:"totalAmount"`
 }
 
 func NewCategory(c domain.Category) Category {
@@ -92,15 +93,15 @@ func NewCategory(c domain.Category) Category {
 }
 
 type Account struct {
-	ID             int64           `json:"id"`
-	Name           string          `json:"name"`
-	Type           string          `json:"type"`
-	InitialBalance decimal.Decimal `json:"initialBalance"`
-	CurrentBalance decimal.Decimal `json:"currentBalance"`
-	IsActive       bool            `json:"isActive"`
-	SortOrder      int             `json:"sortOrder"`
-	Currency       *Currency       `json:"currency"`
-	CreatedAt      *time.Time      `json:"createdAt"`
+	ID             int64       `json:"id"`
+	Name           string      `json:"name"`
+	Type           string      `json:"type"`
+	InitialBalance money.Money `json:"initialBalance"`
+	CurrentBalance money.Money `json:"currentBalance"`
+	IsActive       bool        `json:"isActive"`
+	SortOrder      int         `json:"sortOrder"`
+	Currency       *Currency   `json:"currency"`
+	CreatedAt      *time.Time  `json:"createdAt"`
 }
 
 func NewAccount(a domain.Account) Account {
@@ -115,23 +116,24 @@ func NewAccount(a domain.Account) Account {
 // Debt is a debt account. CurrentBalance is the amount still owed.
 type Debt struct {
 	Account
-	DebtType        *string         `json:"debtType"`
-	TargetAmount    decimal.Decimal `json:"targetAmount"`
-	PaymentProgress float64         `json:"paymentProgress"`
-	DueDate         *string         `json:"dueDate"`
-	Counterparty    *string         `json:"counterparty"`
-	Description     *string         `json:"description"`
-	IsPaidOff       bool            `json:"isPaidOff"`
+	DebtType        *string     `json:"debtType"`
+	TargetAmount    money.Money `json:"targetAmount"`
+	PaymentProgress float64     `json:"paymentProgress"`
+	DueDate         *string     `json:"dueDate"`
+	Counterparty    *string     `json:"counterparty"`
+	Description     *string     `json:"description"`
+	IsPaidOff       bool        `json:"isPaidOff"`
 }
 
 func NewDebt(a domain.Account) Debt {
-	target := decimal.Zero
+	target := money.Zero(a.Currency.Unit())
 	if a.TargetAmount != nil {
 		target = *a.TargetAmount
 	}
 	progress := 0.0
 	if target.IsPositive() {
-		progress = max(0, target.Sub(a.Balance).Div(target).Mul(decimal.NewFromInt(100)).InexactFloat64())
+		paid := target.Sub(a.Balance)
+		progress = max(0, 100*float64(paid.Minor())/float64(target.Minor()))
 	}
 	return Debt{
 		Account: NewAccount(a), DebtType: a.DebtType, TargetAmount: target, PaymentProgress: progress,
@@ -143,8 +145,8 @@ type TxItem struct {
 	ID           int64           `json:"id"`
 	Name         string          `json:"name"`
 	Quantity     decimal.Decimal `json:"quantity"`
-	PricePerUnit decimal.Decimal `json:"pricePerUnit"`
-	TotalPrice   decimal.Decimal `json:"totalPrice"`
+	PricePerUnit money.Money     `json:"pricePerUnit"`
+	TotalPrice   money.Money     `json:"totalPrice"`
 }
 
 func NewTxItem(i domain.TxItem) TxItem {
@@ -160,21 +162,21 @@ type TxActions struct {
 }
 
 type Transaction struct {
-	ID                     int64            `json:"id"`
-	Type                   string           `json:"type"`
-	Amount                 decimal.Decimal  `json:"amount"`
-	ToAmount               *decimal.Decimal `json:"toAmount"`
-	Description            *string          `json:"description"`
-	Date                   *string          `json:"date"`
-	Status                 string           `json:"status"`
-	RecurringTransactionID *int64           `json:"recurringTransactionId"`
-	Actions                TxActions        `json:"actions"`
-	Account                *Account         `json:"account"`
-	ToAccount              *Account         `json:"toAccount"`
-	Category               *Category        `json:"category"`
-	Items                  []TxItem         `json:"items"`
-	Tags                   []Tag            `json:"tags"`
-	CreatedAt              *time.Time       `json:"createdAt"`
+	ID                     int64        `json:"id"`
+	Type                   string       `json:"type"`
+	Amount                 money.Money  `json:"amount"`
+	ToAmount               *money.Money `json:"toAmount"`
+	Description            *string      `json:"description"`
+	Date                   *string      `json:"date"`
+	Status                 string       `json:"status"`
+	RecurringTransactionID *int64       `json:"recurringTransactionId"`
+	Actions                TxActions    `json:"actions"`
+	Account                *Account     `json:"account"`
+	ToAccount              *Account     `json:"toAccount"`
+	Category               *Category    `json:"category"`
+	Items                  []TxItem     `json:"items"`
+	Tags                   []Tag        `json:"tags"`
+	CreatedAt              *time.Time   `json:"createdAt"`
 }
 
 func NewTransaction(t domain.Transaction) Transaction {
@@ -205,11 +207,11 @@ func transactionActions(t domain.Transaction) TxActions {
 }
 
 type TransactionSummary struct {
-	Income            decimal.Decimal `json:"income"`
-	Expense           decimal.Decimal `json:"expense"`
-	Balance           decimal.Decimal `json:"balance"`
-	TransactionsCount int             `json:"transactionsCount"`
-	Currency          *string         `json:"currency"`
+	Income            money.Money `json:"income"`
+	Expense           money.Money `json:"expense"`
+	Balance           money.Money `json:"balance"`
+	TransactionsCount int         `json:"transactionsCount"`
+	Currency          *string     `json:"currency"`
 }
 
 func NewTransactionSummary(s domain.TransactionSummary) TransactionSummary {
@@ -220,12 +222,12 @@ func NewTransactionSummary(s domain.TransactionSummary) TransactionSummary {
 }
 
 type BudgetProgress struct {
-	Spent       decimal.Decimal `json:"spent"`
-	Remaining   decimal.Decimal `json:"remaining"`
-	Percent     float64         `json:"percent"`
-	PeriodStart string          `json:"periodStart"`
-	PeriodEnd   string          `json:"periodEnd"`
-	IsExceeded  bool            `json:"isExceeded"`
+	Spent       money.Money `json:"spent"`
+	Remaining   money.Money `json:"remaining"`
+	Percent     float64     `json:"percent"`
+	PeriodStart string      `json:"periodStart"`
+	PeriodEnd   string      `json:"periodEnd"`
+	IsExceeded  bool        `json:"isExceeded"`
 }
 
 func NewBudgetProgress(p domain.BudgetProgress) BudgetProgress {
@@ -238,7 +240,7 @@ func NewBudgetProgress(p domain.BudgetProgress) BudgetProgress {
 type Budget struct {
 	ID              int64           `json:"id"`
 	Name            string          `json:"name"`
-	Amount          decimal.Decimal `json:"amount"`
+	Amount          money.Money     `json:"amount"`
 	Currency        *Currency       `json:"currency"`
 	Period          string          `json:"period"`
 	StartDate       *string         `json:"startDate"`
@@ -263,24 +265,24 @@ func NewBudget(b domain.Budget) Budget {
 }
 
 type Recurring struct {
-	ID          int64            `json:"id"`
-	Type        string           `json:"type"`
-	Amount      decimal.Decimal  `json:"amount"`
-	ToAmount    *decimal.Decimal `json:"toAmount"`
-	Description *string          `json:"description"`
-	Frequency   string           `json:"frequency"`
-	Interval    int              `json:"interval"`
-	DayOfWeek   *int             `json:"dayOfWeek"`
-	DayOfMonth  *int             `json:"dayOfMonth"`
-	StartDate   string           `json:"startDate"`
-	EndDate     *string          `json:"endDate"`
-	NextRunDate string           `json:"nextRunDate"`
-	LastRunDate *string          `json:"lastRunDate"`
-	IsActive    bool             `json:"isActive"`
-	Account     *Account         `json:"account"`
-	ToAccount   *Account         `json:"toAccount"`
-	Category    *Category        `json:"category"`
-	Tags        []Tag            `json:"tags"`
+	ID          int64        `json:"id"`
+	Type        string       `json:"type"`
+	Amount      money.Money  `json:"amount"`
+	ToAmount    *money.Money `json:"toAmount"`
+	Description *string      `json:"description"`
+	Frequency   string       `json:"frequency"`
+	Interval    int          `json:"interval"`
+	DayOfWeek   *int         `json:"dayOfWeek"`
+	DayOfMonth  *int         `json:"dayOfMonth"`
+	StartDate   string       `json:"startDate"`
+	EndDate     *string      `json:"endDate"`
+	NextRunDate string       `json:"nextRunDate"`
+	LastRunDate *string      `json:"lastRunDate"`
+	IsActive    bool         `json:"isActive"`
+	Account     *Account     `json:"account"`
+	ToAccount   *Account     `json:"toAccount"`
+	Category    *Category    `json:"category"`
+	Tags        []Tag        `json:"tags"`
 }
 
 func NewRecurring(r domain.Recurring) Recurring {
@@ -339,10 +341,10 @@ func NewAutomationLog(l domain.AutomationLog) AutomationLog {
 }
 
 type AccountsSummary struct {
-	TotalBalance  decimal.Decimal `json:"totalBalance"`
-	Currency      *string         `json:"currency"`
-	Decimals      int             `json:"decimals"`
-	AccountsCount int             `json:"accountsCount"`
+	TotalBalance  money.Money `json:"totalBalance"`
+	Currency      *string     `json:"currency"`
+	Decimals      int         `json:"decimals"`
+	AccountsCount int         `json:"accountsCount"`
 }
 
 func NewAccountsSummary(s domain.AccountsSummary) AccountsSummary {
@@ -352,12 +354,12 @@ func NewAccountsSummary(s domain.AccountsSummary) AccountsSummary {
 }
 
 type DebtSummary struct {
-	TotalIOwe     decimal.Decimal `json:"totalIOwe"`
-	TotalOwedToMe decimal.Decimal `json:"totalOwedToMe"`
-	NetDebt       decimal.Decimal `json:"netDebt"`
-	DebtsCount    int             `json:"debtsCount"`
-	Currency      *string         `json:"currency"`
-	Decimals      int             `json:"decimals"`
+	TotalIOwe     money.Money `json:"totalIOwe"`
+	TotalOwedToMe money.Money `json:"totalOwedToMe"`
+	NetDebt       money.Money `json:"netDebt"`
+	DebtsCount    int         `json:"debtsCount"`
+	Currency      *string     `json:"currency"`
+	Decimals      int         `json:"decimals"`
 }
 
 func NewDebtSummary(s domain.DebtSummary) DebtSummary {
@@ -368,11 +370,11 @@ func NewDebtSummary(s domain.DebtSummary) DebtSummary {
 }
 
 type CategoryStatistics struct {
-	CategoryID        int64           `json:"categoryId"`
-	CategoryName      string          `json:"categoryName"`
-	Type              string          `json:"type"`
-	TransactionsCount int             `json:"transactionsCount"`
-	TotalAmount       decimal.Decimal `json:"totalAmount"`
+	CategoryID        int64       `json:"categoryId"`
+	CategoryName      string      `json:"categoryName"`
+	Type              string      `json:"type"`
+	TransactionsCount int         `json:"transactionsCount"`
+	TotalAmount       money.Money `json:"totalAmount"`
 }
 
 func NewCategoryStatistics(s domain.CategoryStatistics) CategoryStatistics {

@@ -21,7 +21,7 @@ type Category struct {
 	Color             *string
 	IsDefault         bool
 	TransactionsCount int
-	TotalAmount       *decimal.Decimal
+	TotalAmount       *money.Money
 }
 
 type Categories struct{ DB *sql.DB }
@@ -160,7 +160,7 @@ func (s Categories) SetDefault(ctx context.Context, id int64) (*Category, error)
 type CategoryStatistics struct {
 	Category Category
 	Count    int
-	Total    decimal.Decimal
+	Total    money.Money
 }
 
 func (s Categories) Statistics(ctx context.Context, id int64, start, end string) (*CategoryStatistics, error) {
@@ -172,15 +172,16 @@ func (s Categories) Statistics(ctx context.Context, id int64, start, end string)
 		CategoryID: db.NI(id), StartDate: db.Narg(start), EndDate: db.Narg(end),
 	})
 	out := &CategoryStatistics{Category: *c}
+	total := decimal.Zero
 	for _, row := range rows {
 		out.Count += int(row.Cnt)
-		out.Total = out.Total.Add(money.FromMinor(row.Total, int(row.Decimals)).Mul(row.Rate))
+		total = total.Add(decimal.New(row.Total, -int32(row.Decimals)).Mul(row.Rate))
 	}
-	baseDec := 2
+	var unit money.Unit // no base currency means nothing was counted either
 	if base, _ := (Currencies{DB: s.DB}).Base(ctx); base != nil {
-		baseDec = base.Decimals
+		unit = base.Unit()
 	}
-	out.Total = out.Total.Round(int32(baseDec))
+	out.Total = money.FromDecimal(total, unit)
 	return out, nil
 }
 

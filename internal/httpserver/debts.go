@@ -77,28 +77,29 @@ func (s *Server) debtsUpdate(w http.ResponseWriter, r *http.Request) {
 		writeValidation(w, map[string][]string{"name": {"The given data was invalid."}})
 		return
 	}
+	in := cur.Input()
 	if body.Name != nil {
-		cur.Name = *body.Name
+		in.Name = *body.Name
 	}
 	if body.DebtType != nil {
-		cur.DebtType = body.DebtType
+		in.DebtType = body.DebtType
 	}
 	if body.CurrencyID != nil {
-		cur.CurrencyID = *body.CurrencyID
+		in.CurrencyID = *body.CurrencyID
 	}
 	if body.Amount != nil {
-		cur.TargetAmount = body.Amount
+		in.TargetAmount = body.Amount
 	}
 	if body.DueDate != nil {
-		cur.DueDate = body.DueDate
+		in.DueDate = body.DueDate
 	}
 	if body.Counterparty != nil {
-		cur.Counterparty = body.Counterparty
+		in.Counterparty = body.Counterparty
 	}
 	if body.Description != nil {
-		cur.DebtDesc = body.Description
+		in.DebtDesc = body.Description
 	}
-	updated, err := s.accounts.Update(r.Context(), cur.ID, *cur)
+	updated, err := s.accounts.Update(r.Context(), cur.ID, in)
 	if err != nil {
 		writeAccountError(w, err)
 		return

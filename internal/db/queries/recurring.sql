@@ -33,7 +33,8 @@ INSERT OR IGNORE INTO recurring_transaction_tag (recurring_transaction_id, tag_i
 SELECT r.id, r.type, r.account_id, r.to_account_id, r.category_id, r.amount, r.to_amount, r.description,
 	r.frequency, r.interval, r.day_of_week, r.day_of_month, r.start_date, r.end_date,
 	r.next_run_date, r.last_run_date, r.is_active,
-	ca.decimals AS decimals, COALESCE(cb.decimals, ca.decimals) AS to_decimals
+	ca.id AS currency_id, ca.decimals AS decimals,
+	COALESCE(cb.id, ca.id) AS to_currency_id, COALESCE(cb.decimals, ca.decimals) AS to_decimals
 FROM recurring_transactions r
 JOIN accounts a ON a.id = r.account_id
 JOIN currencies ca ON ca.id = a.currency_id

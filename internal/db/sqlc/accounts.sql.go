@@ -78,15 +78,20 @@ func (q *Queries) DeleteDebtIssuance(ctx context.Context, toAccountID sql.NullIn
 	return err
 }
 
-const getAccountDecimals = `-- name: GetAccountDecimals :one
-SELECT c.decimals FROM accounts a JOIN currencies c ON c.id = a.currency_id WHERE a.id = ?
+const getAccountUnit = `-- name: GetAccountUnit :one
+SELECT c.id, c.decimals FROM accounts a JOIN currencies c ON c.id = a.currency_id WHERE a.id = ?
 `
 
-func (q *Queries) GetAccountDecimals(ctx context.Context, id int64) (int64, error) {
-	row := q.db.QueryRowContext(ctx, getAccountDecimals, id)
-	var decimals int64
-	err := row.Scan(&decimals)
-	return decimals, err
+type GetAccountUnitRow struct {
+	ID       int64
+	Decimals int64
+}
+
+func (q *Queries) GetAccountUnit(ctx context.Context, id int64) (GetAccountUnitRow, error) {
+	row := q.db.QueryRowContext(ctx, getAccountUnit, id)
+	var i GetAccountUnitRow
+	err := row.Scan(&i.ID, &i.Decimals)
+	return i, err
 }
 
 const insertAccount = `-- name: InsertAccount :execresult

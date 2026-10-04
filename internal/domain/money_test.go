@@ -12,6 +12,7 @@ import (
 	"savvy-go/internal/db"
 	"savvy-go/internal/db/filter"
 	"savvy-go/internal/migrate"
+	"savvy-go/internal/money"
 )
 
 type moneyEnv struct {
@@ -48,7 +49,7 @@ func newMoneyEnv(t *testing.T) *moneyEnv {
 	env.btc = mk("BTC", 8, "50000")
 	accts := Accounts{DB: sqlDB}
 	acct := func(name string, cur Currency, initial string) Account {
-		a, err := accts.Create(ctx, Account{Name: name, Type: "cash", CurrencyID: cur.ID, InitialBalance: decimal.RequireFromString(initial), IsActive: true})
+		a, err := accts.Create(ctx, AccountInput{Name: name, Type: "cash", CurrencyID: cur.ID, InitialBalance: decimal.RequireFromString(initial), IsActive: true})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -74,7 +75,7 @@ func dec(s string) decimal.Decimal { return decimal.RequireFromString(s) }
 
 func TestBalanceIsExactForFloatUnfriendlySums(t *testing.T) {
 	e := newMoneyEnv(t)
-	acct, err := (Accounts{DB: e.db}).Create(e.ctx, Account{Name: "cash2", Type: "cash", CurrencyID: e.usd.ID, IsActive: true})
+	acct, err := (Accounts{DB: e.db}).Create(e.ctx, AccountInput{Name: "cash2", Type: "cash", CurrencyID: e.usd.ID, IsActive: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +85,7 @@ func TestBalanceIsExactForFloatUnfriendlySums(t *testing.T) {
 	if err != nil || got == nil {
 		t.Fatal(err)
 	}
-	if !got.Balance.Equal(dec("0.3")) {
+	if !got.Balance.Decimal().Equal(dec("0.3")) {
 		t.Fatalf("balance = %s, want exactly 0.3", got.Balance)
 	}
 }
@@ -105,14 +106,14 @@ func TestAmountsAreStoredAsMinorUnitsPerCurrency(t *testing.T) {
 	if btcRaw != 12345 || jpyRaw != 1500 {
 		t.Fatalf("raw amounts btc=%d jpy=%d, want 12345 and 1500", btcRaw, jpyRaw)
 	}
-	if !btcTx.Amount.Equal(dec("0.00012345")) || !jpyTx.Amount.Equal(dec("1500")) {
+	if !btcTx.Amount.Decimal().Equal(dec("0.00012345")) || !jpyTx.Amount.Decimal().Equal(dec("1500")) {
 		t.Fatalf("read back btc=%s jpy=%s", btcTx.Amount, jpyTx.Amount)
 	}
 
 	base, _ := (Currencies{DB: e.db}).Base(e.ctx)
 	sum := (Accounts{DB: e.db}).Summary(e.ctx, base)
 	// USD 100-10.50=89.50, JPY 3000-1500=1500 -> 15.00, BTC 0.00012345*50000=6.1725
-	if !sum.Total.Equal(dec("110.67")) {
+	if !sum.Total.Decimal().Equal(dec("110.67")) {
 		t.Fatalf("total = %s, want 110.67", sum.Total)
 	}
 }
@@ -161,7 +162,7 @@ func TestCategoryStatisticsFoldsCurrencies(t *testing.T) {
 	if stats.Count != 2 {
 		t.Fatalf("count = %v", stats.Count)
 	}
-	if !stats.Total.Equal(dec("15")) {
+	if !stats.Total.Decimal().Equal(dec("15")) {
 		t.Fatalf("total = %s, want 15", stats.Total)
 	}
 }
@@ -171,12 +172,12 @@ func TestItemTotalsAreExact(t *testing.T) {
 	date := "2024-01-15"
 	tx, err := e.txs.Create(e.ctx, TxInput{
 		Type: "expense", AccountID: e.usdAcc.ID, Amount: dec("0.30"), Date: &date,
-		Items: []TxItem{{Name: "gum", Quantity: dec("3"), PricePerUnit: dec("0.10")}},
+		Items: []TxItemInput{{Name: "gum", Quantity: dec("3"), PricePerUnit: dec("0.10")}},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(tx.Items) != 1 || !tx.Items[0].TotalPrice.Equal(dec("0.30")) || !tx.Items[0].Quantity.Equal(dec("3")) {
+	if len(tx.Items) != 1 || !tx.Items[0].TotalPrice.Decimal().Equal(dec("0.30")) || !tx.Items[0].Quantity.Equal(dec("3")) {
 		t.Fatalf("items = %+v", tx.Items)
 	}
 }
@@ -204,7 +205,7 @@ func TestFormulaIsExact(t *testing.T) {
 	if got := evaluateFormula("0.1 + 0.2", nil); !got.Equal(dec("0.3")) {
 		t.Fatalf("0.1+0.2 = %s", got)
 	}
-	tx := &Transaction{Amount: dec("0.1")}
+	tx := &Transaction{Amount: money.FromDecimal(dec("0.1"), money.Unit{ID: 1, Decimals: 2})}
 	if got := evaluateFormula("{{transaction.amount}} * 3", tx); !got.Equal(dec("0.3")) {
 		t.Fatalf("amount*3 = %s", got)
 	}
@@ -213,14 +214,52 @@ func TestFormulaIsExact(t *testing.T) {
 	}
 }
 
-func TestCurrencyConversionIsExact(t *testing.T) {
-	jpy := Currency{ID: 2, Rate: dec("0.01")}
-	usd := Currency{ID: 1, IsBase: true, Rate: dec("1")}
-	if got := Convert(dec("1500"), jpy, usd); !got.Equal(dec("15")) {
-		t.Fatalf("JPY->USD = %s", got)
+func TestCurrencyConversionIsExactAndRounded(t *testing.T) {
+	jpy := Currency{ID: 2, Decimals: 0, Rate: dec("0.01")}
+	usd := Currency{ID: 1, Decimals: 2, IsBase: true, Rate: dec("1")}
+	for _, c := range []struct {
+		name     string
+		in       money.Money
+		from, to Currency
+		want     string
+	}{
+		{"JPY->USD", money.FromDecimal(dec("1500"), jpy.Unit()), jpy, usd, "15"},
+		{"USD->JPY", money.FromDecimal(dec("15"), usd.Unit()), usd, jpy, "1500"},
+		{"result rounds to the target scale", money.FromDecimal(dec("1"), usd.Unit()), usd, Currency{ID: 2, Decimals: 0, Rate: dec("0.03")}, "33"},
+		{"same currency is untouched", money.FromDecimal(dec("12.34"), usd.Unit()), usd, usd, "12.34"},
+	} {
+		got := Convert(c.in, c.from, c.to)
+		if !got.Decimal().Equal(dec(c.want)) || got.Unit() != c.to.Unit() {
+			t.Errorf("%s = %s (%+v), want %s in %+v", c.name, got, got.Unit(), c.want, c.to.Unit())
+		}
 	}
-	if got := Convert(dec("15"), usd, jpy); !got.Equal(dec("1500")) {
-		t.Fatalf("USD->JPY = %s", got)
+}
+
+func TestConvertRejectsAmountOfAnotherCurrency(t *testing.T) {
+	jpy := Currency{ID: 2, Decimals: 0, Rate: dec("0.01")}
+	usd := Currency{ID: 1, Decimals: 2, IsBase: true, Rate: dec("1")}
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected a panic when the amount is not in the from currency")
+		}
+	}()
+	Convert(money.FromDecimal(dec("1"), jpy.Unit()), usd, jpy)
+}
+
+func TestTransferWithoutDestinationAmountConverts(t *testing.T) {
+	e := newMoneyEnv(t)
+	date := "2024-01-15"
+	to := e.jpyAcc.ID
+	tx, err := e.txs.Create(e.ctx, TxInput{Type: "transfer", AccountID: e.usdAcc.ID, ToAccountID: &to, Amount: dec("15"), Date: &date})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 15 USD at JPY rate 0.01 (to base) is 1500 JPY, not "15 JPY".
+	if tx.ToAmount == nil || !tx.ToAmount.Decimal().Equal(dec("1500")) {
+		t.Fatalf("to amount = %v, want 1500 JPY", tx.ToAmount)
+	}
+	if tx.ToAmount.Unit() != e.jpy.Unit() {
+		t.Fatalf("to amount unit = %+v, want JPY", tx.ToAmount.Unit())
 	}
 }
 
@@ -240,7 +279,7 @@ func TestAccountCurrencyIsImmutable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, err := accts.Create(e.ctx, Account{Name: "fixed", Type: "cash", CurrencyID: e.usd.ID, InitialBalance: dec("100"), IsActive: true})
+	a, err := accts.Create(e.ctx, AccountInput{Name: "fixed", Type: "cash", CurrencyID: e.usd.ID, InitialBalance: dec("100"), IsActive: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -249,8 +288,9 @@ func TestAccountCurrencyIsImmutable(t *testing.T) {
 	// Any other currency is rejected, even one with the same decimals.
 	for _, other := range []Currency{*eur, e.btc, e.jpy} {
 		cur, _ := accts.ByID(e.ctx, a.ID)
-		cur.CurrencyID = other.ID
-		if _, err := accts.Update(e.ctx, a.ID, *cur); !errors.Is(err, ErrAccountCurrencyImmutable) {
+		in := cur.Input()
+		in.CurrencyID = other.ID
+		if _, err := accts.Update(e.ctx, a.ID, in); !errors.Is(err, ErrAccountCurrencyImmutable) {
 			t.Fatalf("switch to %s = %v, want ErrAccountCurrencyImmutable", other.Code, err)
 		}
 	}
@@ -261,8 +301,9 @@ func TestAccountCurrencyIsImmutable(t *testing.T) {
 
 	// Other fields still update when the currency is left as is.
 	cur, _ := accts.ByID(e.ctx, a.ID)
-	cur.Name = "renamed"
-	got, err := accts.Update(e.ctx, a.ID, *cur)
+	in := cur.Input()
+	in.Name = "renamed"
+	got, err := accts.Update(e.ctx, a.ID, in)
 	if err != nil || got.Name != "renamed" || got.CurrencyID != e.usd.ID {
 		t.Fatalf("update without currency change: %+v, %v", got, err)
 	}
@@ -311,7 +352,7 @@ func TestCurrencyUsedByBudgetCannotBeDeleted(t *testing.T) {
 
 func TestUnknownAccountOrCurrencyIsAnError(t *testing.T) {
 	e := newMoneyEnv(t)
-	if _, err := (Accounts{DB: e.db}).Create(e.ctx, Account{Name: "ghost", Type: "cash", CurrencyID: 999, IsActive: true}); !errors.Is(err, ErrUnknownCurrency) {
+	if _, err := (Accounts{DB: e.db}).Create(e.ctx, AccountInput{Name: "ghost", Type: "cash", CurrencyID: 999, IsActive: true}); !errors.Is(err, ErrUnknownCurrency) {
 		t.Fatalf("create with unknown currency = %v, want ErrUnknownCurrency", err)
 	}
 	date := "2024-01-15"

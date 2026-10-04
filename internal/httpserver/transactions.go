@@ -114,7 +114,7 @@ func (s *Server) transactionsUpdate(w http.ResponseWriter, r *http.Request) {
 		in.Type = cur.Type
 	}
 	if in.Amount.IsZero() {
-		in.Amount = cur.Amount
+		in.Amount = cur.Amount.Decimal()
 	}
 	tx, err := s.txs.Update(r.Context(), cur.ID, in)
 	if err != nil {
@@ -248,7 +248,7 @@ func decodeTx(w http.ResponseWriter, r *http.Request) (domain.TxInput, bool) {
 		if qty.IsZero() {
 			qty = decimal.NewFromInt(1)
 		}
-		in.Items = append(in.Items, domain.TxItem{Name: it.Name, Quantity: qty, PricePerUnit: it.PricePerUnit})
+		in.Items = append(in.Items, domain.TxItemInput{Name: it.Name, Quantity: qty, PricePerUnit: it.PricePerUnit})
 	}
 	return in, true
 }

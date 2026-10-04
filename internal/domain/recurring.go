@@ -19,8 +19,8 @@ type Recurring struct {
 	AccountID   int64
 	ToAccountID *int64
 	CategoryID  *int64
-	Amount      decimal.Decimal
-	ToAmount    *decimal.Decimal
+	Amount      money.Money  // in the currency of Account
+	ToAmount    *money.Money // in the currency of ToAccount
 	Description *string
 	Frequency   string
 	Interval    int
@@ -89,13 +89,14 @@ func (s RecurringStore) Create(ctx context.Context, in RecurringInput) (*Recurri
 		active = *in.IsActive
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	dec, toDec, err := s.Txs.decimalsFor(ctx, in.AccountID, in.ToAccountID)
+	unit, toUnit, err := s.Txs.unitsFor(ctx, in.AccountID, in.ToAccountID)
 	if err != nil {
 		return nil, err
 	}
 	res, err := db.Q(s.DB).InsertRecurring(ctx, sqlc.InsertRecurringParams{
 		Type: in.Type, AccountID: in.AccountID, ToAccountID: db.NullInt64(in.ToAccountID),
-		CategoryID: db.NullInt64(in.CategoryID), Amount: money.ToMinor(in.Amount, dec), ToAmount: money.ToNullMinor(in.ToAmount, toDec),
+		CategoryID: db.NullInt64(in.CategoryID), Amount: money.FromDecimal(in.Amount, unit).Minor(),
+		ToAmount:    money.ToNullMinor(money.FromNullDecimal(in.ToAmount, toUnit)),
 		Description: db.NullString(in.Description), Frequency: in.Frequency, Interval: int64(in.Interval),
 		DayOfWeek: db.NullInt(in.DayOfWeek), DayOfMonth: db.NullInt(in.DayOfMonth),
 		StartDate: in.StartDate, EndDate: db.NullString(in.EndDate), NextRunDate: in.StartDate,
@@ -132,7 +133,7 @@ func (s RecurringStore) Update(ctx context.Context, id int64, in RecurringInput)
 		in.AccountID = cur.AccountID
 	}
 	if in.Amount.IsZero() {
-		in.Amount = cur.Amount
+		in.Amount = cur.Amount.Decimal()
 	}
 	if in.Frequency == "" {
 		in.Frequency = cur.Frequency
@@ -152,13 +153,14 @@ func (s RecurringStore) Update(ctx context.Context, id int64, in RecurringInput)
 		active = *in.IsActive
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	dec, toDec, err := s.Txs.decimalsFor(ctx, in.AccountID, in.ToAccountID)
+	unit, toUnit, err := s.Txs.unitsFor(ctx, in.AccountID, in.ToAccountID)
 	if err != nil {
 		return nil, err
 	}
 	err = db.Q(s.DB).UpdateRecurring(ctx, sqlc.UpdateRecurringParams{
 		Type: in.Type, AccountID: in.AccountID, ToAccountID: db.NullInt64(in.ToAccountID),
-		CategoryID: db.NullInt64(in.CategoryID), Amount: money.ToMinor(in.Amount, dec), ToAmount: money.ToNullMinor(in.ToAmount, toDec),
+		CategoryID: db.NullInt64(in.CategoryID), Amount: money.FromDecimal(in.Amount, unit).Minor(),
+		ToAmount:    money.ToNullMinor(money.FromNullDecimal(in.ToAmount, toUnit)),
 		Description: db.NullString(in.Description), Frequency: in.Frequency, Interval: int64(in.Interval),
 		DayOfWeek: db.NullInt(in.DayOfWeek), DayOfMonth: db.NullInt(in.DayOfMonth),
 		StartDate: in.StartDate, EndDate: db.NullString(in.EndDate), NextRunDate: next,
@@ -247,22 +249,18 @@ func (s RecurringStore) EnsureUpcoming(ctx context.Context) error {
 func (s RecurringStore) createPending(ctx context.Context, rec *Recurring) (*Transaction, error) {
 	var toAmt *decimal.Decimal
 	if rec.Type == "transfer" {
-		if rec.ToAmount != nil {
-			v := *rec.ToAmount
-			toAmt = &v
-		} else {
-			v, err := s.calculateToAmount(ctx, rec)
-			if err != nil {
-				return nil, err
-			}
-			toAmt = &v
+		v, err := s.transferAmount(ctx, rec)
+		if err != nil {
+			return nil, err
 		}
+		d := v.Decimal()
+		toAmt = &d
 	}
 	status := "pending"
 	date := rec.NextRunDate
 	in := TxInput{
 		Type: rec.Type, AccountID: rec.AccountID, ToAccountID: rec.ToAccountID,
-		CategoryID: rec.CategoryID, Amount: rec.Amount, ToAmount: toAmt,
+		CategoryID: rec.CategoryID, Amount: rec.Amount.Decimal(), ToAmount: toAmt,
 		Description: rec.Description, Date: &date, Status: &status, RecurringID: &rec.ID,
 	}
 	for _, t := range rec.Tags {
@@ -283,22 +281,18 @@ func (s RecurringStore) syncOpenPending(ctx context.Context, rec *Recurring) err
 		}
 		return nil
 	}
-	toAmt := rec.ToAmount
-	if rec.Type == "transfer" && toAmt == nil {
-		v, err := s.calculateToAmount(ctx, rec)
+	var toAmt *money.Money
+	if rec.Type == "transfer" {
+		v, err := s.transferAmount(ctx, rec)
 		if err != nil {
 			return err
 		}
 		toAmt = &v
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	dec, toDec, err := s.Txs.decimalsFor(ctx, rec.AccountID, rec.ToAccountID)
-	if err != nil {
-		return err
-	}
 	err = db.Q(s.DB).UpdateTransaction(ctx, sqlc.UpdateTransactionParams{
 		Type: rec.Type, AccountID: rec.AccountID, ToAccountID: db.NullInt64(rec.ToAccountID),
-		CategoryID: db.NullInt64(rec.CategoryID), Amount: money.ToMinor(rec.Amount, dec), ToAmount: money.ToNullMinor(toAmt, toDec),
+		CategoryID: db.NullInt64(rec.CategoryID), Amount: rec.Amount.Minor(), ToAmount: money.ToNullMinor(toAmt),
 		Description: db.NullString(rec.Description), Date: db.NS(rec.NextRunDate),
 		UpdatedAt: db.NS(now), ID: pendingID,
 	})
@@ -320,17 +314,23 @@ func (s RecurringStore) pendingID(ctx context.Context, recurringID int64) (int64
 	return id, err
 }
 
-func (s RecurringStore) calculateToAmount(ctx context.Context, rec *Recurring) (decimal.Decimal, error) {
+// transferAmount is what a transfer recurrence delivers to the destination
+// account: its own amount when set, else Amount converted between the accounts'
+// currencies at the current rates.
+func (s RecurringStore) transferAmount(ctx context.Context, rec *Recurring) (money.Money, error) {
+	if rec.ToAmount != nil {
+		return *rec.ToAmount, nil
+	}
 	if rec.ToAccountID == nil {
 		return rec.Amount, nil
 	}
 	accts := Accounts{DB: s.DB}
 	from, err := accts.ByID(ctx, rec.AccountID)
-	if err != nil || from == nil || from.Currency == nil {
+	if err != nil || from == nil {
 		return rec.Amount, err
 	}
 	to, err := accts.ByID(ctx, *rec.ToAccountID)
-	if err != nil || to == nil || to.Currency == nil {
+	if err != nil || to == nil {
 		return rec.Amount, err
 	}
 	return Convert(rec.Amount, *from.Currency, *to.Currency), nil
@@ -465,8 +465,8 @@ func daysInMonth(t time.Time) int {
 func recurringFromRow(row sqlc.ListRecurringRow) Recurring {
 	r := Recurring{
 		ID: row.ID, Type: row.Type, AccountID: row.AccountID,
-		Amount:    money.FromMinor(row.Amount, int(row.Decimals)),
-		ToAmount:  money.FromNullMinor(row.ToAmount, int(row.ToDecimals)),
+		Amount:    money.New(row.Amount, money.Unit{ID: row.CurrencyID, Decimals: int(row.Decimals)}),
+		ToAmount:  money.FromNullMinor(row.ToAmount, money.Unit{ID: row.ToCurrencyID, Decimals: int(row.ToDecimals)}),
 		Frequency: row.Frequency, Interval: int(row.Interval), StartDate: row.StartDate,
 		NextRunDate: row.NextRunDate, IsActive: row.IsActive != 0,
 	}

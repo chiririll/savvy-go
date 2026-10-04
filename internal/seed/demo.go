@@ -193,7 +193,7 @@ func (s *seeder) createAccounts(usd *domain.Currency, eur *domain.Currency) (map
 	)
 
 	for _, sp := range specs {
-		a := domain.Account{
+		a := domain.AccountInput{
 			Name: sp.name, Type: sp.typ, CurrencyID: sp.cur.ID,
 			InitialBalance: decimal.NewFromFloat(sp.bal), IsActive: true,
 		}
@@ -542,10 +542,11 @@ func (s *seeder) seedTransactionItems() error {
 			catName = "#OTHER"
 		}
 		items := s.randomItems(cand.amount, catName)
+		cents := money.Unit{Decimals: 2} // the demo prices items in cents
 		for _, it := range items {
 			if err := appdb.Q(s.db).InsertTransactionItem(s.ctx, sqlc.InsertTransactionItemParams{
-				TransactionID: cand.id, Name: it.Name, Quantity: it.Quantity, PricePerUnit: money.ToMinor(it.PricePerUnit, 2),
-				TotalPrice: money.ToMinor(it.TotalPrice, 2), CreatedAt: appdb.NS(now), UpdatedAt: appdb.NS(now),
+				TransactionID: cand.id, Name: it.Name, Quantity: it.Quantity, PricePerUnit: money.FromDecimal(it.PricePerUnit, cents).Minor(),
+				TotalPrice: money.FromDecimal(it.TotalPrice, cents).Minor(), CreatedAt: appdb.NS(now), UpdatedAt: appdb.NS(now),
 			}); err != nil {
 				return err
 			}
@@ -554,7 +555,7 @@ func (s *seeder) seedTransactionItems() error {
 	return nil
 }
 
-func (s *seeder) randomItems(amount float64, category string) []domain.TxItem {
+func (s *seeder) randomItems(amount float64, category string) []domain.TxItemInput {
 	catalog := catalogs[category]
 	if len(catalog) == 0 {
 		catalog = catalogs["#OTHER"]
@@ -572,7 +573,7 @@ func (s *seeder) randomItems(amount float64, category string) []domain.TxItem {
 	s.rng.Shuffle(len(names), func(i, j int) { names[i], names[j] = names[j], names[i] })
 	names = names[:count]
 
-	var items []domain.TxItem
+	var items []domain.TxItemInput
 	left := len(names)
 	for _, name := range names {
 		left--
@@ -582,7 +583,7 @@ func (s *seeder) randomItems(amount float64, category string) []domain.TxItem {
 				break
 			}
 			price := decimal.New(int64(remainingCents), -2)
-			items = append(items, domain.TxItem{Name: name, Quantity: decimal.NewFromInt(1), PricePerUnit: price, TotalPrice: price})
+			items = append(items, domain.TxItemInput{Name: name, Quantity: decimal.NewFromInt(1), PricePerUnit: price, TotalPrice: price})
 			break
 		}
 		maxShare := remainingCents - left
@@ -591,7 +592,7 @@ func (s *seeder) randomItems(amount float64, category string) []domain.TxItem {
 		lineCents := (share / qty) * qty
 		lineCents = maxInt(qty, minInt(lineCents, (maxShare/qty)*qty))
 		remainingCents -= lineCents
-		items = append(items, domain.TxItem{
+		items = append(items, domain.TxItemInput{
 			Name: name, Quantity: decimal.NewFromInt(int64(qty)),
 			PricePerUnit: decimal.New(int64(lineCents/qty), -2),
 			TotalPrice:   decimal.New(int64(lineCents), -2),

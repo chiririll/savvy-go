@@ -14,6 +14,7 @@ import (
 
 	"savvy-go/internal/db"
 	"savvy-go/internal/db/sqlc"
+	"savvy-go/internal/money"
 	"strconv"
 	"strings"
 	"time"
@@ -861,6 +862,13 @@ func (p *arithParser) parseFactor() (decimal.Decimal, error) {
 // asDecimal coerces JSON/numeric values (and money fields) to an exact decimal.
 func asDecimal(v any) (decimal.Decimal, bool) {
 	switch n := v.(type) {
+	case money.Money:
+		return n.Decimal(), true
+	case *money.Money:
+		if n == nil {
+			return decimal.Zero, false
+		}
+		return n.Decimal(), true
 	case decimal.Decimal:
 		return n, true
 	case *decimal.Decimal:

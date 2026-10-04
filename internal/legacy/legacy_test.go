@@ -125,14 +125,14 @@ func TestUpgradeLeavesGoSchemaUsable(t *testing.T) {
 	}
 
 	btc, err := (domain.Transactions{DB: sqlDB}).ByID(ctx, 3)
-	if err != nil || btc == nil || !btc.Amount.Equal(decimal.RequireFromString("0.00012345")) {
+	if err != nil || btc == nil || !btc.Amount.Decimal().Equal(decimal.RequireFromString("0.00012345")) {
 		t.Fatalf("btc tx via domain = %+v, %v", btc, err)
 	}
 	if btc.Date == nil || *btc.Date != "2026-01-05" {
 		t.Fatalf("btc tx date = %v, want 2026-01-05", btc.Date)
 	}
 	acct, err := (domain.Accounts{DB: sqlDB}).ByID(ctx, 3)
-	if err != nil || acct == nil || !acct.Balance.Equal(decimal.RequireFromString("0.50012345")) {
+	if err != nil || acct == nil || !acct.Balance.Decimal().Equal(decimal.RequireFromString("0.50012345")) {
 		t.Fatalf("btc account via domain = %+v, %v", acct, err)
 	}
 }

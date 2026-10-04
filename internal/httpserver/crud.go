@@ -10,6 +10,7 @@ import (
 
 	"savvy-go/internal/domain"
 	"savvy-go/internal/httpserver/dto"
+	"savvy-go/internal/money"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/shopspring/decimal"
@@ -130,12 +131,12 @@ func (s *Server) currenciesConvert(w http.ResponseWriter, r *http.Request) {
 		writeValidation(w, map[string][]string{"from_currency_id": {"The selected currency is invalid."}})
 		return
 	}
-	result := domain.Convert(body.Amount, *from, *to)
+	amount := money.FromDecimal(body.Amount, from.Unit())
 	writeJSON(w, http.StatusOK, map[string]any{
-		"amount": body.Amount,
+		"amount": amount,
 		"from":   dto.NewCurrency(*from),
 		"to":     dto.NewCurrency(*to),
-		"result": result.Round(int32(to.Decimals)),
+		"result": domain.Convert(amount, *from, *to),
 	})
 }
 
@@ -196,7 +197,7 @@ func (s *Server) accountsStore(w http.ResponseWriter, r *http.Request) {
 	if body.IsActive != nil {
 		active = *body.IsActive
 	}
-	a, err := s.accounts.Create(r.Context(), domain.Account{
+	a, err := s.accounts.Create(r.Context(), domain.AccountInput{
 		Name: body.Name, Type: body.Type, CurrencyID: currencyID,
 		InitialBalance: body.InitialBalance, IsActive: active,
 	})
@@ -232,30 +233,31 @@ func (s *Server) accountsUpdate(w http.ResponseWriter, r *http.Request) {
 		writeValidation(w, map[string][]string{"name": {"The given data was invalid."}})
 		return
 	}
+	in := cur.Input()
 	if body.Name != nil {
-		cur.Name = *body.Name
+		in.Name = *body.Name
 	}
 	if body.Type != nil {
-		cur.Type = *body.Type
+		in.Type = *body.Type
 	}
 	if body.CurrencyID != nil {
-		cur.CurrencyID = *body.CurrencyID
+		in.CurrencyID = *body.CurrencyID
 	}
 	// A code is only resolved, never created: the currency cannot change anyway.
 	if body.CurrencyCode != nil && *body.CurrencyCode != "" {
 		c, err := s.currencies.ByCode(r.Context(), *body.CurrencyCode)
-		if err != nil || c == nil || c.ID != cur.CurrencyID {
+		if err != nil || c == nil || c.ID != in.CurrencyID {
 			writeAccountError(w, domain.ErrAccountCurrencyImmutable)
 			return
 		}
 	}
 	if body.InitialBalance != nil {
-		cur.InitialBalance = *body.InitialBalance
+		in.InitialBalance = *body.InitialBalance
 	}
 	if body.IsActive != nil {
-		cur.IsActive = *body.IsActive
+		in.IsActive = *body.IsActive
 	}
-	a, err := s.accounts.Update(r.Context(), cur.ID, *cur)
+	a, err := s.accounts.Update(r.Context(), cur.ID, in)
 	if err != nil {
 		writeAccountError(w, err)
 		return
@@ -312,28 +314,21 @@ func (s *Server) accountsBalanceHistory(w http.ResponseWriter, r *http.Request) 
 	accts, _ := s.accounts.All(r.Context(), true, true)
 	dates := dateRange(start, end)
 	series := []map[string]any{}
-	total := make([]float64, len(dates))
+	total := make([]money.Money, len(dates))
+	for i := range total {
+		total[i] = money.Zero(base.Unit())
+	}
 	for _, a := range accts {
-		nativeDec := 2
-		if a.Currency != nil {
-			nativeDec = a.Currency.Decimals
-		}
-		data := make([]float64, len(dates))
-		native := make([]float64, len(dates))
+		data := make([]money.Money, len(dates))   // in the base currency
+		native := make([]money.Money, len(dates)) // in the account's own
 		for i, d := range dates {
 			bal, _ := s.accounts.BalanceAt(r.Context(), a, d)
-			native[i] = bal.Round(int32(nativeDec)).InexactFloat64()
-			if a.Currency != nil {
-				data[i] = domain.Convert(bal, *a.Currency, *base).Round(int32(base.Decimals)).InexactFloat64()
-			}
-			total[i] += data[i]
-		}
-		code := ""
-		if a.Currency != nil {
-			code = a.Currency.Code
+			native[i] = bal
+			data[i] = domain.Convert(bal, *a.Currency, *base)
+			total[i] = total[i].Add(data[i])
 		}
 		series = append(series, map[string]any{
-			"id": a.ID, "name": a.Name, "type": a.Type, "data": data, "native_data": native, "currency": code,
+			"id": a.ID, "name": a.Name, "type": a.Type, "data": data, "native_data": native, "currency": a.Currency.Code,
 		})
 	}
 	if len(accts) > 1 {
@@ -361,7 +356,7 @@ func (s *Server) queryPeriod(r *http.Request) (start, end string) {
 func (s *Server) accountsBalanceComparison(w http.ResponseWriter, r *http.Request) {
 	base, _ := s.currencies.Base(r.Context())
 	sum := dto.NewAccountsSummary(s.accounts.Summary(r.Context(), base))
-	var previous *decimal.Decimal
+	var previous *money.Money
 	if base != nil {
 		start, _ := s.queryPeriod(r)
 		if from, err := time.Parse("2006-01-02", start); err == nil {

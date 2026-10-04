@@ -14,23 +14,57 @@ import (
 	"savvy-go/internal/money"
 )
 
+// Account is an account as stored; every amount is in its Currency. A debt is
+// an account too: Balance is then what is still owed and TargetAmount what
+// was owed in total.
 type Account struct {
 	ID             int64
 	Name           string
 	Type           string
 	CurrencyID     int64
-	InitialBalance decimal.Decimal
+	InitialBalance money.Money
 	IsActive       bool
 	SortOrder      int
 	DebtType       *string
-	TargetAmount   *decimal.Decimal
+	TargetAmount   *money.Money
 	DueDate        *string
 	IsPaidOff      bool
 	Counterparty   *string
 	DebtDesc       *string
 	CreatedAt      *time.Time
 	Currency       *Currency
-	Balance        decimal.Decimal
+	Balance        money.Money
+}
+
+// AccountInput is what create and update take. Amounts arrive as decimals
+// because the request names the currency by id; they are rounded into the
+// account currency's scale when stored.
+type AccountInput struct {
+	Name           string
+	Type           string
+	CurrencyID     int64
+	InitialBalance decimal.Decimal
+	IsActive       bool
+	DebtType       *string
+	TargetAmount   *decimal.Decimal
+	DueDate        *string
+	IsPaidOff      bool
+	Counterparty   *string
+	DebtDesc       *string
+}
+
+// Input is the account as an update input, for read-modify-write.
+func (a Account) Input() AccountInput {
+	in := AccountInput{
+		Name: a.Name, Type: a.Type, CurrencyID: a.CurrencyID, InitialBalance: a.InitialBalance.Decimal(),
+		IsActive: a.IsActive, DebtType: a.DebtType, DueDate: a.DueDate, IsPaidOff: a.IsPaidOff,
+		Counterparty: a.Counterparty, DebtDesc: a.DebtDesc,
+	}
+	if a.TargetAmount != nil {
+		d := a.TargetAmount.Decimal()
+		in.TargetAmount = &d
+	}
+	return in
 }
 
 var (
@@ -67,22 +101,22 @@ func (s Accounts) ByID(ctx context.Context, id int64) (*Account, error) {
 	return &list[0], nil
 }
 
-func (s Accounts) Create(ctx context.Context, a Account) (*Account, error) {
+func (s Accounts) Create(ctx context.Context, a AccountInput) (*Account, error) {
 	if a.Type == "" {
 		a.Type = "cash"
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	dec, err := s.currencyDecimals(ctx, a.CurrencyID)
+	unit, err := s.currencyUnit(ctx, a.CurrencyID)
 	if err != nil {
 		return nil, err
 	}
-	max, _ := db.Q(s.DB).MaxAccountSortOrder(ctx, db.Flag(a.Type == "debt"))
-	a.SortOrder = int(asFloat64(max)) + 1
+	last, _ := db.Q(s.DB).MaxAccountSortOrder(ctx, db.Flag(a.Type == "debt"))
 	res, err := db.Q(s.DB).InsertAccount(ctx, sqlc.InsertAccountParams{
 		Name: a.Name, Type: a.Type, DebtType: db.NullString(a.DebtType), CurrencyID: a.CurrencyID,
-		InitialBalance: money.ToMinor(a.InitialBalance, dec), TargetAmount: money.ToNullMinor(a.TargetAmount, dec), DueDate: db.NullString(a.DueDate),
+		InitialBalance: money.FromDecimal(a.InitialBalance, unit).Minor(),
+		TargetAmount:   money.ToNullMinor(money.FromNullDecimal(a.TargetAmount, unit)), DueDate: db.NullString(a.DueDate),
 		IsPaidOff: db.BoolInt(a.IsPaidOff), Counterparty: db.NullString(a.Counterparty), DebtDescription: db.NullString(a.DebtDesc),
-		IsActive: db.BoolInt(a.IsActive), SortOrder: int64(a.SortOrder), CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
+		IsActive: db.BoolInt(a.IsActive), SortOrder: int64(asFloat64(last)) + 1, CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
 	})
 	if err != nil {
 		return nil, err
@@ -91,7 +125,7 @@ func (s Accounts) Create(ctx context.Context, a Account) (*Account, error) {
 	return s.ByID(ctx, id)
 }
 
-func (s Accounts) Update(ctx context.Context, id int64, a Account) (*Account, error) {
+func (s Accounts) Update(ctx context.Context, id int64, a AccountInput) (*Account, error) {
 	cur, err := s.ByID(ctx, id)
 	if err != nil || cur == nil {
 		return nil, err
@@ -99,15 +133,13 @@ func (s Accounts) Update(ctx context.Context, id int64, a Account) (*Account, er
 	if a.CurrencyID != cur.CurrencyID {
 		return nil, ErrAccountCurrencyImmutable
 	}
-	dec, err := s.currencyDecimals(ctx, cur.CurrencyID)
-	if err != nil {
-		return nil, err
-	}
+	unit := cur.Currency.Unit()
 	now := time.Now().UTC().Format(time.RFC3339)
 	err = db.Q(s.DB).UpdateAccount(ctx, sqlc.UpdateAccountParams{
-		Name: a.Name, Type: a.Type, CurrencyID: cur.CurrencyID, InitialBalance: money.ToMinor(a.InitialBalance, dec),
-		IsActive: db.BoolInt(a.IsActive), DebtType: db.NullString(a.DebtType), TargetAmount: money.ToNullMinor(a.TargetAmount, dec),
-		DueDate: db.NullString(a.DueDate), IsPaidOff: db.BoolInt(a.IsPaidOff), Counterparty: db.NullString(a.Counterparty),
+		Name: a.Name, Type: a.Type, CurrencyID: cur.CurrencyID, InitialBalance: money.FromDecimal(a.InitialBalance, unit).Minor(),
+		IsActive: db.BoolInt(a.IsActive), DebtType: db.NullString(a.DebtType),
+		TargetAmount: money.ToNullMinor(money.FromNullDecimal(a.TargetAmount, unit)),
+		DueDate:      db.NullString(a.DueDate), IsPaidOff: db.BoolInt(a.IsPaidOff), Counterparty: db.NullString(a.Counterparty),
 		DebtDescription: db.NullString(a.DebtDesc), UpdatedAt: db.NS(now), ID: id,
 	})
 	if err != nil {
@@ -136,7 +168,7 @@ func (s Accounts) Reorder(ctx context.Context, ids []int64) error {
 // AccountsSummary totals account balances in Currency (nil when there is
 // none), rounded to its decimals.
 type AccountsSummary struct {
-	Total    decimal.Decimal
+	Total    money.Money
 	Currency *Currency
 	Count    int
 }
@@ -151,26 +183,23 @@ func (s Accounts) Summary(ctx context.Context, base *Currency) AccountsSummary {
 }
 
 // TotalAt is Summary's total as of the end of asOf (YYYY-MM-DD).
-func (s Accounts) TotalAt(ctx context.Context, base Currency, asOf string) decimal.Decimal {
+func (s Accounts) TotalAt(ctx context.Context, base Currency, asOf string) money.Money {
 	accts, _ := s.All(ctx, true, true)
 	return s.total(ctx, accts, base, asOf)
 }
 
 // total converts the balances of accts as of asOf ("" for now, which reuses
-// the loaded balances) to base and rounds the sum to its decimals.
-func (s Accounts) total(ctx context.Context, accts []Account, base Currency, asOf string) decimal.Decimal {
-	sum := decimal.Zero
+// the loaded balances) to base, each rounded to base's scale, and adds them.
+func (s Accounts) total(ctx context.Context, accts []Account, base Currency, asOf string) money.Money {
+	sum := money.Zero(base.Unit())
 	for _, a := range accts {
-		if a.Currency == nil {
-			continue
-		}
 		bal := a.Balance
 		if asOf != "" {
 			bal, _ = s.balance(ctx, a, asOf)
 		}
 		sum = sum.Add(Convert(bal, *a.Currency, base))
 	}
-	return sum.Round(int32(base.Decimals))
+	return sum
 }
 
 func (s Accounts) list(ctx context.Context, arg sqlc.ListAccountsParams) ([]Account, error) {
@@ -188,23 +217,20 @@ func (s Accounts) list(ctx context.Context, arg sqlc.ListAccountsParams) ([]Acco
 	return out, nil
 }
 
-func (s Accounts) BalanceAt(ctx context.Context, a Account, asOf string) (decimal.Decimal, error) {
+func (s Accounts) BalanceAt(ctx context.Context, a Account, asOf string) (money.Money, error) {
 	return s.balance(ctx, a, asOf)
 }
 
-func (s Accounts) balance(ctx context.Context, a Account, asOf string) (decimal.Decimal, error) {
+func (s Accounts) balance(ctx context.Context, a Account, asOf string) (money.Money, error) {
 	q := db.Q(s.DB)
-	dec := 2
-	if a.Currency != nil {
-		dec = a.Currency.Decimals
-	}
+	unit := a.Currency.Unit()
 	if a.Type == "debt" {
 		paid, _ := q.SumDebtPayments(ctx, db.NI(a.ID))
-		target := decimal.Zero
+		target := money.Zero(unit)
 		if a.TargetAmount != nil {
 			target = *a.TargetAmount
 		}
-		return target.Sub(money.FromMinor(paid, dec)), nil
+		return target.Sub(money.New(paid, unit)), nil
 	}
 	asOfArg := db.Narg(asOf)
 	income, _ := q.SumAccountIncome(ctx, sqlc.SumAccountIncomeParams{AccountID: a.ID, AsOf: asOfArg})
@@ -213,32 +239,31 @@ func (s Accounts) balance(ctx context.Context, a Account, asOf string) (decimal.
 	tin, _ := q.SumAccountTransferIn(ctx, sqlc.SumAccountTransferInParams{ToAccountID: db.NI(a.ID), AsOf: asOfArg})
 	dIn, _ := q.SumAccountDebtIn(ctx, sqlc.SumAccountDebtInParams{AccountID: a.ID, AsOf: asOfArg})
 	dOut, _ := q.SumAccountDebtOut(ctx, sqlc.SumAccountDebtOutParams{AccountID: a.ID, AsOf: asOfArg})
-	minor := income - expense - tout + tin + dIn - dOut
-	return a.InitialBalance.Add(money.FromMinor(minor, dec)), nil
+	return a.InitialBalance.Add(money.New(income-expense-tout+tin+dIn-dOut, unit)), nil
 }
 
-func (s Accounts) currencyDecimals(ctx context.Context, currencyID int64) (int, error) {
+func (s Accounts) currencyUnit(ctx context.Context, currencyID int64) (money.Unit, error) {
 	c, err := db.Q(s.DB).GetCurrency(ctx, currencyID)
 	if errors.Is(err, sql.ErrNoRows) {
-		return 0, ErrUnknownCurrency
+		return money.Unit{}, ErrUnknownCurrency
 	}
 	if err != nil {
-		return 0, err
+		return money.Unit{}, err
 	}
-	return int(c.Decimals), nil
+	return money.Unit{ID: c.ID, Decimals: int(c.Decimals)}, nil
 }
 
-// Decimals returns the decimals of the account currency, the scale of every
-// amount stored for that account.
-func (s Accounts) Decimals(ctx context.Context, accountID int64) (int, error) {
-	d, err := db.Q(s.DB).GetAccountDecimals(ctx, accountID)
+// Unit returns the unit of the account currency, the scale of every amount
+// stored for that account.
+func (s Accounts) Unit(ctx context.Context, accountID int64) (money.Unit, error) {
+	u, err := db.Q(s.DB).GetAccountUnit(ctx, accountID)
 	if errors.Is(err, sql.ErrNoRows) {
-		return 0, ErrUnknownAccount
+		return money.Unit{}, ErrUnknownAccount
 	}
 	if err != nil {
-		return 0, err
+		return money.Unit{}, err
 	}
-	return int(d), nil
+	return money.Unit{ID: u.ID, Decimals: int(u.Decimals)}, nil
 }
 
 func accountFromRow(r sqlc.ListAccountsRow) Account {
@@ -249,11 +274,11 @@ func accountFromRow(r sqlc.ListAccountsRow) Account {
 	}
 	cur := Currency{ID: r.CurrencyIDJoin, Code: r.Code, Name: r.CurrencyName, Symbol: r.Symbol, Decimals: int(r.Decimals), IsBase: r.IsBase != 0, Rate: r.Rate}
 	a.Currency = &cur
-	a.InitialBalance = money.FromMinor(r.InitialBalance, cur.Decimals)
+	a.InitialBalance = money.New(r.InitialBalance, cur.Unit())
 	if r.DebtType.Valid {
 		a.DebtType = &r.DebtType.String
 	}
-	a.TargetAmount = money.FromNullMinor(r.TargetAmount, cur.Decimals)
+	a.TargetAmount = money.FromNullMinor(r.TargetAmount, cur.Unit())
 	if r.DueDate.Valid {
 		a.DueDate = &r.DueDate.String
 	}

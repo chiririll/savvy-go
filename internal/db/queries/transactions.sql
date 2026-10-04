@@ -35,7 +35,8 @@ WHERE t.id = COALESCE(sqlc.narg('id'), t.id)
 -- name: ListTransactions :many
 SELECT t.id, t.type, t.account_id, t.to_account_id, t.category_id, t.amount, t.to_amount,
 	t.description, t.date, t.status, t.recurring_transaction_id, t.created_at,
-	ca.decimals AS decimals, COALESCE(cb.decimals, ca.decimals) AS to_decimals
+	ca.id AS currency_id, ca.decimals AS decimals,
+	COALESCE(cb.id, ca.id) AS to_currency_id, COALESCE(cb.decimals, ca.decimals) AS to_decimals
 FROM transactions t
 JOIN accounts a ON a.id = t.account_id
 JOIN currencies ca ON ca.id = a.currency_id

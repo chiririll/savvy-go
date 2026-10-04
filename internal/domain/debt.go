@@ -9,6 +9,7 @@ import (
 
 	"savvy-go/internal/db"
 	"savvy-go/internal/db/sqlc"
+	"savvy-go/internal/money"
 )
 
 type Debts struct {
@@ -31,7 +32,7 @@ func (s Debts) Create(ctx context.Context, name, debtType string, currencyID, ac
 		}
 		currencyID = src.CurrencyID
 	}
-	debt, err := s.Accounts.Create(ctx, Account{
+	debt, err := s.Accounts.Create(ctx, AccountInput{
 		Name: name, Type: "debt", CurrencyID: currencyID,
 		InitialBalance: decimal.Zero, TargetAmount: &amount, DueDate: due,
 		Counterparty: counter, DebtDesc: desc, IsActive: true, DebtType: &debtType,
@@ -117,8 +118,8 @@ func (s Debts) Reopen(ctx context.Context, id int64) (*Account, error) {
 // DebtSummary totals open debts in the base currency (nil when there is none),
 // rounded to its decimals.
 type DebtSummary struct {
-	IOwe     decimal.Decimal
-	OwedToMe decimal.Decimal
+	IOwe     money.Money
+	OwedToMe money.Money
 	Count    int
 	Currency *Currency
 }
@@ -127,20 +128,17 @@ func (s Debts) Summary(ctx context.Context) DebtSummary {
 	debts, _ := s.All(ctx, false)
 	base, _ := (Currencies{DB: s.Accounts.DB}).Base(ctx)
 	out := DebtSummary{Count: len(debts), Currency: base}
+	if base == nil {
+		return out
+	}
+	out.IOwe, out.OwedToMe = money.Zero(base.Unit()), money.Zero(base.Unit())
 	for _, d := range debts {
-		amt := d.Balance
-		if d.Currency != nil && !d.Currency.IsBase {
-			amt = d.Currency.ConvertToBase(amt)
-		}
+		amt := Convert(d.Balance, *d.Currency, *base)
 		if d.DebtType != nil && *d.DebtType == "i_owe" {
 			out.IOwe = out.IOwe.Add(amt)
 		} else {
 			out.OwedToMe = out.OwedToMe.Add(amt)
 		}
-	}
-	if base != nil {
-		out.IOwe = out.IOwe.Round(int32(base.Decimals))
-		out.OwedToMe = out.OwedToMe.Round(int32(base.Decimals))
 	}
 	return out
 }

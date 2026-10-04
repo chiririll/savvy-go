@@ -127,7 +127,7 @@ func (s *scales) fixMoney(table string, cols []string, vals []any) error {
 		if err != nil {
 			return fmt.Errorf("%s.%s: %w", table, name, err)
 		}
-		vals[i] = money.ToMinor(d, dec)
+		vals[i] = money.FromDecimal(d, money.Unit{Decimals: dec}).Minor() // only the scale matters here
 		return nil
 	}
 	var errs [3]error
