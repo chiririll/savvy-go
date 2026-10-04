@@ -152,3 +152,53 @@ func TestConformRebuildsOldTables(t *testing.T) {
 		t.Errorf("foreign_keys left %d, %v", enforced, err)
 	}
 }
+
+// TestForeignKeysAreIndexed requires an index led by every foreign key column.
+// Without one, every lookup by that column and every delete of a parent row
+// (the ON DELETE check or action) scans the whole child table.
+func TestForeignKeysAreIndexed(t *testing.T) {
+	sqlDB, err := db.Open(filepath.Join(t.TempDir(), "database.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = sqlDB.Close() })
+	ctx := context.Background()
+	if err := Up(ctx, sqlDB); err != nil {
+		t.Fatal(err)
+	}
+
+	query := func(q string, args ...any) []string {
+		t.Helper()
+		rows, err := sqlDB.QueryContext(ctx, q, args...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer rows.Close()
+		var out []string
+		for rows.Next() {
+			var s string
+			if err := rows.Scan(&s); err != nil {
+				t.Fatal(err)
+			}
+			out = append(out, s)
+		}
+		return out
+	}
+	for _, table := range query(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`) {
+		leading := map[string]bool{}
+		// A partial index only covers some rows, so it does not count.
+		for _, idx := range query(`SELECT name FROM pragma_index_list(?) WHERE partial = 0`, table) {
+			if first := query(`SELECT name FROM pragma_index_info(?) WHERE seqno = 0`, idx); len(first) == 1 {
+				leading[first[0]] = true
+			}
+		}
+		for _, pk := range query(`SELECT name FROM pragma_table_info(?) WHERE pk = 1`, table) {
+			leading[pk] = true // INTEGER PRIMARY KEY or the first column of a composite key
+		}
+		for _, col := range query(`SELECT "from" FROM pragma_foreign_key_list(?)`, table) {
+			if !leading[col] {
+				t.Errorf("%s.%s is a foreign key without an index", table, col)
+			}
+		}
+	}
+}

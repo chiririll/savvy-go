@@ -11,7 +11,6 @@ import (
 
 	"savvy-go/internal/auth"
 	appdb "savvy-go/internal/db"
-	"savvy-go/internal/db/sqlc"
 	"savvy-go/internal/domain"
 	"savvy-go/internal/settings"
 )
@@ -50,7 +49,7 @@ func Demo(ctx context.Context, db *sql.DB, enabled bool, loc *time.Location) err
 		return fmt.Errorf("mark demo seeded: %w", err)
 	}
 
-	txs, _ := appdb.Q(db).CountTransactions(ctx, sqlc.CountTransactionsParams{})
+	txs, _ := appdb.Q(db).CountAllTransactions(ctx)
 	accts, _ := appdb.Q(db).CountAccounts(ctx)
 	slog.Info("demo data seeded", "transactions", txs, "accounts", accts)
 	return nil

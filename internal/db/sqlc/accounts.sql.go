@@ -135,6 +135,69 @@ func (q *Queries) DeleteDebtIssuance(ctx context.Context, toAccountID sql.NullIn
 	return err
 }
 
+const getAccount = `-- name: GetAccount :one
+SELECT a.id, a.name, a.type, a.currency_id, a.initial_balance, a.is_active, a.sort_order,
+	a.debt_type, a.target_amount, a.due_date, a.is_paid_off, a.counterparty, a.debt_description, a.created_at,
+	c.id AS currency_id_join, c.code, c.name AS currency_name, c.symbol, c.decimals, c.is_base, c.rate
+FROM accounts a
+JOIN currencies c ON c.id = a.currency_id
+WHERE a.id = ?
+`
+
+type GetAccountRow struct {
+	ID              int64
+	Name            string
+	Type            string
+	CurrencyID      int64
+	InitialBalance  int64
+	IsActive        int64
+	SortOrder       int64
+	DebtType        sql.NullString
+	TargetAmount    sql.NullInt64
+	DueDate         sql.NullString
+	IsPaidOff       int64
+	Counterparty    sql.NullString
+	DebtDescription sql.NullString
+	CreatedAt       sql.NullString
+	CurrencyIDJoin  int64
+	Code            string
+	CurrencyName    string
+	Symbol          string
+	Decimals        int64
+	IsBase          int64
+	Rate            decimal.Decimal
+}
+
+// The same columns as ListAccounts, so its row converts to ListAccountsRow.
+func (q *Queries) GetAccount(ctx context.Context, id int64) (GetAccountRow, error) {
+	row := q.db.QueryRowContext(ctx, getAccount, id)
+	var i GetAccountRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Type,
+		&i.CurrencyID,
+		&i.InitialBalance,
+		&i.IsActive,
+		&i.SortOrder,
+		&i.DebtType,
+		&i.TargetAmount,
+		&i.DueDate,
+		&i.IsPaidOff,
+		&i.Counterparty,
+		&i.DebtDescription,
+		&i.CreatedAt,
+		&i.CurrencyIDJoin,
+		&i.Code,
+		&i.CurrencyName,
+		&i.Symbol,
+		&i.Decimals,
+		&i.IsBase,
+		&i.Rate,
+	)
+	return i, err
+}
+
 const getAccountUnit = `-- name: GetAccountUnit :one
 SELECT c.id, c.decimals FROM accounts a JOIN currencies c ON c.id = a.currency_id WHERE a.id = ?
 `
@@ -199,17 +262,15 @@ SELECT a.id, a.name, a.type, a.currency_id, a.initial_balance, a.is_active, a.so
 	c.id AS currency_id_join, c.code, c.name AS currency_name, c.symbol, c.decimals, c.is_base, c.rate
 FROM accounts a
 JOIN currencies c ON c.id = a.currency_id
-WHERE a.id = COALESCE(?1, a.id)
-  AND a.is_active = COALESCE(?2, a.is_active)
+WHERE a.is_active = COALESCE(?1, a.is_active)
   AND CASE a.type WHEN 'bank' THEN 1 WHEN 'crypto' THEN 1 WHEN 'cash' THEN 1 ELSE 0 END
-      >= COALESCE(CAST(?3 AS INTEGER), 0)
-  AND CASE a.type WHEN 'debt' THEN 1 ELSE 0 END >= COALESCE(CAST(?4 AS INTEGER), 0)
-  AND a.is_paid_off <= CASE WHEN CAST(?5 AS INTEGER) IS NULL THEN 1 ELSE 0 END
+      >= COALESCE(CAST(?2 AS INTEGER), 0)
+  AND CASE a.type WHEN 'debt' THEN 1 ELSE 0 END >= COALESCE(CAST(?3 AS INTEGER), 0)
+  AND a.is_paid_off <= CASE WHEN CAST(?4 AS INTEGER) IS NULL THEN 1 ELSE 0 END
 ORDER BY CASE WHEN a.type = 'debt' THEN 1 ELSE 0 END, a.sort_order, a.id
 `
 
 type ListAccountsParams struct {
-	ID           sql.NullInt64
 	OnlyActive   sql.NullInt64
 	ExcludeDebts sql.NullInt64
 	OnlyDebts    sql.NullInt64
@@ -242,7 +303,6 @@ type ListAccountsRow struct {
 
 func (q *Queries) ListAccounts(ctx context.Context, arg ListAccountsParams) ([]ListAccountsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listAccounts,
-		arg.ID,
 		arg.OnlyActive,
 		arg.ExcludeDebts,
 		arg.OnlyDebts,

@@ -3,6 +3,7 @@ package domain
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -73,8 +74,15 @@ func (s RecurringStore) Upcoming(ctx context.Context, limit int) ([]Recurring, e
 }
 
 func (s RecurringStore) ByID(ctx context.Context, id int64) (*Recurring, error) {
-	list, err := s.list(ctx, sqlc.ListRecurringParams{ID: db.NI(id), Limit: 1, Offset: 0})
-	if err != nil || len(list) == 0 {
+	r, err := db.Q(s.DB).GetRecurring(ctx, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	list, err := s.hydrate(ctx, []sqlc.ListRecurringRow{sqlc.ListRecurringRow(r)})
+	if err != nil {
 		return nil, err
 	}
 	return &list[0], nil
@@ -371,27 +379,25 @@ func (s RecurringStore) list(ctx context.Context, arg sqlc.ListRecurringParams) 
 	if err != nil {
 		return nil, err
 	}
+	return s.hydrate(ctx, rows)
+}
+
+// hydrate turns rows into recurrences with their accounts, category and tags,
+// loading each distinct account and category once.
+func (s RecurringStore) hydrate(ctx context.Context, rows []sqlc.ListRecurringRow) ([]Recurring, error) {
 	out := make([]Recurring, 0, len(rows))
+	rel := newRelated(ctx, s.DB)
 	for _, r := range rows {
-		out = append(out, recurringFromRow(r))
-	}
-	accts := Accounts{DB: s.DB}
-	cats := Categories{DB: s.DB}
-	for i := range out {
-		if a, _ := accts.ByID(ctx, out[i].AccountID); a != nil {
-			out[i].Account = a
+		rec := recurringFromRow(r)
+		rec.Account = rel.account(rec.AccountID)
+		rec.ToAccount = rel.optionalAccount(rec.ToAccountID)
+		rec.Category = rel.category(rec.CategoryID)
+		tags, err := s.tags(ctx, rec.ID)
+		if err != nil {
+			return nil, err
 		}
-		if out[i].ToAccountID != nil {
-			if a, _ := accts.ByID(ctx, *out[i].ToAccountID); a != nil {
-				out[i].ToAccount = a
-			}
-		}
-		if out[i].CategoryID != nil {
-			if c, _ := cats.ByID(ctx, *out[i].CategoryID); c != nil {
-				out[i].Category = c
-			}
-		}
-		out[i].Tags, _ = s.tags(ctx, out[i].ID)
+		rec.Tags = tags
+		out = append(out, rec)
 	}
 	return out, nil
 }

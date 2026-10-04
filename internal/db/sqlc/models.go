@@ -260,7 +260,6 @@ type TransactionItem struct {
 	TransactionID int64
 	Name          string
 	Quantity      decimal.Decimal
-	Unit          sql.NullString
 	PricePerUnit  int64
 	TotalPrice    int64
 	CreatedAt     sql.NullString
@@ -353,7 +352,6 @@ type WebauthnCredential struct {
 	Name         sql.NullString
 	Aaguid       sql.NullString
 	Record       string
-	Transports   sql.NullString
 	Counter      int64
 	LastUsedAt   sql.NullString
 	CreatedAt    sql.NullString

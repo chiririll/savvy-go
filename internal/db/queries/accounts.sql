@@ -1,11 +1,19 @@
+-- name: GetAccount :one
+-- The same columns as ListAccounts, so its row converts to ListAccountsRow.
+SELECT a.id, a.name, a.type, a.currency_id, a.initial_balance, a.is_active, a.sort_order,
+	a.debt_type, a.target_amount, a.due_date, a.is_paid_off, a.counterparty, a.debt_description, a.created_at,
+	c.id AS currency_id_join, c.code, c.name AS currency_name, c.symbol, c.decimals, c.is_base, c.rate
+FROM accounts a
+JOIN currencies c ON c.id = a.currency_id
+WHERE a.id = ?;
+
 -- name: ListAccounts :many
 SELECT a.id, a.name, a.type, a.currency_id, a.initial_balance, a.is_active, a.sort_order,
 	a.debt_type, a.target_amount, a.due_date, a.is_paid_off, a.counterparty, a.debt_description, a.created_at,
 	c.id AS currency_id_join, c.code, c.name AS currency_name, c.symbol, c.decimals, c.is_base, c.rate
 FROM accounts a
 JOIN currencies c ON c.id = a.currency_id
-WHERE a.id = COALESCE(sqlc.narg('id'), a.id)
-  AND a.is_active = COALESCE(sqlc.narg('only_active'), a.is_active)
+WHERE a.is_active = COALESCE(sqlc.narg('only_active'), a.is_active)
   AND CASE a.type WHEN 'bank' THEN 1 WHEN 'crypto' THEN 1 WHEN 'cash' THEN 1 ELSE 0 END
       >= COALESCE(CAST(sqlc.narg('exclude_debts') AS INTEGER), 0)
   AND CASE a.type WHEN 'debt' THEN 1 ELSE 0 END >= COALESCE(CAST(sqlc.narg('only_debts') AS INTEGER), 0)

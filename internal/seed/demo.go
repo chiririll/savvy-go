@@ -789,7 +789,7 @@ func floatPtrDecimal(v *float64) *decimal.Decimal {
 }
 
 func (s *seeder) countTx() int {
-	n, _ := appdb.Q(s.db).CountTransactions(s.ctx, sqlc.CountTransactionsParams{})
+	n, _ := appdb.Q(s.db).CountAllTransactions(s.ctx)
 	return int(n)
 }
 

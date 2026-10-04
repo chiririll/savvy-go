@@ -110,7 +110,7 @@ func CountTransactions(ctx context.Context, sqlDB *sql.DB, f TxFilter) (int64, e
 	return n, err
 }
 
-func ListTransactions(ctx context.Context, sqlDB *sql.DB, f TxFilter, limit, offset int) ([]sqlc.ListTransactionsRow, error) {
+func ListTransactions(ctx context.Context, sqlDB *sql.DB, f TxFilter, limit, offset int) ([]sqlc.GetTransactionRow, error) {
 	where, args := txWhere(f)
 	args = append(args, limit, offset)
 	rows, err := sqlDB.QueryContext(ctx, `
@@ -129,9 +129,9 @@ func ListTransactions(ctx context.Context, sqlDB *sql.DB, f TxFilter, limit, off
 		return nil, err
 	}
 	defer rows.Close()
-	out := []sqlc.ListTransactionsRow{}
+	out := []sqlc.GetTransactionRow{}
 	for rows.Next() {
-		var r sqlc.ListTransactionsRow
+		var r sqlc.GetTransactionRow
 		if err := rows.Scan(&r.ID, &r.Type, &r.AccountID, &r.ToAccountID, &r.CategoryID, &r.Amount, &r.ToAmount,
 			&r.Description, &r.Date, &r.Status, &r.RecurringTransactionID, &r.CreatedAt,
 			&r.CurrencyID, &r.Decimals, &r.ToCurrencyID, &r.ToDecimals); err != nil {

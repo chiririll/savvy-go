@@ -60,6 +60,7 @@ CREATE TABLE IF NOT EXISTS two_factor_challenges (
     created_at TEXT,
     updated_at TEXT
 ) STRICT;
+CREATE INDEX IF NOT EXISTS two_factor_challenges_user_idx ON two_factor_challenges (user_id);
 CREATE INDEX IF NOT EXISTS two_factor_challenges_expires_idx ON two_factor_challenges (expires_at);
 
 CREATE TABLE IF NOT EXISTS two_factor_recovery_codes (
@@ -69,6 +70,7 @@ CREATE TABLE IF NOT EXISTS two_factor_recovery_codes (
     used_at TEXT,
     created_at TEXT
 ) STRICT;
+CREATE INDEX IF NOT EXISTS two_factor_recovery_codes_user_idx ON two_factor_recovery_codes (user_id);
 
 CREATE TABLE IF NOT EXISTS webauthn_credentials (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -77,7 +79,6 @@ CREATE TABLE IF NOT EXISTS webauthn_credentials (
     name TEXT,
     aaguid TEXT,
     record TEXT NOT NULL,
-    transports TEXT,
     counter INTEGER NOT NULL DEFAULT 0,
     last_used_at TEXT,
     created_at TEXT,
@@ -96,6 +97,7 @@ CREATE TABLE IF NOT EXISTS webauthn_challenges (
     created_at TEXT,
     updated_at TEXT
 ) STRICT;
+CREATE INDEX IF NOT EXISTS webauthn_challenges_user_idx ON webauthn_challenges (user_id);
 CREATE INDEX IF NOT EXISTS webauthn_challenges_expires_idx ON webauthn_challenges (expires_at);
 
 CREATE TABLE IF NOT EXISTS currencies (
@@ -129,6 +131,7 @@ CREATE TABLE IF NOT EXISTS accounts (
     created_at TEXT,
     updated_at TEXT
 ) STRICT;
+CREATE INDEX IF NOT EXISTS accounts_currency_idx ON accounts (currency_id);
 CREATE INDEX IF NOT EXISTS accounts_type_debt_idx ON accounts (type, debt_type);
 
 CREATE TABLE IF NOT EXISTS categories (
@@ -172,6 +175,9 @@ CREATE TABLE IF NOT EXISTS recurring_transactions (
     created_at TEXT,
     updated_at TEXT
 ) STRICT;
+CREATE INDEX IF NOT EXISTS recurring_account_idx ON recurring_transactions (account_id);
+CREATE INDEX IF NOT EXISTS recurring_to_account_idx ON recurring_transactions (to_account_id);
+CREATE INDEX IF NOT EXISTS recurring_category_idx ON recurring_transactions (category_id);
 CREATE INDEX IF NOT EXISTS recurring_next_run_idx ON recurring_transactions (next_run_date);
 
 CREATE TABLE IF NOT EXISTS recurring_transaction_tag (
@@ -179,6 +185,7 @@ CREATE TABLE IF NOT EXISTS recurring_transaction_tag (
     tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
     PRIMARY KEY (recurring_transaction_id, tag_id)
 ) STRICT;
+CREATE INDEX IF NOT EXISTS recurring_transaction_tag_tag_idx ON recurring_transaction_tag (tag_id);
 
 CREATE TABLE IF NOT EXISTS transactions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -196,6 +203,8 @@ CREATE TABLE IF NOT EXISTS transactions (
     created_at TEXT,
     updated_at TEXT
 ) STRICT;
+CREATE INDEX IF NOT EXISTS transactions_category_idx ON transactions (category_id);
+CREATE INDEX IF NOT EXISTS transactions_recurring_idx ON transactions (recurring_transaction_id);
 CREATE INDEX IF NOT EXISTS transactions_date_idx ON transactions (date);
 CREATE UNIQUE INDEX IF NOT EXISTS transactions_account_dedup_unique ON transactions (account_id, dedup_hash);
 CREATE UNIQUE INDEX IF NOT EXISTS transactions_recurring_pending_unique
@@ -211,18 +220,19 @@ CREATE TABLE IF NOT EXISTS transaction_items (
     transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     quantity TEXT NOT NULL DEFAULT '1',
-    unit TEXT,
     price_per_unit INTEGER NOT NULL CHECK (price_per_unit >= 0),
     total_price INTEGER NOT NULL CHECK (total_price >= 0),
     created_at TEXT,
     updated_at TEXT
 ) STRICT;
+CREATE INDEX IF NOT EXISTS transaction_items_transaction_idx ON transaction_items (transaction_id);
 
 CREATE TABLE IF NOT EXISTS transaction_tag (
     transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
     tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
     PRIMARY KEY (transaction_id, tag_id)
 ) STRICT;
+CREATE INDEX IF NOT EXISTS transaction_tag_tag_idx ON transaction_tag (tag_id);
 
 CREATE TABLE IF NOT EXISTS budgets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -238,18 +248,21 @@ CREATE TABLE IF NOT EXISTS budgets (
     created_at TEXT,
     updated_at TEXT
 ) STRICT;
+CREATE INDEX IF NOT EXISTS budgets_currency_idx ON budgets (currency_id);
 
 CREATE TABLE IF NOT EXISTS budget_category (
     budget_id INTEGER NOT NULL REFERENCES budgets(id) ON DELETE CASCADE,
     category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
     PRIMARY KEY (budget_id, category_id)
 ) STRICT;
+CREATE INDEX IF NOT EXISTS budget_category_category_idx ON budget_category (category_id);
 
 CREATE TABLE IF NOT EXISTS budget_tag (
     budget_id INTEGER NOT NULL REFERENCES budgets(id) ON DELETE CASCADE,
     tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
     PRIMARY KEY (budget_id, tag_id)
 ) STRICT;
+CREATE INDEX IF NOT EXISTS budget_tag_tag_idx ON budget_tag (tag_id);
 
 CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
@@ -374,6 +387,7 @@ CREATE TABLE IF NOT EXISTS sso_login_states (
     created_at TEXT,
     updated_at TEXT
 ) STRICT;
+CREATE INDEX IF NOT EXISTS sso_login_states_provider_idx ON sso_login_states (identity_provider_id);
 CREATE INDEX IF NOT EXISTS sso_login_states_expires_idx ON sso_login_states (expires_at);
 CREATE INDEX IF NOT EXISTS sso_login_states_saml_idx ON sso_login_states (saml_request_id);
 
@@ -388,4 +402,5 @@ CREATE TABLE IF NOT EXISTS sso_login_tickets (
     created_at TEXT,
     updated_at TEXT
 ) STRICT;
+CREATE INDEX IF NOT EXISTS sso_login_tickets_user_idx ON sso_login_tickets (user_id);
 CREATE INDEX IF NOT EXISTS sso_login_tickets_expires_idx ON sso_login_tickets (expires_at);

@@ -3,6 +3,7 @@ package domain
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -252,8 +253,15 @@ func (s Transactions) Duplicate(ctx context.Context, id int64) (*Transaction, er
 }
 
 func (s Transactions) ByID(ctx context.Context, id int64) (*Transaction, error) {
-	list, err := s.list(ctx, sqlc.ListTransactionsParams{ID: db.NI(id), Limit: 1, Offset: 0})
-	if err != nil || len(list) == 0 {
+	r, err := db.Q(s.DB).GetTransaction(ctx, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	list, err := s.hydrate(ctx, []sqlc.GetTransactionRow{r})
+	if err != nil {
 		return nil, err
 	}
 	return &list[0], nil
@@ -274,7 +282,8 @@ func (s Transactions) Filtered(ctx context.Context, f filter.TxFilter, page, per
 	if err != nil {
 		return nil, 0, err
 	}
-	return s.hydrate(ctx, rows), int(total), nil
+	list, err := s.hydrate(ctx, rows)
+	return list, int(total), err
 }
 
 // TransactionSummary totals transactions in the base currency (nil when there
@@ -320,61 +329,46 @@ func (s Transactions) Summary(ctx context.Context, pendingOnly bool) Transaction
 	return out
 }
 
-func (s Transactions) list(ctx context.Context, arg sqlc.ListTransactionsParams) ([]Transaction, error) {
-	rows, err := db.Q(s.DB).ListTransactions(ctx, arg)
-	if err != nil {
-		return nil, err
-	}
-	return s.hydrate(ctx, rows), nil
-}
-
-func (s Transactions) hydrate(ctx context.Context, rows []sqlc.ListTransactionsRow) []Transaction {
+// hydrate turns rows into transactions with their accounts, category, items
+// and tags: one lookup per distinct account and category, and one query each
+// for the items and tags of the whole page.
+func (s Transactions) hydrate(ctx context.Context, rows []sqlc.GetTransactionRow) ([]Transaction, error) {
 	out := make([]Transaction, 0, len(rows))
+	ids := make([]int64, 0, len(rows))
+	at := make(map[int64]int, len(rows))
+	rel := newRelated(ctx, s.DB)
 	for _, r := range rows {
-		out = append(out, txFromRow(r))
+		t := txFromRow(r)
+		t.Account = rel.account(t.AccountID)
+		t.ToAccount = rel.optionalAccount(t.ToAccountID)
+		t.Category = rel.category(t.CategoryID)
+		t.Items, t.Tags = []TxItem{}, []Tag{}
+		at[t.ID] = len(out)
+		ids = append(ids, t.ID)
+		out = append(out, t)
 	}
-	accts := Accounts{DB: s.DB}
-	cats := Categories{DB: s.DB}
-	for i := range out {
-		if a, _ := accts.ByID(ctx, out[i].AccountID); a != nil {
-			out[i].Account = a
-		}
-		if out[i].ToAccountID != nil {
-			if a, _ := accts.ByID(ctx, *out[i].ToAccountID); a != nil {
-				out[i].ToAccount = a
-			}
-		}
-		if out[i].CategoryID != nil {
-			if c, _ := cats.ByID(ctx, *out[i].CategoryID); c != nil {
-				out[i].Category = c
-			}
-		}
-		out[i].Items, _ = s.items(ctx, out[i].ID, out[i].Amount.Unit())
-		out[i].Tags, _ = s.tags(ctx, out[i].ID)
+	if len(ids) == 0 {
+		return out, nil
 	}
-	return out
-}
-
-func (s Transactions) items(ctx context.Context, id int64, unit money.Unit) ([]TxItem, error) {
-	rows, err := db.Q(s.DB).ListTransactionItems(ctx, id)
+	items, err := db.Q(s.DB).ListItemsOfTransactions(ctx, ids)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]TxItem, 0, len(rows))
-	for _, r := range rows {
-		out = append(out, TxItem{ID: r.ID, Name: r.Name, Quantity: r.Quantity, PricePerUnit: money.New(r.PricePerUnit, unit), TotalPrice: money.New(r.TotalPrice, unit)})
+	for _, r := range items {
+		t := &out[at[r.TransactionID]]
+		unit := t.Amount.Unit() // items are priced in the account currency
+		t.Items = append(t.Items, TxItem{
+			ID: r.ID, Name: r.Name, Quantity: r.Quantity,
+			PricePerUnit: money.New(r.PricePerUnit, unit), TotalPrice: money.New(r.TotalPrice, unit),
+		})
 	}
-	return out, nil
-}
-
-func (s Transactions) tags(ctx context.Context, id int64) ([]Tag, error) {
-	rows, err := db.Q(s.DB).ListTransactionTags(ctx, id)
+	tags, err := db.Q(s.DB).ListTagsOfTransactions(ctx, ids)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]Tag, 0, len(rows))
-	for _, r := range rows {
-		out = append(out, tagFromList(r.ID, r.Name, r.CreatedAt, r.TransactionsCount))
+	for _, r := range tags {
+		t := &out[at[r.TransactionID]]
+		t.Tags = append(t.Tags, tagFromList(r.ID, r.Name, r.CreatedAt, 0))
 	}
 	return out, nil
 }
@@ -486,7 +480,7 @@ func (s Transactions) amounts(ctx context.Context, in TxInput) (amount money.Mon
 	return amount, &converted, nil
 }
 
-func txFromRow(r sqlc.ListTransactionsRow) Transaction {
+func txFromRow(r sqlc.GetTransactionRow) Transaction {
 	t := Transaction{
 		ID: r.ID, Type: r.Type, AccountID: r.AccountID, Status: r.Status,
 		Amount:   money.New(r.Amount, money.Unit{ID: r.CurrencyID, Decimals: int(r.Decimals)}),

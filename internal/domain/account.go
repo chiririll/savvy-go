@@ -94,11 +94,18 @@ func (s Accounts) Debts(ctx context.Context, includeCompleted bool) ([]Account, 
 }
 
 func (s Accounts) ByID(ctx context.Context, id int64) (*Account, error) {
-	list, err := s.list(ctx, sqlc.ListAccountsParams{ID: db.NI(id)})
-	if err != nil || len(list) == 0 {
+	r, err := db.Q(s.DB).GetAccount(ctx, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
 		return nil, err
 	}
-	return &list[0], nil
+	a := accountFromRow(sqlc.ListAccountsRow(r))
+	if a.Balance, err = s.balance(ctx, a, ""); err != nil {
+		return nil, err
+	}
+	return &a, nil
 }
 
 func (s Accounts) Create(ctx context.Context, a AccountInput) (*Account, error) {
