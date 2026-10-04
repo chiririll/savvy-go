@@ -397,7 +397,11 @@ func (s *Store) ReplaceSpace(ctx context.Context, id int64, p *store.PreparedSpa
 	if err := sp.db.Close(); err != nil {
 		return err
 	}
-	if err := swapIn(filepath.Join(p.Artifact, "space"+spaceExt), s.spacePath(id)); err != nil {
+	prepared := filepath.Join(p.Artifact, "space"+spaceExt)
+	if err := writeSettings(ctx, prepared, p.Settings); err != nil {
+		return s.reopenOrFail(ctx, sp, err)
+	}
+	if err := swapIn(prepared, s.spacePath(id)); err != nil {
 		return s.reopenOrFail(ctx, sp, err)
 	}
 	return s.reopenOrFail(ctx, sp, nil)
@@ -417,6 +421,26 @@ func (s *Store) reopenOrFail(ctx context.Context, sp *space, cause error) error 
 	}
 	sp.db = sdb
 	return cause
+}
+
+// writeSettings stores space settings in a prepared space database.
+func writeSettings(ctx context.Context, path string, kv map[string]string) error {
+	if len(kv) == 0 {
+		return nil
+	}
+	d, err := db.Open(path)
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+	for k, v := range kv {
+		if _, err := d.ExecContext(ctx, `INSERT INTO space_settings (key, value) VALUES (?, ?)
+			ON CONFLICT (key) DO UPDATE SET value = excluded.value`, k, v); err != nil {
+			return err
+		}
+	}
+	_, err = d.ExecContext(ctx, `PRAGMA wal_checkpoint(TRUNCATE)`)
+	return err
 }
 
 // swapIn replaces dst (and its side files) with src.

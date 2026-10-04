@@ -308,13 +308,47 @@ func (s Spaces) Overview(ctx context.Context) ([]Overview, error) {
 	for i, r := range rows {
 		o := Overview{ID: r.ID, UUID: r.Uuid, Name: r.Name, Members: r.Members, Admins: r.Admins, Unavailable: broken[r.ID]}
 		o.Quota = s.Quota(ctx, r.ID)
-		o.Size, _ = s.Store.SpaceSize(ctx, r.ID)
+		var err error
+		if o.Size, err = s.Store.SpaceSize(ctx, r.ID); errors.Is(err, store.ErrNotFound) {
+			o.Unavailable = "the database file is missing"
+		}
 		if t, ok := parseNullTime(r.CreatedAt); ok {
 			o.CreatedAt = &t
 		}
 		out[i] = o
 	}
 	return out, nil
+}
+
+// Reconcile compares the registry with the databases the store holds (P16):
+// registered spaces without a database and databases without a registered
+// space. Neither is touched; both are reported for an admin to sort out.
+func (s Spaces) Reconcile(ctx context.Context) (missing, orphans []int64, err error) {
+	registered, err := s.IDs(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	held, err := s.Store.Spaces(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	have := map[int64]bool{}
+	for _, id := range held {
+		have[id] = true
+	}
+	known := map[int64]bool{}
+	for _, id := range registered {
+		known[id] = true
+		if !have[id] {
+			missing = append(missing, id)
+		}
+	}
+	for _, id := range held {
+		if !known[id] {
+			orphans = append(orphans, id)
+		}
+	}
+	return missing, orphans, nil
 }
 
 // AuditEntry is a server admin action on a space.

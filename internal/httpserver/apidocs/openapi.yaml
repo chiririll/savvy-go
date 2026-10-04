@@ -41,6 +41,7 @@ security:
 tags:
   - name: API tokens
   - name: Spaces
+  - name: Transfers between spaces
   - name: Currencies
   - name: Accounts
   - name: Categories
@@ -235,6 +236,105 @@ paths:
       description: Space admins only, session only.
       security: [{cookieAuth: []}]
       requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+  /spaces/{space}/links:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Transfers between spaces]
+      summary: List the spaces linked to a space
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "404": {$ref: "#/components/responses/NotFound"}
+    post:
+      tags: [Transfers between spaces]
+      summary: Link a space with another
+      description: >-
+        Session only. The caller must administer both spaces (`target_space_id`); a space the caller
+        does not belong to answers `404`.
+      security: [{cookieAuth: []}]
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+  /spaces/{space}/links/{other}:
+    parameters: [{$ref: "#/components/parameters/Space"}, {name: other, in: path, required: true, schema: {type: integer}}]
+    delete:
+      tags: [Transfers between spaces]
+      summary: Unlink two spaces
+      description: Session only, an admin of either space. Their transfers stay in both spaces, frozen.
+      security: [{cookieAuth: []}]
+      responses:
+        "204": {description: Unlinked}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "422": {$ref: "#/components/responses/Validation"}
+  /spaces/{space}/transfers:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Transfers between spaces]
+      summary: List transfers with linked spaces
+      description: >-
+        Each transfer is kept in both spaces. The other space's account is shown only to members of
+        both spaces. `frozen` transfers are with a space that is no longer linked here; `verified` is
+        false for a signature this server does not trust; `status` `pending` waits for a decision after
+        a restore.
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "404": {$ref: "#/components/responses/NotFound"}
+    post:
+      tags: [Transfers between spaces]
+      summary: Send money to a linked space
+      description: >-
+        `to_space_id`, `from_account_id` (this space), `to_account_id` (the other space), `from_amount`
+        and `to_amount` in each account's currency, `date`, `description`. Needs editor rights in both spaces.
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses:
+        "201": {$ref: "#/components/responses/Data"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "422": {$ref: "#/components/responses/Validation"}
+  /spaces/{space}/transfers/{uuid}:
+    parameters: [{$ref: "#/components/parameters/Space"}, {name: uuid, in: path, required: true, schema: {type: string}}]
+    patch:
+      tags: [Transfers between spaces]
+      summary: Change a transfer in both spaces
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "422": {$ref: "#/components/responses/Validation"}
+    delete:
+      tags: [Transfers between spaces]
+      summary: Delete a transfer from both spaces
+      responses:
+        "204": {description: Deleted}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "422": {$ref: "#/components/responses/Validation"}
+  /spaces/{space}/transfers/{uuid}/accept:
+    parameters: [{$ref: "#/components/parameters/Space"}, {name: uuid, in: path, required: true, schema: {type: string}}]
+    post:
+      tags: [Transfers between spaces]
+      summary: Take the other space's version of a pending transfer
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "422": {$ref: "#/components/responses/Validation"}
+  /spaces/{space}/transfers/{uuid}/reject:
+    parameters: [{$ref: "#/components/parameters/Space"}, {name: uuid, in: path, required: true, schema: {type: string}}]
+    post:
+      tags: [Transfers between spaces]
+      summary: Push this space's version of a pending transfer to the other space
+      description: Needs editor rights in both spaces and a signature this server trusts.
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "422": {$ref: "#/components/responses/Validation"}
+  /spaces/{space}/transfers/{uuid}/trust:
+    parameters: [{$ref: "#/components/parameters/Space"}, {name: uuid, in: path, required: true, schema: {type: string}}]
+    post:
+      tags: [Transfers between spaces]
+      summary: Re-sign a transfer this server cannot verify
+      description: Needs editor rights in every space of the transfer on this server.
       responses:
         "200": {$ref: "#/components/responses/Data"}
         "403": {$ref: "#/components/responses/Forbidden"}

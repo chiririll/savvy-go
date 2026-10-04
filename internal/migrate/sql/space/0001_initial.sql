@@ -82,9 +82,48 @@ CREATE TABLE IF NOT EXISTS recurring_transaction_tag (
     PRIMARY KEY (recurring_transaction_id, tag_id)
 ) STRICT;
 CREATE INDEX IF NOT EXISTS recurring_transaction_tag_tag_idx ON recurring_transaction_tag (tag_id);
+-- A transfer with a linked space. Both spaces hold the whole record, so each
+-- space's backup has its transfers; they are kept in step by version (a
+-- deletion is a tombstone with its own version). The other side's account is
+-- an opaque id: its name never leaves its space. The financial fields and
+-- version are signed by the server (sig_v names the format of the signed
+-- payload); status, review and remote are local bookkeeping.
+CREATE TABLE IF NOT EXISTS space_transfers (
+    uuid TEXT PRIMARY KEY,
+    from_space_uuid TEXT NOT NULL,
+    from_account_id INTEGER NOT NULL,
+    from_amount INTEGER NOT NULL CHECK (from_amount >= 0),
+    from_currency TEXT NOT NULL,
+    from_decimals INTEGER NOT NULL CHECK (from_decimals BETWEEN 0 AND 12),
+    to_space_uuid TEXT NOT NULL,
+    to_account_id INTEGER NOT NULL,
+    to_amount INTEGER NOT NULL CHECK (to_amount >= 0),
+    to_currency TEXT NOT NULL,
+    to_decimals INTEGER NOT NULL CHECK (to_decimals BETWEEN 0 AND 12),
+    date TEXT NOT NULL,
+    description TEXT,
+    created_by INTEGER,
+    version INTEGER NOT NULL CHECK (version >= 1),
+    deleted_at TEXT,
+    sig_v INTEGER NOT NULL DEFAULT 1,
+    signer_kid TEXT,
+    signature TEXT,
+    -- ok; needs_attention (this side's account is missing); pending (a
+    -- difference with the other space found after a restore, see review).
+    status TEXT NOT NULL DEFAULT 'ok' CHECK (status IN ('ok', 'needs_attention', 'pending')),
+    review TEXT CHECK (review IN ('created_remote', 'deleted_remote', 'changed_remote', 'missing_remote')),
+    -- The other space's version of a pending record, as JSON.
+    remote TEXT,
+    updated_at TEXT
+) STRICT;
+CREATE INDEX IF NOT EXISTS space_transfers_from_idx ON space_transfers (from_space_uuid);
+CREATE INDEX IF NOT EXISTS space_transfers_to_idx ON space_transfers (to_space_uuid);
+
 CREATE TABLE IF NOT EXISTS transactions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    type TEXT NOT NULL CHECK (type IN ('income', 'expense', 'transfer', 'debt_payment', 'debt_collection', 'debt_lend', 'debt_borrow')),
+    -- transfer_out / transfer_in are this space's side of a transfer with a
+    -- linked space (see space_transfers); they are written only from there.
+    type TEXT NOT NULL CHECK (type IN ('income', 'expense', 'transfer', 'debt_payment', 'debt_collection', 'debt_lend', 'debt_borrow', 'transfer_out', 'transfer_in')),
     account_id INTEGER NOT NULL REFERENCES accounts(id),
     to_account_id INTEGER REFERENCES accounts(id),
     category_id INTEGER REFERENCES categories(id),
@@ -96,6 +135,10 @@ CREATE TABLE IF NOT EXISTS transactions (
     date TEXT,
     status TEXT NOT NULL DEFAULT 'confirmed' CHECK (status IN ('pending', 'confirmed', 'skipped')),
     recurring_transaction_id INTEGER REFERENCES recurring_transactions(id) ON DELETE SET NULL,
+    -- The space_transfers row this transaction mirrors.
+    space_transfer_uuid TEXT UNIQUE REFERENCES space_transfers(uuid) ON DELETE CASCADE,
+    -- A server user; no foreign key across databases.
+    created_by INTEGER,
     created_at TEXT,
     updated_at TEXT
 ) STRICT;

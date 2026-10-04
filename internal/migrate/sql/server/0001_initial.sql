@@ -254,3 +254,27 @@ CREATE TABLE IF NOT EXISTS admin_audit (
 ) STRICT;
 CREATE INDEX IF NOT EXISTS admin_audit_space_idx ON admin_audit (space_id, created_at);
 CREATE INDEX IF NOT EXISTS admin_audit_actor_idx ON admin_audit (actor_id);
+
+-- Linked spaces may transfer to each other. Only who administers both may
+-- link them; an admin of either may unlink. space_a_id < space_b_id.
+CREATE TABLE IF NOT EXISTS space_links (
+    space_a_id INTEGER NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,
+    space_b_id INTEGER NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,
+    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at TEXT,
+    PRIMARY KEY (space_a_id, space_b_id),
+    CHECK (space_a_id < space_b_id)
+) STRICT;
+CREATE INDEX IF NOT EXISTS space_links_b_idx ON space_links (space_b_id);
+CREATE INDEX IF NOT EXISTS space_links_created_by_idx ON space_links (created_by);
+
+-- Public keys whose signatures this server accepts besides its own: the
+-- keys it used before a rotation and keys of servers spaces moved from.
+CREATE TABLE IF NOT EXISTS trusted_keys (
+    kid TEXT PRIMARY KEY,
+    public_key TEXT NOT NULL,
+    name TEXT NOT NULL,
+    added_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at TEXT
+) STRICT;
+CREATE INDEX IF NOT EXISTS trusted_keys_added_by_idx ON trusted_keys (added_by);

@@ -54,6 +54,23 @@ func main() {
 		slog.Error("signing key", "err", err)
 		os.Exit(1)
 	}
+	if missing, orphans, err := (domain.Spaces{Store: st}).Reconcile(ctx); err == nil {
+		for _, id := range missing {
+			slog.Error("space has no database file", "space", id)
+		}
+		for _, id := range orphans {
+			slog.Warn("space database file without a registered space; left untouched", "space", id)
+		}
+	}
+	// Finish transfers a crash left half-written and review spaces restored
+	// just before it; an unavailable space is merged on a later start.
+	transfers := domain.Transfers{
+		Spaces: domain.Spaces{Store: st},
+		Keys:   domain.KeyRing{Holder: keys, Trusted: domain.TrustedKeys(st.Server())},
+	}
+	if err := transfers.SyncAll(ctx); err != nil {
+		slog.Warn("merge transfers between spaces", "err", err)
+	}
 	for id, why := range st.Status().Unavailable {
 		slog.Error("space unavailable", "space", id, "reason", why)
 	}

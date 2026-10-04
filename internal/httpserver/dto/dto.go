@@ -195,6 +195,11 @@ func NewTransaction(t domain.Transaction) Transaction {
 }
 
 func transactionActions(t domain.Transaction) TxActions {
+	// One side of a transfer between spaces changes only through the
+	// transfer (in the space settings), never as a transaction.
+	if t.Type == "transfer_out" || t.Type == "transfer_in" {
+		return TxActions{}
+	}
 	pending := t.Status == "pending"
 	skipped := t.Status == "skipped"
 	recurring := t.RecurringID != nil

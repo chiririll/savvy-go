@@ -32,6 +32,8 @@ type Server struct {
 	settings   settings.Store
 	spaces     domain.Spaces
 	backups    domain.Backups
+	transfers  *domain.Transfers
+	keys       *signing.Holder
 	uploads    domain.Uploads
 	sso        domain.SSO
 	twoFactor  auth.TwoFactor
@@ -56,7 +58,10 @@ func New(cfg config.Config, st store.Store, keys *signing.Holder) *Server {
 		twoFactor:  auth.TwoFactor{DB: srv, Users: auth.Users{DB: srv}, AppKey: cfg.AppKey},
 		webauthn:   auth.WebAuthn{DB: srv, Cfg: cfg},
 	}
-	s.backups = domain.Backups{Store: st, Keys: domain.KeyRing{Holder: keys}, Dir: cfg.BackupsDir, DataDir: cfg.DataDir}
+	keyRing := domain.KeyRing{Holder: keys, Trusted: domain.TrustedKeys(srv)}
+	s.keys = keys
+	s.transfers = &domain.Transfers{Spaces: s.spaces, Keys: keyRing}
+	s.backups = domain.Backups{Store: st, Keys: keyRing, Dir: cfg.BackupsDir, DataDir: cfg.DataDir, Transfers: s.transfers}
 	s.sso = domain.SSO{DB: srv, Users: s.users, Settings: s.settings, Spaces: s.spaces, AppURL: cfg.AppURL}
 	_ = os.MkdirAll(cfg.UploadsDir, 0o775)
 	_ = os.MkdirAll(cfg.BackupsDir, 0o775)
@@ -135,6 +140,8 @@ func (s *Server) routes() *chi.Mux {
 				r.Get("/", s.spaceShow)
 				r.Get("/members", s.membersIndex)
 				r.Get("/settings", s.spaceSettingsIndex)
+				r.Get("/links", s.linksIndex)
+				r.Get("/transfers", s.transfersIndex)
 				r.With(s.sessionOnly).Post("/leave", s.spaceLeave)
 
 				// Administering the space: its admins, in a real session.
@@ -150,6 +157,8 @@ func (s *Server) routes() *chi.Mux {
 					r.Delete("/invitations/{id}", s.invitationsDestroy)
 					r.Patch("/settings", s.spaceSettingsUpdate)
 					r.Get("/audit", s.spaceAudit)
+					r.Post("/links", s.linksStore)
+					r.Delete("/links/{other}", s.linksDestroy)
 					// P1: a space's backups are for its admins, never for API tokens.
 					r.Get("/backups", s.spaceBackupsIndex)
 					r.Post("/backups", s.spaceBackupsStore)
@@ -162,6 +171,14 @@ func (s *Server) routes() *chi.Mux {
 				r.Group(func(r chi.Router) {
 					r.Use(s.requireWrite)
 					dataRoutes(s, r)
+					// Transfers with linked spaces; the other space's rights
+					// are checked by the transfer itself.
+					r.Post("/transfers", s.transfersStore)
+					r.Patch("/transfers/{uuid}", s.transfersUpdate)
+					r.Delete("/transfers/{uuid}", s.transfersDestroy)
+					r.Post("/transfers/{uuid}/accept", s.transfersResolve(true))
+					r.Post("/transfers/{uuid}/reject", s.transfersResolve(false))
+					r.Post("/transfers/{uuid}/trust", s.transfersTrust)
 				})
 			})
 
@@ -205,6 +222,10 @@ func (s *Server) routes() *chi.Mux {
 				r.Post("/admin/spaces/{id}/admins", s.adminSpaceAssignAdmin)
 				r.Get("/admin/deleted-spaces", s.adminDeletedIndex)
 				r.Post("/admin/deleted-spaces/{name}/restore", s.adminDeletedRestore)
+				r.Get("/admin/keys", s.keysIndex)
+				r.Post("/admin/keys", s.keysStore)
+				r.Delete("/admin/keys/{kid}", s.keysDestroy)
+				r.Post("/admin/keys/rotate", s.keysRotate)
 			})
 
 			// Instance settings everyone may read (sign-in options).

@@ -118,6 +118,9 @@ type PreparedSpace struct {
 	Artifact string
 	UUID     string // the space_uuid recorded in the database, "" if none
 	Size     int64  // bytes
+	// Settings are written into the space's settings before the database
+	// goes live, so a mark set here survives a crash during the swap.
+	Settings map[string]string
 }
 
 // PreparedServer is a validated server backup.

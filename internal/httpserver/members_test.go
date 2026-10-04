@@ -351,3 +351,44 @@ func (u unavailableStore) Space(ctx context.Context, id int64) (store.DB, error)
 	}
 	return u.Store.Space(ctx, id)
 }
+
+// P16: a registered space without a database and a database without a
+// registered space are both reported, never silently dropped.
+func TestP16ReconcileRegistryAndFiles(t *testing.T) {
+	a := newTestApp(t)
+	ctx := context.Background()
+	admin := a.issue(a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
+	if _, err := a.db.Exec(`INSERT INTO spaces (id, uuid, name) VALUES (900, 'no-file', 'Ghost')`); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.store.CreateSpace(ctx, 901); err != nil {
+		t.Fatal(err)
+	}
+	missing, orphans, err := a.s.spaces.Reconcile(ctx)
+	if err != nil || len(missing) != 1 || missing[0] != 900 || len(orphans) != 1 || orphans[0] != 901 {
+		t.Fatalf("reconcile %v %v %v", missing, orphans, err)
+	}
+	for _, x := range decodeJSON(t, a.do("GET", "/api/admin/spaces", nil, admin.Token, ""))["data"].([]any) {
+		row := x.(map[string]any)
+		if row["id"].(float64) == 900 && row["unavailable"] == "" {
+			t.Fatalf("a space without a file looks healthy: %v", row)
+		}
+	}
+}
+
+// The space limits and invitation registration are instance settings a
+// server admin changes through the API.
+func TestSpaceSettingsAreAdminEditable(t *testing.T) {
+	a := newTestApp(t)
+	admin := a.issue(a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
+	res := a.do("PATCH", "/api/settings", map[string]any{"max_spaces_per_user": 0, "space_invites_can_register": false}, admin.Token, admin.CSRF)
+	body := decodeJSON(t, res)
+	if res.StatusCode != 200 || body["max_spaces_per_user"] != float64(0) || body["space_invites_can_register"] != false {
+		t.Fatalf("update %d %v", res.StatusCode, body)
+	}
+	user := a.issue(a.createUser("u@test.com", "secret1", auth.RoleUser), false)
+	status(t, a.do("POST", "/api/spaces", map[string]any{"name": "No"}, user.Token, user.CSRF), 422, "limit 0 through the API")
+	res = a.do("PATCH", "/api/settings", map[string]any{"max_spaces_per_user": nil}, admin.Token, admin.CSRF)
+	res.Body.Close()
+	status(t, a.do("POST", "/api/spaces", map[string]any{"name": "Yes"}, user.Token, user.CSRF), 201, "unlimited again")
+}

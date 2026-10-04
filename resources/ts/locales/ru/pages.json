@@ -194,7 +194,9 @@
             "debt_payment": "Платёж по долгу",
             "debt_collection": "Возврат долга",
             "debt_lend": "Выдача долга",
-            "debt_borrow": "Получение займа"
+            "debt_borrow": "Получение займа",
+            "transfer_out": "В другое пространство",
+            "transfer_in": "Из другого пространства"
         },
         "deleteTitle": "Удалить транзакцию?",
         "deleteDescription": "Это действие нельзя отменить."

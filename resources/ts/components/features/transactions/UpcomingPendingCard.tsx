@@ -16,6 +16,8 @@ const TYPE_ICONS: Record<Transaction['type'], typeof ArrowDownLeft> = {
     debt_collection: HandCoins,
     debt_lend: HandCoins,
     debt_borrow: Banknote,
+    transfer_out: ArrowUpRight,
+    transfer_in: ArrowDownLeft,
 }
 
 interface UpcomingPendingCardProps {

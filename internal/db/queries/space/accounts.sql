@@ -54,7 +54,7 @@ WHERE to_account_id = ? AND status = 'confirmed' AND type IN ('debt_payment','de
 -- The net change of a non-debt account per day, oldest first, for confirmed
 -- transactions up to as_of (all of them when NULL). This is the only place that
 -- knows how a transaction moves money: it adds to the account for income,
--- debt_collection and debt_borrow, takes from it for every other type, and a
+-- debt_collection, debt_borrow and transfer_in, takes from it for every other type, and a
 -- transfer adds to_amount to its destination account (a transfer from an account
 -- to itself therefore does both). A balance is the sum of these rows, a balance
 -- history their running total.
@@ -63,7 +63,7 @@ WITH p AS (SELECT CAST(sqlc.arg('id') AS INTEGER) AS id)
 SELECT t.date AS day,
 	CAST(SUM(
 		CASE WHEN t.account_id = p.id THEN
-			CASE WHEN t.type IN ('income', 'debt_collection', 'debt_borrow') THEN t.amount ELSE -t.amount END
+			CASE WHEN t.type IN ('income', 'debt_collection', 'debt_borrow', 'transfer_in') THEN t.amount ELSE -t.amount END
 		ELSE 0 END
 		+ CASE WHEN t.to_account_id = p.id AND t.type = 'transfer' THEN COALESCE(t.to_amount, 0) ELSE 0 END
 	) AS INTEGER) AS delta

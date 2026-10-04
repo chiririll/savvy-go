@@ -84,6 +84,8 @@ type Backups struct {
 	// KeepPerSpace is how many backups a space keeps; older ones are removed.
 	// Zero keeps all.
 	KeepPerSpace int
+	// Transfers reviews a restored space's transfers with its linked spaces.
+	Transfers *Transfers
 }
 
 var (
@@ -415,7 +417,17 @@ func (s Backups) RestoreSpace(ctx context.Context, sp Space, name string, quota 
 		s.Store.Discard(p.Artifact)
 		return ErrTooLarge
 	}
-	return s.Store.ReplaceSpace(ctx, sp.ID, p)
+	// The review mark goes in before the file goes live: if the process dies
+	// before the review merge, startup reviews again instead of merging
+	// automatically (P24).
+	p.Settings = map[string]string{transferReviewKey: now()}
+	if err := s.Store.ReplaceSpace(ctx, sp.ID, p); err != nil {
+		return err
+	}
+	if s.Transfers != nil {
+		return s.Transfers.AfterRestore(ctx, sp.ID)
+	}
+	return nil
 }
 
 // ImportSpace creates a new space from a backup file at path, owned by

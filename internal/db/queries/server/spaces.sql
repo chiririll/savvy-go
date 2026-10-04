@@ -101,3 +101,35 @@ FROM admin_audit a LEFT JOIN users u ON u.id = a.actor_id
 WHERE a.space_id = ?
 ORDER BY a.id DESC
 LIMIT 200;
+
+-- name: InsertSpaceLink :exec
+INSERT INTO space_links (space_a_id, space_b_id, created_by, created_at) VALUES (?, ?, ?, ?)
+ON CONFLICT DO NOTHING;
+
+-- name: DeleteSpaceLink :execresult
+DELETE FROM space_links WHERE space_a_id = ? AND space_b_id = ?;
+
+-- name: CountSpaceLink :one
+SELECT COUNT(*) FROM space_links WHERE space_a_id = ? AND space_b_id = ?;
+
+-- name: ListSpaceLinks :many
+SELECT space_a_id, space_b_id FROM space_links WHERE space_a_id = sqlc.arg(id) OR space_b_id = sqlc.arg(id);
+
+-- name: ListAllSpaceLinks :many
+SELECT space_a_id, space_b_id FROM space_links ORDER BY space_a_id, space_b_id;
+
+-- name: ListSpaceUUIDs :many
+SELECT id, uuid, name FROM spaces;
+
+-- name: ListTrustedKeys :many
+SELECT kid, public_key, name, created_at FROM trusted_keys ORDER BY created_at;
+
+-- name: GetTrustedKey :one
+SELECT public_key FROM trusted_keys WHERE kid = ?;
+
+-- name: InsertTrustedKey :exec
+INSERT INTO trusted_keys (kid, public_key, name, added_by, created_at) VALUES (?, ?, ?, ?, ?)
+ON CONFLICT (kid) DO NOTHING;
+
+-- name: DeleteTrustedKey :execresult
+DELETE FROM trusted_keys WHERE kid = ?;

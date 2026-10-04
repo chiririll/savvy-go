@@ -25,6 +25,22 @@ func (q *Queries) AcceptInvitation(ctx context.Context, arg AcceptInvitationPara
 	return q.db.ExecContext(ctx, acceptInvitation, arg.AcceptedAt, arg.AcceptedBy, arg.ID)
 }
 
+const countSpaceLink = `-- name: CountSpaceLink :one
+SELECT COUNT(*) FROM space_links WHERE space_a_id = ? AND space_b_id = ?
+`
+
+type CountSpaceLinkParams struct {
+	SpaceAID int64
+	SpaceBID int64
+}
+
+func (q *Queries) CountSpaceLink(ctx context.Context, arg CountSpaceLinkParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countSpaceLink, arg.SpaceAID, arg.SpaceBID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countSpaceMembers = `-- name: CountSpaceMembers :one
 SELECT COUNT(*) FROM space_members WHERE space_id = ?
 `
@@ -76,6 +92,19 @@ func (q *Queries) DeleteInvitation(ctx context.Context, arg DeleteInvitationPara
 	return q.db.ExecContext(ctx, deleteInvitation, arg.ID, arg.SpaceID)
 }
 
+const deleteSpaceLink = `-- name: DeleteSpaceLink :execresult
+DELETE FROM space_links WHERE space_a_id = ? AND space_b_id = ?
+`
+
+type DeleteSpaceLinkParams struct {
+	SpaceAID int64
+	SpaceBID int64
+}
+
+func (q *Queries) DeleteSpaceLink(ctx context.Context, arg DeleteSpaceLinkParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, deleteSpaceLink, arg.SpaceAID, arg.SpaceBID)
+}
+
 const deleteSpaceMember = `-- name: DeleteSpaceMember :exec
 DELETE FROM space_members WHERE space_id = ? AND user_id = ?
 `
@@ -97,6 +126,14 @@ DELETE FROM spaces WHERE id = ?
 func (q *Queries) DeleteSpaceRow(ctx context.Context, id int64) error {
 	_, err := q.db.ExecContext(ctx, deleteSpaceRow, id)
 	return err
+}
+
+const deleteTrustedKey = `-- name: DeleteTrustedKey :execresult
+DELETE FROM trusted_keys WHERE kid = ?
+`
+
+func (q *Queries) DeleteTrustedKey(ctx context.Context, kid string) (sql.Result, error) {
+	return q.db.ExecContext(ctx, deleteTrustedKey, kid)
 }
 
 const deleteUserMemberships = `-- name: DeleteUserMemberships :exec
@@ -190,6 +227,17 @@ func (q *Queries) GetSpaceQuota(ctx context.Context, id int64) (sql.NullInt64, e
 	return quota_bytes, err
 }
 
+const getTrustedKey = `-- name: GetTrustedKey :one
+SELECT public_key FROM trusted_keys WHERE kid = ?
+`
+
+func (q *Queries) GetTrustedKey(ctx context.Context, kid string) (string, error) {
+	row := q.db.QueryRowContext(ctx, getTrustedKey, kid)
+	var public_key string
+	err := row.Scan(&public_key)
+	return public_key, err
+}
+
 const insertAudit = `-- name: InsertAudit :exec
 INSERT INTO admin_audit (actor_id, action, space_id, target_user_id, details, created_at)
 VALUES (?, ?, ?, ?, ?, ?)
@@ -274,6 +322,84 @@ func (q *Queries) InsertSpace(ctx context.Context, arg InsertSpaceParams) (int64
 	var id int64
 	err := row.Scan(&id)
 	return id, err
+}
+
+const insertSpaceLink = `-- name: InsertSpaceLink :exec
+INSERT INTO space_links (space_a_id, space_b_id, created_by, created_at) VALUES (?, ?, ?, ?)
+ON CONFLICT DO NOTHING
+`
+
+type InsertSpaceLinkParams struct {
+	SpaceAID  int64
+	SpaceBID  int64
+	CreatedBy sql.NullInt64
+	CreatedAt sql.NullString
+}
+
+func (q *Queries) InsertSpaceLink(ctx context.Context, arg InsertSpaceLinkParams) error {
+	_, err := q.db.ExecContext(ctx, insertSpaceLink,
+		arg.SpaceAID,
+		arg.SpaceBID,
+		arg.CreatedBy,
+		arg.CreatedAt,
+	)
+	return err
+}
+
+const insertTrustedKey = `-- name: InsertTrustedKey :exec
+INSERT INTO trusted_keys (kid, public_key, name, added_by, created_at) VALUES (?, ?, ?, ?, ?)
+ON CONFLICT (kid) DO NOTHING
+`
+
+type InsertTrustedKeyParams struct {
+	Kid       string
+	PublicKey string
+	Name      string
+	AddedBy   sql.NullInt64
+	CreatedAt sql.NullString
+}
+
+func (q *Queries) InsertTrustedKey(ctx context.Context, arg InsertTrustedKeyParams) error {
+	_, err := q.db.ExecContext(ctx, insertTrustedKey,
+		arg.Kid,
+		arg.PublicKey,
+		arg.Name,
+		arg.AddedBy,
+		arg.CreatedAt,
+	)
+	return err
+}
+
+const listAllSpaceLinks = `-- name: ListAllSpaceLinks :many
+SELECT space_a_id, space_b_id FROM space_links ORDER BY space_a_id, space_b_id
+`
+
+type ListAllSpaceLinksRow struct {
+	SpaceAID int64
+	SpaceBID int64
+}
+
+func (q *Queries) ListAllSpaceLinks(ctx context.Context) ([]ListAllSpaceLinksRow, error) {
+	rows, err := q.db.QueryContext(ctx, listAllSpaceLinks)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAllSpaceLinksRow{}
+	for rows.Next() {
+		var i ListAllSpaceLinksRow
+		if err := rows.Scan(&i.SpaceAID, &i.SpaceBID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listInvitations = `-- name: ListInvitations :many
@@ -442,6 +568,71 @@ func (q *Queries) ListSpaceIDs(ctx context.Context) ([]int64, error) {
 	return items, nil
 }
 
+const listSpaceLinks = `-- name: ListSpaceLinks :many
+SELECT space_a_id, space_b_id FROM space_links WHERE space_a_id = ?1 OR space_b_id = ?1
+`
+
+type ListSpaceLinksRow struct {
+	SpaceAID int64
+	SpaceBID int64
+}
+
+func (q *Queries) ListSpaceLinks(ctx context.Context, id int64) ([]ListSpaceLinksRow, error) {
+	rows, err := q.db.QueryContext(ctx, listSpaceLinks, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListSpaceLinksRow{}
+	for rows.Next() {
+		var i ListSpaceLinksRow
+		if err := rows.Scan(&i.SpaceAID, &i.SpaceBID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSpaceUUIDs = `-- name: ListSpaceUUIDs :many
+SELECT id, uuid, name FROM spaces
+`
+
+type ListSpaceUUIDsRow struct {
+	ID   int64
+	Uuid string
+	Name string
+}
+
+func (q *Queries) ListSpaceUUIDs(ctx context.Context) ([]ListSpaceUUIDsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listSpaceUUIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListSpaceUUIDsRow{}
+	for rows.Next() {
+		var i ListSpaceUUIDsRow
+		if err := rows.Scan(&i.ID, &i.Uuid, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSpacesOverview = `-- name: ListSpacesOverview :many
 SELECT s.id, s.uuid, s.name, s.quota_bytes, s.created_at,
 	(SELECT COUNT(*) FROM space_members m WHERE m.space_id = s.id) AS members,
@@ -476,6 +667,45 @@ func (q *Queries) ListSpacesOverview(ctx context.Context) ([]ListSpacesOverviewR
 			&i.CreatedAt,
 			&i.Members,
 			&i.Admins,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTrustedKeys = `-- name: ListTrustedKeys :many
+SELECT kid, public_key, name, created_at FROM trusted_keys ORDER BY created_at
+`
+
+type ListTrustedKeysRow struct {
+	Kid       string
+	PublicKey string
+	Name      string
+	CreatedAt sql.NullString
+}
+
+func (q *Queries) ListTrustedKeys(ctx context.Context) ([]ListTrustedKeysRow, error) {
+	rows, err := q.db.QueryContext(ctx, listTrustedKeys)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListTrustedKeysRow{}
+	for rows.Next() {
+		var i ListTrustedKeysRow
+		if err := rows.Scan(
+			&i.Kid,
+			&i.PublicKey,
+			&i.Name,
+			&i.CreatedAt,
 		); err != nil {
 			return nil, err
 		}

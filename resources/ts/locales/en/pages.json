@@ -191,7 +191,9 @@
             "debt_payment": "Debt Payment",
             "debt_collection": "Debt Collection",
             "debt_lend": "Debt Issued",
-            "debt_borrow": "Loan Received"
+            "debt_borrow": "Loan Received",
+            "transfer_out": "Sent to another space",
+            "transfer_in": "Received from another space"
         },
         "deleteTitle": "Delete transaction?",
         "deleteDescription": "This action cannot be undone."

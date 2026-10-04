@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -136,6 +137,10 @@ func (s *Server) transactionsDestroy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := sp(r).txs.Delete(r.Context(), tx.ID); err != nil {
+		if errors.Is(err, domain.ErrTransferRow) {
+			writeMessage(w, 422, err.Error())
+			return
+		}
 		writeMessage(w, 422, "Scheduled occurrences cannot be deleted. Skip or confirm them instead.")
 		return
 	}
@@ -179,6 +184,10 @@ func (s *Server) transactionsSkip(w http.ResponseWriter, r *http.Request) {
 	}
 	out, err := sp(r).txs.Skip(r.Context(), tx.ID)
 	if err != nil {
+		if errors.Is(err, domain.ErrTransferRow) {
+			writeMessage(w, 422, err.Error())
+			return
+		}
 		writeMessage(w, 422, "Only a pending scheduled transaction can be skipped.")
 		return
 	}
