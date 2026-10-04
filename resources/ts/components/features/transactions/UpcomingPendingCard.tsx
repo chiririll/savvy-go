@@ -75,16 +75,18 @@ export function UpcomingPendingCard({
                             }
                         />
                     )}
-                    <Button
-                        size="sm"
-                        variant="outline"
-                        title={t('actions.confirm')}
-                        aria-label={t('actions.confirm')}
-                        onClick={() => onConfirm(transaction)}
-                    >
-                        <Check className="size-4" />
-                        {t('actions.confirm')}
-                    </Button>
+                    {transaction.actions.confirm && (
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            title={t('actions.confirm')}
+                            aria-label={t('actions.confirm')}
+                            onClick={() => onConfirm(transaction)}
+                        >
+                            <Check className="size-4" />
+                            {t('actions.confirm')}
+                        </Button>
+                    )}
                 </div>
             )}
         </div>

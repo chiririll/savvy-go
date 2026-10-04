@@ -1,3 +1,4 @@
+import { UserSettingsTabs } from '@/components/features/spaces/UserSettingsTabs'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -99,6 +100,7 @@ export default function ApiSettingsPage() {
     return (
         <Page title={t('api.title')}>
             <PageHeader title={t('api.heading')} description={t('api.description')} />
+            <UserSettingsTabs />
 
             <FormWrapper>
                 <section className="rounded-xl border bg-card shadow-sm">

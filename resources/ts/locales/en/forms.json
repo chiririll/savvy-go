@@ -7,6 +7,7 @@
     "currencyCatalog": "Add currency",
     "currencyEmpty": "No currencies found",
     "selectAccount": "Select account",
+    "selectSpace": "Select space",
     "selectCategory": "Select category",
     "selectType": "Select type",
     "selectRole": "Select role",
@@ -37,6 +38,8 @@
     "transactions": {
         "toAccount": "Destination account",
         "swapAccounts": "Swap accounts",
+        "toSpace": "Destination space",
+        "toSpaceNoAccounts": "That space has no accounts yet.",
         "sendAmount": "Send amount",
         "receiveAmount": "Receive amount",
         "transferRate": "Transfer rate",

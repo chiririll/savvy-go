@@ -7,6 +7,7 @@
     "currencyCatalog": "Добавить валюту",
     "currencyEmpty": "Валюты не найдены",
     "selectAccount": "Выберите счёт",
+    "selectSpace": "Выберите пространство",
     "selectCategory": "Выберите категорию",
     "selectType": "Выберите тип",
     "selectRole": "Выберите роль",
@@ -37,6 +38,8 @@
     "transactions": {
         "toAccount": "Счёт назначения",
         "swapAccounts": "Поменять счета местами",
+        "toSpace": "Пространство назначения",
+        "toSpaceNoAccounts": "В этом пространстве пока нет счетов.",
         "sendAmount": "Сумма отправки",
         "receiveAmount": "Сумма получения",
         "transferRate": "Курс перевода",

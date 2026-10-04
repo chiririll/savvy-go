@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient, QueryKey } from '@tanstack/react-query'
-import { accountsApi } from '@/api'
+import { accountsApi, spacesApi } from '@/api'
 import { Account } from '@/types'
 import { AccountFormData } from '@/schemas'
 import { useResourceItem, useResourceMutation } from './use-crud'
@@ -7,10 +7,16 @@ import i18n from '@/lib/i18n'
 
 const QUERY_KEY = ['accounts']
 
-export function useAccounts(params?: { active?: boolean; exclude_debts?: boolean }) {
+/**
+ * Accounts of the current space, or of another space the user belongs to
+ * when spaceId is given (null: that space is not chosen yet).
+ */
+export function useAccounts(params?: { active?: boolean; exclude_debts?: boolean }, spaceId?: number | null) {
+    const key = params ? [...QUERY_KEY, params] : QUERY_KEY
     return useQuery({
-        queryKey: params ? [...QUERY_KEY, params] : QUERY_KEY,
-        queryFn: () => accountsApi.getAll(params),
+        queryKey: spaceId === undefined ? key : [...key, { space: spaceId }],
+        queryFn: () => (spaceId === undefined ? accountsApi.getAll(params) : spacesApi.accounts(spaceId!, params)),
+        enabled: spaceId !== null,
     })
 }
 

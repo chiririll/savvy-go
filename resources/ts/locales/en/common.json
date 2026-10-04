@@ -41,7 +41,7 @@
         "resulting": "After"
     },
     "readOnly": {
-        "banner": "You are in read-only mode. You can view all data but cannot make any changes.",
+        "banner": "You are a viewer in this space: you can see its data but not change it.",
         "close": "Close banner"
     },
     "devMode": {
@@ -101,6 +101,7 @@
         "passwordMin8": "Password must be at least 8 characters",
         "transferDestination": "Destination account is required for transfers",
         "transferNoCategory": "Category should not be set for transfers",
+        "selectSpace": "Please select a space",
         "destinationDifferent": "Destination must be different from source",
         "selectDestination": "Please select destination account",
         "intervalMin": "Interval must be at least 1",

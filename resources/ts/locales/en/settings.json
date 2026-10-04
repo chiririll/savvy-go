@@ -26,6 +26,18 @@
             "verifiedEmail": "Require a verified email",
             "verifiedEmailOn": "New SSO sign-ups must arrive with an email the provider has verified.",
             "verifiedEmailOff": "Turn on just-in-time provisioning to enforce this."
+        },
+        "spaces": {
+            "title": "Spaces",
+            "description": "Limits for spaces and invitations.",
+            "invitesRegister": "Invitations create accounts",
+            "invitesRegisterDescription": "Someone without an account can register through an invitation link. Who is invited by a non-administrator becomes a guest.",
+            "maxSpaces": "Spaces per user",
+            "maxSpacesDescription": "How many spaces a user may administer. Empty is unlimited, 0 none. Administrators have no limit.",
+            "quota": "Default size limit (MB)",
+            "quotaDescription": "For every space without its own limit. 0 is unlimited.",
+            "backupsMax": "Backups per space",
+            "backupsMaxDescription": "Older backups of a space are removed. 0 keeps all."
         }
     },
     "security": {
@@ -367,5 +379,210 @@
             "copy": "Copy token",
             "done": "Done"
         }
+    },
+    "spaces": {
+        "title": "Space",
+        "description": "Your role here: {{role}}.",
+        "fields": {
+            "name": "Name"
+        },
+        "roles": {
+            "admin": "Admin",
+            "editor": "Editor",
+            "viewer": "Viewer"
+        },
+        "switcher": {
+            "label": "Spaces",
+            "settings": "Space settings",
+            "create": "Create a space"
+        },
+        "create": {
+            "title": "New space",
+            "description": "A space keeps its own accounts, categories and currencies. You will be its admin.",
+            "submit": "Create"
+        },
+        "toasts": {
+            "created": "Space created",
+            "imported": "Space imported",
+            "renamed": "Space renamed",
+            "deleted": "Space deleted",
+            "left": "You left the space",
+            "roleChanged": "Role changed",
+            "memberRemoved": "Member removed",
+            "invitationRevoked": "Invitation revoked",
+            "linked": "Spaces linked",
+            "unlinked": "Spaces unlinked",
+            "transferSent": "Transfer sent",
+            "transferResolved": "Transfer updated",
+            "transferDeleted": "Transfer deleted",
+            "transferUpdated": "Transfer updated"
+        },
+        "general": {
+            "title": "General",
+            "description": "Name and storage of this space.",
+            "usage": "Uses {{size}}.",
+            "usageQuota": "Uses {{size}} of {{quota}}.",
+            "leave": "Leave",
+            "leaveTitle": "Leave {{name}}?",
+            "leaveDescription": "You will lose access until someone invites you again.",
+            "delete": "Delete space",
+            "deleteTitle": "Delete {{name}}?",
+            "deleteDescription": "Everything in it is deleted for every member. A final backup is kept for the server administrators for 30 days."
+        },
+        "members": {
+            "title": "Members",
+            "description": "Who can see this space and what they may do.",
+            "you": "you",
+            "remove": "Remove"
+        },
+        "invitations": {
+            "title": "Invitations",
+            "description": "Single-use links to join this space, valid for 7 days.",
+            "emailPlaceholder": "Email (optional: only this person can use it)",
+            "create": "Create link",
+            "linkReady": "Send this link to the person you invite. It is shown only once.",
+            "copied": "Link copied",
+            "anyone": "Anyone with the link",
+            "expires": "Expires {{date}}",
+            "revoke": "Revoke"
+        },
+        "links": {
+            "title": "Linked spaces",
+            "description": "Money can be transferred between linked spaces.",
+            "none": "No linked spaces.",
+            "unlink": "Unlink",
+            "unlinkTitle": "Unlink {{name}}?",
+            "unlinkDescription": "Transfers already made stay in both spaces but can no longer be changed.",
+            "choose": "Space to link",
+            "link": "Link",
+            "howTo": "You can link spaces you administer. To link with someone else's space, ask them to invite you as an admin."
+        },
+        "transfers": {
+            "title": "Transfers needing attention",
+            "description": "Transfers with linked spaces that someone has to decide on.",
+            "untitled": "Transfer",
+            "unknownSpace": "a space not on this server",
+            "review": {
+                "created_remote": "Made after the restored backup",
+                "deleted_remote": "Deleted in the other space",
+                "changed_remote": "Changed in the other space",
+                "missing_remote": "Not in the other space"
+            },
+            "needsAccount": "Account missing",
+            "unverified": "Signature not verified",
+            "frozen": "Space not linked",
+            "remoteDeleted": "The other space deleted it.",
+            "remoteVersion": "The other space has {{amount}} on {{date}}.",
+            "accept": "Take the other space's version",
+            "reject": "Keep this version",
+            "trust": "Trust as is",
+            "chooseAccount": "Choose an account"
+        },
+        "audit": {
+            "title": "Administrator actions",
+            "description": "What server administrators did to this space.",
+            "someone": "Someone",
+            "none": "Nothing yet.",
+            "actions": {
+                "assign_admin": "made an admin",
+                "set_quota": "changed the size limit",
+                "delete_space": "deleted the space",
+                "restore_deleted_space": "restored the space",
+                "promote_guest": "promoted a guest",
+                "trust_key": "trusted a key",
+                "untrust_key": "removed a trusted key",
+                "rotate_key": "rotated the server key"
+            }
+        },
+        "backups": {
+            "title": "Backups of {{name}}",
+            "description": "Backups of this space only. Restoring replaces its data; transfers with linked spaces are reviewed afterwards.",
+            "adminsOnly": "Only the space's admins manage its backups.",
+            "import": "Import as a new space"
+        },
+        "currencies": {
+            "adminOnly": "Only the space's admins can change this."
+        }
+    },
+    "user": {
+        "title": "User",
+        "description": "Your own settings: they apply in every space.",
+        "tabs": {
+            "preferences": "Preferences",
+            "security": "Security",
+            "api": "API"
+        },
+        "theme": {
+            "title": "Theme",
+            "description": "Light, dark or as your system."
+        }
+    },
+    "admin": {
+        "security": {
+            "title": "Security",
+            "description": "The keys this server signs backups and transfers between spaces with, and the keys it trusts."
+        },
+        "keys": {
+            "title": "Signing keys",
+            "description": "The server signs backups and transfers between spaces, so it can tell them from edited or foreign ones.",
+            "rotate": "Rotate key",
+            "rotateTitle": "Rotate the server key?",
+            "rotateDescription": "A new key signs from now on. The old public key stays trusted, so earlier signatures still verify.",
+            "own": "This server's public key",
+            "ownHelp": "Key id {{kid}}. Give it to another server so it trusts what this one signed.",
+            "copy": "Copy",
+            "copied": "Public key copied",
+            "trusted": "Trusted keys",
+            "untrust": "Remove",
+            "noneTrusted": "No other keys are trusted.",
+            "namePlaceholder": "Name",
+            "keyPlaceholder": "Public key (base64)",
+            "trust": "Trust",
+            "toasts": {
+                "trusted": "Key trusted",
+                "untrusted": "Key removed",
+                "rotated": "Key rotated"
+            }
+        },
+        "backups": {
+            "title": "System backups",
+            "description": "Backups of the whole server: users, every space and the signing key."
+        },
+        "spaces": {
+            "title": "Spaces",
+            "description": "Every space on this server.",
+            "defaultQuota": "Default",
+            "chooseUser": "User",
+            "assign": "Make admin",
+            "members": "Members",
+            "size": "Size",
+            "quota": "Size limit",
+            "membersCount": "{{members}} ({{admins}} admins)",
+            "privacy": "Only names, members and sizes are shown here. Making yourself admin of a space shows in its audit log.",
+            "deletedTitle": "Deleted spaces",
+            "deletedDescription": "Final backups of deleted spaces, kept for 30 days. Restoring creates a new space you administer.",
+            "restore": "Restore",
+            "noDeleted": "No deleted spaces.",
+            "toasts": {
+                "quota": "Size limit saved",
+                "deleted": "Space deleted",
+                "assigned": "Admin assigned",
+                "restored": "Space restored"
+            }
+        }
+    },
+    "invite": {
+        "invalidTitle": "Invitation not valid",
+        "invalidText": "This link was used, revoked or has expired. Ask for a new one.",
+        "title": "Join {{space}}",
+        "text": "{{inviter}} invites you as {{role}}.",
+        "someone": "Someone",
+        "join": "Join the space",
+        "name": "Name",
+        "email": "Email",
+        "password": "Password",
+        "register": "Create account and join",
+        "haveAccount": "Already have an account?",
+        "signIn": "Sign in"
     }
 }

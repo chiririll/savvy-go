@@ -1,9 +1,9 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { useCreateTransaction, useUpdateTransaction } from '@/hooks'
+import { useCreateTransaction, useSendTransfer, useUpdateTransaction } from '@/hooks'
 import { TransactionFormValues } from '@/schemas'
 import { Transaction } from '@/types'
-import { TransactionFormDialog } from './TransactionFormDialog'
+import { TransactionFormDialog, toSpaceTransferInput } from './TransactionFormDialog'
 
 export type CreateTransactionDefaults = Partial<TransactionFormValues>
 
@@ -19,6 +19,7 @@ export function CreateTransactionProvider({ children }: { children: React.ReactN
     const navigate = useNavigate()
     const createTransaction = useCreateTransaction()
     const updateTransaction = useUpdateTransaction()
+    const sendTransfer = useSendTransfer()
     const [open, setOpen] = useState(false)
     const [defaults, setDefaults] = useState<CreateTransactionDefaults>()
     const [transaction, setTransaction] = useState<Transaction | null>(null)
@@ -48,14 +49,19 @@ export function CreateTransactionProvider({ children }: { children: React.ReactN
             return
         }
 
-        createTransaction.mutate(data, {
-            onSuccess: () => {
-                setOpen(false)
-                if (location.pathname !== '/transactions') {
-                    navigate('/transactions')
-                }
-            },
-        })
+        const onSuccess = () => {
+            setOpen(false)
+            if (location.pathname !== '/transactions') {
+                navigate('/transactions')
+            }
+        }
+
+        if (data.type === 'transfer_out') {
+            sendTransfer.mutate(toSpaceTransferInput(data), { onSuccess })
+            return
+        }
+
+        createTransaction.mutate(data, { onSuccess })
     }
 
     const value = useMemo(() => ({ openCreate, openEdit }), [openCreate, openEdit])
@@ -68,7 +74,7 @@ export function CreateTransactionProvider({ children }: { children: React.ReactN
                 open={open}
                 onOpenChange={setOpen}
                 onSubmit={handleSubmit}
-                isSubmitting={createTransaction.isPending || updateTransaction.isPending}
+                isSubmitting={createTransaction.isPending || updateTransaction.isPending || sendTransfer.isPending}
                 defaultValues={defaults}
             />
         </TransactionFormContext.Provider>

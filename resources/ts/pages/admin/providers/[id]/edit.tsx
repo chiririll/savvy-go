@@ -19,7 +19,7 @@ export default function ProviderEditPage() {
     const { t } = useTranslation('settings')
     const { id } = useParams<{ id: string }>()
     const { data: provider, isLoading } = useIdentityProvider(id!)
-    const updateProvider = useUpdateIdentityProvider('/settings/providers')
+    const updateProvider = useUpdateIdentityProvider('/admin/sso')
 
     if (isLoading || !provider) {
         return (
@@ -43,7 +43,7 @@ export default function ProviderEditPage() {
     }
 
     return (
-        <FormPage title={t('providers.edit')} backLink="/settings/providers">
+        <FormPage title={t('providers.edit')} backLink="/admin/sso">
             <div className="space-y-6">
                 <SelectedPresetBanner preset={provider.preset} />
 

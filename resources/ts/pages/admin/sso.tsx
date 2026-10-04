@@ -3,12 +3,12 @@ import { Page, PageHeader } from '@/components/shared'
 import { ProviderCard, ProvidersEmptyState, ProviderGridSkeleton } from '@/components/features/sso'
 import { useIdentityProviders, useDeleteIdentityProvider, useTestIdentityProvider } from '@/hooks/use-sso'
 
-export default function ProvidersPage() {
+/** Single sign-on providers. */
+export default function AdminSsoPage() {
     const { t } = useTranslation('settings')
     const { data: providers, isLoading } = useIdentityProviders()
     const deleteProvider = useDeleteIdentityProvider()
     const testProvider = useTestIdentityProvider()
-
     const hasProviders = !!providers?.length
 
     return (
@@ -16,7 +16,7 @@ export default function ProvidersPage() {
             <PageHeader
                 title={t('providers.title')}
                 description={t('providers.description')}
-                createLink={hasProviders ? '/settings/providers/create' : undefined}
+                createLink={hasProviders ? '/admin/providers/create' : undefined}
                 createLabel={t('providers.add')}
             />
 

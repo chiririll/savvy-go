@@ -8,11 +8,15 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useCreateTransactionDialog } from '@/components/features/transactions'
-import { TRANSACTION_TYPE_OPTIONS } from '@/constants'
+import { SPACE_TRANSFER_OPTION, TRANSACTION_TYPE_OPTIONS } from '@/constants'
+import { useSpaceLinks } from '@/hooks'
+import { useCurrentSpaceId } from '@/stores/space'
 
 export function CreateTransactionMenu() {
     const { t } = useTranslation('nav')
     const { openCreate } = useCreateTransactionDialog()
+    const { data: links } = useSpaceLinks(useCurrentSpaceId())
+    const options = [...TRANSACTION_TYPE_OPTIONS, ...(links?.length ? [SPACE_TRANSFER_OPTION] : [])]
 
     return (
         <DropdownMenu>
@@ -23,7 +27,7 @@ export function CreateTransactionMenu() {
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-                {TRANSACTION_TYPE_OPTIONS.map(({ value, icon: Icon, color }) => (
+                {options.map(({ value, icon: Icon, color }) => (
                     <DropdownMenuItem
                         key={value}
                         onClick={() => openCreate({ type: value })}

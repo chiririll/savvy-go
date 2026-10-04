@@ -7,18 +7,18 @@ import { useCreateIdentityProvider } from '@/hooks/use-sso'
 export default function ProviderCreatePage() {
     const { t } = useTranslation('settings')
     const [preset, setPreset] = useState<string | null>(null)
-    const createProvider = useCreateIdentityProvider('/settings/providers')
+    const createProvider = useCreateIdentityProvider('/admin/sso')
 
     if (!preset) {
         return (
-            <FormPage title={t('providers.create')} backLink="/settings/providers">
+            <FormPage title={t('providers.create')} backLink="/admin/sso">
                 <PresetChooser onSelect={setPreset} />
             </FormPage>
         )
     }
 
     return (
-        <FormPage title={t('providers.create')} backLink="/settings/providers">
+        <FormPage title={t('providers.create')} backLink="/admin/sso">
             <div className="space-y-6">
                 <SelectedPresetBanner preset={preset} onChange={() => setPreset(null)} />
 
