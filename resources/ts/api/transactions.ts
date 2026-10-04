@@ -6,6 +6,14 @@ import { TransactionFormData } from '@/schemas'
 
 const ENDPOINT = '/transactions'
 
+export interface ConfirmTransactionOptions {
+    date?: string | null
+    amount?: number | null
+    to_amount?: number | null
+}
+
+type ConfirmTransactionBody = Omit<ConfirmTransactionOptions, 'date'> & { date?: string }
+
 export interface TransactionsResponse {
     data: Transaction[]
     summary?: TransactionSummary
@@ -47,8 +55,12 @@ export const transactionsApi = {
     duplicate: (id: number | string) =>
         api.post<Transaction, void>(`${ENDPOINT}/${id}/duplicate`, undefined),
 
-    confirm: (id: number | string, date?: string | null) =>
-        api.post<Transaction, { date?: string | null }>(`${ENDPOINT}/${id}/confirm`, date ? { date } : {}),
+    confirm: (id: number | string, options: ConfirmTransactionOptions = {}) =>
+        api.post<Transaction, ConfirmTransactionBody>(`${ENDPOINT}/${id}/confirm`, {
+            ...(options.date ? { date: options.date } : {}),
+            ...(options.amount != null ? { amount: options.amount } : {}),
+            ...(options.to_amount != null ? { to_amount: options.to_amount } : {}),
+        }),
 
     getPendingSummary: () =>
         api.get<TransactionSummary>('/transactions-pending-summary'),

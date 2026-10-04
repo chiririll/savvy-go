@@ -130,7 +130,7 @@ export function TransactionRow({
                     )}
                 </>
             )}
-            amount={`${sign}${formatCurrency(transaction.amount, transaction.account.currency)}`}
+            amount={`${transaction.isEstimated ? '≈ ' : ''}${sign}${formatCurrency(transaction.amount, transaction.account.currency)}`}
             amountClassName={cn(className, transaction.status === 'pending' && 'opacity-60')}
             extraAmount={isTransfer && transaction.toAmount != null && transaction.toAccount
                 ? `${transaction.status === 'skipped' ? '' : '+'}${formatCurrency(transaction.toAmount, transaction.toAccount.currency)}`

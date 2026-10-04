@@ -102,6 +102,7 @@ func decodeRecurring(w http.ResponseWriter, r *http.Request) (domain.RecurringIn
 		CategoryID  *int64           `json:"category_id"`
 		Amount      decimal.Decimal  `json:"amount"`
 		ToAmount    *decimal.Decimal `json:"to_amount"`
+		IsEstimated *bool            `json:"is_estimated"`
 		Description *string          `json:"description"`
 		Frequency   string           `json:"frequency"`
 		Interval    int              `json:"interval"`
@@ -121,7 +122,7 @@ func decodeRecurring(w http.ResponseWriter, r *http.Request) (domain.RecurringIn
 	return domain.RecurringInput{
 		Type: body.Type, AccountID: body.AccountID, ToAccountID: body.ToAccountID,
 		CategoryID: body.CategoryID, Amount: body.Amount, ToAmount: body.ToAmount,
-		Description: body.Description, Frequency: body.Frequency, Interval: body.Interval,
+		IsEstimated: body.IsEstimated, Description: body.Description, Frequency: body.Frequency, Interval: body.Interval,
 		DayOfWeek: body.DayOfWeek, DayOfMonth: body.DayOfMonth, StartDate: body.StartDate,
 		EndDate: body.EndDate, IsActive: body.IsActive, TagIDs: body.TagIDs, HasTagIDs: hasTags,
 	}, true

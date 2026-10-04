@@ -14,17 +14,26 @@ import (
 )
 
 const confirmTransaction = `-- name: ConfirmTransaction :exec
-UPDATE transactions SET status='confirmed', date=?, updated_at=? WHERE id=?
+UPDATE transactions SET status='confirmed', amount=?, to_amount=?, is_estimated=0, date=?, updated_at=? WHERE id=?
 `
 
 type ConfirmTransactionParams struct {
+	Amount    int64
+	ToAmount  sql.NullInt64
 	Date      sql.NullString
 	UpdatedAt sql.NullString
 	ID        int64
 }
 
+// A confirmed transaction has its real amount, so it is no longer an estimate.
 func (q *Queries) ConfirmTransaction(ctx context.Context, arg ConfirmTransactionParams) error {
-	_, err := q.db.ExecContext(ctx, confirmTransaction, arg.Date, arg.UpdatedAt, arg.ID)
+	_, err := q.db.ExecContext(ctx, confirmTransaction,
+		arg.Amount,
+		arg.ToAmount,
+		arg.Date,
+		arg.UpdatedAt,
+		arg.ID,
+	)
 	return err
 }
 
@@ -68,7 +77,7 @@ func (q *Queries) DeleteTransactionTags(ctx context.Context, transactionID int64
 
 const getTransaction = `-- name: GetTransaction :one
 SELECT t.id, t.type, t.account_id, t.to_account_id, t.category_id, t.amount, t.to_amount,
-	t.description, t.date, t.status, t.recurring_transaction_id, t.created_at,
+	t.is_estimated, t.description, t.date, t.status, t.recurring_transaction_id, t.created_at,
 	ca.id AS currency_id, ca.decimals AS decimals,
 	COALESCE(cb.id, ca.id) AS to_currency_id, COALESCE(cb.decimals, ca.decimals) AS to_decimals
 FROM transactions t
@@ -87,6 +96,7 @@ type GetTransactionRow struct {
 	CategoryID             sql.NullInt64
 	Amount                 int64
 	ToAmount               sql.NullInt64
+	IsEstimated            int64
 	Description            sql.NullString
 	Date                   sql.NullString
 	Status                 string
@@ -110,6 +120,7 @@ func (q *Queries) GetTransaction(ctx context.Context, id int64) (GetTransactionR
 		&i.CategoryID,
 		&i.Amount,
 		&i.ToAmount,
+		&i.IsEstimated,
 		&i.Description,
 		&i.Date,
 		&i.Status,
@@ -124,9 +135,9 @@ func (q *Queries) GetTransaction(ctx context.Context, id int64) (GetTransactionR
 }
 
 const insertTransaction = `-- name: InsertTransaction :execresult
-INSERT INTO transactions (type, account_id, to_account_id, category_id, amount, to_amount,
+INSERT INTO transactions (type, account_id, to_account_id, category_id, amount, to_amount, is_estimated,
 	description, date, status, recurring_transaction_id, created_at, updated_at)
-VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
 `
 
 type InsertTransactionParams struct {
@@ -136,6 +147,7 @@ type InsertTransactionParams struct {
 	CategoryID             sql.NullInt64
 	Amount                 int64
 	ToAmount               sql.NullInt64
+	IsEstimated            int64
 	Description            sql.NullString
 	Date                   sql.NullString
 	Status                 string
@@ -152,6 +164,7 @@ func (q *Queries) InsertTransaction(ctx context.Context, arg InsertTransactionPa
 		arg.CategoryID,
 		arg.Amount,
 		arg.ToAmount,
+		arg.IsEstimated,
 		arg.Description,
 		arg.Date,
 		arg.Status,
@@ -404,7 +417,7 @@ func (q *Queries) SkipTransaction(ctx context.Context, arg SkipTransactionParams
 
 const updateTransaction = `-- name: UpdateTransaction :exec
 UPDATE transactions SET type=?, account_id=?, to_account_id=?, category_id=?, amount=?, to_amount=?,
-	description=?, date=?, updated_at=? WHERE id=?
+	is_estimated=?, description=?, date=?, updated_at=? WHERE id=?
 `
 
 type UpdateTransactionParams struct {
@@ -414,6 +427,7 @@ type UpdateTransactionParams struct {
 	CategoryID  sql.NullInt64
 	Amount      int64
 	ToAmount    sql.NullInt64
+	IsEstimated int64
 	Description sql.NullString
 	Date        sql.NullString
 	UpdatedAt   sql.NullString
@@ -428,6 +442,7 @@ func (q *Queries) UpdateTransaction(ctx context.Context, arg UpdateTransactionPa
 		arg.CategoryID,
 		arg.Amount,
 		arg.ToAmount,
+		arg.IsEstimated,
 		arg.Description,
 		arg.Date,
 		arg.UpdatedAt,

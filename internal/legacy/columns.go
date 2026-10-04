@@ -45,6 +45,10 @@ var extraColumns = map[string][]addColumn{
 		{"dedup_hash", "TEXT"},
 		{"status", "TEXT NOT NULL DEFAULT 'confirmed'"},
 		{"recurring_transaction_id", "INTEGER"},
+		{"is_estimated", "INTEGER NOT NULL DEFAULT 0"},
+	},
+	"recurring_transactions": {
+		{"is_estimated", "INTEGER NOT NULL DEFAULT 0"},
 	},
 	"budgets": {
 		{"currency_id", "INTEGER"},

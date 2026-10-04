@@ -55,6 +55,7 @@ type Transaction struct {
 	CategoryID  *int64
 	Amount      money.Money  // in the currency of Account
 	ToAmount    *money.Money // in the currency of ToAccount
+	IsEstimated bool         // the amount is a rough guess until the transaction is confirmed
 	Description *string
 	Date        *string
 	Status      string
@@ -74,6 +75,7 @@ type TxInput struct {
 	CategoryID  *int64
 	Amount      decimal.Decimal
 	ToAmount    *decimal.Decimal
+	IsEstimated bool // only kept for a pending transaction, see keepsEstimate
 	Description *string
 	Date        *string
 	Status      *string
@@ -111,6 +113,7 @@ func (s Transactions) Create(ctx context.Context, in TxInput) (*Transaction, err
 	res, err := db.Q(s.DB).InsertTransaction(ctx, sqlc.InsertTransactionParams{
 		Type: in.Type, AccountID: in.AccountID, ToAccountID: db.NullInt64(in.ToAccountID),
 		CategoryID: db.NullInt64(in.CategoryID), Amount: amount.Minor(), ToAmount: money.ToNullMinor(toAmount),
+		IsEstimated: db.BoolInt(in.IsEstimated && keepsEstimate(in.Type, status, len(items))),
 		Description: db.NullString(in.Description),
 		Date:        db.NullString(in.Date), Status: status, RecurringTransactionID: db.NullInt64(in.RecurringID),
 		CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
@@ -145,9 +148,14 @@ func (s Transactions) Update(ctx context.Context, id int64, in TxInput) (*Transa
 	if err != nil {
 		return nil, err
 	}
+	itemCount := len(cur.Items) // items not sent are kept
+	if in.Items != nil {
+		itemCount = len(items)
+	}
 	err = db.Q(s.DB).UpdateTransaction(ctx, sqlc.UpdateTransactionParams{
 		Type: in.Type, AccountID: in.AccountID, ToAccountID: db.NullInt64(in.ToAccountID),
 		CategoryID: db.NullInt64(in.CategoryID), Amount: amount.Minor(), ToAmount: money.ToNullMinor(toAmount),
+		IsEstimated: db.BoolInt(in.IsEstimated && keepsEstimate(in.Type, cur.Status, itemCount)),
 		Description: db.NullString(in.Description),
 		Date:        db.NullString(in.Date), UpdatedAt: db.NS(now), ID: id,
 	})
@@ -179,7 +187,10 @@ func (s Transactions) Delete(ctx context.Context, id int64) error {
 	return db.Q(s.DB).DeleteTransaction(ctx, id)
 }
 
-func (s Transactions) Confirm(ctx context.Context, id int64, date string) (*Transaction, error) {
+// Confirm settles a pending transaction on date. The amounts it was planned
+// with stand; only an estimate can be replaced by the real amounts, and a
+// transfer given only amount delivers it converted at the current rates.
+func (s Transactions) Confirm(ctx context.Context, id int64, date string, amount, toAmount *decimal.Decimal) (*Transaction, error) {
 	cur, err := s.ByID(ctx, id)
 	if err != nil || cur == nil {
 		return cur, err
@@ -196,8 +207,24 @@ func (s Transactions) Confirm(ctx context.Context, id int64, date string) (*Tran
 	if isFuture(date) {
 		return nil, fmt.Errorf("future")
 	}
+	actual, actualTo := cur.Amount, cur.ToAmount
+	if amount != nil || toAmount != nil {
+		if !cur.IsEstimated {
+			return nil, fmt.Errorf("not estimated")
+		}
+		in := TxInput{Type: cur.Type, AccountID: cur.AccountID, ToAccountID: cur.ToAccountID, Amount: cur.Amount.Decimal(), ToAmount: toAmount}
+		if amount != nil {
+			in.Amount = *amount
+		}
+		if actual, actualTo, err = s.amounts(ctx, in); err != nil {
+			return nil, err
+		}
+	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	err = db.Q(s.DB).ConfirmTransaction(ctx, sqlc.ConfirmTransactionParams{Date: db.NS(date), UpdatedAt: db.NS(now), ID: id})
+	err = db.Q(s.DB).ConfirmTransaction(ctx, sqlc.ConfirmTransactionParams{
+		Amount: actual.Minor(), ToAmount: money.ToNullMinor(actualTo),
+		Date: db.NS(date), UpdatedAt: db.NS(now), ID: id,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -482,7 +509,7 @@ func (s Transactions) amounts(ctx context.Context, in TxInput) (amount money.Mon
 
 func txFromRow(r sqlc.GetTransactionRow) Transaction {
 	t := Transaction{
-		ID: r.ID, Type: r.Type, AccountID: r.AccountID, Status: r.Status,
+		ID: r.ID, Type: r.Type, AccountID: r.AccountID, Status: r.Status, IsEstimated: r.IsEstimated != 0,
 		Amount:   money.New(r.Amount, money.Unit{ID: r.CurrencyID, Decimals: int(r.Decimals)}),
 		ToAmount: money.FromNullMinor(r.ToAmount, money.Unit{ID: r.ToCurrencyID, Decimals: int(r.ToDecimals)}),
 	}
@@ -505,6 +532,16 @@ func txFromRow(r sqlc.GetTransactionRow) Transaction {
 		t.CreatedAt = &tm
 	}
 	return t
+}
+
+// keepsEstimate tells whether a transaction may carry an approximate amount:
+// only a pending income, expense or transfer without items, since items fix
+// the amount and the other types settle debts whose amounts are known.
+func keepsEstimate(txType, status string, items int) bool {
+	if status != "pending" || items > 0 {
+		return false
+	}
+	return txType == "income" || txType == "expense" || txType == "transfer"
 }
 
 // isFuture compares plain "YYYY-MM-DD" calendar dates as strings, using

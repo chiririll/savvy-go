@@ -70,7 +70,7 @@ func (q *Queries) GetPendingRecurringTx(ctx context.Context, recurringTransactio
 }
 
 const getRecurring = `-- name: GetRecurring :one
-SELECT r.id, r.type, r.account_id, r.to_account_id, r.category_id, r.amount, r.to_amount, r.description,
+SELECT r.id, r.type, r.account_id, r.to_account_id, r.category_id, r.amount, r.to_amount, r.is_estimated, r.description,
 	r.frequency, r.interval, r.day_of_week, r.day_of_month, r.start_date, r.end_date,
 	r.next_run_date, r.last_run_date, r.is_active,
 	ca.id AS currency_id, ca.decimals AS decimals,
@@ -91,6 +91,7 @@ type GetRecurringRow struct {
 	CategoryID   sql.NullInt64
 	Amount       int64
 	ToAmount     sql.NullInt64
+	IsEstimated  int64
 	Description  sql.NullString
 	Frequency    string
 	Interval     int64
@@ -119,6 +120,7 @@ func (q *Queries) GetRecurring(ctx context.Context, id int64) (GetRecurringRow, 
 		&i.CategoryID,
 		&i.Amount,
 		&i.ToAmount,
+		&i.IsEstimated,
 		&i.Description,
 		&i.Frequency,
 		&i.Interval,
@@ -139,10 +141,10 @@ func (q *Queries) GetRecurring(ctx context.Context, id int64) (GetRecurringRow, 
 
 const insertRecurring = `-- name: InsertRecurring :execresult
 INSERT INTO recurring_transactions (
-	type, account_id, to_account_id, category_id, amount, to_amount, description,
+	type, account_id, to_account_id, category_id, amount, to_amount, is_estimated, description,
 	frequency, interval, day_of_week, day_of_month, start_date, end_date,
 	next_run_date, is_active, created_at, updated_at)
-VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 `
 
 type InsertRecurringParams struct {
@@ -152,6 +154,7 @@ type InsertRecurringParams struct {
 	CategoryID  sql.NullInt64
 	Amount      int64
 	ToAmount    sql.NullInt64
+	IsEstimated int64
 	Description sql.NullString
 	Frequency   string
 	Interval    int64
@@ -173,6 +176,7 @@ func (q *Queries) InsertRecurring(ctx context.Context, arg InsertRecurringParams
 		arg.CategoryID,
 		arg.Amount,
 		arg.ToAmount,
+		arg.IsEstimated,
 		arg.Description,
 		arg.Frequency,
 		arg.Interval,
@@ -202,7 +206,7 @@ func (q *Queries) InsertRecurringTag(ctx context.Context, arg InsertRecurringTag
 }
 
 const listRecurring = `-- name: ListRecurring :many
-SELECT r.id, r.type, r.account_id, r.to_account_id, r.category_id, r.amount, r.to_amount, r.description,
+SELECT r.id, r.type, r.account_id, r.to_account_id, r.category_id, r.amount, r.to_amount, r.is_estimated, r.description,
 	r.frequency, r.interval, r.day_of_week, r.day_of_month, r.start_date, r.end_date,
 	r.next_run_date, r.last_run_date, r.is_active,
 	ca.id AS currency_id, ca.decimals AS decimals,
@@ -231,6 +235,7 @@ type ListRecurringRow struct {
 	CategoryID   sql.NullInt64
 	Amount       int64
 	ToAmount     sql.NullInt64
+	IsEstimated  int64
 	Description  sql.NullString
 	Frequency    string
 	Interval     int64
@@ -264,6 +269,7 @@ func (q *Queries) ListRecurring(ctx context.Context, arg ListRecurringParams) ([
 			&i.CategoryID,
 			&i.Amount,
 			&i.ToAmount,
+			&i.IsEstimated,
 			&i.Description,
 			&i.Frequency,
 			&i.Interval,
@@ -335,7 +341,7 @@ func (q *Queries) ListRecurringTags(ctx context.Context, recurringTransactionID 
 
 const updateRecurring = `-- name: UpdateRecurring :exec
 UPDATE recurring_transactions SET type=?, account_id=?, to_account_id=?, category_id=?,
-	amount=?, to_amount=?, description=?, frequency=?, interval=?, day_of_week=?,
+	amount=?, to_amount=?, is_estimated=?, description=?, frequency=?, interval=?, day_of_week=?,
 	day_of_month=?, start_date=?, end_date=?, next_run_date=?, is_active=?, updated_at=?
 WHERE id=?
 `
@@ -347,6 +353,7 @@ type UpdateRecurringParams struct {
 	CategoryID  sql.NullInt64
 	Amount      int64
 	ToAmount    sql.NullInt64
+	IsEstimated int64
 	Description sql.NullString
 	Frequency   string
 	Interval    int64
@@ -368,6 +375,7 @@ func (q *Queries) UpdateRecurring(ctx context.Context, arg UpdateRecurringParams
 		arg.CategoryID,
 		arg.Amount,
 		arg.ToAmount,
+		arg.IsEstimated,
 		arg.Description,
 		arg.Frequency,
 		arg.Interval,

@@ -53,7 +53,7 @@ export function UpcomingPendingCard({
                 {dateLabel}
             </p>
             <p className={`row-span-2 self-start pt-0.5 font-mono text-base font-medium truncate ${className}`}>
-                {sign}{formatCurrency(transaction.amount, transaction.account.currency)}
+                {transaction.isEstimated && '≈ '}{sign}{formatCurrency(transaction.amount, transaction.account.currency)}
             </p>
             {!isReadOnly && (
                 <div className="col-start-2 row-start-3 flex items-end justify-end gap-1">

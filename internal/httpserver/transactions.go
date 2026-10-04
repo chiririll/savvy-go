@@ -148,14 +148,16 @@ func (s *Server) transactionsConfirm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Date *string `json:"date"`
+		Date     *string          `json:"date"`
+		Amount   *decimal.Decimal `json:"amount"`
+		ToAmount *decimal.Decimal `json:"to_amount"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
 	date := ""
 	if body.Date != nil {
 		date = *body.Date
 	}
-	out, err := s.txs.Confirm(r.Context(), tx.ID, date)
+	out, err := s.txs.Confirm(r.Context(), tx.ID, date, body.Amount, body.ToAmount)
 	if err != nil {
 		writeMessage(w, 422, err.Error())
 		return
@@ -224,6 +226,7 @@ func decodeTx(w http.ResponseWriter, r *http.Request) (domain.TxInput, bool) {
 		CategoryID  *int64           `json:"category_id"`
 		Amount      decimal.Decimal  `json:"amount"`
 		ToAmount    *decimal.Decimal `json:"to_amount"`
+		IsEstimated bool             `json:"is_estimated"`
 		Description *string          `json:"description"`
 		Date        *string          `json:"date"`
 		TagIDs      []int64          `json:"tag_ids"`
@@ -240,7 +243,7 @@ func decodeTx(w http.ResponseWriter, r *http.Request) (domain.TxInput, bool) {
 	in := domain.TxInput{
 		Type: body.Type, AccountID: body.AccountID, ToAccountID: body.ToAccountID,
 		CategoryID: body.CategoryID, Amount: body.Amount, ToAmount: body.ToAmount,
-		Description: body.Description, Date: body.Date,
+		IsEstimated: body.IsEstimated, Description: body.Description, Date: body.Date,
 		TagIDs: body.TagIDs,
 	}
 	for _, it := range body.Items {

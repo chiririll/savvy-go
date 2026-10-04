@@ -26,6 +26,7 @@ import { formatDateLocal } from '@/lib/utils'
 import {
     CategorySelect,
     FormActiveField,
+    FormEstimatedField,
     FormWrapper,
     MoneyAccountFields,
     TagSelect,
@@ -67,6 +68,7 @@ export function RecurringForm({
             category_id: null,
             amount: 0,
             to_amount: null,
+            is_estimated: false,
             description: '',
             frequency: 'monthly',
             interval: 1,
@@ -323,6 +325,11 @@ export function RecurringForm({
                 <FormActiveField
                     control={form.control}
                     help={t('forms:recurring.activeHelp')}
+                />
+
+                <FormEstimatedField
+                    control={form.control}
+                    help={t('forms:recurring.estimatedHelp')}
                 />
 
                 {!hideSubmit && (

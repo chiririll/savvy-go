@@ -98,7 +98,7 @@ export function FormDialog({
     const isMobile = useIsMobile()
     const [footerStart, setFooterStart] = useState<HTMLDivElement | null>(null)
     const footerStartSlot = (
-        <div ref={setFooterStart} className="mr-auto flex min-w-0 items-center empty:hidden" />
+        <div ref={setFooterStart} className="mr-auto flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 empty:hidden" />
     )
     const body = (
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">

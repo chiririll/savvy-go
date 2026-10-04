@@ -158,6 +158,7 @@ type RecurringTransaction struct {
 	CategoryID  sql.NullInt64
 	Amount      int64
 	ToAmount    sql.NullInt64
+	IsEstimated int64
 	Description sql.NullString
 	Frequency   string
 	Interval    int64
@@ -227,6 +228,7 @@ type Transaction struct {
 	CategoryID             sql.NullInt64
 	Amount                 int64
 	ToAmount               sql.NullInt64
+	IsEstimated            int64
 	Description            sql.NullString
 	DedupHash              sql.NullString
 	Date                   sql.NullString

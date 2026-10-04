@@ -21,6 +21,7 @@ import { X } from 'lucide-react'
 import {
     CategorySelect,
     FieldHelp,
+    FormEstimatedField,
     FormWrapper,
     MoneyAccountFields,
     TagSelect,
@@ -206,6 +207,7 @@ export function TransactionForm({
             category_id: defaultValues?.category_id ?? null,
             amount: defaultValues?.amount ?? 0,
             to_amount: defaultValues?.to_amount ?? null,
+            is_estimated: defaultValues?.is_estimated ?? false,
             exchange_rate: resolveOpeningTransferRate(defaultValues),
             description: defaultValues?.description ?? '',
             date: defaultValues?.date !== undefined ? (defaultValues.date ?? '') : today,
@@ -559,6 +561,13 @@ export function TransactionForm({
                         skipPairRecalcRef.current = true
                     }}
                 />
+
+                {(isPendingDate || (isEdit && !originalAffectsBalance)) && !(items && items.length > 0) && (
+                    <FormEstimatedField
+                        control={form.control}
+                        help={t('forms:transactions.estimatedHelp')}
+                    />
+                )}
 
                 <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
                     {transactionType === 'transfer' && (

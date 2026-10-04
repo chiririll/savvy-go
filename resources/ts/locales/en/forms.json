@@ -1,4 +1,5 @@
 {
+    "estimatedAmount": "Approximate amount",
     "selectAccountType": "Select account type",
     "selectCurrency": "Select currency",
     "searchCurrency": "Search currency...",
@@ -55,7 +56,8 @@
         "noItems": "No items. Click \"Add item\" or enter amount manually.",
         "pendingHint": "This date is in the future. The transaction will stay pending and will not change the balance until you confirm it.",
         "noDateHint": "No date set. The transaction will stay pending and will not change the balance until you confirm it.",
-        "dateOptionalHelp": "Leave empty to defer without a specific date."
+        "dateOptionalHelp": "Leave empty to defer without a specific date.",
+        "estimatedHelp": "The amount is a rough guess. You can enter the real amount when you confirm the transaction."
     },
     "currencies": {
         "code": "Code",
@@ -135,6 +137,7 @@
         "endDate": "End date",
         "endDateHelp": "Leave empty for no end",
         "activeHelp": "Inactive recurring transactions are not generated",
+        "estimatedHelp": "The amount is a rough guess. You enter the real amount when you confirm each occurrence.",
         "frequencies": {
             "daily": "Daily",
             "weekly": "Weekly",

@@ -60,6 +60,7 @@ export const createRecurringColumns = ({
                 row.original.type === 'income' && 'text-green-600',
                 row.original.type === 'expense' && 'text-red-600'
             )}>
+                {row.original.isEstimated && '≈ '}
                 {row.original.type === 'expense' && '-'}
                 {formatCurrency(row.original.amount, row.original.account.currency)}
             </span>

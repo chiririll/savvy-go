@@ -22,6 +22,7 @@ type Recurring struct {
 	CategoryID  *int64
 	Amount      money.Money  // in the currency of Account
 	ToAmount    *money.Money // in the currency of ToAccount
+	IsEstimated bool         // the amount is a rough guess; each occurrence is confirmed with the real one
 	Description *string
 	Frequency   string
 	Interval    int
@@ -45,6 +46,7 @@ type RecurringInput struct {
 	CategoryID  *int64
 	Amount      decimal.Decimal
 	ToAmount    *decimal.Decimal
+	IsEstimated *bool
 	Description *string
 	Frequency   string
 	Interval    int
@@ -96,6 +98,7 @@ func (s RecurringStore) Create(ctx context.Context, in RecurringInput) (*Recurri
 	if in.IsActive != nil {
 		active = *in.IsActive
 	}
+	estimated := in.IsEstimated != nil && *in.IsEstimated
 	now := time.Now().UTC().Format(time.RFC3339)
 	unit, toUnit, err := s.Txs.unitsFor(ctx, in.AccountID, in.ToAccountID)
 	if err != nil {
@@ -108,7 +111,7 @@ func (s RecurringStore) Create(ctx context.Context, in RecurringInput) (*Recurri
 	res, err := db.Q(s.DB).InsertRecurring(ctx, sqlc.InsertRecurringParams{
 		Type: in.Type, AccountID: in.AccountID, ToAccountID: db.NullInt64(in.ToAccountID),
 		CategoryID: db.NullInt64(in.CategoryID), Amount: amount.Minor(),
-		ToAmount:    money.ToNullMinor(toAmount),
+		ToAmount: money.ToNullMinor(toAmount), IsEstimated: db.BoolInt(estimated),
 		Description: db.NullString(in.Description), Frequency: in.Frequency, Interval: int64(in.Interval),
 		DayOfWeek: db.NullInt(in.DayOfWeek), DayOfMonth: db.NullInt(in.DayOfMonth),
 		StartDate: in.StartDate, EndDate: db.NullString(in.EndDate), NextRunDate: in.StartDate,
@@ -164,6 +167,10 @@ func (s RecurringStore) Update(ctx context.Context, id int64, in RecurringInput)
 	if in.IsActive != nil {
 		active = *in.IsActive
 	}
+	estimated := cur.IsEstimated
+	if in.IsEstimated != nil {
+		estimated = *in.IsEstimated
+	}
 	now := time.Now().UTC().Format(time.RFC3339)
 	unit, toUnit, err := s.Txs.unitsFor(ctx, in.AccountID, in.ToAccountID)
 	if err != nil {
@@ -176,7 +183,7 @@ func (s RecurringStore) Update(ctx context.Context, id int64, in RecurringInput)
 	err = db.Q(s.DB).UpdateRecurring(ctx, sqlc.UpdateRecurringParams{
 		Type: in.Type, AccountID: in.AccountID, ToAccountID: db.NullInt64(in.ToAccountID),
 		CategoryID: db.NullInt64(in.CategoryID), Amount: amount.Minor(),
-		ToAmount:    money.ToNullMinor(toAmount),
+		ToAmount: money.ToNullMinor(toAmount), IsEstimated: db.BoolInt(estimated),
 		Description: db.NullString(in.Description), Frequency: in.Frequency, Interval: int64(in.Interval),
 		DayOfWeek: db.NullInt(in.DayOfWeek), DayOfMonth: db.NullInt(in.DayOfMonth),
 		StartDate: in.StartDate, EndDate: db.NullString(in.EndDate), NextRunDate: next,
@@ -286,7 +293,7 @@ func (s RecurringStore) createPending(ctx context.Context, rec *Recurring) (*Tra
 	date := rec.NextRunDate
 	in := TxInput{
 		Type: rec.Type, AccountID: rec.AccountID, ToAccountID: rec.ToAccountID,
-		CategoryID: rec.CategoryID, Amount: rec.Amount.Decimal(), ToAmount: toAmt,
+		CategoryID: rec.CategoryID, Amount: rec.Amount.Decimal(), ToAmount: toAmt, IsEstimated: rec.IsEstimated,
 		Description: rec.Description, Date: &date, Status: &status, RecurringID: &rec.ID,
 	}
 	for _, t := range rec.Tags {
@@ -319,7 +326,7 @@ func (s RecurringStore) syncOpenPending(ctx context.Context, rec *Recurring) err
 	err = db.Q(s.DB).UpdateTransaction(ctx, sqlc.UpdateTransactionParams{
 		Type: rec.Type, AccountID: rec.AccountID, ToAccountID: db.NullInt64(rec.ToAccountID),
 		CategoryID: db.NullInt64(rec.CategoryID), Amount: rec.Amount.Minor(), ToAmount: money.ToNullMinor(toAmt),
-		Description: db.NullString(rec.Description), Date: db.NS(rec.NextRunDate),
+		IsEstimated: db.BoolInt(rec.IsEstimated), Description: db.NullString(rec.Description), Date: db.NS(rec.NextRunDate),
 		UpdatedAt: db.NS(now), ID: pendingID,
 	})
 	if err != nil {
@@ -492,7 +499,7 @@ func recurringFromRow(row sqlc.ListRecurringRow) Recurring {
 		Amount:    money.New(row.Amount, money.Unit{ID: row.CurrencyID, Decimals: int(row.Decimals)}),
 		ToAmount:  money.FromNullMinor(row.ToAmount, money.Unit{ID: row.ToCurrencyID, Decimals: int(row.ToDecimals)}),
 		Frequency: row.Frequency, Interval: int(row.Interval), StartDate: row.StartDate,
-		NextRunDate: row.NextRunDate, IsActive: row.IsActive != 0,
+		NextRunDate: row.NextRunDate, IsActive: row.IsActive != 0, IsEstimated: row.IsEstimated != 0,
 	}
 	if row.ToAccountID.Valid {
 		r.ToAccountID = &row.ToAccountID.Int64

@@ -19,6 +19,8 @@ export const recurringSchema = z.object({
 
     to_amount: z.coerce.number().nullable().optional(),
 
+    is_estimated: z.boolean().default(false),
+
     description: z.string().max(255).nullable().optional(),
 
     frequency: z.enum(['daily', 'weekly', 'monthly', 'yearly'], {

@@ -37,6 +37,8 @@ export const transactionSchema = z.object({
 
     to_amount: z.coerce.number().positive().optional().nullable(),
 
+    is_estimated: z.boolean().optional(),
+
     exchange_rate: z.coerce.number().positive().optional().nullable(),
 
     description: z.string().max(500).optional(),

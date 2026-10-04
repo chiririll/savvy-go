@@ -24,6 +24,7 @@ export function toTransactionFormValues(transaction: Transaction): Partial<Trans
         category_id: transaction.category?.id ?? null,
         amount: transaction.amount,
         to_amount: transaction.toAmount ?? null,
+        is_estimated: transaction.isEstimated,
         description: transaction.description ?? '',
         date: transaction.date ?? '',
         items: transaction.items?.map((item) => ({

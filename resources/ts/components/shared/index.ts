@@ -12,6 +12,7 @@ export { NegativeBalanceConfirmDialog, useNegativeBalanceConfirm } from './Negat
 export { RowActions } from './RowActions'
 export { FeedEmpty, FeedList, FeedRow, FeedRowSkeleton, FeedStatusBadge } from './FeedRow'
 export { FormActiveField } from './FormActiveField'
+export { FormEstimatedField } from './FormEstimatedField'
 export { FormWrapper } from './FormWrapper'
 export { FieldHelp } from './FieldHelp'
 export { CurrencySelect } from './CurrencySelect'

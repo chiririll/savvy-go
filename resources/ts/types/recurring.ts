@@ -12,6 +12,7 @@ export interface RecurringTransaction extends BaseEntity {
     type: RecurringTransactionType
     amount: number
     toAmount: number | null
+    isEstimated: boolean
     description: string | null
     frequency: RecurringFrequency
     interval: number

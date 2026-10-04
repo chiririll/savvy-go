@@ -1,13 +1,13 @@
 -- name: InsertRecurring :execresult
 INSERT INTO recurring_transactions (
-	type, account_id, to_account_id, category_id, amount, to_amount, description,
+	type, account_id, to_account_id, category_id, amount, to_amount, is_estimated, description,
 	frequency, interval, day_of_week, day_of_month, start_date, end_date,
 	next_run_date, is_active, created_at, updated_at)
-VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);
+VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);
 
 -- name: UpdateRecurring :exec
 UPDATE recurring_transactions SET type=?, account_id=?, to_account_id=?, category_id=?,
-	amount=?, to_amount=?, description=?, frequency=?, interval=?, day_of_week=?,
+	amount=?, to_amount=?, is_estimated=?, description=?, frequency=?, interval=?, day_of_week=?,
 	day_of_month=?, start_date=?, end_date=?, next_run_date=?, is_active=?, updated_at=?
 WHERE id=?;
 
@@ -31,7 +31,7 @@ INSERT OR IGNORE INTO recurring_transaction_tag (recurring_transaction_id, tag_i
 
 -- name: GetRecurring :one
 -- The same columns as ListRecurring, so its row converts to ListRecurringRow.
-SELECT r.id, r.type, r.account_id, r.to_account_id, r.category_id, r.amount, r.to_amount, r.description,
+SELECT r.id, r.type, r.account_id, r.to_account_id, r.category_id, r.amount, r.to_amount, r.is_estimated, r.description,
 	r.frequency, r.interval, r.day_of_week, r.day_of_month, r.start_date, r.end_date,
 	r.next_run_date, r.last_run_date, r.is_active,
 	ca.id AS currency_id, ca.decimals AS decimals,
@@ -44,7 +44,7 @@ LEFT JOIN currencies cb ON cb.id = ta.currency_id
 WHERE r.id = ?;
 
 -- name: ListRecurring :many
-SELECT r.id, r.type, r.account_id, r.to_account_id, r.category_id, r.amount, r.to_amount, r.description,
+SELECT r.id, r.type, r.account_id, r.to_account_id, r.category_id, r.amount, r.to_amount, r.is_estimated, r.description,
 	r.frequency, r.interval, r.day_of_week, r.day_of_month, r.start_date, r.end_date,
 	r.next_run_date, r.last_run_date, r.is_active,
 	ca.id AS currency_id, ca.decimals AS decimals,

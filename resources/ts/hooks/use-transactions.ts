@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
-import { transactionsApi } from '@/api'
+import { transactionsApi, type ConfirmTransactionOptions } from '@/api'
 import { Transaction, TransactionFilters } from '@/types'
 import { TransactionFormData } from '@/schemas'
 import { useResourceItem, useResourceMutation } from './use-crud'
@@ -114,8 +114,8 @@ export function useDuplicateTransaction() {
 
 export function useConfirmTransaction() {
     return useResourceMutation({
-        mutationFn: ({ id, date }: { id: string | number; date?: string | null }) =>
-            transactionsApi.confirm(id, date),
+        mutationFn: ({ id, ...options }: { id: string | number } & ConfirmTransactionOptions) =>
+            transactionsApi.confirm(id, options),
         invalidateKeys: [...TRANSACTION_CONFIRM_INVALIDATE],
         resetKeys: [...TRANSACTION_INFINITE_RESET],
         successMessage: i18n.t('toasts.transaction.confirmed'),

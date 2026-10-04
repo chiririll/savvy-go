@@ -1,11 +1,11 @@
 -- name: InsertTransaction :execresult
-INSERT INTO transactions (type, account_id, to_account_id, category_id, amount, to_amount,
+INSERT INTO transactions (type, account_id, to_account_id, category_id, amount, to_amount, is_estimated,
 	description, date, status, recurring_transaction_id, created_at, updated_at)
-VALUES (?,?,?,?,?,?,?,?,?,?,?,?);
+VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?);
 
 -- name: UpdateTransaction :exec
 UPDATE transactions SET type=?, account_id=?, to_account_id=?, category_id=?, amount=?, to_amount=?,
-	description=?, date=?, updated_at=? WHERE id=?;
+	is_estimated=?, description=?, date=?, updated_at=? WHERE id=?;
 
 -- name: DeleteTransactionItems :exec
 DELETE FROM transaction_items WHERE transaction_id = ?;
@@ -14,7 +14,8 @@ DELETE FROM transaction_items WHERE transaction_id = ?;
 DELETE FROM transactions WHERE id = ?;
 
 -- name: ConfirmTransaction :exec
-UPDATE transactions SET status='confirmed', date=?, updated_at=? WHERE id=?;
+-- A confirmed transaction has its real amount, so it is no longer an estimate.
+UPDATE transactions SET status='confirmed', amount=?, to_amount=?, is_estimated=0, date=?, updated_at=? WHERE id=?;
 
 -- name: SkipTransaction :exec
 UPDATE transactions SET status='skipped', updated_at=? WHERE id=?;
@@ -25,7 +26,7 @@ SELECT COUNT(*) FROM transactions;
 -- name: GetTransaction :one
 -- Lists go through filter.ListTransactions, which selects the same columns.
 SELECT t.id, t.type, t.account_id, t.to_account_id, t.category_id, t.amount, t.to_amount,
-	t.description, t.date, t.status, t.recurring_transaction_id, t.created_at,
+	t.is_estimated, t.description, t.date, t.status, t.recurring_transaction_id, t.created_at,
 	ca.id AS currency_id, ca.decimals AS decimals,
 	COALESCE(cb.id, ca.id) AS to_currency_id, COALESCE(cb.decimals, ca.decimals) AS to_decimals
 FROM transactions t

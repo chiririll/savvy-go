@@ -40,6 +40,7 @@ export function RecurringFormDialog({
                 category_id: item.category?.id,
                 amount: item.amount,
                 to_amount: item.toAmount,
+                is_estimated: item.isEstimated,
                 description: item.description,
                 frequency: item.frequency,
                 interval: item.interval,

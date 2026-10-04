@@ -16,6 +16,7 @@ import { formatDateLocal, isDateInFuture, isDateOverdue, parseDateKey } from '@/
 import { intlLocale } from '@/lib/i18n'
 import { warningsForTransactionOutflow } from '@/lib/negative-balance'
 import { Transaction } from '@/types'
+import type { ConfirmTransactionOptions } from '@/api'
 
 type ApplyDateChoice = 'today' | 'original' | 'other'
 
@@ -23,7 +24,7 @@ interface ApplyDeferredDateDialogProps {
     transaction: Transaction | null
     open: boolean
     onOpenChange: (open: boolean) => void
-    onConfirm: (date: string) => void
+    onConfirm: (options: ConfirmTransactionOptions & { date: string }) => void
     isSubmitting?: boolean
 }
 
@@ -40,13 +41,21 @@ export function ApplyDeferredDateDialog({
 }: ApplyDeferredDateDialogProps) {
     const { t } = useTranslation('pages')
     const { t: tCommon } = useTranslation('common')
-    const { confirmIfNeeded, dialog: negativeBalanceDialog } = useNegativeBalanceConfirm<string>()
+    const { confirmIfNeeded, dialog: negativeBalanceDialog } = useNegativeBalanceConfirm<ConfirmTransactionOptions & { date: string }>()
     const groupId = useId()
     const originalDate = transaction?.date ?? null
     const originalIsUsable = Boolean(originalDate) && !isDateInFuture(originalDate)
     const today = formatDateLocal()
     const [choice, setChoice] = useState<ApplyDateChoice>('today')
     const [customDate, setCustomDate] = useState(today)
+    const isEstimated = Boolean(transaction?.isEstimated)
+    const crossCurrencyTransfer = Boolean(
+        transaction?.toAccount
+        && transaction.toAmount != null
+        && transaction.account.currency?.id !== transaction.toAccount.currency?.id,
+    )
+    const [amount, setAmount] = useState('')
+    const [toAmount, setToAmount] = useState('')
 
     useEffect(() => {
         if (!open) {
@@ -55,6 +64,8 @@ export function ApplyDeferredDateDialog({
 
         setChoice('today')
         setCustomDate(formatDateLocal())
+        setAmount(transaction ? String(transaction.amount) : '')
+        setToAmount(transaction?.toAmount != null ? String(transaction.toAmount) : '')
     }, [open, transaction?.id])
 
     const selectedDate = choice === 'today'
@@ -63,7 +74,13 @@ export function ApplyDeferredDateDialog({
             ? originalDate
             : customDate
 
+    const actualAmount = Number(amount)
+    const actualToAmount = Number(toAmount)
+    const amountsValid = !isEstimated
+        || (actualAmount > 0 && (!crossCurrencyTransfer || actualToAmount > 0))
+
     const canSubmit = Boolean(selectedDate)
+        && amountsValid
         && !isDateInFuture(selectedDate)
         && !(choice === 'original' && !originalIsUsable)
         && !isSubmitting
@@ -73,9 +90,18 @@ export function ApplyDeferredDateDialog({
         if (!selectedDate || isDateInFuture(selectedDate)) {
             return
         }
+        const options: ConfirmTransactionOptions & { date: string } = { date: selectedDate }
+        if (isEstimated) {
+            options.amount = actualAmount
+            if (crossCurrencyTransfer) {
+                options.to_amount = actualToAmount
+            }
+        }
         confirmIfNeeded(
-            selectedDate,
-            transaction ? warningsForTransactionOutflow(transaction) : [],
+            options,
+            transaction
+                ? warningsForTransactionOutflow(isEstimated ? { ...transaction, amount: actualAmount } : transaction)
+                : [],
             onConfirm,
         )
     }
@@ -88,6 +114,46 @@ export function ApplyDeferredDateDialog({
                         <DialogTitle>{t('transactions.applyTitle')}</DialogTitle>
                         <DialogDescription>{t('transactions.applyDescription')}</DialogDescription>
                     </DialogHeader>
+
+                    {isEstimated && (
+                        <div className="grid gap-3 rounded-md border border-dashed p-3">
+                            <p className="text-xs text-muted-foreground">{t('transactions.applyEstimatedDescription')}</p>
+                            <div className="grid gap-1.5">
+                                <Label htmlFor={`${groupId}-amount`}>
+                                    {t('transactions.applyAmount')}
+                                    {transaction?.account.currency?.symbol ? ` (${transaction.account.currency.symbol})` : ''}
+                                </Label>
+                                <Input
+                                    id={`${groupId}-amount`}
+                                    type="number"
+                                    inputMode="decimal"
+                                    step="any"
+                                    min="0"
+                                    value={amount}
+                                    onChange={(event) => setAmount(event.target.value)}
+                                    required
+                                />
+                            </div>
+                            {crossCurrencyTransfer && (
+                                <div className="grid gap-1.5">
+                                    <Label htmlFor={`${groupId}-to-amount`}>
+                                        {t('transactions.applyToAmount')}
+                                        {transaction?.toAccount?.currency?.symbol ? ` (${transaction.toAccount.currency.symbol})` : ''}
+                                    </Label>
+                                    <Input
+                                        id={`${groupId}-to-amount`}
+                                        type="number"
+                                        inputMode="decimal"
+                                        step="any"
+                                        min="0"
+                                        value={toAmount}
+                                        onChange={(event) => setToAmount(event.target.value)}
+                                        required
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     <fieldset className="grid gap-3">
                         <legend className="sr-only">{t('transactions.applyDescription')}</legend>

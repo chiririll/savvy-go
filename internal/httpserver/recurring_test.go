@@ -92,6 +92,95 @@ func TestRecurringCreatesPendingAndConfirmSpawnsNext(t *testing.T) {
 	}
 }
 
+func TestEstimatedAmountCarriesToPendingAndConfirmReplacesIt(t *testing.T) {
+	a := newTestApp(t)
+	u := a.createUser("est@test.com", "secret1", auth.RoleReadWrite)
+	sess := a.issue(u, false)
+	accID, catID := seedMoney(t, a, sess)
+	today := time.Now().UTC().Format("2006-01-02")
+
+	res := a.do("POST", "/api/recurring", map[string]any{
+		"type": "expense", "account_id": accID, "category_id": catID, "amount": 80,
+		"frequency": "monthly", "interval": 1, "start_date": today, "is_estimated": true,
+	}, sess.Token, sess.CSRF)
+	body := decodeJSON(t, res)
+	if res.StatusCode != 201 || body["data"].(map[string]any)["isEstimated"] != true {
+		t.Fatalf("create %d %v", res.StatusCode, body)
+	}
+	templateID := int64(body["data"].(map[string]any)["id"].(float64))
+
+	res = a.do("GET", "/api/transactions?status=pending", nil, sess.Token, "")
+	pending := findRecurringTx(decodeJSON(t, res)["data"].([]any), templateID)
+	if pending == nil || pending["isEstimated"] != true {
+		t.Fatalf("pending occurrence should be estimated: %v", pending)
+	}
+
+	res = a.do("POST", "/api/transactions/"+itoa(int64(pending["id"].(float64)))+"/confirm",
+		map[string]any{"amount": 95.5}, sess.Token, sess.CSRF)
+	out := decodeJSON(t, res)["data"].(map[string]any)
+	if res.StatusCode != 200 || out["isEstimated"] != false || out["amount"].(float64) != 95.5 {
+		t.Fatalf("confirm should store the real amount: %d %v", res.StatusCode, out)
+	}
+	res = a.do("GET", "/api/accounts/"+itoa(accID), nil, sess.Token, "")
+	if bal := decodeJSON(t, res)["data"].(map[string]any)["currentBalance"].(float64); bal != 904.5 {
+		t.Fatalf("balance %v, want 904.5", bal)
+	}
+
+	// The template keeps its estimate, so the next occurrence is estimated too.
+	res = a.do("GET", "/api/transactions?status=pending", nil, sess.Token, "")
+	next := findRecurringTx(decodeJSON(t, res)["data"].([]any), templateID)
+	if next == nil || next["isEstimated"] != true || next["amount"].(float64) != 80 {
+		t.Fatalf("next occurrence: %v", next)
+	}
+}
+
+func TestEstimatedFlagOnlyKeptForPendingTransactions(t *testing.T) {
+	a := newTestApp(t)
+	u := a.createUser("est2@test.com", "secret1", auth.RoleReadWrite)
+	sess := a.issue(u, false)
+	accID, catID := seedMoney(t, a, sess)
+	today := time.Now().UTC().Format("2006-01-02")
+
+	res := a.do("POST", "/api/transactions", map[string]any{
+		"type": "expense", "account_id": accID, "category_id": catID, "amount": 10,
+		"date": today, "is_estimated": true,
+	}, sess.Token, sess.CSRF)
+	if got := decodeJSON(t, res)["data"].(map[string]any); got["status"] != "confirmed" || got["isEstimated"] != false {
+		t.Fatalf("confirmed transaction cannot be an estimate: %v", got)
+	}
+
+	res = a.do("POST", "/api/transactions", map[string]any{
+		"type": "expense", "account_id": accID, "category_id": catID, "amount": 10, "is_estimated": true,
+	}, sess.Token, sess.CSRF)
+	got := decodeJSON(t, res)["data"].(map[string]any)
+	if got["status"] != "pending" || got["isEstimated"] != true {
+		t.Fatalf("deferred transaction should be estimated: %v", got)
+	}
+	res = a.do("POST", "/api/transactions/"+itoa(int64(got["id"].(float64)))+"/confirm",
+		map[string]any{"date": today}, sess.Token, sess.CSRF)
+	if out := decodeJSON(t, res)["data"].(map[string]any); out["isEstimated"] != false || out["amount"].(float64) != 10 {
+		t.Fatalf("confirm without amount accepts the estimate: %v", out)
+	}
+
+	res = a.do("POST", "/api/transactions", map[string]any{
+		"type": "expense", "account_id": accID, "category_id": catID, "amount": 10,
+	}, sess.Token, sess.CSRF)
+	exact := decodeJSON(t, res)["data"].(map[string]any)
+	res = a.do("POST", "/api/transactions/"+itoa(int64(exact["id"].(float64)))+"/confirm",
+		map[string]any{"date": today, "amount": 12}, sess.Token, sess.CSRF)
+	if res.StatusCode != 422 {
+		t.Fatalf("only an estimate can be confirmed with another amount, got %d", res.StatusCode)
+	}
+
+	res = a.do("POST", "/api/transactions", map[string]any{
+		"type": "expense", "account_id": accID, "category_id": catID, "amount": 10, "is_estimated": true,
+		"items": []map[string]any{{"name": "Milk", "quantity": 2, "price_per_unit": 5}},
+	}, sess.Token, sess.CSRF)
+	if got := decodeJSON(t, res)["data"].(map[string]any); got["isEstimated"] != false {
+		t.Fatalf("items fix the amount, so it is not an estimate: %v", got)
+	}
+}
+
 func TestRecurringEndDateStopsNextPending(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("rw3@test.com", "secret1", auth.RoleReadWrite)

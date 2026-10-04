@@ -166,6 +166,7 @@ type Transaction struct {
 	Type                   string       `json:"type"`
 	Amount                 money.Money  `json:"amount"`
 	ToAmount               *money.Money `json:"toAmount"`
+	IsEstimated            bool         `json:"isEstimated"`
 	Description            *string      `json:"description"`
 	Date                   *string      `json:"date"`
 	Status                 string       `json:"status"`
@@ -181,7 +182,7 @@ type Transaction struct {
 
 func NewTransaction(t domain.Transaction) Transaction {
 	return Transaction{
-		ID: t.ID, Type: t.Type, Amount: t.Amount, ToAmount: t.ToAmount,
+		ID: t.ID, Type: t.Type, Amount: t.Amount, ToAmount: t.ToAmount, IsEstimated: t.IsEstimated,
 		Description: t.Description, Date: t.Date, Status: t.Status, RecurringTransactionID: t.RecurringID,
 		Actions:   transactionActions(t),
 		Account:   ptr(t.Account, NewAccount),
@@ -269,6 +270,7 @@ type Recurring struct {
 	Type        string       `json:"type"`
 	Amount      money.Money  `json:"amount"`
 	ToAmount    *money.Money `json:"toAmount"`
+	IsEstimated bool         `json:"isEstimated"`
 	Description *string      `json:"description"`
 	Frequency   string       `json:"frequency"`
 	Interval    int          `json:"interval"`
@@ -287,7 +289,7 @@ type Recurring struct {
 
 func NewRecurring(r domain.Recurring) Recurring {
 	return Recurring{
-		ID: r.ID, Type: r.Type, Amount: r.Amount, ToAmount: r.ToAmount, Description: r.Description,
+		ID: r.ID, Type: r.Type, Amount: r.Amount, ToAmount: r.ToAmount, IsEstimated: r.IsEstimated, Description: r.Description,
 		Frequency: r.Frequency, Interval: r.Interval, DayOfWeek: r.DayOfWeek, DayOfMonth: r.DayOfMonth,
 		StartDate: r.StartDate, EndDate: r.EndDate, NextRunDate: r.NextRunDate, LastRunDate: r.LastRunDate,
 		IsActive:  r.IsActive,

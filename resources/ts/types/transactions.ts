@@ -26,6 +26,7 @@ export interface Transaction extends BaseEntity {
     type: TransactionType
     amount: number
     toAmount: number | null
+    isEstimated: boolean
     description: string | null
     date: string | null
     status: TransactionStatus
