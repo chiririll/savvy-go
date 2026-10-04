@@ -91,11 +91,15 @@ func Upgrade(ctx context.Context, db *sql.DB, appKey string) error {
 	if err := migrate.Up(ctx, db); err != nil {
 		return fmt.Errorf("migrate: %w", err)
 	}
-	if !info.Laravel {
-		return nil
+	if info.Laravel {
+		if err := upgradeInPlace(ctx, db, appKey); err != nil {
+			return fmt.Errorf("legacy import: %w", err)
+		}
 	}
-	if err := upgradeInPlace(ctx, db, appKey); err != nil {
-		return fmt.Errorf("legacy import: %w", err)
+	// Old Go databases and converted Laravel ones keep their old table
+	// definitions; bring them up to the current constraints.
+	if err := migrate.Conform(ctx, db); err != nil {
+		return fmt.Errorf("conform schema: %w", err)
 	}
 	return nil
 }
@@ -114,9 +118,6 @@ func upgradeInPlace(ctx context.Context, db *sql.DB, appKey string) error {
 	// retyping is idempotent, so it is safe to repeat.
 	if err := retypeDateColumns(ctx, db); err != nil {
 		return fmt.Errorf("convert dates to text: %w", err)
-	}
-	if err := dropColumns(ctx, db); err != nil {
-		return fmt.Errorf("drop legacy columns: %w", err)
 	}
 	if err := convertMoneyInPlace(ctx, db); err != nil {
 		return fmt.Errorf("convert money to minor units: %w", err)
@@ -190,6 +191,13 @@ func copyTable(ctx context.Context, dest, src *sql.DB, table string, sc *scales)
 	}
 	quoted := quoteAll(common)
 	q := fmt.Sprintf("SELECT %s FROM %s", strings.Join(selectCols, ", "), table)
+	names, err := newNameFixer(ctx, src, table, common)
+	if err != nil {
+		return 0, err
+	}
+	if names != nil {
+		q += " ORDER BY id"
+	}
 	rows, err := src.QueryContext(ctx, q)
 	if err != nil {
 		return 0, err
@@ -228,6 +236,7 @@ func copyTable(ctx context.Context, dest, src *sql.DB, table string, sc *scales)
 		if err := sc.fixMoney(table, common, raw); err != nil {
 			return 0, err
 		}
+		names.fix(raw)
 		if _, err := stmt.ExecContext(ctx, raw...); err != nil {
 			return 0, err
 		}

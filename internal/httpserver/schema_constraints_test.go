@@ -23,7 +23,7 @@ func TestSchemaConstraintsRejectBadInput(t *testing.T) {
 		body       map[string]any
 	}{
 		{"unknown account type", "/api/accounts", map[string]any{"name": "A", "type": "wallet", "currency_id": usd, "initial_balance": 0}},
-		{"zero transaction amount", "/api/transactions", map[string]any{"type": "income", "account_id": 1, "amount": 0, "date": "2024-01-15"}},
+		{"negative transaction amount", "/api/transactions", map[string]any{"type": "income", "account_id": 1, "amount": -5, "date": "2024-01-15"}},
 		{"unknown transaction type", "/api/transactions", map[string]any{"type": "gift", "account_id": 1, "amount": 5, "date": "2024-01-15"}},
 	}
 	// A valid account for the transaction cases.

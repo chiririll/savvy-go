@@ -142,6 +142,8 @@ CREATE TABLE IF NOT EXISTS categories (
     updated_at TEXT
 ) STRICT;
 
+CREATE UNIQUE INDEX IF NOT EXISTS categories_type_name_unique ON categories (type, name COLLATE NOCASE);
+
 CREATE TABLE IF NOT EXISTS tags (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE COLLATE NOCASE,
@@ -155,8 +157,8 @@ CREATE TABLE IF NOT EXISTS recurring_transactions (
     account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
     to_account_id INTEGER REFERENCES accounts(id) ON DELETE SET NULL,
     category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
-    amount INTEGER NOT NULL CHECK (amount > 0),
-    to_amount INTEGER CHECK (to_amount > 0),
+    amount INTEGER NOT NULL CHECK (amount >= 0),
+    to_amount INTEGER CHECK (to_amount >= 0),
     description TEXT,
     frequency TEXT NOT NULL CHECK (frequency IN ('daily', 'weekly', 'monthly', 'yearly')),
     interval INTEGER NOT NULL DEFAULT 1 CHECK (interval >= 1),
@@ -184,8 +186,8 @@ CREATE TABLE IF NOT EXISTS transactions (
     account_id INTEGER NOT NULL REFERENCES accounts(id),
     to_account_id INTEGER REFERENCES accounts(id),
     category_id INTEGER REFERENCES categories(id),
-    amount INTEGER NOT NULL CHECK (amount > 0),
-    to_amount INTEGER CHECK (to_amount > 0),
+    amount INTEGER NOT NULL CHECK (amount >= 0),
+    to_amount INTEGER CHECK (to_amount >= 0),
     description TEXT,
     dedup_hash TEXT,
     date TEXT,

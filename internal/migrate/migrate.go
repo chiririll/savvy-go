@@ -24,6 +24,10 @@ func Up(ctx context.Context, db *sql.DB) error {
 	if _, err := db.ExecContext(ctx, tableSQL); err != nil {
 		return fmt.Errorf("create schema_migrations: %w", err)
 	}
+	// Before any CREATE UNIQUE INDEX / NOCASE rebuild sees the data.
+	if err := DedupeNames(ctx, db); err != nil {
+		return err
+	}
 
 	applied, err := appliedVersions(ctx, db)
 	if err != nil {
