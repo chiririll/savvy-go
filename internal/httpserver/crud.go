@@ -343,11 +343,13 @@ func (s *Server) accountsBalanceHistory(w http.ResponseWriter, r *http.Request) 
 		total[i] = money.Zero(base.Unit())
 	}
 	for _, a := range accts {
-		data := make([]money.Money, len(dates))   // in the base currency
-		native := make([]money.Money, len(dates)) // in the account's own
-		for i, d := range dates {
-			bal, _ := s.accounts.BalanceAt(r.Context(), a, d)
-			native[i] = bal
+		native, err := s.accounts.BalanceSeries(r.Context(), a, dates) // in the account's own currency
+		if err != nil {
+			writeMessage(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		data := make([]money.Money, len(dates)) // in the base currency
+		for i, bal := range native {
 			data[i] = domain.Convert(bal, *a.Currency, *base)
 			total[i] = total[i].Add(data[i])
 		}

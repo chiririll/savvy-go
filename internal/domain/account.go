@@ -114,13 +114,16 @@ func (s Accounts) Create(ctx context.Context, a AccountInput) (*Account, error) 
 	if err != nil {
 		return nil, err
 	}
-	last, _ := db.Q(s.DB).MaxAccountSortOrder(ctx, db.Flag(a.Type == "debt"))
+	next, err := db.Q(s.DB).NextAccountSortOrder(ctx, db.Flag(a.Type == "debt"))
+	if err != nil {
+		return nil, err
+	}
 	res, err := db.Q(s.DB).InsertAccount(ctx, sqlc.InsertAccountParams{
 		Name: a.Name, Type: a.Type, DebtType: db.NullString(a.DebtType), CurrencyID: a.CurrencyID,
 		InitialBalance: initial.Minor(),
 		TargetAmount:   money.ToNullMinor(target), DueDate: db.NullString(a.DueDate),
 		IsPaidOff: db.BoolInt(a.IsPaidOff), Counterparty: db.NullString(a.Counterparty), DebtDescription: db.NullString(a.DebtDesc),
-		IsActive: db.BoolInt(a.IsActive), SortOrder: int64(asFloat64(last)) + 1, CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
+		IsActive: db.BoolInt(a.IsActive), SortOrder: next, CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
 	})
 	if err != nil {
 		return nil, err
@@ -212,7 +215,10 @@ func (s Accounts) total(ctx context.Context, accts []Account, base Currency, asO
 	for _, a := range accts {
 		bal := a.Balance
 		if asOf != "" {
-			bal, _ = s.balance(ctx, a, asOf)
+			var err error
+			if bal, err = s.balance(ctx, a, asOf); err != nil {
+				return money.Zero(base.Unit())
+			}
 		}
 		sum = sum.Add(Convert(bal, *a.Currency, base))
 	}
@@ -229,34 +235,85 @@ func (s Accounts) list(ctx context.Context, arg sqlc.ListAccountsParams) ([]Acco
 		out = append(out, accountFromRow(r))
 	}
 	for i := range out {
-		out[i].Balance, _ = s.balance(ctx, out[i], "")
+		if out[i].Balance, err = s.balance(ctx, out[i], ""); err != nil {
+			return nil, err
+		}
 	}
 	return out, nil
 }
 
-func (s Accounts) BalanceAt(ctx context.Context, a Account, asOf string) (money.Money, error) {
-	return s.balance(ctx, a, asOf)
-}
-
+// balance is the account's balance at the end of asOf ("" for now). A debt's
+// balance is what is still owed; it does not depend on the date.
 func (s Accounts) balance(ctx context.Context, a Account, asOf string) (money.Money, error) {
-	q := db.Q(s.DB)
 	unit := a.Currency.Unit()
 	if a.Type == "debt" {
-		paid, _ := q.SumDebtPayments(ctx, db.NI(a.ID))
+		paid, err := db.Q(s.DB).SumDebtPayments(ctx, db.NI(a.ID))
+		if err != nil {
+			return money.Money{}, err
+		}
 		target := money.Zero(unit)
 		if a.TargetAmount != nil {
 			target = *a.TargetAmount
 		}
 		return target.Sub(money.New(paid, unit)), nil
 	}
-	asOfArg := db.Narg(asOf)
-	income, _ := q.SumAccountIncome(ctx, sqlc.SumAccountIncomeParams{AccountID: a.ID, AsOf: asOfArg})
-	expense, _ := q.SumAccountExpense(ctx, sqlc.SumAccountExpenseParams{AccountID: a.ID, AsOf: asOfArg})
-	tout, _ := q.SumAccountTransferOut(ctx, sqlc.SumAccountTransferOutParams{AccountID: a.ID, AsOf: asOfArg})
-	tin, _ := q.SumAccountTransferIn(ctx, sqlc.SumAccountTransferInParams{ToAccountID: db.NI(a.ID), AsOf: asOfArg})
-	dIn, _ := q.SumAccountDebtIn(ctx, sqlc.SumAccountDebtInParams{AccountID: a.ID, AsOf: asOfArg})
-	dOut, _ := q.SumAccountDebtOut(ctx, sqlc.SumAccountDebtOutParams{AccountID: a.ID, AsOf: asOfArg})
-	return a.InitialBalance.Add(money.New(income-expense-tout+tin+dIn-dOut, unit)), nil
+	deltas, err := s.deltas(ctx, a, asOf)
+	if err != nil {
+		return money.Money{}, err
+	}
+	bal := a.InitialBalance
+	for _, d := range deltas {
+		bal = bal.Add(d.change)
+	}
+	return bal, nil
+}
+
+// BalanceSeries is the balance at the end of each of dates, which must be
+// ascending YYYY-MM-DD days, from one query instead of one per date.
+func (s Accounts) BalanceSeries(ctx context.Context, a Account, dates []string) ([]money.Money, error) {
+	out := make([]money.Money, len(dates))
+	if len(dates) == 0 {
+		return out, nil
+	}
+	if a.Type == "debt" {
+		bal, err := s.balance(ctx, a, "")
+		for i := range out {
+			out[i] = bal
+		}
+		return out, err
+	}
+	deltas, err := s.deltas(ctx, a, dates[len(dates)-1])
+	if err != nil {
+		return nil, err
+	}
+	bal, next := a.InitialBalance, 0
+	for i, date := range dates {
+		for next < len(deltas) && deltas[next].day <= date {
+			bal = bal.Add(deltas[next].change)
+			next++
+		}
+		out[i] = bal
+	}
+	return out, nil
+}
+
+type dayChange struct {
+	day    string
+	change money.Money
+}
+
+// deltas is the account's net change per day up to asOf, oldest first.
+func (s Accounts) deltas(ctx context.Context, a Account, asOf string) ([]dayChange, error) {
+	rows, err := db.Q(s.DB).AccountDailyDeltas(ctx, sqlc.AccountDailyDeltasParams{ID: a.ID, AsOf: db.Narg(asOf)})
+	if err != nil {
+		return nil, err
+	}
+	unit := a.Currency.Unit()
+	out := make([]dayChange, len(rows))
+	for i, r := range rows {
+		out[i] = dayChange{day: r.Day.String, change: money.New(r.Delta, unit)}
+	}
+	return out, nil
 }
 
 func (s Accounts) currencyUnit(ctx context.Context, currencyID int64) (money.Unit, error) {

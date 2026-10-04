@@ -12,8 +12,8 @@ WHERE a.id = COALESCE(sqlc.narg('id'), a.id)
   AND a.is_paid_off <= CASE WHEN CAST(sqlc.narg('unpaid_only') AS INTEGER) IS NULL THEN 1 ELSE 0 END
 ORDER BY CASE WHEN a.type = 'debt' THEN 1 ELSE 0 END, a.sort_order, a.id;
 
--- name: MaxAccountSortOrder :one
-SELECT MAX(sort_order) FROM accounts
+-- name: NextAccountSortOrder :one
+SELECT COALESCE(MAX(sort_order), -1) + 1 FROM accounts
 WHERE CASE WHEN sqlc.narg('debt_only') IS NULL THEN type IN ('bank','crypto','cash') ELSE type = 'debt' END;
 
 -- name: InsertAccount :execresult
@@ -42,35 +42,28 @@ UPDATE accounts SET sort_order = ? WHERE id = ?;
 SELECT CAST(COALESCE(SUM(to_amount),0) AS INTEGER) FROM transactions
 WHERE to_account_id = ? AND status = 'confirmed' AND type IN ('debt_payment','debt_collection');
 
--- name: SumAccountIncome :one
-SELECT CAST(COALESCE(SUM(amount),0) AS INTEGER) FROM transactions
-WHERE account_id=? AND status='confirmed' AND type='income'
-  AND date <= COALESCE(sqlc.narg('as_of'), date);
-
--- name: SumAccountExpense :one
-SELECT CAST(COALESCE(SUM(amount),0) AS INTEGER) FROM transactions
-WHERE account_id=? AND status='confirmed' AND type='expense'
-  AND date <= COALESCE(sqlc.narg('as_of'), date);
-
--- name: SumAccountTransferOut :one
-SELECT CAST(COALESCE(SUM(amount),0) AS INTEGER) FROM transactions
-WHERE account_id=? AND status='confirmed' AND type='transfer'
-  AND date <= COALESCE(sqlc.narg('as_of'), date);
-
--- name: SumAccountTransferIn :one
-SELECT CAST(COALESCE(SUM(to_amount),0) AS INTEGER) FROM transactions
-WHERE to_account_id=? AND status='confirmed'
-  AND date <= COALESCE(sqlc.narg('as_of'), date);
-
--- name: SumAccountDebtIn :one
-SELECT CAST(COALESCE(SUM(amount),0) AS INTEGER) FROM transactions
-WHERE account_id=? AND status='confirmed' AND type IN ('debt_collection','debt_borrow')
-  AND date <= COALESCE(sqlc.narg('as_of'), date);
-
--- name: SumAccountDebtOut :one
-SELECT CAST(COALESCE(SUM(amount),0) AS INTEGER) FROM transactions
-WHERE account_id=? AND status='confirmed' AND type IN ('debt_payment','debt_lend')
-  AND date <= COALESCE(sqlc.narg('as_of'), date);
+-- name: AccountDailyDeltas :many
+-- The net change of a non-debt account per day, oldest first, for confirmed
+-- transactions up to as_of (all of them when NULL). This is the only place that
+-- knows how a transaction moves money: it adds to the account for income,
+-- debt_collection and debt_borrow, takes from it for every other type, and a
+-- transfer adds to_amount to its destination account (a transfer from an account
+-- to itself therefore does both). A balance is the sum of these rows, a balance
+-- history their running total.
+-- CAST: sqlc would type a SUM as float; the sum of integers is an integer.
+WITH p AS (SELECT CAST(sqlc.arg('id') AS INTEGER) AS id)
+SELECT t.date AS day,
+	CAST(SUM(
+		CASE WHEN t.account_id = p.id THEN
+			CASE WHEN t.type IN ('income', 'debt_collection', 'debt_borrow') THEN t.amount ELSE -t.amount END
+		ELSE 0 END
+		+ CASE WHEN t.to_account_id = p.id AND t.type = 'transfer' THEN COALESCE(t.to_amount, 0) ELSE 0 END
+	) AS INTEGER) AS delta
+FROM transactions t, p
+WHERE t.status = 'confirmed' AND (t.account_id = p.id OR t.to_account_id = p.id)
+	AND t.date <= COALESCE(sqlc.narg('as_of'), t.date)
+GROUP BY t.date
+ORDER BY t.date;
 
 -- name: GetAccountUnit :one
 SELECT c.id, c.decimals FROM accounts a JOIN currencies c ON c.id = a.currency_id WHERE a.id = ?;

@@ -195,15 +195,3 @@ func categoryFrom(id int64, name, typ string, icon, color sql.NullString, isDefa
 	}
 	return c
 }
-
-func asFloat64(v any) float64 {
-	switch n := v.(type) {
-	case float64:
-		return n
-	case int64:
-		return float64(n)
-	case int:
-		return float64(n)
-	}
-	return 0
-}
