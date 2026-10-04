@@ -7,28 +7,50 @@ import (
 
 	"savvy-go/internal/auth"
 	"savvy-go/internal/domain"
+	"savvy-go/internal/signing"
 	"savvy-go/internal/store"
 	"savvy-go/internal/store/sqlite"
 )
 
 func openStore(t *testing.T) *sqlite.Store {
 	t.Helper()
-	st, err := sqlite.OpenApp(context.Background(), t.TempDir(), "")
+	st, _ := openStoreKeys(t)
+	return st
+}
+
+func openStoreKeys(t *testing.T) (*sqlite.Store, domain.KeyRing) {
+	t.Helper()
+	dir := t.TempDir()
+	st, err := sqlite.OpenApp(context.Background(), dir, "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = st.Close() })
-	return st
+	key, err := signing.Load(dir, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return st, domain.KeyRing{Holder: signing.NewHolder(key), Trusted: domain.TrustedKeys(st.Server())}
 }
 
-// demoSpace is the database of the only space, the seeded demo space.
-func demoSpace(t *testing.T, st *sqlite.Store) store.DB {
+// seedDemo seeds a fresh store and returns it with its keys.
+func seedDemo(t *testing.T) (*sqlite.Store, domain.KeyRing) {
 	t.Helper()
-	ids, _ := st.Spaces(context.Background())
-	if len(ids) != 1 {
-		t.Fatalf("spaces %v, want only the demo space", ids)
+	st, keys := openStoreKeys(t)
+	if err := Demo(context.Background(), st, keys, true, time.UTC); err != nil {
+		t.Fatal(err)
 	}
-	d, err := st.Space(context.Background(), ids[0])
+	return st, keys
+}
+
+// spaceByName is the database of the seeded space called name.
+func spaceByName(t *testing.T, st *sqlite.Store, name string) store.DB {
+	t.Helper()
+	var id int64
+	if err := st.Server().QueryRowContext(context.Background(), `SELECT id FROM spaces WHERE name = ?`, name).Scan(&id); err != nil {
+		t.Fatalf("space %q: %v", name, err)
+	}
+	d, err := st.Space(context.Background(), id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +70,7 @@ func TestDemoSkippedWhenDisabled(t *testing.T) {
 	st := openStore(t)
 	sqlDB := st.Server()
 	ctx := context.Background()
-	if err := Demo(ctx, st, false, time.UTC); err != nil {
+	if err := Demo(ctx, st, domain.KeyRing{}, false, time.UTC); err != nil {
 		t.Fatal(err)
 	}
 	if n := countWhere(t, sqlDB, `SELECT COUNT(*) FROM users`); n != 0 {
@@ -60,12 +82,9 @@ func TestDemoSkippedWhenDisabled(t *testing.T) {
 }
 
 func TestDemoSeedsEmptyDatabase(t *testing.T) {
-	st := openStore(t)
+	st, _ := seedDemo(t)
 	sqlDB := st.Server()
 	ctx := context.Background()
-	if err := Demo(ctx, st, true, time.UTC); err != nil {
-		t.Fatal(err)
-	}
 
 	for _, email := range []string{"admin@savvy.app", "editor@savvy.app", "demo@demo.com"} {
 		if n := countWhere(t, sqlDB, `SELECT COUNT(*) FROM users WHERE email = ?`, email); n != 1 {
@@ -92,14 +111,29 @@ func TestDemoSeedsEmptyDatabase(t *testing.T) {
 		t.Fatalf("roles demo=%s admin=%s", demo.Role, admin.Role)
 	}
 	editor, _ := users.ByEmail(ctx, "editor@savvy.app")
+	guest, _ := users.ByEmail(ctx, "guest@savvy.app")
+	if guest == nil || !guest.IsGuest() {
+		t.Fatalf("guest user: %v", guest)
+	}
 	spaces := domain.Spaces{Store: st}
-	ids, _ := st.Spaces(ctx)
-	for u, want := range map[*auth.User]string{admin: domain.SpaceAdmin, editor: domain.SpaceEditor, demo: domain.SpaceViewer} {
-		if role, _ := spaces.Role(ctx, ids[0], u.ID); role != want {
-			t.Fatalf("%s has role %q in the demo space, want %q", u.Email, role, want)
+	for _, c := range []struct {
+		space string
+		user  *auth.User
+		role  string
+	}{
+		{"Demo", admin, domain.SpaceAdmin}, {"Demo", editor, domain.SpaceEditor}, {"Demo", demo, domain.SpaceViewer},
+		{"Family Budget", admin, domain.SpaceAdmin}, {"Family Budget", editor, domain.SpaceAdmin}, {"Family Budget", guest, domain.SpaceViewer},
+		{"Studio GmbH", admin, domain.SpaceAdmin}, {"Studio GmbH", editor, domain.SpaceViewer},
+	} {
+		var id int64
+		if err := sqlDB.QueryRowContext(ctx, `SELECT id FROM spaces WHERE name = ?`, c.space).Scan(&id); err != nil {
+			t.Fatal(err)
+		}
+		if role, _ := spaces.Role(ctx, id, c.user.ID); role != c.role {
+			t.Fatalf("%s has role %q in %s, want %q", c.user.Email, role, c.space, c.role)
 		}
 	}
-	space := demoSpace(t, st)
+	space := spaceByName(t, st, "Demo")
 
 	if n := countWhere(t, space, `SELECT COUNT(*) FROM currencies WHERE code IN ('USD','EUR')`); n != 2 {
 		t.Fatalf("currencies=%d", n)
@@ -127,18 +161,48 @@ func TestDemoSeedsEmptyDatabase(t *testing.T) {
 	}
 }
 
+func TestDemoSpacesAreLinkedAndTransfer(t *testing.T) {
+	st, _ := seedDemo(t)
+	sqlDB := st.Server()
+	if n := countWhere(t, sqlDB, `SELECT COUNT(*) FROM spaces`); n != 3 {
+		t.Fatalf("spaces=%d", n)
+	}
+	if n := countWhere(t, sqlDB, `SELECT COUNT(*) FROM space_links`); n != 2 {
+		t.Fatalf("links=%d, want Demo linked to the two others", n)
+	}
+	if n := countWhere(t, sqlDB, `SELECT COUNT(*) FROM space_invitations WHERE accepted_at IS NULL`); n != 2 {
+		t.Fatalf("open invitations=%d", n)
+	}
+	for _, name := range []string{"Demo", "Family Budget", "Studio GmbH"} {
+		d := spaceByName(t, st, name)
+		if n := countWhere(t, d, `SELECT COUNT(*) FROM space_transfers`); n == 0 {
+			t.Fatalf("%s has no transfers", name)
+		}
+		if n := countWhere(t, d, `SELECT COUNT(*) FROM transactions WHERE type IN ('transfer_in','transfer_out')`); n == 0 {
+			t.Fatalf("%s has no transfer transactions", name)
+		}
+	}
+}
+
+func TestDemoHasEstimatedPending(t *testing.T) {
+	st, _ := seedDemo(t)
+	for _, name := range []string{"Demo", "Family Budget", "Studio GmbH"} {
+		d := spaceByName(t, st, name)
+		if n := countWhere(t, d, `SELECT COUNT(*) FROM transactions WHERE status = 'pending' AND is_estimated = 1`); n == 0 {
+			t.Fatalf("%s has no pending transaction with an estimated amount", name)
+		}
+	}
+}
+
 func TestDemoDoesNotReseed(t *testing.T) {
-	st := openStore(t)
+	st, keys := seedDemo(t)
 	sqlDB := st.Server()
 	ctx := context.Background()
-	if err := Demo(ctx, st, true, time.UTC); err != nil {
-		t.Fatal(err)
-	}
-	space := demoSpace(t, st)
+	space := spaceByName(t, st, "Demo")
 	users := countWhere(t, sqlDB, `SELECT COUNT(*) FROM users`)
 	accts := countWhere(t, space, `SELECT COUNT(*) FROM accounts`)
 	txs := countWhere(t, space, `SELECT COUNT(*) FROM transactions`)
-	if err := Demo(ctx, st, true, time.UTC); err != nil {
+	if err := Demo(ctx, st, keys, true, time.UTC); err != nil {
 		t.Fatal(err)
 	}
 	if n := countWhere(t, sqlDB, `SELECT COUNT(*) FROM users`); n != users {
@@ -160,7 +224,7 @@ func TestDemoSkipsWhenUsersExist(t *testing.T) {
 	if _, err := (auth.Users{DB: sqlDB}).Create(ctx, "Owner", "owner@example.com", &pass, auth.RoleAdmin); err != nil {
 		t.Fatal(err)
 	}
-	if err := Demo(ctx, st, true, time.UTC); err != nil {
+	if err := Demo(ctx, st, domain.KeyRing{}, true, time.UTC); err != nil {
 		t.Fatal(err)
 	}
 	if n := countWhere(t, sqlDB, `SELECT COUNT(*) FROM users WHERE email = 'demo@demo.com'`); n != 0 {

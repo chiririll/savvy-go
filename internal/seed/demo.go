@@ -76,7 +76,7 @@ type expenseCand struct {
 	catName string
 }
 
-func seedWorkspace(ctx context.Context, db store.DB, loc *time.Location) error {
+func seedWorkspace(ctx context.Context, db store.DB, loc *time.Location) (map[string]*domain.Account, error) {
 	now := time.Now().In(loc)
 	start := startOfMonth(now.AddDate(0, -monthsOfHistory, 0))
 	s := &seeder{
@@ -97,44 +97,44 @@ func seedWorkspace(ctx context.Context, db store.DB, loc *time.Location) error {
 	curs := domain.Currencies{DB: db}
 	usd, err := curs.ByCode(ctx, "USD")
 	if err != nil || usd == nil {
-		return fmt.Errorf("USD currency missing")
+		return nil, fmt.Errorf("USD currency missing")
 	}
 	eur, err := curs.ByCode(ctx, "EUR")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	accounts, err := s.createAccounts(usd, eur)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	expenses, err := s.cats.All(ctx, "expense")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	incomes, err := s.cats.All(ctx, "income")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	tags, err := s.tags.All(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if err := s.createTransactions(accounts, expenses, incomes, tags); err != nil {
-		return err
+		return nil, err
 	}
 	if err := s.seedTransactionItems(); err != nil {
-		return err
+		return nil, err
 	}
 	if err := s.seedPending(accounts, expenses); err != nil {
-		return err
+		return nil, err
 	}
 	if err := s.createBudgets(usd, expenses, tags); err != nil {
-		return err
+		return nil, err
 	}
 	if err := s.createRecurring(accounts, expenses, incomes); err != nil {
-		return err
+		return nil, err
 	}
-	return s.createAutomation(tags)
+	return accounts, s.createAutomation(tags)
 }
 
 func (s *seeder) createAccounts(usd *domain.Currency, eur *domain.Currency) (map[string]*domain.Account, error) {
@@ -463,8 +463,8 @@ func (s *seeder) seedTransfersAndDebt(accounts map[string]*domain.Account) error
 		"Michael — partial repayment", d, &to, &amt, nil)
 }
 
-// seedPending adds one overdue pending expense and several upcoming ones so the
-// pending strip on the transactions page has data. It does not use the rng, so
+// seedPending adds one overdue pending expense and several upcoming ones (one
+// with an estimated amount) so the pending strip on the transactions page has data. It does not use the rng, so
 // the rest of the seeded data stays unchanged.
 func (s *seeder) seedPending(accounts map[string]*domain.Account, expenses []domain.Category) error {
 	for _, p := range []struct {
@@ -472,12 +472,13 @@ func (s *seeder) seedPending(accounts map[string]*domain.Account, expenses []dom
 		acct, cat  string
 		amount     float64
 		desc       string
+		estimated  bool // the amount is a guess until the real bill arrives
 	}{
-		{-3, "checking", "#HEALTH", 85, "Dentist appointment — City Medical Clinic"},
-		{1, "credit", "#GIFTS", 55, "Birthday gift — Etsy"},
-		{3, "checking", "#UTILITIES", 112.40, "ConEdison — electricity bill"},
-		{5, "checking", "#TRANSPORT", 145, "Car insurance — GEICO"},
-		{9, "checking", "#SHOPPING", 64.50, "Amazon — scheduled order"},
+		{-3, "checking", "#HEALTH", 85, "Dentist appointment — City Medical Clinic", false},
+		{1, "credit", "#GIFTS", 55, "Birthday gift — Etsy", false},
+		{3, "checking", "#UTILITIES", 115, "ConEdison — electricity bill (estimate)", true},
+		{5, "checking", "#TRANSPORT", 145, "Car insurance — GEICO", false},
+		{9, "checking", "#SHOPPING", 64.50, "Amazon — scheduled order", false},
 	} {
 		acct := accounts[p.acct]
 		if acct == nil {
@@ -492,7 +493,7 @@ func (s *seeder) seedPending(accounts map[string]*domain.Account, expenses []dom
 		status := "pending"
 		if _, err := s.txs.Create(s.ctx, domain.TxInput{
 			Type: "expense", AccountID: acct.ID, CategoryID: catID, Amount: decimal.NewFromFloat(p.amount),
-			Description: &desc, Date: &d, Status: &status,
+			Description: &desc, Date: &d, Status: &status, IsEstimated: p.estimated,
 		}); err != nil {
 			return fmt.Errorf("pending %s: %w", p.desc, err)
 		}
