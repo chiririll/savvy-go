@@ -92,22 +92,6 @@ func (s *Server) requireCSRF(next http.Handler) http.Handler {
 	})
 }
 
-func (s *Server) requireWrite(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		u := userFrom(r)
-		mutating := r.Method != http.MethodGet && r.Method != http.MethodHead
-		if u != nil && u.IsReadOnly() && mutating {
-			writeMessage(w, http.StatusForbidden, "Read-only access")
-			return
-		}
-		if t := apiTokenFrom(r); t != nil && !t.CanWrite() && mutating {
-			writeMessage(w, http.StatusForbidden, "Read-only access")
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
 func (s *Server) requireAdmin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		u := userFrom(r)

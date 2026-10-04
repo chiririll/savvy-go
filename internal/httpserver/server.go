@@ -1,7 +1,6 @@
 package httpserver
 
 import (
-	"database/sql"
 	"net/http"
 	"os"
 	"strings"
@@ -11,15 +10,18 @@ import (
 	"savvy-go/internal/domain"
 	"savvy-go/internal/jobs"
 	"savvy-go/internal/settings"
+	"savvy-go/internal/store"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
 
 // Server is the HTTP front door: health probes, /api, and the Vite SPA.
+// Server-level services use the server database; the services of a space are
+// built per request by withSpace (see spaceScope).
 type Server struct {
 	cfg        config.Config
-	db         *sql.DB
+	store      store.Store
 	mux        *chi.Mux
 	users      auth.Users
 	sessions   auth.Sessions
@@ -27,53 +29,32 @@ type Server struct {
 	tokens     auth.PasswordTokens
 	challenges auth.Challenges
 	settings   settings.Store
-	currencies domain.Currencies
-	accounts   domain.Accounts
-	categories domain.Categories
-	tags       domain.Tags
-	txs        domain.Transactions
-	debts      domain.Debts
-	recurring  domain.RecurringStore
-	budgets    domain.Budgets
-	automation domain.Automation
-	reports    domain.Reports
+	spaces     domain.Spaces
 	uploads    domain.Uploads
-	imports    domain.Imports
-	backups    domain.Backups
 	sso        domain.SSO
 	twoFactor  auth.TwoFactor
 	webauthn   auth.WebAuthn
 	queue      *jobs.Queue
 }
 
-func New(cfg config.Config, sqlDB *sql.DB) *Server {
+func New(cfg config.Config, st store.Store) *Server {
 	domain.SetLocation(cfg.Location)
+	srv := st.Server()
 	s := &Server{
 		cfg:        cfg,
-		db:         sqlDB,
-		users:      auth.Users{DB: sqlDB},
-		sessions:   auth.Sessions{DB: sqlDB, Cfg: cfg},
-		apiTokens:  auth.APITokens{DB: sqlDB},
-		tokens:     auth.PasswordTokens{DB: sqlDB},
-		challenges: auth.Challenges{DB: sqlDB, Cfg: cfg},
-		settings:   settings.Store{DB: sqlDB},
-		currencies: domain.Currencies{DB: sqlDB},
-		accounts:   domain.Accounts{DB: sqlDB},
-		categories: domain.Categories{DB: sqlDB},
-		tags:       domain.Tags{DB: sqlDB},
-		txs:        domain.Transactions{DB: sqlDB},
-		debts:      domain.Debts{Accounts: domain.Accounts{DB: sqlDB}, Transactions: domain.Transactions{DB: sqlDB}},
-		recurring:  domain.RecurringStore{DB: sqlDB, Txs: domain.Transactions{DB: sqlDB}},
-		budgets:    domain.Budgets{DB: sqlDB},
-		automation: domain.Automation{DB: sqlDB, Txs: domain.Transactions{DB: sqlDB}},
-		reports:    domain.Reports{DB: sqlDB, Loc: cfg.Location},
-		uploads:    domain.Uploads{DB: sqlDB, Root: cfg.UploadsDir, AppURL: cfg.AppURL, SignSecret: cfg.AppURL + "|upload"},
-		backups:    domain.Backups{DB: sqlDB, Dir: cfg.BackupsDir, Database: cfg.Database},
-		twoFactor:  auth.TwoFactor{DB: sqlDB, Users: auth.Users{DB: sqlDB}, AppKey: cfg.AppKey},
-		webauthn:   auth.WebAuthn{DB: sqlDB, Cfg: cfg},
+		store:      st,
+		users:      auth.Users{DB: srv},
+		sessions:   auth.Sessions{DB: srv, Cfg: cfg},
+		apiTokens:  auth.APITokens{DB: srv},
+		tokens:     auth.PasswordTokens{DB: srv},
+		challenges: auth.Challenges{DB: srv, Cfg: cfg},
+		settings:   settings.Store{DB: srv},
+		spaces:     domain.Spaces{Store: st},
+		uploads:    domain.Uploads{DB: srv, Root: cfg.UploadsDir, AppURL: cfg.AppURL, SignSecret: cfg.AppURL + "|upload"},
+		twoFactor:  auth.TwoFactor{DB: srv, Users: auth.Users{DB: srv}, AppKey: cfg.AppKey},
+		webauthn:   auth.WebAuthn{DB: srv, Cfg: cfg},
 	}
-	s.sso = domain.SSO{DB: sqlDB, Users: s.users, Settings: s.settings, AppURL: cfg.AppURL}
-	s.imports = domain.Imports{DB: sqlDB, Uploads: s.uploads, Txs: s.txs}
+	s.sso = domain.SSO{DB: srv, Users: s.users, Settings: s.settings, Spaces: s.spaces, AppURL: cfg.AppURL}
 	_ = os.MkdirAll(cfg.UploadsDir, 0o775)
 	_ = os.MkdirAll(cfg.BackupsDir, 0o775)
 	s.mux = s.routes()
@@ -81,39 +62,6 @@ func New(cfg config.Config, sqlDB *sql.DB) *Server {
 }
 
 func (s *Server) Handler() http.Handler { return s.mux }
-
-// reconnect replaces every domain object's DB pointer after a backup restore.
-func (s *Server) reconnect(sqlDB *sql.DB) {
-	s.db = sqlDB
-	s.users.DB = sqlDB
-	s.sessions.DB = sqlDB
-	s.apiTokens.DB = sqlDB
-	s.tokens.DB = sqlDB
-	s.challenges.DB = sqlDB
-	s.settings.DB = sqlDB
-	s.currencies.DB = sqlDB
-	s.accounts.DB = sqlDB
-	s.categories.DB = sqlDB
-	s.tags.DB = sqlDB
-	s.txs.DB = sqlDB
-	s.debts.Accounts.DB = sqlDB
-	s.debts.Transactions.DB = sqlDB
-	s.recurring.DB = sqlDB
-	s.recurring.Txs.DB = sqlDB
-	s.budgets.DB = sqlDB
-	s.automation.DB = sqlDB
-	s.automation.Txs.DB = sqlDB
-	s.reports.DB = sqlDB
-	s.uploads.DB = sqlDB
-	s.imports.DB = sqlDB
-	s.imports.Uploads.DB = sqlDB
-	s.imports.Txs.DB = sqlDB
-	s.backups.DB = sqlDB
-	s.sso.DB = sqlDB
-	s.twoFactor.DB = sqlDB
-	s.twoFactor.Users.DB = sqlDB
-	s.webauthn.DB = sqlDB
-}
 
 func (s *Server) routes() *chi.Mux {
 	r := chi.NewRouter()
@@ -162,7 +110,18 @@ func (s *Server) routes() *chi.Mux {
 				r.Get("/auth/api-tokens", s.apiTokensIndex)
 				r.Post("/auth/api-tokens", s.apiTokensStore)
 				r.Delete("/auth/api-tokens/{id}", s.apiTokensDestroy)
+				r.Post("/auth/2fa/enable", s.twoFactorEnable)
+				r.Post("/auth/2fa/confirm", s.twoFactorConfirm)
+				r.Post("/auth/2fa/disable", s.twoFactorDisable)
+				r.Get("/auth/2fa/recovery-codes", s.twoFactorRecoveryCodes)
+				r.Post("/auth/2fa/recovery-codes/regenerate", s.twoFactorRegenerate)
+				r.Post("/auth/webauthn/register/options", s.webauthnRegisterOptions)
+				r.Post("/auth/webauthn/register/verify", s.webauthnRegisterVerify)
+				r.Patch("/auth/webauthn/credentials/{id}", s.webauthnUpdate)
+				r.Delete("/auth/webauthn/credentials/{id}", s.webauthnDestroy)
 			})
+
+			r.Get("/spaces", s.spacesIndex)
 
 			r.Get("/users", s.usersIndex)
 			r.Get("/users/{id}", s.usersShow)
@@ -183,31 +142,28 @@ func (s *Server) routes() *chi.Mux {
 				r.Post("/identity-providers/{id}/test", s.idpTest)
 			})
 
+			// P1: backups hold every space, so only server admins reach them.
 			r.Group(func(r chi.Router) {
-				r.Use(s.requireWrite)
+				r.Use(s.requireAdmin)
+				r.Get("/backups", s.backupsIndex)
+				r.Post("/backups", s.backupsStore)
+				r.Post("/backups/upload", s.backupsUpload)
+				r.Get("/backups/{name}/download", s.backupsDownload)
+				r.Post("/backups/{name}/restore", s.backupsRestore)
+				r.Delete("/backups/{name}", s.backupsDestroy)
+			})
+
+			// Instance settings need no space; the space's own settings are
+			// added when the caller has one. settingsUpdate checks roles itself.
+			r.Group(func(r chi.Router) {
+				r.Use(s.withOptionalSpace)
 				r.Get("/settings", s.settingsIndex)
+				r.With(s.sessionOnly).Patch("/settings", s.settingsUpdate)
+			})
 
-				r.Group(func(r chi.Router) {
-					r.Use(s.sessionOnly)
-					r.Patch("/settings", s.settingsUpdate)
-
-					r.Post("/auth/2fa/enable", s.twoFactorEnable)
-					r.Post("/auth/2fa/confirm", s.twoFactorConfirm)
-					r.Post("/auth/2fa/disable", s.twoFactorDisable)
-					r.Get("/auth/2fa/recovery-codes", s.twoFactorRecoveryCodes)
-					r.Post("/auth/2fa/recovery-codes/regenerate", s.twoFactorRegenerate)
-					r.Post("/auth/webauthn/register/options", s.webauthnRegisterOptions)
-					r.Post("/auth/webauthn/register/verify", s.webauthnRegisterVerify)
-					r.Patch("/auth/webauthn/credentials/{id}", s.webauthnUpdate)
-					r.Delete("/auth/webauthn/credentials/{id}", s.webauthnDestroy)
-
-					r.Get("/backups", s.backupsIndex)
-					r.Post("/backups", s.backupsStore)
-					r.Post("/backups/upload", s.backupsUpload)
-					r.Get("/backups/{name}/download", s.backupsDownload)
-					r.Post("/backups/{name}/restore", s.backupsRestore)
-					r.Delete("/backups/{name}", s.backupsDestroy)
-				})
+			r.Group(func(r chi.Router) {
+				r.Use(s.withSpace)
+				r.Use(s.requireWrite)
 
 				r.Get("/currencies/catalog", s.currenciesCatalog)
 				r.Get("/currencies", s.currenciesIndex)

@@ -18,7 +18,7 @@ import (
 
 func TestTwoFactorEnableConfirmLoginAndRecovery(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("otp@test.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("otp@test.com", "secret1", roleEditor)
 	iss := a.issue(u, false)
 
 	en := a.do("POST", "/api/auth/2fa/enable", map[string]any{}, iss.Token, iss.CSRF)
@@ -108,7 +108,7 @@ func TestLegacyLaravelTOTPStillVerifies(t *testing.T) {
 
 	a := newTestApp(t)
 	a.s.twoFactor.AppKey = appKey
-	u := a.createUser("legacy2fa@test.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("legacy2fa@test.com", "secret1", roleEditor)
 	_, _ = a.db.Exec(`UPDATE users SET two_factor_enabled=1, two_factor_confirmed=1, two_factor_secret=? WHERE id=?`, ct, u.ID)
 
 	login := a.do("POST", "/api/auth/login", map[string]string{"email": "legacy2fa@test.com", "password": "secret1"}, "", "")
@@ -133,7 +133,7 @@ func TestLegacyLaravelTOTPStillVerifies(t *testing.T) {
 
 func TestWebauthnOptionsAndCredentialCRUD(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("pk@test.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("pk@test.com", "secret1", roleEditor)
 	iss := a.issue(u, false)
 
 	opts := a.do("POST", "/api/auth/webauthn/register/options", map[string]any{}, iss.Token, iss.CSRF)
@@ -187,7 +187,7 @@ func TestWebauthnOptionsAndCredentialCRUD(t *testing.T) {
 func TestIdentityProviderCRUDAndPresets(t *testing.T) {
 	a := newTestApp(t)
 	admin := a.createUser("admin@test.com", "secret1", auth.RoleAdmin)
-	rw := a.createUser("rw@test.com", "secret1", auth.RoleReadWrite)
+	rw := a.createUser("rw@test.com", "secret1", roleEditor)
 	adm := a.issue(admin, false)
 	user := a.issue(rw, false)
 
@@ -207,7 +207,7 @@ func TestIdentityProviderCRUDAndPresets(t *testing.T) {
 	if !strings.Contains(string(raw), `"key":"github"`) || !strings.Contains(string(raw), `"key":"custom_saml"`) {
 		t.Fatalf("catalog %s", raw)
 	}
-	ro := a.createUser("ro@test.com", "secret1", auth.RoleReadOnly)
+	ro := a.createUser("ro@test.com", "secret1", roleViewer)
 	roIss := a.issue(ro, false)
 	forbid := a.do("GET", "/api/auth/sso/presets", nil, roIss.Token, "")
 	if forbid.StatusCode != 403 {
@@ -271,7 +271,7 @@ func TestIdentityProviderCRUDAndPresets(t *testing.T) {
 
 func TestSSOTicketExchange(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("u@test.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("u@test.com", "secret1", roleEditor)
 	ticket, err := a.s.sso.IssueTicket(context.Background(), u.ID, false)
 	if err != nil {
 		t.Fatal(err)
@@ -303,7 +303,7 @@ func TestSSOTicketExchange(t *testing.T) {
 	}
 	unknown.Body.Close()
 
-	u2 := a.createUser("tf@test.com", "secret1", auth.RoleReadWrite)
+	u2 := a.createUser("tf@test.com", "secret1", roleEditor)
 	_, _ = a.db.Exec(`UPDATE users SET two_factor_enabled=1, two_factor_confirmed=1 WHERE id=?`, u2.ID)
 	t2, _ := a.s.sso.IssueTicket(context.Background(), u2.ID, true)
 	ch := a.do("POST", "/api/auth/sso/exchange", map[string]string{"ticket": t2}, "", "")
@@ -408,7 +408,7 @@ func TestSSOGithubCallbackAndSAMLMetadata(t *testing.T) {
 func TestSSOProvisioningLinkAndJIT(t *testing.T) {
 	a := newTestApp(t)
 	a.createUser("root@test.com", "secret1", auth.RoleAdmin)
-	existing := a.createUser("jane@test.com", "secret1", auth.RoleReadWrite)
+	existing := a.createUser("jane@test.com", "secret1", roleEditor)
 	p, err := a.s.sso.Create(context.Background(), domain.IdPWrite{
 		Name: "IdP", Slug: "idp", Preset: "custom_oidc", Enabled: boolPtr(true),
 		Fields: map[string]any{

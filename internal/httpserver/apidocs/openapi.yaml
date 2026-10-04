@@ -15,7 +15,12 @@ info:
     A token acts as its owner, limited by its scope:
 
     * `read` — only `GET`/`HEAD` requests.
-    * `read-write` — all methods, capped by the owner's role (a read-only user cannot write).
+    * `read-write` — all methods, capped by the owner's role in the space (a viewer cannot write).
+
+    ## Spaces
+    Finances live in spaces; a user may belong to several, as `admin`, `editor` or `viewer`.
+    Data endpoints work in one space: the one named by the `X-Space-ID` header, otherwise the
+    caller's first space (`GET /spaces`). A space the caller does not belong to answers `404`.
 
     Tokens cannot call administrator endpoints (users, identity providers) or credential and
     instance endpoints (passwords, 2FA, passkeys, API tokens, settings updates, backups).
@@ -130,17 +135,26 @@ paths:
         "200": {$ref: "#/components/responses/Data"}
         "401": {$ref: "#/components/responses/Unauthenticated"}
         "404": {$ref: "#/components/responses/NotFound"}
+  /spaces:
+    get:
+      tags: [Other]
+      summary: List the caller's spaces
+      description: Each space with the caller's role in it (`admin`, `editor`, `viewer`).
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+
   /settings:
     get:
       tags: [Other]
-      summary: Read instance settings
+      summary: Read instance settings and those of the current space
       responses:
         "200": {$ref: "#/components/responses/Data"}
         "401": {$ref: "#/components/responses/Unauthenticated"}
     patch:
       tags: [Other]
-      summary: Update instance settings
-      description: Session only.
+      summary: Update instance settings and those of the current space
+      description: Session only. Instance settings need a server admin, space settings a space admin.
       security: [{cookieAuth: []}]
       requestBody: {$ref: "#/components/requestBodies/Object"}
       responses:

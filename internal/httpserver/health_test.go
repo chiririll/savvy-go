@@ -1,7 +1,6 @@
 package httpserver
 
 import (
-	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -13,8 +12,7 @@ import (
 	"time"
 
 	"savvy-go/internal/config"
-	"savvy-go/internal/db"
-	"savvy-go/internal/migrate"
+	"savvy-go/internal/store"
 )
 
 func testConfig(t *testing.T) (config.Config, string) {
@@ -28,7 +26,6 @@ func testConfig(t *testing.T) (config.Config, string) {
 		AppURL:        "http://localhost:8080",
 		PublicDir:     public,
 		DataDir:       dir,
-		Database:      filepath.Join(dir, "database.sqlite"),
 		UploadsDir:    filepath.Join(dir, "uploads"),
 		BackupsDir:    filepath.Join(dir, "backups"),
 		SessionTTL:    24 * time.Hour,
@@ -43,13 +40,7 @@ func testConfig(t *testing.T) (config.Config, string) {
 
 func TestLivezPass(t *testing.T) {
 	cfg, _ := testConfig(t)
-	sqlDB, err := db.Open(cfg.Database)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = sqlDB.Close() })
-
-	srv := httptest.NewServer(New(cfg, sqlDB).Handler())
+	srv := httptest.NewServer(New(cfg, openTestStore(t, cfg)).Handler())
 	t.Cleanup(srv.Close)
 
 	res, err := http.Get(srv.URL + "/livez")
@@ -72,88 +63,84 @@ func TestLivezPass(t *testing.T) {
 	}
 }
 
-func TestReadyzFailsBeforeMigrations(t *testing.T) {
-	cfg, _ := testConfig(t)
-	sqlDB, err := db.Open(cfg.Database)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = sqlDB.Close() })
+// startingStore is a store still opening and migrating its databases.
+type startingStore struct{ store.Store }
 
-	srv := httptest.NewServer(New(cfg, sqlDB).Handler())
-	t.Cleanup(srv.Close)
+func (startingStore) Status() store.Status { return store.Status{} }
 
-	res, err := http.Get(srv.URL + "/readyz")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusServiceUnavailable {
-		t.Fatalf("status %d", res.StatusCode)
-	}
-	if !strings.Contains(res.Header.Get("Content-Type"), "application/health+json") {
-		t.Fatalf("content-type %q", res.Header.Get("Content-Type"))
-	}
-	raw, _ := io.ReadAll(res.Body)
-	var body map[string]any
-	if err := json.Unmarshal(raw, &body); err != nil {
-		t.Fatal(err)
-	}
-	if body["status"] != "fail" {
-		t.Fatalf("body %s", raw)
-	}
-	checks, _ := body["checks"].(map[string]any)
-	mig, _ := checks["schema:migrations"].([]any)
-	if len(mig) == 0 {
-		t.Fatalf("missing schema:migrations: %s", raw)
-	}
-	entry, _ := mig[0].(map[string]any)
-	if entry["status"] != "fail" {
-		t.Fatalf("migration check %v", entry)
-	}
+// brokenSpaceStore reports one space that failed to migrate.
+type brokenSpaceStore struct{ store.Store }
+
+func (brokenSpaceStore) Status() store.Status {
+	return store.Status{Ready: true, Unavailable: map[int64]string{7: "broken migration"}}
 }
 
-func TestReadyzPassAfterMigrate(t *testing.T) {
+func readyz(t *testing.T, st store.Store) (int, map[string]any) {
+	t.Helper()
 	cfg, _ := testConfig(t)
-	sqlDB, err := db.Open(cfg.Database)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = sqlDB.Close() })
-	if err := migrate.Up(context.Background(), sqlDB); err != nil {
-		t.Fatal(err)
-	}
-
-	srv := httptest.NewServer(New(cfg, sqlDB).Handler())
+	srv := httptest.NewServer(New(cfg, st).Handler())
 	t.Cleanup(srv.Close)
-
 	res, err := http.Get(srv.URL + "/readyz")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		raw, _ := io.ReadAll(res.Body)
-		t.Fatalf("status %d body %s", res.StatusCode, raw)
+	if !strings.Contains(res.Header.Get("Content-Type"), "application/health+json") {
+		t.Fatalf("content-type %q", res.Header.Get("Content-Type"))
 	}
 	var body map[string]any
 	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
 		t.Fatal(err)
 	}
-	if body["status"] != "pass" {
-		t.Fatalf("status %v", body["status"])
+	return res.StatusCode, body
+}
+
+func migrationCheck(t *testing.T, body map[string]any) map[string]any {
+	t.Helper()
+	checks, _ := body["checks"].(map[string]any)
+	mig, _ := checks["store:migrations"].([]any)
+	if len(mig) == 0 {
+		t.Fatalf("missing store:migrations: %v", body)
+	}
+	return mig[0].(map[string]any)
+}
+
+func TestReadyzFailsWhileOpening(t *testing.T) {
+	cfg, _ := testConfig(t)
+	status, body := readyz(t, startingStore{openTestStore(t, cfg)})
+	if status != http.StatusServiceUnavailable || body["status"] != "fail" {
+		t.Fatalf("status %d body %v", status, body)
+	}
+	if migrationCheck(t, body)["status"] != "fail" {
+		t.Fatalf("migration check %v", body)
+	}
+}
+
+func TestReadyzPassAfterOpen(t *testing.T) {
+	cfg, _ := testConfig(t)
+	status, body := readyz(t, openTestStore(t, cfg))
+	if status != http.StatusOK || body["status"] != "pass" {
+		t.Fatalf("status %d body %v", status, body)
 	}
 	checks, _ := body["checks"].(map[string]any)
-	conn, _ := checks["sqlite:connectivity"].([]any)
-	if len(conn) == 0 {
-		t.Fatal("missing sqlite:connectivity")
+	conn, _ := checks["store:connectivity"].([]any)
+	if len(conn) == 0 || conn[0].(map[string]any)["status"] != "pass" {
+		t.Fatalf("connectivity %v", checks)
 	}
-	if conn[0].(map[string]any)["status"] != "pass" {
-		t.Fatalf("connectivity %v", conn[0])
+	if migrationCheck(t, body)["observedValue"].(float64) != 0 {
+		t.Fatalf("unavailable spaces %v", body)
 	}
-	mig, _ := checks["schema:migrations"].([]any)
-	if mig[0].(map[string]any)["observedValue"].(float64) != 0 {
-		t.Fatalf("pending %v", mig[0])
+}
+
+// P15: a space that failed to migrate is a warning, not a failed probe.
+func TestP15ReadyzWarnsAboutUnavailableSpace(t *testing.T) {
+	cfg, _ := testConfig(t)
+	status, body := readyz(t, brokenSpaceStore{openTestStore(t, cfg)})
+	if status != http.StatusOK {
+		t.Fatalf("status %d body %v", status, body)
+	}
+	if mig := migrationCheck(t, body); mig["status"] != "warn" || mig["observedValue"].(float64) != 1 {
+		t.Fatalf("migration check %v", mig)
 	}
 }
 
@@ -166,13 +153,7 @@ func TestSPAServesIndexAndStatic(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(cfg.PublicDir, "index.html"), []byte(index), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	sqlDB, err := db.Open(cfg.Database)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = sqlDB.Close() })
-
-	srv := httptest.NewServer(New(cfg, sqlDB).Handler())
+	srv := httptest.NewServer(New(cfg, openTestStore(t, cfg)).Handler())
 	t.Cleanup(srv.Close)
 
 	res, err := http.Get(srv.URL + "/favicon.svg")

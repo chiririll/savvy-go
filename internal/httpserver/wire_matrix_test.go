@@ -28,7 +28,7 @@ func num(d decimal.Decimal) json.Number { return json.Number(d.String()) }
 func newWireEnv(t *testing.T) *wireEnv {
 	t.Helper()
 	a := newTestApp(t)
-	u := a.createUser("wire@test.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("wire@test.com", "secret1", roleEditor)
 	e := &wireEnv{a: a, sess: a.issue(u, false), cur: map[string]int64{}, acct: map[string]int64{}}
 	for _, c := range moneytest.Currencies {
 		res := a.do("POST", "/api/currencies", map[string]any{

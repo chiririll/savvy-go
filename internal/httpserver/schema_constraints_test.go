@@ -2,15 +2,13 @@ package httpserver
 
 import (
 	"testing"
-
-	"savvy-go/internal/auth"
 )
 
 // TestSchemaConstraintsRejectBadInput verifies the schema CHECK constraints
 // turn invalid values into a client error instead of storing them.
 func TestSchemaConstraintsRejectBadInput(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("rw@test.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("rw@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 
 	res := a.do("POST", "/api/currencies", map[string]any{

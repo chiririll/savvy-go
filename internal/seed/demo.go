@@ -2,7 +2,6 @@ package seed
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"math"
 	"math/rand"
@@ -10,11 +9,11 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	"savvy-go/internal/auth"
 	appdb "savvy-go/internal/db"
 	"savvy-go/internal/db/sqlc"
 	"savvy-go/internal/domain"
 	"savvy-go/internal/money"
+	"savvy-go/internal/store"
 )
 
 const (
@@ -56,7 +55,7 @@ var catalogs = map[string][]string{
 
 type seeder struct {
 	ctx      context.Context
-	db       *sql.DB
+	db       store.DB
 	now      time.Time
 	start    time.Time
 	end      time.Time
@@ -77,7 +76,7 @@ type expenseCand struct {
 	catName string
 }
 
-func seedWorkspace(ctx context.Context, db *sql.DB, loc *time.Location) error {
+func seedWorkspace(ctx context.Context, db store.DB, loc *time.Location) error {
 	now := time.Now().In(loc)
 	start := startOfMonth(now.AddDate(0, -monthsOfHistory, 0))
 	s := &seeder{
@@ -94,9 +93,6 @@ func seedWorkspace(ctx context.Context, db *sql.DB, loc *time.Location) error {
 		budgets: domain.Budgets{DB: db},
 		recur:   domain.RecurringStore{DB: db, Txs: domain.Transactions{DB: db}},
 		auto:    domain.Automation{DB: db, Txs: domain.Transactions{DB: db}},
-	}
-	if err := s.createUsers(); err != nil {
-		return err
 	}
 	curs := domain.Currencies{DB: db}
 	usd, err := curs.ByCode(ctx, "USD")
@@ -139,23 +135,6 @@ func seedWorkspace(ctx context.Context, db *sql.DB, loc *time.Location) error {
 		return err
 	}
 	return s.createAutomation(tags)
-}
-
-func (s *seeder) createUsers() error {
-	users := auth.Users{DB: s.db}
-	for _, u := range []struct {
-		name, email, pass, role string
-	}{
-		{"Alex Morgan", "admin@savvy.app", "password", auth.RoleAdmin},
-		{"Jordan Lee", "editor@savvy.app", "password", auth.RoleReadWrite},
-		{"Demo User", "demo@demo.com", "demo", auth.RoleReadOnly},
-	} {
-		pass := u.pass
-		if _, err := users.Create(s.ctx, u.name, u.email, &pass, u.role); err != nil {
-			return fmt.Errorf("user %s: %w", u.email, err)
-		}
-	}
-	return nil
 }
 
 func (s *seeder) createAccounts(usd *domain.Currency, eur *domain.Currency) (map[string]*domain.Account, error) {

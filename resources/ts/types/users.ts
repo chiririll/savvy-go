@@ -1,4 +1,5 @@
-export type UserRole = 'admin' | 'read-write' | 'read-only'
+/** Server role; what a user may do with a space's data is their role in that space. */
+export type UserRole = 'admin' | 'user' | 'guest'
 
 export interface User {
     id: number

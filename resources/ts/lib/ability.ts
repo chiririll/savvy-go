@@ -13,13 +13,11 @@ export function defineAbilityFor(role: UserRole | null): AppAbility {
         case 'admin':
             can('manage', 'all')
             break
-        case 'read-write':
+        case 'user':
+        case 'guest':
             can('manage', 'all')
             cannot('manage', 'User')
             can('read', 'User')
-            break
-        case 'read-only':
-            can('read', 'all')
             break
         default:
             break

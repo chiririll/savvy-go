@@ -13,7 +13,7 @@ import (
 )
 
 func (s *Server) recurringIndex(w http.ResponseWriter, r *http.Request) {
-	list, err := s.recurring.All(r.Context())
+	list, err := sp(r).recurring.All(r.Context())
 	if err != nil {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
@@ -22,7 +22,7 @@ func (s *Server) recurringIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) recurringUpcoming(w http.ResponseWriter, r *http.Request) {
-	list, err := s.recurring.Upcoming(r.Context(), 5)
+	list, err := sp(r).recurring.Upcoming(r.Context(), 5)
 	if err != nil {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
@@ -35,7 +35,7 @@ func (s *Server) recurringStore(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	rec, err := s.recurring.Create(r.Context(), in)
+	rec, err := sp(r).recurring.Create(r.Context(), in)
 	if err != nil {
 		writeMessage(w, 422, err.Error())
 		return
@@ -60,7 +60,7 @@ func (s *Server) recurringUpdate(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	rec, err := s.recurring.Update(r.Context(), cur.ID, in)
+	rec, err := sp(r).recurring.Update(r.Context(), cur.ID, in)
 	if err != nil {
 		writeMessage(w, 422, err.Error())
 		return
@@ -73,7 +73,7 @@ func (s *Server) recurringDestroy(w http.ResponseWriter, r *http.Request) {
 	if rec == nil {
 		return
 	}
-	if err := s.recurring.Delete(r.Context(), rec.ID); err != nil {
+	if err := sp(r).recurring.Delete(r.Context(), rec.ID); err != nil {
 		writeMessage(w, 422, err.Error())
 		return
 	}
@@ -82,7 +82,7 @@ func (s *Server) recurringDestroy(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) recurringParam(w http.ResponseWriter, r *http.Request) *domain.Recurring {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	rec, _ := s.recurring.ByID(r.Context(), id)
+	rec, _ := sp(r).recurring.ByID(r.Context(), id)
 	if rec == nil {
 		writeMessage(w, http.StatusNotFound, "Not found.")
 	}

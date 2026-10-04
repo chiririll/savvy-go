@@ -35,7 +35,6 @@ import {
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { useApiTokens, useCreateApiToken, useRevokeApiToken } from '@/hooks'
-import { useUser } from '@/stores/auth'
 import { intlLocale } from '@/lib/i18n'
 import type { ApiTokenScope } from '@/types'
 
@@ -51,9 +50,6 @@ function expiryToIso(expiry: Expiry): string | null {
 export default function ApiSettingsPage() {
     const { t } = useTranslation('settings')
     const { t: tCommon } = useTranslation('common')
-    const user = useUser()
-    // Read-only users may still connect apps, but only with read access.
-    const canWrite = user?.role !== 'read-only'
 
     const { data: tokens, isLoading } = useApiTokens()
     const createToken = useCreateApiToken()
@@ -78,7 +74,7 @@ export default function ApiSettingsPage() {
         try {
             const created = await createToken.mutateAsync({
                 name: name.trim(),
-                scope: canWrite ? scope : 'read',
+                scope,
                 expires_at: expiryToIso(expiry),
             })
             setShowCreate(false)
@@ -225,7 +221,7 @@ export default function ApiSettingsPage() {
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="read">{t('api.scope.read')}</SelectItem>
-                                    {canWrite && <SelectItem value="read-write">{t('api.scope.read-write')}</SelectItem>}
+                                    <SelectItem value="read-write">{t('api.scope.read-write')}</SelectItem>
                                 </SelectContent>
                             </Select>
                             <p className="text-xs text-muted-foreground">{t(`api.create.accessHint.${scope}`)}</p>

@@ -13,43 +13,85 @@ import (
 	"time"
 
 	"savvy-go/internal/auth"
-	"savvy-go/internal/db"
-	"savvy-go/internal/migrate"
+	"savvy-go/internal/config"
+	"savvy-go/internal/domain"
 	"savvy-go/internal/settings"
+	"savvy-go/internal/store"
+	"savvy-go/internal/store/sqlite"
+)
+
+// Test roles for createUser: admin is a server admin and admin of the shared
+// test space; editor and viewer are plain users with that role in it.
+const (
+	roleEditor = domain.SpaceEditor
+	roleViewer = domain.SpaceViewer
 )
 
 type testApp struct {
 	t      *testing.T
-	db     *sql.DB
+	db     *sql.DB // the server database
+	store  *sqlite.Store
+	space  *domain.Space // the space every createUser member belongs to
 	srv    *httptest.Server
 	s      *Server
 	client *http.Client
 }
 
+// openTestStore opens a store in cfg.DataDir with the embedded migrations.
+func openTestStore(t *testing.T, cfg config.Config) *sqlite.Store {
+	t.Helper()
+	st, err := sqlite.OpenApp(context.Background(), cfg.DataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	return st
+}
+
 func newTestApp(t *testing.T) *testApp {
 	t.Helper()
 	cfg, _ := testConfig(t)
-	sqlDB, err := db.Open(cfg.Database)
+	st := openTestStore(t, cfg)
+	s := New(cfg, st)
+	space, err := s.spaces.Create(context.Background(), "Test", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := migrate.Up(context.Background(), sqlDB); err != nil {
-		t.Fatal(err)
-	}
-	s := New(cfg, sqlDB)
 	ts := httptest.NewServer(s.Handler())
-	t.Cleanup(func() {
-		ts.Close()
-		_ = sqlDB.Close()
-	})
-	return &testApp{t: t, db: sqlDB, srv: ts, s: s, client: ts.Client()}
+	t.Cleanup(ts.Close)
+	return &testApp{t: t, db: st.Server().(*sql.DB), store: st, space: space, srv: ts, s: s, client: ts.Client()}
 }
 
-func (a *testApp) createUser(email, password, role string, opts ...func(*auth.User)) *auth.User {
+// spaceDB is the database of the shared test space.
+func (a *testApp) spaceDB() store.DB {
 	a.t.Helper()
-	u, err := a.s.users.Create(context.Background(), "U", email, &password, role)
+	d, err := a.store.Space(context.Background(), a.space.ID)
 	if err != nil {
 		a.t.Fatal(err)
+	}
+	return d
+}
+
+// createUser creates a user. role is a server role (admin, user, guest) or,
+// for editor and viewer, a plain user with that role in the shared space; an
+// admin also administers the shared space.
+func (a *testApp) createUser(email, password, role string, opts ...func(*auth.User)) *auth.User {
+	a.t.Helper()
+	serverRole, spaceRole := role, ""
+	switch role {
+	case auth.RoleAdmin:
+		spaceRole = domain.SpaceAdmin
+	case roleEditor, roleViewer:
+		serverRole, spaceRole = auth.RoleUser, role
+	}
+	u, err := a.s.users.Create(context.Background(), "U", email, &password, serverRole)
+	if err != nil {
+		a.t.Fatal(err)
+	}
+	if spaceRole != "" {
+		if err := a.s.spaces.SetMember(context.Background(), a.space.ID, u, spaceRole); err != nil {
+			a.t.Fatal(err)
+		}
 	}
 	for _, opt := range opts {
 		opt(u)
@@ -66,7 +108,7 @@ func (a *testApp) issue(u *auth.User, remember bool) *auth.Issued {
 	return issued
 }
 
-func (a *testApp) do(method, path string, body any, token, csrf string) *http.Response {
+func (a *testApp) request(method, path string, body any, token, csrf string) *http.Request {
 	a.t.Helper()
 	var rdr io.Reader
 	if body != nil {
@@ -89,7 +131,12 @@ func (a *testApp) do(method, path string, body any, token, csrf string) *http.Re
 	if csrf != "" {
 		req.Header.Set("X-CSRF-Token", csrf)
 	}
-	res, err := a.client.Do(req)
+	return req
+}
+
+func (a *testApp) do(method, path string, body any, token, csrf string) *http.Response {
+	a.t.Helper()
+	res, err := a.client.Do(a.request(method, path, body, token, csrf))
 	if err != nil {
 		a.t.Fatal(err)
 	}
@@ -169,15 +216,7 @@ func TestSessionSmokeRegisterMeLogout(t *testing.T) {
 
 func TestHostPrefixedCookieOverTLS(t *testing.T) {
 	cfg, _ := testConfig(t)
-	sqlDB, err := db.Open(cfg.Database)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = sqlDB.Close() })
-	if err := migrate.Up(context.Background(), sqlDB); err != nil {
-		t.Fatal(err)
-	}
-	s := New(cfg, sqlDB)
+	s := New(cfg, openTestStore(t, cfg))
 	ts := httptest.NewTLSServer(s.Handler())
 	t.Cleanup(ts.Close)
 	client := ts.Client()
@@ -216,7 +255,7 @@ func TestHostPrefixedCookieOverTLS(t *testing.T) {
 
 func TestSessionIdleAbsoluteRevokeAndRefresh(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("u@test.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("u@test.com", "secret1", roleEditor)
 	issued := a.issue(u, false)
 
 	_, _ = a.db.Exec(`UPDATE auth_sessions SET idle_expires_at = ? WHERE id = ?`,
@@ -262,7 +301,7 @@ func TestSessionIdleAbsoluteRevokeAndRefresh(t *testing.T) {
 
 func TestRememberMeRotation(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("u@test.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("u@test.com", "secret1", roleEditor)
 	issued := a.issue(u, true)
 	oldHash := issued.Session.TokenHash
 	_, _ = a.db.Exec(`UPDATE auth_sessions SET refreshed_at = ? WHERE id = ?`,
@@ -318,7 +357,7 @@ func TestRememberMeRotation(t *testing.T) {
 
 func TestLoginCookiePersistence(t *testing.T) {
 	a := newTestApp(t)
-	a.createUser("u@test.com", "secret1", auth.RoleReadWrite)
+	a.createUser("u@test.com", "secret1", roleEditor)
 	sessionLogin := a.do("POST", "/api/auth/login", map[string]any{
 		"email": "u@test.com", "password": "secret1", "remember_me": false,
 	}, "", "")
@@ -340,7 +379,7 @@ func TestLoginCookiePersistence(t *testing.T) {
 
 func TestLoginSSOOnlyAnd2FAChallenge(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("sso@test.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("sso@test.com", "secret1", roleEditor)
 	_, _ = a.db.Exec(`UPDATE users SET is_sso_only = 1 WHERE id = ?`, u.ID)
 	res := a.do("POST", "/api/auth/login", map[string]string{"email": "sso@test.com", "password": "secret1"}, "", "")
 	if res.StatusCode != 422 {
@@ -348,7 +387,7 @@ func TestLoginSSOOnlyAnd2FAChallenge(t *testing.T) {
 	}
 	res.Body.Close()
 
-	u2 := a.createUser("u@test.com", "secret1", auth.RoleReadWrite)
+	u2 := a.createUser("u@test.com", "secret1", roleEditor)
 	_, _ = a.db.Exec(`UPDATE users SET two_factor_enabled = 1, two_factor_confirmed = 1, two_factor_secret = 'SECRET' WHERE id = ?`, u2.ID)
 	res = a.do("POST", "/api/auth/login", map[string]string{"email": "u@test.com", "password": "secret1"}, "", "")
 	body := decodeJSON(t, res)
@@ -366,7 +405,7 @@ func TestLoginSSOOnlyAnd2FAChallenge(t *testing.T) {
 
 func TestTwoFactorChallengePeekAndConsume(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("u@test.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("u@test.com", "secret1", roleEditor)
 	tok, err := a.s.challenges.Issue(context.Background(), u)
 	if err != nil {
 		t.Fatal(err)
@@ -398,7 +437,7 @@ func TestTwoFactorChallengePeekAndConsume(t *testing.T) {
 
 func TestChangePasswordAndLogoutOthers(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("u@test.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("u@test.com", "secret1", roleEditor)
 	current := a.issue(u, false)
 	other := a.issue(u, false)
 
@@ -425,7 +464,7 @@ func TestChangePasswordAndLogoutOthers(t *testing.T) {
 		t.Fatal("password not updated")
 	}
 
-	u = a.createUser("w@test.com", "secret1", auth.RoleReadWrite)
+	u = a.createUser("w@test.com", "secret1", roleEditor)
 	current = a.issue(u, false)
 	other = a.issue(u, false)
 	res = a.do("PUT", "/api/auth/password", map[string]string{
@@ -441,7 +480,7 @@ func TestChangePasswordAndLogoutOthers(t *testing.T) {
 	}
 	ok.Body.Close()
 
-	sso := a.createUser("sso2@test.com", "secret1", auth.RoleReadWrite)
+	sso := a.createUser("sso2@test.com", "secret1", roleEditor)
 	_, _ = a.db.Exec(`UPDATE users SET is_sso_only = 1 WHERE id = ?`, sso.ID)
 	sso, _ = a.s.users.ByID(context.Background(), sso.ID)
 	iss := a.issue(sso, false)
@@ -453,7 +492,7 @@ func TestChangePasswordAndLogoutOthers(t *testing.T) {
 	}
 	res.Body.Close()
 
-	u = a.createUser("lo@test.com", "secret1", auth.RoleReadWrite)
+	u = a.createUser("lo@test.com", "secret1", roleEditor)
 	current = a.issue(u, false)
 	other = a.issue(u, false)
 	res = a.do("POST", "/api/auth/logout-others", map[string]any{}, current.Token, current.CSRF)
@@ -482,7 +521,7 @@ func TestPasswordTokensAndUsers(t *testing.T) {
 	sess := a.issue(admin, false)
 
 	res := a.do("POST", "/api/users", map[string]any{
-		"name": "Active", "email": "active@test.com", "password": "password1", "role": "read-only",
+		"name": "Active", "email": "active@test.com", "password": "password1", "role": "user",
 	}, sess.Token, sess.CSRF)
 	body := decodeJSON(t, res)
 	if res.StatusCode != 201 {
@@ -494,7 +533,7 @@ func TestPasswordTokensAndUsers(t *testing.T) {
 	}
 
 	res = a.do("POST", "/api/users", map[string]any{
-		"name": "Invited", "email": "invited@test.com", "role": "read-write",
+		"name": "Invited", "email": "invited@test.com", "role": "user",
 	}, sess.Token, sess.CSRF)
 	body = decodeJSON(t, res)
 	if res.StatusCode != 201 {
@@ -506,7 +545,7 @@ func TestPasswordTokensAndUsers(t *testing.T) {
 	}
 	inviteTok := data["token"].(string)
 
-	rw, _ := a.s.users.Create(context.Background(), "RW", "rw@test.com", ptr("secret1"), auth.RoleReadWrite)
+	rw, _ := a.s.users.Create(context.Background(), "RW", "rw@test.com", ptr("secret1"), auth.RoleUser)
 	rws := a.issue(rw, false)
 	res = a.do("POST", "/api/users", map[string]any{"name": "Nope", "email": "nope@test.com"}, rws.Token, rws.CSRF)
 	if res.StatusCode != 403 {
@@ -514,7 +553,7 @@ func TestPasswordTokensAndUsers(t *testing.T) {
 	}
 	res.Body.Close()
 
-	_, _ = a.s.users.Create(context.Background(), "Pending", "pending@test.com", nil, auth.RoleReadOnly)
+	_, _ = a.s.users.Create(context.Background(), "Pending", "pending@test.com", nil, auth.RoleUser)
 	res = a.do("POST", "/api/auth/login", map[string]string{"email": "pending@test.com", "password": "anything1"}, "", "")
 	if res.StatusCode != 422 {
 		t.Fatalf("inactive login %d", res.StatusCode)
@@ -553,7 +592,7 @@ func TestPasswordTokensAndUsers(t *testing.T) {
 	}
 	res.Body.Close()
 
-	target, _ := a.s.users.Create(context.Background(), "Target", "target@test.com", ptr("oldpass12"), auth.RoleReadOnly)
+	target, _ := a.s.users.Create(context.Background(), "Target", "target@test.com", ptr("oldpass12"), auth.RoleUser)
 	first, _, _ := a.s.tokens.Issue(context.Background(), target)
 	res = a.do("POST", "/api/users/"+itoa(target.ID)+"/password-token", map[string]any{}, sess.Token, sess.CSRF)
 	body = decodeJSON(t, res)
@@ -578,7 +617,7 @@ func TestPasswordTokensAndUsers(t *testing.T) {
 	}
 	res.Body.Close()
 
-	sso, _ := a.s.users.Create(context.Background(), "Sso", "sso@test.com", ptr("x"), auth.RoleReadOnly)
+	sso, _ := a.s.users.Create(context.Background(), "Sso", "sso@test.com", ptr("x"), auth.RoleUser)
 	_, _ = a.db.Exec(`UPDATE users SET is_sso_only = 1 WHERE id = ?`, sso.ID)
 	res = a.do("POST", "/api/users/"+itoa(sso.ID)+"/password-token", map[string]any{}, sess.Token, sess.CSRF)
 	if res.StatusCode != 422 {
@@ -586,7 +625,7 @@ func TestPasswordTokensAndUsers(t *testing.T) {
 	}
 	res.Body.Close()
 
-	inv, _ := a.s.users.Create(context.Background(), "Inv2", "inv2@test.com", nil, auth.RoleReadOnly)
+	inv, _ := a.s.users.Create(context.Background(), "Inv2", "inv2@test.com", nil, auth.RoleUser)
 	issued, _, _ := a.s.tokens.Issue(context.Background(), inv)
 	res = a.do("PATCH", "/api/users/"+itoa(inv.ID), map[string]string{"password": "setbyadmin"}, sess.Token, sess.CSRF)
 	body = decodeJSON(t, res)
@@ -602,7 +641,7 @@ func TestPasswordTokensAndUsers(t *testing.T) {
 
 func TestPasswordLoginToggle(t *testing.T) {
 	a := newTestApp(t)
-	a.createUser("u@test.com", "secret1", auth.RoleReadWrite)
+	a.createUser("u@test.com", "secret1", roleEditor)
 	insertSSO(t, a.db, true)
 	_ = settings.Store{DB: a.db}.Set(context.Background(), "password_login_enabled", false)
 
@@ -662,7 +701,7 @@ func TestPasswordLoginToggle(t *testing.T) {
 
 func TestCSRFOnLogout(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("u@test.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("u@test.com", "secret1", roleEditor)
 	issued := a.issue(u, false)
 	res := a.do("POST", "/api/auth/logout", map[string]any{}, issued.Token, "")
 	if res.StatusCode != 419 {

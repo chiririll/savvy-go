@@ -20,6 +20,7 @@ import (
 	sqlite3 "modernc.org/sqlite"
 
 	"savvy-go/internal/db"
+	"savvy-go/internal/migrate"
 	"savvy-go/internal/store"
 )
 
@@ -412,4 +413,10 @@ func mapErr(err error) error {
 		return quotaError{err}
 	}
 	return err
+}
+
+// OpenApp opens the store of the application in dir with the embedded server
+// and space migrations.
+func OpenApp(ctx context.Context, dir string) (*Store, error) {
+	return Open(ctx, Options{Dir: dir, MigrateServer: migrate.Server.Up, MigrateSpace: migrate.Space.Up})
 }

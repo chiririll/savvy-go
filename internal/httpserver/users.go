@@ -68,6 +68,10 @@ func (s *Server) usersStore(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	if _, err := s.spaces.Provision(r.Context(), u); err != nil {
+		writeMessage(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	payload := u.ResourceJSON()
 	if u.IsInactive() {
 		tok, exp, err := s.tokens.Issue(r.Context(), u)
@@ -177,11 +181,4 @@ func (s *Server) userParam(w http.ResponseWriter, r *http.Request) *auth.User {
 	return u
 }
 
-func validRole(role string) bool {
-	switch role {
-	case auth.RoleAdmin, auth.RoleReadWrite, auth.RoleReadOnly:
-		return true
-	default:
-		return false
-	}
-}
+func validRole(role string) bool { return auth.ValidRole(role) }

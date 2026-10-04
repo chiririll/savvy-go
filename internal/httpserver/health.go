@@ -1,13 +1,9 @@
 package httpserver
 
 import (
-	"context"
-	"database/sql"
 	"net/http"
 	"time"
 
-	"savvy-go/internal/db"
-	"savvy-go/internal/migrate"
 	"savvy-go/internal/version"
 )
 
@@ -33,41 +29,36 @@ func (s *Server) livez(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
+// readyz passes once the store has opened and migrated every database. A
+// space that failed to migrate does not fail the probe (the other spaces
+// work); it is listed as a warning.
 func (s *Server) readyz(w http.ResponseWriter, r *http.Request) {
 	now := time.Now().UTC().Format(time.RFC3339)
 	checks := map[string][]healthChk{}
 	passing := true
 
 	conn := healthChk{ComponentType: "datastore", Status: "pass", Time: now}
-	if err := db.Ready(r.Context(), s.db); err != nil {
+	var one int
+	if err := s.store.Server().QueryRowContext(r.Context(), "SELECT 1").Scan(&one); err != nil {
 		passing = false
 		conn.Status = "fail"
 		conn.Output = err.Error()
 	}
-	checks["sqlite:connectivity"] = []healthChk{conn}
+	checks["store:connectivity"] = []healthChk{conn}
 
-	mig := healthChk{ComponentType: "component", Status: "pass", Time: now, ObservedUnit: "pending"}
-	pending, err := migrate.PendingCount(r.Context(), s.db)
-	if err != nil {
+	st := s.store.Status()
+	mig := healthChk{ComponentType: "component", Status: "pass", Time: now, ObservedUnit: "unavailable spaces"}
+	if !st.Ready {
 		passing = false
 		mig.Status = "fail"
-		mig.Output = err.Error()
-	} else {
-		value := pending
-		if pending < 0 {
-			value = pending
-			passing = false
-			mig.Status = "fail"
-		} else if pending != 0 {
-			passing = false
-			mig.Status = "fail"
-		}
-		mig.ObservedValue = &value
-		if pending < 0 {
-			mig.ObservedValue = intPtr(pending)
-		}
+		mig.Output = "databases are still being opened and migrated"
 	}
-	checks["schema:migrations"] = []healthChk{mig}
+	unavailable := len(st.Unavailable)
+	mig.ObservedValue = &unavailable
+	if unavailable > 0 && st.Ready {
+		mig.Status = "warn"
+	}
+	checks["store:migrations"] = []healthChk{mig}
 
 	status := http.StatusOK
 	reportStatus := "pass"
@@ -80,15 +71,4 @@ func (s *Server) readyz(w http.ResponseWriter, r *http.Request) {
 		ReleaseID: version.Value,
 		Checks:    checks,
 	})
-}
-
-func intPtr(n int) *int { return &n }
-
-// ReadyForTraffic is used by the process itself (startup / probes).
-func ReadyForTraffic(ctx context.Context, sqlDB *sql.DB) bool {
-	if err := db.Ready(ctx, sqlDB); err != nil {
-		return false
-	}
-	pending, err := migrate.PendingCount(ctx, sqlDB)
-	return err == nil && pending == 0
 }

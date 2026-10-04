@@ -12,7 +12,7 @@ import (
 )
 
 func (s *Server) automationIndex(w http.ResponseWriter, r *http.Request) {
-	list, err := s.automation.All(r.Context())
+	list, err := sp(r).automation.All(r.Context())
 	if err != nil {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
@@ -30,7 +30,7 @@ func (s *Server) automationStore(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	rule, err := s.automation.Create(r.Context(), in)
+	rule, err := sp(r).automation.Create(r.Context(), in)
 	if err != nil {
 		writeMessage(w, 422, err.Error())
 		return
@@ -55,7 +55,7 @@ func (s *Server) automationUpdate(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	rule, err := s.automation.Update(r.Context(), cur.ID, in)
+	rule, err := sp(r).automation.Update(r.Context(), cur.ID, in)
 	if err != nil {
 		writeMessage(w, 422, err.Error())
 		return
@@ -68,7 +68,7 @@ func (s *Server) automationDestroy(w http.ResponseWriter, r *http.Request) {
 	if rule == nil {
 		return
 	}
-	if err := s.automation.Delete(r.Context(), rule.ID); err != nil {
+	if err := sp(r).automation.Delete(r.Context(), rule.ID); err != nil {
 		writeMessage(w, 422, err.Error())
 		return
 	}
@@ -80,7 +80,7 @@ func (s *Server) automationToggle(w http.ResponseWriter, r *http.Request) {
 	if rule == nil {
 		return
 	}
-	out, err := s.automation.Toggle(r.Context(), rule.ID)
+	out, err := sp(r).automation.Toggle(r.Context(), rule.ID)
 	if err != nil {
 		writeMessage(w, 422, err.Error())
 		return
@@ -99,7 +99,7 @@ func (s *Server) automationReorder(w http.ResponseWriter, r *http.Request) {
 		writeValidation(w, map[string][]string{"rules": {"The rules field is required."}})
 		return
 	}
-	if err := s.automation.Reorder(r.Context(), body.Rules); err != nil {
+	if err := sp(r).automation.Reorder(r.Context(), body.Rules); err != nil {
 		writeMessage(w, 422, err.Error())
 		return
 	}
@@ -118,7 +118,7 @@ func (s *Server) automationTest(w http.ResponseWriter, r *http.Request) {
 		writeValidation(w, map[string][]string{"transaction_id": {"The transaction id field is required."}})
 		return
 	}
-	result, err := s.automation.Test(r.Context(), rule.ID, body.TransactionID)
+	result, err := sp(r).automation.Test(r.Context(), rule.ID, body.TransactionID)
 	if err != nil {
 		writeMessage(w, 422, err.Error())
 		return
@@ -131,7 +131,7 @@ func (s *Server) automationLogs(w http.ResponseWriter, r *http.Request) {
 	if rule == nil {
 		return
 	}
-	logs, err := s.automation.Logs(r.Context(), rule.ID)
+	logs, err := sp(r).automation.Logs(r.Context(), rule.ID)
 	if err != nil {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
@@ -141,7 +141,7 @@ func (s *Server) automationLogs(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) automationParam(w http.ResponseWriter, r *http.Request) *domain.AutomationRule {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	rule, _ := s.automation.ByID(r.Context(), id)
+	rule, _ := sp(r).automation.ByID(r.Context(), id)
 	if rule == nil {
 		writeMessage(w, http.StatusNotFound, "Not found.")
 	}

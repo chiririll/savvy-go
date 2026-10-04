@@ -150,8 +150,8 @@
     },
     "roles": {
         "admin": "Admin",
-        "read-write": "Read & write",
-        "read-only": "Read only"
+        "user": "User",
+        "guest": "Guest"
     },
     "na": "N/A",
     "yes": "Yes",

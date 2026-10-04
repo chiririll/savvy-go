@@ -201,6 +201,27 @@ type Setting struct {
 	Value sql.NullString
 }
 
+type Space struct {
+	ID        int64
+	Uuid      string
+	Name      string
+	CreatedBy sql.NullInt64
+	CreatedAt sql.NullString
+	UpdatedAt sql.NullString
+}
+
+type SpaceMember struct {
+	SpaceID   int64
+	UserID    int64
+	Role      string
+	CreatedAt sql.NullString
+}
+
+type SpaceSetting struct {
+	Key   string
+	Value sql.NullString
+}
+
 type SsoLoginState struct {
 	ID                 int64
 	State              string

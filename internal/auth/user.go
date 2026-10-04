@@ -11,11 +11,30 @@ import (
 	"savvy-go/internal/store"
 )
 
+// Server roles. What a user may do with the finances of a space is decided by
+// their role in that space, not here.
 const (
-	RoleAdmin     = "admin"
-	RoleReadWrite = "read-write"
-	RoleReadOnly  = "read-only"
+	RoleAdmin = "admin"
+	RoleUser  = "user"
+	// RoleGuest joined through an invitation from someone other than a server
+	// admin: they cannot create spaces or be a space admin until promoted.
+	RoleGuest = "guest"
 )
+
+// ValidRole reports whether role is a server role.
+func ValidRole(role string) bool {
+	return role == RoleAdmin || role == RoleUser || role == RoleGuest
+}
+
+// NormalizeRole maps the retired read-write/read-only roles (Laravel data,
+// old SSO role mappings) to user.
+func NormalizeRole(role string) string {
+	switch role {
+	case "read-write", "read-only":
+		return RoleUser
+	}
+	return role
+}
 
 type User struct {
 	ID                 int64
@@ -41,9 +60,7 @@ func (u User) HasTwoFactor() bool {
 
 func (u User) IsAdmin() bool { return u.Role == RoleAdmin }
 
-func (u User) IsReadOnly() bool { return u.Role == RoleReadOnly }
-
-func (u User) CanWrite() bool { return u.Role == RoleAdmin || u.Role == RoleReadWrite }
+func (u User) IsGuest() bool { return u.Role == RoleGuest }
 
 func (u User) SessionJSON() map[string]any {
 	return map[string]any{
@@ -108,7 +125,7 @@ func (s Users) All(ctx context.Context) ([]User, error) {
 
 func (s Users) Create(ctx context.Context, name, email string, password *string, role string) (*User, error) {
 	if role == "" {
-		role = RoleReadOnly
+		role = RoleUser
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
 	var hash any

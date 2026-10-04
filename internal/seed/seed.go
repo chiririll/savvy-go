@@ -2,7 +2,6 @@ package seed
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log/slog"
 	"time"
@@ -13,30 +12,64 @@ import (
 	appdb "savvy-go/internal/db"
 	"savvy-go/internal/domain"
 	"savvy-go/internal/settings"
+	"savvy-go/internal/store"
 )
 
 const demoSeededKey = "demo_seeded"
 
-// Demo seeds currencies, categories, tags, and the full demo workspace when
-// enabled and the database has never been demo-seeded (no users yet). Later
-// starts are no-ops so first-boot matches Laravel's SEED_DEMO behavior.
-func Demo(ctx context.Context, db *sql.DB, enabled bool, loc *time.Location) error {
+// Demo seeds the demo users and a "Demo" space with currencies, categories,
+// tags and a full workspace when enabled and the server has never been
+// demo-seeded (no users yet). Later starts are no-ops so first-boot matches
+// Laravel's SEED_DEMO behavior. The admin owns the space, the editor edits it
+// and the demo user only views it.
+func Demo(ctx context.Context, st store.Store, enabled bool, loc *time.Location) error {
 	if !enabled {
 		return nil
 	}
 	if loc == nil {
 		loc = time.UTC
 	}
-	st := settings.Store{DB: db}
-	if st.Bool(ctx, demoSeededKey, false) {
+	server := settings.Store{DB: st.Server()}
+	if server.Bool(ctx, demoSeededKey, false) {
 		return nil
 	}
-	n, err := (auth.Users{DB: db}).Count(ctx)
+	users := auth.Users{DB: st.Server()}
+	n, err := users.Count(ctx)
 	if err != nil {
 		return fmt.Errorf("count users: %w", err)
 	}
 	if n > 0 {
 		return nil
+	}
+
+	members := map[string]*auth.User{}
+	for _, u := range []struct {
+		name, email, pass, role, spaceRole string
+	}{
+		{"Alex Morgan", "admin@savvy.app", "password", auth.RoleAdmin, domain.SpaceAdmin},
+		{"Jordan Lee", "editor@savvy.app", "password", auth.RoleUser, domain.SpaceEditor},
+		{"Demo User", "demo@demo.com", "demo", auth.RoleUser, domain.SpaceViewer},
+	} {
+		pass := u.pass
+		created, err := users.Create(ctx, u.name, u.email, &pass, u.role)
+		if err != nil {
+			return fmt.Errorf("user %s: %w", u.email, err)
+		}
+		members[u.spaceRole] = created
+	}
+	spaces := domain.Spaces{Store: st}
+	space, err := spaces.Create(ctx, "Demo", members[domain.SpaceAdmin])
+	if err != nil {
+		return fmt.Errorf("demo space: %w", err)
+	}
+	for _, role := range []string{domain.SpaceEditor, domain.SpaceViewer} {
+		if err := spaces.SetMember(ctx, space.ID, members[role], role); err != nil {
+			return err
+		}
+	}
+	db, err := st.Space(ctx, space.ID)
+	if err != nil {
+		return err
 	}
 
 	if err := seedReference(ctx, db); err != nil {
@@ -45,7 +78,7 @@ func Demo(ctx context.Context, db *sql.DB, enabled bool, loc *time.Location) err
 	if err := seedWorkspace(ctx, db, loc); err != nil {
 		return err
 	}
-	if err := st.Set(ctx, demoSeededKey, true); err != nil {
+	if err := server.Set(ctx, demoSeededKey, true); err != nil {
 		return fmt.Errorf("mark demo seeded: %w", err)
 	}
 
@@ -55,7 +88,7 @@ func Demo(ctx context.Context, db *sql.DB, enabled bool, loc *time.Location) err
 	return nil
 }
 
-func seedReference(ctx context.Context, db *sql.DB) error {
+func seedReference(ctx context.Context, db store.DB) error {
 	if err := seedCurrencies(ctx, domain.Currencies{DB: db}); err != nil {
 		return fmt.Errorf("currencies: %w", err)
 	}

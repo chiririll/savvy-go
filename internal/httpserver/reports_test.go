@@ -3,13 +3,11 @@ package httpserver
 import (
 	"testing"
 	"time"
-
-	"savvy-go/internal/auth"
 )
 
 func TestReportsOverview(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("r@test.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("r@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 	accID, catID := seedMoney(t, a, sess)
 	today := time.Now().UTC().Format("2006-01-02")
@@ -44,7 +42,7 @@ func TestReportsOverview(t *testing.T) {
 
 func TestReportsNetWorth(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("nw@test.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("nw@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 	accID, catID := seedMoney(t, a, sess)
 	today := time.Now().UTC().Format("2006-01-02")
@@ -78,7 +76,7 @@ func TestReportsNetWorth(t *testing.T) {
 
 func TestReportsTransactionSummary(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("txr@test.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("txr@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 	accID, catID := seedMoney(t, a, sess)
 	today := time.Now().UTC().Format("2006-01-02")

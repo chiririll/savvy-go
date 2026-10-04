@@ -38,7 +38,7 @@ func (s *Server) monitoringStorage(w http.ResponseWriter, r *http.Request) {
 		Count  int
 		Bytes  int64
 	}
-	rows, err := db.Q(s.db).UploadUsageByBucket(r.Context())
+	rows, err := db.Q(s.store.Server()).UploadUsageByBucket(r.Context())
 	var usage []bucketRow
 	if err == nil {
 		for _, row := range rows {
@@ -85,7 +85,7 @@ func (s *Server) monitoringStorage(w http.ResponseWriter, r *http.Request) {
 
 	importBy := map[string]int{}
 	importTotal := 0
-	if irows, err := db.Q(s.db).ImportCountsByStatus(r.Context()); err == nil {
+	if irows, err := db.Q(sp(r).db).ImportCountsByStatus(r.Context()); err == nil {
 		for _, row := range irows {
 			importBy[row.Status] = int(row.Count)
 			importTotal += int(row.Count)

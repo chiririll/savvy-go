@@ -80,7 +80,7 @@ func targetTables(ctx context.Context) ([]tableDef, error) {
 	defer scratch.Close()
 	scratch.SetMaxOpenConns(1) // an in-memory database lives per connection
 
-	names, err := migrationFiles()
+	names, err := migrationFiles(all...)
 	if err != nil {
 		return nil, err
 	}

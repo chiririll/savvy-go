@@ -19,7 +19,7 @@ func (s *Server) passwordLoginDisabled(r *http.Request) bool {
 }
 
 func (s *Server) enabledSSOExists(r *http.Request) bool {
-	n, _ := db.Q(s.db).CountEnabledIdentityProviders(r.Context())
+	n, _ := db.Q(s.store.Server()).CountEnabledIdentityProviders(r.Context())
 	return n > 0
 }
 
@@ -72,6 +72,10 @@ func (s *Server) authRegister(w http.ResponseWriter, r *http.Request) {
 	u, err := s.users.Create(r.Context(), strings.TrimSpace(body.Name), body.Email, &pass, auth.RoleAdmin)
 	if err != nil {
 		writeValidation(w, map[string][]string{"email": {"The email has already been taken."}})
+		return
+	}
+	if _, err := s.spaces.Provision(r.Context(), u); err != nil {
+		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	s.issueSession(w, r, u, 201, true)

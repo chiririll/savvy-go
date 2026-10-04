@@ -121,6 +121,7 @@ type SSO struct {
 	DB       store.DB
 	Users    auth.Users
 	Settings settings.Store
+	Spaces   Spaces
 	AppURL   string
 	HTTP     *http.Client
 }

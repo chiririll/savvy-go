@@ -36,7 +36,7 @@ export default function ProviderEditPage() {
         enabled: provider.enabled,
         fields: toStringFields(provider.config),
         role_mapping: provider.roleMapping ?? [],
-        default_role: provider.defaultRole === 'read-write' ? 'read-write' : 'read-only',
+        default_role: provider.defaultRole === 'guest' ? 'guest' : 'user',
         allow_jit: provider.allowJit,
         sync_role_on_login: provider.syncRoleOnLogin,
         link_by_email: provider.linkByEmail,
