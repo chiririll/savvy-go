@@ -25,7 +25,8 @@ import enSettings from '@/locales/en/settings.json'
  */
 
 const REPO = path.resolve(__dirname, '../../..')
-const read = (file: string) => readFileSync(path.join(REPO, file), 'utf8')
+// Line endings normalised: a Windows checkout may have CRLF.
+const read = (file: string) => readFileSync(path.join(REPO, file), 'utf8').replace(/\r\n/g, '\n')
 const sorted = (values: Iterable<string>) => [...new Set(values)].sort()
 
 function goFiles(dir: string): string[] {
@@ -42,6 +43,7 @@ function goFunc(file: string, signature: string): string {
     const start = source.indexOf(signature)
     if (start === -1) throw new Error(`${signature} not found in ${file}`)
     const end = source.indexOf('\n}\n', start)
+    if (end === -1) throw new Error(`end of ${signature} not found in ${file}`)
     return source.slice(start, end)
 }
 
@@ -86,6 +88,32 @@ describe('enum columns in the database schema', () => {
     })
 })
 
+// `sorted` folds duplicates together, so the lists are checked for them here.
+describe('frontend value lists', () => {
+    const lists: Record<string, readonly string[]> = {
+        USER_ROLES,
+        API_TOKEN_SCOPES,
+        SPACE_ROLES,
+        TRANSFER_REVIEWS,
+        ACCOUNT_TYPES,
+        DEBT_TYPE_VALUES,
+        CATEGORY_TYPES,
+        RECURRING_FREQUENCIES,
+        ALL_TRANSACTION_TYPES,
+        TRANSACTION_STATUSES,
+        BUDGET_PERIODS,
+        TRIGGER_TYPES,
+        CONDITION_OPERATORS,
+        ACTION_TYPES,
+        BACKUP_STATUSES,
+        SSO_ERROR_CODES,
+    }
+
+    it.each(Object.entries(lists))('%s has no duplicates', (_, values) => {
+        expect(values.filter((v, i) => values.indexOf(v) !== i)).toEqual([])
+    })
+})
+
 describe('automation', () => {
     it('knows every condition operator the backend evaluates', () => {
         const body = goFunc('internal/domain/automation.go', 'func evaluateCondition(')
@@ -107,11 +135,13 @@ describe('backup status', () => {
 })
 
 describe('SSO sign-in errors', () => {
-    // Codes that can reach /auth/sso/callback?error=: the provider round trip
-    // and provisioning, plus the generic code the handler falls back to.
-    const callbackFiles = ['sso_jwks', 'sso_oauth', 'sso_provision', 'sso_saml', 'sso_xmlsig']
-    const emitted = callbackFiles.flatMap((name) =>
-        [...read(`internal/domain/${name}.go`).matchAll(/ssoErr\(\s*"([a-z_]+)"/g)].map((m) => m[1]),
+    // Codes that can reach /auth/sso/callback?error=: everything in the sso_*.go
+    // files (provider round trip, provisioning), plus the generic code the
+    // handler falls back to. sso.go itself only validates admin input, whose
+    // errors go to the provider form, not the callback.
+    const callbackFiles = goFiles('internal/domain').filter((file) => /\/sso_\w+\.go$/.test(file))
+    const emitted = callbackFiles.flatMap((file) =>
+        [...read(file).matchAll(/ssoErr\(\s*"([a-z_]+)"/g)].map((m) => m[1]),
     )
 
     it('has a message for every code the backend sends back', () => {

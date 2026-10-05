@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { formatBytes, formatDateTime } from './format'
 
-vi.mock('@/lib/i18n', () => ({ intlLocale: () => 'en-US' }))
+const app = vi.hoisted(() => ({ locale: 'en-US' }))
+vi.mock('@/lib/i18n', () => ({ intlLocale: () => app.locale }))
 
 describe('formatBytes', () => {
     it('handles zero and empty values', () => {
@@ -31,7 +32,14 @@ describe('formatDateTime', () => {
         expect(formatDateTime('')).toBe('')
     })
 
-    it('formats a timestamp for the current locale', () => {
-        expect(formatDateTime('2026-03-05T14:30:00')).toBe(new Date('2026-03-05T14:30:00').toLocaleString('en-US'))
+    // Two locales, so at least one differs from the host's default and the test
+    // fails if the app locale is ignored. No offset in the input, so it is local
+    // time wherever the test runs.
+    it.each([
+        ['ru-RU', '05.03.2026, 14:30:00'],
+        ['en-US', '3/5/2026, 2:30:00 PM'],
+    ])('formats a timestamp for the app locale (%s)', (locale, expected) => {
+        app.locale = locale
+        expect(formatDateTime('2026-03-05T14:30:00')).toBe(expected)
     })
 })

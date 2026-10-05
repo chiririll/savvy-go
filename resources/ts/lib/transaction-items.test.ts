@@ -27,16 +27,42 @@ describe('roundMoney', () => {
     it('rounds half up despite binary floating point', () => {
         expect(roundMoney(1.005, 2)).toBe(1.01)
         expect(roundMoney(2.675, 2)).toBe(2.68)
+        // These came out as 2.13 and 4.01 with the old Number.EPSILON nudge.
+        expect(roundMoney(2.135, 2)).toBe(2.14)
+        expect(roundMoney(4.015, 2)).toBe(4.02)
         expect(roundMoney(1.4, 0)).toBe(1)
         expect(roundMoney(1.5, 0)).toBe(2)
+        expect(roundMoney(0.0005, 3)).toBe(0.001)
+    })
+
+    it('rounds every half cent up, like the server', () => {
+        const wrong: string[] = []
+        for (let cents = 0; cents < 100_000; cents++) {
+            const half = `${(cents / 100).toFixed(2)}5`
+            const expected = Number(((cents + 1) / 100).toFixed(2))
+            if (roundMoney(Number(half), 2) !== expected) wrong.push(half)
+        }
+        expect(wrong.slice(0, 10)).toEqual([])
+    })
+
+    it('does not round up below the half', () => {
+        expect(roundMoney(1.0049999, 2)).toBe(1)
+        expect(roundMoney(2.134, 2)).toBe(2.13)
     })
 
     it('treats negative decimals as zero', () => {
         expect(roundMoney(12.7, -2)).toBe(13)
     })
 
-    it('rounds negative values', () => {
+    it('rounds negative values away from zero, as decimal.Round does', () => {
         expect(roundMoney(-1.239, 2)).toBe(-1.24)
+        expect(roundMoney(-1.005, 2)).toBe(-1.01)
+        expect(roundMoney(-2.5, 0)).toBe(-3)
+    })
+
+    it('keeps sums of floats exact', () => {
+        expect(roundMoney(0.1 + 0.2, 2)).toBe(0.3)
+        expect(roundMoney(123456789.125, 2)).toBe(123456789.13)
     })
 })
 

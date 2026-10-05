@@ -4,9 +4,15 @@ export function currencyDecimals(currency?: { decimals?: number | null } | null)
     return currency?.decimals ?? 2
 }
 
+/**
+ * Rounds half away from zero, like decimal.Round on the server. Scaling a float
+ * leaves noise such as 213.49999999999997 for 2.135; 15 significant digits
+ * drop it before rounding.
+ */
 export function roundMoney(value: number, decimals: number): number {
     const factor = 10 ** Math.max(0, decimals)
-    return Math.round((Number(value) + Number.EPSILON) * factor) / factor
+    const scaled = Number((Number(value) * factor).toPrecision(15))
+    return (Math.sign(scaled) * Math.round(Math.abs(scaled))) / factor
 }
 
 export function roundedItemPrice(price: number, decimals: number): number {

@@ -5,12 +5,14 @@ import { useCurrenciesStore } from '@/stores/currencies'
 import { formatCurrency, formatCurrencyCompact } from './currency'
 
 // The real i18n module pulls in the language detector and every locale bundle.
-vi.mock('@/lib/i18n', () => ({ intlLocale: () => 'en-US' }))
+const app = vi.hoisted(() => ({ locale: 'en-US' }))
+vi.mock('@/lib/i18n', () => ({ intlLocale: () => app.locale }))
 
 const currency = (code: string, symbol: string, decimals: number) =>
     ({ code, symbol, decimals }) as unknown as Currency
 
 beforeEach(() => {
+    app.locale = 'en-US'
     useCurrenciesStore.getState().setAll([
         currency('USD', '$', 2),
         currency('JPY', '¥', 0),
@@ -51,6 +53,13 @@ describe('formatCurrency', () => {
 
     it('keeps the sign of negative amounts', () => {
         expect(formatCurrency(-1234.5, 'USD')).toBe('-1,234.50 $')
+    })
+
+    // Together with the en-US cases above, at least one locale differs from the
+    // host's default, so ignoring the app locale fails here.
+    it('formats numbers for the app locale', () => {
+        app.locale = 'ru-RU'
+        expect(formatCurrency(1234.5, 'USD')).toBe('1 234,50 $')
     })
 
     it('rounds to the currency precision', () => {

@@ -361,3 +361,17 @@ export const createMenuLabel = (t: TFunction, type: 'income' | 'expense' | 'tran
     transfer: t('nav:transfer'),
     transfer_out: t('nav:transfer_out'),
 })[type]
+
+/** Transaction types from imported or server data, which may be ones this client does not know. */
+export const transactionTypeLabelLoose = (t: TFunction, type: string): string =>
+    orRaw({
+        income: t('pages:transactions.types.income'),
+        expense: t('pages:transactions.types.expense'),
+        transfer: t('pages:transactions.types.transfer'),
+        debt_payment: t('pages:transactions.types.debt_payment'),
+        debt_collection: t('pages:transactions.types.debt_collection'),
+        debt_lend: t('pages:transactions.types.debt_lend'),
+        debt_borrow: t('pages:transactions.types.debt_borrow'),
+        transfer_out: t('pages:transactions.types.transfer_out'),
+        transfer_in: t('pages:transactions.types.transfer_in'),
+    }, type)
