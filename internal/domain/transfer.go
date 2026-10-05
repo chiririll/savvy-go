@@ -487,6 +487,8 @@ type TransferUpdate struct {
 	ToAmount    *decimal.Decimal
 	Date        *string
 	Description *string
+	// HasDescription applies Description even when nil, which clears it.
+	HasDescription bool
 }
 
 // counterpart finds the other space of t as seen from spaceID.
@@ -596,7 +598,7 @@ func (s Transfers) Update(ctx context.Context, actor *auth.User, spaceID int64, 
 		if in.Date != nil {
 			t.Date = *in.Date
 		}
-		if in.Description != nil {
+		if in.HasDescription {
 			t.Description = in.Description
 		}
 		return nil

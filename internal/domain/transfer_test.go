@@ -314,3 +314,36 @@ func TestP27P46MoveToAnotherServer(t *testing.T) {
 }
 
 var _ store.Store = (*sqlite.Store)(nil)
+
+// An update keeps a description it does not set; HasDescription with nil
+// clears it on both sides.
+func TestTransferUpdateClearsDescriptionOnlyWhenAsked(t *testing.T) {
+	e := newTransferEnv(t)
+	ctx := context.Background()
+	tr, err := e.tr.Create(ctx, e.owner, TransferInput{
+		FromSpace: e.A.ID, FromAccount: e.accA, FromAmount: decimal.NewFromInt(10),
+		ToSpace: e.B.ID, ToAccount: e.accB, ToAmount: decimal.NewFromInt(10), Date: "2026-10-01",
+		Description: ptr("Rent share"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := e.tr.Update(ctx, e.owner, e.A.ID, tr.UUID, TransferUpdate{Date: ptr("2026-10-02")}); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []int64{e.A.ID, e.B.ID} {
+		if d := e.records(t, id)[tr.UUID].Description; d == nil || *d != "Rent share" {
+			t.Fatalf("space %d: description %v, want kept", id, d)
+		}
+	}
+
+	if _, err := e.tr.Update(ctx, e.owner, e.A.ID, tr.UUID, TransferUpdate{HasDescription: true}); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []int64{e.A.ID, e.B.ID} {
+		if d := e.records(t, id)[tr.UUID].Description; d != nil {
+			t.Fatalf("space %d: description %q, want cleared", id, *d)
+		}
+	}
+}

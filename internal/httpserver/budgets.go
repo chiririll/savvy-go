@@ -22,7 +22,7 @@ func (s *Server) budgetsIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) budgetsStore(w http.ResponseWriter, r *http.Request) {
-	in, ok := decodeBudget(w, r)
+	in, ok := decodeBudget(w, r, nil)
 	if !ok {
 		return
 	}
@@ -51,7 +51,7 @@ func (s *Server) budgetsUpdate(w http.ResponseWriter, r *http.Request) {
 	if cur == nil {
 		return
 	}
-	in, ok := decodeBudget(w, r)
+	in, ok := decodeBudget(w, r, cur)
 	if !ok {
 		return
 	}
@@ -84,7 +84,9 @@ func (s *Server) budgetParam(w http.ResponseWriter, r *http.Request) *domain.Bud
 	return b
 }
 
-func decodeBudget(w http.ResponseWriter, r *http.Request) (domain.BudgetInput, bool) {
+// decodeBudget reads a budget from the body; on update, over base (see
+// patch.go).
+func decodeBudget(w http.ResponseWriter, r *http.Request, base *domain.Budget) (domain.BudgetInput, bool) {
 	var raw map[string]json.RawMessage
 	if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
 		writeValidation(w, map[string][]string{"name": {"The name field is required."}})
@@ -102,6 +104,12 @@ func decodeBudget(w http.ResponseWriter, r *http.Request) (domain.BudgetInput, b
 		IsActive        *bool           `json:"is_active"`
 		CategoryIDs     []int64         `json:"category_ids"`
 		TagIDs          []int64         `json:"tag_ids"`
+	}
+	if base != nil {
+		body.Name, body.Amount, body.CurrencyID = base.Name, base.Amount.Decimal(), clone(base.CurrencyID)
+		body.Period, body.StartDate, body.EndDate = base.Period, clone(base.StartDate), clone(base.EndDate)
+		body.IsGlobal, body.NotifyAtPercent = clone(&base.IsGlobal), clone(base.NotifyAtPercent)
+		body.IsActive = clone(&base.IsActive)
 	}
 	buf, _ := json.Marshal(raw)
 	if err := json.Unmarshal(buf, &body); err != nil {

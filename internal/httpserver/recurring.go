@@ -31,7 +31,7 @@ func (s *Server) recurringUpcoming(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) recurringStore(w http.ResponseWriter, r *http.Request) {
-	in, ok := decodeRecurring(w, r)
+	in, ok := decodeRecurring(w, r, nil)
 	if !ok {
 		return
 	}
@@ -56,7 +56,7 @@ func (s *Server) recurringUpdate(w http.ResponseWriter, r *http.Request) {
 	if cur == nil {
 		return
 	}
-	in, ok := decodeRecurring(w, r)
+	in, ok := decodeRecurring(w, r, cur)
 	if !ok {
 		return
 	}
@@ -89,7 +89,10 @@ func (s *Server) recurringParam(w http.ResponseWriter, r *http.Request) *domain.
 	return rec
 }
 
-func decodeRecurring(w http.ResponseWriter, r *http.Request) (domain.RecurringInput, bool) {
+// decodeRecurring reads a recurring template from the body. On update, base
+// is the stored template: fields the body leaves out keep its values, and an
+// explicit null clears a nullable one.
+func decodeRecurring(w http.ResponseWriter, r *http.Request, base *domain.Recurring) (domain.RecurringInput, bool) {
 	var raw map[string]json.RawMessage
 	if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
 		writeValidation(w, map[string][]string{"type": {"The type field is required."}})
@@ -112,6 +115,18 @@ func decodeRecurring(w http.ResponseWriter, r *http.Request) (domain.RecurringIn
 		EndDate     *string          `json:"end_date"`
 		IsActive    *bool            `json:"is_active"`
 		TagIDs      []int64          `json:"tag_ids"`
+	}
+	if base != nil {
+		body.Type, body.AccountID, body.ToAccountID = base.Type, base.AccountID, clone(base.ToAccountID)
+		body.CategoryID, body.Amount = clone(base.CategoryID), base.Amount.Decimal()
+		if base.ToAmount != nil {
+			toAmount := base.ToAmount.Decimal()
+			body.ToAmount = &toAmount
+		}
+		body.IsEstimated, body.Description = clone(&base.IsEstimated), clone(base.Description)
+		body.Frequency, body.Interval = base.Frequency, base.Interval
+		body.DayOfWeek, body.DayOfMonth = clone(base.DayOfWeek), clone(base.DayOfMonth)
+		body.StartDate, body.EndDate, body.IsActive = base.StartDate, clone(base.EndDate), clone(&base.IsActive)
 	}
 	buf, _ := json.Marshal(raw)
 	if err := json.Unmarshal(buf, &body); err != nil {
