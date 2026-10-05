@@ -1,3 +1,4 @@
+import { testId } from '@/lib/test-id'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
@@ -66,7 +67,7 @@ function Confirm({
     const { t } = useTranslation('common')
     return (
         <AlertDialog>
-            <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>
+            <AlertDialogTrigger asChild {...testId('confirm')}>{trigger}</AlertDialogTrigger>
             <AlertDialogContent>
                 <AlertDialogHeader>
                     <AlertDialogTitle>{title}</AlertDialogTitle>

@@ -1,3 +1,4 @@
+import { testId, testIdMenu } from '@/lib/test-id'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -53,6 +54,7 @@ export function SpaceSwitcher() {
                         <DropdownMenuTrigger asChild>
                             <SidebarMenuButton
                                 size="lg"
+                                {...testIdMenu('layout-space')}
                                 className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                             >
                                 <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-sm font-semibold text-primary-foreground">
@@ -92,7 +94,7 @@ export function SpaceSwitcher() {
                                 {t('spaces.switcher.settings')}
                             </DropdownMenuItem>
                             {user?.role !== 'guest' && (
-                                <DropdownMenuItem onClick={() => setCreating(true)} className="gap-2 p-2">
+                                <DropdownMenuItem onClick={() => setCreating(true)} className="gap-2 p-2" {...testId('layout-space-create')}>
                                     <Plus className="size-4" />
                                     {t('spaces.switcher.create')}
                                 </DropdownMenuItem>

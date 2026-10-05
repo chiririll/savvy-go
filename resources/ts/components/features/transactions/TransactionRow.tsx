@@ -1,3 +1,4 @@
+import { testId } from '@/lib/test-id'
 import { useState } from 'react'
 import { Check, Copy, SkipForward } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -114,7 +115,7 @@ export function TransactionRow({
                         <SkipTransactionAlert
                             onConfirm={() => onSkip(transaction.id)}
                             trigger={
-                                <DropdownMenuItem onSelect={(event) => event.preventDefault()}>
+                                <DropdownMenuItem onSelect={(event) => event.preventDefault()} {...testId('skip')}>
                                     <SkipForward className="mr-2 size-4" />
                                     {t('actions.skip')}
                                 </DropdownMenuItem>

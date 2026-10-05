@@ -1,3 +1,4 @@
+import { testId } from '@/lib/test-id'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Link } from 'react-router-dom'
@@ -26,7 +27,7 @@ export function PageHeader({
     const { t } = useTranslation()
     const label = createLabel ?? t('actions.create')
     const createButton = onCreateClick ? (
-        <Button onClick={onCreateClick}>
+        <Button onClick={onCreateClick} {...testId('create')}>
             <Plus className="mr-2 h-4 w-4" />
             {label}
         </Button>

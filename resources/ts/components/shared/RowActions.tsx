@@ -1,3 +1,4 @@
+import { testId, testIdMenu } from '@/lib/test-id'
 import type { ReactNode } from 'react'
 import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -62,6 +63,7 @@ export function RowActions({
                 <Button
                     variant="ghost"
                     size="icon"
+                    {...testIdMenu('row')}
                     className={cn(
                         'size-8',
                         !showTrigger && 'pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 opacity-0',
@@ -76,7 +78,7 @@ export function RowActions({
             <DropdownMenuContent align="end">
                 {leading}
                 {onEdit && (
-                    <DropdownMenuItem onClick={onEdit}>
+                    <DropdownMenuItem onClick={onEdit} {...testId('edit')}>
                         <Pencil className="mr-2 size-4" />
                         {t('actions.edit')}
                     </DropdownMenuItem>
@@ -89,6 +91,7 @@ export function RowActions({
                             <AlertDialogTrigger asChild>
                                 <DropdownMenuItem
                                     variant="destructive"
+                                    {...testId('delete')}
                                     onSelect={(event) => event.preventDefault()}
                                     disabled={deleteDisabled}
                                 >

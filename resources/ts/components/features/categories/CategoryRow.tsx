@@ -1,3 +1,4 @@
+import { testId } from '@/lib/test-id'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Star, Trash2 } from 'lucide-react'
@@ -113,6 +114,7 @@ function ReassignDeleteItem({ category, onConfirm }: ReassignDeleteItemProps) {
             <AlertDialogTrigger asChild>
                 <DropdownMenuItem
                     variant="destructive"
+                    {...testId('delete-reassign')}
                     onSelect={(event) => event.preventDefault()}
                 >
                     <Trash2 className="mr-2 size-4" />

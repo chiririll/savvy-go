@@ -1,3 +1,4 @@
+import { testIdControl, testIdControls } from '@/lib/test-id'
 import { useState, useMemo, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import ReactECharts from '@/components/shared/ReactECharts'
@@ -318,10 +319,11 @@ export function CashFlowChart({ filters }: CashFlowChartProps) {
                     </div>
                     <div className="flex items-center gap-4">
                         {/* Grouping toggle */}
-                        <div className="flex gap-1">
+                        <div className="flex gap-1" {...testIdControls('group-by')}>
                             {(['day', 'week', 'month'] as CashFlowGroupBy[]).map(g => (
                                 <Badge
                                     key={g}
+                                    {...testIdControl(g, groupBy === g)}
                                     variant={groupBy === g ? 'default' : 'outline'}
                                     className="cursor-pointer"
                                     onClick={() => setGroupBy(g)}

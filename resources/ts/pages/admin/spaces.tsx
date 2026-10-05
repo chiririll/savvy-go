@@ -1,3 +1,4 @@
+import { testId } from '@/lib/test-id'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArchiveRestore, ShieldPlus, Trash2 } from 'lucide-react'
@@ -114,7 +115,7 @@ export default function AdminSpacesPage() {
                                     <TableCell><AssignAdmin space={s} /></TableCell>
                                     <TableCell className="text-right">
                                         <AlertDialog>
-                                            <AlertDialogTrigger asChild>
+                                            <AlertDialogTrigger asChild {...testId('confirm')}>
                                                 <Button variant="ghost" size="icon" title={t('actions.delete', { ns: 'common' })}>
                                                     <Trash2 className="size-4" />
                                                 </Button>

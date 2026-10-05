@@ -1,3 +1,4 @@
+import { testId } from '@/lib/test-id'
 import { UserSettingsTabs } from '@/components/features/spaces/UserSettingsTabs'
 import { ReactNode, useMemo, useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
@@ -234,7 +235,7 @@ function SessionsSection({
                 <p className="text-sm leading-relaxed text-muted-foreground">
                     {t('security.sessions.logoutOthersDescription')}
                 </p>
-                <Button variant="outline" onClick={onConfirm}>
+                <Button variant="outline" onClick={onConfirm} {...testId('logout-others')}>
                     <LogOut className="mr-2 size-4" />
                     {t('security.sessions.logoutOthers')}
                 </Button>
@@ -371,6 +372,7 @@ export default function SecuritySettingsPage() {
                                             checked ? handleEnable() : setShowDisableDialog(true)
                                         }
                                         aria-label={t('security.twoFactor.toggleAria')}
+                                        {...testId('two-factor')}
                                     />
                                 </ActionRow>
                             )}
@@ -450,6 +452,7 @@ export default function SecuritySettingsPage() {
                                 )}
                                 <Button
                                     onClick={() => setShowAddPasskeyDialog(true)}
+                                    {...testId('add-passkey')}
                                     disabled={isReadOnly || registerPasskey.isPending || !passkeyDomainValid}
                                 >
                                     <Plus className="mr-2 size-4" />
@@ -473,6 +476,7 @@ export default function SecuritySettingsPage() {
                                     <Button
                                         variant="outline"
                                         onClick={() => setShowRegenerateDialog(true)}
+                                        {...testId('regenerate-codes')}
                                         disabled={isReadOnly}
                                     >
                                         <RefreshCw className="mr-2 size-4" />

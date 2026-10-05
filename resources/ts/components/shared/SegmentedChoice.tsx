@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { testIdTab, testIdTabs } from '@/lib/test-id'
 
 export interface SegmentedChoiceOption<T extends string> {
     value: T
@@ -24,11 +25,12 @@ export function SegmentedChoice<T extends string>({
     disabled,
 }: SegmentedChoiceProps<T>) {
     return (
-        <div className="flex gap-1 sm:gap-2 p-1 bg-muted rounded-lg">
+        <div className="flex gap-1 sm:gap-2 p-1 bg-muted rounded-lg" {...testIdTabs()}>
             {options.map(({ value: option, label, icon: Icon, color, iconOnly }) => (
                 <button
                     key={option}
                     type="button"
+                    {...testIdTab(option, value === option)}
                     disabled={disabled}
                     onClick={() => onChange(option)}
                     title={iconOnly ? label : undefined}
