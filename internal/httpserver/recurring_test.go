@@ -323,3 +323,38 @@ func findRecurringTx(list []any, templateID int64) map[string]any {
 	}
 	return nil
 }
+
+// A PATCH changes only the fields it sends; an explicit null clears one.
+func TestRecurringPatchKeepsOmittedFields(t *testing.T) {
+	a := newTestApp(t)
+	u := a.createUser("patch@test.com", "secret1", roleEditor)
+	sess := a.issue(u, false)
+	accID, catID := seedMoney(t, a, sess)
+
+	res := a.do("POST", "/api/recurring", map[string]any{
+		"type": "expense", "account_id": accID, "category_id": catID, "amount": 50,
+		"description": "Gym", "frequency": "monthly", "interval": 1, "day_of_month": 5,
+		"start_date": "2030-01-05", "end_date": "2031-01-05", "is_active": true,
+	}, sess.Token, sess.CSRF)
+	body := decodeJSON(t, res)
+	if res.StatusCode != 201 {
+		t.Fatalf("create %d %v", res.StatusCode, body)
+	}
+	id := itoa(int64(body["data"].(map[string]any)["id"].(float64)))
+
+	res = a.do("PATCH", "/api/recurring/"+id, map[string]any{"is_active": false}, sess.Token, sess.CSRF)
+	got := decodeJSON(t, res)["data"].(map[string]any)
+	if res.StatusCode != 200 || got["isActive"] != false {
+		t.Fatalf("patch %d %v", res.StatusCode, got)
+	}
+	if got["description"] != "Gym" || got["category"] == nil || got["endDate"] != "2031-01-05" ||
+		got["dayOfMonth"] != float64(5) || got["amount"] != float64(50) {
+		t.Fatalf("omitted fields changed: %v", got)
+	}
+
+	res = a.do("PATCH", "/api/recurring/"+id, map[string]any{"end_date": nil}, sess.Token, sess.CSRF)
+	got = decodeJSON(t, res)["data"].(map[string]any)
+	if got["endDate"] != nil || got["description"] != "Gym" {
+		t.Fatalf("null should clear only end_date: %v", got)
+	}
+}

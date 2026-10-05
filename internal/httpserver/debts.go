@@ -64,41 +64,26 @@ func (s *Server) debtsUpdate(w http.ResponseWriter, r *http.Request) {
 	if cur == nil {
 		return
 	}
+	// Decoded over the stored debt (see patch.go).
+	in := cur.Input()
 	var body struct {
-		Name         *string          `json:"name"`
+		Name         string           `json:"name"`
 		DebtType     *string          `json:"debt_type"`
-		CurrencyID   *int64           `json:"currency_id"`
+		CurrencyID   int64            `json:"currency_id"`
 		Amount       *decimal.Decimal `json:"amount"`
 		DueDate      *string          `json:"due_date"`
 		Counterparty *string          `json:"counterparty"`
 		Description  *string          `json:"description"`
 	}
+	body.Name, body.DebtType, body.CurrencyID = in.Name, clone(in.DebtType), in.CurrencyID
+	body.Amount, body.DueDate = clone(in.TargetAmount), clone(in.DueDate)
+	body.Counterparty, body.Description = clone(in.Counterparty), clone(in.DebtDesc)
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeValidation(w, map[string][]string{"name": {"The given data was invalid."}})
 		return
 	}
-	in := cur.Input()
-	if body.Name != nil {
-		in.Name = *body.Name
-	}
-	if body.DebtType != nil {
-		in.DebtType = body.DebtType
-	}
-	if body.CurrencyID != nil {
-		in.CurrencyID = *body.CurrencyID
-	}
-	if body.Amount != nil {
-		in.TargetAmount = body.Amount
-	}
-	if body.DueDate != nil {
-		in.DueDate = body.DueDate
-	}
-	if body.Counterparty != nil {
-		in.Counterparty = body.Counterparty
-	}
-	if body.Description != nil {
-		in.DebtDesc = body.Description
-	}
+	in.Name, in.DebtType, in.CurrencyID, in.TargetAmount = body.Name, body.DebtType, body.CurrencyID, body.Amount
+	in.DueDate, in.Counterparty, in.DebtDesc = body.DueDate, body.Counterparty, body.Description
 	updated, err := sp(r).accounts.Update(r.Context(), cur.ID, in)
 	if err != nil {
 		writeAccountError(w, err)

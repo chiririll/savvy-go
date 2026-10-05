@@ -73,7 +73,7 @@ func int64List(q url.Values, key string) []int64 {
 }
 
 func (s *Server) transactionsStore(w http.ResponseWriter, r *http.Request) {
-	in, ok := decodeTx(w, r)
+	in, ok := decodeTx(w, r, nil)
 	if !ok {
 		return
 	}
@@ -104,18 +104,9 @@ func (s *Server) transactionsUpdate(w http.ResponseWriter, r *http.Request) {
 	if cur == nil {
 		return
 	}
-	in, ok := decodeTx(w, r)
+	in, ok := decodeTx(w, r, cur)
 	if !ok {
 		return
-	}
-	if in.AccountID == 0 {
-		in.AccountID = cur.AccountID
-	}
-	if in.Type == "" {
-		in.Type = cur.Type
-	}
-	if in.Amount.IsZero() {
-		in.Amount = cur.Amount.Decimal()
 	}
 	tx, err := sp(r).txs.Update(r.Context(), cur.ID, in)
 	if err != nil {
@@ -227,7 +218,9 @@ func (s *Server) txParam(w http.ResponseWriter, r *http.Request) *domain.Transac
 	return tx
 }
 
-func decodeTx(w http.ResponseWriter, r *http.Request) (domain.TxInput, bool) {
+// decodeTx reads a transaction from the body; on update, over base (see
+// patch.go). Items and tags left out are kept by the update itself.
+func decodeTx(w http.ResponseWriter, r *http.Request, base *domain.Transaction) (domain.TxInput, bool) {
 	var body struct {
 		Type        string           `json:"type"`
 		AccountID   int64            `json:"account_id"`
@@ -244,6 +237,15 @@ func decodeTx(w http.ResponseWriter, r *http.Request) (domain.TxInput, bool) {
 			Quantity     decimal.Decimal `json:"quantity"`
 			PricePerUnit decimal.Decimal `json:"price_per_unit"`
 		} `json:"items"`
+	}
+	if base != nil {
+		body.Type, body.AccountID, body.ToAccountID = base.Type, base.AccountID, clone(base.ToAccountID)
+		body.CategoryID, body.Amount = clone(base.CategoryID), base.Amount.Decimal()
+		if base.ToAmount != nil {
+			toAmount := base.ToAmount.Decimal()
+			body.ToAmount = &toAmount
+		}
+		body.IsEstimated, body.Description, body.Date = base.IsEstimated, clone(base.Description), clone(base.Date)
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.AccountID == 0 {
 		writeValidation(w, map[string][]string{"account_id": {"The account id field is required."}})

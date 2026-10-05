@@ -26,7 +26,7 @@ func (s *Server) automationTriggers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) automationStore(w http.ResponseWriter, r *http.Request) {
-	in, ok := decodeAutomation(w, r)
+	in, ok := decodeAutomation(w, r, nil)
 	if !ok {
 		return
 	}
@@ -51,7 +51,7 @@ func (s *Server) automationUpdate(w http.ResponseWriter, r *http.Request) {
 	if cur == nil {
 		return
 	}
-	in, ok := decodeAutomation(w, r)
+	in, ok := decodeAutomation(w, r, cur)
 	if !ok {
 		return
 	}
@@ -148,7 +148,9 @@ func (s *Server) automationParam(w http.ResponseWriter, r *http.Request) *domain
 	return rule
 }
 
-func decodeAutomation(w http.ResponseWriter, r *http.Request) (domain.AutomationInput, bool) {
+// decodeAutomation reads a rule from the body; on update, over base (see
+// patch.go).
+func decodeAutomation(w http.ResponseWriter, r *http.Request, base *domain.AutomationRule) (domain.AutomationInput, bool) {
 	var body struct {
 		Name           string           `json:"name"`
 		Description    *string          `json:"description"`
@@ -159,7 +161,19 @@ func decodeAutomation(w http.ResponseWriter, r *http.Request) (domain.Automation
 		IsActive       *bool            `json:"is_active"`
 		StopProcessing *bool            `json:"stop_processing"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Name == "" || body.TriggerType == "" {
+	if base != nil {
+		body.Name, body.Description, body.TriggerType = base.Name, clone(base.Description), base.TriggerType
+		body.Priority, body.IsActive, body.StopProcessing = base.Priority, clone(&base.IsActive), clone(&base.StopProcessing)
+	}
+	err := json.NewDecoder(r.Body).Decode(&body)
+	// Decoding into a filled map would merge keys, so these are taken whole.
+	if base != nil && body.Conditions == nil {
+		body.Conditions = base.Conditions
+	}
+	if base != nil && body.Actions == nil {
+		body.Actions = base.Actions
+	}
+	if err != nil || body.Name == "" || body.TriggerType == "" {
 		writeValidation(w, map[string][]string{"name": {"The name field is required."}})
 		return domain.AutomationInput{}, false
 	}

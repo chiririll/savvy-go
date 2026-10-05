@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
@@ -191,9 +192,16 @@ func (s *Server) transfersUpdate(w http.ResponseWriter, r *http.Request) {
 		Date          *string          `json:"date"`
 		Description   *string          `json:"description"`
 	}
-	if !decodeBody(w, r, &body) {
+	var raw map[string]json.RawMessage
+	if !decodeBody(w, r, &raw) {
 		return
 	}
+	buf, _ := json.Marshal(raw)
+	if err := json.Unmarshal(buf, &body); err != nil {
+		writeValidation(w, map[string][]string{"body": {"The given data was invalid."}})
+		return
+	}
+	_, hasDescription := raw["description"]
 	if body.Date != nil && !validDate(*body.Date) {
 		writeValidation(w, map[string][]string{"date": {"The date must be YYYY-MM-DD."}})
 		return
@@ -201,7 +209,7 @@ func (s *Server) transfersUpdate(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "uuid")
 	_, err := s.transfers.Update(r.Context(), userFrom(r), sp(r).id, id, domain.TransferUpdate{
 		FromAccount: body.FromAccountID, ToAccount: body.ToAccountID, FromAmount: body.FromAmount, ToAmount: body.ToAmount,
-		Date: body.Date, Description: body.Description,
+		Date: body.Date, Description: body.Description, HasDescription: hasDescription,
 	})
 	if err != nil {
 		writeTransferError(w, err)

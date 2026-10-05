@@ -125,15 +125,6 @@ func (s Budgets) Update(ctx context.Context, id int64, in BudgetInput) (*Budget,
 	if in.Period == "" {
 		in.Period = cur.Period
 	}
-	if in.CurrencyID == nil {
-		in.CurrencyID = cur.CurrencyID
-	}
-	if in.StartDate == nil {
-		in.StartDate = cur.StartDate
-	}
-	if in.EndDate == nil {
-		in.EndDate = cur.EndDate
-	}
 	global := cur.IsGlobal
 	if in.IsGlobal != nil {
 		global = *in.IsGlobal
@@ -141,10 +132,6 @@ func (s Budgets) Update(ctx context.Context, id int64, in BudgetInput) (*Budget,
 	active := cur.IsActive
 	if in.IsActive != nil {
 		active = *in.IsActive
-	}
-	notify := cur.NotifyAtPercent
-	if in.NotifyAtPercent != nil {
-		notify = in.NotifyAtPercent
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
 	unit, err := s.resolveCurrency(ctx, in.CurrencyID)
@@ -158,7 +145,7 @@ func (s Budgets) Update(ctx context.Context, id int64, in BudgetInput) (*Budget,
 	err = db.Q(s.DB).UpdateBudget(ctx, sqlc.UpdateBudgetParams{
 		Name: in.Name, Amount: amount.Minor(), CurrencyID: unit.ID, Period: in.Period,
 		StartDate: db.NullString(in.StartDate), EndDate: db.NullString(in.EndDate),
-		IsGlobal: db.BoolInt(global), NotifyAtPercent: db.NullInt(notify),
+		IsGlobal: db.BoolInt(global), NotifyAtPercent: db.NullInt(in.NotifyAtPercent),
 		IsActive: db.BoolInt(active), UpdatedAt: db.NS(now), ID: id,
 	})
 	if err != nil {

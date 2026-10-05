@@ -127,9 +127,6 @@ func (s Automation) Update(ctx context.Context, id int64, in AutomationInput) (*
 	if in.Actions == nil {
 		in.Actions = cur.Actions
 	}
-	if in.Description == nil {
-		in.Description = cur.Description
-	}
 	active := cur.IsActive
 	if in.IsActive != nil {
 		active = *in.IsActive
