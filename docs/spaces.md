@@ -1,49 +1,40 @@
 # Spaces and Roles
 
-All finances in Go Savvy live in a **space**: its accounts, transactions, categories, tags, currencies, budgets, debts, recurring transactions and automation rules. Spaces are fully separate from each other, so one can be your personal budget, another the family's and a third a side project, each in its own base currency.
+All finances live in a **space**: accounts, transactions, categories, tags, currencies, budgets, debts, recurring transactions and automation rules. Spaces are fully separate, each with its own base currency: say, a personal budget, a family one and a side project.
 
-Every user starts with a personal space. Switch between spaces at the top of the sidebar; the page you are on stays open and shows the other space's data.
+Every user starts with a personal space. Switch spaces at the top of the sidebar.
 
 ## Space roles
 
-Each member of a space has one of three roles there:
+| Role       | Can                                                                                           |
+|------------|-----------------------------------------------------------------------------------------------|
+| **Admin**  | everything an editor can, plus members, invitations, linked spaces, settings, backups, renaming and deleting the space |
+| **Editor** | change all finance data and run imports                                                       |
+| **Viewer** | read data and reports only                                                                    |
 
-| Role       | Can                                                                                                    |
-|------------|--------------------------------------------------------------------------------------------------------|
-| **Admin**  | everything below, plus members and invitations, linked spaces, space settings, backups, renaming and deleting the space |
-| **Editor** | add and change transactions, accounts, categories, tags, currencies, budgets, debts, recurring transactions, automation rules and imports |
-| **Viewer** | read data and reports; the app hides everything that writes                                            |
-
-A space always keeps at least one admin: the last admin cannot leave or be demoted while other members remain.
+A space always keeps one admin: the last admin cannot leave or be demoted while other members remain.
 
 ## Server roles
 
-The instance itself has its own roles:
-
-- **Admin** manages users, single sign-on, signing keys, system settings and server backups. In **Administration → Spaces** they see every space's name, size, quota and members, but never its finances. They can assign an admin to a space; that action, like deleting or restoring a space, is logged in the space's audit log, which its admins see in the space settings.
-- **User** creates spaces, up to the limit the admin sets.
-- **Guest** is someone who registered through an invitation sent by a non-admin. Guests join spaces as editors or viewers but cannot create spaces or administer one. A server admin can promote a guest to user.
+- **Admin**: manages users, single sign-on, signing keys, system settings and server backups. In **Administration → Spaces** they see each space's name, size, quota and members, but not its finances. Assigning an admin to a space, deleting or restoring it is written to the space's audit log (visible to its admins).
+- **User**: creates spaces, up to the admin's limit.
+- **Guest**: registered through an invitation from a non-admin. Can join spaces as editor or viewer, but cannot create or administer spaces. A server admin can promote a guest to user.
 
 ## Invitations
 
-Space admins invite people from **Settings → Space** with a link, optionally tied to an email address, for a chosen role. Someone with an account joins the space; someone without one can register through the link if the server admin allows it.
+Space admins invite people from **Settings → Space** with a link for a chosen role, optionally tied to an email. Existing users join directly; new users can register through the link if the server admin allows it.
 
 ## Linked spaces and transfers
 
-Someone who administers two spaces can link them in **Settings → Space**. Either side's admin can unlink them again.
+An admin of two spaces can link them in **Settings → Space**; either side's admin can unlink.
 
-Editors of both linked spaces can then send money from one to the other: in the transaction dialog, pick the small spaces tab next to *Transfer*, then the destination space and accounts. Each side is entered in its own account's currency. The tab only appears when there is a linked space you can write to.
+Editors of both spaces can then send money between them: in the transaction dialog, choose the spaces tab next to *Transfer*, then the destination space and accounts. Each side uses its own account's currency.
 
-A transfer is stored in both spaces, so each space's backup keeps its side, and the server signs every version of it. That keeps the two sides honest when one space is restored:
+A transfer is stored in both spaces and signed by the server. If one space is restored or the link breaks:
 
-- Restoring a space from an older backup never changes the linked space. Transfers that differ come back as **pending** transactions in the restored space, to accept or reject; pending transactions do not affect balances.
-- After unlinking, importing a space elsewhere or a signature that does not check out, the transfer is **frozen**: it stays in the balances but cannot be changed, and it syncs again once the spaces are linked again.
+- **Restore from an older backup**: the linked space is untouched. Differing transfers come back as **pending** transactions to accept or reject; they do not affect balances.
+- **Unlink, import elsewhere or bad signature**: the transfer is **frozen**. It stays in balances but cannot be edited, and syncs again once the spaces are relinked.
 
 ## Limits
 
-Server admins set the limits in **Administration → System**:
-
-- spaces per user (counted as the spaces they administer);
-- the size quota of each space, which can also be changed per space;
-- how many backups each space keeps;
-- whether invitations may register new users.
+Set by server admins in **Administration → System**: spaces per user (those they administer), size quota per space (can be overridden per space), kept backups per space, and whether invitations may register new users.

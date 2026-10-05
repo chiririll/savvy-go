@@ -26,7 +26,7 @@ volumes:
   savvy-go-data:
 ```
 
-Everything the instance keeps is in the one volume mounted at `/data`; see [Data and backups](data-and-backups.md).
+All data is in the `/data` volume, see [Data and backups](data-and-backups.md).
 
 ## Environment variables
 
@@ -45,7 +45,7 @@ Limits such as spaces per user, space quotas and the number of kept backups are 
 
 ## Behind a reverse proxy
 
-Set `APP_URL` to your public `https://` URL. Savvy honors the `X-Forwarded-Proto` and `X-Forwarded-For` headers from the proxy, so HTTPS link generation and real client IPs work without extra configuration.
+Set `APP_URL` to your public `https://` URL. The `X-Forwarded-Proto` and `X-Forwarded-For` headers are honored, no other setup needed.
 
 ### Traefik (HTTPS)
 
@@ -108,18 +108,16 @@ networks:
 
 ## Health checks
 
-Two probe endpoints are exposed for orchestrators and uptime monitoring (responses use the IETF `application/health+json` format):
+| Endpoint  | Meaning                                                      | Healthy | Unhealthy |
+|-----------|--------------------------------------------------------------|---------|-----------|
+| `/livez`  | The process is up. Use for restart decisions.                | `200`   | —         |
+| `/readyz` | Databases are reachable and all migrations have run. Use to gate traffic. | `200`   | `503`     |
 
-| Endpoint  | Purpose                                                                                                  | Healthy | Unhealthy |
-|-----------|----------------------------------------------------------------------------------------------------------|---------|-----------|
-| `/livez`  | Liveness — the app process is up. Use it for container restart decisions.                                | `200`   | —         |
-| `/readyz` | Readiness — databases are reachable and migrations of the server and every space have run. Gate traffic. | `200`   | `503`     |
-
-`/livez` stays up during maintenance mode; `/readyz` returns `503` so traffic drains while the instance is not ready. A space whose migration fails is marked unavailable and answers `503` for its own requests while the other spaces keep working.
+During maintenance `/livez` stays up and `/readyz` returns `503`. A space whose migration fails answers `503` on its own; other spaces keep working.
 
 ## Kubernetes
 
-Deploy as a single-replica `Deployment` with a `PersistentVolumeClaim` mounted at `/data`. SQLite is single-writer, so use `strategy: { type: Recreate }`. The container runs as non-root (`www-data`, uid 82) — grant `NET_BIND_SERVICE` so it can bind port 80. Wire the probes to the health endpoints:
+Use a single-replica `Deployment` with a `PersistentVolumeClaim` at `/data` and `strategy: { type: Recreate }` (SQLite is single-writer). The container runs as non-root (`www-data`, uid 82), so grant `NET_BIND_SERVICE` to bind port 80. Probes:
 
 ```yaml
         startupProbe:
@@ -143,11 +141,11 @@ curl -fsSLO https://github.com/chiririll/savvy-go/releases/latest/download/savvy
 sudo apt install ./savvy-go.deb
 ```
 
-The binary is installed to `/usr/bin/savvy-go` and runs as the `savvy-go` systemd service. Data lives in `/var/lib/savvy-go`. Optional settings (`APP_URL`, `TZ`) go in `/etc/savvy-go/install.env`. `apt purge savvy-go` removes the data directory.
+It runs as the `savvy-go` systemd service (`/usr/bin/savvy-go`). Data is in `/var/lib/savvy-go`; settings (`APP_URL`, `TZ`) go in `/etc/savvy-go/install.env`. `apt purge savvy-go` deletes the data.
 
 ## Tarball
 
-Release `savvy-go.tar.gz` contains the `savvy-go` binary and the static SPA assets (`public/`). On any Linux host:
+`savvy-go.tar.gz` holds the binary and the frontend (`public/`):
 
 ```bash
 mkdir -p /opt/savvy-go && tar -C /opt/savvy-go -xzf savvy-go.tar.gz
@@ -163,6 +161,6 @@ docker compose pull
 docker compose up -d
 ```
 
-Your data stays in the `/data` volume, and migrations run on start. With the Debian package, install the newer `.deb`; data stays in `/var/lib/savvy-go`.
+Data stays in the volume and migrations run on start. With the Debian package, install the newer `.deb`.
 
-A Laravel install's `database.sqlite` is converted on first start; see [Upgrading from the Laravel version](data-and-backups.md#upgrading-from-the-laravel-version).
+Coming from Laravel: see [Upgrading from the Laravel version](data-and-backups.md#upgrading-from-the-laravel-version).

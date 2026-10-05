@@ -8,9 +8,9 @@ go test ./...
 go run ./cmd/savvy-go
 ```
 
-It listens on `:8080` by default (`LISTEN_ADDR`). State goes under `DATA_DIR` (`./data` locally); see [Data and backups](data-and-backups.md). The SPA is served from `public/` (Vite output in `public/build`). Env: `APP_URL`, `TZ`, `DATA_DIR`, `LISTEN_ADDR`, `PUBLIC_DIR`, `SEED_DEMO`, `SEED_DATE`, `SEED_MANIFEST`.
+Listens on `:8080` (`LISTEN_ADDR`). Data goes to `./data` (`DATA_DIR`), see [Data and backups](data-and-backups.md). The frontend is served from `public/` (`PUBLIC_DIR`).
 
-With `SEED_DEMO=true` the first boot creates demo users and three spaces with ~12 months of data, linked spaces and open invitations:
+With `SEED_DEMO=true`, the first boot creates demo users, three spaces with ~12 months of data, linked spaces and open invitations:
 
 | Email              | Password   | Server role |
 |--------------------|------------|-------------|
@@ -19,17 +19,17 @@ With `SEED_DEMO=true` the first boot creates demo users and three spaces with ~1
 | `guest@savvy.app`  | `password` | guest       |
 | `demo@demo.com`    | `demo`     | user        |
 
-Their roles in the spaces differ, so each one shows a different view of the app.
+Roles differ per space, so each user sees a different view.
 
-`SEED_DATE` (`YYYY-MM-DD`) places the data relative to that day instead of today, and `SEED_MANIFEST` is a file the seed writes its users, spaces and invitation tokens to; [Scripts](scripts.md) uses it to screenshot every page.
+`SEED_DATE` (`YYYY-MM-DD`) places the data relative to that day instead of today. `SEED_MANIFEST` is a file the seed writes users, spaces and invitation tokens to; [Scripts](scripts.md) uses it.
 
-## How it is built
+## Architecture
 
-One Go process serves the HTTP API, the React SPA, the scheduler and background workers. Server-wide data is in `server.sqlite` and each space has its own SQLite file. The business logic only sees a storage interface (`internal/store`); everything SQLite-specific stays in `internal/store/sqlite`, and work that touches two spaces at once goes through `store.InSpaces`. Schema migrations run on startup for the server and every space.
+One Go process serves the API, the React frontend, the scheduler and workers. Server data is in `server.sqlite`, each space has its own SQLite file. Business logic uses the storage interface in `internal/store`; SQLite code stays in `internal/store/sqlite`, and operations spanning two spaces use `store.InSpaces`. Migrations run on startup.
 
 ## Frontend
 
-React with Vite, react-query and ShadCN/UI. The source is in `resources/ts`; run the commands from the repository root:
+React, Vite, react-query, ShadCN/UI. Source in `resources/ts`; run from the repo root:
 
 ```bash
 npm install
@@ -38,4 +38,4 @@ npx tsc --noEmit
 npm run build   # into public/build
 ```
 
-Helper scripts for static assets are described in [Scripts](scripts.md).
+Logo and screenshot scripts: [Scripts](scripts.md).

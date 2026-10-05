@@ -2,47 +2,45 @@
 
 ## Data directory
 
-Everything Go Savvy keeps is inside one directory: `/data` in Docker, `/var/lib/savvy-go` for the Debian package, `./data` when run from source, or whatever `DATA_DIR` points to. Backing up or moving that directory moves the whole instance.
+Everything lives in one directory: `/data` in Docker, `/var/lib/savvy-go` for the Debian package, `./data` from source, or `DATA_DIR`. Back up or move it to move the whole instance.
 
 ```
-server.sqlite          users, sessions, spaces, members, links, server settings
-spaces/<id>.sqlite     one database per space with its finances
-keys/server.ed25519    the server's signing key
+server.sqlite          users, sessions, spaces, members, server settings
+spaces/<id>.sqlite     one database per space
+keys/server.ed25519    server signing key
 backups/               backups made from the UI
 uploads/               uploaded files (imports)
 ```
 
 ### Signing key
 
-The server signs backups and every transfer between spaces with `keys/server.ed25519`, generated on first start. The private key is never part of a space backup or any API response; only a server backup includes it.
+The server signs backups and cross-space transfers with `keys/server.ed25519`, created on first start. Only a server backup includes it.
 
 > [!IMPORTANT]
-> Keep the key file with the data. If it goes missing while the data still holds its signatures, Savvy exits at startup instead of quietly creating a new key, which would leave every transfer unverifiable. Put the file back to start again.
+> Keep the key with the data. If it is missing while the data has its signatures, Savvy refuses to start instead of creating a new key. Put the file back to continue.
 
-Server admins see the public key in **Administration → Security**, can rotate it there (older signatures stay valid) and can trust the public key of another server. Trusting the old server's key is what lets transfers of spaces moved from that server sync again.
+Server admins can see the public key, rotate it (old signatures stay valid) and trust another server's key in **Administration → Security**. Trusting an old server's key lets transfers of spaces moved from it sync again.
 
 ## Backups in the app
 
-- **Settings → Backups**: space admins create, download and restore backups of the current space, or import a backup as a new space. A space backup is a zip with the space database and a manifest signed by the server. The number of kept backups per space is set by the server admin.
-- **Administration → System backups**: server admins back up and restore the whole server: all databases and the signing key.
+- **Settings → Backups** (space admins): create, download and restore backups of the space, or import one as a new space. The number of kept backups is set by the server admin.
+- **Administration → System backups** (server admins): back up and restore the whole server, including the signing key.
 
-Restoring never trusts the uploaded file:
+When restoring:
 
-- The archive is unpacked with size and name checks, and the manifest signature and file hashes are verified. Backups made elsewhere or edited by hand are shown as *not signed by this server*; they can still be restored.
-- A fresh database is built from the current migrations and only known tables and columns are copied from the backup, so triggers, views or extra tables in the file are dropped.
-- A space backup can only be restored over the space it was taken from; import it as a new space otherwise. A backup larger than the space quota is rejected.
-- Transfers with linked spaces that changed since the backup come back as pending transactions to review; see [Spaces](spaces.md#linked-spaces-and-transfers).
+- Backups not made by this server show as *not signed by this server*, but can still be restored.
+- Only known tables and columns are copied into a fresh database; anything extra in the file is dropped.
+- A space backup restores only over its own space; otherwise import it as a new space. Backups over the space quota are rejected.
+- Transfers with linked spaces that changed since the backup come back as pending, see [Spaces](spaces.md#linked-spaces-and-transfers).
 
-Backups of the Laravel version can be restored as a whole server or imported as a new space.
-
-When a space is deleted, a final backup is kept for server admins in **Administration → Spaces**.
+Laravel-version backups can be restored as a server or imported as a space. A deleted space leaves a final backup in **Administration → Spaces**.
 
 ## Manual backups
 
 > [!WARNING]
-> The databases run in **WAL mode**, so recent writes may still sit in the `*.sqlite-wal` files and **not in the `.sqlite` files yet**. Copying files of a running instance can silently lose the latest data. Use the in-app backups, or stop Savvy and copy the whole data directory.
+> Databases use WAL mode: recent writes may still be in `*.sqlite-wal` files. Copying files of a running instance can lose data. Use in-app backups, or stop Savvy first.
 
-Docker (stop the container first so the WAL is flushed):
+Docker:
 
 ```bash
 docker compose down
@@ -58,14 +56,14 @@ sudo tar -C /var/lib/savvy-go -czf savvy-go-$(date +%Y%m%d).tar.gz .
 sudo systemctl start savvy-go
 ```
 
-To restore, stop Savvy, replace the contents of the data directory with the archive and start it again.
+To restore: stop Savvy, replace the data directory contents with the archive, start it.
 
 ## Upgrading from the Laravel version
 
-The Laravel version keeps everything in one `database.sqlite`, and a single database file is only accepted from it; Go Savvy itself never writes one. On first start, while the new server has no users yet, Savvy splits it into `server.sqlite` and a first space and renames the old file to `database.sqlite.migrated`. Old roles are mapped like this:
+On first start with no users, Savvy splits the old `database.sqlite` into `server.sqlite` and a first space, and renames the old file to `database.sqlite.migrated`. Roles map as:
 
-| Old role     | Server role | Role in the first space |
-|--------------|-------------|-------------------------|
-| `admin`      | admin       | admin                   |
-| `read-write` | user        | editor                  |
-| `read-only`  | user        | viewer                  |
+| Old role     | Server role | Space role |
+|--------------|-------------|------------|
+| `admin`      | admin       | admin      |
+| `read-write` | user        | editor     |
+| `read-only`  | user        | viewer     |
