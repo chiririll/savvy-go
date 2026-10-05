@@ -187,9 +187,9 @@ export function ApplyDeferredDateDialog({
                                 />
                                 <span>
                                     <span className="block text-sm font-medium">
-                                        {t(isDateOverdue(originalDate)
-                                            ? 'transactions.applyOverdue'
-                                            : 'transactions.applyOriginal')}
+                                        {isDateOverdue(originalDate)
+                                            ? t('transactions.applyOverdue')
+                                            : t('transactions.applyOriginal')}
                                     </span>
                                     <span className="text-xs text-muted-foreground">
                                         {originalDate ? formatStoredDate(originalDate) : null}

@@ -24,10 +24,11 @@ import { localizeDefaultName } from '@/lib/localized-name'
 import { TRANSACTION_TYPE_OPTIONS } from '@/constants/transactions'
 import type { Category, Tag } from '@/types'
 import type { TransactionListFilters } from '@/hooks/use-transaction-list-filters'
+import { sortOptionLabel, transactionTypeLabel } from '@/lib/labels'
 
 const TYPE_FILTERS: {
     value: 'income' | 'expense' | 'transfer' | null
-    labelKey: string
+    labelKey: 'all' | 'income' | 'expense' | 'transfer'
     icon?: LucideIcon
 }[] = [
     { value: null, labelKey: 'all' },
@@ -78,7 +79,7 @@ export function TransactionFiltersPanel({ list, categories, tags }: TransactionF
                     {TYPE_FILTERS.map(({ value, labelKey, icon: Icon }) => {
                         const label = labelKey === 'all'
                             ? t('common:actions.all')
-                            : t(`transactions.types.${labelKey}`)
+                            : transactionTypeLabel(t, labelKey)
 
                         return (
                             <Button
@@ -109,7 +110,7 @@ export function TransactionFiltersPanel({ list, categories, tags }: TransactionF
                     <SelectContent>
                         {SORT_OPTIONS.map((opt) => (
                             <SelectItem key={opt.value} value={opt.value}>
-                                {t(`transactions.sort.${opt.labelKey}`)}
+                                {sortOptionLabel(t, opt.labelKey)}
                             </SelectItem>
                         ))}
                     </SelectContent>

@@ -8,6 +8,7 @@ import { FiltersBar } from './components'
 import { OverviewTab, CashFlowTab, ExpensesTab, IncomeTab, NetWorthTab } from './tabs'
 import { toggleIdInArray } from '@/lib/utils'
 import { DEFAULT_FILTERS, TABS, type ReportFilters, type ReportTab } from './types'
+import { reportTabLabel } from '@/lib/labels'
 
 export default function ReportsPage() {
     const { t } = useTranslation('pages')
@@ -50,7 +51,7 @@ export default function ReportsPage() {
                 <TabsList className="h-auto flex-wrap md:flex-nowrap md:h-9 md:w-fit">
                     {TABS.map(tab => (
                         <TabsTrigger key={tab} value={tab}>
-                            {t(`reports.tabs.${tab}`)}
+                            {reportTabLabel(t, tab)}
                         </TabsTrigger>
                     ))}
                 </TabsList>

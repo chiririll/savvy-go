@@ -16,6 +16,7 @@ function translateIfExists(key: string, ns: string): string | undefined {
         return undefined
     }
 
+    // i18n-dynamic: the key is an error code sent by the server
     const translated = i18n.t(key, { ns })
     return translated && translated !== key ? translated : undefined
 }

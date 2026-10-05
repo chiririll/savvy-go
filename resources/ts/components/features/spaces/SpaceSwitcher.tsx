@@ -14,6 +14,7 @@ import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/c
 import { pathAfterSwitch, useCurrentSpace, useSpaces, useSwitchSpace } from '@/hooks/use-spaces'
 import { useUser } from '@/stores/auth'
 import { CreateSpaceDialog } from './CreateSpaceDialog'
+import { spaceRoleLabel } from '@/lib/labels'
 
 function initials(name: string) {
     return name
@@ -60,7 +61,7 @@ export function SpaceSwitcher() {
                                 <div className="grid flex-1 text-left text-sm leading-tight">
                                     <span className="truncate font-semibold">{current?.name}</span>
                                     <span className="truncate text-xs text-muted-foreground">
-                                        {current ? t(`spaces.roles.${current.role}`) : ''}
+                                        {current ? spaceRoleLabel(t, current.role) : ''}
                                     </span>
                                 </div>
                                 <ChevronsUpDown className="ml-auto size-4" />
@@ -80,7 +81,7 @@ export function SpaceSwitcher() {
                                     </div>
                                     <div className="grid flex-1 leading-tight">
                                         <span className="truncate">{space.name}</span>
-                                        <span className="truncate text-xs text-muted-foreground">{t(`spaces.roles.${space.role}`)}</span>
+                                        <span className="truncate text-xs text-muted-foreground">{spaceRoleLabel(t, space.role)}</span>
                                     </div>
                                     {space.id === current?.id && <Check className="size-4" />}
                                 </DropdownMenuItem>

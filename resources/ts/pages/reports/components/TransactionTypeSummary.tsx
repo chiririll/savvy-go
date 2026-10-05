@@ -14,7 +14,6 @@ const TONE = {
         week: 'bg-emerald-100 text-emerald-600',
         up: 'text-green-600',
         down: 'text-red-600',
-        metricKey: 'reports.metrics.totalIncome',
     },
     expense: {
         total: 'text-red-600',
@@ -22,7 +21,6 @@ const TONE = {
         week: 'bg-purple-100 text-purple-600',
         up: 'text-red-600',
         down: 'text-green-600',
-        metricKey: 'reports.metrics.totalExpenses',
     },
 } as const
 
@@ -35,6 +33,7 @@ export function TransactionTypeSummary({ filters, type }: TransactionTypeSummary
     const { t } = useTranslation('pages')
     const { data, isLoading } = useTransactionReportSummary(filters, type)
     const tone = TONE[type]
+    const metricLabel = type === 'income' ? t('reports.metrics.totalIncome') : t('reports.metrics.totalExpenses')
 
     const percentChange = data?.previous
         ? ((data.total - data.previous) / data.previous) * 100
@@ -61,7 +60,7 @@ export function TransactionTypeSummary({ filters, type }: TransactionTypeSummary
                     <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
                         <div className="space-y-2">
                             <p className="text-sm text-muted-foreground font-medium">
-                                {t(tone.metricKey)}
+                                {metricLabel}
                             </p>
                             <p className={cn('text-5xl font-bold tracking-tight', tone.total)}>
                                 {formatCurrency(data.total, data.currency)}

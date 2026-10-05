@@ -8,6 +8,7 @@ import { useNetWorth } from '@/hooks'
 import { ACCOUNT_TYPE_CONFIG } from '@/constants'
 import type { ReportFilters } from '../types'
 import type { AccountType } from '@/types'
+import { accountTypeLabelLoose } from '@/lib/labels'
 
 interface NetWorthTabProps {
     filters: ReportFilters
@@ -131,7 +132,7 @@ export function NetWorthTab({ filters }: NetWorthTabProps) {
                                             {account.name}
                                         </p>
                                         <p className="text-xs text-muted-foreground capitalize">
-                                            {t(`accounts.types.${account.type}`, { defaultValue: account.type })}
+                                            {accountTypeLabelLoose(t, account.type)}
                                         </p>
                                     </div>
 

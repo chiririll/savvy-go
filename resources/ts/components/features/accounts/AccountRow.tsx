@@ -4,6 +4,7 @@ import { FeedRow, RowActions } from '@/components/shared'
 import { ACCOUNT_TYPE_CONFIG } from '@/constants'
 import { formatCurrency } from '@/lib/utils'
 import { Account } from '@/types'
+import { accountTypeLabel } from '@/lib/labels'
 
 const TYPE_ICON_TONES = {
     bank: 'bg-blue-100 text-blue-600 dark:bg-blue-950/40',
@@ -30,7 +31,7 @@ export function AccountRow({
     const { t } = useTranslation(['common', 'pages'])
     const TypeIcon = ACCOUNT_TYPE_CONFIG[account.type].icon
     const currency = account.currency?.code ?? t('na')
-    const typeLabel = t(`pages:accounts.types.${account.type}`)
+    const typeLabel = accountTypeLabel(t, account.type)
     const showInitial = account.initialBalance !== account.currentBalance
     const canEdit = !!onEdit && !isReadOnly
     const canDelete = !!onDelete && !isReadOnly

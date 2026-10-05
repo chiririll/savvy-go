@@ -31,6 +31,7 @@ import { useIsMobile } from '@/hooks/use-mobile'
 import { RotateCcw, ChevronDown, Calendar, Filter, SlidersHorizontal } from 'lucide-react'
 import type { ReportFilters, PeriodType, CompareType } from '../types'
 import { getMonthOptions, getQuarterOptions, getYearOptions } from '../utils'
+import { periodTypeLabel } from '@/lib/labels'
 
 interface EntityFilterItem {
     id: number
@@ -146,7 +147,7 @@ export function FiltersBar({ filters, onFilterChange, onToggleArrayFilter, onRes
                     className="cursor-pointer"
                     onClick={() => onFilterChange('periodType', type)}
                 >
-                    {t(`reports.filters.${type}`)}
+                    {periodTypeLabel(t, type)}
                 </Badge>
             ))}
             <Badge

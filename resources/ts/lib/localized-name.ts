@@ -22,6 +22,7 @@ export function localizeDefaultName(
 
     const i18nKey = `${group}.${key}`
     if (i18n.exists(i18nKey, { ns: 'defaults' })) {
+        // i18n-dynamic: the key is a name stored in the database (e.g. #SALARY)
         return i18n.t(i18nKey, { ns: 'defaults' })
     }
 

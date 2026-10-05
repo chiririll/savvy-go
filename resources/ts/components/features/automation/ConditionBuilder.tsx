@@ -13,11 +13,7 @@ import type { Condition, ConditionGroup, ConditionOperator } from '@/types/autom
 import { CONDITION_FIELDS } from '@/types/automation'
 import { TRANSACTION_TYPES } from '@/constants'
 import { AccountSelect, CategorySelect, SegmentedChoice, TagSelect } from '@/components/shared'
-
-const MATCH_OPTIONS = [
-    { value: 'all', labelKey: 'automation.matchAll' },
-    { value: 'any', labelKey: 'automation.matchAny' },
-] as const
+import { conditionFieldLabel, operatorLabel, transactionTypeLabel } from '@/lib/labels'
 
 interface ConditionBuilderProps {
     value: ConditionGroup
@@ -92,7 +88,7 @@ export function ConditionBuilder({ value, onChange }: ConditionBuilderProps) {
                                     updateCondition(index, { value: newValue })
                                 }}
                             >
-                                {t(`pages:transactions.types.${type}`)}
+                                {transactionTypeLabel(t, type)}
                             </Button>
                         ))}
                     </div>
@@ -109,7 +105,7 @@ export function ConditionBuilder({ value, onChange }: ConditionBuilderProps) {
                     <SelectContent>
                         {TRANSACTION_TYPES.map(type => (
                             <SelectItem key={type} value={type}>
-                                {t(`pages:transactions.types.${type}`)}
+                                {transactionTypeLabel(t, type)}
                             </SelectItem>
                         ))}
                     </SelectContent>
@@ -194,10 +190,10 @@ export function ConditionBuilder({ value, onChange }: ConditionBuilderProps) {
             <SegmentedChoice
                 value={value.match}
                 onChange={(match) => onChange({ ...value, match })}
-                options={MATCH_OPTIONS.map((option) => ({
-                    value: option.value,
-                    label: t(option.labelKey),
-                }))}
+                options={[
+                    { value: 'all' as const, label: t('forms:automation.matchAll') },
+                    { value: 'any' as const, label: t('forms:automation.matchAny') },
+                ]}
             />
 
             <div className="space-y-2">
@@ -224,7 +220,7 @@ export function ConditionBuilder({ value, onChange }: ConditionBuilderProps) {
                                 <SelectContent>
                                     {CONDITION_FIELDS.map(field => (
                                         <SelectItem key={field.value} value={field.value}>
-                                            {t(`automation.fields.${field.value}`)}
+                                            {conditionFieldLabel(t, field.value)}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
@@ -240,7 +236,7 @@ export function ConditionBuilder({ value, onChange }: ConditionBuilderProps) {
                                 <SelectContent>
                                     {getOperatorsForField(condition.field).map(op => (
                                         <SelectItem key={op} value={op}>
-                                            {t(`automation.operators.${op}`)}
+                                            {operatorLabel(t, op)}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>

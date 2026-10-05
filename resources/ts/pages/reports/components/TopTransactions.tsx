@@ -28,10 +28,22 @@ function formatShortDate(dateStr: string) {
 export function TopTransactions({ filters, type, limit = 10 }: TopTransactionsProps) {
     const { t } = useTranslation('pages')
     const navigate = useNavigate()
-    const copyKey = type === 'income' ? 'topIncome' : 'topExpenses'
     const { data, isLoading } = useTransactionReportTop(filters, type, limit)
 
     const transactions = data?.items || []
+    const copy = type === 'income'
+        ? {
+            title: t('reports.topIncome.title'),
+            subtitle: t('reports.topIncome.subtitle'),
+            topTotal: t('reports.topIncome.topTotal', { count: transactions.length }),
+            noData: t('reports.topIncome.noData'),
+        }
+        : {
+            title: t('reports.topExpenses.title'),
+            subtitle: t('reports.topExpenses.subtitle'),
+            topTotal: t('reports.topExpenses.topTotal', { count: transactions.length }),
+            noData: t('reports.topExpenses.noData'),
+        }
     const currency = data?.currency
     const amountClass = type === 'income' ? 'text-green-600' : 'text-red-600'
     const amountPrefix = type === 'income' ? '+' : '-'
@@ -45,14 +57,14 @@ export function TopTransactions({ filters, type, limit = 10 }: TopTransactionsPr
             <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                     <div>
-                        <CardTitle className="text-lg">{t(`reports.${copyKey}.title`)}</CardTitle>
+                        <CardTitle className="text-lg">{copy.title}</CardTitle>
                         <p className="text-sm text-muted-foreground">
-                            {t(`reports.${copyKey}.subtitle`)}
+                            {copy.subtitle}
                         </p>
                     </div>
                     {!isLoading && transactions.length > 0 && (
                         <div className="text-right">
-                            <p className="text-sm text-muted-foreground">{t(`reports.${copyKey}.topTotal`, { count: transactions.length })}</p>
+                            <p className="text-sm text-muted-foreground">{copy.topTotal}</p>
                             <p className={`text-lg font-semibold ${amountClass}`}>{formatCurrency(totalTop, currency)}</p>
                         </div>
                     )}
@@ -67,7 +79,7 @@ export function TopTransactions({ filters, type, limit = 10 }: TopTransactionsPr
                     </div>
                 ) : transactions.length === 0 ? (
                     <div className="h-[200px] flex items-center justify-center text-muted-foreground">
-                        {t(`reports.${copyKey}.noData`)}
+                        {copy.noData}
                     </div>
                 ) : (
                     <div className="space-y-1">

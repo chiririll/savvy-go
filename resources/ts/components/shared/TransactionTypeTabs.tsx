@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { SPACE_TRANSFER_OPTION, TRANSACTION_TYPE_OPTIONS } from '@/constants'
 import { SegmentedChoice } from './SegmentedChoice'
+import { transactionTypeLabel } from '@/lib/labels'
 
 export type TransactionFormType = (typeof TRANSACTION_TYPE_OPTIONS)[number]['value']
 export type TransactionFormKind = TransactionFormType | typeof SPACE_TRANSFER_OPTION.value
@@ -25,7 +26,7 @@ export function TransactionTypeTabs({ value, onChange, withSpaceTransfer }: Tran
             onChange={onChange}
             options={options.map((option) => ({
                 ...option,
-                label: t(`transactions.types.${option.value}`),
+                label: transactionTypeLabel(t, option.value),
             }))}
         />
     )

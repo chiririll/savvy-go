@@ -46,6 +46,7 @@ import {
 import { formatBytes, formatDateTime } from '@/lib/format'
 import { useUser } from '@/stores/auth'
 import { Space, SpaceRole, SpaceTransfer } from '@/types/spaces'
+import { auditActionLabel, spaceRoleLabel, transferReviewLabel } from '@/lib/labels'
 
 const ROLES: SpaceRole[] = ['admin', 'editor', 'viewer']
 
@@ -169,12 +170,12 @@ function Members({ space, isAdmin }: { space: Space; isAdmin: boolean }) {
                                     </SelectTrigger>
                                     <SelectContent>
                                         {ROLES.map((r) => (
-                                            <SelectItem key={r} value={r}>{t(`spaces.roles.${r}`)}</SelectItem>
+                                            <SelectItem key={r} value={r}>{spaceRoleLabel(t, r)}</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
                             ) : (
-                                <Badge variant="secondary">{t(`spaces.roles.${m.role}`)}</Badge>
+                                <Badge variant="secondary">{spaceRoleLabel(t, m.role)}</Badge>
                             )}
                             {isAdmin && m.userId !== me?.id && (
                                 <Button variant="ghost" size="icon" title={t('spaces.members.remove')} onClick={() => remove.mutate(m.userId)}>
@@ -223,7 +224,7 @@ function Invitations({ space }: { space: Space }) {
                         </SelectTrigger>
                         <SelectContent>
                             {ROLES.map((r) => (
-                                <SelectItem key={r} value={r}>{t(`spaces.roles.${r}`)}</SelectItem>
+                                <SelectItem key={r} value={r}>{spaceRoleLabel(t, r)}</SelectItem>
                             ))}
                         </SelectContent>
                     </Select>
@@ -245,7 +246,7 @@ function Invitations({ space }: { space: Space }) {
                         {open.map((i) => (
                             <li key={i.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
                                 <div className="min-w-0">
-                                    <p className="truncate">{i.email ?? t('spaces.invitations.anyone')} · {t(`spaces.roles.${i.role}`)}</p>
+                                    <p className="truncate">{i.email ?? t('spaces.invitations.anyone')} · {spaceRoleLabel(t, i.role)}</p>
                                     <p className="truncate text-xs text-muted-foreground">
                                         {t('spaces.invitations.expires', { date: formatDateTime(i.expiresAt) })}
                                     </p>
@@ -363,7 +364,7 @@ function TransfersNeedingAttention({ space }: { space: Space }) {
                             <span className="font-medium tabular-nums">{amount(tr)}</span>
                         </div>
                         <div className="flex flex-wrap gap-1.5">
-                            {tr.review && <Badge variant="outline">{t(`spaces.transfers.review.${tr.review}`)}</Badge>}
+                            {tr.review && <Badge variant="outline">{transferReviewLabel(t, tr.review)}</Badge>}
                             {tr.status === 'needs_attention' && <Badge variant="outline">{t('spaces.transfers.needsAccount')}</Badge>}
                             {!tr.verified && <Badge variant="destructive">{t('spaces.transfers.unverified')}</Badge>}
                             {tr.frozen && <Badge variant="secondary">{t('spaces.transfers.frozen')}</Badge>}
@@ -435,7 +436,7 @@ function Audit({ space }: { space: Space }) {
                     {entries.map((e) => (
                         <li key={e.id} className="flex justify-between gap-3 px-3 py-2">
                             <span>
-                                {e.actor || t('spaces.audit.someone')} — {t(`spaces.audit.actions.${e.action}`, { defaultValue: e.action })}
+                                {e.actor || t('spaces.audit.someone')} — {auditActionLabel(t, e.action)}
                                 {e.details ? ` (${e.details})` : ''}
                             </span>
                             <span className="shrink-0 text-xs text-muted-foreground">{formatDateTime(e.createdAt)}</span>
@@ -457,7 +458,7 @@ export default function SpaceSettingsPage() {
 
     return (
         <Page title={t('spaces.title')}>
-            <PageHeader title={space.name} description={t('spaces.description', { role: t(`spaces.roles.${space.role}`) })} />
+            <PageHeader title={space.name} description={t('spaces.description', { role: spaceRoleLabel(t, space.role) })} />
             <div className="grid items-start gap-6 lg:grid-cols-2">
                 <div className="space-y-6">
                     <General key={space.id} space={space} isAdmin={isAdmin} />

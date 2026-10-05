@@ -5,6 +5,7 @@ import { categoryIconStyle } from '@/lib/category-color'
 import i18n from '@/lib/i18n'
 import { localizeDefaultName } from '@/lib/localized-name'
 import { Budget, BudgetPeriod } from '@/types'
+import { budgetPeriodLabelLoose } from '@/lib/labels'
 
 const PERIOD_ORDER: BudgetPeriod[] = ['weekly', 'monthly', 'yearly', 'one_time']
 
@@ -12,7 +13,7 @@ const PERIOD_ORDER: BudgetPeriod[] = ['weekly', 'monthly', 'yearly', 'one_time']
 export function budgetGroup(budget: Budget): FeedGroupKey {
     return {
         key: budget.period,
-        title: i18n.t(`pages:budgets.periods.${budget.period}`, { defaultValue: budget.period }),
+        title: budgetPeriodLabelLoose(i18n.t, budget.period),
     }
 }
 
