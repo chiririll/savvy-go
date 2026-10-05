@@ -4,7 +4,7 @@
     "type": "module",
     "scripts": {
         "logos": "tsx update-logos.ts",
-        "screenshots": "tsx screenshots/run.ts"
+        "screenshots": "node screenshots/compose.mjs"
     },
     "devDependencies": {
         "@types/node": "^25.0.3",

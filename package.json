@@ -6,6 +6,8 @@
     "scripts": {
         "build": "vite build",
         "dev": "vite",
+        "logos": "npm --prefix scripts run logos",
+        "screenshots": "npm --prefix scripts run screenshots",
         "test": "vitest run"
     },
     "devDependencies": {
