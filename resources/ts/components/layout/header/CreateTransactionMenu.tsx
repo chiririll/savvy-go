@@ -9,14 +9,19 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useCreateTransactionDialog } from '@/components/features/transactions'
 import { SPACE_TRANSFER_OPTION, TRANSACTION_TYPE_OPTIONS } from '@/constants'
-import { useSpaceLinks } from '@/hooks'
-import { useCurrentSpaceId } from '@/stores/space'
+import { useTransferTargets } from '@/hooks'
+import { useReadOnly } from '@/components/providers/ReadOnlyProvider'
 
 export function CreateTransactionMenu() {
     const { t } = useTranslation('nav')
     const { openCreate } = useCreateTransactionDialog()
-    const { data: links } = useSpaceLinks(useCurrentSpaceId())
-    const options = [...TRANSACTION_TYPE_OPTIONS, ...(links?.length ? [SPACE_TRANSFER_OPTION] : [])]
+    const isReadOnly = useReadOnly()
+    const canTransfer = useTransferTargets().length > 0
+    const options = [...TRANSACTION_TYPE_OPTIONS, ...(canTransfer ? [SPACE_TRANSFER_OPTION] : [])]
+
+    if (isReadOnly) {
+        return null
+    }
 
     return (
         <DropdownMenu>
