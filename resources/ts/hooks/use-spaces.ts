@@ -3,7 +3,7 @@ import i18n from '@/lib/i18n'
 import { adminSpacesApi, spacesApi } from '@/api/spaces'
 import { useUser } from '@/stores/auth'
 import { useCurrentSpaceId, useSpaceStore } from '@/stores/space'
-import { SpaceRole, SpaceTransferInput } from '@/types/spaces'
+import { LinkedSpace, SpaceRole, SpaceTransferInput } from '@/types/spaces'
 import { useResourceMutation } from './use-crud'
 
 export const SPACES_KEY = ['spaces']
@@ -148,6 +148,23 @@ export function useRevokeInvitation(id: number) {
 
 export function useSpaceLinks(id: number | null) {
     return useQuery({ queryKey: spaceKey(id, 'links'), queryFn: () => spacesApi.links(id!), enabled: id !== null })
+}
+
+/**
+ * Linked spaces the current one can send money to: a transfer writes to
+ * both, so the user must be able to write in each.
+ */
+export function useTransferTargets(): LinkedSpace[] {
+    const current = useCurrentSpace()
+    const { data: spaces } = useSpaces()
+    const { data: links } = useSpaceLinks(current?.id ?? null)
+    if (!current || current.role === 'viewer') {
+        return []
+    }
+    return (links ?? []).filter((link) => {
+        const role = spaces?.find((space) => space.id === link.id)?.role
+        return role === 'admin' || role === 'editor'
+    })
 }
 
 export function useLinkSpace(id: number) {

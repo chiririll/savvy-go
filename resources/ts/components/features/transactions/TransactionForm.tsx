@@ -18,10 +18,9 @@ import {
     useCategories,
     useCurrencies,
     useFormValuesChange,
-    useSpaceLinks,
+    useTransferTargets,
     useTransactionPartyDefaults,
 } from '@/hooks'
-import { useCurrentSpaceId } from '@/stores/space'
 import { formatDateLocal, isDateInFuture } from '@/lib/utils'
 import { currencyDecimals, sumTransactionItems } from '@/lib/transaction-items'
 import {
@@ -76,7 +75,7 @@ export function TransactionForm({
     const { data: accounts } = useAccounts(ACCOUNT_FILTER)
     const { data: categories } = useCategories()
     const { data: currencies } = useCurrencies()
-    const { data: links = [] } = useSpaceLinks(useCurrentSpaceId())
+    const transferTargets = useTransferTargets()
     const { confirmIfNeeded, dialog: negativeBalanceDialog } = useNegativeBalanceConfirm<TransactionFormValues>()
 
     const formDefaults = useMemo(() => ({
@@ -223,7 +222,7 @@ export function TransactionForm({
             >
                 <TransactionTypeTabs
                     value={transactionType}
-                    withSpaceTransfer={!isEdit && links.length > 0}
+                    withSpaceTransfer={!isEdit && transferTargets.length > 0}
                     onChange={(value) => {
                         if ((value === 'transfer_out') !== isSpaceTransfer) {
                             // The destination account belongs to another space now.
@@ -238,7 +237,7 @@ export function TransactionForm({
 
                 {isSpaceTransfer && (
                     <SpaceTransferTargetField
-                        links={links}
+                        links={transferTargets}
                         noAccounts={destinationSpaceAccounts?.length === 0}
                     />
                 )}
