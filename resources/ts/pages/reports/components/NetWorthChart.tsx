@@ -13,6 +13,7 @@ import { formatReportPeriodLabel } from '../utils'
 import type { ReportFilters } from '../types'
 import type { CashFlowGroupBy } from '@/api/reports'
 import { groupByLabel } from '@/lib/labels'
+import { CHART_COLORS, axisStyle, useChartTheme, verticalFade } from '@/lib/chart-theme'
 
 interface NetWorthChartProps {
     filters: ReportFilters
@@ -20,6 +21,7 @@ interface NetWorthChartProps {
 
 export function NetWorthChart({ filters }: NetWorthChartProps) {
     const { t, i18n: i18nInstance } = useTranslation('pages')
+    const theme = useChartTheme()
     const [groupBy, setGroupBy] = useState<CashFlowGroupBy>(() => defaultGroupBy(filters))
     useEffect(() => {
         setGroupBy(defaultGroupBy(filters))
@@ -33,6 +35,7 @@ export function NetWorthChart({ filters }: NetWorthChartProps) {
 
         return {
             tooltip: {
+                ...theme.tooltip,
                 trigger: 'axis',
                 formatter: (params: { value: number; axisValue: string }[]) => {
                     const p = params[0]
@@ -47,31 +50,16 @@ export function NetWorthChart({ filters }: NetWorthChartProps) {
                 top: 20,
                 bottom: 30,
             },
-            xAxis: {
-                type: 'category',
+            xAxis: axisStyle(theme, 'category', {
                 data: data.dates.map((date) => formatReportPeriodLabel(date, groupBy, 'weekNum')),
                 axisLabel: {
-                    fontSize: 11,
-                    color: '#64748b',
                     rotate: groupBy === 'day' ? 45 : 0,
                     interval: groupBy === 'day' ? 4 : 0,
                 },
-                axisLine: {
-                    lineStyle: { color: '#e2e8f0' },
-                },
-                axisTick: { show: false },
-            },
-            yAxis: {
-                type: 'value',
-                axisLabel: {
-                    formatter: (val: number) => formatCurrencyCompact(val, currency),
-                    fontSize: 11,
-                    color: '#64748b',
-                },
-                splitLine: {
-                    lineStyle: { color: '#f1f5f9', type: 'dashed' },
-                },
-            },
+            }),
+            yAxis: axisStyle(theme, 'value', {
+                axisLabel: { formatter: (val: number) => formatCurrencyCompact(val, currency) },
+            }),
             series: [{
                 name: i18n.t('pages:reports.series.netWorth'),
                 type: 'line',
@@ -80,30 +68,18 @@ export function NetWorthChart({ filters }: NetWorthChartProps) {
                 symbol: 'circle',
                 symbolSize: 8,
                 lineStyle: {
-                    color: '#3b82f6',
+                    color: CHART_COLORS.balance,
                     width: 3,
                 },
                 itemStyle: {
-                    color: '#3b82f6',
-                    borderColor: '#fff',
+                    color: CHART_COLORS.balance,
+                    borderColor: theme.surface,
                     borderWidth: 2,
                 },
-                areaStyle: {
-                    color: {
-                        type: 'linear',
-                        x: 0,
-                        y: 0,
-                        x2: 0,
-                        y2: 1,
-                        colorStops: [
-                            { offset: 0, color: 'rgba(59, 130, 246, 0.25)' },
-                            { offset: 1, color: 'rgba(59, 130, 246, 0)' },
-                        ],
-                    },
-                },
+                areaStyle: { color: verticalFade(CHART_COLORS.balance, 0.25) },
             }],
         }
-    }, [data, groupBy, currency, i18nInstance.language])
+    }, [data, groupBy, currency, i18nInstance.language, theme])
 
     return (
         <Card>

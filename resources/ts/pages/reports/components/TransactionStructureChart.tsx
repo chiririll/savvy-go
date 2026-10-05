@@ -1,5 +1,5 @@
 import { testIdControl, testIdControls } from '@/lib/test-id'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useLayoutEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import ReactECharts from '@/components/shared/ReactECharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -11,9 +11,27 @@ import { formatCurrency, formatCurrencyCompact } from '@/lib/utils'
 import i18n from '@/lib/i18n'
 import { localizeDefaultName } from '@/lib/localized-name'
 import type { ReportFilters } from '../types'
+import { axisStyle, legendTextStyle, useChartTheme } from '@/lib/chart-theme'
 import type { ReportTransactionType } from '@/api/reports'
 
 type ViewMode = 'donut' | 'bar' | 'treemap'
+
+const CHART_HEIGHT = 350
+const DONUT_CENTER_X = 0.35
+
+function useElementWidth<T extends HTMLElement>(ready: boolean) {
+    const ref = useRef<T>(null)
+    const [width, setWidth] = useState(0)
+    useLayoutEffect(() => {
+        const el = ref.current
+        if (!el) return
+        setWidth(el.clientWidth)
+        const observer = new ResizeObserver(([entry]) => setWidth(Math.round(entry.contentRect.width)))
+        observer.observe(el)
+        return () => observer.disconnect()
+    }, [ready])
+    return [ref, width] as const
+}
 
 interface TransactionStructureChartProps {
     filters: ReportFilters
@@ -22,6 +40,7 @@ interface TransactionStructureChartProps {
 
 export function TransactionStructureChart({ filters, type }: TransactionStructureChartProps) {
     const { t, i18n: i18nInstance } = useTranslation('pages')
+    const theme = useChartTheme()
     const copy = type === 'income'
         ? {
             title: t('reports.incomeStructure.title'),
@@ -35,6 +54,7 @@ export function TransactionStructureChart({ filters, type }: TransactionStructur
         }
     const [viewMode, setViewMode] = useState<ViewMode>('donut')
     const { data, isLoading } = useTransactionReportByCategory(filters, type)
+    const [chartRef, chartWidth] = useElementWidth<HTMLDivElement>(!isLoading && !!data?.items?.length)
 
     const chartData = useMemo(() => {
         if (!data?.items) return []
@@ -48,8 +68,20 @@ export function TransactionStructureChart({ filters, type }: TransactionStructur
     const total = data?.total || 0
     const currency = data?.currency
 
-    const donutOption = useMemo(() => ({
+    const donutOption = useMemo(() => {
+        // Inner hole diameter in px: radius 50%..75% of half the smaller side.
+        const width = chartWidth || 600
+        const hole = Math.min(width, CHART_HEIGHT) * 0.75 * 0.5
+        const totalText = formatCurrency(total, currency)
+        const totalFont = Math.max(11, Math.min(24, (hole * 0.85) / (totalText.length * 0.6)))
+        const labelFont = Math.max(10, Math.min(12, totalFont * 0.6))
+        const legendFont = width < 480 ? 11 : 12
+        const centerX = width * DONUT_CENTER_X
+        const centerY = CHART_HEIGHT / 2
+
+        return {
         tooltip: {
+            ...theme.tooltip,
             trigger: 'item',
             formatter: (params: { name: string; value: number; percent: number }) => {
                 return `<div class="font-medium">${params.name}</div>
@@ -60,10 +92,7 @@ export function TransactionStructureChart({ filters, type }: TransactionStructur
             orient: 'vertical',
             right: 20,
             top: 'center',
-            textStyle: {
-                fontSize: 12,
-                color: '#64748b',
-            },
+            textStyle: legendTextStyle(theme, legendFont),
             formatter: (name: string) => {
                 const item = chartData.find((entry) => entry.name === name)
                 if (item) {
@@ -80,7 +109,7 @@ export function TransactionStructureChart({ filters, type }: TransactionStructur
             avoidLabelOverlap: true,
             itemStyle: {
                 borderRadius: 6,
-                borderColor: '#fff',
+                borderColor: theme.surface,
                 borderWidth: 2,
             },
             label: {
@@ -107,33 +136,39 @@ export function TransactionStructureChart({ filters, type }: TransactionStructur
         }],
         graphic: [{
             type: 'text',
-            left: '35%',
-            top: '45%',
+            x: centerX,
+            y: centerY - totalFont * 0.6,
+            silent: true,
             style: {
-                text: formatCurrency(total, currency),
+                text: totalText,
                 textAlign: 'center',
-                fontSize: 24,
+                textVerticalAlign: 'middle',
+                fontSize: totalFont,
                 fontWeight: 'bold',
-                fill: '#1e293b',
+                fill: theme.textStrong,
             },
         }, {
             type: 'text',
-            left: '35%',
-            top: '55%',
+            x: centerX,
+            y: centerY + labelFont * 1.2,
+            silent: true,
             style: {
                 text: i18n.t('pages:reports.series.total'),
                 textAlign: 'center',
-                fontSize: 12,
-                fill: '#64748b',
+                textVerticalAlign: 'middle',
+                fontSize: labelFont,
+                fill: theme.text,
             },
         }],
-    }), [chartData, total, currency, i18nInstance.language])
+        }
+    }, [chartData, total, currency, i18nInstance.language, theme, chartWidth])
 
     const barOption = useMemo(() => {
         const sortedData = [...chartData].sort((a, b) => b.value - a.value)
 
         return {
             tooltip: {
+                ...theme.tooltip,
                 trigger: 'axis',
                 axisPointer: {
                     type: 'shadow',
@@ -151,27 +186,14 @@ export function TransactionStructureChart({ filters, type }: TransactionStructur
                 top: 20,
                 bottom: 20,
             },
-            xAxis: {
-                type: 'value',
-                axisLabel: {
-                    formatter: (val: number) => formatCurrencyCompact(val, currency),
-                    fontSize: 11,
-                    color: '#64748b',
-                },
-                splitLine: {
-                    lineStyle: { color: '#f1f5f9', type: 'dashed' },
-                },
-            },
-            yAxis: {
-                type: 'category',
+            xAxis: axisStyle(theme, 'value', {
+                axisLabel: { formatter: (val: number) => formatCurrencyCompact(val, currency) },
+            }),
+            yAxis: axisStyle(theme, 'category', {
                 data: sortedData.map((item) => item.name),
-                axisLabel: {
-                    fontSize: 12,
-                    color: '#334155',
-                },
+                axisLabel: { fontSize: 12, color: theme.textStrong },
                 axisLine: { show: false },
-                axisTick: { show: false },
-            },
+            }),
             series: [{
                 type: 'bar',
                 data: sortedData.map((item) => ({
@@ -187,14 +209,15 @@ export function TransactionStructureChart({ filters, type }: TransactionStructur
                     position: 'right',
                     formatter: (params: { value: number }) => formatCurrency(params.value, currency),
                     fontSize: 11,
-                    color: '#64748b',
+                    color: theme.text,
                 },
             }],
         }
-    }, [chartData, total, currency, type])
+    }, [chartData, total, currency, type, theme])
 
     const treemapOption = useMemo(() => ({
         tooltip: {
+            ...theme.tooltip,
             formatter: (params: { name: string; value: number }) => {
                 const percent = ((params.value / total) * 100).toFixed(1)
                 return `<div class="font-medium">${params.name}</div>
@@ -235,13 +258,13 @@ export function TransactionStructureChart({ filters, type }: TransactionStructur
             },
             upperLabel: { show: false },
             itemStyle: {
-                borderColor: '#fff',
+                borderColor: theme.surface,
                 borderWidth: 2,
                 gapWidth: 2,
             },
             levels: [{
                 itemStyle: {
-                    borderColor: '#fff',
+                    borderColor: theme.surface,
                     borderWidth: 3,
                     gapWidth: 3,
                 },
@@ -254,7 +277,7 @@ export function TransactionStructureChart({ filters, type }: TransactionStructur
                 },
             })),
         }],
-    }), [chartData, total, currency, i18nInstance.language])
+    }), [chartData, total, currency, i18nInstance.language, theme])
 
     const getOption = () => {
         switch (viewMode) {
@@ -307,11 +330,13 @@ export function TransactionStructureChart({ filters, type }: TransactionStructur
                         {copy.noData}
                     </div>
                 ) : (
-                    <ReactECharts
-                        option={getOption()}
-                        style={{ height: 350 }}
-                        key={viewMode}
-                    />
+                    <div ref={chartRef}>
+                        <ReactECharts
+                            option={getOption()}
+                            style={{ height: CHART_HEIGHT }}
+                            key={viewMode}
+                        />
+                    </div>
                 )}
             </CardContent>
         </Card>

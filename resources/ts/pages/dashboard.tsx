@@ -39,7 +39,7 @@ import { localizeDefaultName } from '@/lib/localized-name'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import ReactECharts from '@/components/shared/ReactECharts'
-import { useTheme } from '@/hooks/use-theme'
+import { legendTextStyle, useChartTheme } from '@/lib/chart-theme'
 import { Link } from 'react-router-dom'
 import { AccountType } from '@/types'
 import { ACCOUNT_TYPE_CONFIG, CATEGORY_COLORS } from '@/constants'
@@ -146,7 +146,7 @@ export default function DashboardPage() {
     const { t, i18n } = useTranslation('pages')
     const { t: tCommon } = useTranslation('common')
     const { t: tNav } = useTranslation('nav')
-    const { theme } = useTheme()
+    const chartTheme = useChartTheme()
     const { openCreate, openEdit } = useCreateTransactionDialog()
     const { data: balance } = useTotalBalance()
     const { data: accounts } = useAccounts({ active: true, exclude_debts: true })
@@ -220,7 +220,6 @@ export default function DashboardPage() {
     const pieChartOption = useMemo(() => {
         if (!expensesByCategory?.data.length) return {}
 
-        const isDark = theme === 'dark'
         const categoryCurrency = expensesByCategory.currency || currency
         const data = expensesByCategory.data
             .filter((c) => (c.totalAmount ?? 0) > 0)
@@ -234,9 +233,7 @@ export default function DashboardPage() {
             tooltip: {
                 trigger: 'item',
                 confine: true,
-                backgroundColor: isDark ? '#1f2937' : '#ffffff',
-                borderColor: isDark ? '#374151' : '#e5e7eb',
-                textStyle: { color: isDark ? '#f3f4f6' : '#1f2937' },
+                ...chartTheme.tooltip,
                 formatter: (params: { name: string; value: number; percent: number }) =>
                     `${params.name}<br/>${formatCurrency(params.value, categoryCurrency)} (${params.percent.toFixed(1)}%)`,
             },
@@ -244,10 +241,7 @@ export default function DashboardPage() {
                 orient: 'horizontal',
                 bottom: 0,
                 left: 'center',
-                textStyle: {
-                    color: isDark ? '#9ca3af' : '#6b7280',
-                    fontSize: 11,
-                },
+                textStyle: legendTextStyle(chartTheme, 11),
                 icon: 'circle',
                 itemWidth: 8,
                 itemHeight: 8,
@@ -264,7 +258,7 @@ export default function DashboardPage() {
                     avoidLabelOverlap: false,
                     itemStyle: {
                         borderRadius: 4,
-                        borderColor: isDark ? '#1f2937' : '#ffffff',
+                        borderColor: chartTheme.surface,
                         borderWidth: 2,
                     },
                     label: { show: false },
@@ -275,7 +269,7 @@ export default function DashboardPage() {
                 },
             ],
         }
-    }, [expensesByCategory, theme, currency, i18n.language])
+    }, [expensesByCategory, chartTheme, currency, i18n.language])
 
     const handlePeriodChange = (value: PeriodPreset) => {
         setPeriod(value)

@@ -8,6 +8,7 @@ import { useMoneyFlow } from '@/hooks'
 import { formatCurrency } from '@/lib/utils'
 import type { ReportFilters } from '../types'
 import { localizeSavingsNodeName } from '../utils'
+import { useChartTheme } from '@/lib/chart-theme'
 
 interface SankeyDiagramProps {
     filters: ReportFilters
@@ -16,6 +17,7 @@ interface SankeyDiagramProps {
 export function SankeyDiagram({ filters }: SankeyDiagramProps) {
     const { t, i18n } = useTranslation('pages')
     const navigate = useNavigate()
+    const theme = useChartTheme()
     const { data, isLoading, error } = useMoneyFlow(filters)
 
     const sankeyOption = useMemo(() => {
@@ -33,6 +35,7 @@ export function SankeyDiagram({ filters }: SankeyDiagramProps) {
 
         return {
             tooltip: {
+                ...theme.tooltip,
                 trigger: 'item',
                 triggerOn: 'mousemove',
                 formatter: (params: { data: { source?: string; target?: string; value: number }; name?: string; value?: number }) => {
@@ -59,13 +62,15 @@ export function SankeyDiagram({ filters }: SankeyDiagramProps) {
                 nodeGap: 12,
                 nodeWidth: 20,
                 label: {
-                    fontSize: 12,
+                    fontSize: 13,
+                    color: theme.textStrong,
+                    textBorderWidth: 0,
                 },
                 data: nodes,
                 links,
             }],
         }
-    }, [data, t, i18n.language])
+    }, [data, t, i18n.language, theme])
 
     const handleSankeyClick = useCallback((params: { data: { source?: string; target?: string } }) => {
         if (params.data.source && params.data.target) {

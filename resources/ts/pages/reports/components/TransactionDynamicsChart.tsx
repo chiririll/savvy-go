@@ -21,6 +21,7 @@ import { dynamicsSeriesName, formatReportPeriodLabel } from '../utils'
 import type { ReportFilters } from '../types'
 import type { CashFlowGroupBy, ReportTransactionType } from '@/api/reports'
 import { groupByLabel } from '@/lib/labels'
+import { axisStyle, legendTextStyle, useChartTheme } from '@/lib/chart-theme'
 
 type ChartType = 'line' | 'bar'
 
@@ -38,6 +39,7 @@ interface TransactionDynamicsChartProps {
 
 export function TransactionDynamicsChart({ filters, type }: TransactionDynamicsChartProps) {
     const { t, i18n } = useTranslation('pages')
+    const theme = useChartTheme()
     const copy = type === 'income'
         ? {
             title: t('reports.incomeDynamics.title'),
@@ -128,6 +130,7 @@ export function TransactionDynamicsChart({ filters, type }: TransactionDynamicsC
 
         return {
             tooltip: {
+                ...theme.tooltip,
                 trigger: 'axis',
                 axisPointer: {
                     type: chartType === 'bar' ? 'shadow' : 'cross',
@@ -147,10 +150,7 @@ export function TransactionDynamicsChart({ filters, type }: TransactionDynamicsC
             legend: chartData.datasets.length > 1 ? {
                 data: chartData.datasets.map((dataset) => dataset.name),
                 bottom: 0,
-                textStyle: {
-                    fontSize: 12,
-                    color: '#64748b',
-                },
+                textStyle: legendTextStyle(theme),
             } : undefined,
             grid: {
                 left: 60,
@@ -158,34 +158,19 @@ export function TransactionDynamicsChart({ filters, type }: TransactionDynamicsC
                 top: 20,
                 bottom: chartData.datasets.length > 1 ? 50 : 30,
             },
-            xAxis: {
-                type: 'category',
+            xAxis: axisStyle(theme, 'category', {
                 data: chartData.labels,
                 axisLabel: {
-                    fontSize: 11,
-                    color: '#64748b',
                     rotate: groupBy === 'day' ? 45 : 0,
                     interval: groupBy === 'day' ? 4 : 0,
                 },
-                axisLine: {
-                    lineStyle: { color: '#e2e8f0' },
-                },
-                axisTick: { show: false },
-            },
-            yAxis: {
-                type: 'value',
-                axisLabel: {
-                    formatter: (val: number) => formatCurrencyCompact(val, currency),
-                    fontSize: 11,
-                    color: '#64748b',
-                },
-                splitLine: {
-                    lineStyle: { color: '#f1f5f9', type: 'dashed' },
-                },
-            },
+            }),
+            yAxis: axisStyle(theme, 'value', {
+                axisLabel: { formatter: (val: number) => formatCurrencyCompact(val, currency) },
+            }),
             series: chartSeries,
         }
-    }, [chartData, chartType, groupBy, currency])
+    }, [chartData, chartType, groupBy, currency, theme])
 
     return (
         <Card>
