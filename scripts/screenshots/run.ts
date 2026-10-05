@@ -2,28 +2,25 @@
 //
 // The app must be seeded with SEED_DEMO=true and SEED_MANIFEST (see
 // internal/seed/manifest.go); the manifest says who can sign in, which spaces
-// exist and which ids the parametrised pages need. Prefer
-// docker-compose.screenshots.yml, which seeds a throwaway app and runs this.
+// exist and which ids the parametrised pages need. See docs/scripts.md.
 //
-// Usage: npm run screenshots -- [--only=<text in the page path>]
-// Env:   BASE_URL (http://localhost:8080), MANIFEST (manifest.json), OUT (screenshots),
-//        CONCURRENCY (4), TZ (UTC), LOCALE (en-US)
+// Usage: npm --prefix scripts run screenshots -- [--only=<text in the page path>]
+// Env:   BASE_URL (http://localhost:8080), MANIFEST (<repo>/screenshots/manifest.json),
+//        OUT (<repo>/screenshots), CONCURRENCY (4), TZ (UTC), LOCALE (en-US)
 import { mkdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { chromium, devices, type Browser, type BrowserContextOptions } from 'playwright'
-import { routes, type Route } from './routes.ts'
-
-interface Manifest {
-    date: string
-    users: { key: string; name: string; email: string; password: string; role: string }[]
-    spaces: { id: number; name: string; members: Record<string, string>; automations?: number[] }[]
-    invitations: { space_id: number; email?: string; role: string; token: string }[]
-}
+import type { Page } from '../../resources/ts/app/pages.ts'
+import type { Manifest, ManifestSpace } from './manifest.ts'
+import { paramValue, routes, skip } from './routes.ts'
 
 const env = (name: string, fallback: string) => process.env[name]?.trim() || fallback
 const baseURL = env('BASE_URL', 'http://localhost:8080').replace(/\/$/, '')
-const outDir = path.resolve(env('OUT', 'screenshots'))
-const manifestPath = path.resolve(env('MANIFEST', 'manifest.json'))
+// Relative to the repository, not the working directory (npm --prefix runs from scripts/).
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
+const outDir = path.resolve(env('OUT', path.join(root, 'screenshots')))
+const manifestPath = path.resolve(env('MANIFEST', path.join(outDir, 'manifest.json')))
 const concurrency = Number(env('CONCURRENCY', '4'))
 const timezoneId = env('TZ', 'UTC')
 const locale = env('LOCALE', 'en-US')
@@ -61,29 +58,37 @@ async function main() {
     // The app works out some periods ("last 30 days") from the server's own clock,
     // so data seeded for another day only looks right if the server runs on that
     // day. The browser's clock is moved to the seeded day, but the server's is not.
-    const seeded = new Date(`${manifest.date}T12:00:00Z`)
-    const today = new Intl.DateTimeFormat('en-CA', { timeZone: timezoneId }).format(new Date())
-    const now = manifest.date === today ? null : seeded
-    if (now) console.warn(`Data was seeded for ${manifest.date}, not today (${today}): server-side periods will be empty.`)
+    const seeded = new Date(manifest.now)
+    const day = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: timezoneId }).format(d)
+    const now = day(seeded) === day(new Date()) ? null : seeded
+    if (now) console.warn(`Data was seeded for ${day(seeded)}, not today (${day(new Date())}): server-side periods will be empty.`)
     const browser = await chromium.launch()
 
-    const fill = (r: Route, params: Record<string, string | number | undefined>) => {
-        let skip = false
-        const p = r.path.replace(/:(\w+)/g, (_, k) => {
-            const v = params[k]
-            if (v === undefined) skip = true
-            return String(v)
+    // A page with a ":param" is captured only where the manifest has a value for it.
+    const resolved = new Set<string>()
+    const unresolved = new Set<string>()
+    const fill = (page: Page, space?: ManifestSpace) => {
+        if (skip.has(page.path)) return []
+        let missing = false
+        const p = page.path.replace(/:\w+/g, () => {
+            const value = paramValue[page.path]?.(manifest, space)
+            if (value === undefined) missing = true
+            return String(value)
         })
+        if (missing) {
+            unresolved.add(page.path)
+            return []
+        }
+        resolved.add(page.path)
         // The name leaves out the ids, which differ from run to run.
-        return skip || (only && !p.includes(only)) ? null : { path: p, name: pageName(r.path.replace(/\/:\w+/g, '')) }
+        return only && !p.includes(only) ? [] : [{ path: p, name: pageName(page.path.replace(/\/:\w+/g, '')) }]
     }
-    const pagesOf = (scope: Route['scope'], params: Record<string, string | number | undefined>) =>
-        routes.filter((r) => r.scope === scope).flatMap((r) => fill(r, params) ?? [])
+    const pagesOf = (scope: Page['scope'], space?: ManifestSpace) =>
+        routes.filter((r) => r.scope === scope).flatMap((r) => fill(r, space))
 
     const jobs: Job[] = []
-    const invite = manifest.invitations[0]?.token
     for (const viewport of Object.keys(viewports)) {
-        jobs.push({ label: 'public', viewport, dir: 'public', pages: pagesOf('public', { inviteToken: invite }) })
+        jobs.push({ label: 'public', viewport, dir: 'public', pages: pagesOf('public') })
     }
 
     for (const user of manifest.users) {
@@ -91,19 +96,22 @@ async function main() {
         const mine = manifest.spaces.filter((s) => user.key in s.members)
         for (const viewport of Object.keys(viewports)) {
             mine.forEach((sp, i) => {
-                const pages = pagesOf('space', { automationId: sp.automations?.[0] })
+                const list = pagesOf('space', sp)
                 // Pages of the user and the server do not depend on the space: once is enough.
                 if (i === 0) {
-                    pages.push(...pagesOf('user', {}))
-                    if (user.role === 'admin') pages.push(...pagesOf('admin', {}))
+                    list.push(...pagesOf('user'))
+                    if (user.role === 'admin') list.push(...pagesOf('admin'))
                 }
                 jobs.push({
-                    label: `${user.key}/${slug(sp.name)}`, viewport, storageState, spaceId: sp.id, pages,
+                    label: `${user.key}/${slug(sp.name)}`, viewport, storageState, spaceId: sp.id, pages: list,
                     dir: path.join(user.key, slug(sp.name)),
                 })
             })
         }
     }
+    // Some spaces have no value (no automation rules): only a page that has none anywhere is worth a warning.
+    const never = [...unresolved].filter((p) => !resolved.has(p))
+    if (never.length) console.warn(`Left out, no value for their parameters in the manifest: ${never.join(', ')}`)
 
     let done = 0
     const total = jobs.reduce((n, j) => n + j.pages.length, 0)

@@ -1,56 +1,23 @@
-// Pages to capture. Keep in sync with resources/ts/app/router.tsx.
-//
-// scope:
-//   public - no session (the sign-in and invitation pages)
-//   space  - data of the current space: captured for every user in each space they belong to
-//   user   - the signed-in user's own pages: captured once per user
-//   admin  - server administration: captured once per user with the server role "admin"
-//
-// A ":name" segment is filled in from the manifest (see params in run.ts); a page
-// whose parameter has no value is skipped.
+// The pages to capture are the app's own (resources/ts/app/pages.ts), so a new page
+// is picked up without touching this script. routes.test.ts requires that a page
+// with a ":param" is either left out below or has a value for it.
+import { pages, type Page } from '../../resources/ts/app/pages.ts'
+import type { Manifest, ManifestSpace } from './manifest.ts'
 
-export type Scope = 'public' | 'space' | 'user' | 'admin'
+export const routes: Page[] = Object.values(pages)
 
-export interface Route {
-    path: string
-    scope: Scope
+/** Pages that are not worth a screenshot: they only work mid-flow or redirect when signed in. */
+export const skip = new Set<string>([
+    pages.setup.path,
+    pages.setup2fa.path,
+    pages.ssoCallback.path,
+    pages.setPassword.path,
+    // The demo has no single sign-on providers to edit.
+    pages.providerEdit.path,
+])
+
+/** The value of the ":param" of a page, from the manifest; undefined when there is none. */
+export const paramValue: Record<string, (m: Manifest, space?: ManifestSpace) => string | number | undefined> = {
+    [pages.invite.path]: (m) => m.invitations[0]?.token,
+    [pages.automationLogs.path]: (_, space) => space?.automations?.[0],
 }
-
-const space = (...paths: string[]): Route[] => paths.map((path) => ({ path, scope: 'space' }))
-const user = (...paths: string[]): Route[] => paths.map((path) => ({ path, scope: 'user' }))
-const admin = (...paths: string[]): Route[] => paths.map((path) => ({ path, scope: 'admin' }))
-
-export const routes: Route[] = [
-    { path: '/login', scope: 'public' },
-    { path: '/invite/:inviteToken', scope: 'public' },
-
-    ...space(
-        '/',
-        '/transactions',
-        '/accounts',
-        '/categories',
-        '/currencies',
-        '/budgets',
-        '/tags',
-        '/debts',
-        '/recurring',
-        '/automation',
-        '/automation/:automationId/logs',
-        '/reports',
-        '/settings/space',
-        '/settings/import',
-        '/settings/backups',
-    ),
-
-    ...user('/settings/user', '/settings/security', '/settings/api'),
-
-    ...admin(
-        '/admin/system',
-        '/admin/monitoring',
-        '/admin/sso',
-        '/admin/security',
-        '/admin/backups',
-        '/admin/users',
-        '/admin/spaces',
-    ),
-]
