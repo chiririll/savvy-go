@@ -29,7 +29,13 @@ echarts.use([
     SVGRenderer,
 ])
 
-/** ECharts with only the charts/components this app uses registered (tree-shaken). */
-export default function ReactECharts(props: Omit<EChartsReactProps, 'echarts'>) {
-    return <ReactEChartsCore echarts={echarts} {...props} />
+const prefersReducedMotion = () =>
+    typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+
+/**
+ * ECharts with only the charts/components this app uses registered (tree-shaken).
+ * Charts draw without animation when the user asks for reduced motion.
+ */
+export default function ReactECharts({ option, ...props }: Omit<EChartsReactProps, 'echarts'>) {
+    return <ReactEChartsCore echarts={echarts} option={prefersReducedMotion() ? { ...option, animation: false } : option} {...props} />
 }
