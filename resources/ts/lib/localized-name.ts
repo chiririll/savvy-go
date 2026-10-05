@@ -40,9 +40,5 @@ export function toStoredDefaultName(
         return original.trim()
     }
 
-    if (defaultNameKey(trimmed) && i18n.exists(`${group}.${trimmed.slice(1)}`, { ns: 'defaults' })) {
-        return trimmed
-    }
-
     return trimmed
 }

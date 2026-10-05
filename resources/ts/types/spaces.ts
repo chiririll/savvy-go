@@ -1,4 +1,5 @@
-export type SpaceRole = 'admin' | 'editor' | 'viewer'
+export const SPACE_ROLES = ['admin', 'editor', 'viewer'] as const
+export type SpaceRole = (typeof SPACE_ROLES)[number]
 
 export interface Space {
     id: number
@@ -52,7 +53,8 @@ export interface TransferSide {
     accountId?: number
 }
 
-export type TransferReview = 'created_remote' | 'deleted_remote' | 'changed_remote' | 'missing_remote'
+export const TRANSFER_REVIEWS = ['created_remote', 'deleted_remote', 'changed_remote', 'missing_remote'] as const
+export type TransferReview = (typeof TRANSFER_REVIEWS)[number]
 
 export interface SpaceTransfer {
     uuid: string

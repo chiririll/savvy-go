@@ -1,6 +1,7 @@
 import { Account } from './accounts'
 
-export type DebtType = 'i_owe' | 'owed_to_me'
+export const DEBT_TYPE_VALUES = ['i_owe', 'owed_to_me'] as const
+export type DebtType = (typeof DEBT_TYPE_VALUES)[number]
 
 /** A debt account; currentBalance is the amount still owed. */
 export interface Debt extends Account {

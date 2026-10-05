@@ -3,7 +3,7 @@
  * them under /spaces/{space}. Keep in sync with dataRoutes in
  * internal/httpserver/server.go.
  */
-const SPACE_ROOTS = new Set([
+export const SPACE_ROOTS = new Set([
     'currencies',
     'accounts',
     'accounts-balance-history',

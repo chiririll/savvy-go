@@ -1,5 +1,6 @@
 // API token (external app connection) types
-export type ApiTokenScope = 'read' | 'read-write'
+export const API_TOKEN_SCOPES = ['read', 'read-write'] as const
+export type ApiTokenScope = (typeof API_TOKEN_SCOPES)[number]
 
 export interface ApiTokenSummary {
     id: number
