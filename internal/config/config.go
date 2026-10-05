@@ -24,7 +24,6 @@ type Config struct {
 	SessionCookie string
 	CSRFCookie    string
 	CSRFHeader    string
-	SeedDemo      bool
 	AppKey        string
 }
 
@@ -54,7 +53,6 @@ func FromEnv() Config {
 		SessionCookie: firstNonEmpty(os.Getenv("AUTH_SESSION_COOKIE"), "svy_session"),
 		CSRFCookie:    firstNonEmpty(os.Getenv("AUTH_SESSION_CSRF_COOKIE"), "svy_csrf"),
 		CSRFHeader:    firstNonEmpty(os.Getenv("AUTH_SESSION_CSRF_HEADER"), "X-CSRF-Token"),
-		SeedDemo:      truthy(os.Getenv("SEED_DEMO")),
 	}
 	cfg.AppKey = loadAppKey(dataDir)
 	return cfg
@@ -125,13 +123,4 @@ func minutesEnv(key string, fallback int) time.Duration {
 		return time.Duration(fallback) * time.Minute
 	}
 	return time.Duration(n) * time.Minute
-}
-
-func truthy(v string) bool {
-	switch strings.ToLower(strings.TrimSpace(v)) {
-	case "1", "true", "yes", "on":
-		return true
-	default:
-		return false
-	}
 }

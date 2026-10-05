@@ -76,8 +76,7 @@ type expenseCand struct {
 	catName string
 }
 
-func seedWorkspace(ctx context.Context, db store.DB, loc *time.Location) (map[string]*domain.Account, error) {
-	now := time.Now().In(loc)
+func seedWorkspace(ctx context.Context, db store.DB, now time.Time) (map[string]*domain.Account, error) {
 	start := startOfMonth(now.AddDate(0, -monthsOfHistory, 0))
 	s := &seeder{
 		ctx:     ctx,
@@ -515,7 +514,7 @@ func (s *seeder) seedTransactionItems() error {
 	if target > len(s.expenses) {
 		target = len(s.expenses)
 	}
-	now := time.Now().UTC().Format(time.RFC3339)
+	now := s.now.UTC().Format(time.RFC3339)
 	for _, cand := range s.expenses[:target] {
 		catName := cand.catName
 		if catName == "" {

@@ -2,6 +2,9 @@ package seed
 
 import (
 	"context"
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -37,7 +40,7 @@ func openStoreKeys(t *testing.T) (*sqlite.Store, domain.KeyRing) {
 func seedDemo(t *testing.T) (*sqlite.Store, domain.KeyRing) {
 	t.Helper()
 	st, keys := openStoreKeys(t)
-	if err := Demo(context.Background(), st, keys, true, time.UTC); err != nil {
+	if _, err := Demo(context.Background(), st, keys, Options{Loc: time.UTC}); err != nil {
 		t.Fatal(err)
 	}
 	return st, keys
@@ -70,7 +73,7 @@ func TestDemoSkippedWhenDisabled(t *testing.T) {
 	st := openStore(t)
 	sqlDB := st.Server()
 	ctx := context.Background()
-	if err := Demo(ctx, st, domain.KeyRing{}, false, time.UTC); err != nil {
+	if err := Run(ctx, st, domain.KeyRing{}, Config{}, time.UTC); err != nil {
 		t.Fatal(err)
 	}
 	if n := countWhere(t, sqlDB, `SELECT COUNT(*) FROM users`); n != 0 {
@@ -202,7 +205,7 @@ func TestDemoDoesNotReseed(t *testing.T) {
 	users := countWhere(t, sqlDB, `SELECT COUNT(*) FROM users`)
 	accts := countWhere(t, space, `SELECT COUNT(*) FROM accounts`)
 	txs := countWhere(t, space, `SELECT COUNT(*) FROM transactions`)
-	if err := Demo(ctx, st, keys, true, time.UTC); err != nil {
+	if _, err := Demo(ctx, st, keys, Options{Loc: time.UTC}); err != nil {
 		t.Fatal(err)
 	}
 	if n := countWhere(t, sqlDB, `SELECT COUNT(*) FROM users`); n != users {
@@ -224,7 +227,7 @@ func TestDemoSkipsWhenUsersExist(t *testing.T) {
 	if _, err := (auth.Users{DB: sqlDB}).Create(ctx, "Owner", "owner@example.com", &pass, auth.RoleAdmin); err != nil {
 		t.Fatal(err)
 	}
-	if err := Demo(ctx, st, domain.KeyRing{}, true, time.UTC); err != nil {
+	if _, err := Demo(ctx, st, domain.KeyRing{}, Options{Loc: time.UTC}); err != nil {
 		t.Fatal(err)
 	}
 	if n := countWhere(t, sqlDB, `SELECT COUNT(*) FROM users WHERE email = 'demo@demo.com'`); n != 0 {
@@ -232,5 +235,72 @@ func TestDemoSkipsWhenUsersExist(t *testing.T) {
 	}
 	if n := countWhere(t, sqlDB, `SELECT COUNT(*) FROM users`); n != 1 {
 		t.Fatalf("users=%d", n)
+	}
+}
+
+func TestDemoPinnedDateIsReproducibleAndHasManifest(t *testing.T) {
+	now, err := Config{Date: "2026-03-15"}.now(time.UTC)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var dumps [2]string
+	var manifest *Manifest
+	for i := range dumps {
+		st, keys := openStoreKeys(t)
+		manifest, err = Demo(context.Background(), st, keys, Options{Loc: time.UTC, Now: now})
+		if err != nil {
+			t.Fatal(err)
+		}
+		space := spaceByName(t, st, "Demo")
+		var last string
+		if err := space.QueryRowContext(context.Background(), `SELECT MAX(date) FROM transactions WHERE status = 'confirmed'`).Scan(&last); err != nil {
+			t.Fatal(err)
+		}
+		if last > "2026-03-15" {
+			t.Fatalf("confirmed transaction after the pinned date: %s", last)
+		}
+		var sum string
+		if err := space.QueryRowContext(context.Background(), `SELECT COUNT(*) || ':' || SUM(amount) FROM transactions`).Scan(&sum); err != nil {
+			t.Fatal(err)
+		}
+		dumps[i] = sum
+	}
+	if dumps[0] != dumps[1] {
+		t.Fatalf("same date seeded different data: %s vs %s", dumps[0], dumps[1])
+	}
+	if manifest == nil || !manifest.Now.Equal(now) || len(manifest.Users) != 4 || len(manifest.Spaces) != 3 {
+		t.Fatalf("manifest: %+v", manifest)
+	}
+	if len(manifest.Invitations) != 2 || manifest.Invitations[0].Token == "" {
+		t.Fatalf("invitations: %+v", manifest.Invitations)
+	}
+	if len(manifest.Spaces[0].Automations) == 0 || manifest.Spaces[2].Members["alex"] != domain.SpaceAdmin {
+		t.Fatalf("spaces: %+v", manifest.Spaces)
+	}
+}
+
+func TestConfigRejectsBadDate(t *testing.T) {
+	if _, err := (Config{Date: "15.03.2026"}).now(time.UTC); err == nil {
+		t.Fatal("accepted a malformed date")
+	}
+}
+
+func TestRunWritesManifest(t *testing.T) {
+	st, keys := openStoreKeys(t)
+	path := filepath.Join(t.TempDir(), "out", "manifest.json")
+	cfg := Config{Enabled: true, Date: "2026-03-15", Manifest: path}
+	if err := Run(context.Background(), st, keys, cfg, time.UTC); err != nil {
+		t.Fatal(err)
+	}
+	var m Manifest
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(raw, &m); err != nil {
+		t.Fatal(err)
+	}
+	if got := m.Now.Format("2006-01-02T15:04:05Z07:00"); got != "2026-03-15T12:00:00Z" {
+		t.Fatalf("manifest now = %s", got)
 	}
 }
