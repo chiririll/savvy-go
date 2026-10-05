@@ -265,76 +265,33 @@ func TestServerBackupMustMatchItsSpaceFiles(t *testing.T) {
 	}
 }
 
-// writeSingleFile builds a database in the single-file layout: every table
-// in one file, read-write and read-only roles.
-func writeSingleFile(t *testing.T) string {
-	t.Helper()
+// A Go database never holds the server and the finances in one file, so such
+// a file is refused rather than split.
+func TestGoFileWithEverythingIsRefused(t *testing.T) {
+	ctx := context.Background()
 	path := filepath.Join(t.TempDir(), "database.sqlite")
 	d, err := db.Open(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer d.Close()
-	if err := migrate.Up(context.Background(), d); err != nil {
-		t.Fatal(err)
-	}
-	for _, q := range []string{
-		// The single-file layout allowed the retired roles; its CHECK is gone
-		// here, so recreate the rows through a table without it.
-		`PRAGMA ignore_check_constraints = ON`,
-		`INSERT INTO users (id, name, email, role) VALUES (1, 'Admin', 'a@x', 'admin'), (2, 'Writer', 'w@x', 'read-write'), (3, 'Reader', 'r@x', 'read-only')`,
-		`INSERT INTO settings (key, value) VALUES ('auto_update_currencies', 'false'), ('sso_allow_signup', 'false')`,
-		`INSERT INTO currencies (code, name, symbol, decimals, is_base, rate) VALUES ('EUR', 'Euro', '€', 2, 1, '1')`,
-		`INSERT INTO accounts (name, type, currency_id) VALUES ('Cash', 'cash', 1)`,
-	} {
-		if _, err := d.Exec(q); err != nil {
-			t.Fatal(q, err)
+	for _, set := range []migrate.Set{migrate.Server, migrate.Space} {
+		if err := set.Up(ctx, d); err != nil {
+			t.Fatal(err)
 		}
 	}
-	return path
-}
+	_ = d.Close()
 
-// P21: a database in the single-file layout restores as a server: the server
-// tables go to the server, the finances to space 1, and the old roles become
-// memberships.
-func TestP21SingleFileSplitsIntoServerAndSpace(t *testing.T) {
-	ctx := context.Background()
 	s := openApp(t)
-	p, err := s.PrepareServer(ctx, writeSingleFile(t))
-	if err != nil {
-		t.Fatal(err)
+	if _, err := s.PrepareServer(ctx, path); !errors.Is(err, ErrWrongKind) {
+		t.Fatalf("as a server: %v", err)
 	}
-	if err := s.ReplaceServer(ctx, p); err != nil {
-		t.Fatal(err)
-	}
-	srv := s.Server()
-	if n := count(t, srv, `SELECT COUNT(*) FROM users WHERE role IN ('admin', 'user')`); n != 3 {
-		t.Fatalf("users with mapped roles %d", n)
-	}
-	for user, role := range map[int]string{1: "admin", 2: "editor", 3: "viewer"} {
-		if n := count(t, srv, `SELECT COUNT(*) FROM space_members WHERE space_id = 1 AND user_id = ? AND role = ?`, user, role); n != 1 {
-			t.Fatalf("user %d is not %s of space 1", user, role)
-		}
-	}
-	space, err := s.Space(ctx, 1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if n := count(t, space, `SELECT COUNT(*) FROM accounts`); n != 1 {
-		t.Fatalf("accounts %d", n)
-	}
-	if n := count(t, space, `SELECT COUNT(*) FROM space_settings WHERE key = 'auto_update_currencies' AND value = 'false'`); n != 1 {
-		t.Fatal("the space setting did not move into the space")
-	}
-	var uuid string
-	_ = srv.QueryRowContext(ctx, `SELECT uuid FROM spaces WHERE id = 1`).Scan(&uuid)
-	if n := count(t, space, `SELECT COUNT(*) FROM space_settings WHERE key = 'space_uuid' AND value = ?`, uuid); n != 1 {
-		t.Fatal("the space file does not carry its registry uuid")
+	if _, err := s.PrepareSpace(ctx, path); !errors.Is(err, ErrWrongKind) {
+		t.Fatalf("as a space: %v", err)
 	}
 }
 
-// P21: a Laravel-era backup is converted, then split like a single file; as a
-// space backup only its finances are taken.
+// P21: a Laravel backup is converted, then split into the server and space 1
+// with the Laravel roles mapped; as a space backup only its finances are taken.
 func TestP21LaravelBackup(t *testing.T) {
 	ctx := context.Background()
 	path := filepath.Join(t.TempDir(), "laravel.sqlite")
@@ -349,8 +306,15 @@ func TestP21LaravelBackup(t *testing.T) {
 	if _, err := d.Exec(string(script)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := d.Exec(`INSERT INTO migrations (migration, batch) VALUES (?, 2)`, legacy.LatestMigration); err != nil {
-		t.Fatal(err)
+	for _, q := range []string{
+		`INSERT INTO migrations (migration, batch) VALUES ('` + legacy.LatestMigration + `', 2)`,
+		`INSERT INTO users (id, name, email, role) VALUES (2, 'Writer', 'w@x', 'read-write'), (3, 'Reader', 'r@x', 'read-only')`,
+		`CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT)`,
+		`INSERT INTO settings (key, value) VALUES ('auto_update_currencies', 'false')`,
+	} {
+		if _, err := d.Exec(q); err != nil {
+			t.Fatal(q, err)
+		}
 	}
 	_ = d.Close()
 
@@ -377,11 +341,25 @@ func TestP21LaravelBackup(t *testing.T) {
 	if err := s.ReplaceServer(ctx, p); err != nil {
 		t.Fatal(err)
 	}
-	if n := count(t, s.Server(), `SELECT COUNT(*) FROM space_members WHERE space_id = 1 AND user_id = 1 AND role = 'admin'`); n != 1 {
-		t.Fatal("the Laravel admin does not administer space 1")
+	srv := s.Server()
+	if n := count(t, srv, `SELECT COUNT(*) FROM users WHERE role IN ('admin', 'user')`); n != 3 {
+		t.Fatalf("users with mapped roles %d", n)
+	}
+	for user, role := range map[int]string{1: "admin", 2: "editor", 3: "viewer"} {
+		if n := count(t, srv, `SELECT COUNT(*) FROM space_members WHERE space_id = 1 AND user_id = ? AND role = ?`, user, role); n != 1 {
+			t.Fatalf("user %d is not %s of space 1", user, role)
+		}
 	}
 	space, _ = s.Space(ctx, 1)
 	if n := count(t, space, `SELECT COUNT(*) FROM accounts`); n != 4 {
 		t.Fatalf("accounts %d", n)
+	}
+	if n := count(t, space, `SELECT COUNT(*) FROM space_settings WHERE key = 'auto_update_currencies' AND value = 'false'`); n != 1 {
+		t.Fatal("the space setting did not move into the space")
+	}
+	var uuid string
+	_ = srv.QueryRowContext(ctx, `SELECT uuid FROM spaces WHERE id = 1`).Scan(&uuid)
+	if n := count(t, space, `SELECT COUNT(*) FROM space_settings WHERE key = 'space_uuid' AND value = ?`, uuid); n != 1 {
+		t.Fatal("the space file does not carry its registry uuid")
 	}
 }

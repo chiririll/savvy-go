@@ -5,8 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
-
-	"savvy-go/internal/migrate"
 )
 
 // Laravel declared these columns as date and stored "YYYY-MM-DD 00:00:00". Go
@@ -16,18 +14,6 @@ var dateColumns = map[string][]string{
 	"recurring_transactions": {"start_date", "end_date", "next_run_date", "last_run_date"},
 	"budgets":                {"start_date", "end_date"},
 	"accounts":               {"due_date"},
-}
-
-// normalizeDates cuts stored dates to YYYY-MM-DD. It is enough for a
-// Go-schema database, whose date columns are already declared TEXT.
-func normalizeDates(ctx context.Context, db *sql.DB) error {
-	return eachDateColumn(ctx, db, func(table, col string) error {
-		q := fmt.Sprintf(`UPDATE %s SET %[2]s = substr(%[2]s, 1, 10) WHERE length(%[2]s) > 10`, table, quoteIdent(col))
-		if _, err := db.ExecContext(ctx, q); err != nil {
-			return fmt.Errorf("normalize %s.%s: %w", table, col, err)
-		}
-		return nil
-	})
 }
 
 // retypeDateColumns makes the date columns of a Laravel table declared TEXT
@@ -88,13 +74,13 @@ func retypeDateColumns(ctx context.Context, db *sql.DB) error {
 		return err
 	}
 	// Indexes on the swapped columns were dropped; recreate every declared index.
-	return migrate.EnsureIndexes(ctx, db)
+	return ensureIndexes(ctx, db)
 }
 
 // eachDateColumn calls fn for every date column that exists in q's database.
-func eachDateColumn(ctx context.Context, q migrate.Querier, fn func(table, col string) error) error {
+func eachDateColumn(ctx context.Context, q querier, fn func(table, col string) error) error {
 	for table, cols := range dateColumns {
-		have, err := migrate.Columns(ctx, q, table)
+		have, err := columns(ctx, q, table)
 		if err != nil {
 			return err
 		}

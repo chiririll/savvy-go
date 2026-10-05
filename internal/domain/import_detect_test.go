@@ -108,7 +108,7 @@ func TestCategoryResolver(t *testing.T) {
 	}
 	defer sqlDB.Close()
 	ctx := context.Background()
-	if err := migrate.Up(ctx, sqlDB); err != nil {
+	if err := migrate.Space.Up(ctx, sqlDB); err != nil {
 		t.Fatal(err)
 	}
 	cats := Categories{DB: sqlDB}

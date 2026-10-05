@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"savvy-go/internal/db"
-	"savvy-go/internal/migrate"
 )
 
 // addRepeatedNames adds names that differ only by case, which the old schema
@@ -98,39 +97,64 @@ func TestUpgradeDedupesNamesAndConformsSchema(t *testing.T) {
 	}
 }
 
-func TestCopyDedupesNames(t *testing.T) {
+// TestConformRebuildsOldTables degrades a table to the pre-STRICT shape, with
+// an extra retired column, and expects conform to restore the current
+// definition without losing rows or the id sequence.
+func TestConformRebuildsOldTables(t *testing.T) {
+	sqlDB, err := db.Open(filepath.Join(t.TempDir(), "database.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = sqlDB.Close() })
 	ctx := context.Background()
-	dir := t.TempDir()
-	src, err := db.Open(filepath.Join(dir, "laravel.sqlite"))
+	if err := upBoth(ctx, sqlDB); err != nil {
+		t.Fatal(err)
+	}
+	exec := func(q string) {
+		t.Helper()
+		if _, err := sqlDB.ExecContext(ctx, q); err != nil {
+			t.Fatalf("%s: %v", q, err)
+		}
+	}
+	exec(`PRAGMA foreign_keys=OFF`)
+	exec(`CREATE TABLE tags_old (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, created_at TEXT, updated_at TEXT, retired TEXT)`)
+	exec(`DROP TABLE tags`)
+	exec(`ALTER TABLE tags_old RENAME TO tags`)
+	exec(`PRAGMA foreign_keys=ON`)
+	exec(`INSERT INTO tags (id, name, retired) VALUES (1, 'a', 'x'), (2, 'b', 'y'), (3, 'c', 'z')`)
+	exec(`DELETE FROM tags WHERE id = 3`) // the sequence stays at 3
+
+	if err := conform(ctx, sqlDB); err != nil {
+		t.Fatal(err)
+	}
+	if err := conform(ctx, sqlDB); err != nil { // idempotent
+		t.Fatal(err)
+	}
+
+	var strict, retired int
+	if err := sqlDB.QueryRowContext(ctx, `SELECT strict FROM pragma_table_list WHERE name = 'tags' AND schema = 'main'`).Scan(&strict); err != nil || strict != 1 {
+		t.Fatalf("tags strict = %d, %v", strict, err)
+	}
+	if err := sqlDB.QueryRowContext(ctx, `SELECT COUNT(*) FROM pragma_table_info('tags') WHERE name = 'retired'`).Scan(&retired); err != nil || retired != 0 {
+		t.Fatalf("retired column kept (%d, %v)", retired, err)
+	}
+	var n int
+	if err := sqlDB.QueryRowContext(ctx, `SELECT COUNT(*) FROM tags WHERE name IN ('a', 'b')`).Scan(&n); err != nil || n != 2 {
+		t.Fatalf("rows kept = %d, %v", n, err)
+	}
+	res, err := sqlDB.ExecContext(ctx, `INSERT INTO tags (name) VALUES ('d')`)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = src.Close() })
-	createLaravelShape(t, src)
-	addRepeatedNames(t, src)
-
-	dest, err := db.Open(filepath.Join(dir, "go.sqlite"))
-	if err != nil {
-		t.Fatal(err)
+	if id, _ := res.LastInsertId(); id != 4 {
+		t.Errorf("next id = %d, want 4 (sequence carried over)", id)
 	}
-	t.Cleanup(func() { _ = dest.Close() })
-	if err := migrate.Up(ctx, dest); err != nil {
-		t.Fatal(err)
+	var enforced int
+	if err := sqlDB.QueryRowContext(ctx, `PRAGMA foreign_keys`).Scan(&enforced); err != nil || enforced != 1 {
+		t.Errorf("foreign_keys left %d, %v", enforced, err)
 	}
-	if err := Copy(ctx, dest, src); err != nil {
-		t.Fatal(err)
-	}
-	assertRenamed(t, dest)
-
-	// Idempotent: a second copy neither duplicates nor renames again.
-	if err := Copy(ctx, dest, src); err != nil {
-		t.Fatal(err)
-	}
-	assertRenamed(t, dest)
 }
 
-// assertConformed checks every table is STRICT, retired columns are gone and no
-// foreign key is left dangling by the rebuild.
 func assertConformed(t *testing.T, sqlDB *sql.DB) {
 	t.Helper()
 	rows, err := sqlDB.Query(`SELECT name FROM pragma_table_list WHERE schema = 'main' AND type = 'table' AND strict = 0 AND name NOT LIKE 'sqlite_%'`)

@@ -492,7 +492,7 @@ func NewWebAuthnCred(c auth.WebAuthnCred) WebAuthnCred {
 
 // Backup status: "current" is a backup signed by this server (or a key it
 // trusts), "unsigned" one made elsewhere or edited, "raw" a bare database file
-// (single-file layout or Laravel-era) and "invalid" one that cannot be read.
+// (a Laravel one) and "invalid" one that cannot be read.
 type Backup struct {
 	Filename   string     `json:"filename"`
 	Size       int64      `json:"size"`

@@ -95,11 +95,11 @@ type Store interface {
 	// ExportServer writes the server database and every space database into
 	// dir; spaces cannot be created or removed meanwhile.
 	ExportServer(ctx context.Context, dir string) error
-	// PrepareSpace validates a space database (a space backup, a single-file
-	// or Laravel-era database) for ReplaceSpace or ImportSpace.
+	// PrepareSpace validates a space database (a space backup or a Laravel
+	// database) for ReplaceSpace or ImportSpace.
 	PrepareSpace(ctx context.Context, src string) (*PreparedSpace, error)
 	// PrepareServer validates a server backup: a directory written by
-	// ExportServer, or a single-file or Laravel-era database, which is split.
+	// ExportServer, or a Laravel database, which is split.
 	PrepareServer(ctx context.Context, src string) (*PreparedServer, error)
 	// ReplaceSpace swaps a space's database for a prepared one.
 	ReplaceSpace(ctx context.Context, id int64, p *PreparedSpace) error

@@ -9,7 +9,6 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	"savvy-go/internal/migrate"
 	"savvy-go/internal/money"
 )
 
@@ -23,7 +22,7 @@ type scales struct {
 	base        int64
 }
 
-func loadScales(ctx context.Context, q migrate.Querier) (*scales, error) {
+func loadScales(ctx context.Context, q querier) (*scales, error) {
 	s := &scales{currencyDec: map[int64]int{}, accountCur: map[int64]int64{}, txAccount: map[int64]int64{}}
 	pairs := []struct {
 		query string
@@ -51,7 +50,7 @@ func loadScales(ctx context.Context, q migrate.Querier) (*scales, error) {
 	return s, nil
 }
 
-func scanPairs(ctx context.Context, q migrate.Querier, query string, each func(a, b int64)) error {
+func scanPairs(ctx context.Context, q querier, query string, each func(a, b int64)) error {
 	rows, err := q.QueryContext(ctx, query)
 	if err != nil {
 		return err
@@ -206,7 +205,7 @@ func convertMoneyInPlace(ctx context.Context, db *sql.DB) error {
 	}
 	var plans []plan
 	for _, spec := range inPlaceMoney {
-		have, err := migrate.Columns(ctx, db, spec.table)
+		have, err := columns(ctx, db, spec.table)
 		if err != nil {
 			return err
 		}
@@ -317,7 +316,7 @@ func convertMoneyInPlace(ctx context.Context, db *sql.DB) error {
 		return err
 	}
 	// Indexes on the swapped columns were dropped; recreate every declared index.
-	return migrate.EnsureIndexes(ctx, db)
+	return ensureIndexes(ctx, db)
 }
 
 // dropIndexesOn drops the CREATE INDEX indexes of table that include any of cols.

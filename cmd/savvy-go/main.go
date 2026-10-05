@@ -45,7 +45,7 @@ func main() {
 		os.Exit(1)
 	}
 	defer st.Close()
-	if err := migrateSingleFile(ctx, cfg.DataDir, st); err != nil {
+	if err := migrateLaravelFile(ctx, cfg.DataDir, st); err != nil {
 		slog.Error("migrate database.sqlite", "err", err)
 		os.Exit(1)
 	}
@@ -150,10 +150,10 @@ func main() {
 	}
 }
 
-// migrateSingleFile moves a database.sqlite of the single-file layout (or a
-// Laravel-era one) into server.sqlite and space 1, once: only while the server
-// has no users, and the old file is kept renamed.
-func migrateSingleFile(ctx context.Context, dataDir string, st *sqlite.Store) error {
+// migrateLaravelFile moves the database.sqlite of a Laravel install into
+// server.sqlite and space 1, once: only while the server has no users, and
+// the old file is kept renamed.
+func migrateLaravelFile(ctx context.Context, dataDir string, st *sqlite.Store) error {
 	old := filepath.Join(dataDir, "database.sqlite")
 	if _, err := os.Stat(old); err != nil {
 		return nil
