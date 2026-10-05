@@ -39,8 +39,9 @@ export class ErrorBoundary extends Component<Props, State> {
         console.error('Error caught by boundary:', error, errorInfo)
     }
 
-    handleReset = () => {
-        this.setState({ hasError: false, error: undefined })
+    // Re-rendering the same tree usually hits the same error, so start over.
+    handleRetry = () => {
+        window.location.reload()
     }
 
     render() {
@@ -63,7 +64,7 @@ export class ErrorBoundary extends Component<Props, State> {
                             {this.state.error.message}
                         </pre>
                     )}
-                    <Button onClick={this.handleReset}>
+                    <Button onClick={this.handleRetry}>
                         <RefreshCw className="mr-2 h-4 w-4" />
                         {i18n.t('actions.retry')}
                     </Button>
