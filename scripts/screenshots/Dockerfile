@@ -10,6 +10,7 @@ RUN npm ci
 RUN test "$(node -p "require('playwright/package.json').version")" = "${PLAYWRIGHT_VERSION}" \
     || { echo "scripts/package-lock.json has another Playwright than PLAYWRIGHT_VERSION=${PLAYWRIGHT_VERSION}: update both" >&2; exit 1; }
 COPY scripts/screenshots ./screenshots
-# The script reads the list of pages from the app's sources.
+# The script reads the list of pages and the languages (a directory each) from the app's sources.
 COPY resources/ts/app/pages.ts /app/resources/ts/app/pages.ts
+COPY resources/ts/locales /app/resources/ts/locales
 CMD ["npx", "tsx", "screenshots/run.ts"]

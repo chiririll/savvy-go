@@ -4,14 +4,17 @@
 // internal/seed/manifest.go); the manifest says who can sign in, which spaces
 // exist and which ids the parametrised pages need. See docs/scripts.md.
 //
-// Run it with docker compose (docker-compose.screenshots.yml); only the page filter is an argument: --only=<text in the page path>
+// What is taken is set in a config of configs/ (users, spaces, viewports, languages, themes, pages, ...).
+// Run it with docker compose (docker-compose.screenshots.yml).
 // Env:   BASE_URL (http://localhost:8080), MANIFEST (<repo>/screenshots/manifest.json),
-//        OUT (<repo>/screenshots), CONCURRENCY (4), TZ (UTC), LOCALE (en-US)
+//        OUT (<repo>/screenshots), RUN_NAME (the start time; the files go to OUT/RUN_NAME),
+//        CONFIG (the name of a file of configs/; none: the defaults), CONCURRENCY (4), TZ (UTC)
 import { mkdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium, devices, type Browser, type BrowserContextOptions, type Locator, type Page as PwPage } from 'playwright'
 import { pages, type Page } from '../../resources/ts/app/pages.ts'
+import { loadConfig, pageWanted, type Config } from './config.ts'
 import type { Manifest, ManifestSpace } from './manifest.ts'
 import { paramValue, routes, skip } from './routes.ts'
 
@@ -19,12 +22,16 @@ const env = (name: string, fallback: string) => process.env[name]?.trim() || fal
 const baseURL = env('BASE_URL', 'http://localhost:8080').replace(/\/$/, '')
 // Relative to the repository, not the working directory (npm --prefix runs from scripts/).
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
-const outDir = path.resolve(env('OUT', path.join(root, 'screenshots')))
-const manifestPath = path.resolve(env('MANIFEST', path.join(outDir, 'manifest.json')))
+const outRoot = path.resolve(env('OUT', path.join(root, 'screenshots')))
+const configName = env('CONFIG', '')
+// Every run has a directory of its own, named by when it started (and by its config), so nothing
+// has to be cleaned between runs.
+const stamp = new Date().toISOString().slice(0, 19).replace('T', '_').replace(/:/g, '-')
+const runName = env('RUN_NAME', configName ? `${stamp}_${configName}` : stamp)
+const outDir = path.join(outRoot, runName)
+const manifestPath = path.resolve(env('MANIFEST', path.join(outRoot, 'manifest.json')))
 const concurrency = Number(env('CONCURRENCY', '4'))
 const timezoneId = env('TZ', 'UTC')
-const locale = env('LOCALE', 'en-US')
-const only = process.argv.find((a) => a.startsWith('--only='))?.slice('--only='.length)
 
 const viewports: Record<string, BrowserContextOptions> = {
     desktop: { viewport: { width: 1440, height: 900 } },
@@ -44,6 +51,8 @@ const pageName = (p: string) => slug(p.replace(/^\//, '').replace(/\//g, '-')) |
 interface Job {
     label: string
     viewport: string
+    language: string
+    theme: string
     dir: string
     // The page's "today" and the session, space and pages to capture.
     storageState?: BrowserContextOptions['storageState']
@@ -53,6 +62,7 @@ interface Job {
     seen?: Set<string>
 }
 
+let config: Config
 const failures: string[] = []
 let saved = 0
 let done = 0
@@ -63,6 +73,10 @@ const log = (job: Job, what: string) => console.log(`[${job.label} ${job.viewpor
 
 async function main() {
     const manifest: Manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+    config = await loadConfig(configName, manifest, {
+        viewports: Object.keys(viewports),
+        pages: routes.map((r) => r.path),
+    })
     // The app works out some periods ("last 30 days") from the server's own clock,
     // so data seeded for another day only looks right if the server runs on that
     // day. The browser's clock is moved to the seeded day, but the server's is not.
@@ -89,36 +103,49 @@ async function main() {
         }
         resolved.add(page.path)
         // The name leaves out the ids, which differ from run to run.
-        return only && !p.includes(only) ? [] : [{ path: p, name: pageName(page.path.replace(/\/:\w+/g, '')) }]
+        return pageWanted(config, page.path) ? [{ path: p, name: pageName(page.path.replace(/\/:\w+/g, '')) }] : []
     }
     const pagesOf = (scope: Page['scope'], space?: ManifestSpace): Job['pages'] =>
         routes.filter((r) => r.scope === scope).flatMap((r) => fill(r, space))
 
+    // Everything is taken once for each language and theme, in a directory of its own.
+    const variants = config.languages.flatMap((language) => config.themes.map((theme) => ({ language, theme, name: `${language}-${theme}` })))
+
     const jobs: Job[] = []
-    for (const viewport of Object.keys(viewports)) {
-        jobs.push({ label: 'public', viewport, dir: 'public', pages: pagesOf('public') })
+    for (const v of variants) {
+        for (const viewport of config.viewports) {
+            const list = pagesOf('public')
+            if (list.length) jobs.push({ label: `${v.name} public`, viewport, language: v.language, theme: v.theme, dir: path.join(v.name, 'public'), pages: list })
+        }
     }
 
     for (const user of manifest.users) {
+        if (config.users.length && !config.users.includes(user.key)) continue
         const storageState = await signIn(browser, user.email, user.password)
-        const mine = manifest.spaces.filter((s) => user.key in s.members)
-        for (const viewport of Object.keys(viewports)) {
-            mine.forEach((sp, i) => {
-                const list = pagesOf('space', sp)
-                // On a phone the sidebar is a drawer behind a button, so it is not in any page's shot.
-                if (viewport === 'mobile' && (!only || 'sidebar'.includes(only))) {
-                    list.unshift({ path: pages.dashboard.path, name: 'sidebar', sidebar: true })
-                }
-                // Pages of the user and the server do not depend on the space: once is enough.
-                if (i === 0) {
-                    list.push(...pagesOf('user'))
-                    if (user.role === 'admin') list.push(...pagesOf('admin'))
-                }
-                jobs.push({
-                    label: `${user.key}/${slug(sp.name)}`, viewport, storageState, spaceId: sp.id, pages: list,
-                    dir: path.join(user.key, slug(sp.name)),
+        const mine = manifest.spaces
+            .filter((s) => user.key in s.members)
+            .filter((s) => !config.spaces.length || config.spaces.some((n) => n.toLowerCase() === s.name.toLowerCase()))
+        for (const v of variants) {
+            for (const viewport of config.viewports) {
+                mine.forEach((sp, i) => {
+                    const list = pagesOf('space', sp)
+                    // On a phone the sidebar is a drawer behind a button, so it is not in any page's shot.
+                    if (viewport === 'mobile' && config.sidebar) {
+                        list.unshift({ path: pages.dashboard.path, name: 'sidebar', sidebar: true })
+                    }
+                    // Pages of the user and the server do not depend on the space: once is enough.
+                    if (i === 0) {
+                        list.push(...pagesOf('user'))
+                        if (user.role === 'admin') list.push(...pagesOf('admin'))
+                    }
+                    if (!list.length) return
+                    jobs.push({
+                        label: `${v.name} ${user.key}/${slug(sp.name)}`, viewport, language: v.language, theme: v.theme,
+                        storageState, spaceId: sp.id, pages: list,
+                        dir: path.join(v.name, user.key, slug(sp.name)),
+                    })
                 })
-            })
+            }
         }
     }
     // Some spaces have no value (no automation rules): only a page that has none anywhere is worth a warning.
@@ -126,7 +153,10 @@ async function main() {
     if (never.length) console.warn(`Left out, no value for their parameters in the manifest: ${never.join(', ')}`)
 
     total = jobs.reduce((n, j) => n + j.pages.length, 0)
-    console.log(`${baseURL}: ${total} pages in ${jobs.length} runs (user, space, viewport), ${concurrency} at a time`)
+    console.log(
+        `${baseURL}, config ${configName || 'default'}: ${total} pages in ${jobs.length} runs; languages ${config.languages.join(', ')}, themes ${config.themes.join(', ')}, ` +
+            `viewports ${config.viewports.join(', ')}; ${concurrency} at a time`,
+    )
     const queue = [...jobs]
     await Promise.all(
         Array.from({ length: concurrency }, async () => {
@@ -156,23 +186,28 @@ async function signIn(browser: Browser, email: string, password: string) {
 
 async function run(browser: Browser, job: Job, now: Date | null) {
     const context = await browser.newContext({
-        ...viewports[job.viewport], baseURL, locale, timezoneId, storageState: job.storageState,
+        ...viewports[job.viewport], baseURL, timezoneId, storageState: job.storageState,
+        // What the browser itself says; the app also keeps its own choice in storage (below).
+        locale: job.language, colorScheme: job.theme as 'light' | 'dark',
         reducedMotion: 'reduce',
     })
     // install() keeps the time running: charts animate off the clock and stall on a frozen one.
     if (now) await context.clock.install({ time: now })
     await context.addInitScript(
-        ({ css, spaceId }) => {
+        ({ css, spaceId, language, theme }) => {
             if (spaceId !== undefined) {
                 localStorage.setItem('savvy-space', JSON.stringify({ state: { currentId: spaceId }, version: 0 }))
             }
+            // The keys of the app's language and theme choice (lib/i18n.ts, hooks/use-theme.ts).
+            localStorage.setItem('savvy.locale', language)
+            localStorage.setItem('theme', theme)
             document.addEventListener('DOMContentLoaded', () => {
                 const style = document.createElement('style')
                 style.textContent = css
                 document.head.append(style)
             })
         },
-        { css: noMotion, spaceId: job.spaceId },
+        { css: noMotion, spaceId: job.spaceId, language: job.language, theme: job.theme },
     )
     const page = await context.newPage()
     const dir = path.join(outDir, job.dir, job.viewport)
@@ -198,8 +233,8 @@ async function run(browser: Browser, job: Job, now: Date | null) {
                 ok = true
                 log(job, `${done + 1}/${total} ${p.path}${p.sidebar ? ' (sidebar)' : ''}`)
                 if (!p.sidebar) {
-                    await captureTabs(page, job, page.locator('body'), p.name, dir, 'page')
-                    await captureDialogs(page, job, p.name, dir, frameDone)
+                    if (config.tabs) await captureTabs(page, job, page.locator('body'), p.name, dir, 'page')
+                    if (config.dialogs) await captureDialogs(page, job, p.name, dir, frameDone)
                 }
                 break
             } catch (e) {
@@ -348,7 +383,7 @@ async function captureDialogs(page: PwPage, job: Job, pageName: string, dir: str
         saved++
         take(id)
         log(job, `  dialog ${name}`)
-        await captureTabs(page, job, page.locator(dialogSelector).first(), name, dialogs, 'dialog')
+        if (config.tabs) await captureTabs(page, job, page.locator(dialogSelector).first(), name, dialogs, 'dialog')
         await closeAll()
     }
 

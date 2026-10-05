@@ -39,6 +39,10 @@ services:
       BASE_URL: http://savvy
       MANIFEST: /data/manifest.json
       OUT: /out
+      # The name of this run's directory in ./screenshots; the start time when empty.
+      RUN_NAME: ${RUN_NAME:-}
+      # The name of a file of scripts/screenshots/configs; the defaults when empty.
+      CONFIG: ${CONFIG:-}
       TZ: UTC
     # Chromium recommends sharing the host's IPC namespace in Docker.
     ipc: host
