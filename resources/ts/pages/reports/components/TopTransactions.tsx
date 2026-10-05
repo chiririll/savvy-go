@@ -70,7 +70,7 @@ export function TopTransactions({ filters, type, limit = 10 }: TopTransactionsPr
                     )}
                 </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-3 sm:px-6">
                 {isLoading ? (
                     <div className="space-y-2">
                         {Array.from({ length: 5 }).map((_, index) => (
@@ -86,7 +86,7 @@ export function TopTransactions({ filters, type, limit = 10 }: TopTransactionsPr
                         {transactions.map((transaction, index) => (
                             <div
                                 key={transaction.id}
-                                className="group flex items-center gap-2 sm:gap-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                                className="group flex items-center gap-2 sm:gap-3 px-1 py-2 sm:px-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
                                 onClick={() => navigate(`/transactions?id=${transaction.id}`)}
                             >
                                 <div className="flex items-center justify-center size-6 shrink-0 rounded-full bg-muted text-xs font-medium text-muted-foreground">
@@ -115,7 +115,7 @@ export function TopTransactions({ filters, type, limit = 10 }: TopTransactionsPr
                                         {amountPrefix}{formatCurrency(transaction.amount, currency)}
                                     </p>
                                 </div>
-                                <ChevronRight className="size-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                                <ChevronRight className="hidden sm:block size-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
                             </div>
                         ))}
                     </div>

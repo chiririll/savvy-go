@@ -23,6 +23,45 @@ const NARROW_CHART_HEIGHT = 460
 const NARROW_DONUT_CENTER_Y = 160
 const DONUT_CENTER_X = 0.35
 
+/**
+ * Treemap label sized to the tile it sits in. The tile's side is estimated from its
+ * share of the chart area (tiles are roughly square): tiny tiles get no label, small
+ * ones just the name, larger ones add the amount and percentage.
+ */
+function treemapLabel(
+    item: { name: string; value: number },
+    total: number,
+    currency: string | null | undefined,
+    chartWidth: number,
+) {
+    const side = Math.sqrt((item.value / (total || 1)) * chartWidth * CHART_HEIGHT)
+    if (side < 44) return { show: false }
+
+    const font = Math.max(9, Math.min(14, Math.round(side / 7)))
+    const width = Math.max(side - 14, 20)
+    const text = (extra: Record<string, unknown> = {}) => ({
+        fontSize: font,
+        color: '#fff',
+        lineHeight: font + 6,
+        width,
+        overflow: 'truncate',
+        ...extra,
+    })
+    const lines = [`{name|${item.name}}`]
+    if (side >= 76) lines.push(`{value|${formatCurrency(item.value, currency)}}`)
+    if (side >= 96) lines.push(`{percent|${Math.round((item.value / (total || 1)) * 100)}%}`)
+
+    return {
+        show: true,
+        formatter: lines.join('\n'),
+        rich: {
+            name: text({ fontWeight: 'bold' }),
+            value: text(),
+            percent: text({ fontSize: Math.max(9, font - 2), color: 'rgba(255,255,255,0.8)' }),
+        },
+    }
+}
+
 interface TransactionStructureChartProps {
     filters: ReportFilters
     type: ReportTransactionType
@@ -226,31 +265,7 @@ export function TransactionStructureChart({ filters, type }: TransactionStructur
             roam: false,
             nodeClick: false,
             breadcrumb: { show: false },
-            label: {
-                show: true,
-                formatter: (params: { name: string; value: number }) => {
-                    const percent = ((params.value / total) * 100).toFixed(0)
-                    return `{name|${params.name}}\n{value|${formatCurrency(params.value, currency)}}\n{percent|${percent}%}`
-                },
-                rich: {
-                    name: {
-                        fontSize: 13,
-                        fontWeight: 'bold',
-                        color: '#fff',
-                        lineHeight: 20,
-                    },
-                    value: {
-                        fontSize: 14,
-                        color: '#fff',
-                        lineHeight: 22,
-                    },
-                    percent: {
-                        fontSize: 11,
-                        color: 'rgba(255,255,255,0.8)',
-                    },
-                },
-                position: 'inside',
-            },
+            label: { show: true, position: 'inside', overflow: 'truncate' },
             upperLabel: { show: false },
             itemStyle: {
                 borderColor: theme.surface,
@@ -270,9 +285,10 @@ export function TransactionStructureChart({ filters, type }: TransactionStructur
                 itemStyle: {
                     color: item.color,
                 },
+                label: treemapLabel(item, total, currency, chartWidth || 600),
             })),
         }],
-    }), [chartData, total, currency, i18nInstance.language, theme])
+    }), [chartData, total, currency, i18nInstance.language, theme, chartWidth])
 
     const getOption = () => {
         switch (viewMode) {

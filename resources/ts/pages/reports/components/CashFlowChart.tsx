@@ -241,12 +241,11 @@ export function CashFlowChart({ filters }: CashFlowChartProps) {
                 left: isNarrow ? 44 : 60,
                 right: isNarrow ? 44 : 60,
                 top: 20,
-                bottom: 72,
+                bottom: 96,
             },
             xAxis: axisStyle(theme, 'category', {
                 data: labels,
                 axisLabel: {
-                    rotate: groupBy === 'day' && chartData.length > 15 ? 45 : 0,
                     interval: groupBy === 'day' ? Math.floor(chartData.length / 10) : 0,
                 },
             }),

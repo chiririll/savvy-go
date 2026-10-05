@@ -159,12 +159,11 @@ export function TransactionDynamicsChart({ filters, type }: TransactionDynamicsC
                 left: isNarrow ? 48 : 60,
                 right: 20,
                 top: 20,
-                bottom: chartData.datasets.length > 1 ? 50 : 30,
+                bottom: chartData.datasets.length > 1 ? 76 : 50,
             },
             xAxis: axisStyle(theme, 'category', {
                 data: chartData.labels,
                 axisLabel: {
-                    rotate: groupBy === 'day' ? 45 : 0,
                     interval: groupBy === 'day' ? 4 : 0,
                 },
             }),
@@ -178,35 +177,70 @@ export function TransactionDynamicsChart({ filters, type }: TransactionDynamicsC
     return (
         <Card>
             <CardHeader className="pb-2">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="space-y-3">
                     <div>
                         <CardTitle className="text-lg">{copy.title}</CardTitle>
                         <p className="text-sm text-muted-foreground">
                             {copy.subtitle}
                         </p>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                        <div className="flex gap-1" {...testIdControls('chart-type')}>
-                            <Badge
-                                {...testIdControl('line', chartType === 'line')}
-                                variant={chartType === 'line' ? 'default' : 'outline'}
-                                className="cursor-pointer gap-1.5"
-                                onClick={() => setChartType('line')}
-                            >
-                                <LineChart className="size-3.5" />
-                                {t('reports.views.line')}
-                            </Badge>
-                            <Badge
-                                {...testIdControl('bar', chartType === 'bar')}
-                                variant={chartType === 'bar' ? 'default' : 'outline'}
-                                className="cursor-pointer gap-1.5"
-                                onClick={() => setChartType('bar')}
-                            >
-                                <BarChart3 className="size-3.5" />
-                                {t('reports.views.bar')}
-                            </Badge>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <div className="flex gap-1" {...testIdControls('chart-type')}>
+                                <Badge
+                                    {...testIdControl('line', chartType === 'line')}
+                                    variant={chartType === 'line' ? 'default' : 'outline'}
+                                    className="cursor-pointer gap-1.5"
+                                    onClick={() => setChartType('line')}
+                                >
+                                    <LineChart className="size-3.5" />
+                                    {t('reports.views.line')}
+                                </Badge>
+                                <Badge
+                                    {...testIdControl('bar', chartType === 'bar')}
+                                    variant={chartType === 'bar' ? 'default' : 'outline'}
+                                    className="cursor-pointer gap-1.5"
+                                    onClick={() => setChartType('bar')}
+                                >
+                                    <BarChart3 className="size-3.5" />
+                                    {t('reports.views.bar')}
+                                </Badge>
+                            </div>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button variant="outline" size="sm" className="h-7 gap-1">
+                                        {seriesLabel}
+                                        <Badge variant="secondary" className="ml-1 px-1.5 text-xs">
+                                            {enabledSeries.length}
+                                        </Badge>
+                                        <ChevronDown className="size-3" />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-56 p-2" align="end">
+                                    <div className="space-y-1">
+                                        {series.map((item) => (
+                                            <div
+                                                key={item.id}
+                                                className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer"
+                                                onClick={() => toggleSeries(item.id)}
+                                            >
+                                                <Checkbox
+                                                    checked={item.enabled}
+                                                    className="pointer-events-none"
+                                                />
+                                                <span
+                                                    className="w-2.5 h-2.5 rounded-full"
+                                                    style={{ backgroundColor: item.color }}
+                                                />
+                                                <Label className="text-sm cursor-pointer flex-1">
+                                                    {item.name}
+                                                </Label>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </PopoverContent>
+                            </Popover>
                         </div>
-
                         <div className="flex gap-1" {...testIdControls('group-by')}>
                             {(['day', 'week', 'month'] as CashFlowGroupBy[]).map((group) => (
                                 <Badge
@@ -220,41 +254,6 @@ export function TransactionDynamicsChart({ filters, type }: TransactionDynamicsC
                                 </Badge>
                             ))}
                         </div>
-
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <Button variant="outline" size="sm" className="h-7 gap-1">
-                                    {seriesLabel}
-                                    <Badge variant="secondary" className="ml-1 px-1.5 text-xs">
-                                        {enabledSeries.length}
-                                    </Badge>
-                                    <ChevronDown className="size-3" />
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-56 p-2" align="end">
-                                <div className="space-y-1">
-                                    {series.map((item) => (
-                                        <div
-                                            key={item.id}
-                                            className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer"
-                                            onClick={() => toggleSeries(item.id)}
-                                        >
-                                            <Checkbox
-                                                checked={item.enabled}
-                                                className="pointer-events-none"
-                                            />
-                                            <span
-                                                className="w-2.5 h-2.5 rounded-full"
-                                                style={{ backgroundColor: item.color }}
-                                            />
-                                            <Label className="text-sm cursor-pointer flex-1">
-                                                {item.name}
-                                            </Label>
-                                        </div>
-                                    ))}
-                                </div>
-                            </PopoverContent>
-                        </Popover>
                     </div>
                 </div>
             </CardHeader>

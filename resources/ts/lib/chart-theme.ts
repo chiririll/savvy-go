@@ -79,7 +79,7 @@ export function axisStyle(c: ChartTheme, kind: 'category' | 'value', extra: Reco
             type: 'category',
             axisLine: { lineStyle: { color: c.axisLine } },
             axisTick: { show: false },
-            axisLabel: { fontSize: 11, color: c.text, ...axisLabel },
+            axisLabel: { fontSize: 11, color: c.text, rotate: 45, ...axisLabel },
             ...rest,
         }
         : {

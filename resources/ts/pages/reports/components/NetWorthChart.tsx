@@ -51,12 +51,11 @@ export function NetWorthChart({ filters }: NetWorthChartProps) {
                 left: isNarrow ? 52 : 70,
                 right: 20,
                 top: 20,
-                bottom: 30,
+                bottom: 50,
             },
             xAxis: axisStyle(theme, 'category', {
                 data: data.dates.map((date) => formatReportPeriodLabel(date, groupBy, 'weekNum')),
                 axisLabel: {
-                    rotate: groupBy === 'day' ? 45 : 0,
                     interval: groupBy === 'day' ? 4 : 0,
                 },
             }),
