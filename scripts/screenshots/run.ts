@@ -14,13 +14,12 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium, devices, type Browser, type BrowserContextOptions } from 'playwright'
 import { loadConfig } from './config.ts'
-import { captureControls } from './controls.ts'
 import { captureDialogs } from './dialogs.ts'
 import type { Manifest } from './manifest.ts'
 import { plan } from './plan.ts'
 import { routes } from './routes.ts'
 import { log, state, type Job } from './shared.ts'
-import { captureTabs } from './tabs.ts'
+import { captureViews } from './views.ts'
 
 const env = (name: string, fallback: string) => process.env[name]?.trim() || fallback
 const baseURL = env('BASE_URL', 'http://localhost:8080').replace(/\/$/, '')
@@ -147,8 +146,7 @@ async function run(browser: Browser, job: Job, now: Date | null) {
                 ok = true
                 log(job, `${state.done + 1}/${state.total} ${p.path}${p.sidebar ? ' (sidebar)' : ''}`)
                 if (!p.sidebar) {
-                    if (state.config.tabs) await captureTabs(page, job, page.locator('body'), p.name, dir, 'page')
-                    if (state.config.controls) await captureControls(page, job, page.locator('body'), p.name, dir, true)
+                    await captureViews(page, job, page.locator('body'), p.name, dir)
                     if (state.config.dialogs) await captureDialogs(page, job, p.name, dir, frameDone)
                 }
                 break

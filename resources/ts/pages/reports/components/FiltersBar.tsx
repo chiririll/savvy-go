@@ -171,7 +171,7 @@ export function FiltersBar({ filters, onFilterChange, onToggleArrayFilter, onRes
                     value={filters.selectedMonth}
                     onValueChange={(val) => onFilterChange('selectedMonth', val)}
                 >
-                    <SelectTrigger className="w-full md:w-[180px]" {...testIdSelect('period-value')}>
+                    <SelectTrigger className="w-full md:w-[180px]" {...testIdSelect('global-period-value')}>
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -189,7 +189,7 @@ export function FiltersBar({ filters, onFilterChange, onToggleArrayFilter, onRes
                     value={filters.selectedQuarter}
                     onValueChange={(val) => onFilterChange('selectedQuarter', val)}
                 >
-                    <SelectTrigger className="w-full md:w-[140px]" {...testIdSelect('period-value')}>
+                    <SelectTrigger className="w-full md:w-[140px]" {...testIdSelect('global-period-value')}>
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -207,7 +207,7 @@ export function FiltersBar({ filters, onFilterChange, onToggleArrayFilter, onRes
                     value={filters.selectedYear}
                     onValueChange={(val) => onFilterChange('selectedYear', val)}
                 >
-                    <SelectTrigger className="w-full md:w-[100px]" {...testIdSelect('period-value')}>
+                    <SelectTrigger className="w-full md:w-[100px]" {...testIdSelect('global-period-value')}>
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>

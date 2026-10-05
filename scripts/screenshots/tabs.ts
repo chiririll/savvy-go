@@ -32,7 +32,7 @@ export async function fresh(job: Job, dialog: Locator) {
 }
 
 /** A shot of every choice of every tab group in scope, which is a page or an open dialog. */
-export async function captureTabs(page: PwPage, job: Job, scope: Locator, base: string, folder: string, kind: 'page' | 'dialog') {
+export async function captureTabs(page: PwPage, job: Job, scope: Locator, base: string, folder: string, kind: 'page' | 'dialog', local = true) {
     try {
         const groups = scope.locator(tabGroup)
         const count = await groups.count()
@@ -68,8 +68,8 @@ export async function captureTabs(page: PwPage, job: Job, scope: Locator, base: 
                 state.saved++
                 log(job, `  tab ${name}`)
                 // A tab of a page has charts and filters of its own: their choices are taken in it.
-                if (kind === 'page' && state.config.controls && (await group.getAttribute('role')) === 'tablist') {
-                    await captureControls(page, job, scope, name, folder, false)
+                if (local && kind === 'page' && state.config.controls && (await group.getAttribute('role')) === 'tablist') {
+                    await captureControls(page, job, scope, name, folder, 'local')
                 }
             }
             // Back to the choice that was selected, for whatever comes next.

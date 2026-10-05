@@ -7,7 +7,15 @@ import { log, slug, state, type Job } from './shared.ts'
 // the period of a report. A group of choices is marked data-testid-controls and a select
 // data-testid-select (resources/ts/lib/test-id.ts); each choice is taken like a tab, and what comes
 // with it: choosing a month brings a select of months. A name starting with "global-" is for what is
-// on the whole page, so it is taken once, not again in every tab.
+// on the whole page (the period of a report): it comes before the tabs, which are taken under each of
+// its choices (see views.ts). The others belong to a tab and are taken in it.
+/** Whether a control belongs to the whole page ("global") or to what is in a tab ("local"). */
+export type Level = 'global' | 'local'
+const levelOf = (name: string): Level => (name.startsWith('global-') ? 'global' : 'local')
+
+/** Called with the name of the shot, once a choice has been made and shot. */
+export type After = (name: string) => Promise<void>
+
 const MAX_SELECT_OPTIONS = 3
 
 const controlLabel = (name: string) => name.replace(/^global-/, '')
@@ -19,17 +27,20 @@ async function snap(page: PwPage, job: Job, folder: string, name: string) {
     log(job, `  control ${name}`)
 }
 
-/** Takes the page with each choice of each marked group in scope; `top` is the page as it is, not a tab of it. */
-export async function captureControls(page: PwPage, job: Job, scope: Locator, base: string, folder: string, top: boolean) {
+/**
+ * Takes the page with each choice of each marked group in scope that is of this level, and of each
+ * select. `after` is what is to be taken with the choice made, before it is put back.
+ */
+export async function captureControls(page: PwPage, job: Job, scope: Locator, base: string, folder: string, level: Level, after?: After) {
     try {
-        if (top) await captureSelects(page, job, scope, base, folder, true)
+        await captureSelects(page, job, scope, base, folder, level, after)
         const groups = scope.locator('[data-testid-controls]')
         const count = await groups.count()
         for (let g = 0; g < count; g++) {
             const group = groups.nth(g)
             if (!(await group.isVisible())) continue
             const name = (await group.getAttribute('data-testid-controls')) ?? ''
-            if (!top && name.startsWith('global-')) continue
+            if (levelOf(name) !== level) continue
             const choices = await group.evaluate((el) =>
                 [...el.querySelectorAll<HTMLElement>('[data-testid-control]')].map((item) => ({
                     id: item.getAttribute('data-testid-control') ?? '',
@@ -49,7 +60,8 @@ export async function captureControls(page: PwPage, job: Job, scope: Locator, ba
                     continue
                 }
                 await snap(page, job, folder, shot)
-                await captureSelects(page, job, scope, shot, folder, false)
+                await after?.(shot)
+                await captureSelects(page, job, scope, shot, folder, level, after)
             }
             // Back to the choice that was selected, for whatever comes next.
             if (start >= 0) await items.nth(start).click({ timeout: 3000 }).catch(() => {})
@@ -60,14 +72,14 @@ export async function captureControls(page: PwPage, job: Job, scope: Locator, ba
 }
 
 /** Takes the page with the first few other options of each marked select in scope chosen. */
-async function captureSelects(page: PwPage, job: Job, scope: Locator, base: string, folder: string, top: boolean) {
+async function captureSelects(page: PwPage, job: Job, scope: Locator, base: string, folder: string, level: Level, after?: After) {
     const selects = scope.locator('[data-testid-select]')
     const count = await selects.count()
     for (let s = 0; s < count; s++) {
         const select = selects.nth(s)
         if (!(await select.isVisible())) continue
         const name = (await select.getAttribute('data-testid-select')) ?? ''
-        if (!top && name.startsWith('global-')) continue
+        if (levelOf(name) !== level) continue
         // The options of an open select are in a portal of their own.
         const options = page.locator('[role="option"]')
         try {
@@ -95,7 +107,9 @@ async function captureSelects(page: PwPage, job: Job, scope: Locator, base: stri
                 continue
             }
             taken++
-            await snap(page, job, folder, `${base}-${controlLabel(name)}-${slug(option.text)}`)
+            const shot = `${base}-${controlLabel(name)}-${slug(option.text)}`
+            await snap(page, job, folder, shot)
+            await after?.(shot)
         }
         // Back to the option that was selected.
         if (current >= 0) {
