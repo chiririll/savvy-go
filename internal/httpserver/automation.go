@@ -12,45 +12,30 @@ import (
 )
 
 func (s *Server) automationIndex(w http.ResponseWriter, r *http.Request) {
-	list, err := s.automation.All(r.Context())
+	list, err := sp(r).automation.All(r.Context())
 	if err != nil {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, mapSlice(list, dto.AutomationRule))
+	writeData(w, http.StatusOK, dto.Map(list, dto.NewAutomationRule))
 }
 
+// automationTriggers lists the trigger types; the SPA localizes them.
 func (s *Server) automationTriggers(w http.ResponseWriter, r *http.Request) {
-	createL, createD := domainTriggerMeta("on_transaction_create")
-	updateL, updateD := domainTriggerMeta("on_transaction_update")
-	writeJSON(w, http.StatusOK, []map[string]string{
-		{"value": "on_transaction_create", "label": createL, "description": createD},
-		{"value": "on_transaction_update", "label": updateL, "description": updateD},
-	})
-}
-
-func domainTriggerMeta(v string) (string, string) {
-	switch v {
-	case "on_transaction_create":
-		return "On Transaction Create", "Triggers when a new transaction is created"
-	case "on_transaction_update":
-		return "On Transaction Update", "Triggers when a transaction is updated"
-	default:
-		return v, ""
-	}
+	writeJSON(w, http.StatusOK, []string{"on_transaction_create", "on_transaction_update"})
 }
 
 func (s *Server) automationStore(w http.ResponseWriter, r *http.Request) {
-	in, ok := decodeAutomation(w, r)
+	in, ok := decodeAutomation(w, r, nil)
 	if !ok {
 		return
 	}
-	rule, err := s.automation.Create(r.Context(), in)
+	rule, err := sp(r).automation.Create(r.Context(), in)
 	if err != nil {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusCreated, dto.AutomationRule(*rule))
+	writeData(w, http.StatusCreated, dto.NewAutomationRule(*rule))
 }
 
 func (s *Server) automationShow(w http.ResponseWriter, r *http.Request) {
@@ -58,7 +43,7 @@ func (s *Server) automationShow(w http.ResponseWriter, r *http.Request) {
 	if rule == nil {
 		return
 	}
-	writeData(w, http.StatusOK, dto.AutomationRule(*rule))
+	writeData(w, http.StatusOK, dto.NewAutomationRule(*rule))
 }
 
 func (s *Server) automationUpdate(w http.ResponseWriter, r *http.Request) {
@@ -66,16 +51,16 @@ func (s *Server) automationUpdate(w http.ResponseWriter, r *http.Request) {
 	if cur == nil {
 		return
 	}
-	in, ok := decodeAutomation(w, r)
+	in, ok := decodeAutomation(w, r, cur)
 	if !ok {
 		return
 	}
-	rule, err := s.automation.Update(r.Context(), cur.ID, in)
+	rule, err := sp(r).automation.Update(r.Context(), cur.ID, in)
 	if err != nil {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, dto.AutomationRule(*rule))
+	writeData(w, http.StatusOK, dto.NewAutomationRule(*rule))
 }
 
 func (s *Server) automationDestroy(w http.ResponseWriter, r *http.Request) {
@@ -83,7 +68,7 @@ func (s *Server) automationDestroy(w http.ResponseWriter, r *http.Request) {
 	if rule == nil {
 		return
 	}
-	if err := s.automation.Delete(r.Context(), rule.ID); err != nil {
+	if err := sp(r).automation.Delete(r.Context(), rule.ID); err != nil {
 		writeMessage(w, 422, err.Error())
 		return
 	}
@@ -95,12 +80,12 @@ func (s *Server) automationToggle(w http.ResponseWriter, r *http.Request) {
 	if rule == nil {
 		return
 	}
-	out, err := s.automation.Toggle(r.Context(), rule.ID)
+	out, err := sp(r).automation.Toggle(r.Context(), rule.ID)
 	if err != nil {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, dto.AutomationRule(*out))
+	writeData(w, http.StatusOK, dto.NewAutomationRule(*out))
 }
 
 func (s *Server) automationReorder(w http.ResponseWriter, r *http.Request) {
@@ -114,7 +99,7 @@ func (s *Server) automationReorder(w http.ResponseWriter, r *http.Request) {
 		writeValidation(w, map[string][]string{"rules": {"The rules field is required."}})
 		return
 	}
-	if err := s.automation.Reorder(r.Context(), body.Rules); err != nil {
+	if err := sp(r).automation.Reorder(r.Context(), body.Rules); err != nil {
 		writeMessage(w, 422, err.Error())
 		return
 	}
@@ -133,7 +118,7 @@ func (s *Server) automationTest(w http.ResponseWriter, r *http.Request) {
 		writeValidation(w, map[string][]string{"transaction_id": {"The transaction id field is required."}})
 		return
 	}
-	result, err := s.automation.Test(r.Context(), rule.ID, body.TransactionID)
+	result, err := sp(r).automation.Test(r.Context(), rule.ID, body.TransactionID)
 	if err != nil {
 		writeMessage(w, 422, err.Error())
 		return
@@ -146,24 +131,26 @@ func (s *Server) automationLogs(w http.ResponseWriter, r *http.Request) {
 	if rule == nil {
 		return
 	}
-	logs, err := s.automation.Logs(r.Context(), rule.ID)
+	logs, err := sp(r).automation.Logs(r.Context(), rule.ID)
 	if err != nil {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, mapSlice(logs, dto.AutomationLog))
+	writeData(w, http.StatusOK, dto.Map(logs, dto.NewAutomationLog))
 }
 
 func (s *Server) automationParam(w http.ResponseWriter, r *http.Request) *domain.AutomationRule {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	rule, _ := s.automation.ByID(r.Context(), id)
+	rule, _ := sp(r).automation.ByID(r.Context(), id)
 	if rule == nil {
 		writeMessage(w, http.StatusNotFound, "Not found.")
 	}
 	return rule
 }
 
-func decodeAutomation(w http.ResponseWriter, r *http.Request) (domain.AutomationInput, bool) {
+// decodeAutomation reads a rule from the body; on update, over base (see
+// patch.go).
+func decodeAutomation(w http.ResponseWriter, r *http.Request, base *domain.AutomationRule) (domain.AutomationInput, bool) {
 	var body struct {
 		Name           string           `json:"name"`
 		Description    *string          `json:"description"`
@@ -174,7 +161,19 @@ func decodeAutomation(w http.ResponseWriter, r *http.Request) (domain.Automation
 		IsActive       *bool            `json:"is_active"`
 		StopProcessing *bool            `json:"stop_processing"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Name == "" || body.TriggerType == "" {
+	if base != nil {
+		body.Name, body.Description, body.TriggerType = base.Name, clone(base.Description), base.TriggerType
+		body.Priority, body.IsActive, body.StopProcessing = base.Priority, clone(&base.IsActive), clone(&base.StopProcessing)
+	}
+	err := json.NewDecoder(r.Body).Decode(&body)
+	// Decoding into a filled map would merge keys, so these are taken whole.
+	if base != nil && body.Conditions == nil {
+		body.Conditions = base.Conditions
+	}
+	if base != nil && body.Actions == nil {
+		body.Actions = base.Actions
+	}
+	if err != nil || body.Name == "" || body.TriggerType == "" {
 		writeValidation(w, map[string][]string{"name": {"The name field is required."}})
 		return domain.AutomationInput{}, false
 	}

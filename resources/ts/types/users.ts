@@ -1,4 +1,6 @@
-export type UserRole = 'admin' | 'read-write' | 'read-only'
+/** Server role; what a user may do with a space's data is their role in that space. */
+export const USER_ROLES = ['admin', 'user', 'guest'] as const
+export type UserRole = (typeof USER_ROLES)[number]
 
 export interface User {
     id: number

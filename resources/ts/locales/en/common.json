@@ -41,7 +41,7 @@
         "resulting": "After"
     },
     "readOnly": {
-        "banner": "You are in read-only mode. You can view all data but cannot make any changes.",
+        "banner": "You are a viewer in this space: you can see its data but not change it.",
         "close": "Close banner"
     },
     "devMode": {
@@ -101,6 +101,7 @@
         "passwordMin8": "Password must be at least 8 characters",
         "transferDestination": "Destination account is required for transfers",
         "transferNoCategory": "Category should not be set for transfers",
+        "selectSpace": "Please select a space",
         "destinationDifferent": "Destination must be different from source",
         "selectDestination": "Please select destination account",
         "intervalMin": "Interval must be at least 1",
@@ -150,8 +151,8 @@
     },
     "roles": {
         "admin": "Admin",
-        "read-write": "Read & write",
-        "read-only": "Read only"
+        "user": "User",
+        "guest": "Guest"
     },
     "na": "N/A",
     "yes": "Yes",
@@ -308,7 +309,6 @@
             "createFailed": "Failed to create backup",
             "uploadFailed": "Failed to upload backup",
             "restoreFailed": "Failed to restore backup",
-            "inspectFailed": "Failed to check the backup file",
             "deleteFailed": "Failed to delete backup"
         },
         "import": {
@@ -339,6 +339,23 @@
             "passwordFailed": "Could not update the password",
             "loggedOutOthers": "Signed out of other devices",
             "logoutOthersFailed": "Could not sign out other devices"
+        },
+        "apiToken": {
+            "created": "API token created",
+            "revoked": "API token revoked",
+            "createFailed": "Failed to create API token",
+            "revokeFailed": "Failed to revoke API token"
         }
+    },
+    "spaces": {
+        "noneTitle": "No space yet",
+        "noneText": "Your finances live in spaces. Create one to start, or join one through an invitation link.",
+        "noneGuest": "You are not in any space. Ask for an invitation link.",
+        "create": "Create a space",
+        "defaultName": "My space"
+    },
+    "progress": {
+        "of": "of {{amount}}",
+        "over": "over"
     }
 }

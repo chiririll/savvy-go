@@ -26,6 +26,8 @@ interface AccountSelectProps {
     plain?: boolean
     showBalance?: boolean
     allowCreate?: boolean
+    /** Lists another space's accounts (null: no space chosen yet). */
+    spaceId?: number | null
 }
 
 const NEW_ACCOUNT_VALUE = '__new__'
@@ -41,11 +43,12 @@ export function AccountSelect({
     plain,
     showBalance,
     allowCreate,
+    spaceId,
 }: AccountSelectProps) {
     const { t } = useTranslation(['forms', 'pages'])
     const [createOpen, setCreateOpen] = useState(false)
     const createAccount = useCreateAccount()
-    const { data: accounts } = useAccounts({ active: activeOnly, exclude_debts: excludeDebts })
+    const { data: accounts } = useAccounts({ active: activeOnly, exclude_debts: excludeDebts }, spaceId)
 
     const selectedId = Number(value) > 0 ? Number(value) : null
     const filteredAccounts = accounts?.filter((account) => {
@@ -75,7 +78,7 @@ export function AccountSelect({
                 onChange(Number(val))
             }}
             value={selectedId ? String(selectedId) : undefined}
-            disabled={disabled}
+            disabled={disabled || spaceId === null}
         >
             {plain ? trigger : <FormControl>{trigger}</FormControl>}
             <SelectContent>

@@ -5,29 +5,27 @@ import { Tag } from './tags'
 
 import type { TransactionType } from './transactions'
 
-export type RecurringFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly'
+export const RECURRING_FREQUENCIES = ['daily', 'weekly', 'monthly', 'yearly'] as const
+export type RecurringFrequency = (typeof RECURRING_FREQUENCIES)[number]
 export type RecurringTransactionType = Extract<TransactionType, 'income' | 'expense' | 'transfer'>
 
 export interface RecurringTransaction extends BaseEntity {
     type: RecurringTransactionType
-    accountId: number
-    toAccountId?: number
-    categoryId?: number
     amount: number
-    toAmount?: number
-    description?: string
+    toAmount: number | null
+    isEstimated: boolean
+    description: string | null
     frequency: RecurringFrequency
-    frequencyLabel: string
     interval: number
-    dayOfWeek?: number
-    dayOfMonth?: number
+    dayOfWeek: number | null
+    dayOfMonth: number | null
     startDate: string
-    endDate?: string
+    endDate: string | null
     nextRunDate: string
-    lastRunDate?: string
+    lastRunDate: string | null
     isActive: boolean
     account: Account
-    toAccount?: Account
-    category?: Category
+    toAccount: Account | null
+    category: Category | null
     tags: Tag[]
 }

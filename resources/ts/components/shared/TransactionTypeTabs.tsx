@@ -1,24 +1,32 @@
 import { useTranslation } from 'react-i18next'
-import { TRANSACTION_TYPE_OPTIONS } from '@/constants'
+import { SPACE_TRANSFER_OPTION, TRANSACTION_TYPE_OPTIONS } from '@/constants'
 import { SegmentedChoice } from './SegmentedChoice'
+import { transactionTypeLabel } from '@/lib/labels'
 
 export type TransactionFormType = (typeof TRANSACTION_TYPE_OPTIONS)[number]['value']
+export type TransactionFormKind = TransactionFormType | typeof SPACE_TRANSFER_OPTION.value
 
 interface TransactionTypeTabsProps {
-    value: TransactionFormType
-    onChange: (value: TransactionFormType) => void
+    value: TransactionFormKind
+    onChange: (value: TransactionFormKind) => void
+    /** Adds a square tab for a transfer to a linked space. */
+    withSpaceTransfer?: boolean
 }
 
-export function TransactionTypeTabs({ value, onChange }: TransactionTypeTabsProps) {
+export function TransactionTypeTabs({ value, onChange, withSpaceTransfer }: TransactionTypeTabsProps) {
     const { t } = useTranslation('pages')
+    const options = [
+        ...TRANSACTION_TYPE_OPTIONS,
+        ...(withSpaceTransfer ? [{ ...SPACE_TRANSFER_OPTION, iconOnly: true }] : []),
+    ]
 
     return (
-        <SegmentedChoice
+        <SegmentedChoice<TransactionFormKind>
             value={value}
             onChange={onChange}
-            options={TRANSACTION_TYPE_OPTIONS.map((option) => ({
+            options={options.map((option) => ({
                 ...option,
-                label: t(`transactions.types.${option.value}`),
+                label: transactionTypeLabel(t, option.value),
             }))}
         />
     )

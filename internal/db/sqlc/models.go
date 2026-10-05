@@ -6,6 +6,8 @@ package sqlc
 
 import (
 	"database/sql"
+
+	"github.com/shopspring/decimal"
 )
 
 type Account struct {
@@ -14,8 +16,8 @@ type Account struct {
 	Type            string
 	DebtType        sql.NullString
 	CurrencyID      int64
-	InitialBalance  float64
-	TargetAmount    sql.NullFloat64
+	InitialBalance  int64
+	TargetAmount    sql.NullInt64
 	DueDate         sql.NullString
 	IsPaidOff       int64
 	Counterparty    sql.NullString
@@ -24,6 +26,29 @@ type Account struct {
 	SortOrder       int64
 	CreatedAt       sql.NullString
 	UpdatedAt       sql.NullString
+}
+
+type AdminAudit struct {
+	ID           int64
+	ActorID      sql.NullInt64
+	Action       string
+	SpaceID      sql.NullInt64
+	TargetUserID sql.NullInt64
+	Details      sql.NullString
+	CreatedAt    string
+}
+
+type ApiToken struct {
+	ID         int64
+	UserID     int64
+	Name       string
+	TokenHash  string
+	Prefix     string
+	Scope      string
+	ExpiresAt  sql.NullString
+	LastUsedAt sql.NullString
+	CreatedAt  sql.NullString
+	UpdatedAt  sql.NullString
 }
 
 type AuthSession struct {
@@ -73,8 +98,8 @@ type AutomationRuleLog struct {
 type Budget struct {
 	ID              int64
 	Name            string
-	Amount          float64
-	CurrencyID      sql.NullInt64
+	Amount          int64
+	CurrencyID      int64
 	Period          string
 	StartDate       sql.NullString
 	EndDate         sql.NullString
@@ -113,7 +138,7 @@ type Currency struct {
 	Symbol    string
 	Decimals  int64
 	IsBase    int64
-	Rate      float64
+	Rate      decimal.Decimal
 	CreatedAt sql.NullString
 	UpdatedAt sql.NullString
 }
@@ -154,8 +179,9 @@ type RecurringTransaction struct {
 	AccountID   int64
 	ToAccountID sql.NullInt64
 	CategoryID  sql.NullInt64
-	Amount      float64
-	ToAmount    sql.NullFloat64
+	Amount      int64
+	ToAmount    sql.NullInt64
+	IsEstimated int64
 	Description sql.NullString
 	Frequency   string
 	Interval    int64
@@ -183,6 +209,75 @@ type SchemaMigration struct {
 type Setting struct {
 	Key   string
 	Value sql.NullString
+}
+
+type Space struct {
+	ID         int64
+	Uuid       string
+	Name       string
+	QuotaBytes sql.NullInt64
+	CreatedBy  sql.NullInt64
+	CreatedAt  sql.NullString
+	UpdatedAt  sql.NullString
+}
+
+type SpaceInvitation struct {
+	ID                   int64
+	SpaceID              int64
+	Email                sql.NullString
+	Role                 string
+	TokenHash            string
+	InvitedBy            sql.NullInt64
+	InvitedByServerAdmin int64
+	ExpiresAt            string
+	AcceptedAt           sql.NullString
+	AcceptedBy           sql.NullInt64
+	CreatedAt            sql.NullString
+}
+
+type SpaceLink struct {
+	SpaceAID  int64
+	SpaceBID  int64
+	CreatedBy sql.NullInt64
+	CreatedAt sql.NullString
+}
+
+type SpaceMember struct {
+	SpaceID   int64
+	UserID    int64
+	Role      string
+	CreatedAt sql.NullString
+}
+
+type SpaceSetting struct {
+	Key   string
+	Value sql.NullString
+}
+
+type SpaceTransfer struct {
+	Uuid          string
+	FromSpaceUuid string
+	FromAccountID int64
+	FromAmount    int64
+	FromCurrency  string
+	FromDecimals  int64
+	ToSpaceUuid   string
+	ToAccountID   int64
+	ToAmount      int64
+	ToCurrency    string
+	ToDecimals    int64
+	Date          string
+	Description   sql.NullString
+	CreatedBy     sql.NullInt64
+	Version       int64
+	DeletedAt     sql.NullString
+	SigV          int64
+	SignerKid     sql.NullString
+	Signature     sql.NullString
+	Status        string
+	Review        sql.NullString
+	Remote        sql.NullString
+	UpdatedAt     sql.NullString
 }
 
 type SsoLoginState struct {
@@ -223,14 +318,16 @@ type Transaction struct {
 	AccountID              int64
 	ToAccountID            sql.NullInt64
 	CategoryID             sql.NullInt64
-	Amount                 float64
-	ToAmount               sql.NullFloat64
-	ExchangeRate           sql.NullFloat64
+	Amount                 int64
+	ToAmount               sql.NullInt64
+	IsEstimated            int64
 	Description            sql.NullString
 	DedupHash              sql.NullString
 	Date                   sql.NullString
 	Status                 string
 	RecurringTransactionID sql.NullInt64
+	SpaceTransferUuid      sql.NullString
+	CreatedBy              sql.NullInt64
 	CreatedAt              sql.NullString
 	UpdatedAt              sql.NullString
 }
@@ -258,10 +355,9 @@ type TransactionItem struct {
 	ID            int64
 	TransactionID int64
 	Name          string
-	Quantity      float64
-	Unit          sql.NullString
-	PricePerUnit  float64
-	TotalPrice    float64
+	Quantity      decimal.Decimal
+	PricePerUnit  int64
+	TotalPrice    int64
 	CreatedAt     sql.NullString
 	UpdatedAt     sql.NullString
 }
@@ -269,6 +365,14 @@ type TransactionItem struct {
 type TransactionTag struct {
 	TransactionID int64
 	TagID         int64
+}
+
+type TrustedKey struct {
+	Kid       string
+	PublicKey string
+	Name      string
+	AddedBy   sql.NullInt64
+	CreatedAt sql.NullString
 }
 
 type TwoFactorChallenge struct {
@@ -318,6 +422,7 @@ type User struct {
 	TwoFactorSecret    sql.NullString
 	TwoFactorEnabled   int64
 	TwoFactorConfirmed int64
+	DeletedAt          sql.NullString
 	CreatedAt          sql.NullString
 	UpdatedAt          sql.NullString
 }
@@ -352,7 +457,6 @@ type WebauthnCredential struct {
 	Name         sql.NullString
 	Aaguid       sql.NullString
 	Record       string
-	Transports   sql.NullString
 	Counter      int64
 	LastUsedAt   sql.NullString
 	CreatedAt    sql.NullString

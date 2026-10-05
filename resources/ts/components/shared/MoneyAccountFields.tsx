@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { ArrowUpDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { AccountSelect } from './AccountSelect'
 
@@ -22,6 +23,11 @@ interface MoneyAccountFieldsProps<T extends FieldValues> {
     toAmountReadOnly?: boolean
     toAmountPlaceholder?: string
     onSwapAccounts?: () => void
+    /**
+     * Set when the destination account belongs to another space (null until
+     * one is chosen). Such a transfer has one direction, so no swap button.
+     */
+    toSpaceId?: number | null
 }
 
 export function MoneyAccountFields<T extends FieldValues>({
@@ -34,9 +40,11 @@ export function MoneyAccountFields<T extends FieldValues>({
     toAmountReadOnly,
     toAmountPlaceholder,
     onSwapAccounts,
+    toSpaceId,
 }: MoneyAccountFieldsProps<T>) {
     const { t } = useTranslation(['common', 'forms'])
     const form = useFormContext<T>()
+    const swappable = isTransfer && toSpaceId === undefined
 
     const swapAccounts = () => {
         const values = form.getValues() as Record<string, unknown>
@@ -72,8 +80,8 @@ export function MoneyAccountFields<T extends FieldValues>({
     }
 
     return (
-        <div className={isTransfer ? 'relative' : undefined}>
-            <div className={isTransfer ? 'space-y-2 pr-12' : undefined}>
+        <div className={swappable ? 'relative' : undefined}>
+            <div className={cn(isTransfer && 'space-y-2', swappable && 'pr-12')}>
                 <div className="grid grid-cols-2 gap-4">
                     <FormField
                         control={control}
@@ -163,7 +171,8 @@ export function MoneyAccountFields<T extends FieldValues>({
                                     <AccountSelect
                                         value={field.value}
                                         onChange={field.onChange}
-                                        excludeId={accountId ? Number(accountId) : undefined}
+                                        excludeId={toSpaceId === undefined && accountId ? Number(accountId) : undefined}
+                                        spaceId={toSpaceId}
                                     />
                                     <FormMessage />
                                 </FormItem>
@@ -173,7 +182,7 @@ export function MoneyAccountFields<T extends FieldValues>({
                 )}
             </div>
 
-            {isTransfer && (
+            {swappable && (
                 <Button
                     type="button"
                     variant="outline"

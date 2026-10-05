@@ -13,6 +13,7 @@ type ctxKey int
 const (
 	ctxUser ctxKey = iota
 	ctxSession
+	ctxAPIToken
 )
 
 func userFrom(r *http.Request) *auth.User {
@@ -25,8 +26,38 @@ func sessionFrom(r *http.Request) *auth.Session {
 	return s
 }
 
+func apiTokenFrom(r *http.Request) *auth.APIToken {
+	t, _ := r.Context().Value(ctxAPIToken).(*auth.APIToken)
+	return t
+}
+
+// bearerToken returns the raw Authorization: Bearer value and whether the header was present.
+func bearerToken(r *http.Request) (string, bool) {
+	h := strings.TrimSpace(r.Header.Get("Authorization"))
+	if h == "" {
+		return "", false
+	}
+	if len(h) > 7 && strings.EqualFold(h[:7], "bearer ") {
+		return strings.TrimSpace(h[7:]), true
+	}
+	return "", true
+}
+
+// requireSession authenticates via Authorization: Bearer (API token) when the header is
+// present, otherwise via the session cookie. A bad bearer never falls back to the cookie.
 func (s *Server) requireSession(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if raw, present := bearerToken(r); present {
+			t, err := s.apiTokens.Resolve(r.Context(), raw)
+			if err != nil || t == nil || t.User == nil {
+				writeMessage(w, http.StatusUnauthorized, "Unauthenticated.")
+				return
+			}
+			ctx := context.WithValue(r.Context(), ctxUser, t.User)
+			ctx = context.WithValue(ctx, ctxAPIToken, t)
+			next.ServeHTTP(w, r.WithContext(ctx))
+			return
+		}
 		token := auth.ReadToken(r, s.cfg)
 		sess, err := s.sessions.Resolve(r.Context(), token)
 		if err != nil || sess == nil || sess.User == nil {
@@ -47,6 +78,10 @@ func (s *Server) requireCSRF(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
+		if apiTokenFrom(r) != nil {
+			next.ServeHTTP(w, r)
+			return
+		}
 		sess := sessionFrom(r)
 		header := r.Header.Get(s.cfg.CSRFHeader)
 		if sess == nil || header == "" || !secureCompare(sess.CSRF, header) {
@@ -57,22 +92,22 @@ func (s *Server) requireCSRF(next http.Handler) http.Handler {
 	})
 }
 
-func (s *Server) requireWrite(next http.Handler) http.Handler {
+func (s *Server) requireAdmin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		u := userFrom(r)
-		if u != nil && u.IsReadOnly() && r.Method != http.MethodGet && r.Method != http.MethodHead {
-			writeMessage(w, http.StatusForbidden, "Read-only access")
+		if u == nil || !u.IsAdmin() || apiTokenFrom(r) != nil {
+			writeMessage(w, http.StatusForbidden, "Forbidden")
 			return
 		}
 		next.ServeHTTP(w, r)
 	})
 }
 
-func (s *Server) requireAdmin(next http.Handler) http.Handler {
+// sessionOnly rejects API-token requests for credential and instance-level endpoints.
+func (s *Server) sessionOnly(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		u := userFrom(r)
-		if u == nil || !u.IsAdmin() {
-			writeMessage(w, http.StatusForbidden, "Forbidden")
+		if apiTokenFrom(r) != nil {
+			writeMessage(w, http.StatusForbidden, "Not available for API tokens.")
 			return
 		}
 		next.ServeHTTP(w, r)

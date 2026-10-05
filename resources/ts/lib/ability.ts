@@ -1,5 +1,6 @@
 import { AbilityBuilder, createMongoAbility, MongoAbility } from '@casl/ability'
-import { UserRole } from '@/types'
+import type { UserRole } from '@/types'
+import type { SpaceRole } from '@/types/spaces'
 
 type Actions = 'manage' | 'create' | 'read' | 'update' | 'delete'
 type Subjects = 'all' | 'User'
@@ -13,17 +14,20 @@ export function defineAbilityFor(role: UserRole | null): AppAbility {
         case 'admin':
             can('manage', 'all')
             break
-        case 'read-write':
+        case 'user':
+        case 'guest':
             can('manage', 'all')
             cannot('manage', 'User')
             can('read', 'User')
-            break
-        case 'read-only':
-            can('read', 'all')
             break
         default:
             break
     }
 
     return build()
+}
+
+/** Whether a role in a space may change its data; mirrors CanWriteSpace in internal/domain/space.go. */
+export function canWriteSpace(role: SpaceRole): boolean {
+    return role === 'admin' || role === 'editor'
 }

@@ -193,12 +193,12 @@ export default function TransactionsPage() {
                     }
                 }}
                 isSubmitting={confirmTransaction.isPending}
-                onConfirm={(date) => {
+                onConfirm={(options) => {
                     if (!applying) {
                         return
                     }
                     confirmTransaction.mutate(
-                        { id: applying.id, date },
+                        { id: applying.id, ...options },
                         { onSuccess: () => setApplying(null) },
                     )
                 }}

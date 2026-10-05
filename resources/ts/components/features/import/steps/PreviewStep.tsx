@@ -1,5 +1,6 @@
 import { CheckCircle2, XCircle, AlertTriangle, Copy } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { transactionTypeLabelLoose } from '@/lib/labels'
 import { Badge } from '@/components/ui/badge'
 import { cn, formatCurrency } from '@/lib/utils'
 import { intlLocale } from '@/lib/i18n'
@@ -154,7 +155,7 @@ export function PreviewStep({ previewResult, categoryMap, onCategoryMapChange, i
                                         <td className="px-4 py-2">
                                             <Badge variant={tx.type === 'income' ? 'default' : 'secondary'}>
                                                 {tx.type
-                                                    ? tPages(`transactions.types.${tx.type}`, { defaultValue: tx.type })
+                                                    ? transactionTypeLabelLoose(tPages, tx.type)
                                                     : '-'}
                                             </Badge>
                                         </td>

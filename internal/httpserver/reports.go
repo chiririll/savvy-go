@@ -50,57 +50,57 @@ func queryIDs(q map[string][]string, key string) []int64 {
 }
 
 func (s *Server) reportsOverview(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, s.reports.Overview(r.Context(), s.reportFilter(r)))
+	writeJSON(w, http.StatusOK, sp(r).reports.Overview(r.Context(), s.reportFilter(r)))
 }
 
 func (s *Server) reportsMoneyFlow(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, s.reports.MoneyFlow(r.Context(), s.reportFilter(r)))
+	writeJSON(w, http.StatusOK, sp(r).reports.MoneyFlow(r.Context(), s.reportFilter(r)))
 }
 
 func (s *Server) reportsExpensePace(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, s.reports.ExpensePace(r.Context(), s.reportFilter(r)))
+	writeJSON(w, http.StatusOK, sp(r).reports.ExpensePace(r.Context(), s.reportFilter(r)))
 }
 
 func (s *Server) reportsByCategory(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, s.reports.ExpensesByCategory(r.Context(), s.reportFilter(r)))
+	writeJSON(w, http.StatusOK, sp(r).reports.ExpensesByCategory(r.Context(), s.reportFilter(r)))
 }
 
 func (s *Server) reportsCashFlow(w http.ResponseWriter, r *http.Request) {
 	group := firstQuery(r.URL.Query().Get("group_by"), "day")
-	writeJSON(w, http.StatusOK, s.reports.CashFlowOverTime(r.Context(), s.reportFilter(r), group))
+	writeJSON(w, http.StatusOK, sp(r).reports.CashFlowOverTime(r.Context(), s.reportFilter(r), group))
 }
 
 func (s *Server) reportsHeatmap(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, s.reports.Heatmap(r.Context(), s.reportFilter(r)))
+	writeJSON(w, http.StatusOK, sp(r).reports.Heatmap(r.Context(), s.reportFilter(r)))
 }
 
 func (s *Server) reportsTxSummary(w http.ResponseWriter, r *http.Request) {
 	typ := firstQuery(r.URL.Query().Get("type"), "expense")
-	writeJSON(w, http.StatusOK, s.reports.TxSummary(r.Context(), s.reportFilter(r), typ))
+	writeJSON(w, http.StatusOK, sp(r).reports.TxSummary(r.Context(), s.reportFilter(r), typ))
 }
 
 func (s *Server) reportsTxByCategory(w http.ResponseWriter, r *http.Request) {
 	typ := firstQuery(r.URL.Query().Get("type"), "expense")
-	writeJSON(w, http.StatusOK, s.reports.TxByCategory(r.Context(), s.reportFilter(r), typ))
+	writeJSON(w, http.StatusOK, sp(r).reports.TxByCategory(r.Context(), s.reportFilter(r), typ))
 }
 
 func (s *Server) reportsTxDynamics(w http.ResponseWriter, r *http.Request) {
 	typ := firstQuery(r.URL.Query().Get("type"), "expense")
 	group := firstQuery(r.URL.Query().Get("group_by"), "day")
-	writeJSON(w, http.StatusOK, s.reports.TxDynamics(r.Context(), s.reportFilter(r), typ, group))
+	writeJSON(w, http.StatusOK, sp(r).reports.TxDynamics(r.Context(), s.reportFilter(r), typ, group))
 }
 
 func (s *Server) reportsTxTop(w http.ResponseWriter, r *http.Request) {
 	typ := firstQuery(r.URL.Query().Get("type"), "expense")
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	writeJSON(w, http.StatusOK, s.reports.TxTop(r.Context(), s.reportFilter(r), typ, limit))
+	writeJSON(w, http.StatusOK, sp(r).reports.TxTop(r.Context(), s.reportFilter(r), typ, limit))
 }
 
 func (s *Server) reportsNetWorth(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, s.reports.NetWorth(r.Context(), s.reportFilter(r)))
+	writeJSON(w, http.StatusOK, sp(r).reports.NetWorth(r.Context(), s.reportFilter(r)))
 }
 
 func (s *Server) reportsNetWorthHistory(w http.ResponseWriter, r *http.Request) {
 	group := firstQuery(r.URL.Query().Get("group_by"), "day")
-	writeJSON(w, http.StatusOK, s.reports.NetWorthHistory(r.Context(), s.reportFilter(r), group))
+	writeJSON(w, http.StatusOK, sp(r).reports.NetWorthHistory(r.Context(), s.reportFilter(r), group))
 }

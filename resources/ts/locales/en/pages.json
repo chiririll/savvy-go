@@ -54,8 +54,7 @@
         "deleteTitle": "Delete category?",
         "deleteDescription": "This action cannot be undone. The category \"{{name}}\" will be permanently deleted.",
         "reassignTitle": "Delete category?",
-        "reassignDescription_one": "\"{{name}}\" has {{count}} transaction. Choose a category to move it to before deleting.",
-        "reassignDescription_other": "\"{{name}}\" has {{count}} transactions. Choose a category to move them to before deleting.",
+        "reassignDescription": "\"{{name}}\" has {{count, plural(one: # transaction; other: # transactions)}}. Choose a category to move the transactions to before deleting.",
         "reassignPlaceholder": "Choose replacement category",
         "reassignAndDelete": "Delete and reassign"
     },
@@ -128,8 +127,13 @@
         "noDate": "No date",
         "today": "Today",
         "yesterday": "Yesterday",
+        "tomorrow": "Tomorrow",
         "applyTitle": "Confirm transaction",
         "applyDescription": "Which date should this transaction be posted on? The posted date cannot be in the future.",
+        "applyEstimatedDescription": "The amount is approximate. Enter the real amount to post it.",
+        "applyAmount": "Actual amount",
+        "applyToAmount": "Actual received amount",
+        "estimatedTitle": "Approximate amount",
         "applyToday": "Today",
         "applyOverdue": "Overdue date",
         "applyOriginal": "Original date",
@@ -165,8 +169,7 @@
             "qty": "Qty",
             "price": "Price",
             "total": "Total",
-            "count_one": "{{count}} item",
-            "count_other": "{{count}} items"
+            "count": "{{count, plural(one: # item; other: # items)}}"
         },
         "fallback": {
             "payment": "Payment: {{name}}",
@@ -187,7 +190,9 @@
             "debt_payment": "Debt Payment",
             "debt_collection": "Debt Collection",
             "debt_lend": "Debt Issued",
-            "debt_borrow": "Loan Received"
+            "debt_borrow": "Loan Received",
+            "transfer_out": "Sent to another space",
+            "transfer_in": "Received from another space"
         },
         "deleteTitle": "Delete transaction?",
         "deleteDescription": "This action cannot be undone."
@@ -198,21 +203,6 @@
         "create": "New Recurring",
         "createTitle": "New Recurring Transaction",
         "editTitle": "Edit Recurring Transaction",
-        "columns": {
-            "transaction": "Transaction",
-            "amount": "Amount",
-            "category": "Category",
-            "frequency": "Frequency",
-            "nextRun": "Next Run",
-            "status": "Status"
-        },
-        "status": {
-            "active": "Active",
-            "paused": "Paused"
-        },
-        "today": "Today",
-        "tomorrow": "Tomorrow",
-        "lastRun": "Last: {{date}}",
         "everyInterval": "Every {{count}} {{frequency}}",
         "deleteTitle": "Delete recurring transaction?",
         "deleteDescription": "This action cannot be undone."
@@ -225,26 +215,11 @@
         "editTitle": "Edit Budget",
         "notFound": "Budget not found",
         "allExpenses": "All expenses",
-        "noCategories": "No categories",
-        "spent": "{{amount}} spent",
-        "remaining": "{{amount}} remaining",
-        "exceededBy": "Exceeded by {{amount}}",
-        "status": {
-            "active": "Active",
-            "inactive": "Inactive"
-        },
         "periods": {
             "weekly": "Weekly",
             "monthly": "Monthly",
             "yearly": "Yearly",
             "one_time": "One-time"
-        },
-        "columns": {
-            "budget": "Budget",
-            "limit": "Limit",
-            "period": "Period",
-            "progress": "Progress",
-            "status": "Status"
         },
         "deleteTitle": "Delete budget?",
         "deleteDescription": "This action cannot be undone."
@@ -258,17 +233,11 @@
         "netPosition": "Net Position",
         "inYourFavor": "in your favor",
         "youOwe": "you owe",
-        "showCompleted": "Show completed debts",
         "notFound": "Debt not found",
         "paidOff": "Paid Off",
         "makePayment": "Make Payment",
         "collectPayment": "Collect Payment",
         "reopen": "Reopen",
-        "status": {
-            "completed": "Completed",
-            "active": "Active",
-            "inactive": "Inactive"
-        },
         "columns": {
             "debt": "Debt",
             "type": "Type",
@@ -283,7 +252,12 @@
             "owed_to_me": "Owed To Me"
         },
         "deleteTitle": "Delete debt?",
-        "deleteDescription": "This action cannot be undone."
+        "deleteDescription": "This action cannot be undone.",
+        "due": "Due {{date}}",
+        "tabs": {
+            "active": "Active",
+            "completed": "Completed"
+        }
     },
     "automation": {
         "title": "Automation Rules",
@@ -304,21 +278,12 @@
             "error": "Error",
             "skipped": "Skipped"
         },
-        "columns": {
-            "order": "#",
-            "name": "Name",
-            "trigger": "Trigger",
-            "conditions": "Conditions",
-            "actions": "Actions",
-            "runs": "Runs",
-            "active": "Active"
-        },
         "deleteTitle": "Delete rule?",
         "deleteDescription": "This action cannot be undone.",
-        "conditionCount_one": "{{count}} condition",
-        "conditionCount_other": "{{count}} conditions",
-        "actionCount_one": "{{count}} action",
-        "actionCount_other": "{{count}} actions"
+        "runs": "{{count, plural(one: # run; other: # runs)}}",
+        "shape": "C {{conditions}} | A {{actions}}",
+        "shapeTitle": "{{conditions}} conditions, {{actions}} actions",
+        "active": "Active"
     },
     "reports": {
         "title": "Reports",
@@ -355,11 +320,6 @@
             "reset": "Reset",
             "resetFilters": "Reset filters",
             "quarterLabel": "Q{{q}} {{year}}"
-        },
-        "groupBy": {
-            "day": "Day",
-            "week": "Week",
-            "month": "Month"
         },
         "views": {
             "donut": "Donut",
@@ -440,8 +400,7 @@
             "less": "Less",
             "more": "More",
             "noExpenses": "No expenses",
-            "transactions_one": "{{count}} transaction",
-            "transactions_other": "{{count}} transactions"
+            "transactions": "{{count, plural(one: # transaction; other: # transactions)}}"
         },
         "expensesByCategory": {
             "title": "Expenses by Category",
@@ -501,8 +460,7 @@
         "expenses": "Expenses",
         "pending": "Pending",
         "pendingCount": "{{count}} transactions",
-        "pendingCount_one": "{{count}} transaction",
-        "pendingCount_other": "{{count}} transactions",
+        "pendingCount": "{{count, plural(one: # transaction; other: # transactions)}}",
         "pendingEmpty": "No pending transactions",
         "balanceDynamics": "Balance Dynamics",
         "accountBalances": "Account Balances",

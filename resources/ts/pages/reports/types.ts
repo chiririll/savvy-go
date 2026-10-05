@@ -33,28 +33,49 @@ export const DEFAULT_FILTERS: ReportFilters = {
     tagIds: [],
 }
 
-export function defaultGroupBy(filters: ReportFilters): CashFlowGroupBy {
+const DAY_MS = 86_400_000
+
+function daysBetween(start: Date, end: Date): number {
+    return Math.round((end.getTime() - start.getTime()) / DAY_MS) + 1
+}
+
+/** Number of days in the period the filters select (0 when it can't be worked out). */
+export function reportPeriodDays(filters: ReportFilters, today = new Date()): number {
     switch (filters.periodType) {
         case 'last_30_days':
-        case 'month':
-            return 'day'
-        case 'quarter':
-            return 'week'
-        case 'year':
-            return 'month'
-        case 'ytd':
-            return 'week'
-        case 'custom': {
-            const start = new Date(filters.customStartDate)
-            const end = new Date(filters.customEndDate)
-            const days = Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1
-            if (days <= 45) return 'day'
-            if (days <= 185) return 'week'
-            return 'month'
+            return 30
+        case 'month': {
+            const [year, month] = filters.selectedMonth.split('-').map(Number)
+            return year && month ? new Date(year, month, 0).getDate() : 30
         }
-        default:
-            return 'day'
+        case 'quarter': {
+            const [year, quarter] = filters.selectedQuarter.split('-Q').map(Number)
+            if (!year || !quarter) return 91
+            const start = new Date(year, (quarter - 1) * 3, 1)
+            return daysBetween(start, new Date(year, quarter * 3, 0))
+        }
+        case 'year': {
+            const year = Number(filters.selectedYear) || today.getFullYear()
+            return daysBetween(new Date(year, 0, 1), new Date(year, 11, 31))
+        }
+        case 'ytd':
+            return daysBetween(new Date(today.getFullYear(), 0, 1), today)
+        case 'custom': {
+            const days = daysBetween(new Date(filters.customStartDate), new Date(filters.customEndDate))
+            return Number.isFinite(days) && days > 0 ? days : 30
+        }
     }
+}
+
+/**
+ * Chart detail for the selected period, by its length alone: a year of daily
+ * points is slow and unreadable, a month of monthly points shows nothing.
+ */
+export function defaultGroupBy(filters: ReportFilters): CashFlowGroupBy {
+    const days = reportPeriodDays(filters)
+    if (days <= 45) return 'day'
+    if (days <= 185) return 'week'
+    return 'month'
 }
 
 export const TABS: ReportTab[] = ['overview', 'cashflow', 'expenses', 'income', 'networth']

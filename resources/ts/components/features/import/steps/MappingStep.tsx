@@ -126,7 +126,7 @@ export function MappingStep({ parseResult, onSubmit, isLoading }: MappingStepPro
                                         disabled={isLoading}
                                     >
                                         <FormControl>
-                                            <SelectTrigger>
+                                            <SelectTrigger className="w-full">
                                                 <SelectValue placeholder={tForms('import.selectColumn')} />
                                             </SelectTrigger>
                                         </FormControl>
@@ -155,7 +155,7 @@ export function MappingStep({ parseResult, onSubmit, isLoading }: MappingStepPro
                                         disabled={isLoading}
                                     >
                                         <FormControl>
-                                            <SelectTrigger>
+                                            <SelectTrigger className="w-full">
                                                 <SelectValue placeholder={tForms('import.selectColumn')} />
                                             </SelectTrigger>
                                         </FormControl>
@@ -212,7 +212,7 @@ export function MappingStep({ parseResult, onSubmit, isLoading }: MappingStepPro
                                         disabled={isLoading}
                                     >
                                         <FormControl>
-                                            <SelectTrigger>
+                                            <SelectTrigger className="w-full">
                                                 <SelectValue placeholder={tForms('import.selectColumn')} />
                                             </SelectTrigger>
                                         </FormControl>
@@ -242,7 +242,7 @@ export function MappingStep({ parseResult, onSubmit, isLoading }: MappingStepPro
                                         disabled={isLoading}
                                     >
                                         <FormControl>
-                                            <SelectTrigger>
+                                            <SelectTrigger className="w-full">
                                                 <SelectValue placeholder={tForms('import.selectColumn')} />
                                             </SelectTrigger>
                                         </FormControl>
@@ -275,7 +275,7 @@ export function MappingStep({ parseResult, onSubmit, isLoading }: MappingStepPro
                                         disabled={isLoading}
                                     >
                                         <FormControl>
-                                            <SelectTrigger>
+                                            <SelectTrigger className="w-full">
                                                 <SelectValue placeholder={tForms('import.selectColumn')} />
                                             </SelectTrigger>
                                         </FormControl>
@@ -308,7 +308,7 @@ export function MappingStep({ parseResult, onSubmit, isLoading }: MappingStepPro
                                         disabled={isLoading}
                                     >
                                         <FormControl>
-                                            <SelectTrigger>
+                                            <SelectTrigger className="w-full">
                                                 <SelectValue placeholder={tForms('import.selectColumn')} />
                                             </SelectTrigger>
                                         </FormControl>
@@ -348,7 +348,7 @@ export function MappingStep({ parseResult, onSubmit, isLoading }: MappingStepPro
                                         disabled={isLoading}
                                     >
                                         <FormControl>
-                                            <SelectTrigger>
+                                            <SelectTrigger className="w-full">
                                                 <SelectValue />
                                             </SelectTrigger>
                                         </FormControl>
@@ -376,7 +376,7 @@ export function MappingStep({ parseResult, onSubmit, isLoading }: MappingStepPro
                                         disabled={isLoading}
                                     >
                                         <FormControl>
-                                            <SelectTrigger>
+                                            <SelectTrigger className="w-full">
                                                 <SelectValue />
                                             </SelectTrigger>
                                         </FormControl>
@@ -402,7 +402,7 @@ export function MappingStep({ parseResult, onSubmit, isLoading }: MappingStepPro
                                         disabled={isLoading}
                                     >
                                         <FormControl>
-                                            <SelectTrigger>
+                                            <SelectTrigger className="w-full">
                                                 <SelectValue />
                                             </SelectTrigger>
                                         </FormControl>

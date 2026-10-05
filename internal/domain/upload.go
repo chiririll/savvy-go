@@ -20,6 +20,7 @@ import (
 
 	"savvy-go/internal/db"
 	"savvy-go/internal/db/sqlc"
+	"savvy-go/internal/store"
 )
 
 const (
@@ -49,7 +50,7 @@ type Upload struct {
 }
 
 type Uploads struct {
-	DB         *sql.DB
+	DB         store.DB
 	Root       string
 	AppURL     string
 	SignSecret string

@@ -1,0 +1,15 @@
+#!/bin/sh
+set -e
+
+# $1: 1 = fresh install, 2 = upgrade.
+chown -R savvy-go:savvy-go /var/lib/savvy-go /opt/savvy-go 2>/dev/null || true
+
+if [ -d /run/systemd/system ]; then
+    systemctl daemon-reload
+    if [ "$1" -eq 1 ]; then
+        systemctl enable savvy-go.service >/dev/null
+    fi
+    systemctl restart savvy-go.service
+fi
+
+exit 0

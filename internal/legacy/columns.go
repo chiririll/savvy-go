@@ -28,11 +28,11 @@ var extraColumns = map[string][]addColumn{
 	},
 	"currencies": {
 		{"is_base", "INTEGER NOT NULL DEFAULT 0"},
-		{"rate", "REAL NOT NULL DEFAULT 1"},
+		{"rate", "TEXT NOT NULL DEFAULT '1'"},
 	},
 	"accounts": {
 		{"debt_type", "TEXT"},
-		{"target_amount", "REAL"},
+		{"target_amount", "INTEGER"},
 		{"due_date", "TEXT"},
 		{"is_paid_off", "INTEGER NOT NULL DEFAULT 0"},
 		{"counterparty", "TEXT"},
@@ -43,6 +43,10 @@ var extraColumns = map[string][]addColumn{
 		{"dedup_hash", "TEXT"},
 		{"status", "TEXT NOT NULL DEFAULT 'confirmed'"},
 		{"recurring_transaction_id", "INTEGER"},
+		{"is_estimated", "INTEGER NOT NULL DEFAULT 0"},
+	},
+	"recurring_transactions": {
+		{"is_estimated", "INTEGER NOT NULL DEFAULT 0"},
 	},
 	"budgets": {
 		{"currency_id", "INTEGER"},
@@ -52,19 +56,17 @@ var extraColumns = map[string][]addColumn{
 	},
 }
 
-// EnsureColumns adds missing domain columns on a Laravel-era database so the
-// Go schema indexes can be created. No-op when the file is not Laravel.
-func EnsureColumns(ctx context.Context, db *sql.DB) error {
-	if !IsLaravel(ctx, db) {
-		return nil
-	}
+// ensureColumns adds missing domain columns on a Laravel-era database so the
+// Go schema indexes can be created. Tables the file lacks are skipped; Go
+// migrations create them.
+func ensureColumns(ctx context.Context, db *sql.DB) error {
 	for table, cols := range extraColumns {
-		if !tableExists(ctx, db, table) {
-			continue
-		}
 		have, err := columns(ctx, db, table)
 		if err != nil {
 			return err
+		}
+		if len(have) == 0 {
+			continue
 		}
 		set := make(map[string]bool, len(have))
 		for _, c := range have {

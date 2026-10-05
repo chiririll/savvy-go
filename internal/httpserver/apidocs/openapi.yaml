@@ -1,0 +1,1261 @@
+openapi: 3.0.3
+info:
+  title: Savvy Go API
+  version: "1.0"
+  description: |
+    REST API of a self-hosted Savvy Go instance.
+
+    ## Authentication
+    Create an API token in **Settings → API** and send it on every request:
+
+    ```
+    Authorization: Bearer svy_xxxxxxxx
+    ```
+
+    A token acts as its owner, limited by its scope:
+
+    * `read` — only `GET`/`HEAD` requests.
+    * `read-write` — all methods, capped by the owner's role in the space (a viewer cannot write).
+
+    ## Spaces
+    Finances live in spaces; a user may belong to several, as `admin`, `editor` or `viewer`.
+    Data endpoints live under `/spaces/{space}` (ids from `GET /spaces`). A space the caller
+    does not belong to answers `404`.
+
+    Tokens cannot call administrator endpoints (users, identity providers) or credential and
+    instance endpoints (passwords, 2FA, passkeys, API tokens, settings updates, backups).
+    Those answer `403`. A request with an invalid, expired or revoked token answers `401`
+    and never falls back to a session cookie.
+
+    Browser sessions (cookie + `X-CSRF-Token`) use the same endpoints; the SPA relies on them.
+
+    ## Conventions
+    * Successful bodies are wrapped as `{"data": ...}`; list endpoints may add `meta`.
+    * Errors: `{"message": "..."}`. Validation errors answer `422` with `{"message", "errors": {field: [..]}}`.
+    * Dates are `YYYY-MM-DD`, timestamps RFC 3339.
+    * Request bodies use `snake_case`; response resources use `camelCase`.
+servers:
+  - url: /api
+security:
+  - bearerAuth: []
+tags:
+  - name: API tokens
+  - name: Spaces
+  - name: Transfers between spaces
+  - name: Currencies
+  - name: Accounts
+  - name: Categories
+  - name: Tags
+  - name: Transactions
+  - name: Debts
+  - name: Recurring
+  - name: Budgets
+  - name: Automation rules
+  - name: Reports
+  - name: Other
+paths:
+  /auth/api-tokens:
+    get:
+      tags: [API tokens]
+      summary: List your API tokens
+      description: Session only. Raw token values are never returned after creation.
+      security: [{cookieAuth: []}]
+      responses:
+        "200":
+          description: Tokens
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: {$ref: "#/components/schemas/ApiToken"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+    post:
+      tags: [API tokens]
+      summary: Create an API token
+      description: Session only. The raw `token` is shown once, in this response.
+      security: [{cookieAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: {type: string, maxLength: 100, example: Zapier}
+                scope: {type: string, enum: [read, read-write], default: read}
+                expires_at: {type: string, format: date-time, nullable: true, description: Future RFC 3339 timestamp; omit for a token that never expires.}
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    allOf:
+                      - {$ref: "#/components/schemas/ApiToken"}
+                      - type: object
+                        properties:
+                          token: {type: string, example: svy_AbC123...}
+                  message: {type: string}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "419": {$ref: "#/components/responses/CsrfMismatch"}
+        "422": {$ref: "#/components/responses/Validation"}
+  /auth/api-tokens/{id}:
+    delete:
+      tags: [API tokens]
+      summary: Revoke an API token
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/Id"}]
+      responses:
+        "200": {$ref: "#/components/responses/Message"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "419": {$ref: "#/components/responses/CsrfMismatch"}
+
+  /users:
+    get:
+      tags: [Other]
+      summary: List users
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+  /users/{id}:
+    get:
+      tags: [Other]
+      summary: Get a user
+      parameters: [{$ref: "#/components/parameters/Id"}]
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "404": {$ref: "#/components/responses/NotFound"}
+  /spaces:
+    get:
+      tags: [Spaces]
+      summary: List the caller's spaces
+      description: Each space with the caller's role in it (`admin`, `editor`, `viewer`).
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+    post:
+      tags: [Spaces]
+      summary: Create a space administered by the caller
+      description: Session only. Guests cannot create spaces; `max_spaces_per_user` limits how many a user administers.
+      security: [{cookieAuth: []}]
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses:
+        "201": {$ref: "#/components/responses/Data"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "422": {$ref: "#/components/responses/Validation"}
+
+  /spaces/{space}:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Spaces]
+      summary: Get a space with the caller's role, its size and quota
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "404": {$ref: "#/components/responses/NotFound"}
+    patch:
+      tags: [Spaces]
+      summary: Rename a space
+      description: Space admins only, session only.
+      security: [{cookieAuth: []}]
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+    delete:
+      tags: [Spaces]
+      summary: Delete a space
+      description: Space admins only, session only. A final backup is kept for the server administrators.
+      security: [{cookieAuth: []}]
+      responses:
+        "204": {description: Deleted}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+  /spaces/{space}/members:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Spaces]
+      summary: List the members of a space
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "404": {$ref: "#/components/responses/NotFound"}
+  /spaces/{space}/members/{user}:
+    parameters: [{$ref: "#/components/parameters/Space"}, {name: user, in: path, required: true, schema: {type: integer}}]
+    patch:
+      tags: [Spaces]
+      summary: Change a member's role
+      description: Space admins only, session only. A space keeps at least one admin; guests cannot be admins.
+      security: [{cookieAuth: []}]
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "422": {$ref: "#/components/responses/Validation"}
+    delete:
+      tags: [Spaces]
+      summary: Remove a member
+      description: Space admins only, session only.
+      security: [{cookieAuth: []}]
+      responses:
+        "204": {description: Removed}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "422": {$ref: "#/components/responses/Validation"}
+  /spaces/{space}/leave:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    post:
+      tags: [Spaces]
+      summary: Leave a space
+      description: Session only. The last admin of a space with other members cannot leave.
+      security: [{cookieAuth: []}]
+      responses:
+        "204": {description: Left}
+        "422": {$ref: "#/components/responses/Validation"}
+  /spaces/{space}/settings:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Spaces]
+      summary: Read the settings of a space
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "404": {$ref: "#/components/responses/NotFound"}
+    patch:
+      tags: [Spaces]
+      summary: Update the settings of a space
+      description: Space admins only, session only.
+      security: [{cookieAuth: []}]
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+  /spaces/{space}/links:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Transfers between spaces]
+      summary: List the spaces linked to a space
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "404": {$ref: "#/components/responses/NotFound"}
+    post:
+      tags: [Transfers between spaces]
+      summary: Link a space with another
+      description: >-
+        Session only. The caller must administer both spaces (`target_space_id`); a space the caller
+        does not belong to answers `404`.
+      security: [{cookieAuth: []}]
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+  /spaces/{space}/links/{other}:
+    parameters: [{$ref: "#/components/parameters/Space"}, {name: other, in: path, required: true, schema: {type: integer}}]
+    delete:
+      tags: [Transfers between spaces]
+      summary: Unlink two spaces
+      description: Session only, an admin of either space. Their transfers stay in both spaces, frozen.
+      security: [{cookieAuth: []}]
+      responses:
+        "204": {description: Unlinked}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "422": {$ref: "#/components/responses/Validation"}
+  /spaces/{space}/transfers:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Transfers between spaces]
+      summary: List transfers with linked spaces
+      description: >-
+        Each transfer is kept in both spaces. The other space's account is shown only to members of
+        both spaces. `frozen` transfers are with a space that is no longer linked here; `verified` is
+        false for a signature this server does not trust; `status` `pending` waits for a decision after
+        a restore.
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "404": {$ref: "#/components/responses/NotFound"}
+    post:
+      tags: [Transfers between spaces]
+      summary: Send money to a linked space
+      description: >-
+        `to_space_id`, `from_account_id` (this space), `to_account_id` (the other space), `from_amount`
+        and `to_amount` in each account's currency, `date`, `description`. Needs editor rights in both spaces.
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses:
+        "201": {$ref: "#/components/responses/Data"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "422": {$ref: "#/components/responses/Validation"}
+  /spaces/{space}/transfers/{uuid}:
+    parameters: [{$ref: "#/components/parameters/Space"}, {name: uuid, in: path, required: true, schema: {type: string}}]
+    patch:
+      tags: [Transfers between spaces]
+      summary: Change a transfer in both spaces
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "422": {$ref: "#/components/responses/Validation"}
+    delete:
+      tags: [Transfers between spaces]
+      summary: Delete a transfer from both spaces
+      responses:
+        "204": {description: Deleted}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "422": {$ref: "#/components/responses/Validation"}
+  /spaces/{space}/transfers/{uuid}/accept:
+    parameters: [{$ref: "#/components/parameters/Space"}, {name: uuid, in: path, required: true, schema: {type: string}}]
+    post:
+      tags: [Transfers between spaces]
+      summary: Take the other space's version of a pending transfer
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "422": {$ref: "#/components/responses/Validation"}
+  /spaces/{space}/transfers/{uuid}/reject:
+    parameters: [{$ref: "#/components/parameters/Space"}, {name: uuid, in: path, required: true, schema: {type: string}}]
+    post:
+      tags: [Transfers between spaces]
+      summary: Push this space's version of a pending transfer to the other space
+      description: Needs editor rights in both spaces and a signature this server trusts.
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "422": {$ref: "#/components/responses/Validation"}
+  /spaces/{space}/transfers/{uuid}/trust:
+    parameters: [{$ref: "#/components/parameters/Space"}, {name: uuid, in: path, required: true, schema: {type: string}}]
+    post:
+      tags: [Transfers between spaces]
+      summary: Re-sign a transfer this server cannot verify
+      description: Needs editor rights in every space of the transfer on this server.
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+  /settings:
+    get:
+      tags: [Other]
+      summary: Read instance settings
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+    patch:
+      tags: [Other]
+      summary: Update instance settings
+      description: Server administrators only, session only.
+      security: [{cookieAuth: []}]
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "422": {$ref: "#/components/responses/Validation"}
+
+  /spaces/{space}/currencies:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Currencies]
+      summary: List currencies
+      responses: &list-ok
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+    post:
+      tags: [Currencies]
+      summary: Add a currency
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses: &create-ok
+        "201": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "422": {$ref: "#/components/responses/Validation"}
+  /spaces/{space}/currencies/catalog:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Currencies]
+      summary: Catalog of currencies that can be added
+      responses: *list-ok
+  /spaces/{space}/currencies/convert:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    post:
+      tags: [Currencies]
+      summary: Convert an amount between currencies
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                amount: {type: number}
+                from_currency_id: {type: integer}
+                to_currency_id: {type: integer}
+      responses: &action-ok
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "422": {$ref: "#/components/responses/Validation"}
+  /spaces/{space}/currencies/{id}:
+    parameters: [{$ref: "#/components/parameters/Space"}, {$ref: "#/components/parameters/Id"}]
+    get:
+      tags: [Currencies]
+      summary: Get a currency
+      responses: &show-ok
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "404": {$ref: "#/components/responses/NotFound"}
+    put:
+      tags: [Currencies]
+      summary: Update a currency
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses: *action-ok
+    patch:
+      tags: [Currencies]
+      summary: Update a currency (partial)
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses: *action-ok
+    delete:
+      tags: [Currencies]
+      summary: Delete a currency
+      responses: &delete-ok
+        "204": {description: Deleted}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "422": {$ref: "#/components/responses/Validation"}
+  /spaces/{space}/currencies/{id}/set-base:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    post:
+      tags: [Currencies]
+      summary: Make this the base currency
+      parameters: [{$ref: "#/components/parameters/Id"}]
+      responses: *action-ok
+
+  /spaces/{space}/accounts:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Accounts]
+      summary: List accounts
+      parameters:
+        - {name: active, in: query, schema: {type: boolean}, description: Only active accounts}
+        - {name: exclude_debts, in: query, schema: {type: boolean}}
+        - {name: with_summary, in: query, schema: {type: boolean}}
+        - {name: base_currency_id, in: query, schema: {type: integer}}
+      responses: *list-ok
+    post:
+      tags: [Accounts]
+      summary: Create an account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/AccountInput"}
+      responses: *create-ok
+  /spaces/{space}/accounts/reorder:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    post:
+      tags: [Accounts]
+      summary: Reorder accounts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids: {type: array, items: {type: integer}}
+      responses: *action-ok
+  /spaces/{space}/accounts-balance-history:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Accounts]
+      summary: Balance history of accounts
+      responses: *list-ok
+  /spaces/{space}/accounts-balance-comparison:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Accounts]
+      summary: Compare balances between two dates
+      responses: *list-ok
+  /spaces/{space}/accounts/{id}:
+    parameters: [{$ref: "#/components/parameters/Space"}, {$ref: "#/components/parameters/Id"}]
+    get:
+      tags: [Accounts]
+      summary: Get an account
+      responses: *show-ok
+    put:
+      tags: [Accounts]
+      summary: Update an account
+      requestBody:
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/AccountInput"}
+      responses: *action-ok
+    patch:
+      tags: [Accounts]
+      summary: Update an account (partial)
+      requestBody:
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/AccountInput"}
+      responses: *action-ok
+    delete:
+      tags: [Accounts]
+      summary: Delete an account
+      responses: *delete-ok
+
+  /spaces/{space}/categories:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Categories]
+      summary: List categories
+      parameters:
+        - {name: type, in: query, schema: {type: string, enum: [income, expense]}}
+      responses: *list-ok
+    post:
+      tags: [Categories]
+      summary: Create a category
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses: *create-ok
+  /spaces/{space}/categories-summary:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Categories]
+      summary: Totals per category
+      parameters:
+        - {name: type, in: query, schema: {type: string, enum: [income, expense]}}
+        - {name: start_date, in: query, schema: {type: string, format: date}}
+        - {name: end_date, in: query, schema: {type: string, format: date}}
+      responses: *list-ok
+  /spaces/{space}/categories/{id}:
+    parameters: [{$ref: "#/components/parameters/Space"}, {$ref: "#/components/parameters/Id"}]
+    get:
+      tags: [Categories]
+      summary: Get a category
+      responses: *show-ok
+    put:
+      tags: [Categories]
+      summary: Update a category
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses: *action-ok
+    patch:
+      tags: [Categories]
+      summary: Update a category (partial)
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses: *action-ok
+    delete:
+      tags: [Categories]
+      summary: Delete a category
+      parameters:
+        - {name: successor_id, in: query, schema: {type: integer}, description: Category that inherits the transactions}
+      responses: *delete-ok
+  /spaces/{space}/categories/{id}/set-default:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    post:
+      tags: [Categories]
+      summary: Make this the default category
+      parameters: [{$ref: "#/components/parameters/Id"}]
+      responses: *action-ok
+  /spaces/{space}/categories/{id}/statistics:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Categories]
+      summary: Category statistics
+      parameters:
+        - {$ref: "#/components/parameters/Id"}
+        - {name: start_date, in: query, schema: {type: string, format: date}}
+        - {name: end_date, in: query, schema: {type: string, format: date}}
+      responses: *show-ok
+
+  /spaces/{space}/tags:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Tags]
+      summary: List tags
+      responses: *list-ok
+    post:
+      tags: [Tags]
+      summary: Create a tag
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: {type: string}
+      responses: *create-ok
+  /spaces/{space}/tags/{id}:
+    parameters: [{$ref: "#/components/parameters/Space"}, {$ref: "#/components/parameters/Id"}]
+    get:
+      tags: [Tags]
+      summary: Get a tag
+      responses: *show-ok
+    put:
+      tags: [Tags]
+      summary: Rename a tag
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses: *action-ok
+    patch:
+      tags: [Tags]
+      summary: Rename a tag (partial)
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses: *action-ok
+    delete:
+      tags: [Tags]
+      summary: Delete a tag
+      responses: *delete-ok
+
+  /spaces/{space}/transactions:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Transactions]
+      summary: List transactions
+      parameters:
+        - {name: type, in: query, schema: {type: string, enum: [income, expense, transfer]}}
+        - {name: status, in: query, schema: {type: string, enum: [completed, pending, skipped]}}
+        - {name: start_date, in: query, schema: {type: string, format: date}}
+        - {name: end_date, in: query, schema: {type: string, format: date}}
+        - {name: account_id, in: query, schema: {type: integer}}
+        - {name: category_id, in: query, schema: {type: integer}}
+        - {name: category_ids, in: query, schema: {type: string}, description: Comma separated ids}
+        - {name: tag_ids, in: query, schema: {type: string}, description: Comma separated ids}
+        - {name: sort_by, in: query, schema: {type: string}}
+        - {name: sort_direction, in: query, schema: {type: string, enum: [asc, desc]}}
+        - {name: page, in: query, schema: {type: integer, default: 1}}
+        - {name: per_page, in: query, schema: {type: integer, default: 25}}
+        - {name: with_summary, in: query, schema: {type: boolean}}
+      responses:
+        "200":
+          description: A page of transactions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: {$ref: "#/components/schemas/Transaction"}
+                  meta:
+                    type: object
+                    properties:
+                      current_page: {type: integer}
+                      last_page: {type: integer}
+                      per_page: {type: integer}
+                      total: {type: integer}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+    post:
+      tags: [Transactions]
+      summary: Create a transaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/TransactionInput"}
+      responses: *create-ok
+  /spaces/{space}/transactions-summary:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Transactions]
+      summary: Totals for the current filter
+      responses: *list-ok
+  /spaces/{space}/transactions-pending-summary:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Transactions]
+      summary: Pending (not yet confirmed) transactions summary
+      responses: *list-ok
+  /spaces/{space}/transactions/{id}:
+    parameters: [{$ref: "#/components/parameters/Space"}, {$ref: "#/components/parameters/Id"}]
+    get:
+      tags: [Transactions]
+      summary: Get a transaction
+      responses: *show-ok
+    put:
+      tags: [Transactions]
+      summary: Update a transaction
+      requestBody:
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/TransactionInput"}
+      responses: *action-ok
+    patch:
+      tags: [Transactions]
+      summary: Update a transaction (partial)
+      requestBody:
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/TransactionInput"}
+      responses: *action-ok
+    delete:
+      tags: [Transactions]
+      summary: Delete a transaction
+      responses: *delete-ok
+  /spaces/{space}/transactions/{id}/duplicate:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    post:
+      tags: [Transactions]
+      summary: Duplicate a transaction
+      parameters: [{$ref: "#/components/parameters/Id"}]
+      responses: *action-ok
+  /spaces/{space}/transactions/{id}/confirm:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    post:
+      tags: [Transactions]
+      summary: Confirm a pending transaction
+      parameters: [{$ref: "#/components/parameters/Id"}]
+      responses: *action-ok
+  /spaces/{space}/transactions/{id}/skip:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    post:
+      tags: [Transactions]
+      summary: Skip a pending recurring transaction
+      parameters: [{$ref: "#/components/parameters/Id"}]
+      responses: *action-ok
+
+  /spaces/{space}/debts:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Debts]
+      summary: List debts
+      parameters:
+        - {name: include_completed, in: query, schema: {type: boolean}}
+        - {name: with_summary, in: query, schema: {type: boolean}}
+      responses: *list-ok
+    post:
+      tags: [Debts]
+      summary: Create a debt
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                origin: {type: string}
+                name: {type: string}
+                debt_type: {type: string}
+                account_id: {type: integer}
+                currency_id: {type: integer}
+                amount: {type: number}
+                date: {type: string, format: date}
+                due_date: {type: string, format: date, nullable: true}
+                counterparty: {type: string, nullable: true}
+                description: {type: string, nullable: true}
+      responses: *create-ok
+  /spaces/{space}/debts-summary:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Debts]
+      summary: Debts summary
+      responses: *list-ok
+  /spaces/{space}/debts/{id}:
+    parameters: [{$ref: "#/components/parameters/Space"}, {$ref: "#/components/parameters/Id"}]
+    get:
+      tags: [Debts]
+      summary: Get a debt
+      responses: *show-ok
+    put:
+      tags: [Debts]
+      summary: Update a debt
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses: *action-ok
+    patch:
+      tags: [Debts]
+      summary: Update a debt (partial)
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses: *action-ok
+    delete:
+      tags: [Debts]
+      summary: Delete a debt
+      responses: *delete-ok
+  /spaces/{space}/debts/{id}/payment:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    post:
+      tags: [Debts]
+      summary: Register a payment
+      parameters: [{$ref: "#/components/parameters/Id"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                account_id: {type: integer}
+                amount: {type: number}
+                date: {type: string, format: date}
+                description: {type: string, nullable: true}
+      responses: *action-ok
+  /spaces/{space}/debts/{id}/collect:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    post:
+      tags: [Debts]
+      summary: Collect a debt
+      parameters: [{$ref: "#/components/parameters/Id"}]
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses: *action-ok
+  /spaces/{space}/debts/{id}/reopen:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    post:
+      tags: [Debts]
+      summary: Reopen a closed debt
+      parameters: [{$ref: "#/components/parameters/Id"}]
+      responses: *action-ok
+
+  /spaces/{space}/recurring:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Recurring]
+      summary: List recurring transactions
+      responses: *list-ok
+    post:
+      tags: [Recurring]
+      summary: Create a recurring transaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                type: {type: string, enum: [income, expense, transfer]}
+                account_id: {type: integer}
+                to_account_id: {type: integer, nullable: true}
+                category_id: {type: integer, nullable: true}
+                amount: {type: number}
+                to_amount: {type: number, nullable: true}
+                description: {type: string, nullable: true}
+                frequency: {type: string}
+                interval: {type: integer}
+                day_of_week: {type: integer, nullable: true}
+                day_of_month: {type: integer, nullable: true}
+                start_date: {type: string, format: date}
+                end_date: {type: string, format: date, nullable: true}
+                is_active: {type: boolean}
+                tag_ids: {type: array, items: {type: integer}}
+      responses: *create-ok
+  /spaces/{space}/recurring-upcoming:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Recurring]
+      summary: Upcoming runs
+      responses: *list-ok
+  /spaces/{space}/recurring/{id}:
+    parameters: [{$ref: "#/components/parameters/Space"}, {$ref: "#/components/parameters/Id"}]
+    get:
+      tags: [Recurring]
+      summary: Get a recurring transaction
+      responses: *show-ok
+    put:
+      tags: [Recurring]
+      summary: Update a recurring transaction
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses: *action-ok
+    patch:
+      tags: [Recurring]
+      summary: Update a recurring transaction (partial)
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses: *action-ok
+    delete:
+      tags: [Recurring]
+      summary: Delete a recurring transaction
+      responses: *delete-ok
+
+  /spaces/{space}/budgets:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Budgets]
+      summary: List budgets
+      responses: *list-ok
+    post:
+      tags: [Budgets]
+      summary: Create a budget
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/BudgetInput"}
+      responses: *create-ok
+  /spaces/{space}/budgets/{id}:
+    parameters: [{$ref: "#/components/parameters/Space"}, {$ref: "#/components/parameters/Id"}]
+    get:
+      tags: [Budgets]
+      summary: Get a budget
+      responses: *show-ok
+    put:
+      tags: [Budgets]
+      summary: Update a budget
+      requestBody:
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/BudgetInput"}
+      responses: *action-ok
+    patch:
+      tags: [Budgets]
+      summary: Update a budget (partial)
+      requestBody:
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/BudgetInput"}
+      responses: *action-ok
+    delete:
+      tags: [Budgets]
+      summary: Delete a budget
+      responses: *delete-ok
+
+  /spaces/{space}/automation-rules:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Automation rules]
+      summary: List automation rules
+      responses: *list-ok
+    post:
+      tags: [Automation rules]
+      summary: Create a rule
+      requestBody: {$ref: "#/components/requestBodies/AutomationRule"}
+      responses: *create-ok
+  /spaces/{space}/automation-rules/triggers:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Automation rules]
+      summary: Available triggers
+      responses: *list-ok
+  /spaces/{space}/automation-rules/reorder:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    post:
+      tags: [Automation rules]
+      summary: Reorder rules
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rules:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id: {type: integer}
+                      priority: {type: integer}
+      responses: *action-ok
+  /spaces/{space}/automation-rules/{id}:
+    parameters: [{$ref: "#/components/parameters/Space"}, {$ref: "#/components/parameters/Id"}]
+    get:
+      tags: [Automation rules]
+      summary: Get a rule
+      responses: *show-ok
+    put:
+      tags: [Automation rules]
+      summary: Update a rule
+      requestBody: {$ref: "#/components/requestBodies/AutomationRule"}
+      responses: *action-ok
+    patch:
+      tags: [Automation rules]
+      summary: Update a rule (partial)
+      requestBody: {$ref: "#/components/requestBodies/AutomationRule"}
+      responses: *action-ok
+    delete:
+      tags: [Automation rules]
+      summary: Delete a rule
+      responses: *delete-ok
+  /spaces/{space}/automation-rules/{id}/toggle:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    post:
+      tags: [Automation rules]
+      summary: Enable or disable a rule
+      parameters: [{$ref: "#/components/parameters/Id"}]
+      responses: *action-ok
+  /spaces/{space}/automation-rules/{id}/test:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    post:
+      tags: [Automation rules]
+      summary: Test a rule against a transaction
+      parameters: [{$ref: "#/components/parameters/Id"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                transaction_id: {type: integer}
+      responses: *action-ok
+  /spaces/{space}/automation-rules/{id}/logs:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Automation rules]
+      summary: Rule execution log
+      parameters: [{$ref: "#/components/parameters/Id"}]
+      responses: *show-ok
+
+  /spaces/{space}/reports/overview:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Reports]
+      summary: Overview
+      parameters: &report-period
+        - {name: period_type, in: query, schema: {type: string, default: last_30_days}}
+        - {name: period_value, in: query, schema: {type: string}}
+        - {name: start_date, in: query, schema: {type: string, format: date}}
+        - {name: end_date, in: query, schema: {type: string, format: date}}
+        - {name: compare_with, in: query, schema: {type: string, default: none}}
+      responses: *list-ok
+  /spaces/{space}/reports/money-flow:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Reports]
+      summary: Money flow
+      parameters: *report-period
+      responses: *list-ok
+  /spaces/{space}/reports/expense-pace:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Reports]
+      summary: Expense pace
+      parameters: *report-period
+      responses: *list-ok
+  /spaces/{space}/reports/expenses-by-category:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Reports]
+      summary: Expenses by category
+      parameters: *report-period
+      responses: *list-ok
+  /spaces/{space}/reports/cash-flow-over-time:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Reports]
+      summary: Cash flow over time
+      parameters: *report-period
+      responses: *list-ok
+  /spaces/{space}/reports/activity-heatmap:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Reports]
+      summary: Activity heatmap
+      parameters: *report-period
+      responses: *list-ok
+  /spaces/{space}/reports/transactions/summary:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Reports]
+      summary: Transactions summary
+      parameters: *report-period
+      responses: *list-ok
+  /spaces/{space}/reports/transactions/by-category:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Reports]
+      summary: Transactions by category
+      parameters: *report-period
+      responses: *list-ok
+  /spaces/{space}/reports/transactions/dynamics:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Reports]
+      summary: Transactions dynamics
+      parameters: *report-period
+      responses: *list-ok
+  /spaces/{space}/reports/transactions/top:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Reports]
+      summary: Top transactions
+      parameters:
+        - {name: limit, in: query, schema: {type: integer}}
+        - {name: type, in: query, schema: {type: string, default: expense}}
+      responses: *list-ok
+  /spaces/{space}/reports/net-worth:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Reports]
+      summary: Net worth
+      responses: *list-ok
+  /spaces/{space}/reports/net-worth-history:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Reports]
+      summary: Net worth history
+      responses: *list-ok
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: API token created in Settings → API (`svy_…`).
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: svy_session
+      description: Browser session. Non-GET requests also need the `X-CSRF-Token` header.
+  parameters:
+    Space:
+      name: space
+      in: path
+      required: true
+      description: Space id (see `GET /spaces`).
+      schema: {type: integer}
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: {type: integer}
+  requestBodies:
+    Object:
+      required: true
+      content:
+        application/json:
+          schema: {type: object, additionalProperties: true}
+    AutomationRule:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              name: {type: string}
+              description: {type: string, nullable: true}
+              trigger_type: {type: string}
+              priority: {type: integer}
+              conditions: {type: object, additionalProperties: true}
+              actions: {type: array, items: {type: object, additionalProperties: true}}
+              is_active: {type: boolean}
+              stop_processing: {type: boolean}
+  responses:
+    Data:
+      description: Success
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data: {}
+    Message:
+      description: Success
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Message"}
+    Unauthenticated:
+      description: Missing, invalid, expired or revoked credentials
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Message"}
+    Forbidden:
+      description: Read-only access, insufficient token scope, or not available for API tokens
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Message"}
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Message"}
+    CsrfMismatch:
+      description: CSRF token mismatch (cookie sessions only)
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Message"}
+    Validation:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message: {type: string}
+              errors:
+                type: object
+                additionalProperties:
+                  type: array
+                  items: {type: string}
+  schemas:
+    Message:
+      type: object
+      properties:
+        message: {type: string}
+    ApiToken:
+      type: object
+      properties:
+        id: {type: integer}
+        name: {type: string}
+        prefix: {type: string, example: svy_AbC1}
+        scope: {type: string, enum: [read, read-write]}
+        expires_at: {type: string, format: date-time, nullable: true}
+        last_used_at: {type: string, format: date-time, nullable: true}
+        created_at: {type: string, format: date-time, nullable: true}
+    AccountInput:
+      type: object
+      properties:
+        name: {type: string}
+        type: {type: string}
+        currency_id: {type: integer, nullable: true}
+        currency_code: {type: string, description: Alternative to currency_id}
+        initial_balance: {type: number}
+        is_active: {type: boolean}
+    TransactionInput:
+      type: object
+      required: [type, account_id, amount]
+      properties:
+        type: {type: string, enum: [income, expense, transfer]}
+        account_id: {type: integer}
+        to_account_id: {type: integer, nullable: true, description: Transfers only}
+        category_id: {type: integer, nullable: true}
+        amount: {type: number}
+        to_amount: {type: number, nullable: true}
+        exchange_rate: {type: number, nullable: true}
+        description: {type: string, nullable: true}
+        date: {type: string, format: date}
+        tag_ids: {type: array, items: {type: integer}}
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              name: {type: string}
+              quantity: {type: number}
+              price_per_unit: {type: number}
+    Transaction:
+      type: object
+      properties:
+        id: {type: integer}
+        type: {type: string}
+        amount: {type: number}
+        toAmount: {type: number}
+        exchangeRate: {type: number}
+        description: {type: string, nullable: true}
+        date: {type: string}
+        status: {type: string}
+        recurringTransactionId: {type: integer, nullable: true}
+        account: {type: object, additionalProperties: true}
+        toAccount: {type: object, additionalProperties: true}
+        category: {type: object, additionalProperties: true}
+        tags: {type: array, items: {type: object, additionalProperties: true}}
+        items: {type: array, items: {type: object, additionalProperties: true}}
+        itemsCount: {type: integer}
+        actions:
+          type: object
+          additionalProperties: {type: boolean}
+        createdAt: {type: string, format: date-time}
+    BudgetInput:
+      type: object
+      properties:
+        name: {type: string}
+        amount: {type: number}
+        currency_id: {type: integer, nullable: true}
+        period: {type: string}
+        start_date: {type: string, format: date, nullable: true}
+        end_date: {type: string, format: date, nullable: true}
+        is_global: {type: boolean}
+        notify_at_percent: {type: integer}
+        is_active: {type: boolean}
+        category_ids: {type: array, items: {type: integer}}
+        tag_ids: {type: array, items: {type: integer}}

@@ -1,8 +1,7 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import ReactECharts from '@/components/shared/ReactECharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useCashFlowOverTime } from '@/hooks'
 import { formatCurrency, formatCurrencyCompact } from '@/lib/utils'
@@ -10,7 +9,8 @@ import i18n from '@/lib/i18n'
 import { defaultGroupBy } from '../types'
 import { formatReportPeriodLabel } from '../utils'
 import type { ReportFilters } from '../types'
-import type { CashFlowGroupBy } from '@/api/reports'
+import { isNarrowChart, useElementWidth } from '@/hooks/use-element-width'
+import { CHART_COLORS, axisStyle, legendTextStyle, useChartTheme, verticalFade, withAlpha } from '@/lib/chart-theme'
 
 interface CashFlowChartProps {
     filters: ReportFilters
@@ -18,10 +18,11 @@ interface CashFlowChartProps {
 
 export function CashFlowChart({ filters }: CashFlowChartProps) {
     const { t, i18n: i18nInstance } = useTranslation('pages')
-    const [groupBy, setGroupBy] = useState<CashFlowGroupBy>(() => defaultGroupBy(filters))
-    useEffect(() => {
-        setGroupBy(defaultGroupBy(filters))
-    }, [filters.periodType, filters.customStartDate, filters.customEndDate])
+    const theme = useChartTheme()
+    const [chartRef, chartWidth] = useElementWidth<HTMLDivElement>()
+    const isNarrow = isNarrowChart(chartWidth)
+    // Detail follows the report period (a year of daily points is slow and unreadable).
+    const groupBy = defaultGroupBy(filters)
     const { data, isLoading, error } = useCashFlowOverTime(filters, groupBy)
 
     const showComparison = filters.compareWith !== 'none'
@@ -55,9 +56,7 @@ export function CashFlowChart({ filters }: CashFlowChartProps) {
         const chartData = data.items
         const currency = data.currency
 
-        const labels = chartData.map(d =>
-            d.date ? formatReportPeriodLabel(d.date, groupBy) : d.label
-        )
+        const labels = chartData.map(d => formatReportPeriodLabel(d.date, groupBy))
         const incomeData = chartData.map(d => d.income)
         const expensesData = chartData.map(d => -d.expenses) // Negative for downward bars
         const balanceData = chartData.map(d => d.balance)
@@ -79,7 +78,7 @@ export function CashFlowChart({ filters }: CashFlowChartProps) {
                 stack: 'current',
                 data: incomeData,
                 itemStyle: {
-                    color: '#22c55e',
+                    color: CHART_COLORS.income,
                     borderRadius: [4, 4, 0, 0],
                 },
                 barMaxWidth: 24,
@@ -91,7 +90,7 @@ export function CashFlowChart({ filters }: CashFlowChartProps) {
                 stack: 'current',
                 data: expensesData,
                 itemStyle: {
-                    color: '#ef4444',
+                    color: CHART_COLORS.expense,
                     borderRadius: [0, 0, 4, 4],
                 },
                 barMaxWidth: 24,
@@ -106,27 +105,15 @@ export function CashFlowChart({ filters }: CashFlowChartProps) {
                 symbol: 'circle',
                 symbolSize: 6,
                 lineStyle: {
-                    color: '#3b82f6',
+                    color: CHART_COLORS.balance,
                     width: 3,
                 },
                 itemStyle: {
-                    color: '#3b82f6',
-                    borderColor: '#fff',
+                    color: CHART_COLORS.balance,
+                    borderColor: theme.surface,
                     borderWidth: 2,
                 },
-                areaStyle: {
-                    color: {
-                        type: 'linear',
-                        x: 0,
-                        y: 0,
-                        x2: 0,
-                        y2: 1,
-                        colorStops: [
-                            { offset: 0, color: 'rgba(59, 130, 246, 0.15)' },
-                            { offset: 1, color: 'rgba(59, 130, 246, 0)' },
-                        ],
-                    },
-                },
+                areaStyle: { color: verticalFade(CHART_COLORS.balance, 0.15) },
             },
         ]
 
@@ -144,7 +131,7 @@ export function CashFlowChart({ filters }: CashFlowChartProps) {
                     stack: 'previous',
                     data: prevIncomeData,
                     itemStyle: {
-                        color: 'rgba(34, 197, 94, 0.3)',
+                        color: withAlpha(CHART_COLORS.income, 0.3),
                         borderRadius: [4, 4, 0, 0],
                     },
                     barMaxWidth: 24,
@@ -157,7 +144,7 @@ export function CashFlowChart({ filters }: CashFlowChartProps) {
                     stack: 'previous',
                     data: prevExpensesData,
                     itemStyle: {
-                        color: 'rgba(239, 68, 68, 0.3)',
+                        color: withAlpha(CHART_COLORS.expense, 0.3),
                         borderRadius: [0, 0, 4, 4],
                     },
                     barMaxWidth: 24,
@@ -171,7 +158,7 @@ export function CashFlowChart({ filters }: CashFlowChartProps) {
                     smooth: true,
                     symbol: 'none',
                     lineStyle: {
-                        color: '#3b82f6',
+                        color: CHART_COLORS.balance,
                         width: 2,
                         type: 'dashed',
                         opacity: 0.5,
@@ -184,11 +171,12 @@ export function CashFlowChart({ filters }: CashFlowChartProps) {
 
         return {
             tooltip: {
+                ...theme.tooltip,
                 trigger: 'axis',
                 axisPointer: {
                     type: 'cross',
                     crossStyle: {
-                        color: '#999',
+                        color: theme.text,
                     },
                 },
                 formatter: (params: any[]) => {
@@ -220,8 +208,8 @@ export function CashFlowChart({ filters }: CashFlowChartProps) {
                         const prevExpenses = Math.abs(params.find((p: any) => p.seriesName === namePrevExpenses)?.value || 0)
                         const prevBalance = params.find((p: any) => p.seriesName === namePrevBalance)?.value || 0
 
-                        html += `<div class="mt-2 pt-2 border-t border-gray-200 space-y-1 opacity-70">`
-                        html += `<div class="text-xs text-gray-500 mb-1">${namePreviousPeriod}</div>`
+                        html += `<div class="mt-2 pt-2 space-y-1 opacity-70" style="border-top:1px solid ${theme.axisLine}">`
+                        html += `<div class="text-xs mb-1" style="color:${theme.text}">${namePreviousPeriod}</div>`
                         html += `<div class="flex items-center gap-2 text-sm">
                             <span>${nameIncome}: ${formatCurrency(prevIncome, currency)}</span>
                         </div>`
@@ -240,62 +228,41 @@ export function CashFlowChart({ filters }: CashFlowChartProps) {
             legend: {
                 data: [nameIncome, nameExpenses, nameBalance],
                 bottom: 0,
-                textStyle: {
-                    fontSize: 12,
-                    color: '#64748b',
-                },
+                itemGap: 16,
+                textStyle: legendTextStyle(theme),
             },
             grid: {
-                left: 60,
-                right: 60,
+                left: isNarrow ? 44 : 60,
+                right: isNarrow ? 44 : 60,
                 top: 20,
-                bottom: 50,
+                bottom: 96,
             },
-            xAxis: {
-                type: 'category',
+            xAxis: axisStyle(theme, 'category', {
                 data: labels,
                 axisLabel: {
-                    fontSize: 11,
-                    color: '#64748b',
-                    rotate: groupBy === 'day' && chartData.length > 15 ? 45 : 0,
                     interval: groupBy === 'day' ? Math.floor(chartData.length / 10) : 0,
                 },
-                axisLine: {
-                    lineStyle: { color: '#e2e8f0' },
-                },
-                axisTick: { show: false },
-            },
+            }),
             yAxis: [
                 // Left Y-axis for bars (income/expenses)
-                {
-                    type: 'value',
-                    name: nameFlow,
+                axisStyle(theme, 'value', {
+                    name: isNarrow ? undefined : nameFlow,
+                    nameTextStyle: { color: theme.text },
                     position: 'left',
-                    axisLabel: {
-                        formatter: formatValue,
-                        fontSize: 11,
-                        color: '#64748b',
-                    },
-                    splitLine: {
-                        lineStyle: { color: '#f1f5f9', type: 'dashed' },
-                    },
-                },
+                    axisLabel: { formatter: formatValue },
+                }),
                 // Right Y-axis for balance line
-                {
-                    type: 'value',
-                    name: nameBalance,
+                axisStyle(theme, 'value', {
+                    name: isNarrow ? undefined : nameBalance,
+                    nameTextStyle: { color: CHART_COLORS.balance },
                     position: 'right',
-                    axisLabel: {
-                        formatter: formatValue,
-                        fontSize: 11,
-                        color: '#3b82f6',
-                    },
+                    axisLabel: { formatter: formatValue, color: CHART_COLORS.balance },
                     splitLine: { show: false },
-                },
+                }),
             ],
             series,
         }
-    }, [data, showComparison, groupBy, hasIncome, hasExpenses, i18nInstance.language])
+    }, [data, showComparison, groupBy, hasIncome, hasExpenses, i18nInstance.language, theme, isNarrow])
 
     if (error) {
         return (
@@ -310,28 +277,11 @@ export function CashFlowChart({ filters }: CashFlowChartProps) {
     return (
         <Card>
             <CardHeader className="pb-2">
-                <div className="flex items-start justify-between">
-                    <div>
-                        <CardTitle className="text-lg">{t('reports.cashFlowChart.title')}</CardTitle>
-                        <p className="text-sm text-muted-foreground">
-                            {t('reports.cashFlowChart.subtitle')}
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-4">
-                        {/* Grouping toggle */}
-                        <div className="flex gap-1">
-                            {(['day', 'week', 'month'] as CashFlowGroupBy[]).map(g => (
-                                <Badge
-                                    key={g}
-                                    variant={groupBy === g ? 'default' : 'outline'}
-                                    className="cursor-pointer"
-                                    onClick={() => setGroupBy(g)}
-                                >
-                                    {t(`reports.groupBy.${g}`)}
-                                </Badge>
-                            ))}
-                        </div>
-                    </div>
+                <div>
+                    <CardTitle className="text-lg">{t('reports.cashFlowChart.title')}</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                        {t('reports.cashFlowChart.subtitle')}
+                    </p>
                 </div>
             </CardHeader>
             <CardContent>
@@ -342,10 +292,15 @@ export function CashFlowChart({ filters }: CashFlowChartProps) {
                         {noDataMessage}
                     </div>
                 ) : (
-                    <ReactECharts
-                        option={chartOption}
-                        style={{ height: 400 }}
-                    />
+                    <div ref={chartRef} style={{ height: 400 }}>
+                        {/* Mount once measured so the chart animates in a single pass */}
+                        {chartWidth > 0 && (
+                            <ReactECharts
+                                option={chartOption}
+                                style={{ height: 400 }}
+                            />
+                        )}
+                    </div>
                 )}
             </CardContent>
         </Card>

@@ -9,7 +9,7 @@ import (
 
 func TestPendingAndConfirmedTransactions(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("rw@test.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("rw@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 
 	res := a.do("POST", "/api/currencies", map[string]any{
@@ -62,7 +62,7 @@ func TestPendingAndConfirmedTransactions(t *testing.T) {
 
 func TestDebtCreateLendAndBorrow(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("d@test.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("d@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 
 	res := a.do("POST", "/api/currencies", map[string]any{
@@ -82,7 +82,7 @@ func TestDebtCreateLendAndBorrow(t *testing.T) {
 	if res.StatusCode != 201 {
 		t.Fatalf("lend %d %v", res.StatusCode, body)
 	}
-	if body["data"].(map[string]any)["remainingDebt"].(float64) != 200 {
+	if body["data"].(map[string]any)["currentBalance"].(float64) != 200 {
 		t.Fatalf("remaining %v", body)
 	}
 	res = a.do("GET", "/api/accounts/"+itoa(accID), nil, sess.Token, "")
@@ -98,7 +98,7 @@ func TestDebtCreateLendAndBorrow(t *testing.T) {
 	if res.StatusCode != 201 {
 		t.Fatalf("borrow %d %v", res.StatusCode, body)
 	}
-	if body["data"].(map[string]any)["remainingDebt"].(float64) != 300 {
+	if body["data"].(map[string]any)["currentBalance"].(float64) != 300 {
 		t.Fatalf("borrow remaining %v", body)
 	}
 	res = a.do("GET", "/api/accounts/"+itoa(accID), nil, sess.Token, "")
@@ -120,7 +120,7 @@ func listTxIDs(t *testing.T, a *testApp, sess *auth.Issued, query string) (ids [
 
 func TestTransactionsListSortAndFilters(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("sort@test.com", "secret1", auth.RoleReadWrite)
+	u := a.createUser("sort@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 	mk := func(path string, payload map[string]any) int64 {
 		res := a.do("POST", path, payload, sess.Token, sess.CSRF)

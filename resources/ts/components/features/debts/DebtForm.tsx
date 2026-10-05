@@ -28,6 +28,7 @@ import {
 } from '@/components/shared'
 import { warningsForAccountOutflow } from '@/lib/negative-balance'
 import { cn, formatCurrency, formatDateLocal } from '@/lib/utils'
+import { debtTypeLabel } from '@/lib/labels'
 
 interface DebtFormProps {
     defaultValues?: Partial<DebtFormData>
@@ -128,7 +129,7 @@ export function DebtForm({
                     onChange={(value) => form.setValue('debt_type', value)}
                     options={DEBT_TYPES.map((option) => ({
                         ...option,
-                        label: t(`pages:debts.types.${option.value}`),
+                        label: debtTypeLabel(t, option.value),
                     }))}
                 />
 

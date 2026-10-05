@@ -45,7 +45,7 @@ export function ExpensesByCategory({ filters }: ExpensesByCategoryProps) {
                     {t('reports.expensesByCategory.subtitle')}
                 </p>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-1 px-3 sm:px-6">
                 {isLoading ? (
                     <div className="space-y-3">
                         {Array.from({ length: 5 }).map((_, i) => (
@@ -69,13 +69,11 @@ export function ExpensesByCategory({ filters }: ExpensesByCategoryProps) {
                         return (
                             <div
                                 key={category.id}
-                                className="group"
+                                className="group cursor-pointer rounded-lg px-1 py-2 transition-colors hover:bg-muted/50"
+                                onClick={() => handleCategoryClick(category.id)}
                             >
-                                <div
-                                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-                                    onClick={() => handleCategoryClick(category.id)}
-                                >
-                                    {/* Icon */}
+                                {/* Header row: icon, name, amounts */}
+                                <div className="flex items-center gap-2.5 mb-1.5">
                                     <div
                                         className="flex items-center justify-center size-8 rounded-lg flex-shrink-0"
                                         style={{ backgroundColor: category.color }}
@@ -83,70 +81,61 @@ export function ExpensesByCategory({ filters }: ExpensesByCategoryProps) {
                                         <span className="text-base">{category.icon}</span>
                                     </div>
 
-                                    {/* Content */}
-                                    <div className="flex-1 min-w-0">
-                                        {/* Header row */}
-                                        <div className="flex items-center justify-between mb-1.5">
-                                            <div className="flex items-center gap-2">
-                                                <span className="font-medium text-sm">{localizeDefaultName(category.name)}</span>
-                                                {isAnomalous && filters.compareWith !== 'none' && (
-                                                    <AlertTriangle className="size-4 text-amber-500" />
-                                                )}
-                                            </div>
-                                            <div className="flex items-center gap-3 text-sm">
-                                                <span className="font-semibold">
-                                                    {formatCurrency(category.current, data.currency)}
-                                                </span>
-                                                {filters.compareWith !== 'none' && category.previous > 0 && (
-                                                    <>
-                                                        <span className="text-muted-foreground">
-                                                            {t('reports.vsAmount', { amount: formatCurrency(category.previous, data.currency) })}
-                                                        </span>
-                                                        <span className={cn(
-                                                            'flex items-center gap-0.5 text-xs font-medium',
-                                                            isIncrease ? 'text-red-600' : 'text-green-600'
-                                                        )}>
-                                                            {isIncrease ? (
-                                                                <TrendingUp className="size-3" />
-                                                            ) : (
-                                                                <TrendingDown className="size-3" />
-                                                            )}
-                                                            {Math.abs(change).toFixed(0)}%
-                                                        </span>
-                                                    </>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        {/* Bars */}
-                                        <div className="space-y-1">
-                                            {/* Current period bar */}
-                                            <div className="h-2.5 bg-muted rounded-full overflow-hidden">
-                                                <div
-                                                    className="h-full rounded-full transition-all duration-500"
-                                                    style={{
-                                                        width: `${currentWidth}%`,
-                                                        backgroundColor: category.color,
-                                                    }}
-                                                />
-                                            </div>
-                                            {/* Previous period bar (if comparing) */}
-                                            {filters.compareWith !== 'none' && category.previous > 0 && (
-                                                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                                                    <div
-                                                        className="h-full rounded-full transition-all duration-500 opacity-40"
-                                                        style={{
-                                                            width: `${previousWidth}%`,
-                                                            backgroundColor: category.color,
-                                                        }}
-                                                    />
-                                                </div>
-                                            )}
-                                        </div>
+                                    <div className="flex min-w-0 flex-1 items-center gap-2">
+                                        <span className="font-medium text-sm truncate">{localizeDefaultName(category.name)}</span>
+                                        {isAnomalous && filters.compareWith !== 'none' && (
+                                            <AlertTriangle className="size-4 shrink-0 text-amber-500" />
+                                        )}
                                     </div>
 
-                                    {/* Chevron */}
-                                    <ChevronRight className="size-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                                    <div className="flex shrink-0 flex-col items-end text-sm sm:flex-row sm:items-center sm:gap-3">
+                                        <span className="font-semibold">
+                                            {formatCurrency(category.current, data.currency)}
+                                        </span>
+                                        {filters.compareWith !== 'none' && category.previous > 0 && (
+                                            <span className="flex items-center gap-2 text-xs sm:text-sm">
+                                                <span className="text-muted-foreground">
+                                                    {t('reports.vsAmount', { amount: formatCurrency(category.previous, data.currency) })}
+                                                </span>
+                                                <span className={cn(
+                                                    'flex items-center gap-0.5 text-xs font-medium',
+                                                    isIncrease ? 'text-red-600' : 'text-green-600'
+                                                )}>
+                                                    {isIncrease ? (
+                                                        <TrendingUp className="size-3" />
+                                                    ) : (
+                                                        <TrendingDown className="size-3" />
+                                                    )}
+                                                    {Math.abs(change).toFixed(0)}%
+                                                </span>
+                                            </span>
+                                        )}
+                                    </div>
+                                    <ChevronRight className="hidden size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 sm:block" />
+                                </div>
+
+                                {/* Bars: full row width */}
+                                <div className="space-y-1">
+                                    <div className="h-2.5 bg-muted rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full rounded-full transition-all duration-500"
+                                            style={{
+                                                width: `${currentWidth}%`,
+                                                backgroundColor: category.color,
+                                            }}
+                                        />
+                                    </div>
+                                    {filters.compareWith !== 'none' && category.previous > 0 && (
+                                        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                                            <div
+                                                className="h-full rounded-full transition-all duration-500 opacity-40"
+                                                style={{
+                                                    width: `${previousWidth}%`,
+                                                    backgroundColor: category.color,
+                                                }}
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )

@@ -1,4 +1,5 @@
 {
+    "estimatedAmount": "Approximate amount",
     "selectAccountType": "Select account type",
     "selectCurrency": "Select currency",
     "searchCurrency": "Search currency...",
@@ -6,6 +7,7 @@
     "currencyCatalog": "Add currency",
     "currencyEmpty": "No currencies found",
     "selectAccount": "Select account",
+    "selectSpace": "Select space",
     "selectCategory": "Select category",
     "selectType": "Select type",
     "selectRole": "Select role",
@@ -18,7 +20,8 @@
         "initialBalance": "Initial Balance",
         "initialBalanceHelp": "Starting balance for this account",
         "activeHelp": "Inactive accounts are hidden from lists",
-        "currencyCatalogHelp": "A currency that is not in your list yet will be added automatically."
+        "currencyCatalogHelp": "A currency that is not in your list yet will be added automatically.",
+        "currencyLockedHelp": "The currency of an existing account cannot be changed."
     },
     "categories": {
         "namePlaceholder": "Groceries",
@@ -35,6 +38,8 @@
     "transactions": {
         "toAccount": "Destination account",
         "swapAccounts": "Swap accounts",
+        "toSpace": "Destination space",
+        "toSpaceNoAccounts": "That space has no accounts yet.",
         "sendAmount": "Send amount",
         "receiveAmount": "Receive amount",
         "transferRate": "Transfer rate",
@@ -54,7 +59,8 @@
         "noItems": "No items. Click \"Add item\" or enter amount manually.",
         "pendingHint": "This date is in the future. The transaction will stay pending and will not change the balance until you confirm it.",
         "noDateHint": "No date set. The transaction will stay pending and will not change the balance until you confirm it.",
-        "dateOptionalHelp": "Leave empty to defer without a specific date."
+        "dateOptionalHelp": "Leave empty to defer without a specific date.",
+        "estimatedHelp": "The amount is a rough guess. You can enter the real amount when you confirm the transaction."
     },
     "currencies": {
         "code": "Code",
@@ -134,6 +140,7 @@
         "endDate": "End date",
         "endDateHelp": "Leave empty for no end",
         "activeHelp": "Inactive recurring transactions are not generated",
+        "estimatedHelp": "The amount is a rough guess. You enter the real amount when you confirm each occurrence.",
         "frequencies": {
             "daily": "Daily",
             "weekly": "Weekly",

@@ -1,10 +1,12 @@
+import { testId } from '@/lib/test-id'
+import { UserSettingsTabs } from '@/components/features/spaces/UserSettingsTabs'
 import { ReactNode, useMemo, useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Page, PageHeader, FormWrapper } from '@/components/shared'
+import { Page, PageHeader, FormWrapper, ResponsiveDialog } from '@/components/shared'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -17,14 +19,6 @@ import {
     FormLabel,
     FormMessage,
 } from '@/components/ui/form'
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog'
 import {
     AlertDialog,
     AlertDialogAction,
@@ -233,7 +227,7 @@ function SessionsSection({
                 <p className="text-sm leading-relaxed text-muted-foreground">
                     {t('security.sessions.logoutOthersDescription')}
                 </p>
-                <Button variant="outline" onClick={onConfirm}>
+                <Button variant="outline" onClick={onConfirm} {...testId('logout-others')}>
                     <LogOut className="mr-2 size-4" />
                     {t('security.sessions.logoutOthers')}
                 </Button>
@@ -250,6 +244,26 @@ function RowSkeleton() {
                 <Skeleton className="h-3 w-64" />
             </div>
             <Skeleton className="h-9 w-24" />
+        </div>
+    )
+}
+
+function OtpField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+    return (
+        <div className="flex justify-center py-2">
+            <InputOTP maxLength={6} value={value} onChange={onChange}>
+                <InputOTPGroup>
+                    <InputOTPSlot index={0} />
+                    <InputOTPSlot index={1} />
+                    <InputOTPSlot index={2} />
+                </InputOTPGroup>
+                <InputOTPSeparator />
+                <InputOTPGroup>
+                    <InputOTPSlot index={3} />
+                    <InputOTPSlot index={4} />
+                    <InputOTPSlot index={5} />
+                </InputOTPGroup>
+            </InputOTP>
         </div>
     )
 }
@@ -343,6 +357,7 @@ export default function SecuritySettingsPage() {
     return (
         <Page title={t('security.title')}>
             <PageHeader title={t('security.heading')} description={t('security.description')} />
+            <UserSettingsTabs />
 
             <FormWrapper>
                 <div className="grid items-start gap-6 lg:grid-cols-2">
@@ -369,6 +384,7 @@ export default function SecuritySettingsPage() {
                                             checked ? handleEnable() : setShowDisableDialog(true)
                                         }
                                         aria-label={t('security.twoFactor.toggleAria')}
+                                        {...testId('two-factor')}
                                     />
                                 </ActionRow>
                             )}
@@ -395,10 +411,10 @@ export default function SecuritySettingsPage() {
                                                         {passkey.name || t('security.passkeys.unnamed')}
                                                     </div>
                                                     <p className="text-sm leading-relaxed text-muted-foreground">
-                                                        {t('security.passkeys.added', { date: formatDate(passkey.created_at) })}
+                                                        {t('security.passkeys.added', { date: formatDate(passkey.createdAt) })}
                                                         {' · '}
-                                                        {passkey.last_used_at
-                                                            ? t('security.passkeys.lastUsed', { date: formatDate(passkey.last_used_at) })
+                                                        {passkey.lastUsedAt
+                                                            ? t('security.passkeys.lastUsed', { date: formatDate(passkey.lastUsedAt) })
                                                             : t('security.passkeys.neverUsed')}
                                                     </p>
                                                 </div>
@@ -448,6 +464,7 @@ export default function SecuritySettingsPage() {
                                 )}
                                 <Button
                                     onClick={() => setShowAddPasskeyDialog(true)}
+                                    {...testId('add-passkey')}
                                     disabled={isReadOnly || registerPasskey.isPending || !passkeyDomainValid}
                                 >
                                     <Plus className="mr-2 size-4" />
@@ -471,6 +488,7 @@ export default function SecuritySettingsPage() {
                                     <Button
                                         variant="outline"
                                         onClick={() => setShowRegenerateDialog(true)}
+                                        {...testId('regenerate-codes')}
                                         disabled={isReadOnly}
                                     >
                                         <RefreshCw className="mr-2 size-4" />
@@ -483,153 +501,106 @@ export default function SecuritySettingsPage() {
                 </div>
             </FormWrapper>
 
-            <Dialog open={showEnableDialog} onOpenChange={closeEnableDialog}>
-                <DialogContent className="sm:max-w-md">
-                    {setupStep === 'qr' && qrData && (
+            <ResponsiveDialog
+                open={showEnableDialog}
+                onOpenChange={closeEnableDialog}
+                title={
+                    setupStep === 'qr'
+                        ? t('security.dialogs.enableTitle')
+                        : setupStep === 'verify'
+                            ? t('security.dialogs.verifyTitle')
+                            : t('security.dialogs.recoveryTitle')
+                }
+                description={
+                    setupStep === 'qr'
+                        ? t('security.dialogs.enableDescription')
+                        : setupStep === 'verify'
+                            ? t('security.dialogs.verifyDescription')
+                            : t('security.dialogs.recoveryDescription')
+                }
+                footer={
+                    setupStep === 'qr' ? (
+                        <Button onClick={() => setSetupStep('verify')}>
+                            {tCommon('actions.continue')}
+                        </Button>
+                    ) : setupStep === 'verify' ? (
                         <>
-                            <DialogHeader>
-                                <DialogTitle>{t('security.dialogs.enableTitle')}</DialogTitle>
-                                <DialogDescription>
-                                    {t('security.dialogs.enableDescription')}
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className="flex flex-col items-center gap-4 py-4">
-                                <QRCode
-                                    value={qrData.qr_code_url}
-                                    size={240}
-                                    ecLevel="M"
-                                    bgColor="transparent"
-                                    fgColor={theme === 'dark' ? '#ffffff' : '#0f172a'}
-                                    qrStyle="dots"
-                                    eyeRadius={6}
-                                    quietZone={0}
-                                />
-                                <div className="w-full">
-                                    <p className="text-sm text-muted-foreground mb-2 text-center">
-                                        {t('security.dialogs.manualCode')}
-                                    </p>
-                                    <div className="flex items-center gap-2 bg-muted p-2 rounded-md">
-                                        <code className="flex-1 text-sm font-mono break-all">
-                                            {qrData.secret}
-                                        </code>
-                                        <Button variant="ghost" size="sm" onClick={copySecret}>
-                                            <Copy className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                </div>
-                            </div>
-                            <DialogFooter>
-                                <Button onClick={() => setSetupStep('verify')}>
-                                    {tCommon('actions.continue')}
-                                </Button>
-                            </DialogFooter>
+                            <Button variant="outline" onClick={() => setSetupStep('qr')}>
+                                {tCommon('actions.back')}
+                            </Button>
+                            <Button
+                                onClick={handleConfirm}
+                                disabled={otpValue.length !== 6 || confirmMutation.isPending}
+                            >
+                                {confirmMutation.isPending ? t('security.dialogs.verifying') : t('security.dialogs.verify')}
+                            </Button>
                         </>
-                    )}
-
-                    {setupStep === 'verify' && (
-                        <>
-                            <DialogHeader>
-                                <DialogTitle>{t('security.dialogs.verifyTitle')}</DialogTitle>
-                                <DialogDescription>
-                                    {t('security.dialogs.verifyDescription')}
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className="flex justify-center py-6">
-                                <InputOTP
-                                    maxLength={6}
-                                    value={otpValue}
-                                    onChange={setOtpValue}
-                                >
-                                    <InputOTPGroup>
-                                        <InputOTPSlot index={0} />
-                                        <InputOTPSlot index={1} />
-                                        <InputOTPSlot index={2} />
-                                    </InputOTPGroup>
-                                    <InputOTPSeparator />
-                                    <InputOTPGroup>
-                                        <InputOTPSlot index={3} />
-                                        <InputOTPSlot index={4} />
-                                        <InputOTPSlot index={5} />
-                                    </InputOTPGroup>
-                                </InputOTP>
-                            </div>
-                            <DialogFooter className="gap-2 sm:gap-0">
-                                <Button variant="outline" onClick={() => setSetupStep('qr')}>
-                                    {tCommon('actions.back')}
-                                </Button>
-                                <Button
-                                    onClick={handleConfirm}
-                                    disabled={otpValue.length !== 6 || confirmMutation.isPending}
-                                >
-                                    {confirmMutation.isPending ? t('security.dialogs.verifying') : t('security.dialogs.verify')}
-                                </Button>
-                            </DialogFooter>
-                        </>
-                    )}
-
-                    {setupStep === 'recovery' && recoveryCodes.length > 0 && (
-                        <>
-                            <DialogHeader>
-                                <DialogTitle>{t('security.dialogs.recoveryTitle')}</DialogTitle>
-                                <DialogDescription>
-                                    {t('security.dialogs.recoveryDescription')}
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className="py-4">
-                                <div className="bg-muted p-4 rounded-md font-mono text-sm grid grid-cols-2 gap-2">
-                                    {recoveryCodes.map((code, index) => (
-                                        <div key={index} className="text-center">
-                                            {code}
-                                        </div>
-                                    ))}
-                                </div>
-                                <Button
-                                    variant="outline"
-                                    className="w-full mt-4"
-                                    onClick={copyRecoveryCodes}
-                                >
-                                    <Copy className="h-4 w-4 mr-2" />
-                                    {t('security.dialogs.copyCodes')}
+                    ) : (
+                        <Button onClick={closeEnableDialog}>
+                            {tCommon('actions.done')}
+                        </Button>
+                    )
+                }
+            >
+                {setupStep === 'qr' && qrData && (
+                    <div className="flex flex-col items-center gap-4">
+                        <QRCode
+                            value={qrData.qr_code_url}
+                            size={240}
+                            ecLevel="M"
+                            bgColor="transparent"
+                            fgColor={theme === 'dark' ? '#ffffff' : '#0f172a'}
+                            qrStyle="dots"
+                            eyeRadius={6}
+                            quietZone={0}
+                            style={{ maxWidth: '100%', height: 'auto' }}
+                        />
+                        <div className="w-full">
+                            <p className="text-sm text-muted-foreground mb-2 text-center">
+                                {t('security.dialogs.manualCode')}
+                            </p>
+                            <div className="flex items-center gap-2 bg-muted p-2 rounded-md">
+                                <code className="flex-1 text-sm font-mono break-all">
+                                    {qrData.secret}
+                                </code>
+                                <Button variant="ghost" size="sm" onClick={copySecret}>
+                                    <Copy className="h-4 w-4" />
                                 </Button>
                             </div>
-                            <DialogFooter>
-                                <Button onClick={closeEnableDialog}>
-                                    {tCommon('actions.done')}
-                                </Button>
-                            </DialogFooter>
-                        </>
-                    )}
-                </DialogContent>
-            </Dialog>
-
-            <Dialog open={showDisableDialog} onOpenChange={setShowDisableDialog}>
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>{t('security.dialogs.disableTitle')}</DialogTitle>
-                        <DialogDescription>
-                            {t('security.dialogs.disableDescription')}
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="flex justify-center py-6">
-                        <InputOTP
-                            maxLength={6}
-                            value={otpValue}
-                            onChange={setOtpValue}
-                        >
-                            <InputOTPGroup>
-                                <InputOTPSlot index={0} />
-                                <InputOTPSlot index={1} />
-                                <InputOTPSlot index={2} />
-                            </InputOTPGroup>
-                            <InputOTPSeparator />
-                            <InputOTPGroup>
-                                <InputOTPSlot index={3} />
-                                <InputOTPSlot index={4} />
-                                <InputOTPSlot index={5} />
-                            </InputOTPGroup>
-                        </InputOTP>
+                        </div>
                     </div>
-                    <DialogFooter className="gap-2 sm:gap-0">
+                )}
+
+                {setupStep === 'verify' && <OtpField value={otpValue} onChange={setOtpValue} />}
+
+                {setupStep === 'recovery' && recoveryCodes.length > 0 && (
+                    <>
+                        <div className="bg-muted p-4 rounded-md font-mono text-sm grid grid-cols-2 gap-2">
+                            {recoveryCodes.map((code, index) => (
+                                <div key={index} className="text-center">
+                                    {code}
+                                </div>
+                            ))}
+                        </div>
+                        <Button
+                            variant="outline"
+                            className="w-full mt-4"
+                            onClick={copyRecoveryCodes}
+                        >
+                            <Copy className="h-4 w-4 mr-2" />
+                            {t('security.dialogs.copyCodes')}
+                        </Button>
+                    </>
+                )}
+            </ResponsiveDialog>
+
+            <ResponsiveDialog
+                open={showDisableDialog}
+                onOpenChange={setShowDisableDialog}
+                title={t('security.dialogs.disableTitle')}
+                description={t('security.dialogs.disableDescription')}
+                footer={
+                    <>
                         <Button variant="outline" onClick={() => {
                             setShowDisableDialog(false)
                             setOtpValue('')
@@ -643,38 +614,19 @@ export default function SecuritySettingsPage() {
                         >
                             {disableMutation.isPending ? t('security.dialogs.disabling') : t('security.dialogs.disable')}
                         </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                    </>
+                }
+            >
+                <OtpField value={otpValue} onChange={setOtpValue} />
+            </ResponsiveDialog>
 
-            <Dialog open={showRegenerateDialog} onOpenChange={setShowRegenerateDialog}>
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>{t('security.recovery.regenerateTitle')}</DialogTitle>
-                        <DialogDescription>
-                            {t('security.recovery.regenerateDescription')}
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="flex justify-center py-6">
-                        <InputOTP
-                            maxLength={6}
-                            value={otpValue}
-                            onChange={setOtpValue}
-                        >
-                            <InputOTPGroup>
-                                <InputOTPSlot index={0} />
-                                <InputOTPSlot index={1} />
-                                <InputOTPSlot index={2} />
-                            </InputOTPGroup>
-                            <InputOTPSeparator />
-                            <InputOTPGroup>
-                                <InputOTPSlot index={3} />
-                                <InputOTPSlot index={4} />
-                                <InputOTPSlot index={5} />
-                            </InputOTPGroup>
-                        </InputOTP>
-                    </div>
-                    <DialogFooter className="gap-2 sm:gap-0">
+            <ResponsiveDialog
+                open={showRegenerateDialog}
+                onOpenChange={setShowRegenerateDialog}
+                title={t('security.recovery.regenerateTitle')}
+                description={t('security.recovery.regenerateDescription')}
+                footer={
+                    <>
                         <Button variant="outline" onClick={() => {
                             setShowRegenerateDialog(false)
                             setOtpValue('')
@@ -687,19 +639,19 @@ export default function SecuritySettingsPage() {
                         >
                             {regenerateMutation.isPending ? t('security.recovery.regenerating') : t('security.recovery.regenerate')}
                         </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                    </>
+                }
+            >
+                <OtpField value={otpValue} onChange={setOtpValue} />
+            </ResponsiveDialog>
 
-            <Dialog open={showLogoutOthersDialog} onOpenChange={setShowLogoutOthersDialog}>
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>{t('security.sessions.confirmTitle')}</DialogTitle>
-                        <DialogDescription>
-                            {t('security.sessions.confirmDescription')}
-                        </DialogDescription>
-                    </DialogHeader>
-                    <DialogFooter className="gap-2 sm:gap-0">
+            <ResponsiveDialog
+                open={showLogoutOthersDialog}
+                onOpenChange={setShowLogoutOthersDialog}
+                title={t('security.sessions.confirmTitle')}
+                description={t('security.sessions.confirmDescription')}
+                footer={
+                    <>
                         <Button variant="outline" onClick={() => setShowLogoutOthersDialog(false)}>
                             {tCommon('actions.cancel')}
                         </Button>
@@ -717,34 +669,20 @@ export default function SecuritySettingsPage() {
                         >
                             {t('security.sessions.confirm')}
                         </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                    </>
+                }
+            />
 
-            <Dialog open={showAddPasskeyDialog} onOpenChange={(open) => {
-                setShowAddPasskeyDialog(open)
-                if (!open) setPasskeyName('')
-            }}>
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>{t('security.passkeys.addTitle')}</DialogTitle>
-                        <DialogDescription>
-                            {t('security.passkeys.addDescription')}
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="py-2">
-                        <Input
-                            placeholder={t('security.passkeys.namePlaceholder')}
-                            value={passkeyName}
-                            onChange={(e) => setPasskeyName(e.target.value)}
-                            maxLength={100}
-                            autoFocus
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' && !registerPasskey.isPending) handleAddPasskey()
-                            }}
-                        />
-                    </div>
-                    <DialogFooter className="gap-2 sm:gap-0">
+            <ResponsiveDialog
+                open={showAddPasskeyDialog}
+                onOpenChange={(open) => {
+                    setShowAddPasskeyDialog(open)
+                    if (!open) setPasskeyName('')
+                }}
+                title={t('security.passkeys.addTitle')}
+                description={t('security.passkeys.addDescription')}
+                footer={
+                    <>
                         <Button variant="outline" onClick={() => {
                             setShowAddPasskeyDialog(false)
                             setPasskeyName('')
@@ -754,9 +692,20 @@ export default function SecuritySettingsPage() {
                         <Button onClick={handleAddPasskey} disabled={registerPasskey.isPending}>
                             {registerPasskey.isPending ? t('security.passkeys.waiting') : tCommon('actions.continue')}
                         </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                    </>
+                }
+            >
+                <Input
+                    placeholder={t('security.passkeys.namePlaceholder')}
+                    value={passkeyName}
+                    onChange={(e) => setPasskeyName(e.target.value)}
+                    maxLength={100}
+                    autoFocus
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !registerPasskey.isPending) handleAddPasskey()
+                    }}
+                />
+            </ResponsiveDialog>
         </Page>
     )
 }

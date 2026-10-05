@@ -61,7 +61,7 @@ export function UserForm({
             name: '',
             email: '',
             password: '',
-            role: 'read-only',
+            role: 'user',
             setPassword: false,
             ...defaultValues,
         },
@@ -174,8 +174,8 @@ export function UserForm({
                                     </FormControl>
                                     <SelectContent>
                                         <SelectItem value="admin">{t('roles.admin')}</SelectItem>
-                                        <SelectItem value="read-write">{t('roles.read-write')}</SelectItem>
-                                        <SelectItem value="read-only">{t('roles.read-only')}</SelectItem>
+                                        <SelectItem value="user">{t('roles.user')}</SelectItem>
+                                        <SelectItem value="guest">{t('roles.guest')}</SelectItem>
                                     </SelectContent>
                                 </Select>
                                 {isEditingSelf && (

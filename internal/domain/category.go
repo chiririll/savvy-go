@@ -6,8 +6,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/shopspring/decimal"
+
 	"savvy-go/internal/db"
 	"savvy-go/internal/db/sqlc"
+	"savvy-go/internal/money"
+	"savvy-go/internal/store"
 )
 
 type Category struct {
@@ -18,10 +22,10 @@ type Category struct {
 	Color             *string
 	IsDefault         bool
 	TransactionsCount int
-	TotalAmount       *float64
+	TotalAmount       *money.Money
 }
 
-type Categories struct{ DB *sql.DB }
+type Categories struct{ DB store.DB }
 
 func (s Categories) All(ctx context.Context, typ string) ([]Category, error) {
 	rows, err := db.Q(s.DB).ListCategories(ctx, db.Narg(typ))
@@ -111,21 +115,15 @@ func (s Categories) Delete(ctx context.Context, id int64, successorID *int64) er
 		if successor == nil || successor.Type != c.Type || successor.ID == c.ID {
 			return fmt.Errorf("invalid successor")
 		}
-		tx, err := s.DB.BeginTx(ctx, nil)
-		if err != nil {
-			return err
-		}
-		defer func() { _ = tx.Rollback() }()
-		q := db.Q(s.DB).WithTx(tx)
-		if err := q.ReassignCategoryTransactions(ctx, sqlc.ReassignCategoryTransactionsParams{
-			CategoryID: db.NI(*successorID), CategoryID_2: db.NI(id),
-		}); err != nil {
-			return err
-		}
-		if err := q.DeleteCategory(ctx, id); err != nil {
-			return err
-		}
-		return tx.Commit()
+		return store.Tx(ctx, s.DB, func(tx store.DB) error {
+			q := db.Q(tx)
+			if err := q.ReassignCategoryTransactions(ctx, sqlc.ReassignCategoryTransactionsParams{
+				CategoryID: db.NI(*successorID), CategoryID_2: db.NI(id),
+			}); err != nil {
+				return err
+			}
+			return q.DeleteCategory(ctx, id)
+		})
 	}
 	n, _ := db.Q(s.DB).CountCategoriesByType(ctx, c.Type)
 	if n <= 1 {
@@ -152,21 +150,34 @@ func (s Categories) SetDefault(ctx context.Context, id int64) (*Category, error)
 	return s.ByID(ctx, id)
 }
 
-func (s Categories) Statistics(ctx context.Context, id int64, start, end string) (map[string]any, error) {
+// CategoryStatistics totals a category's transactions in the base currency,
+// rounded to its decimals.
+type CategoryStatistics struct {
+	Category Category
+	Count    int
+	Total    money.Money
+}
+
+func (s Categories) Statistics(ctx context.Context, id int64, start, end string) (*CategoryStatistics, error) {
 	c, err := s.ByID(ctx, id)
 	if err != nil || c == nil {
 		return nil, err
 	}
-	row, _ := db.Q(s.DB).CategoryStatistics(ctx, sqlc.CategoryStatisticsParams{
+	rows, _ := db.Q(s.DB).CategoryStatistics(ctx, sqlc.CategoryStatisticsParams{
 		CategoryID: db.NI(id), StartDate: db.Narg(start), EndDate: db.Narg(end),
 	})
-	return map[string]any{
-		"category_id":        c.ID,
-		"category_name":      c.Name,
-		"type":               c.Type,
-		"transactions_count": int(row.Count),
-		"total_amount":       asFloat64(row.Coalesce),
-	}, nil
+	out := &CategoryStatistics{Category: *c}
+	total := decimal.Zero
+	for _, row := range rows {
+		out.Count += int(row.Cnt)
+		total = total.Add(decimal.New(row.Total, -int32(row.Decimals)).Mul(row.Rate))
+	}
+	var unit money.Unit // no base currency means nothing was counted either
+	if base, _ := (Currencies{DB: s.DB}).Base(ctx); base != nil {
+		unit = base.Unit()
+	}
+	out.Total = money.FromDecimal(total, unit)
+	return out, nil
 }
 
 func categoryFrom(id int64, name, typ string, icon, color sql.NullString, isDefault, count int64) Category {
@@ -178,16 +189,4 @@ func categoryFrom(id int64, name, typ string, icon, color sql.NullString, isDefa
 		c.Color = &color.String
 	}
 	return c
-}
-
-func asFloat64(v any) float64 {
-	switch n := v.(type) {
-	case float64:
-		return n
-	case int64:
-		return float64(n)
-	case int:
-		return float64(n)
-	}
-	return 0
 }

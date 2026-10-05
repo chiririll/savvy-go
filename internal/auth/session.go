@@ -8,6 +8,7 @@ import (
 	"savvy-go/internal/config"
 	"savvy-go/internal/db"
 	"savvy-go/internal/db/sqlc"
+	"savvy-go/internal/store"
 )
 
 type Session struct {
@@ -36,7 +37,7 @@ func (s *Session) IsActive(now time.Time) bool {
 }
 
 type Sessions struct {
-	DB  *sql.DB
+	DB  store.DB
 	Cfg config.Config
 }
 

@@ -1,8 +1,16 @@
 version: "2"
 sql:
   - engine: "sqlite"
-    schema: "internal/migrate/sql"
-    queries: "internal/db/queries"
+    # One package for both databases: the server schema and the space schema
+    # share no table names. queries/server may only touch server tables and
+    # queries/space only space tables (internal/db/queries_lint_test.go).
+    schema:
+      - "internal/migrate/sql/server"
+      - "internal/migrate/sql/space"
+    queries:
+      - "internal/db/queries/schema.sql"
+      - "internal/db/queries/server"
+      - "internal/db/queries/space"
     gen:
       go:
         package: "sqlc"
@@ -11,5 +19,10 @@ sql:
         emit_empty_slices: true
         emit_pointers_for_null_types: false
         emit_json_tags: false
+        overrides:
+          - column: "currencies.rate"
+            go_type: "github.com/shopspring/decimal.Decimal"
+          - column: "transaction_items.quantity"
+            go_type: "github.com/shopspring/decimal.Decimal"
 # sqlc sqlite emits ?NNN for nargs. modernc.org/sqlite + database/sql count
 # every '?' so reuse the same narg only once (COALESCE/CASE), never "OR col = ?N".

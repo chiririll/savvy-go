@@ -1,3 +1,4 @@
+import { testId } from '@/lib/test-id'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Trash2, MoreHorizontal, PlugZap, ArrowUpRight } from 'lucide-react'
@@ -68,7 +69,7 @@ export function ProviderCard({ provider, index, onDelete, onTest }: ProviderCard
             )}
         >
             <Link
-                to={`/settings/providers/${provider.id}/edit`}
+                to={`/admin/providers/${provider.id}/edit`}
                 className="absolute inset-0 z-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
                 <span className="sr-only">{t('providers.editAria', { name: provider.name })}</span>
@@ -98,7 +99,7 @@ export function ProviderCard({ provider, index, onDelete, onTest }: ProviderCard
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <AlertDialog>
-                            <AlertDialogTrigger asChild>
+                            <AlertDialogTrigger asChild {...testId('confirm')}>
                                 <DropdownMenuItem
                                     variant="destructive"
                                     onSelect={(e) => e.preventDefault()}
@@ -174,7 +175,7 @@ export function ProvidersEmptyState() {
             </p>
 
             <Button asChild className="mt-6">
-                <Link to="/settings/providers/create">
+                <Link to="/admin/providers/create">
                     {t('providers.add')}
                     <ArrowUpRight className="size-4" />
                 </Link>

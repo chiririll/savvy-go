@@ -43,12 +43,7 @@ interface IdentityProviderFormProps {
     previewPreset?: string
 }
 
-const TOGGLES: { name: keyof IdentityProviderFormValues; labelKey: string; descriptionKey: string }[] = [
-    { name: 'enabled', labelKey: 'sso.enabled', descriptionKey: 'sso.enabledHelp' },
-    { name: 'allow_jit', labelKey: 'sso.allowJit', descriptionKey: 'sso.allowJitHelp' },
-    { name: 'link_by_email', labelKey: 'sso.linkByEmail', descriptionKey: 'sso.linkByEmailHelp' },
-    { name: 'sync_role_on_login', labelKey: 'sso.syncRole', descriptionKey: 'sso.syncRoleHelp' },
-]
+const TOGGLE_NAMES: (keyof IdentityProviderFormValues)[] = ['enabled', 'allow_jit', 'link_by_email', 'sync_role_on_login']
 
 function CopyableUrl({ label, value }: { label: string; value: string }) {
     const { t } = useTranslation('forms')
@@ -122,6 +117,12 @@ export function IdentityProviderForm({
     previewPreset,
 }: IdentityProviderFormProps) {
     const { t } = useTranslation(['common', 'forms'])
+    const toggleLabels: Record<string, { label: string; description: string }> = {
+        enabled: { label: t('forms:sso.enabled'), description: t('forms:sso.enabledHelp') },
+        allow_jit: { label: t('forms:sso.allowJit'), description: t('forms:sso.allowJitHelp') },
+        link_by_email: { label: t('forms:sso.linkByEmail'), description: t('forms:sso.linkByEmailHelp') },
+        sync_role_on_login: { label: t('forms:sso.syncRole'), description: t('forms:sso.syncRoleHelp') },
+    }
     const { data: presets } = useSsoPresets()
 
     const form = useForm<IdentityProviderFormValues>({
@@ -133,7 +134,7 @@ export function IdentityProviderForm({
             enabled: true,
             fields: {},
             role_mapping: [],
-            default_role: 'read-only',
+            default_role: 'user',
             allow_jit: true,
             sync_role_on_login: false,
             link_by_email: true,
@@ -266,8 +267,8 @@ export function IdentityProviderForm({
                                             </SelectTrigger>
                                         </FormControl>
                                         <SelectContent>
-                                            <SelectItem value="read-only">{t('roles.read-only')}</SelectItem>
-                                            <SelectItem value="read-write">{t('roles.read-write')}</SelectItem>
+                                            <SelectItem value="user">{t('roles.user')}</SelectItem>
+                                            <SelectItem value="guest">{t('roles.guest')}</SelectItem>
                                         </SelectContent>
                                     </Select>
                                     <FormDescription>{t('forms:sso.defaultRoleHelp')}</FormDescription>
@@ -277,16 +278,16 @@ export function IdentityProviderForm({
                         />
 
                         <div className="divide-y rounded-lg border">
-                            {TOGGLES.map((toggle) => (
+                            {TOGGLE_NAMES.map((name) => (
                                 <FormField
-                                    key={toggle.name}
+                                    key={name}
                                     control={form.control}
-                                    name={toggle.name}
+                                    name={name}
                                     render={({ field }) => (
                                         <FormItem className="flex items-center justify-between gap-4 px-4 py-3">
                                             <div className="space-y-0.5">
-                                                <FormLabel className="cursor-pointer">{t(`forms:${toggle.labelKey}`)}</FormLabel>
-                                                <FormDescription>{t(`forms:${toggle.descriptionKey}`)}</FormDescription>
+                                                <FormLabel className="cursor-pointer">{toggleLabels[name].label}</FormLabel>
+                                                <FormDescription>{toggleLabels[name].description}</FormDescription>
                                             </div>
                                             <FormControl>
                                                 <Switch checked={Boolean(field.value)} onCheckedChange={field.onChange} />
@@ -323,7 +324,7 @@ export function IdentityProviderForm({
                                     value={form.watch(`role_mapping.${index}.operator`)}
                                     onValueChange={(v) => form.setValue(`role_mapping.${index}.operator`, v as 'equals' | 'contains' | 'one_of')}
                                 >
-                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="equals">{t('forms:sso.equals')}</SelectItem>
                                         <SelectItem value="contains">{t('forms:sso.contains')}</SelectItem>
@@ -337,13 +338,13 @@ export function IdentityProviderForm({
                                 />
                                 <Select
                                     value={form.watch(`role_mapping.${index}.role`)}
-                                    onValueChange={(v) => form.setValue(`role_mapping.${index}.role`, v as 'admin' | 'read-write' | 'read-only')}
+                                    onValueChange={(v) => form.setValue(`role_mapping.${index}.role`, v as 'admin' | 'user' | 'guest')}
                                 >
-                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="admin">{t('roles.admin')}</SelectItem>
-                                        <SelectItem value="read-write">{t('roles.read-write')}</SelectItem>
-                                        <SelectItem value="read-only">{t('roles.read-only')}</SelectItem>
+                                        <SelectItem value="user">{t('roles.user')}</SelectItem>
+                                        <SelectItem value="guest">{t('roles.guest')}</SelectItem>
                                     </SelectContent>
                                 </Select>
                                 <Button
@@ -369,7 +370,7 @@ export function IdentityProviderForm({
                             variant="outline"
                             size="sm"
                             className="w-full sm:w-auto"
-                            onClick={() => append({ claim: 'groups', operator: 'contains', value: '', role: 'read-only' })}
+                            onClick={() => append({ claim: 'groups', operator: 'contains', value: '', role: 'user' })}
                         >
                             <Plus className="mr-2 size-4" />
                             {t('forms:sso.addRule')}

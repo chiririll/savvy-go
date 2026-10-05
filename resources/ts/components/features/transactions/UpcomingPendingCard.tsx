@@ -16,6 +16,8 @@ const TYPE_ICONS: Record<Transaction['type'], typeof ArrowDownLeft> = {
     debt_collection: HandCoins,
     debt_lend: HandCoins,
     debt_borrow: Banknote,
+    transfer_out: ArrowUpRight,
+    transfer_in: ArrowDownLeft,
 }
 
 interface UpcomingPendingCardProps {
@@ -53,7 +55,7 @@ export function UpcomingPendingCard({
                 {dateLabel}
             </p>
             <p className={`row-span-2 self-start pt-0.5 font-mono text-base font-medium truncate ${className}`}>
-                {sign}{formatCurrency(transaction.amount, transaction.account.currency)}
+                {transaction.isEstimated && '≈ '}{sign}{formatCurrency(transaction.amount, transaction.account.currency)}
             </p>
             {!isReadOnly && (
                 <div className="col-start-2 row-start-3 flex items-end justify-end gap-1">
@@ -73,16 +75,18 @@ export function UpcomingPendingCard({
                             }
                         />
                     )}
-                    <Button
-                        size="sm"
-                        variant="outline"
-                        title={t('actions.confirm')}
-                        aria-label={t('actions.confirm')}
-                        onClick={() => onConfirm(transaction)}
-                    >
-                        <Check className="size-4" />
-                        {t('actions.confirm')}
-                    </Button>
+                    {transaction.actions.confirm && (
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            title={t('actions.confirm')}
+                            aria-label={t('actions.confirm')}
+                            onClick={() => onConfirm(transaction)}
+                        >
+                            <Check className="size-4" />
+                            {t('actions.confirm')}
+                        </Button>
+                    )}
                 </div>
             )}
         </div>

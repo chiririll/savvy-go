@@ -3,8 +3,10 @@ import { Account } from './accounts'
 import { Category } from './categories'
 import { Tag } from './tags'
 
-export type TransactionType = 'income' | 'expense' | 'transfer' | 'debt_payment' | 'debt_collection' | 'debt_lend' | 'debt_borrow'
-export type TransactionStatus = 'pending' | 'confirmed' | 'skipped'
+export const ALL_TRANSACTION_TYPES = ['income', 'expense', 'transfer', 'debt_payment', 'debt_collection', 'debt_lend', 'debt_borrow', 'transfer_out', 'transfer_in'] as const
+export type TransactionType = (typeof ALL_TRANSACTION_TYPES)[number]
+export const TRANSACTION_STATUSES = ['pending', 'confirmed', 'skipped'] as const
+export type TransactionStatus = (typeof TRANSACTION_STATUSES)[number]
 
 export interface TransactionItem {
     id?: number
@@ -25,18 +27,17 @@ export interface TransactionActions {
 export interface Transaction extends BaseEntity {
     type: TransactionType
     amount: number
-    toAmount?: number
-    exchangeRate?: number
-    description?: string
+    toAmount: number | null
+    isEstimated: boolean
+    description: string | null
     date: string | null
     status: TransactionStatus
-    recurringTransactionId?: number | null
+    recurringTransactionId: number | null
     actions: TransactionActions
     account: Account
-    toAccount?: Account
-    category?: Category
+    toAccount: Account | null
+    category: Category | null
     items: TransactionItem[]
-    itemsCount?: number
     tags: Tag[]
 }
 
@@ -59,6 +60,6 @@ export interface TransactionSummary {
     income: number
     expense: number
     balance: number
-    transactions_count: number
+    transactionsCount: number
     currency: string | null
 }

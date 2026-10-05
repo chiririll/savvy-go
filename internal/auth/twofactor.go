@@ -3,18 +3,18 @@ package auth
 import (
 	"context"
 	"crypto/rand"
-	"database/sql"
 	"strings"
 	"time"
 
 	"savvy-go/internal/db"
 	"savvy-go/internal/db/sqlc"
+	"savvy-go/internal/store"
 )
 
 const recoveryChars = "abcdefghjkmnpqrstuvwxyz23456789"
 
 type TwoFactor struct {
-	DB     *sql.DB
+	DB     store.DB
 	Users  Users
 	AppKey string
 }

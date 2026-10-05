@@ -1,4 +1,4 @@
-name: Build dist tarball and deb
+name: Build deb and rpm
 
 on:
   push:
@@ -44,28 +44,12 @@ jobs:
           GITHUB_REPO: ${{ github.repository }}
 
       - name: Compose release notes
-        env:
-          REPO: ${{ github.repository }}
         run: |
-          {
-            if [ -s CHANGES.md ]; then
-              cat CHANGES.md
-              echo
-            else
-              echo "Savvy ${{ steps.ver.outputs.tag }}"
-              echo
-            fi
-            echo "---"
-            echo
-            echo "Tarball: \`https://github.com/${REPO}/releases/latest/download/savvy-go.tar.gz\`"
-            echo
-            echo "Debian:"
-            echo
-            echo '```bash'
-            echo "curl -fsSLO https://github.com/${REPO}/releases/latest/download/savvy-go.deb"
-            echo "sudo apt install ./savvy-go.deb"
-            echo '```'
-          } > RELEASE_NOTES.md
+          if [ -s CHANGES.md ]; then
+            cp CHANGES.md RELEASE_NOTES.md
+          else
+            echo "Savvy ${{ steps.ver.outputs.tag }}" > RELEASE_NOTES.md
+          fi
           echo "::group::Release notes"
           cat RELEASE_NOTES.md
           echo "::endgroup::"
@@ -96,7 +80,7 @@ jobs:
           APP_VERSION: ${{ steps.ver.outputs.tag }}
         run: npm ci && npm run build
 
-      - name: Package tarball
+      - name: Assemble dist/public
         env:
           APP_VERSION: ${{ steps.ver.outputs.tag }}
         run: bash deploy/common/package-dist.sh
@@ -112,7 +96,12 @@ jobs:
       - name: Package deb
         env:
           APP_VERSION: ${{ steps.ver.outputs.tag }}
-        run: bash deploy/deb/package-deb.sh
+        run: bash deploy/nfpm/package-linux.sh deb
+
+      - name: Package rpm
+        env:
+          APP_VERSION: ${{ steps.ver.outputs.tag }}
+        run: bash deploy/nfpm/package-linux.sh rpm
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
@@ -120,6 +109,6 @@ jobs:
           tag_name: ${{ steps.ver.outputs.tag }}
           name: ${{ steps.ver.outputs.tag }}
           files: |
-            dist/savvy-go.tar.gz
             dist/*.deb
+            dist/*.rpm
           body_path: RELEASE_NOTES.md

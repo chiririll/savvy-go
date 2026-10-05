@@ -12,6 +12,7 @@ import { Plus, Trash2 } from 'lucide-react'
 import type { Action, ActionType } from '@/types/automation'
 import { ACTION_TYPES } from '@/types/automation'
 import { AccountSelect, CategorySelect, TagSelect } from '@/components/shared'
+import { actionTypeLabel } from '@/lib/labels'
 
 interface ActionBuilderProps {
     value: Action[]
@@ -109,8 +110,8 @@ export function ActionBuilder({ value, onChange }: ActionBuilderProps) {
                                 </SelectTrigger>
                                 <SelectContent>
                                     {ACTION_TYPES.map(actionType => (
-                                        <SelectItem key={actionType.value} value={actionType.value}>
-                                            {t(`automation.actionTypes.${actionType.value}`)}
+                                        <SelectItem key={actionType} value={actionType}>
+                                            {actionTypeLabel(t, actionType)}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>

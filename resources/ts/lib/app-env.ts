@@ -12,6 +12,9 @@ export function getAppEnv(): string {
     return value || 'production'
 }
 
+/** Environments that look like production: no development banner. */
+const PRODUCTION_LIKE = ['production', 'screenshots']
+
 export function isNonProductionApp(): boolean {
-    return getAppEnv() !== 'production'
+    return !PRODUCTION_LIKE.includes(getAppEnv())
 }

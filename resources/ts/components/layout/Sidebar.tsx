@@ -1,7 +1,8 @@
 import { useEffect } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { Home, FolderTree, Coins, CreditCard, Settings, ChevronDown, Receipt, PiggyBank, Hash, BarChart3, HandCoins, Users, Cog, Repeat, Zap, Shield, Upload, Database, LucideIcon, Github, ExternalLink, KeyRound, Activity } from 'lucide-react'
-import { Logo } from '@/components/shared/Logo'
+import { Home, FolderTree, Coins, CreditCard, Settings, ChevronDown, Receipt, PiggyBank, Hash, BarChart3, HandCoins, Users, Cog, Repeat, Zap, Shield, Upload, Database, LucideIcon, Github, ExternalLink, Activity, KeyRound, UserRound, Boxes, ServerCog, HardDrive, Wrench } from 'lucide-react'
+import { SpaceSwitcher } from '@/components/features/spaces/SpaceSwitcher'
+import { useUser } from '@/stores/auth'
 import {
     Sidebar,
     SidebarContent,
@@ -31,35 +32,47 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { APP_VERSION } from '@/version'
 import { useTranslation } from 'react-i18next'
+import { navLabel, type NavKey } from '@/lib/labels'
 
 interface MenuItem {
     to: string
     icon: LucideIcon
-    labelKey: string
+    labelKey: NavKey
+    /** Other paths that belong to this item (sub-pages). */
+    also?: string[]
 }
 
 const mainItems: MenuItem[] = [
     { to: '/', icon: Home, labelKey: 'dashboard' },
     { to: '/transactions', icon: Receipt, labelKey: 'transactions' },
     { to: '/recurring', icon: Repeat, labelKey: 'recurring' },
-    { to: '/automation', icon: Zap, labelKey: 'automation' },
     { to: '/budgets', icon: PiggyBank, labelKey: 'budgets' },
     { to: '/debts', icon: HandCoins, labelKey: 'debts' },
     { to: '/reports', icon: BarChart3, labelKey: 'reports' },
 ]
 
+/** The current space's setup, and the user's own settings. */
 const settingsItems: MenuItem[] = [
-    { to: '/settings/system', icon: Cog, labelKey: 'system' },
-    { to: '/settings/monitoring', icon: Activity, labelKey: 'monitoring' },
-    { to: '/settings/security', icon: Shield, labelKey: 'security' },
-    { to: '/settings/providers', icon: KeyRound, labelKey: 'ssoProviders' },
-    { to: '/settings/import', icon: Upload, labelKey: 'import' },
-    { to: '/settings/backups', icon: Database, labelKey: 'backups' },
     { to: '/accounts', icon: CreditCard, labelKey: 'accounts' },
     { to: '/categories', icon: FolderTree, labelKey: 'categories' },
-    { to: '/currencies', icon: Coins, labelKey: 'currencies' },
     { to: '/tags', icon: Hash, labelKey: 'tags' },
-    { to: '/users', icon: Users, labelKey: 'users' },
+    { to: '/currencies', icon: Coins, labelKey: 'currencies' },
+    { to: '/automation', icon: Zap, labelKey: 'automation' },
+    { to: '/settings/space', icon: Boxes, labelKey: 'space' },
+    { to: '/settings/user', icon: UserRound, labelKey: 'user', also: ['/settings/security', '/settings/api'] },
+    { to: '/settings/import', icon: Upload, labelKey: 'import' },
+    { to: '/settings/backups', icon: Database, labelKey: 'backups' },
+]
+
+/** The server: server administrators only. */
+const adminItems: MenuItem[] = [
+    { to: '/admin/system', icon: Cog, labelKey: 'system' },
+    { to: '/admin/monitoring', icon: Activity, labelKey: 'monitoring' },
+    { to: '/admin/sso', icon: KeyRound, labelKey: 'sso', also: ['/admin/providers'] },
+    { to: '/admin/security', icon: Shield, labelKey: 'security' },
+    { to: '/admin/backups', icon: HardDrive, labelKey: 'systemBackups' },
+    { to: '/admin/users', icon: Users, labelKey: 'users' },
+    { to: '/admin/spaces', icon: ServerCog, labelKey: 'spaces' },
 ]
 
 export function AppSidebar() {
@@ -67,6 +80,9 @@ export function AppSidebar() {
     const location = useLocation()
     const settingsOpen = useUiStore((state) => state.settingsOpen)
     const setSettingsOpen = useUiStore((state) => state.setSettingsOpen)
+    const adminOpen = useUiStore((state) => state.adminOpen)
+    const setAdminOpen = useUiStore((state) => state.setAdminOpen)
+    const isServerAdmin = useUser()?.role === 'admin'
     const { setOpenMobile } = useSidebar()
 
     // Close mobile sidebar when navigating to a new page
@@ -74,29 +90,15 @@ export function AppSidebar() {
         setOpenMobile(false)
     }, [location.pathname, setOpenMobile])
 
-    const isActive = (path: string) => {
+    const isActive = (path: string, also: string[] = []) => {
         if (path === '/') return location.pathname === '/'
-        return location.pathname.startsWith(path)
+        return [path, ...also].some((p) => location.pathname.startsWith(p))
     }
 
     return (
         <Sidebar collapsible="icon">
             <SidebarHeader>
-                <SidebarMenu>
-                    <SidebarMenuItem>
-                        <SidebarMenuButton size="lg" asChild>
-                            <NavLink to="/">
-                                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                                    <Logo className="size-5" />
-                                </div>
-                                <div className="grid flex-1 text-left text-sm leading-tight">
-                                    <span className="truncate font-semibold">{t('appName', { ns: 'common' })}</span>
-                                    <span className="truncate text-xs text-muted-foreground">{t('appTagline', { ns: 'common' })}</span>
-                                </div>
-                            </NavLink>
-                        </SidebarMenuButton>
-                    </SidebarMenuItem>
-                </SidebarMenu>
+                <SpaceSwitcher />
             </SidebarHeader>
 
             <SidebarContent>
@@ -105,7 +107,7 @@ export function AppSidebar() {
                     <SidebarGroupContent>
                         <SidebarMenu>
                             {mainItems.map(({ to, icon: Icon, labelKey }) => {
-                                const label = t(labelKey)
+                                const label = navLabel(t, labelKey)
                                 return (
                                 <SidebarMenuItem key={to}>
                                     <SidebarMenuButton
@@ -125,37 +127,24 @@ export function AppSidebar() {
                     </SidebarGroupContent>
                 </SidebarGroup>
 
-                <SidebarGroup>
-                    <SidebarGroupContent>
-                        <SidebarMenu>
-                            <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen} className="group/collapsible">
-                                <SidebarMenuItem>
-                                    <CollapsibleTrigger asChild>
-                                        <SidebarMenuButton tooltip={t('settings')}>
-                                            <Settings />
-                                            <span>{t('settings')}</span>
-                                            <ChevronDown className={`ml-auto transition-transform duration-200 ${settingsOpen ? '' : '-rotate-90'}`} />
-                                        </SidebarMenuButton>
-                                    </CollapsibleTrigger>
-                                    <CollapsibleContent>
-                                        <SidebarMenuSub>
-                                            {settingsItems.map(({ to, icon: Icon, labelKey }) => (
-                                                <SidebarMenuSubItem key={to}>
-                                                    <SidebarMenuSubButton asChild isActive={isActive(to)}>
-                                                        <NavLink to={to}>
-                                                            <Icon />
-                                                            <span>{t(labelKey)}</span>
-                                                        </NavLink>
-                                                    </SidebarMenuSubButton>
-                                                </SidebarMenuSubItem>
-                                            ))}
-                                        </SidebarMenuSub>
-                                    </CollapsibleContent>
-                                </SidebarMenuItem>
-                            </Collapsible>
-                        </SidebarMenu>
-                    </SidebarGroupContent>
-                </SidebarGroup>
+                <NavGroup
+                    icon={Settings}
+                    label={t('settings')}
+                    items={settingsItems}
+                    open={settingsOpen}
+                    onOpenChange={setSettingsOpen}
+                    isActive={isActive}
+                />
+                {isServerAdmin && (
+                    <NavGroup
+                        icon={Wrench}
+                        label={t('administration')}
+                        items={adminItems}
+                        open={adminOpen}
+                        onOpenChange={setAdminOpen}
+                        isActive={isActive}
+                    />
+                )}
             </SidebarContent>
 
             <SidebarFooter>
@@ -195,5 +184,56 @@ export function AppSidebar() {
 
             <SidebarRail />
         </Sidebar>
+    )
+}
+
+function NavGroup({
+    icon: GroupIcon,
+    label,
+    items,
+    open,
+    onOpenChange,
+    isActive,
+}: {
+    icon: LucideIcon
+    label: string
+    items: MenuItem[]
+    open: boolean
+    onOpenChange: (open: boolean) => void
+    isActive: (path: string, also?: string[]) => boolean
+}) {
+    const { t } = useTranslation('nav')
+    return (
+        <SidebarGroup>
+            <SidebarGroupContent>
+                <SidebarMenu>
+                    <Collapsible open={open} onOpenChange={onOpenChange} className="group/collapsible">
+                        <SidebarMenuItem>
+                            <CollapsibleTrigger asChild>
+                                <SidebarMenuButton tooltip={label}>
+                                    <GroupIcon />
+                                    <span>{label}</span>
+                                    <ChevronDown className={`ml-auto transition-transform duration-200 ${open ? '' : '-rotate-90'}`} />
+                                </SidebarMenuButton>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                                <SidebarMenuSub>
+                                    {items.map(({ to, icon: Icon, labelKey, also }) => (
+                                        <SidebarMenuSubItem key={to}>
+                                            <SidebarMenuSubButton asChild isActive={isActive(to, also)}>
+                                                <NavLink to={to}>
+                                                    <Icon />
+                                                    <span>{navLabel(t, labelKey)}</span>
+                                                </NavLink>
+                                            </SidebarMenuSubButton>
+                                        </SidebarMenuSubItem>
+                                    ))}
+                                </SidebarMenuSub>
+                            </CollapsibleContent>
+                        </SidebarMenuItem>
+                    </Collapsible>
+                </SidebarMenu>
+            </SidebarGroupContent>
+        </SidebarGroup>
     )
 }

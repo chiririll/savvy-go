@@ -18,8 +18,13 @@ export const transactionItemSchema = z.object({
     price_per_unit: z.coerce.number().min(0, i18n.t('validation.cannotBeNegative')),
 })
 
+/** Both kinds of transfer move money between accounts and have no category. */
+export function isTransferType(type?: string | null): boolean {
+    return type === 'transfer' || type === 'transfer_out'
+}
+
 export const transactionSchema = z.object({
-    type: z.enum(['income', 'expense', 'transfer'], {
+    type: z.enum(['income', 'expense', 'transfer', 'transfer_out'], {
         error: i18n.t('validation.selectTransactionType'),
     }),
 
@@ -29,6 +34,9 @@ export const transactionSchema = z.object({
 
     to_account_id: z.coerce.number().positive().optional().nullable(),
 
+    /** transfer_out only: the linked space to_account_id belongs to. */
+    to_space_id: z.coerce.number().positive().optional().nullable(),
+
     category_id: z.coerce.number().positive().optional().nullable(),
 
     amount: z.coerce.number({
@@ -36,6 +44,8 @@ export const transactionSchema = z.object({
     }).positive(i18n.t('validation.amountPositive')),
 
     to_amount: z.coerce.number().positive().optional().nullable(),
+
+    is_estimated: z.boolean().optional(),
 
     exchange_rate: z.coerce.number().positive().optional().nullable(),
 
@@ -50,8 +60,10 @@ export const transactionSchema = z.object({
 
     tag_ids: z.array(z.number()).optional(),
 }).superRefine((data, ctx) => {
-    // Transfer requires to_account_id
-    if (data.type === 'transfer' && !data.to_account_id) {
+    const isTransfer = isTransferType(data.type)
+
+    // Transfers require to_account_id
+    if (isTransfer && !data.to_account_id) {
         ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message: i18n.t('validation.transferDestination'),
@@ -59,8 +71,16 @@ export const transactionSchema = z.object({
         })
     }
 
-    // Transfer should not have category
-    if (data.type === 'transfer' && data.category_id) {
+    if (data.type === 'transfer_out' && !data.to_space_id) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: i18n.t('validation.selectSpace'),
+            path: ['to_space_id'],
+        })
+    }
+
+    // Transfers should not have category
+    if (isTransfer && data.category_id) {
         ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message: i18n.t('validation.transferNoCategory'),
@@ -69,7 +89,7 @@ export const transactionSchema = z.object({
     }
 
     // Income/Expense should have category
-    if (data.type !== 'transfer' && !data.category_id) {
+    if (!isTransfer && !data.category_id) {
         ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message: i18n.t('validation.selectCategory'),

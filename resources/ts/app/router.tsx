@@ -2,7 +2,9 @@ import { lazy, Suspense } from 'react'
 import { createBrowserRouter, Navigate, useParams } from 'react-router-dom'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { AuthProvider } from '@/components/providers/AuthProvider'
+import { useUser } from '@/stores/auth'
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary'
+import { childPath, pages } from './pages'
 
 // Auth pages
 const LoginPage = lazy(() => import('@/pages/auth/login'))
@@ -10,6 +12,7 @@ const SetupPage = lazy(() => import('@/pages/auth/setup'))
 const Setup2FAPage = lazy(() => import('@/pages/auth/setup-2fa'))
 const SsoCallbackPage = lazy(() => import('@/pages/auth/sso-callback'))
 const SetPasswordPage = lazy(() => import('@/pages/auth/set-password'))
+const InvitePage = lazy(() => import('@/pages/invite'))
 
 // Protected pages
 const DashboardPage = lazy(() => import('@/pages/dashboard'))
@@ -33,16 +36,36 @@ function AutomationEditRedirect() {
     return <Navigate to={id ? `/automation?edit=${id}` : '/automation'} replace />
 }
 
-const UsersPage = lazy(() => import('@/pages/users'))
 const ReportsPage = lazy(() => import('@/pages/reports'))
-const MonitoringPage = lazy(() => import('@/pages/settings/monitoring'))
-const SystemSettingsPage = lazy(() => import('@/pages/settings/system'))
+// Settings: the current space and the user's own.
+const SpaceSettingsPage = lazy(() => import('@/pages/settings/space'))
+const UserSettingsPage = lazy(() => import('@/pages/settings/user'))
 const SecuritySettingsPage = lazy(() => import('@/pages/settings/security'))
+const ApiSettingsPage = lazy(() => import('@/pages/settings/api'))
 const ImportSettingsPage = lazy(() => import('@/pages/settings/import'))
-const BackupsSettingsPage = lazy(() => import('@/pages/settings/backups'))
-const ProvidersPage = lazy(() => import('@/pages/settings/providers'))
-const ProviderCreatePage = lazy(() => import('@/pages/settings/providers/create'))
-const ProviderEditPage = lazy(() => import('@/pages/settings/providers/[id]/edit'))
+const SpaceBackupsPage = lazy(() => import('@/pages/settings/backups'))
+// Administration: server admins.
+const AdminSystemPage = lazy(() => import('@/pages/admin/system'))
+const AdminMonitoringPage = lazy(() => import('@/pages/admin/monitoring'))
+const AdminSsoPage = lazy(() => import('@/pages/admin/sso'))
+const AdminSecurityPage = lazy(() => import('@/pages/admin/security'))
+const ProviderCreatePage = lazy(() => import('@/pages/admin/providers/create'))
+const ProviderEditPage = lazy(() => import('@/pages/admin/providers/[id]/edit'))
+const SystemBackupsPage = lazy(() => import('@/pages/admin/backups'))
+const AdminUsersPage = lazy(() => import('@/pages/admin/users'))
+const AdminSpacesPage = lazy(() => import('@/pages/admin/spaces'))
+
+/** Server administration: others are sent home (the API refuses them anyway). */
+function AdminOnly({ children }: { children: React.ReactNode }) {
+    return useUser()?.role === 'admin' ? <>{children}</> : <Navigate to="/" replace />
+}
+
+const admin = (Component: React.LazyExoticComponent<() => React.JSX.Element>) => <AdminOnly>{withSuspense(Component)}</AdminOnly>
+
+function ProviderEditRedirect() {
+    const { id } = useParams<{ id: string }>()
+    return <Navigate to={`/admin/providers/${id}/edit`} replace />
+}
 const NotFoundPage = lazy(() => import('@/pages/not-found'))
 
 const withSuspense = (Component: React.LazyExoticComponent<() => React.JSX.Element>) => (
@@ -60,24 +83,28 @@ const withSuspense = (Component: React.LazyExoticComponent<() => React.JSX.Eleme
 export const router = createBrowserRouter([
     // Public routes
     {
-        path: '/login',
+        path: pages.login.path,
         element: withSuspense(LoginPage),
     },
     {
-        path: '/setup',
+        path: pages.setup.path,
         element: withSuspense(SetupPage),
     },
     {
-        path: '/setup-2fa',
+        path: pages.setup2fa.path,
         element: withSuspense(Setup2FAPage),
     },
     {
-        path: '/auth/sso/callback',
+        path: pages.ssoCallback.path,
         element: withSuspense(SsoCallbackPage),
     },
     {
-        path: '/set-password/:token',
+        path: pages.setPassword.path,
         element: withSuspense(SetPasswordPage),
+    },
+    {
+        path: pages.invite.path,
+        element: withSuspense(InvitePage),
     },
 
     // Protected routes
@@ -85,32 +112,46 @@ export const router = createBrowserRouter([
         element: <AuthProvider />,
         children: [
             {
-                path: '/',
+                // The layout sits at the root, where the dashboard is the index page.
+                path: pages.dashboard.path,
                 element: <AppLayout />,
                 children: [
                     { index: true, element: withSuspense(DashboardPage) },
-                    { path: 'transactions', element: withSuspense(TransactionsPage) },
-                    { path: 'accounts', element: withSuspense(AccountsPage) },
-                    { path: 'categories', element: withSuspense(CategoriesPage) },
-                    { path: 'currencies', element: withSuspense(CurrenciesPage) },
-                    { path: 'budgets', element: withSuspense(BudgetsPage) },
-                    { path: 'tags', element: withSuspense(TagsPage) },
-                    { path: 'debts', element: withSuspense(DebtsPage) },
-                    { path: 'recurring', element: withSuspense(RecurringPage) },
-                    { path: 'automation', element: withSuspense(AutomationPage) },
+                    { path: childPath(pages.transactions), element: withSuspense(TransactionsPage) },
+                    { path: childPath(pages.accounts), element: withSuspense(AccountsPage) },
+                    { path: childPath(pages.categories), element: withSuspense(CategoriesPage) },
+                    { path: childPath(pages.currencies), element: withSuspense(CurrenciesPage) },
+                    { path: childPath(pages.budgets), element: withSuspense(BudgetsPage) },
+                    { path: childPath(pages.tags), element: withSuspense(TagsPage) },
+                    { path: childPath(pages.debts), element: withSuspense(DebtsPage) },
+                    { path: childPath(pages.recurring), element: withSuspense(RecurringPage) },
+                    { path: childPath(pages.automation), element: withSuspense(AutomationPage) },
                     { path: 'automation/create', element: <AutomationCreateRedirect /> },
                     { path: 'automation/:id/edit', element: <AutomationEditRedirect /> },
-                    { path: 'automation/:id/logs', element: withSuspense(AutomationLogsPage) },
-                    { path: 'users', element: withSuspense(UsersPage) },
-                    { path: 'reports', element: withSuspense(ReportsPage) },
-                    { path: 'settings/system', element: withSuspense(SystemSettingsPage) },
-                    { path: 'settings/monitoring', element: withSuspense(MonitoringPage) },
-                    { path: 'settings/security', element: withSuspense(SecuritySettingsPage) },
-                    { path: 'settings/import', element: withSuspense(ImportSettingsPage) },
-                    { path: 'settings/backups', element: withSuspense(BackupsSettingsPage) },
-                    { path: 'settings/providers', element: withSuspense(ProvidersPage) },
-                    { path: 'settings/providers/create', element: withSuspense(ProviderCreatePage) },
-                    { path: 'settings/providers/:id/edit', element: withSuspense(ProviderEditPage) },
+                    { path: childPath(pages.automationLogs), element: withSuspense(AutomationLogsPage) },
+                    { path: childPath(pages.reports), element: withSuspense(ReportsPage) },
+                    { path: childPath(pages.spaceSettings), element: withSuspense(SpaceSettingsPage) },
+                    { path: childPath(pages.userSettings), element: withSuspense(UserSettingsPage) },
+                    { path: childPath(pages.securitySettings), element: withSuspense(SecuritySettingsPage) },
+                    { path: childPath(pages.apiSettings), element: withSuspense(ApiSettingsPage) },
+                    { path: childPath(pages.importSettings), element: withSuspense(ImportSettingsPage) },
+                    { path: childPath(pages.spaceBackups), element: withSuspense(SpaceBackupsPage) },
+                    { path: childPath(pages.adminSystem), element: admin(AdminSystemPage) },
+                    { path: childPath(pages.adminMonitoring), element: admin(AdminMonitoringPage) },
+                    { path: childPath(pages.adminSso), element: admin(AdminSsoPage) },
+                    { path: childPath(pages.adminSecurity), element: admin(AdminSecurityPage) },
+                    { path: childPath(pages.providerCreate), element: admin(ProviderCreatePage) },
+                    { path: childPath(pages.providerEdit), element: admin(ProviderEditPage) },
+                    { path: childPath(pages.adminBackups), element: admin(SystemBackupsPage) },
+                    { path: childPath(pages.adminUsers), element: admin(AdminUsersPage) },
+                    { path: childPath(pages.adminSpaces), element: admin(AdminSpacesPage) },
+                    // Old addresses.
+                    { path: 'users', element: <Navigate to="/admin/users" replace /> },
+                    { path: 'settings/system', element: <Navigate to="/admin/system" replace /> },
+                    { path: 'settings/monitoring', element: <Navigate to="/admin/monitoring" replace /> },
+                    { path: 'settings/providers', element: <Navigate to="/admin/sso" replace /> },
+                    { path: 'settings/providers/create', element: <Navigate to="/admin/providers/create" replace /> },
+                    { path: 'settings/providers/:id/edit', element: <ProviderEditRedirect /> },
                 ],
             },
         ],

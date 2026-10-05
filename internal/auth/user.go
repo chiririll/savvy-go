@@ -8,13 +8,33 @@ import (
 
 	"savvy-go/internal/db"
 	"savvy-go/internal/db/sqlc"
+	"savvy-go/internal/store"
 )
 
+// Server roles. What a user may do with the finances of a space is decided by
+// their role in that space, not here.
 const (
-	RoleAdmin     = "admin"
-	RoleReadWrite = "read-write"
-	RoleReadOnly  = "read-only"
+	RoleAdmin = "admin"
+	RoleUser  = "user"
+	// RoleGuest joined through an invitation from someone other than a server
+	// admin: they cannot create spaces or be a space admin until promoted.
+	RoleGuest = "guest"
 )
+
+// ValidRole reports whether role is a server role.
+func ValidRole(role string) bool {
+	return role == RoleAdmin || role == RoleUser || role == RoleGuest
+}
+
+// NormalizeRole maps the retired read-write/read-only roles (Laravel data,
+// old SSO role mappings) to user.
+func NormalizeRole(role string) string {
+	switch role {
+	case "read-write", "read-only":
+		return RoleUser
+	}
+	return role
+}
 
 type User struct {
 	ID                 int64
@@ -26,6 +46,7 @@ type User struct {
 	TwoFactorSecret    *string
 	TwoFactorEnabled   bool
 	TwoFactorConfirmed bool
+	Deleted            bool
 	CreatedAt          *time.Time
 	UpdatedAt          *time.Time
 }
@@ -40,9 +61,7 @@ func (u User) HasTwoFactor() bool {
 
 func (u User) IsAdmin() bool { return u.Role == RoleAdmin }
 
-func (u User) IsReadOnly() bool { return u.Role == RoleReadOnly }
-
-func (u User) CanWrite() bool { return u.Role == RoleAdmin || u.Role == RoleReadWrite }
+func (u User) IsGuest() bool { return u.Role == RoleGuest }
 
 func (u User) SessionJSON() map[string]any {
 	return map[string]any{
@@ -71,7 +90,7 @@ func (u User) ResourceJSON() map[string]any {
 }
 
 type Users struct {
-	DB *sql.DB
+	DB store.DB
 }
 
 func (s Users) Count(ctx context.Context) (int, error) {
@@ -107,7 +126,7 @@ func (s Users) All(ctx context.Context) ([]User, error) {
 
 func (s Users) Create(ctx context.Context, name, email string, password *string, role string) (*User, error) {
 	if role == "" {
-		role = RoleReadOnly
+		role = RoleUser
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
 	var hash any
@@ -216,8 +235,24 @@ func boolToInt(v bool) int {
 	return 0
 }
 
+// Delete tombstones a user: the row stays (ids in space databases still
+// resolve to "Deleted user") but loses its email, password, second factors,
+// sessions, tokens, passkeys, SSO links and space memberships.
 func (s Users) Delete(ctx context.Context, id int64) error {
-	return db.Q(s.DB).DeleteUser(ctx, id)
+	now := time.Now().UTC().Format(time.RFC3339)
+	return store.Tx(ctx, s.DB, func(tx store.DB) error {
+		q := db.Q(tx)
+		for _, del := range []func(context.Context, int64) error{
+			q.DeleteUserCredentials, q.DeleteUserAPITokens, q.DeleteUserPasskeys,
+			q.DeleteUserIdentities, q.DeleteUserPasswordTokens, q.DeleteUserRecoveryCodes,
+			q.DeleteUserMemberships,
+		} {
+			if err := del(ctx, id); err != nil {
+				return err
+			}
+		}
+		return q.TombstoneUser(ctx, sqlc.TombstoneUserParams{Now: db.NS(now), ID: id})
+	})
 }
 
 func (s Users) AdminCount(ctx context.Context) (int, error) {
@@ -242,6 +277,7 @@ func userFromRow(r sqlc.User, err error) (*User, error) {
 	u.IsSSOOnly = r.IsSsoOnly != 0
 	u.TwoFactorEnabled = r.TwoFactorEnabled != 0
 	u.TwoFactorConfirmed = r.TwoFactorConfirmed != 0
+	u.Deleted = r.DeletedAt.Valid
 	if t, ok := parseTime(r.CreatedAt); ok {
 		u.CreatedAt = &t
 	}

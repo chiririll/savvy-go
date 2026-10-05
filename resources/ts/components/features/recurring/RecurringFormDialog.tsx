@@ -35,11 +35,12 @@ export function RecurringFormDialog({
             description={t('recurring.description')}
             toFormValues={(item) => ({
                 type: item.type,
-                account_id: item.accountId,
-                to_account_id: item.toAccountId,
-                category_id: item.categoryId,
+                account_id: item.account.id,
+                to_account_id: item.toAccount?.id,
+                category_id: item.category?.id,
                 amount: item.amount,
                 to_amount: item.toAmount,
+                is_estimated: item.isEstimated,
                 description: item.description,
                 frequency: item.frequency,
                 interval: item.interval,

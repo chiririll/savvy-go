@@ -1,9 +1,10 @@
 import i18n from '@/lib/i18n'
 import { localizeDefaultName } from '@/lib/localized-name'
 import type { Transaction, TransactionStatus, TransactionType } from '@/types/transactions'
+import { transactionTypeLabel } from '@/lib/labels'
 
-const INCOMING_TYPES: TransactionType[] = ['income', 'debt_collection', 'debt_borrow']
-const OUTGOING_TYPES: TransactionType[] = ['expense', 'debt_payment', 'debt_lend']
+const INCOMING_TYPES: TransactionType[] = ['income', 'debt_collection', 'debt_borrow', 'transfer_in']
+const OUTGOING_TYPES: TransactionType[] = ['expense', 'debt_payment', 'debt_lend', 'transfer_out']
 
 const STORED_MESSAGE_KEY = /^messages\.[a-z0-9_.]+$/i
 
@@ -31,7 +32,7 @@ export function displayTransactionDescription(
         case 'debt_borrow':
             return i18n.t('pages:transactions.fallback.borrow', { name })
         default:
-            return localizeDefaultName(transaction.category?.name) || i18n.t(`pages:transactions.types.${transaction.type}`)
+            return localizeDefaultName(transaction.category?.name) || transactionTypeLabel(i18n.t, transaction.type)
     }
 }
 

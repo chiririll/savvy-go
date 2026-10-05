@@ -3,6 +3,7 @@ package domain
 import (
 	"context"
 	"database/sql"
+	"savvy-go/internal/store"
 	"sort"
 	"strings"
 )
@@ -55,7 +56,7 @@ func collectImportCategories(rows [][]string, mapping, options map[string]any) [
 	return out
 }
 
-func existingCategoryIndex(ctx context.Context, db *sql.DB) (map[string]int64, error) {
+func existingCategoryIndex(ctx context.Context, db store.DB) (map[string]int64, error) {
 	all, err := Categories{DB: db}.All(ctx, "")
 	if err != nil {
 		return nil, err
@@ -95,7 +96,7 @@ func (s Imports) matchImportCategories(ctx context.Context, cats []*importCatego
 // are created when create_missing_categories is on.
 type categoryResolver struct {
 	ctx           context.Context
-	db            *sql.DB
+	db            store.DB
 	cats          map[string]*importCategory
 	choices       map[string]any
 	createMissing bool

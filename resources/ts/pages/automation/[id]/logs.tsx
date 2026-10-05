@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ArrowLeft } from 'lucide-react'
 import { format } from 'date-fns'
+import { actionTypeLabelLoose, automationLogStatusLabel } from '@/lib/labels'
 
 export default function AutomationLogsPage() {
     const { t } = useTranslation('pages')
@@ -61,29 +62,29 @@ export default function AutomationLogsPage() {
                                                   : 'secondary'
                                         }
                                     >
-                                        {t(`automation.logsStatus.${log.status}`)}
+                                        {automationLogStatusLabel(t, log.status)}
                                     </Badge>
-                                    {log.trigger_entity_type && (
+                                    {log.triggerEntityType && (
                                         <span className="text-sm text-muted-foreground">
-                                            {t('automation.logsEntity', { type: log.trigger_entity_type, id: log.trigger_entity_id })}
+                                            {t('automation.logsEntity', { type: log.triggerEntityType, id: log.triggerEntityId })}
                                         </span>
                                     )}
                                 </div>
-                                {log.error_message && (
-                                    <p className="text-sm text-destructive">{log.error_message}</p>
+                                {log.errorMessage && (
+                                    <p className="text-sm text-destructive">{log.errorMessage}</p>
                                 )}
-                                {log.actions_executed && log.actions_executed.length > 0 && (
+                                {log.actionsExecuted && log.actionsExecuted.length > 0 && (
                                     <p className="text-sm text-muted-foreground">
                                         {t('automation.logsActions', {
-                                            actions: log.actions_executed
-                                                .map(a => t(`forms:automation.actionTypes.${a.type}`, { defaultValue: a.type }))
+                                            actions: log.actionsExecuted
+                                                .map(a => actionTypeLabelLoose(t, a.type))
                                                 .join(', '),
                                         })}
                                     </p>
                                 )}
                             </div>
                             <span className="text-sm text-muted-foreground">
-                                {format(new Date(log.created_at), 'dd.MM.yyyy HH:mm:ss')}
+                                {format(new Date(log.createdAt), 'dd.MM.yyyy HH:mm:ss')}
                             </span>
                         </div>
                     ))}

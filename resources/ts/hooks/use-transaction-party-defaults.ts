@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { isTransferType } from '@/schemas/transactions'
 import type { Account, Category } from '@/types'
 
 interface TransactionPartyForm {
@@ -25,7 +26,7 @@ export function useTransactionPartyDefaults(
     }, [accountId, accounts, form])
 
     useEffect(() => {
-        if (categoryId || type === 'transfer') {
+        if (categoryId || isTransferType(type)) {
             return
         }
 

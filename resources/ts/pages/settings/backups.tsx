@@ -1,431 +1,68 @@
-import { useState } from 'react'
+import { useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Page, PageHeader } from '@/components/shared'
+import { FolderInput } from 'lucide-react'
+import { spacesApi } from '@/api/spaces'
+import { BackupsView, BackupSource } from '@/components/features/backups/BackupsView'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table'
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog'
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Badge } from '@/components/ui/badge'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { Download, RotateCcw, Trash2, Plus, Upload, Loader2 } from 'lucide-react'
-import { useBackups, useCreateBackup, useUploadBackup, useRestoreBackup, useDeleteBackup } from '@/hooks/use-backups'
-import { backupsApi } from '@/api/backups'
-import { Backup, BackupInspection, BackupSchemaStatus } from '@/types/backup'
-import { useReadOnly } from '@/components/providers/ReadOnlyProvider'
-import { intlLocale } from '@/lib/i18n'
-import { getApiErrorMessage } from '@/lib/api-error'
-import { toast } from 'sonner'
+import { useCurrentSpace, useImportSpace, useSwitchSpace } from '@/hooks/use-spaces'
+import { useUser } from '@/stores/auth'
 
-function formatBytes(bytes: number): string {
-    if (bytes === 0) return '0 B'
-    const k = 1024
-    const sizes = ['B', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
-}
-
-function formatDate(dateString: string): string {
-    return new Date(dateString).toLocaleString(intlLocale())
-}
-
-function schemaBadgeVariant(status: BackupSchemaStatus): 'secondary' | 'outline' | 'destructive' {
-    if (status === 'current') return 'secondary'
-    if (status === 'newer') return 'destructive'
-    return 'outline'
-}
-
-export default function BackupsPage() {
+/** Backups of the current space; only its admins reach the endpoints. */
+export default function SpaceBackupsPage() {
     const { t } = useTranslation('settings')
-    const { t: tCommon } = useTranslation('common')
-    const isReadOnly = useReadOnly()
-    const { data: backups, isLoading } = useBackups()
-    const createBackup = useCreateBackup()
-    const uploadBackup = useUploadBackup()
-    const restoreBackup = useRestoreBackup()
-    const deleteBackup = useDeleteBackup()
+    const space = useCurrentSpace()
+    const user = useUser()
+    const importSpace = useImportSpace()
+    const switchSpace = useSwitchSpace()
+    const fileInput = useRef<HTMLInputElement>(null)
 
-    const [createDialogOpen, setCreateDialogOpen] = useState(false)
-    const [uploadDialogOpen, setUploadDialogOpen] = useState(false)
-    const [restoreDialogOpen, setRestoreDialogOpen] = useState(false)
-    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-    const [selectedBackup, setSelectedBackup] = useState<Backup | null>(null)
-    const [restorePreview, setRestorePreview] = useState<BackupInspection | null>(null)
-    const [inspectingId, setInspectingId] = useState<string | null>(null)
-    const [note, setNote] = useState('')
-    const [uploadFile, setUploadFile] = useState<File | null>(null)
-
-    const handleCreate = () => {
-        createBackup.mutate(note || undefined, {
-            onSuccess: () => {
-                setCreateDialogOpen(false)
-                setNote('')
-            },
-        })
-    }
-
-    const handleUpload = () => {
-        if (!uploadFile) return
-        uploadBackup.mutate({ file: uploadFile, note: note || undefined }, {
-            onSuccess: () => {
-                setUploadDialogOpen(false)
-                setNote('')
-                setUploadFile(null)
-            },
-        })
-    }
-
-    const openRestore = async (backup: Backup) => {
-        setSelectedBackup(backup)
-        setInspectingId(backup.filename)
-        try {
-            const preview = await backupsApi.inspect(backup.filename)
-            setRestorePreview(preview)
-            setRestoreDialogOpen(true)
-        } catch (error) {
-            toast.error(getApiErrorMessage(error, tCommon('toasts.backup.inspectFailed')))
-            setSelectedBackup(null)
-            setRestorePreview(null)
-        } finally {
-            setInspectingId(null)
+    const source = useMemo<BackupSource | null>(() => {
+        if (!space) return null
+        const id = space.id
+        return {
+            key: ['space', id, 'backups'],
+            list: () => spacesApi.backups(id),
+            create: (note) => spacesApi.createBackup(id, note),
+            upload: (file) => spacesApi.uploadBackup(id, file),
+            downloadUrl: (name) => spacesApi.backupDownloadUrl(id, name),
+            restore: (name) => spacesApi.restoreBackup(id, name),
+            remove: (name) => spacesApi.deleteBackup(id, name),
         }
+    }, [space])
+
+    if (!space) return <></>
+    if (space.role !== 'admin') {
+        return <p className="text-sm text-muted-foreground">{t('spaces.backups.adminsOnly')}</p>
     }
 
-    const closeRestore = () => {
-        setRestoreDialogOpen(false)
-        setSelectedBackup(null)
-        setRestorePreview(null)
-    }
-
-    const handleRestore = () => {
-        if (!selectedBackup || restorePreview?.compatible === false) return
-        restoreBackup.mutate(selectedBackup.filename, {
-            onSuccess: closeRestore,
-        })
-    }
-
-    const handleDelete = () => {
-        if (!selectedBackup) return
-        deleteBackup.mutate(selectedBackup.filename, {
-            onSuccess: () => {
-                setDeleteDialogOpen(false)
-                setSelectedBackup(null)
-            },
-        })
-    }
-
-    const handleDownload = (backup: Backup) => {
-        const token = localStorage.getItem('token')
-        const url = backupsApi.download(backup.filename)
-
-        fetch(url, {
-            headers: { Authorization: `Bearer ${token}` }
-        })
-            .then(res => res.blob())
-            .then(blob => {
-                const a = document.createElement('a')
-                a.href = URL.createObjectURL(blob)
-                a.download = backup.filename
-                a.click()
-                URL.revokeObjectURL(a.href)
-            })
-    }
+    const importAction = user?.role !== 'guest' && (
+        <>
+            <Button variant="outline" onClick={() => fileInput.current?.click()} disabled={importSpace.isPending}>
+                <FolderInput className="mr-2 size-4" />
+                {t('spaces.backups.import')}
+            </Button>
+            <input
+                ref={fileInput}
+                type="file"
+                accept=".zip,.sqlite"
+                className="hidden"
+                onChange={async (e) => {
+                    const file = e.target.files?.[0]
+                    e.target.value = ''
+                    if (!file) return
+                    const created = await importSpace.mutateAsync({ file })
+                    await switchSpace(created.id)
+                }}
+            />
+        </>
+    )
 
     return (
-        <Page title={t('backups.title')}>
-            <PageHeader
-                title={t('backups.title')}
-                description={t('backups.description')}
-            />
-
-            <div className="flex gap-2 mb-6">
-                <Button onClick={() => setCreateDialogOpen(true)} disabled={isReadOnly}>
-                    <Plus className="size-4 mr-2" />
-                    {t('backups.create')}
-                </Button>
-                <Button variant="outline" onClick={() => setUploadDialogOpen(true)} disabled={isReadOnly}>
-                    <Upload className="size-4 mr-2" />
-                    {t('backups.upload')}
-                </Button>
-            </div>
-
-            <div className="border rounded-lg">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>{t('backups.date')}</TableHead>
-                            <TableHead>{t('backups.size')}</TableHead>
-                            <TableHead>{t('backups.version')}</TableHead>
-                            <TableHead>{t('backups.note')}</TableHead>
-                            <TableHead className="text-right">{t('backups.actions')}</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {isLoading ? (
-                            Array.from({ length: 3 }).map((_, i) => (
-                                <TableRow key={i}>
-                                    <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                                    <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                                    <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-                                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                                    <TableCell><Skeleton className="h-4 w-24 ml-auto" /></TableCell>
-                                </TableRow>
-                            ))
-                        ) : backups?.length === 0 ? (
-                            <TableRow>
-                                <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                                    {t('backups.empty')}
-                                </TableCell>
-                            </TableRow>
-                        ) : (
-                            backups?.map((backup) => (
-                                <TableRow key={backup.filename}>
-                                    <TableCell>{formatDate(backup.createdAt)}</TableCell>
-                                    <TableCell>{formatBytes(backup.size)}</TableCell>
-                                    <TableCell>
-                                        <div className="flex flex-col items-start gap-1">
-                                            <span className="font-mono text-sm">
-                                                {backup.schemaVersion || t('backups.versionUnknown')}
-                                            </span>
-                                            <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                    <Badge variant={schemaBadgeVariant(backup.schemaStatus)}>
-                                                        {t(`backups.schemaStatus.${backup.schemaStatus}`)}
-                                                    </Badge>
-                                                </TooltipTrigger>
-                                                <TooltipContent>
-                                                    {t(`backups.schemaStatusHelp.${backup.schemaStatus}`)}
-                                                </TooltipContent>
-                                            </Tooltip>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="text-muted-foreground">
-                                        {backup.note || '-'}
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        <div className="flex justify-end gap-1">
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={() => handleDownload(backup)}
-                                                title={t('backups.download')}
-                                            >
-                                                <Download className="size-4" />
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={() => openRestore(backup)}
-                                                title={backup.schemaStatus === 'newer'
-                                                    ? t('backups.schemaStatusHelp.newer')
-                                                    : t('backups.restore')}
-                                                disabled={isReadOnly || backup.schemaStatus === 'newer' || inspectingId === backup.filename}
-                                            >
-                                                {inspectingId === backup.filename
-                                                    ? <Loader2 className="size-4 animate-spin" />
-                                                    : <RotateCcw className="size-4" />}
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={() => {
-                                                    setSelectedBackup(backup)
-                                                    setDeleteDialogOpen(true)
-                                                }}
-                                                title={tCommon('actions.delete')}
-                                                disabled={isReadOnly}
-                                            >
-                                                <Trash2 className="size-4" />
-                                            </Button>
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            ))
-                        )}
-                    </TableBody>
-                </Table>
-            </div>
-
-            <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>{t('backups.createTitle')}</DialogTitle>
-                        <DialogDescription>
-                            {t('backups.createDescription')}
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="note">{t('backups.noteOptional')}</Label>
-                            <Input
-                                id="note"
-                                placeholder={t('backups.notePlaceholder')}
-                                value={note}
-                                onChange={(e) => setNote(e.target.value)}
-                            />
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
-                            {tCommon('actions.cancel')}
-                        </Button>
-                        <Button onClick={handleCreate} disabled={createBackup.isPending}>
-                            {createBackup.isPending && <Loader2 className="size-4 mr-2 animate-spin" />}
-                            {tCommon('actions.create')}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>{t('backups.uploadTitle')}</DialogTitle>
-                        <DialogDescription>
-                            {t('backups.uploadDescription')}
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="file">{t('backups.backupFile')}</Label>
-                            <Input
-                                id="file"
-                                type="file"
-                                accept=".sqlite,.db"
-                                onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="upload-note">{t('backups.noteOptional')}</Label>
-                            <Input
-                                id="upload-note"
-                                placeholder={t('backups.uploadNotePlaceholder')}
-                                value={note}
-                                onChange={(e) => setNote(e.target.value)}
-                            />
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setUploadDialogOpen(false)}>
-                            {tCommon('actions.cancel')}
-                        </Button>
-                        <Button onClick={handleUpload} disabled={!uploadFile || uploadBackup.isPending}>
-                            {uploadBackup.isPending && <Loader2 className="size-4 mr-2 animate-spin" />}
-                            {t('backups.upload')}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            <AlertDialog
-                open={restoreDialogOpen}
-                onOpenChange={(open) => {
-                    if (!open) {
-                        closeRestore()
-                        return
-                    }
-                    setRestoreDialogOpen(true)
-                }}
-            >
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>
-                            {restorePreview?.compatible === false
-                                ? t('backups.restoreNewerTitle')
-                                : t('backups.restoreTitle')}
-                        </AlertDialogTitle>
-                        <AlertDialogDescription asChild>
-                            <div className="space-y-2">
-                                {restorePreview?.compatible === false ? (
-                                    <p>{t('backups.restoreNewerDescription')}</p>
-                                ) : (
-                                    <>
-                                        <p>
-                                            {t('backups.restoreDescription', {
-                                                date: selectedBackup ? formatDate(selectedBackup.createdAt) : '',
-                                            })}
-                                        </p>
-                                        {restorePreview && restorePreview.pendingCount > 0 && (
-                                            <p>
-                                                {t('backups.restoreMigrationsDescription', {
-                                                    count: restorePreview.pendingCount,
-                                                })}
-                                            </p>
-                                        )}
-                                    </>
-                                )}
-                            </div>
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel disabled={restoreBackup.isPending}>
-                            {restorePreview?.compatible === false
-                                ? tCommon('actions.done')
-                                : tCommon('actions.cancel')}
-                        </AlertDialogCancel>
-                        {restorePreview?.compatible !== false && (
-                            <Button
-                                type="button"
-                                variant="destructive"
-                                disabled={restoreBackup.isPending}
-                                onClick={handleRestore}
-                            >
-                                {restoreBackup.isPending && <Loader2 className="size-4 mr-2 animate-spin" />}
-                                {t('backups.restore')}
-                            </Button>
-                        )}
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-
-            <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>{t('backups.deleteTitle')}</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            {t('backups.deleteDescription', {
-                                date: selectedBackup ? formatDate(selectedBackup.createdAt) : '',
-                            })}
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>{tCommon('actions.cancel')}</AlertDialogCancel>
-                        <AlertDialogAction
-                            variant="destructive"
-                            onClick={handleDelete}
-                            disabled={deleteBackup.isPending}
-                        >
-                            {deleteBackup.isPending && <Loader2 className="size-4 mr-2 animate-spin" />}
-                            {tCommon('actions.delete')}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-        </Page>
+        <BackupsView
+            source={source!}
+            title={t('spaces.backups.title', { name: space.name })}
+            description={t('spaces.backups.description')}
+            actions={importAction}
+        />
     )
 }

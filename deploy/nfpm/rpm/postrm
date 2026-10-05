@@ -1,0 +1,9 @@
+#!/bin/sh
+set -e
+
+# Data in /var/lib/savvy-go and /etc/savvy-go is kept on removal.
+if [ -d /run/systemd/system ]; then
+    systemctl daemon-reload || true
+fi
+
+exit 0

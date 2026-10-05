@@ -1,31 +1,25 @@
-import { BaseEntity } from './api'
-import { Currency } from './currencies'
+import { Account } from './accounts'
 
-export type DebtType = 'i_owe' | 'owed_to_me'
+export const DEBT_TYPE_VALUES = ['i_owe', 'owed_to_me'] as const
+export type DebtType = (typeof DEBT_TYPE_VALUES)[number]
 
-export interface Debt extends BaseEntity {
-    name: string
+/** A debt account; currentBalance is the amount still owed. */
+export interface Debt extends Account {
     type: 'debt'
     debtType: DebtType
-    debtTypeLabel: string
-    currencyId: number
     targetAmount: number
-    currentBalance: number
-    remainingDebt: number
     paymentProgress: number
-    dueDate?: string
-    counterparty?: string
-    description?: string
+    dueDate: string | null
+    counterparty: string | null
+    description: string | null
     isPaidOff: boolean
-    isActive: boolean
-    currency?: Currency
 }
 
 export interface DebtSummary {
-    total_i_owe: number
-    total_owed_to_me: number
-    net_debt: number
-    debts_count: number
+    totalIOwe: number
+    totalOwedToMe: number
+    netDebt: number
+    debtsCount: number
     currency: string | null
     decimals: number
 }

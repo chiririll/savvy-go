@@ -48,18 +48,18 @@ export function MetricCard({ title, value, previousValue, sparklineData, type, c
     return (
         <Card>
             <CardContent className="pt-5 pb-4">
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start justify-between gap-3">
                     <div className="space-y-1 min-w-0 flex-1">
                         <p className="text-sm text-muted-foreground truncate">{title}</p>
                         <p className={cn(
-                            'text-2xl font-bold tracking-tight',
+                            'text-xl sm:text-2xl font-bold tracking-tight break-words',
                             type === 'income' && 'text-green-600',
                             type === 'expense' && 'text-red-600',
                         )}>
                             {formatValue(value)}{suffix}
                         </p>
                         {compareWith !== 'none' && percentChange !== null && (
-                            <div className="flex items-center gap-2 text-xs">
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
                                 <span className={cn(
                                     'flex items-center gap-0.5',
                                     isGoodChange ? 'text-green-600' : 'text-red-600'

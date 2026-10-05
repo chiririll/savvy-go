@@ -1,19 +1,20 @@
-export type BackupSchemaStatus = 'current' | 'outdated' | 'newer' | 'unknown'
+/**
+ * current: signed by this server; unsigned: made elsewhere or edited;
+ * raw: a bare database file (a Laravel one); invalid: unreadable.
+ */
+export const BACKUP_STATUSES = ['current', 'unsigned', 'raw', 'invalid'] as const
+export type BackupStatus = (typeof BACKUP_STATUSES)[number]
 
 export interface Backup {
     filename: string
     size: number
     note: string | null
-    schemaVersion: string | null
-    schemaStatus: BackupSchemaStatus
+    appVersion: string | null
+    kind: 'server' | 'space' | ''
+    spaceName?: string
+    status: BackupStatus
+    signature: 'own' | 'trusted' | 'unsigned'
+    /** Whether this app can try to restore it; decided by the server. */
+    restorable: boolean
     createdAt: string
-}
-
-export interface BackupInspection {
-    valid: boolean
-    compatible: boolean
-    pendingCount: number
-    pendingMigrations: string[]
-    unknownCount: number
-    unknownMigrations: string[]
 }

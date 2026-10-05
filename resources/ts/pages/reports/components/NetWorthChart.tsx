@@ -1,8 +1,7 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import ReactECharts from '@/components/shared/ReactECharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useNetWorthHistory } from '@/hooks'
 import { formatCurrency, formatCurrencyCompact } from '@/lib/utils'
@@ -10,7 +9,8 @@ import i18n from '@/lib/i18n'
 import { defaultGroupBy } from '../types'
 import { formatReportPeriodLabel } from '../utils'
 import type { ReportFilters } from '../types'
-import type { CashFlowGroupBy } from '@/api/reports'
+import { isNarrowChart, useElementWidth } from '@/hooks/use-element-width'
+import { CHART_COLORS, axisStyle, useChartTheme, verticalFade } from '@/lib/chart-theme'
 
 interface NetWorthChartProps {
     filters: ReportFilters
@@ -18,10 +18,11 @@ interface NetWorthChartProps {
 
 export function NetWorthChart({ filters }: NetWorthChartProps) {
     const { t, i18n: i18nInstance } = useTranslation('pages')
-    const [groupBy, setGroupBy] = useState<CashFlowGroupBy>(() => defaultGroupBy(filters))
-    useEffect(() => {
-        setGroupBy(defaultGroupBy(filters))
-    }, [filters.periodType, filters.customStartDate, filters.customEndDate])
+    const theme = useChartTheme()
+    const [chartRef, chartWidth] = useElementWidth<HTMLDivElement>()
+    const isNarrow = isNarrowChart(chartWidth)
+    // Detail follows the report period (a year of daily points is slow and unreadable).
+    const groupBy = defaultGroupBy(filters)
     const { data, isLoading } = useNetWorthHistory(filters, groupBy)
 
     const currency = data?.currency
@@ -31,6 +32,7 @@ export function NetWorthChart({ filters }: NetWorthChartProps) {
 
         return {
             tooltip: {
+                ...theme.tooltip,
                 trigger: 'axis',
                 formatter: (params: { value: number; axisValue: string }[]) => {
                     const p = params[0]
@@ -40,40 +42,20 @@ export function NetWorthChart({ filters }: NetWorthChartProps) {
                 },
             },
             grid: {
-                left: 70,
+                left: isNarrow ? 52 : 70,
                 right: 20,
                 top: 20,
-                bottom: 30,
+                bottom: 50,
             },
-            xAxis: {
-                type: 'category',
-                data: (data.dates ?? data.labels).map((value, index) =>
-                    data.dates?.[index]
-                        ? formatReportPeriodLabel(value, groupBy, 'weekNum')
-                        : value
-                ),
+            xAxis: axisStyle(theme, 'category', {
+                data: data.dates.map((date) => formatReportPeriodLabel(date, groupBy, 'weekNum')),
                 axisLabel: {
-                    fontSize: 11,
-                    color: '#64748b',
-                    rotate: groupBy === 'day' ? 45 : 0,
                     interval: groupBy === 'day' ? 4 : 0,
                 },
-                axisLine: {
-                    lineStyle: { color: '#e2e8f0' },
-                },
-                axisTick: { show: false },
-            },
-            yAxis: {
-                type: 'value',
-                axisLabel: {
-                    formatter: (val: number) => formatCurrencyCompact(val, currency),
-                    fontSize: 11,
-                    color: '#64748b',
-                },
-                splitLine: {
-                    lineStyle: { color: '#f1f5f9', type: 'dashed' },
-                },
-            },
+            }),
+            yAxis: axisStyle(theme, 'value', {
+                axisLabel: { formatter: (val: number) => formatCurrencyCompact(val, currency) },
+            }),
             series: [{
                 name: i18n.t('pages:reports.series.netWorth'),
                 type: 'line',
@@ -82,53 +64,27 @@ export function NetWorthChart({ filters }: NetWorthChartProps) {
                 symbol: 'circle',
                 symbolSize: 8,
                 lineStyle: {
-                    color: '#3b82f6',
+                    color: CHART_COLORS.balance,
                     width: 3,
                 },
                 itemStyle: {
-                    color: '#3b82f6',
-                    borderColor: '#fff',
+                    color: CHART_COLORS.balance,
+                    borderColor: theme.surface,
                     borderWidth: 2,
                 },
-                areaStyle: {
-                    color: {
-                        type: 'linear',
-                        x: 0,
-                        y: 0,
-                        x2: 0,
-                        y2: 1,
-                        colorStops: [
-                            { offset: 0, color: 'rgba(59, 130, 246, 0.25)' },
-                            { offset: 1, color: 'rgba(59, 130, 246, 0)' },
-                        ],
-                    },
-                },
+                areaStyle: { color: verticalFade(CHART_COLORS.balance, 0.25) },
             }],
         }
-    }, [data, groupBy, currency, i18nInstance.language])
+    }, [data, groupBy, currency, i18nInstance.language, theme, isNarrow])
 
     return (
         <Card>
             <CardHeader className="pb-2">
-                <div className="flex items-start justify-between">
-                    <div>
-                        <CardTitle className="text-lg">{t('reports.netWorth.chartTitle')}</CardTitle>
-                        <p className="text-sm text-muted-foreground">
-                            {t('reports.netWorth.chartSubtitle')}
-                        </p>
-                    </div>
-                    <div className="flex gap-1">
-                        {(['day', 'week', 'month'] as CashFlowGroupBy[]).map(g => (
-                            <Badge
-                                key={g}
-                                variant={groupBy === g ? 'default' : 'outline'}
-                                className="cursor-pointer"
-                                onClick={() => setGroupBy(g)}
-                            >
-                                {t(`reports.groupBy.${g}`)}
-                            </Badge>
-                        ))}
-                    </div>
+                <div className="min-w-0">
+                    <CardTitle className="text-lg">{t('reports.netWorth.chartTitle')}</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                        {t('reports.netWorth.chartSubtitle')}
+                    </p>
                 </div>
             </CardHeader>
             <CardContent>
@@ -139,11 +95,16 @@ export function NetWorthChart({ filters }: NetWorthChartProps) {
                         {t('reports.noData')}
                     </div>
                 ) : (
-                    <ReactECharts
-                        option={chartOption}
-                        style={{ height: 350 }}
-                        key={groupBy}
-                    />
+                    <div ref={chartRef} style={{ height: 350 }}>
+                        {/* Mount once measured so the chart animates in a single pass */}
+                        {chartWidth > 0 && (
+                            <ReactECharts
+                                option={chartOption}
+                                style={{ height: 350 }}
+                                key={groupBy}
+                            />
+                        )}
+                    </div>
                 )}
             </CardContent>
         </Card>

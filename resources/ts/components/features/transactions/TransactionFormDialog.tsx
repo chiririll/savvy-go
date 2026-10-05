@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { EntityFormDialog } from '@/components/shared'
 import { TransactionFormValues } from '@/schemas/transactions'
 import { Transaction } from '@/types'
+import { SpaceTransferInput } from '@/types/spaces'
 import { TransactionForm } from './TransactionForm'
 
 const FORM_ID = 'transaction-form'
@@ -24,7 +25,7 @@ export function toTransactionFormValues(transaction: Transaction): Partial<Trans
         category_id: transaction.category?.id ?? null,
         amount: transaction.amount,
         to_amount: transaction.toAmount ?? null,
-        exchange_rate: transaction.exchangeRate ?? null,
+        is_estimated: transaction.isEstimated,
         description: transaction.description ?? '',
         date: transaction.date ?? '',
         items: transaction.items?.map((item) => ({
@@ -33,6 +34,19 @@ export function toTransactionFormValues(transaction: Transaction): Partial<Trans
             price_per_unit: item.pricePerUnit,
         })) ?? [],
         tag_ids: transaction.tags?.map((tag) => tag.id) ?? [],
+    }
+}
+
+/** The transfers API request for a transfer_out the form produced. */
+export function toSpaceTransferInput(data: TransactionFormValues): SpaceTransferInput {
+    return {
+        to_space_id: Number(data.to_space_id),
+        from_account_id: data.account_id,
+        to_account_id: Number(data.to_account_id),
+        from_amount: String(data.amount),
+        to_amount: String(data.to_amount ?? data.amount),
+        date: data.date ?? '',
+        description: data.description?.trim() || null,
     }
 }
 

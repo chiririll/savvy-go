@@ -27,6 +27,7 @@ import { useAutomationTriggers } from '@/hooks/use-automation'
 import { ConditionBuilder } from './ConditionBuilder'
 import { ActionBuilder } from './ActionBuilder'
 import { FieldHelp, FormActiveField, FormWrapper } from '@/components/shared'
+import { triggerDescription, triggerLabel } from '@/lib/labels'
 
 interface AutomationRuleFormProps {
     defaultValues?: Partial<AutomationRuleFormData>
@@ -111,14 +112,14 @@ export function AutomationRuleForm({
                         control={form.control}
                         name="trigger_type"
                         render={({ field }) => {
-                            const selectedTrigger = triggers?.find(tr => tr.value === field.value)
+                            const selectedTrigger = triggers?.find(tr => tr === field.value)
                             return (
                                 <FormItem className="min-w-0">
                                     <FormLabel className="flex items-center gap-1.5">
                                         {t('forms:automation.trigger')}
                                         {selectedTrigger && (
                                             <FieldHelp>
-                                                {t(`forms:automation.triggerDescriptions.${selectedTrigger.value}`)}
+                                                {triggerDescription(t, selectedTrigger)}
                                             </FieldHelp>
                                         )}
                                     </FormLabel>
@@ -130,8 +131,8 @@ export function AutomationRuleForm({
                                         </FormControl>
                                         <SelectContent>
                                             {triggers?.map((trigger) => (
-                                                <SelectItem key={trigger.value} value={trigger.value}>
-                                                    {t(`forms:automation.triggers.${trigger.value}`)}
+                                                <SelectItem key={trigger} value={trigger}>
+                                                    {triggerLabel(t, trigger)}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>

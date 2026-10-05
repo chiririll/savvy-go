@@ -13,7 +13,6 @@ type Config struct {
 	AppURL        string
 	ListenAddr    string
 	DataDir       string
-	Database      string
 	UploadsDir    string
 	BackupsDir    string
 	PublicDir     string
@@ -25,7 +24,6 @@ type Config struct {
 	SessionCookie string
 	CSRFCookie    string
 	CSRFHeader    string
-	SeedDemo      bool
 	AppKey        string
 }
 
@@ -44,7 +42,6 @@ func FromEnv() Config {
 		AppURL:        strings.TrimRight(firstNonEmpty(os.Getenv("APP_URL"), "http://localhost:8080"), "/"),
 		ListenAddr:    firstNonEmpty(os.Getenv("LISTEN_ADDR"), os.Getenv("HTTP_ADDR"), "localhost:8080"),
 		DataDir:       dataDir,
-		Database:      firstNonEmpty(os.Getenv("DB_DATABASE"), filepath.Join(dataDir, "database.sqlite")),
 		UploadsDir:    firstNonEmpty(os.Getenv("UPLOAD_ROOT"), filepath.Join(dataDir, "uploads")),
 		BackupsDir:    firstNonEmpty(os.Getenv("BACKUP_PATH"), filepath.Join(dataDir, "backups")),
 		PublicDir:     firstNonEmpty(os.Getenv("PUBLIC_DIR"), "public"),
@@ -56,7 +53,6 @@ func FromEnv() Config {
 		SessionCookie: firstNonEmpty(os.Getenv("AUTH_SESSION_COOKIE"), "svy_session"),
 		CSRFCookie:    firstNonEmpty(os.Getenv("AUTH_SESSION_CSRF_COOKIE"), "svy_csrf"),
 		CSRFHeader:    firstNonEmpty(os.Getenv("AUTH_SESSION_CSRF_HEADER"), "X-CSRF-Token"),
-		SeedDemo:      truthy(os.Getenv("SEED_DEMO")),
 	}
 	cfg.AppKey = loadAppKey(dataDir)
 	return cfg
@@ -127,13 +123,4 @@ func minutesEnv(key string, fallback int) time.Duration {
 		return time.Duration(fallback) * time.Minute
 	}
 	return time.Duration(n) * time.Minute
-}
-
-func truthy(v string) bool {
-	switch strings.ToLower(strings.TrimSpace(v)) {
-	case "1", "true", "yes", "on":
-		return true
-	default:
-		return false
-	}
 }

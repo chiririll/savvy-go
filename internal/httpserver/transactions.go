@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -12,6 +13,7 @@ import (
 	"savvy-go/internal/httpserver/dto"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/shopspring/decimal"
 )
 
 func (s *Server) transactionsIndex(w http.ResponseWriter, r *http.Request) {
@@ -31,7 +33,7 @@ func (s *Server) transactionsIndex(w http.ResponseWriter, r *http.Request) {
 	f.TagIDs = int64List(q, "tag_ids")
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	per, _ := strconv.Atoi(r.URL.Query().Get("per_page"))
-	list, total, err := s.txs.Filtered(r.Context(), f, page, per)
+	list, total, err := sp(r).txs.Filtered(r.Context(), f, page, per)
 	if err != nil {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
@@ -47,13 +49,13 @@ func (s *Server) transactionsIndex(w http.ResponseWriter, r *http.Request) {
 		last = 1
 	}
 	payload := map[string]any{
-		"data": mapSlice(list, dto.Transaction),
+		"data": dto.Map(list, dto.NewTransaction),
 		"meta": map[string]any{
 			"current_page": page, "last_page": last, "per_page": per, "total": total,
 		},
 	}
 	if r.URL.Query().Get("with_summary") == "1" || r.URL.Query().Get("with_summary") == "true" {
-		payload["summary"] = s.txs.Summary(r.Context(), false)
+		payload["summary"] = dto.NewTransactionSummary(sp(r).txs.Summary(r.Context(), false))
 	}
 	writeJSON(w, http.StatusOK, payload)
 }
@@ -71,22 +73,22 @@ func int64List(q url.Values, key string) []int64 {
 }
 
 func (s *Server) transactionsStore(w http.ResponseWriter, r *http.Request) {
-	in, ok := decodeTx(w, r)
+	in, ok := decodeTx(w, r, nil)
 	if !ok {
 		return
 	}
-	tx, err := s.txs.Create(r.Context(), in)
+	tx, err := sp(r).txs.Create(r.Context(), in)
 	if err != nil {
 		writeMessage(w, 422, err.Error())
 		return
 	}
 	if tx.Status == "confirmed" {
-		s.automation.Process(r.Context(), "on_transaction_create", tx)
-		if fresh, e := s.txs.ByID(r.Context(), tx.ID); e == nil && fresh != nil {
+		sp(r).automation.Process(r.Context(), "on_transaction_create", tx)
+		if fresh, e := sp(r).txs.ByID(r.Context(), tx.ID); e == nil && fresh != nil {
 			tx = fresh
 		}
 	}
-	writeData(w, http.StatusCreated, dto.Transaction(*tx))
+	writeData(w, http.StatusCreated, dto.NewTransaction(*tx))
 }
 
 func (s *Server) transactionsShow(w http.ResponseWriter, r *http.Request) {
@@ -94,7 +96,7 @@ func (s *Server) transactionsShow(w http.ResponseWriter, r *http.Request) {
 	if tx == nil {
 		return
 	}
-	writeData(w, http.StatusOK, dto.Transaction(*tx))
+	writeData(w, http.StatusOK, dto.NewTransaction(*tx))
 }
 
 func (s *Server) transactionsUpdate(w http.ResponseWriter, r *http.Request) {
@@ -102,31 +104,22 @@ func (s *Server) transactionsUpdate(w http.ResponseWriter, r *http.Request) {
 	if cur == nil {
 		return
 	}
-	in, ok := decodeTx(w, r)
+	in, ok := decodeTx(w, r, cur)
 	if !ok {
 		return
 	}
-	if in.AccountID == 0 {
-		in.AccountID = cur.AccountID
-	}
-	if in.Type == "" {
-		in.Type = cur.Type
-	}
-	if in.Amount == 0 {
-		in.Amount = cur.Amount
-	}
-	tx, err := s.txs.Update(r.Context(), cur.ID, in)
+	tx, err := sp(r).txs.Update(r.Context(), cur.ID, in)
 	if err != nil {
 		writeMessage(w, 422, err.Error())
 		return
 	}
 	if tx.Status == "confirmed" {
-		s.automation.Process(r.Context(), "on_transaction_update", tx)
-		if fresh, e := s.txs.ByID(r.Context(), tx.ID); e == nil && fresh != nil {
+		sp(r).automation.Process(r.Context(), "on_transaction_update", tx)
+		if fresh, e := sp(r).txs.ByID(r.Context(), tx.ID); e == nil && fresh != nil {
 			tx = fresh
 		}
 	}
-	writeData(w, http.StatusOK, dto.Transaction(*tx))
+	writeData(w, http.StatusOK, dto.NewTransaction(*tx))
 }
 
 func (s *Server) transactionsDestroy(w http.ResponseWriter, r *http.Request) {
@@ -134,7 +127,11 @@ func (s *Server) transactionsDestroy(w http.ResponseWriter, r *http.Request) {
 	if tx == nil {
 		return
 	}
-	if err := s.txs.Delete(r.Context(), tx.ID); err != nil {
+	if err := sp(r).txs.Delete(r.Context(), tx.ID); err != nil {
+		if errors.Is(err, domain.ErrTransferRow) {
+			writeMessage(w, 422, err.Error())
+			return
+		}
 		writeMessage(w, 422, "Scheduled occurrences cannot be deleted. Skip or confirm them instead.")
 		return
 	}
@@ -147,26 +144,28 @@ func (s *Server) transactionsConfirm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Date *string `json:"date"`
+		Date     *string          `json:"date"`
+		Amount   *decimal.Decimal `json:"amount"`
+		ToAmount *decimal.Decimal `json:"to_amount"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
 	date := ""
 	if body.Date != nil {
 		date = *body.Date
 	}
-	out, err := s.txs.Confirm(r.Context(), tx.ID, date)
+	out, err := sp(r).txs.Confirm(r.Context(), tx.ID, date, body.Amount, body.ToAmount)
 	if err != nil {
 		writeMessage(w, 422, err.Error())
 		return
 	}
 	if out.RecurringID != nil {
-		_ = s.recurring.AdvanceAfterOccurrence(r.Context(), *out.RecurringID)
+		_ = sp(r).recurring.AdvanceAfterOccurrence(r.Context(), *out.RecurringID)
 	}
-	s.automation.Process(r.Context(), "on_transaction_create", out)
-	if fresh, e := s.txs.ByID(r.Context(), out.ID); e == nil && fresh != nil {
+	sp(r).automation.Process(r.Context(), "on_transaction_create", out)
+	if fresh, e := sp(r).txs.ByID(r.Context(), out.ID); e == nil && fresh != nil {
 		out = fresh
 	}
-	writeData(w, http.StatusOK, dto.Transaction(*out))
+	writeData(w, http.StatusOK, dto.NewTransaction(*out))
 }
 
 func (s *Server) transactionsSkip(w http.ResponseWriter, r *http.Request) {
@@ -174,15 +173,19 @@ func (s *Server) transactionsSkip(w http.ResponseWriter, r *http.Request) {
 	if tx == nil {
 		return
 	}
-	out, err := s.txs.Skip(r.Context(), tx.ID)
+	out, err := sp(r).txs.Skip(r.Context(), tx.ID)
 	if err != nil {
+		if errors.Is(err, domain.ErrTransferRow) {
+			writeMessage(w, 422, err.Error())
+			return
+		}
 		writeMessage(w, 422, "Only a pending scheduled transaction can be skipped.")
 		return
 	}
 	if out.RecurringID != nil {
-		_ = s.recurring.AdvanceAfterOccurrence(r.Context(), *out.RecurringID)
+		_ = sp(r).recurring.AdvanceAfterOccurrence(r.Context(), *out.RecurringID)
 	}
-	writeData(w, http.StatusOK, dto.Transaction(*out))
+	writeData(w, http.StatusOK, dto.NewTransaction(*out))
 }
 
 func (s *Server) transactionsDuplicate(w http.ResponseWriter, r *http.Request) {
@@ -190,48 +193,59 @@ func (s *Server) transactionsDuplicate(w http.ResponseWriter, r *http.Request) {
 	if tx == nil {
 		return
 	}
-	out, err := s.txs.Duplicate(r.Context(), tx.ID)
+	out, err := sp(r).txs.Duplicate(r.Context(), tx.ID)
 	if err != nil {
 		writeMessage(w, 422, err.Error())
 		return
 	}
-	writeData(w, http.StatusCreated, dto.Transaction(*out))
+	writeData(w, http.StatusCreated, dto.NewTransaction(*out))
 }
 
 func (s *Server) transactionsSummary(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, s.txs.Summary(r.Context(), false))
+	writeJSON(w, http.StatusOK, dto.NewTransactionSummary(sp(r).txs.Summary(r.Context(), false)))
 }
 
 func (s *Server) transactionsPendingSummary(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, s.txs.Summary(r.Context(), true))
+	writeJSON(w, http.StatusOK, dto.NewTransactionSummary(sp(r).txs.Summary(r.Context(), true)))
 }
 
 func (s *Server) txParam(w http.ResponseWriter, r *http.Request) *domain.Transaction {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	tx, _ := s.txs.ByID(r.Context(), id)
+	tx, _ := sp(r).txs.ByID(r.Context(), id)
 	if tx == nil {
 		writeMessage(w, http.StatusNotFound, "Not found.")
 	}
 	return tx
 }
 
-func decodeTx(w http.ResponseWriter, r *http.Request) (domain.TxInput, bool) {
+// decodeTx reads a transaction from the body; on update, over base (see
+// patch.go). Items and tags left out are kept by the update itself.
+func decodeTx(w http.ResponseWriter, r *http.Request, base *domain.Transaction) (domain.TxInput, bool) {
 	var body struct {
-		Type         string   `json:"type"`
-		AccountID    int64    `json:"account_id"`
-		ToAccountID  *int64   `json:"to_account_id"`
-		CategoryID   *int64   `json:"category_id"`
-		Amount       float64  `json:"amount"`
-		ToAmount     *float64 `json:"to_amount"`
-		ExchangeRate *float64 `json:"exchange_rate"`
-		Description  *string  `json:"description"`
-		Date         *string  `json:"date"`
-		TagIDs       []int64  `json:"tag_ids"`
-		Items        []struct {
-			Name         string  `json:"name"`
-			Quantity     float64 `json:"quantity"`
-			PricePerUnit float64 `json:"price_per_unit"`
+		Type        string           `json:"type"`
+		AccountID   int64            `json:"account_id"`
+		ToAccountID *int64           `json:"to_account_id"`
+		CategoryID  *int64           `json:"category_id"`
+		Amount      decimal.Decimal  `json:"amount"`
+		ToAmount    *decimal.Decimal `json:"to_amount"`
+		IsEstimated bool             `json:"is_estimated"`
+		Description *string          `json:"description"`
+		Date        *string          `json:"date"`
+		TagIDs      []int64          `json:"tag_ids"`
+		Items       []struct {
+			Name         string          `json:"name"`
+			Quantity     decimal.Decimal `json:"quantity"`
+			PricePerUnit decimal.Decimal `json:"price_per_unit"`
 		} `json:"items"`
+	}
+	if base != nil {
+		body.Type, body.AccountID, body.ToAccountID = base.Type, base.AccountID, clone(base.ToAccountID)
+		body.CategoryID, body.Amount = clone(base.CategoryID), base.Amount.Decimal()
+		if base.ToAmount != nil {
+			toAmount := base.ToAmount.Decimal()
+			body.ToAmount = &toAmount
+		}
+		body.IsEstimated, body.Description, body.Date = base.IsEstimated, clone(base.Description), clone(base.Date)
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.AccountID == 0 {
 		writeValidation(w, map[string][]string{"account_id": {"The account id field is required."}})
@@ -240,15 +254,15 @@ func decodeTx(w http.ResponseWriter, r *http.Request) (domain.TxInput, bool) {
 	in := domain.TxInput{
 		Type: body.Type, AccountID: body.AccountID, ToAccountID: body.ToAccountID,
 		CategoryID: body.CategoryID, Amount: body.Amount, ToAmount: body.ToAmount,
-		ExchangeRate: body.ExchangeRate, Description: body.Description, Date: body.Date,
+		IsEstimated: body.IsEstimated, Description: body.Description, Date: body.Date,
 		TagIDs: body.TagIDs,
 	}
 	for _, it := range body.Items {
 		qty := it.Quantity
-		if qty == 0 {
-			qty = 1
+		if qty.IsZero() {
+			qty = decimal.NewFromInt(1)
 		}
-		in.Items = append(in.Items, domain.TxItem{Name: it.Name, Quantity: qty, PricePerUnit: it.PricePerUnit})
+		in.Items = append(in.Items, domain.TxItemInput{Name: it.Name, Quantity: qty, PricePerUnit: it.PricePerUnit})
 	}
 	return in, true
 }

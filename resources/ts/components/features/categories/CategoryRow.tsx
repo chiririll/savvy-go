@@ -1,3 +1,4 @@
+import { testId } from '@/lib/test-id'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Star, Trash2 } from 'lucide-react'
@@ -14,8 +15,10 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
+import { categoryIconStyle } from '@/lib/category-color'
 import { localizeDefaultName } from '@/lib/localized-name'
 import { Category } from '@/types'
+import { categoryTypeLabel } from '@/lib/labels'
 
 interface CategoryRowProps {
     category: Category
@@ -48,7 +51,7 @@ export function CategoryRow({
     return (
         <FeedRow
             icon={<span aria-hidden>{category.icon}</span>}
-            iconStyle={{ backgroundColor: `${category.color}20` }}
+            iconStyle={categoryIconStyle(category.color)}
             title={name}
             badge={category.isDefault ? (
                 <Star
@@ -56,7 +59,7 @@ export function CategoryRow({
                     aria-label={t('pages:categories.columns.default')}
                 />
             ) : undefined}
-            subtitle={t(`pages:categories.types.${category.type}`)}
+            subtitle={categoryTypeLabel(t, category.type)}
             onOpen={canEdit ? () => onEdit(category) : undefined}
             hasActions={canEdit || canDelete || canSetDefault}
             actions={({ menuOpen, setMenuOpen, isMobile }) => (
@@ -111,6 +114,7 @@ function ReassignDeleteItem({ category, onConfirm }: ReassignDeleteItemProps) {
             <AlertDialogTrigger asChild>
                 <DropdownMenuItem
                     variant="destructive"
+                    {...testId('delete-reassign')}
                     onSelect={(event) => event.preventDefault()}
                 >
                     <Trash2 className="mr-2 size-4" />

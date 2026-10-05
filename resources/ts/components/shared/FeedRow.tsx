@@ -33,6 +33,8 @@ interface FeedRowProps {
     extraAmount?: ReactNode
     leading?: ReactNode
     below?: ReactNode
+    /** Greyed out: an inactive item. */
+    muted?: boolean
     onOpen?: () => void
     hasActions?: boolean
     actions?: (context: FeedRowActionsContext) => ReactNode
@@ -66,6 +68,7 @@ export function FeedRow({
     extraAmount,
     leading,
     below,
+    muted,
     onOpen,
     hasActions = false,
     actions,
@@ -113,6 +116,7 @@ export function FeedRow({
                 <div
                     className={cn(
                         'flex size-10 shrink-0 items-center justify-center rounded-full text-base',
+                        muted && 'opacity-50 grayscale',
                         iconClassName,
                     )}
                     style={iconStyle}
@@ -120,7 +124,7 @@ export function FeedRow({
                     {icon}
                 </div>
 
-                <div className="min-w-0 flex-1">
+                <div className={cn('min-w-0 flex-1', muted && 'opacity-60')}>
                     <div className="flex min-w-0 items-center gap-1.5">
                         <p className={cn('truncate font-semibold', titleClassName)}>{title}</p>
                         {badge}
@@ -138,9 +142,9 @@ export function FeedRow({
                 </div>
 
                 {(amount != null || extraAmount) && (
-                    <div className="min-w-0 shrink-0 text-right">
+                    <div className={cn('min-w-0 shrink-0 text-right', muted && 'opacity-60')}>
                         {amount != null && (
-                            <p className={cn('font-mono font-semibold', amountClassName)}>
+                            <p className={cn('font-mono font-semibold', muted ? 'text-muted-foreground' : amountClassName)}>
                                 {amount}
                             </p>
                         )}
@@ -164,6 +168,60 @@ export function FeedRow({
             {below}
         </div>
     )
+}
+
+/** A thin progress bar under a row; exceeded turns it red. */
+export function FeedProgress({
+    value,
+    exceeded,
+    muted,
+}: {
+    value: number
+    exceeded?: boolean
+    muted?: boolean
+}) {
+    return (
+        <div className="-mt-1 mb-1.5 h-1 overflow-hidden rounded-full bg-muted sm:mx-1.5" role="presentation">
+            <div
+                className={cn(
+                    'h-full rounded-full transition-[width]',
+                    exceeded ? 'bg-red-500' : 'bg-green-500',
+                    muted && 'bg-muted-foreground/40',
+                )}
+                style={{ width: `${Math.max(0, Math.min(value, 100))}%` }}
+            />
+        </div>
+    )
+}
+
+/** A titled section of feed rows. */
+export function FeedGroup({ title, children }: { title: ReactNode; children: ReactNode }) {
+    return (
+        <section className="min-w-0">
+            <h2 className="px-1.5 pb-1 text-sm font-semibold capitalize">{title}</h2>
+            <div className="divide-y divide-border/60">{children}</div>
+        </section>
+    )
+}
+
+export interface FeedGroupKey {
+    key: string
+    title: ReactNode
+}
+
+/** Splits items into groups in order of first appearance. */
+export function groupFeedItems<T>(items: T[], groupBy: (item: T) => FeedGroupKey) {
+    const groups = new Map<string, FeedGroupKey & { items: T[] }>()
+    for (const item of items) {
+        const group = groupBy(item)
+        const existing = groups.get(group.key)
+        if (existing) {
+            existing.items.push(item)
+        } else {
+            groups.set(group.key, { ...group, items: [item] })
+        }
+    }
+    return [...groups.values()]
 }
 
 export function FeedRowSkeleton({ showHeading = false }: { showHeading?: boolean }) {
@@ -194,6 +252,7 @@ export function FeedList<T>({
     createLabel,
     isReadOnly,
     getKey,
+    groupBy,
     children,
 }: {
     items: T[]
@@ -205,10 +264,12 @@ export function FeedList<T>({
     createLabel?: string
     isReadOnly?: boolean
     getKey: (item: T) => string | number
+    /** Shows items in titled sections, in order of first appearance. */
+    groupBy?: (item: T) => FeedGroupKey
     children: (item: T) => ReactNode
 }) {
     if (isLoading) {
-        return <FeedRowSkeleton />
+        return <FeedRowSkeleton showHeading={!!groupBy} />
     }
 
     if (items.length === 0) {
@@ -221,6 +282,20 @@ export function FeedList<T>({
                 createLabel={createLabel}
                 isReadOnly={isReadOnly}
             />
+        )
+    }
+
+    if (groupBy) {
+        return (
+            <div className="space-y-5">
+                {groupFeedItems(items, groupBy).map((group) => (
+                    <FeedGroup key={group.key} title={group.title}>
+                        {group.items.map((item) => (
+                            <div key={getKey(item)}>{children(item)}</div>
+                        ))}
+                    </FeedGroup>
+                ))}
+            </div>
         )
     }
 

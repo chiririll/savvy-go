@@ -5,6 +5,7 @@ import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { RowActions, UserAvatar } from '@/components/shared'
 import { User } from '@/types/users'
 import i18n from '@/lib/i18n'
+import { userRoleLabel } from '@/lib/labels'
 
 export const createUserColumns = (
     onDelete: (id: number) => void,
@@ -42,7 +43,7 @@ export const createUserColumns = (
         accessorKey: 'role',
         header: () => i18n.t('pages:users.columns.role'),
         cell: ({ row }) => (
-            <span>{i18n.t(`roles.${row.original.role}`)}</span>
+            <span>{userRoleLabel(i18n.t, row.original.role)}</span>
         ),
     },
     {

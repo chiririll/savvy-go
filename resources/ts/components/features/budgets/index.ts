@@ -1,3 +1,3 @@
 export { BudgetForm } from './BudgetForm'
 export { BudgetFormDialog } from './BudgetFormDialog'
-export { createBudgetColumns } from './columns'
+export { BudgetRow, budgetGroup, compareBudgets } from './BudgetRow'

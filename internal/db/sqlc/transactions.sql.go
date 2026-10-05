@@ -8,57 +8,41 @@ package sqlc
 import (
 	"context"
 	"database/sql"
+	"strings"
+
+	"github.com/shopspring/decimal"
 )
 
 const confirmTransaction = `-- name: ConfirmTransaction :exec
-UPDATE transactions SET status='confirmed', date=?, updated_at=? WHERE id=?
+UPDATE transactions SET status='confirmed', amount=?, to_amount=?, is_estimated=0, date=?, updated_at=? WHERE id=?
 `
 
 type ConfirmTransactionParams struct {
+	Amount    int64
+	ToAmount  sql.NullInt64
 	Date      sql.NullString
 	UpdatedAt sql.NullString
 	ID        int64
 }
 
+// A confirmed transaction has its real amount, so it is no longer an estimate.
 func (q *Queries) ConfirmTransaction(ctx context.Context, arg ConfirmTransactionParams) error {
-	_, err := q.db.ExecContext(ctx, confirmTransaction, arg.Date, arg.UpdatedAt, arg.ID)
+	_, err := q.db.ExecContext(ctx, confirmTransaction,
+		arg.Amount,
+		arg.ToAmount,
+		arg.Date,
+		arg.UpdatedAt,
+		arg.ID,
+	)
 	return err
 }
 
-const countTransactions = `-- name: CountTransactions :one
-
-SELECT COUNT(*) FROM transactions t
-WHERE t.id = COALESCE(?1, t.id)
-  AND t.type = COALESCE(?2, t.type)
-  AND t.account_id = COALESCE(?3, t.account_id)
-  AND IFNULL(t.category_id, -1) = IFNULL(?4, IFNULL(t.category_id, -1))
-  AND t.status = COALESCE(?5, t.status)
-  AND (t.date IS NULL OR t.date >= COALESCE(?6, t.date))
-  AND (t.date IS NULL OR t.date <= COALESCE(?7, t.date))
+const countAllTransactions = `-- name: CountAllTransactions :one
+SELECT COUNT(*) FROM transactions
 `
 
-type CountTransactionsParams struct {
-	ID         sql.NullInt64
-	Type       sql.NullString
-	AccountID  sql.NullInt64
-	CategoryID interface{}
-	Status     sql.NullString
-	StartDate  sql.NullString
-	EndDate    sql.NullString
-}
-
-// Optional filters use each narg once (COALESCE/CASE). sqlc sqlite emits ?NNN;
-// modernc.org/sqlite counts every '?' so "OR col = ?N" (second use) over-binds.
-func (q *Queries) CountTransactions(ctx context.Context, arg CountTransactionsParams) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countTransactions,
-		arg.ID,
-		arg.Type,
-		arg.AccountID,
-		arg.CategoryID,
-		arg.Status,
-		arg.StartDate,
-		arg.EndDate,
-	)
+func (q *Queries) CountAllTransactions(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countAllTransactions)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -91,8 +75,67 @@ func (q *Queries) DeleteTransactionTags(ctx context.Context, transactionID int64
 	return err
 }
 
+const getTransaction = `-- name: GetTransaction :one
+SELECT t.id, t.type, t.account_id, t.to_account_id, t.category_id, t.amount, t.to_amount,
+	t.is_estimated, t.description, t.date, t.status, t.recurring_transaction_id, t.created_at,
+	ca.id AS currency_id, ca.decimals AS decimals,
+	COALESCE(cb.id, ca.id) AS to_currency_id, COALESCE(cb.decimals, ca.decimals) AS to_decimals
+FROM transactions t
+JOIN accounts a ON a.id = t.account_id
+JOIN currencies ca ON ca.id = a.currency_id
+LEFT JOIN accounts ta ON ta.id = t.to_account_id
+LEFT JOIN currencies cb ON cb.id = ta.currency_id
+WHERE t.id = ?
+`
+
+type GetTransactionRow struct {
+	ID                     int64
+	Type                   string
+	AccountID              int64
+	ToAccountID            sql.NullInt64
+	CategoryID             sql.NullInt64
+	Amount                 int64
+	ToAmount               sql.NullInt64
+	IsEstimated            int64
+	Description            sql.NullString
+	Date                   sql.NullString
+	Status                 string
+	RecurringTransactionID sql.NullInt64
+	CreatedAt              sql.NullString
+	CurrencyID             int64
+	Decimals               int64
+	ToCurrencyID           int64
+	ToDecimals             int64
+}
+
+// Lists go through filter.ListTransactions, which selects the same columns.
+func (q *Queries) GetTransaction(ctx context.Context, id int64) (GetTransactionRow, error) {
+	row := q.db.QueryRowContext(ctx, getTransaction, id)
+	var i GetTransactionRow
+	err := row.Scan(
+		&i.ID,
+		&i.Type,
+		&i.AccountID,
+		&i.ToAccountID,
+		&i.CategoryID,
+		&i.Amount,
+		&i.ToAmount,
+		&i.IsEstimated,
+		&i.Description,
+		&i.Date,
+		&i.Status,
+		&i.RecurringTransactionID,
+		&i.CreatedAt,
+		&i.CurrencyID,
+		&i.Decimals,
+		&i.ToCurrencyID,
+		&i.ToDecimals,
+	)
+	return i, err
+}
+
 const insertTransaction = `-- name: InsertTransaction :execresult
-INSERT INTO transactions (type, account_id, to_account_id, category_id, amount, to_amount, exchange_rate,
+INSERT INTO transactions (type, account_id, to_account_id, category_id, amount, to_amount, is_estimated,
 	description, date, status, recurring_transaction_id, created_at, updated_at)
 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
 `
@@ -102,9 +145,9 @@ type InsertTransactionParams struct {
 	AccountID              int64
 	ToAccountID            sql.NullInt64
 	CategoryID             sql.NullInt64
-	Amount                 float64
-	ToAmount               sql.NullFloat64
-	ExchangeRate           sql.NullFloat64
+	Amount                 int64
+	ToAmount               sql.NullInt64
+	IsEstimated            int64
 	Description            sql.NullString
 	Date                   sql.NullString
 	Status                 string
@@ -121,7 +164,7 @@ func (q *Queries) InsertTransaction(ctx context.Context, arg InsertTransactionPa
 		arg.CategoryID,
 		arg.Amount,
 		arg.ToAmount,
-		arg.ExchangeRate,
+		arg.IsEstimated,
 		arg.Description,
 		arg.Date,
 		arg.Status,
@@ -132,15 +175,16 @@ func (q *Queries) InsertTransaction(ctx context.Context, arg InsertTransactionPa
 }
 
 const insertTransactionIgnoreDup = `-- name: InsertTransactionIgnoreDup :execresult
-INSERT OR IGNORE INTO transactions (type, account_id, category_id, amount, description, date, status, dedup_hash, created_at, updated_at)
+INSERT INTO transactions (type, account_id, category_id, amount, description, date, status, dedup_hash, created_at, updated_at)
 VALUES (?,?,?,?,?,?,?,?,?,?)
+ON CONFLICT DO NOTHING
 `
 
 type InsertTransactionIgnoreDupParams struct {
 	Type        string
 	AccountID   int64
 	CategoryID  sql.NullInt64
-	Amount      float64
+	Amount      int64
 	Description sql.NullString
 	Date        sql.NullString
 	Status      string
@@ -172,9 +216,9 @@ VALUES (?,?,?,?,?,?,?)
 type InsertTransactionItemParams struct {
 	TransactionID int64
 	Name          string
-	Quantity      float64
-	PricePerUnit  float64
-	TotalPrice    float64
+	Quantity      decimal.Decimal
+	PricePerUnit  int64
+	TotalPrice    int64
 	CreatedAt     sql.NullString
 	UpdatedAt     sql.NullString
 }
@@ -193,7 +237,7 @@ func (q *Queries) InsertTransactionItem(ctx context.Context, arg InsertTransacti
 }
 
 const insertTransactionTag = `-- name: InsertTransactionTag :exec
-INSERT OR IGNORE INTO transaction_tag (transaction_id, tag_id) VALUES (?,?)
+INSERT INTO transaction_tag (transaction_id, tag_id) VALUES (?,?) ON CONFLICT DO NOTHING
 `
 
 type InsertTransactionTagParams struct {
@@ -206,28 +250,42 @@ func (q *Queries) InsertTransactionTag(ctx context.Context, arg InsertTransactio
 	return err
 }
 
-const listTransactionItems = `-- name: ListTransactionItems :many
-SELECT id, name, quantity, price_per_unit, total_price FROM transaction_items WHERE transaction_id = ?
+const listItemsOfTransactions = `-- name: ListItemsOfTransactions :many
+SELECT transaction_id, id, name, quantity, price_per_unit, total_price FROM transaction_items
+WHERE transaction_id IN (/*SLICE:ids*/?)
+ORDER BY transaction_id, id
 `
 
-type ListTransactionItemsRow struct {
-	ID           int64
-	Name         string
-	Quantity     float64
-	PricePerUnit float64
-	TotalPrice   float64
+type ListItemsOfTransactionsRow struct {
+	TransactionID int64
+	ID            int64
+	Name          string
+	Quantity      decimal.Decimal
+	PricePerUnit  int64
+	TotalPrice    int64
 }
 
-func (q *Queries) ListTransactionItems(ctx context.Context, transactionID int64) ([]ListTransactionItemsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listTransactionItems, transactionID)
+func (q *Queries) ListItemsOfTransactions(ctx context.Context, ids []int64) ([]ListItemsOfTransactionsRow, error) {
+	query := listItemsOfTransactions
+	var queryParams []interface{}
+	if len(ids) > 0 {
+		for _, v := range ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListTransactionItemsRow{}
+	items := []ListItemsOfTransactionsRow{}
 	for rows.Next() {
-		var i ListTransactionItemsRow
+		var i ListItemsOfTransactionsRow
 		if err := rows.Scan(
+			&i.TransactionID,
 			&i.ID,
 			&i.Name,
 			&i.Quantity,
@@ -247,8 +305,60 @@ func (q *Queries) ListTransactionItems(ctx context.Context, transactionID int64)
 	return items, nil
 }
 
+const listTagsOfTransactions = `-- name: ListTagsOfTransactions :many
+SELECT tt.transaction_id, tags.id, tags.name, tags.created_at FROM tags
+JOIN transaction_tag tt ON tt.tag_id = tags.id
+WHERE tt.transaction_id IN (/*SLICE:ids*/?)
+ORDER BY tt.transaction_id, tags.name
+`
+
+type ListTagsOfTransactionsRow struct {
+	TransactionID int64
+	ID            int64
+	Name          string
+	CreatedAt     sql.NullString
+}
+
+func (q *Queries) ListTagsOfTransactions(ctx context.Context, ids []int64) ([]ListTagsOfTransactionsRow, error) {
+	query := listTagsOfTransactions
+	var queryParams []interface{}
+	if len(ids) > 0 {
+		for _, v := range ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListTagsOfTransactionsRow{}
+	for rows.Next() {
+		var i ListTagsOfTransactionsRow
+		if err := rows.Scan(
+			&i.TransactionID,
+			&i.ID,
+			&i.Name,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTransactionSummaryRows = `-- name: ListTransactionSummaryRows :many
-SELECT t.type, t.amount, c.rate, c.is_base
+SELECT t.type, t.amount, c.rate, c.is_base, c.decimals
 FROM transactions t
 JOIN accounts a ON a.id = t.account_id
 JOIN currencies c ON c.id = a.currency_id
@@ -256,10 +366,11 @@ WHERE t.status = ? AND t.type IN ('income','expense')
 `
 
 type ListTransactionSummaryRowsRow struct {
-	Type   string
-	Amount float64
-	Rate   float64
-	IsBase int64
+	Type     string
+	Amount   int64
+	Rate     decimal.Decimal
+	IsBase   int64
+	Decimals int64
 }
 
 func (q *Queries) ListTransactionSummaryRows(ctx context.Context, status string) ([]ListTransactionSummaryRowsRow, error) {
@@ -276,136 +387,7 @@ func (q *Queries) ListTransactionSummaryRows(ctx context.Context, status string)
 			&i.Amount,
 			&i.Rate,
 			&i.IsBase,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listTransactionTags = `-- name: ListTransactionTags :many
-SELECT tags.id, tags.name, tags.created_at, 0 AS transactions_count FROM tags
-JOIN transaction_tag tt ON tt.tag_id = tags.id WHERE tt.transaction_id = ?
-`
-
-type ListTransactionTagsRow struct {
-	ID                int64
-	Name              string
-	CreatedAt         sql.NullString
-	TransactionsCount int64
-}
-
-func (q *Queries) ListTransactionTags(ctx context.Context, transactionID int64) ([]ListTransactionTagsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listTransactionTags, transactionID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListTransactionTagsRow{}
-	for rows.Next() {
-		var i ListTransactionTagsRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.Name,
-			&i.CreatedAt,
-			&i.TransactionsCount,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listTransactions = `-- name: ListTransactions :many
-SELECT t.id, t.type, t.account_id, t.to_account_id, t.category_id, t.amount, t.to_amount, t.exchange_rate,
-	t.description, t.date, t.status, t.recurring_transaction_id, t.created_at
-FROM transactions t
-WHERE t.id = COALESCE(?1, t.id)
-  AND t.type = COALESCE(?2, t.type)
-  AND t.account_id = COALESCE(?3, t.account_id)
-  AND IFNULL(t.category_id, -1) = IFNULL(?4, IFNULL(t.category_id, -1))
-  AND t.status = COALESCE(?5, t.status)
-  AND (t.date IS NULL OR t.date >= COALESCE(?6, t.date))
-  AND (t.date IS NULL OR t.date <= COALESCE(?7, t.date))
-ORDER BY t.date DESC, t.id DESC
-LIMIT ?9 OFFSET ?8
-`
-
-type ListTransactionsParams struct {
-	ID         sql.NullInt64
-	Type       sql.NullString
-	AccountID  sql.NullInt64
-	CategoryID interface{}
-	Status     sql.NullString
-	StartDate  sql.NullString
-	EndDate    sql.NullString
-	Offset     int64
-	Limit      int64
-}
-
-type ListTransactionsRow struct {
-	ID                     int64
-	Type                   string
-	AccountID              int64
-	ToAccountID            sql.NullInt64
-	CategoryID             sql.NullInt64
-	Amount                 float64
-	ToAmount               sql.NullFloat64
-	ExchangeRate           sql.NullFloat64
-	Description            sql.NullString
-	Date                   sql.NullString
-	Status                 string
-	RecurringTransactionID sql.NullInt64
-	CreatedAt              sql.NullString
-}
-
-func (q *Queries) ListTransactions(ctx context.Context, arg ListTransactionsParams) ([]ListTransactionsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listTransactions,
-		arg.ID,
-		arg.Type,
-		arg.AccountID,
-		arg.CategoryID,
-		arg.Status,
-		arg.StartDate,
-		arg.EndDate,
-		arg.Offset,
-		arg.Limit,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListTransactionsRow{}
-	for rows.Next() {
-		var i ListTransactionsRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.Type,
-			&i.AccountID,
-			&i.ToAccountID,
-			&i.CategoryID,
-			&i.Amount,
-			&i.ToAmount,
-			&i.ExchangeRate,
-			&i.Description,
-			&i.Date,
-			&i.Status,
-			&i.RecurringTransactionID,
-			&i.CreatedAt,
+			&i.Decimals,
 		); err != nil {
 			return nil, err
 		}
@@ -436,21 +418,21 @@ func (q *Queries) SkipTransaction(ctx context.Context, arg SkipTransactionParams
 
 const updateTransaction = `-- name: UpdateTransaction :exec
 UPDATE transactions SET type=?, account_id=?, to_account_id=?, category_id=?, amount=?, to_amount=?,
-	exchange_rate=?, description=?, date=?, updated_at=? WHERE id=?
+	is_estimated=?, description=?, date=?, updated_at=? WHERE id=?
 `
 
 type UpdateTransactionParams struct {
-	Type         string
-	AccountID    int64
-	ToAccountID  sql.NullInt64
-	CategoryID   sql.NullInt64
-	Amount       float64
-	ToAmount     sql.NullFloat64
-	ExchangeRate sql.NullFloat64
-	Description  sql.NullString
-	Date         sql.NullString
-	UpdatedAt    sql.NullString
-	ID           int64
+	Type        string
+	AccountID   int64
+	ToAccountID sql.NullInt64
+	CategoryID  sql.NullInt64
+	Amount      int64
+	ToAmount    sql.NullInt64
+	IsEstimated int64
+	Description sql.NullString
+	Date        sql.NullString
+	UpdatedAt   sql.NullString
+	ID          int64
 }
 
 func (q *Queries) UpdateTransaction(ctx context.Context, arg UpdateTransactionParams) error {
@@ -461,7 +443,7 @@ func (q *Queries) UpdateTransaction(ctx context.Context, arg UpdateTransactionPa
 		arg.CategoryID,
 		arg.Amount,
 		arg.ToAmount,
-		arg.ExchangeRate,
+		arg.IsEstimated,
 		arg.Description,
 		arg.Date,
 		arg.UpdatedAt,
