@@ -37,6 +37,8 @@ export interface Config {
     dialogs: boolean
     /** The tabs of each page and dialog. */
     tabs: boolean
+    /** The type of a chart, its grouping, the period of a report: each choice, in each tab. Off unless asked for. */
+    controls: boolean
 }
 
 export const configsDir = path.join(here, 'configs')
@@ -81,9 +83,9 @@ export async function loadConfig(name: string, manifest: Manifest, known: { view
         if (!Array.isArray(value) || value.some((v) => typeof v !== 'string')) throw new Error(`config "${key}": a list of strings is expected`)
         return value as string[]
     }
-    const flag = (key: string): boolean => {
+    const flag = (key: string, whenLeftOut = true): boolean => {
         const value = raw[key]
-        if (value === undefined) return true
+        if (value === undefined) return whenLeftOut
         if (typeof value !== 'boolean') throw new Error(`config "${key}": true or false is expected`)
         return value
     }
@@ -115,6 +117,7 @@ export async function loadConfig(name: string, manifest: Manifest, known: { view
         sidebar: flag('sidebar'),
         dialogs: flag('dialogs'),
         tabs: flag('tabs'),
+        controls: flag('controls', false),
     }
 
     // A path that matches nothing is most likely a typo.
