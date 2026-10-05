@@ -1,3 +1,5 @@
+# Shared by deb and rpm; built via package-linux.sh.
+# Env: APP_VERSION. @APP_USER@ (service account) is substituted by the script.
 name: savvy-go
 arch: amd64
 platform: linux
@@ -15,9 +17,6 @@ description: |-
   Installs the Go Savvy binary, static SPA assets, and a systemd unit.
   SQLite data lives in /var/lib/savvy-go.
 
-depends:
-  - adduser
-
 contents:
   - src: ../../dist/savvy-go
     dst: /usr/bin/savvy-go
@@ -26,19 +25,29 @@ contents:
   - src: ../../dist/public
     dst: /opt/savvy-go/public
     type: tree
-  - src: savvy-go.service
+  - src: ../../dist/stage/savvy-go.service
     dst: /usr/lib/systemd/system/savvy-go.service
   - src: install.env
     dst: /etc/savvy-go/install.env
-    type: config
+    type: config|noreplace
   - dst: /var/lib/savvy-go
     type: dir
     file_info:
       mode: 0775
-      owner: www-data
-      group: www-data
+      owner: "@APP_USER@"
+      group: "@APP_USER@"
 
-scripts:
-  postinstall: postinst
-  preremove: prerm
-  postremove: postrm
+overrides:
+  deb:
+    depends:
+      - adduser
+    scripts:
+      postinstall: deb/postinst
+      preremove: deb/prerm
+      postremove: deb/postrm
+  rpm:
+    scripts:
+      preinstall: rpm/preinst
+      postinstall: rpm/postinst
+      preremove: rpm/prerm
+      postremove: rpm/postrm

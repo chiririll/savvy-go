@@ -1,0 +1,16 @@
+#!/bin/sh
+set -e
+
+# $1: 0 = removal, 1 = upgrade. On upgrade this runs after the new package's
+# postinst has already restarted the service, so it must not touch it.
+if [ "$1" -eq 0 ]; then
+    if [ -d /run/systemd/system ]; then
+        systemctl disable --now savvy-go.service || true
+    fi
+    if [ -f /var/lib/savvy-go/database.sqlite ] && command -v sqlite3 >/dev/null 2>&1; then
+        runuser -u savvy-go -- sqlite3 /var/lib/savvy-go/database.sqlite \
+            "PRAGMA wal_checkpoint(TRUNCATE);" || true
+    fi
+fi
+
+exit 0

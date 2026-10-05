@@ -1,4 +1,4 @@
-name: Build dist tarball and deb
+name: Build dist tarball, deb and rpm
 
 on:
   push:
@@ -65,6 +65,13 @@ jobs:
             echo "curl -fsSLO https://github.com/${REPO}/releases/latest/download/savvy-go.deb"
             echo "sudo apt install ./savvy-go.deb"
             echo '```'
+            echo
+            echo "Fedora / RHEL / openSUSE:"
+            echo
+            echo '```bash'
+            echo "curl -fsSLO https://github.com/${REPO}/releases/latest/download/savvy-go.rpm"
+            echo "sudo dnf install ./savvy-go.rpm"
+            echo '```'
           } > RELEASE_NOTES.md
           echo "::group::Release notes"
           cat RELEASE_NOTES.md
@@ -112,7 +119,12 @@ jobs:
       - name: Package deb
         env:
           APP_VERSION: ${{ steps.ver.outputs.tag }}
-        run: bash deploy/deb/package-deb.sh
+        run: bash deploy/nfpm/package-linux.sh deb
+
+      - name: Package rpm
+        env:
+          APP_VERSION: ${{ steps.ver.outputs.tag }}
+        run: bash deploy/nfpm/package-linux.sh rpm
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
@@ -122,4 +134,5 @@ jobs:
           files: |
             dist/savvy-go.tar.gz
             dist/*.deb
+            dist/*.rpm
           body_path: RELEASE_NOTES.md

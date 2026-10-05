@@ -4,8 +4,8 @@ After=network.target
 
 [Service]
 Type=simple
-User=www-data
-Group=www-data
+User=@APP_USER@
+Group=@APP_USER@
 Environment=DATA_DIR=/var/lib/savvy-go
 Environment=PUBLIC_DIR=/opt/savvy-go/public
 Environment=LISTEN_ADDR=:8080

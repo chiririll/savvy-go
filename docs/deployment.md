@@ -143,6 +143,17 @@ sudo apt install ./savvy-go.deb
 
 It runs as the `savvy-go` systemd service (`/usr/bin/savvy-go`). Data is in `/var/lib/savvy-go`; settings (`APP_URL`, `TZ`) go in `/etc/savvy-go/install.env`. `apt purge savvy-go` deletes the data.
 
+## RPM package
+
+On Fedora, RHEL (and derivatives) or openSUSE, install the `.rpm` from the GitHub release:
+
+```bash
+curl -fsSLO https://github.com/chiririll/savvy-go/releases/latest/download/savvy-go.rpm
+sudo dnf install ./savvy-go.rpm
+```
+
+It behaves like the Debian package but runs as its own `savvy-go` system user. Removing the package keeps `/var/lib/savvy-go` and `/etc/savvy-go`; delete them yourself to wipe the data.
+
 ## Tarball
 
 `savvy-go.tar.gz` holds the binary and the frontend (`public/`):
@@ -161,6 +172,6 @@ docker compose pull
 docker compose up -d
 ```
 
-Data stays in the volume and migrations run on start. With the Debian package, install the newer `.deb`.
+Data stays in the volume and migrations run on start. With the Debian package, install the newer `.deb` or `.rpm`.
 
 Coming from Laravel: see [Upgrading from the Laravel version](data-and-backups.md#upgrading-from-the-laravel-version).
