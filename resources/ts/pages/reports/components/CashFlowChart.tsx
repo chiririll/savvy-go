@@ -292,11 +292,14 @@ export function CashFlowChart({ filters }: CashFlowChartProps) {
                         {noDataMessage}
                     </div>
                 ) : (
-                    <div ref={chartRef}>
-                        <ReactECharts
-                            option={chartOption}
-                            style={{ height: 400 }}
-                        />
+                    <div ref={chartRef} style={{ height: 400 }}>
+                        {/* Mount once measured so the chart animates in a single pass */}
+                        {chartWidth > 0 && (
+                            <ReactECharts
+                                option={chartOption}
+                                style={{ height: 400 }}
+                            />
+                        )}
                     </div>
                 )}
             </CardContent>

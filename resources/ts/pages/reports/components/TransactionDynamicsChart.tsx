@@ -249,12 +249,15 @@ export function TransactionDynamicsChart({ filters, type }: TransactionDynamicsC
                         {t('reports.noData')}
                     </div>
                 ) : (
-                    <div ref={chartRef}>
-                        <ReactECharts
-                            option={chartOption}
-                            style={{ height: 350 }}
-                            key={`${chartType}-${groupBy}`}
-                        />
+                    <div ref={chartRef} style={{ height: 350 }}>
+                        {/* Mount once measured so the chart animates in a single pass */}
+                        {chartWidth > 0 && (
+                            <ReactECharts
+                                option={chartOption}
+                                style={{ height: 350 }}
+                                key={`${chartType}-${groupBy}`}
+                            />
+                        )}
                     </div>
                 )}
             </CardContent>

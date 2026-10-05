@@ -56,7 +56,9 @@ function treemapLabel(
         ...extra,
     })
     const amount = formatCurrency(item.value, currency)
-    const rows = [`{name|${item.name}}`]
+    // Rich-text markup can't carry these characters inside a name
+    const name = item.name.replace(/[{}|]/g, ' ')
+    const rows = [`{name|${name}}`]
     if (lines >= 2 && width >= amount.length * font * 0.55) rows.push(`{value|${amount}}`)
     if (lines >= 3) rows.push(`{percent|${Math.round((item.value / (total || 1)) * 100)}%}`)
 
@@ -269,8 +271,10 @@ export function TransactionStructureChart({ filters, type }: TransactionStructur
         },
         series: [{
             type: 'treemap',
-            width: '100%',
-            height: '100%',
+            left: 0,
+            top: 0,
+            right: 0,
+            bottom: 0,
             roam: false,
             squareRatio: TREEMAP_SQUARE_RATIO,
             nodeClick: false,

@@ -112,14 +112,17 @@ export function SankeyDiagram({ filters }: SankeyDiagramProps) {
                         {t('reports.noData')}
                     </div>
                 ) : (
-                    <div ref={chartRef}>
-                        <ReactECharts
-                            option={sankeyOption}
-                            style={{ height: 400 }}
-                            onEvents={{
-                                click: handleSankeyClick,
-                            }}
-                        />
+                    <div ref={chartRef} style={{ height: 400 }}>
+                        {/* Mount once measured so the chart animates in a single pass */}
+                        {chartWidth > 0 && (
+                            <ReactECharts
+                                option={sankeyOption}
+                                style={{ height: 400 }}
+                                onEvents={{
+                                    click: handleSankeyClick,
+                                }}
+                            />
+                        )}
                     </div>
                 )}
             </CardContent>

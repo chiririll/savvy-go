@@ -95,12 +95,15 @@ export function NetWorthChart({ filters }: NetWorthChartProps) {
                         {t('reports.noData')}
                     </div>
                 ) : (
-                    <div ref={chartRef}>
-                        <ReactECharts
-                            option={chartOption}
-                            style={{ height: 350 }}
-                            key={groupBy}
-                        />
+                    <div ref={chartRef} style={{ height: 350 }}>
+                        {/* Mount once measured so the chart animates in a single pass */}
+                        {chartWidth > 0 && (
+                            <ReactECharts
+                                option={chartOption}
+                                style={{ height: 350 }}
+                                key={groupBy}
+                            />
+                        )}
                     </div>
                 )}
             </CardContent>
