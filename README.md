@@ -18,7 +18,7 @@
 ---
 
 <p align="center">
-  <img src="docs/images/screenshot.png" alt="Go Savvy Screenshot" width="1920">
+  <img src="docs/images/screenshot.jpg" alt="Go Savvy Screenshot" width="1920">
 </p>
 
 ## ⚡ Quick Start
@@ -46,7 +46,7 @@ Open http://localhost:3000 and create your account. For Docker Compose, reverse 
 - **API** — tokens for scripts and other apps, with an OpenAPI reference
 
 <p align="center">
-  <img src="docs/images/report.png" alt="Go Savvy Reports" width="1920">
+  <img src="docs/images/report.jpg" alt="Go Savvy Reports" width="1920">
 </p>
 
 ## 📱 Mobile-Friendly
@@ -54,7 +54,7 @@ Open http://localhost:3000 and create your account. For Docker Compose, reverse 
 Fully responsive design built with ShadCN/UI — track expenses from your phone right after purchase.
 
 <p align="center">
-  <img src="docs/images/mobile.png" alt="Mobile Dashboard" width="1920">
+  <img src="docs/images/mobile.jpg" alt="Mobile Dashboard" width="1920">
 </p>
 
 ## 📚 Documentation
