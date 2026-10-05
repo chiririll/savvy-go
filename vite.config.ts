@@ -35,7 +35,7 @@ export default defineConfig(({ mode }) => {
         },
         test: {
             environment: 'node',
-            include: ['resources/ts/**/*.test.ts'],
+            include: ['resources/ts/**/*.test.{ts,tsx}'],
         },
         server: {
             port: 5173,
