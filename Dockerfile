@@ -2,7 +2,7 @@ ARG APP_VERSION=dev
 ARG APP_ENV=production
 
 # Build the frontend
-FROM node:24-alpine AS frontend
+FROM --platform=$BUILDPLATFORM node:24-alpine AS frontend
 ARG APP_VERSION
 ARG APP_ENV
 ENV APP_VERSION=${APP_VERSION}
@@ -15,7 +15,9 @@ COPY vite.config.ts ./
 RUN npm run build
 
 # Build the backend
-FROM golang:1.26-alpine AS gobuild
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS gobuild
+ARG TARGETOS
+ARG TARGETARCH
 ARG APP_VERSION
 ARG APP_ENV
 WORKDIR /src
@@ -25,7 +27,7 @@ COPY cmd ./cmd
 COPY internal ./internal
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 go build -trimpath \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath \
     -ldflags="-s -w -X savvy-go/internal/version.Value=${APP_VERSION} -X savvy-go/internal/version.Env=${APP_ENV}" \
     -o /out/savvy-go ./cmd/savvy-go
 
