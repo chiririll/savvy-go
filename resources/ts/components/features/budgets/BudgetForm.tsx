@@ -25,6 +25,7 @@ import { useCategories, useFormValuesChange } from '@/hooks'
 import { Category } from '@/types'
 import { localizeDefaultName } from '@/lib/localized-name'
 import { CurrencyIdField, FieldHelp, FormActiveField, FormWrapper, TagSelect } from '@/components/shared'
+import { budgetPeriodLabel } from '@/lib/labels'
 
 interface BudgetFormProps {
     defaultValues?: Partial<BudgetFormData>
@@ -145,7 +146,7 @@ export function BudgetForm({
                                     <SelectContent>
                                         {periodOptions.map((option) => (
                                             <SelectItem key={option} value={option}>
-                                                {t(`forms:budgets.periods.${option}`)}
+                                                {budgetPeriodLabel(t, option)}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>

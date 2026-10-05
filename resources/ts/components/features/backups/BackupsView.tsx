@@ -39,6 +39,7 @@ import { useResourceMutation } from '@/hooks/use-crud'
 import i18n from '@/lib/i18n'
 import { Backup } from '@/types/backup'
 import { formatBytes, formatDateTime } from '@/lib/format'
+import { backupStatusHelp, backupStatusLabel } from '@/lib/labels'
 
 const formatDate = formatDateTime
 
@@ -218,11 +219,11 @@ export function BackupsView({ source, title, description, actions }: BackupsView
                                             <Tooltip>
                                                 <TooltipTrigger asChild>
                                                     <Badge variant={statusBadgeVariant(backup)}>
-                                                        {t(`backups.status.${backup.status}`)}
+                                                        {backupStatusLabel(t, backup.status)}
                                                     </Badge>
                                                 </TooltipTrigger>
                                                 <TooltipContent>
-                                                    {t(`backups.statusHelp.${backup.status}`)}
+                                                    {backupStatusHelp(t, backup.status)}
                                                 </TooltipContent>
                                             </Tooltip>
                                         </div>
@@ -246,7 +247,7 @@ export function BackupsView({ source, title, description, actions }: BackupsView
                                                 onClick={() => openRestore(backup)}
                                                 title={backup.restorable
                                                     ? t('backups.restore')
-                                                    : t(`backups.statusHelp.${backup.status}`)}
+                                                    : backupStatusHelp(t, backup.status)}
                                                 disabled={!backup.restorable}
                                             >
                                                 <RotateCcw className="size-4" />
@@ -365,7 +366,7 @@ export function BackupsView({ source, title, description, actions }: BackupsView
                                 </p>
                                 {selectedBackup && selectedBackup.status !== 'current' && (
                                     <p>
-                                        {t(`backups.statusHelp.${selectedBackup.status}`)}
+                                        {backupStatusHelp(t, selectedBackup.status)}
                                     </p>
                                 )}
                             </div>

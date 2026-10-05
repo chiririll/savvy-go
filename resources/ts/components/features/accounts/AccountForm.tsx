@@ -32,6 +32,7 @@ import { cn } from '@/lib/utils'
 import { CurrencySelect, type CurrencySelectValue } from '@/components/shared/CurrencySelect'
 import { FormActiveField } from '@/components/shared/FormActiveField'
 import { FormWrapper } from '@/components/shared/FormWrapper'
+import { accountTypeLabel } from '@/lib/labels'
 
 interface AccountFormProps {
     defaultValues?: Partial<AccountFormValues>
@@ -130,7 +131,7 @@ export function AccountForm({
                                             <SelectItem key={type} value={type}>
                                                 <div className="flex items-center gap-2">
                                                     <Icon className={cn('size-4', config.textColor)} />
-                                                    {t(`pages:accounts.types.${type}`)}
+                                                    {accountTypeLabel(t, type)}
                                                 </div>
                                             </SelectItem>
                                         )

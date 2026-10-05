@@ -5,6 +5,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { FeedRow, FeedStatusBadge, RowActions } from '@/components/shared'
 import type { AutomationRule } from '@/types/automation'
+import { triggerLabel } from '@/lib/labels'
 
 interface AutomationRuleRowProps {
     rule: AutomationRule
@@ -40,7 +41,7 @@ export function AutomationRuleRow({ rule, onEdit, onDelete, onToggle, isReadOnly
             )}
             title={rule.name}
             badge={<FeedStatusBadge variant="outline">#{rule.priority}</FeedStatusBadge>}
-            subtitle={t(`forms:automation.triggers.${rule.triggerType}`)}
+            subtitle={triggerLabel(t, rule.triggerType)}
             amount={t('pages:automation.runs', { count: rule.runsCount })}
             amountClassName="font-sans font-medium"
             extraAmount={(

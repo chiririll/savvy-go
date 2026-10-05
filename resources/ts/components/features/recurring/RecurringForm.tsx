@@ -32,6 +32,7 @@ import {
     TagSelect,
     TransactionTypeTabs,
 } from '@/components/shared'
+import { frequencyLabel, weekdayLabel } from '@/lib/labels'
 
 interface RecurringFormProps {
     defaultValues?: Partial<RecurringFormData>
@@ -187,7 +188,7 @@ export function RecurringForm({
                                         <SelectContent>
                                             {frequencyOptions.map((option) => (
                                                 <SelectItem key={option} value={option}>
-                                                    {t(`forms:recurring.frequencies.${option}`)}
+                                                    {frequencyLabel(t, option)}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
@@ -237,7 +238,7 @@ export function RecurringForm({
                                         <SelectContent>
                                             {weekdayValues.map((value) => (
                                                 <SelectItem key={value} value={value.toString()}>
-                                                    {t(`forms:recurring.weekdays.${value}`)}
+                                                    {weekdayLabel(t, value)}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>

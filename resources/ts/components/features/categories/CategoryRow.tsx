@@ -17,6 +17,7 @@ import {
 import { categoryIconStyle } from '@/lib/category-color'
 import { localizeDefaultName } from '@/lib/localized-name'
 import { Category } from '@/types'
+import { categoryTypeLabel } from '@/lib/labels'
 
 interface CategoryRowProps {
     category: Category
@@ -57,7 +58,7 @@ export function CategoryRow({
                     aria-label={t('pages:categories.columns.default')}
                 />
             ) : undefined}
-            subtitle={t(`pages:categories.types.${category.type}`)}
+            subtitle={categoryTypeLabel(t, category.type)}
             onOpen={canEdit ? () => onEdit(category) : undefined}
             hasActions={canEdit || canDelete || canSetDefault}
             actions={({ menuOpen, setMenuOpen, isMobile }) => (

@@ -2,7 +2,8 @@ import { BaseEntity } from './api'
 import { Currency } from './currencies'
 
 // All account types including debt
-export type AccountType = 'bank' | 'crypto' | 'cash' | 'debt'
+export const ACCOUNT_TYPES = ['bank', 'crypto', 'cash', 'debt'] as const
+export type AccountType = (typeof ACCOUNT_TYPES)[number]
 
 // Regular account types (excluding debt) - for account creation
 export type RegularAccountType = 'bank' | 'crypto' | 'cash'

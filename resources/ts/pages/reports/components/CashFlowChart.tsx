@@ -11,6 +11,7 @@ import { defaultGroupBy } from '../types'
 import { formatReportPeriodLabel } from '../utils'
 import type { ReportFilters } from '../types'
 import type { CashFlowGroupBy } from '@/api/reports'
+import { groupByLabel } from '@/lib/labels'
 
 interface CashFlowChartProps {
     filters: ReportFilters
@@ -325,7 +326,7 @@ export function CashFlowChart({ filters }: CashFlowChartProps) {
                                     className="cursor-pointer"
                                     onClick={() => setGroupBy(g)}
                                 >
-                                    {t(`reports.groupBy.${g}`)}
+                                    {groupByLabel(t, g)}
                                 </Badge>
                             ))}
                         </div>

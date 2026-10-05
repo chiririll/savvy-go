@@ -45,6 +45,7 @@ function resolveDottedNamespaceKey(key: string): string {
     }
 
     if (i18n.exists(rest, { ns })) {
+        // i18n-dynamic: this is the missing-key handler itself
         return i18n.t(rest, { ns })
     }
 

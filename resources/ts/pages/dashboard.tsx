@@ -44,6 +44,7 @@ import { Link } from 'react-router-dom'
 import { AccountType } from '@/types'
 import { ACCOUNT_TYPE_CONFIG, CATEGORY_COLORS } from '@/constants'
 import { DEFAULT_FILTERS, type ReportFilters } from '@/pages/reports/types'
+import { accountTypeLabelLoose } from '@/lib/labels'
 
 type PeriodPreset = 'last_30_days' | 'this_month' | 'last_month' | 'last_3_months' | 'last_6_months' | 'this_year' | 'custom'
 
@@ -469,7 +470,7 @@ export default function DashboardPage() {
                                             <div className="min-w-0">
                                                 <p className="text-sm font-medium truncate">{account.name}</p>
                                                 <p className="text-xs text-muted-foreground capitalize">
-                                                    {t(`accounts.types.${account.type}`, { defaultValue: account.type })}
+                                                    {accountTypeLabelLoose(t, account.type)}
                                                 </p>
                                             </div>
                                         </div>

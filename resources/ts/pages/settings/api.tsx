@@ -38,6 +38,7 @@ import {
 import { useApiTokens, useCreateApiToken, useRevokeApiToken } from '@/hooks'
 import { intlLocale } from '@/lib/i18n'
 import type { ApiTokenScope } from '@/types'
+import { apiScopeHint, apiScopeLabel } from '@/lib/labels'
 
 type Expiry = 'never' | '30' | '90' | '365'
 
@@ -139,7 +140,7 @@ export default function ApiSettingsPage() {
                                             <div className="flex flex-wrap items-center gap-2">
                                                 <span className="truncate text-sm font-medium">{token.name}</span>
                                                 <Badge variant={token.scope === 'read' ? 'secondary' : 'default'}>
-                                                    {t(`api.scope.${token.scope}`)}
+                                                    {apiScopeLabel(t, token.scope)}
                                                 </Badge>
                                                 <code className="text-xs text-muted-foreground">{token.prefix}…</code>
                                             </div>
@@ -226,7 +227,7 @@ export default function ApiSettingsPage() {
                                     <SelectItem value="read-write">{t('api.scope.read-write')}</SelectItem>
                                 </SelectContent>
                             </Select>
-                            <p className="text-xs text-muted-foreground">{t(`api.create.accessHint.${scope}`)}</p>
+                            <p className="text-xs text-muted-foreground">{apiScopeHint(t, scope)}</p>
                         </div>
                         <div className="space-y-2">
                             <Label>{t('api.create.expiry')}</Label>

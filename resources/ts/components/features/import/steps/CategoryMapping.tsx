@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next'
+import { transactionTypeLabelLoose } from '@/lib/labels'
 import { Badge } from '@/components/ui/badge'
 import {
     Select,
@@ -57,7 +58,7 @@ export function CategoryMapping({ candidates, value, onChange, disabled }: Categ
                             <div className="flex min-w-0 items-center gap-2">
                                 <span className="truncate font-medium">{candidate.name}</span>
                                 <Badge variant="secondary">
-                                    {tPages(`transactions.types.${candidate.type}`, { defaultValue: candidate.type })}
+                                    {transactionTypeLabelLoose(tPages, candidate.type)}
                                 </Badge>
                                 <span className="shrink-0 text-xs text-muted-foreground">
                                     {t('import.categoryMapping.rows', { count: candidate.count.toLocaleString(intlLocale()) })}

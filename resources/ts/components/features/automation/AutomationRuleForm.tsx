@@ -27,6 +27,7 @@ import { useAutomationTriggers } from '@/hooks/use-automation'
 import { ConditionBuilder } from './ConditionBuilder'
 import { ActionBuilder } from './ActionBuilder'
 import { FieldHelp, FormActiveField, FormWrapper } from '@/components/shared'
+import { triggerDescription, triggerLabel } from '@/lib/labels'
 
 interface AutomationRuleFormProps {
     defaultValues?: Partial<AutomationRuleFormData>
@@ -118,7 +119,7 @@ export function AutomationRuleForm({
                                         {t('forms:automation.trigger')}
                                         {selectedTrigger && (
                                             <FieldHelp>
-                                                {t(`forms:automation.triggerDescriptions.${selectedTrigger}`)}
+                                                {triggerDescription(t, selectedTrigger)}
                                             </FieldHelp>
                                         )}
                                     </FormLabel>
@@ -131,7 +132,7 @@ export function AutomationRuleForm({
                                         <SelectContent>
                                             {triggers?.map((trigger) => (
                                                 <SelectItem key={trigger} value={trigger}>
-                                                    {t(`forms:automation.triggers.${trigger}`)}
+                                                    {triggerLabel(t, trigger)}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>

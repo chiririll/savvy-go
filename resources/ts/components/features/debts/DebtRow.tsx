@@ -72,7 +72,7 @@ export function DebtRow({ debt, onEdit, onDelete, onPayment, onCollect, onReopen
                             {canSettle && (
                                 <DropdownMenuItem onClick={() => settle(debt)}>
                                     <Icon className="mr-2 size-4" />
-                                    {t(debt.debtType === 'i_owe' ? 'debts.makePayment' : 'debts.collectPayment')}
+                                    {debt.debtType === 'i_owe' ? t('debts.makePayment') : t('debts.collectPayment')}
                                 </DropdownMenuItem>
                             )}
                             {canReopen && (

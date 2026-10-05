@@ -11,6 +11,7 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useAuthStore } from '@/stores/auth'
+import { userRoleLabel } from '@/lib/labels'
 
 export function UserMenu() {
     const { t } = useTranslation()
@@ -37,7 +38,7 @@ export function UserMenu() {
                     <UserAvatar user={user} className="size-8" />
                     <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium">{user.name}</p>
-                        <p className="truncate text-xs text-muted-foreground">{t(`roles.${user.role}`)}</p>
+                        <p className="truncate text-xs text-muted-foreground">{user.role ? userRoleLabel(t, user.role) : ''}</p>
                     </div>
                 </div>
                 <DropdownMenuSeparator />

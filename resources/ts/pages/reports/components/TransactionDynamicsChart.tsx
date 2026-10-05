@@ -19,6 +19,7 @@ import { defaultGroupBy } from '../types'
 import { dynamicsSeriesName, formatReportPeriodLabel } from '../utils'
 import type { ReportFilters } from '../types'
 import type { CashFlowGroupBy, ReportTransactionType } from '@/api/reports'
+import { groupByLabel } from '@/lib/labels'
 
 type ChartType = 'line' | 'bar'
 
@@ -36,7 +37,15 @@ interface TransactionDynamicsChartProps {
 
 export function TransactionDynamicsChart({ filters, type }: TransactionDynamicsChartProps) {
     const { t, i18n } = useTranslation('pages')
-    const copyKey = type === 'income' ? 'incomeDynamics' : 'expensesDynamics'
+    const copy = type === 'income'
+        ? {
+            title: t('reports.incomeDynamics.title'),
+            subtitle: t('reports.incomeDynamics.subtitle'),
+        }
+        : {
+            title: t('reports.expensesDynamics.title'),
+            subtitle: t('reports.expensesDynamics.subtitle'),
+        }
     const seriesLabel = type === 'income' ? t('reports.series.sources') : t('reports.filters.categories')
     const [chartType, setChartType] = useState<ChartType>('line')
     const [groupBy, setGroupBy] = useState<CashFlowGroupBy>(() => defaultGroupBy(filters))
@@ -182,9 +191,9 @@ export function TransactionDynamicsChart({ filters, type }: TransactionDynamicsC
             <CardHeader className="pb-2">
                 <div className="flex items-start justify-between">
                     <div>
-                        <CardTitle className="text-lg">{t(`reports.${copyKey}.title`)}</CardTitle>
+                        <CardTitle className="text-lg">{copy.title}</CardTitle>
                         <p className="text-sm text-muted-foreground">
-                            {t(`reports.${copyKey}.subtitle`)}
+                            {copy.subtitle}
                         </p>
                     </div>
                     <div className="flex items-center gap-3">
@@ -215,7 +224,7 @@ export function TransactionDynamicsChart({ filters, type }: TransactionDynamicsC
                                     className="cursor-pointer"
                                     onClick={() => setGroupBy(group)}
                                 >
-                                    {t(`reports.groupBy.${group}`)}
+                                    {groupByLabel(t, group)}
                                 </Badge>
                             ))}
                         </div>

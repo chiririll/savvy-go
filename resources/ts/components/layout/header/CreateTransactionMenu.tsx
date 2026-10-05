@@ -10,6 +10,7 @@ import {
 import { useCreateTransactionDialog } from '@/components/features/transactions'
 import { SPACE_TRANSFER_OPTION, TRANSACTION_TYPE_OPTIONS } from '@/constants'
 import { useTransferTargets } from '@/hooks'
+import { createMenuLabel } from '@/lib/labels'
 import { useReadOnly } from '@/components/providers/ReadOnlyProvider'
 
 export function CreateTransactionMenu() {
@@ -38,7 +39,7 @@ export function CreateTransactionMenu() {
                         onClick={() => openCreate({ type: value })}
                     >
                         <Icon className={`size-4 mr-2 ${color}`} />
-                        {t(value)}
+                        {createMenuLabel(t, value)}
                     </DropdownMenuItem>
                 ))}
             </DropdownMenuContent>

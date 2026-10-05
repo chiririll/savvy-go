@@ -3,7 +3,8 @@ import { Category } from './categories'
 import { Currency } from './currencies'
 import { Tag } from './tags'
 
-export type BudgetPeriod = 'weekly' | 'monthly' | 'yearly' | 'one_time'
+export const BUDGET_PERIODS = ['weekly', 'monthly', 'yearly', 'one_time'] as const
+export type BudgetPeriod = (typeof BUDGET_PERIODS)[number]
 
 export interface BudgetProgress {
     spent: number

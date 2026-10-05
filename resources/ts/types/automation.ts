@@ -1,34 +1,40 @@
-export type TriggerType =
-    | 'on_transaction_create'
-    | 'on_transaction_update'
+export const TRIGGER_TYPES = [
+    'on_transaction_create',
+    'on_transaction_update',
+] as const
+export type TriggerType = (typeof TRIGGER_TYPES)[number]
 
-export type ConditionOperator =
-    | 'equals'
-    | 'not_equals'
-    | 'in'
-    | 'not_in'
-    | 'gt'
-    | 'gte'
-    | 'lt'
-    | 'lte'
-    | 'between'
-    | 'contains'
-    | 'not_contains'
-    | 'starts_with'
-    | 'ends_with'
-    | 'matches'
-    | 'is_null'
-    | 'is_not_null'
-    | 'has_any'
-    | 'has_all'
-    | 'has_none'
+export const CONDITION_OPERATORS = [
+    'equals',
+    'not_equals',
+    'in',
+    'not_in',
+    'gt',
+    'gte',
+    'lt',
+    'lte',
+    'between',
+    'contains',
+    'not_contains',
+    'starts_with',
+    'ends_with',
+    'matches',
+    'is_null',
+    'is_not_null',
+    'has_any',
+    'has_all',
+    'has_none',
+] as const
+export type ConditionOperator = (typeof CONDITION_OPERATORS)[number]
 
-export type ActionType =
-    | 'set_category'
-    | 'add_tags'
-    | 'remove_tags'
-    | 'set_description'
-    | 'create_transfer'
+export const ACTION_TYPES = [
+    'set_category',
+    'add_tags',
+    'remove_tags',
+    'set_description',
+    'create_transfer',
+] as const
+export type ActionType = (typeof ACTION_TYPES)[number]
 
 export interface Condition {
     field: string
@@ -83,10 +89,3 @@ export const CONDITION_FIELDS = [
     { value: 'tags', operators: ['has_any', 'has_all', 'has_none'] },
 ] as const
 
-export const ACTION_TYPES: readonly ActionType[] = [
-    'set_category',
-    'add_tags',
-    'remove_tags',
-    'set_description',
-    'create_transfer',
-]

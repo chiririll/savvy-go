@@ -11,6 +11,7 @@ import { invitationsApi } from '@/api/spaces'
 import { useAuthStore } from '@/stores/auth'
 import { useSpaceStore } from '@/stores/space'
 import { ApiError } from '@/types'
+import { spaceRoleLabel } from '@/lib/labels'
 
 /** Opened from an invitation link: join the space, or create an account for it. */
 export default function InvitePage() {
@@ -88,7 +89,7 @@ export default function InvitePage() {
                             <CardDescription>
                                 {t('invite.text', {
                                     inviter: invitation.inviter || t('invite.someone'),
-                                    role: t(`spaces.roles.${invitation.role}`),
+                                    role: spaceRoleLabel(t, invitation.role),
                                 })}
                             </CardDescription>
                         </CardHeader>

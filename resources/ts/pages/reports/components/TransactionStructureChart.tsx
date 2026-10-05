@@ -21,7 +21,17 @@ interface TransactionStructureChartProps {
 
 export function TransactionStructureChart({ filters, type }: TransactionStructureChartProps) {
     const { t, i18n: i18nInstance } = useTranslation('pages')
-    const copyKey = type === 'income' ? 'incomeStructure' : 'expensesStructure'
+    const copy = type === 'income'
+        ? {
+            title: t('reports.incomeStructure.title'),
+            subtitle: t('reports.incomeStructure.subtitle'),
+            noData: t('reports.incomeStructure.noData'),
+        }
+        : {
+            title: t('reports.expensesStructure.title'),
+            subtitle: t('reports.expensesStructure.subtitle'),
+            noData: t('reports.expensesStructure.noData'),
+        }
     const [viewMode, setViewMode] = useState<ViewMode>('donut')
     const { data, isLoading } = useTransactionReportByCategory(filters, type)
 
@@ -267,9 +277,9 @@ export function TransactionStructureChart({ filters, type }: TransactionStructur
             <CardHeader className="pb-2">
                 <div className="flex items-start justify-between">
                     <div>
-                        <CardTitle className="text-lg">{t(`reports.${copyKey}.title`)}</CardTitle>
+                        <CardTitle className="text-lg">{copy.title}</CardTitle>
                         <p className="text-sm text-muted-foreground">
-                            {t(`reports.${copyKey}.subtitle`)}
+                            {copy.subtitle}
                         </p>
                     </div>
                     <div className="flex gap-1">
@@ -292,7 +302,7 @@ export function TransactionStructureChart({ filters, type }: TransactionStructur
                     <Skeleton className="h-[350px]" />
                 ) : chartData.length === 0 ? (
                     <div className="h-[350px] flex items-center justify-center text-muted-foreground">
-                        {t(`reports.${copyKey}.noData`)}
+                        {copy.noData}
                     </div>
                 ) : (
                     <ReactECharts

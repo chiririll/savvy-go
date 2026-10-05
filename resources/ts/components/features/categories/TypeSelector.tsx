@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { CATEGORY_TYPE_OPTIONS } from '@/constants/categories'
 import { CategoryType } from '@/types'
 import { SegmentedChoice } from '@/components/shared'
+import { categoryTypeLabel } from '@/lib/labels'
 
 interface TypeSelectorProps {
     value: CategoryType
@@ -23,7 +24,7 @@ export function TypeSelector({ value, onChange, error, disabled, disabledHelp }:
                 disabled={disabled}
                 options={CATEGORY_TYPE_OPTIONS.map((option) => ({
                     value: option.value,
-                    label: t(`pages:categories.types.${option.value}`),
+                    label: categoryTypeLabel(t, option.value),
                     color: option.value === 'income' ? 'text-green-600' : 'text-red-600',
                 }))}
             />

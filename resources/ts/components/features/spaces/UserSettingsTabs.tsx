@@ -1,8 +1,9 @@
 import { NavLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
+import { userTabLabel, type UserTab } from '@/lib/labels'
 
-const tabs = [
+const tabs: { to: string; key: UserTab }[] = [
     { to: '/settings/user', key: 'preferences' },
     { to: '/settings/security', key: 'security' },
     { to: '/settings/api', key: 'api' },
@@ -25,7 +26,7 @@ export function UserSettingsTabs() {
                         )
                     }
                 >
-                    {t(`user.tabs.${tab.key}`)}
+                    {userTabLabel(t, tab.key)}
                 </NavLink>
             ))}
         </nav>

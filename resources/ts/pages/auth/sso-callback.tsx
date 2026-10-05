@@ -5,26 +5,11 @@ import { toast } from 'sonner'
 import { ssoApi } from '@/api/sso'
 import { useAuthStore } from '@/stores/auth'
 import i18n from '@/lib/i18n'
-
-const SSO_ERROR_CODES = [
-    'invalid_issuer',
-    'invalid_audience',
-    'invalid_nonce',
-    'invalid_id_token',
-    'invalid_state',
-    'token_exchange_failed',
-    'jwks_failed',
-    'metadata_unreachable',
-    'idp_error',
-    'no_email',
-    'email_in_use',
-    'signup_disabled',
-    'no_admin',
-] as const
+import { SSO_ERROR_CODES, ssoErrorLabel, type SsoErrorCode } from '@/lib/labels'
 
 function ssoErrorMessage(code: string): string {
     if ((SSO_ERROR_CODES as readonly string[]).includes(code)) {
-        return i18n.t(`auth:sso.errors.${code}`)
+        return ssoErrorLabel(i18n.t, code as SsoErrorCode)
     }
 
     return i18n.t('auth:sso.errors.unknown', { code })

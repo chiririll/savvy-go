@@ -32,11 +32,12 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { APP_VERSION } from '@/version'
 import { useTranslation } from 'react-i18next'
+import { navLabel, type NavKey } from '@/lib/labels'
 
 interface MenuItem {
     to: string
     icon: LucideIcon
-    labelKey: string
+    labelKey: NavKey
     /** Other paths that belong to this item (sub-pages). */
     also?: string[]
 }
@@ -106,7 +107,7 @@ export function AppSidebar() {
                     <SidebarGroupContent>
                         <SidebarMenu>
                             {mainItems.map(({ to, icon: Icon, labelKey }) => {
-                                const label = t(labelKey)
+                                const label = navLabel(t, labelKey)
                                 return (
                                 <SidebarMenuItem key={to}>
                                     <SidebarMenuButton
@@ -222,7 +223,7 @@ function NavGroup({
                                             <SidebarMenuSubButton asChild isActive={isActive(to, also)}>
                                                 <NavLink to={to}>
                                                     <Icon />
-                                                    <span>{t(labelKey)}</span>
+                                                    <span>{navLabel(t, labelKey)}</span>
                                                 </NavLink>
                                             </SidebarMenuSubButton>
                                         </SidebarMenuSubItem>

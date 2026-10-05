@@ -21,6 +21,7 @@ import type {
     ImportResult,
     ImportCategoryMap,
 } from '@/types/import'
+import { importStepLabel } from '@/lib/labels'
 
 const STEP_IDS: ImportStep[] = ['upload', 'mapping', 'preview', 'result']
 
@@ -154,7 +155,7 @@ export function CsvImportWizard() {
             >
                 {STEP_IDS.map((id, index) => (
                     <Step key={id} disabled={!canGoToStep(index) || isLoading}>
-                        {t(`import.steps.${id}`)}
+                        {importStepLabel(t, id)}
                     </Step>
                 ))}
             </Stepper>

@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ArrowLeft } from 'lucide-react'
 import { format } from 'date-fns'
+import { actionTypeLabelLoose, automationLogStatusLabel } from '@/lib/labels'
 
 export default function AutomationLogsPage() {
     const { t } = useTranslation('pages')
@@ -61,7 +62,7 @@ export default function AutomationLogsPage() {
                                                   : 'secondary'
                                         }
                                     >
-                                        {t(`automation.logsStatus.${log.status}`)}
+                                        {automationLogStatusLabel(t, log.status)}
                                     </Badge>
                                     {log.triggerEntityType && (
                                         <span className="text-sm text-muted-foreground">
@@ -76,7 +77,7 @@ export default function AutomationLogsPage() {
                                     <p className="text-sm text-muted-foreground">
                                         {t('automation.logsActions', {
                                             actions: log.actionsExecuted
-                                                .map(a => t(`forms:automation.actionTypes.${a.type}`, { defaultValue: a.type }))
+                                                .map(a => actionTypeLabelLoose(t, a.type))
                                                 .join(', '),
                                         })}
                                     </p>

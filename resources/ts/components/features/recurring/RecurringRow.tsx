@@ -7,12 +7,13 @@ import i18n from '@/lib/i18n'
 import { displayTransactionDescription, transactionAmountAppearance, transactionSubtitle } from '@/lib/transaction-description'
 import { cn, formatCurrency } from '@/lib/utils'
 import { RecurringFrequency, RecurringTransaction } from '@/types'
+import { frequencyLabel } from '@/lib/labels'
 
 const FREQUENCY_ORDER: RecurringFrequency[] = ['daily', 'weekly', 'monthly', 'yearly']
 
 /** Sections of the recurring list: one per schedule, shortest first. */
 export function recurringGroup(recurring: RecurringTransaction): FeedGroupKey {
-    const frequency = i18n.t(`forms:recurring.frequencies.${recurring.frequency}`)
+    const frequency = frequencyLabel(i18n.t, recurring.frequency)
     return {
         key: `${recurring.frequency}:${recurring.interval}`,
         title: recurring.interval === 1

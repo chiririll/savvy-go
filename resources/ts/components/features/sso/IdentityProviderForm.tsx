@@ -43,12 +43,7 @@ interface IdentityProviderFormProps {
     previewPreset?: string
 }
 
-const TOGGLES: { name: keyof IdentityProviderFormValues; labelKey: string; descriptionKey: string }[] = [
-    { name: 'enabled', labelKey: 'sso.enabled', descriptionKey: 'sso.enabledHelp' },
-    { name: 'allow_jit', labelKey: 'sso.allowJit', descriptionKey: 'sso.allowJitHelp' },
-    { name: 'link_by_email', labelKey: 'sso.linkByEmail', descriptionKey: 'sso.linkByEmailHelp' },
-    { name: 'sync_role_on_login', labelKey: 'sso.syncRole', descriptionKey: 'sso.syncRoleHelp' },
-]
+const TOGGLE_NAMES: (keyof IdentityProviderFormValues)[] = ['enabled', 'allow_jit', 'link_by_email', 'sync_role_on_login']
 
 function CopyableUrl({ label, value }: { label: string; value: string }) {
     const { t } = useTranslation('forms')
@@ -122,6 +117,12 @@ export function IdentityProviderForm({
     previewPreset,
 }: IdentityProviderFormProps) {
     const { t } = useTranslation(['common', 'forms'])
+    const toggleLabels: Record<string, { label: string; description: string }> = {
+        enabled: { label: t('forms:sso.enabled'), description: t('forms:sso.enabledHelp') },
+        allow_jit: { label: t('forms:sso.allowJit'), description: t('forms:sso.allowJitHelp') },
+        link_by_email: { label: t('forms:sso.linkByEmail'), description: t('forms:sso.linkByEmailHelp') },
+        sync_role_on_login: { label: t('forms:sso.syncRole'), description: t('forms:sso.syncRoleHelp') },
+    }
     const { data: presets } = useSsoPresets()
 
     const form = useForm<IdentityProviderFormValues>({
@@ -277,16 +278,16 @@ export function IdentityProviderForm({
                         />
 
                         <div className="divide-y rounded-lg border">
-                            {TOGGLES.map((toggle) => (
+                            {TOGGLE_NAMES.map((name) => (
                                 <FormField
-                                    key={toggle.name}
+                                    key={name}
                                     control={form.control}
-                                    name={toggle.name}
+                                    name={name}
                                     render={({ field }) => (
                                         <FormItem className="flex items-center justify-between gap-4 px-4 py-3">
                                             <div className="space-y-0.5">
-                                                <FormLabel className="cursor-pointer">{t(`forms:${toggle.labelKey}`)}</FormLabel>
-                                                <FormDescription>{t(`forms:${toggle.descriptionKey}`)}</FormDescription>
+                                                <FormLabel className="cursor-pointer">{toggleLabels[name].label}</FormLabel>
+                                                <FormDescription>{toggleLabels[name].description}</FormDescription>
                                             </div>
                                             <FormControl>
                                                 <Switch checked={Boolean(field.value)} onCheckedChange={field.onChange} />
