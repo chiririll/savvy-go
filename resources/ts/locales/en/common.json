@@ -353,5 +353,9 @@
         "noneGuest": "You are not in any space. Ask for an invitation link.",
         "create": "Create a space",
         "defaultName": "My space"
+    },
+    "progress": {
+        "of": "of {{amount}}",
+        "over": "over"
     }
 }

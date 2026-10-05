@@ -39,7 +39,7 @@ export function isDateOverdue(date?: string | null): boolean {
 export function formatTransactionGroupHeading(
     dateKey: string | null,
     locale: string,
-    labels: { today: string; yesterday: string; noDate: string },
+    labels: { today: string; yesterday: string; tomorrow?: string; noDate: string },
 ): string {
     if (!dateKey) {
         return labels.noDate
@@ -51,6 +51,9 @@ export function formatTransactionGroupHeading(
     }
     if (dateKey === addDaysLocal(new Date(), -1)) {
         return labels.yesterday
+    }
+    if (labels.tomorrow && dateKey === addDaysLocal(new Date(), 1)) {
+        return labels.tomorrow
     }
 
     const date = parseDateKey(dateKey)
