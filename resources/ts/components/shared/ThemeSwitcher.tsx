@@ -1,4 +1,5 @@
 import { Moon, Sun } from 'lucide-react'
+import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import {
@@ -55,23 +56,29 @@ interface ThemeSwitcherProps {
 export function ThemeSwitcher({ className }: ThemeSwitcherProps) {
     const { t } = useTranslation()
     const { theme, preference, setTheme } = useTheme()
+    const triggerRef = useRef<HTMLButtonElement>(null)
+
+    const handleChange = (value: string) => {
+        if (value !== 'light' && value !== 'dark' && value !== 'auto') return
+        const rect = triggerRef.current?.getBoundingClientRect()
+        setTheme(value, rect && { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 })
+    }
 
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className={cn('overflow-visible', className)} aria-label={t('theme.label')}>
+                <Button
+                    ref={triggerRef}
+                    variant="ghost"
+                    size="icon"
+                    className={cn('overflow-visible', className)}
+                    aria-label={t('theme.label')}
+                >
                     <TriggerIcon preference={preference} theme={theme} />
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-                <DropdownMenuRadioGroup
-                    value={preference}
-                    onValueChange={(value) => {
-                        if (value === 'light' || value === 'dark' || value === 'auto') {
-                            setTheme(value)
-                        }
-                    }}
-                >
+                <DropdownMenuRadioGroup value={preference} onValueChange={handleChange}>
                     <DropdownMenuRadioItem value="light">
                         <Sun className="size-4" />
                         {t('theme.light')}

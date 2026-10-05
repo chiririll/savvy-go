@@ -113,38 +113,6 @@ export function AccountForm({
 
                 <FormField
                     control={form.control}
-                    name="type"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>{t('fields.type')}</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
-                                <FormControl>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder={t('forms:selectAccountType')} />
-                                    </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                    {REGULAR_ACCOUNT_TYPES.map((type) => {
-                                        const config = REGULAR_ACCOUNT_TYPE_CONFIG[type]
-                                        const Icon = config.icon
-                                        return (
-                                            <SelectItem key={type} value={type}>
-                                                <div className="flex items-center gap-2">
-                                                    <Icon className={cn('size-4', config.textColor)} />
-                                                    {accountTypeLabel(t, type)}
-                                                </div>
-                                            </SelectItem>
-                                        )
-                                    })}
-                                </SelectContent>
-                            </Select>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-
-                <FormField
-                    control={form.control}
                     name="currency"
                     render={({ field }) => (
                         <FormItem>
@@ -171,28 +139,61 @@ export function AccountForm({
                     )}
                 />
 
-                <FormField
-                    control={form.control}
-                    name="initial_balance"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>{t('forms:accounts.initialBalance')}</FormLabel>
-                            <FormControl>
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    min={0}
-                                    placeholder="0.00"
-                                    {...field}
-                                />
-                            </FormControl>
-                            <FormDescription>
-                                {t('forms:accounts.initialBalanceHelp')}
-                            </FormDescription>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
+                <div className="grid grid-cols-2 items-start gap-3">
+                    <FormField
+                        control={form.control}
+                        name="type"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>{t('fields.type')}</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                        <SelectTrigger className="w-full">
+                                            <SelectValue placeholder={t('forms:selectAccountType')} />
+                                        </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        {REGULAR_ACCOUNT_TYPES.map((type) => {
+                                            const config = REGULAR_ACCOUNT_TYPE_CONFIG[type]
+                                            const Icon = config.icon
+                                            return (
+                                                <SelectItem key={type} value={type}>
+                                                    <div className="flex items-center gap-2">
+                                                        <Icon className={cn('size-4', config.textColor)} />
+                                                        {accountTypeLabel(t, type)}
+                                                    </div>
+                                                </SelectItem>
+                                            )
+                                        })}
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="initial_balance"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>{t('forms:accounts.initialBalance')}</FormLabel>
+                                <FormControl>
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        min={0}
+                                        placeholder="0.00"
+                                        {...field}
+                                    />
+                                </FormControl>
+                                <FormDescription>
+                                    {t('forms:accounts.initialBalanceHelp')}
+                                </FormDescription>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                </div>
 
                 <FormActiveField
                     control={form.control}

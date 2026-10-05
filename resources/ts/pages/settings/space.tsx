@@ -220,7 +220,7 @@ function Invitations({ space }: { space: Space }) {
                 >
                     <Input type="email" placeholder={t('spaces.invitations.emailPlaceholder')} value={email} onChange={(e) => setEmail(e.target.value)} />
                     <Select value={role} onValueChange={(r) => setRole(r as SpaceRole)}>
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>

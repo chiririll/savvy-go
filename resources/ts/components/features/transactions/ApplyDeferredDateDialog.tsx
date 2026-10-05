@@ -1,14 +1,7 @@
 import { useEffect, useId, useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog'
+import { ResponsiveDialog } from '@/components/shared/ResponsiveDialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useNegativeBalanceConfirm } from '@/components/shared'
@@ -107,14 +100,24 @@ export function ApplyDeferredDateDialog({
     }
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md">
-                <form onSubmit={handleSubmit} className="grid gap-4">
-                    <DialogHeader>
-                        <DialogTitle>{t('transactions.applyTitle')}</DialogTitle>
-                        <DialogDescription>{t('transactions.applyDescription')}</DialogDescription>
-                    </DialogHeader>
-
+        <>
+            <ResponsiveDialog
+                open={open}
+                onOpenChange={onOpenChange}
+                title={t('transactions.applyTitle')}
+                description={t('transactions.applyDescription')}
+                footer={
+                    <>
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                            {tCommon('actions.cancel')}
+                        </Button>
+                        <Button type="submit" form={`${groupId}-form`} disabled={!canSubmit}>
+                            {isSubmitting ? tCommon('actions.saving') : tCommon('actions.confirm')}
+                        </Button>
+                    </>
+                }
+            >
+                <form id={`${groupId}-form`} onSubmit={handleSubmit} className="grid gap-4">
                     {isEstimated && (
                         <div className="grid gap-3 rounded-md border border-dashed p-3">
                             <p className="text-xs text-muted-foreground">{t('transactions.applyEstimatedDescription')}</p>
@@ -225,18 +228,9 @@ export function ApplyDeferredDateDialog({
                             </span>
                         </label>
                     </fieldset>
-
-                    <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                            {tCommon('actions.cancel')}
-                        </Button>
-                        <Button type="submit" disabled={!canSubmit}>
-                            {isSubmitting ? tCommon('actions.saving') : tCommon('actions.confirm')}
-                        </Button>
-                    </DialogFooter>
                 </form>
-            </DialogContent>
+            </ResponsiveDialog>
             {negativeBalanceDialog}
-        </Dialog>
+        </>
     )
 }

@@ -121,6 +121,32 @@
   }
 }
 
+/* Theme switch (see use-theme.ts). Manual switch: the new theme is revealed through a JS-driven clip-path. */
+:root[data-theme-transition="wave"]::view-transition-old(root),
+:root[data-theme-transition="wave"]::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+:root[data-theme-transition="wave"]::view-transition-new(root) {
+  clip-path: var(--theme-clip, none);
+}
+
+/* The transition ends when its CSS animations end, so keep the group alive for the whole wave. */
+:root[data-theme-transition="wave"]::view-transition-group(root) {
+  animation-duration: var(--theme-duration, 0.25s);
+}
+
+/* System/cross-tab switch: plain crossfade. */
+:root[data-theme-transition="fade"]::view-transition-group(root) {
+  animation-duration: 0.4s;
+}
+
+:root[data-theme-transition="fade"]::view-transition-old(root),
+:root[data-theme-transition="fade"]::view-transition-new(root) {
+  animation-duration: 0.4s;
+}
+
 @layer base {
   :root {
     --sidebar-background: 0 0% 98%;
