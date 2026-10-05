@@ -21,6 +21,7 @@ import { dynamicsSeriesName, formatReportPeriodLabel } from '../utils'
 import type { ReportFilters } from '../types'
 import type { CashFlowGroupBy, ReportTransactionType } from '@/api/reports'
 import { groupByLabel } from '@/lib/labels'
+import { isNarrowChart, useElementWidth } from '@/hooks/use-element-width'
 import { axisStyle, legendTextStyle, useChartTheme } from '@/lib/chart-theme'
 
 type ChartType = 'line' | 'bar'
@@ -40,6 +41,8 @@ interface TransactionDynamicsChartProps {
 export function TransactionDynamicsChart({ filters, type }: TransactionDynamicsChartProps) {
     const { t, i18n } = useTranslation('pages')
     const theme = useChartTheme()
+    const [chartRef, chartWidth] = useElementWidth<HTMLDivElement>()
+    const isNarrow = isNarrowChart(chartWidth)
     const copy = type === 'income'
         ? {
             title: t('reports.incomeDynamics.title'),
@@ -153,7 +156,7 @@ export function TransactionDynamicsChart({ filters, type }: TransactionDynamicsC
                 textStyle: legendTextStyle(theme),
             } : undefined,
             grid: {
-                left: 60,
+                left: isNarrow ? 48 : 60,
                 right: 20,
                 top: 20,
                 bottom: chartData.datasets.length > 1 ? 50 : 30,
@@ -170,19 +173,19 @@ export function TransactionDynamicsChart({ filters, type }: TransactionDynamicsC
             }),
             series: chartSeries,
         }
-    }, [chartData, chartType, groupBy, currency, theme])
+    }, [chartData, chartType, groupBy, currency, theme, isNarrow])
 
     return (
         <Card>
             <CardHeader className="pb-2">
-                <div className="flex items-start justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                         <CardTitle className="text-lg">{copy.title}</CardTitle>
                         <p className="text-sm text-muted-foreground">
                             {copy.subtitle}
                         </p>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                         <div className="flex gap-1" {...testIdControls('chart-type')}>
                             <Badge
                                 {...testIdControl('line', chartType === 'line')}
@@ -263,11 +266,13 @@ export function TransactionDynamicsChart({ filters, type }: TransactionDynamicsC
                         {t('reports.noData')}
                     </div>
                 ) : (
-                    <ReactECharts
-                        option={chartOption}
-                        style={{ height: 350 }}
-                        key={`${chartType}-${groupBy}`}
-                    />
+                    <div ref={chartRef}>
+                        <ReactECharts
+                            option={chartOption}
+                            style={{ height: 350 }}
+                            key={`${chartType}-${groupBy}`}
+                        />
+                    </div>
                 )}
             </CardContent>
         </Card>

@@ -13,6 +13,7 @@ import { formatReportPeriodLabel } from '../utils'
 import type { ReportFilters } from '../types'
 import type { CashFlowGroupBy } from '@/api/reports'
 import { groupByLabel } from '@/lib/labels'
+import { isNarrowChart, useElementWidth } from '@/hooks/use-element-width'
 import { CHART_COLORS, axisStyle, legendTextStyle, useChartTheme, verticalFade, withAlpha } from '@/lib/chart-theme'
 
 interface CashFlowChartProps {
@@ -22,6 +23,8 @@ interface CashFlowChartProps {
 export function CashFlowChart({ filters }: CashFlowChartProps) {
     const { t, i18n: i18nInstance } = useTranslation('pages')
     const theme = useChartTheme()
+    const [chartRef, chartWidth] = useElementWidth<HTMLDivElement>()
+    const isNarrow = isNarrowChart(chartWidth)
     const [groupBy, setGroupBy] = useState<CashFlowGroupBy>(() => defaultGroupBy(filters))
     useEffect(() => {
         setGroupBy(defaultGroupBy(filters))
@@ -235,8 +238,8 @@ export function CashFlowChart({ filters }: CashFlowChartProps) {
                 textStyle: legendTextStyle(theme),
             },
             grid: {
-                left: 60,
-                right: 60,
+                left: isNarrow ? 44 : 60,
+                right: isNarrow ? 44 : 60,
                 top: 20,
                 bottom: 72,
             },
@@ -250,14 +253,14 @@ export function CashFlowChart({ filters }: CashFlowChartProps) {
             yAxis: [
                 // Left Y-axis for bars (income/expenses)
                 axisStyle(theme, 'value', {
-                    name: nameFlow,
+                    name: isNarrow ? undefined : nameFlow,
                     nameTextStyle: { color: theme.text },
                     position: 'left',
                     axisLabel: { formatter: formatValue },
                 }),
                 // Right Y-axis for balance line
                 axisStyle(theme, 'value', {
-                    name: nameBalance,
+                    name: isNarrow ? undefined : nameBalance,
                     nameTextStyle: { color: CHART_COLORS.balance },
                     position: 'right',
                     axisLabel: { formatter: formatValue, color: CHART_COLORS.balance },
@@ -266,7 +269,7 @@ export function CashFlowChart({ filters }: CashFlowChartProps) {
             ],
             series,
         }
-    }, [data, showComparison, groupBy, hasIncome, hasExpenses, i18nInstance.language, theme])
+    }, [data, showComparison, groupBy, hasIncome, hasExpenses, i18nInstance.language, theme, isNarrow])
 
     if (error) {
         return (
@@ -281,7 +284,7 @@ export function CashFlowChart({ filters }: CashFlowChartProps) {
     return (
         <Card>
             <CardHeader className="pb-2">
-                <div className="flex items-start justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                         <CardTitle className="text-lg">{t('reports.cashFlowChart.title')}</CardTitle>
                         <p className="text-sm text-muted-foreground">
@@ -290,7 +293,7 @@ export function CashFlowChart({ filters }: CashFlowChartProps) {
                     </div>
                     <div className="flex items-center gap-4">
                         {/* Grouping toggle */}
-                        <div className="flex gap-1" {...testIdControls('group-by')}>
+                        <div className="flex flex-wrap gap-1" {...testIdControls('group-by')}>
                             {(['day', 'week', 'month'] as CashFlowGroupBy[]).map(g => (
                                 <Badge
                                     key={g}
@@ -314,10 +317,12 @@ export function CashFlowChart({ filters }: CashFlowChartProps) {
                         {noDataMessage}
                     </div>
                 ) : (
-                    <ReactECharts
-                        option={chartOption}
-                        style={{ height: 400 }}
-                    />
+                    <div ref={chartRef}>
+                        <ReactECharts
+                            option={chartOption}
+                            style={{ height: 400 }}
+                        />
+                    </div>
                 )}
             </CardContent>
         </Card>

@@ -1,5 +1,5 @@
 import { testIdControl, testIdControls } from '@/lib/test-id'
-import { useState, useMemo, useRef, useLayoutEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import ReactECharts from '@/components/shared/ReactECharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -10,6 +10,7 @@ import { useTransactionReportByCategory } from '@/hooks'
 import { formatCurrency, formatCurrencyCompact } from '@/lib/utils'
 import i18n from '@/lib/i18n'
 import { localizeDefaultName } from '@/lib/localized-name'
+import { isNarrowChart, useElementWidth } from '@/hooks/use-element-width'
 import type { ReportFilters } from '../types'
 import { axisStyle, legendTextStyle, useChartTheme } from '@/lib/chart-theme'
 import type { ReportTransactionType } from '@/api/reports'
@@ -17,21 +18,10 @@ import type { ReportTransactionType } from '@/api/reports'
 type ViewMode = 'donut' | 'bar' | 'treemap'
 
 const CHART_HEIGHT = 350
+// Narrow screens: legend moves below the donut, so the chart needs more height.
+const NARROW_CHART_HEIGHT = 460
+const NARROW_DONUT_CENTER_Y = 160
 const DONUT_CENTER_X = 0.35
-
-function useElementWidth<T extends HTMLElement>(ready: boolean) {
-    const ref = useRef<T>(null)
-    const [width, setWidth] = useState(0)
-    useLayoutEffect(() => {
-        const el = ref.current
-        if (!el) return
-        setWidth(el.clientWidth)
-        const observer = new ResizeObserver(([entry]) => setWidth(Math.round(entry.contentRect.width)))
-        observer.observe(el)
-        return () => observer.disconnect()
-    }, [ready])
-    return [ref, width] as const
-}
 
 interface TransactionStructureChartProps {
     filters: ReportFilters
@@ -54,7 +44,7 @@ export function TransactionStructureChart({ filters, type }: TransactionStructur
         }
     const [viewMode, setViewMode] = useState<ViewMode>('donut')
     const { data, isLoading } = useTransactionReportByCategory(filters, type)
-    const [chartRef, chartWidth] = useElementWidth<HTMLDivElement>(!isLoading && !!data?.items?.length)
+    const [chartRef, chartWidth] = useElementWidth<HTMLDivElement>()
 
     const chartData = useMemo(() => {
         if (!data?.items) return []
@@ -71,13 +61,15 @@ export function TransactionStructureChart({ filters, type }: TransactionStructur
     const donutOption = useMemo(() => {
         // Inner hole diameter in px: radius 50%..75% of half the smaller side.
         const width = chartWidth || 600
-        const hole = Math.min(width, CHART_HEIGHT) * 0.75 * 0.5
+        const isNarrow = isNarrowChart(chartWidth)
+        const height = isNarrow ? NARROW_CHART_HEIGHT : CHART_HEIGHT
+        const hole = Math.min(width, height) * 0.75 * 0.5
         const totalText = formatCurrency(total, currency)
         const totalFont = Math.max(11, Math.min(24, (hole * 0.85) / (totalText.length * 0.6)))
         const labelFont = Math.max(10, Math.min(12, totalFont * 0.6))
         const legendFont = width < 480 ? 11 : 12
-        const centerX = width * DONUT_CENTER_X
-        const centerY = CHART_HEIGHT / 2
+        const centerX = width * (isNarrow ? 0.5 : DONUT_CENTER_X)
+        const centerY = isNarrow ? NARROW_DONUT_CENTER_Y : height / 2
 
         return {
         tooltip: {
@@ -89,9 +81,9 @@ export function TransactionStructureChart({ filters, type }: TransactionStructur
             },
         },
         legend: {
-            orient: 'vertical',
-            right: 20,
-            top: 'center',
+            ...(isNarrow
+                ? { orient: 'horizontal', left: 12, right: 12, top: NARROW_DONUT_CENTER_Y * 2 - 4 }
+                : { orient: 'vertical', right: 20, top: 'center' }),
             textStyle: legendTextStyle(theme, legendFont),
             formatter: (name: string) => {
                 const item = chartData.find((entry) => entry.name === name)
@@ -105,7 +97,7 @@ export function TransactionStructureChart({ filters, type }: TransactionStructur
         series: [{
             type: 'pie',
             radius: ['50%', '75%'],
-            center: ['35%', '50%'],
+            center: isNarrow ? ['50%', NARROW_DONUT_CENTER_Y] : ['35%', '50%'],
             avoidLabelOverlap: true,
             itemStyle: {
                 borderRadius: 6,
@@ -164,6 +156,7 @@ export function TransactionStructureChart({ filters, type }: TransactionStructur
     }, [chartData, total, currency, i18nInstance.language, theme, chartWidth])
 
     const barOption = useMemo(() => {
+        const isNarrow = isNarrowChart(chartWidth)
         const sortedData = [...chartData].sort((a, b) => b.value - a.value)
 
         return {
@@ -181,8 +174,8 @@ export function TransactionStructureChart({ filters, type }: TransactionStructur
                 },
             },
             grid: {
-                left: type === 'income' ? 140 : 120,
-                right: 60,
+                left: isNarrow ? 96 : type === 'income' ? 140 : 120,
+                right: isNarrow ? 72 : 60,
                 top: 20,
                 bottom: 20,
             },
@@ -191,7 +184,9 @@ export function TransactionStructureChart({ filters, type }: TransactionStructur
             }),
             yAxis: axisStyle(theme, 'category', {
                 data: sortedData.map((item) => item.name),
-                axisLabel: { fontSize: 12, color: theme.textStrong },
+                axisLabel: isNarrow
+                    ? { fontSize: 11, color: theme.textStrong, width: 88, overflow: 'truncate' }
+                    : { fontSize: 12, color: theme.textStrong },
                 axisLine: { show: false },
             }),
             series: [{
@@ -208,12 +203,12 @@ export function TransactionStructureChart({ filters, type }: TransactionStructur
                     show: true,
                     position: 'right',
                     formatter: (params: { value: number }) => formatCurrency(params.value, currency),
-                    fontSize: 11,
+                    fontSize: isNarrow ? 10 : 11,
                     color: theme.text,
                 },
             }],
         }
-    }, [chartData, total, currency, type, theme])
+    }, [chartData, total, currency, type, theme, chartWidth])
 
     const treemapOption = useMemo(() => ({
         tooltip: {
@@ -299,14 +294,14 @@ export function TransactionStructureChart({ filters, type }: TransactionStructur
     return (
         <Card>
             <CardHeader className="pb-2">
-                <div className="flex items-start justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                         <CardTitle className="text-lg">{copy.title}</CardTitle>
                         <p className="text-sm text-muted-foreground">
                             {copy.subtitle}
                         </p>
                     </div>
-                    <div className="flex gap-1" {...testIdControls('view')}>
+                    <div className="flex flex-wrap gap-1" {...testIdControls('view')}>
                         {viewModes.map((mode) => (
                             <Badge
                                 key={mode.value}
@@ -333,7 +328,7 @@ export function TransactionStructureChart({ filters, type }: TransactionStructur
                     <div ref={chartRef}>
                         <ReactECharts
                             option={getOption()}
-                            style={{ height: CHART_HEIGHT }}
+                            style={{ height: viewMode === 'donut' && isNarrowChart(chartWidth) ? NARROW_CHART_HEIGHT : CHART_HEIGHT }}
                             key={viewMode}
                         />
                     </div>

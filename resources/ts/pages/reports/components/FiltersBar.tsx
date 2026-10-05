@@ -139,8 +139,8 @@ export function FiltersBar({ filters, onFilterChange, onToggleArrayFilter, onRes
         filters.tagIds.length
 
     // Period type badges component
-    const PeriodTypeBadges = () => (
-        <div className="flex flex-wrap gap-1" {...testIdControls('global-period')}>
+    const PeriodTypeBadges = ({ scroll = false }: { scroll?: boolean }) => (
+        <div className={scroll ? 'flex w-max gap-1' : 'flex flex-wrap gap-1'} {...testIdControls('global-period')}>
             {(['last_30_days', 'month', 'quarter', 'year', 'ytd'] as PeriodType[]).map(type => (
                 <Badge
                     key={type}
@@ -295,8 +295,8 @@ export function FiltersBar({ filters, onFilterChange, onToggleArrayFilter, onRes
                 <CardContent className="py-3">
                     <div className="flex items-center justify-between gap-2">
                         {/* Quick period selection */}
-                        <div className="flex-1 overflow-x-auto">
-                            <PeriodTypeBadges />
+                        <div className="min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                            <PeriodTypeBadges scroll />
                         </div>
 
                         {/* Filters button */}

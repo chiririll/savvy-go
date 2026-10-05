@@ -122,14 +122,14 @@ export function NetWorthTab({ filters }: NetWorthTabProps) {
                             {data?.accounts.map(account => (
                                 <div
                                     key={account.id}
-                                    className="flex items-center gap-3 p-3 rounded-lg bg-muted/30"
+                                    className="flex items-center gap-2 sm:gap-3 p-3 rounded-lg bg-muted/30"
                                 >
                                     {/* Icon */}
                                     {(() => {
                                         const config = ACCOUNT_TYPE_CONFIG[account.type as AccountType]
                                         const Icon = config?.icon || Wallet
                                         return (
-                                            <div className={cn('flex items-center justify-center size-10 rounded-lg', config?.color || 'bg-muted')}>
+                                            <div className={cn('flex shrink-0 items-center justify-center size-10 rounded-lg', config?.color || 'bg-muted')}>
                                                 <Icon className="size-4" />
                                             </div>
                                         )
@@ -146,8 +146,8 @@ export function NetWorthTab({ filters }: NetWorthTabProps) {
                                     </div>
 
                                     {/* Balance and percentage */}
-                                    <div className="text-right">
-                                        <p className="font-semibold">
+                                    <div className="shrink-0 text-right">
+                                        <p className="text-sm sm:text-base font-semibold">
                                             {formatCurrency(account.balance, data.currency)}
                                         </p>
                                         <p className="text-xs text-muted-foreground">
@@ -156,7 +156,7 @@ export function NetWorthTab({ filters }: NetWorthTabProps) {
                                     </div>
 
                                     {/* Progress bar */}
-                                    <div className="w-20 h-2 bg-muted rounded-full overflow-hidden">
+                                    <div className="hidden sm:block w-20 h-2 bg-muted rounded-full overflow-hidden">
                                         <div
                                             className="h-full bg-blue-500 rounded-full"
                                             style={{ width: `${Math.max(account.percentage, 2)}%` }}

@@ -9,6 +9,7 @@ import { formatCurrency } from '@/lib/utils'
 import type { ReportFilters } from '../types'
 import { localizeSavingsNodeName } from '../utils'
 import { useChartTheme } from '@/lib/chart-theme'
+import { isNarrowChart, useElementWidth } from '@/hooks/use-element-width'
 
 interface SankeyDiagramProps {
     filters: ReportFilters
@@ -18,6 +19,8 @@ export function SankeyDiagram({ filters }: SankeyDiagramProps) {
     const { t, i18n } = useTranslation('pages')
     const navigate = useNavigate()
     const theme = useChartTheme()
+    const [chartRef, chartWidth] = useElementWidth<HTMLDivElement>()
+    const isNarrow = isNarrowChart(chartWidth)
     const { data, isLoading, error } = useMoneyFlow(filters)
 
     const sankeyOption = useMemo(() => {
@@ -59,10 +62,13 @@ export function SankeyDiagram({ filters }: SankeyDiagramProps) {
                     color: 'gradient',
                     curveness: 0.5,
                 },
-                nodeGap: 12,
-                nodeWidth: 20,
+                nodeGap: isNarrow ? 8 : 12,
+                nodeWidth: isNarrow ? 12 : 20,
+                left: 8,
+                right: isNarrow ? 84 : '20%',
                 label: {
-                    fontSize: 13,
+                    fontSize: isNarrow ? 11 : 13,
+                    ...(isNarrow ? { width: 76, overflow: 'truncate' } : {}),
                     color: theme.textStrong,
                     textBorderWidth: 0,
                 },
@@ -70,7 +76,7 @@ export function SankeyDiagram({ filters }: SankeyDiagramProps) {
                 links,
             }],
         }
-    }, [data, t, i18n.language, theme])
+    }, [data, t, i18n.language, theme, isNarrow])
 
     const handleSankeyClick = useCallback((params: { data: { source?: string; target?: string } }) => {
         if (params.data.source && params.data.target) {
@@ -106,13 +112,15 @@ export function SankeyDiagram({ filters }: SankeyDiagramProps) {
                         {t('reports.noData')}
                     </div>
                 ) : (
-                    <ReactECharts
-                        option={sankeyOption}
-                        style={{ height: 400 }}
-                        onEvents={{
-                            click: handleSankeyClick,
-                        }}
-                    />
+                    <div ref={chartRef}>
+                        <ReactECharts
+                            option={sankeyOption}
+                            style={{ height: 400 }}
+                            onEvents={{
+                                click: handleSankeyClick,
+                            }}
+                        />
+                    </div>
                 )}
             </CardContent>
         </Card>

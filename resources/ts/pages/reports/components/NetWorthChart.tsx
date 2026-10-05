@@ -13,6 +13,7 @@ import { formatReportPeriodLabel } from '../utils'
 import type { ReportFilters } from '../types'
 import type { CashFlowGroupBy } from '@/api/reports'
 import { groupByLabel } from '@/lib/labels'
+import { isNarrowChart, useElementWidth } from '@/hooks/use-element-width'
 import { CHART_COLORS, axisStyle, useChartTheme, verticalFade } from '@/lib/chart-theme'
 
 interface NetWorthChartProps {
@@ -22,6 +23,8 @@ interface NetWorthChartProps {
 export function NetWorthChart({ filters }: NetWorthChartProps) {
     const { t, i18n: i18nInstance } = useTranslation('pages')
     const theme = useChartTheme()
+    const [chartRef, chartWidth] = useElementWidth<HTMLDivElement>()
+    const isNarrow = isNarrowChart(chartWidth)
     const [groupBy, setGroupBy] = useState<CashFlowGroupBy>(() => defaultGroupBy(filters))
     useEffect(() => {
         setGroupBy(defaultGroupBy(filters))
@@ -45,7 +48,7 @@ export function NetWorthChart({ filters }: NetWorthChartProps) {
                 },
             },
             grid: {
-                left: 70,
+                left: isNarrow ? 52 : 70,
                 right: 20,
                 top: 20,
                 bottom: 30,
@@ -79,13 +82,13 @@ export function NetWorthChart({ filters }: NetWorthChartProps) {
                 areaStyle: { color: verticalFade(CHART_COLORS.balance, 0.25) },
             }],
         }
-    }, [data, groupBy, currency, i18nInstance.language, theme])
+    }, [data, groupBy, currency, i18nInstance.language, theme, isNarrow])
 
     return (
         <Card>
             <CardHeader className="pb-2">
-                <div className="flex items-start justify-between">
-                    <div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
                         <CardTitle className="text-lg">{t('reports.netWorth.chartTitle')}</CardTitle>
                         <p className="text-sm text-muted-foreground">
                             {t('reports.netWorth.chartSubtitle')}
@@ -114,11 +117,13 @@ export function NetWorthChart({ filters }: NetWorthChartProps) {
                         {t('reports.noData')}
                     </div>
                 ) : (
-                    <ReactECharts
-                        option={chartOption}
-                        style={{ height: 350 }}
-                        key={groupBy}
-                    />
+                    <div ref={chartRef}>
+                        <ReactECharts
+                            option={chartOption}
+                            style={{ height: 350 }}
+                            key={groupBy}
+                        />
+                    </div>
                 )}
             </CardContent>
         </Card>

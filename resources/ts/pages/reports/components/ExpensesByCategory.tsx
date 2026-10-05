@@ -86,14 +86,14 @@ export function ExpensesByCategory({ filters }: ExpensesByCategoryProps) {
                                     {/* Content */}
                                     <div className="flex-1 min-w-0">
                                         {/* Header row */}
-                                        <div className="flex items-center justify-between mb-1.5">
-                                            <div className="flex items-center gap-2">
-                                                <span className="font-medium text-sm">{localizeDefaultName(category.name)}</span>
+                                        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 mb-1.5">
+                                            <div className="flex min-w-0 items-center gap-2">
+                                                <span className="font-medium text-sm truncate">{localizeDefaultName(category.name)}</span>
                                                 {isAnomalous && filters.compareWith !== 'none' && (
-                                                    <AlertTriangle className="size-4 text-amber-500" />
+                                                    <AlertTriangle className="size-4 shrink-0 text-amber-500" />
                                                 )}
                                             </div>
-                                            <div className="flex items-center gap-3 text-sm">
+                                            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm">
                                                 <span className="font-semibold">
                                                     {formatCurrency(category.current, data.currency)}
                                                 </span>
