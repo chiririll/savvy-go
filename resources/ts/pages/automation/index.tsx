@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
-import { ListPage } from '@/components/shared'
-import { createAutomationColumns, AutomationRuleFormDialog } from '@/components/features/automation'
+import { FeedList, Page, PageHeader } from '@/components/shared'
+import { AutomationRuleFormDialog, AutomationRuleRow } from '@/components/features/automation'
 import {
     useAutomationRules,
     useCreateAutomationRule,
@@ -29,24 +29,37 @@ export default function AutomationPage() {
         update: updateRule,
     })
 
-    const columns = createAutomationColumns({
-        onDelete: (id) => deleteRule.mutate(id),
-        onToggle: (id) => toggleRule.mutate(id),
-        onEdit: form.openEdit,
-        isReadOnly,
-    })
-
     return (
-        <>
-            <ListPage
+        <Page title={t('automation.title')}>
+            <PageHeader
                 title={t('automation.title')}
                 description={t('automation.description')}
                 createLabel={t('automation.create')}
                 onCreateClick={isReadOnly ? undefined : form.openCreate}
-                data={items}
-                columns={columns}
-                isLoading={isLoading}
             />
+
+            <div className="mx-auto w-full max-w-[800px]">
+                <FeedList
+                    items={items}
+                    isLoading={isLoading}
+                    emptyTitle={t('table.emptyTitle', { ns: 'common' })}
+                    emptyDescription={t('table.emptyDescription', { ns: 'common' })}
+                    onCreate={form.openCreate}
+                    createLabel={t('automation.create')}
+                    isReadOnly={isReadOnly}
+                    getKey={(rule) => rule.id}
+                >
+                    {(rule) => (
+                        <AutomationRuleRow
+                            rule={rule}
+                            onEdit={form.openEdit}
+                            onDelete={(id) => deleteRule.mutate(id)}
+                            onToggle={(id) => toggleRule.mutate(id)}
+                            isReadOnly={isReadOnly}
+                        />
+                    )}
+                </FeedList>
+            </div>
 
             <AutomationRuleFormDialog
                 rule={form.entity}
@@ -55,6 +68,6 @@ export default function AutomationPage() {
                 onSubmit={form.submit}
                 isSubmitting={form.isSubmitting}
             />
-        </>
+        </Page>
     )
 }

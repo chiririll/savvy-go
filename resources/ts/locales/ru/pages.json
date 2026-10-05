@@ -129,6 +129,7 @@
         "noDate": "Без даты",
         "today": "Сегодня",
         "yesterday": "Вчера",
+        "tomorrow": "Завтра",
         "applyTitle": "Подтвердить транзакцию",
         "applyDescription": "На какую дату провести операцию? Дата проведения не может быть в будущем.",
         "applyEstimatedDescription": "Сумма ориентировочная. Укажите фактическую сумму для проведения.",
@@ -207,21 +208,6 @@
         "create": "Новый платёж",
         "createTitle": "Новый регулярный платёж",
         "editTitle": "Изменить регулярный платёж",
-        "columns": {
-            "transaction": "Транзакция",
-            "amount": "Сумма",
-            "category": "Категория",
-            "frequency": "Период",
-            "nextRun": "Следующий запуск",
-            "status": "Статус"
-        },
-        "status": {
-            "active": "Активен",
-            "paused": "Пауза"
-        },
-        "today": "Сегодня",
-        "tomorrow": "Завтра",
-        "lastRun": "Последний: {{date}}",
         "everyInterval": "Каждые {{count}} {{frequency}}",
         "deleteTitle": "Удалить регулярный платёж?",
         "deleteDescription": "Это действие нельзя отменить."
@@ -234,26 +220,11 @@
         "editTitle": "Изменить бюджет",
         "notFound": "Бюджет не найден",
         "allExpenses": "Все расходы",
-        "noCategories": "Нет категорий",
-        "spent": "{{amount}} потрачено",
-        "remaining": "{{amount}} осталось",
-        "exceededBy": "Превышение на {{amount}}",
-        "status": {
-            "active": "Активен",
-            "inactive": "Неактивен"
-        },
         "periods": {
             "weekly": "Неделя",
             "monthly": "Месяц",
             "yearly": "Год",
             "one_time": "Разовый"
-        },
-        "columns": {
-            "budget": "Бюджет",
-            "limit": "Лимит",
-            "period": "Период",
-            "progress": "Прогресс",
-            "status": "Статус"
         },
         "deleteTitle": "Удалить бюджет?",
         "deleteDescription": "Это действие нельзя отменить."
@@ -267,17 +238,11 @@
         "netPosition": "Чистая позиция",
         "inYourFavor": "в вашу пользу",
         "youOwe": "вы должны",
-        "showCompleted": "Показать закрытые долги",
         "notFound": "Долг не найден",
         "paidOff": "Погашен",
         "makePayment": "Внести платёж",
         "collectPayment": "Принять платёж",
         "reopen": "Открыть снова",
-        "status": {
-            "completed": "Закрыт",
-            "active": "Активен",
-            "inactive": "Неактивен"
-        },
         "columns": {
             "debt": "Долг",
             "type": "Тип",
@@ -292,7 +257,12 @@
             "owed_to_me": "Мне должны"
         },
         "deleteTitle": "Удалить долг?",
-        "deleteDescription": "Это действие нельзя отменить."
+        "deleteDescription": "Это действие нельзя отменить.",
+        "due": "До {{date}}",
+        "tabs": {
+            "active": "Активные",
+            "completed": "Закрытые"
+        }
     },
     "automation": {
         "title": "Правила автоматизации",
@@ -313,25 +283,15 @@
             "error": "Ошибка",
             "skipped": "Пропущено"
         },
-        "columns": {
-            "order": "№",
-            "name": "Название",
-            "trigger": "Триггер",
-            "conditions": "Условия",
-            "actions": "Действия",
-            "runs": "Запуски",
-            "active": "Активно"
-        },
         "deleteTitle": "Удалить правило?",
         "deleteDescription": "Это действие нельзя отменить.",
-        "conditionCount_one": "{{count}} условие",
-        "conditionCount_few": "{{count}} условия",
-        "conditionCount_many": "{{count}} условий",
-        "conditionCount_other": "{{count}} условий",
-        "actionCount_one": "{{count}} действие",
-        "actionCount_few": "{{count}} действия",
-        "actionCount_many": "{{count}} действий",
-        "actionCount_other": "{{count}} действий"
+        "runs_one": "{{count}} запуск",
+        "runs_few": "{{count}} запуска",
+        "runs_many": "{{count}} запусков",
+        "runs_other": "{{count}} запусков",
+        "shape": "У {{conditions}} | Д {{actions}}",
+        "shapeTitle": "Условий: {{conditions}}, действий: {{actions}}",
+        "active": "Активно"
     },
     "reports": {
         "title": "Отчёты",

@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
-import { ListPage } from '@/components/shared'
-import { BudgetFormDialog, createBudgetColumns } from '@/components/features/budgets'
+import { FeedList, Page, PageHeader } from '@/components/shared'
+import { BudgetFormDialog, BudgetRow, budgetGroup, compareBudgets } from '@/components/features/budgets'
 import { useBudgets, useCreateBudget, useDeleteBudget, useUpdateBudget, useResourceFormDialog } from '@/hooks'
 import { useReadOnly } from '@/components/providers/ReadOnlyProvider'
 import type { Budget } from '@/types'
@@ -13,7 +13,7 @@ export default function BudgetsPage() {
     const createBudget = useCreateBudget()
     const updateBudget = useUpdateBudget()
     const isReadOnly = useReadOnly()
-    const items = budgets ?? []
+    const items = [...(budgets ?? [])].sort(compareBudgets)
     const form = useResourceFormDialog<Budget, BudgetFormData>({
         items,
         isLoading,
@@ -21,23 +21,37 @@ export default function BudgetsPage() {
         update: updateBudget,
     })
 
-    const columns = createBudgetColumns({
-        onDelete: (id) => deleteBudget.mutate(id),
-        onEdit: form.openEdit,
-        isReadOnly,
-    })
-
     return (
-        <>
-            <ListPage
+        <Page title={t('budgets.title')}>
+            <PageHeader
                 title={t('budgets.title')}
                 description={t('budgets.description')}
                 createLabel={t('budgets.create')}
                 onCreateClick={isReadOnly ? undefined : form.openCreate}
-                data={items}
-                columns={columns}
-                isLoading={isLoading}
             />
+
+            <div className="mx-auto w-full max-w-[800px]">
+                <FeedList
+                    items={items}
+                    isLoading={isLoading}
+                    emptyTitle={t('table.emptyTitle', { ns: 'common' })}
+                    emptyDescription={t('table.emptyDescription', { ns: 'common' })}
+                    onCreate={form.openCreate}
+                    createLabel={t('budgets.create')}
+                    isReadOnly={isReadOnly}
+                    getKey={(budget) => budget.id}
+                    groupBy={budgetGroup}
+                >
+                    {(budget) => (
+                        <BudgetRow
+                            budget={budget}
+                            onEdit={form.openEdit}
+                            onDelete={(id) => deleteBudget.mutate(id)}
+                            isReadOnly={isReadOnly}
+                        />
+                    )}
+                </FeedList>
+            </div>
 
             <BudgetFormDialog
                 budget={form.entity}
@@ -46,6 +60,6 @@ export default function BudgetsPage() {
                 onSubmit={form.submit}
                 isSubmitting={form.isSubmitting}
             />
-        </>
+        </Page>
     )
 }

@@ -1,8 +1,7 @@
 import { type ReactNode } from 'react'
-import { useTranslation } from 'react-i18next'
-import { FeedEmpty, FeedRowSkeleton } from '@/components/shared'
-import { formatTransactionGroupHeading, groupByDateKey } from '@/lib/dates'
-import { intlLocale } from '@/lib/i18n'
+import { FeedEmpty, FeedGroup, FeedRowSkeleton } from '@/components/shared'
+import { useRelativeDay } from '@/hooks'
+import { groupByDateKey } from '@/lib/dates'
 import { Transaction } from '@/types'
 import { TransactionRow } from './TransactionRow'
 
@@ -39,7 +38,7 @@ export function TransactionList({
     isReadOnly,
     grouped = true,
 }: TransactionListProps) {
-    const { t, i18n } = useTranslation('pages')
+    const relativeDay = useRelativeDay()
     const groups = grouped ? groupByDateKey(transactions) : []
 
     if (isLoading) {
@@ -87,29 +86,23 @@ export function TransactionList({
     return (
         <div className="space-y-5">
             {groups.map((group) => (
-                <section key={group.date ?? 'undated'} className="min-w-0">
-                    <h2 className="px-1.5 pb-1 text-sm font-semibold capitalize">
-                        {formatTransactionGroupHeading(group.date, intlLocale(i18n.language), {
-                            today: t('transactions.today'),
-                            yesterday: t('transactions.yesterday'),
-                            noDate: t('transactions.noDate'),
-                        })}
-                    </h2>
-                    <div className="divide-y divide-border/60">
-                        {group.items.map((transaction) => (
-                            <TransactionRow
-                                key={transaction.id}
-                                transaction={transaction}
-                                onDelete={onDelete}
-                                onDuplicate={onDuplicate}
-                                onConfirm={onConfirm}
-                                onSkip={onSkip}
-                                onEdit={onEdit}
-                                isReadOnly={isReadOnly}
-                            />
-                        ))}
-                    </div>
-                </section>
+                <FeedGroup
+                    key={group.date ?? 'undated'}
+                    title={relativeDay(group.date)}
+                >
+                    {group.items.map((transaction) => (
+                        <TransactionRow
+                            key={transaction.id}
+                            transaction={transaction}
+                            onDelete={onDelete}
+                            onDuplicate={onDuplicate}
+                            onConfirm={onConfirm}
+                            onSkip={onSkip}
+                            onEdit={onEdit}
+                            isReadOnly={isReadOnly}
+                        />
+                    ))}
+                </FeedGroup>
             ))}
         </div>
     )

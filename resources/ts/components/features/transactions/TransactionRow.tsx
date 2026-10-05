@@ -1,48 +1,15 @@
 import { useState } from 'react'
-import {
-    ArrowDownLeft,
-    ArrowLeftRight,
-    ArrowUpRight,
-    Banknote,
-    Check,
-    Copy,
-    HandCoins,
-    SkipForward,
-} from 'lucide-react'
+import { Check, Copy, SkipForward } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { FeedRow, FeedStatusBadge, RowActions } from '@/components/shared'
-import { formatTransactionGroupHeading } from '@/lib/dates'
-import { intlLocale } from '@/lib/i18n'
+import { useRelativeDay } from '@/hooks'
 import { cn, formatCurrency } from '@/lib/utils'
 import { displayTransactionDescription, transactionAmountAppearance, transactionSubtitle } from '@/lib/transaction-description'
 import { Transaction } from '@/types'
 import { SkipTransactionAlert } from './SkipTransactionAlert'
 import { TransactionItemsRow } from './TransactionItemsRow'
-
-const TYPE_ICONS = {
-    income: ArrowDownLeft,
-    expense: ArrowUpRight,
-    transfer: ArrowLeftRight,
-    debt_payment: Banknote,
-    debt_collection: HandCoins,
-    debt_lend: HandCoins,
-    debt_borrow: Banknote,
-    transfer_out: ArrowUpRight,
-    transfer_in: ArrowDownLeft,
-} as const
-
-const TYPE_ICON_TONES = {
-    income: 'bg-green-100 text-green-600 dark:bg-green-950/40',
-    expense: 'bg-red-100 text-red-600 dark:bg-red-950/40',
-    transfer: 'bg-blue-100 text-blue-600 dark:bg-blue-950/40',
-    debt_payment: 'bg-orange-100 text-orange-600 dark:bg-orange-950/40',
-    debt_collection: 'bg-purple-100 text-purple-600 dark:bg-purple-950/40',
-    debt_lend: 'bg-red-100 text-red-600 dark:bg-red-950/40',
-    debt_borrow: 'bg-green-100 text-green-600 dark:bg-green-950/40',
-    transfer_out: 'bg-blue-100 text-blue-600 dark:bg-blue-950/40',
-    transfer_in: 'bg-blue-100 text-blue-600 dark:bg-blue-950/40',
-} as const
+import { transactionIconProps } from './transaction-icon'
 
 interface TransactionRowProps {
     transaction: Transaction
@@ -67,20 +34,14 @@ export function TransactionRow({
     showActions = true,
     showDate = false,
 }: TransactionRowProps) {
-    const { t, i18n } = useTranslation(['common', 'pages'])
-    const dateLabel = showDate
-        ? formatTransactionGroupHeading(transaction.date, intlLocale(i18n.language), {
-            today: t('pages:transactions.today'),
-            yesterday: t('pages:transactions.yesterday'),
-            noDate: t('pages:transactions.noDate'),
-        })
-        : null
+    const { t } = useTranslation(['common', 'pages'])
+    const relativeDay = useRelativeDay()
+    const dateLabel = showDate ? relativeDay(transaction.date) : null
     const [expanded, setExpanded] = useState(false)
     const itemsCount = transaction.items.length
     const canExpand = itemsCount > 1
     const { sign, className } = transactionAmountAppearance(transaction.type, transaction.status)
     const isTransfer = transaction.type === 'transfer'
-    const TypeIcon = TYPE_ICONS[transaction.type]
     const { edit, duplicate, delete: canRemove, confirm, skip } = transaction.actions
     const canEdit = edit && !!onEdit
     const canConfirm = !isReadOnly && confirm && !!onConfirm
@@ -91,15 +52,7 @@ export function TransactionRow({
 
     return (
         <FeedRow
-            icon={transaction.category?.icon ? (
-                <span aria-hidden>{transaction.category.icon}</span>
-            ) : (
-                <TypeIcon className="size-4" />
-            )}
-            iconClassName={!transaction.category?.color ? TYPE_ICON_TONES[transaction.type] : undefined}
-            iconStyle={transaction.category?.color
-                ? { backgroundColor: `${transaction.category.color}20` }
-                : undefined}
+            {...transactionIconProps(transaction.type, transaction.category)}
             title={displayTransactionDescription(transaction)}
             badge={(
                 <>

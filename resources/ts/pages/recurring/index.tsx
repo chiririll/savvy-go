@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
-import { ListPage } from '@/components/shared'
-import { createRecurringColumns, RecurringFormDialog } from '@/components/features/recurring'
+import { FeedList, Page, PageHeader } from '@/components/shared'
+import { compareRecurring, recurringGroup, RecurringFormDialog, RecurringRow } from '@/components/features/recurring'
 import { useCreateRecurring, useDeleteRecurring, useRecurring, useUpdateRecurring, useResourceFormDialog } from '@/hooks'
 import { useReadOnly } from '@/components/providers/ReadOnlyProvider'
 import { RecurringFormData } from '@/schemas'
@@ -13,7 +13,7 @@ export default function RecurringPage() {
     const createRecurring = useCreateRecurring()
     const updateRecurring = useUpdateRecurring()
     const isReadOnly = useReadOnly()
-    const items = recurring ?? []
+    const items = [...(recurring ?? [])].sort(compareRecurring)
     const form = useResourceFormDialog<RecurringTransaction, RecurringFormData>({
         items,
         isLoading,
@@ -21,23 +21,37 @@ export default function RecurringPage() {
         update: updateRecurring,
     })
 
-    const columns = createRecurringColumns({
-        onDelete: (id) => deleteRecurring.mutate(id),
-        onEdit: form.openEdit,
-        isReadOnly,
-    })
-
     return (
-        <>
-            <ListPage
+        <Page title={t('recurring.title')}>
+            <PageHeader
                 title={t('recurring.title')}
                 description={t('recurring.description')}
                 createLabel={t('recurring.create')}
                 onCreateClick={isReadOnly ? undefined : form.openCreate}
-                data={items}
-                columns={columns}
-                isLoading={isLoading}
             />
+
+            <div className="mx-auto w-full max-w-[800px]">
+                <FeedList
+                    items={items}
+                    isLoading={isLoading}
+                    emptyTitle={t('table.emptyTitle', { ns: 'common' })}
+                    emptyDescription={t('table.emptyDescription', { ns: 'common' })}
+                    onCreate={form.openCreate}
+                    createLabel={t('recurring.create')}
+                    isReadOnly={isReadOnly}
+                    getKey={(item) => item.id}
+                    groupBy={recurringGroup}
+                >
+                    {(item) => (
+                        <RecurringRow
+                            recurring={item}
+                            onEdit={form.openEdit}
+                            onDelete={(id) => deleteRecurring.mutate(id)}
+                            isReadOnly={isReadOnly}
+                        />
+                    )}
+                </FeedList>
+            </div>
 
             <RecurringFormDialog
                 recurring={form.entity}
@@ -46,6 +60,6 @@ export default function RecurringPage() {
                 onSubmit={form.submit}
                 isSubmitting={form.isSubmitting}
             />
-        </>
+        </Page>
     )
 }
