@@ -3,14 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Check, Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog'
+import { ResponsiveDialog } from '@/components/shared/ResponsiveDialog'
 
 interface UserPasswordLinkDialogProps {
     url: string | null
@@ -38,28 +31,24 @@ export function UserPasswordLinkDialog({
     }
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-lg">
-                <DialogHeader>
-                    <DialogTitle>{t('users.inviteLinkTitle')}</DialogTitle>
-                    <DialogDescription>
-                        {t('users.inviteLinkDescription')}
-                    </DialogDescription>
-                </DialogHeader>
-
-                <div className="flex gap-2">
-                    <Input readOnly value={url ?? ''} className="font-mono text-sm" />
-                    <Button type="button" variant="outline" onClick={handleCopy}>
-                        {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-                    </Button>
-                </div>
-
-                <DialogFooter>
-                    <Button type="button" onClick={() => onOpenChange(false)}>
-                        {t('common:actions.done')}
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+        <ResponsiveDialog
+            open={open}
+            onOpenChange={onOpenChange}
+            title={t('users.inviteLinkTitle')}
+            description={t('users.inviteLinkDescription')}
+            className="sm:max-w-lg"
+            footer={
+                <Button type="button" onClick={() => onOpenChange(false)}>
+                    {t('common:actions.done')}
+                </Button>
+            }
+        >
+            <div className="flex gap-2">
+                <Input readOnly value={url ?? ''} className="font-mono text-sm" />
+                <Button type="button" variant="outline" onClick={handleCopy}>
+                    {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+                </Button>
+            </div>
+        </ResponsiveDialog>
     )
 }

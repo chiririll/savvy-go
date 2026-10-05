@@ -181,7 +181,7 @@ export function RecurringForm({
                                     <FormLabel>{t('forms:recurring.frequency')}</FormLabel>
                                     <Select onValueChange={field.onChange} value={field.value}>
                                         <FormControl>
-                                            <SelectTrigger>
+                                            <SelectTrigger className="w-full">
                                                 <SelectValue />
                                             </SelectTrigger>
                                         </FormControl>
@@ -231,7 +231,7 @@ export function RecurringForm({
                                         value={field.value?.toString() ?? ''}
                                     >
                                         <FormControl>
-                                            <SelectTrigger>
+                                            <SelectTrigger className="w-full">
                                                 <SelectValue placeholder={t('forms:selectDay')} />
                                             </SelectTrigger>
                                         </FormControl>

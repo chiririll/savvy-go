@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Check, Copy, ExternalLink, KeyRound, Plus, Trash2 } from 'lucide-react'
-import { Page, PageHeader, FormWrapper } from '@/components/shared'
+import { Page, PageHeader, FormWrapper, ResponsiveDialog } from '@/components/shared'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -17,14 +17,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select'
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog'
 import {
     AlertDialog,
     AlertDialogAction,
@@ -193,34 +185,42 @@ export default function ApiSettingsPage() {
                 </section>
             </FormWrapper>
 
-            <Dialog
+            <ResponsiveDialog
                 open={showCreate}
                 onOpenChange={(open) => {
                     setShowCreate(open)
                     if (!open) resetForm()
                 }}
+                title={t('api.create.title')}
+                description={t('api.create.description')}
+                footer={
+                    <>
+                        <Button variant="outline" onClick={() => setShowCreate(false)}>
+                            {tCommon('actions.cancel')}
+                        </Button>
+                        <Button onClick={handleCreate} disabled={!name.trim() || createToken.isPending}>
+                            {tCommon('actions.create')}
+                        </Button>
+                    </>
+                }
             >
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>{t('api.create.title')}</DialogTitle>
-                        <DialogDescription>{t('api.create.description')}</DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-2">
-                        <div className="space-y-2">
-                            <Label htmlFor="api-token-name">{t('api.create.name')}</Label>
-                            <Input
-                                id="api-token-name"
-                                placeholder={t('api.create.namePlaceholder')}
-                                value={name}
-                                maxLength={100}
-                                autoFocus
-                                onChange={(e) => setName(e.target.value)}
-                            />
-                        </div>
+                <div className="space-y-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="api-token-name">{t('api.create.name')}</Label>
+                        <Input
+                            id="api-token-name"
+                            placeholder={t('api.create.namePlaceholder')}
+                            value={name}
+                            maxLength={100}
+                            autoFocus
+                            onChange={(e) => setName(e.target.value)}
+                        />
+                    </div>
+                    <div className="grid grid-cols-2 items-start gap-3">
                         <div className="space-y-2">
                             <Label>{t('api.create.access')}</Label>
                             <Select value={scope} onValueChange={(v) => setScope(v as ApiTokenScope)}>
-                                <SelectTrigger>
+                                <SelectTrigger className="w-full">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -228,12 +228,11 @@ export default function ApiSettingsPage() {
                                     <SelectItem value="read-write">{t('api.scope.read-write')}</SelectItem>
                                 </SelectContent>
                             </Select>
-                            <p className="text-xs text-muted-foreground">{apiScopeHint(t, scope)}</p>
                         </div>
                         <div className="space-y-2">
                             <Label>{t('api.create.expiry')}</Label>
                             <Select value={expiry} onValueChange={(v) => setExpiry(v as Expiry)}>
-                                <SelectTrigger>
+                                <SelectTrigger className="w-full">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -245,36 +244,27 @@ export default function ApiSettingsPage() {
                             </Select>
                         </div>
                     </div>
-                    <DialogFooter className="gap-2 sm:gap-0">
-                        <Button variant="outline" onClick={() => setShowCreate(false)}>
-                            {tCommon('actions.cancel')}
-                        </Button>
-                        <Button onClick={handleCreate} disabled={!name.trim() || createToken.isPending}>
-                            {tCommon('actions.create')}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                    <p className="text-xs text-muted-foreground">{apiScopeHint(t, scope)}</p>
+                </div>
+            </ResponsiveDialog>
 
-            <Dialog open={createdToken !== null} onOpenChange={(open) => !open && setCreatedToken(null)}>
-                <DialogContent className="sm:max-w-lg">
-                    <DialogHeader>
-                        <DialogTitle>{t('api.created.title')}</DialogTitle>
-                        <DialogDescription>{t('api.created.description')}</DialogDescription>
-                    </DialogHeader>
-                    <div className="flex items-center gap-2 py-2">
-                        <code className="min-w-0 flex-1 break-all rounded-md border bg-muted px-3 py-2 text-xs">
-                            {createdToken}
-                        </code>
-                        <Button variant="outline" size="icon" onClick={handleCopy} aria-label={t('api.created.copy')}>
-                            {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-                        </Button>
-                    </div>
-                    <DialogFooter>
-                        <Button onClick={() => setCreatedToken(null)}>{t('api.created.done')}</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            <ResponsiveDialog
+                open={createdToken !== null}
+                onOpenChange={(open) => !open && setCreatedToken(null)}
+                title={t('api.created.title')}
+                description={t('api.created.description')}
+                className="sm:max-w-lg"
+                footer={<Button onClick={() => setCreatedToken(null)}>{t('api.created.done')}</Button>}
+            >
+                <div className="flex items-center gap-2">
+                    <code className="min-w-0 flex-1 break-all rounded-md border bg-muted px-3 py-2 text-xs">
+                        {createdToken}
+                    </code>
+                    <Button variant="outline" size="icon" onClick={handleCopy} aria-label={t('api.created.copy')}>
+                        {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+                    </Button>
+                </div>
+            </ResponsiveDialog>
         </Page>
     )
 }

@@ -2,7 +2,7 @@ import { testId } from '@/lib/test-id'
 import { ReactNode, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
-import { Page, PageHeader } from '@/components/shared'
+import { Page, PageHeader, ResponsiveDialog } from '@/components/shared'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -14,14 +14,6 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table'
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog'
 import {
     AlertDialog,
     AlertDialogAction,
@@ -274,26 +266,13 @@ export function BackupsView({ source, title, description, actions }: BackupsView
                 </Table>
             </div>
 
-            <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>{t('backups.createTitle')}</DialogTitle>
-                        <DialogDescription>
-                            {t('backups.createDescription')}
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="note">{t('backups.noteOptional')}</Label>
-                            <Input
-                                id="note"
-                                placeholder={t('backups.notePlaceholder')}
-                                value={note}
-                                onChange={(e) => setNote(e.target.value)}
-                            />
-                        </div>
-                    </div>
-                    <DialogFooter>
+            <ResponsiveDialog
+                open={createDialogOpen}
+                onOpenChange={setCreateDialogOpen}
+                title={t('backups.createTitle')}
+                description={t('backups.createDescription')}
+                footer={
+                    <>
                         <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
                             {tCommon('actions.cancel')}
                         </Button>
@@ -301,39 +280,27 @@ export function BackupsView({ source, title, description, actions }: BackupsView
                             {createBackup.isPending && <Loader2 className="size-4 mr-2 animate-spin" />}
                             {tCommon('actions.create')}
                         </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                    </>
+                }
+            >
+                <div className="space-y-2">
+                    <Label htmlFor="note">{t('backups.noteOptional')}</Label>
+                    <Input
+                        id="note"
+                        placeholder={t('backups.notePlaceholder')}
+                        value={note}
+                        onChange={(e) => setNote(e.target.value)}
+                    />
+                </div>
+            </ResponsiveDialog>
 
-            <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>{t('backups.uploadTitle')}</DialogTitle>
-                        <DialogDescription>
-                            {t('backups.uploadDescription')}
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="file">{t('backups.backupFile')}</Label>
-                            <Input
-                                id="file"
-                                type="file"
-                                accept=".zip,.sqlite"
-                                onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="upload-note">{t('backups.noteOptional')}</Label>
-                            <Input
-                                id="upload-note"
-                                placeholder={t('backups.uploadNotePlaceholder')}
-                                value={note}
-                                onChange={(e) => setNote(e.target.value)}
-                            />
-                        </div>
-                    </div>
-                    <DialogFooter>
+            <ResponsiveDialog
+                open={uploadDialogOpen}
+                onOpenChange={setUploadDialogOpen}
+                title={t('backups.uploadTitle')}
+                description={t('backups.uploadDescription')}
+                footer={
+                    <>
                         <Button variant="outline" onClick={() => setUploadDialogOpen(false)}>
                             {tCommon('actions.cancel')}
                         </Button>
@@ -341,9 +308,30 @@ export function BackupsView({ source, title, description, actions }: BackupsView
                             {uploadBackup.isPending && <Loader2 className="size-4 mr-2 animate-spin" />}
                             {t('backups.upload')}
                         </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                    </>
+                }
+            >
+                <div className="space-y-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="file">{t('backups.backupFile')}</Label>
+                        <Input
+                            id="file"
+                            type="file"
+                            accept=".zip,.sqlite"
+                            onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="upload-note">{t('backups.noteOptional')}</Label>
+                        <Input
+                            id="upload-note"
+                            placeholder={t('backups.uploadNotePlaceholder')}
+                            value={note}
+                            onChange={(e) => setNote(e.target.value)}
+                        />
+                    </div>
+                </div>
+            </ResponsiveDialog>
 
             <AlertDialog
                 open={restoreDialogOpen}

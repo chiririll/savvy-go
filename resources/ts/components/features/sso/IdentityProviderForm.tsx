@@ -324,7 +324,7 @@ export function IdentityProviderForm({
                                     value={form.watch(`role_mapping.${index}.operator`)}
                                     onValueChange={(v) => form.setValue(`role_mapping.${index}.operator`, v as 'equals' | 'contains' | 'one_of')}
                                 >
-                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="equals">{t('forms:sso.equals')}</SelectItem>
                                         <SelectItem value="contains">{t('forms:sso.contains')}</SelectItem>
@@ -340,7 +340,7 @@ export function IdentityProviderForm({
                                     value={form.watch(`role_mapping.${index}.role`)}
                                     onValueChange={(v) => form.setValue(`role_mapping.${index}.role`, v as 'admin' | 'user' | 'guest')}
                                 >
-                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="admin">{t('roles.admin')}</SelectItem>
                                         <SelectItem value="user">{t('roles.user')}</SelectItem>

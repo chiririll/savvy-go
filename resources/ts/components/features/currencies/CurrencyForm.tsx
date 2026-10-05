@@ -196,39 +196,41 @@ export function CurrencyForm({
                     )}
                 />
 
-                <FormField
-                    control={form.control}
-                    name="symbol"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>{t('forms:currencies.symbol')}</FormLabel>
-                            <FormControl>
-                                <Input placeholder="$" {...field} />
-                            </FormControl>
-                            <FormDescription>
-                                {t('forms:currencies.symbolHelp')}
-                            </FormDescription>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
+                <div className="grid grid-cols-2 items-start gap-3">
+                    <FormField
+                        control={form.control}
+                        name="symbol"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>{t('forms:currencies.symbol')}</FormLabel>
+                                <FormControl>
+                                    <Input placeholder="$" {...field} />
+                                </FormControl>
+                                <FormDescription>
+                                    {t('forms:currencies.symbolHelp')}
+                                </FormDescription>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
 
-                <FormField
-                    control={form.control}
-                    name="decimals"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>{t('forms:currencies.decimals')}</FormLabel>
-                            <FormControl>
-                                <Input type="number" min={0} max={8} {...field} />
-                            </FormControl>
-                            <FormDescription>
-                                {t('forms:currencies.decimalsHelp')}
-                            </FormDescription>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
+                    <FormField
+                        control={form.control}
+                        name="decimals"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>{t('forms:currencies.decimals')}</FormLabel>
+                                <FormControl>
+                                    <Input type="number" min={0} max={8} {...field} />
+                                </FormControl>
+                                <FormDescription>
+                                    {t('forms:currencies.decimalsHelp')}
+                                </FormDescription>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                </div>
 
                 <FormField
                     control={form.control}
