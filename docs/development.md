@@ -8,7 +8,7 @@ go test ./...
 go run ./cmd/savvy-go
 ```
 
-It listens on `:8080` by default (`LISTEN_ADDR`). State goes under `DATA_DIR` (`./data` locally); see [Data and backups](data-and-backups.md). The SPA is served from `public/` (Vite output in `public/build`). Env: `APP_URL`, `TZ`, `DATA_DIR`, `LISTEN_ADDR`, `PUBLIC_DIR`, `SEED_DEMO`.
+It listens on `:8080` by default (`LISTEN_ADDR`). State goes under `DATA_DIR` (`./data` locally); see [Data and backups](data-and-backups.md). The SPA is served from `public/` (Vite output in `public/build`). Env: `APP_URL`, `TZ`, `DATA_DIR`, `LISTEN_ADDR`, `PUBLIC_DIR`, `SEED_DEMO`, `SEED_DATE`, `SEED_MANIFEST`.
 
 With `SEED_DEMO=true` the first boot creates demo users and three spaces with ~12 months of data, linked spaces and open invitations:
 
@@ -20,6 +20,8 @@ With `SEED_DEMO=true` the first boot creates demo users and three spaces with ~1
 | `demo@demo.com`    | `demo`     | user        |
 
 Their roles in the spaces differ, so each one shows a different view of the app.
+
+`SEED_DATE` (`YYYY-MM-DD`) places the data relative to that day instead of today, and `SEED_MANIFEST` is a file the seed writes its users, spaces and invitation tokens to; [Scripts](scripts.md) uses it to screenshot every page.
 
 ## How it is built
 
