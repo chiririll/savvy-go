@@ -1,6 +1,6 @@
 /**
  * current: signed by this server; unsigned: made elsewhere or edited;
- * raw: a bare database file (single-file layout or Laravel); invalid: unreadable.
+ * raw: a bare database file (a Laravel one); invalid: unreadable.
  */
 export const BACKUP_STATUSES = ['current', 'unsigned', 'raw', 'invalid'] as const
 export type BackupStatus = (typeof BACKUP_STATUSES)[number]

@@ -54,10 +54,7 @@
         "deleteTitle": "Удалить категорию?",
         "deleteDescription": "Это действие нельзя отменить. Категория «{{name}}» будет удалена навсегда.",
         "reassignTitle": "Удалить категорию?",
-        "reassignDescription_one": "В категории «{{name}}» есть {{count}} транзакция. Выберите категорию, куда её перенести перед удалением.",
-        "reassignDescription_few": "В категории «{{name}}» есть {{count}} транзакции. Выберите категорию, куда их перенести перед удалением.",
-        "reassignDescription_many": "В категории «{{name}}» есть {{count}} транзакций. Выберите категорию, куда их перенести перед удалением.",
-        "reassignDescription_other": "В категории «{{name}}» есть {{count}} транзакции. Выберите категорию, куда их перенести перед удалением.",
+        "reassignDescription": "В категории «{{name}}» есть {{count, plural(one: # транзакция; few: # транзакции; other: # транзакций)}}. Выберите категорию, куда перенести транзакции перед удалением.",
         "reassignPlaceholder": "Выберите категорию-преемника",
         "reassignAndDelete": "Удалить и перенести"
     },
@@ -172,10 +169,7 @@
             "qty": "Кол-во",
             "price": "Цена",
             "total": "Итого",
-            "count_one": "{{count}} позиция",
-            "count_few": "{{count}} позиции",
-            "count_many": "{{count}} позиций",
-            "count_other": "{{count}} позиций"
+            "count": "{{count, plural(one: # позиция; few: # позиции; other: # позиций)}}"
         },
         "fallback": {
             "payment": "Платёж: {{name}}",
@@ -286,10 +280,7 @@
         },
         "deleteTitle": "Удалить правило?",
         "deleteDescription": "Это действие нельзя отменить.",
-        "runs_one": "{{count}} запуск",
-        "runs_few": "{{count}} запуска",
-        "runs_many": "{{count}} запусков",
-        "runs_other": "{{count}} запусков",
+        "runs": "{{count, plural(one: # запуск; few: # запуска; other: # запусков)}}",
         "shape": "У {{conditions}} | Д {{actions}}",
         "shapeTitle": "Условий: {{conditions}}, действий: {{actions}}",
         "active": "Активно"
@@ -414,10 +405,7 @@
             "less": "Меньше",
             "more": "Больше",
             "noExpenses": "Нет расходов",
-            "transactions_one": "{{count}} транзакция",
-            "transactions_few": "{{count}} транзакции",
-            "transactions_many": "{{count}} транзакций",
-            "transactions_other": "{{count}} транзакций"
+            "transactions": "{{count, plural(one: # транзакция; few: # транзакции; other: # транзакций)}}"
         },
         "expensesByCategory": {
             "title": "Расходы по категориям",
@@ -477,10 +465,7 @@
         "expenses": "Расходы",
         "pending": "Отложенные",
         "pendingCount": "{{count}} операций",
-        "pendingCount_one": "{{count}} операция",
-        "pendingCount_few": "{{count}} операции",
-        "pendingCount_many": "{{count}} операций",
-        "pendingCount_other": "{{count}} операций",
+        "pendingCount": "{{count, plural(one: # операция; few: # операции; other: # операций)}}",
         "pendingEmpty": "Нет отложенных транзакций",
         "balanceDynamics": "Динамика баланса",
         "accountBalances": "Балансы счетов",

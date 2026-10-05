@@ -3,6 +3,8 @@ import { initReactI18next } from 'react-i18next'
 import LanguageDetector from 'i18next-browser-languagedetector'
 import type { BackendModule } from 'i18next'
 
+import { formatPlural } from '@/lib/plural'
+
 import enCommon from '@/locales/en/common.json'
 import enNav from '@/locales/en/nav.json'
 import enAuth from '@/locales/en/auth.json'
@@ -98,6 +100,9 @@ function applyDocumentLang(lng: string) {
 
     document.documentElement.lang = lng.startsWith('ru') ? 'ru' : 'en'
 }
+
+// Created by init() above, before it resolves, so it is there for the first t().
+i18n.services.formatter?.add('plural', formatPlural)
 
 applyDocumentLang(i18n.resolvedLanguage ?? i18n.language)
 i18n.on('languageChanged', applyDocumentLang)

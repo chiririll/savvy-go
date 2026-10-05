@@ -54,8 +54,7 @@
         "deleteTitle": "Delete category?",
         "deleteDescription": "This action cannot be undone. The category \"{{name}}\" will be permanently deleted.",
         "reassignTitle": "Delete category?",
-        "reassignDescription_one": "\"{{name}}\" has {{count}} transaction. Choose a category to move it to before deleting.",
-        "reassignDescription_other": "\"{{name}}\" has {{count}} transactions. Choose a category to move them to before deleting.",
+        "reassignDescription": "\"{{name}}\" has {{count, plural(one: # transaction; other: # transactions)}}. Choose a category to move the transactions to before deleting.",
         "reassignPlaceholder": "Choose replacement category",
         "reassignAndDelete": "Delete and reassign"
     },
@@ -170,8 +169,7 @@
             "qty": "Qty",
             "price": "Price",
             "total": "Total",
-            "count_one": "{{count}} item",
-            "count_other": "{{count}} items"
+            "count": "{{count, plural(one: # item; other: # items)}}"
         },
         "fallback": {
             "payment": "Payment: {{name}}",
@@ -282,8 +280,7 @@
         },
         "deleteTitle": "Delete rule?",
         "deleteDescription": "This action cannot be undone.",
-        "runs_one": "{{count}} run",
-        "runs_other": "{{count}} runs",
+        "runs": "{{count, plural(one: # run; other: # runs)}}",
         "shape": "C {{conditions}} | A {{actions}}",
         "shapeTitle": "{{conditions}} conditions, {{actions}} actions",
         "active": "Active"
@@ -408,8 +405,7 @@
             "less": "Less",
             "more": "More",
             "noExpenses": "No expenses",
-            "transactions_one": "{{count}} transaction",
-            "transactions_other": "{{count}} transactions"
+            "transactions": "{{count, plural(one: # transaction; other: # transactions)}}"
         },
         "expensesByCategory": {
             "title": "Expenses by Category",
@@ -469,8 +465,7 @@
         "expenses": "Expenses",
         "pending": "Pending",
         "pendingCount": "{{count}} transactions",
-        "pendingCount_one": "{{count}} transaction",
-        "pendingCount_other": "{{count}} transactions",
+        "pendingCount": "{{count, plural(one: # transaction; other: # transactions)}}",
         "pendingEmpty": "No pending transactions",
         "balanceDynamics": "Balance Dynamics",
         "accountBalances": "Account Balances",

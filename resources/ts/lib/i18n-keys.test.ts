@@ -6,8 +6,10 @@ const TS_ROOT = path.resolve(__dirname, '..')
 const LOCALES_ROOT = path.join(TS_ROOT, 'locales')
 const LOCALES = readdirSync(LOCALES_ROOT)
 
-// i18next plural suffixes; en has two forms, ru four.
+// Plurals are written inline, `{{count, plural(one: …; other: …)}}`, not as
+// `key_one` / `key_other` siblings; see lib/plural.ts.
 const PLURAL_SUFFIX = /_(zero|one|two|few|many|other)$/
+const PLURAL_CALL = /\{\{\s*\w+\s*,\s*plural\(([^)]*)\)\s*\}\}/g
 
 /** Leaf keys of a locale file with their text. */
 function flatten(value: unknown, prefix = '', out = new Map<string, string>()): Map<string, string> {
@@ -29,11 +31,6 @@ function loadLocale(locale: string): Map<string, Map<string, string>> {
         namespaces.set(file.replace(/\.json$/, ''), flatten(json))
     }
     return namespaces
-}
-
-/** Plural variants collapse into their base key. */
-function baseKeys(keys: Iterable<string>): Set<string> {
-    return new Set([...keys].map((k) => k.replace(PLURAL_SUFFIX, '')))
 }
 
 /** `{{name}}` and `{{name, format}}` placeholders of a text. */
@@ -84,7 +81,7 @@ function sourceFiles(dir: string): string[] {
 
 const locales = new Map(LOCALES.map((locale) => [locale, loadLocale(locale)]))
 const en = locales.get('en')!
-const enKeysByNs = new Map([...en].map(([ns, keys]) => [ns, baseKeys(keys.keys())]))
+const enKeysByNs = new Map([...en].map(([ns, keys]) => [ns, new Set(keys.keys())]))
 const enKeys = new Set([...enKeysByNs.values()].flatMap((keys) => [...keys]))
 
 interface Usage {
@@ -129,58 +126,62 @@ describe('locale files', () => {
             expect([...other.keys()].sort()).toEqual([...en.keys()].sort())
 
             for (const [ns, keys] of en) {
-                expect(
-                    [...baseKeys(other.get(ns)?.keys() ?? [])].sort(),
-                    `${locale}/${ns}.json`,
-                ).toEqual([...baseKeys(keys.keys())].sort())
+                expect([...(other.get(ns)?.keys() ?? [])].sort(), `${locale}/${ns}.json`).toEqual([...keys.keys()].sort())
             }
         })
 
         it(`${locale} uses the same placeholders as en`, () => {
             const mismatched: string[] = []
             for (const [ns, enTexts] of en) {
-                const byBase = (texts: Map<string, string>) => {
-                    const out = new Map<string, Set<string>>()
-                    for (const [key, text] of texts) {
-                        const base = key.replace(PLURAL_SUFFIX, '')
-                        out.set(base, new Set([...(out.get(base) ?? []), ...placeholders(text)]))
-                    }
-                    return out
-                }
-                const ours = byBase(enTexts)
-                const theirs = byBase(other.get(ns) ?? new Map())
-                for (const [key, vars] of ours) {
-                    const otherVars = theirs.get(key)
-                    if (otherVars && [...vars].sort().join() !== [...otherVars].sort().join()) {
-                        mismatched.push(`${ns}:${key}  en {${[...vars]}} vs ${locale} {${[...otherVars]}}`)
-                    }
+                for (const [key, text] of enTexts) {
+                    const translated = other.get(ns)?.get(key)
+                    if (translated === undefined) continue
+                    const ours = [...new Set(placeholders(text))].sort().join()
+                    const theirs = [...new Set(placeholders(translated))].sort().join()
+                    if (ours !== theirs) mismatched.push(`${ns}:${key}  en {${ours}} vs ${locale} {${theirs}}`)
                 }
             }
             expect(mismatched).toEqual([])
         })
     }
 
-    for (const locale of LOCALES) {
-        it(`${locale} has every plural form the language needs`, () => {
-            const required = new Intl.PluralRules(locale).resolvedOptions().pluralCategories
-            const incomplete: string[] = []
-            for (const [ns, texts] of locales.get(locale)!) {
-                const forms = new Map<string, Set<string>>()
-                for (const key of texts.keys()) {
-                    const m = PLURAL_SUFFIX.exec(key)
-                    if (m) {
-                        const base = key.slice(0, m.index)
-                        forms.set(base, new Set([...(forms.get(base) ?? []), m[1]]))
+    it.each(LOCALES)('%s has no key_one / key_other style plurals', (locale) => {
+        const suffixed = [...locales.get(locale)!].flatMap(([ns, texts]) =>
+            [...texts.keys()].filter((key) => PLURAL_SUFFIX.test(key)).map((key) => `${ns}:${key}`),
+        )
+        expect(suffixed).toEqual([])
+    })
+
+    it.each(LOCALES)('%s writes every plural(...) with the forms its language has', (locale) => {
+        const categories = new Intl.PluralRules(locale).resolvedOptions().pluralCategories
+        const problems: string[] = []
+        let found = 0
+        for (const [ns, texts] of locales.get(locale)!) {
+            for (const [key, text] of texts) {
+                for (const m of text.matchAll(PLURAL_CALL)) {
+                    found++
+                    const forms = m[1].split(';').map((part) => part.trim()).filter(Boolean)
+                    const parsed = forms.map((part) => /^(\w+):\s*(\S.*)$/.exec(part))
+                    const where = `${ns}:${key}`
+                    if (parsed.some((form) => !form)) {
+                        problems.push(`${where}: cannot parse "${m[1]}"`)
+                        continue
                     }
-                }
-                for (const [base, present] of forms) {
-                    const missing = required.filter((form) => !present.has(form))
-                    if (missing.length > 0) incomplete.push(`${ns}:${base} lacks ${missing.join(', ')}`)
+                    const names = parsed.map((form) => form![1])
+                    if (!names.includes('other')) problems.push(`${where}: no "other" form`)
+                    for (const name of names) {
+                        if (!categories.includes(name as never)) problems.push(`${where}: "${name}" is not a plural form of ${locale}`)
+                    }
+                    if (new Set(names).size !== names.length) problems.push(`${where}: a form is listed twice`)
+                    // The forms the language distinguishes should be written out; `other` alone is only fine for one form.
+                    const missing = categories.filter((c) => c !== 'other' && !names.includes(c) && c !== 'many')
+                    if (missing.length > 0) problems.push(`${where}: lacks ${missing.join(', ')}`)
                 }
             }
-            expect(incomplete).toEqual([])
-        })
-    }
+        }
+        expect(found).toBeGreaterThan(5)
+        expect(problems).toEqual([])
+    })
 })
 
 describe('blankComments', () => {
