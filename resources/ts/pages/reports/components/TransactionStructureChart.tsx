@@ -23,10 +23,14 @@ const NARROW_CHART_HEIGHT = 460
 const NARROW_DONUT_CENTER_Y = 160
 const DONUT_CENTER_X = 0.35
 
+// Squarify aims for this width/height ratio, so tiles come out wider than tall
+// (rows are split horizontally first); ECharts' default is the golden ratio (~1.6).
+const TREEMAP_SQUARE_RATIO = 2.2
+
 /**
- * Treemap label sized to the tile it sits in. The tile's side is estimated from its
- * share of the chart area (tiles are roughly square): tiny tiles get no label, small
- * ones just the name, larger ones add the amount and percentage.
+ * Treemap label sized to the tile it sits in. The tile is estimated from its share of
+ * the chart area and the layout's target ratio: tiles too small get no label, and
+ * the amount and percentage are added only when the tile is tall and wide enough.
  */
 function treemapLabel(
     item: { name: string; value: number },
@@ -34,26 +38,31 @@ function treemapLabel(
     currency: string | null | undefined,
     chartWidth: number,
 ) {
-    const side = Math.sqrt((item.value / (total || 1)) * chartWidth * CHART_HEIGHT)
-    if (side < 44) return { show: false }
+    const area = (item.value / (total || 1)) * chartWidth * CHART_HEIGHT
+    const tileW = Math.sqrt(area * TREEMAP_SQUARE_RATIO)
+    const tileH = Math.sqrt(area / TREEMAP_SQUARE_RATIO)
+    if (tileW < 26 || tileH < 15) return { show: false }
 
-    const font = Math.max(9, Math.min(14, Math.round(side / 7)))
-    const width = Math.max(side - 14, 20)
+    const font = Math.max(8, Math.min(14, Math.round(Math.min(tileW / 6, tileH / 2.6))))
+    const lineHeight = font + 4
+    const lines = Math.max(1, Math.floor((tileH - 4) / lineHeight))
+    const width = Math.max(tileW - 8, 18)
     const text = (extra: Record<string, unknown> = {}) => ({
         fontSize: font,
         color: '#fff',
-        lineHeight: font + 6,
+        lineHeight,
         width,
         overflow: 'truncate',
         ...extra,
     })
-    const lines = [`{name|${item.name}}`]
-    if (side >= 76) lines.push(`{value|${formatCurrency(item.value, currency)}}`)
-    if (side >= 96) lines.push(`{percent|${Math.round((item.value / (total || 1)) * 100)}%}`)
+    const amount = formatCurrency(item.value, currency)
+    const rows = [`{name|${item.name}}`]
+    if (lines >= 2 && width >= amount.length * font * 0.55) rows.push(`{value|${amount}}`)
+    if (lines >= 3) rows.push(`{percent|${Math.round((item.value / (total || 1)) * 100)}%}`)
 
     return {
         show: true,
-        formatter: lines.join('\n'),
+        formatter: rows.join('\n'),
         rich: {
             name: text({ fontWeight: 'bold' }),
             value: text(),
@@ -263,6 +272,7 @@ export function TransactionStructureChart({ filters, type }: TransactionStructur
             width: '100%',
             height: '100%',
             roam: false,
+            squareRatio: TREEMAP_SQUARE_RATIO,
             nodeClick: false,
             breadcrumb: { show: false },
             label: { show: true, position: 'inside', overflow: 'truncate' },
@@ -300,6 +310,8 @@ export function TransactionStructureChart({ filters, type }: TransactionStructur
                 return treemapOption
         }
     }
+
+    const chartHeight = viewMode === 'donut' && isNarrowChart(chartWidth) ? NARROW_CHART_HEIGHT : CHART_HEIGHT
 
     const viewModes: { value: ViewMode; label: string; icon: React.ReactNode }[] = [
         { value: 'donut', label: t('reports.views.donut'), icon: <PieChart className="size-3.5" /> },
@@ -341,12 +353,15 @@ export function TransactionStructureChart({ filters, type }: TransactionStructur
                         {copy.noData}
                     </div>
                 ) : (
-                    <div ref={chartRef}>
-                        <ReactECharts
-                            option={getOption()}
-                            style={{ height: viewMode === 'donut' && isNarrowChart(chartWidth) ? NARROW_CHART_HEIGHT : CHART_HEIGHT }}
-                            key={viewMode}
-                        />
+                    <div ref={chartRef} style={{ height: chartHeight }}>
+                        {/* Mount once measured so the chart animates in a single pass */}
+                        {chartWidth > 0 && (
+                            <ReactECharts
+                                option={getOption()}
+                                style={{ height: chartHeight }}
+                                key={viewMode}
+                            />
+                        )}
                     </div>
                 )}
             </CardContent>
