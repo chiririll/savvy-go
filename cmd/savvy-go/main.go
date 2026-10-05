@@ -75,7 +75,7 @@ func main() {
 		slog.Error("space unavailable", "space", id, "reason", why)
 	}
 
-	if err := seed.Demo(ctx, st, transfers.Keys, cfg.SeedDemo, cfg.Location); err != nil {
+	if err := seed.Run(ctx, st, transfers.Keys, seed.ConfigFromEnv(), cfg.Location); err != nil {
 		slog.Error("seed demo", "err", err)
 		os.Exit(1)
 	}

@@ -1,3 +1,4 @@
+import { testId } from '@/lib/test-id'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Trash2, MoreHorizontal, PlugZap, ArrowUpRight } from 'lucide-react'
@@ -98,7 +99,7 @@ export function ProviderCard({ provider, index, onDelete, onTest }: ProviderCard
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <AlertDialog>
-                            <AlertDialogTrigger asChild>
+                            <AlertDialogTrigger asChild {...testId('confirm')}>
                                 <DropdownMenuItem
                                     variant="destructive"
                                     onSelect={(e) => e.preventDefault()}

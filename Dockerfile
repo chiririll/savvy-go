@@ -4,7 +4,9 @@ ARG APP_ENV=production
 # Build the frontend
 FROM node:24-alpine AS frontend
 ARG APP_VERSION
+ARG APP_ENV
 ENV APP_VERSION=${APP_VERSION}
+ENV APP_ENV=${APP_ENV}
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci

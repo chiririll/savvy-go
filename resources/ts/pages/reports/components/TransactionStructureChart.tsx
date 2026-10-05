@@ -1,3 +1,4 @@
+import { testIdControl, testIdControls } from '@/lib/test-id'
 import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import ReactECharts from '@/components/shared/ReactECharts'
@@ -282,10 +283,11 @@ export function TransactionStructureChart({ filters, type }: TransactionStructur
                             {copy.subtitle}
                         </p>
                     </div>
-                    <div className="flex gap-1">
+                    <div className="flex gap-1" {...testIdControls('view')}>
                         {viewModes.map((mode) => (
                             <Badge
                                 key={mode.value}
+                                {...testIdControl(mode.value, viewMode === mode.value)}
                                 variant={viewMode === mode.value ? 'default' : 'outline'}
                                 className="cursor-pointer gap-1.5"
                                 onClick={() => setViewMode(mode.value)}

@@ -1,3 +1,4 @@
+import { testId } from '@/lib/test-id'
 import { Banknote, HandCoins, RotateCcw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
@@ -70,7 +71,7 @@ export function DebtRow({ debt, onEdit, onDelete, onPayment, onCollect, onReopen
                     leading={(canSettle || canReopen) && (
                         <>
                             {canSettle && (
-                                <DropdownMenuItem onClick={() => settle(debt)}>
+                                <DropdownMenuItem onClick={() => settle(debt)} {...testId('settle')}>
                                     <Icon className="mr-2 size-4" />
                                     {debt.debtType === 'i_owe' ? t('debts.makePayment') : t('debts.collectPayment')}
                                 </DropdownMenuItem>

@@ -1,3 +1,4 @@
+import { testIdControl, testIdControls } from '@/lib/test-id'
 import { useState, useMemo, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import ReactECharts from '@/components/shared/ReactECharts'
@@ -197,8 +198,9 @@ export function TransactionDynamicsChart({ filters, type }: TransactionDynamicsC
                         </p>
                     </div>
                     <div className="flex items-center gap-3">
-                        <div className="flex gap-1">
+                        <div className="flex gap-1" {...testIdControls('chart-type')}>
                             <Badge
+                                {...testIdControl('line', chartType === 'line')}
                                 variant={chartType === 'line' ? 'default' : 'outline'}
                                 className="cursor-pointer gap-1.5"
                                 onClick={() => setChartType('line')}
@@ -207,6 +209,7 @@ export function TransactionDynamicsChart({ filters, type }: TransactionDynamicsC
                                 {t('reports.views.line')}
                             </Badge>
                             <Badge
+                                {...testIdControl('bar', chartType === 'bar')}
                                 variant={chartType === 'bar' ? 'default' : 'outline'}
                                 className="cursor-pointer gap-1.5"
                                 onClick={() => setChartType('bar')}
@@ -216,10 +219,11 @@ export function TransactionDynamicsChart({ filters, type }: TransactionDynamicsC
                             </Badge>
                         </div>
 
-                        <div className="flex gap-1">
+                        <div className="flex gap-1" {...testIdControls('group-by')}>
                             {(['day', 'week', 'month'] as CashFlowGroupBy[]).map((group) => (
                                 <Badge
                                     key={group}
+                                    {...testIdControl(group, groupBy === group)}
                                     variant={groupBy === group ? 'default' : 'outline'}
                                     className="cursor-pointer"
                                     onClick={() => setGroupBy(group)}

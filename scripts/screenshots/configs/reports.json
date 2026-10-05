@@ -1,0 +1,9 @@
+{
+    "users": ["alex"],
+    "spaces": ["Demo"],
+    "languages": ["en"],
+    "themes": ["light"],
+    "pages": ["/reports"],
+    "sidebar": false,
+    "controls": true
+}

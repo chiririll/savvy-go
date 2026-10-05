@@ -25,7 +25,16 @@ const (
 	userDemo   = "demo"
 )
 
-// Demo seeds demo users and several spaces when enabled and the server has
+// Options configures Demo.
+type Options struct {
+	// Loc is the time zone of the seeded dates; UTC when nil.
+	Loc *time.Location
+	// Now is the moment the data is placed relative to; the current time when
+	// zero. Pin it to seed the same data on any day.
+	Now time.Time
+}
+
+// Demo seeds demo users and several spaces when the server has
 // never been demo-seeded (no users yet). Later starts are no-ops so first-boot
 // matches Laravel's SEED_DEMO behavior.
 //
@@ -37,98 +46,112 @@ const (
 //   - "Studio GmbH": a EUR-based space Alex administers, Jordan only views. It is
 //     linked to Demo, so transfers between them cross currencies, and it is not
 //     linked to Family Budget. It has open invitations.
-func Demo(ctx context.Context, st store.Store, keys domain.KeyRing, enabled bool, loc *time.Location) error {
-	if !enabled {
-		return nil
-	}
+//
+// It returns what it created, or nil when it seeded nothing.
+func Demo(ctx context.Context, st store.Store, keys domain.KeyRing, opts Options) (*Manifest, error) {
+	loc := opts.Loc
 	if loc == nil {
 		loc = time.UTC
 	}
+	now := opts.Now
+	if now.IsZero() {
+		now = time.Now()
+	}
+	now = now.In(loc)
 	server := settings.Store{DB: st.Server()}
 	if server.Bool(ctx, demoSeededKey, false) {
-		return nil
+		return nil, nil
 	}
 	users := auth.Users{DB: st.Server()}
 	n, err := users.Count(ctx)
 	if err != nil {
-		return fmt.Errorf("count users: %w", err)
+		return nil, fmt.Errorf("count users: %w", err)
 	}
 	if n > 0 {
-		return nil
+		return nil, nil
 	}
 
 	people, err := createDemoUsers(ctx, users)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	spaces := domain.Spaces{Store: st}
-	d := &demo{ctx: ctx, st: st, spaces: spaces, people: people, now: time.Now().In(loc)}
+	d := &demo{ctx: ctx, st: st, spaces: spaces, people: people, now: now, manifest: &Manifest{Now: now}}
+	for _, u := range demoUsers {
+		d.manifest.Users = append(d.manifest.Users, ManifestUser{Key: u.key, Name: u.name, Email: u.email, Password: u.pass, Role: u.role})
+	}
 
 	d.demo, err = d.createSpace("Demo", userAlex, map[string]string{userJordan: domain.SpaceEditor, userDemo: domain.SpaceViewer})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	d.family, err = d.createSpace("Family Budget", userAlex, map[string]string{userJordan: domain.SpaceAdmin, userSam: domain.SpaceViewer})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	d.studio, err = d.createSpace("Studio GmbH", userAlex, map[string]string{userJordan: domain.SpaceViewer})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	demoAccts, err := d.fill(d.demo, currencySet(usdCurrency, withRate(eurCurrency, "1.08")), func(db store.DB) (map[string]*domain.Account, error) {
-		return seedWorkspace(ctx, db, loc)
+		return seedWorkspace(ctx, db, now)
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	familyAccts, err := d.fill(d.family, currencySet(usdCurrency), func(db store.DB) (map[string]*domain.Account, error) {
 		return seedMini(ctx, db, d.now, familySpace)
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	studioAccts, err := d.fill(d.studio, currencySet(eurCurrency, withRate(usdCurrency, "0.9259")), func(db store.DB) (map[string]*domain.Account, error) {
 		return seedMini(ctx, db, d.now, studioSpace)
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	transfers := domain.Transfers{Spaces: spaces, Keys: keys}
 	if err := d.linkAndTransfer(transfers, demoAccts, familyAccts, studioAccts); err != nil {
-		return err
+		return nil, err
 	}
 	if err := d.invite(); err != nil {
-		return err
+		return nil, err
+	}
+	if err := d.recordAutomations(); err != nil {
+		return nil, err
 	}
 	if err := server.Set(ctx, demoSeededKey, true); err != nil {
-		return fmt.Errorf("mark demo seeded: %w", err)
+		return nil, fmt.Errorf("mark demo seeded: %w", err)
 	}
 
 	for _, sp := range []*domain.Space{d.demo, d.family, d.studio} {
 		db, err := st.Space(ctx, sp.ID)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		txs, _ := appdb.Q(db).CountAllTransactions(ctx)
 		accts, _ := appdb.Q(db).CountAccounts(ctx)
 		slog.Info("demo space seeded", "space", sp.Name, "transactions", txs, "accounts", accts)
 	}
-	return nil
+	return d.manifest, nil
+}
+
+// demoUsers are the seeded accounts; role is the server role.
+var demoUsers = []struct {
+	key, name, email, pass, role string
+}{
+	{userAlex, "Alex Morgan", "admin@savvy.app", "password", auth.RoleAdmin},
+	{userJordan, "Jordan Lee", "editor@savvy.app", "password", auth.RoleUser},
+	{userSam, "Sam Rivera", "guest@savvy.app", "password", auth.RoleGuest},
+	{userDemo, "Demo User", "demo@demo.com", "demo", auth.RoleUser},
 }
 
 func createDemoUsers(ctx context.Context, users auth.Users) (map[string]*auth.User, error) {
 	out := map[string]*auth.User{}
-	for _, u := range []struct {
-		key, name, email, pass, role string
-	}{
-		{userAlex, "Alex Morgan", "admin@savvy.app", "password", auth.RoleAdmin},
-		{userJordan, "Jordan Lee", "editor@savvy.app", "password", auth.RoleUser},
-		{userSam, "Sam Rivera", "guest@savvy.app", "password", auth.RoleGuest},
-		{userDemo, "Demo User", "demo@demo.com", "demo", auth.RoleUser},
-	} {
+	for _, u := range demoUsers {
 		pass := u.pass
 		created, err := users.Create(ctx, u.name, u.email, &pass, u.role)
 		if err != nil {
@@ -147,6 +170,7 @@ type demo struct {
 	people map[string]*auth.User
 	now    time.Time
 
+	manifest             *Manifest
 	demo, family, studio *domain.Space
 }
 
@@ -161,6 +185,11 @@ func (d *demo) createSpace(name, owner string, members map[string]string) (*doma
 			return nil, fmt.Errorf("space %s member %s: %w", name, key, err)
 		}
 	}
+	roles := map[string]string{owner: domain.SpaceAdmin}
+	for key, role := range members {
+		roles[key] = role
+	}
+	d.manifest.Spaces = append(d.manifest.Spaces, ManifestSpace{ID: sp.ID, Name: name, Members: roles})
 	return sp, nil
 }
 
@@ -220,11 +249,45 @@ func (d *demo) linkAndTransfer(tr domain.Transfers, demoAccts, familyAccts, stud
 // one anyone with the link can use.
 func (d *demo) invite() error {
 	alex := d.people[userAlex]
-	if _, err := d.spaces.Invite(d.ctx, d.studio.ID, alex, "newhire@example.com", domain.SpaceEditor); err != nil {
-		return fmt.Errorf("invitation: %w", err)
+	for _, inv := range []struct{ email, role string }{
+		{"newhire@example.com", domain.SpaceEditor},
+		{"", domain.SpaceViewer},
+	} {
+		token, err := d.spaces.Invite(d.ctx, d.studio.ID, alex, inv.email, inv.role)
+		if err != nil {
+			return fmt.Errorf("invitation: %w", err)
+		}
+		d.manifest.Invitations = append(d.manifest.Invitations, ManifestInvitation{
+			SpaceID: d.studio.ID, Email: inv.email, Role: inv.role, Token: token,
+		})
 	}
-	if _, err := d.spaces.Invite(d.ctx, d.studio.ID, alex, "", domain.SpaceViewer); err != nil {
-		return fmt.Errorf("invitation: %w", err)
+	return nil
+}
+
+// recordAutomations notes the automation rules of each space in the manifest,
+// for the pages that address a rule by id.
+func (d *demo) recordAutomations() error {
+	for i := range d.manifest.Spaces {
+		sp := &d.manifest.Spaces[i]
+		db, err := d.st.Space(d.ctx, sp.ID)
+		if err != nil {
+			return err
+		}
+		rows, err := db.QueryContext(d.ctx, `SELECT id FROM automation_rules ORDER BY priority, id`)
+		if err != nil {
+			return fmt.Errorf("space %s automation rules: %w", sp.Name, err)
+		}
+		for rows.Next() {
+			var id int64
+			if err := rows.Scan(&id); err != nil {
+				_ = rows.Close()
+				return err
+			}
+			sp.Automations = append(sp.Automations, id)
+		}
+		if err := rows.Close(); err != nil {
+			return err
+		}
 	}
 	return nil
 }

@@ -1,3 +1,4 @@
+import { testId, testIdControl, testIdControls, testIdSelect } from '@/lib/test-id'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
@@ -139,10 +140,11 @@ export function FiltersBar({ filters, onFilterChange, onToggleArrayFilter, onRes
 
     // Period type badges component
     const PeriodTypeBadges = () => (
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap gap-1" {...testIdControls('global-period')}>
             {(['last_30_days', 'month', 'quarter', 'year', 'ytd'] as PeriodType[]).map(type => (
                 <Badge
                     key={type}
+                    {...testIdControl(type, filters.periodType === type)}
                     variant={filters.periodType === type ? 'default' : 'outline'}
                     className="cursor-pointer"
                     onClick={() => onFilterChange('periodType', type)}
@@ -151,6 +153,7 @@ export function FiltersBar({ filters, onFilterChange, onToggleArrayFilter, onRes
                 </Badge>
             ))}
             <Badge
+                {...testIdControl('custom', filters.periodType === 'custom')}
                 variant={filters.periodType === 'custom' ? 'default' : 'outline'}
                 className="cursor-pointer"
                 onClick={() => onFilterChange('periodType', 'custom')}
@@ -168,7 +171,7 @@ export function FiltersBar({ filters, onFilterChange, onToggleArrayFilter, onRes
                     value={filters.selectedMonth}
                     onValueChange={(val) => onFilterChange('selectedMonth', val)}
                 >
-                    <SelectTrigger className="w-full md:w-[180px]">
+                    <SelectTrigger className="w-full md:w-[180px]" {...testIdSelect('global-period-value')}>
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -186,7 +189,7 @@ export function FiltersBar({ filters, onFilterChange, onToggleArrayFilter, onRes
                     value={filters.selectedQuarter}
                     onValueChange={(val) => onFilterChange('selectedQuarter', val)}
                 >
-                    <SelectTrigger className="w-full md:w-[140px]">
+                    <SelectTrigger className="w-full md:w-[140px]" {...testIdSelect('global-period-value')}>
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -204,7 +207,7 @@ export function FiltersBar({ filters, onFilterChange, onToggleArrayFilter, onRes
                     value={filters.selectedYear}
                     onValueChange={(val) => onFilterChange('selectedYear', val)}
                 >
-                    <SelectTrigger className="w-full md:w-[100px]">
+                    <SelectTrigger className="w-full md:w-[100px]" {...testIdSelect('global-period-value')}>
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -243,7 +246,7 @@ export function FiltersBar({ filters, onFilterChange, onToggleArrayFilter, onRes
             value={filters.compareWith}
             onValueChange={(val) => onFilterChange('compareWith', val as CompareType)}
         >
-            <SelectTrigger className="w-full md:w-[200px]">
+            <SelectTrigger className="w-full md:w-[200px]" {...testIdSelect('global-compare')}>
                 <SelectValue placeholder={t('reports.filters.comparePlaceholder')} />
             </SelectTrigger>
             <SelectContent>
@@ -299,7 +302,7 @@ export function FiltersBar({ filters, onFilterChange, onToggleArrayFilter, onRes
                         {/* Filters button */}
                         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
                             <SheetTrigger asChild>
-                                <Button variant="outline" size="sm" className="shrink-0">
+                                <Button variant="outline" size="sm" className="shrink-0" {...testId('filters')}>
                                     <SlidersHorizontal className="size-4" />
                                     {activeFiltersCount > 0 && (
                                         <Badge variant="secondary" className="ml-1 px-1.5">

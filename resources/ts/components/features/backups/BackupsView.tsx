@@ -1,3 +1,4 @@
+import { testId } from '@/lib/test-id'
 import { ReactNode, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
@@ -164,11 +165,11 @@ export function BackupsView({ source, title, description, actions }: BackupsView
             <PageHeader title={title} description={description} />
 
             <div className="flex gap-2 mb-6">
-                <Button onClick={() => setCreateDialogOpen(true)}>
+                <Button onClick={() => setCreateDialogOpen(true)} {...testId('create')}>
                     <Plus className="size-4 mr-2" />
                     {t('backups.create')}
                 </Button>
-                <Button variant="outline" onClick={() => setUploadDialogOpen(true)}>
+                <Button variant="outline" onClick={() => setUploadDialogOpen(true)} {...testId('upload')}>
                     <Upload className="size-4 mr-2" />
                     {t('backups.upload')}
                 </Button>

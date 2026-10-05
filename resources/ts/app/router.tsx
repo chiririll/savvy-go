@@ -4,6 +4,7 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import { AuthProvider } from '@/components/providers/AuthProvider'
 import { useUser } from '@/stores/auth'
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary'
+import { childPath, pages } from './pages'
 
 // Auth pages
 const LoginPage = lazy(() => import('@/pages/auth/login'))
@@ -82,27 +83,27 @@ const withSuspense = (Component: React.LazyExoticComponent<() => React.JSX.Eleme
 export const router = createBrowserRouter([
     // Public routes
     {
-        path: '/login',
+        path: pages.login.path,
         element: withSuspense(LoginPage),
     },
     {
-        path: '/setup',
+        path: pages.setup.path,
         element: withSuspense(SetupPage),
     },
     {
-        path: '/setup-2fa',
+        path: pages.setup2fa.path,
         element: withSuspense(Setup2FAPage),
     },
     {
-        path: '/auth/sso/callback',
+        path: pages.ssoCallback.path,
         element: withSuspense(SsoCallbackPage),
     },
     {
-        path: '/set-password/:token',
+        path: pages.setPassword.path,
         element: withSuspense(SetPasswordPage),
     },
     {
-        path: '/invite/:token',
+        path: pages.invite.path,
         element: withSuspense(InvitePage),
     },
 
@@ -111,38 +112,39 @@ export const router = createBrowserRouter([
         element: <AuthProvider />,
         children: [
             {
-                path: '/',
+                // The layout sits at the root, where the dashboard is the index page.
+                path: pages.dashboard.path,
                 element: <AppLayout />,
                 children: [
                     { index: true, element: withSuspense(DashboardPage) },
-                    { path: 'transactions', element: withSuspense(TransactionsPage) },
-                    { path: 'accounts', element: withSuspense(AccountsPage) },
-                    { path: 'categories', element: withSuspense(CategoriesPage) },
-                    { path: 'currencies', element: withSuspense(CurrenciesPage) },
-                    { path: 'budgets', element: withSuspense(BudgetsPage) },
-                    { path: 'tags', element: withSuspense(TagsPage) },
-                    { path: 'debts', element: withSuspense(DebtsPage) },
-                    { path: 'recurring', element: withSuspense(RecurringPage) },
-                    { path: 'automation', element: withSuspense(AutomationPage) },
+                    { path: childPath(pages.transactions), element: withSuspense(TransactionsPage) },
+                    { path: childPath(pages.accounts), element: withSuspense(AccountsPage) },
+                    { path: childPath(pages.categories), element: withSuspense(CategoriesPage) },
+                    { path: childPath(pages.currencies), element: withSuspense(CurrenciesPage) },
+                    { path: childPath(pages.budgets), element: withSuspense(BudgetsPage) },
+                    { path: childPath(pages.tags), element: withSuspense(TagsPage) },
+                    { path: childPath(pages.debts), element: withSuspense(DebtsPage) },
+                    { path: childPath(pages.recurring), element: withSuspense(RecurringPage) },
+                    { path: childPath(pages.automation), element: withSuspense(AutomationPage) },
                     { path: 'automation/create', element: <AutomationCreateRedirect /> },
                     { path: 'automation/:id/edit', element: <AutomationEditRedirect /> },
-                    { path: 'automation/:id/logs', element: withSuspense(AutomationLogsPage) },
-                    { path: 'reports', element: withSuspense(ReportsPage) },
-                    { path: 'settings/space', element: withSuspense(SpaceSettingsPage) },
-                    { path: 'settings/user', element: withSuspense(UserSettingsPage) },
-                    { path: 'settings/security', element: withSuspense(SecuritySettingsPage) },
-                    { path: 'settings/api', element: withSuspense(ApiSettingsPage) },
-                    { path: 'settings/import', element: withSuspense(ImportSettingsPage) },
-                    { path: 'settings/backups', element: withSuspense(SpaceBackupsPage) },
-                    { path: 'admin/system', element: admin(AdminSystemPage) },
-                    { path: 'admin/monitoring', element: admin(AdminMonitoringPage) },
-                    { path: 'admin/sso', element: admin(AdminSsoPage) },
-                    { path: 'admin/security', element: admin(AdminSecurityPage) },
-                    { path: 'admin/providers/create', element: admin(ProviderCreatePage) },
-                    { path: 'admin/providers/:id/edit', element: admin(ProviderEditPage) },
-                    { path: 'admin/backups', element: admin(SystemBackupsPage) },
-                    { path: 'admin/users', element: admin(AdminUsersPage) },
-                    { path: 'admin/spaces', element: admin(AdminSpacesPage) },
+                    { path: childPath(pages.automationLogs), element: withSuspense(AutomationLogsPage) },
+                    { path: childPath(pages.reports), element: withSuspense(ReportsPage) },
+                    { path: childPath(pages.spaceSettings), element: withSuspense(SpaceSettingsPage) },
+                    { path: childPath(pages.userSettings), element: withSuspense(UserSettingsPage) },
+                    { path: childPath(pages.securitySettings), element: withSuspense(SecuritySettingsPage) },
+                    { path: childPath(pages.apiSettings), element: withSuspense(ApiSettingsPage) },
+                    { path: childPath(pages.importSettings), element: withSuspense(ImportSettingsPage) },
+                    { path: childPath(pages.spaceBackups), element: withSuspense(SpaceBackupsPage) },
+                    { path: childPath(pages.adminSystem), element: admin(AdminSystemPage) },
+                    { path: childPath(pages.adminMonitoring), element: admin(AdminMonitoringPage) },
+                    { path: childPath(pages.adminSso), element: admin(AdminSsoPage) },
+                    { path: childPath(pages.adminSecurity), element: admin(AdminSecurityPage) },
+                    { path: childPath(pages.providerCreate), element: admin(ProviderCreatePage) },
+                    { path: childPath(pages.providerEdit), element: admin(ProviderEditPage) },
+                    { path: childPath(pages.adminBackups), element: admin(SystemBackupsPage) },
+                    { path: childPath(pages.adminUsers), element: admin(AdminUsersPage) },
+                    { path: childPath(pages.adminSpaces), element: admin(AdminSpacesPage) },
                     // Old addresses.
                     { path: 'users', element: <Navigate to="/admin/users" replace /> },
                     { path: 'settings/system', element: <Navigate to="/admin/system" replace /> },

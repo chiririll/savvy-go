@@ -22,3 +22,7 @@ go.work.sum
 /.idea
 /.vscode
 public/build
+
+# Output and dependencies of the screenshot script: large, and never part of an image
+/screenshots
+/scripts/node_modules

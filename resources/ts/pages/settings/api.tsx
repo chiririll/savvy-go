@@ -1,3 +1,4 @@
+import { testId } from '@/lib/test-id'
 import { UserSettingsTabs } from '@/components/features/spaces/UserSettingsTabs'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -122,7 +123,7 @@ export default function ApiSettingsPage() {
                                     {t('api.docs')}
                                 </a>
                             </Button>
-                            <Button size="sm" onClick={() => setShowCreate(true)}>
+                            <Button size="sm" onClick={() => setShowCreate(true)} {...testId('create-token')}>
                                 <Plus className="size-4" />
                                 {t('api.tokens.add')}
                             </Button>

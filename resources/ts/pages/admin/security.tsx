@@ -1,3 +1,4 @@
+import { testId } from '@/lib/test-id'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Copy, KeyRound, RefreshCw, Trash2 } from 'lucide-react'
@@ -40,7 +41,7 @@ function SigningKeys() {
             description={t('admin.keys.description')}
             actions={
                 <AlertDialog>
-                    <AlertDialogTrigger asChild>
+                    <AlertDialogTrigger asChild {...testId('confirm')}>
                         <Button variant="outline" size="sm" disabled={rotate.isPending}>
                             <RefreshCw className="mr-2 size-4" />
                             {t('admin.keys.rotate')}
