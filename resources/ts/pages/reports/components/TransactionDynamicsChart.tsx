@@ -19,8 +19,7 @@ import { formatCurrency, formatCurrencyCompact } from '@/lib/utils'
 import { defaultGroupBy } from '../types'
 import { dynamicsSeriesName, formatReportPeriodLabel } from '../utils'
 import type { ReportFilters } from '../types'
-import type { CashFlowGroupBy, ReportTransactionType } from '@/api/reports'
-import { groupByLabel } from '@/lib/labels'
+import type { ReportTransactionType } from '@/api/reports'
 import { isNarrowChart, useElementWidth } from '@/hooks/use-element-width'
 import { axisStyle, legendTextStyle, useChartTheme } from '@/lib/chart-theme'
 
@@ -54,12 +53,10 @@ export function TransactionDynamicsChart({ filters, type }: TransactionDynamicsC
         }
     const seriesLabel = type === 'income' ? t('reports.series.sources') : t('reports.filters.categories')
     const [chartType, setChartType] = useState<ChartType>('line')
-    const [groupBy, setGroupBy] = useState<CashFlowGroupBy>(() => defaultGroupBy(filters))
     const [series, setSeries] = useState<SeriesConfig[]>([])
 
-    useEffect(() => {
-        setGroupBy(defaultGroupBy(filters))
-    }, [filters.periodType, filters.customStartDate, filters.customEndDate])
+    // Detail follows the report period (a year of daily points is slow and unreadable).
+    const groupBy = defaultGroupBy(filters)
 
     const { data, isLoading } = useTransactionReportDynamics(filters, type, groupBy)
 
@@ -240,19 +237,6 @@ export function TransactionDynamicsChart({ filters, type }: TransactionDynamicsC
                                     </div>
                                 </PopoverContent>
                             </Popover>
-                        </div>
-                        <div className="flex gap-1" {...testIdControls('group-by')}>
-                            {(['day', 'week', 'month'] as CashFlowGroupBy[]).map((group) => (
-                                <Badge
-                                    key={group}
-                                    {...testIdControl(group, groupBy === group)}
-                                    variant={groupBy === group ? 'default' : 'outline'}
-                                    className="cursor-pointer"
-                                    onClick={() => setGroupBy(group)}
-                                >
-                                    {groupByLabel(t, group)}
-                                </Badge>
-                            ))}
                         </div>
                     </div>
                 </div>

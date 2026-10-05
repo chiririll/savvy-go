@@ -1,9 +1,7 @@
-import { testIdControl, testIdControls } from '@/lib/test-id'
-import { useState, useMemo, useEffect } from 'react'
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import ReactECharts from '@/components/shared/ReactECharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useNetWorthHistory } from '@/hooks'
 import { formatCurrency, formatCurrencyCompact } from '@/lib/utils'
@@ -11,8 +9,6 @@ import i18n from '@/lib/i18n'
 import { defaultGroupBy } from '../types'
 import { formatReportPeriodLabel } from '../utils'
 import type { ReportFilters } from '../types'
-import type { CashFlowGroupBy } from '@/api/reports'
-import { groupByLabel } from '@/lib/labels'
 import { isNarrowChart, useElementWidth } from '@/hooks/use-element-width'
 import { CHART_COLORS, axisStyle, useChartTheme, verticalFade } from '@/lib/chart-theme'
 
@@ -25,10 +21,8 @@ export function NetWorthChart({ filters }: NetWorthChartProps) {
     const theme = useChartTheme()
     const [chartRef, chartWidth] = useElementWidth<HTMLDivElement>()
     const isNarrow = isNarrowChart(chartWidth)
-    const [groupBy, setGroupBy] = useState<CashFlowGroupBy>(() => defaultGroupBy(filters))
-    useEffect(() => {
-        setGroupBy(defaultGroupBy(filters))
-    }, [filters.periodType, filters.customStartDate, filters.customEndDate])
+    // Detail follows the report period (a year of daily points is slow and unreadable).
+    const groupBy = defaultGroupBy(filters)
     const { data, isLoading } = useNetWorthHistory(filters, groupBy)
 
     const currency = data?.currency
@@ -86,26 +80,11 @@ export function NetWorthChart({ filters }: NetWorthChartProps) {
     return (
         <Card>
             <CardHeader className="pb-2">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0">
-                        <CardTitle className="text-lg">{t('reports.netWorth.chartTitle')}</CardTitle>
-                        <p className="text-sm text-muted-foreground">
-                            {t('reports.netWorth.chartSubtitle')}
-                        </p>
-                    </div>
-                    <div className="flex gap-1" {...testIdControls('group-by')}>
-                        {(['day', 'week', 'month'] as CashFlowGroupBy[]).map(g => (
-                            <Badge
-                                key={g}
-                                {...testIdControl(g, groupBy === g)}
-                                variant={groupBy === g ? 'default' : 'outline'}
-                                className="cursor-pointer"
-                                onClick={() => setGroupBy(g)}
-                            >
-                                {groupByLabel(t, g)}
-                            </Badge>
-                        ))}
-                    </div>
+                <div className="min-w-0">
+                    <CardTitle className="text-lg">{t('reports.netWorth.chartTitle')}</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                        {t('reports.netWorth.chartSubtitle')}
+                    </p>
                 </div>
             </CardHeader>
             <CardContent>

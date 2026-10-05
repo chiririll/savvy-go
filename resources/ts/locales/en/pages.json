@@ -321,11 +321,6 @@
             "resetFilters": "Reset filters",
             "quarterLabel": "Q{{q}} {{year}}"
         },
-        "groupBy": {
-            "day": "Day",
-            "week": "Week",
-            "month": "Month"
-        },
         "views": {
             "donut": "Donut",
             "bar": "Bar",
