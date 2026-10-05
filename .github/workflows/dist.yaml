@@ -1,4 +1,4 @@
-name: Build dist tarball, deb and rpm
+name: Build deb and rpm
 
 on:
   push:
@@ -44,35 +44,12 @@ jobs:
           GITHUB_REPO: ${{ github.repository }}
 
       - name: Compose release notes
-        env:
-          REPO: ${{ github.repository }}
         run: |
-          {
-            if [ -s CHANGES.md ]; then
-              cat CHANGES.md
-              echo
-            else
-              echo "Savvy ${{ steps.ver.outputs.tag }}"
-              echo
-            fi
-            echo "---"
-            echo
-            echo "Tarball: \`https://github.com/${REPO}/releases/latest/download/savvy-go.tar.gz\`"
-            echo
-            echo "Debian:"
-            echo
-            echo '```bash'
-            echo "curl -fsSLO https://github.com/${REPO}/releases/latest/download/savvy-go.deb"
-            echo "sudo apt install ./savvy-go.deb"
-            echo '```'
-            echo
-            echo "Fedora / RHEL / openSUSE:"
-            echo
-            echo '```bash'
-            echo "curl -fsSLO https://github.com/${REPO}/releases/latest/download/savvy-go.rpm"
-            echo "sudo dnf install ./savvy-go.rpm"
-            echo '```'
-          } > RELEASE_NOTES.md
+          if [ -s CHANGES.md ]; then
+            cp CHANGES.md RELEASE_NOTES.md
+          else
+            echo "Savvy ${{ steps.ver.outputs.tag }}" > RELEASE_NOTES.md
+          fi
           echo "::group::Release notes"
           cat RELEASE_NOTES.md
           echo "::endgroup::"
@@ -103,7 +80,7 @@ jobs:
           APP_VERSION: ${{ steps.ver.outputs.tag }}
         run: npm ci && npm run build
 
-      - name: Package tarball
+      - name: Assemble dist/public
         env:
           APP_VERSION: ${{ steps.ver.outputs.tag }}
         run: bash deploy/common/package-dist.sh
@@ -132,7 +109,6 @@ jobs:
           tag_name: ${{ steps.ver.outputs.tag }}
           name: ${{ steps.ver.outputs.tag }}
           files: |
-            dist/savvy-go.tar.gz
             dist/*.deb
             dist/*.rpm
           body_path: RELEASE_NOTES.md

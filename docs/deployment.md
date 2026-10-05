@@ -154,17 +154,6 @@ sudo dnf install ./savvy-go.rpm
 
 It behaves like the Debian package but runs as its own `savvy-go` system user. Removing the package keeps `/var/lib/savvy-go` and `/etc/savvy-go`; delete them yourself to wipe the data.
 
-## Tarball
-
-`savvy-go.tar.gz` holds the binary and the frontend (`public/`):
-
-```bash
-mkdir -p /opt/savvy-go && tar -C /opt/savvy-go -xzf savvy-go.tar.gz
-DATA_DIR=/var/lib/savvy-go PUBLIC_DIR=/opt/savvy-go/public LISTEN_ADDR=:8080 APP_URL=https://savvy.example.com /opt/savvy-go/savvy-go
-```
-
-Point a reverse proxy at `:8080`.
-
 ## Updating
 
 ```bash
