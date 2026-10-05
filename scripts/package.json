@@ -3,10 +3,12 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "logos": "tsx update-logos.ts"
+        "logos": "tsx update-logos.ts",
+        "screenshots": "tsx screenshots/run.ts"
     },
     "devDependencies": {
         "@types/node": "^25.0.3",
+        "playwright": "^1.63.0",
         "sharp": "^0.35.5",
         "tsx": "^4.23.15"
     }
