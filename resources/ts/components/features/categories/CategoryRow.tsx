@@ -14,6 +14,7 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
+import { categoryIconStyle } from '@/lib/category-color'
 import { localizeDefaultName } from '@/lib/localized-name'
 import { Category } from '@/types'
 
@@ -48,7 +49,7 @@ export function CategoryRow({
     return (
         <FeedRow
             icon={<span aria-hidden>{category.icon}</span>}
-            iconStyle={{ backgroundColor: `${category.color}20` }}
+            iconStyle={categoryIconStyle(category.color)}
             title={name}
             badge={category.isDefault ? (
                 <Star

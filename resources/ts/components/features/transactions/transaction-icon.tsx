@@ -5,6 +5,7 @@ import {
     Banknote,
     HandCoins,
 } from 'lucide-react'
+import { categoryIconStyle } from '@/lib/category-color'
 import type { Category, TransactionType } from '@/types'
 
 const TYPE_ICONS = {
@@ -37,6 +38,6 @@ export function transactionIconProps(type: TransactionType, category?: Pick<Cate
     return {
         icon: category?.icon ? <span aria-hidden>{category.icon}</span> : <TypeIcon className="size-4" />,
         iconClassName: category?.color ? undefined : TYPE_ICON_TONES[type],
-        iconStyle: category?.color ? { backgroundColor: `${category.color}20` } : undefined,
+        iconStyle: categoryIconStyle(category?.color),
     }
 }

@@ -13,6 +13,7 @@ import {
     FormMessage,
     FormDescription,
 } from '@/components/ui/form'
+import { COLOR_OPTIONS } from '@/constants'
 import { categorySchema, CategoryFormData } from '@/schemas'
 import { defaultNameKey, localizeDefaultName, toStoredDefaultName } from '@/lib/localized-name'
 import { TypeSelector } from './TypeSelector'
@@ -48,7 +49,7 @@ export function CategoryForm({
         defaultValues: {
             type: 'expense',
             icon: '🏠',
-            color: '#3B82F6',
+            color: COLOR_OPTIONS[9], // blue-400
             ...defaultValues,
             name: defaultValues?.name ? localizeDefaultName(defaultValues.name) : '',
         },
