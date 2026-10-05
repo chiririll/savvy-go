@@ -1,14 +1,12 @@
 import { useTranslation } from 'react-i18next'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn, formatCurrency } from '@/lib/utils'
 import { TrendingUp, TrendingDown, Wallet } from 'lucide-react'
 import { NetWorthChart } from '../components/NetWorthChart'
+import { AccountsStructureChart } from '../components/AccountsStructureChart'
 import { useNetWorth } from '@/hooks'
-import { ACCOUNT_TYPE_CONFIG } from '@/constants'
 import type { ReportFilters } from '../types'
-import type { AccountType } from '@/types'
-import { accountTypeLabelLoose } from '@/lib/labels'
 
 // Shrinks the headline amount with its length so it fits narrow screens (≈0.6em per glyph).
 function netWorthFontSize(text: string) {
@@ -99,77 +97,7 @@ export function NetWorthTab({ filters }: NetWorthTabProps) {
             <NetWorthChart filters={filters} />
 
             {/* Block 3 — Accounts Breakdown */}
-            <Card>
-                <CardHeader className="pb-2">
-                    <CardTitle className="text-lg">{t('reports.netWorth.accountsBreakdown')}</CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                        {t('reports.netWorth.distribution')}
-                    </p>
-                </CardHeader>
-                <CardContent>
-                    {isLoading ? (
-                        <div className="space-y-2">
-                            {Array.from({ length: 3 }).map((_, i) => (
-                                <Skeleton key={i} className="h-14" />
-                            ))}
-                        </div>
-                    ) : !data?.accounts?.length ? (
-                        <div className="h-[150px] flex items-center justify-center text-muted-foreground">
-                            {t('reports.netWorth.noAccounts')}
-                        </div>
-                    ) : (
-                        <div className="space-y-2">
-                            {data?.accounts.map(account => (
-                                <div
-                                    key={account.id}
-                                    className="p-3 rounded-lg bg-muted/30"
-                                >
-                                    <div className="flex items-center gap-2 sm:gap-3">
-                                        {/* Icon */}
-                                        {(() => {
-                                            const config = ACCOUNT_TYPE_CONFIG[account.type as AccountType]
-                                            const Icon = config?.icon || Wallet
-                                            return (
-                                                <div className={cn('flex shrink-0 items-center justify-center size-10 rounded-lg', config?.color || 'bg-muted')}>
-                                                    <Icon className="size-4" />
-                                                </div>
-                                            )
-                                        })()}
-
-                                        {/* Name and type */}
-                                        <div className="flex-1 min-w-0">
-                                            <p className="font-medium text-sm truncate">
-                                                {account.name}
-                                            </p>
-                                            <p className="text-xs text-muted-foreground capitalize">
-                                                {accountTypeLabelLoose(t, account.type)}
-                                            </p>
-                                        </div>
-
-                                        {/* Balance and percentage */}
-                                        <div className="shrink-0 text-right">
-                                            <p className="text-sm sm:text-base font-semibold">
-                                                {formatCurrency(account.balance, data.currency)}
-                                            </p>
-                                            <p className="text-xs text-muted-foreground">
-                                                {account.percentage}%
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    {/* Progress bar */}
-                                    <div className="mt-3 h-2 bg-muted rounded-full overflow-hidden">
-                                        <div
-                                            className="h-full bg-blue-500 rounded-full"
-                                            style={{ width: `${Math.max(account.percentage, 2)}%` }}
-                                        />
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
+            <AccountsStructureChart filters={filters} />
         </div>
     )
 }
