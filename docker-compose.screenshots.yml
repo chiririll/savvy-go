@@ -1,0 +1,48 @@
+# Screenshots of every page on a throwaway app with demo data (scripts/screenshots).
+#
+#   docker compose -f docker-compose.screenshots.yml up --build --abort-on-container-exit --exit-code-from shots
+#   docker compose -f docker-compose.screenshots.yml down -v
+#
+# The files appear in ./screenshots. `down -v` removes the app's data with its volume.
+services:
+  # Not called "app": Chromium treats http://app as the .app top-level domain, which is HTTPS-only.
+  savvy:
+    build:
+      context: .
+      args:
+        APP_VERSION: screenshots
+    environment:
+      APP_URL: http://savvy
+      TZ: UTC
+      SEED_DEMO: "true"
+      # The seed writes who can sign in and the ids of its data here for the runner.
+      SEED_MANIFEST: /data/manifest.json
+    volumes:
+      - data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/livez"]
+      interval: 3s
+      timeout: 3s
+      start_period: 60s
+      retries: 20
+
+  shots:
+    build:
+      context: .
+      dockerfile: scripts/screenshots/Dockerfile
+    depends_on:
+      savvy:
+        condition: service_healthy
+    environment:
+      BASE_URL: http://savvy
+      MANIFEST: /data/manifest.json
+      OUT: /out
+      TZ: UTC
+    # Chromium recommends sharing the host's IPC namespace in Docker.
+    ipc: host
+    volumes:
+      - data:/data:ro
+      - ./screenshots:/out
+
+volumes:
+  data:

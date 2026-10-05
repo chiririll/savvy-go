@@ -4,14 +4,14 @@
 // internal/seed/manifest.go); the manifest says who can sign in, which spaces
 // exist and which ids the parametrised pages need. See docs/scripts.md.
 //
-// Usage: npm --prefix scripts run screenshots -- [--only=<text in the page path>]
+// Run it with docker compose (docker-compose.screenshots.yml); only the page filter is an argument: --only=<text in the page path>
 // Env:   BASE_URL (http://localhost:8080), MANIFEST (<repo>/screenshots/manifest.json),
 //        OUT (<repo>/screenshots), CONCURRENCY (4), TZ (UTC), LOCALE (en-US)
 import { mkdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium, devices, type Browser, type BrowserContextOptions } from 'playwright'
-import type { Page } from '../../resources/ts/app/pages.ts'
+import { pages, type Page } from '../../resources/ts/app/pages.ts'
 import type { Manifest, ManifestSpace } from './manifest.ts'
 import { paramValue, routes, skip } from './routes.ts'
 
@@ -48,7 +48,7 @@ interface Job {
     // The page's "today" and the session, space and pages to capture.
     storageState?: BrowserContextOptions['storageState']
     spaceId?: number
-    pages: { path: string; name: string }[]
+    pages: { path: string; name: string; sidebar?: boolean }[]
 }
 
 const failures: string[] = []
@@ -83,7 +83,7 @@ async function main() {
         // The name leaves out the ids, which differ from run to run.
         return only && !p.includes(only) ? [] : [{ path: p, name: pageName(page.path.replace(/\/:\w+/g, '')) }]
     }
-    const pagesOf = (scope: Page['scope'], space?: ManifestSpace) =>
+    const pagesOf = (scope: Page['scope'], space?: ManifestSpace): Job['pages'] =>
         routes.filter((r) => r.scope === scope).flatMap((r) => fill(r, space))
 
     const jobs: Job[] = []
@@ -97,6 +97,10 @@ async function main() {
         for (const viewport of Object.keys(viewports)) {
             mine.forEach((sp, i) => {
                 const list = pagesOf('space', sp)
+                // On a phone the sidebar is a drawer behind a button, so it is not in any page's shot.
+                if (viewport === 'mobile' && (!only || 'sidebar'.includes(only))) {
+                    list.unshift({ path: pages.dashboard.path, name: 'sidebar', sidebar: true })
+                }
                 // Pages of the user and the server do not depend on the space: once is enough.
                 if (i === 0) {
                     list.push(...pagesOf('user'))
@@ -170,11 +174,22 @@ async function run(browser: Browser, job: Job, now: Date | null, tick: () => voi
     await mkdir(dir, { recursive: true })
     for (const p of job.pages) {
         const file = path.join(dir, `${p.name}.png`)
-        try {
-            await page.goto(p.path, { waitUntil: 'networkidle' })
-            await page.screenshot({ path: file, fullPage: true, animations: 'disabled' })
-        } catch (e) {
-            failures.push(`${job.label} ${job.viewport} ${p.path}: ${(e as Error).message.split('\n')[0]}`)
+        // A slow machine now and then stalls a capture; one more try is enough.
+        for (let attempt = 1; ; attempt++) {
+            try {
+                await page.goto(p.path, { waitUntil: 'networkidle' })
+                if (p.sidebar) {
+                    await page.locator('[data-sidebar="trigger"]').first().click()
+                    await page.locator('[data-sidebar="sidebar"][data-mobile="true"]').waitFor()
+                }
+                // The open drawer is fixed to the screen: a full-page shot would stretch it over the page.
+                await page.screenshot({ path: file, fullPage: !p.sidebar, animations: 'disabled' })
+                break
+            } catch (e) {
+                if (attempt < 2) continue
+                failures.push(`${job.label} ${job.viewport} ${p.path}: ${(e as Error).message.split('\n')[0]}`)
+                break
+            }
         }
         tick()
     }
