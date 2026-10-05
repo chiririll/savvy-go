@@ -4,7 +4,7 @@ import ReactECharts from '@/components/shared/ReactECharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useBalanceHistory } from '@/hooks'
-import { useTheme } from '@/hooks/use-theme'
+import { axisStyle, useChartTheme, verticalFade } from '@/lib/chart-theme'
 import { cn, formatCurrency, formatCurrencyCompact } from '@/lib/utils'
 import { CHART_COLORS } from '@/constants'
 import type { BalanceHistorySeries } from '@/api/accounts'
@@ -32,7 +32,7 @@ function lastAmount(series: BalanceHistorySeries): number {
 
 export function BalanceDynamicsChart({ startDate, endDate, className }: BalanceDynamicsChartProps) {
     const { t } = useTranslation('pages')
-    const { theme } = useTheme()
+    const chartTheme = useChartTheme()
     const { data: historyData, isLoading } = useBalanceHistory({
         start_date: startDate,
         end_date: endDate,
@@ -67,7 +67,6 @@ export function BalanceDynamicsChart({ startDate, endDate, className }: BalanceD
     const chartOption = useMemo(() => {
         if (!historyData || labeledSeries.length === 0) return {}
 
-        const isDark = theme === 'dark'
         const daysDiff = historyData.dates.length
         const visibleLabeled = labeledSeries.filter((series) => !hiddenKeys.has(series.key))
         const visibleCurrencies = new Set(
@@ -95,9 +94,7 @@ export function BalanceDynamicsChart({ startDate, endDate, className }: BalanceD
             tooltip: {
                 trigger: 'axis',
                 confine: true,
-                backgroundColor: isDark ? '#1f2937' : '#ffffff',
-                borderColor: isDark ? '#374151' : '#e5e7eb',
-                textStyle: { color: isDark ? '#f3f4f6' : '#1f2937' },
+                ...chartTheme.tooltip,
                 formatter: (params: { seriesName: string; seriesIndex: number; dataIndex: number; color: string }[]) => {
                     const label = historyData.dates[params[0]?.dataIndex]
                         ? formatLabel(historyData.dates[params[0].dataIndex])
@@ -123,25 +120,21 @@ export function BalanceDynamicsChart({ startDate, endDate, className }: BalanceD
                 top: '10%',
                 containLabel: true,
             },
-            xAxis: {
-                type: 'category',
+            xAxis: axisStyle(chartTheme, 'category', {
                 boundaryGap: false,
                 data: historyData.dates.map(formatLabel),
-                axisLine: { lineStyle: { color: isDark ? '#374151' : '#e5e7eb' } },
                 axisLabel: {
-                    color: isDark ? '#9ca3af' : '#6b7280',
+                    fontSize: 12,
                     interval: daysDiff > 60 ? Math.floor(daysDiff / 10) : 'auto',
                 },
-            },
-            yAxis: {
-                type: 'value',
+            }),
+            yAxis: axisStyle(chartTheme, 'value', {
                 axisLine: { show: false },
-                splitLine: { lineStyle: { color: isDark ? '#374151' : '#e5e7eb' } },
                 axisLabel: {
-                    color: isDark ? '#9ca3af' : '#6b7280',
+                    fontSize: 12,
                     formatter: (value: number) => formatCurrencyCompact(value, axisCurrency, { showSymbol: false }),
                 },
-            },
+            }),
             series: labeledSeries.map((series) => ({
                 id: series.key,
                 name: series.label,
@@ -154,24 +147,12 @@ export function BalanceDynamicsChart({ startDate, endDate, className }: BalanceD
                 },
                 itemStyle: { color: series.color },
                 areaStyle: series.type === 'total'
-                    ? {
-                        color: {
-                            type: 'linear',
-                            x: 0,
-                            y: 0,
-                            x2: 0,
-                            y2: 1,
-                            colorStops: [
-                                { offset: 0, color: 'rgba(99, 102, 241, 0.2)' },
-                                { offset: 1, color: 'rgba(99, 102, 241, 0.02)' },
-                            ],
-                        },
-                    }
+                    ? { color: verticalFade('#6366f1', 0.2, 0.02) }
                     : undefined,
                 emphasis: { focus: 'series' },
             })),
         }
-    }, [historyData, labeledSeries, hiddenKeys, theme])
+    }, [historyData, labeledSeries, hiddenKeys, chartTheme])
 
     const hasData = Boolean(historyData && historyData.series.length > 0 && historyData.dates.length > 0)
 

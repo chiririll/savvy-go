@@ -10,15 +10,15 @@ import type { ReportTransactionType } from '@/api/reports'
 const TONE = {
     income: {
         total: 'text-green-600',
-        day: 'bg-green-100 text-green-600',
-        week: 'bg-emerald-100 text-emerald-600',
+        day: 'bg-green-100 text-green-600 dark:bg-green-950/50 dark:text-green-400',
+        week: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400',
         up: 'text-green-600',
         down: 'text-red-600',
     },
     expense: {
         total: 'text-red-600',
-        day: 'bg-orange-100 text-orange-600',
-        week: 'bg-purple-100 text-purple-600',
+        day: 'bg-orange-100 text-orange-600 dark:bg-orange-950/50 dark:text-orange-400',
+        week: 'bg-purple-100 text-purple-600 dark:bg-purple-950/50 dark:text-purple-400',
         up: 'text-red-600',
         down: 'text-green-600',
     },
@@ -51,23 +51,23 @@ export function TransactionTypeSummary({ filters, type }: TransactionTypeSummary
                             <Skeleton className="h-12 w-40" />
                             <Skeleton className="h-4 w-48" />
                         </div>
-                        <div className="flex gap-6">
-                            <Skeleton className="h-20 w-36" />
-                            <Skeleton className="h-20 w-36" />
+                        <div className="flex flex-col gap-3 sm:flex-row sm:gap-6">
+                            <Skeleton className="h-20 w-full sm:w-36" />
+                            <Skeleton className="h-20 w-full sm:w-36" />
                         </div>
                     </div>
                 ) : data ? (
                     <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-                        <div className="space-y-2">
+                        <div className="min-w-0 space-y-2">
                             <p className="text-sm text-muted-foreground font-medium">
                                 {metricLabel}
                             </p>
-                            <p className={cn('text-5xl font-bold tracking-tight', tone.total)}>
+                            <p className={cn('text-3xl sm:text-5xl font-bold tracking-tight break-words', tone.total)}>
                                 {formatCurrency(data.total, data.currency)}
                             </p>
 
                             {filters.compareWith !== 'none' && data.previous !== null && (
-                                <div className="flex items-center gap-3 pt-1">
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1">
                                     <span className={cn(
                                         'flex items-center gap-1 text-sm font-medium',
                                         isIncrease ? tone.up : tone.down
@@ -88,14 +88,14 @@ export function TransactionTypeSummary({ filters, type }: TransactionTypeSummary
                             )}
                         </div>
 
-                        <div className="flex gap-6">
-                            <div className="flex items-center gap-3 px-5 py-4 bg-muted/50 rounded-xl">
-                                <div className={cn('flex items-center justify-center size-10 rounded-lg', tone.day)}>
+                        <div className="flex flex-col gap-3 sm:flex-row sm:gap-6">
+                            <div className="flex min-w-0 items-center gap-3 px-4 py-3 sm:px-5 sm:py-4 bg-muted/50 rounded-xl">
+                                <div className={cn('flex shrink-0 items-center justify-center size-10 rounded-lg', tone.day)}>
                                     <Calendar className="size-5" />
                                 </div>
-                                <div>
+                                <div className="min-w-0">
                                     <p className="text-xs text-muted-foreground">{t('reports.metrics.avgPerDay')}</p>
-                                    <p className="text-xl font-semibold">{formatCurrency(data.avgPerDay, data.currency)}</p>
+                                    <p className="text-xl font-semibold break-words">{formatCurrency(data.avgPerDay, data.currency)}</p>
                                     {filters.compareWith !== 'none' && data.prevAvgPerDay !== null && (
                                         <p className="text-xs text-muted-foreground">
                                             {t('reports.vsAmount', { amount: formatCurrency(data.prevAvgPerDay, data.currency) })}
@@ -104,13 +104,13 @@ export function TransactionTypeSummary({ filters, type }: TransactionTypeSummary
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-3 px-5 py-4 bg-muted/50 rounded-xl">
-                                <div className={cn('flex items-center justify-center size-10 rounded-lg', tone.week)}>
+                            <div className="flex min-w-0 items-center gap-3 px-4 py-3 sm:px-5 sm:py-4 bg-muted/50 rounded-xl">
+                                <div className={cn('flex shrink-0 items-center justify-center size-10 rounded-lg', tone.week)}>
                                     <CalendarDays className="size-5" />
                                 </div>
-                                <div>
+                                <div className="min-w-0">
                                     <p className="text-xs text-muted-foreground">{t('reports.metrics.avgPerWeek')}</p>
-                                    <p className="text-xl font-semibold">{formatCurrency(data.avgPerWeek, data.currency)}</p>
+                                    <p className="text-xl font-semibold break-words">{formatCurrency(data.avgPerWeek, data.currency)}</p>
                                     {filters.compareWith !== 'none' && data.prevAvgPerWeek !== null && (
                                         <p className="text-xs text-muted-foreground">
                                             {t('reports.vsAmount', { amount: formatCurrency(data.prevAvgPerWeek, data.currency) })}

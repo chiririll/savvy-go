@@ -55,22 +55,22 @@ export function TopTransactions({ filters, type, limit = 10 }: TopTransactionsPr
     return (
         <Card>
             <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                    <div>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
                         <CardTitle className="text-lg">{copy.title}</CardTitle>
                         <p className="text-sm text-muted-foreground">
                             {copy.subtitle}
                         </p>
                     </div>
                     {!isLoading && transactions.length > 0 && (
-                        <div className="text-right">
+                        <div className="sm:text-right">
                             <p className="text-sm text-muted-foreground">{copy.topTotal}</p>
                             <p className={`text-lg font-semibold ${amountClass}`}>{formatCurrency(totalTop, currency)}</p>
                         </div>
                     )}
                 </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-3 sm:px-6">
                 {isLoading ? (
                     <div className="space-y-2">
                         {Array.from({ length: 5 }).map((_, index) => (
@@ -86,10 +86,10 @@ export function TopTransactions({ filters, type, limit = 10 }: TopTransactionsPr
                         {transactions.map((transaction, index) => (
                             <div
                                 key={transaction.id}
-                                className="group flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                                className="group flex items-center gap-2 sm:gap-3 px-1 py-2 sm:px-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
                                 onClick={() => navigate(`/transactions?id=${transaction.id}`)}
                             >
-                                <div className="flex items-center justify-center size-6 rounded-full bg-muted text-xs font-medium text-muted-foreground">
+                                <div className="flex items-center justify-center size-6 shrink-0 rounded-full bg-muted text-xs font-medium text-muted-foreground">
                                     {index + 1}
                                 </div>
                                 <div
@@ -102,20 +102,20 @@ export function TopTransactions({ filters, type, limit = 10 }: TopTransactionsPr
                                     <p className="font-medium text-sm truncate">
                                         {transaction.description || localizeDefaultName(transaction.category.name)}
                                     </p>
-                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                        <span>{formatShortDate(transaction.date)}</span>
-                                        <span>•</span>
-                                        <span>{localizeDefaultName(transaction.category.name)}</span>
-                                        <span>•</span>
-                                        <span>{transaction.account.name}</span>
-                                    </div>
+                                    <p className="truncate text-xs text-muted-foreground">
+                                        {[
+                                            formatShortDate(transaction.date),
+                                            localizeDefaultName(transaction.category.name),
+                                            transaction.account.name,
+                                        ].join(' • ')}
+                                    </p>
                                 </div>
                                 <div className="text-right flex-shrink-0">
-                                    <p className={`font-semibold ${amountClass}`}>
+                                    <p className={`text-sm sm:text-base font-semibold ${amountClass}`}>
                                         {amountPrefix}{formatCurrency(transaction.amount, currency)}
                                     </p>
                                 </div>
-                                <ChevronRight className="size-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                                <ChevronRight className="hidden sm:block size-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
                             </div>
                         ))}
                     </div>

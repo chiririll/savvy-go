@@ -253,12 +253,6 @@ export const periodTypeLabel = (t: TFunction, type: PeriodType): string => ({
     custom: t('pages:reports.filters.custom'),
 } satisfies Record<PeriodType, string>)[type]
 
-export const groupByLabel = (t: TFunction, group: GroupBy): string => ({
-    day: t('pages:reports.groupBy.day'),
-    week: t('pages:reports.groupBy.week'),
-    month: t('pages:reports.groupBy.month'),
-} satisfies Record<GroupBy, string>)[group]
-
 export const reportTabLabel = (t: TFunction, tab: ReportTab): string => ({
     overview: t('pages:reports.tabs.overview'),
     cashflow: t('pages:reports.tabs.cashflow'),

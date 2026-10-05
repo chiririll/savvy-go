@@ -8,6 +8,8 @@ import { cn, formatCurrency, formatCurrencyCompact } from '@/lib/utils'
 import { TrendingUp, TrendingDown, AlertCircle } from 'lucide-react'
 import { useExpensePace } from '@/hooks'
 import i18n from '@/lib/i18n'
+import { isNarrowChart, useElementWidth } from '@/hooks/use-element-width'
+import { CHART_COLORS, axisStyle, useChartTheme, verticalFade, withAlpha, type ChartTheme } from '@/lib/chart-theme'
 import type { ReportFilters } from '../types'
 import { formatExpensePaceMonthLabel } from '../utils'
 import type { ExpensePaceMonth } from '@/api/reports'
@@ -90,7 +92,7 @@ function processMonthData(month: ExpensePaceMonth): MonthChartData {
     }
 }
 
-function buildChartOption(chartData: MonthChartData, currency: string | null) {
+function buildChartOption(chartData: MonthChartData, currency: string | null, theme: ChartTheme, isNarrow: boolean) {
     const { days, idealPace, actualExpenses, currentDay, currentActual, budget, daysInMonth, hasBudget, forecastTotal } = chartData
 
     const maxValue = Math.max(
@@ -116,16 +118,8 @@ function buildChartOption(chartData: MonthChartData, currency: string | null) {
             smooth: true,
             symbol: 'none',
             showSymbol: false,
-            lineStyle: { color: '#94a3b8', width: 2, type: 'dashed' },
-            areaStyle: {
-                color: {
-                    type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
-                    colorStops: [
-                        { offset: 0, color: 'rgba(148, 163, 184, 0.1)' },
-                        { offset: 1, color: 'rgba(148, 163, 184, 0)' },
-                    ],
-                },
-            },
+            lineStyle: { color: CHART_COLORS.neutral, width: 2, type: 'dashed' },
+            areaStyle: { color: verticalFade(CHART_COLORS.neutral, 0.1) },
         })
     }
 
@@ -136,16 +130,8 @@ function buildChartOption(chartData: MonthChartData, currency: string | null) {
         smooth: true,
         symbol: 'none',
         showSymbol: false,
-        lineStyle: { color: '#ef4444', width: 3 },
-        areaStyle: {
-            color: {
-                type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
-                colorStops: [
-                    { offset: 0, color: 'rgba(239, 68, 68, 0.2)' },
-                    { offset: 1, color: 'rgba(239, 68, 68, 0)' },
-                ],
-            },
-        },
+        lineStyle: { color: CHART_COLORS.expense, width: 3 },
+        areaStyle: { color: verticalFade(CHART_COLORS.expense, 0.2) },
     })
 
     if (currentDay !== null && currentDay > 0) {
@@ -156,10 +142,10 @@ function buildChartOption(chartData: MonthChartData, currency: string | null) {
             symbol: 'circle',
             symbolSize: 12,
             itemStyle: {
-                color: '#ef4444',
-                borderColor: '#fff',
+                color: CHART_COLORS.expense,
+                borderColor: theme.surface,
                 borderWidth: 2,
-                shadowColor: 'rgba(239, 68, 68, 0.4)',
+                shadowColor: withAlpha(CHART_COLORS.expense, 0.4),
                 shadowBlur: 8,
             },
             label: {
@@ -167,7 +153,7 @@ function buildChartOption(chartData: MonthChartData, currency: string | null) {
                 position: 'top',
                 formatter: i18n.t('pages:reports.series.today'),
                 fontSize: 11,
-                color: '#ef4444',
+                color: CHART_COLORS.expense,
                 fontWeight: 'bold',
                 distance: 8,
             },
@@ -181,25 +167,26 @@ function buildChartOption(chartData: MonthChartData, currency: string | null) {
             type: 'line',
             data: Array.from({ length: daysInMonth }, () => budget),
             symbol: 'none',
-            lineStyle: { color: '#22c55e', width: 2, type: 'dotted' },
+            lineStyle: { color: CHART_COLORS.income, width: 2, type: 'dotted' },
             markLine: {
                 silent: true,
                 symbol: 'none',
                 label: {
                     show: true,
-                    position: 'end',
+                    position: isNarrow ? 'insideEndTop' : 'end',
                     formatter: i18n.t('pages:reports.series.budgetLabel', { amount: formatCurrency(budget, currency) }),
                     fontSize: 11,
-                    color: '#22c55e',
+                    color: CHART_COLORS.income,
                 },
                 data: [{ yAxis: budget }],
-                lineStyle: { color: '#22c55e', type: 'dotted' },
+                lineStyle: { color: CHART_COLORS.income, type: 'dotted' },
             },
         })
     }
 
     return {
         tooltip: {
+            ...theme.tooltip,
             trigger: 'axis',
             formatter: (params: { seriesName: string; value: number; axisValue: number }[]) => {
                 const day = params[0]?.axisValue
@@ -207,11 +194,11 @@ function buildChartOption(chartData: MonthChartData, currency: string | null) {
                 params.forEach(p => {
                     if (p.value !== undefined && p.seriesName !== nameCurrent) {
                         const colors: Record<string, string> = {
-                            [nameActual]: '#ef4444',
-                            [nameBudgetPace]: '#94a3b8',
-                            [nameBudget]: '#22c55e',
+                            [nameActual]: CHART_COLORS.expense,
+                            [nameBudgetPace]: CHART_COLORS.neutral,
+                            [nameBudget]: CHART_COLORS.income,
                         }
-                        const color = colors[p.seriesName] || '#64748b'
+                        const color = colors[p.seriesName] || theme.text
                         html += `<div class="flex items-center gap-2">
                             <span style="background:${color}" class="w-2 h-2 rounded-full inline-block"></span>
                             <span>${p.seriesName}: <strong>${formatCurrency(p.value, currency)}</strong></span>
@@ -221,20 +208,15 @@ function buildChartOption(chartData: MonthChartData, currency: string | null) {
                 return html
             },
         },
-        grid: { left: 60, right: 20, top: 40, bottom: 40 },
-        xAxis: {
-            type: 'category',
+        grid: { left: isNarrow ? 48 : 60, right: isNarrow ? 12 : 20, top: 40, bottom: 40 },
+        xAxis: axisStyle(theme, 'category', {
             data: days,
-            axisLabel: { interval: Math.floor(daysInMonth / 7), fontSize: 11, color: '#64748b' },
-            axisLine: { lineStyle: { color: '#e2e8f0' } },
-            axisTick: { show: false },
-        },
-        yAxis: {
-            type: 'value',
-            axisLabel: { formatter: formatYAxis, fontSize: 11, color: '#64748b' },
-            splitLine: { lineStyle: { color: '#f1f5f9', type: 'dashed' } },
+            axisLabel: { interval: Math.floor(daysInMonth / 7) },
+        }),
+        yAxis: axisStyle(theme, 'value', {
+            axisLabel: { formatter: formatYAxis },
             max: maxValue,
-        },
+        }),
         series,
     }
 }
@@ -242,6 +224,9 @@ function buildChartOption(chartData: MonthChartData, currency: string | null) {
 export function ExpensePaceChart({ filters }: ExpensePaceChartProps) {
     const { t, i18n } = useTranslation('pages')
     const { data, isLoading, error } = useExpensePace(filters)
+    const theme = useChartTheme()
+    const [chartRef, chartWidth] = useElementWidth<HTMLDivElement>()
+    const isNarrow = isNarrowChart(chartWidth)
     const [selectedMonth, setSelectedMonth] = useState(0)
 
     const monthsData = useMemo(() => {
@@ -258,8 +243,8 @@ export function ExpensePaceChart({ filters }: ExpensePaceChartProps) {
     const currentMonthData = monthsData?.[Math.min(selectedMonth, (monthsData?.length ?? 1) - 1)]
     const chartOption = useMemo(() => {
         if (!currentMonthData || !data) return null
-        return buildChartOption(currentMonthData, data.currency)
-    }, [currentMonthData, data, i18n.language])
+        return buildChartOption(currentMonthData, data.currency, theme, isNarrow)
+    }, [currentMonthData, data, i18n.language, theme, isNarrow])
 
     const currency = data?.currency
 
@@ -276,8 +261,8 @@ export function ExpensePaceChart({ filters }: ExpensePaceChartProps) {
     return (
         <Card>
             <CardHeader className="pb-2">
-                <div className="flex items-start justify-between">
-                    <div>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
                         <CardTitle className="text-lg">{t('reports.expensePace.title')}</CardTitle>
                         <p className="text-sm text-muted-foreground">
                             {currentMonthData?.hasBudget
@@ -287,15 +272,15 @@ export function ExpensePaceChart({ filters }: ExpensePaceChartProps) {
                         </p>
                     </div>
                     {currentMonthData && (
-                        <div className="text-right">
+                        <div className="min-w-0 sm:text-right">
                             <p className="text-sm text-muted-foreground">
                                 {currentMonthData.hasBudget ? t('reports.expensePace.budgetRemaining') : t('reports.expensePace.spentSoFar')}
                             </p>
                             <p className={cn(
-                                'text-2xl font-bold',
+                                'text-xl sm:text-2xl font-bold break-words',
                                 currentMonthData.hasBudget
                                     ? (currentMonthData.budgetRemaining >= 0 ? 'text-green-600' : 'text-red-600')
-                                    : 'text-slate-700'
+                                    : 'text-foreground'
                             )}>
                                 {currentMonthData.hasBudget
                                     ? formatCurrency(currentMonthData.budgetRemaining, currency)
@@ -318,7 +303,7 @@ export function ExpensePaceChart({ filters }: ExpensePaceChartProps) {
                         {monthsData.length > 1 && (
                             <div className="mb-4">
                                 <Select value={String(selectedMonth)} onValueChange={(v) => setSelectedMonth(Number(v))}>
-                                    <SelectTrigger className="w-[180px]">
+                                    <SelectTrigger className="w-full sm:w-[180px]">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -330,7 +315,12 @@ export function ExpensePaceChart({ filters }: ExpensePaceChartProps) {
                             </div>
                         )}
 
-                        <ReactECharts option={chartOption} style={{ height: 300 }} />
+                        <div ref={chartRef} style={{ height: 300 }}>
+                            {/* Mount once measured so the chart animates in a single pass */}
+                            {chartWidth > 0 && (
+                                <ReactECharts option={chartOption} style={{ height: 300 }} />
+                            )}
+                        </div>
 
                         {currentMonthData && (
                             <div className="mt-4 pt-4 border-t">
@@ -341,8 +331,8 @@ export function ExpensePaceChart({ filters }: ExpensePaceChartProps) {
                                     </div>
                                 )}
 
-                                <div className="flex items-center justify-between">
-                                    <div>
+                                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <div className="min-w-0">
                                         <p className="text-sm text-muted-foreground">
                                             {currentMonthData.currentDay ? t('reports.expensePace.projectedEnd') : t('reports.expensePace.totalSpent')}
                                         </p>
@@ -352,11 +342,11 @@ export function ExpensePaceChart({ filters }: ExpensePaceChartProps) {
                                     </div>
                                     {currentMonthData.hasBudget && (
                                         <div className={cn(
-                                            'flex items-center gap-2 px-3 py-2 rounded-lg',
-                                            currentMonthData.isOverBudget ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'
+                                            'flex min-w-0 items-start gap-2 px-3 py-2 rounded-lg',
+                                            currentMonthData.isOverBudget ? 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300' : 'bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-300'
                                         )}>
-                                            {currentMonthData.isOverBudget ? <TrendingUp className="size-4" /> : <TrendingDown className="size-4" />}
-                                            <span className="text-sm font-medium">
+                                            {currentMonthData.isOverBudget ? <TrendingUp className="size-4 mt-0.5 shrink-0" /> : <TrendingDown className="size-4 mt-0.5 shrink-0" />}
+                                            <span className="text-sm font-medium break-words min-w-0">
                                                 {currentMonthData.isOverBudget
                                                     ? t('reports.expensePace.overBudget', { amount: `+${formatCurrency(Math.abs(currentMonthData.forecastDiff), currency)}` })
                                                     : t('reports.expensePace.underBudget', { amount: formatCurrency(Math.abs(currentMonthData.forecastDiff), currency) })}

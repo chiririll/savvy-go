@@ -321,11 +321,6 @@
             "resetFilters": "Сбросить фильтры",
             "quarterLabel": "{{q}} кв. {{year}}"
         },
-        "groupBy": {
-            "day": "День",
-            "week": "Неделя",
-            "month": "Месяц"
-        },
         "views": {
             "donut": "Кольцо",
             "bar": "Столбцы",

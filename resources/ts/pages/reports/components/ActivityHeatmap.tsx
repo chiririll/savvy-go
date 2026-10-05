@@ -110,8 +110,8 @@ export function ActivityHeatmap({ filters }: ActivityHeatmapProps) {
     return (
         <Card className="flex flex-col">
             <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                    <div>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
                         <CardTitle className="text-lg">{t('reports.heatmap.title')}</CardTitle>
                         <p className="text-sm text-muted-foreground">
                             {t('reports.heatmap.subtitle')}

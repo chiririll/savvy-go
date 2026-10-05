@@ -2,7 +2,6 @@ import { testId, testIdControl, testIdControls, testIdSelect } from '@/lib/test-
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -139,8 +138,8 @@ export function FiltersBar({ filters, onFilterChange, onToggleArrayFilter, onRes
         filters.tagIds.length
 
     // Period type badges component
-    const PeriodTypeBadges = () => (
-        <div className="flex flex-wrap gap-1" {...testIdControls('global-period')}>
+    const PeriodTypeBadges = ({ scroll = false }: { scroll?: boolean }) => (
+        <div className={scroll ? 'flex w-max gap-1' : 'flex flex-wrap gap-1'} {...testIdControls('global-period')}>
             {(['last_30_days', 'month', 'quarter', 'year', 'ytd'] as PeriodType[]).map(type => (
                 <Badge
                     key={type}
@@ -291,12 +290,11 @@ export function FiltersBar({ filters, onFilterChange, onToggleArrayFilter, onRes
     // Mobile version
     if (isMobile) {
         return (
-            <Card className="mb-6">
-                <CardContent className="py-3">
-                    <div className="flex items-center justify-between gap-2">
+            <div className="mb-6">
+                <div className="flex items-center justify-between gap-2">
                         {/* Quick period selection */}
-                        <div className="flex-1 overflow-x-auto">
-                            <PeriodTypeBadges />
+                        <div className="min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                            <PeriodTypeBadges scroll />
                         </div>
 
                         {/* Filters button */}
@@ -358,54 +356,49 @@ export function FiltersBar({ filters, onFilterChange, onToggleArrayFilter, onRes
                                 </div>
                             </SheetContent>
                         </Sheet>
-                    </div>
-                </CardContent>
-            </Card>
+                </div>
+            </div>
         )
     }
 
-    // Desktop version
+    // Desktop version: period on the left, everything else on the right
     return (
-        <Card className="mb-6">
-            <CardContent className="py-4">
-                <div className="flex flex-wrap items-center gap-3">
-                    {/* Period Type & Selection */}
-                    <div className="flex items-center gap-2">
-                        <Calendar className="size-4 text-muted-foreground" />
-                        <PeriodTypeBadges />
-                        <PeriodSelector />
-                    </div>
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+            {/* Period Type & Selection */}
+            <div className="flex flex-wrap items-center gap-2">
+                <Calendar className="size-4 text-muted-foreground" />
+                <PeriodTypeBadges />
+                <PeriodSelector />
+            </div>
 
-                    <div className="h-6 w-px bg-border" />
+            <div className="ml-auto flex flex-wrap items-center justify-end gap-3">
+                {/* Comparison Period */}
+                <ComparisonSelector />
 
-                    {/* Comparison Period */}
-                    <ComparisonSelector />
+                <div className="h-6 w-px bg-border" />
 
-                    <div className="h-6 w-px bg-border" />
-
-                    {/* Filter Dropdowns */}
-                    <div className="flex items-center gap-2">
-                        <Filter className="size-4 text-muted-foreground" />
-                        {entityFilters()}
-                    </div>
-
-                    {/* Reset Button */}
-                    {hasActiveFilters && (
-                        <>
-                            <div className="h-6 w-px bg-border" />
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={onReset}
-                                className="h-8 text-muted-foreground"
-                            >
-                                <RotateCcw className="size-3 mr-1" />
-                                {t('reports.filters.reset')}
-                            </Button>
-                        </>
-                    )}
+                {/* Filter Dropdowns */}
+                <div className="flex items-center gap-2">
+                    <Filter className="size-4 text-muted-foreground" />
+                    {entityFilters()}
                 </div>
-            </CardContent>
-        </Card>
+
+                {/* Reset Button */}
+                {hasActiveFilters && (
+                    <>
+                        <div className="h-6 w-px bg-border" />
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={onReset}
+                            className="h-8 text-muted-foreground"
+                        >
+                            <RotateCcw className="size-3 mr-1" />
+                            {t('reports.filters.reset')}
+                        </Button>
+                    </>
+                )}
+            </div>
+        </div>
     )
 }
