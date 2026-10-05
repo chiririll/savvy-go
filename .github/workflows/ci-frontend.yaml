@@ -1,27 +1,31 @@
-name: CI
+name: CI Frontend
 
 on:
   pull_request:
     branches: [main]
+    paths:
+      - 'resources/**'
+      - 'public/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig*.json'
+      - 'vite.config.ts'
+      - 'components.json'
+      - '.github/workflows/ci-frontend.yaml'
   push:
     branches: [main]
+    paths:
+      - 'resources/**'
+      - 'public/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig*.json'
+      - 'vite.config.ts'
+      - 'components.json'
+      - '.github/workflows/ci-frontend.yaml'
   workflow_dispatch:
 
 jobs:
-  go:
-    name: Go tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.26.x'
-
-      - name: Test
-        run: go test ./...
-
   frontend:
     name: Frontend tests
     runs-on: ubuntu-latest
