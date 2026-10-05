@@ -15,48 +15,6 @@ import (
 	"savvy-go/internal/migrate"
 )
 
-func TestCopyFromLaravelFixture(t *testing.T) {
-	ctx := context.Background()
-	dir := t.TempDir()
-
-	src, err := db.Open(filepath.Join(dir, "laravel.sqlite"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = src.Close() })
-	createLaravelShape(t, src)
-
-	dest, err := db.Open(filepath.Join(dir, "go.sqlite"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dest.Close() })
-	if err := migrate.Up(ctx, dest); err != nil {
-		t.Fatal(err)
-	}
-
-	if !IsLaravel(ctx, src) {
-		t.Fatal("expected laravel detection")
-	}
-	if IsLaravel(ctx, dest) {
-		t.Fatal("fresh go db should not look like laravel")
-	}
-
-	if err := Copy(ctx, dest, src); err != nil {
-		t.Fatal(err)
-	}
-	assertCopied(t, dest)
-	if !AlreadyImported(ctx, dest) {
-		t.Fatal("expected import stamp")
-	}
-
-	// Idempotent: second copy does not duplicate.
-	if err := Copy(ctx, dest, src); err != nil {
-		t.Fatal(err)
-	}
-	assertCopied(t, dest)
-}
-
 func TestUnsupportedLaravelVersionRejected(t *testing.T) {
 	ctx := context.Background()
 	sqlDB, err := db.Open(filepath.Join(t.TempDir(), "database.sqlite"))
@@ -69,17 +27,28 @@ func TestUnsupportedLaravelVersionRejected(t *testing.T) {
 	if _, err := sqlDB.Exec(`DELETE FROM migrations WHERE migration = ?`, LatestMigration); err != nil {
 		t.Fatal(err)
 	}
-	if info := Inspect(ctx, sqlDB); !info.Laravel || info.Supported {
-		t.Fatalf("inspect %+v", info)
-	}
 	if err := Upgrade(ctx, sqlDB, ""); err != ErrUnsupportedVersion {
 		t.Fatalf("Upgrade err %v", err)
 	}
-	if err := Copy(ctx, sqlDB, sqlDB); err != ErrUnsupportedVersion {
-		t.Fatalf("Copy err %v", err)
+	if !tableExists(ctx, sqlDB, "migrations") {
+		t.Fatal("a rejected database must be left alone")
 	}
-	if AlreadyImported(ctx, sqlDB) {
-		t.Fatal("rejected database must not be stamped")
+}
+
+// Only Laravel files are converted: Go databases are never single files that
+// need it.
+func TestUpgradeRejectsGoDatabase(t *testing.T) {
+	ctx := context.Background()
+	sqlDB, err := db.Open(filepath.Join(t.TempDir(), "space.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = sqlDB.Close() })
+	if err := migrate.Space.Up(ctx, sqlDB); err != nil {
+		t.Fatal(err)
+	}
+	if err := Upgrade(ctx, sqlDB, ""); err != ErrNotLaravel {
+		t.Fatalf("Upgrade err %v, want ErrNotLaravel", err)
 	}
 }
 
@@ -87,17 +56,15 @@ func TestUpgrade(t *testing.T) {
 	ctx := context.Background()
 	sqlDB := upgradedFixture(t)
 
-	// Second run only re-applies (already applied) migrations.
-	if err := Upgrade(ctx, sqlDB, ""); err != nil {
-		t.Fatal(err)
-	}
-	if !AlreadyImported(ctx, sqlDB) {
-		t.Fatal("expected stamp")
-	}
-	if migrate.TableExists(ctx, sqlDB, "migrations") {
+	assertConverted(t, sqlDB)
+	if tableExists(ctx, sqlDB, "migrations") {
 		t.Fatal("laravel migrations table should be dropped")
 	}
-	if cols, _ := migrate.Columns(ctx, sqlDB, "transactions"); slices.Contains(cols, "exchange_rate") {
+	// The converted file is a Go database now, so it is not converted twice.
+	if err := Upgrade(ctx, sqlDB, ""); err != ErrNotLaravel {
+		t.Fatalf("second Upgrade err %v, want ErrNotLaravel", err)
+	}
+	if cols, _ := columns(ctx, sqlDB, "transactions"); slices.Contains(cols, "exchange_rate") {
 		t.Fatal("transactions.exchange_rate should be dropped")
 	}
 	assertMinorUnits(t, sqlDB)
@@ -174,7 +141,8 @@ func createLaravelShape(t *testing.T, sqlDB *sql.DB) {
 	}
 }
 
-func assertCopied(t *testing.T, dest *sql.DB) {
+// assertConverted checks the fixture's rows survived the conversion.
+func assertConverted(t *testing.T, dest *sql.DB) {
 	t.Helper()
 	assertCount(t, dest, "users", 1)
 	assertCount(t, dest, "currencies", 4)

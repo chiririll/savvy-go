@@ -59,3 +59,34 @@ func TestP34BusinessLogicDoesNotKnowTheFiles(t *testing.T) {
 		}
 	}
 }
+
+// P57: Laravel is only ever converted by internal/legacy, and the migrations
+// know nothing about it: they create and update Go databases and no more.
+func TestP57MigrationsKnowNothingOfLaravel(t *testing.T) {
+	files, err := filepath.Glob(filepath.Join("..", "migrate", "*.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	laravel := regexp.MustCompile(`(?i)laravel|\blegacy\b`)
+	for _, f := range files {
+		if strings.HasSuffix(f, "_test.go") {
+			continue
+		}
+		body, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if loc := laravel.Find(body); loc != nil {
+			t.Errorf("%s mentions %q: Laravel conversion belongs in internal/legacy", f, loc)
+		}
+	}
+	parsed, err := parser.ParseFile(token.NewFileSet(), filepath.Join("..", "migrate", "migrate.go"), nil, parser.ImportsOnly)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, imp := range parsed.Imports {
+		if path, _ := strconv.Unquote(imp.Path.Value); path == "savvy-go/internal/legacy" {
+			t.Errorf("migrate imports %s", path)
+		}
+	}
+}

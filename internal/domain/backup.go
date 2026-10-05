@@ -26,8 +26,8 @@ import (
 
 const (
 	archiveExt = ".zip"
-	// rawExt is an uploaded single database file: the single-file layout or
-	// a Laravel-era backup. Such files carry no manifest and no signature.
+	// rawExt is an uploaded bare database file, in practice a Laravel backup.
+	// Such files carry no manifest and no signature.
 	rawExt = ".sqlite"
 )
 
@@ -453,7 +453,7 @@ func (s Backups) ImportSpace(ctx context.Context, spaces Spaces, path, name stri
 }
 
 // RestoreServer replaces the server and every space with a server backup (a
-// zip made by CreateServer, or a raw single-file or Laravel-era database).
+// zip made by CreateServer, or a raw Laravel database).
 func (s Backups) RestoreServer(ctx context.Context, name string) error {
 	if _, err := s.ServerBackup(name); err != nil {
 		return err

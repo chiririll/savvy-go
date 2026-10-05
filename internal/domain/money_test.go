@@ -32,7 +32,7 @@ func newMoneyEnv(t *testing.T) *moneyEnv {
 	}
 	t.Cleanup(func() { _ = sqlDB.Close() })
 	ctx := context.Background()
-	if err := migrate.Up(ctx, sqlDB); err != nil {
+	if err := migrate.Space.Up(ctx, sqlDB); err != nil {
 		t.Fatal(err)
 	}
 	env := &moneyEnv{ctx: ctx, db: sqlDB, txs: Transactions{DB: sqlDB}}

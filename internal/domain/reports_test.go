@@ -61,7 +61,7 @@ func TestReportsFollowTheBaseCurrencyScale(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = sqlDB.Close() })
 	ctx := context.Background()
-	if err := migrate.Up(ctx, sqlDB); err != nil {
+	if err := migrate.Space.Up(ctx, sqlDB); err != nil {
 		t.Fatal(err)
 	}
 	curs := Currencies{DB: sqlDB}

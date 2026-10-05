@@ -27,8 +27,11 @@ func TestHotQueriesDoNotScanTables(t *testing.T) {
 	}
 	defer sqlDB.Close()
 	sqlDB.SetMaxOpenConns(1) // an in-memory database lives per connection
-	if err := migrate.Up(ctx, sqlDB); err != nil {
-		t.Fatal(err)
+	// Queries of both sets are planned against one scratch file.
+	for _, set := range []migrate.Set{migrate.Server, migrate.Space} {
+		if err := set.Up(ctx, sqlDB); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	for _, c := range []struct {

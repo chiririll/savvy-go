@@ -232,7 +232,7 @@ func (s *Server) spaceBackupsDestroy(w http.ResponseWriter, r *http.Request) {
 }
 
 // spacesImport creates a new space, owned by the caller, from an uploaded
-// space backup (or a single-file or Laravel-era database). Guests cannot.
+// space backup (or a Laravel database). Guests cannot.
 func (s *Server) spacesImport(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r)
 	if u.IsGuest() {

@@ -16,16 +16,13 @@ var files embed.FS
 
 // Set is one family of migrations: the server database or a space database.
 // Versions are recorded as "<set>/<file>", so both sets can be applied to one
-// file (a Laravel-era database before it is split) without clashing.
+// file without clashing.
 type Set string
 
 const (
 	Server Set = "server"
 	Space  Set = "space"
 )
-
-// all is every set, for a database that still holds everything in one file.
-var all = []Set{Server, Space}
 
 // Up applies the pending migrations of this set.
 func (s Set) Up(ctx context.Context, db *sql.DB) error { return up(ctx, db, s) }
@@ -43,19 +40,10 @@ const tableSQL = `CREATE TABLE IF NOT EXISTS schema_migrations (
     applied_at TEXT NOT NULL
 ) STRICT`
 
-// Up applies every set to one database. Only a database that has not been
-// split into server and space files (a Laravel-era one) needs this.
-func Up(ctx context.Context, db *sql.DB) error { return up(ctx, db, all...) }
-
 func up(ctx context.Context, db *sql.DB, sets ...Set) error {
 	if _, err := db.ExecContext(ctx, tableSQL); err != nil {
 		return fmt.Errorf("create schema_migrations: %w", err)
 	}
-	// Before any CREATE UNIQUE INDEX / NOCASE rebuild sees the data.
-	if err := DedupeNames(ctx, db); err != nil {
-		return err
-	}
-
 	applied, err := appliedVersions(ctx, db)
 	if err != nil {
 		return err
@@ -88,11 +76,6 @@ func up(ctx context.Context, db *sql.DB, sets ...Set) error {
 	return nil
 }
 
-// EnsureIndexes creates every index declared by the embedded migrations (they
-// are all IF NOT EXISTS). Schema surgery on upgraded databases drops indexes
-// together with the columns they covered; this restores them.
-func EnsureIndexes(ctx context.Context, db *sql.DB) error { return ensureIndexes(ctx, db, all...) }
-
 func ensureIndexes(ctx context.Context, db *sql.DB, sets ...Set) error {
 	names, err := migrationFiles(sets...)
 	if err != nil {
@@ -116,10 +99,8 @@ func ensureIndexes(ctx context.Context, db *sql.DB, sets ...Set) error {
 	return nil
 }
 
-// PendingCount is the number of embedded migrations not yet recorded.
-// Returns -1 when schema_migrations is missing (never migrated).
-func PendingCount(ctx context.Context, db *sql.DB) (int, error) { return pendingCount(ctx, db, all...) }
-
+// pendingCount is the number of the sets' migrations not yet recorded, or -1
+// when schema_migrations is missing (never migrated).
 func pendingCount(ctx context.Context, db *sql.DB, sets ...Set) (int, error) {
 	var name string
 	err := db.QueryRowContext(ctx,

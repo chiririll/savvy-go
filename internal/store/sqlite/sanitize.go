@@ -23,14 +23,6 @@ import (
 // a read-only ATTACH with trusted_schema off. The fresh file's constraints
 // and a foreign key check then validate the data.
 
-// copyFile is the file a sanitize writes to; the caller removes it on error.
-type copyPlan struct {
-	set migrate.Set
-	// transforms replaces a column's value by an SQL expression over the
-	// source row, e.g. to map retired roles.
-	transforms map[string]map[string]string
-}
-
 var errNotSQLite = errors.New("not a readable SQLite database")
 
 // srcURI is the read-only URI of a source file for ATTACH.
@@ -46,21 +38,21 @@ func srcURI(path string) string {
 	return "file:" + abs + "?mode=ro"
 }
 
-// sourceKind classifies a database file.
+// sourceKind classifies a database file. Go keeps the server and every space
+// in separate files, so a file holding everything is a Laravel one.
 type sourceKind int
 
 const (
-	kindInvalid  sourceKind = iota
-	kindSpace               // one space's database
-	kindServer              // a server database
-	kindCombined            // everything in one file: the single-file Go layout or a converted Laravel database
-	kindLaravel             // a Laravel database not converted yet
+	kindInvalid sourceKind = iota
+	kindSpace              // one space's database
+	kindServer             // a server database
+	kindLaravel            // a Laravel database
 )
 
 // knownVersions are the migrations this build knows, for refusing files made
-// by a newer app. "0001_initial" is the single-file layout's only version.
+// by a newer app.
 func knownVersions() map[string]bool {
-	known := map[string]bool{"0001_initial": true}
+	known := map[string]bool{}
 	for _, set := range []migrate.Set{migrate.Server, migrate.Space} {
 		names, _ := set.Versions()
 		for _, n := range names {
@@ -87,16 +79,9 @@ func inspect(ctx context.Context, path string) (sourceKind, error) {
 	if err != nil {
 		return kindInvalid, errNotSQLite
 	}
-	if tables["migrations"] && !tables["schema_migrations"] {
-		return kindLaravel, nil
-	}
+	// Laravel's migration tracker; Go records its own in schema_migrations.
 	if tables["migrations"] {
-		// Converted Laravel files keep their tracker; the stamp tells them apart.
-		var stamp sql.NullString
-		_ = scratch.QueryRowContext(ctx, `SELECT value FROM src.settings WHERE key = 'legacy_import_completed_at'`).Scan(&stamp)
-		if !stamp.Valid {
-			return kindLaravel, nil
-		}
+		return kindLaravel, nil
 	}
 	if tables["schema_migrations"] {
 		rows, err := scratch.QueryContext(ctx, `SELECT version FROM src.schema_migrations`)
@@ -115,7 +100,8 @@ func inspect(ctx context.Context, path string) (sourceKind, error) {
 	}
 	switch {
 	case tables["users"] && tables["accounts"]:
-		return kindCombined, nil
+		// Server and finances in one Go file: no version of the app writes that.
+		return kindInvalid, ErrWrongKind
 	case tables["users"]:
 		return kindServer, nil
 	case tables["accounts"]:
@@ -191,17 +177,17 @@ func tableColumns(ctx context.Context, conn store.DB, schema, table string) ([]s
 
 func quoteIdent(s string) string { return `"` + strings.ReplaceAll(s, `"`, `""`) + `"` }
 
-// sanitize creates dst with the migrations of plan.set and copies into it the
+// sanitize creates dst with the migrations of set and copies into it the
 // rows of src that fit: tables of the set only, columns both have. Nothing of
 // src's schema runs.
-func sanitize(ctx context.Context, src, dst string, plan copyPlan) error {
+func sanitize(ctx context.Context, src, dst string, set migrate.Set) error {
 	removeFiles(dst)
 	fresh, err := db.Open(dst)
 	if err != nil {
 		return err
 	}
 	defer fresh.Close()
-	if err := plan.set.Up(ctx, fresh); err != nil {
+	if err := set.Up(ctx, fresh); err != nil {
 		return fmt.Errorf("prepare schema: %w", err)
 	}
 	if _, err := fresh.ExecContext(ctx, `PRAGMA trusted_schema = OFF`); err != nil {
@@ -250,23 +236,17 @@ func sanitize(ctx context.Context, src, dst string, plan copyPlan) error {
 		if err != nil {
 			return err
 		}
-		var cols, exprs []string
+		var cols []string
 		for _, c := range dstCols {
-			if !slices.Contains(srcCols, c) {
-				continue
-			}
-			cols = append(cols, quoteIdent(c))
-			if expr, ok := plan.transforms[t][c]; ok {
-				exprs = append(exprs, expr)
-			} else {
-				exprs = append(exprs, quoteIdent(c))
+			if slices.Contains(srcCols, c) {
+				cols = append(cols, quoteIdent(c))
 			}
 		}
 		if len(cols) == 0 {
 			continue
 		}
 		q := fmt.Sprintf(`INSERT INTO main.%s (%s) SELECT %s FROM src.%s`,
-			quoteIdent(t), strings.Join(cols, ", "), strings.Join(exprs, ", "), quoteIdent(t))
+			quoteIdent(t), strings.Join(cols, ", "), strings.Join(cols, ", "), quoteIdent(t))
 		if _, err := tx.ExecContext(ctx, q); err != nil {
 			return fmt.Errorf("copy %s: %w", t, mapErr(err))
 		}
@@ -278,7 +258,7 @@ func sanitize(ctx context.Context, src, dst string, plan copyPlan) error {
 			}
 		}
 	}
-	if plan.set == migrate.Space && have["settings"] {
+	if set == migrate.Space && have["settings"] {
 		if err := copySpaceSettings(ctx, tx); err != nil {
 			return err
 		}
@@ -322,8 +302,8 @@ func copySequence(ctx context.Context, tx *sql.Tx, table string) error {
 	return err
 }
 
-// spaceSettingKeys are the settings the single-file layout kept in settings
-// and a space now keeps in space_settings.
+// spaceSettingKeys are the settings Laravel kept in settings and a space now
+// keeps in space_settings.
 var spaceSettingKeys = []string{"auto_update_currencies"}
 
 func copySpaceSettings(ctx context.Context, tx *sql.Tx) error {

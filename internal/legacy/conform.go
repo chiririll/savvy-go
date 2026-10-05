@@ -1,10 +1,9 @@
-package migrate
+package legacy
 
 import (
 	"context"
 	"database/sql"
 	"fmt"
-	"io/fs"
 	"log/slog"
 	"regexp"
 	"slices"
@@ -15,13 +14,13 @@ import (
 
 // Constraints (STRICT, CHECK, COLLATE, foreign key actions) cannot be added to
 // an existing SQLite table, so a database created before they were declared
-// keeps its old definitions. Conform rebuilds such tables to the current
+// keeps its old definitions. conform rebuilds such tables to the current
 // definitions. Each table is rebuilt by the procedure SQLite documents for
 // schema changes: create the new table, copy the rows, drop the old one,
 // rename.
 //
-// The target definitions come from running the embedded migrations on a
-// scratch database, so they stay right when later migrations ALTER a table.
+// The target definitions come from running the migrations on a scratch
+// database, so they stay right when later migrations ALTER a table.
 // A table needs a rebuild when it is not STRICT while the target is; a future
 // constraint change that does not touch STRICT needs its own marker here.
 //
@@ -37,14 +36,10 @@ type tableDef struct {
 	strict bool
 }
 
-// Conform rebuilds every table that predates the current constraints and
-// recreates the declared indexes. It does nothing for a Laravel database that
-// is not converted yet (its money columns are still REAL), so run it after
-// the legacy conversion. A conforming database costs one metadata query.
-func Conform(ctx context.Context, db *sql.DB) error {
-	if TableExists(ctx, db, "migrations") {
-		return nil
-	}
+// conform rebuilds every table that predates the current constraints and
+// recreates the declared indexes. Run it after the money and date conversion:
+// before it, money columns still hold REAL values the STRICT tables reject.
+func conform(ctx context.Context, db *sql.DB) error {
 	target, err := targetTables(ctx)
 	if err != nil {
 		return err
@@ -67,11 +62,11 @@ func Conform(ctx context.Context, db *sql.DB) error {
 			return err
 		}
 	}
-	return EnsureIndexes(ctx, db)
+	return ensureIndexes(ctx, db)
 }
 
-// targetTables applies every embedded migration to an empty in-memory database
-// and returns the tables it ends up with.
+// targetTables applies the server and space migrations to an empty in-memory
+// database, as a converted Laravel file holds both, and returns its tables.
 func targetTables(ctx context.Context) ([]tableDef, error) {
 	scratch, err := sql.Open("sqlite", "file::memory:")
 	if err != nil {
@@ -80,23 +75,14 @@ func targetTables(ctx context.Context) ([]tableDef, error) {
 	defer scratch.Close()
 	scratch.SetMaxOpenConns(1) // an in-memory database lives per connection
 
-	names, err := migrationFiles(all...)
-	if err != nil {
-		return nil, err
-	}
-	for _, name := range names {
-		body, err := fs.ReadFile(files, "sql/"+name)
-		if err != nil {
-			return nil, err
-		}
-		if err := execScript(ctx, scratch, string(body)); err != nil {
-			return nil, fmt.Errorf("scratch %s: %w", name, err)
-		}
+	if err := upBoth(ctx, scratch); err != nil {
+		return nil, fmt.Errorf("scratch: %w", err)
 	}
 	rows, err := scratch.QueryContext(ctx, `
 		SELECT m.name, m.sql, t.strict
 		FROM sqlite_master m JOIN pragma_table_list t ON t.name = m.name AND t.schema = 'main'
-		WHERE m.type = 'table' AND m.name NOT LIKE 'sqlite_%' ORDER BY m.name`)
+		WHERE m.type = 'table' AND m.name NOT LIKE 'sqlite_%' AND m.name <> 'schema_migrations'
+		ORDER BY m.name`)
 	if err != nil {
 		return nil, err
 	}
@@ -171,11 +157,11 @@ func rebuildTable(ctx context.Context, tx *sql.Tx, t tableDef) error {
 	if _, err := tx.ExecContext(ctx, ddl); err != nil {
 		return err
 	}
-	oldCols, err := Columns(ctx, tx, t.name)
+	oldCols, err := columns(ctx, tx, t.name)
 	if err != nil {
 		return err
 	}
-	newCols, err := Columns(ctx, tx, staging)
+	newCols, err := columns(ctx, tx, staging)
 	if err != nil {
 		return err
 	}

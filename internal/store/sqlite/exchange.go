@@ -118,8 +118,9 @@ func (s *Store) PrepareSpace(ctx context.Context, src string) (*store.PreparedSp
 		return nil, err
 	}
 	switch kind {
-	case kindSpace, kindCombined:
+	case kindSpace:
 	case kindLaravel:
+		// Its finances are copied below; users and other server tables are left out.
 		if src, err = s.convertLaravel(ctx, src, staging); err != nil {
 			return fail(err)
 		}
@@ -127,7 +128,7 @@ func (s *Store) PrepareSpace(ctx context.Context, src string) (*store.PreparedSp
 		return fail(ErrWrongKind)
 	}
 	out := filepath.Join(staging, "space"+spaceExt)
-	if err := sanitize(ctx, src, out, copyPlan{set: migrate.Space}); err != nil {
+	if err := sanitize(ctx, src, out, migrate.Space); err != nil {
 		return fail(err)
 	}
 	id, err := readSpaceUUID(ctx, out)
@@ -137,8 +138,8 @@ func (s *Store) PrepareSpace(ctx context.Context, src string) (*store.PreparedSp
 	return &store.PreparedSpace{Artifact: staging, UUID: id, Size: fileSize(out)}, nil
 }
 
-// convertLaravel converts a copy of a Laravel-era database to the Go schema
-// (everything in one file) and returns its path. The copy is opened as a
+// convertLaravel converts a copy of a Laravel database to the Go schema, the
+// server and space tables still in one file, and returns its path. The copy is opened as a
 // live database, so its triggers and views are dropped first: the conversion
 // writes to it and must not run anything the file brought along.
 func (s *Store) convertLaravel(ctx context.Context, src, staging string) (string, error) {
@@ -198,20 +199,18 @@ func (s *Store) PrepareServer(ctx context.Context, src string) (*store.PreparedS
 			return fail(err)
 		}
 	} else {
+		// A single file is a Laravel database: Go server backups are directories.
 		kind, err := inspect(ctx, src)
 		if err != nil {
 			return fail(err)
 		}
-		switch kind {
-		case kindCombined:
-		case kindLaravel:
-			if src, err = s.convertLaravel(ctx, src, staging); err != nil {
-				return fail(err)
-			}
-		default:
+		if kind != kindLaravel {
 			return fail(ErrWrongKind)
 		}
-		if err := splitCombined(ctx, src, staging); err != nil {
+		if src, err = s.convertLaravel(ctx, src, staging); err != nil {
+			return fail(err)
+		}
+		if err := splitLaravel(ctx, src, staging); err != nil {
 			return fail(err)
 		}
 		ids = []int64{1}
@@ -229,7 +228,7 @@ func (s *Store) prepareServerDir(ctx context.Context, dir, staging string) ([]in
 		return nil, ErrWrongKind
 	}
 	out := filepath.Join(staging, serverFile)
-	if err := sanitize(ctx, src, out, copyPlan{set: migrate.Server}); err != nil {
+	if err := sanitize(ctx, src, out, migrate.Server); err != nil {
 		return nil, fmt.Errorf("server: %w", err)
 	}
 	registered, err := registeredSpaces(ctx, out)
@@ -250,7 +249,7 @@ func (s *Store) prepareServerDir(ctx context.Context, dir, staging string) ([]in
 		} else if kind != kindSpace {
 			return nil, fmt.Errorf("space %d: %w", id, ErrWrongKind)
 		}
-		if err := sanitize(ctx, filepath.Join(dir, spacesDir, name), filepath.Join(staging, spacesDir, name), copyPlan{set: migrate.Space}); err != nil {
+		if err := sanitize(ctx, filepath.Join(dir, spacesDir, name), filepath.Join(staging, spacesDir, name), migrate.Space); err != nil {
 			return nil, fmt.Errorf("space %d: %w", id, err)
 		}
 	}
@@ -295,28 +294,20 @@ func registeredSpaces(ctx context.Context, serverPath string) ([]int64, error) {
 	return ids, rows.Err()
 }
 
-// retiredRole maps the read-write/read-only roles of a single-file database
-// to the server role user.
-const retiredRole = `CASE %s WHEN 'read-write' THEN 'user' WHEN 'read-only' THEN 'user' ELSE %s END`
-
-// splitCombined turns a database that holds everything (the single-file Go
-// layout or a converted Laravel database) into a server database and space 1.
-// Every user joins space 1 with the space role of their old role: admins
-// administer it, read-write users edit and read-only users view it.
-func splitCombined(ctx context.Context, src, staging string) error {
+// splitLaravel turns a converted Laravel database, which holds everything,
+// into a server database and space 1. Every user joins space 1 with the space
+// role of their Laravel role: admins administer it, read-write users edit and
+// read-only users view it.
+func splitLaravel(ctx context.Context, src, staging string) error {
 	server := filepath.Join(staging, serverFile)
-	plan := copyPlan{set: migrate.Server, transforms: map[string]map[string]string{
-		"users":              {"role": fmt.Sprintf(retiredRole, "role", "role")},
-		"identity_providers": {"default_role": fmt.Sprintf(retiredRole, "default_role", "default_role")},
-	}}
-	if err := sanitize(ctx, src, server, plan); err != nil {
+	if err := sanitize(ctx, src, server, migrate.Server); err != nil {
 		return fmt.Errorf("server: %w", err)
 	}
 	space := filepath.Join(staging, spacesDir, "1"+spaceExt)
 	if err := os.MkdirAll(filepath.Dir(space), 0o775); err != nil {
 		return err
 	}
-	if err := sanitize(ctx, src, space, copyPlan{set: migrate.Space}); err != nil {
+	if err := sanitize(ctx, src, space, migrate.Space); err != nil {
 		return fmt.Errorf("space: %w", err)
 	}
 	roles, err := oldRoles(ctx, src)
@@ -359,7 +350,8 @@ func splitCombined(ctx context.Context, src, staging string) error {
 	return writeSpaceUUID(ctx, space, id7.String())
 }
 
-// oldRoles reads each user's role from a single-file database.
+// oldRoles reads each user's Laravel role, which the conversion kept in
+// legacy.RolesTable.
 func oldRoles(ctx context.Context, src string) (map[int64]string, error) {
 	scratch, err := openScratch(ctx)
 	if err != nil {
@@ -369,7 +361,7 @@ func oldRoles(ctx context.Context, src string) (map[int64]string, error) {
 	if err := attachSource(ctx, scratch, src); err != nil {
 		return nil, err
 	}
-	rows, err := scratch.QueryContext(ctx, `SELECT id, role FROM src.users`)
+	rows, err := scratch.QueryContext(ctx, `SELECT user_id, role FROM src.`+legacy.RolesTable)
 	if err != nil {
 		return nil, err
 	}

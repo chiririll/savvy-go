@@ -34,7 +34,7 @@ func newMatrixEnv(t *testing.T, base moneytest.Currency) *matrixEnv {
 	}
 	t.Cleanup(func() { _ = sqlDB.Close() })
 	ctx := context.Background()
-	if err := migrate.Up(ctx, sqlDB); err != nil {
+	if err := migrate.Space.Up(ctx, sqlDB); err != nil {
 		t.Fatal(err)
 	}
 	e := &matrixEnv{ctx: ctx, db: sqlDB, base: base, curs: map[string]Currency{}, accts: map[string]Account{}, txs: Transactions{DB: sqlDB}}
