@@ -18,6 +18,8 @@ export default defineConfig(({ mode }) => {
         },
         define: {
             __APP_VERSION__: JSON.stringify(env.APP_VERSION || process.env.APP_VERSION || 'dev'),
+            // Test ids (lib/test-id.ts), for scripts/screenshots; left out of every other build.
+            __TEST_IDS__: JSON.stringify((env.APP_ENV || process.env.APP_ENV) === 'screenshots'),
         },
         build: {
             outDir: 'public/build',

@@ -11,6 +11,8 @@ services:
       context: .
       args:
         APP_VERSION: screenshots
+        # Marks what opens a dialog in the interface, so the runner finds it.
+        APP_ENV: screenshots
     environment:
       APP_URL: http://savvy
       TZ: UTC
@@ -18,7 +20,7 @@ services:
       # The seed writes who can sign in and the ids of its data here for the runner.
       SEED_MANIFEST: /data/manifest.json
     volumes:
-      - data:/data
+      - test-data:/data
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/livez"]
       interval: 3s
@@ -41,8 +43,8 @@ services:
     # Chromium recommends sharing the host's IPC namespace in Docker.
     ipc: host
     volumes:
-      - data:/data:ro
+      - test-data:/data:ro
       - ./screenshots:/out
 
 volumes:
-  data:
+  test-data:
