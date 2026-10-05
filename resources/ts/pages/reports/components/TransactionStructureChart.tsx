@@ -224,8 +224,8 @@ export function TransactionStructureChart({ filters, type }: TransactionStructur
             yAxis: axisStyle(theme, 'category', {
                 data: sortedData.map((item) => item.name),
                 axisLabel: isNarrow
-                    ? { fontSize: 11, color: theme.textStrong, width: 88, overflow: 'truncate' }
-                    : { fontSize: 12, color: theme.textStrong },
+                    ? { fontSize: 11, color: theme.textStrong, width: 88, overflow: 'truncate', rotate: 0 }
+                    : { fontSize: 12, color: theme.textStrong, rotate: 0 },
                 axisLine: { show: false },
             }),
             series: [{

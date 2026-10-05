@@ -208,7 +208,7 @@ function buildChartOption(chartData: MonthChartData, currency: string | null, th
                 return html
             },
         },
-        grid: { left: isNarrow ? 48 : 60, right: isNarrow ? 12 : 20, top: 40, bottom: 56 },
+        grid: { left: isNarrow ? 48 : 60, right: isNarrow ? 12 : 20, top: 40, bottom: 40 },
         xAxis: axisStyle(theme, 'category', {
             data: days,
             axisLabel: { interval: Math.floor(daysInMonth / 7) },

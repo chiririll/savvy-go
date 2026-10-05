@@ -71,15 +71,25 @@ export function legendTextStyle(c: ChartTheme, fontSize = 12) {
     return { fontSize, color: c.text }
 }
 
-/** Shared axis styling; pass `extra` to override or extend a section. */
+/** Labels longer than this are tilted on a horizontal category axis. */
+const MAX_FLAT_LABEL_LENGTH = 3
+
+/**
+ * Shared axis styling; pass `extra` to override or extend a section.
+ * Horizontal category axes tilt their labels 45° when any label is longer than
+ * three characters (e.g. dates); pass `axisLabel.rotate` to force a value, such
+ * as `0` for a vertical category axis.
+ */
 export function axisStyle(c: ChartTheme, kind: 'category' | 'value', extra: Record<string, unknown> = {}) {
-    const { axisLabel, ...rest } = extra as { axisLabel?: Record<string, unknown> }
+    const { axisLabel, ...rest } = extra as { axisLabel?: Record<string, unknown>; data?: unknown[] }
+    const labels = Array.isArray(rest.data) ? rest.data : []
+    const rotate = labels.some((label) => String(label).length > MAX_FLAT_LABEL_LENGTH) ? 45 : 0
     return kind === 'category'
         ? {
             type: 'category',
             axisLine: { lineStyle: { color: c.axisLine } },
             axisTick: { show: false },
-            axisLabel: { fontSize: 11, color: c.text, rotate: 45, ...axisLabel },
+            axisLabel: { fontSize: 11, color: c.text, rotate, ...axisLabel },
             ...rest,
         }
         : {
