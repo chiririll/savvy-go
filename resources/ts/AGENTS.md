@@ -4,7 +4,7 @@ React, Vite, react-query, ShadCN/UI, Tailwind 4. Alias `@/` = `resources/ts`.
 
 ```bash
 npx tsc --noEmit -p tsconfig.ci.json   # types, CI runs it
-npm run build                          # -> public/build
+npm run build                          # -> public/build; release builds embed it (go tool mage build:release)
 ```
 
 ## Layout

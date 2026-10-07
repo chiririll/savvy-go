@@ -1,9 +1,10 @@
 package httpserver
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"context"
+	"io/fs"
 	"net/http"
 	"os"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"savvy-go/internal/settings"
 	"savvy-go/internal/signing"
 	"savvy-go/internal/store"
+	"savvy-go/internal/webui"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -42,6 +44,7 @@ type Server struct {
 	twoFactor  auth.TwoFactor
 	webauthn   auth.WebAuthn
 	queue      *jobs.Queue
+	assets     fs.FS // the frontend: index.html, icons and build/
 }
 
 func New(cfg config.Config, st store.Store, keys *signing.Holder) *Server {
@@ -49,6 +52,7 @@ func New(cfg config.Config, st store.Store, keys *signing.Holder) *Server {
 	srv := st.Server()
 	s := &Server{
 		cfg:        cfg,
+		assets:     resolveAssets(cfg.PublicDir, webui.FS()),
 		store:      st,
 		users:      auth.Users{DB: srv},
 		sessions:   auth.Sessions{DB: srv, Cfg: cfg},

@@ -25,9 +25,12 @@ COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod go mod download
 COPY cmd ./cmd
 COPY internal ./internal
+# The frontend is embedded into the binary (build tag "embed").
+COPY public ./internal/webui/dist
+COPY --from=frontend /app/public/build ./internal/webui/dist/build
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -tags embed -trimpath \
     -ldflags="-s -w -X savvy-go/internal/config.DefaultListen=:80 -X savvy-go/internal/version.Value=${APP_VERSION} -X savvy-go/internal/version.Env=${APP_ENV}" \
     -o /out/savvy-go ./cmd/savvy-go
 
@@ -40,8 +43,6 @@ RUN apk upgrade --no-cache \
     && mkdir /data \
     && chown www-data:www-data /data
 COPY --from=gobuild /out/savvy-go /usr/local/bin/savvy-go
-COPY --chown=www-data:www-data public /public
-COPY --chown=www-data:www-data --from=frontend /app/public/build /public/build
 RUN setcap 'cap_net_bind_service=+ep' /usr/local/bin/savvy-go
 VOLUME /data
 EXPOSE 80

@@ -48,7 +48,7 @@ type file struct {
 		Data    string `toml:"data" comment:"Where the databases live. Empty: /data or /var/lib/savvy-go when they exist, otherwise ./data."`
 		Uploads string `toml:"uploads" comment:"Empty: <data>/uploads."`
 		Backups string `toml:"backups" comment:"Empty: <data>/backups."`
-		Public  string `toml:"public" comment:"The built frontend. Empty: public, relative to the working directory."`
+		Public  string `toml:"public" comment:"The built frontend. Empty: the one built into the binary, or public (relative to the working directory) when the binary has none."`
 	} `toml:"paths"`
 	Security struct {
 		SessionTTL   int    `toml:"session_ttl" comment:"Lifetimes in minutes."`
@@ -204,7 +204,7 @@ func (f file) resolve() Config {
 		DataDir:       dataDir,
 		UploadsDir:    firstNonEmpty(f.Paths.Uploads, filepath.Join(dataDir, "uploads")),
 		BackupsDir:    firstNonEmpty(f.Paths.Backups, filepath.Join(dataDir, "backups")),
-		PublicDir:     firstNonEmpty(f.Paths.Public, "public"),
+		PublicDir:     f.Paths.Public,
 		TZ:            tz,
 		Location:      loc,
 		SessionTTL:    minutes(f.Security.SessionTTL, 60*24),

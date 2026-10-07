@@ -8,7 +8,7 @@ go test ./...
 go run ./cmd/savvy-go
 ```
 
-Listens on `localhost:8080`. Data and the generated `config.toml` go to `./data`, see [Data and backups](data-and-backups.md) and [Configuration](deployment.md#configuration). The frontend is served from `public/`.
+Listens on `localhost:8080`. Data and the generated `config.toml` go to `./data`, see [Data and backups](data-and-backups.md) and [Configuration](deployment.md#configuration). A plain `go build` or `go run` serves the frontend from `public/` on disk; release builds have it built into the binary, see [Build tasks](#build-tasks).
 
 With `--seed-config <file>` (any TOML file, even an empty one), the first boot creates demo users, three spaces with ~12 months of data, linked spaces and open invitations:
 

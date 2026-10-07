@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"html/template"
+	"io/fs"
 	"net/http"
 	"os"
 	"path"
-	"path/filepath"
 	"strings"
 
 	"savvy-go/internal/version"
@@ -20,6 +20,20 @@ type viteChunk struct {
 	Src     string   `json:"src"`
 }
 
+// resolveAssets picks where the frontend comes from: a configured directory
+// first (a way to override the UI), then the copy built into the binary, then
+// public/ next to the working directory (development).
+func resolveAssets(publicDir string, embedded fs.FS) fs.FS {
+	switch {
+	case publicDir != "":
+		return os.DirFS(publicDir)
+	case embedded != nil:
+		return embedded
+	default:
+		return os.DirFS("public")
+	}
+}
+
 func (s *Server) spa(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -28,12 +42,11 @@ func (s *Server) spa(w http.ResponseWriter, r *http.Request) {
 
 	rel := strings.TrimPrefix(path.Clean("/"+r.URL.Path), "/")
 	if rel != "" && rel != "index.html" && !strings.Contains(rel, "..") {
-		full := filepath.Join(s.cfg.PublicDir, filepath.FromSlash(rel))
-		if info, err := os.Stat(full); err == nil && !info.IsDir() {
+		if info, err := fs.Stat(s.assets, rel); err == nil && !info.IsDir() {
 			if strings.HasPrefix(rel, "build/assets/") {
 				w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 			}
-			http.ServeFile(w, r, full)
+			http.ServeFileFS(w, r, s.assets, rel)
 			return
 		}
 		// A missing asset must 404: answering with index.html makes the
@@ -64,7 +77,7 @@ type indexData struct {
 
 // renderIndex renders the public/index.html template.
 func (s *Server) renderIndex() ([]byte, error) {
-	tpl, err := template.ParseFiles(filepath.Join(s.cfg.PublicDir, "index.html"))
+	tpl, err := template.ParseFS(s.assets, "index.html")
 	if err != nil {
 		return nil, err
 	}
@@ -80,9 +93,9 @@ func (s *Server) renderIndex() ([]byte, error) {
 }
 
 func (s *Server) viteAssets() (js []string, css []string) {
-	raw, err := os.ReadFile(filepath.Join(s.cfg.PublicDir, "build", "manifest.json"))
+	raw, err := fs.ReadFile(s.assets, "build/manifest.json")
 	if err != nil {
-		raw, err = os.ReadFile(filepath.Join(s.cfg.PublicDir, "build", ".vite", "manifest.json"))
+		raw, err = fs.ReadFile(s.assets, "build/.vite/manifest.json")
 	}
 	if err != nil {
 		return nil, nil
