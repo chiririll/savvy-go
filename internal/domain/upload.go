@@ -52,7 +52,6 @@ type Upload struct {
 type Uploads struct {
 	DB         store.DB
 	Root       string
-	AppURL     string
 	SignSecret string
 }
 
@@ -146,8 +145,9 @@ func (s Uploads) SignPart(u *Upload, part int) (map[string]any, error) {
 	}
 	expires := time.Now().UTC().Add(time.Duration(uploadURLTTL) * time.Second).Unix()
 	sig := s.sign(u.ID, part, expires)
-	base := strings.TrimRight(s.AppURL, "/")
-	raw := fmt.Sprintf("%s/api/uploads/%s/parts/%d?expires=%d&signature=%s", base, u.ID, part, expires, sig)
+	// Relative on purpose: the browser resolves it against the origin it loaded the app from,
+	// so uploads work behind any port or proxy regardless of APP_URL.
+	raw := fmt.Sprintf("/api/uploads/%s/parts/%d?expires=%d&signature=%s", u.ID, part, expires, sig)
 	return map[string]any{
 		"url": raw, "method": "PUT", "headers": map[string]string{}, "expires": uploadURLTTL,
 	}, nil
@@ -287,8 +287,7 @@ func (s Uploads) Discard(ctx context.Context, u *Upload) error {
 }
 
 func (s Uploads) Location(u *Upload) string {
-	base := strings.TrimRight(s.AppURL, "/")
-	return base + "/api/s3/" + u.Bucket + "/" + strings.TrimLeft(u.ObjectKey, "/")
+	return "/api/s3/" + u.Bucket + "/" + strings.TrimLeft(u.ObjectKey, "/")
 }
 
 func (s Uploads) PruneExpired(ctx context.Context) error {

@@ -44,7 +44,7 @@ type testApp struct {
 // openTestStore opens a store in cfg.DataDir with the embedded migrations.
 func openTestStore(t *testing.T, cfg config.Config) *sqlite.Store {
 	t.Helper()
-	st, err := sqlite.OpenApp(context.Background(), cfg.DataDir, "")
+	st, err := sqlite.OpenApp(context.Background(), cfg.DataDir)
 	if err != nil {
 		t.Fatal(err)
 	}

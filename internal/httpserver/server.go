@@ -1,6 +1,10 @@
 package httpserver
 
 import (
+	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"io/fs"
 	"net/http"
 	"os"
 	"strings"
@@ -12,6 +16,7 @@ import (
 	"savvy-go/internal/settings"
 	"savvy-go/internal/signing"
 	"savvy-go/internal/store"
+	"savvy-go/internal/webui"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -39,6 +44,7 @@ type Server struct {
 	twoFactor  auth.TwoFactor
 	webauthn   auth.WebAuthn
 	queue      *jobs.Queue
+	assets     fs.FS // the frontend: index.html, icons and build/
 }
 
 func New(cfg config.Config, st store.Store, keys *signing.Holder) *Server {
@@ -46,6 +52,7 @@ func New(cfg config.Config, st store.Store, keys *signing.Holder) *Server {
 	srv := st.Server()
 	s := &Server{
 		cfg:        cfg,
+		assets:     resolveAssets(webui.FS()),
 		store:      st,
 		users:      auth.Users{DB: srv},
 		sessions:   auth.Sessions{DB: srv, Cfg: cfg},
@@ -54,15 +61,15 @@ func New(cfg config.Config, st store.Store, keys *signing.Holder) *Server {
 		challenges: auth.Challenges{DB: srv, Cfg: cfg},
 		settings:   settings.Store{DB: srv},
 		spaces:     domain.Spaces{Store: st},
-		uploads:    domain.Uploads{DB: srv, Root: cfg.UploadsDir, AppURL: cfg.AppURL, SignSecret: cfg.AppURL + "|upload"},
-		twoFactor:  auth.TwoFactor{DB: srv, Users: auth.Users{DB: srv}, AppKey: cfg.AppKey},
+		uploads:    domain.Uploads{DB: srv, Root: cfg.UploadsDir, SignSecret: randomSecret()},
+		twoFactor:  auth.TwoFactor{DB: srv, Users: auth.Users{DB: srv}},
 		webauthn:   auth.WebAuthn{DB: srv, Cfg: cfg},
 	}
 	keyRing := domain.KeyRing{Holder: keys, Trusted: domain.TrustedKeys(srv)}
 	s.keys = keys
 	s.transfers = &domain.Transfers{Spaces: s.spaces, Keys: keyRing}
 	s.backups = domain.Backups{Store: st, Keys: keyRing, Dir: cfg.BackupsDir, DataDir: cfg.DataDir, Transfers: s.transfers}
-	s.sso = domain.SSO{DB: srv, Users: s.users, Settings: s.settings, Spaces: s.spaces, AppURL: cfg.AppURL}
+	s.sso = domain.SSO{DB: srv, Users: s.users, Settings: s.settings, Spaces: s.spaces, AppURL: cfg.URL}
 	_ = os.MkdirAll(cfg.UploadsDir, 0o775)
 	_ = os.MkdirAll(cfg.BackupsDir, 0o775)
 	s.mux = s.routes()
@@ -95,12 +102,12 @@ func (s *Server) routes() *chi.Mux {
 		r.Post("/auth/2fa/verify", s.twoFactorVerify)
 		r.Get("/auth/sso/providers", s.ssoProviders)
 		r.Post("/auth/sso/exchange", s.ssoExchange)
-		r.Get("/auth/sso/{slug}/redirect", s.ssoRedirect)
-		r.Get("/auth/sso/{slug}/callback", s.ssoCallback)
-		r.Post("/auth/sso/{slug}/acs", s.ssoACS)
-		r.Get("/auth/sso/{slug}/metadata", s.ssoMetadata)
-		r.Post("/auth/webauthn/login/options", s.webauthnLoginOptions)
-		r.Post("/auth/webauthn/login/verify", s.webauthnLoginVerify)
+		r.With(s.needAppURL).Get("/auth/sso/{slug}/redirect", s.ssoRedirect)
+		r.With(s.needAppURL).Get("/auth/sso/{slug}/callback", s.ssoCallback)
+		r.With(s.needAppURL).Post("/auth/sso/{slug}/acs", s.ssoACS)
+		r.With(s.needAppURL).Get("/auth/sso/{slug}/metadata", s.ssoMetadata)
+		r.With(s.needAppURL).Post("/auth/webauthn/login/options", s.webauthnLoginOptions)
+		r.With(s.needAppURL).Post("/auth/webauthn/login/verify", s.webauthnLoginVerify)
 		r.Put("/uploads/{id}/parts/{part}", s.uploadPart)
 		r.Get("/invitations/{token}", s.invitationPreview)
 		r.Post("/invitations/{token}/register", s.invitationRegister)
@@ -125,8 +132,8 @@ func (s *Server) routes() *chi.Mux {
 				r.Post("/auth/2fa/disable", s.twoFactorDisable)
 				r.Get("/auth/2fa/recovery-codes", s.twoFactorRecoveryCodes)
 				r.Post("/auth/2fa/recovery-codes/regenerate", s.twoFactorRegenerate)
-				r.Post("/auth/webauthn/register/options", s.webauthnRegisterOptions)
-				r.Post("/auth/webauthn/register/verify", s.webauthnRegisterVerify)
+				r.With(s.needAppURL).Post("/auth/webauthn/register/options", s.webauthnRegisterOptions)
+				r.With(s.needAppURL).Post("/auth/webauthn/register/verify", s.webauthnRegisterVerify)
 				r.Patch("/auth/webauthn/credentials/{id}", s.webauthnUpdate)
 				r.Delete("/auth/webauthn/credentials/{id}", s.webauthnDestroy)
 			})
@@ -163,6 +170,7 @@ func (s *Server) routes() *chi.Mux {
 					r.Get("/backups", s.spaceBackupsIndex)
 					r.Post("/backups", s.spaceBackupsStore)
 					r.Post("/backups/upload", s.spaceBackupsUpload)
+					r.Post("/backups/restore-laravel", s.spaceBackupsRestoreLaravel)
 					r.Get("/backups/{name}/download", s.spaceBackupsDownload)
 					r.Post("/backups/{name}/restore", s.spaceBackupsRestore)
 					r.Delete("/backups/{name}", s.spaceBackupsDestroy)
@@ -213,6 +221,7 @@ func (s *Server) routes() *chi.Mux {
 				r.Get("/backups", s.backupsIndex)
 				r.Post("/backups", s.backupsStore)
 				r.Post("/backups/upload", s.backupsUpload)
+				r.Post("/backups/restore-laravel", s.backupsRestoreLaravel)
 				r.Get("/backups/{name}/download", s.backupsDownload)
 				r.Post("/backups/{name}/restore", s.backupsRestore)
 				r.Delete("/backups/{name}", s.backupsDestroy)
@@ -366,4 +375,33 @@ func dataRoutes(s *Server, r chi.Router) {
 	r.Post("/transactions/import/preview", s.importPreview)
 	r.Post("/transactions/import/execute", s.importExecute)
 	r.Get("/transactions/import/{import}", s.importShow)
+}
+
+// needAppURL gates features that hand absolute URLs or origins to browsers and
+// identity providers (SSO, passkeys). Like Gitea's ROOT_URL, nothing is guessed
+// from request headers: without APP_URL these features are simply unavailable.
+func (s *Server) needAppURL(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if s.appURL(r.Context()) == "" {
+			writeMessage(w, http.StatusServiceUnavailable, "APP_URL is not configured.")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// appURL is the public URL of the instance, empty when unset.
+func (s *Server) appURL(ctx context.Context) string {
+	return s.cfg.URL()
+}
+
+// randomSecret is a fresh secret for signing upload part URLs. It lives as long
+// as the process: those URLs expire within minutes, and an upload interrupted
+// by a restart starts over.
+func randomSecret() string {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		panic(err) // the system's random source is broken: nothing safe to do
+	}
+	return hex.EncodeToString(b)
 }

@@ -24,6 +24,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { isLaravelFile, laravelActionLabel, LaravelRestoreOptions, LaravelTarget } from './LaravelRestoreOptions'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -50,6 +51,14 @@ export interface BackupSource {
     downloadUrl: (filename: string) => string
     restore: (filename: string) => Promise<unknown>
     remove: (filename: string) => Promise<unknown>
+    /**
+     * A Laravel database cannot be kept as a backup: it is converted and restored at
+     * once, so the upload dialog asks what to restore it as.
+     */
+    laravel?: {
+        targets: LaravelTarget[]
+        restore: (file: File, target: LaravelTarget, appKey?: string) => Promise<unknown>
+    }
 }
 
 interface BackupsViewProps {
@@ -79,6 +88,12 @@ export function BackupsView({ source, title, description, actions }: BackupsView
         invalidateAll: true,
         successMessage: i18n.t('toasts.backup.restored'),
     })
+    const restoreLaravel = useResourceMutation({
+        mutationFn: ({ file, target, appKey }: { file: File; target: LaravelTarget; appKey?: string }) =>
+            source.laravel!.restore(file, target, appKey),
+        invalidateAll: true,
+        successMessage: i18n.t('toasts.backup.restored'),
+    })
     const deleteBackup = useResourceMutation({
         mutationFn: (filename: string) => source.remove(filename),
         invalidateKeys: [source.key],
@@ -92,6 +107,10 @@ export function BackupsView({ source, title, description, actions }: BackupsView
     const [selectedBackup, setSelectedBackup] = useState<Backup | null>(null)
     const [note, setNote] = useState('')
     const [uploadFile, setUploadFile] = useState<File | null>(null)
+    const [appKey, setAppKey] = useState('')
+    const [laravelTarget, setLaravelTarget] = useState<LaravelTarget | null>(null)
+    const laravelUpload = !!source.laravel && isLaravelFile(uploadFile)
+    const target = laravelTarget ?? source.laravel?.targets[0]
 
     const handleCreate = () => {
         createBackup.mutate(note || undefined, {
@@ -102,15 +121,24 @@ export function BackupsView({ source, title, description, actions }: BackupsView
         })
     }
 
+    const closeUpload = () => {
+        setUploadDialogOpen(false)
+        setNote('')
+        setUploadFile(null)
+        setAppKey('')
+        setLaravelTarget(null)
+    }
+
     const handleUpload = () => {
         if (!uploadFile) return
-        uploadBackup.mutate({ file: uploadFile, note: note || undefined }, {
-            onSuccess: () => {
-                setUploadDialogOpen(false)
-                setNote('')
-                setUploadFile(null)
-            },
-        })
+        if (laravelUpload) {
+            restoreLaravel.mutate(
+                { file: uploadFile, target: target!, appKey: target === 'server' ? appKey.trim() || undefined : undefined },
+                { onSuccess: closeUpload },
+            )
+            return
+        }
+        uploadBackup.mutate({ file: uploadFile, note: note || undefined }, { onSuccess: closeUpload })
     }
 
     const openRestore = (backup: Backup) => {
@@ -204,10 +232,7 @@ export function BackupsView({ source, title, description, actions }: BackupsView
                                     <TableCell>
                                         <div className="flex flex-col items-start gap-1">
                                             <span className="font-mono text-sm">
-                                                {backup.appVersion
-                                                    || (backup.status === 'raw'
-                                                        ? t('backups.versionRaw')
-                                                        : t('backups.versionUnknown'))}
+                                                {backup.appVersion || t('backups.versionUnknown')}
                                             </span>
                                             <Tooltip>
                                                 <TooltipTrigger asChild>
@@ -296,17 +321,21 @@ export function BackupsView({ source, title, description, actions }: BackupsView
 
             <ResponsiveDialog
                 open={uploadDialogOpen}
-                onOpenChange={setUploadDialogOpen}
+                onOpenChange={(open) => (open ? setUploadDialogOpen(true) : closeUpload())}
                 title={t('backups.uploadTitle')}
                 description={t('backups.uploadDescription')}
                 footer={
                     <>
-                        <Button variant="outline" onClick={() => setUploadDialogOpen(false)}>
+                        <Button variant="outline" onClick={closeUpload}>
                             {tCommon('actions.cancel')}
                         </Button>
-                        <Button onClick={handleUpload} disabled={!uploadFile || uploadBackup.isPending}>
-                            {uploadBackup.isPending && <Loader2 className="size-4 mr-2 animate-spin" />}
-                            {t('backups.upload')}
+                        <Button
+                            variant={laravelUpload && target !== 'new' ? 'destructive' : 'default'}
+                            onClick={handleUpload}
+                            disabled={!uploadFile || uploadBackup.isPending || restoreLaravel.isPending}
+                        >
+                            {(uploadBackup.isPending || restoreLaravel.isPending) && <Loader2 className="size-4 mr-2 animate-spin" />}
+                            {laravelUpload ? laravelActionLabel(t, target!) : t('backups.upload')}
                         </Button>
                     </>
                 }
@@ -321,6 +350,15 @@ export function BackupsView({ source, title, description, actions }: BackupsView
                             onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
                         />
                     </div>
+                    {laravelUpload ? (
+                        <LaravelRestoreOptions
+                            targets={source.laravel!.targets}
+                            target={target!}
+                            onTarget={setLaravelTarget}
+                            appKey={appKey}
+                            onAppKey={setAppKey}
+                        />
+                    ) : (
                     <div className="space-y-2">
                         <Label htmlFor="upload-note">{t('backups.noteOptional')}</Label>
                         <Input
@@ -330,6 +368,7 @@ export function BackupsView({ source, title, description, actions }: BackupsView
                             onChange={(e) => setNote(e.target.value)}
                         />
                     </div>
+                    )}
                 </div>
             </ResponsiveDialog>
 

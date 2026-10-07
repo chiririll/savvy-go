@@ -17,7 +17,7 @@ import (
 
 func openApp(t *testing.T) *Store {
 	t.Helper()
-	s, err := OpenApp(context.Background(), t.TempDir(), "")
+	s, err := OpenApp(context.Background(), t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}

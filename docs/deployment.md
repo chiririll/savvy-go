@@ -12,9 +12,6 @@ services:
       - "3000:80"
     volumes:
       - savvy-go-data:/data
-    environment:
-      - APP_URL=https://savvy.yourdomain.com
-      - TZ=Europe/Belgrade
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/livez"]
       interval: 10s
@@ -28,24 +25,25 @@ volumes:
 
 All data is in the `/data` volume, see [Data and backups](data-and-backups.md).
 
-## Environment variables
+## Configuration
 
-| Variable      | Description                                                                       | Default             |
-|---------------|-----------------------------------------------------------------------------------|---------------------|
-| `APP_URL`     | Public URL of your instance                                                       | `http://localhost`  |
-| `TZ`          | Timezone                                                                          | `UTC`               |
-| `SEED_DEMO`   | First boot only: seed demo users, spaces, accounts and ~12 months of transactions | `false`             |
-| `SEED_DATE`   | With `SEED_DEMO`: the day (`YYYY-MM-DD`) the demo data is placed relative to, for reproducible data | today |
-| `SEED_MANIFEST` | With `SEED_DEMO`: file to write the seeded users, spaces, invitation tokens and rule ids to (JSON) | none |
-| `DATA_DIR`    | Where all state lives                                                             | `/data` if it exists, else `/var/lib/savvy-go`, else `./data` |
-| `UPLOAD_ROOT` | Optional override for uploads                                                     | `$DATA_DIR/uploads` |
-| `BACKUP_PATH` | Optional override for backups                                                     | `$DATA_DIR/backups` |
+The application is configured by a TOML file and reads no environment variables for settings. `config.toml` is created with the defaults on the first start, in the data directory (`/data` in the image, `/var/lib/savvy-go` for the Debian package, `./savvy-data` otherwise); `-config <path>` or the `CONFIG_FILE` environment variable points elsewhere. Demo data is not configured here: see `--seed-config` in [Development](development.md). On every start the file is read and written back, so keys a newer version adds appear on their own; comments are regenerated, your values are kept. Edit it and restart. A read-only file works too, it is just not rewritten.
 
-Limits such as spaces per user, space quotas and the number of kept backups are not environment variables: server admins set them in **Administration → System**.
+Keys, with their defaults, are listed in the generated file itself:
+
+| Section      | Keys                                                                                              |
+|--------------|---------------------------------------------------------------------------------------------------|
+| `[server]`   | `listen` (`:80` in the image, `localhost:8080` otherwise), `app_url`, `timezone`                  |
+| `[paths]`    | `data`, `uploads`, `backups`                                                                      |
+| `[security]` | `session_ttl`, `remember_ttl`, `challenge_ttl`, `session_cookie`, `csrf_cookie`, `csrf_header` |
+
+`app_url` is the public `https://` URL of your instance. SSO and passkeys stay disabled without it. It can also be changed in the admin panel (System → Server), which writes it back to the file. Behind Docker, set it there, or edit `/data/config.toml` once.
+
+Limits such as spaces per user, space quotas and the number of kept backups are not in the file: server admins set them in **Administration → System**.
 
 ## Behind a reverse proxy
 
-Set `APP_URL` to your public `https://` URL. The `X-Forwarded-Proto` and `X-Forwarded-For` headers are honored, no other setup needed.
+Set `app_url` to your public `https://` URL. The `X-Forwarded-Proto` and `X-Forwarded-For` headers are honored, no other setup needed.
 
 ### Traefik (HTTPS)
 
@@ -57,9 +55,6 @@ services:
     restart: unless-stopped
     volumes:
       - savvy-go-data:/data
-    environment:
-      - APP_URL=https://savvy.yourdomain.com
-      - TZ=Europe/Belgrade
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.savvy.rule=Host(`savvy.yourdomain.com`)"
@@ -91,8 +86,6 @@ services:
       - "80"
     volumes:
       - savvy-go-data:/data
-    environment:
-      - APP_URL=https://savvy.yourdomain.com
     networks:
       - npm-network
 
@@ -141,7 +134,7 @@ curl -fsSLO https://github.com/chiririll/savvy-go/releases/latest/download/savvy
 sudo apt install ./savvy-go.deb
 ```
 
-It runs as the `savvy-go` systemd service (`/usr/bin/savvy-go`). Data is in `/var/lib/savvy-go`; settings (`APP_URL`, `TZ`) go in `/etc/savvy-go/install.env`. `apt purge savvy-go` deletes the data.
+It runs as the `savvy-go` systemd service (`/usr/bin/savvy-go`). Data is in `/var/lib/savvy-go`; settings are in `/etc/savvy-go/config.toml`, which the service creates and maintains itself (restart after editing). It listens on `127.0.0.1:8080` only; put a reverse proxy in front, or set `listen = ":8080"` under `[server]` to expose it. `apt purge savvy-go` deletes the data.
 
 ## RPM package
 
@@ -153,6 +146,12 @@ sudo dnf install ./savvy-go.rpm
 ```
 
 It behaves like the Debian package but runs as its own `savvy-go` system user. Removing the package keeps `/var/lib/savvy-go` and `/etc/savvy-go`; delete them yourself to wipe the data.
+
+## Standalone binary
+
+Each GitHub release has a single-file build for Linux (`savvy-go-linux-amd64`) and Windows (`savvy-go-windows-amd64.exe`). The web UI is built in and there is nothing else to install. Run it and open `http://localhost:8080`. Data and `config.toml` go to a `savvy-data` folder in the working directory, not next to the executable (on Linux, `/data` or `/var/lib/savvy-go` is used instead when it exists). Double-clicking the `.exe` starts it in its own folder, but a shortcut or a scheduled task may start it somewhere else, so set the working directory there, or pass `--config <path>` (or `CONFIG_FILE`) to fix the location. `data` and the other folders can be changed under `[paths]` in the config. Compare the download with `SHA256SUMS` from the release.
+
+It does not run as a service by itself; use the packages above on Linux, or a tool such as NSSM or Task Scheduler on Windows.
 
 ## Updating
 

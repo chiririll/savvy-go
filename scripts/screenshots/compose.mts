@@ -4,7 +4,7 @@
 //
 //   npm run screenshots              the default config: everything, in English and the light theme
 //   npm run screenshots -- <name>    the config configs/<name>.json
-import { spawn } from 'node:child_process'
+import { spawn, type ChildProcess } from 'node:child_process'
 import { existsSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -23,14 +23,14 @@ if (config && !names.includes(config)) {
 
 // The directory of this run in screenshots/, named by the start time here, on the host, since the
 // container knows only UTC (and by the config). RUN_NAME can be set by hand to name it otherwise.
-const pad = (n) => String(n).padStart(2, '0')
+const pad = (n: number) => String(n).padStart(2, '0')
 const now = new Date()
 const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`
 const runName = process.env.RUN_NAME || (config ? `${stamp}_${config}` : stamp)
 
-let current = null
-const compose = (...args) =>
-    new Promise((resolve) => {
+let current: ChildProcess | null = null
+const compose = (...args: string[]) =>
+    new Promise<number>((resolve) => {
         const child = spawn('docker', ['compose', '-f', 'docker-compose.screenshots.yml', ...args], {
             cwd: root,
             stdio: 'inherit',

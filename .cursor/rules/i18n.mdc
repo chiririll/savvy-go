@@ -1,7 +1,0 @@
----
-description: i18n — colon ns, en+ru keys, no raw dotted keys
-globs: resources/ts/**/*.{ts,tsx,json},lang/**/*.php
-alwaysApply: false
----
-
-`t('forms:key')` not `t('forms.key')`. New strings in en+ru. Toasts: `getApiErrorMessage`. PHP: `__('messages…')`.

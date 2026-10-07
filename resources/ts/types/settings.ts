@@ -12,4 +12,6 @@ export interface Settings {
     max_spaces_per_user: number | null
     /** Whether an invitation link may create an account. */
     space_invites_can_register: boolean
+    /** Public URL of the instance; empty falls back to APP_URL. */
+    app_url: string
 }

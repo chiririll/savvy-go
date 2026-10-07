@@ -49,8 +49,6 @@ type Options struct {
 	// last. An error stops the remaining commits, simulating a crash between
 	// them; tests use it to check that a later merge reconciles the spaces.
 	BetweenCommits func(committed int) error
-	// AppKey is the Laravel APP_KEY, for converting Laravel-era databases.
-	AppKey string
 }
 
 // Store is the SQLite store.Store.
@@ -452,9 +450,9 @@ func mapErr(err error) error {
 
 // OpenApp opens the store of the application in dir with the embedded server
 // and space migrations.
-func OpenApp(ctx context.Context, dir, appKey string) (*Store, error) {
+func OpenApp(ctx context.Context, dir string) (*Store, error) {
 	return Open(ctx, Options{
-		Dir: dir, AppKey: appKey, MigrateServer: migrate.Server.Up, MigrateSpace: migrate.Space.Up,
+		Dir: dir, MigrateServer: migrate.Server.Up, MigrateSpace: migrate.Space.Up,
 		Quota: func(server store.DB, id int64) int64 {
 			if q, err := db.Q(server).GetSpaceQuota(ctx, id); err == nil && q.Valid {
 				return q.Int64

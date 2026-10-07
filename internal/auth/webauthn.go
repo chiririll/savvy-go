@@ -6,9 +6,9 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
-	"strings"
 	"time"
 
 	"savvy-go/internal/config"
@@ -51,20 +51,20 @@ type WebAuthnCred struct {
 	CreatedAt  *string
 }
 
+// ErrNoPublicURL means passkeys cannot work: the relying party is the public
+// URL of the instance, and it is not set (or is not a URL).
+var ErrNoPublicURL = errors.New("the public URL is not set")
+
 func (w WebAuthn) engine() (*webauthn.WebAuthn, error) {
-	u, err := url.Parse(w.Cfg.AppURL)
-	if err != nil || u.Host == "" {
-		u, _ = url.Parse("http://localhost:8080")
+	u, err := url.Parse(w.Cfg.URL())
+	if err != nil || u.Host == "" || u.Hostname() == "" {
+		return nil, ErrNoPublicURL
 	}
-	rpID := u.Hostname()
-	if rpID == "" {
-		rpID = "localhost"
-	}
-	origin := strings.TrimRight(w.Cfg.AppURL, "/")
 	return webauthn.New(&webauthn.Config{
 		RPDisplayName: "Savvy",
-		RPID:          rpID,
-		RPOrigins:     []string{origin},
+		RPID:          u.Hostname(),
+		// An origin is scheme and host only, whatever path the instance lives under.
+		RPOrigins: []string{u.Scheme + "://" + u.Host},
 	})
 }
 

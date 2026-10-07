@@ -257,6 +257,7 @@
         "providerType": "Тип провайдера",
         "selectProviderType": "Выберите тип провайдера",
         "secretKeepPlaceholder": "Оставьте пустым, чтобы не менять",
+        "needAppUrl": "Сначала задайте публичный URL в «Администрирование → Система → Сервер»: от него строятся URL для регистрации у провайдера, а без него единый вход не работает.",
         "registerUrls": "Зарегистрируйте эти URL у провайдера идентификации.",
         "acsUrl": "ACS (Reply) URL",
         "spEntityId": "SP Entity ID / Metadata",

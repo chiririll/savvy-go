@@ -8,6 +8,9 @@ on:
 
 jobs:
   build:
+    # Opt-in: set repo variable DOCKER_IMAGE (e.g. user/savvy-go) and secrets
+    # DOCKERHUB_USERNAME / DOCKERHUB_TOKEN. Without the variable the job is skipped.
+    if: vars.DOCKER_IMAGE != ''
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,7 +28,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: chiririll/savvy-go
+          images: ${{ vars.DOCKER_IMAGE }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=semver,pattern={{version}}

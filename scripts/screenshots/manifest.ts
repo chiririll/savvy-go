@@ -1,4 +1,4 @@
-// What the demo seed writes to SEED_MANIFEST; see internal/seed/manifest.go.
+// What the demo seed writes to the manifest of --seed-config; see internal/seed/manifest.go.
 export interface ManifestSpace {
     id: number
     name: string

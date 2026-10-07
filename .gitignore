@@ -18,6 +18,7 @@ go.work.sum
 # Build and package outputs
 /public/build
 /public/hot
+/dist/
 
 # Dependency and package-manager directories
 node_modules/
@@ -26,7 +27,7 @@ node_modules/
 .env
 
 # Development files
-/data/
+/savvy-data/
 
 # Other
 .DS_Store
@@ -37,3 +38,15 @@ node_modules/
 
 # Screenshots made by scripts/screenshots
 /screenshots/
+
+# AI agent folders (personal settings and skills; shared rules live in AGENTS.md)
+/.claude/
+/.cursor/
+/.codex/
+/.gemini/
+/.windsurf/
+CLAUDE.md
+CLAUDE.local.md
+
+# Frontend copied in for the embed build (go tool mage build:release)
+/internal/webui/dist/

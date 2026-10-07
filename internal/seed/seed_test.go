@@ -24,7 +24,7 @@ func openStore(t *testing.T) *sqlite.Store {
 func openStoreKeys(t *testing.T) (*sqlite.Store, domain.KeyRing) {
 	t.Helper()
 	dir := t.TempDir()
-	st, err := sqlite.OpenApp(context.Background(), dir, "")
+	st, err := sqlite.OpenApp(context.Background(), dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -302,5 +302,24 @@ func TestRunWritesManifest(t *testing.T) {
 	}
 	if got := m.Now.Format("2006-01-02T15:04:05Z07:00"); got != "2026-03-15T12:00:00Z" {
 		t.Fatalf("manifest now = %s", got)
+	}
+}
+
+func TestLoadConfig(t *testing.T) {
+	dir := t.TempDir()
+	good := filepath.Join(dir, "seed.toml")
+	if err := os.WriteFile(good, []byte("date = \"2026-03-15\"\nmanifest = \"/m.json\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	c, err := LoadConfig(good)
+	if err != nil || !c.Enabled || c.Date != "2026-03-15" || c.Manifest != "/m.json" {
+		t.Fatalf("got %+v, %v", c, err)
+	}
+	bad := filepath.Join(dir, "bad.toml")
+	if err := os.WriteFile(bad, []byte("dat = \"x\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadConfig(bad); err == nil {
+		t.Error("accepted an unknown key")
 	}
 }

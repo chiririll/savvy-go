@@ -10,9 +10,9 @@
 </p>
 
 <p align="center">
-<a href="https://hub.docker.com/r/chiririll/savvy-go"><img src="https://img.shields.io/badge/DOCKER-chiririll/savvy-go-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker"></a>
-<img src="https://img.shields.io/github/v/tag/chiririll/savvy-go?style=for-the-badge&color=orange" alt="Version">
-<img src="https://img.shields.io/badge/LICENSE-MIT-green?style=for-the-badge" alt="License">
+<a href="https://hub.docker.com/r/chiririll/savvy-go"><img src="https://img.shields.io/docker/v/chiririll/savvy-go?style=for-the-badge&logo=docker&logoColor=white" alt="Docker"></a>
+<a href="https://github.com/chiririll/savvy-go/releases/latest"><img src="https://img.shields.io/github/v/release/chiririll/savvy-go?style=for-the-badge&logo=github" alt="Version"></a>
+<img src="https://img.shields.io/github/license/chiririll/savvy-go?style=for-the-badge" alt="License">
 </p>
 
 ---
@@ -24,10 +24,10 @@
 ## ⚡ Quick Start
 
 ```bash
-docker run -d -p 3000:80 -v savvy-go-data:/data chiririll/savvy-go
+docker run -d -p 8080:80 -v savvy-go-data:/data chiririll/savvy-go
 ```
 
-Open http://localhost:3000 and create your account. For Docker Compose, reverse proxies and the Debian package, see [Deployment](docs/deployment.md).
+Open http://localhost:8080 and create your account. For Docker Compose, reverse proxies and the Debian package, see [Deployment](docs/deployment.md).
 
 ## ✨ Features
 

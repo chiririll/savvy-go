@@ -122,7 +122,8 @@ type SSO struct {
 	Users    auth.Users
 	Settings settings.Store
 	Spaces   Spaces
-	AppURL   string
+	// AppURL returns the public URL of the instance, empty when unset.
+	AppURL func() string
 	HTTP     *http.Client
 }
 

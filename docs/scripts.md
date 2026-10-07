@@ -81,7 +81,7 @@ A dialog reachable in several ways is shot once per run.
 ### Good to know
 
 - **Pages** come from [`pages.ts`](../resources/ts/app/pages.ts), so new pages are picked up automatically. Pages with a `:param` need a source in [`routes.ts`](../scripts/screenshots/routes.ts); skipped ones are listed in the log.
-- **Seed date**: the app computes periods from the current day, so the compose file seeds for today. Setting `SEED_DATE` gives empty totals (the script warns).
+- **Seed date**: the app computes periods from the current day, so the compose file seeds for today. Setting `date` in the seed config gives empty totals (the script warns).
 - **Animations** are off, so shots are still frames.
 - **Runs on different days differ** because dates on screen follow the current day. Exchange rates are fetched live, so those amounts can differ too.
 - **Playwright version**: the Docker image tag must match the `playwright` package version; the build fails otherwise.

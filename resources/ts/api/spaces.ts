@@ -72,6 +72,15 @@ export const spacesApi = {
         })
         return res.data?.data ?? res.data
     },
+    /** Replaces this space's data with a Laravel database; it is converted on the way, not kept. */
+    restoreLaravel: async (id: number, file: File): Promise<void> => {
+        const form = new FormData()
+        form.append('file', file)
+        await apiClient.post(`${base(id)}/backups/restore-laravel`, form, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            timeout: 0,
+        })
+    },
     backupDownloadUrl: (id: number, name: string) =>
         `${apiClient.defaults.baseURL}${base(id)}/backups/${encodeURIComponent(name)}/download`,
     restoreBackup: (id: number, name: string) =>
