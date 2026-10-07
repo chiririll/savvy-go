@@ -97,10 +97,10 @@ type Store interface {
 	ExportServer(ctx context.Context, dir string) error
 	// PrepareSpace validates a space database (a space backup or a Laravel
 	// database) for ReplaceSpace or ImportSpace.
-	PrepareSpace(ctx context.Context, src string) (*PreparedSpace, error)
+	PrepareSpace(ctx context.Context, src string, opts ...PrepareOption) (*PreparedSpace, error)
 	// PrepareServer validates a server backup: a directory written by
 	// ExportServer, or a Laravel database, which is split.
-	PrepareServer(ctx context.Context, src string) (*PreparedServer, error)
+	PrepareServer(ctx context.Context, src string, opts ...PrepareOption) (*PreparedServer, error)
 	// ReplaceSpace swaps a space's database for a prepared one.
 	ReplaceSpace(ctx context.Context, id int64, p *PreparedSpace) error
 	// ImportSpace creates space id from a prepared database.
@@ -110,6 +110,30 @@ type Store interface {
 	ReplaceServer(ctx context.Context, p *PreparedServer) error
 	// Discard removes a prepared artifact that will not be used.
 	Discard(artifact string)
+}
+
+// PrepareOption adjusts how a file from outside is prepared.
+type PrepareOption func(*PrepareOptions)
+
+// PrepareOptions are the resolved PrepareOptions.
+type PrepareOptions struct {
+	// LegacyKey is the Laravel APP_KEY that decrypts the secrets of a Laravel
+	// database. Without it those secrets cannot be converted.
+	LegacyKey string
+}
+
+// WithLegacyKey sets PrepareOptions.LegacyKey.
+func WithLegacyKey(key string) PrepareOption {
+	return func(o *PrepareOptions) { o.LegacyKey = key }
+}
+
+// ResolvePrepare applies opts.
+func ResolvePrepare(opts []PrepareOption) PrepareOptions {
+	var o PrepareOptions
+	for _, f := range opts {
+		f(&o)
+	}
+	return o
 }
 
 // PreparedSpace is a validated space database. Artifact belongs to the store;

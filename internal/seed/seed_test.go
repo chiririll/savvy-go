@@ -24,7 +24,7 @@ func openStore(t *testing.T) *sqlite.Store {
 func openStoreKeys(t *testing.T) (*sqlite.Store, domain.KeyRing) {
 	t.Helper()
 	dir := t.TempDir()
-	st, err := sqlite.OpenApp(context.Background(), dir, "")
+	st, err := sqlite.OpenApp(context.Background(), dir)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -33,7 +33,7 @@ When restoring:
 - A space backup restores only over its own space; otherwise import it as a new space. Backups over the space quota are rejected.
 - Transfers with linked spaces that changed since the backup come back as pending, see [Spaces](spaces.md#linked-spaces-and-transfers).
 
-Laravel-version backups can be restored as a server or imported as a space. A deleted space leaves a final backup in **Administration → Spaces**.
+A database of the Laravel version is not kept as a backup, see [Upgrading from the Laravel version](#upgrading-from-the-laravel-version). A deleted space leaves a final backup in **Administration → Spaces**.
 
 ## Manual backups
 
@@ -60,7 +60,13 @@ To restore: stop Savvy, replace the data directory contents with the archive, st
 
 ## Upgrading from the Laravel version
 
-On first start with no users, Savvy splits the old `database.sqlite` into `server.sqlite` and a first space, and renames the old file to `database.sqlite.migrated`. Roles map as:
+A database of the Laravel version (a bare `.sqlite` file) is never kept as a backup. Upload it in the backup dialog: Savvy sees that it is a Laravel database, converts it to the current format and restores it at once, as what you choose:
+
+- **The whole server** (**Administration → System backups**, server admins): replaces everything, users and spaces included. The dialog asks for the old `APP_KEY` (from the `.env` of the Laravel install), which decrypts the two-factor secrets. Without it, two-factor sign-in is switched off for the users who had it, so they can still sign in with their password and set it up again.
+- **The current space** (**Settings → Backups**, space admins): replaces the data of that space with the old finances. Users are not imported.
+- **A new space**: creates a space with the old finances and makes you its admin. Users are not imported.
+
+Roles map as:
 
 | Old role     | Server role | Space role |
 |--------------|-------------|------------|

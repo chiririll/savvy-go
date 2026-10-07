@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 
-	"savvy-go/internal/auth"
 )
 
 // Laravel-only tables that the Go runtime does not use.
@@ -56,8 +55,12 @@ func convert(ctx context.Context, db *sql.DB, appKey string) error {
 	if err := ensureSettings(ctx, db); err != nil {
 		return err
 	}
-	if err := auth.UnwrapLegacyTOTPSecrets(ctx, db, appKey); err != nil {
-		slog.Warn("could not unwrap legacy totp secrets", "err", err)
+	unwrapped, reset, err := UpgradeLegacyTOTPSecrets(ctx, db, appKey)
+	if err != nil {
+		return fmt.Errorf("convert two-factor secrets: %w", err)
+	}
+	if unwrapped+reset > 0 {
+		slog.Info("laravel two-factor secrets converted", "decrypted", unwrapped, "reset", reset)
 	}
 	if err := retypeDateColumns(ctx, db); err != nil {
 		return fmt.Errorf("convert dates to text: %w", err)

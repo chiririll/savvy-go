@@ -26,9 +26,9 @@ import (
 
 const (
 	archiveExt = ".zip"
-	// rawExt is an uploaded bare database file, in practice a Laravel backup.
-	// Such files carry no manifest and no signature.
-	rawExt = ".sqlite"
+	// laravelExt is a bare database file, in practice a Laravel database. It is
+	// converted when it is used and never kept as a backup.
+	laravelExt = ".sqlite"
 )
 
 // Backup is a backup file as listed.
@@ -107,8 +107,7 @@ func (s Backups) spaceDir(id int64) string {
 func (s Backups) tmpDir() string { return filepath.Join(s.Dir, ".tmp") }
 func stamp(t time.Time) string   { return t.UTC().Format("20060102-150405") }
 func validName(name string) bool {
-	return name != "" && filepath.Base(name) == name && !strings.HasPrefix(name, ".") &&
-		(strings.HasSuffix(name, archiveExt) || strings.HasSuffix(name, rawExt))
+	return name != "" && filepath.Base(name) == name && !strings.HasPrefix(name, ".") && strings.HasSuffix(name, archiveExt)
 }
 
 // --- listing ---------------------------------------------------------------
@@ -151,10 +150,6 @@ func (s Backups) list(dir string) ([]Backup, error) {
 func (s Backups) describe(dir string, info os.FileInfo) Backup {
 	mod := info.ModTime().UTC()
 	b := Backup{Filename: info.Name(), Size: info.Size(), CreatedAt: &mod, Signature: Unsigned}
-	if strings.HasSuffix(info.Name(), rawExt) {
-		b.Valid = true
-		return b
-	}
 	m, sig, err := readManifest(filepath.Join(dir, info.Name()), s.Keys)
 	if err != nil {
 		return b
@@ -298,29 +293,25 @@ func (s Backups) workDir() (string, error) {
 }
 
 // IngestServer / IngestSpace move an uploaded file into the backup directory.
-func (s Backups) IngestServer(src, original string) (*Backup, error) {
-	return s.ingest(s.serverDir(), src, original)
+func (s Backups) IngestServer(src string) (*Backup, error) {
+	return s.ingest(s.serverDir(), src)
 }
 
-func (s Backups) IngestSpace(spaceID int64, src, original string) (*Backup, error) {
-	b, err := s.ingest(s.spaceDir(spaceID), src, original)
+func (s Backups) IngestSpace(spaceID int64, src string) (*Backup, error) {
+	b, err := s.ingest(s.spaceDir(spaceID), src)
 	if err == nil {
 		s.prune(spaceID)
 	}
 	return b, err
 }
 
-func (s Backups) ingest(dir, src, original string) (*Backup, error) {
-	ext := archiveExt
-	if strings.HasSuffix(strings.ToLower(original), rawExt) {
-		ext = rawExt
-	}
+func (s Backups) ingest(dir, src string) (*Backup, error) {
 	if err := os.MkdirAll(dir, 0o775); err != nil {
 		return nil, err
 	}
-	name := stamp(time.Now()) + "-upload" + ext
+	name := stamp(time.Now()) + "-upload" + archiveExt
 	for i := 2; fileExists(filepath.Join(dir, name)); i++ {
-		name = stamp(time.Now()) + "-upload-" + strconv.Itoa(i) + ext
+		name = stamp(time.Now()) + "-upload-" + strconv.Itoa(i) + archiveExt
 	}
 	if err := os.Rename(src, filepath.Join(dir, name)); err != nil {
 		return nil, err
@@ -379,8 +370,10 @@ func (s Backups) DeletedPath(name string) (string, error) {
 
 // prepareSpaceFrom unpacks a space backup (or takes a raw database file) and
 // has the store validate it. maxBytes bounds the unpacked size.
+// prepareSpaceFrom prepares a space backup archive, or a bare Laravel database
+// (only ever an upload that is not kept).
 func (s Backups) prepareSpaceFrom(ctx context.Context, path string, maxBytes int64) (*store.PreparedSpace, *Manifest, error) {
-	if strings.HasSuffix(path, rawExt) {
+	if strings.HasSuffix(path, laravelExt) {
 		if maxBytes > 0 && fileSizeOf(path) > maxBytes {
 			return nil, nil, ErrTooLarge
 		}
@@ -413,6 +406,26 @@ func (s Backups) RestoreSpace(ctx context.Context, sp Space, name string, quota 
 		s.Store.Discard(p.Artifact)
 		return ErrOtherSpace
 	}
+	return s.swapSpace(ctx, sp, p, quota)
+}
+
+// RestoreLaravelSpace replaces a space's data with the finances of a Laravel
+// database (its users and other server data are left out). The file is
+// converted for this one restoration and not kept.
+func (s Backups) RestoreLaravelSpace(ctx context.Context, sp Space, path string, quota int64) error {
+	if quota > 0 && fileSizeOf(path) > quota {
+		return ErrTooLarge
+	}
+	p, err := s.Store.PrepareSpace(ctx, path)
+	if err != nil {
+		return err
+	}
+	p.Settings = map[string]string{"space_uuid": sp.UUID}
+	return s.swapSpace(ctx, sp, p, quota)
+}
+
+// swapSpace puts a prepared database in the place of a space's own, within quota.
+func (s Backups) swapSpace(ctx context.Context, sp Space, p *store.PreparedSpace, quota int64) error {
 	if quota > 0 && p.Size > quota {
 		s.Store.Discard(p.Artifact)
 		return ErrTooLarge
@@ -420,7 +433,10 @@ func (s Backups) RestoreSpace(ctx context.Context, sp Space, name string, quota 
 	// The review mark goes in before the file goes live: if the process dies
 	// before the review merge, startup reviews again instead of merging
 	// automatically (P24).
-	p.Settings = map[string]string{transferReviewKey: now()}
+	if p.Settings == nil {
+		p.Settings = map[string]string{}
+	}
+	p.Settings[transferReviewKey] = now()
 	if err := s.Store.ReplaceSpace(ctx, sp.ID, p); err != nil {
 		return err
 	}
@@ -452,33 +468,28 @@ func (s Backups) ImportSpace(ctx context.Context, spaces Spaces, path, name stri
 	return spaces.createFrom(ctx, name, owner, p)
 }
 
-// RestoreServer replaces the server and every space with a server backup (a
-// zip made by CreateServer, or a raw Laravel database).
+// RestoreServer replaces the server and every space with a server backup.
 func (s Backups) RestoreServer(ctx context.Context, name string) error {
 	if _, err := s.ServerBackup(name); err != nil {
 		return err
 	}
-	src := s.ServerPath(name)
+	arc, err := openArchive(s.ServerPath(name), s.tmpDir(), 0, s.Keys)
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(arc.Dir)
+	if arc.Manifest.Kind != kindServer {
+		return ErrNotServerBackup
+	}
 	var seed []byte
-	if strings.HasSuffix(name, archiveExt) {
-		arc, err := openArchive(src, s.tmpDir(), 0, s.Keys)
+	if raw, err := os.ReadFile(filepath.Join(arc.Dir, "keys", "server.ed25519")); err == nil {
+		key, err := signing.Parse(raw)
 		if err != nil {
 			return err
 		}
-		defer os.RemoveAll(arc.Dir)
-		if arc.Manifest.Kind != kindServer {
-			return ErrNotServerBackup
-		}
-		src = arc.Dir
-		if raw, err := os.ReadFile(filepath.Join(arc.Dir, "keys", "server.ed25519")); err == nil {
-			key, err := signing.Parse(raw)
-			if err != nil {
-				return err
-			}
-			seed = key.Seed()
-		}
+		seed = key.Seed()
 	}
-	p, err := s.Store.PrepareServer(ctx, src)
+	p, err := s.Store.PrepareServer(ctx, arc.Dir)
 	if err != nil {
 		return err
 	}
@@ -496,6 +507,18 @@ func (s Backups) RestoreServer(ctx context.Context, name string) error {
 		s.Keys.Holder.Set(key)
 	}
 	return nil
+}
+
+// RestoreLaravelServer replaces the server and every space with a Laravel
+// database at path, which is converted for this one restoration and not kept.
+// appKey is the Laravel APP_KEY, "" if the user has none: two-factor secrets
+// that cannot be decrypted are then reset (see legacy.UpgradeLegacyTOTPSecrets).
+func (s Backups) RestoreLaravelServer(ctx context.Context, path, appKey string) error {
+	p, err := s.Store.PrepareServer(ctx, path, store.WithLegacyKey(appKey))
+	if err != nil {
+		return err
+	}
+	return s.Store.ReplaceServer(ctx, p)
 }
 
 func deref(p *string) string {

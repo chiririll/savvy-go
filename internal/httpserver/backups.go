@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -88,6 +89,56 @@ func (s *Server) receiveUpload(w http.ResponseWriter, r *http.Request, limit int
 	return tmp.Name(), header.Filename, true
 }
 
+// isLaravelFile tells a bare database file (a Laravel database) from a backup
+// archive by its name.
+func isLaravelFile(name string) bool { return strings.HasSuffix(strings.ToLower(name), ".sqlite") }
+
+// rejectLaravelBackup refuses a Laravel database where a backup archive is
+// expected: it is never kept, it is restored with the dedicated endpoints.
+func (s *Server) rejectLaravelBackup(w http.ResponseWriter, tmp, name string) bool {
+	if !isLaravelFile(name) {
+		return true
+	}
+	_ = os.Remove(tmp)
+	writeValidation(w, map[string][]string{"file": {"A Laravel database is not kept as a backup: restore it from the upload dialog."}})
+	return false
+}
+
+// backupsRestoreLaravel replaces the whole server with an uploaded Laravel
+// database. It is converted on the way and not kept (server admins, by route).
+func (s *Server) backupsRestoreLaravel(w http.ResponseWriter, r *http.Request) {
+	tmp, _, ok := s.receiveUpload(w, r, maxServerUpload)
+	if !ok {
+		return
+	}
+	defer os.Remove(tmp)
+	// An invalid key is refused by the store before anything is touched.
+	if err := s.backups.RestoreLaravelServer(r.Context(), tmp, strings.TrimSpace(r.FormValue("app_key"))); err != nil {
+		writeBackupError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"message": "Database restored."})
+}
+
+// spaceBackupsRestoreLaravel replaces the current space's data with the
+// finances of an uploaded Laravel database (space admins, by route).
+func (s *Server) spaceBackupsRestoreLaravel(w http.ResponseWriter, r *http.Request) {
+	space := s.currentSpace(w, r)
+	if space == nil {
+		return
+	}
+	tmp, _, ok := s.receiveUpload(w, r, s.spaceUploadLimit(r))
+	if !ok {
+		return
+	}
+	defer os.Remove(tmp)
+	if err := s.backups.RestoreLaravelSpace(r.Context(), *space, tmp, s.spaceQuota(r)); err != nil {
+		writeBackupError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"message": "Database restored."})
+}
+
 func serveBackup(w http.ResponseWriter, r *http.Request, path, name string) {
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Content-Disposition", `attachment; filename="`+name+`"`)
@@ -115,7 +166,10 @@ func (s *Server) backupsUpload(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	b, err := s.backups.IngestServer(tmp, name)
+	if !s.rejectLaravelBackup(w, tmp, name) {
+		return
+	}
+	b, err := s.backups.IngestServer(tmp)
 	if err != nil {
 		_ = os.Remove(tmp)
 		writeBackupError(w, err)
@@ -193,7 +247,10 @@ func (s *Server) spaceBackupsUpload(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	b, err := s.backupsService(r).IngestSpace(sp(r).id, tmp, name)
+	if !s.rejectLaravelBackup(w, tmp, name) {
+		return
+	}
+	b, err := s.backupsService(r).IngestSpace(sp(r).id, tmp)
 	if err != nil {
 		_ = os.Remove(tmp)
 		writeBackupError(w, err)

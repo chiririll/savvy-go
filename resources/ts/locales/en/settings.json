@@ -305,17 +305,14 @@
         "note": "Note",
         "actions": "Actions",
         "versionUnknown": "Unknown",
-        "versionRaw": "Database file",
         "status": {
             "current": "Signed by this server",
             "unsigned": "Not signed here",
-            "raw": "Database file",
             "invalid": "Unreadable"
         },
         "statusHelp": {
             "current": "This backup’s schema matches the running app.",
             "unsigned": "This backup was made elsewhere or edited, so its signature is not trusted here. You can still restore it.",
-            "raw": "A bare database file. Savvy will check it and convert it during restore if needed. The backup file is not changed.",
             "invalid": "This file is not a database Savvy can read."
         },
         "empty": "No backups yet. Create your first backup to get started.",
@@ -327,6 +324,30 @@
         "notePlaceholder": "e.g., Before major update",
         "uploadTitle": "Upload Backup",
         "uploadDescription": "Upload a backup archive (.zip) or a database file (.sqlite).",
+            "laravel": {
+                "intro": "This is a database of the Laravel version. It is not kept as a backup: it is converted to the current format and restored right away. Choose what to restore it as.",
+                "target": {
+                    "server": {
+                        "title": "The whole server",
+                        "description": "Replaces everything on this server: users, spaces and settings. You will have to sign in with an account from the old database."
+                    },
+                    "space": {
+                        "title": "This space",
+                        "description": "Replaces the data of this space with the old finances. Users are not imported."
+                    },
+                    "new": {
+                        "title": "A new space",
+                        "description": "Creates a new space with the old finances and makes you its admin. Users are not imported."
+                    }
+                },
+                "action": {
+                    "server": "Replace the server",
+                    "space": "Replace this space",
+                    "new": "Import as a new space"
+                },
+                "appKey": "Laravel APP_KEY (optional)",
+                "appKeyHint": "From the .env of the old install. It decrypts two-factor secrets. Without it two-factor sign-in is switched off for those users, so they can still sign in with their password."
+            },
         "backupFile": "Backup File",
         "uploadNotePlaceholder": "e.g., Backup from old device",
         "restoreTitle": "Restore Backup?",
