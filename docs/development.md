@@ -39,3 +39,32 @@ npm run build   # into public/build
 ```
 
 Logo and screenshot scripts: [Scripts](scripts.md).
+
+## Workflows
+
+In `.github/workflows`. All of them can also be started manually.
+
+### Testing
+
+Run on PRs and pushes to `main`, only when relevant files change.
+
+- `ci-go`: backend tests.
+- `ci-frontend`: frontend type checking and tests.
+
+### Release
+
+Usually run on a `v*` tag push.
+
+#### dist
+
+Builds the Linux packages (`.deb`, `.rpm`) and publishes a GitHub release.
+
+#### docker
+
+Builds and pushes the Docker Hub image. Also runs on every push to `main`.
+
+Skipped while the `DOCKER_IMAGE` variable is unset, so forks don't fail. To enable, set under Settings → Secrets and variables → Actions:
+
+- variable `DOCKER_IMAGE`: Docker Hub repository, e.g. `chiririll/savvy-go`
+- secret `DOCKERHUB_USERNAME`: Docker Hub username
+- secret `DOCKERHUB_TOKEN`: Docker Hub API token
