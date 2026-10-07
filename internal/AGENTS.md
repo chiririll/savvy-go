@@ -2,7 +2,7 @@
 
 ```bash
 go generate ./internal/db   # sqlc: queries -> internal/db/sqlc
-go run ./cmd/savvy-go       # serves :8080, data in ./data
+go run ./cmd/savvy-go       # serves :8080, data in ./savvy-data
 ```
 
 ## Store boundary

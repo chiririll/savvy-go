@@ -27,7 +27,7 @@ node_modules/
 .env
 
 # Development files
-/data/
+/savvy-data/
 
 # Other
 .DS_Store

@@ -10,34 +10,23 @@ import (
 	"testing/fstest"
 )
 
-func TestResolveAssetsPrefersConfiguredDir(t *testing.T) {
-	embedded := fstest.MapFS{"index.html": {Data: []byte("embedded")}}
-	dir := t.TempDir()
-
-	got := resolveAssets(dir, embedded)
-	if _, err := got.Open("index.html"); err == nil {
-		t.Fatal("configured dir must win over the embedded frontend")
-	}
-}
-
-func TestResolveAssetsUsesEmbeddedWhenDirEmpty(t *testing.T) {
+func TestResolveAssetsUsesEmbedded(t *testing.T) {
 	embedded := fstest.MapFS{"index.html": {Data: []byte("embedded")}}
 
-	raw, err := fs.ReadFile(resolveAssets("", embedded), "index.html")
+	raw, err := fs.ReadFile(resolveAssets(embedded), "index.html")
 	if err != nil || string(raw) != "embedded" {
 		t.Fatalf("got %q, %v", raw, err)
 	}
 }
 
 func TestResolveAssetsFallsBackToPublicDir(t *testing.T) {
-	if got := resolveAssets("", nil); got == nil {
-		t.Fatal("no FS without embedded frontend or configured dir")
+	if got := resolveAssets(nil); got == nil {
+		t.Fatal("no FS without an embedded frontend")
 	}
 }
 
 func TestSPAServesEmbeddedFrontend(t *testing.T) {
 	cfg, _ := testConfig(t)
-	cfg.PublicDir = ""
 	s := New(cfg, openTestStore(t, cfg), testKeys(t, cfg))
 	s.assets = fstest.MapFS{
 		"index.html":                {Data: []byte(`<html><body><div id="app"></div>{{range .JS}}<script src="{{.}}"></script>{{end}}</body></html>`)},

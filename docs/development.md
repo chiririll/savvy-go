@@ -8,7 +8,7 @@ go test ./...
 go run ./cmd/savvy-go
 ```
 
-Listens on `localhost:8080`. Data and the generated `config.toml` go to `./data`, see [Data and backups](data-and-backups.md) and [Configuration](deployment.md#configuration). A plain `go build` or `go run` serves the frontend from `public/` on disk; release builds have it built into the binary, see [Build tasks](#build-tasks).
+Listens on `localhost:8080`. Data and the generated `config.toml` go to `./savvy-data`, see [Data and backups](data-and-backups.md) and [Configuration](deployment.md#configuration). A plain `go build` or `go run` serves the frontend from `public/` on disk; release builds have it built into the binary, see [Build tasks](#build-tasks).
 
 With `--seed-config <file>` (any TOML file, even an empty one), the first boot creates demo users, three spaces with ~12 months of data, linked spaces and open invitations:
 
@@ -51,7 +51,7 @@ go tool mage generate        # sqlc
 go tool mage release         # everything a release ships, into dist/ (needs APP_VERSION and nfpm)
 ```
 
-`build:release` honors `APP_VERSION`, `APP_ENV` (default `production`), `TARGET_GOOS` and `TARGET_GOARCH`. The target falls back to `GOOS` and `GOARCH`, but those also change how Mage itself is compiled, so cross-building from Windows or macOS needs `TARGET_*`. It copies `public/` to `internal/webui/dist` (git-ignored) and builds with the `embed` tag; without the tag the Go build never touches the frontend, so `go test ./...` needs no frontend build. `paths.public` in `config.toml` overrides the built-in copy.
+`build:release` honors `APP_VERSION`, `APP_ENV` (default `production`), `TARGET_GOOS` and `TARGET_GOARCH`. The target falls back to `GOOS` and `GOARCH`, but those also change how Mage itself is compiled, so cross-building from Windows or macOS needs `TARGET_*`. It copies `public/` to `internal/webui/dist` (git-ignored) and builds with the `embed` tag; without the tag the Go build never touches the frontend, so `go test ./...` needs no frontend build.
 
 Logo and screenshot scripts: [Scripts](scripts.md).
 

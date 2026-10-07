@@ -1,6 +1,8 @@
 package config
 
 import (
+	"bytes"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -45,9 +47,34 @@ session_ttl = 30
 	}
 }
 
-func TestLoadRejectsUnknownKeys(t *testing.T) {
-	if _, err := Load(write(t, "[server]\nlisten_addr = \"x\"\n")); err == nil {
-		t.Fatal("typo accepted")
+// A key a version dropped (or a typo) must not stop the server: it is named in
+// the log and left out when the file is rewritten.
+func TestLoadIgnoresUnknownKeys(t *testing.T) {
+	var logs bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
+	path := write(t, "[server]\napp_url = \"https://a.example\"\nlisten_addr = \"x\"\n[paths]\npublic = \"\"\n")
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.AppURL != "https://a.example" {
+		t.Errorf("known key lost: %q", cfg.AppURL)
+	}
+	if !strings.Contains(logs.String(), "server.listen_addr") || !strings.Contains(logs.String(), "paths.public") {
+		t.Errorf("unknown keys not named in the log: %s", logs.String())
+	}
+	raw, _ := os.ReadFile(path)
+	if strings.Contains(string(raw), "listen_addr") || strings.Contains(string(raw), "public") {
+		t.Errorf("unknown keys kept in the rewritten file:\n%s", raw)
+	}
+}
+
+func TestLoadRejectsBrokenSyntax(t *testing.T) {
+	if _, err := Load(write(t, "[server\nlisten = \n")); err == nil {
+		t.Fatal("broken TOML accepted")
 	}
 }
 

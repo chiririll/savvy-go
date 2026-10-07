@@ -20,18 +20,13 @@ type viteChunk struct {
 	Src     string   `json:"src"`
 }
 
-// resolveAssets picks where the frontend comes from: a configured directory
-// first (a way to override the UI), then the copy built into the binary, then
-// public/ next to the working directory (development).
-func resolveAssets(publicDir string, embedded fs.FS) fs.FS {
-	switch {
-	case publicDir != "":
-		return os.DirFS(publicDir)
-	case embedded != nil:
+// resolveAssets picks where the frontend comes from: the copy built into the
+// binary, or public/ next to the working directory (development builds).
+func resolveAssets(embedded fs.FS) fs.FS {
+	if embedded != nil {
 		return embedded
-	default:
-		return os.DirFS("public")
 	}
+	return os.DirFS("public")
 }
 
 func (s *Server) spa(w http.ResponseWriter, r *http.Request) {

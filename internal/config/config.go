@@ -24,7 +24,6 @@ type Config struct {
 	DataDir       string
 	UploadsDir    string
 	BackupsDir    string
-	PublicDir     string
 	TZ            string
 	Location      *time.Location
 	SessionTTL    time.Duration
@@ -45,10 +44,9 @@ type file struct {
 		Timezone string `toml:"timezone" comment:"Time zone."`
 	} `toml:"server"`
 	Paths struct {
-		Data    string `toml:"data" comment:"Where the databases live. Empty: /data or /var/lib/savvy-go when they exist, otherwise ./data."`
+		Data    string `toml:"data" comment:"Where the databases live. Empty: /data or /var/lib/savvy-go when they exist, otherwise ./savvy-data."`
 		Uploads string `toml:"uploads" comment:"Empty: <data>/uploads."`
 		Backups string `toml:"backups" comment:"Empty: <data>/backups."`
-		Public  string `toml:"public" comment:"The built frontend. Empty: the one built into the binary, or public (relative to the working directory) when the binary has none."`
 	} `toml:"paths"`
 	Security struct {
 		SessionTTL   int    `toml:"session_ttl" comment:"Lifetimes in minutes."`
@@ -98,10 +96,10 @@ var DefaultListen = "localhost:8080"
 // Load reads the TOML config file, adds the keys it lacks and writes it back,
 // creating it on the first run. path is the file to use; when empty, the
 // CONFIG_FILE environment variable, else config.toml in the data directory
-// (/data or /var/lib/savvy-go when they exist, otherwise ./data). That variable
+// (/data or /var/lib/savvy-go when they exist, otherwise ./savvy-data). That variable
 // is the only environment the application reads: everything else is configured
-// in the file. Unknown keys are an error, so typos do not go unnoticed. A file
-// that cannot be written (read-only mount) is logged and otherwise ignored.
+// in the file. Unknown keys are logged and dropped on the rewrite; invalid TOML
+// is an error. A file that cannot be written (read-only mount) is logged and otherwise ignored.
 func Load(path string) (Config, error) {
 	if path == "" {
 		path = strings.TrimSpace(os.Getenv("CONFIG_FILE"))
@@ -116,7 +114,17 @@ func Load(path string) (Config, error) {
 		dec := toml.NewDecoder(bytes.NewReader(raw))
 		dec.DisallowUnknownFields()
 		if err := dec.Decode(&f); err != nil {
-			return Config{}, fmt.Errorf("parse %s: %w", path, err)
+			// Unknown keys come from a typo or a version that dropped one. The
+			// rest of the file is decoded already, so do not stop the server.
+			var unknown *toml.StrictMissingError
+			if !errors.As(err, &unknown) {
+				return Config{}, fmt.Errorf("parse %s: %w", path, err)
+			}
+			keys := make([]string, 0, len(unknown.Errors))
+			for _, e := range unknown.Errors {
+				keys = append(keys, strings.Join(e.Key(), "."))
+			}
+			slog.Warn("ignoring unknown keys in the config file; they are left out when it is rewritten", "path", path, "keys", keys)
 		}
 	case errors.Is(err, fs.ErrNotExist):
 	default:
@@ -204,7 +212,6 @@ func (f file) resolve() Config {
 		DataDir:       dataDir,
 		UploadsDir:    firstNonEmpty(f.Paths.Uploads, filepath.Join(dataDir, "uploads")),
 		BackupsDir:    firstNonEmpty(f.Paths.Backups, filepath.Join(dataDir, "backups")),
-		PublicDir:     f.Paths.Public,
 		TZ:            tz,
 		Location:      loc,
 		SessionTTL:    minutes(f.Security.SessionTTL, 60*24),
@@ -223,7 +230,7 @@ func detectDataDir() string {
 			return candidate
 		}
 	}
-	return "./data"
+	return "./savvy-data"
 }
 
 func firstNonEmpty(values ...string) string {

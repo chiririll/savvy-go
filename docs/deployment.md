@@ -27,14 +27,14 @@ All data is in the `/data` volume, see [Data and backups](data-and-backups.md).
 
 ## Configuration
 
-The application is configured by a TOML file and reads no environment variables for settings. `config.toml` is created with the defaults on the first start, in the data directory (`/data` in the image, `/var/lib/savvy-go` for the Debian package, `./data` otherwise); `-config <path>` or the `CONFIG_FILE` environment variable points elsewhere. Demo data is not configured here: see `--seed-config` in [Development](development.md). On every start the file is read and written back, so keys a newer version adds appear on their own; comments are regenerated, your values are kept. Edit it and restart. A read-only file works too, it is just not rewritten.
+The application is configured by a TOML file and reads no environment variables for settings. `config.toml` is created with the defaults on the first start, in the data directory (`/data` in the image, `/var/lib/savvy-go` for the Debian package, `./savvy-data` otherwise); `-config <path>` or the `CONFIG_FILE` environment variable points elsewhere. Demo data is not configured here: see `--seed-config` in [Development](development.md). On every start the file is read and written back, so keys a newer version adds appear on their own; comments are regenerated, your values are kept. Edit it and restart. A read-only file works too, it is just not rewritten.
 
 Keys, with their defaults, are listed in the generated file itself:
 
 | Section      | Keys                                                                                              |
 |--------------|---------------------------------------------------------------------------------------------------|
 | `[server]`   | `listen` (`:80` in the image, `localhost:8080` otherwise), `app_url`, `timezone`                  |
-| `[paths]`    | `data`, `uploads`, `backups`, `public` (leave empty: the web UI is built into the binary)         |
+| `[paths]`    | `data`, `uploads`, `backups`                                                                      |
 | `[security]` | `session_ttl`, `remember_ttl`, `challenge_ttl`, `session_cookie`, `csrf_cookie`, `csrf_header` |
 
 `app_url` is the public `https://` URL of your instance. SSO and passkeys stay disabled without it. It can also be changed in the admin panel (System → Server), which writes it back to the file. Behind Docker, set it there, or edit `/data/config.toml` once.
@@ -149,7 +149,7 @@ It behaves like the Debian package but runs as its own `savvy-go` system user. R
 
 ## Standalone binary
 
-Each GitHub release has a single-file build for Linux (`savvy-go-linux-amd64`) and Windows (`savvy-go-windows-amd64.exe`). The web UI is built in and there is nothing else to install. Run it and open `http://localhost:8080`. Data and `config.toml` go to a `data` folder in the working directory, not next to the executable (on Linux, `/data` or `/var/lib/savvy-go` is used instead when it exists). Double-clicking the `.exe` starts it in its own folder, but a shortcut or a scheduled task may start it somewhere else, so set the working directory there, or pass `--config <path>` (or `CONFIG_FILE`) to fix the location. `data` and the other folders can be changed under `[paths]` in the config. Compare the download with `SHA256SUMS` from the release.
+Each GitHub release has a single-file build for Linux (`savvy-go-linux-amd64`) and Windows (`savvy-go-windows-amd64.exe`). The web UI is built in and there is nothing else to install. Run it and open `http://localhost:8080`. Data and `config.toml` go to a `savvy-data` folder in the working directory, not next to the executable (on Linux, `/data` or `/var/lib/savvy-go` is used instead when it exists). Double-clicking the `.exe` starts it in its own folder, but a shortcut or a scheduled task may start it somewhere else, so set the working directory there, or pass `--config <path>` (or `CONFIG_FILE`) to fix the location. `data` and the other folders can be changed under `[paths]` in the config. Compare the download with `SHA256SUMS` from the release.
 
 It does not run as a service by itself; use the packages above on Linux, or a tool such as NSSM or Task Scheduler on Windows.
 

@@ -52,7 +52,7 @@ func New(cfg config.Config, st store.Store, keys *signing.Holder) *Server {
 	srv := st.Server()
 	s := &Server{
 		cfg:        cfg,
-		assets:     resolveAssets(cfg.PublicDir, webui.FS()),
+		assets:     resolveAssets(webui.FS()),
 		store:      st,
 		users:      auth.Users{DB: srv},
 		sessions:   auth.Sessions{DB: srv, Cfg: cfg},
