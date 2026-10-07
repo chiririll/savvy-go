@@ -38,6 +38,19 @@ npx tsc --noEmit
 npm run build   # into public/build
 ```
 
+## Build tasks
+
+[Mage](https://magefile.org) runs the builds from `magefile.go`, pinned in `go.mod` so nothing is installed globally. `go tool mage -l` lists the targets:
+
+```bash
+go tool mage build:release   # frontend + dist/savvy-go with the frontend embedded
+go tool mage build:dev       # dist/savvy-go that serves public/ from disk
+go tool mage build:embed     # release without rebuilding the frontend
+go tool mage test:all        # Go (with and without the embed tag) and frontend tests
+```
+
+`build:release` honors `APP_VERSION`, `APP_ENV` (default `production`), `GOOS` and `GOARCH`. It copies `public/` to `internal/webui/dist` (git-ignored) and builds with the `embed` tag; without the tag the Go build never touches the frontend, so `go test ./...` needs no frontend build. `paths.public` in `config.toml` overrides the built-in copy.
+
 Logo and screenshot scripts: [Scripts](scripts.md).
 
 AI agent setup: [Agentic development](agentic-development.md).

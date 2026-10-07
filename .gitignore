@@ -18,6 +18,7 @@ go.work.sum
 # Build and package outputs
 /public/build
 /public/hot
+/dist/
 
 # Dependency and package-manager directories
 node_modules/
