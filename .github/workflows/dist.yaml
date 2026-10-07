@@ -65,43 +65,18 @@ jobs:
           node-version: '24'
           cache: npm
 
-      - name: Build Go binary
-        env:
-          APP_VERSION: ${{ steps.ver.outputs.tag }}
-          APP_ENV: production
-        run: |
-          mkdir -p dist
-          CGO_ENABLED=0 go build -trimpath \
-            -ldflags="-s -w -X savvy-go/internal/version.Value=${APP_VERSION} -X savvy-go/internal/version.Env=${APP_ENV}" \
-            -o dist/savvy-go ./cmd/savvy-go
-
-      - name: Build frontend
-        env:
-          APP_VERSION: ${{ steps.ver.outputs.tag }}
-        run: npm ci && npm run build
-
-      - name: Assemble dist/public
-        env:
-          APP_VERSION: ${{ steps.ver.outputs.tag }}
-        run: bash deploy/common/package-dist.sh
-
       - name: Install nfpm
         env:
           NFPM_VERSION: "2.47.0"
         run: |
-          curl -fsSL "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/nfpm_${NFPM_VERSION}_Linux_x86_64.tar.gz" \
-            | sudo tar -xz -C /usr/local/bin nfpm
+          curl -fsSL "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/nfpm_${NFPM_VERSION}_Linux_x86_64.tar.gz"             | sudo tar -xz -C /usr/local/bin nfpm
           nfpm --version
 
-      - name: Package deb
+      # Frontend, Linux and Windows binaries with it embedded, deb, rpm and SHA256SUMS into dist/.
+      - name: Build release
         env:
           APP_VERSION: ${{ steps.ver.outputs.tag }}
-        run: bash deploy/nfpm/package-linux.sh deb
-
-      - name: Package rpm
-        env:
-          APP_VERSION: ${{ steps.ver.outputs.tag }}
-        run: bash deploy/nfpm/package-linux.sh rpm
+        run: npm ci && go tool mage release
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
@@ -111,4 +86,7 @@ jobs:
           files: |
             dist/*.deb
             dist/*.rpm
+            dist/savvy-go-linux-amd64
+            dist/savvy-go-windows-amd64.exe
+            dist/SHA256SUMS
           body_path: RELEASE_NOTES.md

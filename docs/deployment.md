@@ -34,7 +34,7 @@ Keys, with their defaults, are listed in the generated file itself:
 | Section      | Keys                                                                                              |
 |--------------|---------------------------------------------------------------------------------------------------|
 | `[server]`   | `listen` (`:80` in the image, `localhost:8080` otherwise), `app_url`, `timezone`                  |
-| `[paths]`    | `data`, `uploads`, `backups`, `public`                                                            |
+| `[paths]`    | `data`, `uploads`, `backups`, `public` (leave empty: the web UI is built into the binary)         |
 | `[security]` | `session_ttl`, `remember_ttl`, `challenge_ttl`, `session_cookie`, `csrf_cookie`, `csrf_header` |
 
 `app_url` is the public `https://` URL of your instance. SSO and passkeys stay disabled without it. It can also be changed in the admin panel (System → Server), which writes it back to the file. Behind Docker, set it there, or edit `/data/config.toml` once.
@@ -146,6 +146,12 @@ sudo dnf install ./savvy-go.rpm
 ```
 
 It behaves like the Debian package but runs as its own `savvy-go` system user. Removing the package keeps `/var/lib/savvy-go` and `/etc/savvy-go`; delete them yourself to wipe the data.
+
+## Standalone binary
+
+Each GitHub release has a single-file build for Linux (`savvy-go-linux-amd64`) and Windows (`savvy-go-windows-amd64.exe`). The web UI is built in and there is nothing else to install. Run it and open `http://localhost:8080`. Data and `config.toml` go to a `data` folder in the working directory, not next to the executable (on Linux, `/data` or `/var/lib/savvy-go` is used instead when it exists). Double-clicking the `.exe` starts it in its own folder, but a shortcut or a scheduled task may start it somewhere else, so set the working directory there, or pass `--config <path>` (or `CONFIG_FILE`) to fix the location. `data` and the other folders can be changed under `[paths]` in the config. Compare the download with `SHA256SUMS` from the release.
+
+It does not run as a service by itself; use the packages above on Linux, or a tool such as NSSM or Task Scheduler on Windows.
 
 ## Updating
 

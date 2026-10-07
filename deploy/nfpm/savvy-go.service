@@ -6,9 +6,8 @@ After=network.target
 Type=simple
 User=@APP_USER@
 Group=@APP_USER@
-# The only environment the app reads; the frontend is public/ below the working directory.
+# The only environment the app reads. The web UI is built into the binary.
 Environment=CONFIG_FILE=/etc/savvy-go/config.toml
-WorkingDirectory=/usr/share/savvy-go
 ExecStart=/usr/bin/savvy-go
 Restart=always
 RestartSec=3

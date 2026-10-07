@@ -47,9 +47,11 @@ go tool mage build:release   # frontend + dist/savvy-go with the frontend embedd
 go tool mage build:dev       # dist/savvy-go that serves public/ from disk
 go tool mage build:embed     # release without rebuilding the frontend
 go tool mage test:all        # Go (with and without the embed tag) and frontend tests
+go tool mage generate        # sqlc
+go tool mage release         # everything a release ships, into dist/ (needs APP_VERSION and nfpm)
 ```
 
-`build:release` honors `APP_VERSION`, `APP_ENV` (default `production`), `GOOS` and `GOARCH`. It copies `public/` to `internal/webui/dist` (git-ignored) and builds with the `embed` tag; without the tag the Go build never touches the frontend, so `go test ./...` needs no frontend build. `paths.public` in `config.toml` overrides the built-in copy.
+`build:release` honors `APP_VERSION`, `APP_ENV` (default `production`), `TARGET_GOOS` and `TARGET_GOARCH`. The target falls back to `GOOS` and `GOARCH`, but those also change how Mage itself is compiled, so cross-building from Windows or macOS needs `TARGET_*`. It copies `public/` to `internal/webui/dist` (git-ignored) and builds with the `embed` tag; without the tag the Go build never touches the frontend, so `go test ./...` needs no frontend build. `paths.public` in `config.toml` overrides the built-in copy.
 
 Logo and screenshot scripts: [Scripts](scripts.md).
 
@@ -66,13 +68,25 @@ Run on PRs and pushes to `main`, only when relevant files change.
 - `ci-go`: backend tests.
 - `ci-frontend`: frontend type checking and tests.
 
+### Package check
+
+`ci-packages` runs it on every push to `main` (not on tags). Run it by hand after changing anything in `deploy/`. Needs Docker, Go and Node; works the same on Linux, macOS and Windows:
+
+```sh
+go tool mage test:packages     # deb and rpm
+go tool mage test:deb          # one format (test:rpm)
+SKIP_FRONTEND=1 go tool mage test:packages   # reuse public/build (set the variable your shell's way on Windows)
+```
+
+It builds the Linux binary with the frontend embedded on the host, runs the `package:deb` and `package:rpm` targets (a compiled Mage, so no Go is needed) in a container that has nfpm, then installs the package in a Debian (deb) or Rocky Linux (rpm) container with systemd as PID 1, then checks install, health endpoints, the service user, crash restart, upgrade and removal (plus purge for deb). The container is privileged, so only run it on a machine you trust.
+
 ### Release
 
 Usually run on a `v*` tag push.
 
 #### dist
 
-Builds the Linux packages (`.deb`, `.rpm`) and publishes a GitHub release.
+Runs `mage release`: builds the Linux packages (`.deb`, `.rpm`), the standalone Linux and Windows binaries and `SHA256SUMS`, and publishes a GitHub release. The frontend is built once and shared by all of them. To run it locally, install [nfpm](https://nfpm.goreleaser.com) and set `APP_VERSION`.
 
 #### docker
 

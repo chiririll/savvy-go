@@ -30,13 +30,20 @@ func (Build) Frontend() error {
 	return sh.RunV(npm(), "run", "build")
 }
 
+// FrontendDev builds the React app in development mode (no minification).
+func (Build) FrontendDev() error {
+	return sh.RunV(npm(), "run", "build", "--", "--mode", "development")
+}
+
 // Dev builds a binary that serves the frontend from public/ on disk.
 func (Build) Dev() error {
-	return goBuild("dev", nil, os.Getenv("APP_ENV"))
+	return compile(buildOpts{env: os.Getenv("APP_ENV")})
 }
 
 // Release builds the frontend and a binary with it embedded. Honors
-// APP_VERSION, APP_ENV (default production), GOOS and GOARCH.
+// APP_VERSION, APP_ENV (default production), TARGET_GOOS and TARGET_GOARCH
+// (GOOS and GOARCH when unset; those also apply to mage itself, so a host that
+// differs from the target needs TARGET_*).
 func (Build) Release() error {
 	mg.Deps(Build.Frontend)
 	return Build{}.Embed()
@@ -47,11 +54,12 @@ func (Build) Embed() error {
 	if err := stageFrontend(); err != nil {
 		return err
 	}
-	env := os.Getenv("APP_ENV")
-	if env == "" {
-		env = "production"
-	}
-	return goBuild("release", []string{"-tags", "embed", "-trimpath"}, env)
+	return compile(buildOpts{embed: true, env: firstNonEmpty(os.Getenv("APP_ENV"), "production")})
+}
+
+// Generate regenerates the sqlc code from internal/db/queries.
+func Generate() error {
+	return sh.RunV("go", "generate", "./internal/db")
 }
 
 // Go runs the Go tests, with and without the embed tag.
@@ -98,24 +106,36 @@ func stageFrontend() error {
 	return os.CopyFS(embedDir, os.DirFS("public"))
 }
 
-func goBuild(name string, flags []string, appEnv string) error {
-	bin := filepath.Join(outDir, "savvy-go")
-	goos := firstNonEmpty(os.Getenv("GOOS"), runtime.GOOS)
-	if goos == "windows" {
-		bin += ".exe"
+// buildOpts describes one binary. Zero values mean: the host or TARGET_*
+// platform, dist/savvy-go[.exe], APP_VERSION (or dev), served from disk.
+type buildOpts struct {
+	goos, goarch string
+	out          string
+	embed        bool
+	env          string // version.Env
+}
+
+func compile(o buildOpts) error {
+	o.goos = firstNonEmpty(o.goos, os.Getenv("TARGET_GOOS"), os.Getenv("GOOS"), runtime.GOOS)
+	o.goarch = firstNonEmpty(o.goarch, os.Getenv("TARGET_GOARCH"), os.Getenv("GOARCH"), runtime.GOARCH)
+	if o.out == "" {
+		o.out = filepath.Join(outDir, "savvy-go")
+		if o.goos == "windows" {
+			o.out += ".exe"
+		}
 	}
 
 	ldflags := "-X savvy-go/internal/version.Value=" + firstNonEmpty(os.Getenv("APP_VERSION"), "dev")
-	if appEnv != "" {
-		ldflags += " -X savvy-go/internal/version.Env=" + appEnv
+	if o.env != "" {
+		ldflags += " -X savvy-go/internal/version.Env=" + o.env
 	}
-	if name == "release" {
+	args := []string{"build"}
+	if o.embed {
+		args = append(args, "-tags", "embed", "-trimpath")
 		ldflags = "-s -w " + ldflags
 	}
-
-	args := append([]string{"build"}, flags...)
-	args = append(args, "-ldflags", ldflags, "-o", bin, pkg)
-	return sh.RunWithV(map[string]string{"CGO_ENABLED": "0"}, "go", args...)
+	args = append(args, "-ldflags", ldflags, "-o", o.out, pkg)
+	return sh.RunWithV(map[string]string{"CGO_ENABLED": "0", "GOOS": o.goos, "GOARCH": o.goarch}, "go", args...)
 }
 
 func npm() string {
