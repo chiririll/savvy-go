@@ -2,26 +2,20 @@ package main
 
 import (
 	"context"
-	"errors"
+	"flag"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"time"
 
-	"savvy-go/internal/auth"
 	"savvy-go/internal/config"
 	"savvy-go/internal/domain"
 	"savvy-go/internal/httpserver"
 	"savvy-go/internal/jobs"
-	"savvy-go/internal/schedule"
 	"savvy-go/internal/seed"
-	"savvy-go/internal/settings"
-	"savvy-go/internal/signing"
-	"savvy-go/internal/store"
 	"savvy-go/internal/store/sqlite"
 	"savvy-go/internal/version"
 )
@@ -29,168 +23,81 @@ import (
 func main() {
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
 
-	cfg := config.FromEnv()
-
-	if err := os.MkdirAll(cfg.DataDir, 0o775); err != nil {
-		slog.Error("create data dir", "err", err)
+	configPath := flag.String("config", "", "path to config.toml (default: $CONFIG_FILE, else config.toml in the data directory; created if missing)")
+	seedConfig := flag.String("seed-config", "", "path to a TOML file (keys date, manifest, both optional); seeds the demo data on first boot when given")
+	flag.Parse()
+	cfg, err := config.Load(*configPath)
+	if err != nil {
+		slog.Error("load config", "err", err)
 		os.Exit(1)
 	}
-	_ = os.MkdirAll(cfg.UploadsDir, 0o775)
-	_ = os.MkdirAll(cfg.BackupsDir, 0o775)
+	var seedCfg seed.Config
+	if *seedConfig != "" {
+		if seedCfg, err = seed.LoadConfig(*seedConfig); err != nil {
+			slog.Error("load seed config", "err", err)
+			os.Exit(1)
+		}
+	}
+	if err := run(cfg, seedCfg); err != nil {
+		slog.Error("savvy-go", "err", err)
+		os.Exit(1)
+	}
+}
+
+// run serves the application until it is interrupted.
+func run(cfg config.Config, seedCfg seed.Config) error {
+	for _, dir := range []string{cfg.DataDir, cfg.UploadsDir, cfg.BackupsDir} {
+		if err := os.MkdirAll(dir, 0o775); err != nil {
+			return fmt.Errorf("create %s: %w", dir, err)
+		}
+	}
 
 	ctx := context.Background()
-	st, err := sqlite.OpenApp(ctx, cfg.DataDir, cfg.AppKey)
+	st, err := sqlite.OpenApp(ctx, cfg.DataDir)
 	if err != nil {
-		slog.Error("open store", "err", err)
-		os.Exit(1)
+		return fmt.Errorf("open store: %w", err)
 	}
 	defer st.Close()
-	if err := migrateLaravelFile(ctx, cfg.DataDir, st); err != nil {
-		slog.Error("migrate database.sqlite", "err", err)
-		os.Exit(1)
-	}
-	keys, err := loadSigningKey(ctx, cfg.DataDir, st)
+	keys, transfers, err := prepare(ctx, cfg, st)
 	if err != nil {
-		slog.Error("signing key", "err", err)
-		os.Exit(1)
+		return err
 	}
-	if missing, orphans, err := (domain.Spaces{Store: st}).Reconcile(ctx); err == nil {
-		for _, id := range missing {
-			slog.Error("space has no database file", "space", id)
-		}
-		for _, id := range orphans {
-			slog.Warn("space database file without a registered space; left untouched", "space", id)
-		}
-	}
-	// Finish transfers a crash left half-written and review spaces restored
-	// just before it; an unavailable space is merged on a later start.
-	transfers := domain.Transfers{
-		Spaces: domain.Spaces{Store: st},
-		Keys:   domain.KeyRing{Holder: keys, Trusted: domain.TrustedKeys(st.Server())},
-	}
-	if err := transfers.SyncAll(ctx); err != nil {
-		slog.Warn("merge transfers between spaces", "err", err)
-	}
-	for id, why := range st.Status().Unavailable {
-		slog.Error("space unavailable", "space", id, "reason", why)
-	}
-
-	if err := seed.Run(ctx, st, transfers.Keys, seed.ConfigFromEnv(), cfg.Location); err != nil {
-		slog.Error("seed demo", "err", err)
-		os.Exit(1)
+	if err := seed.Run(ctx, st, transfers.Keys, seedCfg, cfg.Location); err != nil {
+		return fmt.Errorf("seed demo: %w", err)
 	}
 
 	queue := jobs.New(2)
-	schedCtx, schedCancel := context.WithCancel(context.Background())
-	defer schedCancel()
-	uploads := domain.Uploads{DB: st.Server(), Root: cfg.UploadsDir, AppURL: cfg.AppURL, SignSecret: cfg.AppURL + "|upload"}
-	// eachSpace runs a job in every available space; one failing space does
-	// not stop the others.
-	eachSpace := func(job func(context.Context, store.DB) error) func(context.Context) error {
-		return func(ctx context.Context) error {
-			ids, err := st.Spaces(ctx)
-			if err != nil {
-				return err
-			}
-			var errs []error
-			for _, id := range ids {
-				d, err := st.Space(ctx, id)
-				if err != nil {
-					continue // unavailable: reported at startup
-				}
-				if err := job(ctx, d); err != nil {
-					errs = append(errs, fmt.Errorf("space %d: %w", id, err))
-				}
-			}
-			return errors.Join(errs...)
-		}
-	}
-	schedule.New(
-		schedule.Job{Name: "currencies:update", Interval: 24 * time.Hour, Run: eachSpace(func(ctx context.Context, d store.DB) error {
-			if !(settings.Store{DB: d, Space: true}).Bool(ctx, "auto_update_currencies", true) {
-				return nil
-			}
-			updated, skipped, err := domain.Currencies{DB: d}.UpdateRates(ctx)
-			if err == nil {
-				slog.Info("currency rates updated", "updated", updated, "skipped", skipped)
-			}
-			return err
-		})},
-		schedule.Job{Name: "recurring:ensure-upcoming", Interval: time.Hour, Run: eachSpace(func(ctx context.Context, d store.DB) error {
-			return domain.RecurringStore{DB: d, Txs: domain.Transactions{DB: d}}.EnsureUpcoming(ctx)
-		})},
-		schedule.Job{Name: "uploads:prune", Interval: time.Hour, Run: uploads.PruneExpired},
-	).Start(schedCtx)
-	_ = queue
+	jobsCtx, stopJobs := context.WithCancel(ctx)
+	defer stopJobs()
+	startJobs(jobsCtx, st, domain.Uploads{DB: st.Server(), Root: cfg.UploadsDir})
 
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,
 		Handler:           httpserver.New(cfg, st, keys).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
-
+	failed := make(chan error, 1)
 	go func() {
 		slog.Info("go savvy listening", "addr", cfg.ListenAddr, "data", cfg.DataDir, "version", version.Value)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			slog.Error("http server", "err", err)
-			os.Exit(1)
+			failed <- fmt.Errorf("http server: %w", err)
 		}
 	}()
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
-	<-stop
+	select {
+	case err := <-failed:
+		return err
+	case <-stop:
+	}
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-	schedCancel()
+	stopJobs()
 	queue.Shutdown(shutdownCtx)
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		slog.Error("shutdown", "err", err)
+		return fmt.Errorf("shutdown: %w", err)
 	}
-}
-
-// migrateLaravelFile moves the database.sqlite of a Laravel install into
-// server.sqlite and space 1, once: only while the server has no users, and
-// the old file is kept renamed.
-func migrateLaravelFile(ctx context.Context, dataDir string, st *sqlite.Store) error {
-	old := filepath.Join(dataDir, "database.sqlite")
-	if _, err := os.Stat(old); err != nil {
-		return nil
-	}
-	n, err := (auth.Users{DB: st.Server()}).Count(ctx)
-	if err != nil || n > 0 {
-		slog.Warn("database.sqlite is ignored: the server already has data", "file", old)
-		return err
-	}
-	p, err := st.PrepareServer(ctx, old)
-	if err != nil {
-		return err
-	}
-	if err := st.ReplaceServer(ctx, p); err != nil {
-		return err
-	}
-	slog.Info("database.sqlite split into server.sqlite and spaces/")
-	return os.Rename(old, old+".migrated")
-}
-
-// signingKeyUsedKey records the key id once the server has a key, so a key
-// file that disappears later is noticed instead of silently replaced.
-const signingKeyUsedKey = "signing_kid"
-
-func loadSigningKey(ctx context.Context, dataDir string, st *sqlite.Store) (*signing.Holder, error) {
-	server := settings.Store{DB: st.Server()}
-	kid, _ := server.Get(ctx, signingKeyUsedKey, "").(string)
-	key, err := signing.Load(dataDir, kid != "")
-	if err != nil {
-		return nil, err
-	}
-	if kid == "" {
-		if err := server.Set(ctx, signingKeyUsedKey, key.KID()); err != nil {
-			return nil, err
-		}
-	} else if kid != key.KID() {
-		slog.Warn("the signing key file is not the key this server used before", "recorded", kid, "file", key.KID())
-	}
-	return signing.NewHolder(key), nil
+	return nil
 }

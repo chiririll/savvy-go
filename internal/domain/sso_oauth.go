@@ -13,12 +13,12 @@ import (
 	"strings"
 )
 
-func (s SSO) CallbackURL(p IdentityProvider) string {
-	return strings.TrimRight(s.AppURL, "/") + "/api/auth/sso/" + p.Slug + "/callback"
+func (s SSO) CallbackURL(ctx context.Context, p IdentityProvider) string {
+	return s.AppURL() + "/api/auth/sso/" + p.Slug + "/callback"
 }
 
-func (s SSO) ACSURL(p IdentityProvider) string {
-	return strings.TrimRight(s.AppURL, "/") + "/api/auth/sso/" + p.Slug + "/acs"
+func (s SSO) ACSURL(ctx context.Context, p IdentityProvider) string {
+	return s.AppURL() + "/api/auth/sso/" + p.Slug + "/acs"
 }
 
 func (s SSO) AuthorizeURL(ctx context.Context, p IdentityProvider, redirectAfter string) (string, error) {
@@ -33,7 +33,7 @@ func (s SSO) AuthorizeURL(ctx context.Context, p IdentityProvider, redirectAfter
 		u, _ := url.Parse("https://github.com/login/oauth/authorize")
 		q := u.Query()
 		q.Set("client_id", cfgString(p.Config, "client_id"))
-		q.Set("redirect_uri", s.CallbackURL(p))
+		q.Set("redirect_uri", s.CallbackURL(ctx, p))
 		q.Set("response_type", "code")
 		q.Set("scope", "read:user user:email")
 		q.Set("state", state)
@@ -58,7 +58,7 @@ func (s SSO) AuthorizeURL(ctx context.Context, p IdentityProvider, redirectAfter
 	}
 	q := u.Query()
 	q.Set("client_id", cfgString(p.Config, "client_id"))
-	q.Set("redirect_uri", s.CallbackURL(p))
+	q.Set("redirect_uri", s.CallbackURL(ctx, p))
 	q.Set("response_type", "code")
 	q.Set("scope", strings.Join(scopes, " "))
 	q.Set("state", state)
@@ -126,7 +126,7 @@ func (s SSO) githubIdentity(ctx context.Context, p IdentityProvider, code string
 	form := url.Values{}
 	form.Set("grant_type", "authorization_code")
 	form.Set("code", code)
-	form.Set("redirect_uri", s.CallbackURL(p))
+	form.Set("redirect_uri", s.CallbackURL(ctx, p))
 	form.Set("client_id", cfgString(p.Config, "client_id"))
 	form.Set("client_secret", secretString(p.Secrets, "client_secret"))
 	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, "https://github.com/login/oauth/access_token", strings.NewReader(form.Encode()))
@@ -183,7 +183,7 @@ func (s SSO) oidcIdentity(ctx context.Context, p IdentityProvider, code, verifie
 	form := url.Values{}
 	form.Set("grant_type", "authorization_code")
 	form.Set("code", code)
-	form.Set("redirect_uri", s.CallbackURL(p))
+	form.Set("redirect_uri", s.CallbackURL(ctx, p))
 	form.Set("client_id", cfgString(p.Config, "client_id"))
 	form.Set("client_secret", secretString(p.Secrets, "client_secret"))
 	if verifier != "" {
@@ -325,7 +325,7 @@ func (s SSO) TestConnection(ctx context.Context, p IdentityProvider) error {
 		_, err := s.discover(ctx, p)
 		return err
 	case "saml":
-		_ = s.SamlMetadata(p)
+		_ = s.SamlMetadata(ctx, p)
 		return nil
 	default:
 		return nil

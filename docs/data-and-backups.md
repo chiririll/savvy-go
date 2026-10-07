@@ -2,7 +2,7 @@
 
 ## Data directory
 
-Everything lives in one directory: `/data` in Docker, `/var/lib/savvy-go` for the Debian package, `./data` from source, or `DATA_DIR`. Back up or move it to move the whole instance.
+Everything lives in one directory: `/data` in Docker, `/var/lib/savvy-go` for the Debian package, `./data` from source. Back up or move it to move the whole instance.
 
 ```
 server.sqlite          users, sessions, spaces, members, server settings

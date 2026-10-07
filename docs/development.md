@@ -8,9 +8,9 @@ go test ./...
 go run ./cmd/savvy-go
 ```
 
-Listens on `:8080` (`LISTEN_ADDR`). Data goes to `./data` (`DATA_DIR`), see [Data and backups](data-and-backups.md). The frontend is served from `public/` (`PUBLIC_DIR`).
+Listens on `localhost:8080`. Data and the generated `config.toml` go to `./data`, see [Data and backups](data-and-backups.md) and [Configuration](deployment.md#configuration). The frontend is served from `public/`.
 
-With `SEED_DEMO=true`, the first boot creates demo users, three spaces with ~12 months of data, linked spaces and open invitations:
+With `--seed-config <file>` (any TOML file, even an empty one), the first boot creates demo users, three spaces with ~12 months of data, linked spaces and open invitations:
 
 | Email              | Password   | Server role |
 |--------------------|------------|-------------|
@@ -21,7 +21,7 @@ With `SEED_DEMO=true`, the first boot creates demo users, three spaces with ~12 
 
 Roles differ per space, so each user sees a different view.
 
-`SEED_DATE` (`YYYY-MM-DD`) places the data relative to that day instead of today. `SEED_MANIFEST` is a file the seed writes users, spaces and invitation tokens to; [Scripts](scripts.md) uses it.
+In the seed config file, `date` (`YYYY-MM-DD`) places the data relative to that day instead of today. `manifest` is a file the seed writes users, spaces and invitation tokens to; [Scripts](scripts.md) uses it.
 
 ## Architecture
 

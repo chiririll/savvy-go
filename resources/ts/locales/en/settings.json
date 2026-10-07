@@ -27,6 +27,13 @@
             "verifiedEmailOn": "New SSO sign-ups must arrive with an email the provider has verified.",
             "verifiedEmailOff": "Turn on just-in-time provisioning to enforce this."
         },
+        "server": {
+            "title": "Server",
+            "description": "How this instance is reached from outside.",
+            "appUrl": "Public URL",
+            "appUrlDescription": "Full address users open Savvy at, for example https://savvy.example.com. Required for SSO and passkeys; leave empty to use the APP_URL environment variable.",
+            "appUrlPlaceholder": "https://savvy.example.com"
+        },
         "spaces": {
             "title": "Spaces",
             "description": "Limits for spaces and invitations.",

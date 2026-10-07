@@ -28,14 +28,11 @@ COPY internal ./internal
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath \
-    -ldflags="-s -w -X savvy-go/internal/version.Value=${APP_VERSION} -X savvy-go/internal/version.Env=${APP_ENV}" \
+    -ldflags="-s -w -X savvy-go/internal/config.DefaultListen=:80 -X savvy-go/internal/version.Value=${APP_VERSION} -X savvy-go/internal/version.Env=${APP_ENV}" \
     -o /out/savvy-go ./cmd/savvy-go
 
 # Build the final image
 FROM alpine:3.22
-ENV DATA_DIR=/data \
-    PUBLIC_DIR=/public \
-    LISTEN_ADDR=:80
 # wget (used by the healthcheck) is provided by busybox
 RUN apk upgrade --no-cache \
     && apk add --no-cache ca-certificates tzdata libcap \

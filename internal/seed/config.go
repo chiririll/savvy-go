@@ -1,35 +1,43 @@
 package seed
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
-	"strings"
 	"time"
+
+	"github.com/pelletier/go-toml/v2"
 
 	"savvy-go/internal/domain"
 	"savvy-go/internal/store"
 )
 
-// Config says whether and how to seed the demo data. It is read from the
-// environment apart from the rest of the server's configuration.
+// Config says how to seed the demo data. It is read from the file named by
+// the --seed-config flag (TOML); every key is optional.
 type Config struct {
-	// Enabled is SEED_DEMO: seed on first boot.
-	Enabled bool
-	// Date is SEED_DATE (YYYY-MM-DD): the day the data is placed relative to, the
-	// current day when empty. Pin it to seed the same data on any day.
-	Date string
-	// Manifest is SEED_MANIFEST: a file to write what was seeded to, if any.
-	Manifest string
+	// Enabled seeds on first boot; it is set when a file is given.
+	Enabled bool `toml:"-"`
+	// Date (YYYY-MM-DD) is the day the data is placed relative to, the current
+	// day when empty. Pin it to seed the same data on any day.
+	Date string `toml:"date"`
+	// Manifest is a file to write what was seeded to, if any.
+	Manifest string `toml:"manifest"`
 }
 
-// ConfigFromEnv reads SEED_DEMO, SEED_DATE and SEED_MANIFEST.
-func ConfigFromEnv() Config {
-	return Config{
-		Enabled:  truthy(os.Getenv("SEED_DEMO")),
-		Date:     strings.TrimSpace(os.Getenv("SEED_DATE")),
-		Manifest: strings.TrimSpace(os.Getenv("SEED_MANIFEST")),
+// LoadConfig reads a seed config file; unknown keys are an error.
+func LoadConfig(path string) (Config, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return Config{}, fmt.Errorf("read seed config: %w", err)
 	}
+	c := Config{Enabled: true}
+	dec := toml.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&c); err != nil {
+		return Config{}, fmt.Errorf("parse %s: %w", path, err)
+	}
+	return c, nil
 }
 
 // Run seeds the demo data as cfg says (see Demo) and writes the manifest.
@@ -68,13 +76,4 @@ func (c Config) now(loc *time.Location) (time.Time, error) {
 		return time.Time{}, fmt.Errorf("seed date %q: want YYYY-MM-DD", c.Date)
 	}
 	return d.Add(12 * time.Hour), nil
-}
-
-func truthy(v string) bool {
-	switch strings.ToLower(strings.TrimSpace(v)) {
-	case "1", "true", "yes", "on":
-		return true
-	default:
-		return false
-	}
 }

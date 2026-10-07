@@ -1,6 +1,6 @@
 // Screenshots every page of a running app, per seeded user, space and viewport.
 //
-// The app must be seeded with SEED_DEMO=true and SEED_MANIFEST (see
+// The app must be seeded with `--seed-config` with a `manifest` (see
 // internal/seed/manifest.go); the manifest says who can sign in, which spaces
 // exist and which ids the parametrised pages need. See docs/scripts.md.
 //

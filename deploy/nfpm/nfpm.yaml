@@ -15,7 +15,7 @@ description: |-
   Selfhosted expense tracker with multi-currency support.
   .
   Installs the Go Savvy binary, static SPA assets, and a systemd unit.
-  SQLite data lives in /var/lib/savvy-go.
+  SQLite data lives in /var/lib/savvy-go, the config in /etc/savvy-go/config.toml.
 
 contents:
   - src: ../../dist/savvy-go
@@ -23,13 +23,16 @@ contents:
     file_info:
       mode: 0755
   - src: ../../dist/public
-    dst: /opt/savvy-go/public
+    dst: /usr/share/savvy-go/public
     type: tree
   - src: ../../dist/stage/savvy-go.service
     dst: /usr/lib/systemd/system/savvy-go.service
-  - src: install.env
-    dst: /etc/savvy-go/install.env
-    type: config|noreplace
+  - dst: /etc/savvy-go
+    type: dir
+    file_info:
+      mode: 0750
+      owner: "@APP_USER@"
+      group: "@APP_USER@"
   - dst: /var/lib/savvy-go
     type: dir
     file_info:
