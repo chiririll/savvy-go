@@ -35,7 +35,6 @@ import { useOverviewMetrics } from '@/hooks/use-reports'
 import { cn, formatCurrency, formatDateLocal, formatYearMonth, addDaysLocal } from '@/lib/utils'
 import { BalanceDynamicsChart } from '@/components/features/accounts/BalanceDynamicsChart'
 import { TransactionRow, useCreateTransactionDialog } from '@/components/features/transactions'
-import { localizeDefaultName } from '@/lib/localized-name'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import ReactECharts from '@/components/shared/ReactECharts'
@@ -224,7 +223,7 @@ export default function DashboardPage() {
         const data = expensesByCategory.data
             .filter((c) => (c.totalAmount ?? 0) > 0)
             .map((c, i) => ({
-                name: localizeDefaultName(c.name),
+                name: c.name,
                 value: c.totalAmount ?? 0,
                 itemStyle: { color: c.color || CATEGORY_COLORS[i % CATEGORY_COLORS.length] },
             }))
@@ -618,7 +617,7 @@ export default function DashboardPage() {
                                         <p className="text-xs text-muted-foreground mt-1">
                                             {budget.isGlobal
                                                 ? t('dashboard.allExpenses')
-                                                : budget.categories.map(c => localizeDefaultName(c.name)).join(', ') || t('dashboard.noCategories')}
+                                                : budget.categories.map(c => c.name).join(', ') || t('dashboard.noCategories')}
                                         </p>
                                     </Link>
                                 )

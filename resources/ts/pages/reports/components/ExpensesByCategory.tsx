@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn, formatCurrency } from '@/lib/utils'
-import { localizeDefaultName } from '@/lib/localized-name'
 import { TrendingUp, TrendingDown, AlertTriangle, ChevronRight } from 'lucide-react'
 import { useExpensesByCategory } from '@/hooks'
 import type { ReportFilters } from '../types'
@@ -82,7 +81,7 @@ export function ExpensesByCategory({ filters }: ExpensesByCategoryProps) {
                                     </div>
 
                                     <div className="flex min-w-0 flex-1 items-center gap-2">
-                                        <span className="font-medium text-sm truncate">{localizeDefaultName(category.name)}</span>
+                                        <span className="font-medium text-sm truncate">{category.name}</span>
                                         {isAnomalous && filters.compareWith !== 'none' && (
                                             <AlertTriangle className="size-4 shrink-0 text-amber-500" />
                                         )}

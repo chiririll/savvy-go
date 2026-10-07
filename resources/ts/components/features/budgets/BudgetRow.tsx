@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next'
 import { FeedProgress, FeedRow, progressAmounts, RowActions, type FeedGroupKey } from '@/components/shared'
 import { categoryIconStyle } from '@/lib/category-color'
 import i18n from '@/lib/i18n'
-import { localizeDefaultName } from '@/lib/localized-name'
 import { Budget, BudgetPeriod } from '@/types'
 import { budgetPeriodLabelLoose } from '@/lib/labels'
 
@@ -55,7 +54,7 @@ export function BudgetRow({ budget, onEdit, onDelete, isReadOnly }: BudgetRowPro
     const color = budget.categories.find((category) => category.color)?.color
     const scope = budget.isGlobal
         ? t('budgets.allExpenses')
-        : budget.categories.map((category) => localizeDefaultName(category.name)).join(', ')
+        : budget.categories.map((category) => category.name).join(', ')
 
     return (
         <FeedRow

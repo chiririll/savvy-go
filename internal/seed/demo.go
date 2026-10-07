@@ -23,34 +23,34 @@ const (
 )
 
 var merchants = map[string][]string{
-	"#GROCERIES":     {"Whole Foods Market", "Trader Joe's", "Costco Wholesale", "Walmart", "Kroger", "Aldi", "Target", "Safeway"},
-	"#TRANSPORT":     {"Shell", "BP", "Chevron", "Uber", "Lyft", "Metro Transit", "ParkMobile", "Jiffy Lube"},
-	"#DINING":        {"Starbucks", "Chipotle Mexican Grill", "McDonald's", "Olive Garden", "Subway", "Domino's Pizza", "Panera Bread", "Five Guys"},
-	"#ENTERTAINMENT": {"AMC Theatres", "Steam", "PlayStation Store", "Ticketmaster", "Netflix", "Spotify"},
-	"#SHOPPING":      {"Amazon", "Best Buy", "IKEA", "Nike", "Apple Store", "Zara", "H&M", "Home Depot"},
-	"#HEALTH":        {"CVS Pharmacy", "Walgreens", "City Medical Clinic", "Planet Fitness", "LA Fitness", "Quest Diagnostics"},
-	"#PERSONAL_CARE": {"Supercuts", "Sephora", "Ulta Beauty", "The Barber Shop"},
-	"#GIFTS":         {"Etsy", "Amazon", "Tiffany & Co.", "Local Florist"},
-	"#TRAVEL":        {"Booking.com", "Airbnb", "Delta Air Lines", "Marriott", "Expedia", "Hertz"},
-	"#UTILITIES":     {"ConEdison", "AT&T", "Xfinity", "National Grid", "Verizon Wireless"},
-	"#HOUSING":       {"IKEA", "Home Depot", "Bed Bath & Beyond"},
-	"#OTHER":         {"PayPal", "Venmo", "Cash Withdrawal", "Square"},
+	"Groceries":        {"Whole Foods Market", "Trader Joe's", "Costco Wholesale", "Walmart", "Kroger", "Aldi", "Target", "Safeway"},
+	"Transport":        {"Shell", "BP", "Chevron", "Uber", "Lyft", "Metro Transit", "ParkMobile", "Jiffy Lube"},
+	"Dining & takeout": {"Starbucks", "Chipotle Mexican Grill", "McDonald's", "Olive Garden", "Subway", "Domino's Pizza", "Panera Bread", "Five Guys"},
+	"Entertainment":    {"AMC Theatres", "Steam", "PlayStation Store", "Ticketmaster", "Netflix", "Spotify"},
+	"Shopping":         {"Amazon", "Best Buy", "IKEA", "Nike", "Apple Store", "Zara", "H&M", "Home Depot"},
+	"Healthcare":       {"CVS Pharmacy", "Walgreens", "City Medical Clinic", "Planet Fitness", "LA Fitness", "Quest Diagnostics"},
+	"Personal care":    {"Supercuts", "Sephora", "Ulta Beauty", "The Barber Shop"},
+	"Gifts":            {"Etsy", "Amazon", "Tiffany & Co.", "Local Florist"},
+	"Travel":           {"Booking.com", "Airbnb", "Delta Air Lines", "Marriott", "Expedia", "Hertz"},
+	"Utilities":        {"ConEdison", "AT&T", "Xfinity", "National Grid", "Verizon Wireless"},
+	"Home":             {"IKEA", "Home Depot", "Bed Bath & Beyond"},
+	"Other":            {"PayPal", "Venmo", "Cash Withdrawal", "Square"},
 }
 
 var catalogs = map[string][]string{
-	"#GROCERIES":     {"Organic Bananas", "Whole Milk", "Sourdough Bread", "Free-range Eggs", "Chicken Breast", "Avocados", "Greek Yogurt", "Baby Spinach", "Ground Coffee", "Cheddar Cheese", "Pasta", "Olive Oil", "Roma Tomatoes", "Atlantic Salmon", "Brown Rice", "Butter", "Orange Juice", "Granola"},
-	"#DINING":        {"Latte", "Avocado Toast", "Caesar Salad", "Burger Combo", "Iced Americano", "Chicken Bowl", "Fries", "Cheesecake", "Iced Tea", "Soup of the Day", "Fish Tacos", "Espresso"},
-	"#TRANSPORT":     {"Regular Gasoline", "Premium Gasoline", "Airport Parking", "Car Wash", "Metro Day Pass", "Oil Change", "Tire Rotation", "Tolls"},
-	"#SHOPPING":      {"Cotton T-Shirt", "Wireless Earbuds", "Desk Lamp", "Running Shorts", "Phone Case", "Notebook Set", "Kitchen Towels", "HDMI Cable", "Sneakers", "Backpack"},
-	"#ENTERTAINMENT": {"Movie Ticket", "Popcorn Combo", "Game Download", "Arcade Tokens", "Concert Ticket", "Streaming Rental", "Base Plan"},
-	"#HEALTH":        {"Prescription Refill", "Vitamin D", "Ibuprofen", "Allergy Test", "Contact Lenses", "First Aid Kit", "Protein Powder"},
-	"#PERSONAL_CARE": {"Haircut", "Shampoo", "Face Moisturizer", "Toothpaste", "Sunscreen", "Nail Polish", "Beard Oil"},
-	"#TRAVEL":        {"Hotel Night", "Airport Transfer", "City Museum Pass", "Travel Adapter", "Bottled Water", "Snack Box", "Souvenir"},
-	"#GIFTS":         {"Greeting Card", "Gift Wrap", "Scented Candle", "Chocolate Box", "Bouquet", "Mug"},
-	"#UTILITIES":     {"Electricity Usage", "Delivery Charge", "Service Fee"},
-	"#HOUSING":       {"Shelf brackets", "Light bulbs", "Paint", "Towels"},
-	"#RENT":          {"Base Rent"},
-	"#OTHER":         {"Service Fee", "Convenience Charge", "Misc. Purchase", "Packaging"},
+	"Groceries":        {"Organic Bananas", "Whole Milk", "Sourdough Bread", "Free-range Eggs", "Chicken Breast", "Avocados", "Greek Yogurt", "Baby Spinach", "Ground Coffee", "Cheddar Cheese", "Pasta", "Olive Oil", "Roma Tomatoes", "Atlantic Salmon", "Brown Rice", "Butter", "Orange Juice", "Granola"},
+	"Dining & takeout": {"Latte", "Avocado Toast", "Caesar Salad", "Burger Combo", "Iced Americano", "Chicken Bowl", "Fries", "Cheesecake", "Iced Tea", "Soup of the Day", "Fish Tacos", "Espresso"},
+	"Transport":        {"Regular Gasoline", "Premium Gasoline", "Airport Parking", "Car Wash", "Metro Day Pass", "Oil Change", "Tire Rotation", "Tolls"},
+	"Shopping":         {"Cotton T-Shirt", "Wireless Earbuds", "Desk Lamp", "Running Shorts", "Phone Case", "Notebook Set", "Kitchen Towels", "HDMI Cable", "Sneakers", "Backpack"},
+	"Entertainment":    {"Movie Ticket", "Popcorn Combo", "Game Download", "Arcade Tokens", "Concert Ticket", "Streaming Rental", "Base Plan"},
+	"Healthcare":       {"Prescription Refill", "Vitamin D", "Ibuprofen", "Allergy Test", "Contact Lenses", "First Aid Kit", "Protein Powder"},
+	"Personal care":    {"Haircut", "Shampoo", "Face Moisturizer", "Toothpaste", "Sunscreen", "Nail Polish", "Beard Oil"},
+	"Travel":           {"Hotel Night", "Airport Transfer", "City Museum Pass", "Travel Adapter", "Bottled Water", "Snack Box", "Souvenir"},
+	"Gifts":            {"Greeting Card", "Gift Wrap", "Scented Candle", "Chocolate Box", "Bouquet", "Mug"},
+	"Utilities":        {"Electricity Usage", "Delivery Charge", "Service Fee"},
+	"Home":             {"Shelf brackets", "Light bulbs", "Paint", "Towels"},
+	"Rent":             {"Base Rent"},
+	"Other":            {"Service Fee", "Convenience Charge", "Misc. Purchase", "Packaging"},
 }
 
 type seeder struct {
@@ -208,10 +208,10 @@ func (s *seeder) createTransactions(accounts map[string]*domain.Account, expense
 }
 
 func (s *seeder) seedIncome(accounts map[string]*domain.Account, incomes []domain.Category) error {
-	salary := catByName(incomes, "#SALARY")
-	freelance := catByName(incomes, "#FREELANCE")
-	investments := catByName(incomes, "#INVESTMENTS")
-	other := catByName(incomes, "#OTHER_INCOME")
+	salary := catByName(incomes, "Salary")
+	freelance := catByName(incomes, "Freelance")
+	investments := catByName(incomes, "Investments")
+	other := catByName(incomes, "Other income")
 	baseSalary := 6400.0
 
 	for cursor := s.start; !cursor.After(s.end); cursor = addMonthsNoOverflow(cursor, 1) {
@@ -267,9 +267,9 @@ func (s *seeder) seedIncome(accounts map[string]*domain.Account, incomes []domai
 }
 
 func (s *seeder) seedFixedExpenses(accounts map[string]*domain.Account, expenses []domain.Category) error {
-	rent := catByName(expenses, "#RENT")
-	utilities := catByName(expenses, "#UTILITIES")
-	entertainment := catByName(expenses, "#ENTERTAINMENT")
+	rent := catByName(expenses, "Rent")
+	utilities := catByName(expenses, "Utilities")
+	entertainment := catByName(expenses, "Entertainment")
 	subs := []struct {
 		name  string
 		price float64
@@ -332,9 +332,9 @@ func (s *seeder) seedVariableExpenses(accounts map[string]*domain.Account, expen
 		name string
 		w    int
 	}{
-		{"#GROCERIES", 22}, {"#DINING", 20}, {"#TRANSPORT", 16},
-		{"#SHOPPING", 12}, {"#ENTERTAINMENT", 9}, {"#HEALTH", 6}, {"#PERSONAL_CARE", 5},
-		{"#TRAVEL", 3}, {"#HOUSING", 2}, {"#GIFTS", 2}, {"#OTHER", 2},
+		{"Groceries", 22}, {"Dining & takeout", 20}, {"Transport", 16},
+		{"Shopping", 12}, {"Entertainment", 9}, {"Healthcare", 6}, {"Personal care", 5},
+		{"Travel", 3}, {"Home", 2}, {"Gifts", 2}, {"Other", 2},
 	}
 	var pool []domain.Category
 	for _, w := range weights {
@@ -348,10 +348,10 @@ func (s *seeder) seedVariableExpenses(accounts map[string]*domain.Account, expen
 		return nil
 	}
 	ranges := map[string][2]int{
-		"#GROCERIES": {18, 145}, "#DINING": {9, 70}, "#TRANSPORT": {4, 65},
-		"#SHOPPING": {15, 240}, "#ENTERTAINMENT": {12, 95}, "#HEALTH": {10, 160},
-		"#PERSONAL_CARE": {15, 85}, "#TRAVEL": {120, 950}, "#HOUSING": {25, 180},
-		"#GIFTS": {20, 180}, "#OTHER": {10, 120},
+		"Groceries": {18, 145}, "Dining & takeout": {9, 70}, "Transport": {4, 65},
+		"Shopping": {15, 240}, "Entertainment": {12, 95}, "Healthcare": {10, 160},
+		"Personal care": {15, 85}, "Travel": {120, 950}, "Home": {25, 180},
+		"Gifts": {20, 180}, "Other": {10, 120},
 	}
 	vacation := tagByName(tags, "Vacation")
 	essential := tagByName(tags, "Essential")
@@ -373,7 +373,7 @@ func (s *seeder) seedVariableExpenses(accounts map[string]*domain.Account, expen
 		count := int(math.Round(float64(s.mtRand(lo, hi)) * seasonal))
 		for i := 0; i < count; i++ {
 			cat := pool[s.rng.Intn(len(pool))]
-			if cat.Name == "#TRAVEL" && s.mtRand(1, 100) > 12 {
+			if cat.Name == "Travel" && s.mtRand(1, 100) > 12 {
 				continue
 			}
 			r := ranges[cat.Name]
@@ -384,21 +384,21 @@ func (s *seeder) seedVariableExpenses(accounts map[string]*domain.Account, expen
 			merchant := s.merchantFor(cat.Name)
 			acct := accounts["checking"]
 			switch {
-			case cat.Name == "#TRAVEL" && accounts["eur"] != nil && s.mtRand(0, 1) == 1:
+			case cat.Name == "Travel" && accounts["eur"] != nil && s.mtRand(0, 1) == 1:
 				acct = accounts["eur"]
-			case inList(cat.Name, "#GROCERIES", "#SHOPPING", "#TRAVEL", "#HEALTH") && s.mtRand(1, 100) <= 60:
+			case inList(cat.Name, "Groceries", "Shopping", "Travel", "Healthcare") && s.mtRand(1, 100) <= 60:
 				acct = accounts["credit"]
 			case amount < 25 && s.mtRand(1, 100) <= 35:
 				acct = accounts["cash"]
 			}
 			var tagIDs []int64
-			if cat.Name == "#TRAVEL" && vacation != nil {
+			if cat.Name == "Travel" && vacation != nil {
 				tagIDs = append(tagIDs, vacation.ID)
 			}
-			if inList(cat.Name, "#GROCERIES", "#HEALTH") && essential != nil && s.mtRand(1, 100) <= 35 {
+			if inList(cat.Name, "Groceries", "Healthcare") && essential != nil && s.mtRand(1, 100) <= 35 {
 				tagIDs = append(tagIDs, essential.ID)
 			}
-			if cat.Name == "#HOUSING" && business != nil && s.mtRand(1, 100) <= 20 {
+			if cat.Name == "Home" && business != nil && s.mtRand(1, 100) <= 20 {
 				tagIDs = append(tagIDs, business.ID)
 			}
 			if err := s.addTx("expense", acct.ID, &cat.ID, amount, merchant, cursor, nil, nil, tagIDs); err != nil {
@@ -473,11 +473,11 @@ func (s *seeder) seedPending(accounts map[string]*domain.Account, expenses []dom
 		desc       string
 		estimated  bool // the amount is a guess until the real bill arrives
 	}{
-		{-3, "checking", "#HEALTH", 85, "Dentist appointment — City Medical Clinic", false},
-		{1, "credit", "#GIFTS", 55, "Birthday gift — Etsy", false},
-		{3, "checking", "#UTILITIES", 115, "ConEdison — electricity bill (estimate)", true},
-		{5, "checking", "#TRANSPORT", 145, "Car insurance — GEICO", false},
-		{9, "checking", "#SHOPPING", 64.50, "Amazon — scheduled order", false},
+		{-3, "checking", "Healthcare", 85, "Dentist appointment — City Medical Clinic", false},
+		{1, "credit", "Gifts", 55, "Birthday gift — Etsy", false},
+		{3, "checking", "Utilities", 115, "ConEdison — electricity bill (estimate)", true},
+		{5, "checking", "Transport", 145, "Car insurance — GEICO", false},
+		{9, "checking", "Shopping", 64.50, "Amazon — scheduled order", false},
 	} {
 		acct := accounts[p.acct]
 		if acct == nil {
@@ -518,7 +518,7 @@ func (s *seeder) seedTransactionItems() error {
 	for _, cand := range s.expenses[:target] {
 		catName := cand.catName
 		if catName == "" {
-			catName = "#OTHER"
+			catName = "Other"
 		}
 		items := s.randomItems(cand.amount, catName)
 		cents := money.Unit{Decimals: 2} // the demo prices items in cents
@@ -537,7 +537,7 @@ func (s *seeder) seedTransactionItems() error {
 func (s *seeder) randomItems(amount float64, category string) []domain.TxItemInput {
 	catalog := catalogs[category]
 	if len(catalog) == 0 {
-		catalog = catalogs["#OTHER"]
+		catalog = catalogs["Other"]
 	}
 	remainingCents := int(math.Round(amount * 100))
 	if remainingCents < 1 {
@@ -589,9 +589,9 @@ func (s *seeder) createBudgets(usd *domain.Currency, expenses []domain.Category,
 		notify int
 	}
 	for _, b := range []named{
-		{"Groceries", 750, "#GROCERIES", 80},
-		{"Dining Out", 450, "#DINING", 90},
-		{"Fun Money", 300, "#ENTERTAINMENT", 100},
+		{"Groceries", 750, "Groceries", 80},
+		{"Dining Out", 450, "Dining & takeout", 90},
+		{"Fun Money", 300, "Entertainment", 100},
 	} {
 		cat := catByName(expenses, b.cat)
 		if cat == nil {
@@ -628,7 +628,7 @@ func (s *seeder) createBudgets(usd *domain.Currency, expenses []domain.Category,
 }
 
 func (s *seeder) createRecurring(accounts map[string]*domain.Account, expenses, incomes []domain.Category) error {
-	if salary := catByName(incomes, "#SALARY"); salary != nil {
+	if salary := catByName(incomes, "Salary"); salary != nil {
 		day := 5
 		if _, err := s.recur.Create(s.ctx, domain.RecurringInput{
 			Type: "income", AccountID: accounts["checking"].ID, CategoryID: &salary.ID,
@@ -639,7 +639,7 @@ func (s *seeder) createRecurring(accounts map[string]*domain.Account, expenses, 
 			return err
 		}
 	}
-	if rent := catByName(expenses, "#RENT"); rent != nil {
+	if rent := catByName(expenses, "Rent"); rent != nil {
 		day := 1
 		next := startOfMonth(s.now.AddDate(0, 1, 0)).Format("2006-01-02")
 		if _, err := s.recur.Create(s.ctx, domain.RecurringInput{
@@ -650,7 +650,7 @@ func (s *seeder) createRecurring(accounts map[string]*domain.Account, expenses, 
 			return err
 		}
 	}
-	if subs := catByName(expenses, "#ENTERTAINMENT"); subs != nil {
+	if subs := catByName(expenses, "Entertainment"); subs != nil {
 		// Always due within the coming week so upcoming recurring is visible.
 		due := s.now.AddDate(0, 0, 2)
 		day := due.Day()

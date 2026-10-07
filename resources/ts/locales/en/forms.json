@@ -27,7 +27,6 @@
         "namePlaceholder": "Groceries",
         "preview": "Preview:",
         "previewName": "Category name",
-        "defaultNameHelp": "Built-in category. Leave the name unchanged to keep it translated with the interface language.",
         "typeDefaultHelp": "The default category's type can't be changed. Set another category as default first."
     },
     "tags": {

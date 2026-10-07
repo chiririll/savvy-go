@@ -7,10 +7,9 @@ import {
     transactionSubtitle,
 } from './transaction-description'
 
-// Echoes keys so the tests see which message was picked; SALARY is the only translated default name.
+// Echoes keys so the tests see which message was picked.
 vi.mock('@/lib/i18n', () => ({
     default: {
-        exists: (key: string) => key === 'categories.SALARY',
         t: (key: string, options?: { name?: string }) => (options?.name ? `${key}(${options.name})` : key),
     },
 }))
@@ -52,7 +51,6 @@ describe('displayTransactionDescription', () => {
     })
 
     it('falls back to the category, then to the type', () => {
-        expect(displayTransactionDescription(tx({ category: { name: '#SALARY' } }))).toBe('categories.SALARY')
         expect(displayTransactionDescription(tx({ category: { name: 'Taxi' } }))).toBe('Taxi')
         expect(displayTransactionDescription(tx({ type: 'income' }))).toBe('pages:transactions.types.income')
     })
@@ -61,7 +59,6 @@ describe('displayTransactionDescription', () => {
 describe('transactionSubtitle', () => {
     it('joins the account and the category', () => {
         expect(transactionSubtitle({ account, category: { name: 'Taxi' } } as unknown as Transaction)).toBe('Cash · Taxi')
-        expect(transactionSubtitle({ account, category: { name: '#SALARY' } } as unknown as Transaction)).toBe('Cash · categories.SALARY')
     })
 
     it('shows only the account without a category', () => {

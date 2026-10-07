@@ -1,17 +1,16 @@
 import type { TFunction } from 'i18next'
 import i18n, { intlLocale } from '@/lib/i18n'
-import { localizeDefaultName } from '@/lib/localized-name'
 import { formatYearMonth, parseDateKey } from '@/lib/dates'
 import type { CashFlowGroupBy } from '@/api/reports'
 
 const SAVINGS_NODE_IDS = new Set(['__savings__', 'Savings', 'messages.reports.savings'])
 
 export function dynamicsSeriesName(id: number, fallbackName: string, t: TFunction): string {
-    return id === 0 ? t('reports.series.total') : localizeDefaultName(fallbackName)
+    return id === 0 ? t('reports.series.total') : fallbackName
 }
 
 export function localizeSavingsNodeName(name: string, t: TFunction): string {
-    return SAVINGS_NODE_IDS.has(name) ? t('reports.series.savings') : localizeDefaultName(name)
+    return SAVINGS_NODE_IDS.has(name) ? t('reports.series.savings') : name
 }
 
 /** ISO-8601 week number (Carbon weekOfYear). */

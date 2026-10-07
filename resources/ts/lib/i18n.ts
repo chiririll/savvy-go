@@ -11,7 +11,6 @@ import enAuth from '@/locales/en/auth.json'
 import enSettings from '@/locales/en/settings.json'
 import enPages from '@/locales/en/pages.json'
 import enForms from '@/locales/en/forms.json'
-import enDefaults from '@/locales/en/defaults.json'
 
 export const SUPPORTED_LOCALES = ['en', 'ru'] as const
 export type AppLocale = (typeof SUPPORTED_LOCALES)[number]
@@ -27,7 +26,7 @@ export function isAppLocale(value: string): value is AppLocale {
     return (SUPPORTED_LOCALES as readonly string[]).includes(value)
 }
 
-const I18N_NAMESPACES = ['common', 'nav', 'auth', 'settings', 'pages', 'forms', 'defaults'] as const
+const I18N_NAMESPACES = ['common', 'nav', 'auth', 'settings', 'pages', 'forms'] as const
 
 /** BCP 47 tag for Intl formatters. */
 export function intlLocale(locale: string = i18n.resolvedLanguage ?? i18n.language): string {
@@ -76,7 +75,7 @@ export const i18nReady = i18n
     .use(initReactI18next)
     .init({
         resources: {
-            en: { common: enCommon, nav: enNav, auth: enAuth, settings: enSettings, pages: enPages, forms: enForms, defaults: enDefaults },
+            en: { common: enCommon, nav: enNav, auth: enAuth, settings: enSettings, pages: enPages, forms: enForms },
         },
         partialBundledLanguages: true,
         fallbackLng: 'en',

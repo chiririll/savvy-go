@@ -1,7 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { FeedRow } from '@/components/shared'
 import { categoryIconStyle } from '@/lib/category-color'
-import { localizeDefaultName } from '@/lib/localized-name'
 
 interface CategoryPreviewProps {
     name: string
@@ -19,7 +18,7 @@ export function CategoryPreview({ name, icon, color }: CategoryPreviewProps) {
             <FeedRow
                 icon={<span aria-hidden>{icon}</span>}
                 iconStyle={categoryIconStyle(color)}
-                title={localizeDefaultName(name) || t('categories.previewName')}
+                title={name || t('categories.previewName')}
             />
         </div>
     )

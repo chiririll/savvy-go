@@ -16,7 +16,6 @@ import {
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { categoryIconStyle } from '@/lib/category-color'
-import { localizeDefaultName } from '@/lib/localized-name'
 import { Category } from '@/types'
 import { categoryTypeLabel } from '@/lib/labels'
 
@@ -42,7 +41,7 @@ export function CategoryRow({
     deleteDisabledLabel,
 }: CategoryRowProps) {
     const { t } = useTranslation(['common', 'pages'])
-    const name = localizeDefaultName(category.name)
+    const name = category.name
     const canEdit = !!onEdit && !isReadOnly
     const canDelete = !!onDelete && !isReadOnly
     const canSetDefault = !!onSetDefault && !isReadOnly && !category.isDefault
@@ -105,7 +104,7 @@ interface ReassignDeleteItemProps {
 
 function ReassignDeleteItem({ category, onConfirm }: ReassignDeleteItemProps) {
     const { t } = useTranslation(['common', 'pages'])
-    const name = localizeDefaultName(category.name)
+    const name = category.name
     const count = category.transactionsCount ?? 0
     const [successorId, setSuccessorId] = useState<number | null>(null)
 

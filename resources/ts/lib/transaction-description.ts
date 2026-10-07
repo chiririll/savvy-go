@@ -1,5 +1,4 @@
 import i18n from '@/lib/i18n'
-import { localizeDefaultName } from '@/lib/localized-name'
 import type { Transaction, TransactionStatus, TransactionType } from '@/types/transactions'
 import { transactionTypeLabel } from '@/lib/labels'
 
@@ -32,7 +31,7 @@ export function displayTransactionDescription(
         case 'debt_borrow':
             return i18n.t('pages:transactions.fallback.borrow', { name })
         default:
-            return localizeDefaultName(transaction.category?.name) || transactionTypeLabel(i18n.t, transaction.type)
+            return transaction.category?.name || transactionTypeLabel(i18n.t, transaction.type)
     }
 }
 
@@ -41,7 +40,7 @@ export function transactionSubtitle(
 ): string {
     const accountName = transaction.account.name
     const categoryName = transaction.category
-        ? localizeDefaultName(transaction.category.name)
+        ? transaction.category.name
         : null
 
     return categoryName ? `${accountName} · ${categoryName}` : accountName

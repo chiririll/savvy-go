@@ -11,11 +11,9 @@ import {
     FormLabel,
     FormControl,
     FormMessage,
-    FormDescription,
 } from '@/components/ui/form'
 import { COLOR_OPTIONS } from '@/constants'
 import { categorySchema, CategoryFormData } from '@/schemas'
-import { defaultNameKey, localizeDefaultName, toStoredDefaultName } from '@/lib/localized-name'
 import { TypeSelector } from './TypeSelector'
 import { IconPicker } from './IconPicker'
 import { ColorPicker } from './ColorPicker'
@@ -51,13 +49,10 @@ export function CategoryForm({
             icon: '🏠',
             color: COLOR_OPTIONS[9], // blue-400
             ...defaultValues,
-            name: defaultValues?.name ? localizeDefaultName(defaultValues.name) : '',
         },
     })
 
     const watchedValues = form.watch()
-    const storedName = toStoredDefaultName(watchedValues.name ?? '', defaultValues?.name)
-    const isDefaultName = Boolean(defaultNameKey(storedName))
 
     useFormValuesChange(form, onValuesChange)
 
@@ -66,10 +61,7 @@ export function CategoryForm({
         <Form {...form}>
             <form
                 id={formId}
-                onSubmit={form.handleSubmit((data) => onSubmit({
-                    ...data,
-                    name: toStoredDefaultName(data.name, defaultValues?.name),
-                }))}
+                onSubmit={form.handleSubmit(onSubmit)}
                 className="space-y-4"
             >
                 <FormField
@@ -81,11 +73,6 @@ export function CategoryForm({
                             <FormControl>
                                 <Input placeholder={t('forms:categories.namePlaceholder')} {...field} />
                             </FormControl>
-                            {isDefaultName && (
-                                <FormDescription>
-                                    {t('forms:categories.defaultNameHelp')}
-                                </FormDescription>
-                            )}
                             <FormMessage />
                         </FormItem>
                     )}

@@ -59,7 +59,7 @@ func seedCurrencies(ctx context.Context, curs domain.Currencies, list []domain.C
 func seedCategories(ctx context.Context, cats domain.Categories) error {
 	for _, c := range defaultCategories {
 		icon, color := c.icon, c.color
-		isDefault := c.name == "#OTHER" || c.name == "#OTHER_INCOME"
+		isDefault := c.name == "Other" || c.name == "Other income"
 		if _, err := cats.Create(ctx, domain.Category{
 			Name: c.name, Type: c.typ, Icon: &icon, Color: &color, IsDefault: isDefault,
 		}); err != nil {
@@ -83,25 +83,25 @@ type seededCategory struct {
 }
 
 var defaultCategories = []seededCategory{
-	{"#RENT", "expense", "🏢", "#94a3b8"},
-	{"#HOUSING", "expense", "🏠", "#a78bfa"},
-	{"#UTILITIES", "expense", "⚡", "#fbbf24"},
-	{"#GROCERIES", "expense", "🛒", "#4ade80"},
-	{"#TRANSPORT", "expense", "🚗", "#60a5fa"},
-	{"#HEALTH", "expense", "🏥", "#f87171"},
-	{"#DINING", "expense", "🍽️", "#fb923c"},
-	{"#ENTERTAINMENT", "expense", "🎮", "#f472b6"},
-	{"#SHOPPING", "expense", "🛍️", "#2dd4bf"},
-	{"#PERSONAL_CARE", "expense", "✨", "#e879f9"},
-	{"#GIFTS", "expense", "🎁", "#fb7185"},
-	{"#TRAVEL", "expense", "✈️", "#38bdf8"},
-	{"#OTHER", "expense", "📌", "#94a3b8"},
-	{"#SALARY", "income", "💵", "#4ade80"},
-	{"#FREELANCE", "income", "💻", "#60a5fa"},
-	{"#INVESTMENTS", "income", "📈", "#a78bfa"},
-	{"#GIFTS_RECEIVED", "income", "🎀", "#f472b6"},
-	{"#REFUNDS", "income", "↩️", "#2dd4bf"},
-	{"#OTHER_INCOME", "income", "💰", "#94a3b8"},
+	{"Rent", "expense", "🏢", "#94a3b8"},
+	{"Home", "expense", "🏠", "#a78bfa"},
+	{"Utilities", "expense", "⚡", "#fbbf24"},
+	{"Groceries", "expense", "🛒", "#4ade80"},
+	{"Transport", "expense", "🚗", "#60a5fa"},
+	{"Healthcare", "expense", "🏥", "#f87171"},
+	{"Dining & takeout", "expense", "🍽️", "#fb923c"},
+	{"Entertainment", "expense", "🎮", "#f472b6"},
+	{"Shopping", "expense", "🛍️", "#2dd4bf"},
+	{"Personal care", "expense", "✨", "#e879f9"},
+	{"Gifts", "expense", "🎁", "#fb7185"},
+	{"Travel", "expense", "✈️", "#38bdf8"},
+	{"Other", "expense", "📌", "#94a3b8"},
+	{"Salary", "income", "💵", "#4ade80"},
+	{"Freelance", "income", "💻", "#60a5fa"},
+	{"Investments", "income", "📈", "#a78bfa"},
+	{"Gifts received", "income", "🎀", "#f472b6"},
+	{"Refunds", "income", "↩️", "#2dd4bf"},
+	{"Other income", "income", "💰", "#94a3b8"},
 }
 
 var defaultTags = []string{

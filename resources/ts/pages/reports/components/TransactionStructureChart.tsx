@@ -1,7 +1,6 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useTransactionReportByCategory } from '@/hooks'
-import { localizeDefaultName } from '@/lib/localized-name'
 import type { ReportFilters } from '../types'
 import type { ReportTransactionType } from '@/api/reports'
 import { StructureChart } from './StructureChart'
@@ -27,7 +26,7 @@ export function TransactionStructureChart({ filters, type }: TransactionStructur
     const { data, isLoading } = useTransactionReportByCategory(filters, type)
 
     const items = useMemo(() => (data?.items ?? []).map((item) => ({
-        name: localizeDefaultName(item.name),
+        name: item.name,
         value: item.value,
         color: item.color,
     })), [data, i18n.language])
