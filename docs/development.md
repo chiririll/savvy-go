@@ -40,6 +40,8 @@ npm run build   # into public/build
 
 Logo and screenshot scripts: [Scripts](scripts.md).
 
+AI agent setup: [Agentic development](agentic-development.md).
+
 ## Workflows
 
 In `.github/workflows`. All of them can also be started manually.

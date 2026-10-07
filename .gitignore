@@ -37,3 +37,12 @@ node_modules/
 
 # Screenshots made by scripts/screenshots
 /screenshots/
+
+# AI agent folders (personal settings and skills; shared rules live in AGENTS.md)
+/.claude/
+/.cursor/
+/.codex/
+/.gemini/
+/.windsurf/
+CLAUDE.md
+CLAUDE.local.md
