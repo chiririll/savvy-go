@@ -7,8 +7,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	"savvy-go/internal/db"
-	"savvy-go/internal/db/sqlc"
+	repo "savvy-go/internal/db/repo/ledger"
 	"savvy-go/internal/money"
 )
 
@@ -16,6 +15,8 @@ type Debts struct {
 	Accounts     Accounts
 	Transactions Transactions
 }
+
+func (s Debts) repo() repo.Repo { return repo.Repo{DB: s.Accounts.DB} }
 
 func (s Debts) All(ctx context.Context, includeCompleted bool) ([]Account, error) {
 	return s.Accounts.Debts(ctx, includeCompleted)
@@ -95,7 +96,7 @@ func (s Debts) maybePayOff(ctx context.Context, debt *Account) {
 		return
 	}
 	if !fresh.Balance.IsPositive() {
-		_ = db.Q(s.Accounts.DB).MarkAccountPaidOff(ctx, debt.ID)
+		_ = s.repo().MarkPaidOff(ctx, debt.ID)
 	}
 }
 
@@ -107,9 +108,7 @@ func (s Debts) Reopen(ctx context.Context, id int64) (*Account, error) {
 	if !d.IsPaidOff {
 		return nil, fmt.Errorf("not paid off")
 	}
-	now := time.Now().UTC().Format(time.RFC3339)
-	err = db.Q(s.Accounts.DB).ReopenAccount(ctx, sqlc.ReopenAccountParams{UpdatedAt: db.NS(now), ID: id})
-	if err != nil {
+	if err := s.repo().Reopen(ctx, id, time.Now().UTC()); err != nil {
 		return nil, err
 	}
 	return s.Accounts.ByID(ctx, id)
@@ -144,10 +143,8 @@ func (s Debts) Summary(ctx context.Context) DebtSummary {
 }
 
 func (s Debts) Delete(ctx context.Context, id int64) error {
-	n, _ := db.Q(s.Accounts.DB).CountDebtHistory(ctx, db.NI(id))
-	if n > 0 {
+	if s.repo().CountDebtHistory(ctx, id) > 0 {
 		return fmt.Errorf("has history")
 	}
-	_ = db.Q(s.Accounts.DB).DeleteDebtIssuance(ctx, db.NI(id))
-	return db.Q(s.Accounts.DB).DeleteDebtAccount(ctx, id)
+	return s.repo().DeleteDebt(ctx, id)
 }

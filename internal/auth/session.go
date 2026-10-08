@@ -4,8 +4,7 @@ import (
 	"context"
 	"time"
 
-	"savvy-go/internal/db"
-	"savvy-go/internal/db/sqlc"
+	repo "savvy-go/internal/db/repo/auth"
 	"savvy-go/internal/store"
 )
 
@@ -50,30 +49,26 @@ type Issued struct {
 	Session *Session
 }
 
+func (s Sessions) repo() repo.Repo { return repo.Repo{DB: s.DB} }
+
 func (s Sessions) Issue(ctx context.Context, user *User, ip, ua string, remember bool) (*Issued, error) {
 	token := RandomString(48)
 	csrf := RandomString(40)
-	ttl := s.ttl(remember)
 	now := time.Now().UTC()
-	exp := now.Add(ttl)
-	res, err := db.Q(s.DB).InsertSession(ctx, sqlc.InsertSessionParams{
-		UserID: user.ID, TokenHash: HashToken(token), Csrf: csrf,
-		Ip: db.NullStringVal(ip), UserAgent: db.NS(truncate(ua, 500)), RememberMe: db.BoolInt(remember),
-		LastUsedAt: db.FormatTime(now), RefreshedAt: db.TimeNS(now),
-		IdleExpiresAt: db.FormatTime(exp), AbsoluteExpiresAt: db.FormatTime(exp),
-		CreatedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now),
+	exp := now.Add(s.ttl(remember))
+	id, err := s.repo().InsertSession(ctx, repo.NewSession{
+		UserID: user.ID, TokenHash: HashToken(token), CSRF: csrf, IP: ip, UserAgent: truncate(ua, 500),
+		RememberMe: remember, Expires: exp, Now: now,
 	})
 	if err != nil {
 		return nil, err
 	}
-	id, _ := res.LastInsertId()
+	ref := now
 	sess := &Session{
 		ID: id, UserID: user.ID, TokenHash: HashToken(token), CSRF: csrf,
-		RememberMe: remember, LastUsedAt: now, IdleExpiresAt: exp, AbsoluteExpiresAt: exp,
+		RememberMe: remember, LastUsedAt: now, RefreshedAt: &ref, IdleExpiresAt: exp, AbsoluteExpiresAt: exp,
 		CreatedAt: now, User: user,
 	}
-	ref := now
-	sess.RefreshedAt = &ref
 	return &Issued{Token: token, CSRF: csrf, Session: sess}, nil
 }
 
@@ -81,10 +76,14 @@ func (s Sessions) Resolve(ctx context.Context, token string) (*Session, error) {
 	if token == "" {
 		return nil, nil
 	}
-	row, err := db.Q(s.DB).GetSessionByTokenHash(ctx, HashToken(token))
-	sess, err := sessionFromRow(row, err)
-	if err != nil || sess == nil {
-		return sess, err
+	row, err := s.repo().SessionByTokenHash(ctx, HashToken(token))
+	if row == nil || err != nil {
+		return nil, err
+	}
+	sess := &Session{
+		ID: row.ID, UserID: row.UserID, TokenHash: row.TokenHash, CSRF: row.CSRF, RememberMe: row.RememberMe,
+		LastUsedAt: row.LastUsedAt, RefreshedAt: row.RefreshedAt, IdleExpiresAt: row.IdleExpiresAt,
+		AbsoluteExpiresAt: row.AbsoluteExpiresAt, RevokedAt: row.RevokedAt, CreatedAt: row.CreatedAt,
 	}
 	if !sess.IsActive(time.Now().UTC()) {
 		return nil, nil
@@ -105,9 +104,7 @@ func (s Sessions) Touch(ctx context.Context, sess *Session) error {
 	}
 	sess.LastUsedAt = now
 	sess.IdleExpiresAt = idle
-	return db.Q(s.DB).TouchSession(ctx, sqlc.TouchSessionParams{
-		LastUsedAt: db.FormatTime(now), IdleExpiresAt: db.FormatTime(idle), UpdatedAt: db.TimeNS(now), ID: sess.ID,
-	})
+	return s.repo().TouchSession(ctx, sess.ID, now, idle)
 }
 
 // MaybeRefresh rotates remember-me tokens once a day. Returns new raw token+csrf or nil.
@@ -129,14 +126,8 @@ func (s Sessions) Refresh(ctx context.Context, sess *Session) (*Issued, error) {
 	token := RandomString(48)
 	csrf := RandomString(40)
 	now := time.Now().UTC()
-	ttl := s.ttl(true)
-	exp := now.Add(ttl)
-	err := db.Q(s.DB).RefreshSession(ctx, sqlc.RefreshSessionParams{
-		TokenHash: HashToken(token), Csrf: csrf, LastUsedAt: db.FormatTime(now),
-		RefreshedAt: db.TimeNS(now), IdleExpiresAt: db.FormatTime(exp),
-		AbsoluteExpiresAt: db.FormatTime(exp), UpdatedAt: db.TimeNS(now), ID: sess.ID,
-	})
-	if err != nil {
+	exp := now.Add(s.ttl(true))
+	if err := s.repo().RotateSession(ctx, sess.ID, HashToken(token), csrf, now, exp); err != nil {
 		return nil, err
 	}
 	sess.TokenHash = HashToken(token)
@@ -166,29 +157,15 @@ func (s *Session) RefreshDueAt() *time.Time {
 }
 
 func (s Sessions) Revoke(ctx context.Context, sess *Session) error {
-	now := time.Now().UTC()
-	return db.Q(s.DB).RevokeSession(ctx, sqlc.RevokeSessionParams{
-		RevokedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now), ID: sess.ID,
-	})
+	return s.repo().RevokeSession(ctx, sess.ID, time.Now().UTC())
 }
 
 func (s Sessions) RevokeAll(ctx context.Context, userID int64) error {
-	now := time.Now().UTC()
-	return db.Q(s.DB).RevokeUserSessions(ctx, sqlc.RevokeUserSessionsParams{
-		RevokedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now), UserID: userID,
-	})
+	return s.repo().RevokeUserSessions(ctx, userID, time.Now().UTC())
 }
 
 func (s Sessions) RevokeOthers(ctx context.Context, userID, keepID int64) (int, error) {
-	now := time.Now().UTC()
-	res, err := db.Q(s.DB).RevokeOtherSessions(ctx, sqlc.RevokeOtherSessionsParams{
-		RevokedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now), UserID: userID, ID: keepID,
-	})
-	if err != nil {
-		return 0, err
-	}
-	n, _ := res.RowsAffected()
-	return int(n), nil
+	return s.repo().RevokeOtherSessions(ctx, userID, keepID, time.Now().UTC())
 }
 
 func (s Sessions) ttl(remember bool) time.Duration {
@@ -196,32 +173,6 @@ func (s Sessions) ttl(remember bool) time.Duration {
 		return s.RememberTTL
 	}
 	return s.SessionTTL
-}
-
-func sessionFromRow(r sqlc.GetSessionByTokenHashRow, err error) (*Session, error) {
-	if err == db.ErrNotFound {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	sess := &Session{
-		ID: r.ID, UserID: r.UserID, TokenHash: r.TokenHash, CSRF: r.Csrf,
-		RememberMe: r.RememberMe != 0,
-	}
-	sess.LastUsedAt, _ = db.ParseTimeString(r.LastUsedAt)
-	if t, ok := db.ParseTime(r.RefreshedAt); ok {
-		sess.RefreshedAt = &t
-	}
-	sess.IdleExpiresAt, _ = db.ParseTimeString(r.IdleExpiresAt)
-	sess.AbsoluteExpiresAt, _ = db.ParseTimeString(r.AbsoluteExpiresAt)
-	if t, ok := db.ParseTime(r.RevokedAt); ok {
-		sess.RevokedAt = &t
-	}
-	if t, ok := db.ParseTime(r.CreatedAt); ok {
-		sess.CreatedAt = t
-	}
-	return sess, nil
 }
 
 func truncate(s string, n int) string {

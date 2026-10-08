@@ -16,8 +16,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"savvy-go/internal/auth"
-	"savvy-go/internal/db"
-	"savvy-go/internal/db/sqlc"
+	repo "savvy-go/internal/db/repo/transfers"
 	"savvy-go/internal/money"
 	"savvy-go/internal/settings"
 	"savvy-go/internal/signing"
@@ -79,7 +78,7 @@ const (
 
 	// transferReviewKey marks a restored space whose transfers wait for a
 	// review merge; it is written before the restored file goes live.
-	transferReviewKey = "transfer_review_pending"
+	transferReviewKey = repo.ReviewKey
 )
 
 // MarkTransferReview flags a prepared space so its transfers are reviewed
@@ -151,8 +150,8 @@ func verifyTransfer(k signing.KeyRing, t Transfer) bool {
 // TrustedKeys looks up a trusted public key in the server database.
 func TrustedKeys(server store.DB) func(kid string) ed25519.PublicKey {
 	return func(kid string) ed25519.PublicKey {
-		raw, err := db.Q(server).GetTrustedKey(context.Background(), kid)
-		if err != nil {
+		raw, ok := (repo.Server{DB: server}).PublicKey(context.Background(), kid)
+		if !ok {
 			return nil
 		}
 		pub, err := base64.StdEncoding.DecodeString(raw)
@@ -165,60 +164,57 @@ func TrustedKeys(server store.DB) func(kid string) ed25519.PublicKey {
 
 // --- rows ------------------------------------------------------------------
 
-func transferFromRow(r sqlc.SpaceTransfer) Transfer {
+func sideFromRecord(r repo.Side) Side { return Side(r) }
+
+func transferFromRecord(r repo.Record) Transfer {
 	t := Transfer{
-		UUID: r.Uuid,
-		From: Side{r.FromSpaceUuid, r.FromAccountID, r.FromAmount, r.FromCurrency, r.FromDecimals},
-		To:   Side{r.ToSpaceUuid, r.ToAccountID, r.ToAmount, r.ToCurrency, r.ToDecimals},
-		Date: r.Date, Version: r.Version, SigV: r.SigV, SignerKID: r.SignerKid.String, Signature: r.Signature.String,
-		Status: r.Status,
+		UUID: r.UUID, From: sideFromRecord(r.From), To: sideFromRecord(r.To),
+		Date: r.Date, Description: r.Description, CreatedBy: r.CreatedBy, Version: r.Version, DeletedAt: r.DeletedAt,
+		SigV: r.SigV, SignerKID: r.SignerKID, Signature: r.Signature, Status: r.Status, Review: r.Review,
 	}
-	if r.Description.Valid {
-		v := r.Description.String
-		t.Description = &v
-	}
-	if r.CreatedBy.Valid {
-		v := r.CreatedBy.Int64
-		t.CreatedBy = &v
-	}
-	if r.DeletedAt.Valid {
-		v := r.DeletedAt.String
-		t.DeletedAt = &v
-	}
-	if r.Review.Valid {
-		v := r.Review.String
-		t.Review = &v
-	}
-	if r.Remote.Valid {
+	if r.Remote != "" {
 		var remote Transfer
-		if json.Unmarshal([]byte(r.Remote.String), &remote) == nil {
+		if json.Unmarshal([]byte(r.Remote), &remote) == nil {
 			t.Remote = &remote
 		}
 	}
 	return t
 }
 
+func recordOf(t Transfer, status string, review *string, remote *Transfer) repo.Record {
+	rec := repo.Record{
+		UUID: t.UUID, From: repo.Side(t.From), To: repo.Side(t.To),
+		Date: t.Date, Description: t.Description, CreatedBy: t.CreatedBy, Version: t.Version, DeletedAt: t.DeletedAt,
+		SigV: t.SigV, SignerKID: t.SignerKID, Signature: t.Signature, Status: status, Review: review,
+	}
+	if remote != nil {
+		b, _ := json.Marshal(remote)
+		rec.Remote = string(b)
+	}
+	return rec
+}
+
 func loadTransfers(ctx context.Context, d store.DB) (map[string]Transfer, error) {
-	rows, err := db.Q(d).ListSpaceTransfers(ctx)
+	rows, err := repo.Space{DB: d}.Records(ctx)
 	if err != nil {
 		return nil, err
 	}
 	out := make(map[string]Transfer, len(rows))
 	for _, r := range rows {
-		out[r.Uuid] = transferFromRow(sqlc.SpaceTransfer(r))
+		out[r.UUID] = transferFromRecord(r)
 	}
 	return out, nil
 }
 
 func loadTransfer(ctx context.Context, d store.DB, id string) (*Transfer, error) {
-	r, err := db.Q(d).GetSpaceTransfer(ctx, id)
-	if errors.Is(err, db.ErrNotFound) {
-		return nil, ErrGone
-	}
+	r, err := repo.Space{DB: d}.Record(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	t := transferFromRow(sqlc.SpaceTransfer(r))
+	if r == nil {
+		return nil, ErrGone
+	}
+	t := transferFromRecord(*r)
 	return &t, nil
 }
 
@@ -250,7 +246,7 @@ func (t Transfer) same(o Transfer) bool {
 // record needing attention without a transaction. d must be the handle of
 // the transaction the caller runs in.
 func writeRecord(ctx context.Context, d store.DB, own string, t Transfer, localStatus string, review *string, remote *Transfer) error {
-	q := db.Q(d)
+	sp := repo.Space{DB: d}
 	side, sender, ok := t.side(own)
 	if !ok {
 		return fmt.Errorf("transfer %s does not involve this space", t.UUID)
@@ -261,51 +257,39 @@ func writeRecord(ctx context.Context, d store.DB, own string, t Transfer, localS
 	}
 	hasAccount := false
 	if t.DeletedAt == nil {
-		if _, err := q.GetAccountCurrency(ctx, side.AccountID); err == nil {
-			hasAccount = true
-		} else if !errors.Is(err, db.ErrNotFound) {
+		acc, err := sp.AccountCurrency(ctx, side.AccountID)
+		if err != nil {
 			return err
+		}
+		if acc != nil {
+			hasAccount = true
 		} else if review == nil {
 			status = transferNeedsAttention
 		}
 	}
-	var remoteJSON db.NString
-	if remote != nil {
-		b, _ := json.Marshal(remote)
-		remoteJSON = db.NS(string(b))
-	}
-	if err := q.UpsertSpaceTransfer(ctx, sqlc.UpsertSpaceTransferParams{
-		Uuid: t.UUID, FromSpaceUuid: t.From.SpaceUUID, FromAccountID: t.From.AccountID, FromAmount: t.From.Amount,
-		FromCurrency: t.From.Currency, FromDecimals: t.From.Decimals,
-		ToSpaceUuid: t.To.SpaceUUID, ToAccountID: t.To.AccountID, ToAmount: t.To.Amount,
-		ToCurrency: t.To.Currency, ToDecimals: t.To.Decimals,
-		Date: t.Date, Description: db.NullString(t.Description), CreatedBy: db.NullInt64(t.CreatedBy),
-		Version: t.Version, DeletedAt: db.NullString(t.DeletedAt), SigV: t.SigV,
-		SignerKid: db.NullStringVal(t.SignerKID), Signature: db.NullStringVal(t.Signature),
-		Status: status, Review: db.NullString(review), Remote: remoteJSON, UpdatedAt: db.NS(now()),
-	}); err != nil {
+	at := time.Now().UTC()
+	if err := sp.Save(ctx, recordOf(t, status, review, remote), at); err != nil {
 		return err
 	}
 	if t.DeletedAt != nil || !hasAccount {
-		return q.DeleteTransferTransaction(ctx, db.NS(t.UUID))
+		return sp.DeleteTransaction(ctx, t.UUID)
 	}
 	typ := "transfer_in"
 	if sender {
 		typ = "transfer_out"
 	}
-	if _, err := q.GetTransferTransaction(ctx, db.NS(t.UUID)); errors.Is(err, db.ErrNotFound) {
-		return q.InsertTransferTransaction(ctx, sqlc.InsertTransferTransactionParams{
-			Type: typ, AccountID: side.AccountID, Amount: side.Amount, Description: db.NullString(t.Description),
-			Date: db.NS(t.Date), Status: localStatus, SpaceTransferUuid: db.NS(t.UUID), CreatedBy: db.NullInt64(t.CreatedBy),
-			CreatedAt: db.NS(now()), UpdatedAt: db.NS(now()),
-		})
-	} else if err != nil {
+	tx := repo.Transaction{
+		UUID: t.UUID, Type: typ, Date: t.Date, Status: localStatus, AccountID: side.AccountID, Amount: side.Amount,
+		Description: t.Description, CreatedBy: t.CreatedBy,
+	}
+	exists, err := sp.HasTransaction(ctx, t.UUID)
+	if err != nil {
 		return err
 	}
-	return q.UpdateTransferTransaction(ctx, sqlc.UpdateTransferTransactionParams{
-		Type: typ, AccountID: side.AccountID, Amount: side.Amount, Description: db.NullString(t.Description),
-		Date: db.NS(t.Date), Status: localStatus, UpdatedAt: db.NS(now()), SpaceTransferUuid: db.NS(t.UUID),
-	})
+	if !exists {
+		return sp.InsertTransaction(ctx, tx, at)
+	}
+	return sp.UpdateTransaction(ctx, tx, at)
 }
 
 // --- service ---------------------------------------------------------------
@@ -316,22 +300,23 @@ type Service struct {
 	Keys   signing.KeyRing
 }
 
-func (s Service) st() store.Store       { return s.Spaces.Store }
-func (s Service) server() *sqlc.Queries { return db.Q(s.st().Server()) }
+func (s Service) st() store.Store { return s.Spaces.Store }
+
+func (s Service) server() repo.Server { return repo.Server{DB: s.st().Server()} }
 
 func now() string                       { return time.Now().UTC().Format(time.RFC3339) }
 func linkKey(a, b int64) (int64, int64) { return min(a, b), max(a, b) }
 
 // spaceUUIDs maps every registered space's id to its uuid and back.
 func (s Service) spaceUUIDs(ctx context.Context) (map[int64]spaces.Space, map[string]spaces.Space, error) {
-	rows, err := s.server().ListSpaceUUIDs(ctx)
+	rows, err := s.Spaces.All(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
 	byID, byUUID := map[int64]spaces.Space{}, map[string]spaces.Space{}
 	for _, r := range rows {
-		sp := spaces.Space{ID: r.ID, UUID: r.Uuid, Name: r.Name}
-		byID[r.ID], byUUID[r.Uuid] = sp, sp
+		sp := spaces.Space{ID: r.ID, UUID: r.UUID, Name: r.Name}
+		byID[r.ID], byUUID[r.UUID] = sp, sp
 	}
 	return byID, byUUID, nil
 }
@@ -339,13 +324,12 @@ func (s Service) spaceUUIDs(ctx context.Context) (map[int64]spaces.Space, map[st
 // Linked reports whether two spaces are linked.
 func (s Service) Linked(ctx context.Context, a, b int64) (bool, error) {
 	x, y := linkKey(a, b)
-	n, err := s.server().CountSpaceLink(ctx, sqlc.CountSpaceLinkParams{SpaceAID: x, SpaceBID: y})
-	return n > 0, err
+	return s.server().Linked(ctx, x, y)
 }
 
 // Links lists the spaces linked to a space.
 func (s Service) Links(ctx context.Context, spaceID int64) ([]spaces.Space, error) {
-	rows, err := s.server().ListSpaceLinks(ctx, spaceID)
+	rows, err := s.server().Links(ctx, spaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -355,9 +339,9 @@ func (s Service) Links(ctx context.Context, spaceID int64) ([]spaces.Space, erro
 	}
 	out := []spaces.Space{}
 	for _, r := range rows {
-		other := r.SpaceAID
+		other := r.A
 		if other == spaceID {
-			other = r.SpaceBID
+			other = r.B
 		}
 		out = append(out, byID[other])
 	}
@@ -381,7 +365,7 @@ func (s Service) Link(ctx context.Context, actor *auth.User, a, b int64) error {
 		}
 	}
 	x, y := linkKey(a, b)
-	if err := s.server().InsertSpaceLink(ctx, sqlc.InsertSpaceLinkParams{SpaceAID: x, SpaceBID: y, CreatedBy: db.NI(actor.ID), CreatedAt: db.NS(now())}); err != nil {
+	if err := s.server().InsertLink(ctx, x, y, actor.ID, time.Now().UTC()); err != nil {
 		return err
 	}
 	return s.sync(ctx, a, b, 0)
@@ -391,11 +375,11 @@ func (s Service) Link(ctx context.Context, actor *auth.User, a, b int64) error {
 // both spaces, frozen.
 func (s Service) Unlink(ctx context.Context, a, b int64) error {
 	x, y := linkKey(a, b)
-	res, err := s.server().DeleteSpaceLink(ctx, sqlc.DeleteSpaceLinkParams{SpaceAID: x, SpaceBID: y})
+	ok, err := s.server().DeleteLink(ctx, x, y)
 	if err != nil {
 		return err
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
+	if !ok {
 		return ErrNotLinked
 	}
 	return nil
@@ -428,12 +412,12 @@ type Input struct {
 
 // sideFor reads an account's currency in a space and converts amount to it.
 func sideFor(ctx context.Context, d store.DB, spaceUUID string, account int64, amount decimal.Decimal) (Side, error) {
-	acc, err := db.Q(d).GetAccountCurrency(ctx, account)
-	if errors.Is(err, db.ErrNotFound) {
-		return Side{}, ErrAccountMissing
-	}
+	acc, err := repo.Space{DB: d}.AccountCurrency(ctx, account)
 	if err != nil {
 		return Side{}, err
+	}
+	if acc == nil {
+		return Side{}, ErrAccountMissing
 	}
 	m, err := money.FromInput(amount, money.Unit{Decimals: int(acc.Decimals)})
 	if err != nil {
@@ -648,7 +632,7 @@ func (s Service) List(ctx context.Context, spaceID int64) ([]View, error) {
 	if err != nil {
 		return nil, err
 	}
-	rows, err := db.Q(d).ListSpaceTransfers(ctx)
+	rows, err := repo.Space{DB: d}.Records(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -659,7 +643,7 @@ func (s Service) List(ctx context.Context, spaceID int64) ([]View, error) {
 	own := byID[spaceID]
 	out := []View{}
 	for _, r := range rows {
-		t := transferFromRow(sqlc.SpaceTransfer(r))
+		t := transferFromRecord(r)
 		if t.DeletedAt != nil && t.Status != transferPending {
 			continue
 		}
@@ -832,14 +816,14 @@ func ptr[T any](v T) *T { return &v }
 // SyncAll merges every link, as at startup. A space marked as restored is
 // merged in review mode, and its mark cleared once all its links are done.
 func (s Service) SyncAll(ctx context.Context) error {
-	links, err := s.server().ListAllSpaceLinks(ctx)
+	links, err := s.server().AllLinks(ctx)
 	if err != nil {
 		return err
 	}
 	marked := map[int64]bool{}
 	failed := map[int64]bool{}
 	for _, l := range links {
-		for _, id := range []int64{l.SpaceAID, l.SpaceBID} {
+		for _, id := range []int64{l.A, l.B} {
 			if _, seen := marked[id]; !seen {
 				marked[id] = s.reviewPending(ctx, id)
 			}
@@ -849,14 +833,14 @@ func (s Service) SyncAll(ctx context.Context) error {
 	for _, l := range links {
 		review := int64(0)
 		switch {
-		case marked[l.SpaceAID]:
-			review = l.SpaceAID
-		case marked[l.SpaceBID]:
-			review = l.SpaceBID
+		case marked[l.A]:
+			review = l.A
+		case marked[l.B]:
+			review = l.B
 		}
-		if err := s.sync(ctx, l.SpaceAID, l.SpaceBID, review); err != nil {
-			errs = append(errs, fmt.Errorf("link %d-%d: %w", l.SpaceAID, l.SpaceBID, err))
-			failed[l.SpaceAID], failed[l.SpaceBID] = true, true
+		if err := s.sync(ctx, l.A, l.B, review); err != nil {
+			errs = append(errs, fmt.Errorf("link %d-%d: %w", l.A, l.B, err))
+			failed[l.A], failed[l.B] = true, true
 		}
 	}
 	for id, m := range marked {
@@ -874,8 +858,8 @@ func (s Service) reviewPending(ctx context.Context, id int64) bool {
 	if err != nil {
 		return false
 	}
-	v, err := db.Q(d).GetSpaceSetting(ctx, transferReviewKey)
-	return err == nil && v.Valid && v.String != ""
+	pending, err := repo.Space{DB: d}.ReviewPending(ctx)
+	return err == nil && pending
 }
 
 func (s Service) clearReview(ctx context.Context, id int64) error {
@@ -883,8 +867,7 @@ func (s Service) clearReview(ctx context.Context, id int64) error {
 	if err != nil {
 		return err
 	}
-	_, err = d.ExecContext(ctx, `DELETE FROM space_settings WHERE key = ?`, transferReviewKey)
-	return err
+	return repo.Space{DB: d}.ClearReview(ctx)
 }
 
 // AfterRestore merges a restored space with every space it is linked to, in
@@ -930,10 +913,7 @@ func (s Service) dropForeign(ctx context.Context, spaceID int64) error {
 		}
 		for id, t := range all {
 			if _, _, ok := t.side(own); !ok {
-				if err := db.Q(tx).DeleteTransferTransaction(ctx, db.NS(id)); err != nil {
-					return err
-				}
-				if err := db.Q(tx).DeleteSpaceTransfer(ctx, id); err != nil {
+				if err := (repo.Space{DB: tx}).Delete(ctx, id); err != nil {
 					return err
 				}
 			}
@@ -992,10 +972,7 @@ func (s Service) Resolve(ctx context.Context, actor *auth.User, spaceID int64, i
 				cur.Review, cur.Remote = nil, nil
 				return writeRecord(ctx, mine, own.UUID, *cur, "confirmed", nil, nil)
 			case reviewMissingRemote:
-				if err := db.Q(mine).DeleteTransferTransaction(ctx, db.NS(id)); err != nil {
-					return err
-				}
-				return db.Q(mine).DeleteSpaceTransfer(ctx, id)
+				return repo.Space{DB: mine}.Delete(ctx, id)
 			default:
 				if theirs == nil {
 					return ErrGone
@@ -1076,16 +1053,13 @@ type TrustedKey struct {
 
 // TrustedKeysList lists the trusted keys.
 func (s Service) TrustedKeysList(ctx context.Context) ([]TrustedKey, error) {
-	rows, err := s.server().ListTrustedKeys(ctx)
+	rows, err := s.server().TrustedKeys(ctx)
 	if err != nil {
 		return nil, err
 	}
 	out := make([]TrustedKey, len(rows))
 	for i, r := range rows {
-		out[i] = TrustedKey{KID: r.Kid, PublicKey: r.PublicKey, Name: r.Name}
-		if t, ok := db.ParseTime(r.CreatedAt); ok {
-			out[i].CreatedAt = &t
-		}
+		out[i] = TrustedKey{KID: r.KID, PublicKey: r.PublicKey, Name: r.Name, CreatedAt: r.CreatedAt}
 	}
 	return out, nil
 }
@@ -1097,9 +1071,7 @@ func (s Service) TrustKey(ctx context.Context, actor *auth.User, name, publicKey
 		return "", errors.New("the public key must be a base64 Ed25519 key")
 	}
 	kid := signing.KID(pub)
-	if err := s.server().InsertTrustedKey(ctx, sqlc.InsertTrustedKeyParams{
-		Kid: kid, PublicKey: publicKey, Name: name, AddedBy: db.NI(actor.ID), CreatedAt: db.NS(now()),
-	}); err != nil {
+	if err := s.server().InsertTrustedKey(ctx, kid, publicKey, name, actor.ID, time.Now().UTC()); err != nil {
 		return "", err
 	}
 	return kid, s.Spaces.Audit(ctx, actor, "trust_key", nil, nil, kid+" "+name)
@@ -1107,11 +1079,11 @@ func (s Service) TrustKey(ctx context.Context, actor *auth.User, name, publicKey
 
 // UntrustKey removes a trusted key.
 func (s Service) UntrustKey(ctx context.Context, actor *auth.User, kid string) error {
-	res, err := s.server().DeleteTrustedKey(ctx, kid)
+	ok, err := s.server().DeleteTrustedKey(ctx, kid)
 	if err != nil {
 		return err
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
+	if !ok {
 		return ErrGone
 	}
 	return s.Spaces.Audit(ctx, actor, "untrust_key", nil, nil, kid)
@@ -1123,9 +1095,7 @@ func (s Service) RotateKey(ctx context.Context, actor *auth.User, dataDir string
 	old := s.Keys.Holder.Key()
 	if old != nil {
 		pub := base64.StdEncoding.EncodeToString(old.Public())
-		if err := s.server().InsertTrustedKey(ctx, sqlc.InsertTrustedKeyParams{
-			Kid: old.KID(), PublicKey: pub, Name: "previous server key", AddedBy: db.NI(actor.ID), CreatedAt: db.NS(now()),
-		}); err != nil {
+		if err := s.server().InsertTrustedKey(ctx, old.KID(), pub, "previous server key", actor.ID, time.Now().UTC()); err != nil {
 			return "", err
 		}
 	}

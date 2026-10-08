@@ -14,8 +14,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	"savvy-go/internal/db"
-	"savvy-go/internal/db/sqlc"
+	repo "savvy-go/internal/db/repo/automation"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/money"
 	"savvy-go/internal/store"
@@ -64,12 +63,14 @@ type Service struct {
 	Txs ledger.Transactions
 }
 
+func (s Service) repo() repo.Repo { return repo.Repo{DB: s.DB} }
+
 func (s Service) All(ctx context.Context) ([]Rule, error) {
-	return s.list(ctx, sqlc.ListAutomationRulesParams{})
+	return s.list(ctx, repo.Filter{})
 }
 
 func (s Service) ByID(ctx context.Context, id int64) (*Rule, error) {
-	list, err := s.list(ctx, sqlc.ListAutomationRulesParams{ID: db.NI(id)})
+	list, err := s.list(ctx, repo.Filter{ID: id})
 	if err != nil || len(list) == 0 {
 		return nil, err
 	}
@@ -93,16 +94,13 @@ func (s Service) Create(ctx context.Context, in Input) (*Rule, error) {
 	if in.Actions == nil {
 		acts = []byte("[]")
 	}
-	now := time.Now().UTC().Format(time.RFC3339)
-	res, err := db.Q(s.DB).InsertAutomationRule(ctx, sqlc.InsertAutomationRuleParams{
-		Name: in.Name, Description: db.NullString(in.Description), TriggerType: in.TriggerType,
-		Priority: int64(in.Priority), Conditions: string(cond), Actions: string(acts),
-		IsActive: db.BoolInt(active), StopProcessing: db.BoolInt(stop), CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
-	})
+	id, err := s.repo().Insert(ctx, repo.Fields{
+		Name: in.Name, Description: in.Description, TriggerType: in.TriggerType, Priority: in.Priority,
+		Conditions: string(cond), Actions: string(acts), IsActive: active, StopProcessing: stop,
+	}, time.Now().UTC())
 	if err != nil {
 		return nil, err
 	}
-	id, _ := res.LastInsertId()
 	return s.ByID(ctx, id)
 }
 
@@ -136,12 +134,10 @@ func (s Service) Update(ctx context.Context, id int64, in Input) (*Rule, error) 
 	}
 	cond, _ := json.Marshal(normalizeConditions(in.Conditions))
 	acts, _ := json.Marshal(in.Actions)
-	now := time.Now().UTC().Format(time.RFC3339)
-	err = db.Q(s.DB).UpdateAutomationRule(ctx, sqlc.UpdateAutomationRuleParams{
-		Name: in.Name, Description: db.NullString(in.Description), TriggerType: in.TriggerType,
-		Priority: int64(in.Priority), Conditions: string(cond), Actions: string(acts),
-		IsActive: db.BoolInt(active), StopProcessing: db.BoolInt(stop), UpdatedAt: db.NS(now), ID: id,
-	})
+	err = s.repo().Update(ctx, id, repo.Fields{
+		Name: in.Name, Description: in.Description, TriggerType: in.TriggerType, Priority: in.Priority,
+		Conditions: string(cond), Actions: string(acts), IsActive: active, StopProcessing: stop,
+	}, time.Now().UTC())
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +145,7 @@ func (s Service) Update(ctx context.Context, id int64, in Input) (*Rule, error) 
 }
 
 func (s Service) Delete(ctx context.Context, id int64) error {
-	return db.Q(s.DB).DeleteAutomationRule(ctx, id)
+	return s.repo().Delete(ctx, id)
 }
 
 func (s Service) Toggle(ctx context.Context, id int64) (*Rule, error) {
@@ -157,8 +153,7 @@ func (s Service) Toggle(ctx context.Context, id int64) (*Rule, error) {
 	if err != nil || cur == nil {
 		return cur, err
 	}
-	now := time.Now().UTC().Format(time.RFC3339)
-	err = db.Q(s.DB).ToggleAutomationRule(ctx, sqlc.ToggleAutomationRuleParams{IsActive: db.BoolInt(!cur.IsActive), UpdatedAt: db.NS(now), ID: id})
+	err = s.repo().SetActive(ctx, id, !cur.IsActive, time.Now().UTC())
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +165,7 @@ func (s Service) Reorder(ctx context.Context, rules []struct {
 	Priority int   `json:"priority"`
 }) error {
 	for _, r := range rules {
-		if err := db.Q(s.DB).SetAutomationPriority(ctx, sqlc.SetAutomationPriorityParams{Priority: int64(r.Priority), ID: r.ID}); err != nil {
+		if err := s.repo().SetPriority(ctx, r.ID, r.Priority); err != nil {
 			return err
 		}
 	}
@@ -178,31 +173,20 @@ func (s Service) Reorder(ctx context.Context, rules []struct {
 }
 
 func (s Service) Logs(ctx context.Context, ruleID int64) ([]Log, error) {
-	rows, err := db.Q(s.DB).ListAutomationLogs(ctx, ruleID)
+	rows, err := s.repo().Logs(ctx, ruleID)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]Log, 0, len(rows))
-	for _, r := range rows {
-		l := Log{ID: r.ID, RuleID: r.RuleID, Status: r.Status}
-		if r.TriggerEntityType.Valid {
-			l.TriggerEntityType = &r.TriggerEntityType.String
-		}
-		if r.TriggerEntityID.Valid {
-			l.TriggerEntityID = &r.TriggerEntityID.Int64
-		}
-		if r.ActionsExecuted.Valid && r.ActionsExecuted.String != "" {
+	out := make([]Log, len(rows))
+	for i, r := range rows {
+		l := Log{ID: r.ID, RuleID: r.RuleID, Status: r.Status, TriggerEntityType: r.TriggerEntityType,
+			TriggerEntityID: r.TriggerEntityID, ErrorMessage: r.ErrorMessage, CreatedAt: r.CreatedAt}
+		if r.ActionsExecuted != "" {
 			var v any
-			_ = json.Unmarshal([]byte(r.ActionsExecuted.String), &v)
+			_ = json.Unmarshal([]byte(r.ActionsExecuted), &v)
 			l.ActionsExecuted = v
 		}
-		if r.ErrorMessage.Valid {
-			l.ErrorMessage = &r.ErrorMessage.String
-		}
-		if tm, ok := db.ParseTimeString(r.CreatedAt); ok {
-			l.CreatedAt = tm
-		}
-		out = append(out, l)
+		out[i] = l
 	}
 	return out, nil
 }
@@ -227,7 +211,7 @@ func (s Service) Process(ctx context.Context, trigger string, tx *ledger.Transac
 	if tx == nil || tx.Status != "confirmed" {
 		return
 	}
-	rules, err := s.list(ctx, sqlc.ListAutomationRulesParams{ActiveOnly: db.Flag(true), TriggerType: db.NullStringVal(trigger)})
+	rules, err := s.list(ctx, repo.Filter{ActiveOnly: true, TriggerType: trigger})
 	if err != nil {
 		slog.Error("automation load", "err", err)
 		return
@@ -252,21 +236,16 @@ func (s Service) Process(ctx context.Context, trigger string, tx *ledger.Transac
 }
 
 func (s Service) incrementRuns(ctx context.Context, id int64) {
-	now := time.Now().UTC().Format(time.RFC3339)
-	_ = db.Q(s.DB).IncrementAutomationRuns(ctx, sqlc.IncrementAutomationRunsParams{LastRunAt: db.NS(now), UpdatedAt: db.NS(now), ID: id})
+	_ = s.repo().CountRun(ctx, id, time.Now().UTC())
 }
 
 func (s Service) log(ctx context.Context, rule *Rule, tx *ledger.Transaction, status string, actions any, errMsg string) {
-	now := time.Now().UTC().Format(time.RFC3339)
-	var actsS db.NString
+	var actionsJSON string
 	if actions != nil {
 		raw, _ := json.Marshal(actions)
-		actsS = db.NS(string(raw))
+		actionsJSON = string(raw)
 	}
-	_ = db.Q(s.DB).InsertAutomationLog(ctx, sqlc.InsertAutomationLogParams{
-		RuleID: rule.ID, TriggerEntityType: db.NS("Transaction"), TriggerEntityID: db.NI(tx.ID),
-		ActionsExecuted: actsS, Status: status, ErrorMessage: db.NullStringVal(errMsg), CreatedAt: now,
-	})
+	_ = s.repo().AddLog(ctx, rule.ID, tx.ID, status, actionsJSON, errMsg, time.Now().UTC())
 }
 
 func (s Service) executeActions(ctx context.Context, actions []map[string]any, tx *ledger.Transaction) ([]map[string]any, error) {
@@ -304,8 +283,7 @@ func (s Service) actionSetCategory(ctx context.Context, action map[string]any, t
 	if !ok {
 		return false, nil
 	}
-	now := time.Now().UTC().Format(time.RFC3339)
-	err := db.Q(s.DB).UpdateTransactionCategory(ctx, sqlc.UpdateTransactionCategoryParams{CategoryID: db.NI(id), UpdatedAt: db.NS(now), ID: tx.ID})
+	err := s.Txs.SetCategory(ctx, tx.ID, id)
 	return err == nil, err
 }
 
@@ -354,8 +332,7 @@ func (s Service) actionSetDescription(ctx context.Context, action map[string]any
 		return false, nil
 	}
 	desc := parseTemplate(tmpl, tx)
-	now := time.Now().UTC().Format(time.RFC3339)
-	err := db.Q(s.DB).UpdateTransactionDescription(ctx, sqlc.UpdateTransactionDescriptionParams{Description: db.NS(desc), UpdatedAt: db.NS(now), ID: tx.ID})
+	err := s.Txs.SetDescription(ctx, tx.ID, desc)
 	return err == nil, err
 }
 
@@ -391,25 +368,23 @@ func (s Service) actionCreateTransfer(ctx context.Context, action map[string]any
 	return created.ID, nil
 }
 
-func (s Service) list(ctx context.Context, arg sqlc.ListAutomationRulesParams) ([]Rule, error) {
-	rows, err := db.Q(s.DB).ListAutomationRules(ctx, arg)
+func (s Service) list(ctx context.Context, f repo.Filter) ([]Rule, error) {
+	rows, err := s.repo().List(ctx, f)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]Rule, 0, len(rows))
-	for _, r := range rows {
-		out = append(out, automationFrom(r))
+	out := make([]Rule, len(rows))
+	for i, r := range rows {
+		out[i] = automationFrom(r)
 	}
 	return out, nil
 }
 
-func automationFrom(row sqlc.AutomationRule) Rule {
+func automationFrom(row repo.Rule) Rule {
 	r := Rule{
-		ID: row.ID, Name: row.Name, TriggerType: row.TriggerType, Priority: int(row.Priority),
-		RunsCount: int(row.RunsCount), IsActive: row.IsActive != 0, StopProcessing: row.StopProcessing != 0,
-	}
-	if row.Description.Valid {
-		r.Description = &row.Description.String
+		ID: row.ID, Name: row.Name, Description: row.Description, TriggerType: row.TriggerType, Priority: row.Priority,
+		RunsCount: row.RunsCount, IsActive: row.IsActive, StopProcessing: row.StopProcessing,
+		LastRunAt: row.LastRunAt, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
 	}
 	if row.Conditions != "" {
 		_ = json.Unmarshal([]byte(row.Conditions), &r.Conditions)
@@ -419,15 +394,6 @@ func automationFrom(row sqlc.AutomationRule) Rule {
 	}
 	if row.Actions != "" {
 		_ = json.Unmarshal([]byte(row.Actions), &r.Actions)
-	}
-	if tm, ok := db.ParseTime(row.LastRunAt); ok {
-		r.LastRunAt = &tm
-	}
-	if tm, ok := db.ParseTime(row.CreatedAt); ok {
-		r.CreatedAt = &tm
-	}
-	if tm, ok := db.ParseTime(row.UpdatedAt); ok {
-		r.UpdatedAt = &tm
 	}
 	return r
 }

@@ -11,8 +11,7 @@ import (
 	"time"
 
 	"savvy-go/internal/config"
-	"savvy-go/internal/db"
-	"savvy-go/internal/db/sqlc"
+	repo "savvy-go/internal/db/repo/auth"
 	"savvy-go/internal/store"
 
 	"github.com/go-webauthn/webauthn/protocol"
@@ -29,6 +28,8 @@ type WebAuthn struct {
 	DB  store.DB
 	Cfg config.Config
 }
+
+func (w WebAuthn) repo() repo.Repo { return repo.Repo{DB: w.DB} }
 
 type waUser struct {
 	user        *User
@@ -68,33 +69,19 @@ func (w WebAuthn) engine() (*webauthn.WebAuthn, error) {
 }
 
 func (w WebAuthn) List(ctx context.Context, userID int64) ([]WebAuthnCred, error) {
-	rows, err := db.Q(w.DB).ListWebAuthnCredentials(ctx, userID)
+	rows, err := w.repo().Passkeys(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]WebAuthnCred, 0, len(rows))
-	for _, r := range rows {
-		c := WebAuthnCred{ID: r.ID}
-		if r.Name.Valid {
-			c.Name = &r.Name.String
-		}
-		if r.Aaguid.Valid {
-			c.AAGUID = &r.Aaguid.String
-		}
-		if r.LastUsedAt.Valid {
-			c.LastUsedAt = &r.LastUsedAt.String
-		}
-		if r.CreatedAt.Valid {
-			c.CreatedAt = &r.CreatedAt.String
-		}
-		out = append(out, c)
+	out := make([]WebAuthnCred, len(rows))
+	for i, r := range rows {
+		out[i] = WebAuthnCred{ID: r.ID, Name: r.Name, AAGUID: r.AAGUID, LastUsedAt: r.LastUsedAt, CreatedAt: r.CreatedAt}
 	}
 	return out, nil
 }
 
 func (w WebAuthn) Count(ctx context.Context, userID int64) (int, error) {
-	n, err := db.Q(w.DB).CountWebAuthnCredentials(ctx, userID)
-	return int(n), err
+	return w.repo().CountPasskeys(ctx, userID)
 }
 
 func (w WebAuthn) BeginRegistration(ctx context.Context, u *User) (token string, options any, err error) {
@@ -145,17 +132,17 @@ func (w WebAuthn) FinishRegistration(ctx context.Context, u *User, token, name s
 		name = "Passkey"
 	}
 	rec, _ := json.Marshal(cred)
-	now := time.Now().UTC().Format(time.RFC3339)
+	now := time.Now().UTC()
 	aaguid := fmt.Sprintf("%x", cred.Authenticator.AAGUID)
-	res, err := db.Q(w.DB).InsertWebAuthnCredential(ctx, sqlc.InsertWebAuthnCredentialParams{
-		UserID: u.ID, CredentialID: b64(cred.ID), Name: db.NS(name), Aaguid: db.NS(aaguid),
-		Record: string(rec), Counter: int64(cred.Authenticator.SignCount), CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
+	id, err := w.repo().InsertPasskey(ctx, repo.NewPasskey{
+		UserID: u.ID, CredentialID: b64(cred.ID), Name: name, AAGUID: aaguid,
+		Record: string(rec), Counter: int64(cred.Authenticator.SignCount), Now: now,
 	})
 	if err != nil {
 		return nil, err
 	}
-	id, _ := res.LastInsertId()
-	return &WebAuthnCred{ID: id, Name: &name, AAGUID: &aaguid, CreatedAt: &now}, nil
+	created := now.Format(time.RFC3339)
+	return &WebAuthnCred{ID: id, Name: &name, AAGUID: &aaguid, CreatedAt: &created}, nil
 }
 
 func (w WebAuthn) BeginLogin(ctx context.Context, u *User) (token string, options any, err error) {
@@ -226,27 +213,23 @@ func (w WebAuthn) FinishLogin(ctx context.Context, token string, response json.R
 }
 
 func (w WebAuthn) Rename(ctx context.Context, userID, id int64, name string) error {
-	res, err := db.Q(w.DB).RenameWebAuthnCredential(ctx, sqlc.RenameWebAuthnCredentialParams{
-		Name: db.NS(name), UpdatedAt: db.NS(time.Now().UTC().Format(time.RFC3339)), ID: id, UserID: userID,
-	})
+	ok, err := w.repo().RenamePasskey(ctx, userID, id, name, time.Now().UTC())
 	if err != nil {
 		return err
 	}
-	n, _ := res.RowsAffected()
-	if n == 0 {
-		return db.ErrNotFound
+	if !ok {
+		return ErrNotFound
 	}
 	return nil
 }
 
 func (w WebAuthn) Delete(ctx context.Context, userID, id int64) error {
-	res, err := db.Q(w.DB).DeleteWebAuthnCredential(ctx, sqlc.DeleteWebAuthnCredentialParams{ID: id, UserID: userID})
+	ok, err := w.repo().DeletePasskey(ctx, userID, id)
 	if err != nil {
 		return err
 	}
-	n, _ := res.RowsAffected()
-	if n == 0 {
-		return db.ErrNotFound
+	if !ok {
+		return ErrNotFound
 	}
 	return nil
 }
@@ -254,16 +237,11 @@ func (w WebAuthn) Delete(ctx context.Context, userID, id int64) error {
 func (w WebAuthn) issueChallenge(ctx context.Context, userID *int64, typ string, options any, session *webauthn.SessionData) (string, any, error) {
 	token := RandomString(48)
 	now := time.Now().UTC()
-	payload := map[string]any{"options": options, "session": session}
-	raw, err := json.Marshal(payload)
+	raw, err := json.Marshal(map[string]any{"options": options, "session": session})
 	if err != nil {
 		return "", nil, err
 	}
-	err = db.Q(w.DB).InsertWebAuthnChallenge(ctx, sqlc.InsertWebAuthnChallengeParams{
-		UserID: db.NullInt64(userID), TokenHash: HashToken(token), Type: typ, Options: string(raw),
-		ExpiresAt: now.Add(5 * time.Minute).Format(time.RFC3339),
-		CreatedAt: db.NS(now.Format(time.RFC3339)), UpdatedAt: db.NS(now.Format(time.RFC3339)),
-	})
+	err = w.repo().InsertPasskeyChallenge(ctx, userID, HashToken(token), typ, string(raw), now.Add(5*time.Minute), now)
 	return token, options, err
 }
 
@@ -279,29 +257,21 @@ func (w WebAuthn) consumeChallenge(ctx context.Context, token, typ string, userI
 }
 
 func (w WebAuthn) consumeChallengeAny(ctx context.Context, token, typ string) (*webauthn.SessionData, int64, error) {
-	now := time.Now().UTC().Format(time.RFC3339)
-	row, err := db.Q(w.DB).GetOpenWebAuthnChallenge(ctx, sqlc.GetOpenWebAuthnChallengeParams{
-		TokenHash: HashToken(token), Type: typ, ExpiresAt: now,
-	})
-	if err != nil {
+	row, _ := w.repo().TakePasskeyChallenge(ctx, HashToken(token), typ, time.Now().UTC())
+	if row == nil {
 		return nil, 0, nil
 	}
-	_ = db.Q(w.DB).ConsumeWebAuthnChallenge(ctx, sqlc.ConsumeWebAuthnChallengeParams{
-		ConsumedAt: db.NS(now), UpdatedAt: db.NS(now), TokenHash: HashToken(token),
-	})
-	raw := row.Options
-	uid := row.UserID
 	var wrap struct {
 		Session webauthn.SessionData `json:"session"`
 	}
-	if err := json.Unmarshal([]byte(raw), &wrap); err != nil {
+	if err := json.Unmarshal([]byte(row.Options), &wrap); err != nil {
 		return nil, 0, err
 	}
-	return &wrap.Session, uid.Int64, nil
+	return &wrap.Session, row.UserID, nil
 }
 
 func (w WebAuthn) loadCreds(ctx context.Context, userID int64) ([]webauthn.Credential, error) {
-	recs, err := db.Q(w.DB).ListWebAuthnRecords(ctx, userID)
+	recs, err := w.repo().PasskeyRecords(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -330,11 +300,11 @@ func (w WebAuthn) userForHandle(ctx context.Context, handle, rawID []byte) (*Use
 	if len(rawID) == 0 {
 		return nil, nil, nil
 	}
-	userID, err := db.Q(w.DB).GetWebAuthnUserIDByCredential(ctx, b64(rawID))
-	if err != nil {
+	userID, err := w.repo().PasskeyUserID(ctx, b64(rawID))
+	if err != nil || userID == nil {
 		return nil, nil, nil
 	}
-	u, err := Users{DB: w.DB}.ByID(ctx, userID)
+	u, err := Users{DB: w.DB}.ByID(ctx, *userID)
 	if err != nil || u == nil {
 		return u, nil, err
 	}
@@ -343,10 +313,7 @@ func (w WebAuthn) userForHandle(ctx context.Context, handle, rawID []byte) (*Use
 }
 
 func (w WebAuthn) touchCred(ctx context.Context, rawID []byte) {
-	now := time.Now().UTC().Format(time.RFC3339)
-	_ = db.Q(w.DB).TouchWebAuthnCredential(ctx, sqlc.TouchWebAuthnCredentialParams{
-		LastUsedAt: db.NS(now), UpdatedAt: db.NS(now), CredentialID: b64(rawID),
-	})
+	_ = w.repo().TouchPasskey(ctx, b64(rawID), time.Now().UTC())
 }
 
 func descriptors(creds []webauthn.Credential) []protocol.CredentialDescriptor {

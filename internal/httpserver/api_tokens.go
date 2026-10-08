@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"savvy-go/internal/auth"
-	"savvy-go/internal/db"
 	"savvy-go/internal/httpserver/dto"
 
 	"github.com/go-chi/chi/v5"
@@ -83,7 +82,7 @@ func (s *Server) apiTokensStore(w http.ResponseWriter, r *http.Request) {
 func (s *Server) apiTokensDestroy(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err := s.apiTokens.Revoke(r.Context(), userFrom(r).ID, id); err != nil {
-		if err == db.ErrNotFound {
+		if err == auth.ErrNotFound {
 			writeMessage(w, http.StatusNotFound, "Not found.")
 			return
 		}

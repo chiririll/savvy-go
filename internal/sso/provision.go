@@ -8,8 +8,6 @@ import (
 	"time"
 
 	"savvy-go/internal/auth"
-	"savvy-go/internal/db"
-	"savvy-go/internal/db/sqlc"
 )
 
 func (s Service) Provision(ctx context.Context, p IdentityProvider, id NormalizedIdentity) (*auth.User, bool, error) {
@@ -43,8 +41,8 @@ func (s Service) Provision(ctx context.Context, p IdentityProvider, id Normalize
 }
 
 func (s Service) loginExisting(ctx context.Context, p IdentityProvider, id NormalizedIdentity) (*auth.User, bool, error) {
-	link, err := db.Q(s.DB).GetUserIdentity(ctx, sqlc.GetUserIdentityParams{IdentityProviderID: p.ID, Subject: id.Subject})
-	if err != nil {
+	link, err := s.repo().LinkBySubject(ctx, p.ID, id.Subject)
+	if link == nil || err != nil {
 		return nil, false, nil
 	}
 	userID := link.UserID
@@ -57,11 +55,8 @@ func (s Service) loginExisting(ctx context.Context, p IdentityProvider, id Norma
 		_ = s.syncRole(ctx, user, p, id)
 		user, _ = s.Users.ByID(ctx, user.ID)
 	}
-	now := time.Now().UTC().Format(time.RFC3339)
 	raw, _ := json.Marshal(id.Raw)
-	_ = db.Q(s.DB).TouchUserIdentity(ctx, sqlc.TouchUserIdentityParams{
-		LastLoginAt: db.NS(now), Claims: db.NS(string(raw)), UpdatedAt: db.NS(now), ID: linkID,
-	})
+	_ = s.repo().TouchLink(ctx, linkID, string(raw), time.Now().UTC())
 	return user, true, nil
 }
 
@@ -120,12 +115,8 @@ func (s Service) justInTime(ctx context.Context, p IdentityProvider, id Normaliz
 }
 
 func (s Service) createLink(ctx context.Context, p IdentityProvider, id NormalizedIdentity, userID int64) error {
-	now := time.Now().UTC().Format(time.RFC3339)
 	raw, _ := json.Marshal(id.Raw)
-	return db.Q(s.DB).InsertUserIdentity(ctx, sqlc.InsertUserIdentityParams{
-		UserID: userID, IdentityProviderID: p.ID, Subject: id.Subject,
-		LastLoginAt: db.NS(now), Claims: db.NS(string(raw)), CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
-	})
+	return s.repo().InsertLink(ctx, userID, p.ID, id.Subject, string(raw), time.Now().UTC())
 }
 
 func (s Service) syncRole(ctx context.Context, user *auth.User, p IdentityProvider, id NormalizedIdentity) error {

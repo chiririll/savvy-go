@@ -7,7 +7,7 @@ go run ./cmd/savvy-go       # serves :8080, data in ./savvy-data
 
 ## Store boundary
 
-- `ledger`, `spaces`, `transfers`, `uploads`, `automation`, `recurring`, `reports`, `calendar`, `currencydata`, `sso`, `backup`, `importer`, `legacy/restore`, `httpserver`, `auth`, `settings`, `seed`, `signing`, `schedule`, `jobs` use storage only via `internal/store`. No `store/sqlite`, `migrate`, `legacy`, `modernc.org/sqlite`, `database/sql` imports (use `db.NInt`, `db.NString`, `db.ErrNotFound`, `db.TimeNS`, `db.FormatTime`). No `PRAGMA`, `ATTACH`, `sqlite_master` in SQL. `store/arch_test.go` enforces. Reason: space DB may become Postgres schema later.
+- `ledger`, `spaces`, `transfers`, `uploads`, `automation`, `recurring`, `reports`, `calendar`, `currencydata`, `sso`, `backup`, `importer`, `legacy/restore`, `httpserver`, `auth`, `settings`, `seed`, `signing`, `schedule`, `jobs` use storage only via `internal/store`. No `store/sqlite`, `migrate`, `legacy`, `modernc.org/sqlite`, `database/sql`, `db/sqlc` imports. No `PRAGMA`, `ATTACH`, `sqlite_master` in SQL. `store/arch_test.go` enforces. Reason: space DB may become Postgres schema later.
 - Work touching two spaces: `store.InSpaces`.
 
 ## Packages
@@ -27,6 +27,11 @@ Dependencies point down. Each package may import the ones above it in this list,
 
 ## SQL
 
+- SQL lives only in the database packages: `internal/db` (+ `sqlc`, `filter`), the repositories `internal/db/repo/<area>`, `store/sqlite`, `migrate`, `legacy`. Business code never builds a query or sees a `sql.Null*`.
+- A repository (`internal/db/repo/<area>`: `auth`, `ledger`, `spaces`, `sso`, `transfers`, `recurring`, `automation`, `importer`, `settings`, `uploads`; imported as `repo` by its own package) takes a `store.DB` and speaks plain Go: `time.Time`, pointers for optional values, `money.Money` for amounts, nil for "no such row", a bool for "did it change a row". It decides nothing: rules and the clock (it is handed `now`) stay in the business package. It never imports a business package (tested).
+- A package imports only its own repository (as `repo`). Rows of another area come through that area's package. Exceptions: `reports` and `seed` (tested in `store/arch_test.go`). Repo tests may import other repos for fixtures.
+- `Repo{DB: tx}` works inside `store.Tx`; build it from the transaction handle.
+- New query: add the `.sql`, run generate, add a repository method, call that. Test the method in `repo/<area>` with `db/dbtest` (real migrated DB). Tests may still use raw SQL to set up or check stored rows.
 - Queries in `internal/db/queries/{server,space}`. Server queries touch only server tables, space only space tables. Keep SQL Postgres-compatible. Tests enforce.
 - `internal/db/sqlc` generated, never edit. Change query, run `go generate ./internal/db`.
 - sqlc sqlite: use each `narg` once per query (COALESCE/CASE), never `OR col = ?N`. Driver counts every `?`.

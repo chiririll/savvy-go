@@ -7,8 +7,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	"savvy-go/internal/db"
-	"savvy-go/internal/db/sqlc"
+	repo "savvy-go/internal/db/repo/ledger"
 	"savvy-go/internal/money"
 	"savvy-go/internal/store"
 )
@@ -26,45 +25,39 @@ type Category struct {
 
 type Categories struct{ DB store.DB }
 
+func (s Categories) repo() repo.Repo { return repo.Repo{DB: s.DB} }
+
 func (s Categories) All(ctx context.Context, typ string) ([]Category, error) {
-	rows, err := db.Q(s.DB).ListCategories(ctx, db.Narg(typ))
+	rows, err := s.repo().Categories(ctx, typ)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]Category, 0, len(rows))
-	for _, r := range rows {
-		out = append(out, categoryFrom(r.ID, r.Name, r.Type, r.Icon, r.Color, r.IsDefault, r.Count))
+	out := make([]Category, len(rows))
+	for i, r := range rows {
+		out[i] = categoryFrom(r)
 	}
 	return out, nil
 }
 
 func (s Categories) ByID(ctx context.Context, id int64) (*Category, error) {
-	r, err := db.Q(s.DB).GetCategory(ctx, id)
-	if err == db.ErrNotFound {
-		return nil, nil
-	}
-	if err != nil {
+	r, err := s.repo().Category(ctx, id)
+	if r == nil || err != nil {
 		return nil, err
 	}
-	c := categoryFrom(r.ID, r.Name, r.Type, r.Icon, r.Color, r.IsDefault, r.Count)
+	c := categoryFrom(*r)
 	return &c, nil
 }
 
 func (s Categories) Create(ctx context.Context, c Category) (*Category, error) {
 	if c.IsDefault {
-		if err := db.Q(s.DB).ClearDefaultCategory(ctx, c.Type); err != nil {
+		if err := s.repo().ClearDefaultCategory(ctx, c.Type); err != nil {
 			return nil, err
 		}
 	}
-	now := time.Now().UTC().Format(time.RFC3339)
-	res, err := db.Q(s.DB).InsertCategory(ctx, sqlc.InsertCategoryParams{
-		Name: c.Name, Type: c.Type, Icon: db.NullString(c.Icon), Color: db.NullString(c.Color),
-		IsDefault: db.BoolInt(c.IsDefault), CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
-	})
+	id, err := s.repo().InsertCategory(ctx, categoryRow(c), time.Now().UTC())
 	if err != nil {
 		return nil, err
 	}
-	id, _ := res.LastInsertId()
 	return s.ByID(ctx, id)
 }
 
@@ -80,16 +73,11 @@ func (s Categories) Update(ctx context.Context, id int64, c Category) (*Category
 		return nil, fmt.Errorf("cannot unset default")
 	}
 	if c.IsDefault && !cur.IsDefault {
-		if err := db.Q(s.DB).ClearDefaultCategory(ctx, c.Type); err != nil {
+		if err := s.repo().ClearDefaultCategory(ctx, c.Type); err != nil {
 			return nil, err
 		}
 	}
-	now := time.Now().UTC().Format(time.RFC3339)
-	err = db.Q(s.DB).UpdateCategory(ctx, sqlc.UpdateCategoryParams{
-		Name: c.Name, Type: c.Type, Icon: db.NullString(c.Icon), Color: db.NullString(c.Color),
-		IsDefault: db.BoolInt(c.IsDefault), UpdatedAt: db.NS(now), ID: id,
-	})
-	if err != nil {
+	if err := s.repo().UpdateCategory(ctx, id, categoryRow(c), time.Now().UTC()); err != nil {
 		return nil, err
 	}
 	return s.ByID(ctx, id)
@@ -114,21 +102,12 @@ func (s Categories) Delete(ctx context.Context, id int64, successorID *int64) er
 		if successor == nil || successor.Type != c.Type || successor.ID == c.ID {
 			return fmt.Errorf("invalid successor")
 		}
-		return store.Tx(ctx, s.DB, func(tx store.DB) error {
-			q := db.Q(tx)
-			if err := q.ReassignCategoryTransactions(ctx, sqlc.ReassignCategoryTransactionsParams{
-				CategoryID: db.NI(*successorID), CategoryID_2: db.NI(id),
-			}); err != nil {
-				return err
-			}
-			return q.DeleteCategory(ctx, id)
-		})
+		return s.repo().ReplaceCategory(ctx, id, *successorID)
 	}
-	n, _ := db.Q(s.DB).CountCategoriesByType(ctx, c.Type)
-	if n <= 1 {
+	if s.repo().CountCategoriesOfType(ctx, c.Type) <= 1 {
 		return fmt.Errorf("last")
 	}
-	return db.Q(s.DB).DeleteCategory(ctx, id)
+	return s.repo().DeleteCategory(ctx, id)
 }
 
 func (s Categories) SetDefault(ctx context.Context, id int64) (*Category, error) {
@@ -139,11 +118,10 @@ func (s Categories) SetDefault(ctx context.Context, id int64) (*Category, error)
 	if c.IsDefault {
 		return c, nil
 	}
-	if err := db.Q(s.DB).ClearDefaultCategory(ctx, c.Type); err != nil {
+	if err := s.repo().ClearDefaultCategory(ctx, c.Type); err != nil {
 		return nil, err
 	}
-	now := time.Now().UTC().Format(time.RFC3339)
-	if err := db.Q(s.DB).SetCategoryDefault(ctx, sqlc.SetCategoryDefaultParams{UpdatedAt: db.NS(now), ID: id}); err != nil {
+	if err := s.repo().SetCategoryDefault(ctx, id, time.Now().UTC()); err != nil {
 		return nil, err
 	}
 	return s.ByID(ctx, id)
@@ -162,14 +140,11 @@ func (s Categories) Statistics(ctx context.Context, id int64, start, end string)
 	if err != nil || c == nil {
 		return nil, err
 	}
-	rows, _ := db.Q(s.DB).CategoryStatistics(ctx, sqlc.CategoryStatisticsParams{
-		CategoryID: db.NI(id), StartDate: db.Narg(start), EndDate: db.Narg(end),
-	})
 	out := &CategoryStatistics{Category: *c}
 	total := decimal.Zero
-	for _, row := range rows {
-		out.Count += int(row.Cnt)
-		total = total.Add(decimal.New(row.Total, -int32(row.Decimals)).Mul(row.Rate))
+	for _, row := range s.repo().CategoryStatistics(ctx, id, start, end) {
+		out.Count += row.Count
+		total = total.Add(decimal.New(row.Minor, -int32(row.Decimals)).Mul(row.Rate))
 	}
 	var unit money.Unit // no base currency means nothing was counted either
 	if base, _ := (Currencies{DB: s.DB}).Base(ctx); base != nil {
@@ -179,13 +154,13 @@ func (s Categories) Statistics(ctx context.Context, id int64, start, end string)
 	return out, nil
 }
 
-func categoryFrom(id int64, name, typ string, icon, color db.NString, isDefault, count int64) Category {
-	c := Category{ID: id, Name: name, Type: typ, IsDefault: isDefault != 0, TransactionsCount: int(count)}
-	if icon.Valid {
-		c.Icon = &icon.String
+func categoryFrom(r repo.Category) Category {
+	return Category{
+		ID: r.ID, Name: r.Name, Type: r.Type, Icon: r.Icon, Color: r.Color,
+		IsDefault: r.IsDefault, TransactionsCount: r.TransactionsCount,
 	}
-	if color.Valid {
-		c.Color = &color.String
-	}
-	return c
+}
+
+func categoryRow(c Category) repo.Category {
+	return repo.Category{Name: c.Name, Type: c.Type, Icon: c.Icon, Color: c.Color, IsDefault: c.IsDefault}
 }

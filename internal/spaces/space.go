@@ -9,8 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"savvy-go/internal/auth"
-	"savvy-go/internal/db"
-	"savvy-go/internal/db/sqlc"
+	repo "savvy-go/internal/db/repo/spaces"
 	"savvy-go/internal/store"
 )
 
@@ -30,10 +29,6 @@ func ValidRole(role string) bool {
 // CanWrite reports whether a space role may change the space's data.
 func CanWrite(role string) bool { return role == RoleAdmin || role == RoleEditor }
 
-// spaceUUIDKey is the space_settings key that ties a space database to its
-// registry row, so a file can be recognised when it is restored or imported.
-const spaceUUIDKey = "space_uuid"
-
 // Space is a space as one user sees it: Role is their role in it.
 type Space struct {
 	ID   int64
@@ -49,7 +44,23 @@ var ErrGuestCannotAdmin = errors.New("a guest cannot be a space admin")
 // database and creates their databases through the store.
 type Service struct{ Store store.Store }
 
-func (s Service) server() *sqlc.Queries { return db.Q(s.Store.Server()) }
+func (s Service) registry() repo.Repo { return repo.Repo{DB: s.Store.Server()} }
+
+// stampUUID writes a space's uuid into its own database.
+func (s Service) stampUUID(ctx context.Context, id int64, uuid string) error {
+	spaceDB, err := s.Store.Space(ctx, id)
+	if err != nil {
+		return err
+	}
+	return repo.Stamp{DB: spaceDB}.SetUUID(ctx, uuid)
+}
+
+func ownerID(owner *auth.User) *int64 {
+	if owner == nil {
+		return nil
+	}
+	return &owner.ID
+}
 
 // Create registers a space, creates its database and, when owner is set,
 // makes them its admin.
@@ -61,28 +72,17 @@ func (s Service) Create(ctx context.Context, name string, owner *auth.User) (*Sp
 	if err != nil {
 		return nil, err
 	}
-	now := time.Now().UTC().Format(time.RFC3339)
-	var createdBy db.NInt
-	if owner != nil {
-		createdBy = db.NI(owner.ID)
-	}
-	id, err := s.server().InsertSpace(ctx, sqlc.InsertSpaceParams{
-		Uuid: id7.String(), Name: name, CreatedBy: createdBy, CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
-	})
+	id, err := s.registry().Insert(ctx, id7.String(), name, ownerID(owner), time.Now().UTC())
 	if err != nil {
 		return nil, err
 	}
 	if err := s.Store.CreateSpace(ctx, id); err != nil {
-		_ = s.server().DeleteSpaceRow(ctx, id)
+		_ = s.registry().Delete(ctx, id)
 		return nil, fmt.Errorf("create space database: %w", err)
 	}
-	spaceDB, err := s.Store.Space(ctx, id)
-	if err == nil {
-		err = db.Q(spaceDB).UpsertSpaceSetting(ctx, sqlc.UpsertSpaceSettingParams{Key: spaceUUIDKey, Value: db.NS(id7.String())})
-	}
-	if err != nil {
+	if err := s.stampUUID(ctx, id, id7.String()); err != nil {
 		_ = s.Store.DeleteSpace(ctx, id)
-		_ = s.server().DeleteSpaceRow(ctx, id)
+		_ = s.registry().Delete(ctx, id)
 		return nil, err
 	}
 	sp := &Space{ID: id, UUID: id7.String(), Name: name}
@@ -103,7 +103,8 @@ func (s Service) CreateFrom(ctx context.Context, name string, owner *auth.User, 
 		return nil, ErrGuestCannotAdmin
 	}
 	id7 := p.UUID
-	if _, err := s.server().SpaceIDByUUID(ctx, id7); id7 == "" || err == nil {
+	taken, err := s.registry().HasUUID(ctx, id7)
+	if id7 == "" || taken || err != nil {
 		fresh, err := uuid.NewV7()
 		if err != nil {
 			s.Store.Discard(p.Artifact)
@@ -111,28 +112,17 @@ func (s Service) CreateFrom(ctx context.Context, name string, owner *auth.User, 
 		}
 		id7 = fresh.String()
 	}
-	now := time.Now().UTC().Format(time.RFC3339)
-	var createdBy db.NInt
-	if owner != nil {
-		createdBy = db.NI(owner.ID)
-	}
-	id, err := s.server().InsertSpace(ctx, sqlc.InsertSpaceParams{
-		Uuid: id7, Name: name, CreatedBy: createdBy, CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
-	})
+	id, err := s.registry().Insert(ctx, id7, name, ownerID(owner), time.Now().UTC())
 	if err != nil {
 		s.Store.Discard(p.Artifact)
 		return nil, err
 	}
 	if err := s.Store.ImportSpace(ctx, id, p); err != nil {
-		_ = s.server().DeleteSpaceRow(ctx, id)
+		_ = s.registry().Delete(ctx, id)
 		return nil, err
 	}
 	if id7 != p.UUID {
-		spaceDB, err := s.Store.Space(ctx, id)
-		if err == nil {
-			err = db.Q(spaceDB).UpsertSpaceSetting(ctx, sqlc.UpsertSpaceSettingParams{Key: spaceUUIDKey, Value: db.NS(id7)})
-		}
-		if err != nil {
+		if err := s.stampUUID(ctx, id, id7); err != nil {
 			return nil, err
 		}
 	}
@@ -148,14 +138,11 @@ func (s Service) CreateFrom(ctx context.Context, name string, owner *auth.User, 
 
 // Get is a space by id, without a role.
 func (s Service) Get(ctx context.Context, id int64) (*Space, error) {
-	row, err := s.server().GetSpace(ctx, id)
-	if errors.Is(err, db.ErrNotFound) {
-		return nil, nil
-	}
-	if err != nil {
+	row, err := s.registry().ByID(ctx, id)
+	if row == nil || err != nil {
 		return nil, err
 	}
-	return &Space{ID: row.ID, UUID: row.Uuid, Name: row.Name}, nil
+	return &Space{ID: row.ID, UUID: row.UUID, Name: row.Name}, nil
 }
 
 // Provision gives a new user their personal space. Guests get none: they
@@ -175,34 +162,41 @@ func (s Service) SetMember(ctx context.Context, spaceID int64, u *auth.User, rol
 	if role == RoleAdmin && u.IsGuest() {
 		return ErrGuestCannotAdmin
 	}
-	return s.server().UpsertSpaceMember(ctx, sqlc.UpsertSpaceMemberParams{
-		SpaceID: spaceID, UserID: u.ID, Role: role, CreatedAt: db.NS(time.Now().UTC().Format(time.RFC3339)),
-	})
+	return s.registry().UpsertMember(ctx, spaceID, u.ID, role, time.Now().UTC())
 }
 
 // Role is userID's role in a space, "" when they are not a member.
 func (s Service) Role(ctx context.Context, spaceID, userID int64) (string, error) {
-	role, err := s.server().GetMemberRole(ctx, sqlc.GetMemberRoleParams{SpaceID: spaceID, UserID: userID})
-	if errors.Is(err, db.ErrNotFound) {
-		return "", nil
-	}
-	return role, err
+	return s.registry().MemberRole(ctx, spaceID, userID)
 }
 
 // ForUser lists the spaces a user is a member of, oldest first.
 func (s Service) ForUser(ctx context.Context, userID int64) ([]Space, error) {
-	rows, err := s.server().ListUserSpaces(ctx, userID)
+	rows, err := s.registry().ForUser(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 	out := make([]Space, len(rows))
 	for i, r := range rows {
-		out[i] = Space{ID: r.ID, UUID: r.Uuid, Name: r.Name, Role: r.Role}
+		out[i] = Space{ID: r.ID, UUID: r.UUID, Name: r.Name, Role: r.Role}
+	}
+	return out, nil
+}
+
+// All lists every registered space with its uuid.
+func (s Service) All(ctx context.Context) ([]Space, error) {
+	rows, err := s.registry().All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Space, len(rows))
+	for i, r := range rows {
+		out[i] = Space{ID: r.ID, UUID: r.UUID, Name: r.Name}
 	}
 	return out, nil
 }
 
 // IDs lists every registered space.
 func (s Service) IDs(ctx context.Context) ([]int64, error) {
-	return s.server().ListSpaceIDs(ctx)
+	return s.registry().IDs(ctx)
 }

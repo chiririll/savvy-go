@@ -16,8 +16,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	"savvy-go/internal/db"
-	"savvy-go/internal/db/sqlc"
+	repo "savvy-go/internal/db/repo/importer"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/money"
 	"savvy-go/internal/store"
@@ -29,6 +28,13 @@ type Service struct {
 	DB      store.DB
 	Uploads uploads.Service
 	Txs     ledger.Transactions
+}
+
+func (s Service) repo() repo.Repo { return repo.Repo{DB: s.DB} }
+
+// CountsByStatus counts the imports of the space by their status.
+func (s Service) CountsByStatus(ctx context.Context) (map[string]int, error) {
+	return s.repo().CountsByStatus(ctx)
 }
 
 type Import struct {
@@ -50,58 +56,38 @@ type Import struct {
 
 func (s Service) Create(ctx context.Context, userID int64, uploadID string) (*Import, error) {
 	id := newID()
-	now := time.Now().UTC().Format(time.RFC3339)
-	err := db.Q(s.DB).InsertImport(ctx, sqlc.InsertImportParams{
-		ID: id, UserID: db.NI(userID), UploadID: db.NS(uploadID), Status: "parsing",
-		CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
-	})
-	if err != nil {
+	if err := s.repo().Insert(ctx, id, userID, uploadID, "parsing", time.Now().UTC()); err != nil {
 		return nil, err
 	}
 	return s.ByID(ctx, id)
 }
 
 func (s Service) ByID(ctx context.Context, id string) (*Import, error) {
-	row, err := db.Q(s.DB).GetImport(ctx, id)
-	if err == db.ErrNotFound {
-		return nil, nil
-	}
-	if err != nil {
+	row, err := s.repo().ByID(ctx, id)
+	if row == nil || err != nil {
 		return nil, err
 	}
 	im := Import{
-		ID: row.ID, Status: row.Status, ProcessedRows: int(row.ProcessedRows),
-		CreatedCount: int(row.CreatedCount), SkippedCount: int(row.SkippedCount), ErrorCount: int(row.ErrorCount),
+		ID: row.ID, UserID: row.UserID, UploadID: row.UploadID, Status: row.Status, TotalRows: row.TotalRows,
+		ProcessedRows: row.ProcessedRows, CreatedCount: row.CreatedCount, SkippedCount: row.SkippedCount,
+		ErrorCount: row.ErrorCount, Message: row.Message,
 	}
-	if row.UserID.Valid {
-		im.UserID = &row.UserID.Int64
+	if row.Mapping != nil {
+		_ = json.Unmarshal([]byte(*row.Mapping), &im.Mapping)
 	}
-	if row.UploadID.Valid {
-		im.UploadID = &row.UploadID.String
+	if row.Options != nil {
+		_ = json.Unmarshal([]byte(*row.Options), &im.Options)
 	}
-	if row.TotalRows.Valid {
-		n := int(row.TotalRows.Int64)
-		im.TotalRows = &n
-	}
-	if row.Mapping.Valid {
-		_ = json.Unmarshal([]byte(row.Mapping.String), &im.Mapping)
-	}
-	if row.Options.Valid {
-		_ = json.Unmarshal([]byte(row.Options.String), &im.Options)
-	}
-	if row.Errors.Valid && row.Errors.String != "" {
+	if row.Errors != nil && *row.Errors != "" {
 		var v any
-		_ = json.Unmarshal([]byte(row.Errors.String), &v)
+		_ = json.Unmarshal([]byte(*row.Errors), &v)
 		im.Errors = v
 	}
-	if row.Meta.Valid && row.Meta.String != "" {
-		_ = json.Unmarshal([]byte(row.Meta.String), &im.Meta)
+	if row.Meta != nil && *row.Meta != "" {
+		_ = json.Unmarshal([]byte(*row.Meta), &im.Meta)
 	}
 	if im.Meta == nil {
 		im.Meta = map[string]any{}
-	}
-	if row.Message.Valid {
-		im.Message = &row.Message.String
 	}
 	return &im, nil
 }
@@ -138,10 +124,7 @@ func (s Service) Parse(ctx context.Context, importID, uploadID string) error {
 		"parse_meta":        map[string]any{"delimiter": string(detected.delimiter), "has_header": true, "encoding": "utf-8"},
 	}
 	rawMeta, _ := json.Marshal(meta)
-	now := time.Now().UTC().Format(time.RFC3339)
-	return db.Q(s.DB).MarkImportParsed(ctx, sqlc.MarkImportParsedParams{
-		TotalRows: db.NI(int64(len(rows))), Meta: db.NS(string(rawMeta)), UpdatedAt: db.NS(now), ID: importID,
-	})
+	return s.repo().MarkParsed(ctx, importID, len(rows), string(rawMeta), time.Now().UTC())
 }
 
 func (s Service) Execute(ctx context.Context, importID string, mapping, options map[string]any) error {
@@ -158,10 +141,8 @@ func (s Service) Execute(ctx context.Context, importID string, mapping, options 
 	}
 	mapJSON, _ := json.Marshal(mapping)
 	optJSON, _ := json.Marshal(options)
-	now := time.Now().UTC().Format(time.RFC3339)
-	_ = db.Q(s.DB).MarkImportImporting(ctx, sqlc.MarkImportImportingParams{
-		Mapping: db.NS(string(mapJSON)), Options: db.NS(string(optJSON)), UpdatedAt: db.NS(now), ID: importID,
-	})
+	now := time.Now().UTC()
+	_ = s.repo().MarkImporting(ctx, importID, string(mapJSON), string(optJSON), now)
 
 	raw, err := s.Uploads.ReadFile(up)
 	if err != nil {
@@ -198,20 +179,18 @@ func (s Service) Execute(ctx context.Context, importID string, mapping, options 
 			continue
 		}
 		hash := dedupHash(res.date, res.amount, res.desc)
-		st := "confirmed"
-		ins, err := db.Q(s.DB).InsertTransactionIgnoreDup(ctx, sqlc.InsertTransactionIgnoreDupParams{
-			Type: res.typ, AccountID: accountID, CategoryID: resolver.resolve(res.category), Amount: amount.Minor(), Description: db.NS(res.desc),
-			Date: db.NS(res.date), Status: st, DedupHash: db.NS(hash), CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
-		})
+		added, err := s.repo().InsertRow(ctx, repo.Row{
+			Type: res.typ, AccountID: accountID, CategoryID: resolver.resolve(res.category), Minor: amount.Minor(),
+			Description: res.desc, Date: res.date, Status: "confirmed", DedupHash: hash,
+		}, now)
 		if err != nil {
 			errs = append(errs, map[string]any{"row": i + 1, "message": err.Error()})
 			continue
 		}
-		n, _ := ins.RowsAffected()
-		if n == 0 {
-			skipped++
-		} else {
+		if added {
 			created++
+		} else {
+			skipped++
 		}
 	}
 	errJSON, _ := json.Marshal(errs)
@@ -223,11 +202,10 @@ func (s Service) Execute(ctx context.Context, importID string, mapping, options 
 	meta["created_tags"] = []any{}
 	meta["created_categories"] = resolver.created
 	metaJSON, _ := json.Marshal(meta)
-	err = db.Q(s.DB).MarkImportCompleted(ctx, sqlc.MarkImportCompletedParams{
-		ProcessedRows: int64(created + skipped + len(errs)), CreatedCount: int64(created), SkippedCount: int64(skipped),
-		ErrorCount: int64(len(errs)), Errors: db.NS(string(errJSON)), Meta: db.NS(string(metaJSON)),
-		UpdatedAt: db.NS(now), ID: importID,
-	})
+	err = s.repo().MarkCompleted(ctx, importID, repo.Result{
+		Processed: created + skipped + len(errs), Created: created, Skipped: skipped, Errors: len(errs),
+		ErrorsJSON: string(errJSON), MetaJSON: string(metaJSON),
+	}, now)
 	if err != nil {
 		return err
 	}
@@ -297,8 +275,7 @@ func (s Service) Preview(ctx context.Context, im *Import, mapping, options map[s
 }
 
 func (s Service) fail(ctx context.Context, id, msg string) error {
-	now := time.Now().UTC().Format(time.RFC3339)
-	return db.Q(s.DB).FailImport(ctx, sqlc.FailImportParams{Message: db.NS(msg), UpdatedAt: db.NS(now), ID: id})
+	return s.repo().Fail(ctx, id, msg, time.Now().UTC())
 }
 
 func parseCSV(raw []byte) ([]string, [][]string, error) {

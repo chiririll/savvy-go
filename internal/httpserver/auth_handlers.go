@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"savvy-go/internal/auth"
-	"savvy-go/internal/db"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -20,8 +19,7 @@ func (s *Server) passwordLoginDisabled(r *http.Request) bool {
 }
 
 func (s *Server) enabledSSOExists(r *http.Request) bool {
-	n, _ := db.Q(s.store.Server()).CountEnabledIdentityProviders(r.Context())
-	return n > 0
+	return s.sso.AnyEnabled(r.Context())
 }
 
 func (s *Server) authStatus(w http.ResponseWriter, r *http.Request) {

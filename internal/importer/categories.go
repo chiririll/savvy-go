@@ -5,7 +5,6 @@ import (
 	"sort"
 	"strings"
 
-	"savvy-go/internal/db"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/store"
 )
@@ -103,7 +102,7 @@ type categoryResolver struct {
 	choices       map[string]any
 	createMissing bool
 	existing      map[string]int64
-	cache         map[string]db.NInt
+	cache         map[string]*int64
 	created       []string
 }
 
@@ -114,7 +113,7 @@ func (s Service) newCategoryResolver(ctx context.Context, cats []*importCategory
 	}
 	r := &categoryResolver{
 		ctx: ctx, db: s.DB, existing: existing,
-		cats: map[string]*importCategory{}, choices: map[string]any{}, cache: map[string]db.NInt{},
+		cats: map[string]*importCategory{}, choices: map[string]any{}, cache: map[string]*int64{},
 		created: []string{},
 	}
 	for _, c := range cats {
@@ -131,10 +130,10 @@ func (s Service) newCategoryResolver(ctx context.Context, cats []*importCategory
 	return r, nil
 }
 
-func (r *categoryResolver) resolve(name string) db.NInt {
+func (r *categoryResolver) resolve(name string) *int64 {
 	key := strings.ToLower(strings.TrimSpace(name))
 	if key == "" {
-		return db.NInt{}
+		return nil
 	}
 	if v, ok := r.cache[key]; ok {
 		return v
@@ -144,7 +143,7 @@ func (r *categoryResolver) resolve(name string) db.NInt {
 	return v
 }
 
-func (r *categoryResolver) lookup(key, name string) db.NInt {
+func (r *categoryResolver) lookup(key, name string) *int64 {
 	typ := "expense"
 	if c := r.cats[key]; c != nil {
 		typ = c.Type
@@ -154,30 +153,30 @@ func (r *categoryResolver) lookup(key, name string) db.NInt {
 	if chosen {
 		if id, ok := asInt64(choice); ok {
 			if c, err := (ledger.Categories{DB: r.db}).ByID(r.ctx, id); err == nil && c != nil {
-				return db.NI(id)
+				return &id
 			}
-			return db.NInt{}
+			return nil
 		}
 		if s, _ := choice.(string); s != "create" {
-			return db.NInt{} // "skip" or null: leave the transaction uncategorized
+			return nil // "skip" or null: leave the transaction uncategorized
 		}
 	}
 	if !chosen {
 		if id, ok := r.existing[categoryKey(name, typ)]; ok {
-			return db.NI(id)
+			return &id
 		}
 		if !r.createMissing {
-			return db.NInt{}
+			return nil
 		}
 	}
 	if id, ok := r.existing[categoryKey(name, typ)]; ok { // "create" for a name that already exists
-		return db.NI(id)
+		return &id
 	}
 	c, err := (ledger.Categories{DB: r.db}).Create(r.ctx, ledger.Category{Name: name, Type: typ})
 	if err != nil || c == nil {
-		return db.NInt{}
+		return nil
 	}
 	r.existing[categoryKey(name, typ)] = c.ID
 	r.created = append(r.created, name)
-	return db.NI(c.ID)
+	return &c.ID
 }

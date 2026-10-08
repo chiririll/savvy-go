@@ -7,8 +7,7 @@ import (
 	"time"
 
 	"savvy-go/internal/auth"
-	"savvy-go/internal/db"
-	"savvy-go/internal/db/sqlc"
+	repo "savvy-go/internal/db/repo/spaces"
 	"savvy-go/internal/store"
 )
 
@@ -69,82 +68,54 @@ func (s Service) Invite(ctx context.Context, spaceID int64, inviter *auth.User, 
 		return "", errors.New("invalid space role")
 	}
 	token := auth.RandomString(40)
-	var mail db.NString
-	if e := strings.TrimSpace(email); e != "" {
-		mail = db.NS(e)
-	}
-	t := time.Now().UTC()
-	_, err := s.server().InsertInvitation(ctx, sqlc.InsertInvitationParams{
-		SpaceID: spaceID, Email: mail, Role: role, TokenHash: auth.HashToken(token),
-		InvitedBy: db.NI(inviter.ID), InvitedByServerAdmin: db.BoolInt(inviter.IsAdmin()),
-		ExpiresAt: t.Add(invitationTTL).Format(time.RFC3339), CreatedAt: db.NS(t.Format(time.RFC3339)),
+	now := time.Now().UTC()
+	return token, s.registry().InsertInvitation(ctx, repo.NewInvitation{
+		SpaceID: spaceID, Email: strings.TrimSpace(email), Role: role, TokenHash: auth.HashToken(token),
+		InvitedBy: inviter.ID, ByServerAdmin: inviter.IsAdmin(), Expires: now.Add(invitationTTL), Now: now,
 	})
-	return token, err
 }
 
 // Invitations lists a space's invitations, newest first.
 func (s Service) Invitations(ctx context.Context, spaceID int64) ([]Invitation, error) {
-	rows, err := s.server().ListInvitations(ctx, spaceID)
+	rows, err := s.registry().Invitations(ctx, spaceID)
 	if err != nil {
 		return nil, err
 	}
 	out := make([]Invitation, len(rows))
 	for i, r := range rows {
-		inv := Invitation{ID: r.ID, Role: r.Role, Inviter: r.Inviter}
-		if r.Email.Valid {
-			e := r.Email.String
-			inv.Email = &e
-		}
-		if t, err := time.Parse(time.RFC3339, r.ExpiresAt); err == nil {
-			inv.ExpiresAt = &t
-		}
-		if t, ok := db.ParseTime(r.AcceptedAt); ok {
-			inv.AcceptedAt = &t
-		}
-		if t, ok := db.ParseTime(r.CreatedAt); ok {
-			inv.CreatedAt = &t
-		}
-		out[i] = inv
+		out[i] = Invitation{ID: r.ID, Email: r.Email, Role: r.Role, Inviter: r.Inviter,
+			ExpiresAt: r.ExpiresAt, AcceptedAt: r.AcceptedAt, CreatedAt: r.CreatedAt}
 	}
 	return out, nil
 }
 
 // Revoke deletes an invitation of a space.
 func (s Service) Revoke(ctx context.Context, spaceID, id int64) error {
-	res, err := s.server().DeleteInvitation(ctx, sqlc.DeleteInvitationParams{ID: id, SpaceID: spaceID})
+	ok, err := s.registry().DeleteInvitation(ctx, spaceID, id)
 	if err != nil {
 		return err
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
+	if !ok {
 		return ErrInvitationInvalid
 	}
 	return nil
 }
 
-func (s Service) lookupInvitation(ctx context.Context, q *sqlc.Queries, token string) (*invitation, error) {
-	r, err := q.GetInvitationByHash(ctx, auth.HashToken(token))
-	if errors.Is(err, db.ErrNotFound) {
-		return nil, ErrInvitationInvalid
-	}
+func (s Service) lookupInvitation(ctx context.Context, reg repo.Repo, token string) (*invitation, error) {
+	r, err := reg.InvitationByHash(ctx, auth.HashToken(token))
 	if err != nil {
 		return nil, err
 	}
-	inv := &invitation{id: r.ID, spaceID: r.SpaceID, role: r.Role, byServerAdmin: r.InvitedByServerAdmin == 1,
-		accepted: r.AcceptedAt.Valid, spaceName: r.SpaceName, inviter: r.Inviter}
-	if r.Email.Valid {
-		e := r.Email.String
-		inv.email = &e
-	}
-	inv.expires, _ = time.Parse(time.RFC3339, r.ExpiresAt)
-	if inv.accepted || !time.Now().Before(inv.expires) {
+	if r == nil || r.Used || !time.Now().Before(r.Expires) {
 		return nil, ErrInvitationInvalid
 	}
-	return inv, nil
+	return &invitation{id: r.ID, spaceID: r.SpaceID, email: r.Email, role: r.Role, byServerAdmin: r.ByServerAdmin,
+		expires: r.Expires, accepted: r.Used, spaceName: r.SpaceName, inviter: r.Inviter}, nil
 }
 
 // Preview describes a valid invitation to whoever holds its link.
 func (s Service) Preview(ctx context.Context, token string) (*InvitationPreview, error) {
-	inv, err := s.lookupInvitation(ctx, s.server(), token)
+	inv, err := s.lookupInvitation(ctx, s.registry(), token)
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +131,7 @@ func (s Service) Preview(ctx context.Context, token string) (*InvitationPreview,
 func (s Service) Accept(ctx context.Context, token string, u *auth.User) (*Space, error) {
 	// Checks first: inside the transaction only its handle may be used (the
 	// database has one connection, which the transaction holds).
-	inv, err := s.lookupInvitation(ctx, s.server(), token)
+	inv, err := s.lookupInvitation(ctx, s.registry(), token)
 	if err != nil {
 		return nil, err
 	}
@@ -178,15 +149,16 @@ func (s Service) Accept(ctx context.Context, token string, u *auth.User) (*Space
 		}
 	}
 	err = store.Tx(ctx, s.Store.Server(), func(tx store.DB) error {
-		q := db.Q(tx)
-		res, err := q.AcceptInvitation(ctx, sqlc.AcceptInvitationParams{AcceptedAt: db.NS(now()), AcceptedBy: db.NI(u.ID), ID: inv.id})
+		reg := repo.Repo{DB: tx}
+		now := time.Now().UTC()
+		ok, err := reg.AcceptInvitation(ctx, inv.id, u.ID, now)
 		if err != nil {
 			return err
 		}
-		if n, _ := res.RowsAffected(); n == 0 {
+		if !ok {
 			return ErrInvitationInvalid // used meanwhile
 		}
-		return q.UpsertSpaceMember(ctx, sqlc.UpsertSpaceMemberParams{SpaceID: inv.spaceID, UserID: u.ID, Role: inv.role, CreatedAt: db.NS(now())})
+		return reg.UpsertMember(ctx, inv.spaceID, u.ID, inv.role, now)
 	})
 	if err != nil {
 		return nil, err
@@ -205,7 +177,7 @@ func (s Service) Register(ctx context.Context, users auth.Users, token, name, em
 	if !s.settings().Bool(ctx, "space_invites_can_register", true) {
 		return nil, nil, ErrRegistrationClosed
 	}
-	inv, err := s.lookupInvitation(ctx, s.server(), token)
+	inv, err := s.lookupInvitation(ctx, s.registry(), token)
 	if err != nil {
 		return nil, nil, err
 	}

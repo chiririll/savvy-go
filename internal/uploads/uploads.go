@@ -17,8 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"savvy-go/internal/db"
-	"savvy-go/internal/db/sqlc"
+	repo "savvy-go/internal/db/repo/uploads"
 	"savvy-go/internal/store"
 )
 
@@ -57,6 +56,16 @@ type Service struct {
 	SignSecret string
 }
 
+func (s Service) repo() repo.Repo { return repo.Repo{DB: s.DB} }
+
+// Usage is how many uploads of a bucket are in a status, and their bytes.
+type Usage = repo.Usage
+
+// UsageByBucket sums the uploads per bucket and status.
+func (s Service) UsageByBucket(ctx context.Context) ([]Usage, error) {
+	return s.repo().UsageByBucket(ctx)
+}
+
 func (s Service) Create(ctx context.Context, userID int64, bucket, filename string, size *int64, mime *string) (*Upload, error) {
 	b, ok := uploadBucket(bucket)
 	if !ok {
@@ -80,20 +89,18 @@ func (s Service) Create(ctx context.Context, userID int64, bucket, filename stri
 	key := buildObjectKey(b.Prefix, id, filename)
 	now := time.Now().UTC()
 	exp := now.Add(time.Duration(uploadURLTTL) * time.Second)
-	var totalParts db.NInt
+	var totalParts *int
 	if size != nil {
 		n := int((*size + int64(partSize) - 1) / int64(partSize))
 		if n < 1 {
 			n = 1
 		}
-		totalParts = db.NI(int64(n))
+		totalParts = &n
 	}
-	err := db.Q(s.DB).InsertUpload(ctx, sqlc.InsertUploadParams{
-		ID: id, UserID: db.NI(userID), Bucket: bucket, ObjectKey: key, Disk: "local",
-		OriginalName: filename, MimeType: db.NullString(mime), Size: db.NullInt64(size),
-		PartSize: db.NI(int64(partSize)), TotalParts: totalParts, Status: uploadPending,
-		ExpiresAt: db.NS(exp.Format(time.RFC3339)), CreatedAt: db.NS(now.Format(time.RFC3339)),
-		UpdatedAt: db.NS(now.Format(time.RFC3339)),
+	err := s.repo().Insert(ctx, repo.New{
+		ID: id, UserID: userID, Bucket: bucket, ObjectKey: key, Disk: "local", OriginalName: filename,
+		MimeType: mime, Size: size, PartSize: partSize, TotalParts: totalParts, Status: uploadPending,
+		ExpiresAt: exp, Now: now,
 	})
 	if err != nil {
 		return nil, err
@@ -102,40 +109,15 @@ func (s Service) Create(ctx context.Context, userID int64, bucket, filename stri
 }
 
 func (s Service) ByID(ctx context.Context, id string) (*Upload, error) {
-	row, err := db.Q(s.DB).GetUpload(ctx, id)
-	if err == db.ErrNotFound {
-		return nil, nil
-	}
-	if err != nil {
+	row, err := s.repo().ByID(ctx, id)
+	if row == nil || err != nil {
 		return nil, err
 	}
-	u := Upload{
-		ID: row.ID, Bucket: row.Bucket, ObjectKey: row.ObjectKey, Disk: row.Disk,
-		OriginalName: row.OriginalName, Status: row.Status,
-	}
-	if row.PartSize.Valid {
-		u.PartSize = int(row.PartSize.Int64)
-	}
-	if row.UserID.Valid {
-		u.UserID = &row.UserID.Int64
-	}
-	if row.Path.Valid {
-		u.Path = &row.Path.String
-	}
-	if row.MimeType.Valid {
-		u.MimeType = &row.MimeType.String
-	}
-	if row.Size.Valid {
-		u.Size = &row.Size.Int64
-	}
-	if row.TotalParts.Valid {
-		n := int(row.TotalParts.Int64)
-		u.TotalParts = &n
-	}
-	if tm, ok := db.ParseTime(row.ExpiresAt); ok {
-		u.ExpiresAt = &tm
-	}
-	return &u, nil
+	return &Upload{
+		ID: row.ID, UserID: row.UserID, Bucket: row.Bucket, ObjectKey: row.ObjectKey, Disk: row.Disk,
+		Path: row.Path, OriginalName: row.OriginalName, MimeType: row.MimeType, Size: row.Size,
+		PartSize: row.PartSize, TotalParts: row.TotalParts, Status: row.Status, ExpiresAt: row.ExpiresAt,
+	}, nil
 }
 
 func (s Service) SignPart(u *Upload, part int) (map[string]any, error) {
@@ -251,11 +233,7 @@ func (s Service) Complete(ctx context.Context, u *Upload, parts []struct {
 			return nil, err
 		}
 	}
-	now := time.Now().UTC().Format(time.RFC3339)
-	err = db.Q(s.DB).CompleteUpload(ctx, sqlc.CompleteUploadParams{
-		Path: db.NS(u.ObjectKey), TotalParts: db.NI(int64(len(parts))), Status: uploadCompleted,
-		CompletedAt: db.NS(now), UpdatedAt: db.NS(now), ID: u.ID,
-	})
+	err = s.repo().Complete(ctx, u.ID, u.ObjectKey, uploadCompleted, len(parts), time.Now().UTC())
 	if err != nil {
 		return nil, err
 	}
@@ -268,8 +246,7 @@ func (s Service) Abort(ctx context.Context, u *Upload) error {
 	if u.Path != nil {
 		_ = os.Remove(filepath.Join(s.Root, filepath.FromSlash(*u.Path)))
 	}
-	now := time.Now().UTC().Format(time.RFC3339)
-	return db.Q(s.DB).SetUploadStatus(ctx, sqlc.SetUploadStatusParams{Status: uploadAborted, UpdatedAt: db.NS(now), ID: u.ID})
+	return s.repo().SetStatus(ctx, u.ID, uploadAborted, time.Now().UTC())
 }
 
 func (s Service) ReadFile(u *Upload) ([]byte, error) {
@@ -284,8 +261,7 @@ func (s Service) Discard(ctx context.Context, u *Upload) error {
 		_ = os.Remove(filepath.Join(s.Root, filepath.FromSlash(*u.Path)))
 	}
 	_ = os.RemoveAll(filepath.Join(s.Root, u.ID))
-	now := time.Now().UTC().Format(time.RFC3339)
-	return db.Q(s.DB).SetUploadStatus(ctx, sqlc.SetUploadStatusParams{Status: uploadConsumed, UpdatedAt: db.NS(now), ID: u.ID})
+	return s.repo().SetStatus(ctx, u.ID, uploadConsumed, time.Now().UTC())
 }
 
 func (s Service) Location(u *Upload) string {
@@ -293,8 +269,7 @@ func (s Service) Location(u *Upload) string {
 }
 
 func (s Service) PruneExpired(ctx context.Context) error {
-	now := time.Now().UTC().Format(time.RFC3339)
-	ids, err := db.Q(s.DB).ListExpiredPendingUploads(ctx, db.NS(now))
+	ids, err := s.repo().ExpiredPending(ctx, time.Now().UTC())
 	if err != nil {
 		return err
 	}

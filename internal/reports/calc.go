@@ -9,8 +9,8 @@ import (
 	"github.com/shopspring/decimal"
 
 	"savvy-go/internal/calendar"
-	"savvy-go/internal/db"
 	"savvy-go/internal/db/filter"
+	ledgerrepo "savvy-go/internal/db/repo/ledger"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/money"
 )
@@ -589,18 +589,17 @@ func (q report) monthlyBudget() any {
 	case scoped:
 		limits = filter.ScopedMonthlyBudgets(q.ctx, q.DB, f.CategoryIDs, f.TagIDs)
 	default:
-		if row, err := db.Q(q.DB).GetGlobalMonthlyBudget(q.ctx); err == nil {
+		repo := ledgerrepo.Repo{DB: q.DB}
+		if global := repo.GlobalMonthlyBudget(q.ctx); global != nil {
 			// A global budget stands for the whole scope, whatever its size.
-			amount := money.New(row.Amount, money.Unit{ID: row.CurrencyID, Decimals: int(row.Decimals)})
-			return money.FromDecimal(budgetToBase(amount, row.Rate, row.IsBase != 0), q.unit)
+			return money.FromDecimal(budgetToBase(global.Amount, global.Rate, global.IsBase), q.unit)
 		}
-		rows, err := db.Q(q.DB).ListMonthlyBudgets(q.ctx)
+		rows, err := repo.MonthlyBudgets(q.ctx)
 		if err != nil {
 			return nil
 		}
 		for _, r := range rows {
-			amount := money.New(r.Amount, money.Unit{ID: r.CurrencyID, Decimals: int(r.Decimals)})
-			limits = append(limits, filter.BudgetAmount{Amount: amount, Rate: r.Rate, IsBase: r.IsBase != 0})
+			limits = append(limits, filter.BudgetAmount{Amount: r.Amount, Rate: r.Rate, IsBase: r.IsBase})
 		}
 	}
 	total := decimal.Zero

@@ -8,9 +8,8 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	"savvy-go/internal/db"
 	"savvy-go/internal/db/filter"
-	"savvy-go/internal/db/sqlc"
+	repo "savvy-go/internal/db/repo/ledger"
 	"savvy-go/internal/money"
 	"savvy-go/internal/store"
 )
@@ -89,6 +88,8 @@ type TxInput struct {
 
 type Transactions struct{ DB store.DB }
 
+func (s Transactions) repo() repo.Repo { return repo.Repo{DB: s.DB} }
+
 // ErrTransferRow is returned for a change to one side of a transfer between
 // spaces: the transfer changes, not its rows.
 var ErrTransferRow = errors.New("this transaction is one side of a transfer between spaces; change the transfer instead")
@@ -115,7 +116,6 @@ func (s Transactions) Create(ctx context.Context, in TxInput) (*Transaction, err
 			return nil, fmt.Errorf("future")
 		}
 	}
-	now := time.Now().UTC().Format(time.RFC3339)
 	amount, toAmount, err := s.amounts(ctx, in)
 	if err != nil {
 		return nil, err
@@ -124,19 +124,16 @@ func (s Transactions) Create(ctx context.Context, in TxInput) (*Transaction, err
 	if err != nil {
 		return nil, err
 	}
-	res, err := db.Q(s.DB).InsertTransaction(ctx, sqlc.InsertTransactionParams{
-		Type: in.Type, AccountID: in.AccountID, ToAccountID: db.NullInt64(in.ToAccountID),
-		CategoryID: db.NullInt64(in.CategoryID), Amount: amount.Minor(), ToAmount: db.NullMoney(toAmount),
-		IsEstimated: db.BoolInt(in.IsEstimated && keepsEstimate(in.Type, status, len(items))),
-		Description: db.NullString(in.Description),
-		Date:        db.NullString(in.Date), Status: status, RecurringTransactionID: db.NullInt64(in.RecurringID),
-		CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
-	})
+	now := time.Now().UTC()
+	id, err := s.repo().InsertTransaction(ctx, repo.TxFields{
+		Type: in.Type, Status: status, AccountID: in.AccountID, ToAccountID: in.ToAccountID, CategoryID: in.CategoryID,
+		Amount: amount, ToAmount: toAmount, IsEstimated: in.IsEstimated && keepsEstimate(in.Type, status, len(items)),
+		Description: in.Description, Date: in.Date, RecurringID: in.RecurringID,
+	}, now)
 	if err != nil {
 		return nil, err
 	}
-	id, _ := res.LastInsertId()
-	if err := s.saveItems(ctx, id, items); err != nil {
+	if err := s.repo().InsertItems(ctx, id, items, now); err != nil {
 		return nil, err
 	}
 	if err := s.SetTags(ctx, id, in.TagIDs); err != nil {
@@ -159,7 +156,6 @@ func (s Transactions) Update(ctx context.Context, id int64, in TxInput) (*Transa
 	if cur.Status == "skipped" || cur.RecurringID != nil {
 		return nil, fmt.Errorf("cannot edit")
 	}
-	now := time.Now().UTC().Format(time.RFC3339)
 	amount, toAmount, err := s.amounts(ctx, in)
 	if err != nil {
 		return nil, err
@@ -172,19 +168,18 @@ func (s Transactions) Update(ctx context.Context, id int64, in TxInput) (*Transa
 	if in.Items != nil {
 		itemCount = len(items)
 	}
-	err = db.Q(s.DB).UpdateTransaction(ctx, sqlc.UpdateTransactionParams{
-		Type: in.Type, AccountID: in.AccountID, ToAccountID: db.NullInt64(in.ToAccountID),
-		CategoryID: db.NullInt64(in.CategoryID), Amount: amount.Minor(), ToAmount: db.NullMoney(toAmount),
-		IsEstimated: db.BoolInt(in.IsEstimated && keepsEstimate(in.Type, cur.Status, itemCount)),
-		Description: db.NullString(in.Description),
-		Date:        db.NullString(in.Date), UpdatedAt: db.NS(now), ID: id,
-	})
+	now := time.Now().UTC()
+	err = s.repo().UpdateTransaction(ctx, id, repo.TxFields{
+		Type: in.Type, AccountID: in.AccountID, ToAccountID: in.ToAccountID, CategoryID: in.CategoryID,
+		Amount: amount, ToAmount: toAmount, IsEstimated: in.IsEstimated && keepsEstimate(in.Type, cur.Status, itemCount),
+		Description: in.Description, Date: in.Date,
+	}, now)
 	if err != nil {
 		return nil, err
 	}
 	if in.Items != nil {
-		_ = db.Q(s.DB).DeleteTransactionItems(ctx, id)
-		if err := s.saveItems(ctx, id, items); err != nil {
+		_ = s.repo().DeleteItems(ctx, id)
+		if err := s.repo().InsertItems(ctx, id, items, now); err != nil {
 			return nil, err
 		}
 	}
@@ -196,11 +191,38 @@ func (s Transactions) Update(ctx context.Context, id int64, in TxInput) (*Transa
 	return s.ByID(ctx, id)
 }
 
+// Plan is what a recurrence plans for its next, still pending, occurrence.
+type Plan struct {
+	Type        string
+	AccountID   int64
+	ToAccountID *int64
+	CategoryID  *int64
+	Amount      money.Money
+	ToAmount    *money.Money
+	IsEstimated bool
+	Description *string
+	Date        string
+	TagIDs      []int64
+}
+
+// Replan rewrites a pending occurrence to follow its recurrence, which owns
+// its content (so it bypasses the edit rules of Update).
+func (s Transactions) Replan(ctx context.Context, id int64, p Plan) error {
+	date := p.Date
+	err := s.repo().UpdateTransaction(ctx, id, repo.TxFields{
+		Type: p.Type, AccountID: p.AccountID, ToAccountID: p.ToAccountID, CategoryID: p.CategoryID,
+		Amount: p.Amount, ToAmount: p.ToAmount, IsEstimated: p.IsEstimated, Description: p.Description, Date: &date,
+	}, time.Now().UTC())
+	if err != nil {
+		return err
+	}
+	return s.SetTags(ctx, id, p.TagIDs)
+}
+
 // guardTransfer refuses changing a transaction that mirrors a transfer
 // between spaces (P31): such rows change only through the transfer.
 func (s Transactions) guardTransfer(ctx context.Context, id int64) error {
-	v, err := db.Q(s.DB).GetTransactionTransferUUID(ctx, id)
-	if err == nil && v.Valid {
+	if s.repo().TransferUUID(ctx, id) != "" {
 		return ErrTransferRow
 	}
 	return nil
@@ -217,7 +239,7 @@ func (s Transactions) Delete(ctx context.Context, id int64) error {
 	if cur.RecurringID != nil {
 		return fmt.Errorf("cannot delete recurring")
 	}
-	return db.Q(s.DB).DeleteTransaction(ctx, id)
+	return s.repo().DeleteTransaction(ctx, id)
 }
 
 // Confirm settles a pending transaction on date. The amounts it was planned
@@ -256,12 +278,7 @@ func (s Transactions) Confirm(ctx context.Context, id int64, date string, amount
 			return nil, err
 		}
 	}
-	now := time.Now().UTC().Format(time.RFC3339)
-	err = db.Q(s.DB).ConfirmTransaction(ctx, sqlc.ConfirmTransactionParams{
-		Amount: actual.Minor(), ToAmount: db.NullMoney(actualTo),
-		Date: db.NS(date), UpdatedAt: db.NS(now), ID: id,
-	})
-	if err != nil {
+	if err := s.repo().ConfirmTransaction(ctx, id, actual, actualTo, date, time.Now().UTC()); err != nil {
 		return nil, err
 	}
 	return s.ByID(ctx, id)
@@ -278,9 +295,7 @@ func (s Transactions) Skip(ctx context.Context, id int64) (*Transaction, error) 
 	if cur.Status != "pending" || cur.RecurringID == nil {
 		return nil, fmt.Errorf("cannot skip")
 	}
-	now := time.Now().UTC().Format(time.RFC3339)
-	err = db.Q(s.DB).SkipTransaction(ctx, sqlc.SkipTransactionParams{UpdatedAt: db.NS(now), ID: id})
-	if err != nil {
+	if err := s.repo().SkipTransaction(ctx, id, time.Now().UTC()); err != nil {
 		return nil, err
 	}
 	return s.ByID(ctx, id)
@@ -322,14 +337,11 @@ func (s Transactions) Duplicate(ctx context.Context, id int64) (*Transaction, er
 }
 
 func (s Transactions) ByID(ctx context.Context, id int64) (*Transaction, error) {
-	r, err := db.Q(s.DB).GetTransaction(ctx, id)
-	if errors.Is(err, db.ErrNotFound) {
-		return nil, nil
-	}
-	if err != nil {
+	r, err := s.repo().Transaction(ctx, id)
+	if r == nil || err != nil {
 		return nil, err
 	}
-	list, err := s.hydrate(ctx, []sqlc.GetTransactionRow{r})
+	list, err := s.hydrate(ctx, []repo.Tx{*r})
 	if err != nil {
 		return nil, err
 	}
@@ -343,16 +355,12 @@ func (s Transactions) Filtered(ctx context.Context, f filter.TxFilter, page, per
 	if page <= 0 {
 		page = 1
 	}
-	total, err := filter.CountTransactions(ctx, s.DB, f)
-	if err != nil {
-		return nil, 0, err
-	}
-	rows, err := filter.ListTransactions(ctx, s.DB, f, perPage, (page-1)*perPage)
+	rows, total, err := s.repo().Filtered(ctx, f, perPage, (page-1)*perPage)
 	if err != nil {
 		return nil, 0, err
 	}
 	list, err := s.hydrate(ctx, rows)
-	return list, int(total), err
+	return list, total, err
 }
 
 // TransactionSummary totals transactions in the base currency (nil when there
@@ -376,15 +384,15 @@ func (s Transactions) Summary(ctx context.Context, pendingOnly bool) Transaction
 		unit = base.Unit()
 	}
 	out.Income, out.Expense = money.Zero(unit), money.Zero(unit)
-	rows, err := db.Q(s.DB).ListTransactionSummaryRows(ctx, status)
+	rows, err := s.repo().SummaryRows(ctx, status)
 	if err != nil {
 		return out
 	}
 	// Sum in base major units and round once: rounding each row would drift.
 	income, expense := decimal.Zero, decimal.Zero
 	for _, r := range rows {
-		amount := decimal.New(r.Amount, -int32(r.Decimals))
-		if r.IsBase == 0 && !r.Rate.IsZero() {
+		amount := decimal.New(r.Minor, -int32(r.Decimals))
+		if !r.IsBase && !r.Rate.IsZero() {
 			amount = amount.Mul(r.Rate)
 		}
 		if r.Type == "income" {
@@ -401,13 +409,13 @@ func (s Transactions) Summary(ctx context.Context, pendingOnly bool) Transaction
 // hydrate turns rows into transactions with their accounts, category, items
 // and tags: one lookup per distinct account and category, and one query each
 // for the items and tags of the whole page.
-func (s Transactions) hydrate(ctx context.Context, rows []sqlc.GetTransactionRow) ([]Transaction, error) {
+func (s Transactions) hydrate(ctx context.Context, rows []repo.Tx) ([]Transaction, error) {
 	out := make([]Transaction, 0, len(rows))
 	ids := make([]int64, 0, len(rows))
 	at := make(map[int64]int, len(rows))
 	rel := NewRelated(ctx, s.DB)
 	for _, r := range rows {
-		t := txFromRow(r)
+		t := txFrom(r)
 		t.Account = rel.Account(t.AccountID)
 		t.ToAccount = rel.OptionalAccount(t.ToAccountID)
 		t.Category = rel.Category(t.CategoryID)
@@ -419,7 +427,7 @@ func (s Transactions) hydrate(ctx context.Context, rows []sqlc.GetTransactionRow
 	if len(ids) == 0 {
 		return out, nil
 	}
-	items, err := db.Q(s.DB).ListItemsOfTransactions(ctx, ids)
+	items, err := s.repo().ItemsOf(ctx, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -431,23 +439,19 @@ func (s Transactions) hydrate(ctx context.Context, rows []sqlc.GetTransactionRow
 			PricePerUnit: money.New(r.PricePerUnit, unit), TotalPrice: money.New(r.TotalPrice, unit),
 		})
 	}
-	tags, err := db.Q(s.DB).ListTagsOfTransactions(ctx, ids)
+	tags, err := s.repo().TagsOf(ctx, ids)
 	if err != nil {
 		return nil, err
 	}
 	for _, r := range tags {
 		t := &out[at[r.TransactionID]]
-		t.Tags = append(t.Tags, TagFromRow(r.ID, r.Name, r.CreatedAt, 0))
+		t.Tags = append(t.Tags, tagFrom(r.Tag))
 	}
 	return out, nil
 }
 
 // itemRow is a transaction line ready to store.
-type itemRow struct {
-	name        string
-	quantity    decimal.Decimal
-	price, line money.Money
-}
+type itemRow = repo.NewTxItem
 
 // itemRows checks the lines entered for a transaction against the range and
 // rounds them into unit, so nothing is written for a transaction with a bad
@@ -466,33 +470,24 @@ func itemRows(items []TxItemInput, unit money.Unit) ([]itemRow, error) {
 		if err != nil {
 			return nil, err
 		}
-		rows = append(rows, itemRow{name: it.Name, quantity: it.Quantity, price: price, line: line})
+		rows = append(rows, itemRow{Name: it.Name, Quantity: it.Quantity, PricePerUnit: price, TotalPrice: line})
 	}
 	return rows, nil
 }
 
-func (s Transactions) saveItems(ctx context.Context, txID int64, rows []itemRow) error {
-	now := time.Now().UTC().Format(time.RFC3339)
-	for _, it := range rows {
-		if err := db.Q(s.DB).InsertTransactionItem(ctx, sqlc.InsertTransactionItemParams{
-			TransactionID: txID, Name: it.name, Quantity: it.quantity,
-			PricePerUnit: it.price.Minor(), TotalPrice: it.line.Minor(), CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
-		}); err != nil {
-			return err
-		}
-	}
-	return nil
+// SetCategory changes only a transaction's category (an automation action).
+func (s Transactions) SetCategory(ctx context.Context, id, categoryID int64) error {
+	return s.repo().SetTransactionCategory(ctx, id, categoryID, time.Now().UTC())
+}
+
+// SetDescription changes only a transaction's description (an automation action).
+func (s Transactions) SetDescription(ctx context.Context, id int64, description string) error {
+	return s.repo().SetTransactionDescription(ctx, id, description, time.Now().UTC())
 }
 
 // SetTags replaces the tags of a transaction.
 func (s Transactions) SetTags(ctx context.Context, txID int64, ids []int64) error {
-	_ = db.Q(s.DB).DeleteTransactionTags(ctx, txID)
-	for _, id := range ids {
-		if err := db.Q(s.DB).InsertTransactionTag(ctx, sqlc.InsertTransactionTagParams{TransactionID: txID, TagID: id}); err != nil {
-			return err
-		}
-	}
-	return nil
+	return s.repo().SetTags(ctx, txID, ids)
 }
 
 // Units returns the unit of the account and, when set, of the to-account;
@@ -550,31 +545,12 @@ func (s Transactions) amounts(ctx context.Context, in TxInput) (amount money.Mon
 	return amount, &converted, nil
 }
 
-func txFromRow(r sqlc.GetTransactionRow) Transaction {
-	t := Transaction{
-		ID: r.ID, Type: r.Type, AccountID: r.AccountID, Status: r.Status, IsEstimated: r.IsEstimated != 0,
-		Amount:   money.New(r.Amount, money.Unit{ID: r.CurrencyID, Decimals: int(r.Decimals)}),
-		ToAmount: db.MoneyFromNull(r.ToAmount, money.Unit{ID: r.ToCurrencyID, Decimals: int(r.ToDecimals)}),
+func txFrom(r repo.Tx) Transaction {
+	return Transaction{
+		ID: r.ID, Type: r.Type, AccountID: r.AccountID, ToAccountID: r.ToAccountID, CategoryID: r.CategoryID,
+		Amount: r.Amount, ToAmount: r.ToAmount, IsEstimated: r.IsEstimated, Description: r.Description, Date: r.Date,
+		Status: r.Status, RecurringID: r.RecurringID, CreatedAt: r.CreatedAt,
 	}
-	if r.ToAccountID.Valid {
-		t.ToAccountID = &r.ToAccountID.Int64
-	}
-	if r.CategoryID.Valid {
-		t.CategoryID = &r.CategoryID.Int64
-	}
-	if r.Description.Valid {
-		t.Description = &r.Description.String
-	}
-	if r.Date.Valid {
-		t.Date = &r.Date.String
-	}
-	if r.RecurringTransactionID.Valid {
-		t.RecurringID = &r.RecurringTransactionID.Int64
-	}
-	if tm, ok := db.ParseTime(r.CreatedAt); ok {
-		t.CreatedAt = &tm
-	}
-	return t
 }
 
 // keepsEstimate tells whether a transaction may carry an approximate amount:

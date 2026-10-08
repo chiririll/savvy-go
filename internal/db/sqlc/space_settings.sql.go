@@ -10,6 +10,15 @@ import (
 	"database/sql"
 )
 
+const deleteSpaceSetting = `-- name: DeleteSpaceSetting :exec
+DELETE FROM space_settings WHERE key = ?
+`
+
+func (q *Queries) DeleteSpaceSetting(ctx context.Context, key string) error {
+	_, err := q.db.ExecContext(ctx, deleteSpaceSetting, key)
+	return err
+}
+
 const getSpaceSetting = `-- name: GetSpaceSetting :one
 SELECT value FROM space_settings WHERE key = ?
 `

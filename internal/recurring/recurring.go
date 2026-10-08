@@ -2,15 +2,13 @@ package recurring
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
 	"github.com/shopspring/decimal"
 
 	"savvy-go/internal/calendar"
-	"savvy-go/internal/db"
-	"savvy-go/internal/db/sqlc"
+	repo "savvy-go/internal/db/repo/recurring"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/money"
 	"savvy-go/internal/store"
@@ -66,26 +64,25 @@ type Service struct {
 	Txs ledger.Transactions
 }
 
+func (s Service) repo() repo.Repo { return repo.Repo{DB: s.DB} }
+
 func (s Service) All(ctx context.Context) ([]Recurring, error) {
-	return s.list(ctx, sqlc.ListRecurringParams{Limit: 1_000_000, Offset: 0})
+	return s.list(ctx, false, 1_000_000)
 }
 
 func (s Service) Upcoming(ctx context.Context, limit int) ([]Recurring, error) {
 	if limit <= 0 {
 		limit = 5
 	}
-	return s.list(ctx, sqlc.ListRecurringParams{ActiveOnly: db.Flag(true), Limit: int64(limit), Offset: 0})
+	return s.list(ctx, true, limit)
 }
 
 func (s Service) ByID(ctx context.Context, id int64) (*Recurring, error) {
-	r, err := db.Q(s.DB).GetRecurring(ctx, id)
-	if errors.Is(err, db.ErrNotFound) {
-		return nil, nil
-	}
-	if err != nil {
+	r, err := s.repo().ByID(ctx, id)
+	if r == nil || err != nil {
 		return nil, err
 	}
-	list, err := s.hydrate(ctx, []sqlc.ListRecurringRow{sqlc.ListRecurringRow(r)})
+	list, err := s.hydrate(ctx, []repo.Row{*r})
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +98,6 @@ func (s Service) Create(ctx context.Context, in Input) (*Recurring, error) {
 		active = *in.IsActive
 	}
 	estimated := in.IsEstimated != nil && *in.IsEstimated
-	now := time.Now().UTC().Format(time.RFC3339)
 	unit, toUnit, err := s.Txs.Units(ctx, in.AccountID, in.ToAccountID)
 	if err != nil {
 		return nil, err
@@ -110,20 +106,16 @@ func (s Service) Create(ctx context.Context, in Input) (*Recurring, error) {
 	if err != nil {
 		return nil, err
 	}
-	res, err := db.Q(s.DB).InsertRecurring(ctx, sqlc.InsertRecurringParams{
-		Type: in.Type, AccountID: in.AccountID, ToAccountID: db.NullInt64(in.ToAccountID),
-		CategoryID: db.NullInt64(in.CategoryID), Amount: amount.Minor(),
-		ToAmount: db.NullMoney(toAmount), IsEstimated: db.BoolInt(estimated),
-		Description: db.NullString(in.Description), Frequency: in.Frequency, Interval: int64(in.Interval),
-		DayOfWeek: db.NullInt(in.DayOfWeek), DayOfMonth: db.NullInt(in.DayOfMonth),
-		StartDate: in.StartDate, EndDate: db.NullString(in.EndDate), NextRunDate: in.StartDate,
-		IsActive: db.BoolInt(active), CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
-	})
+	id, err := s.repo().Insert(ctx, repo.Fields{
+		Type: in.Type, AccountID: in.AccountID, ToAccountID: in.ToAccountID, CategoryID: in.CategoryID,
+		Amount: amount, ToAmount: toAmount, IsEstimated: estimated, Description: in.Description,
+		Frequency: in.Frequency, Interval: in.Interval, DayOfWeek: in.DayOfWeek, DayOfMonth: in.DayOfMonth,
+		StartDate: in.StartDate, EndDate: in.EndDate, NextRunDate: in.StartDate, IsActive: active,
+	}, time.Now().UTC())
 	if err != nil {
 		return nil, err
 	}
-	id, _ := res.LastInsertId()
-	if err := s.saveTags(ctx, id, in.TagIDs); err != nil {
+	if err := s.repo().SetTags(ctx, id, in.TagIDs); err != nil {
 		return nil, err
 	}
 	rec, err := s.ByID(ctx, id)
@@ -173,7 +165,6 @@ func (s Service) Update(ctx context.Context, id int64, in Input) (*Recurring, er
 	if in.IsEstimated != nil {
 		estimated = *in.IsEstimated
 	}
-	now := time.Now().UTC().Format(time.RFC3339)
 	unit, toUnit, err := s.Txs.Units(ctx, in.AccountID, in.ToAccountID)
 	if err != nil {
 		return nil, err
@@ -182,20 +173,17 @@ func (s Service) Update(ctx context.Context, id int64, in Input) (*Recurring, er
 	if err != nil {
 		return nil, err
 	}
-	err = db.Q(s.DB).UpdateRecurring(ctx, sqlc.UpdateRecurringParams{
-		Type: in.Type, AccountID: in.AccountID, ToAccountID: db.NullInt64(in.ToAccountID),
-		CategoryID: db.NullInt64(in.CategoryID), Amount: amount.Minor(),
-		ToAmount: db.NullMoney(toAmount), IsEstimated: db.BoolInt(estimated),
-		Description: db.NullString(in.Description), Frequency: in.Frequency, Interval: int64(in.Interval),
-		DayOfWeek: db.NullInt(in.DayOfWeek), DayOfMonth: db.NullInt(in.DayOfMonth),
-		StartDate: in.StartDate, EndDate: db.NullString(in.EndDate), NextRunDate: next,
-		IsActive: db.BoolInt(active), UpdatedAt: db.NS(now), ID: id,
-	})
+	err = s.repo().Update(ctx, id, repo.Fields{
+		Type: in.Type, AccountID: in.AccountID, ToAccountID: in.ToAccountID, CategoryID: in.CategoryID,
+		Amount: amount, ToAmount: toAmount, IsEstimated: estimated, Description: in.Description,
+		Frequency: in.Frequency, Interval: in.Interval, DayOfWeek: in.DayOfWeek, DayOfMonth: in.DayOfMonth,
+		StartDate: in.StartDate, EndDate: in.EndDate, NextRunDate: next, IsActive: active,
+	}, time.Now().UTC())
 	if err != nil {
 		return nil, err
 	}
 	if in.HasTagIDs {
-		if err := s.saveTags(ctx, id, in.TagIDs); err != nil {
+		if err := s.repo().SetTags(ctx, id, in.TagIDs); err != nil {
 			return nil, err
 		}
 	}
@@ -210,10 +198,7 @@ func (s Service) Update(ctx context.Context, id int64, in Input) (*Recurring, er
 }
 
 func (s Service) Delete(ctx context.Context, id int64) error {
-	if err := db.Q(s.DB).DeletePendingForRecurring(ctx, db.NI(id)); err != nil {
-		return err
-	}
-	return db.Q(s.DB).DeleteRecurring(ctx, id)
+	return s.repo().Delete(ctx, id)
 }
 
 func (s Service) AdvanceAfterOccurrence(ctx context.Context, id int64) error {
@@ -223,10 +208,7 @@ func (s Service) AdvanceAfterOccurrence(ctx context.Context, id int64) error {
 	}
 	next := rec.calculateNextRunDate()
 	now := time.Now().UTC()
-	err = db.Q(s.DB).AdvanceRecurring(ctx, sqlc.AdvanceRecurringParams{
-		LastRunDate: db.NS(now.Format("2006-01-02")), NextRunDate: next,
-		UpdatedAt: db.NS(now.Format(time.RFC3339)), ID: id,
-	})
+	err = s.repo().Advance(ctx, id, now.Format("2006-01-02"), next, now)
 	if err != nil {
 		return err
 	}
@@ -248,7 +230,7 @@ func (s Service) AdvanceAfterOccurrence(ctx context.Context, id int64) error {
 // EnsureUpcoming creates a pending occurrence for every active template that
 // is still on schedule and has none (scheduler / crash recovery).
 func (s Service) EnsureUpcoming(ctx context.Context) error {
-	list, err := s.list(ctx, sqlc.ListRecurringParams{ActiveOnly: db.Flag(true), Limit: 1_000_000, Offset: 0})
+	list, err := s.list(ctx, true, 1_000_000)
 	if err != nil {
 		return err
 	}
@@ -324,29 +306,19 @@ func (s Service) syncOpenPending(ctx context.Context, rec *Recurring) error {
 		}
 		toAmt = &v
 	}
-	now := time.Now().UTC().Format(time.RFC3339)
-	err = db.Q(s.DB).UpdateTransaction(ctx, sqlc.UpdateTransactionParams{
-		Type: rec.Type, AccountID: rec.AccountID, ToAccountID: db.NullInt64(rec.ToAccountID),
-		CategoryID: db.NullInt64(rec.CategoryID), Amount: rec.Amount.Minor(), ToAmount: db.NullMoney(toAmt),
-		IsEstimated: db.BoolInt(rec.IsEstimated), Description: db.NullString(rec.Description), Date: db.NS(rec.NextRunDate),
-		UpdatedAt: db.NS(now), ID: pendingID,
-	})
-	if err != nil {
-		return err
-	}
 	ids := make([]int64, 0, len(rec.Tags))
 	for _, t := range rec.Tags {
 		ids = append(ids, t.ID)
 	}
-	return s.Txs.SetTags(ctx, pendingID, ids)
+	return s.Txs.Replan(ctx, pendingID, ledger.Plan{
+		Type: rec.Type, AccountID: rec.AccountID, ToAccountID: rec.ToAccountID, CategoryID: rec.CategoryID,
+		Amount: rec.Amount, ToAmount: toAmt, IsEstimated: rec.IsEstimated, Description: rec.Description,
+		Date: rec.NextRunDate, TagIDs: ids,
+	})
 }
 
 func (s Service) pendingID(ctx context.Context, recurringID int64) (int64, error) {
-	id, err := db.Q(s.DB).GetPendingRecurringTx(ctx, db.NI(recurringID))
-	if err == db.ErrNotFound {
-		return 0, nil
-	}
-	return id, err
+	return s.repo().PendingTransactionID(ctx, recurringID)
 }
 
 // transferAmount is what a transfer recurrence delivers to the destination
@@ -371,20 +343,8 @@ func (s Service) transferAmount(ctx context.Context, rec *Recurring) (money.Mone
 	return ledger.Convert(rec.Amount, *from.Currency, *to.Currency), nil
 }
 
-func (s Service) saveTags(ctx context.Context, id int64, tagIDs []int64) error {
-	if err := db.Q(s.DB).DeleteRecurringTags(ctx, id); err != nil {
-		return err
-	}
-	for _, tagID := range tagIDs {
-		if err := db.Q(s.DB).InsertRecurringTag(ctx, sqlc.InsertRecurringTagParams{RecurringTransactionID: id, TagID: tagID}); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (s Service) list(ctx context.Context, arg sqlc.ListRecurringParams) ([]Recurring, error) {
-	rows, err := db.Q(s.DB).ListRecurring(ctx, arg)
+func (s Service) list(ctx context.Context, activeOnly bool, limit int) ([]Recurring, error) {
+	rows, err := s.repo().List(ctx, activeOnly, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -393,11 +353,11 @@ func (s Service) list(ctx context.Context, arg sqlc.ListRecurringParams) ([]Recu
 
 // hydrate turns rows into recurrences with their accounts, category and tags,
 // loading each distinct account and category once.
-func (s Service) hydrate(ctx context.Context, rows []sqlc.ListRecurringRow) ([]Recurring, error) {
+func (s Service) hydrate(ctx context.Context, rows []repo.Row) ([]Recurring, error) {
 	out := make([]Recurring, 0, len(rows))
 	rel := ledger.NewRelated(ctx, s.DB)
 	for _, r := range rows {
-		rec := recurringFromRow(r)
+		rec := recurringFrom(r)
 		rec.Account = rel.Account(rec.AccountID)
 		rec.ToAccount = rel.OptionalAccount(rec.ToAccountID)
 		rec.Category = rel.Category(rec.CategoryID)
@@ -412,13 +372,13 @@ func (s Service) hydrate(ctx context.Context, rows []sqlc.ListRecurringRow) ([]R
 }
 
 func (s Service) tags(ctx context.Context, id int64) ([]ledger.Tag, error) {
-	rows, err := db.Q(s.DB).ListRecurringTags(ctx, id)
+	rows, err := s.repo().Tags(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]ledger.Tag, 0, len(rows))
-	for _, r := range rows {
-		out = append(out, ledger.TagFromRow(r.ID, r.Name, r.CreatedAt, r.TransactionsCount))
+	out := make([]ledger.Tag, len(rows))
+	for i, r := range rows {
+		out[i] = ledger.Tag{ID: r.ID, Name: r.Name, TransactionsCount: r.TransactionsCount, CreatedAt: r.CreatedAt}
 	}
 	return out, nil
 }
@@ -481,36 +441,12 @@ func nextWeekday(t time.Time, want time.Weekday) time.Time {
 	return t.AddDate(0, 0, delta)
 }
 
-func recurringFromRow(row sqlc.ListRecurringRow) Recurring {
-	r := Recurring{
-		ID: row.ID, Type: row.Type, AccountID: row.AccountID,
-		Amount:    money.New(row.Amount, money.Unit{ID: row.CurrencyID, Decimals: int(row.Decimals)}),
-		ToAmount:  db.MoneyFromNull(row.ToAmount, money.Unit{ID: row.ToCurrencyID, Decimals: int(row.ToDecimals)}),
-		Frequency: row.Frequency, Interval: int(row.Interval), StartDate: row.StartDate,
-		NextRunDate: row.NextRunDate, IsActive: row.IsActive != 0, IsEstimated: row.IsEstimated != 0,
+func recurringFrom(row repo.Row) Recurring {
+	return Recurring{
+		ID: row.ID, Type: row.Type, AccountID: row.AccountID, ToAccountID: row.ToAccountID, CategoryID: row.CategoryID,
+		Amount: row.Amount, ToAmount: row.ToAmount, IsEstimated: row.IsEstimated, Description: row.Description,
+		Frequency: row.Frequency, Interval: row.Interval, DayOfWeek: row.DayOfWeek, DayOfMonth: row.DayOfMonth,
+		StartDate: row.StartDate, EndDate: row.EndDate, NextRunDate: row.NextRunDate, LastRunDate: row.LastRunDate,
+		IsActive: row.IsActive,
 	}
-	if row.ToAccountID.Valid {
-		r.ToAccountID = &row.ToAccountID.Int64
-	}
-	if row.CategoryID.Valid {
-		r.CategoryID = &row.CategoryID.Int64
-	}
-	if row.Description.Valid {
-		r.Description = &row.Description.String
-	}
-	if row.DayOfWeek.Valid {
-		v := int(row.DayOfWeek.Int64)
-		r.DayOfWeek = &v
-	}
-	if row.DayOfMonth.Valid {
-		v := int(row.DayOfMonth.Int64)
-		r.DayOfMonth = &v
-	}
-	if row.EndDate.Valid {
-		r.EndDate = &row.EndDate.String
-	}
-	if row.LastRunDate.Valid {
-		r.LastRunDate = &row.LastRunDate.String
-	}
-	return r
 }

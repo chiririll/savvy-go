@@ -5,8 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"savvy-go/internal/db"
-	"savvy-go/internal/db/sqlc"
+	repo "savvy-go/internal/db/repo/auth"
 	"savvy-go/internal/store"
 )
 
@@ -92,33 +91,28 @@ type Users struct {
 	DB store.DB
 }
 
-func (s Users) Count(ctx context.Context) (int, error) {
-	n, err := db.Q(s.DB).CountUsers(ctx)
-	return int(n), err
-}
+func (s Users) repo() repo.Repo { return repo.Repo{DB: s.DB} }
+
+func (s Users) Count(ctx context.Context) (int, error) { return s.repo().CountUsers(ctx) }
 
 func (s Users) ByID(ctx context.Context, id int64) (*User, error) {
-	row, err := db.Q(s.DB).GetUser(ctx, id)
-	return userFromRow(row, err)
+	row, err := s.repo().UserByID(ctx, id)
+	return userFrom(row, err)
 }
 
 func (s Users) ByEmail(ctx context.Context, email string) (*User, error) {
-	row, err := db.Q(s.DB).GetUserByEmail(ctx, strings.ToLower(email))
-	return userFromRow(row, err)
+	row, err := s.repo().UserByEmail(ctx, strings.ToLower(email))
+	return userFrom(row, err)
 }
 
 func (s Users) All(ctx context.Context) ([]User, error) {
-	rows, err := db.Q(s.DB).ListUsers(ctx)
+	rows, err := s.repo().ListUsers(ctx)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]User, 0, len(rows))
-	for _, r := range rows {
-		u, err := userFromRow(r, nil)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, *u)
+	out := make([]User, len(rows))
+	for i := range rows {
+		out[i] = *toUser(&rows[i])
 	}
 	return out, nil
 }
@@ -127,7 +121,6 @@ func (s Users) Create(ctx context.Context, name, email string, password *string,
 	if role == "" {
 		role = RoleUser
 	}
-	now := time.Now().UTC().Format(time.RFC3339)
 	var hash string // empty: an account with no password (SSO only)
 	if password != nil && *password != "" {
 		h, err := HashPassword(*password)
@@ -136,14 +129,7 @@ func (s Users) Create(ctx context.Context, name, email string, password *string,
 		}
 		hash = h
 	}
-	res, err := db.Q(s.DB).InsertUser(ctx, sqlc.InsertUserParams{
-		Name: name, Email: strings.ToLower(email), Password: db.NullStringVal(hash), Role: role,
-		CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
-	})
-	if err != nil {
-		return nil, err
-	}
-	id, err := res.LastInsertId()
+	id, err := s.repo().InsertUser(ctx, name, strings.ToLower(email), hash, role, time.Now().UTC())
 	if err != nil {
 		return nil, err
 	}
@@ -155,9 +141,7 @@ func (s Users) UpdatePassword(ctx context.Context, id int64, plain string) error
 	if err != nil {
 		return err
 	}
-	return db.Q(s.DB).UpdateUserPassword(ctx, sqlc.UpdateUserPasswordParams{
-		Password: db.NS(h), UpdatedAt: db.NS(time.Now().UTC().Format(time.RFC3339)), ID: id,
-	})
+	return s.repo().SetPassword(ctx, id, h, time.Now().UTC())
 }
 
 func (s Users) Update(ctx context.Context, id int64, name, email, role *string, password *string) (*User, error) {
@@ -174,7 +158,7 @@ func (s Users) Update(ctx context.Context, id int64, name, email, role *string, 
 	if role != nil {
 		u.Role = *role
 	}
-	var hash string
+	var hash string // empty keeps the current password
 	if password != nil && *password != "" {
 		h, err := HashPassword(*password)
 		if err != nil {
@@ -182,89 +166,47 @@ func (s Users) Update(ctx context.Context, id int64, name, email, role *string, 
 		}
 		hash = h
 	}
-	now := time.Now().UTC().Format(time.RFC3339)
-	q := db.Q(s.DB)
-	if hash != "" {
-		err = q.UpdateUserWithPassword(ctx, sqlc.UpdateUserWithPasswordParams{
-			Name: u.Name, Email: u.Email, Role: u.Role, Password: db.NS(hash), UpdatedAt: db.NS(now), ID: id,
-		})
-	} else {
-		err = q.UpdateUserProfile(ctx, sqlc.UpdateUserProfileParams{
-			Name: u.Name, Email: u.Email, Role: u.Role, UpdatedAt: db.NS(now), ID: id,
-		})
-	}
-	if err != nil {
+	if err := s.repo().UpdateUser(ctx, id, u.Name, u.Email, u.Role, hash, time.Now().UTC()); err != nil {
 		return nil, err
 	}
 	return s.ByID(ctx, id)
 }
 
 func (s Users) MarkSSOOnly(ctx context.Context, id int64) error {
-	now := time.Now().UTC().Format(time.RFC3339)
-	return db.Q(s.DB).MarkUserSSOOnly(ctx, sqlc.MarkUserSSOOnlyParams{UpdatedAt: db.NS(now), ID: id})
+	return s.repo().MarkSSOOnly(ctx, id, time.Now().UTC())
 }
 
 func (s Users) SetRole(ctx context.Context, id int64, role string) error {
-	now := time.Now().UTC().Format(time.RFC3339)
-	return db.Q(s.DB).SetUserRole(ctx, sqlc.SetUserRoleParams{Role: role, UpdatedAt: db.NS(now), ID: id})
+	return s.repo().SetRole(ctx, id, role, time.Now().UTC())
 }
 
 func (s Users) SetTwoFactor(ctx context.Context, id int64, secret *string, enabled, confirmed bool) error {
-	now := time.Now().UTC().Format(time.RFC3339)
-	return db.Q(s.DB).SetUserTwoFactor(ctx, sqlc.SetUserTwoFactorParams{
-		TwoFactorSecret: db.NullString(secret), TwoFactorEnabled: db.BoolInt(enabled),
-		TwoFactorConfirmed: db.BoolInt(confirmed), UpdatedAt: db.NS(now), ID: id,
-	})
+	return s.repo().SetTwoFactor(ctx, id, secret, enabled, confirmed, time.Now().UTC())
 }
 
 // Delete tombstones a user: the row stays (ids in space databases still
 // resolve to "Deleted user") but loses its email, password, second factors,
 // sessions, tokens, passkeys, SSO links and space memberships.
 func (s Users) Delete(ctx context.Context, id int64) error {
-	now := time.Now().UTC().Format(time.RFC3339)
-	return store.Tx(ctx, s.DB, func(tx store.DB) error {
-		q := db.Q(tx)
-		for _, del := range []func(context.Context, int64) error{
-			q.DeleteUserCredentials, q.DeleteUserAPITokens, q.DeleteUserPasskeys,
-			q.DeleteUserIdentities, q.DeleteUserPasswordTokens, q.DeleteUserRecoveryCodes,
-			q.DeleteUserMemberships,
-		} {
-			if err := del(ctx, id); err != nil {
-				return err
-			}
-		}
-		return q.TombstoneUser(ctx, sqlc.TombstoneUserParams{Now: db.NS(now), ID: id})
-	})
+	return s.repo().Tombstone(ctx, id, time.Now().UTC())
 }
 
 func (s Users) AdminCount(ctx context.Context) (int, error) {
-	n, err := db.Q(s.DB).CountAdmins(ctx, RoleAdmin)
-	return int(n), err
+	return s.repo().CountAdmins(ctx, RoleAdmin)
 }
 
-func userFromRow(r sqlc.User, err error) (*User, error) {
-	if err == db.ErrNotFound {
-		return nil, nil
-	}
-	if err != nil {
+func userFrom(r *repo.User, err error) (*User, error) {
+	if r == nil || err != nil {
 		return nil, err
 	}
-	u := &User{ID: r.ID, Name: r.Name, Email: r.Email, Role: r.Role}
-	if r.Password.Valid {
-		u.Password = &r.Password.String
+	return toUser(r), nil
+}
+
+func toUser(r *repo.User) *User {
+	return &User{
+		ID: r.ID, Name: r.Name, Email: r.Email, Password: r.Password, Role: r.Role,
+		IsSSOOnly: r.SSOOnly, TwoFactorSecret: r.TwoFactorSecret,
+		TwoFactorEnabled: r.TwoFactorEnabled, TwoFactorConfirmed: r.TwoFactorConfirmed,
+		Deleted: r.Deleted, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
 	}
-	if r.TwoFactorSecret.Valid {
-		u.TwoFactorSecret = &r.TwoFactorSecret.String
-	}
-	u.IsSSOOnly = r.IsSsoOnly != 0
-	u.TwoFactorEnabled = r.TwoFactorEnabled != 0
-	u.TwoFactorConfirmed = r.TwoFactorConfirmed != 0
-	u.Deleted = r.DeletedAt.Valid
-	if t, ok := db.ParseTime(r.CreatedAt); ok {
-		u.CreatedAt = &t
-	}
-	if t, ok := db.ParseTime(r.UpdatedAt); ok {
-		u.UpdatedAt = &t
-	}
-	return u, nil
 }

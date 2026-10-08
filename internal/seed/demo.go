@@ -10,8 +10,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"savvy-go/internal/automation"
-	appdb "savvy-go/internal/db"
-	"savvy-go/internal/db/sqlc"
+	ledgerrepo "savvy-go/internal/db/repo/ledger"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/money"
 	"savvy-go/internal/recurring"
@@ -516,7 +515,6 @@ func (s *seeder) seedTransactionItems() error {
 	if target > len(s.expenses) {
 		target = len(s.expenses)
 	}
-	now := s.now.UTC().Format(time.RFC3339)
 	for _, cand := range s.expenses[:target] {
 		catName := cand.catName
 		if catName == "" {
@@ -524,13 +522,15 @@ func (s *seeder) seedTransactionItems() error {
 		}
 		items := s.randomItems(cand.amount, catName)
 		cents := money.Unit{Decimals: 2} // the demo prices items in cents
-		for _, it := range items {
-			if err := appdb.Q(s.db).InsertTransactionItem(s.ctx, sqlc.InsertTransactionItemParams{
-				TransactionID: cand.id, Name: it.Name, Quantity: it.Quantity, PricePerUnit: money.FromDecimal(it.PricePerUnit, cents).Minor(),
-				TotalPrice: money.FromDecimal(it.TotalPrice, cents).Minor(), CreatedAt: appdb.NS(now), UpdatedAt: appdb.NS(now),
-			}); err != nil {
-				return err
+		lines := make([]ledgerrepo.NewTxItem, len(items))
+		for i, it := range items {
+			lines[i] = ledgerrepo.NewTxItem{
+				Name: it.Name, Quantity: it.Quantity,
+				PricePerUnit: money.FromDecimal(it.PricePerUnit, cents), TotalPrice: money.FromDecimal(it.TotalPrice, cents),
 			}
+		}
+		if err := (ledgerrepo.Repo{DB: s.db}).InsertItems(s.ctx, cand.id, lines, s.now.UTC()); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -770,8 +770,7 @@ func floatPtrDecimal(v *float64) *decimal.Decimal {
 }
 
 func (s *seeder) countTx() int {
-	n, _ := appdb.Q(s.db).CountAllTransactions(s.ctx)
-	return int(n)
+	return ledgerrepo.Repo{DB: s.db}.CountTransactions(s.ctx)
 }
 
 func (s *seeder) inRange(d time.Time) bool {

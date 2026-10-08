@@ -25,7 +25,7 @@ In the seed config file, `date` (`YYYY-MM-DD`) places the data relative to that 
 
 ## Architecture
 
-One Go process serves the API, the React frontend, the scheduler and workers. Server data is in `server.sqlite`, each space has its own SQLite file. Business logic uses the storage interface in `internal/store`; SQLite code stays in `internal/store/sqlite`, and operations spanning two spaces use `store.InSpaces`. Migrations run on startup.
+One Go process serves the API, the React frontend, the scheduler and workers. Server data is in `server.sqlite`, each space has its own SQLite file. Business logic uses the storage interface in `internal/store` and asks the repositories in `internal/db/repo/<area>` for rows, so it holds no SQL; SQLite code stays in `internal/store/sqlite`, and operations spanning two spaces use `store.InSpaces`. Migrations run on startup.
 
 ## Frontend
 

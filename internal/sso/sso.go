@@ -12,8 +12,7 @@ import (
 	"time"
 
 	"savvy-go/internal/auth"
-	"savvy-go/internal/db"
-	"savvy-go/internal/db/sqlc"
+	repo "savvy-go/internal/db/repo/sso"
 	"savvy-go/internal/settings"
 	"savvy-go/internal/store"
 )
@@ -135,16 +134,24 @@ func (s Service) client() *http.Client {
 	return &http.Client{Timeout: 10 * time.Second}
 }
 
+func (s Service) repo() repo.Repo { return repo.Repo{DB: s.DB} }
+
+// AnyEnabled reports whether some identity provider is enabled.
+func (s Service) AnyEnabled(ctx context.Context) bool {
+	n, _ := s.repo().CountEnabled(ctx)
+	return n > 0
+}
+
 func (s Service) All(ctx context.Context) ([]IdentityProvider, error) {
-	return s.list(ctx, sqlc.ListIdentityProvidersParams{})
+	return s.list(ctx, repo.Filter{})
 }
 
 func (s Service) Enabled(ctx context.Context) ([]IdentityProvider, error) {
-	return s.list(ctx, sqlc.ListIdentityProvidersParams{EnabledOnly: db.Flag(true)})
+	return s.list(ctx, repo.Filter{EnabledOnly: true})
 }
 
 func (s Service) ByID(ctx context.Context, id int64) (*IdentityProvider, error) {
-	list, err := s.list(ctx, sqlc.ListIdentityProvidersParams{ID: db.NI(id)})
+	list, err := s.list(ctx, repo.Filter{ID: id})
 	if err != nil || len(list) == 0 {
 		return nil, err
 	}
@@ -152,7 +159,7 @@ func (s Service) ByID(ctx context.Context, id int64) (*IdentityProvider, error) 
 }
 
 func (s Service) BySlug(ctx context.Context, slug string) (*IdentityProvider, error) {
-	list, err := s.list(ctx, sqlc.ListIdentityProvidersParams{Slug: db.NullStringVal(slug)})
+	list, err := s.list(ctx, repo.Filter{Slug: slug})
 	if err != nil || len(list) == 0 {
 		return nil, err
 	}
@@ -226,19 +233,15 @@ func (s Service) Create(ctx context.Context, in IdPWrite) (*IdentityProvider, er
 	secJSON, _ := json.Marshal(sec)
 	claimJSON, _ := json.Marshal(claims)
 	roleJSON, _ := json.Marshal(roles)
-	now := time.Now().UTC().Format(time.RFC3339)
-	res, err := db.Q(s.DB).InsertIdentityProvider(ctx, sqlc.InsertIdentityProviderParams{
+	id, err := s.repo().Insert(ctx, repo.Save{
 		Name: in.Name, Slug: in.Slug, Protocol: preset.Protocol, Preset: preset.Key,
-		Enabled: db.BoolInt(enabled), SortOrder: int64(sort),
-		Config: db.NS(string(cfgJSON)), Secrets: db.NS(string(secJSON)),
-		ClaimMappings: db.NS(string(claimJSON)), RoleMapping: db.NS(string(roleJSON)),
-		DefaultRole: role, AllowJit: db.BoolInt(allowJIT), SyncRoleOnLogin: db.BoolInt(sync),
-		LinkByEmail: db.BoolInt(link), CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
-	})
+		Enabled: enabled, SortOrder: sort, Config: string(cfgJSON), Secrets: string(secJSON),
+		ClaimMappings: string(claimJSON), RoleMapping: string(roleJSON),
+		DefaultRole: role, AllowJIT: allowJIT, SyncRoleOnLogin: sync, LinkByEmail: link,
+	}, time.Now().UTC())
 	if err != nil {
 		return nil, err
 	}
-	id, _ := res.LastInsertId()
 	return s.ByID(ctx, id)
 }
 
@@ -298,16 +301,12 @@ func (s Service) Update(ctx context.Context, id int64, in IdPWrite) (*IdentityPr
 	secJSON, _ := json.Marshal(cur.Secrets)
 	claimJSON, _ := json.Marshal(cur.ClaimMappings)
 	roleJSON, _ := json.Marshal(cur.RoleMapping)
-	now := time.Now().UTC().Format(time.RFC3339)
-	err = db.Q(s.DB).UpdateIdentityProvider(ctx, sqlc.UpdateIdentityProviderParams{
+	err = s.repo().Update(ctx, id, repo.Save{
 		Name: cur.Name, Slug: cur.Slug, Protocol: cur.Protocol, Preset: cur.Preset,
-		Enabled: db.BoolInt(cur.Enabled), SortOrder: int64(cur.SortOrder),
-		Config: db.NS(string(cfgJSON)), Secrets: db.NS(string(secJSON)),
-		ClaimMappings: db.NS(string(claimJSON)), RoleMapping: db.NS(string(roleJSON)),
-		DefaultRole: cur.DefaultRole, AllowJit: db.BoolInt(cur.AllowJIT),
-		SyncRoleOnLogin: db.BoolInt(cur.SyncRoleOnLogin), LinkByEmail: db.BoolInt(cur.LinkByEmail),
-		UpdatedAt: db.NS(now), ID: id,
-	})
+		Enabled: cur.Enabled, SortOrder: cur.SortOrder, Config: string(cfgJSON), Secrets: string(secJSON),
+		ClaimMappings: string(claimJSON), RoleMapping: string(roleJSON),
+		DefaultRole: cur.DefaultRole, AllowJIT: cur.AllowJIT, SyncRoleOnLogin: cur.SyncRoleOnLogin, LinkByEmail: cur.LinkByEmail,
+	}, time.Now().UTC())
 	if err != nil {
 		return nil, err
 	}
@@ -315,11 +314,11 @@ func (s Service) Update(ctx context.Context, id int64, in IdPWrite) (*IdentityPr
 }
 
 func (s Service) Delete(ctx context.Context, id int64) error {
-	orphans, _ := db.Q(s.DB).CountSSOOnlyOrphans(ctx, id)
+	orphans, _ := s.repo().SSOOnlyOrphans(ctx, id)
 	if orphans > 0 {
 		return fmt.Errorf("Cannot delete: Service-only users would be left without a way to sign in.")
 	}
-	return db.Q(s.DB).DeleteIdentityProvider(ctx, id)
+	return s.repo().Delete(ctx, id)
 }
 
 func assembleFields(preset Preset, input map[string]any, existing *IdentityProvider) (cfg, sec map[string]any, err error) {
@@ -385,31 +384,16 @@ func (s Service) IssueTicket(ctx context.Context, userID int64, requires2FA bool
 	_, _ = rand.Read(b)
 	ticket := hex.EncodeToString(b)
 	now := time.Now().UTC()
-	err := db.Q(s.DB).InsertSSOTicket(ctx, sqlc.InsertSSOTicketParams{
-		Ticket: ticket, UserID: userID, Requires2fa: db.BoolInt(requires2FA),
-		ExpiresAt: now.Add(2 * time.Minute).Format(time.RFC3339),
-		CreatedAt: db.NS(now.Format(time.RFC3339)), UpdatedAt: db.NS(now.Format(time.RFC3339)),
-	})
+	err := s.repo().InsertTicket(ctx, ticket, userID, requires2FA, now.Add(2*time.Minute), now)
 	return ticket, err
 }
 
 func (s Service) ConsumeTicket(ctx context.Context, ticket string) (userID int64, requires2FA bool, ok bool) {
-	now := time.Now().UTC().Format(time.RFC3339)
-	res, err := db.Q(s.DB).ConsumeSSOTicket(ctx, sqlc.ConsumeSSOTicketParams{
-		ConsumedAt: db.NS(now), UpdatedAt: db.NS(now), Ticket: ticket, ExpiresAt: now,
-	})
-	if err != nil {
+	userID, requires2FA, ok, err := s.repo().TakeTicket(ctx, ticket, time.Now().UTC())
+	if err != nil || !ok {
 		return 0, false, false
 	}
-	n, _ := res.RowsAffected()
-	if n != 1 {
-		return 0, false, false
-	}
-	row, err := db.Q(s.DB).GetSSOTicket(ctx, ticket)
-	if err != nil {
-		return 0, false, false
-	}
-	return row.UserID, row.Requires2fa != 0, true
+	return userID, requires2FA, true
 }
 
 func (s Service) SaveState(ctx context.Context, st IdPState) (string, error) {
@@ -417,71 +401,53 @@ func (s Service) SaveState(ctx context.Context, st IdPState) (string, error) {
 	_, _ = rand.Read(b)
 	state := hex.EncodeToString(b)
 	now := time.Now().UTC()
-	err := db.Q(s.DB).InsertSSOState(ctx, sqlc.InsertSSOStateParams{
-		State: state, IdentityProviderID: st.ProviderID,
-		Nonce: db.NullStringVal(st.Nonce), CodeVerifier: db.NullStringVal(st.CodeVerifier),
-		SamlRequestID: db.NullStringVal(st.SAMLRequestID), RedirectAfter: db.NullStringVal(st.RedirectAfter),
-		ExpiresAt: now.Add(10 * time.Minute).Format(time.RFC3339),
-		CreatedAt: db.NS(now.Format(time.RFC3339)), UpdatedAt: db.NS(now.Format(time.RFC3339)),
-	})
+	err := s.repo().InsertState(ctx, state, repo.State(st), now.Add(10*time.Minute), now)
 	return state, err
 }
 
 func (s Service) AttachSAMLRequestID(ctx context.Context, state, requestID string) error {
-	return db.Q(s.DB).AttachSAMLRequestID(ctx, sqlc.AttachSAMLRequestIDParams{SamlRequestID: db.NS(requestID), State: state})
+	return s.repo().AttachSAMLRequestID(ctx, state, requestID)
 }
 
 func (s Service) ConsumeState(ctx context.Context, state string) (*IdPState, error) {
-	now := time.Now().UTC().Format(time.RFC3339)
-	row, err := db.Q(s.DB).GetSSOState(ctx, state)
-	if err != nil {
+	st, _ := s.repo().TakeState(ctx, state, time.Now().UTC())
+	if st == nil {
 		return nil, nil
 	}
-	_ = db.Q(s.DB).DeleteSSOState(ctx, state)
-	if row.ExpiresAt <= now {
-		return nil, nil
-	}
-	return &IdPState{
-		ProviderID: row.IdentityProviderID, Nonce: row.Nonce.String, CodeVerifier: row.CodeVerifier.String,
-		SAMLRequestID: row.SamlRequestID.String, RedirectAfter: row.RedirectAfter.String,
-	}, nil
+	out := IdPState(*st)
+	return &out, nil
 }
 
-func (s Service) list(ctx context.Context, arg sqlc.ListIdentityProvidersParams) ([]IdentityProvider, error) {
-	rows, err := db.Q(s.DB).ListIdentityProviders(ctx, arg)
+func (s Service) list(ctx context.Context, f repo.Filter) ([]IdentityProvider, error) {
+	rows, err := s.repo().List(ctx, f)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]IdentityProvider, 0, len(rows))
-	for _, r := range rows {
-		out = append(out, idpFrom(r))
+	out := make([]IdentityProvider, len(rows))
+	for i, r := range rows {
+		out[i] = idpFrom(r)
 	}
 	return out, nil
 }
 
-func idpFrom(row sqlc.IdentityProvider) IdentityProvider {
+func idpFrom(row repo.Provider) IdentityProvider {
 	p := IdentityProvider{
 		ID: row.ID, Name: row.Name, Slug: row.Slug, Protocol: row.Protocol, Preset: row.Preset,
-		Enabled: row.Enabled != 0, SortOrder: int(row.SortOrder), DefaultRole: row.DefaultRole,
-		AllowJIT: row.AllowJit != 0, SyncRoleOnLogin: row.SyncRoleOnLogin != 0, LinkByEmail: row.LinkByEmail != 0,
+		Enabled: row.Enabled, SortOrder: row.SortOrder, DefaultRole: row.DefaultRole,
+		AllowJIT: row.AllowJIT, SyncRoleOnLogin: row.SyncRoleOnLogin, LinkByEmail: row.LinkByEmail,
+		CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
 	}
-	if row.Config.Valid {
-		_ = json.Unmarshal([]byte(row.Config.String), &p.Config)
+	if row.Config != "" {
+		_ = json.Unmarshal([]byte(row.Config), &p.Config)
 	}
-	if row.Secrets.Valid {
-		_ = json.Unmarshal([]byte(row.Secrets.String), &p.Secrets)
+	if row.Secrets != "" {
+		_ = json.Unmarshal([]byte(row.Secrets), &p.Secrets)
 	}
-	if row.ClaimMappings.Valid {
-		_ = json.Unmarshal([]byte(row.ClaimMappings.String), &p.ClaimMappings)
+	if row.ClaimMappings != "" {
+		_ = json.Unmarshal([]byte(row.ClaimMappings), &p.ClaimMappings)
 	}
-	if row.RoleMapping.Valid {
-		_ = json.Unmarshal([]byte(row.RoleMapping.String), &p.RoleMapping)
-	}
-	if tm, ok := db.ParseTime(row.CreatedAt); ok {
-		p.CreatedAt = &tm
-	}
-	if tm, ok := db.ParseTime(row.UpdatedAt); ok {
-		p.UpdatedAt = &tm
+	if row.RoleMapping != "" {
+		_ = json.Unmarshal([]byte(row.RoleMapping), &p.RoleMapping)
 	}
 	return p
 }

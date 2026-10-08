@@ -7,8 +7,7 @@ import (
 	"time"
 
 	"savvy-go/internal/auth"
-	"savvy-go/internal/db"
-	"savvy-go/internal/db/sqlc"
+	repo "savvy-go/internal/db/repo/spaces"
 	"savvy-go/internal/settings"
 	"savvy-go/internal/store"
 )
@@ -50,7 +49,7 @@ func (s Service) checkAdminLimit(ctx context.Context, u *auth.User) error {
 	if !ok {
 		return nil
 	}
-	n, err := s.server().CountUserAdminSpaces(ctx, u.ID)
+	n, err := s.registry().CountAdminSpaces(ctx, u.ID)
 	if err != nil {
 		return err
 	}
@@ -73,38 +72,33 @@ func (s Service) CreateOwned(ctx context.Context, name string, owner *auth.User)
 
 // Rename renames a space.
 func (s Service) Rename(ctx context.Context, id int64, name string) error {
-	return s.server().RenameSpace(ctx, sqlc.RenameSpaceParams{Name: name, UpdatedAt: db.NS(now()), ID: id})
+	return s.registry().Rename(ctx, id, name, time.Now().UTC())
 }
-
-func now() string { return time.Now().UTC().Format(time.RFC3339) }
 
 // Members lists a space's members.
 func (s Service) Members(ctx context.Context, spaceID int64) ([]Member, error) {
-	rows, err := s.server().ListMembers(ctx, spaceID)
+	rows, err := s.registry().Members(ctx, spaceID)
 	if err != nil {
 		return nil, err
 	}
 	out := make([]Member, len(rows))
 	for i, r := range rows {
-		out[i] = Member{UserID: r.UserID, Name: r.Name, Email: r.Email, Role: r.Role}
-		if t, ok := db.ParseTime(r.CreatedAt); ok {
-			out[i].CreatedAt = &t
-		}
+		out[i] = Member{UserID: r.UserID, Name: r.Name, Email: r.Email, Role: r.Role, CreatedAt: r.CreatedAt}
 	}
 	return out, nil
 }
 
 // keepsAnAdmin reports whether the space still has an admin once userID
 // stops being one.
-func (s Service) keepsAnAdmin(ctx context.Context, q *sqlc.Queries, spaceID, userID int64) (bool, error) {
-	role, err := q.GetMemberRole(ctx, sqlc.GetMemberRoleParams{SpaceID: spaceID, UserID: userID})
-	if errors.Is(err, db.ErrNotFound) || (err == nil && role != RoleAdmin) {
-		return true, nil
-	}
+func keepsAnAdmin(ctx context.Context, reg repo.Repo, spaceID, userID int64) (bool, error) {
+	role, err := reg.MemberRole(ctx, spaceID, userID)
 	if err != nil {
 		return false, err
 	}
-	admins, err := q.CountSpaceRole(ctx, sqlc.CountSpaceRoleParams{SpaceID: spaceID, Role: RoleAdmin})
+	if role != RoleAdmin { // not a member, or not an admin: nothing is lost
+		return true, nil
+	}
+	admins, err := reg.CountWithRole(ctx, spaceID, RoleAdmin)
 	return admins > 1, err
 }
 
@@ -134,28 +128,28 @@ func (s Service) ChangeRole(ctx context.Context, spaceID int64, target *auth.Use
 		}
 	}
 	return store.Tx(ctx, s.Store.Server(), func(tx store.DB) error {
-		q := db.Q(tx)
-		if ok, err := s.keepsAnAdmin(ctx, q, spaceID, target.ID); err != nil {
+		reg := repo.Repo{DB: tx}
+		if ok, err := keepsAnAdmin(ctx, reg, spaceID, target.ID); err != nil {
 			return err
 		} else if !ok && role != RoleAdmin {
 			return ErrLastAdmin
 		}
-		return q.UpsertSpaceMember(ctx, sqlc.UpsertSpaceMemberParams{SpaceID: spaceID, UserID: target.ID, Role: role, CreatedAt: db.NS(now())})
+		return reg.UpsertMember(ctx, spaceID, target.ID, role, time.Now().UTC())
 	})
 }
 
 // RemoveMember takes a member out of a space (also how a member leaves).
 func (s Service) RemoveMember(ctx context.Context, spaceID, userID int64) error {
 	return store.Tx(ctx, s.Store.Server(), func(tx store.DB) error {
-		q := db.Q(tx)
-		role, err := q.GetMemberRole(ctx, sqlc.GetMemberRoleParams{SpaceID: spaceID, UserID: userID})
-		if errors.Is(err, db.ErrNotFound) {
-			return ErrNotMember
-		}
+		reg := repo.Repo{DB: tx}
+		role, err := reg.MemberRole(ctx, spaceID, userID)
 		if err != nil {
 			return err
 		}
-		members, err := q.CountSpaceMembers(ctx, spaceID)
+		if role == "" {
+			return ErrNotMember
+		}
+		members, err := reg.CountMembers(ctx, spaceID)
 		if err != nil {
 			return err
 		}
@@ -163,13 +157,13 @@ func (s Service) RemoveMember(ctx context.Context, spaceID, userID int64) error 
 			return ErrLastMember
 		}
 		if role == RoleAdmin {
-			if ok, err := s.keepsAnAdmin(ctx, q, spaceID, userID); err != nil {
+			if ok, err := keepsAnAdmin(ctx, reg, spaceID, userID); err != nil {
 				return err
 			} else if !ok {
 				return ErrLastAdmin
 			}
 		}
-		return q.DeleteSpaceMember(ctx, sqlc.DeleteSpaceMemberParams{SpaceID: spaceID, UserID: userID})
+		return reg.DeleteMember(ctx, spaceID, userID)
 	})
 }
 
@@ -199,20 +193,20 @@ func (s Service) Delete(ctx context.Context, sp Space, backups FinalBackuper) er
 	if err := s.Store.DeleteSpace(ctx, sp.ID); err != nil && !errors.Is(err, store.ErrNotFound) {
 		return err
 	}
-	return s.server().DeleteSpaceRow(ctx, sp.ID)
+	return s.registry().Delete(ctx, sp.ID)
 }
 
 // DeleteUser tombstones a user. Where they are the last admin of a space with
 // other members the deletion is refused (P11); spaces they are alone in are
 // deleted with them.
 func (s Service) DeleteUser(ctx context.Context, users auth.Users, u *auth.User, backups FinalBackuper) error {
-	ids, err := s.server().ListUserAdminSpaces(ctx, u.ID)
+	ids, err := s.registry().AdminSpaceIDs(ctx, u.ID)
 	if err != nil {
 		return err
 	}
 	var alone []int64
 	for _, id := range ids {
-		members, err := s.server().CountSpaceMembers(ctx, id)
+		members, err := s.registry().CountMembers(ctx, id)
 		if err != nil {
 			return err
 		}
@@ -220,7 +214,7 @@ func (s Service) DeleteUser(ctx context.Context, users auth.Users, u *auth.User,
 			alone = append(alone, id)
 			continue
 		}
-		if ok, err := s.keepsAnAdmin(ctx, s.server(), id, u.ID); err != nil {
+		if ok, err := keepsAnAdmin(ctx, s.registry(), id, u.ID); err != nil {
 			return err
 		} else if !ok {
 			sp, _ := s.Get(ctx, id)
@@ -249,7 +243,7 @@ func (s Service) SetRoleAllowed(ctx context.Context, u *auth.User, role string) 
 	if role != auth.RoleGuest || u.IsGuest() {
 		return nil
 	}
-	n, err := s.server().CountUserAdminSpaces(ctx, u.ID)
+	n, err := s.registry().CountAdminSpaces(ctx, u.ID)
 	if err != nil {
 		return err
 	}
@@ -267,19 +261,19 @@ func (s Service) Quota(ctx context.Context, id int64) int64 {
 
 // Quota reads a space's size limit from the server database.
 func Quota(ctx context.Context, server store.DB, id int64) int64 {
-	if q, err := db.Q(server).GetSpaceQuota(ctx, id); err == nil && q.Valid {
-		return q.Int64
+	if own, err := (repo.Repo{DB: server}).Quota(ctx, id); err == nil && own != nil {
+		return *own
 	}
 	return settings.SpaceQuota(ctx, server)
 }
 
 // SetQuota sets or clears (bytes <= 0) a space's own size limit.
 func (s Service) SetQuota(ctx context.Context, actor *auth.User, id, bytes int64) error {
-	var v db.NInt
+	var own *int64
 	if bytes > 0 {
-		v = db.NI(bytes)
+		own = &bytes
 	}
-	if err := s.server().SetSpaceQuota(ctx, sqlc.SetSpaceQuotaParams{QuotaBytes: v, UpdatedAt: db.NS(now()), ID: id}); err != nil {
+	if err := s.registry().SetQuota(ctx, id, own, time.Now().UTC()); err != nil {
 		return err
 	}
 	if err := s.Store.ApplyQuota(ctx, id); err != nil && !errors.Is(err, store.ErrUnavailable) {
@@ -303,21 +297,19 @@ type Overview struct {
 
 // Overview lists every space with its size and members, never its data (P5).
 func (s Service) Overview(ctx context.Context) ([]Overview, error) {
-	rows, err := s.server().ListSpacesOverview(ctx)
+	rows, err := s.registry().Overview(ctx)
 	if err != nil {
 		return nil, err
 	}
 	broken := s.Store.Status().Unavailable
 	out := make([]Overview, len(rows))
 	for i, r := range rows {
-		o := Overview{ID: r.ID, UUID: r.Uuid, Name: r.Name, Members: r.Members, Admins: r.Admins, Unavailable: broken[r.ID]}
+		o := Overview{ID: r.ID, UUID: r.UUID, Name: r.Name, Members: r.Members, Admins: r.Admins,
+			Unavailable: broken[r.ID], CreatedAt: r.CreatedAt}
 		o.Quota = s.Quota(ctx, r.ID)
 		var err error
 		if o.Size, err = s.Store.SpaceSize(ctx, r.ID); errors.Is(err, store.ErrNotFound) {
 			o.Unavailable = "the database file is missing"
-		}
-		if t, ok := db.ParseTime(r.CreatedAt); ok {
-			o.CreatedAt = &t
 		}
 		out[i] = o
 	}
@@ -367,38 +359,19 @@ type AuditEntry struct {
 
 // Audit records a server admin action (P53).
 func (s Service) Audit(ctx context.Context, actor *auth.User, action string, spaceID, target *int64, details string) error {
-	var actorID, sid, tid db.NInt
-	if actor != nil {
-		actorID = db.NI(actor.ID)
-	}
-	if spaceID != nil {
-		sid = db.NI(*spaceID)
-	}
-	if target != nil {
-		tid = db.NI(*target)
-	}
-	return s.server().InsertAudit(ctx, sqlc.InsertAuditParams{
-		ActorID: actorID, Action: action, SpaceID: sid, TargetUserID: tid, Details: db.NullStringVal(details), CreatedAt: now(),
-	})
+	return s.registry().InsertAudit(ctx, ownerID(actor), spaceID, target, action, details, time.Now().UTC())
 }
 
 // AuditLog lists the server admin actions on a space, newest first.
 func (s Service) AuditLog(ctx context.Context, spaceID int64) ([]AuditEntry, error) {
-	rows, err := s.server().ListSpaceAudit(ctx, db.NI(spaceID))
+	rows, err := s.registry().Audit(ctx, spaceID)
 	if err != nil {
 		return nil, err
 	}
 	out := make([]AuditEntry, len(rows))
 	for i, r := range rows {
-		e := AuditEntry{ID: r.ID, Actor: r.Actor, Action: r.Action, Details: r.Details.String}
-		if r.TargetUserID.Valid {
-			id := r.TargetUserID.Int64
-			e.TargetUserID = &id
-		}
-		if t, err := time.Parse(time.RFC3339, r.CreatedAt); err == nil {
-			e.CreatedAt = &t
-		}
-		out[i] = e
+		out[i] = AuditEntry{ID: r.ID, Actor: r.Actor, Action: r.Action, TargetUserID: r.TargetUserID,
+			Details: r.Details, CreatedAt: r.CreatedAt}
 	}
 	return out, nil
 }

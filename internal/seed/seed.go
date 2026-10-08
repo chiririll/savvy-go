@@ -9,7 +9,8 @@ import (
 	"github.com/shopspring/decimal"
 
 	"savvy-go/internal/auth"
-	appdb "savvy-go/internal/db"
+	automationrepo "savvy-go/internal/db/repo/automation"
+	ledgerrepo "savvy-go/internal/db/repo/ledger"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/settings"
 	"savvy-go/internal/signing"
@@ -135,8 +136,8 @@ func Demo(ctx context.Context, st store.Store, keys signing.KeyRing, opts Option
 		if err != nil {
 			return nil, err
 		}
-		txs, _ := appdb.Q(db).CountAllTransactions(ctx)
-		accts, _ := appdb.Q(db).CountAccounts(ctx)
+		repo := ledgerrepo.Repo{DB: db}
+		txs, accts := repo.CountTransactions(ctx), repo.CountAccounts(ctx)
 		slog.Info("demo space seeded", "space", sp.Name, "transactions", txs, "accounts", accts)
 	}
 	return d.manifest, nil
@@ -276,20 +277,12 @@ func (d *demo) recordAutomations() error {
 		if err != nil {
 			return err
 		}
-		rows, err := db.QueryContext(d.ctx, `SELECT id FROM automation_rules ORDER BY priority, id`)
+		rules, err := automationrepo.Repo{DB: db}.List(d.ctx, automationrepo.Filter{})
 		if err != nil {
 			return fmt.Errorf("space %s automation rules: %w", sp.Name, err)
 		}
-		for rows.Next() {
-			var id int64
-			if err := rows.Scan(&id); err != nil {
-				_ = rows.Close()
-				return err
-			}
-			sp.Automations = append(sp.Automations, id)
-		}
-		if err := rows.Close(); err != nil {
-			return err
+		for _, r := range rules {
+			sp.Automations = append(sp.Automations, r.ID)
 		}
 	}
 	return nil

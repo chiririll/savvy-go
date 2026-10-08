@@ -161,20 +161,20 @@ func TestCategoryResolver(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := r.resolve("food"); !got.Valid || got.Int64 != food.ID {
-		t.Fatalf("food: %+v", got)
+	if got := r.resolve("food"); got == nil || *got != food.ID {
+		t.Fatalf("food: %v", got)
 	}
-	if got := r.resolve("Supermarket"); !got.Valid || got.Int64 != other.ID {
-		t.Fatalf("supermarket: %+v", got)
+	if got := r.resolve("Supermarket"); got == nil || *got != other.ID {
+		t.Fatalf("supermarket: %v", got)
 	}
-	if got := r.resolve("Gym"); got.Valid {
+	if got := r.resolve("Gym"); got != nil {
 		t.Fatalf("gym should be skipped: %+v", got)
 	}
-	if got := r.resolve("Salary"); got.Valid {
+	if got := r.resolve("Salary"); got != nil {
 		t.Fatalf("salary has no choice and create_missing is off: %+v", got)
 	}
 	cafes := r.resolve("Cafes")
-	if !cafes.Valid || r.resolve("cafes") != cafes {
+	if cafes == nil || r.resolve("cafes") != cafes {
 		t.Fatalf("cafes: %+v", cafes)
 	}
 	if len(r.created) != 1 || r.created[0] != "Cafes" {
@@ -184,10 +184,10 @@ func TestCategoryResolver(t *testing.T) {
 	options["create_missing_categories"] = true
 	r, _ = imports.newCategoryResolver(ctx, found, options)
 	salary := r.resolve("Salary")
-	if !salary.Valid {
+	if salary == nil {
 		t.Fatal("salary should be created when create_missing is on")
 	}
-	created, _ := cats.ByID(ctx, salary.Int64)
+	created, _ := cats.ByID(ctx, *salary)
 	if created == nil || created.Type != "income" {
 		t.Fatalf("created salary %+v", created)
 	}

@@ -9,8 +9,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	"savvy-go/internal/db"
-	"savvy-go/internal/db/sqlc"
+	repo "savvy-go/internal/db/repo/ledger"
 	"savvy-go/internal/money"
 	"savvy-go/internal/store"
 )
@@ -125,31 +124,38 @@ type Currencies struct {
 	Source RateSource
 }
 
+func (s Currencies) repo() repo.Repo { return repo.Repo{DB: s.DB} }
+
 func (s Currencies) All(ctx context.Context) ([]Currency, error) {
-	rows, err := db.Q(s.DB).ListCurrencies(ctx)
+	rows, err := s.repo().Currencies(ctx)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]Currency, 0, len(rows))
-	for _, r := range rows {
-		out = append(out, currencyFrom(r.ID, r.Code, r.Name, r.Symbol, r.Decimals, r.IsBase, r.Rate))
+	out := make([]Currency, len(rows))
+	for i, r := range rows {
+		out[i] = currencyFrom(r)
 	}
 	return out, nil
 }
 
 func (s Currencies) ByID(ctx context.Context, id int64) (*Currency, error) {
-	r, err := db.Q(s.DB).GetCurrency(ctx, id)
-	return currencyFromRow(r.ID, r.Code, r.Name, r.Symbol, r.Decimals, r.IsBase, r.Rate, err)
+	return optCurrency(s.repo().Currency(ctx, id))
 }
 
 func (s Currencies) ByCode(ctx context.Context, code string) (*Currency, error) {
-	r, err := db.Q(s.DB).GetCurrencyByCode(ctx, strings.ToUpper(code))
-	return currencyFromRow(r.ID, r.Code, r.Name, r.Symbol, r.Decimals, r.IsBase, r.Rate, err)
+	return optCurrency(s.repo().CurrencyByCode(ctx, strings.ToUpper(code)))
 }
 
 func (s Currencies) Base(ctx context.Context) (*Currency, error) {
-	r, err := db.Q(s.DB).GetBaseCurrency(ctx)
-	return currencyFromRow(r.ID, r.Code, r.Name, r.Symbol, r.Decimals, r.IsBase, r.Rate, err)
+	return optCurrency(s.repo().BaseCurrency(ctx))
+}
+
+func optCurrency(r *repo.Currency, err error) (*Currency, error) {
+	if r == nil || err != nil {
+		return nil, err
+	}
+	c := currencyFrom(*r)
+	return &c, nil
 }
 
 func (s Currencies) Create(ctx context.Context, c Currency) (*Currency, error) {
@@ -166,24 +172,19 @@ func (s Currencies) Create(ctx context.Context, c Currency) (*Currency, error) {
 	if !validRate(c.Rate) {
 		return nil, ErrInvalidRate
 	}
-	if n, err := db.Q(s.DB).CountCurrencies(ctx); err == nil && n == 0 {
+	if n, err := s.repo().CountCurrencies(ctx); err == nil && n == 0 {
 		c.IsBase = true
 	}
 	if c.IsBase {
-		if err := db.Q(s.DB).ClearBaseCurrency(ctx); err != nil {
+		if err := s.repo().ClearBaseCurrency(ctx); err != nil {
 			return nil, err
 		}
 		c.Rate = one
 	}
-	now := time.Now().UTC().Format(time.RFC3339)
-	res, err := db.Q(s.DB).InsertCurrency(ctx, sqlc.InsertCurrencyParams{
-		Code: c.Code, Name: c.Name, Symbol: c.Symbol, Decimals: int64(c.Decimals),
-		IsBase: db.BoolInt(c.IsBase), Rate: c.Rate, CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
-	})
+	id, err := s.repo().InsertCurrency(ctx, currencyRow(c), time.Now().UTC())
 	if err != nil {
 		return nil, err
 	}
-	id, _ := res.LastInsertId()
 	return s.ByID(ctx, id)
 }
 
@@ -205,17 +206,12 @@ func (s Currencies) Update(ctx context.Context, id int64, c Currency) (*Currency
 		return nil, fmt.Errorf("base rate")
 	}
 	if c.IsBase && !cur.IsBase {
-		if err := db.Q(s.DB).ClearBaseCurrency(ctx); err != nil {
+		if err := s.repo().ClearBaseCurrency(ctx); err != nil {
 			return nil, err
 		}
 		c.Rate = one
 	}
-	now := time.Now().UTC().Format(time.RFC3339)
-	err = db.Q(s.DB).UpdateCurrency(ctx, sqlc.UpdateCurrencyParams{
-		Name: c.Name, Symbol: c.Symbol, Decimals: int64(c.Decimals), IsBase: db.BoolInt(c.IsBase),
-		Rate: c.Rate, UpdatedAt: db.NS(now), ID: id,
-	})
-	if err != nil {
+	if err := s.repo().UpdateCurrency(ctx, id, currencyRow(c), time.Now().UTC()); err != nil {
 		return nil, err
 	}
 	return s.ByID(ctx, id)
@@ -226,15 +222,13 @@ func (s Currencies) Delete(ctx context.Context, id int64) error {
 	if err != nil || cur == nil {
 		return err
 	}
-	used, _ := db.Q(s.DB).CountAccountsForCurrency(ctx, id)
-	usedByBudgets, _ := db.Q(s.DB).CountBudgetsForCurrency(ctx, id)
-	if used > 0 || usedByBudgets > 0 {
+	if s.repo().CurrencyInUse(ctx, id) {
 		return fmt.Errorf("in use")
 	}
 	if cur.IsBase {
 		return fmt.Errorf("base")
 	}
-	return db.Q(s.DB).DeleteCurrency(ctx, id)
+	return s.repo().DeleteCurrency(ctx, id)
 }
 
 func (s Currencies) SetBase(ctx context.Context, id int64) (*Currency, error) {
@@ -249,7 +243,7 @@ func (s Currencies) SetBase(ctx context.Context, id int64) (*Currency, error) {
 	if newRate.IsZero() {
 		newRate = one
 	}
-	rows, err := db.Q(s.DB).ListOtherCurrencyRates(ctx, id)
+	rows, err := s.repo().OtherRates(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -261,13 +255,11 @@ func (s Currencies) SetBase(ctx context.Context, id int64) (*Currency, error) {
 		}
 	}
 	for i, r := range rows {
-		if err := db.Q(s.DB).UpdateCurrencyRate(ctx, sqlc.UpdateCurrencyRateParams{Rate: rebased[i], ID: r.ID}); err != nil {
+		if err := s.repo().SetCurrencyRate(ctx, r.ID, rebased[i]); err != nil {
 			return nil, err
 		}
 	}
-	now := time.Now().UTC().Format(time.RFC3339)
-	err = db.Q(s.DB).SetCurrencyBase(ctx, sqlc.SetCurrencyBaseParams{UpdatedAt: db.NS(now), ID: id})
-	if err != nil {
+	if err := s.repo().SetBaseCurrency(ctx, id, time.Now().UTC()); err != nil {
 		return nil, err
 	}
 	return s.ByID(ctx, id)
@@ -277,7 +269,7 @@ func (s Currencies) FindOrCreateByCode(ctx context.Context, code string) (*Curre
 	if c, err := s.ByCode(ctx, code); err != nil || c != nil {
 		return c, err
 	}
-	n, _ := db.Q(s.DB).CountCurrencies(ctx)
+	n, _ := s.repo().CountCurrencies(ctx)
 	item := s.catalogItem(ctx, code)
 	if item == nil {
 		return nil, fmt.Errorf("unknown code")
@@ -304,8 +296,8 @@ func (s Currencies) catalogItem(ctx context.Context, code string) *Currency {
 
 func (s Currencies) Catalog(ctx context.Context) []map[string]any {
 	existing := map[string]bool{}
-	if rows, err := db.Q(s.DB).ListCurrencyCodes(ctx); err == nil {
-		for _, code := range rows {
+	if codes, err := s.repo().CurrencyCodes(ctx); err == nil {
+		for _, code := range codes {
 			existing[strings.ToUpper(code)] = true
 		}
 	}
@@ -332,26 +324,12 @@ func (s Currencies) baseCode(ctx context.Context) string {
 	return "USD"
 }
 
-func currencyFrom(id int64, code, name, symbol string, decimals, isBase int64, rate decimal.Decimal) Currency {
-	return Currency{ID: id, Code: code, Name: name, Symbol: symbol, Decimals: int(decimals), IsBase: isBase != 0, Rate: rate}
+func currencyFrom(r repo.Currency) Currency {
+	return Currency{ID: r.ID, Code: r.Code, Name: r.Name, Symbol: r.Symbol, Decimals: r.Decimals, IsBase: r.IsBase, Rate: r.Rate}
 }
 
-func currencyFromRow(id int64, code, name, symbol string, decimals, isBase int64, rate decimal.Decimal, err error) (*Currency, error) {
-	if err == db.ErrNotFound {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	c := currencyFrom(id, code, name, symbol, decimals, isBase, rate)
-	return &c, nil
-}
-
-func boolInt(v bool) int {
-	if v {
-		return 1
-	}
-	return 0
+func currencyRow(c Currency) repo.Currency {
+	return repo.Currency{ID: c.ID, Code: c.Code, Name: c.Name, Symbol: c.Symbol, Decimals: c.Decimals, IsBase: c.IsBase, Rate: c.Rate}
 }
 
 // UpdateRates sets the rate of every non-base currency from the source.
@@ -384,7 +362,7 @@ func (s Currencies) UpdateRates(ctx context.Context) (updated, skipped int, err 
 			skipped++
 			continue
 		}
-		if err := db.Q(s.DB).UpdateCurrencyRate(ctx, sqlc.UpdateCurrencyRateParams{Rate: rate, ID: c.ID}); err != nil {
+		if err := s.repo().SetCurrencyRate(ctx, c.ID, rate); err != nil {
 			return updated, skipped, err
 		}
 		updated++

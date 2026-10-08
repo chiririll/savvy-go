@@ -22,10 +22,12 @@ var sqliteOnlyImports = []string{
 	"savvy-go/internal/migrate",
 	"savvy-go/internal/legacy",
 	"modernc.org/sqlite",
-	// Nullable columns, "no rows" and timestamps come from internal/db
-	// (db.NInt, db.ErrNotFound, db.TimeNS), so only the database packages
-	// import database/sql.
+	// SQL lives in the database packages: internal/db, its generated sqlc
+	// code and the repositories internal/db/repo/<area>. Business code asks a
+	// repository and sees plain Go values; helpers for nullable columns, "no
+	// rows" and timestamps are in internal/db (db.ErrNotFound, db.TimeNS).
 	"database/sql",
+	"savvy-go/internal/db/sqlc",
 }
 
 var sqliteOnlySQL = regexp.MustCompile(`(?i)\bPRAGMA\b|\bATTACH\s+DATABASE\b|\bsqlite_master\b|\bsqlite_sequence\b`)
@@ -134,6 +136,66 @@ func TestPackagesRespectTheLayering(t *testing.T) {
 					if path == b {
 						t.Errorf("%s imports %s", f, path)
 					}
+				}
+			}
+		}
+	}
+}
+
+// A repository package (internal/db/repo/<area>) moves rows for one area and
+// knows nothing of the business package above it: the rules sit there, and a
+// repository importing it back would be a cycle in spirit if not in Go.
+func TestRepositoriesDoNotImportBusinessCode(t *testing.T) {
+	repos, err := filepath.Glob(filepath.Join("..", "db", "repo", "*"))
+	if err != nil || len(repos) == 0 {
+		t.Fatalf("no repositories found: %v", err)
+	}
+	business := map[string]bool{}
+	for _, pkg := range businessPackages {
+		business["savvy-go/internal/"+pkg] = true
+	}
+	for _, dir := range repos {
+		files, _ := filepath.Glob(filepath.Join(dir, "*.go"))
+		for _, f := range files {
+			if strings.HasSuffix(f, "_test.go") {
+				continue
+			}
+			parsed, err := parser.ParseFile(token.NewFileSet(), f, nil, parser.ImportsOnly)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, imp := range parsed.Imports {
+				if path, _ := strconv.Unquote(imp.Path.Value); business[path] {
+					t.Errorf("%s imports business package %s", f, path)
+				}
+			}
+		}
+	}
+}
+
+// A business package reaches rows of another area through that area's
+// package, never through its repository. reports and seed read and write
+// ledger and automation rows directly by design.
+func TestBusinessCodeUsesOnlyItsOwnRepository(t *testing.T) {
+	allowed := map[string]bool{"reports": true, "seed": true}
+	const prefix = "savvy-go/internal/db/repo/"
+	for _, pkg := range businessPackages {
+		if allowed[pkg] {
+			continue
+		}
+		files, _ := filepath.Glob(filepath.Join("..", filepath.FromSlash(pkg), "*.go"))
+		for _, f := range files {
+			if strings.HasSuffix(f, "_test.go") {
+				continue
+			}
+			parsed, err := parser.ParseFile(token.NewFileSet(), f, nil, parser.ImportsOnly)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, imp := range parsed.Imports {
+				path, _ := strconv.Unquote(imp.Path.Value)
+				if area, ok := strings.CutPrefix(path, prefix); ok && area != pkg {
+					t.Errorf("%s imports the %s repository; use the %s package", f, area, area)
 				}
 			}
 		}

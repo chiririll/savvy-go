@@ -9,9 +9,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"savvy-go/internal/calendar"
-	"savvy-go/internal/db"
-	"savvy-go/internal/db/filter"
-	"savvy-go/internal/db/sqlc"
+	repo "savvy-go/internal/db/repo/ledger"
 	"savvy-go/internal/money"
 	"savvy-go/internal/store"
 )
@@ -62,12 +60,14 @@ type BudgetInput struct {
 
 type Budgets struct{ DB store.DB }
 
+func (s Budgets) repo() repo.Repo { return repo.Repo{DB: s.DB} }
+
 func (s Budgets) All(ctx context.Context) ([]Budget, error) {
-	return s.list(ctx, db.NInt{})
+	return s.list(ctx, nil)
 }
 
 func (s Budgets) ByID(ctx context.Context, id int64) (*Budget, error) {
-	list, err := s.list(ctx, db.NI(id))
+	list, err := s.list(ctx, &id)
 	if err != nil || len(list) == 0 {
 		return nil, err
 	}
@@ -83,7 +83,6 @@ func (s Budgets) Create(ctx context.Context, in BudgetInput) (*Budget, error) {
 	if in.IsGlobal != nil {
 		global = *in.IsGlobal
 	}
-	now := time.Now().UTC().Format(time.RFC3339)
 	unit, err := s.resolveCurrency(ctx, in.CurrencyID)
 	if err != nil {
 		return nil, err
@@ -92,20 +91,17 @@ func (s Budgets) Create(ctx context.Context, in BudgetInput) (*Budget, error) {
 	if err != nil {
 		return nil, err
 	}
-	res, err := db.Q(s.DB).InsertBudget(ctx, sqlc.InsertBudgetParams{
-		Name: in.Name, Amount: amount.Minor(), CurrencyID: unit.ID, Period: in.Period,
-		StartDate: db.NullString(in.StartDate), EndDate: db.NullString(in.EndDate),
-		IsGlobal: db.BoolInt(global), NotifyAtPercent: db.NullInt(in.NotifyAtPercent),
-		IsActive: db.BoolInt(active), CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
-	})
+	id, err := s.repo().InsertBudget(ctx, repo.BudgetFields{
+		Name: in.Name, Amount: amount, Period: in.Period, StartDate: in.StartDate, EndDate: in.EndDate,
+		IsGlobal: global, NotifyAtPercent: in.NotifyAtPercent, IsActive: active,
+	}, time.Now().UTC())
 	if err != nil {
 		return nil, err
 	}
-	id, _ := res.LastInsertId()
-	if err := s.saveCats(ctx, id, in.CategoryIDs); err != nil {
+	if err := s.repo().SetBudgetCategories(ctx, id, in.CategoryIDs); err != nil {
 		return nil, err
 	}
-	if err := s.saveTags(ctx, id, in.TagIDs); err != nil {
+	if err := s.repo().SetBudgetTags(ctx, id, in.TagIDs); err != nil {
 		return nil, err
 	}
 	return s.ByID(ctx, id)
@@ -133,7 +129,6 @@ func (s Budgets) Update(ctx context.Context, id int64, in BudgetInput) (*Budget,
 	if in.IsActive != nil {
 		active = *in.IsActive
 	}
-	now := time.Now().UTC().Format(time.RFC3339)
 	unit, err := s.resolveCurrency(ctx, in.CurrencyID)
 	if err != nil {
 		return nil, err
@@ -142,22 +137,20 @@ func (s Budgets) Update(ctx context.Context, id int64, in BudgetInput) (*Budget,
 	if err != nil {
 		return nil, err
 	}
-	err = db.Q(s.DB).UpdateBudget(ctx, sqlc.UpdateBudgetParams{
-		Name: in.Name, Amount: amount.Minor(), CurrencyID: unit.ID, Period: in.Period,
-		StartDate: db.NullString(in.StartDate), EndDate: db.NullString(in.EndDate),
-		IsGlobal: db.BoolInt(global), NotifyAtPercent: db.NullInt(in.NotifyAtPercent),
-		IsActive: db.BoolInt(active), UpdatedAt: db.NS(now), ID: id,
-	})
+	err = s.repo().UpdateBudget(ctx, id, repo.BudgetFields{
+		Name: in.Name, Amount: amount, Period: in.Period, StartDate: in.StartDate, EndDate: in.EndDate,
+		IsGlobal: global, NotifyAtPercent: in.NotifyAtPercent, IsActive: active,
+	}, time.Now().UTC())
 	if err != nil {
 		return nil, err
 	}
 	if in.HasCategoryIDs {
-		if err := s.saveCats(ctx, id, in.CategoryIDs); err != nil {
+		if err := s.repo().SetBudgetCategories(ctx, id, in.CategoryIDs); err != nil {
 			return nil, err
 		}
 	}
 	if in.HasTagIDs {
-		if err := s.saveTags(ctx, id, in.TagIDs); err != nil {
+		if err := s.repo().SetBudgetTags(ctx, id, in.TagIDs); err != nil {
 			return nil, err
 		}
 	}
@@ -165,7 +158,7 @@ func (s Budgets) Update(ctx context.Context, id int64, in BudgetInput) (*Budget,
 }
 
 func (s Budgets) Delete(ctx context.Context, id int64) error {
-	return db.Q(s.DB).DeleteBudget(ctx, id)
+	return s.repo().DeleteBudget(ctx, id)
 }
 
 func (s Budgets) CalculateProgress(ctx context.Context, b *Budget) BudgetProgress {
@@ -204,7 +197,7 @@ func (s Budgets) spent(ctx context.Context, b *Budget, start, end time.Time) mon
 	for _, t := range b.Tags {
 		tagIDs = append(tagIDs, t.ID)
 	}
-	spent, err := filter.BudgetSpent(ctx, s.DB, start.Format("2006-01-02"), end.Format("2006-01-02"), catIDs, tagIDs, unit, targetRate)
+	spent, err := s.repo().BudgetSpent(ctx, start.Format("2006-01-02"), end.Format("2006-01-02"), catIDs, tagIDs, unit, targetRate)
 	if err != nil {
 		return money.Zero(unit)
 	}
@@ -263,24 +256,25 @@ func budgetPeriodDates(b Budget) (time.Time, time.Time) {
 	}
 }
 
-func (s Budgets) list(ctx context.Context, id db.NInt) ([]Budget, error) {
-	rows, err := db.Q(s.DB).ListBudgets(ctx, id)
+func (s Budgets) list(ctx context.Context, id *int64) ([]Budget, error) {
+	rows, err := s.repo().Budgets(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]Budget, 0, len(rows))
-	for _, r := range rows {
-		out = append(out, budgetFromRow(r))
-	}
+	out := make([]Budget, len(rows))
 	curs := Currencies{DB: s.DB}
-	for i := range out {
-		if out[i].CurrencyID != nil {
-			if c, _ := curs.ByID(ctx, *out[i].CurrencyID); c != nil {
-				out[i].Currency = c
-			}
+	for i, r := range rows {
+		currencyID := r.Amount.Unit().ID
+		out[i] = Budget{
+			ID: r.ID, Name: r.Name, Amount: r.Amount, CurrencyID: &currencyID, Period: r.Period,
+			StartDate: r.StartDate, EndDate: r.EndDate, IsGlobal: r.IsGlobal, NotifyAtPercent: r.NotifyAtPercent,
+			IsActive: r.IsActive,
 		}
-		out[i].Categories, _ = s.cats(ctx, out[i].ID)
-		out[i].Tags, _ = s.tags(ctx, out[i].ID)
+		if c, _ := curs.ByID(ctx, currencyID); c != nil {
+			out[i].Currency = c
+		}
+		out[i].Categories, _ = s.cats(ctx, r.ID)
+		out[i].Tags, _ = s.tags(ctx, r.ID)
 		p := s.CalculateProgress(ctx, &out[i])
 		out[i].Progress = &p
 	}
@@ -288,67 +282,25 @@ func (s Budgets) list(ctx context.Context, id db.NInt) ([]Budget, error) {
 }
 
 func (s Budgets) cats(ctx context.Context, id int64) ([]Category, error) {
-	rows, err := db.Q(s.DB).ListBudgetCategories(ctx, id)
+	rows, err := s.repo().BudgetCategories(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]Category, 0, len(rows))
-	for _, r := range rows {
-		out = append(out, categoryFrom(r.ID, r.Name, r.Type, r.Icon, r.Color, r.IsDefault, r.TransactionsCount))
+	out := make([]Category, len(rows))
+	for i, r := range rows {
+		out[i] = categoryFrom(r)
 	}
 	return out, nil
 }
 
 func (s Budgets) tags(ctx context.Context, id int64) ([]Tag, error) {
-	rows, err := db.Q(s.DB).ListBudgetTags(ctx, id)
+	rows, err := s.repo().BudgetTags(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]Tag, 0, len(rows))
-	for _, r := range rows {
-		out = append(out, TagFromRow(r.ID, r.Name, r.CreatedAt, r.TransactionsCount))
+	out := make([]Tag, len(rows))
+	for i, r := range rows {
+		out[i] = tagFrom(r)
 	}
 	return out, nil
-}
-
-func (s Budgets) saveCats(ctx context.Context, id int64, ids []int64) error {
-	if err := db.Q(s.DB).DeleteBudgetCategories(ctx, id); err != nil {
-		return err
-	}
-	for _, catID := range ids {
-		if err := db.Q(s.DB).InsertBudgetCategory(ctx, sqlc.InsertBudgetCategoryParams{BudgetID: id, CategoryID: catID}); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (s Budgets) saveTags(ctx context.Context, id int64, ids []int64) error {
-	if err := db.Q(s.DB).DeleteBudgetTags(ctx, id); err != nil {
-		return err
-	}
-	for _, tagID := range ids {
-		if err := db.Q(s.DB).InsertBudgetTag(ctx, sqlc.InsertBudgetTagParams{BudgetID: id, TagID: tagID}); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func budgetFromRow(r sqlc.ListBudgetsRow) Budget {
-	unit := money.Unit{ID: r.CurrencyID, Decimals: int(r.Decimals)}
-	b := Budget{ID: r.ID, Name: r.Name, Amount: money.New(r.Amount, unit), Period: r.Period, IsGlobal: r.IsGlobal != 0, IsActive: r.IsActive != 0}
-	currencyID := r.CurrencyID
-	b.CurrencyID = &currencyID
-	if r.StartDate.Valid {
-		b.StartDate = &r.StartDate.String
-	}
-	if r.EndDate.Valid {
-		b.EndDate = &r.EndDate.String
-	}
-	if r.NotifyAtPercent.Valid {
-		v := int(r.NotifyAtPercent.Int64)
-		b.NotifyAtPercent = &v
-	}
-	return b
 }

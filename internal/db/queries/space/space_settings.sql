@@ -7,3 +7,6 @@ ON CONFLICT(key) DO UPDATE SET value = excluded.value;
 
 -- name: ListSpaceSettings :many
 SELECT key, value FROM space_settings;
+
+-- name: DeleteSpaceSetting :exec
+DELETE FROM space_settings WHERE key = ?;

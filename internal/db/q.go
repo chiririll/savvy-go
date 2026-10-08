@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -143,4 +144,10 @@ func ParseTimeString(raw string) (t time.Time, ok bool) {
 		}
 	}
 	return time.Time{}, false
+}
+
+// Ping checks that the database answers.
+func Ping(ctx context.Context, conn sqlc.DBTX) error {
+	var one int
+	return conn.QueryRowContext(ctx, "SELECT 1").Scan(&one)
 }
