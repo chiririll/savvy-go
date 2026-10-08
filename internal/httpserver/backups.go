@@ -11,9 +11,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"savvy-go/internal/domain"
+	"savvy-go/internal/backup"
 	"savvy-go/internal/httpserver/dto"
+	"savvy-go/internal/legacy/restore"
 	"savvy-go/internal/settings"
+	"savvy-go/internal/spaces"
 )
 
 // Server backups hold every database and the signing key: server admins only
@@ -21,7 +23,7 @@ import (
 
 const maxServerUpload = 4 << 30 // 4 GiB
 
-func (s *Server) backupsService(r *http.Request) domain.Backups {
+func (s *Server) backupsService(r *http.Request) backup.Service {
 	b := s.backups
 	b.KeepPerSpace = int(s.settings.Int(r.Context(), "space_backups_max", 10))
 	return b
@@ -37,14 +39,14 @@ func (s *Server) spaceQuota(r *http.Request) int64 {
 }
 
 func writeBackupError(w http.ResponseWriter, err error) {
-	if errors.Is(err, domain.ErrBackupNotFound) {
+	if errors.Is(err, backup.ErrBackupNotFound) {
 		writeMessage(w, http.StatusNotFound, "Backup not found.")
 		return
 	}
 	writeMessage(w, http.StatusUnprocessableEntity, err.Error())
 }
 
-func backupList(w http.ResponseWriter, list []domain.Backup, err error) {
+func backupList(w http.ResponseWriter, list []backup.Entry, err error) {
 	if err != nil {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
@@ -89,14 +91,10 @@ func (s *Server) receiveUpload(w http.ResponseWriter, r *http.Request, limit int
 	return tmp.Name(), header.Filename, true
 }
 
-// isLaravelFile tells a bare database file (a Laravel database) from a backup
-// archive by its name.
-func isLaravelFile(name string) bool { return strings.HasSuffix(strings.ToLower(name), ".sqlite") }
-
 // rejectLaravelBackup refuses a Laravel database where a backup archive is
 // expected: it is never kept, it is restored with the dedicated endpoints.
 func (s *Server) rejectLaravelBackup(w http.ResponseWriter, tmp, name string) bool {
-	if !isLaravelFile(name) {
+	if !restore.IsDatabaseFile(name) {
 		return true
 	}
 	_ = os.Remove(tmp)
@@ -113,7 +111,7 @@ func (s *Server) backupsRestoreLaravel(w http.ResponseWriter, r *http.Request) {
 	}
 	defer os.Remove(tmp)
 	// An invalid key is refused by the store before anything is touched.
-	if err := s.backups.RestoreLaravelServer(r.Context(), tmp, strings.TrimSpace(r.FormValue("app_key"))); err != nil {
+	if err := restore.Server(r.Context(), s.store, tmp, strings.TrimSpace(r.FormValue("app_key"))); err != nil {
 		writeBackupError(w, err)
 		return
 	}
@@ -132,7 +130,7 @@ func (s *Server) spaceBackupsRestoreLaravel(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	defer os.Remove(tmp)
-	if err := s.backups.RestoreLaravelSpace(r.Context(), *space, tmp, s.spaceQuota(r)); err != nil {
+	if err := restore.Space(r.Context(), s.backups, *space, tmp, s.spaceQuota(r)); err != nil {
 		writeBackupError(w, err)
 		return
 	}
@@ -206,7 +204,7 @@ func (s *Server) backupsDestroy(w http.ResponseWriter, r *http.Request) {
 // --- space -----------------------------------------------------------------
 
 // currentSpace is the registry entry of the request's space.
-func (s *Server) currentSpace(w http.ResponseWriter, r *http.Request) *domain.Space {
+func (s *Server) currentSpace(w http.ResponseWriter, r *http.Request) *spaces.Space {
 	space, err := s.spaces.Get(r.Context(), sp(r).id)
 	if err != nil || space == nil {
 		writeMessage(w, http.StatusNotFound, "Space not found.")
@@ -308,7 +306,13 @@ func (s *Server) spacesImport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer os.Remove(src)
-	space, err := s.backups.ImportSpace(r.Context(), s.spaces, src, r.FormValue("name"), u, s.spaceQuota(r))
+	var space *spaces.Space
+	var err error
+	if restore.IsDatabaseFile(src) {
+		space, err = restore.ImportSpace(r.Context(), s.spaces, src, r.FormValue("name"), u, s.spaceQuota(r))
+	} else {
+		space, err = s.backups.ImportSpace(r.Context(), s.spaces, src, r.FormValue("name"), u, s.spaceQuota(r))
+	}
 	if err != nil {
 		writeBackupError(w, err)
 		return
@@ -319,7 +323,7 @@ func (s *Server) spacesImport(w http.ResponseWriter, r *http.Request) {
 // requireSpaceAdmin lets only admins of the request's space through.
 func (s *Server) requireSpaceAdmin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if scope := sp(r); scope == nil || scope.role != domain.SpaceAdmin {
+		if scope := sp(r); scope == nil || scope.role != spaces.RoleAdmin {
 			writeMessage(w, http.StatusForbidden, "Only space administrators can do this.")
 			return
 		}

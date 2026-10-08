@@ -9,7 +9,7 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 
-	"savvy-go/internal/domain"
+	"savvy-go/internal/signing"
 	"savvy-go/internal/store"
 )
 
@@ -41,7 +41,7 @@ func LoadConfig(path string) (Config, error) {
 }
 
 // Run seeds the demo data as cfg says (see Demo) and writes the manifest.
-func Run(ctx context.Context, st store.Store, keys domain.KeyRing, cfg Config, loc *time.Location) error {
+func Run(ctx context.Context, st store.Store, keys signing.KeyRing, cfg Config, loc *time.Location) error {
 	if !cfg.Enabled {
 		return nil
 	}

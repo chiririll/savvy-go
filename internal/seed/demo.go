@@ -9,10 +9,12 @@ import (
 
 	"github.com/shopspring/decimal"
 
+	"savvy-go/internal/automation"
 	appdb "savvy-go/internal/db"
 	"savvy-go/internal/db/sqlc"
-	"savvy-go/internal/domain"
+	"savvy-go/internal/ledger"
 	"savvy-go/internal/money"
+	"savvy-go/internal/recurring"
 	"savvy-go/internal/store"
 )
 
@@ -60,13 +62,13 @@ type seeder struct {
 	start    time.Time
 	end      time.Time
 	rng      *rand.Rand
-	txs      domain.Transactions
-	accts    domain.Accounts
-	cats     domain.Categories
-	tags     domain.Tags
-	budgets  domain.Budgets
-	recur    domain.RecurringStore
-	auto     domain.Automation
+	txs      ledger.Transactions
+	accts    ledger.Accounts
+	cats     ledger.Categories
+	tags     ledger.Tags
+	budgets  ledger.Budgets
+	recur    recurring.Service
+	auto     automation.Service
 	expenses []expenseCand
 }
 
@@ -76,7 +78,7 @@ type expenseCand struct {
 	catName string
 }
 
-func seedWorkspace(ctx context.Context, db store.DB, now time.Time) (map[string]*domain.Account, error) {
+func seedWorkspace(ctx context.Context, db store.DB, now time.Time) (map[string]*ledger.Account, error) {
 	start := startOfMonth(now.AddDate(0, -monthsOfHistory, 0))
 	s := &seeder{
 		ctx:     ctx,
@@ -85,15 +87,15 @@ func seedWorkspace(ctx context.Context, db store.DB, now time.Time) (map[string]
 		start:   start,
 		end:     now,
 		rng:     rand.New(rand.NewSource(rngSeed)),
-		txs:     domain.Transactions{DB: db},
-		accts:   domain.Accounts{DB: db},
-		cats:    domain.Categories{DB: db},
-		tags:    domain.Tags{DB: db},
-		budgets: domain.Budgets{DB: db},
-		recur:   domain.RecurringStore{DB: db, Txs: domain.Transactions{DB: db}},
-		auto:    domain.Automation{DB: db, Txs: domain.Transactions{DB: db}},
+		txs:     ledger.Transactions{DB: db},
+		accts:   ledger.Accounts{DB: db},
+		cats:    ledger.Categories{DB: db},
+		tags:    ledger.Tags{DB: db},
+		budgets: ledger.Budgets{DB: db},
+		recur:   recurring.Service{DB: db, Txs: ledger.Transactions{DB: db}},
+		auto:    automation.Service{DB: db, Txs: ledger.Transactions{DB: db}},
 	}
-	curs := domain.Currencies{DB: db}
+	curs := ledger.Currencies{DB: db}
 	usd, err := curs.ByCode(ctx, "USD")
 	if err != nil || usd == nil {
 		return nil, fmt.Errorf("USD currency missing")
@@ -136,11 +138,11 @@ func seedWorkspace(ctx context.Context, db store.DB, now time.Time) (map[string]
 	return accounts, s.createAutomation(tags)
 }
 
-func (s *seeder) createAccounts(usd *domain.Currency, eur *domain.Currency) (map[string]*domain.Account, error) {
-	out := map[string]*domain.Account{}
+func (s *seeder) createAccounts(usd *ledger.Currency, eur *ledger.Currency) (map[string]*ledger.Account, error) {
+	out := map[string]*ledger.Account{}
 	type spec struct {
 		key, name, typ string
-		cur            *domain.Currency
+		cur            *ledger.Currency
 		bal            float64
 		debtType       string
 		target         *float64
@@ -171,7 +173,7 @@ func (s *seeder) createAccounts(usd *domain.Currency, eur *domain.Currency) (map
 	)
 
 	for _, sp := range specs {
-		a := domain.AccountInput{
+		a := ledger.AccountInput{
 			Name: sp.name, Type: sp.typ, CurrencyID: sp.cur.ID,
 			InitialBalance: decimal.NewFromFloat(sp.bal), IsActive: true,
 		}
@@ -194,7 +196,7 @@ func (s *seeder) createAccounts(usd *domain.Currency, eur *domain.Currency) (map
 	return out, nil
 }
 
-func (s *seeder) createTransactions(accounts map[string]*domain.Account, expenses, incomes []domain.Category, tags []domain.Tag) error {
+func (s *seeder) createTransactions(accounts map[string]*ledger.Account, expenses, incomes []ledger.Category, tags []ledger.Tag) error {
 	if err := s.seedIncome(accounts, incomes); err != nil {
 		return err
 	}
@@ -207,7 +209,7 @@ func (s *seeder) createTransactions(accounts map[string]*domain.Account, expense
 	return s.seedTransfersAndDebt(accounts)
 }
 
-func (s *seeder) seedIncome(accounts map[string]*domain.Account, incomes []domain.Category) error {
+func (s *seeder) seedIncome(accounts map[string]*ledger.Account, incomes []ledger.Category) error {
 	salary := catByName(incomes, "#SALARY")
 	freelance := catByName(incomes, "#FREELANCE")
 	investments := catByName(incomes, "#INVESTMENTS")
@@ -266,7 +268,7 @@ func (s *seeder) seedIncome(accounts map[string]*domain.Account, incomes []domai
 	return nil
 }
 
-func (s *seeder) seedFixedExpenses(accounts map[string]*domain.Account, expenses []domain.Category) error {
+func (s *seeder) seedFixedExpenses(accounts map[string]*ledger.Account, expenses []ledger.Category) error {
 	rent := catByName(expenses, "#RENT")
 	utilities := catByName(expenses, "#UTILITIES")
 	entertainment := catByName(expenses, "#ENTERTAINMENT")
@@ -327,7 +329,7 @@ func (s *seeder) seedFixedExpenses(accounts map[string]*domain.Account, expenses
 	return nil
 }
 
-func (s *seeder) seedVariableExpenses(accounts map[string]*domain.Account, expenses []domain.Category, tags []domain.Tag) error {
+func (s *seeder) seedVariableExpenses(accounts map[string]*ledger.Account, expenses []ledger.Category, tags []ledger.Tag) error {
 	weights := []struct {
 		name string
 		w    int
@@ -336,7 +338,7 @@ func (s *seeder) seedVariableExpenses(accounts map[string]*domain.Account, expen
 		{"#SHOPPING", 12}, {"#ENTERTAINMENT", 9}, {"#HEALTH", 6}, {"#PERSONAL_CARE", 5},
 		{"#TRAVEL", 3}, {"#HOUSING", 2}, {"#GIFTS", 2}, {"#OTHER", 2},
 	}
-	var pool []domain.Category
+	var pool []ledger.Category
 	for _, w := range weights {
 		if c := catByName(expenses, w.name); c != nil {
 			for i := 0; i < w.w; i++ {
@@ -409,7 +411,7 @@ func (s *seeder) seedVariableExpenses(accounts map[string]*domain.Account, expen
 	return nil
 }
 
-func (s *seeder) seedTransfersAndDebt(accounts map[string]*domain.Account) error {
+func (s *seeder) seedTransfersAndDebt(accounts map[string]*ledger.Account) error {
 	for cursor := s.start; !cursor.After(s.end); cursor = addMonthsNoOverflow(cursor, 1) {
 		d := dateOn(cursor, minInt(6, daysInMonth(cursor)))
 		if s.inRange(d) {
@@ -465,7 +467,7 @@ func (s *seeder) seedTransfersAndDebt(accounts map[string]*domain.Account) error
 // seedPending adds one overdue pending expense and several upcoming ones (one
 // with an estimated amount) so the pending strip on the transactions page has data. It does not use the rng, so
 // the rest of the seeded data stays unchanged.
-func (s *seeder) seedPending(accounts map[string]*domain.Account, expenses []domain.Category) error {
+func (s *seeder) seedPending(accounts map[string]*ledger.Account, expenses []ledger.Category) error {
 	for _, p := range []struct {
 		offsetDays int
 		acct, cat  string
@@ -490,7 +492,7 @@ func (s *seeder) seedPending(accounts map[string]*domain.Account, expenses []dom
 		d := s.now.AddDate(0, 0, p.offsetDays).Format("2006-01-02")
 		desc := p.desc
 		status := "pending"
-		if _, err := s.txs.Create(s.ctx, domain.TxInput{
+		if _, err := s.txs.Create(s.ctx, ledger.TxInput{
 			Type: "expense", AccountID: acct.ID, CategoryID: catID, Amount: decimal.NewFromFloat(p.amount),
 			Description: &desc, Date: &d, Status: &status, IsEstimated: p.estimated,
 		}); err != nil {
@@ -534,7 +536,7 @@ func (s *seeder) seedTransactionItems() error {
 	return nil
 }
 
-func (s *seeder) randomItems(amount float64, category string) []domain.TxItemInput {
+func (s *seeder) randomItems(amount float64, category string) []ledger.TxItemInput {
 	catalog := catalogs[category]
 	if len(catalog) == 0 {
 		catalog = catalogs["#OTHER"]
@@ -552,7 +554,7 @@ func (s *seeder) randomItems(amount float64, category string) []domain.TxItemInp
 	s.rng.Shuffle(len(names), func(i, j int) { names[i], names[j] = names[j], names[i] })
 	names = names[:count]
 
-	var items []domain.TxItemInput
+	var items []ledger.TxItemInput
 	left := len(names)
 	for _, name := range names {
 		left--
@@ -562,7 +564,7 @@ func (s *seeder) randomItems(amount float64, category string) []domain.TxItemInp
 				break
 			}
 			price := decimal.New(int64(remainingCents), -2)
-			items = append(items, domain.TxItemInput{Name: name, Quantity: decimal.NewFromInt(1), PricePerUnit: price, TotalPrice: price})
+			items = append(items, ledger.TxItemInput{Name: name, Quantity: decimal.NewFromInt(1), PricePerUnit: price, TotalPrice: price})
 			break
 		}
 		maxShare := remainingCents - left
@@ -571,7 +573,7 @@ func (s *seeder) randomItems(amount float64, category string) []domain.TxItemInp
 		lineCents := (share / qty) * qty
 		lineCents = maxInt(qty, minInt(lineCents, (maxShare/qty)*qty))
 		remainingCents -= lineCents
-		items = append(items, domain.TxItemInput{
+		items = append(items, ledger.TxItemInput{
 			Name: name, Quantity: decimal.NewFromInt(int64(qty)),
 			PricePerUnit: decimal.New(int64(lineCents/qty), -2),
 			TotalPrice:   decimal.New(int64(lineCents), -2),
@@ -580,7 +582,7 @@ func (s *seeder) randomItems(amount float64, category string) []domain.TxItemInp
 	return items
 }
 
-func (s *seeder) createBudgets(usd *domain.Currency, expenses []domain.Category, tags []domain.Tag) error {
+func (s *seeder) createBudgets(usd *ledger.Currency, expenses []ledger.Category, tags []ledger.Tag) error {
 	start := startOfMonth(s.now).Format("2006-01-02")
 	type named struct {
 		name   string
@@ -598,7 +600,7 @@ func (s *seeder) createBudgets(usd *domain.Currency, expenses []domain.Category,
 			continue
 		}
 		notify := b.notify
-		if _, err := s.budgets.Create(s.ctx, domain.BudgetInput{
+		if _, err := s.budgets.Create(s.ctx, ledger.BudgetInput{
 			Name: b.name, Amount: decimal.NewFromFloat(b.amount), CurrencyID: &usd.ID, Period: "monthly",
 			StartDate: &start, NotifyAtPercent: &notify, CategoryIDs: []int64{cat.ID},
 		}); err != nil {
@@ -607,7 +609,7 @@ func (s *seeder) createBudgets(usd *domain.Currency, expenses []domain.Category,
 	}
 	notify := 85
 	global := true
-	if _, err := s.budgets.Create(s.ctx, domain.BudgetInput{
+	if _, err := s.budgets.Create(s.ctx, ledger.BudgetInput{
 		Name: "Total Monthly Spending", Amount: decimal.NewFromInt(5500), CurrencyID: &usd.ID, Period: "monthly",
 		StartDate: &start, IsGlobal: &global, NotifyAtPercent: &notify,
 	}); err != nil {
@@ -617,7 +619,7 @@ func (s *seeder) createBudgets(usd *domain.Currency, expenses []domain.Category,
 		from := s.now.AddDate(0, -1, 0).Format("2006-01-02")
 		to := s.now.AddDate(0, 4, 0).Format("2006-01-02")
 		n := 75
-		if _, err := s.budgets.Create(s.ctx, domain.BudgetInput{
+		if _, err := s.budgets.Create(s.ctx, ledger.BudgetInput{
 			Name: "Italy Trip 2026", Amount: decimal.NewFromInt(3500), CurrencyID: &usd.ID, Period: "one_time",
 			StartDate: &from, EndDate: &to, NotifyAtPercent: &n, TagIDs: []int64{vac.ID},
 		}); err != nil {
@@ -627,10 +629,10 @@ func (s *seeder) createBudgets(usd *domain.Currency, expenses []domain.Category,
 	return nil
 }
 
-func (s *seeder) createRecurring(accounts map[string]*domain.Account, expenses, incomes []domain.Category) error {
+func (s *seeder) createRecurring(accounts map[string]*ledger.Account, expenses, incomes []ledger.Category) error {
 	if salary := catByName(incomes, "#SALARY"); salary != nil {
 		day := 5
-		if _, err := s.recur.Create(s.ctx, domain.RecurringInput{
+		if _, err := s.recur.Create(s.ctx, recurring.Input{
 			Type: "income", AccountID: accounts["checking"].ID, CategoryID: &salary.ID,
 			Amount: decimal.NewFromInt(7000), Description: strPtr("Acme Corp — Payroll"),
 			Frequency: "monthly", Interval: 1, DayOfMonth: &day,
@@ -642,7 +644,7 @@ func (s *seeder) createRecurring(accounts map[string]*domain.Account, expenses, 
 	if rent := catByName(expenses, "#RENT"); rent != nil {
 		day := 1
 		next := startOfMonth(s.now.AddDate(0, 1, 0)).Format("2006-01-02")
-		if _, err := s.recur.Create(s.ctx, domain.RecurringInput{
+		if _, err := s.recur.Create(s.ctx, recurring.Input{
 			Type: "expense", AccountID: accounts["checking"].ID, CategoryID: &rent.ID,
 			Amount: decimal.NewFromInt(2150), Description: strPtr("Rent — Greystar Apartments"),
 			Frequency: "monthly", Interval: 1, DayOfMonth: &day, StartDate: next,
@@ -654,7 +656,7 @@ func (s *seeder) createRecurring(accounts map[string]*domain.Account, expenses, 
 		// Always due within the coming week so upcoming recurring is visible.
 		due := s.now.AddDate(0, 0, 2)
 		day := due.Day()
-		if _, err := s.recur.Create(s.ctx, domain.RecurringInput{
+		if _, err := s.recur.Create(s.ctx, recurring.Input{
 			Type: "expense", AccountID: accounts["credit"].ID, CategoryID: &subs.ID,
 			Amount: decimal.RequireFromString("22.99"), Description: strPtr("Netflix subscription"),
 			Frequency: "monthly", Interval: 1, DayOfMonth: &day,
@@ -666,7 +668,7 @@ func (s *seeder) createRecurring(accounts map[string]*domain.Account, expenses, 
 	toSav := accounts["savings"].ID
 	amt := decimal.NewFromInt(800)
 	day6 := 6
-	if _, err := s.recur.Create(s.ctx, domain.RecurringInput{
+	if _, err := s.recur.Create(s.ctx, recurring.Input{
 		Type: "transfer", AccountID: accounts["checking"].ID, ToAccountID: &toSav,
 		Amount: amt, ToAmount: &amt, Description: strPtr("Automatic transfer to savings"),
 		Frequency: "monthly", Interval: 1, DayOfMonth: &day6,
@@ -677,7 +679,7 @@ func (s *seeder) createRecurring(accounts map[string]*domain.Account, expenses, 
 	toMort := accounts["mortgage"].ID
 	mort := decimal.NewFromInt(1680)
 	day2 := 2
-	if _, err := s.recur.Create(s.ctx, domain.RecurringInput{
+	if _, err := s.recur.Create(s.ctx, recurring.Input{
 		Type: "transfer", AccountID: accounts["checking"].ID, ToAccountID: &toMort,
 		Amount: mort, ToAmount: &mort, Description: strPtr("Monthly mortgage payment"),
 		Frequency: "monthly", Interval: 1, DayOfMonth: &day2,
@@ -688,11 +690,11 @@ func (s *seeder) createRecurring(accounts map[string]*domain.Account, expenses, 
 	return nil
 }
 
-func (s *seeder) createAutomation(tags []domain.Tag) error {
+func (s *seeder) createAutomation(tags []ledger.Tag) error {
 	trigger := "on_transaction_create"
 	if essential := tagByName(tags, "Essential"); essential != nil {
 		desc := "Tag any transaction above $500 as Essential"
-		if _, err := s.auto.Create(s.ctx, domain.AutomationInput{
+		if _, err := s.auto.Create(s.ctx, automation.Input{
 			Name: "Flag large transactions", Description: &desc, TriggerType: trigger, Priority: 1,
 			Conditions: map[string]any{"match": "all", "conditions": []any{
 				map[string]any{"field": "amount", "op": "gt", "value": 500},
@@ -704,7 +706,7 @@ func (s *seeder) createAutomation(tags []domain.Tag) error {
 	}
 	if recurring := tagByName(tags, "Recurring"); recurring != nil {
 		desc := `Tag transactions containing "subscription"`
-		if _, err := s.auto.Create(s.ctx, domain.AutomationInput{
+		if _, err := s.auto.Create(s.ctx, automation.Input{
 			Name: "Tag subscriptions", Description: &desc, TriggerType: trigger, Priority: 2,
 			Conditions: map[string]any{"match": "all", "conditions": []any{
 				map[string]any{"field": "description", "op": "contains", "value": "subscription"},
@@ -716,7 +718,7 @@ func (s *seeder) createAutomation(tags []domain.Tag) error {
 	}
 	if business := tagByName(tags, "Business"); business != nil {
 		desc := "Tag GitHub / Adobe / Udemy as Business"
-		if _, err := s.auto.Create(s.ctx, domain.AutomationInput{
+		if _, err := s.auto.Create(s.ctx, automation.Input{
 			Name: "Tag software tools", Description: &desc, TriggerType: trigger, Priority: 3,
 			Conditions: map[string]any{"match": "any", "conditions": []any{
 				map[string]any{"field": "description", "op": "contains", "value": "GitHub"},
@@ -740,7 +742,7 @@ func (s *seeder) addTx(typ string, accountID int64, catID *int64, amount float64
 		return nil
 	}
 	status := "confirmed"
-	in := domain.TxInput{
+	in := ledger.TxInput{
 		Type: typ, AccountID: accountID, ToAccountID: toID, CategoryID: catID,
 		Amount: decimal.NewFromFloat(amount), ToAmount: floatPtrDecimal(toAmt),
 		Description: &desc, Date: &d, Status: &status, TagIDs: tagIDs,
@@ -792,7 +794,7 @@ func (s *seeder) merchantFor(category string) string {
 	return list[s.rng.Intn(len(list))]
 }
 
-func catByName(cats []domain.Category, name string) *domain.Category {
+func catByName(cats []ledger.Category, name string) *ledger.Category {
 	for i := range cats {
 		if cats[i].Name == name {
 			return &cats[i]
@@ -801,7 +803,7 @@ func catByName(cats []domain.Category, name string) *domain.Category {
 	return nil
 }
 
-func tagByName(tags []domain.Tag, name string) *domain.Tag {
+func tagByName(tags []ledger.Tag, name string) *ledger.Tag {
 	for i := range tags {
 		if tags[i].Name == name {
 			return &tags[i]

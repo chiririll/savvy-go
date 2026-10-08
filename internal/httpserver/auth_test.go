@@ -13,29 +13,30 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-chi/chi/v5"
+
 	"savvy-go/internal/auth"
 	"savvy-go/internal/config"
-	"savvy-go/internal/domain"
+	"savvy-go/internal/currencydata"
 	"savvy-go/internal/settings"
 	"savvy-go/internal/signing"
+	"savvy-go/internal/spaces"
 	"savvy-go/internal/store"
 	"savvy-go/internal/store/sqlite"
-
-	"github.com/go-chi/chi/v5"
 )
 
 // Test roles for createUser: admin is a server admin and admin of the shared
 // test space; editor and viewer are plain users with that role in it.
 const (
-	roleEditor = domain.SpaceEditor
-	roleViewer = domain.SpaceViewer
+	roleEditor = spaces.RoleEditor
+	roleViewer = spaces.RoleViewer
 )
 
 type testApp struct {
 	t      *testing.T
 	db     *sql.DB // the server database
 	store  *sqlite.Store
-	space  *domain.Space // the space every createUser member belongs to
+	space  *spaces.Space // the space every createUser member belongs to
 	srv    *httptest.Server
 	s      *Server
 	client *http.Client
@@ -66,7 +67,7 @@ func newTestApp(t *testing.T) *testApp {
 	t.Helper()
 	cfg, _ := testConfig(t)
 	st := openTestStore(t, cfg)
-	s := New(cfg, st, testKeys(t, cfg))
+	s := New(cfg, st, testKeys(t, cfg), WithRates(currencydata.NewOffline()))
 	space, err := s.spaces.Create(context.Background(), "Test", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -94,7 +95,7 @@ func (a *testApp) createUser(email, password, role string, opts ...func(*auth.Us
 	serverRole, spaceRole := role, ""
 	switch role {
 	case auth.RoleAdmin:
-		spaceRole = domain.SpaceAdmin
+		spaceRole = spaces.RoleAdmin
 	case roleEditor, roleViewer:
 		serverRole, spaceRole = auth.RoleUser, role
 	}

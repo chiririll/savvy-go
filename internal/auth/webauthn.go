@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"crypto/rand"
-	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -235,7 +234,7 @@ func (w WebAuthn) Rename(ctx context.Context, userID, id int64, name string) err
 	}
 	n, _ := res.RowsAffected()
 	if n == 0 {
-		return sql.ErrNoRows
+		return db.ErrNotFound
 	}
 	return nil
 }
@@ -247,7 +246,7 @@ func (w WebAuthn) Delete(ctx context.Context, userID, id int64) error {
 	}
 	n, _ := res.RowsAffected()
 	if n == 0 {
-		return sql.ErrNoRows
+		return db.ErrNotFound
 	}
 	return nil
 }

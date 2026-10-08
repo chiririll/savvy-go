@@ -9,17 +9,23 @@ import (
 	"os"
 	"strings"
 
-	"savvy-go/internal/auth"
-	"savvy-go/internal/config"
-	"savvy-go/internal/domain"
-	"savvy-go/internal/jobs"
-	"savvy-go/internal/settings"
-	"savvy-go/internal/signing"
-	"savvy-go/internal/store"
-	"savvy-go/internal/webui"
-
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+
+	"savvy-go/internal/auth"
+	"savvy-go/internal/backup"
+	"savvy-go/internal/config"
+	"savvy-go/internal/currencydata"
+	"savvy-go/internal/jobs"
+	"savvy-go/internal/ledger"
+	"savvy-go/internal/settings"
+	"savvy-go/internal/signing"
+	"savvy-go/internal/spaces"
+	"savvy-go/internal/sso"
+	"savvy-go/internal/store"
+	"savvy-go/internal/transfers"
+	"savvy-go/internal/uploads"
+	"savvy-go/internal/webui"
 )
 
 // Server is the HTTP front door: health probes, /api, and the Vite SPA.
@@ -35,41 +41,56 @@ type Server struct {
 	tokens     auth.PasswordTokens
 	challenges auth.Challenges
 	settings   settings.Store
-	spaces     domain.Spaces
-	backups    domain.Backups
-	transfers  *domain.Transfers
+	spaces     spaces.Service
+	backups    backup.Service
+	transfers  *transfers.Service
 	keys       *signing.Holder
-	uploads    domain.Uploads
-	sso        domain.SSO
+	uploads    uploads.Service
+	rates      ledger.RateSource // currency catalog and exchange rates, shared by every space
+	sso        sso.Service
 	twoFactor  auth.TwoFactor
 	webauthn   auth.WebAuthn
 	queue      *jobs.Queue
 	assets     fs.FS // the frontend: index.html, icons and build/
 }
 
-func New(cfg config.Config, st store.Store, keys *signing.Holder) *Server {
-	domain.SetLocation(cfg.Location)
+// Option configures New.
+type Option func(*Server)
+
+// WithRates sets where currencies and exchange rates come from. The default
+// is the public data files; share one source with the scheduled rate update
+// so spaces do not each fetch their own.
+func WithRates(src ledger.RateSource) Option { return func(s *Server) { s.rates = src } }
+
+func New(cfg config.Config, st store.Store, keys *signing.Holder, opts ...Option) *Server {
+	ledger.SetLocation(cfg.Location)
 	srv := st.Server()
 	s := &Server{
 		cfg:        cfg,
 		assets:     resolveAssets(webui.FS()),
 		store:      st,
 		users:      auth.Users{DB: srv},
-		sessions:   auth.Sessions{DB: srv, Cfg: cfg},
+		sessions:   auth.Sessions{DB: srv, SessionTTL: cfg.SessionTTL, RememberTTL: cfg.RememberTTL},
 		apiTokens:  auth.APITokens{DB: srv},
 		tokens:     auth.PasswordTokens{DB: srv},
 		challenges: auth.Challenges{DB: srv, Cfg: cfg},
 		settings:   settings.Store{DB: srv},
-		spaces:     domain.Spaces{Store: st},
-		uploads:    domain.Uploads{DB: srv, Root: cfg.UploadsDir, SignSecret: randomSecret()},
+		spaces:     spaces.Service{Store: st},
+		uploads:    uploads.Service{DB: srv, Root: cfg.UploadsDir, SignSecret: randomSecret()},
 		twoFactor:  auth.TwoFactor{DB: srv, Users: auth.Users{DB: srv}},
 		webauthn:   auth.WebAuthn{DB: srv, Cfg: cfg},
 	}
-	keyRing := domain.KeyRing{Holder: keys, Trusted: domain.TrustedKeys(srv)}
+	keyRing := signing.KeyRing{Holder: keys, Trusted: transfers.TrustedKeys(srv)}
 	s.keys = keys
-	s.transfers = &domain.Transfers{Spaces: s.spaces, Keys: keyRing}
-	s.backups = domain.Backups{Store: st, Keys: keyRing, Dir: cfg.BackupsDir, DataDir: cfg.DataDir, Transfers: s.transfers}
-	s.sso = domain.SSO{DB: srv, Users: s.users, Settings: s.settings, Spaces: s.spaces, AppURL: cfg.URL}
+	s.transfers = &transfers.Service{Spaces: s.spaces, Keys: keyRing}
+	s.backups = backup.Service{Store: st, Keys: keyRing, Dir: cfg.BackupsDir, DataDir: cfg.DataDir, Transfers: s.transfers}
+	for _, opt := range opts {
+		opt(s)
+	}
+	if s.rates == nil {
+		s.rates = currencydata.New()
+	}
+	s.sso = sso.Service{DB: srv, Users: s.users, Settings: s.settings, ProvisionSpace: func(ctx context.Context, u *auth.User) error { _, err := s.spaces.Provision(ctx, u); return err }, AppURL: cfg.URL}
 	_ = os.MkdirAll(cfg.UploadsDir, 0o775)
 	_ = os.MkdirAll(cfg.BackupsDir, 0o775)
 	s.mux = s.routes()

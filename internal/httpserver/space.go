@@ -6,54 +6,59 @@ import (
 	"net/http"
 	"strconv"
 
-	"savvy-go/internal/domain"
-	"savvy-go/internal/settings"
-	"savvy-go/internal/store"
-
 	"github.com/go-chi/chi/v5"
+
+	"savvy-go/internal/automation"
+	"savvy-go/internal/importer"
+	"savvy-go/internal/ledger"
+	"savvy-go/internal/recurring"
+	"savvy-go/internal/reports"
+	"savvy-go/internal/settings"
+	"savvy-go/internal/spaces"
+	"savvy-go/internal/store"
 )
 
 const ctxSpace ctxKey = 100
 
 // spaceScope is the space a request works in: the caller's role there and
-// the domain services bound to its database.
+// the ledger services bound to its database.
 type spaceScope struct {
 	id         int64
 	role       string
 	db         store.DB
 	settings   settings.Store
-	currencies domain.Currencies
-	accounts   domain.Accounts
-	categories domain.Categories
-	tags       domain.Tags
-	txs        domain.Transactions
-	debts      domain.Debts
-	recurring  domain.RecurringStore
-	budgets    domain.Budgets
-	automation domain.Automation
-	reports    domain.Reports
-	imports    domain.Imports
+	currencies ledger.Currencies
+	accounts   ledger.Accounts
+	categories ledger.Categories
+	tags       ledger.Tags
+	txs        ledger.Transactions
+	debts      ledger.Debts
+	recurring  recurring.Service
+	budgets    ledger.Budgets
+	automation automation.Service
+	reports    reports.Service
+	imports    importer.Service
 }
 
 func (s *Server) newScope(id int64, role string, d store.DB) *spaceScope {
-	txs := domain.Transactions{DB: d}
-	accounts := domain.Accounts{DB: d}
+	txs := ledger.Transactions{DB: d}
+	accounts := ledger.Accounts{DB: d}
 	return &spaceScope{
 		id:         id,
 		role:       role,
 		db:         d,
 		settings:   settings.Store{DB: d, Space: true},
-		currencies: domain.Currencies{DB: d},
+		currencies: ledger.Currencies{DB: d, Source: s.rates},
 		accounts:   accounts,
-		categories: domain.Categories{DB: d},
-		tags:       domain.Tags{DB: d},
+		categories: ledger.Categories{DB: d},
+		tags:       ledger.Tags{DB: d},
 		txs:        txs,
-		debts:      domain.Debts{Accounts: accounts, Transactions: txs},
-		recurring:  domain.RecurringStore{DB: d, Txs: txs},
-		budgets:    domain.Budgets{DB: d},
-		automation: domain.Automation{DB: d, Txs: txs},
-		reports:    domain.Reports{DB: d, Loc: s.cfg.Location},
-		imports:    domain.Imports{DB: d, Uploads: s.uploads, Txs: txs},
+		debts:      ledger.Debts{Accounts: accounts, Transactions: txs},
+		recurring:  recurring.Service{DB: d, Txs: txs},
+		budgets:    ledger.Budgets{DB: d},
+		automation: automation.Service{DB: d, Txs: txs},
+		reports:    reports.Service{DB: d, Loc: s.cfg.Location},
+		imports:    importer.Service{DB: d, Uploads: s.uploads, Txs: txs},
 	}
 }
 
@@ -106,7 +111,7 @@ func (s *Server) requireWrite(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mutating := r.Method != http.MethodGet && r.Method != http.MethodHead
 		if mutating {
-			if scope := sp(r); scope == nil || !domain.CanWriteSpace(scope.role) {
+			if scope := sp(r); scope == nil || !spaces.CanWrite(scope.role) {
 				writeMessage(w, http.StatusForbidden, "Read-only access")
 				return
 			}

@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"savvy-go/internal/db/filter"
-	"savvy-go/internal/domain"
 	"savvy-go/internal/httpserver/dto"
+	"savvy-go/internal/ledger"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/shopspring/decimal"
@@ -128,7 +128,7 @@ func (s *Server) transactionsDestroy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := sp(r).txs.Delete(r.Context(), tx.ID); err != nil {
-		if errors.Is(err, domain.ErrTransferRow) {
+		if errors.Is(err, ledger.ErrTransferRow) {
 			writeMessage(w, 422, err.Error())
 			return
 		}
@@ -175,7 +175,7 @@ func (s *Server) transactionsSkip(w http.ResponseWriter, r *http.Request) {
 	}
 	out, err := sp(r).txs.Skip(r.Context(), tx.ID)
 	if err != nil {
-		if errors.Is(err, domain.ErrTransferRow) {
+		if errors.Is(err, ledger.ErrTransferRow) {
 			writeMessage(w, 422, err.Error())
 			return
 		}
@@ -209,7 +209,7 @@ func (s *Server) transactionsPendingSummary(w http.ResponseWriter, r *http.Reque
 	writeJSON(w, http.StatusOK, dto.NewTransactionSummary(sp(r).txs.Summary(r.Context(), true)))
 }
 
-func (s *Server) txParam(w http.ResponseWriter, r *http.Request) *domain.Transaction {
+func (s *Server) txParam(w http.ResponseWriter, r *http.Request) *ledger.Transaction {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	tx, _ := sp(r).txs.ByID(r.Context(), id)
 	if tx == nil {
@@ -220,7 +220,7 @@ func (s *Server) txParam(w http.ResponseWriter, r *http.Request) *domain.Transac
 
 // decodeTx reads a transaction from the body; on update, over base (see
 // patch.go). Items and tags left out are kept by the update itself.
-func decodeTx(w http.ResponseWriter, r *http.Request, base *domain.Transaction) (domain.TxInput, bool) {
+func decodeTx(w http.ResponseWriter, r *http.Request, base *ledger.Transaction) (ledger.TxInput, bool) {
 	var body struct {
 		Type        string           `json:"type"`
 		AccountID   int64            `json:"account_id"`
@@ -249,9 +249,9 @@ func decodeTx(w http.ResponseWriter, r *http.Request, base *domain.Transaction) 
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.AccountID == 0 {
 		writeValidation(w, map[string][]string{"account_id": {"The account id field is required."}})
-		return domain.TxInput{}, false
+		return ledger.TxInput{}, false
 	}
-	in := domain.TxInput{
+	in := ledger.TxInput{
 		Type: body.Type, AccountID: body.AccountID, ToAccountID: body.ToAccountID,
 		CategoryID: body.CategoryID, Amount: body.Amount, ToAmount: body.ToAmount,
 		IsEstimated: body.IsEstimated, Description: body.Description, Date: body.Date,
@@ -262,7 +262,7 @@ func decodeTx(w http.ResponseWriter, r *http.Request, base *domain.Transaction) 
 		if qty.IsZero() {
 			qty = decimal.NewFromInt(1)
 		}
-		in.Items = append(in.Items, domain.TxItemInput{Name: it.Name, Quantity: qty, PricePerUnit: it.PricePerUnit})
+		in.Items = append(in.Items, ledger.TxItemInput{Name: it.Name, Quantity: qty, PricePerUnit: it.PricePerUnit})
 	}
 	return in, true
 }

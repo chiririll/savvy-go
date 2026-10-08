@@ -7,8 +7,23 @@ go run ./cmd/savvy-go       # serves :8080, data in ./savvy-data
 
 ## Store boundary
 
-- `domain`, `httpserver`, `auth`, `settings`, `seed`, `signing`, `schedule`, `jobs` use storage only via `internal/store`. No `store/sqlite`, `migrate`, `legacy`, `modernc.org/sqlite` imports. No `PRAGMA`, `ATTACH`, `sqlite_master` in SQL. `store/arch_test.go` enforces. Reason: space DB may become Postgres schema later.
+- `ledger`, `spaces`, `transfers`, `uploads`, `automation`, `recurring`, `reports`, `calendar`, `currencydata`, `sso`, `backup`, `importer`, `legacy/restore`, `httpserver`, `auth`, `settings`, `seed`, `signing`, `schedule`, `jobs` use storage only via `internal/store`. No `store/sqlite`, `migrate`, `legacy`, `modernc.org/sqlite`, `database/sql` imports (use `db.NInt`, `db.NString`, `db.ErrNotFound`, `db.TimeNS`, `db.FormatTime`). No `PRAGMA`, `ATTACH`, `sqlite_master` in SQL. `store/arch_test.go` enforces. Reason: space DB may become Postgres schema later.
 - Work touching two spaces: `store.InSpaces`.
+
+## Packages
+
+Dependencies point down. Each package may import the ones above it in this list, never below.
+
+- `calendar`, `money`, `signing`, `db`, `store`: leaves.
+- `currencydata`: the one place that talks to the currency data service (names, rates). One `Source` per server, shared by all spaces. Update rates are cached in a map by base currency (spaces with the same base share a request; the job calls `Expire` once per run); catalog look-ups fetch live and skip that cache. `ledger` only sees the `ledger.RateSource` interface. Tests use `currencydata.NewOffline()`.
+- `spaces`: registry, members, roles, invitations, quotas, audit log. Needs from outside go through small interfaces (`spaces.FinalBackuper`).
+- `ledger`: finance core of one space: accounts, transactions, categories, tags, currencies, budgets, debts. Knows nothing of the packages below.
+- On top of `ledger`, independent of each other: `reports`, `recurring`, `automation`, `importer` (CSV; also uses `uploads`), `uploads`.
+- `transfers`: signed transfers between linked spaces. Uses `spaces`, `signing`; not `ledger`.
+- `backup`: backup files, archive format, restore. Uses `spaces`, `transfers`, `signing`.
+- `sso`: identity providers, OIDC/OAuth/SAML, JIT provisioning. `ProvisionSpace` is injected.
+- `store/arch_test.go` enforces this layering and that the core never imports `net/http`.
+- Shared test fixtures cannot live in `ledger` (its in-package tests would import-cycle), so `reports` keeps its own small copy.
 
 ## SQL
 
@@ -28,6 +43,7 @@ go run ./cmd/savvy-go       # serves :8080, data in ./savvy-data
 - `internal/migrate/sql/{server,space}/0001_initial.sql`. Edit in place.
 - `migrate`: upgrades between Go versions, not released yet.
 - `legacy`: loads Laravel-era DB once, on a staging copy. Rarely touched. No new Go-era logic.
+- `legacy/restore`: Laravel restore/import entry points (server, space, new space). Only drives `store`, so HTTP may import it, never `legacy` itself. `backup` and `ledger` know nothing of Laravel.
 
 ## HTTP
 

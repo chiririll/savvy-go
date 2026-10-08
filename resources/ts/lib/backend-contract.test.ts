@@ -116,12 +116,12 @@ describe('frontend value lists', () => {
 
 describe('automation', () => {
     it('knows every condition operator the backend evaluates', () => {
-        const body = goFunc('internal/domain/automation.go', 'func evaluateCondition(')
+        const body = goFunc('internal/automation/automation.go', 'func evaluateCondition(')
         expect(sorted(CONDITION_OPERATORS)).toEqual(sorted(quoted(body.match(/case [^\n]*:/g)!.join('\n'))))
     })
 
     it('knows every action the backend executes', () => {
-        const body = goFunc('internal/domain/automation.go', 'func (s Automation) executeActions(')
+        const body = goFunc('internal/automation/automation.go', 'func (s Service) executeActions(')
         expect(sorted(ACTION_TYPES)).toEqual(sorted(quoted(body.match(/case [^\n]*:/g)!.join('\n'))))
     })
 })
@@ -135,11 +135,11 @@ describe('backup status', () => {
 })
 
 describe('SSO sign-in errors', () => {
-    // Codes that can reach /auth/sso/callback?error=: everything in the sso_*.go
-    // files (provider round trip, provisioning), plus the generic code the
+    // Codes that can reach /auth/sso/callback?error=: everything in package sso
+    // but sso.go (provider round trip, provisioning), plus the generic code the
     // handler falls back to. sso.go itself only validates admin input, whose
     // errors go to the provider form, not the callback.
-    const callbackFiles = goFiles('internal/domain').filter((file) => /\/sso_\w+\.go$/.test(file))
+    const callbackFiles = goFiles('internal/sso').filter((file) => !file.endsWith('/sso.go'))
     const emitted = callbackFiles.flatMap((file) =>
         [...read(file).matchAll(/ssoErr\(\s*"([a-z_]+)"/g)].map((m) => m[1]),
     )
@@ -171,10 +171,10 @@ describe('API routes', () => {
 
 describe('space permissions', () => {
     it('lets the same roles write as the backend does', () => {
-        const source = read('internal/domain/space.go')
-        const consts = Object.fromEntries([...source.matchAll(/(Space\w+)\s*=\s*"([a-z]+)"/g)].map((m) => [m[1], m[2]]))
-        const body = /func CanWriteSpace\([^)]*\) bool \{([^}]*)\}/.exec(source)![1]
-        const writable = [...body.matchAll(/role == (Space\w+)/g)].map((m) => consts[m[1]])
+        const source = read('internal/spaces/space.go')
+        const consts = Object.fromEntries([...source.matchAll(/(Role\w+)\s*=\s*"([a-z]+)"/g)].map((m) => [m[1], m[2]]))
+        const body = /func CanWrite\([^)]*\) bool \{([^}]*)\}/.exec(source)![1]
+        const writable = [...body.matchAll(/role == (Role\w+)/g)].map((m) => consts[m[1]])
 
         expect(writable.length).toBeGreaterThan(0)
         expect(SPACE_ROLES.filter(canWriteSpace).sort()).toEqual(writable.sort())

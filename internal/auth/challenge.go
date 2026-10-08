@@ -2,7 +2,6 @@ package auth
 
 import (
 	"context"
-	"database/sql"
 	"time"
 
 	"savvy-go/internal/config"
@@ -21,8 +20,8 @@ func (c Challenges) Issue(ctx context.Context, user *User) (string, error) {
 	now := time.Now().UTC()
 	exp := now.Add(c.Cfg.ChallengeTTL)
 	err := db.Q(c.DB).InsertTwoFactorChallenge(ctx, sqlc.InsertTwoFactorChallengeParams{
-		UserID: user.ID, TokenHash: HashToken(token), ExpiresAt: fmtTime(exp),
-		CreatedAt: db.NS(fmtTime(now)), UpdatedAt: db.NS(fmtTime(now)),
+		UserID: user.ID, TokenHash: HashToken(token), ExpiresAt: db.FormatTime(exp),
+		CreatedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now),
 	})
 	return token, err
 }
@@ -32,9 +31,9 @@ func (c Challenges) Resolve(ctx context.Context, token string) (*User, error) {
 		return nil, nil
 	}
 	userID, err := db.Q(c.DB).GetValidChallengeUserID(ctx, sqlc.GetValidChallengeUserIDParams{
-		TokenHash: HashToken(token), ExpiresAt: fmtTime(time.Now().UTC()),
+		TokenHash: HashToken(token), ExpiresAt: db.FormatTime(time.Now().UTC()),
 	})
-	if err == sql.ErrNoRows {
+	if err == db.ErrNotFound {
 		return nil, nil
 	}
 	if err != nil {
@@ -44,7 +43,7 @@ func (c Challenges) Resolve(ctx context.Context, token string) (*User, error) {
 }
 
 func (c Challenges) Consume(ctx context.Context, token string) (*User, error) {
-	now := fmtTime(time.Now().UTC())
+	now := db.FormatTime(time.Now().UTC())
 	res, err := db.Q(c.DB).ConsumeTwoFactorChallenge(ctx, sqlc.ConsumeTwoFactorChallengeParams{
 		ConsumedAt: db.NS(now), UpdatedAt: db.NS(now), TokenHash: HashToken(token), ExpiresAt: now,
 	})

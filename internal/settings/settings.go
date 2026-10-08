@@ -2,7 +2,6 @@ package settings
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"strconv"
 	"strings"
@@ -58,7 +57,7 @@ func (s Store) defaults() map[string]any {
 	return serverDefaults
 }
 
-func (s Store) get(ctx context.Context, key string) (sql.NullString, error) {
+func (s Store) get(ctx context.Context, key string) (db.NString, error) {
 	if s.Space {
 		return db.Q(s.DB).GetSpaceSetting(ctx, key)
 	}
@@ -66,7 +65,7 @@ func (s Store) get(ctx context.Context, key string) (sql.NullString, error) {
 }
 
 func (s Store) Get(ctx context.Context, key string, fallback any) any {
-	var raw sql.NullString
+	var raw db.NString
 	raw, err := s.get(ctx, key)
 	if err != nil || !raw.Valid {
 		if fallback != nil {
@@ -115,7 +114,7 @@ func (s Store) All(ctx context.Context) (map[string]any, error) {
 	}
 	type kv struct {
 		key   string
-		value sql.NullString
+		value db.NString
 	}
 	var rows []kv
 	if s.Space {

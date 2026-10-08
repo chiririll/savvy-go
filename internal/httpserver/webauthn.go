@@ -1,11 +1,11 @@
 package httpserver
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strconv"
 
+	"savvy-go/internal/db"
 	"savvy-go/internal/httpserver/dto"
 
 	"github.com/go-chi/chi/v5"
@@ -69,7 +69,7 @@ func (s *Server) webauthnUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.webauthn.Rename(r.Context(), userFrom(r).ID, id, body.Name); err != nil {
-		if err == sql.ErrNoRows {
+		if err == db.ErrNotFound {
 			writeMessage(w, http.StatusNotFound, "Not found.")
 			return
 		}
@@ -82,7 +82,7 @@ func (s *Server) webauthnUpdate(w http.ResponseWriter, r *http.Request) {
 func (s *Server) webauthnDestroy(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err := s.webauthn.Delete(r.Context(), userFrom(r).ID, id); err != nil {
-		if err == sql.ErrNoRows {
+		if err == db.ErrNotFound {
 			writeMessage(w, http.StatusNotFound, "Not found.")
 			return
 		}

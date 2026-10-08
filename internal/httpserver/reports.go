@@ -5,12 +5,12 @@ import (
 	"strconv"
 	"strings"
 
-	"savvy-go/internal/domain"
+	"savvy-go/internal/reports"
 )
 
-func (s *Server) reportFilter(r *http.Request) domain.ReportFilter {
+func (s *Server) reportFilter(r *http.Request) reports.Filter {
 	q := r.URL.Query()
-	return domain.ReportFilter{
+	return reports.Filter{
 		PeriodType:  firstQuery(q.Get("period_type"), "last_30_days"),
 		PeriodValue: q.Get("period_value"),
 		StartDate:   q.Get("start_date"),

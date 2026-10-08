@@ -2,7 +2,6 @@ package auth
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"strings"
 	"time"
@@ -62,13 +61,9 @@ func (s APITokens) Issue(ctx context.Context, user *User, name, scope string, ex
 	}
 	raw := apiTokenPrefix + RandomString(48)
 	now := time.Now().UTC()
-	var exp sql.NullString
-	if expiresAt != nil {
-		exp = db.NS(fmtTime(*expiresAt))
-	}
 	res, err := db.Q(s.DB).InsertAPIToken(ctx, sqlc.InsertAPITokenParams{
 		UserID: user.ID, Name: name, TokenHash: HashToken(raw), Prefix: raw[:len(apiTokenPrefix)+4],
-		Scope: scope, ExpiresAt: exp, CreatedAt: db.NS(fmtTime(now)), UpdatedAt: db.NS(fmtTime(now)),
+		Scope: scope, ExpiresAt: db.NullTime(expiresAt), CreatedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now),
 	})
 	if err != nil {
 		return "", nil, err
@@ -103,7 +98,7 @@ func (s APITokens) Resolve(ctx context.Context, raw string) (*APIToken, error) {
 		return nil, nil
 	}
 	row, err := db.Q(s.DB).GetAPITokenByHash(ctx, HashToken(raw))
-	if err == sql.ErrNoRows {
+	if err == db.ErrNotFound {
 		return nil, nil
 	}
 	if err != nil {
@@ -120,7 +115,7 @@ func (s APITokens) Resolve(ctx context.Context, raw string) (*APIToken, error) {
 	}
 	t.User = u
 	if t.LastUsedAt == nil || now.Sub(*t.LastUsedAt) > apiTokenTouchEach {
-		_ = db.Q(s.DB).TouchAPIToken(ctx, sqlc.TouchAPITokenParams{LastUsedAt: db.NS(fmtTime(now)), ID: t.ID})
+		_ = db.Q(s.DB).TouchAPIToken(ctx, sqlc.TouchAPITokenParams{LastUsedAt: db.TimeNS(now), ID: t.ID})
 	}
 	return &t, nil
 }
@@ -131,20 +126,20 @@ func (s APITokens) Revoke(ctx context.Context, userID, id int64) error {
 		return err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
-		return sql.ErrNoRows
+		return db.ErrNotFound
 	}
 	return nil
 }
 
 func tokenFromRow(r sqlc.ApiToken) APIToken {
 	t := APIToken{ID: r.ID, UserID: r.UserID, Name: r.Name, Prefix: r.Prefix, Scope: r.Scope}
-	if v, ok := parseTime(r.ExpiresAt); ok {
+	if v, ok := db.ParseTime(r.ExpiresAt); ok {
 		t.ExpiresAt = &v
 	}
-	if v, ok := parseTime(r.LastUsedAt); ok {
+	if v, ok := db.ParseTime(r.LastUsedAt); ok {
 		t.LastUsedAt = &v
 	}
-	if v, ok := parseTime(r.CreatedAt); ok {
+	if v, ok := db.ParseTime(r.CreatedAt); ok {
 		t.CreatedAt = &v
 	}
 	return t

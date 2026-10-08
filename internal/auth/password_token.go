@@ -2,7 +2,6 @@ package auth
 
 import (
 	"context"
-	"database/sql"
 	"time"
 
 	"savvy-go/internal/db"
@@ -31,8 +30,8 @@ func (p PasswordTokens) Issue(ctx context.Context, user *User) (token string, ex
 	now := time.Now().UTC()
 	expires = now.Add(passwordTokenTTL)
 	err = db.Q(p.DB).InsertPasswordToken(ctx, sqlc.InsertPasswordTokenParams{
-		UserID: user.ID, TokenHash: HashToken(token), ExpiresAt: fmtTime(expires),
-		CreatedAt: db.NS(fmtTime(now)), UpdatedAt: db.NS(fmtTime(now)),
+		UserID: user.ID, TokenHash: HashToken(token), ExpiresAt: db.FormatTime(expires),
+		CreatedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now),
 	})
 	return token, expires, err
 }
@@ -42,7 +41,7 @@ func (p PasswordTokens) Preview(ctx context.Context, token string) (*PasswordTok
 }
 
 func (p PasswordTokens) Consume(ctx context.Context, token string) (*PasswordToken, error) {
-	now := fmtTime(time.Now().UTC())
+	now := db.FormatTime(time.Now().UTC())
 	res, err := db.Q(p.DB).ConsumePasswordToken(ctx, sqlc.ConsumePasswordTokenParams{
 		ConsumedAt: db.NS(now), UpdatedAt: db.NS(now), TokenHash: HashToken(token), ExpiresAt: now,
 	})
@@ -57,7 +56,7 @@ func (p PasswordTokens) Consume(ctx context.Context, token string) (*PasswordTok
 }
 
 func (p PasswordTokens) RevokeActive(ctx context.Context, userID int64) error {
-	now := fmtTime(time.Now().UTC())
+	now := db.FormatTime(time.Now().UTC())
 	return db.Q(p.DB).RevokeActivePasswordTokens(ctx, sqlc.RevokeActivePasswordTokensParams{
 		ConsumedAt: db.NS(now), UpdatedAt: db.NS(now), UserID: userID,
 	})
@@ -65,7 +64,7 @@ func (p PasswordTokens) RevokeActive(ctx context.Context, userID int64) error {
 
 func (p PasswordTokens) findValid(ctx context.Context, token string) (*PasswordToken, error) {
 	row, err := db.Q(p.DB).GetValidPasswordToken(ctx, sqlc.GetValidPasswordTokenParams{
-		TokenHash: HashToken(token), ExpiresAt: fmtTime(time.Now().UTC()),
+		TokenHash: HashToken(token), ExpiresAt: db.FormatTime(time.Now().UTC()),
 	})
 	return p.fromValid(ctx, row.ID, row.UserID, row.ExpiresAt, err)
 }
@@ -76,14 +75,14 @@ func (p PasswordTokens) findHash(ctx context.Context, hash string) (*PasswordTok
 }
 
 func (p PasswordTokens) fromValid(ctx context.Context, id, userID int64, exp string, err error) (*PasswordToken, error) {
-	if err == sql.ErrNoRows {
+	if err == db.ErrNotFound {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
 	out := &PasswordToken{ID: id, UserID: userID}
-	out.ExpiresAt, _ = parseTime(sql.NullString{String: exp, Valid: true})
+	out.ExpiresAt, _ = db.ParseTimeString(exp)
 	u, err := Users{DB: p.DB}.ByID(ctx, userID)
 	if err != nil {
 		return nil, err

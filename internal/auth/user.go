@@ -2,7 +2,6 @@ package auth
 
 import (
 	"context"
-	"database/sql"
 	"strings"
 	"time"
 
@@ -129,7 +128,7 @@ func (s Users) Create(ctx context.Context, name, email string, password *string,
 		role = RoleUser
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	var hash any
+	var hash string // empty: an account with no password (SSO only)
 	if password != nil && *password != "" {
 		h, err := HashPassword(*password)
 		if err != nil {
@@ -137,12 +136,8 @@ func (s Users) Create(ctx context.Context, name, email string, password *string,
 		}
 		hash = h
 	}
-	var pass sql.NullString
-	if h, ok := hash.(string); ok {
-		pass = db.NS(h)
-	}
 	res, err := db.Q(s.DB).InsertUser(ctx, sqlc.InsertUserParams{
-		Name: name, Email: strings.ToLower(email), Password: pass, Role: role,
+		Name: name, Email: strings.ToLower(email), Password: db.NullStringVal(hash), Role: role,
 		CreatedAt: db.NS(now), UpdatedAt: db.NS(now),
 	})
 	if err != nil {
@@ -179,25 +174,19 @@ func (s Users) Update(ctx context.Context, id int64, name, email, role *string, 
 	if role != nil {
 		u.Role = *role
 	}
-	var pass any = nil
-	setPass := false
+	var hash string
 	if password != nil && *password != "" {
 		h, err := HashPassword(*password)
 		if err != nil {
 			return nil, err
 		}
-		pass = h
-		setPass = true
+		hash = h
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
 	q := db.Q(s.DB)
-	if setPass {
-		var p sql.NullString
-		if h, ok := pass.(string); ok {
-			p = db.NS(h)
-		}
+	if hash != "" {
 		err = q.UpdateUserWithPassword(ctx, sqlc.UpdateUserWithPasswordParams{
-			Name: u.Name, Email: u.Email, Role: u.Role, Password: p, UpdatedAt: db.NS(now), ID: id,
+			Name: u.Name, Email: u.Email, Role: u.Role, Password: db.NS(hash), UpdatedAt: db.NS(now), ID: id,
 		})
 	} else {
 		err = q.UpdateUserProfile(ctx, sqlc.UpdateUserProfileParams{
@@ -223,16 +212,9 @@ func (s Users) SetRole(ctx context.Context, id int64, role string) error {
 func (s Users) SetTwoFactor(ctx context.Context, id int64, secret *string, enabled, confirmed bool) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	return db.Q(s.DB).SetUserTwoFactor(ctx, sqlc.SetUserTwoFactorParams{
-		TwoFactorSecret: db.NullString(secret), TwoFactorEnabled: int64(boolToInt(enabled)),
-		TwoFactorConfirmed: int64(boolToInt(confirmed)), UpdatedAt: db.NS(now), ID: id,
+		TwoFactorSecret: db.NullString(secret), TwoFactorEnabled: db.BoolInt(enabled),
+		TwoFactorConfirmed: db.BoolInt(confirmed), UpdatedAt: db.NS(now), ID: id,
 	})
-}
-
-func boolToInt(v bool) int {
-	if v {
-		return 1
-	}
-	return 0
 }
 
 // Delete tombstones a user: the row stays (ids in space databases still
@@ -261,7 +243,7 @@ func (s Users) AdminCount(ctx context.Context) (int, error) {
 }
 
 func userFromRow(r sqlc.User, err error) (*User, error) {
-	if err == sql.ErrNoRows {
+	if err == db.ErrNotFound {
 		return nil, nil
 	}
 	if err != nil {
@@ -278,23 +260,11 @@ func userFromRow(r sqlc.User, err error) (*User, error) {
 	u.TwoFactorEnabled = r.TwoFactorEnabled != 0
 	u.TwoFactorConfirmed = r.TwoFactorConfirmed != 0
 	u.Deleted = r.DeletedAt.Valid
-	if t, ok := parseTime(r.CreatedAt); ok {
+	if t, ok := db.ParseTime(r.CreatedAt); ok {
 		u.CreatedAt = &t
 	}
-	if t, ok := parseTime(r.UpdatedAt); ok {
+	if t, ok := db.ParseTime(r.UpdatedAt); ok {
 		u.UpdatedAt = &t
 	}
 	return u, nil
-}
-
-func parseTime(raw sql.NullString) (time.Time, bool) {
-	if !raw.Valid || raw.String == "" {
-		return time.Time{}, false
-	}
-	for _, layout := range []string{time.RFC3339Nano, time.RFC3339, "2006-01-02 15:04:05"} {
-		if t, err := time.ParseInLocation(layout, raw.String, time.UTC); err == nil {
-			return t, true
-		}
-	}
-	return time.Time{}, false
 }

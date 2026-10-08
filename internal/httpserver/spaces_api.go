@@ -11,25 +11,25 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"savvy-go/internal/auth"
-	"savvy-go/internal/domain"
 	"savvy-go/internal/httpserver/dto"
+	"savvy-go/internal/spaces"
 )
 
-func spaceJSON(space domain.Space) map[string]any {
+func spaceJSON(space spaces.Space) map[string]any {
 	return map[string]any{"id": space.ID, "uuid": space.UUID, "name": space.Name, "role": space.Role}
 }
 
 // writeSpaceError maps space rules to 422 and forbidden ones to 403.
 func writeSpaceError(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, domain.ErrNotMember):
+	case errors.Is(err, spaces.ErrNotMember):
 		writeMessage(w, http.StatusNotFound, "Not a member of this space.")
-	case errors.Is(err, domain.ErrInvitationInvalid):
+	case errors.Is(err, spaces.ErrInvitationInvalid):
 		writeMessage(w, http.StatusNotFound, err.Error())
-	case errors.Is(err, domain.ErrRegistrationClosed):
+	case errors.Is(err, spaces.ErrRegistrationClosed):
 		writeMessage(w, http.StatusForbidden, err.Error())
-	case errors.Is(err, domain.ErrGuestCannotAdmin), errors.Is(err, domain.ErrLastAdmin), errors.Is(err, domain.ErrLastMember),
-		errors.Is(err, domain.ErrSpaceLimit), errors.Is(err, domain.ErrInvitationEmail):
+	case errors.Is(err, spaces.ErrGuestCannotAdmin), errors.Is(err, spaces.ErrLastAdmin), errors.Is(err, spaces.ErrLastMember),
+		errors.Is(err, spaces.ErrSpaceLimit), errors.Is(err, spaces.ErrInvitationEmail):
 		writeMessage(w, http.StatusUnprocessableEntity, err.Error())
 	default:
 		writeMessage(w, http.StatusInternalServerError, err.Error())
@@ -124,7 +124,7 @@ func (s *Server) membersIndex(w http.ResponseWriter, r *http.Request) {
 		writeSpaceError(w, err)
 		return
 	}
-	writeData(w, http.StatusOK, dto.Map(list, func(m domain.Member) map[string]any {
+	writeData(w, http.StatusOK, dto.Map(list, func(m spaces.Member) map[string]any {
 		return map[string]any{"userId": m.UserID, "name": m.Name, "email": m.Email, "role": m.Role, "createdAt": timeOrNil(m.CreatedAt)}
 	}))
 }
@@ -154,7 +154,7 @@ func (s *Server) membersUpdate(w http.ResponseWriter, r *http.Request) {
 	if !decodeBody(w, r, &body) {
 		return
 	}
-	if !domain.ValidSpaceRole(body.Role) {
+	if !spaces.ValidRole(body.Role) {
 		writeValidation(w, map[string][]string{"role": {"The role must be admin, editor or viewer."}})
 		return
 	}
@@ -193,7 +193,7 @@ func (s *Server) invitationsIndex(w http.ResponseWriter, r *http.Request) {
 		writeSpaceError(w, err)
 		return
 	}
-	writeData(w, http.StatusOK, dto.Map(list, func(i domain.Invitation) map[string]any {
+	writeData(w, http.StatusOK, dto.Map(list, func(i spaces.Invitation) map[string]any {
 		return map[string]any{
 			"id": i.ID, "email": i.Email, "role": i.Role, "inviter": i.Inviter,
 			"expiresAt": timeOrNil(i.ExpiresAt), "acceptedAt": timeOrNil(i.AcceptedAt), "createdAt": timeOrNil(i.CreatedAt),
@@ -209,7 +209,7 @@ func (s *Server) invitationsStore(w http.ResponseWriter, r *http.Request) {
 	if !decodeBody(w, r, &body) {
 		return
 	}
-	if !domain.ValidSpaceRole(body.Role) {
+	if !spaces.ValidRole(body.Role) {
 		writeValidation(w, map[string][]string{"role": {"The role must be admin, editor or viewer."}})
 		return
 	}
@@ -260,7 +260,7 @@ func (s *Server) invitationAccept(w http.ResponseWriter, r *http.Request) {
 // in. Password sign-in must be on.
 func (s *Server) invitationRegister(w http.ResponseWriter, r *http.Request) {
 	if s.passwordLoginDisabled(r) {
-		writeMessage(w, http.StatusForbidden, domain.ErrRegistrationClosed.Error())
+		writeMessage(w, http.StatusForbidden, spaces.ErrRegistrationClosed.Error())
 		return
 	}
 	var body struct {
@@ -317,7 +317,7 @@ func (s *Server) spaceAudit(w http.ResponseWriter, r *http.Request) {
 	writeData(w, http.StatusOK, dto.Map(list, auditJSON))
 }
 
-func auditJSON(e domain.AuditEntry) map[string]any {
+func auditJSON(e spaces.AuditEntry) map[string]any {
 	return map[string]any{"id": e.ID, "actor": e.Actor, "action": e.Action, "targetUserId": e.TargetUserID,
 		"details": e.Details, "createdAt": timeOrNil(e.CreatedAt)}
 }
@@ -331,13 +331,13 @@ func (s *Server) adminSpacesIndex(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, dto.Map(list, func(o domain.Overview) map[string]any {
+	writeData(w, http.StatusOK, dto.Map(list, func(o spaces.Overview) map[string]any {
 		return map[string]any{"id": o.ID, "uuid": o.UUID, "name": o.Name, "members": o.Members, "admins": o.Admins,
 			"size": o.Size, "quota": o.Quota, "unavailable": o.Unavailable, "createdAt": timeOrNil(o.CreatedAt)}
 	}))
 }
 
-func (s *Server) adminSpaceParam(w http.ResponseWriter, r *http.Request) *domain.Space {
+func (s *Server) adminSpaceParam(w http.ResponseWriter, r *http.Request) *spaces.Space {
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err == nil {
 		if space, _ := s.spaces.Get(r.Context(), id); space != nil {

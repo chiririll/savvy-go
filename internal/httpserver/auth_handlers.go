@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"time"
 
 	"savvy-go/internal/auth"
 	"savvy-go/internal/db"
@@ -253,10 +254,14 @@ func (s *Server) issueSession(w http.ResponseWriter, r *http.Request, u *auth.Us
 }
 
 func (s *Server) writeSessionPayload(w http.ResponseWriter, status int, u *auth.User, sess *auth.Session) {
-	expires, refresh := s.sessions.ClientTimes(sess)
+	var refresh *string // null when the session does not rotate
+	if at := sess.RefreshDueAt(); at != nil {
+		iso := at.UTC().Format(time.RFC3339)
+		refresh = &iso
+	}
 	payload := map[string]any{
 		"user":       u.SessionJSON(),
-		"expires_at": expires,
+		"expires_at": sess.AbsoluteExpiresAt.UTC().Format(time.RFC3339),
 		"refresh_at": refresh,
 	}
 	writeJSON(w, status, payload)

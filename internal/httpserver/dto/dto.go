@@ -11,8 +11,13 @@ import (
 	"github.com/shopspring/decimal"
 
 	"savvy-go/internal/auth"
-	"savvy-go/internal/domain"
+	"savvy-go/internal/automation"
+	"savvy-go/internal/backup"
+	"savvy-go/internal/importer"
+	"savvy-go/internal/ledger"
 	"savvy-go/internal/money"
+	"savvy-go/internal/recurring"
+	"savvy-go/internal/signing"
 )
 
 func init() {
@@ -59,7 +64,7 @@ type Currency struct {
 	Rate     decimal.Decimal `json:"rate"`
 }
 
-func NewCurrency(c domain.Currency) Currency {
+func NewCurrency(c ledger.Currency) Currency {
 	return Currency{ID: c.ID, Code: c.Code, Name: c.Name, Symbol: c.Symbol, Decimals: c.Decimals, IsBase: c.IsBase, Rate: c.Rate}
 }
 
@@ -70,7 +75,7 @@ type Tag struct {
 	CreatedAt         *time.Time `json:"createdAt"`
 }
 
-func NewTag(t domain.Tag) Tag {
+func NewTag(t ledger.Tag) Tag {
 	return Tag{ID: t.ID, Name: t.Name, TransactionsCount: t.TransactionsCount, CreatedAt: utc(t.CreatedAt)}
 }
 
@@ -85,7 +90,7 @@ type Category struct {
 	TotalAmount       *money.Money `json:"totalAmount"`
 }
 
-func NewCategory(c domain.Category) Category {
+func NewCategory(c ledger.Category) Category {
 	return Category{
 		ID: c.ID, Name: c.Name, Type: c.Type, Icon: c.Icon, Color: c.Color, IsDefault: c.IsDefault,
 		TransactionsCount: c.TransactionsCount, TotalAmount: c.TotalAmount,
@@ -104,7 +109,7 @@ type Account struct {
 	CreatedAt      *time.Time  `json:"createdAt"`
 }
 
-func NewAccount(a domain.Account) Account {
+func NewAccount(a ledger.Account) Account {
 	return Account{
 		ID: a.ID, Name: a.Name, Type: a.Type,
 		InitialBalance: a.InitialBalance, CurrentBalance: a.Balance,
@@ -125,7 +130,7 @@ type Debt struct {
 	IsPaidOff       bool        `json:"isPaidOff"`
 }
 
-func NewDebt(a domain.Account) Debt {
+func NewDebt(a ledger.Account) Debt {
 	target := money.Zero(a.Currency.Unit())
 	if a.TargetAmount != nil {
 		target = *a.TargetAmount
@@ -149,7 +154,7 @@ type TxItem struct {
 	TotalPrice   money.Money     `json:"totalPrice"`
 }
 
-func NewTxItem(i domain.TxItem) TxItem {
+func NewTxItem(i ledger.TxItem) TxItem {
 	return TxItem{ID: i.ID, Name: i.Name, Quantity: i.Quantity, PricePerUnit: i.PricePerUnit, TotalPrice: i.TotalPrice}
 }
 
@@ -180,7 +185,7 @@ type Transaction struct {
 	CreatedAt              *time.Time   `json:"createdAt"`
 }
 
-func NewTransaction(t domain.Transaction) Transaction {
+func NewTransaction(t ledger.Transaction) Transaction {
 	return Transaction{
 		ID: t.ID, Type: t.Type, Amount: t.Amount, ToAmount: t.ToAmount, IsEstimated: t.IsEstimated,
 		Description: t.Description, Date: t.Date, Status: t.Status, RecurringTransactionID: t.RecurringID,
@@ -194,7 +199,7 @@ func NewTransaction(t domain.Transaction) Transaction {
 	}
 }
 
-func transactionActions(t domain.Transaction) TxActions {
+func transactionActions(t ledger.Transaction) TxActions {
 	// One side of a transfer between spaces changes only through the
 	// transfer (in the space settings), never as a transaction.
 	if t.Type == "transfer_out" || t.Type == "transfer_in" {
@@ -220,7 +225,7 @@ type TransactionSummary struct {
 	Currency          *string     `json:"currency"`
 }
 
-func NewTransactionSummary(s domain.TransactionSummary) TransactionSummary {
+func NewTransactionSummary(s ledger.TransactionSummary) TransactionSummary {
 	return TransactionSummary{
 		Income: s.Income, Expense: s.Expense, Balance: s.Income.Sub(s.Expense),
 		TransactionsCount: s.Count, Currency: currencyCode(s.Currency),
@@ -236,7 +241,7 @@ type BudgetProgress struct {
 	IsExceeded  bool        `json:"isExceeded"`
 }
 
-func NewBudgetProgress(p domain.BudgetProgress) BudgetProgress {
+func NewBudgetProgress(p ledger.BudgetProgress) BudgetProgress {
 	return BudgetProgress{
 		Spent: p.Spent, Remaining: p.Remaining, Percent: p.Percent,
 		PeriodStart: p.PeriodStart, PeriodEnd: p.PeriodEnd, IsExceeded: p.IsExceeded,
@@ -259,7 +264,7 @@ type Budget struct {
 	Progress        *BudgetProgress `json:"progress"`
 }
 
-func NewBudget(b domain.Budget) Budget {
+func NewBudget(b ledger.Budget) Budget {
 	return Budget{
 		ID: b.ID, Name: b.Name, Amount: b.Amount, Currency: ptr(b.Currency, NewCurrency),
 		Period: b.Period, StartDate: b.StartDate, EndDate: b.EndDate,
@@ -292,7 +297,7 @@ type Recurring struct {
 	Tags        []Tag        `json:"tags"`
 }
 
-func NewRecurring(r domain.Recurring) Recurring {
+func NewRecurring(r recurring.Recurring) Recurring {
 	return Recurring{
 		ID: r.ID, Type: r.Type, Amount: r.Amount, ToAmount: r.ToAmount, IsEstimated: r.IsEstimated, Description: r.Description,
 		Frequency: r.Frequency, Interval: r.Interval, DayOfWeek: r.DayOfWeek, DayOfMonth: r.DayOfMonth,
@@ -321,7 +326,7 @@ type AutomationRule struct {
 	UpdatedAt      *time.Time       `json:"updatedAt"`
 }
 
-func NewAutomationRule(r domain.AutomationRule) AutomationRule {
+func NewAutomationRule(r automation.Rule) AutomationRule {
 	return AutomationRule{
 		ID: r.ID, Name: r.Name, Description: r.Description, TriggerType: r.TriggerType, Priority: r.Priority,
 		Conditions: r.Conditions, Actions: r.Actions, IsActive: r.IsActive, StopProcessing: r.StopProcessing,
@@ -340,7 +345,7 @@ type AutomationLog struct {
 	CreatedAt         time.Time `json:"createdAt"`
 }
 
-func NewAutomationLog(l domain.AutomationLog) AutomationLog {
+func NewAutomationLog(l automation.Log) AutomationLog {
 	return AutomationLog{
 		ID: l.ID, RuleID: l.RuleID, TriggerEntityType: l.TriggerEntityType, TriggerEntityID: l.TriggerEntityID,
 		ActionsExecuted: l.ActionsExecuted, Status: l.Status, ErrorMessage: l.ErrorMessage, CreatedAt: l.CreatedAt.UTC(),
@@ -354,7 +359,7 @@ type AccountsSummary struct {
 	AccountsCount int         `json:"accountsCount"`
 }
 
-func NewAccountsSummary(s domain.AccountsSummary) AccountsSummary {
+func NewAccountsSummary(s ledger.AccountsSummary) AccountsSummary {
 	return AccountsSummary{
 		TotalBalance: s.Total, Currency: currencyCode(s.Currency), Decimals: currencyDecimals(s.Currency), AccountsCount: s.Count,
 	}
@@ -369,7 +374,7 @@ type DebtSummary struct {
 	Decimals      int         `json:"decimals"`
 }
 
-func NewDebtSummary(s domain.DebtSummary) DebtSummary {
+func NewDebtSummary(s ledger.DebtSummary) DebtSummary {
 	return DebtSummary{
 		TotalIOwe: s.IOwe, TotalOwedToMe: s.OwedToMe, NetDebt: s.OwedToMe.Sub(s.IOwe), DebtsCount: s.Count,
 		Currency: currencyCode(s.Currency), Decimals: currencyDecimals(s.Currency),
@@ -384,14 +389,14 @@ type CategoryStatistics struct {
 	TotalAmount       money.Money `json:"totalAmount"`
 }
 
-func NewCategoryStatistics(s domain.CategoryStatistics) CategoryStatistics {
+func NewCategoryStatistics(s ledger.CategoryStatistics) CategoryStatistics {
 	return CategoryStatistics{
 		CategoryID: s.Category.ID, CategoryName: s.Category.Name, Type: s.Category.Type,
 		TransactionsCount: s.Count, TotalAmount: s.Total,
 	}
 }
 
-func currencyCode(c *domain.Currency) *string {
+func currencyCode(c *ledger.Currency) *string {
 	if c == nil {
 		return nil
 	}
@@ -399,7 +404,7 @@ func currencyCode(c *domain.Currency) *string {
 }
 
 // currencyDecimals is the scale totals in c are rounded to (2 without one).
-func currencyDecimals(c *domain.Currency) int {
+func currencyDecimals(c *ledger.Currency) int {
 	if c == nil {
 		return 2
 	}
@@ -445,7 +450,7 @@ type Import struct {
 
 // NewImport reads the parse/result details from im.Meta, which the domain
 // stores as JSON with snake_case keys.
-func NewImport(im domain.Import) Import {
+func NewImport(im importer.Import) Import {
 	out := Import{
 		ImportID: im.ID, Status: im.Status, TotalRows: im.TotalRows, ProcessedRows: im.ProcessedRows,
 		Created: im.CreatedCount, Skipped: im.SkippedCount, Errors: im.ErrorCount, Message: im.Message,
@@ -506,11 +511,11 @@ type Backup struct {
 	CreatedAt  *time.Time `json:"createdAt"`
 }
 
-func NewBackup(b domain.Backup) Backup {
+func NewBackup(b backup.Entry) Backup {
 	status := "invalid"
 	switch {
 	case !b.Valid:
-	case b.Signature == domain.SignedHere || b.Signature == domain.SignedTrusted:
+	case b.Signature == signing.SignedHere || b.Signature == signing.SignedTrusted:
 		status = "current"
 	default:
 		status = "unsigned"

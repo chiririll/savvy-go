@@ -1,25 +1,26 @@
 package main
 
 import (
-	"fmt"
 	"context"
+	"fmt"
 	"log/slog"
 
 	"savvy-go/internal/config"
-	"savvy-go/internal/domain"
 	"savvy-go/internal/settings"
 	"savvy-go/internal/signing"
+	"savvy-go/internal/spaces"
 	"savvy-go/internal/store/sqlite"
+	"savvy-go/internal/transfers"
 )
 
 // prepare brings the databases to a servable state: loads the signing key,
 // checks the spaces and finishes interrupted transfers between them.
-func prepare(ctx context.Context, cfg config.Config, st *sqlite.Store) (*signing.Holder, domain.Transfers, error) {
+func prepare(ctx context.Context, cfg config.Config, st *sqlite.Store) (*signing.Holder, transfers.Service, error) {
 	keys, err := loadSigningKey(ctx, cfg.DataDir, st)
 	if err != nil {
-		return nil, domain.Transfers{}, fmt.Errorf("signing key: %w", err)
+		return nil, transfers.Service{}, fmt.Errorf("signing key: %w", err)
 	}
-	if missing, orphans, err := (domain.Spaces{Store: st}).Reconcile(ctx); err == nil {
+	if missing, orphans, err := (spaces.Service{Store: st}).Reconcile(ctx); err == nil {
 		for _, id := range missing {
 			slog.Error("space has no database file", "space", id)
 		}
@@ -29,9 +30,9 @@ func prepare(ctx context.Context, cfg config.Config, st *sqlite.Store) (*signing
 	}
 	// Finish transfers a crash left half-written and review spaces restored
 	// just before it; an unavailable space is merged on a later start.
-	transfers := domain.Transfers{
-		Spaces: domain.Spaces{Store: st},
-		Keys:   domain.KeyRing{Holder: keys, Trusted: domain.TrustedKeys(st.Server())},
+	transfers := transfers.Service{
+		Spaces: spaces.Service{Store: st},
+		Keys:   signing.KeyRing{Holder: keys, Trusted: transfers.TrustedKeys(st.Server())},
 	}
 	if err := transfers.SyncAll(ctx); err != nil {
 		slog.Warn("merge transfers between spaces", "err", err)

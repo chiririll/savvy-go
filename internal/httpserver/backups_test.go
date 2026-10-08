@@ -19,8 +19,9 @@ import (
 
 	"savvy-go/internal/auth"
 	"savvy-go/internal/db"
-	"savvy-go/internal/domain"
+	"savvy-go/internal/ledger"
 	"savvy-go/internal/legacy"
+	"savvy-go/internal/spaces"
 )
 
 func loadLaravelFixture(t *testing.T, sqlDB *sql.DB) {
@@ -209,17 +210,14 @@ func rezip(t *testing.T, src string, edit func(name string, data []byte) ([]byte
 	return buf.Bytes()
 }
 
-// P44, P55: an edited archive is no longer "current", a database that does
-// not match the manifest is refused, and entries outside the expected names
-// are refused before anything is written.
+// P44, P55: how a tampered archive shows through the API: an edited manifest
+// is listed "unsigned" but restores, an inconsistent archive is a 422. The
+// archive checks themselves are tested in internal/backup.
 func TestP44P55TamperedArchives(t *testing.T) {
 	a := newTestApp(t)
 	sess := a.issue(a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
 	b := createdBackup(t, a.do("POST", spacePath(a.space.ID, "/backups"), map[string]any{}, sess.Token, sess.CSRF))
 	orig := a.s.backups.SpacePath(a.space.ID, b["filename"].(string))
-	keep := func(string, []byte) ([]byte, bool) { return nil, true }
-	same := func(name string, data []byte) ([]byte, bool) { return data, true }
-	_ = keep
 
 	restore := func(content []byte) (int, map[string]any) {
 		up := createdBackup(t, a.upload(spacePath(a.space.ID, "/backups/upload"), "x.zip", content, nil, sess))
@@ -255,14 +253,9 @@ func TestP44P55TamperedArchives(t *testing.T) {
 		t.Fatalf("swapped database: %d %v", code, body)
 	}
 
-	for _, name := range []string{"../escape.sqlite", "/abs.sqlite", "spaces/../x.sqlite", "extra.txt"} {
-		bad := rezip(t, orig, same, map[string][]byte{name: []byte("x")})
-		if code, body := restore(bad); code != http.StatusUnprocessableEntity {
-			t.Fatalf("entry %q: %d %v", name, code, body)
-		}
-	}
-	if entries, _ := filepath.Glob(filepath.Join(a.s.cfg.BackupsDir, "*escape*")); len(entries) != 0 {
-		t.Fatal("an entry escaped the unpack directory")
+	bad := rezip(t, orig, func(name string, data []byte) ([]byte, bool) { return data, true }, map[string][]byte{"../escape.sqlite": []byte("x")})
+	if code, body := restore(bad); code != http.StatusUnprocessableEntity {
+		t.Fatalf("unexpected entry: %d %v", code, body)
 	}
 }
 
@@ -360,14 +353,14 @@ func TestP21RestoreLaravelBackupAsServer(t *testing.T) {
 	if ada == nil || ada.Role != auth.RoleAdmin {
 		t.Fatalf("laravel admin %+v", ada)
 	}
-	if role, _ := a.s.spaces.Role(ctx, 1, ada.ID); role != domain.SpaceAdmin {
+	if role, _ := a.s.spaces.Role(ctx, 1, ada.ID); role != spaces.RoleAdmin {
 		t.Fatalf("laravel admin's space role %q", role)
 	}
 	d, err := a.store.Space(ctx, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx, err := (domain.Transactions{DB: d}).ByID(ctx, 1)
+	tx, err := (ledger.Transactions{DB: d}).ByID(ctx, 1)
 	if err != nil || tx == nil || tx.Date == nil || *tx.Date != "2026-01-03" {
 		t.Fatalf("restored transaction date = %+v, %v; want 2026-01-03", tx, err)
 	}
@@ -404,7 +397,7 @@ func TestP21ImportLaravelBackupAsSpace(t *testing.T) {
 	}
 	data := body["data"].(map[string]any)
 	id := int64(data["id"].(float64))
-	if data["role"] != domain.SpaceAdmin || data["name"] != "From Laravel" {
+	if data["role"] != spaces.RoleAdmin || data["name"] != "From Laravel" {
 		t.Fatalf("imported %v", data)
 	}
 	res = a.inSpace(id, "GET", "/api/accounts", nil, sess)
