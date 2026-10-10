@@ -132,6 +132,11 @@ func (s *Store) PrepareSpace(ctx context.Context, src string, opts ...store.Prep
 	if err := sanitize(ctx, src, out, migrate.Space); err != nil {
 		return fail(err)
 	}
+	if o.SpaceUUID != "" {
+		if err := writeSpaceUUID(ctx, out, o.SpaceUUID); err != nil {
+			return fail(err)
+		}
+	}
 	id, err := readSpaceUUID(ctx, out)
 	if err != nil {
 		return fail(err)

@@ -1,6 +1,8 @@
-// Package restore brings Laravel-era databases into a running server: as a
-// whole-server replacement, over one space, or as a new space. The file is
-// converted for this one restoration and never kept as a backup.
+// Package restore brings Laravel-era databases into a running server. A
+// database for the whole server or for one space is converted and kept as an
+// ordinary backup, which the user then restores like any other; the Laravel
+// file itself is never kept. A new space is created straight away, as it
+// replaces nothing.
 //
 // The conversion itself is internal/legacy, run by the store when it prepares
 // the file. This package only drives the store's interface and imports none
@@ -19,34 +21,39 @@ import (
 	"savvy-go/internal/store"
 )
 
+const note = "Upgraded from the Laravel version"
+
 // IsDatabaseFile tells a bare database file, in practice a Laravel database,
 // from a backup archive by its name.
 func IsDatabaseFile(name string) bool { return strings.HasSuffix(strings.ToLower(name), ".sqlite") }
 
-// Server replaces the server and every space with the Laravel database at
-// path. appKey is the Laravel APP_KEY, "" if the user has none: two-factor
+// Server converts the Laravel database at path and keeps it as a server
+// backup. appKey is the Laravel APP_KEY, "" if the user has none: two-factor
 // secrets that cannot be decrypted are then reset (see
-// legacy.UpgradeLegacyTOTPSecrets).
-func Server(ctx context.Context, st store.Store, path, appKey string) error {
-	p, err := st.PrepareServer(ctx, path, store.WithLegacyKey(appKey))
+// legacy.UpgradeLegacyTOTPSecrets). Nothing live is touched.
+func Server(ctx context.Context, backups backup.Service, path, appKey string) (*backup.Entry, error) {
+	p, err := backups.Store.PrepareServer(ctx, path, store.WithLegacyKey(appKey))
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return st.ReplaceServer(ctx, p)
+	return backups.SaveServerFrom(p, note)
 }
 
-// Space replaces a space's data with the finances of the Laravel database at
-// path; its users and other server data are left out.
-func Space(ctx context.Context, backups backup.Service, sp spaces.Space, path string, quota int64) error {
+// Space converts the finances of the Laravel database at path and keeps them
+// as a backup of sp, whose users and other server data are left out.
+func Space(ctx context.Context, backups backup.Service, sp spaces.Space, path string, quota int64) (*backup.Entry, error) {
 	if exceeds(path, quota) {
-		return backup.ErrTooLarge
+		return nil, backup.ErrTooLarge
 	}
-	p, err := backups.Store.PrepareSpace(ctx, path)
+	p, err := backups.Store.PrepareSpace(ctx, path, store.WithSpaceUUID(sp.UUID))
 	if err != nil {
-		return err
+		return nil, err
 	}
-	p.Settings = map[string]string{"space_uuid": sp.UUID}
-	return backups.Replace(ctx, sp, p, quota)
+	if quota > 0 && p.Size > quota {
+		backups.Store.Discard(p.Artifact)
+		return nil, backup.ErrTooLarge
+	}
+	return backups.SaveSpaceFrom(sp, p, note)
 }
 
 // ImportSpace creates a new space, owned by owner, from the finances of the

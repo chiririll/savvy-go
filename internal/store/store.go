@@ -120,11 +120,19 @@ type PrepareOptions struct {
 	// LegacyKey is the Laravel APP_KEY that decrypts the secrets of a Laravel
 	// database. Without it those secrets cannot be converted.
 	LegacyKey string
+	// SpaceUUID, if set, is recorded as the prepared space's uuid, so a Laravel
+	// database (which has none) becomes a backup of that very space.
+	SpaceUUID string
 }
 
 // WithLegacyKey sets PrepareOptions.LegacyKey.
 func WithLegacyKey(key string) PrepareOption {
 	return func(o *PrepareOptions) { o.LegacyKey = key }
+}
+
+// WithSpaceUUID sets PrepareOptions.SpaceUUID.
+func WithSpaceUUID(uuid string) PrepareOption {
+	return func(o *PrepareOptions) { o.SpaceUUID = uuid }
 }
 
 // ResolvePrepare applies opts.

@@ -287,6 +287,33 @@ func (s Service) ingest(dir, src string) (*Entry, error) {
 	return s.find(dir, name)
 }
 
+// SaveServerFrom keeps a prepared server (a converted Laravel database) as a
+// server backup and consumes p. It has no signing key, so restoring it leaves
+// this server's key as it is.
+func (s Service) SaveServerFrom(p *store.PreparedServer, note string) (*Entry, error) {
+	defer s.Store.Discard(p.Artifact)
+	files := map[string]string{"server.sqlite": filepath.Join(p.Artifact, "server.sqlite")}
+	for _, id := range p.Spaces {
+		name := strconv.FormatInt(id, 10) + ".sqlite"
+		files["spaces/"+name] = filepath.Join(p.Artifact, "spaces", name)
+	}
+	return s.write(s.serverDir(), Manifest{Kind: kindServer, Note: note}, files)
+}
+
+// SaveSpaceFrom keeps a prepared space database (a converted Laravel
+// database) as a backup of sp and consumes p. The database must carry sp's
+// uuid, or the backup could not be restored over sp.
+func (s Service) SaveSpaceFrom(sp spaces.Space, p *store.PreparedSpace, note string) (*Entry, error) {
+	defer s.Store.Discard(p.Artifact)
+	b, err := s.write(s.spaceDir(sp.ID), Manifest{Kind: kindSpace, Note: note, SpaceUUID: sp.UUID, SpaceName: sp.Name},
+		map[string]string{"space.sqlite": filepath.Join(p.Artifact, "space.sqlite")})
+	if err != nil {
+		return nil, err
+	}
+	s.prune(sp.ID)
+	return b, nil
+}
+
 // deletedDir holds the final backups of deleted spaces, for server admins.
 func (s Service) deletedDir() string { return filepath.Join(s.Dir, "deleted") }
 

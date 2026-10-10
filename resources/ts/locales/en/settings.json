@@ -325,15 +325,15 @@
         "uploadTitle": "Upload Backup",
         "uploadDescription": "Upload a backup archive (.zip) or a database file (.sqlite).",
             "laravel": {
-                "intro": "This is a database of the Laravel version. It is not kept as a backup: it is converted to the current format and restored right away. Choose what to restore it as.",
+                "intro": "This is a database of the Laravel version. It will be upgraded to the current format and only the upgraded version is saved, as a backup. Your file is not kept, so keep your own copy. Nothing changes until you restore that backup. Choose what to upgrade it for.",
                 "target": {
                     "server": {
                         "title": "The whole server",
-                        "description": "Replaces everything on this server: users, spaces and settings. You will have to sign in with an account from the old database."
+                        "description": "Saves a server backup with the old users, spaces and settings. Restoring it replaces everything on this server, and you will have to sign in with an account from the old database."
                     },
                     "space": {
                         "title": "This space",
-                        "description": "Replaces the data of this space with the old finances. Users are not imported."
+                        "description": "Saves a backup of this space with the old finances. Restoring it replaces the data of this space. Users are not imported."
                     },
                     "new": {
                         "title": "A new space",
@@ -341,8 +341,8 @@
                     }
                 },
                 "action": {
-                    "server": "Replace the server",
-                    "space": "Replace this space",
+                    "server": "Upgrade and save as backup",
+                    "space": "Upgrade and save as backup",
                     "new": "Import as a new space"
                 },
                 "appKey": "Laravel APP_KEY (optional)",

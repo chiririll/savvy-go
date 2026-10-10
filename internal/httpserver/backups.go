@@ -92,35 +92,38 @@ func (s *Server) receiveUpload(w http.ResponseWriter, r *http.Request, limit int
 }
 
 // rejectLaravelBackup refuses a Laravel database where a backup archive is
-// expected: it is never kept, it is restored with the dedicated endpoints.
+// expected: it is upgraded by the dedicated endpoints, which save the result.
 func (s *Server) rejectLaravelBackup(w http.ResponseWriter, tmp, name string) bool {
 	if !restore.IsDatabaseFile(name) {
 		return true
 	}
 	_ = os.Remove(tmp)
-	writeValidation(w, map[string][]string{"file": {"A Laravel database is not kept as a backup: restore it from the upload dialog."}})
+	writeValidation(w, map[string][]string{"file": {"A Laravel database is not a backup: upgrade it from the upload dialog."}})
 	return false
 }
 
-// backupsRestoreLaravel replaces the whole server with an uploaded Laravel
-// database. It is converted on the way and not kept (server admins, by route).
-func (s *Server) backupsRestoreLaravel(w http.ResponseWriter, r *http.Request) {
+// backupsUpgradeLaravel upgrades an uploaded Laravel database and saves only
+// the upgraded version as a server backup. Nothing live changes until the
+// admin restores it (server admins, by route).
+func (s *Server) backupsUpgradeLaravel(w http.ResponseWriter, r *http.Request) {
 	tmp, _, ok := s.receiveUpload(w, r, maxServerUpload)
 	if !ok {
 		return
 	}
 	defer os.Remove(tmp)
-	// An invalid key is refused by the store before anything is touched.
-	if err := restore.Server(r.Context(), s.store, tmp, strings.TrimSpace(r.FormValue("app_key"))); err != nil {
+	// An invalid key is refused by the store before anything is converted.
+	b, err := restore.Server(r.Context(), s.backups, tmp, strings.TrimSpace(r.FormValue("app_key")))
+	if err != nil {
 		writeBackupError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"message": "Database restored."})
+	writeData(w, http.StatusCreated, dto.NewBackup(*b))
 }
 
-// spaceBackupsRestoreLaravel replaces the current space's data with the
-// finances of an uploaded Laravel database (space admins, by route).
-func (s *Server) spaceBackupsRestoreLaravel(w http.ResponseWriter, r *http.Request) {
+// spaceBackupsUpgradeLaravel upgrades the finances of an uploaded Laravel
+// database and saves only the upgraded version as a backup of the current
+// space (space admins, by route).
+func (s *Server) spaceBackupsUpgradeLaravel(w http.ResponseWriter, r *http.Request) {
 	space := s.currentSpace(w, r)
 	if space == nil {
 		return
@@ -130,11 +133,12 @@ func (s *Server) spaceBackupsRestoreLaravel(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	defer os.Remove(tmp)
-	if err := restore.Space(r.Context(), s.backups, *space, tmp, s.spaceQuota(r)); err != nil {
+	b, err := restore.Space(r.Context(), s.backupsService(r), *space, tmp, s.spaceQuota(r))
+	if err != nil {
 		writeBackupError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"message": "Database restored."})
+	writeData(w, http.StatusCreated, dto.NewBackup(*b))
 }
 
 func serveBackup(w http.ResponseWriter, r *http.Request, path, name string) {

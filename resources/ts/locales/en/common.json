@@ -305,6 +305,7 @@
             "created": "Backup created",
             "uploaded": "Backup uploaded",
             "restored": "Database restored successfully",
+            "upgraded": "Database upgraded and saved as a backup",
             "deleted": "Backup deleted",
             "createFailed": "Failed to create backup",
             "uploadFailed": "Failed to upload backup",

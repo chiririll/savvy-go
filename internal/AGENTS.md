@@ -48,7 +48,7 @@ Dependencies point down. Each package may import the ones above it in this list,
 - `internal/migrate/sql/{server,space}/0001_initial.sql`. Edit in place.
 - `migrate`: upgrades between Go versions, not released yet.
 - `legacy`: loads Laravel-era DB once, on a staging copy. Rarely touched. No new Go-era logic.
-- `legacy/restore`: Laravel restore/import entry points (server, space, new space). Only drives `store`, so HTTP may import it, never `legacy` itself. `backup` and `ledger` know nothing of Laravel.
+- `legacy/restore`: Laravel upgrade entry points. Server and space: convert, then save only the upgraded file as an ordinary backup (`backup.SaveServerFrom/SaveSpaceFrom`); live data is touched only when the user restores it. The Laravel file is never kept. New space: created at once, replaces nothing. A space upgrade is stamped with the target space's uuid (`store.WithSpaceUUID`) so it restores over that space. Only drives `store`, so HTTP may import it, never `legacy` itself. `backup` and `ledger` know nothing of Laravel.
 
 ## HTTP
 

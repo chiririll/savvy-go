@@ -333,20 +333,38 @@ func TestP20ServerBackupRestore(t *testing.T) {
 	}
 }
 
-// P21: a Laravel backup restores as the whole server, admin included, and its
-// dates come back date-only.
-func TestP21RestoreLaravelBackupAsServer(t *testing.T) {
+// upgradeLaravelServer uploads a Laravel database for the whole server and
+// returns the name of the backup it was saved as.
+func upgradeLaravelServer(t *testing.T, a *testApp, sess *auth.Issued, content []byte, fields map[string]string) string {
+	t.Helper()
+	res := a.upload("/api/backups/upgrade-laravel", "laravel.sqlite", content, fields, sess)
+	body := decodeJSON(t, res)
+	if res.StatusCode != http.StatusCreated {
+		t.Fatalf("upgrade %d %v", res.StatusCode, body)
+	}
+	return body["data"].(map[string]any)["filename"].(string)
+}
+
+// P21: a Laravel database is upgraded and saved as a server backup, and the
+// live data stays as it is until that backup is restored. Restoring it brings
+// the Laravel admin, and its dates come back date-only.
+func TestP21UpgradeLaravelBackupAsServer(t *testing.T) {
 	a := newTestApp(t)
 	sess := a.issue(a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
 	content, _ := os.ReadFile(laravelFile(t, true))
-	res := a.upload("/api/backups/restore-laravel", "laravel.sqlite", content, nil, sess)
-	if res.StatusCode != http.StatusOK {
-		t.Fatalf("restore %d %v", res.StatusCode, decodeJSON(t, res))
+	name := upgradeLaravelServer(t, a, sess, content, nil)
+
+	list, _ := a.s.backups.ServerBackups()
+	if len(list) != 1 || list[0].Filename != name || !list[0].Valid || list[0].Kind != "server" {
+		t.Fatalf("saved backups %+v; want only the upgraded one", list)
 	}
-	res.Body.Close()
-	if list, _ := a.s.backups.ServerBackups(); len(list) != 0 {
-		t.Fatalf("the Laravel database was kept as a backup: %v", list)
+	if u, _ := a.s.users.ByEmail(context.Background(), "ada@example.com"); u != nil {
+		t.Fatal("the upgrade changed live data")
 	}
+	if u, _ := a.s.users.ByEmail(context.Background(), "admin@test.com"); u == nil {
+		t.Fatal("the upgrade removed a live user")
+	}
+	status(t, a.do("POST", "/api/backups/"+name+"/restore", nil, sess.Token, sess.CSRF), http.StatusOK, "restore")
 
 	ctx := context.Background()
 	ada, _ := a.s.users.ByEmail(ctx, "ada@example.com")
@@ -366,17 +384,20 @@ func TestP21RestoreLaravelBackupAsServer(t *testing.T) {
 	}
 }
 
-// A Laravel backup older than the supported version is refused and the live
-// data is untouched.
-func TestRestoreOldLaravelBackupKeepsLiveData(t *testing.T) {
+// A Laravel database older than the supported version is refused and nothing
+// is saved.
+func TestUpgradeOldLaravelBackupSavesNothing(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("admin@test.com", "secret1", auth.RoleAdmin)
 	sess := a.issue(u, false)
 	content, _ := os.ReadFile(laravelFile(t, false))
-	res := a.upload("/api/backups/restore-laravel", "old.sqlite", content, nil, sess)
+	res := a.upload("/api/backups/upgrade-laravel", "old.sqlite", content, nil, sess)
 	body := decodeJSON(t, res)
 	if res.StatusCode != http.StatusUnprocessableEntity {
-		t.Fatalf("restore %d %v", res.StatusCode, body)
+		t.Fatalf("upgrade %d %v", res.StatusCode, body)
+	}
+	if list, _ := a.s.backups.ServerBackups(); len(list) != 0 {
+		t.Fatalf("saved %v", list)
 	}
 	if got, _ := a.s.users.ByEmail(context.Background(), "admin@test.com"); got == nil {
 		t.Fatal("live data damaged")
@@ -435,7 +456,8 @@ func TestP27ImportCopyGetsNewUUID(t *testing.T) {
 	}
 }
 
-// A Laravel database is not kept as a backup archive.
+// A Laravel database is not accepted by the plain backup upload: only its
+// upgraded version is kept.
 func TestLaravelDatabaseIsNotAcceptedAsBackup(t *testing.T) {
 	a := newTestApp(t)
 	sess := a.issue(a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
@@ -487,8 +509,9 @@ func TestRestoreLaravelServerDecryptsTwoFactorWithKey(t *testing.T) {
 	sess := a.issue(a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
 	content, appKey, secret := laravelFileWithTOTP(t)
 
-	status(t, a.upload("/api/backups/restore-laravel", "laravel.sqlite", content, map[string]string{"app_key": "nonsense"}, sess), http.StatusUnprocessableEntity, "invalid key")
-	status(t, a.upload("/api/backups/restore-laravel", "laravel.sqlite", content, map[string]string{"app_key": appKey}, sess), http.StatusOK, "restore")
+	status(t, a.upload("/api/backups/upgrade-laravel", "laravel.sqlite", content, map[string]string{"app_key": "nonsense"}, sess), http.StatusUnprocessableEntity, "invalid key")
+	name := upgradeLaravelServer(t, a, sess, content, map[string]string{"app_key": appKey})
+	status(t, a.do("POST", "/api/backups/"+name+"/restore", nil, sess.Token, sess.CSRF), http.StatusOK, "restore")
 
 	ada, err := a.s.users.ByEmail(context.Background(), "ada@example.com")
 	if err != nil || ada == nil || ada.TwoFactorSecret == nil || *ada.TwoFactorSecret != secret {
@@ -503,7 +526,8 @@ func TestRestoreLaravelServerWithoutKeyResetsTwoFactor(t *testing.T) {
 	sess := a.issue(a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
 	content, _, _ := laravelFileWithTOTP(t)
 
-	status(t, a.upload("/api/backups/restore-laravel", "laravel.sqlite", content, nil, sess), http.StatusOK, "restore")
+	name := upgradeLaravelServer(t, a, sess, content, nil)
+	status(t, a.do("POST", "/api/backups/"+name+"/restore", nil, sess.Token, sess.CSRF), http.StatusOK, "restore")
 
 	ada, err := a.s.users.ByEmail(context.Background(), "ada@example.com")
 	if err != nil || ada == nil {
@@ -514,19 +538,31 @@ func TestRestoreLaravelServerWithoutKeyResetsTwoFactor(t *testing.T) {
 	}
 }
 
-// A Laravel database replaces the current space's data in place, keeping the
-// space's identity, and is not kept as a backup.
-func TestRestoreLaravelIntoCurrentSpace(t *testing.T) {
+// A Laravel database is upgraded and saved as a backup of the current space,
+// which stays as it is until the backup is restored. The restore keeps the
+// space's identity.
+func TestUpgradeLaravelIntoCurrentSpaceBackup(t *testing.T) {
 	a := newTestApp(t)
 	sess := a.issue(a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
 	content, _ := os.ReadFile(laravelFile(t, true))
 	before, _ := a.s.spaces.Get(context.Background(), a.space.ID)
+	accountsBefore := len(decodeJSON(t, a.inSpace(a.space.ID, "GET", "/api/accounts", nil, sess))["data"].([]any))
 
-	res := a.upload(spacePath(a.space.ID, "/backups/restore-laravel"), "laravel.sqlite", content, nil, sess)
-	if res.StatusCode != http.StatusOK {
-		t.Fatalf("restore %d %v", res.StatusCode, decodeJSON(t, res))
+	res := a.upload(spacePath(a.space.ID, "/backups/upgrade-laravel"), "laravel.sqlite", content, nil, sess)
+	body := decodeJSON(t, res)
+	if res.StatusCode != http.StatusCreated {
+		t.Fatalf("upgrade %d %v", res.StatusCode, body)
 	}
-	res.Body.Close()
+	name := body["data"].(map[string]any)["filename"].(string)
+	list, _ := a.s.backups.SpaceBackups(a.space.ID)
+	if len(list) != 1 || list[0].Filename != name || !list[0].Valid || list[0].Kind != "space" || list[0].SpaceUUID != before.UUID {
+		t.Fatalf("saved backups %+v; want the upgraded one, of this space", list)
+	}
+	if n := len(decodeJSON(t, a.inSpace(a.space.ID, "GET", "/api/accounts", nil, sess))["data"].([]any)); n != accountsBefore {
+		t.Fatalf("the upgrade changed the live space: %d accounts, had %d", n, accountsBefore)
+	}
+
+	status(t, a.do("POST", spacePath(a.space.ID, "/backups/"+name+"/restore"), nil, sess.Token, sess.CSRF), http.StatusOK, "restore")
 
 	after, _ := a.s.spaces.Get(context.Background(), a.space.ID)
 	if after == nil || before == nil || after.UUID != before.UUID {
@@ -538,8 +574,5 @@ func TestRestoreLaravelIntoCurrentSpace(t *testing.T) {
 	}
 	if u, _ := a.s.users.ByEmail(context.Background(), "ada@example.com"); u != nil {
 		t.Fatal("restoring into a space brought the Laravel users")
-	}
-	if list, _ := a.s.backups.SpaceBackups(a.space.ID); len(list) != 0 {
-		t.Fatalf("kept as a backup: %v", list)
 	}
 }
