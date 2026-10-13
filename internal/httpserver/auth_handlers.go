@@ -2,11 +2,13 @@ package httpserver
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
 
 	"savvy-go/internal/auth"
+	"savvy-go/internal/bootstrap"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -28,26 +30,37 @@ func (s *Server) authStatus(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	// Tells the setup page where to find the first-run password; the password
+	// itself never leaves the server.
+	var hint any
+	if n == 0 && s.bootstrap.Active() {
+		h := s.bootstrap.Hint()
+		hint = map[string]any{"environment": h.Environment, "file": h.File}
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"needs_registration":     n == 0,
 		"password_login_enabled": !s.passwordLoginDisabled(r),
+		"bootstrap_hint":         hint,
 	})
 }
 
+// authRegister creates the first admin. Registration is never open: it needs
+// the bootstrap password, and only while the server has no users.
 func (s *Server) authRegister(w http.ResponseWriter, r *http.Request) {
 	n, err := s.users.Count(r.Context())
 	if err != nil {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	if n > 0 {
+	if n > 0 || !s.bootstrap.Active() {
 		writeMessage(w, http.StatusForbidden, "Registration is closed.")
 		return
 	}
 	var body struct {
-		Name     string `json:"name"`
-		Email    string `json:"email"`
-		Password string `json:"password"`
+		Name              string `json:"name"`
+		Email             string `json:"email"`
+		Password          string `json:"password"`
+		BootstrapPassword string `json:"bootstrap_password"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeValidation(w, map[string][]string{"email": {"The given data was invalid."}})
@@ -67,18 +80,46 @@ func (s *Server) authRegister(w http.ResponseWriter, r *http.Request) {
 		writeValidation(w, errs)
 		return
 	}
-	pass := body.Password
-	u, err := s.users.Create(r.Context(), strings.TrimSpace(body.Name), body.Email, &pass, auth.RoleAdmin)
-	if err != nil {
+	var (
+		u            *auth.User
+		provisionErr error
+	)
+	// Verify, create and invalidate are one step, so two parallel requests
+	// with the right password still create one admin.
+	err = s.bootstrap.Register(body.BootstrapPassword, func() error {
+		if n, err := s.users.Count(r.Context()); err != nil {
+			return err
+		} else if n > 0 {
+			return bootstrap.ErrClosed
+		}
+		pass := body.Password
+		var err error
+		if u, err = s.users.Create(r.Context(), strings.TrimSpace(body.Name), body.Email, &pass, auth.RoleAdmin); err != nil {
+			return errEmailTaken
+		}
+		// The admin exists from here on, so the password must be spent even
+		// if the personal space fails.
+		_, provisionErr = s.spaces.Provision(r.Context(), u)
+		return nil
+	})
+	switch {
+	case errors.Is(err, bootstrap.ErrWrongPassword):
+		writeValidation(w, map[string][]string{"bootstrap_password": {"The bootstrap password is missing or wrong."}})
+	case errors.Is(err, bootstrap.ErrClosed):
+		s.bootstrap.Invalidate()
+		writeMessage(w, http.StatusForbidden, "Registration is closed.")
+	case errors.Is(err, errEmailTaken):
 		writeValidation(w, map[string][]string{"email": {"The email has already been taken."}})
-		return
-	}
-	if _, err := s.spaces.Provision(r.Context(), u); err != nil {
+	case err != nil:
 		writeMessage(w, http.StatusInternalServerError, err.Error())
-		return
+	case provisionErr != nil:
+		writeMessage(w, http.StatusInternalServerError, provisionErr.Error())
+	default:
+		s.issueSession(w, r, u, 201, true)
 	}
-	s.issueSession(w, r, u, 201, true)
 }
+
+var errEmailTaken = errors.New("email taken")
 
 func (s *Server) authLogin(w http.ResponseWriter, r *http.Request) {
 	var body struct {

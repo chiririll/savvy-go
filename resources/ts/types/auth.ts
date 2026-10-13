@@ -18,6 +18,8 @@ export interface RegisterData {
     name: string
     email: string
     password: string
+    /** First-run password from the server log or file; required while the server has no users. */
+    bootstrap_password: string
 }
 
 export interface AuthResponse {
@@ -40,6 +42,13 @@ export interface TwoFactorAuthResponse {
 export interface AuthStatus {
     needs_registration: boolean
     password_login_enabled: boolean
+    /** Where to find the bootstrap password; null once the server has users. */
+    bootstrap_hint: BootstrapHint | null
+}
+
+export interface BootstrapHint {
+    environment: 'docker' | 'systemd' | 'binary'
+    file: string
 }
 
 // 2FA Types

@@ -25,6 +25,18 @@ volumes:
 
 All data is in the `/data` volume, see [Data and backups](data-and-backups.md).
 
+## First run
+
+A new server has no users, and creating the first admin needs a one-time **bootstrap password**, so nobody who finds the server first can claim it. The server prints it in the log at start and saves it in the file `bootstrap-password` in the data directory. Open the app, enter the password and create the admin account. The password stops working, and the file is removed, as soon as the first user exists.
+
+| Install          | Read the password                                                           |
+|------------------|-----------------------------------------------------------------------------|
+| Docker           | `docker logs savvy` or `docker exec savvy cat /data/bootstrap-password`     |
+| Debian/RPM       | `journalctl -u savvy-go` or `sudo cat /var/lib/savvy-go/bootstrap-password` |
+| Standalone binary| the terminal, or `bootstrap-password` in the data directory                 |
+
+A restart before the first user exists keeps the same password. A server started with demo data has users already and needs none.
+
 ## Configuration
 
 The application is configured by a TOML file and reads no environment variables for settings. `config.toml` is created with the defaults on the first start, in the data directory (`/data` in the image, `/var/lib/savvy-go` for the Debian package, `./savvy-data` otherwise); `-config <path>` or the `CONFIG_FILE` environment variable points elsewhere. Demo data is not configured here: see `--seed-config` in [Development](development.md). On every start the file is read and written back, so keys a newer version adds appear on their own; comments are regenerated, your values are kept. Edit it and restart. A read-only file works too, it is just not rewritten.

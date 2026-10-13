@@ -84,7 +84,7 @@ func TestUserWithoutSpaceGets404ForData(t *testing.T) {
 
 func TestRegistrationProvisionsPersonalSpace(t *testing.T) {
 	a := newTestApp(t)
-	res := a.do("POST", "/api/auth/register", map[string]string{"name": "Owner", "email": "o@test.com", "password": "secret1"}, "", "")
+	res := a.register(a.bootstrap.Password(), map[string]string{"name": "Owner", "email": "o@test.com"})
 	session := cookieNamed(res, "svy_session")
 	res.Body.Close()
 	if res.StatusCode != 201 || session == nil {

@@ -14,6 +14,7 @@ import (
 
 	"savvy-go/internal/auth"
 	"savvy-go/internal/backup"
+	"savvy-go/internal/bootstrap"
 	"savvy-go/internal/config"
 	"savvy-go/internal/currencydata"
 	"savvy-go/internal/jobs"
@@ -55,7 +56,8 @@ type Server struct {
 	webauthn   auth.WebAuthn
 	queue      *jobs.Queue
 	mail       mailer.Mailer
-	assets     fs.FS // the frontend: index.html, icons and build/
+	bootstrap  *bootstrap.Guard // first-run password; nil keeps registration closed
+	assets     fs.FS            // the frontend: index.html, icons and build/
 }
 
 // Option configures New.
@@ -65,6 +67,10 @@ type Option func(*Server)
 // is the public data files; share one source with the scheduled rate update
 // so spaces do not each fetch their own.
 func WithRates(src ledger.RateSource) Option { return func(s *Server) { s.rates = src } }
+
+// WithBootstrap sets the first-run password that registration needs while the
+// server has no users. Without it, registration is always closed.
+func WithBootstrap(g *bootstrap.Guard) Option { return func(s *Server) { s.bootstrap = g } }
 
 func New(cfg config.Config, st store.Store, keys *signing.Holder, opts ...Option) *Server {
 	ledger.SetLocation(cfg.Location)

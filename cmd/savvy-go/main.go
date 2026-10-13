@@ -67,6 +67,11 @@ func run(cfg config.Config, seedCfg seed.Config) error {
 		return fmt.Errorf("seed demo: %w", err)
 	}
 
+	guard, err := startBootstrap(ctx, cfg, st)
+	if err != nil {
+		return err
+	}
+
 	queue := jobs.New(2)
 	jobsCtx, stopJobs := context.WithCancel(ctx)
 	defer stopJobs()
@@ -75,7 +80,7 @@ func run(cfg config.Config, seedCfg seed.Config) error {
 
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,
-		Handler:           httpserver.New(cfg, st, keys, httpserver.WithRates(rates)).Handler(),
+		Handler:           httpserver.New(cfg, st, keys, httpserver.WithRates(rates), httpserver.WithBootstrap(guard)).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 	failed := make(chan error, 1)

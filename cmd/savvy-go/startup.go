@@ -4,7 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net"
+	"os"
+	"path/filepath"
 
+	"savvy-go/internal/auth"
+	"savvy-go/internal/bootstrap"
 	"savvy-go/internal/config"
 	"savvy-go/internal/refsync"
 	"savvy-go/internal/settings"
@@ -46,6 +51,42 @@ func prepare(ctx context.Context, cfg config.Config, st *sqlite.Store) (*signing
 		slog.Error("space unavailable", "space", id, "reason", why)
 	}
 	return keys, transfers, nil
+}
+
+// startBootstrap creates the first-run password when the server has no users
+// and prints it. It returns nil, which keeps registration closed, otherwise;
+// that includes a demo-seeded server. A password file left from an earlier run
+// is removed once users exist.
+func startBootstrap(ctx context.Context, cfg config.Config, st *sqlite.Store) (*bootstrap.Guard, error) {
+	n, err := (auth.Users{DB: st.Server()}).Count(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("count users: %w", err)
+	}
+	if n > 0 {
+		if err := os.Remove(filepath.Join(cfg.DataDir, bootstrap.FileName)); err != nil && !os.IsNotExist(err) {
+			slog.Warn("could not remove the stale bootstrap password file", "err", err)
+		}
+		return nil, nil
+	}
+	guard := bootstrap.New(cfg.DataDir, bootstrap.DetectEnv())
+	guard.Announce(openURL(cfg))
+	return guard, nil
+}
+
+// openURL is where the operator opens the app: the public URL when set,
+// otherwise the listen address on localhost.
+func openURL(cfg config.Config) string {
+	if u := cfg.URL(); u != "" {
+		return u
+	}
+	host, port, err := net.SplitHostPort(cfg.ListenAddr)
+	if err != nil {
+		return "http://localhost"
+	}
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		host = "localhost"
+	}
+	return "http://" + net.JoinHostPort(host, port)
 }
 
 // signingKeyUsedKey records the key id once the server has a key, so a key

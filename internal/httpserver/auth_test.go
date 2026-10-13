@@ -16,6 +16,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"savvy-go/internal/auth"
+	"savvy-go/internal/bootstrap"
 	"savvy-go/internal/config"
 	"savvy-go/internal/currencydata"
 	"savvy-go/internal/settings"
@@ -40,6 +41,8 @@ type testApp struct {
 	srv    *httptest.Server
 	s      *Server
 	client *http.Client
+
+	bootstrap *bootstrap.Guard // the first-run password of the server
 }
 
 // openTestStore opens a store in cfg.DataDir with the embedded migrations.
@@ -67,14 +70,15 @@ func newTestApp(t *testing.T) *testApp {
 	t.Helper()
 	cfg, _ := testConfig(t)
 	st := openTestStore(t, cfg)
-	s := New(cfg, st, testKeys(t, cfg), WithRates(currencydata.NewOffline()))
+	guard := bootstrap.New(cfg.DataDir, bootstrap.Binary)
+	s := New(cfg, st, testKeys(t, cfg), WithRates(currencydata.NewOffline()), WithBootstrap(guard))
 	space, err := s.spaces.Create(context.Background(), "Test", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ts := httptest.NewServer(s.Handler())
 	t.Cleanup(ts.Close)
-	return &testApp{t: t, db: st.SQL(), store: st, space: space, srv: ts, s: s, client: ts.Client()}
+	return &testApp{t: t, db: st.SQL(), store: st, space: space, srv: ts, s: s, client: ts.Client(), bootstrap: guard}
 }
 
 // spaceDB is the database of the shared test space.
@@ -138,6 +142,9 @@ func dataRoots(s *Server) map[string]bool {
 // apiPath sends data requests written as /api/<data> to the shared test
 // space, /api/spaces/{id}/<data>.
 func (a *testApp) apiPath(path string) string {
+	if a.space == nil {
+		return path
+	}
 	return spacedPath(a.s, a.space.ID, path)
 }
 
@@ -211,9 +218,7 @@ func cookieNamed(res *http.Response, name string) *http.Cookie {
 
 func TestSessionSmokeRegisterMeLogout(t *testing.T) {
 	a := newTestApp(t)
-	res := a.do("POST", "/api/auth/register", map[string]string{
-		"name": "A", "email": "a@a.com", "password": "secret1",
-	}, "", "")
+	res := a.register(a.bootstrap.Password(), nil)
 	if res.StatusCode != http.StatusCreated {
 		t.Fatalf("register %d %v", res.StatusCode, decodeJSON(t, res))
 	}
@@ -263,12 +268,13 @@ func TestSessionSmokeRegisterMeLogout(t *testing.T) {
 
 func TestHostPrefixedCookieOverTLS(t *testing.T) {
 	cfg, _ := testConfig(t)
-	s := New(cfg, openTestStore(t, cfg), testKeys(t, cfg))
+	guard := bootstrap.New(cfg.DataDir, bootstrap.Binary)
+	s := New(cfg, openTestStore(t, cfg), testKeys(t, cfg), WithBootstrap(guard))
 	ts := httptest.NewTLSServer(s.Handler())
 	t.Cleanup(ts.Close)
 	client := ts.Client()
 
-	raw, _ := json.Marshal(map[string]string{"name": "A", "email": "a@a.com", "password": "secret1"})
+	raw, _ := json.Marshal(map[string]string{"name": "A", "email": "a@a.com", "password": "secret1", "bootstrap_password": guard.Password()})
 	req, _ := http.NewRequest("POST", ts.URL+"/api/auth/register", bytes.NewReader(raw))
 	req.Header.Set("Content-Type", "application/json")
 	res, err := client.Do(req)

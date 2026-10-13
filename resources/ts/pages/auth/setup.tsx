@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import {
     Form,
     FormControl,
+    FormDescription,
     FormField,
     FormItem,
     FormLabel,
@@ -21,10 +22,12 @@ import { useAuthStore } from '@/stores/auth'
 import { LanguageSwitcher } from '@/components/shared'
 import { Logo } from '@/components/shared/Logo'
 import { authApi } from '@/api'
+import type { BootstrapHint } from '@/types'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { toast } from 'sonner'
 
 type SetupFormValues = {
+    bootstrap_password: string
     name: string
     email: string
     password: string
@@ -38,16 +41,19 @@ export default function SetupPage() {
     const register = useAuthStore((state) => state.register)
     const [isLoading, setIsLoading] = useState(false)
     const [checkingStatus, setCheckingStatus] = useState(true)
+    const [hint, setHint] = useState<BootstrapHint | null>(null)
 
     useEffect(() => {
         authApi.status().then((status) => {
             if (!status.needs_registration) {
                 navigate('/login', { replace: true })
             }
+            setHint(status.bootstrap_hint)
         }).finally(() => setCheckingStatus(false))
     }, [navigate])
 
     const setupSchema = useMemo(() => z.object({
+        bootstrap_password: z.string().min(1, t('setup.validation.bootstrapPassword')),
         name: z.string().min(1, t('setup.validation.name')),
         email: z.string().email(t('setup.validation.email')),
         password: z.string().min(6, t('setup.validation.passwordMin')),
@@ -60,6 +66,7 @@ export default function SetupPage() {
     const form = useForm<SetupFormValues>({
         resolver: zodResolver(setupSchema),
         defaultValues: {
+            bootstrap_password: '',
             name: '',
             email: '',
             password: '',
@@ -71,6 +78,7 @@ export default function SetupPage() {
         setIsLoading(true)
         try {
             await register({
+                bootstrap_password: data.bootstrap_password,
                 name: data.name,
                 email: data.email,
                 password: data.password,
@@ -114,6 +122,29 @@ export default function SetupPage() {
                 <CardContent>
                     <Form {...form}>
                         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                            <FormField
+                                control={form.control}
+                                name="bootstrap_password"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>{t('setup.bootstrapPassword')}</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX-XXXXX"
+                                                autoComplete="off"
+                                                autoCapitalize="characters"
+                                                spellCheck={false}
+                                                {...field}
+                                            />
+                                        </FormControl>
+                                        <FormDescription>
+                                            {t('setup.bootstrapHint', { file: hint?.file ?? '' })}
+                                        </FormDescription>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
                             <FormField
                                 control={form.control}
                                 name="name"
