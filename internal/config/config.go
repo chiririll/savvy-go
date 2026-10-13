@@ -63,15 +63,15 @@ type file struct {
 		CSRFHeader   string `toml:"csrf_header"`
 	} `toml:"security"`
 	Mailer struct {
-		Enabled    bool   `toml:"enabled" comment:"Send email (password reset links, invitations) through an SMTP server. Changes need a restart."`
-		Host       string `toml:"host" comment:"SMTP server, e.g. \"smtp.example.com\"."`
-		Port       int    `toml:"port" comment:"587 for starttls, 465 for smtps, 25 for smtp."`
-		Protocol   string `toml:"protocol" comment:"\"starttls\" (upgrade to TLS, required), \"smtps\" (TLS from the start) or \"smtp\" (no encryption; a trusted local relay only)."`
-		User       string `toml:"user" comment:"Leave empty when the server needs no login."`
-		Password   string `toml:"password" comment:"Stored in plain text: keep this file readable by the application only."`
-		From       string `toml:"from" comment:"Sender address, e.g. \"Go Savvy <savvy@example.com>\"."`
-		SkipVerify bool   `toml:"skip_verify" comment:"Accept any TLS certificate. Only for a server with a self-signed certificate."`
-		Timeout    int    `toml:"timeout" comment:"Seconds to wait for the server."`
+		Enabled    bool   `toml:"enabled"`
+		Host       string `toml:"host"`
+		Port       int    `toml:"port"`
+		Protocol   string `toml:"protocol" comment:"Supported: \"starttls\", \"smtps\" or \"smtp\""`
+		User       string `toml:"user"`
+		Password   string `toml:"password"`
+		From       string `toml:"from"`
+		SkipVerify bool   `toml:"skip_verify"`
+		Timeout    int    `toml:"timeout"`
 	} `toml:"mailer"`
 }
 
