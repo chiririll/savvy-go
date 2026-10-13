@@ -271,6 +271,7 @@
             "updateFailed": "Failed to update user",
             "deleteFailed": "Failed to delete user",
             "passwordLink": "Set-password link created",
+            "resetEmailSent": "Reset link sent to {{email}}",
             "passwordLinkFailed": "Failed to create set-password link"
         },
         "automation": {

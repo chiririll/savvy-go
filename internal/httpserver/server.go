@@ -18,6 +18,7 @@ import (
 	"savvy-go/internal/currencydata"
 	"savvy-go/internal/jobs"
 	"savvy-go/internal/ledger"
+	"savvy-go/internal/mailer"
 	"savvy-go/internal/refsync"
 	"savvy-go/internal/settings"
 	"savvy-go/internal/signing"
@@ -53,6 +54,7 @@ type Server struct {
 	twoFactor  auth.TwoFactor
 	webauthn   auth.WebAuthn
 	queue      *jobs.Queue
+	mail       mailer.Mailer
 	assets     fs.FS // the frontend: index.html, icons and build/
 }
 
@@ -92,6 +94,9 @@ func New(cfg config.Config, st store.Store, keys *signing.Holder, opts ...Option
 	}
 	if s.rates == nil {
 		s.rates = currencydata.New()
+	}
+	if s.mail == nil {
+		s.mail = mailer.New(cfg.Mail)
 	}
 	s.sso = sso.Service{DB: srv, Users: s.users, Settings: s.settings, ProvisionSpace: func(ctx context.Context, u *auth.User) error { _, err := s.spaces.Provision(ctx, u); return err }, AppURL: cfg.URL}
 	_ = os.MkdirAll(cfg.UploadsDir, 0o775)
@@ -245,6 +250,8 @@ func (s *Server) routes() *chi.Mux {
 				r.Use(s.requireAdmin)
 				r.Use(s.sessionOnly)
 				r.Patch("/settings", s.settingsUpdate)
+				r.Get("/admin/mail", s.mailIndex)
+				r.Post("/admin/mail/test", s.mailTest)
 				// P1: backups hold every space.
 				r.Get("/backups", s.backupsIndex)
 				r.Post("/backups", s.backupsStore)

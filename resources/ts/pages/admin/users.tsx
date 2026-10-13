@@ -2,7 +2,10 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ListPage } from '@/components/shared'
 import { createUserColumns, UserFormDialog, UserPasswordLinkDialog } from '@/components/features/users'
-import { useUsers, useDeleteUser, useCreateUser, useUpdateUser, useIssuePasswordToken, useResourceFormDialog } from '@/hooks'
+import {
+    useUsers, useDeleteUser, useCreateUser, useUpdateUser, useIssuePasswordToken, useResourceFormDialog,
+    useMailStatus, useSettings,
+} from '@/hooks'
 import { useUser as useCurrentUser } from '@/stores/auth'
 import { useReadOnly } from '@/components/providers/ReadOnlyProvider'
 import { User } from '@/types/users'
@@ -20,6 +23,8 @@ export default function UsersPage() {
     const createUser = useCreateUser()
     const updateUser = useUpdateUser()
     const issueToken = useIssuePasswordToken()
+    const { data: mail } = useMailStatus()
+    const { data: settings } = useSettings()
     const isReadOnly = useReadOnly()
 
     const [linkUrl, setLinkUrl] = useState<string | null>(null)
@@ -66,17 +71,22 @@ export default function UsersPage() {
     }
 
     const handleReset = (user: User) => {
-        issueToken.mutate(user.id, {
+        issueToken.mutate({ id: user.id }, {
             onSuccess: (result) => showLink(result.token),
         })
     }
+
+    // Emailing needs a working mail server, the public URL for the link, and password sign-in.
+    const canEmail = !!mail?.enabled && mail.appUrlSet && settings?.password_login_enabled !== false
+    const handleEmailReset = (user: User) => issueToken.mutate({ id: user.id, send: true })
 
     const columns = createUserColumns(
         (id) => deleteUser.mutate(id),
         form.openEdit,
         handleReset,
         currentUser?.id,
-        isReadOnly
+        isReadOnly,
+        canEmail ? handleEmailReset : undefined,
     )
 
     return (

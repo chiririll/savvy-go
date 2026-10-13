@@ -271,6 +271,7 @@
             "updateFailed": "Не удалось обновить пользователя",
             "deleteFailed": "Не удалось удалить пользователя",
             "passwordLink": "Ссылка для пароля создана",
+            "resetEmailSent": "Ссылка для сброса отправлена на {{email}}",
             "passwordLinkFailed": "Не удалось создать ссылку"
         },
         "automation": {

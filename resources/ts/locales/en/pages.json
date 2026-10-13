@@ -85,6 +85,7 @@
         "editTitle": "Edit User",
         "editDescription": "Update the user's name, email, role, or password.",
         "resetPassword": "Reset password",
+        "sendResetEmail": "Email a reset link",
         "inviteLinkTitle": "Set-password link",
         "inviteLinkDescription": "Copy this link and send it to the user. It is shown only once and expires in 7 days.",
         "columns": {

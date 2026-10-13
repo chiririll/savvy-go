@@ -15,6 +15,7 @@ go run ./cmd/savvy-go       # serves :8080, data in ./savvy-data
 Dependencies point down. Each package may import the ones above it in this list, never below.
 
 - `calendar`, `money`, `signing`, `db`, `store`: leaves.
+- `mailer`: leaf. Sends plain-text email over SMTP (`starttls` never downgrades to plain). Configured only by `[mailer]` in config.toml (`config.Config.Mail`), never the DB or admin panel; the admin panel shows it and sends a test. A bad section disables mail (`Config.MailProblem`), it does not stop startup. `httpserver` holds a `mailer.Mailer` (`WithMailer` in tests). Email is a convenience: invitations always return the link, a failed send never undoes them.
 - `currencydata`: the one place that talks to the currency data service (names, rates). One `Source` per server, shared by all spaces. Update rates are cached in a map by base currency (spaces with the same base share a request; the job calls `Expire` once per run); catalog look-ups fetch live and skip that cache. `ledger` only sees the `ledger.RateSource` interface. Tests use `currencydata.NewOffline()`.
 - `spaces`: registry, members, roles, invitations, quotas, audit log. Needs from outside go through small interfaces (`spaces.FinalBackuper`).
 - `ledger`: finance core of one space: accounts, transactions, categories, tags, currencies, budgets, debts. Knows nothing of the packages below.

@@ -214,9 +214,12 @@ function Invitations({ space }: { space: Space }) {
                     className="grid gap-2 sm:grid-cols-[2fr_1fr_auto]"
                     onSubmit={async (e) => {
                         e.preventDefault()
-                        const { token } = await invite.mutateAsync({ role, email: email.trim() || undefined })
+                        const to = email.trim()
+                        const { token, emailSent, emailError } = await invite.mutateAsync({ role, email: to || undefined })
                         setLink(`${window.location.origin}/invite/${token}`)
                         setEmail('')
+                        if (emailSent) toast.success(t('spaces.invitations.emailSent', { email: to }))
+                        else if (emailError) toast.error(t('spaces.invitations.emailFailed', { error: emailError }))
                     }}
                 >
                     <Input type="email" placeholder={t('spaces.invitations.emailPlaceholder')} value={email} onChange={(e) => setEmail(e.target.value)} />

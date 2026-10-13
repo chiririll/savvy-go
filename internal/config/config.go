@@ -3,16 +3,18 @@ package config
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io/fs"
 	"log/slog"
-	"sync"
-	"fmt"
 	"os"
 	"path/filepath"
-		"strings"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/pelletier/go-toml/v2"
+
+	"savvy-go/internal/mailer"
 )
 
 // Config is process-wide runtime configuration loaded from the environment.
@@ -32,6 +34,10 @@ type Config struct {
 	SessionCookie string
 	CSRFCookie    string
 	CSRFHeader    string
+	// Mail is the SMTP server from [mailer]; read-only at run time (changes need
+	// a restart). It is disabled when MailProblem is set.
+	Mail        mailer.Config
+	MailProblem string
 }
 
 // file mirrors config.toml: it is decoded over defaults() and encoded back, so
@@ -56,6 +62,17 @@ type file struct {
 		CSRFCookie   string `toml:"csrf_cookie"`
 		CSRFHeader   string `toml:"csrf_header"`
 	} `toml:"security"`
+	Mailer struct {
+		Enabled    bool   `toml:"enabled" comment:"Send email (password reset links, invitations) through an SMTP server. Changes need a restart."`
+		Host       string `toml:"host" comment:"SMTP server, e.g. \"smtp.example.com\"."`
+		Port       int    `toml:"port" comment:"587 for starttls, 465 for smtps, 25 for smtp."`
+		Protocol   string `toml:"protocol" comment:"\"starttls\" (upgrade to TLS, required), \"smtps\" (TLS from the start) or \"smtp\" (no encryption; a trusted local relay only)."`
+		User       string `toml:"user" comment:"Leave empty when the server needs no login."`
+		Password   string `toml:"password" comment:"Stored in plain text: keep this file readable by the application only."`
+		From       string `toml:"from" comment:"Sender address, e.g. \"Go Savvy <savvy@example.com>\"."`
+		SkipVerify bool   `toml:"skip_verify" comment:"Accept any TLS certificate. Only for a server with a self-signed certificate."`
+		Timeout    int    `toml:"timeout" comment:"Seconds to wait for the server."`
+	} `toml:"mailer"`
 }
 
 // defaults is the configuration of a new install.
@@ -69,6 +86,9 @@ func defaults() file {
 	f.Security.Cookie = "svy_session"
 	f.Security.CSRFCookie = "svy_csrf"
 	f.Security.CSRFHeader = "X-CSRF-Token"
+	f.Mailer.Port = 587
+	f.Mailer.Protocol = mailer.STARTTLS
+	f.Mailer.Timeout = 10
 	return f
 }
 
@@ -142,6 +162,9 @@ func Load(path string) (Config, error) {
 	cfg := f.resolve()
 	if cfg.AppURL == "" {
 		slog.Warn("the public URL is not set; SSO and passkeys stay disabled until app_url is set in the config file or the admin panel")
+	}
+	if cfg.MailProblem != "" {
+		slog.Warn("mail is disabled: invalid [mailer] section in the config file", "problem", cfg.MailProblem)
 	}
 	cfg.Live = &Live{path: path, f: f, appURL: cfg.AppURL}
 	return cfg, nil
@@ -220,6 +243,23 @@ func (f file) resolve() Config {
 		SessionCookie: firstNonEmpty(f.Security.Cookie, "svy_session"),
 		CSRFCookie:    firstNonEmpty(f.Security.CSRFCookie, "svy_csrf"),
 		CSRFHeader:    firstNonEmpty(f.Security.CSRFHeader, "X-CSRF-Token"),
+		Mail: mailer.Config{
+			Enabled:    f.Mailer.Enabled,
+			Host:       strings.TrimSpace(f.Mailer.Host),
+			Port:       f.Mailer.Port,
+			Protocol:   strings.ToLower(strings.TrimSpace(f.Mailer.Protocol)),
+			User:       f.Mailer.User,
+			Password:   f.Mailer.Password,
+			From:       strings.TrimSpace(f.Mailer.From),
+			SkipVerify: f.Mailer.SkipVerify,
+			Timeout:    seconds(f.Mailer.Timeout, 10),
+		},
+	}
+	// A mistake in [mailer] switches mail off instead of stopping the server;
+	// the admin panel shows the reason.
+	if err := cfg.Mail.Validate(); err != nil {
+		cfg.MailProblem = err.Error()
+		cfg.Mail.Enabled = false
 	}
 	return cfg
 }
@@ -248,6 +288,14 @@ func minutes(fromFile, fallback int) time.Duration {
 		return time.Duration(fromFile) * time.Minute
 	}
 	return time.Duration(fallback) * time.Minute
+}
+
+// seconds turns a timeout in seconds into a duration; non-positive values give fallback.
+func seconds(fromFile, fallback int) time.Duration {
+	if fromFile > 0 {
+		return time.Duration(fromFile) * time.Second
+	}
+	return time.Duration(fallback) * time.Second
 }
 
 // URL is the current public URL of the instance, empty when unset.

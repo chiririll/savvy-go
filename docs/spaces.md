@@ -22,7 +22,7 @@ A space always keeps one admin: the last admin cannot leave or be demoted while 
 
 ## Invitations
 
-Space admins invite people from **Settings → Space** with a link for a chosen role, optionally tied to an email. Existing users join directly; new users can register through the link if the server admin allows it.
+Space admins invite people from **Settings → Space** with a link for a chosen role, optionally tied to an email. Existing users join directly; new users can register through the link if the server admin allows it. When the server has [email](deployment.md#email) set up and the invitation has an address, the link is emailed too; it is always shown on screen as well.
 
 ## Linked spaces and transfers
 

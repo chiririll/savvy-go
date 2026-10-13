@@ -5,6 +5,7 @@ import { Account } from '@/types'
 import {
     AuditEntry,
     InvitationPreview,
+    InviteResult,
     LinkedSpace,
     SigningKeys,
     Space,
@@ -42,7 +43,7 @@ export const spacesApi = {
 
     invitations: (id: number) => api.get<SpaceInvitation[]>(`${base(id)}/invitations`),
     invite: (id: number, role: SpaceRole, email?: string) =>
-        api.post<{ token: string }, { role: SpaceRole; email?: string }>(`${base(id)}/invitations`, { role, email }),
+        api.post<InviteResult, { role: SpaceRole; email?: string }>(`${base(id)}/invitations`, { role, email }),
     revokeInvitation: (id: number, invitationId: number) => api.delete<void>(`${base(id)}/invitations/${invitationId}`),
 
     links: (id: number) => api.get<LinkedSpace[]>(`${base(id)}/links`),

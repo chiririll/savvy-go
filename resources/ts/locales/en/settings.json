@@ -31,8 +31,37 @@
             "title": "Server",
             "description": "How this instance is reached from outside.",
             "appUrl": "Public URL",
-            "appUrlDescription": "Full address users open Savvy at, for example https://savvy.example.com. Required for SSO and passkeys; leave empty to use the APP_URL environment variable.",
+            "appUrlDescription": "Full address users open Savvy at, for example https://savvy.example.com. Required for SSO and passkeys; can also be set as app_url in config.toml.",
             "appUrlPlaceholder": "https://savvy.example.com"
+        },
+        "mail": {
+            "title": "Email",
+            "description": "Sends password reset links and invitations.",
+            "configHint": "Mail is set up in the [mailer] section of config.toml. Restart the server after changing it.",
+            "status": "Status",
+            "working": "Working",
+            "off": "Not configured",
+            "problem": "Switched off: {{problem}}",
+            "server": "Server",
+            "protocols": {
+                "starttls": "STARTTLS",
+                "smtps": "SMTPS (TLS)",
+                "smtp": "No encryption"
+            },
+            "user": "Login",
+            "noUser": "None",
+            "from": "Sender",
+            "password": "Password",
+            "passwordSet": "Set",
+            "passwordNotSet": "Not set",
+            "certificate": "TLS certificate",
+            "verified": "Checked",
+            "unverified": "Not checked",
+            "noAppUrl": "The public URL is not set. Links in emails need it.",
+            "testTitle": "Send a test email",
+            "testPlaceholder": "Recipient (default: your email)",
+            "testSend": "Send",
+            "testSent": "Test email sent to {{to}}"
         },
         "spaces": {
             "title": "Spaces",
@@ -463,6 +492,8 @@
             "create": "Create link",
             "linkReady": "Send this link to the person you invite. It is shown only once.",
             "copied": "Link copied",
+            "emailSent": "Invitation emailed to {{email}}",
+            "emailFailed": "The email was not sent: {{error}} Send the link yourself.",
             "anyone": "Anyone with the link",
             "expires": "Expires {{date}}",
             "revoke": "Revoke"

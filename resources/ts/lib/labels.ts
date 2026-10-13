@@ -7,6 +7,7 @@ import type { BackupStatus } from '@/types/backup'
 import type { BudgetPeriod } from '@/types/budgets'
 import type { CategoryType } from '@/types/categories'
 import type { DebtType } from '@/types/debts'
+import type { MailProtocol } from '@/types/mail'
 import type { ImportStep } from '@/types/import'
 import type { RecurringFrequency } from '@/types/recurring'
 import type { SpaceRole, SyncKind, TransferReview } from '@/types/spaces'
@@ -264,6 +265,12 @@ export const userRoleLabel = (t: TFunction, role: UserRole): string => ({
     user: t('common:roles.user'),
     guest: t('common:roles.guest'),
 } satisfies Record<UserRole, string>)[role]
+
+export const mailProtocolLabel = (t: TFunction, protocol: MailProtocol): string => ({
+    starttls: t('settings:system.mail.protocols.starttls'),
+    smtps: t('settings:system.mail.protocols.smtps'),
+    smtp: t('settings:system.mail.protocols.smtp'),
+} satisfies Record<MailProtocol, string>)[protocol]
 
 export const spaceRoleLabel = (t: TFunction, role: SpaceRole): string => ({
     admin: t('settings:spaces.roles.admin'),

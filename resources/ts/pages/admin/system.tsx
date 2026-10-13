@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useSettings, useUpdateSettings, useSsoProviders } from '@/hooks'
+import { MailSection } from '@/components/features/mail'
 import { Settings } from '@/types'
 
 /** A number field saved on blur; empty means null when nullable. */
@@ -192,6 +193,8 @@ export default function AdminSystemPage() {
                             )}
                         </div>
                     </SettingsSection>
+
+                    <MailSection />
 
                     <SettingsSection icon={Boxes} title={t('system.spaces.title')} description={t('system.spaces.description')}>
                         <div className="divide-y rounded-lg border">

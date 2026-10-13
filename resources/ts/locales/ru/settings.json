@@ -31,8 +31,37 @@
             "title": "Сервер",
             "description": "По какому адресу этот инстанс доступен снаружи.",
             "appUrl": "Публичный адрес",
-            "appUrlDescription": "Полный адрес, по которому пользователи открывают Savvy, например https://savvy.example.com. Нужен для SSO и passkeys; если пусто, используется переменная окружения APP_URL.",
+            "appUrlDescription": "Полный адрес, по которому пользователи открывают Savvy, например https://savvy.example.com. Нужен для SSO и passkeys; также можно задать как app_url в config.toml.",
             "appUrlPlaceholder": "https://savvy.example.com"
+        },
+        "mail": {
+            "title": "Почта",
+            "description": "Отправляет ссылки для сброса пароля и приглашения.",
+            "configHint": "Почта настраивается в разделе [mailer] файла config.toml. После изменений перезапустите сервер.",
+            "status": "Состояние",
+            "working": "Работает",
+            "off": "Не настроена",
+            "problem": "Отключена: {{problem}}",
+            "server": "Сервер",
+            "protocols": {
+                "starttls": "STARTTLS",
+                "smtps": "SMTPS (TLS)",
+                "smtp": "Без шифрования"
+            },
+            "user": "Логин",
+            "noUser": "Нет",
+            "from": "Отправитель",
+            "password": "Пароль",
+            "passwordSet": "Задан",
+            "passwordNotSet": "Не задан",
+            "certificate": "TLS-сертификат",
+            "verified": "Проверяется",
+            "unverified": "Не проверяется",
+            "noAppUrl": "Публичный адрес не задан. Он нужен для ссылок в письмах.",
+            "testTitle": "Отправить тестовое письмо",
+            "testPlaceholder": "Получатель (по умолчанию ваша почта)",
+            "testSend": "Отправить",
+            "testSent": "Тестовое письмо отправлено на {{to}}"
         },
         "spaces": {
             "title": "Пространства",
@@ -463,6 +492,8 @@
             "create": "Создать ссылку",
             "linkReady": "Отправьте ссылку приглашённому. Она показывается один раз.",
             "copied": "Ссылка скопирована",
+            "emailSent": "Приглашение отправлено на {{email}}",
+            "emailFailed": "Письмо не отправлено: {{error}} Отправьте ссылку сами.",
             "anyone": "Любой со ссылкой",
             "expires": "Действует до {{date}}",
             "revoke": "Отозвать"

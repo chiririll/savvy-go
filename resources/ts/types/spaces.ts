@@ -32,6 +32,14 @@ export interface SpaceInvitation {
     createdAt: string | null
 }
 
+/** A new invitation. The link is always returned; the email is a convenience that may fail. */
+export interface InviteResult {
+    token: string
+    emailSent: boolean
+    /** Why the email was not sent; absent when mail is off or the invitation has no address. */
+    emailError?: string
+}
+
 export interface InvitationPreview {
     spaceName: string
     role: SpaceRole
