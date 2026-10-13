@@ -432,6 +432,7 @@
             "invitationRevoked": "Invitation revoked",
             "linked": "Spaces linked",
             "unlinked": "Spaces unlinked",
+            "syncApplied": "Sync group updated",
             "transferSent": "Transfer sent",
             "transferResolved": "Transfer updated",
             "transferDeleted": "Transfer deleted",
@@ -476,6 +477,45 @@
             "choose": "Space to link",
             "link": "Link",
             "howTo": "You can link spaces you administer. To link with someone else's space, ask them to invite you as an admin."
+        },
+        "sync": {
+            "title": "Shared categories and tags",
+            "description": "Spaces in a group keep their categories and tags identical: what is added, changed or deleted in one appears in the others.",
+            "none": "This space is not in a group. Pick the spaces to share with.",
+            "kinds": {
+                "categories": "Categories",
+                "tags": "Tags"
+            },
+            "types": {
+                "income": "income",
+                "expense": "expense"
+            },
+            "setup": "Set up…",
+            "choose": "Space to add",
+            "add": "Add",
+            "remove": "Remove from group",
+            "removeTitle": "Take {{name}} out of the group?",
+            "removeDescription": "Its categories and tags stay as they are but no longer follow the other spaces.",
+            "hidden": "{{count, plural(one: # more space you are not a member of; other: # more spaces you are not a member of)}}",
+            "rights": "Changing categories or tags needs the editor role in every space of the group.",
+            "howTo": "You can group spaces you administer. To share with someone else's space, ask them to invite you as an admin.",
+            "dialog": {
+                "title": "Make the spaces identical",
+                "description": "These differ between the spaces. Decide what stays; nothing changes until you apply.",
+                "loading": "Comparing the spaces…",
+                "identical": "The spaces are already identical.",
+                "presentIn": "In: {{spaces}}",
+                "missingIn": "missing in: {{spaces}}",
+                "keep": "Keep",
+                "keepAdd": "Keep and add where missing",
+                "drop": "Delete everywhere",
+                "dropTag": "Delete everywhere (transactions lose the tag)",
+                "look": "Use the icon and color from",
+                "successor": "Move its transactions to",
+                "successorPlaceholder": "Choose a category",
+                "defaultTitle": "Default {{type}} category",
+                "apply": "Apply"
+            }
         },
         "transfers": {
             "title": "Transfers needing attention",

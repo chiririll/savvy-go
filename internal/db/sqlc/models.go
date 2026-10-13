@@ -305,6 +305,18 @@ type SsoLoginTicket struct {
 	UpdatedAt      sql.NullString
 }
 
+type SyncGroup struct {
+	ID             int64
+	SyncCategories int64
+	SyncTags       int64
+	CreatedAt      sql.NullString
+}
+
+type SyncGroupSpace struct {
+	GroupID int64
+	SpaceID int64
+}
+
 type Tag struct {
 	ID        int64
 	Name      string

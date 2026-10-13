@@ -15,6 +15,10 @@ import {
     SpaceRole,
     SpaceTransfer,
     SpaceTransferInput,
+    SyncChange,
+    SyncDiff,
+    SyncGroup,
+    SyncPlan,
 } from '@/types/spaces'
 
 const base = (id: number) => `/spaces/${id}`
@@ -45,6 +49,9 @@ export const spacesApi = {
     link: (id: number, targetSpaceId: number) =>
         api.post<LinkedSpace[], { target_space_id: number }>(`${base(id)}/links`, { target_space_id: targetSpaceId }),
     unlink: (id: number, otherId: number) => api.delete<void>(`${base(id)}/links/${otherId}`),
+
+    /** The sync group of the space, null when it is in none. */
+    syncGroup: (id: number) => api.get<SyncGroup | null>(`${base(id)}/sync-group`),
 
     /** Accounts of any space the caller belongs to (for the other side of a transfer). */
     accounts: (id: number, params?: { active?: boolean; exclude_debts?: boolean }) =>
@@ -99,6 +106,11 @@ export const spacesApi = {
         })
         return res.data?.data ?? res.data
     },
+}
+
+export const syncGroupsApi = {
+    diff: (change: SyncChange) => api.post<SyncDiff, SyncChange>('/sync-groups/diff', change),
+    apply: (plan: SyncPlan) => api.post<{ id: number } | null, SyncPlan>('/sync-groups/apply', plan),
 }
 
 export const invitationsApi = {

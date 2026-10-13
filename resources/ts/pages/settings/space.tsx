@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { AlertTriangle, ArrowLeftRight, Boxes, Copy, History, Link2, LogOut, Mail, Trash2, Unlink, Users } from 'lucide-react'
 import { Page, PageHeader, SettingsSection } from '@/components/shared'
+import { SyncGroupSection } from '@/components/features/spaces/SyncGroupSection'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -469,6 +470,7 @@ export default function SpaceSettingsPage() {
                 <div className="space-y-6">
                     <TransfersNeedingAttention space={space} />
                     <Links space={space} isAdmin={isAdmin} />
+                    <SyncGroupSection space={space} isAdmin={isAdmin} />
                     {isAdmin && <Audit space={space} />}
                 </div>
             </div>

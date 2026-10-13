@@ -268,6 +268,22 @@ CREATE TABLE IF NOT EXISTS space_links (
 CREATE INDEX IF NOT EXISTS space_links_b_idx ON space_links (space_b_id);
 CREATE INDEX IF NOT EXISTS space_links_created_by_idx ON space_links (created_by);
 
+-- Spaces of a sync group keep their categories and/or tags identical: what
+-- one changes the others follow. Independent of space_links. A space is in at
+-- most one group; a group with fewer than two spaces does nothing.
+CREATE TABLE IF NOT EXISTS sync_groups (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sync_categories INTEGER NOT NULL DEFAULT 0 CHECK (sync_categories IN (0, 1)),
+    sync_tags INTEGER NOT NULL DEFAULT 0 CHECK (sync_tags IN (0, 1)),
+    created_at TEXT
+) STRICT;
+
+CREATE TABLE IF NOT EXISTS sync_group_spaces (
+    group_id INTEGER NOT NULL REFERENCES sync_groups(id) ON DELETE CASCADE,
+    space_id INTEGER NOT NULL UNIQUE REFERENCES spaces(id) ON DELETE CASCADE,
+    PRIMARY KEY (group_id, space_id)
+) STRICT;
+
 -- Public keys whose signatures this server accepts besides its own: the
 -- keys it used before a rotation and keys of servers spaces moved from.
 CREATE TABLE IF NOT EXISTS trusted_keys (

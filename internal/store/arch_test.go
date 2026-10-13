@@ -15,7 +15,7 @@ import (
 // packages below may use the store only through internal/store; only the
 // store's SQLite implementation (and the SQLite helpers it uses) know about
 // files, PRAGMAs and ATTACH.
-var businessPackages = []string{"ledger", "sso", "spaces", "transfers", "uploads", "currencydata", "automation", "recurring", "reports", "calendar", "backup", "importer", "legacy/restore", "httpserver", "auth", "settings", "seed", "signing", "schedule", "jobs"}
+var businessPackages = []string{"ledger", "sso", "spaces", "transfers", "refsync", "uploads", "currencydata", "automation", "recurring", "reports", "calendar", "backup", "importer", "legacy/restore", "httpserver", "auth", "settings", "seed", "signing", "schedule", "jobs"}
 
 var sqliteOnlyImports = []string{
 	"savvy-go/internal/store/sqlite",
@@ -109,6 +109,7 @@ var forbiddenImports = map[string][]string{
 	},
 	"spaces":     {"net/http", "savvy-go/internal/ledger", "savvy-go/internal/transfers", "savvy-go/internal/backup"},
 	"transfers":  {"net/http", "savvy-go/internal/ledger", "savvy-go/internal/backup"},
+	"refsync":    {"net/http", "savvy-go/internal/httpserver", "savvy-go/internal/backup", "savvy-go/internal/transfers"},
 	"reports":    {"net/http", "savvy-go/internal/recurring", "savvy-go/internal/automation"},
 	"recurring":  {"net/http", "savvy-go/internal/reports", "savvy-go/internal/automation"},
 	"automation": {"net/http", "savvy-go/internal/reports", "savvy-go/internal/recurring"},

@@ -32,6 +32,7 @@ When restoring:
 - Only known tables and columns are copied into a fresh database; anything extra in the file is dropped.
 - A space backup restores only over its own space; otherwise import it as a new space. Backups over the space quota are rejected.
 - Transfers with linked spaces that changed since the backup come back as pending, see [Spaces](spaces.md#linked-spaces-and-transfers).
+- A restored space in a sync group may no longer have the same categories and tags as the rest of the group; they are brought back together at the next server start, see [Spaces](spaces.md#shared-categories-and-tags).
 
 A database of the Laravel version is upgraded and only the upgraded version is kept as a backup, see [Upgrading from the Laravel version](#upgrading-from-the-laravel-version). A deleted space leaves a final backup in **Administration → Spaces**.
 

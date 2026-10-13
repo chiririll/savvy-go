@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"savvy-go/internal/config"
+	"savvy-go/internal/refsync"
 	"savvy-go/internal/settings"
 	"savvy-go/internal/signing"
 	"savvy-go/internal/spaces"
@@ -36,6 +37,10 @@ func prepare(ctx context.Context, cfg config.Config, st *sqlite.Store) (*signing
 	}
 	if err := transfers.SyncAll(ctx); err != nil {
 		slog.Warn("merge transfers between spaces", "err", err)
+	}
+	// Bring the spaces of sync groups back together if they drifted apart.
+	if err := (refsync.Service{Spaces: spaces.Service{Store: st}}).Heal(ctx); err != nil {
+		slog.Warn("heal sync groups", "err", err)
 	}
 	for id, why := range st.Status().Unavailable {
 		slog.Error("space unavailable", "space", id, "reason", why)

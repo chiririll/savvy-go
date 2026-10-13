@@ -14,7 +14,7 @@ var setTables = map[Set][]string{
 	Server: {
 		"users", "auth_sessions", "password_tokens", "two_factor_challenges", "webauthn_credentials",
 		"api_tokens", "settings", "uploads", "identity_providers", "spaces", "space_members",
-		"space_invitations", "space_links", "trusted_keys", "admin_audit",
+		"space_invitations", "space_links", "sync_groups", "sync_group_spaces", "trusted_keys", "admin_audit",
 	},
 	Space: {
 		"currencies", "accounts", "categories", "tags", "transactions", "transaction_items",

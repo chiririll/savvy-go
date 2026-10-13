@@ -11,6 +11,7 @@ import {
     useCreateCategory,
     useDeleteCategory,
     useSetDefaultCategory,
+    useSyncs,
     useUpdateCategory,
     useResourceFormDialog,
 } from '@/hooks'
@@ -29,6 +30,7 @@ export default function CategoriesPage() {
     const createCategory = useCreateCategory()
     const updateCategory = useUpdateCategory()
     const isReadOnly = useReadOnly()
+    const synced = useSyncs('categories')
     const items = categories ?? []
     const visibleItems = useMemo(
         () => items.filter((category) => category.type === type),
@@ -96,6 +98,7 @@ export default function CategoriesPage() {
                             onSetDefault={(id) => setDefaultCategory.mutate(id)}
                             isSettingDefault={setDefaultCategory.isPending}
                             isReadOnly={isReadOnly}
+                            synced={synced}
                             deleteDisabled={category.isDefault || typeCounts[category.type] <= 1}
                             deleteDisabledLabel={
                                 category.isDefault
