@@ -56,7 +56,9 @@
         "reassignTitle": "Delete category?",
         "reassignDescription": "\"{{name}}\" has {{count, plural(one: # transaction; other: # transactions)}}. Choose a category to move the transactions to before deleting.",
         "reassignPlaceholder": "Choose replacement category",
-        "reassignAndDelete": "Delete and reassign"
+        "reassignAndDelete": "Delete and reassign",
+        "syncedDeleteDescription": "\"{{name}}\" will be deleted in every space that shares its categories with this one. If one of them has transactions in it, choose a category to move them to.",
+        "syncedDeleteNote": "The same category takes over the transactions in the other spaces."
     },
     "tags": {
         "title": "Tags",
@@ -83,6 +85,7 @@
         "editTitle": "Edit User",
         "editDescription": "Update the user's name, email, role, or password.",
         "resetPassword": "Reset password",
+        "sendResetEmail": "Email a reset link",
         "inviteLinkTitle": "Set-password link",
         "inviteLinkDescription": "Copy this link and send it to the user. It is shown only once and expires in 7 days.",
         "columns": {

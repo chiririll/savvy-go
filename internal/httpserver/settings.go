@@ -21,6 +21,8 @@ func (s *Server) settingsIndex(w http.ResponseWriter, r *http.Request) {
 	}
 	// The public URL lives in the config file, not the database.
 	all["app_url"] = s.cfg.URL()
+	// False when the config file is read-only: the fields it holds are locked.
+	all["config_writable"] = s.cfg.Live.Writable()
 	writeJSON(w, http.StatusOK, all)
 }
 
@@ -44,8 +46,8 @@ func (s *Server) settingsUpdate(w http.ResponseWriter, r *http.Request) {
 			writeValidation(w, map[string][]string{"app_url": {"Enter a full URL such as https://savvy.example.com."}})
 			return
 		}
-		if s.cfg.Live == nil {
-			writeMessage(w, http.StatusInternalServerError, "The config file is not available.")
+		if !s.cfg.Live.Writable() {
+			writeValidation(w, map[string][]string{"app_url": {"The config file is read-only. Set app_url in config.toml."}})
 			return
 		}
 		if err := s.cfg.Live.SetAppURL(clean); err != nil {

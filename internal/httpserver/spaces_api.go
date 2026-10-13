@@ -222,7 +222,29 @@ func (s *Server) invitationsStore(w http.ResponseWriter, r *http.Request) {
 		writeSpaceError(w, err)
 		return
 	}
-	writeData(w, http.StatusCreated, map[string]any{"token": token})
+	out := map[string]any{"token": token, "emailSent": false}
+	// The link is always returned; the email is a convenience that may fail
+	// without undoing the invitation.
+	if body.Email != "" && s.mail.Enabled() {
+		if err := s.emailInvitation(r, body.Email, body.Role, token); err != nil {
+			out["emailError"] = err.Error()
+		} else {
+			out["emailSent"] = true
+		}
+	}
+	writeData(w, http.StatusCreated, out)
+}
+
+func (s *Server) emailInvitation(r *http.Request, to, role, token string) error {
+	base := s.cfg.URL()
+	if base == "" {
+		return errors.New(noAppURLMessage)
+	}
+	space, err := s.spaces.Get(r.Context(), sp(r).id)
+	if err != nil || space == nil {
+		return errors.New("could not read the space")
+	}
+	return s.sendMail(r.Context(), inviteMessage(to, userFrom(r).Name, space.Name, role, base+"/invite/"+token))
 }
 
 func (s *Server) invitationsDestroy(w http.ResponseWriter, r *http.Request) {

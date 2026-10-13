@@ -7,9 +7,10 @@ import type { BackupStatus } from '@/types/backup'
 import type { BudgetPeriod } from '@/types/budgets'
 import type { CategoryType } from '@/types/categories'
 import type { DebtType } from '@/types/debts'
+import type { MailProtocol } from '@/types/mail'
 import type { ImportStep } from '@/types/import'
 import type { RecurringFrequency } from '@/types/recurring'
-import type { SpaceRole, TransferReview } from '@/types/spaces'
+import type { SpaceRole, SyncKind, TransferReview } from '@/types/spaces'
 import type { TransactionType } from '@/types/transactions'
 import type { UserRole } from '@/types/users'
 
@@ -265,13 +266,29 @@ export const userRoleLabel = (t: TFunction, role: UserRole): string => ({
     guest: t('common:roles.guest'),
 } satisfies Record<UserRole, string>)[role]
 
+export const mailProtocolLabel = (t: TFunction, protocol: MailProtocol): string => ({
+    starttls: t('settings:system.mail.protocols.starttls'),
+    smtps: t('settings:system.mail.protocols.smtps'),
+    smtp: t('settings:system.mail.protocols.smtp'),
+} satisfies Record<MailProtocol, string>)[protocol]
+
 export const spaceRoleLabel = (t: TFunction, role: SpaceRole): string => ({
     admin: t('settings:spaces.roles.admin'),
     editor: t('settings:spaces.roles.editor'),
     viewer: t('settings:spaces.roles.viewer'),
 } satisfies Record<SpaceRole, string>)[role]
 
-export const transferReviewLabel = (t: TFunction, review: TransferReview): string => ({
+export const syncKindLabel = (t: TFunction, kind: SyncKind): string => ({
+    categories: t('settings:spaces.sync.kinds.categories'),
+    tags: t('settings:spaces.sync.kinds.tags'),
+} satisfies Record<SyncKind, string>)[kind]
+
+export const syncTypeLabel = (t: TFunction, type: CategoryType): string => ({
+    income: t('settings:spaces.sync.types.income'),
+    expense: t('settings:spaces.sync.types.expense'),
+} satisfies Record<CategoryType, string>)[type]
+
+export const transferReviewLabel =(t: TFunction, review: TransferReview): string => ({
     created_remote: t('settings:spaces.transfers.review.created_remote'),
     deleted_remote: t('settings:spaces.transfers.review.deleted_remote'),
     changed_remote: t('settings:spaces.transfers.review.changed_remote'),

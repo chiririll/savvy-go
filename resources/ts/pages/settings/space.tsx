@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { AlertTriangle, ArrowLeftRight, Boxes, Copy, History, Link2, LogOut, Mail, Trash2, Unlink, Users } from 'lucide-react'
 import { Page, PageHeader, SettingsSection } from '@/components/shared'
+import { SyncGroupSection } from '@/components/features/spaces/SyncGroupSection'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -213,9 +214,12 @@ function Invitations({ space }: { space: Space }) {
                     className="grid gap-2 sm:grid-cols-[2fr_1fr_auto]"
                     onSubmit={async (e) => {
                         e.preventDefault()
-                        const { token } = await invite.mutateAsync({ role, email: email.trim() || undefined })
+                        const to = email.trim()
+                        const { token, emailSent, emailError } = await invite.mutateAsync({ role, email: to || undefined })
                         setLink(`${window.location.origin}/invite/${token}`)
                         setEmail('')
+                        if (emailSent) toast.success(t('spaces.invitations.emailSent', { email: to }))
+                        else if (emailError) toast.error(t('spaces.invitations.emailFailed', { error: emailError }))
                     }}
                 >
                     <Input type="email" placeholder={t('spaces.invitations.emailPlaceholder')} value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -469,6 +473,7 @@ export default function SpaceSettingsPage() {
                 <div className="space-y-6">
                     <TransfersNeedingAttention space={space} />
                     <Links space={space} isAdmin={isAdmin} />
+                    <SyncGroupSection space={space} isAdmin={isAdmin} />
                     {isAdmin && <Audit space={space} />}
                 </div>
             </div>

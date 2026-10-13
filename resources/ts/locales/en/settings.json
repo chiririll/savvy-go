@@ -31,8 +31,38 @@
             "title": "Server",
             "description": "How this instance is reached from outside.",
             "appUrl": "Public URL",
-            "appUrlDescription": "Full address users open Savvy at, for example https://savvy.example.com. Required for SSO and passkeys; leave empty to use the APP_URL environment variable.",
-            "appUrlPlaceholder": "https://savvy.example.com"
+            "appUrlDescription": "Full address users open Savvy at, for example https://savvy.example.com. Required for SSO and passkeys; can also be set as app_url in config.toml.",
+            "appUrlPlaceholder": "https://savvy.example.com",
+            "configReadOnly": "config.toml is read-only for Savvy, so this cannot be changed here. Set app_url in the file and restart."
+        },
+        "mail": {
+            "title": "Email",
+            "description": "Sends password reset links and invitations.",
+            "configHint": "Mail is set up in the [mailer] section of config.toml. Restart the server after changing it.",
+            "status": "Status",
+            "working": "Working",
+            "off": "Not configured",
+            "problem": "Switched off: {{problem}}",
+            "server": "Server",
+            "protocols": {
+                "starttls": "STARTTLS",
+                "smtps": "SMTPS (TLS)",
+                "smtp": "No encryption"
+            },
+            "user": "Login",
+            "noUser": "None",
+            "from": "Sender",
+            "password": "Password",
+            "passwordSet": "Set",
+            "passwordNotSet": "Not set",
+            "certificate": "TLS certificate",
+            "verified": "Checked",
+            "unverified": "Not checked",
+            "noAppUrl": "The public URL is not set. Links in emails need it.",
+            "testTitle": "Send a test email",
+            "testPlaceholder": "Recipient (default: your email)",
+            "testSend": "Send",
+            "testSent": "Test email sent to {{to}}"
         },
         "spaces": {
             "title": "Spaces",
@@ -432,6 +462,7 @@
             "invitationRevoked": "Invitation revoked",
             "linked": "Spaces linked",
             "unlinked": "Spaces unlinked",
+            "syncApplied": "Sync group updated",
             "transferSent": "Transfer sent",
             "transferResolved": "Transfer updated",
             "transferDeleted": "Transfer deleted",
@@ -462,6 +493,8 @@
             "create": "Create link",
             "linkReady": "Send this link to the person you invite. It is shown only once.",
             "copied": "Link copied",
+            "emailSent": "Invitation emailed to {{email}}",
+            "emailFailed": "The email was not sent: {{error}} Send the link yourself.",
             "anyone": "Anyone with the link",
             "expires": "Expires {{date}}",
             "revoke": "Revoke"
@@ -476,6 +509,45 @@
             "choose": "Space to link",
             "link": "Link",
             "howTo": "You can link spaces you administer. To link with someone else's space, ask them to invite you as an admin."
+        },
+        "sync": {
+            "title": "Shared categories and tags",
+            "description": "Spaces in a group keep their categories and tags identical: what is added, changed or deleted in one appears in the others.",
+            "none": "This space is not in a group. Pick the spaces to share with.",
+            "kinds": {
+                "categories": "Categories",
+                "tags": "Tags"
+            },
+            "types": {
+                "income": "income",
+                "expense": "expense"
+            },
+            "setup": "Set up…",
+            "choose": "Space to add",
+            "add": "Add",
+            "remove": "Remove from group",
+            "removeTitle": "Take {{name}} out of the group?",
+            "removeDescription": "Its categories and tags stay as they are but no longer follow the other spaces.",
+            "hidden": "{{count, plural(one: # more space you are not a member of; other: # more spaces you are not a member of)}}",
+            "rights": "Changing categories or tags needs the editor role in every space of the group.",
+            "howTo": "You can group spaces you administer. To share with someone else's space, ask them to invite you as an admin.",
+            "dialog": {
+                "title": "Make the spaces identical",
+                "description": "These differ between the spaces. Decide what stays; nothing changes until you apply.",
+                "loading": "Comparing the spaces…",
+                "identical": "The spaces are already identical.",
+                "presentIn": "In: {{spaces}}",
+                "missingIn": "missing in: {{spaces}}",
+                "keep": "Keep",
+                "keepAdd": "Keep and add where missing",
+                "drop": "Delete everywhere",
+                "dropTag": "Delete everywhere (transactions lose the tag)",
+                "look": "Use the icon and color from",
+                "successor": "Move its transactions to",
+                "successorPlaceholder": "Choose a category",
+                "defaultTitle": "Default {{type}} category",
+                "apply": "Apply"
+            }
         },
         "transfers": {
             "title": "Transfers needing attention",

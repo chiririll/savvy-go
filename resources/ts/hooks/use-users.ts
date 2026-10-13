@@ -44,8 +44,9 @@ export function useDeleteUser() {
 
 export function useIssuePasswordToken() {
     return useResourceMutation({
-        mutationFn: (id: string | number) => usersApi.issuePasswordToken(id),
+        mutationFn: ({ id, send }: { id: string | number; send?: boolean }) => usersApi.issuePasswordToken(id, send),
         invalidateKeys: [QUERY_KEY],
-        successMessage: i18n.t('toasts.user.passwordLink'),
+        successMessage: (user, { send }) =>
+            send ? i18n.t('toasts.user.resetEmailSent', { email: user.email }) : i18n.t('toasts.user.passwordLink'),
     })
 }

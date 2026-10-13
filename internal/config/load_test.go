@@ -2,6 +2,7 @@ package config
 
 import (
 	"bytes"
+	"errors"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -136,6 +137,124 @@ func TestSetAppURLPersists(t *testing.T) {
 	again, _ := Load(path)
 	if again.AppURL != "https://b.example" {
 		t.Errorf("not persisted: %q", again.AppURL)
+	}
+}
+
+func TestWritableFlag(t *testing.T) {
+	path := write(t, "[server]\napp_url = \"https://a.example\"\n")
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.Live.Writable() {
+		t.Error("a normal file must be writable")
+	}
+
+	// A directory where the temp file goes makes every write fail, like a read-only mount.
+	path = write(t, "[server]\napp_url = \"https://a.example\"\n")
+	if err := os.Mkdir(path+".tmp", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err = Load(path)
+	if err != nil {
+		t.Fatalf("a read-only config must not stop the server: %v", err)
+	}
+	if cfg.Live.Writable() {
+		t.Error("write failed but the config is reported writable")
+	}
+	if err := cfg.Live.SetAppURL("https://b.example"); !errors.Is(err, ErrReadOnly) {
+		t.Errorf("SetAppURL on a read-only config: %v", err)
+	}
+	if cfg.URL() != "https://a.example" {
+		t.Errorf("url changed despite the failure: %q", cfg.URL())
+	}
+}
+
+func TestMailerDefaultsAreWrittenAndDisabled(t *testing.T) {
+	path := write(t, "")
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Mail.Enabled || cfg.MailProblem != "" {
+		t.Errorf("mail must be off without a config: %+v %q", cfg.Mail, cfg.MailProblem)
+	}
+	raw, _ := os.ReadFile(path)
+	for _, want := range []string{"[mailer]", "enabled = false", "protocol = 'starttls'", "port = 587", "timeout = 10"} {
+		if !strings.Contains(string(raw), want) {
+			t.Errorf("defaults lack %q:\n%s", want, raw)
+		}
+	}
+}
+
+func TestMailerLoadsAndSurvivesRewrite(t *testing.T) {
+	path := write(t, `
+[mailer]
+enabled = true
+host = "smtp.example.com"
+port = 465
+protocol = "smtps"
+user = "savvy"
+password = "s3cret"
+from = "Go Savvy <savvy@example.com>"
+skip_verify = true
+timeout = 3
+`)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := cfg.Mail
+	if !m.Enabled || m.Host != "smtp.example.com" || m.Port != 465 || m.Protocol != "smtps" ||
+		m.User != "savvy" || m.Password != "s3cret" || !m.SkipVerify || m.Timeout != 3*time.Second {
+		t.Errorf("mail config: %+v", m)
+	}
+	if cfg.MailProblem != "" {
+		t.Errorf("unexpected problem: %s", cfg.MailProblem)
+	}
+	// Saving another setting rewrites the file; the mail block must stay.
+	if err := cfg.Live.SetAppURL("https://b.example"); err != nil {
+		t.Fatal(err)
+	}
+	again, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again.Mail != m {
+		t.Errorf("mail config changed by a rewrite: %+v", again.Mail)
+	}
+}
+
+// A mistake in [mailer] must not stop the server: mail is switched off and the
+// reason is kept for the admin panel.
+func TestMailerProblemDisablesMailWithoutStoppingTheServer(t *testing.T) {
+	var logs bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
+	cfg, err := Load(write(t, "[mailer]\nenabled = true\nhost = \"\"\nfrom = \"savvy@example.com\"\n"))
+	if err != nil {
+		t.Fatalf("a bad mailer section stopped the server: %v", err)
+	}
+	if cfg.Mail.Enabled {
+		t.Error("mail stays enabled with an invalid config")
+	}
+	if !strings.Contains(cfg.MailProblem, "mailer.host") {
+		t.Errorf("problem not kept: %q", cfg.MailProblem)
+	}
+	if !strings.Contains(logs.String(), "mailer.host") {
+		t.Errorf("problem not logged: %s", logs.String())
+	}
+}
+
+func TestMailerTimeoutFallsBack(t *testing.T) {
+	cfg, err := Load(write(t, "[mailer]\nenabled = true\nhost = \"h\"\nfrom = \"a@example.com\"\ntimeout = 0\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Mail.Timeout != 10*time.Second {
+		t.Errorf("timeout %v", cfg.Mail.Timeout)
 	}
 }
 

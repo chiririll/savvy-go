@@ -1,9 +1,9 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import i18n from '@/lib/i18n'
-import { adminSpacesApi, spacesApi } from '@/api/spaces'
+import { adminSpacesApi, spacesApi, syncGroupsApi } from '@/api/spaces'
 import { useUser } from '@/stores/auth'
 import { useCurrentSpaceId, useSpaceStore } from '@/stores/space'
-import { LinkedSpace, SpaceRole, SpaceTransferInput } from '@/types/spaces'
+import { LinkedSpace, SpaceRole, SpaceTransferInput, SyncChange, SyncKind, SyncPlan } from '@/types/spaces'
 import { useResourceMutation } from './use-crud'
 
 export const SPACES_KEY = ['spaces']
@@ -180,6 +180,29 @@ export function useUnlinkSpace(id: number) {
         mutationFn: (otherId: number) => spacesApi.unlink(id, otherId),
         invalidateAll: true,
         successMessage: i18n.t('spaces.toasts.unlinked', { ns: 'settings' }),
+    })
+}
+
+export function useSyncGroup(id: number | null) {
+    return useQuery({ queryKey: spaceKey(id, 'sync-group'), queryFn: () => spacesApi.syncGroup(id!), enabled: id !== null })
+}
+
+/** Whether categories (or tags) of the current space are kept identical with other spaces. */
+export function useSyncs(kind: SyncKind): boolean {
+    const group = useSyncGroup(useCurrentSpaceId()).data
+    return !!group?.[kind]
+}
+
+/** What changing a sync group would have to reconcile; nothing is changed. */
+export function useSyncDiff() {
+    return useMutation({ mutationFn: (change: SyncChange) => syncGroupsApi.diff(change) })
+}
+
+export function useApplySync() {
+    return useResourceMutation({
+        mutationFn: (plan: SyncPlan) => syncGroupsApi.apply(plan),
+        invalidateAll: true,
+        successMessage: i18n.t('spaces.toasts.syncApplied', { ns: 'settings' }),
     })
 }
 

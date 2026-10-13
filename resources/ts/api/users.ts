@@ -6,6 +6,7 @@ import type { UserFormData } from '@/schemas'
 export const usersApi = {
     ...createCrudApi<User, UserFormData>('/users'),
 
-    issuePasswordToken: (id: number | string) =>
-        api.post<User>(`/users/${id}/password-token`),
+    /** Returns a one-time link as `token`; with `send` the server emails it instead. */
+    issuePasswordToken: (id: number | string, send = false) =>
+        api.post<User, { send?: boolean }>(`/users/${id}/password-token`, send ? { send: true } : {}),
 }

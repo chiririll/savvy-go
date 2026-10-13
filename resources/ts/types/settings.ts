@@ -14,4 +14,6 @@ export interface Settings {
     space_invites_can_register: boolean
     /** Public URL of the instance; empty falls back to APP_URL. */
     app_url: string
+    /** False when config.toml is read-only: app_url cannot be changed here. */
+    config_writable: boolean
 }

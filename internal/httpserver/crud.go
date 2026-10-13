@@ -15,6 +15,7 @@ import (
 	"savvy-go/internal/httpserver/dto"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/money"
+	"savvy-go/internal/refsync"
 	"savvy-go/internal/reports"
 )
 
@@ -414,9 +415,11 @@ func (s *Server) categoriesStore(w http.ResponseWriter, r *http.Request) {
 		writeValidation(w, map[string][]string{"name": {"The name field is required."}})
 		return
 	}
-	c, err := sp(r).categories.Create(r.Context(), body)
+	c, err := s.refsync.CreateCategory(r.Context(), userFrom(r), sp(r).id, body)
 	if err != nil {
-		writeMessage(w, 422, err.Error())
+		if !writeSyncError(w, err) {
+			writeMessage(w, 422, err.Error())
+		}
 		return
 	}
 	writeData(w, http.StatusCreated, dto.NewCategory(*c))
@@ -440,9 +443,15 @@ func (s *Server) categoriesUpdate(w http.ResponseWriter, r *http.Request) {
 		writeValidation(w, map[string][]string{"name": {"The given data was invalid."}})
 		return
 	}
-	c, err := sp(r).categories.Update(r.Context(), cur.ID, body)
+	c, err := s.refsync.UpdateCategory(r.Context(), userFrom(r), sp(r).id, cur.ID, body)
 	if err != nil {
-		writeMessage(w, 422, err.Error())
+		if !writeSyncError(w, err) {
+			writeMessage(w, 422, err.Error())
+		}
+		return
+	}
+	if c == nil {
+		writeMessage(w, http.StatusNotFound, "Not found.")
 		return
 	}
 	writeData(w, http.StatusOK, dto.NewCategory(*c))
@@ -462,22 +471,32 @@ func (s *Server) categoriesDestroy(w http.ResponseWriter, r *http.Request) {
 		}
 		successorID = &id
 	}
-	if err := sp(r).categories.Delete(r.Context(), c.ID, successorID); err != nil {
-		switch err.Error() {
-		case "default":
-			writeMessage(w, 422, "Cannot delete the default category. Set another category as default first.")
-		case "has transactions":
-			writeMessage(w, 422, "Cannot delete category that has transactions.")
-		case "invalid successor":
-			writeMessage(w, 422, "The selected replacement category is invalid.")
-		case "last":
-			writeMessage(w, 422, "Cannot delete the last category of this type.")
+	if err := s.refsync.DeleteCategory(r.Context(), userFrom(r), sp(r).id, c.ID, successorID); err != nil {
+		var mirror *refsync.MirrorError
+		switch {
+		case errors.As(err, &mirror): // it failed in another space of the group
+			writeMessage(w, 422, "In "+mirror.Name+": "+categoryDeleteMessage(mirror.Err))
+		case writeSyncError(w, err):
 		default:
-			writeMessage(w, 422, err.Error())
+			writeMessage(w, 422, categoryDeleteMessage(err))
 		}
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func categoryDeleteMessage(err error) string {
+	switch err.Error() {
+	case "default":
+		return "Cannot delete the default category. Set another category as default first."
+	case "has transactions":
+		return "Cannot delete category that has transactions."
+	case "invalid successor":
+		return "The selected replacement category is invalid."
+	case "last":
+		return "Cannot delete the last category of this type."
+	}
+	return err.Error()
 }
 
 func (s *Server) categoriesSetDefault(w http.ResponseWriter, r *http.Request) {
@@ -485,9 +504,15 @@ func (s *Server) categoriesSetDefault(w http.ResponseWriter, r *http.Request) {
 	if c == nil {
 		return
 	}
-	updated, err := sp(r).categories.SetDefault(r.Context(), c.ID)
+	updated, err := s.refsync.SetDefaultCategory(r.Context(), userFrom(r), sp(r).id, c.ID)
 	if err != nil {
-		writeMessage(w, 422, err.Error())
+		if !writeSyncError(w, err) {
+			writeMessage(w, 422, err.Error())
+		}
+		return
+	}
+	if updated == nil {
+		writeMessage(w, http.StatusNotFound, "Not found.")
 		return
 	}
 	writeData(w, http.StatusOK, dto.NewCategory(*updated))
@@ -547,9 +572,11 @@ func (s *Server) tagsStore(w http.ResponseWriter, r *http.Request) {
 		writeValidation(w, map[string][]string{"name": {"The name field is required."}})
 		return
 	}
-	t, err := sp(r).tags.Create(r.Context(), body.Name)
+	t, err := s.refsync.CreateTag(r.Context(), userFrom(r), sp(r).id, body.Name)
 	if err != nil {
-		writeValidation(w, map[string][]string{"name": {"The name has already been taken."}})
+		if !writeSyncError(w, err) {
+			writeValidation(w, map[string][]string{"name": {"The name has already been taken."}})
+		}
 		return
 	}
 	writeData(w, http.StatusCreated, dto.NewTag(*t))
@@ -575,9 +602,15 @@ func (s *Server) tagsUpdate(w http.ResponseWriter, r *http.Request) {
 		writeValidation(w, map[string][]string{"name": {"The name field is required."}})
 		return
 	}
-	t, err := sp(r).tags.Update(r.Context(), cur.ID, body.Name)
+	t, err := s.refsync.RenameTag(r.Context(), userFrom(r), sp(r).id, cur.ID, body.Name)
 	if err != nil {
-		writeMessage(w, 422, err.Error())
+		if !writeSyncError(w, err) {
+			writeMessage(w, 422, err.Error())
+		}
+		return
+	}
+	if t == nil {
+		writeMessage(w, http.StatusNotFound, "Not found.")
 		return
 	}
 	writeData(w, http.StatusOK, dto.NewTag(*t))
@@ -588,7 +621,11 @@ func (s *Server) tagsDestroy(w http.ResponseWriter, r *http.Request) {
 	if t == nil {
 		return
 	}
-	_ = sp(r).tags.Delete(r.Context(), t.ID)
+	// A failure on the plain path was never reported; one that comes from the
+	// sync group (rights, another space) is.
+	if err := s.refsync.DeleteTag(r.Context(), userFrom(r), sp(r).id, t.ID); err != nil && writeSyncError(w, err) {
+		return
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 

@@ -32,6 +32,14 @@ export interface SpaceInvitation {
     createdAt: string | null
 }
 
+/** A new invitation. The link is always returned; the email is a convenience that may fail. */
+export interface InviteResult {
+    token: string
+    emailSent: boolean
+    /** Why the email was not sent; absent when mail is off or the invitation has no address. */
+    emailError?: string
+}
+
 export interface InvitationPreview {
     spaceName: string
     role: SpaceRole
@@ -51,6 +59,79 @@ export interface TransferSide {
     currency: string
     /** Only for members of the space this side belongs to. */
     accountId?: number
+}
+
+export const SYNC_KINDS = ['categories', 'tags'] as const
+export type SyncKind = (typeof SYNC_KINDS)[number]
+
+/** The sync group of a space: spaces that keep their categories and/or tags identical. */
+export interface SyncGroup {
+    id: number
+    categories: boolean
+    tags: boolean
+    /** The group's spaces the caller belongs to. */
+    members: (LinkedSpace & { role: SpaceRole })[]
+    /** Spaces of the group the caller does not belong to. */
+    hidden: number
+}
+
+export interface SyncCategoryState {
+    spaceId: number
+    icon: string | null
+    color: string | null
+    isDefault: boolean
+    transactions: number
+}
+
+export interface SyncCategoryConflict {
+    type: 'income' | 'expense'
+    name: string
+    present: SyncCategoryState[]
+    missing: number[]
+}
+
+export interface SyncTagConflict {
+    name: string
+    present: { spaceId: number; transactions: number }[]
+    missing: number[]
+}
+
+export interface SyncDefaultConflict {
+    type: 'income' | 'expense'
+    defaults: { spaceId: number; name: string }[]
+}
+
+/** What makes the spaces of a group differ, for the caller to decide. */
+export interface SyncDiff {
+    categories: SyncCategoryConflict[]
+    tags: SyncTagConflict[]
+    defaults: SyncDefaultConflict[]
+    spaces: LinkedSpace[]
+}
+
+/** A change of a group; `categories` and `tags` are what it keeps identical afterwards. */
+export interface SyncChange {
+    group_id?: number
+    add_space_ids?: number[]
+    remove_space_ids?: number[]
+    categories: boolean
+    tags: boolean
+}
+
+export interface SyncDecision {
+    kind: SyncKind
+    type?: string
+    name: string
+    keep: boolean
+    /** The space whose icon and color win. */
+    from_space_id?: number
+    /** Name of the category that takes the transactions of a deleted one. */
+    successor?: string
+}
+
+export interface SyncPlan extends SyncChange {
+    decisions: SyncDecision[]
+    defaults: { type: string; name: string }[]
 }
 
 export const TRANSFER_REVIEWS = ['created_remote', 'deleted_remote', 'changed_remote', 'missing_remote'] as const

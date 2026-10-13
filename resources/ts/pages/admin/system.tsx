@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useSettings, useUpdateSettings, useSsoProviders } from '@/hooks'
+import { MailSection } from '@/components/features/mail'
 import { Settings } from '@/types'
 
 /** A number field saved on blur; empty means null when nullable. */
@@ -57,6 +58,7 @@ function TextRow({
     description,
     placeholder,
     value,
+    readOnly,
     onSave,
 }: {
     id: string
@@ -64,6 +66,7 @@ function TextRow({
     description: string
     placeholder?: string
     value: string
+    readOnly?: boolean
     onSave: (value: string) => void
 }) {
     const { t } = useTranslation('settings')
@@ -78,8 +81,8 @@ function TextRow({
                 <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
             </div>
             <div className="flex items-center gap-2">
-                <Input id={id} type="url" className="w-full sm:w-72" placeholder={placeholder} value={draft} onChange={(e) => setDraft(e.target.value)} />
-                {changed && (
+                <Input id={id} type="url" className="w-full sm:w-72" placeholder={placeholder} value={draft} readOnly={readOnly} onChange={(e) => setDraft(e.target.value)} />
+                {changed && !readOnly && (
                     <Button size="sm" onClick={() => onSave(draft.trim())}>
                         {t('actions.save', { ns: 'common' })}
                     </Button>
@@ -184,7 +187,12 @@ export default function AdminSystemPage() {
                                 <TextRow
                                     id="app-url"
                                     label={t('system.server.appUrl')}
-                                    description={t('system.server.appUrlDescription')}
+                                    description={
+                                        settings.config_writable === false
+                                            ? t('system.server.configReadOnly')
+                                            : t('system.server.appUrlDescription')
+                                    }
+                                    readOnly={settings.config_writable === false}
                                     placeholder={t('system.server.appUrlPlaceholder')}
                                     value={settings.app_url ?? ''}
                                     onSave={(v) => save({ app_url: v })}
@@ -192,6 +200,8 @@ export default function AdminSystemPage() {
                             )}
                         </div>
                     </SettingsSection>
+
+                    <MailSection />
 
                     <SettingsSection icon={Boxes} title={t('system.spaces.title')} description={t('system.spaces.description')}>
                         <div className="divide-y rounded-lg border">

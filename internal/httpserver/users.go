@@ -2,6 +2,8 @@ package httpserver
 
 import (
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -170,14 +172,46 @@ func (s *Server) usersIssueToken(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusUnprocessableEntity, "This user signs in with SSO and has no password.")
 		return
 	}
+	// The body is optional: {"send": true} emails the link instead of returning it.
+	var body struct {
+		Send bool `json:"send"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil && !errors.Is(err, io.EOF) {
+		writeValidation(w, map[string][]string{"body": {"The given data was invalid."}})
+		return
+	}
+	if body.Send {
+		switch {
+		case !s.mail.Enabled():
+			writeMessage(w, http.StatusUnprocessableEntity, s.mailOffReason())
+			return
+		case s.passwordLoginDisabled(r):
+			writeMessage(w, http.StatusUnprocessableEntity, "Password sign-in is switched off, so a reset link is of no use.")
+			return
+		case s.cfg.URL() == "":
+			writeMessage(w, http.StatusUnprocessableEntity, noAppURLMessage)
+			return
+		}
+	}
 	tok, exp, err := s.tokens.Issue(r.Context(), u)
 	if err != nil {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	payload := u.ResourceJSON()
-	payload["token"] = tok
 	payload["expiresAt"] = exp.UTC().Format("2006-01-02T15:04:05.000000Z")
+	if !body.Send {
+		payload["token"] = tok
+		writeData(w, http.StatusOK, payload)
+		return
+	}
+	if err := s.sendMail(r.Context(), resetMessage(u, s.cfg.URL()+"/set-password/"+tok, exp)); err != nil {
+		// The link was never seen by anyone: do not leave it valid.
+		_ = s.tokens.RevokeActive(r.Context(), u.ID)
+		writeMessage(w, http.StatusUnprocessableEntity, "Could not send the email: "+err.Error())
+		return
+	}
+	payload["emailSent"] = true
 	writeData(w, http.StatusOK, payload)
 }
 

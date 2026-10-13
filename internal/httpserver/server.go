@@ -18,6 +18,8 @@ import (
 	"savvy-go/internal/currencydata"
 	"savvy-go/internal/jobs"
 	"savvy-go/internal/ledger"
+	"savvy-go/internal/mailer"
+	"savvy-go/internal/refsync"
 	"savvy-go/internal/settings"
 	"savvy-go/internal/signing"
 	"savvy-go/internal/spaces"
@@ -44,6 +46,7 @@ type Server struct {
 	spaces     spaces.Service
 	backups    backup.Service
 	transfers  *transfers.Service
+	refsync    refsync.Service
 	keys       *signing.Holder
 	uploads    uploads.Service
 	rates      ledger.RateSource // currency catalog and exchange rates, shared by every space
@@ -51,6 +54,7 @@ type Server struct {
 	twoFactor  auth.TwoFactor
 	webauthn   auth.WebAuthn
 	queue      *jobs.Queue
+	mail       mailer.Mailer
 	assets     fs.FS // the frontend: index.html, icons and build/
 }
 
@@ -83,12 +87,16 @@ func New(cfg config.Config, st store.Store, keys *signing.Holder, opts ...Option
 	keyRing := signing.KeyRing{Holder: keys, Trusted: transfers.TrustedKeys(srv)}
 	s.keys = keys
 	s.transfers = &transfers.Service{Spaces: s.spaces, Keys: keyRing}
+	s.refsync = refsync.Service{Spaces: s.spaces}
 	s.backups = backup.Service{Store: st, Keys: keyRing, Dir: cfg.BackupsDir, DataDir: cfg.DataDir, Transfers: s.transfers}
 	for _, opt := range opts {
 		opt(s)
 	}
 	if s.rates == nil {
 		s.rates = currencydata.New()
+	}
+	if s.mail == nil {
+		s.mail = mailer.New(cfg.Mail)
 	}
 	s.sso = sso.Service{DB: srv, Users: s.users, Settings: s.settings, ProvisionSpace: func(ctx context.Context, u *auth.User) error { _, err := s.spaces.Provision(ctx, u); return err }, AppURL: cfg.URL}
 	_ = os.MkdirAll(cfg.UploadsDir, 0o775)
@@ -163,12 +171,16 @@ func (s *Server) routes() *chi.Mux {
 			r.With(s.sessionOnly).Post("/spaces", s.spacesStore)
 			r.With(s.sessionOnly).Post("/spaces/import", s.spacesImport)
 			r.With(s.sessionOnly).Post("/invitations/{token}/accept", s.invitationAccept)
+			// Sync groups span several spaces; the rights are checked in each.
+			r.With(s.sessionOnly).Post("/sync-groups/diff", s.syncGroupDiff)
+			r.With(s.sessionOnly).Post("/sync-groups/apply", s.syncGroupApply)
 			r.Route("/spaces/{space}", func(r chi.Router) {
 				r.Use(s.withSpace)
 				r.Get("/", s.spaceShow)
 				r.Get("/members", s.membersIndex)
 				r.Get("/settings", s.spaceSettingsIndex)
 				r.Get("/links", s.linksIndex)
+				r.Get("/sync-group", s.syncGroupShow)
 				r.Get("/transfers", s.transfersIndex)
 				r.With(s.sessionOnly).Post("/leave", s.spaceLeave)
 
@@ -238,6 +250,8 @@ func (s *Server) routes() *chi.Mux {
 				r.Use(s.requireAdmin)
 				r.Use(s.sessionOnly)
 				r.Patch("/settings", s.settingsUpdate)
+				r.Get("/admin/mail", s.mailIndex)
+				r.Post("/admin/mail/test", s.mailTest)
 				// P1: backups hold every space.
 				r.Get("/backups", s.backupsIndex)
 				r.Post("/backups", s.backupsStore)

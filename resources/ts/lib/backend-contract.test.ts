@@ -9,6 +9,7 @@ import { BACKUP_STATUSES } from '@/types/backup'
 import { BUDGET_PERIODS } from '@/types/budgets'
 import { CATEGORY_TYPES } from '@/types/categories'
 import { DEBT_TYPE_VALUES } from '@/types/debts'
+import { MAIL_PROTOCOLS } from '@/types/mail'
 import { RECURRING_FREQUENCIES } from '@/types/recurring'
 import { SPACE_ROLES, TRANSFER_REVIEWS } from '@/types/spaces'
 import { ALL_TRANSACTION_TYPES, TRANSACTION_STATUSES } from '@/types/transactions'
@@ -107,6 +108,7 @@ describe('frontend value lists', () => {
         ACTION_TYPES,
         BACKUP_STATUSES,
         SSO_ERROR_CODES,
+        MAIL_PROTOCOLS,
     }
 
     it.each(Object.entries(lists))('%s has no duplicates', (_, values) => {
@@ -123,6 +125,14 @@ describe('automation', () => {
     it('knows every action the backend executes', () => {
         const body = goFunc('internal/automation/automation.go', 'func (s Service) executeActions(')
         expect(sorted(ACTION_TYPES)).toEqual(sorted(quoted(body.match(/case [^\n]*:/g)!.join('\n'))))
+    })
+})
+
+describe('mail protocols', () => {
+    it('are the ones the mailer accepts', () => {
+        const source = read('internal/mailer/mailer.go')
+        const fromGo = [...source.matchAll(/^	[A-Za-z]+\s+= "([a-z]+)"\s+\/\//gm)].map((m) => m[1])
+        expect(sorted(MAIL_PROTOCOLS)).toEqual(sorted(fromGo))
     })
 })
 

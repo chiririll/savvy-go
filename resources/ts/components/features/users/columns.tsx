@@ -1,5 +1,5 @@
 import { ColumnDef } from '@tanstack/react-table'
-import { KeyRound } from 'lucide-react'
+import { KeyRound, Mail } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { RowActions, UserAvatar } from '@/components/shared'
@@ -12,7 +12,9 @@ export const createUserColumns = (
     onEdit: (user: User) => void,
     onResetPassword: (user: User) => void,
     currentUserId?: number,
-    isReadOnly?: boolean
+    isReadOnly?: boolean,
+    /** Given when the server can send mail: adds "email a reset link". */
+    onEmailReset?: (user: User) => void,
 ): ColumnDef<User>[] => [
     {
         accessorKey: 'name',
@@ -63,6 +65,12 @@ export const createUserColumns = (
                     deleteDisabledLabel={i18n.t('actions.cannotDeleteSelf')}
                     isReadOnly={isReadOnly}
                 >
+                    {canReset && onEmailReset && (
+                        <DropdownMenuItem onClick={() => onEmailReset(row.original)}>
+                            <Mail className="mr-2 size-4" />
+                            {i18n.t('pages:users.sendResetEmail')}
+                        </DropdownMenuItem>
+                    )}
                     {canReset && (
                         <DropdownMenuItem onClick={() => onResetPassword(row.original)}>
                             <KeyRound className="mr-2 size-4" />

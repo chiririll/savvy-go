@@ -36,10 +36,44 @@ Keys, with their defaults, are listed in the generated file itself:
 | `[server]`   | `listen` (`:80` in the image, `localhost:8080` otherwise), `app_url`, `timezone`                  |
 | `[paths]`    | `data`, `uploads`, `backups`                                                                      |
 | `[security]` | `session_ttl`, `remember_ttl`, `challenge_ttl`, `session_cookie`, `csrf_cookie`, `csrf_header` |
+| `[mailer]`   | `enabled`, `host`, `port`, `protocol`, `user`, `password`, `from`, `skip_verify`, `timeout`       |
 
-`app_url` is the public `https://` URL of your instance. SSO and passkeys stay disabled without it. It can also be changed in the admin panel (System → Server), which writes it back to the file. Behind Docker, set it there, or edit `/data/config.toml` once.
+`app_url` is the public `https://` URL of your instance. SSO and passkeys stay disabled without it. It can also be changed in the admin panel (System → Server), which writes it back to the file. If Go Savvy cannot write the file (a read-only mount), the field is locked in the panel and you edit the file yourself. Behind Docker, set it there, or edit `/data/config.toml` once.
 
 Limits such as spaces per user, space quotas and the number of kept backups are not in the file: server admins set them in **Administration → System**.
+
+### Email
+
+Without a mail server everything works; reset and invitation links are shown to copy and send yourself. With one, Go Savvy can email them. Set it up in the `[mailer]` section and restart; there is no way to change it from the admin panel.
+
+```toml
+[mailer]
+enabled = true
+host = "smtp.example.com"
+port = 587
+protocol = "starttls"
+user = "savvy@example.com"
+password = "app-password"
+from = "Go Savvy <savvy@example.com>"
+```
+
+| `protocol`           | Port | Connection                                                                           |
+|----------------------|------|--------------------------------------------------------------------------------------|
+| `starttls` (default) | 587  | Starts plain and upgrades to TLS. Never falls back to plain text if the server cannot. |
+| `smtps`              | 465  | TLS from the first byte.                                                             |
+| `smtp`               | 25   | No encryption. Only for a trusted relay on the same host or network.                 |
+
+- The TLS certificate is checked. `skip_verify = true` accepts any certificate, for a server with a self-signed one.
+- `user` and `password` are optional (leave `user` empty for a relay without login). The password is stored in plain text in `config.toml`, so keep the file readable by the application only. The admin panel never shows it.
+- `timeout` is how many seconds to wait for the server (default 10).
+- A mistake in the section does not stop the server: mail is switched off, the log says why, and **Administration → System → Email** shows the problem.
+
+That page shows the current settings and has a **Send test email** button. When mail works and `app_url` is set:
+
+- **Administration → Users → Email a reset link** sends a user a one-time password link (valid 7 days). It is not offered for yourself, for SSO-only users, or when password sign-in is off. **Reset password** still shows a link to copy.
+- Inviting someone by email from **Settings → Space** also emails the invitation link. The link is always shown too, in case the email fails.
+
+Any space admin can make the server email an address by creating an invitation. There is no rate limit yet; keep that in mind on a server open to untrusted space admins.
 
 ## Behind a reverse proxy
 

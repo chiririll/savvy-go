@@ -4,6 +4,8 @@ go 1.26.0
 
 require (
 	github.com/beevik/etree v1.8.0
+	github.com/emersion/go-sasl v0.0.0-20241020182733-b788ff22d5a6
+	github.com/emersion/go-smtp v0.25.0
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/go-webauthn/webauthn v0.18.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
@@ -12,6 +14,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/russellhaering/goxmldsig v1.6.1
 	github.com/shopspring/decimal v1.4.0
+	github.com/wneessen/go-mail v0.8.1
 	golang.org/x/crypto v0.57.0
 	golang.org/x/sys v0.48.0
 	modernc.org/sqlite v1.40.1
@@ -31,6 +34,7 @@ require (
 	github.com/tinylib/msgp v1.6.4 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b // indirect
+	golang.org/x/text v0.42.0 // indirect
 	modernc.org/libc v1.66.10 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
