@@ -387,6 +387,11 @@ paths:
     get:
       tags: [Other]
       summary: Read instance settings
+      description: >-
+        Besides the stored settings it returns `app_url` (from config.toml) and
+        `config_writable`, false when config.toml is read-only and `app_url`
+        cannot be changed. `onboarding_server_done` is true once the admin has
+        finished or skipped the server setup.
       responses:
         "200": {$ref: "#/components/responses/Data"}
         "401": {$ref: "#/components/responses/Unauthenticated"}

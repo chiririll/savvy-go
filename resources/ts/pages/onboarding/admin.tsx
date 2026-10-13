@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -16,6 +16,7 @@ import { OnboardingLayout } from '@/components/features/onboarding/OnboardingLay
 import { authApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { getApiErrorMessage } from '@/lib/api-error'
+import { pages } from '@/app/pages'
 import type { ApiError } from '@/types'
 
 type AdminSetupValues = {
@@ -25,8 +26,8 @@ type AdminSetupValues = {
     password_confirmation: string
 }
 
-// Until server setup (task 04) exists, the new admin goes on to 2FA as before.
-const NEXT_PATH = '/setup-2fa'
+// The new admin goes on to the server setup, then 2FA.
+const NEXT_PATH = pages.serverSetup.path
 
 /** Flow 1: the bootstrap password, then the first admin. */
 export default function AdminSetupPage() {
@@ -42,8 +43,11 @@ export default function AdminSetupPage() {
 
     const { data: status } = useQuery({ queryKey: ['auth', 'status'], queryFn: authApi.status, retry: false })
 
+    // Registering is what makes needs_registration false: that must not send the new admin to the login page.
+    const registered = useRef(false)
+
     useEffect(() => {
-        if (status && !status.needs_registration) {
+        if (status && !status.needs_registration && !registered.current) {
             navigate('/login', { replace: true })
         }
     }, [status, navigate])
@@ -95,6 +99,7 @@ export default function AdminSetupPage() {
                 email: data.email,
                 password: data.password,
             })
+            registered.current = true
             // AuthProvider caches the status forever; drop the stale needs_registration=true.
             await queryClient.invalidateQueries({ queryKey: ['auth', 'status'] })
             toast.success(t('setup.created'))
@@ -129,7 +134,19 @@ export default function AdminSetupPage() {
             description={step === 'bootstrap' ? t('setup.description') : t('setup.adminDescription')}
         >
             <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <form
+                    onSubmit={(e) => {
+                        // Enter in the password field submits the form: on the first screen that means "next",
+                        // not validating admin fields the user has not seen yet.
+                        if (step === 'bootstrap') {
+                            e.preventDefault()
+                            void goToAdmin()
+                            return
+                        }
+                        void form.handleSubmit(onSubmit)(e)
+                    }}
+                    className="space-y-4"
+                >
                     {step === 'bootstrap' ? (
                         <>
                             {hint && <BootstrapInstructions hint={hint} />}

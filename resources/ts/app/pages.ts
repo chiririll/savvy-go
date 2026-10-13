@@ -20,6 +20,7 @@ export interface Page {
 export const pages = {
     login: { path: '/login', scope: 'public' },
     setup: { path: '/setup', scope: 'public' },
+    serverSetup: { path: '/setup/server', scope: 'admin' },
     setup2fa: { path: '/setup-2fa', scope: 'public' },
     ssoCallback: { path: '/auth/sso/callback', scope: 'public' },
     setPassword: { path: '/set-password/:token', scope: 'public' },

@@ -6,10 +6,12 @@ import i18n from '@/lib/i18n'
 
 const QUERY_KEY = ['settings']
 
-export function useSettings() {
+/** Pass `enabled` false while there is nothing to ask yet (no session). */
+export function useSettings(enabled = true) {
     return useQuery({
         queryKey: QUERY_KEY,
         queryFn: settingsApi.get,
+        enabled,
     })
 }
 

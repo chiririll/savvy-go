@@ -9,6 +9,7 @@ import { childPath, pages } from './pages'
 // Auth pages
 const LoginPage = lazy(() => import('@/pages/auth/login'))
 const SetupPage = lazy(() => import('@/pages/onboarding/admin'))
+const ServerSetupPage = lazy(() => import('@/pages/onboarding/server'))
 const Setup2FAPage = lazy(() => import('@/pages/auth/setup-2fa'))
 const SsoCallbackPage = lazy(() => import('@/pages/auth/sso-callback'))
 const SetPasswordPage = lazy(() => import('@/pages/auth/set-password'))
@@ -89,6 +90,12 @@ export const router = createBrowserRouter([
     {
         path: pages.setup.path,
         element: withSuspense(SetupPage),
+    },
+    {
+        // Outside AuthProvider: an admin without a space must not land on the no-space screen.
+        // Several screens: /setup/server, /setup/server/more, /mail, /sso.
+        path: `${pages.serverSetup.path}/*`,
+        element: withSuspense(ServerSetupPage),
     },
     {
         path: pages.setup2fa.path,

@@ -5,6 +5,7 @@ import { useAuthStore, useAuthLoading, useIsAuthenticated, useSessionExpired } f
 import { authApi } from '@/api'
 import { Loader2 } from 'lucide-react'
 import { SessionExpiredDialog } from './SessionExpiredDialog'
+import { ServerSetupGate } from './ServerSetupGate'
 import { SpaceGate } from './SpaceGate'
 
 const FOCUS_DEBOUNCE_MS = 1000
@@ -105,9 +106,11 @@ export function AuthProvider() {
 
     return (
         <>
-            <SpaceGate>
-                <Outlet />
-            </SpaceGate>
+            <ServerSetupGate>
+                <SpaceGate>
+                    <Outlet />
+                </SpaceGate>
+            </ServerSetupGate>
             <SessionExpiredDialog />
         </>
     )

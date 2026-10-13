@@ -3,6 +3,7 @@ package httpserver
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -130,6 +131,10 @@ func (s *Server) authRegister(w http.ResponseWriter, r *http.Request) {
 	case err != nil:
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 	default:
+		// The admin is taken through server setup, also after a reload or on another device.
+		if err := s.settings.Set(r.Context(), "onboarding_server_done", false); err != nil {
+			slog.Warn("mark server setup pending", "err", err)
+		}
 		s.issueSession(w, r, u, 201, true)
 	}
 }

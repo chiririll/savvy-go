@@ -30,7 +30,7 @@ function renderPage(queryClient = new QueryClient()) {
                 <MemoryRouter initialEntries={['/setup']}>
                     <Routes>
                         <Route path="/setup" element={<AdminSetupPage />} />
-                        <Route path="/setup-2fa" element={<div>next</div>} />
+                        <Route path="/setup/server" element={<div>next</div>} />
                         <Route path="/login" element={<div>login</div>} />
                     </Routes>
                 </MemoryRouter>
@@ -94,6 +94,18 @@ describe('admin setup', () => {
         expect(screen.queryByLabelText('setup.name')).toBeNull()
     })
 
+    it('Enter on the first screen goes on and does not validate the admin fields', async () => {
+        renderPage()
+        await screen.findByLabelText('setup.bootstrapPassword')
+        type('setup.bootstrapPassword', 'RIGHT')
+        fireEvent.submit(screen.getByLabelText('setup.bootstrapPassword').closest('form')!)
+        await screen.findByLabelText('setup.name')
+        expect(verifyBootstrap).toHaveBeenCalledWith('RIGHT')
+        expect(screen.queryByText('setup.validation.name')).toBeNull()
+        expect(screen.queryByText('setup.validation.email')).toBeNull()
+        expect(screen.queryByText('setup.validation.passwordMin')).toBeNull()
+    })
+
     it('checks the password before asking for the admin', async () => {
         verifyBootstrap.mockRejectedValue({
             message: 'x',
@@ -136,6 +148,20 @@ describe('admin setup', () => {
             password: 'secret1',
         })
         expect(invalidate).toHaveBeenCalledWith({ queryKey: ['auth', 'status'] })
+    })
+
+    it('does not bounce to the login page once the status says registration is over', async () => {
+        // The first admin exists now: the refreshed status no longer asks for registration.
+        register.mockImplementation(async () => {
+            status.mockResolvedValue({ needs_registration: false, bootstrap_hint: null })
+        })
+        renderPage()
+        await toAdminScreen('RIGHT')
+        fillAdmin()
+        await screen.findByText('next')
+        await new Promise((resolve) => setTimeout(resolve, 50))
+        expect(screen.getByText('next')).toBeTruthy()
+        expect(screen.queryByText('login')).toBeNull()
     })
 
     it('goes to the login page when the server already has users', async () => {

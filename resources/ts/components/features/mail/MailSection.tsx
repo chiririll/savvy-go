@@ -10,9 +10,9 @@ import { mailProtocolLabel } from '@/lib/labels'
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
     return (
-        <div className="flex items-start justify-between gap-4 px-4 py-3">
+        <div className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
             <span className="text-sm font-medium">{label}</span>
-            <span className="min-w-0 break-words text-right text-sm text-muted-foreground">{children}</span>
+            <span className="min-w-0 break-words text-sm text-muted-foreground sm:text-right">{children}</span>
         </div>
     )
 }
