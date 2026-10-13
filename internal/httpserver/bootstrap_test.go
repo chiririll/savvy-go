@@ -155,3 +155,28 @@ func TestStatusHintFollowsTheEnvironment(t *testing.T) {
 		}
 	}
 }
+
+func (a *testApp) verifyBootstrap(password string) *http.Response {
+	return a.do("POST", "/api/auth/bootstrap/verify", map[string]string{"bootstrap_password": password}, "", "")
+}
+
+func TestVerifyBootstrapPassword(t *testing.T) {
+	a := newTestApp(t)
+	fieldErrors(t, a.verifyBootstrap(""), "bootstrap_password")
+	fieldErrors(t, a.verifyBootstrap("AAAAA-AAAAA-AAAAA-AAAAA-AAAAA-AAAAA"), "bootstrap_password")
+	status(t, a.verifyBootstrap(a.bootstrap.Password()), http.StatusNoContent, "right password")
+
+	var n int
+	_ = a.db.QueryRow(`SELECT COUNT(*) FROM users`).Scan(&n)
+	if n != 0 || !a.bootstrap.Active() {
+		t.Fatalf("verify must create nothing and keep the password (users=%d)", n)
+	}
+	status(t, a.register(a.bootstrap.Password(), nil), http.StatusCreated, "register after verify")
+}
+
+func TestVerifyBootstrapIsClosedWhenUsersExist(t *testing.T) {
+	a := newTestApp(t)
+	pass := a.bootstrap.Password()
+	a.createUser("someone@test.com", "secret1", "user")
+	status(t, a.verifyBootstrap(pass), http.StatusForbidden, "users present")
+}

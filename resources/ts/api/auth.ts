@@ -26,6 +26,11 @@ export const authApi = {
         return response.data
     },
 
+    /** Checks the first-run password without using it up; rejects when it is wrong. */
+    verifyBootstrap: async (bootstrapPassword: string): Promise<void> => {
+        await apiClient.post('/auth/bootstrap/verify', { bootstrap_password: bootstrapPassword })
+    },
+
     register: async (data: RegisterData): Promise<AuthResponse> => {
         const response = await apiClient.post('/auth/register', data)
         return response.data

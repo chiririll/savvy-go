@@ -219,3 +219,32 @@ func TestDetectEnv(t *testing.T) {
 		}
 	}
 }
+
+func TestVerifyChecksWithoutSpendingThePassword(t *testing.T) {
+	g := New(t.TempDir(), Binary)
+	for _, candidate := range []string{"", "nope", g.Password() + "A"} {
+		if err := g.Verify(candidate); !errors.Is(err, ErrWrongPassword) {
+			t.Errorf("Verify(%q) = %v, want ErrWrongPassword", candidate, err)
+		}
+	}
+	typed := " " + strings.ToLower(g.Password()) + " "
+	if err := g.Verify(typed); err != nil {
+		t.Fatalf("right password refused: %v", err)
+	}
+	if !g.Active() {
+		t.Fatal("Verify must not invalidate")
+	}
+}
+
+func TestVerifyIsClosedWithoutAPassword(t *testing.T) {
+	var nilGuard *Guard
+	if err := nilGuard.Verify("x"); !errors.Is(err, ErrClosed) {
+		t.Errorf("nil guard: %v, want ErrClosed", err)
+	}
+	g := New(t.TempDir(), Binary)
+	pass := g.Password()
+	g.Invalidate()
+	if err := g.Verify(pass); !errors.Is(err, ErrClosed) {
+		t.Errorf("invalidated guard: %v, want ErrClosed", err)
+	}
+}

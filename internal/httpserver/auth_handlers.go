@@ -44,6 +44,29 @@ func (s *Server) authStatus(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// bootstrapVerify tells the setup page whether the bootstrap password is right,
+// without using it up; register still checks it again.
+func (s *Server) bootstrapVerify(w http.ResponseWriter, r *http.Request) {
+	n, err := s.users.Count(r.Context())
+	if err != nil {
+		writeMessage(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if n > 0 || !s.bootstrap.Active() {
+		writeMessage(w, http.StatusForbidden, "Registration is closed.")
+		return
+	}
+	var body struct {
+		BootstrapPassword string `json:"bootstrap_password"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	if s.bootstrap.Verify(body.BootstrapPassword) != nil {
+		writeValidation(w, map[string][]string{"bootstrap_password": {"The bootstrap password is missing or wrong."}})
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // authRegister creates the first admin. Registration is never open: it needs
 // the bootstrap password, and only while the server has no users.
 func (s *Server) authRegister(w http.ResponseWriter, r *http.Request) {

@@ -134,6 +134,23 @@ func (g *Guard) Register(candidate string, create func() error) error {
 	return nil
 }
 
+// Verify checks the password without using it up, so the setup page can
+// refuse a wrong one before asking for the admin's details.
+func (g *Guard) Verify(candidate string) error {
+	if g == nil {
+		return ErrClosed
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	switch {
+	case g.password == "":
+		return ErrClosed
+	case !secureCompare(g.password, candidate):
+		return ErrWrongPassword
+	}
+	return nil
+}
+
 // Invalidate closes the guard and removes the file. Call it when the first
 // user comes into being by another route, such as a restore.
 func (g *Guard) Invalidate() {

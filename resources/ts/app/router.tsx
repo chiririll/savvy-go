@@ -8,7 +8,7 @@ import { childPath, pages } from './pages'
 
 // Auth pages
 const LoginPage = lazy(() => import('@/pages/auth/login'))
-const SetupPage = lazy(() => import('@/pages/auth/setup'))
+const SetupPage = lazy(() => import('@/pages/onboarding/admin'))
 const Setup2FAPage = lazy(() => import('@/pages/auth/setup-2fa'))
 const SsoCallbackPage = lazy(() => import('@/pages/auth/sso-callback'))
 const SetPasswordPage = lazy(() => import('@/pages/auth/set-password'))
