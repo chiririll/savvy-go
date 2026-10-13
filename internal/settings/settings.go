@@ -2,13 +2,11 @@ package settings
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"strconv"
 	"strings"
 
-	"savvy-go/internal/db"
-	"savvy-go/internal/db/sqlc"
+	repo "savvy-go/internal/db/repo/settings"
 	"savvy-go/internal/store"
 )
 
@@ -58,17 +56,11 @@ func (s Store) defaults() map[string]any {
 	return serverDefaults
 }
 
-func (s Store) get(ctx context.Context, key string) (sql.NullString, error) {
-	if s.Space {
-		return db.Q(s.DB).GetSpaceSetting(ctx, key)
-	}
-	return db.Q(s.DB).GetSetting(ctx, key)
-}
+func (s Store) repo() repo.Repo { return repo.Repo{DB: s.DB, Space: s.Space} }
 
 func (s Store) Get(ctx context.Context, key string, fallback any) any {
-	var raw sql.NullString
-	raw, err := s.get(ctx, key)
-	if err != nil || !raw.Valid {
+	raw, ok, err := s.repo().Get(ctx, key)
+	if err != nil || !ok {
 		if fallback != nil {
 			return fallback
 		}
@@ -77,7 +69,7 @@ func (s Store) Get(ctx context.Context, key string, fallback any) any {
 		}
 		return nil
 	}
-	return decode(raw.String)
+	return decode(raw)
 }
 
 func (s Store) Bool(ctx context.Context, key string, fallback bool) bool {
@@ -101,10 +93,7 @@ func (s Store) Set(ctx context.Context, key string, value any) error {
 	if err != nil {
 		return err
 	}
-	if s.Space {
-		return db.Q(s.DB).UpsertSpaceSetting(ctx, sqlc.UpsertSpaceSettingParams{Key: key, Value: db.NS(string(raw))})
-	}
-	return db.Q(s.DB).UpsertSetting(ctx, sqlc.UpsertSettingParams{Key: key, Value: db.NS(string(raw))})
+	return s.repo().Set(ctx, key, string(raw))
 }
 
 func (s Store) All(ctx context.Context) (map[string]any, error) {
@@ -113,36 +102,16 @@ func (s Store) All(ctx context.Context) (map[string]any, error) {
 	for k, v := range defaults {
 		out[k] = v
 	}
-	type kv struct {
-		key   string
-		value sql.NullString
+	stored, err := s.repo().All(ctx)
+	if err != nil {
+		return nil, err
 	}
-	var rows []kv
-	if s.Space {
-		list, err := db.Q(s.DB).ListSpaceSettings(ctx)
-		if err != nil {
-			return nil, err
-		}
-		for _, r := range list {
-			rows = append(rows, kv{r.Key, r.Value})
-		}
-	} else {
-		list, err := db.Q(s.DB).ListSettings(ctx)
-		if err != nil {
-			return nil, err
-		}
-		for _, r := range list {
-			rows = append(rows, kv{r.Key, r.Value})
-		}
-	}
-	for _, r := range rows {
+	for key, raw := range stored {
 		// Only known keys: internal markers (legacy_*, space_uuid) stay private.
-		if _, known := defaults[r.key]; !known || strings.HasPrefix(r.key, "legacy_") {
+		if _, known := defaults[key]; !known || strings.HasPrefix(key, "legacy_") {
 			continue
 		}
-		if r.value.Valid {
-			out[r.key] = decode(r.value.String)
-		}
+		out[key] = decode(raw)
 	}
 	return out, nil
 }

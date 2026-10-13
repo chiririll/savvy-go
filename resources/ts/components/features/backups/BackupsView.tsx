@@ -52,8 +52,9 @@ export interface BackupSource {
     restore: (filename: string) => Promise<unknown>
     remove: (filename: string) => Promise<unknown>
     /**
-     * A Laravel database cannot be kept as a backup: it is converted and restored at
-     * once, so the upload dialog asks what to restore it as.
+     * A Laravel database is not kept as it is: for the server or this space only the
+     * upgraded version is saved as a backup, to be restored like any other. A new
+     * space is created at once. The upload dialog asks which.
      */
     laravel?: {
         targets: LaravelTarget[]
@@ -92,7 +93,8 @@ export function BackupsView({ source, title, description, actions }: BackupsView
         mutationFn: ({ file, target, appKey }: { file: File; target: LaravelTarget; appKey?: string }) =>
             source.laravel!.restore(file, target, appKey),
         invalidateAll: true,
-        successMessage: i18n.t('toasts.backup.restored'),
+        successMessage: (_, { target }) =>
+            target === 'new' ? i18n.t('toasts.backup.restored') : i18n.t('toasts.backup.upgraded'),
     })
     const deleteBackup = useResourceMutation({
         mutationFn: (filename: string) => source.remove(filename),
@@ -330,7 +332,6 @@ export function BackupsView({ source, title, description, actions }: BackupsView
                             {tCommon('actions.cancel')}
                         </Button>
                         <Button
-                            variant={laravelUpload && target !== 'new' ? 'destructive' : 'default'}
                             onClick={handleUpload}
                             disabled={!uploadFile || uploadBackup.isPending || restoreLaravel.isPending}
                         >

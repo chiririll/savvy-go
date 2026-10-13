@@ -1,7 +1,6 @@
 package money_test
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"math"
@@ -192,16 +191,10 @@ func TestMaximumIsAnExactIntegerForJavaScript(t *testing.T) {
 }
 
 func TestNullVariants(t *testing.T) {
-	if money.FromNullMinor(sql.NullInt64{}, usd) != nil {
-		t.Fatal("null should map to nil")
-	}
 	d := dec("1.25")
 	m := money.FromNullDecimal(&d, usd)
-	if n := money.ToNullMinor(m); !n.Valid || n.Int64 != 125 {
-		t.Fatalf("got %+v", n)
-	}
-	if money.ToNullMinor(nil).Valid {
-		t.Fatal("nil should map to invalid")
+	if m == nil || m.Minor() != 125 {
+		t.Fatalf("got %+v", m)
 	}
 	if money.FromNullDecimal(nil, usd) != nil {
 		t.Fatal("nil should stay nil")

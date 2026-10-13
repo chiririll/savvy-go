@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"time"
 
-	"savvy-go/internal/db"
+	"savvy-go/internal/importer"
 	"savvy-go/internal/version"
 )
 
@@ -32,19 +32,7 @@ func (s *Server) monitoringStorage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	type bucketRow struct {
-		Bucket string
-		Status string
-		Count  int
-		Bytes  int64
-	}
-	rows, err := db.Q(s.store.Server()).UploadUsageByBucket(r.Context())
-	var usage []bucketRow
-	if err == nil {
-		for _, row := range rows {
-			usage = append(usage, bucketRow{row.Bucket, row.Status, int(row.Count), coalesceInt64(row.Coalesce)})
-		}
-	}
+	usage, _ := s.uploads.UsageByBucket(r.Context())
 
 	type bucketAgg struct {
 		bytes   int64
@@ -91,11 +79,13 @@ func (s *Server) monitoringStorage(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			continue
 		}
-		if irows, err := db.Q(d).ImportCountsByStatus(r.Context()); err == nil {
-			for _, row := range irows {
-				importBy[row.Status] += int(row.Count)
-				importTotal += int(row.Count)
-			}
+		counts, err := importer.Service{DB: d}.CountsByStatus(r.Context())
+		if err != nil {
+			continue
+		}
+		for status, n := range counts {
+			importBy[status] += n
+			importTotal += n
 		}
 	}
 
@@ -127,19 +117,6 @@ func (s *Server) monitoringResources(w http.ResponseWriter, r *http.Request) {
 			"environment": version.Env, "uptime_seconds": int(time.Since(processStarted).Seconds()),
 		},
 	})
-}
-
-func coalesceInt64(v any) int64 {
-	switch t := v.(type) {
-	case int64:
-		return t
-	case int:
-		return int64(t)
-	case float64:
-		return int64(t)
-	default:
-		return 0
-	}
 }
 
 func volumeSpace(path string) (total, free int64, ok bool) {

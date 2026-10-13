@@ -20,7 +20,7 @@ export default function SystemBackupsPage() {
         laravel: {
             targets: ['server', 'new'],
             restore: async (file, target, appKey) => {
-                if (target === 'server') return backupsApi.restoreLaravel(file, appKey)
+                if (target === 'server') return backupsApi.upgradeLaravel(file, appKey)
                 await switchSpace((await spacesApi.importSpace(file)).id)
             },
         },

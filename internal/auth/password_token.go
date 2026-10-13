@@ -2,11 +2,9 @@ package auth
 
 import (
 	"context"
-	"database/sql"
 	"time"
 
-	"savvy-go/internal/db"
-	"savvy-go/internal/db/sqlc"
+	repo "savvy-go/internal/db/repo/auth"
 	"savvy-go/internal/store"
 )
 
@@ -23,6 +21,8 @@ type PasswordTokens struct {
 	DB store.DB
 }
 
+func (p PasswordTokens) repo() repo.Repo { return repo.Repo{DB: p.DB} }
+
 func (p PasswordTokens) Issue(ctx context.Context, user *User) (token string, expires time.Time, err error) {
 	if err = p.RevokeActive(ctx, user.ID); err != nil {
 		return "", time.Time{}, err
@@ -30,64 +30,36 @@ func (p PasswordTokens) Issue(ctx context.Context, user *User) (token string, ex
 	token = RandomString(64)
 	now := time.Now().UTC()
 	expires = now.Add(passwordTokenTTL)
-	err = db.Q(p.DB).InsertPasswordToken(ctx, sqlc.InsertPasswordTokenParams{
-		UserID: user.ID, TokenHash: HashToken(token), ExpiresAt: fmtTime(expires),
-		CreatedAt: db.NS(fmtTime(now)), UpdatedAt: db.NS(fmtTime(now)),
-	})
+	err = p.repo().InsertPasswordToken(ctx, user.ID, HashToken(token), expires, now)
 	return token, expires, err
 }
 
 func (p PasswordTokens) Preview(ctx context.Context, token string) (*PasswordToken, error) {
-	return p.findValid(ctx, token)
+	row, err := p.repo().ValidPasswordToken(ctx, HashToken(token), time.Now().UTC())
+	return p.withUser(ctx, row, err)
 }
 
 func (p PasswordTokens) Consume(ctx context.Context, token string) (*PasswordToken, error) {
-	now := fmtTime(time.Now().UTC())
-	res, err := db.Q(p.DB).ConsumePasswordToken(ctx, sqlc.ConsumePasswordTokenParams{
-		ConsumedAt: db.NS(now), UpdatedAt: db.NS(now), TokenHash: HashToken(token), ExpiresAt: now,
-	})
-	if err != nil {
+	hash := HashToken(token)
+	ok, err := p.repo().ConsumePasswordToken(ctx, hash, time.Now().UTC())
+	if err != nil || !ok {
 		return nil, err
 	}
-	n, _ := res.RowsAffected()
-	if n != 1 {
-		return nil, nil
-	}
-	return p.findHash(ctx, HashToken(token))
+	row, err := p.repo().PasswordTokenByHash(ctx, hash)
+	return p.withUser(ctx, row, err)
 }
 
 func (p PasswordTokens) RevokeActive(ctx context.Context, userID int64) error {
-	now := fmtTime(time.Now().UTC())
-	return db.Q(p.DB).RevokeActivePasswordTokens(ctx, sqlc.RevokeActivePasswordTokensParams{
-		ConsumedAt: db.NS(now), UpdatedAt: db.NS(now), UserID: userID,
-	})
+	return p.repo().RevokeActivePasswordTokens(ctx, userID, time.Now().UTC())
 }
 
-func (p PasswordTokens) findValid(ctx context.Context, token string) (*PasswordToken, error) {
-	row, err := db.Q(p.DB).GetValidPasswordToken(ctx, sqlc.GetValidPasswordTokenParams{
-		TokenHash: HashToken(token), ExpiresAt: fmtTime(time.Now().UTC()),
-	})
-	return p.fromValid(ctx, row.ID, row.UserID, row.ExpiresAt, err)
-}
-
-func (p PasswordTokens) findHash(ctx context.Context, hash string) (*PasswordToken, error) {
-	row, err := db.Q(p.DB).GetPasswordTokenByHash(ctx, hash)
-	return p.fromValid(ctx, row.ID, row.UserID, row.ExpiresAt, err)
-}
-
-func (p PasswordTokens) fromValid(ctx context.Context, id, userID int64, exp string, err error) (*PasswordToken, error) {
-	if err == sql.ErrNoRows {
-		return nil, nil
+func (p PasswordTokens) withUser(ctx context.Context, row *repo.OneTime, err error) (*PasswordToken, error) {
+	if row == nil || err != nil {
+		return nil, err
 	}
+	u, err := Users{DB: p.DB}.ByID(ctx, row.UserID)
 	if err != nil {
 		return nil, err
 	}
-	out := &PasswordToken{ID: id, UserID: userID}
-	out.ExpiresAt, _ = parseTime(sql.NullString{String: exp, Valid: true})
-	u, err := Users{DB: p.DB}.ByID(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	out.User = u
-	return out, nil
+	return &PasswordToken{ID: row.ID, UserID: row.UserID, ExpiresAt: row.ExpiresAt, User: u}, nil
 }

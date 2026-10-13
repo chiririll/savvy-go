@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"strconv"
 
-	"savvy-go/internal/domain"
-
 	"github.com/go-chi/chi/v5"
+
+	"savvy-go/internal/uploads"
 )
 
 func (s *Server) uploadCreate(w http.ResponseWriter, r *http.Request) {
@@ -131,7 +131,7 @@ func (s *Server) uploadPart(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"part_number": part, "etag": etag, "size": size})
 }
 
-func (s *Server) uploadOwned(w http.ResponseWriter, r *http.Request) *domain.Upload {
+func (s *Server) uploadOwned(w http.ResponseWriter, r *http.Request) *uploads.Upload {
 	id := chi.URLParam(r, "upload")
 	up, _ := s.uploads.ByID(r.Context(), id)
 	if up == nil {

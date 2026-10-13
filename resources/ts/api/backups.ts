@@ -21,15 +21,16 @@ export const backupsApi = {
         return response.data
     },
 
-    /** Replaces the whole server with a Laravel database; it is converted on the way, not kept. */
-    restoreLaravel: async (file: File, appKey?: string): Promise<void> => {
+    /** Upgrades a Laravel database and keeps only the upgraded version as a server backup. */
+    upgradeLaravel: async (file: File, appKey?: string): Promise<Backup> => {
         const formData = new FormData()
         formData.append('file', file)
         if (appKey) formData.append('app_key', appKey)
-        await apiClient.post(`${ENDPOINT}/restore-laravel`, formData, {
+        const response = await apiClient.post(`${ENDPOINT}/upgrade-laravel`, formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
             timeout: 0,
         })
+        return response.data?.data ?? response.data
     },
 
     download: (filename: string) =>

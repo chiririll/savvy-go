@@ -11,7 +11,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"savvy-go/internal/db"
-	"savvy-go/internal/domain"
+	"savvy-go/internal/ledger"
 	"savvy-go/internal/migrate"
 )
 
@@ -91,16 +91,16 @@ func TestUpgradeLeavesGoSchemaUsable(t *testing.T) {
 		t.Fatalf("amount index restored = %d, %v", idx, err)
 	}
 
-	btc, err := (domain.Transactions{DB: sqlDB}).ByID(ctx, 3)
+	btc, err := (ledger.Transactions{DB: sqlDB}).ByID(ctx, 3)
 	if err != nil || btc == nil || !btc.Amount.Decimal().Equal(decimal.RequireFromString("0.00012345")) {
-		t.Fatalf("btc tx via domain = %+v, %v", btc, err)
+		t.Fatalf("btc tx via ledger = %+v, %v", btc, err)
 	}
 	if btc.Date == nil || *btc.Date != "2026-01-05" {
 		t.Fatalf("btc tx date = %v, want 2026-01-05", btc.Date)
 	}
-	acct, err := (domain.Accounts{DB: sqlDB}).ByID(ctx, 3)
+	acct, err := (ledger.Accounts{DB: sqlDB}).ByID(ctx, 3)
 	if err != nil || acct == nil || !acct.Balance.Decimal().Equal(decimal.RequireFromString("0.50012345")) {
-		t.Fatalf("btc account via domain = %+v, %v", acct, err)
+		t.Fatalf("btc account via ledger = %+v, %v", acct, err)
 	}
 }
 

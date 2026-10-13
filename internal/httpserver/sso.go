@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"savvy-go/internal/domain"
-
 	"github.com/go-chi/chi/v5"
+
+	"savvy-go/internal/sso"
 )
 
 func (s *Server) ssoProviders(w http.ResponseWriter, r *http.Request) {
@@ -30,7 +30,7 @@ func (s *Server) ssoProviders(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) ssoPresets(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, domain.SSOPresetCatalog())
+	writeJSON(w, http.StatusOK, sso.PresetCatalog())
 }
 
 func (s *Server) ssoRedirect(w http.ResponseWriter, r *http.Request) {
@@ -109,7 +109,7 @@ func (s *Server) ssoExchange(w http.ResponseWriter, r *http.Request) {
 	s.issueSession(w, r, u, http.StatusOK, true)
 }
 
-func (s *Server) finishSSO(w http.ResponseWriter, r *http.Request, p *domain.IdentityProvider, id domain.NormalizedIdentity, err error) {
+func (s *Server) finishSSO(w http.ResponseWriter, r *http.Request, p *sso.IdentityProvider, id sso.NormalizedIdentity, err error) {
 	if err != nil {
 		s.redirectSPAError(w, r, ssoCode(err))
 		return
@@ -127,7 +127,7 @@ func (s *Server) finishSSO(w http.ResponseWriter, r *http.Request, p *domain.Ide
 	http.Redirect(w, r, "/auth/sso/callback?ticket="+ticket, http.StatusFound)
 }
 
-func (s *Server) lookupProvider(r *http.Request, slug string) *domain.IdentityProvider {
+func (s *Server) lookupProvider(r *http.Request, slug string) *sso.IdentityProvider {
 	p, err := s.sso.BySlug(r.Context(), slug)
 	if err != nil {
 		return nil
@@ -144,7 +144,7 @@ func (s *Server) redirectSPAError(w http.ResponseWriter, r *http.Request, code s
 }
 
 func ssoCode(err error) string {
-	if e := domain.AsSSOError(err); e != nil {
+	if e := sso.AsError(err); e != nil {
 		return e.Code
 	}
 	return "sso_error"
@@ -222,7 +222,7 @@ func (s *Server) idpTest(w http.ResponseWriter, r *http.Request) {
 		code := "sso_error"
 		status := http.StatusBadGateway
 		msg := err.Error()
-		if e := domain.AsSSOError(err); e != nil {
+		if e := sso.AsError(err); e != nil {
 			code, status, msg = e.Code, e.Status, e.Message
 		}
 		writeJSON(w, status, map[string]any{"status": "error", "message": msg, "error": code})
@@ -231,7 +231,7 @@ func (s *Server) idpTest(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
 }
 
-func (s *Server) idpParam(w http.ResponseWriter, r *http.Request) *domain.IdentityProvider {
+func (s *Server) idpParam(w http.ResponseWriter, r *http.Request) *sso.IdentityProvider {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	p, err := s.sso.ByID(r.Context(), id)
 	if err != nil || p == nil {
@@ -241,13 +241,13 @@ func (s *Server) idpParam(w http.ResponseWriter, r *http.Request) *domain.Identi
 	return p
 }
 
-func decodeIdPWrite(w http.ResponseWriter, r *http.Request, create bool) (domain.IdPWrite, bool) {
+func decodeIdPWrite(w http.ResponseWriter, r *http.Request, create bool) (sso.IdPWrite, bool) {
 	var raw map[string]any
 	if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
 		writeValidation(w, map[string][]string{"name": {"The given data was invalid."}})
-		return domain.IdPWrite{}, false
+		return sso.IdPWrite{}, false
 	}
-	var in domain.IdPWrite
+	var in sso.IdPWrite
 	in.Name, _ = raw["name"].(string)
 	in.Slug, _ = raw["slug"].(string)
 	in.Preset, _ = raw["preset"].(string)
@@ -314,7 +314,7 @@ func asFloat(v any) float64 {
 }
 
 func writeSSOErr(w http.ResponseWriter, err error) {
-	if e := domain.AsSSOError(err); e != nil {
+	if e := sso.AsError(err); e != nil {
 		if e.Status == 422 && e.Code == "invalid_slug" {
 			writeValidation(w, map[string][]string{"slug": {e.Message}})
 			return

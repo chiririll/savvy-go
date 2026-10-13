@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	"savvy-go/internal/db"
 	"savvy-go/internal/version"
 )
 
@@ -38,8 +39,7 @@ func (s *Server) readyz(w http.ResponseWriter, r *http.Request) {
 	passing := true
 
 	conn := healthChk{ComponentType: "datastore", Status: "pass", Time: now}
-	var one int
-	if err := s.store.Server().QueryRowContext(r.Context(), "SELECT 1").Scan(&one); err != nil {
+	if err := db.Ping(r.Context(), s.store.Server()); err != nil {
 		passing = false
 		conn.Status = "fail"
 		conn.Output = err.Error()

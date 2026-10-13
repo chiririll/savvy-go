@@ -2,13 +2,11 @@ package auth
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"strings"
 	"time"
 
-	"savvy-go/internal/db"
-	"savvy-go/internal/db/sqlc"
+	repo "savvy-go/internal/db/repo/auth"
 	"savvy-go/internal/store"
 )
 
@@ -22,6 +20,9 @@ const (
 )
 
 var ErrTokenLimit = errors.New("api token limit reached")
+
+// ErrNotFound is returned when the user has no token or passkey with that id.
+var ErrNotFound = errors.New("not found")
 
 // APIToken is a long-lived bearer credential issued to an external app.
 type APIToken struct {
@@ -51,48 +52,39 @@ type APITokens struct {
 	DB store.DB
 }
 
+func (s APITokens) repo() repo.Repo { return repo.Repo{DB: s.DB} }
+
 // Issue creates a token and returns the raw value, which is never stored.
 func (s APITokens) Issue(ctx context.Context, user *User, name, scope string, expiresAt *time.Time) (string, *APIToken, error) {
-	n, err := s.count(ctx, user.ID)
+	existing, err := s.repo().APITokens(ctx, user.ID)
 	if err != nil {
 		return "", nil, err
 	}
-	if n >= maxAPITokens {
+	if len(existing) >= maxAPITokens {
 		return "", nil, ErrTokenLimit
 	}
 	raw := apiTokenPrefix + RandomString(48)
+	prefix := raw[:len(apiTokenPrefix)+4]
 	now := time.Now().UTC()
-	var exp sql.NullString
-	if expiresAt != nil {
-		exp = db.NS(fmtTime(*expiresAt))
-	}
-	res, err := db.Q(s.DB).InsertAPIToken(ctx, sqlc.InsertAPITokenParams{
-		UserID: user.ID, Name: name, TokenHash: HashToken(raw), Prefix: raw[:len(apiTokenPrefix)+4],
-		Scope: scope, ExpiresAt: exp, CreatedAt: db.NS(fmtTime(now)), UpdatedAt: db.NS(fmtTime(now)),
+	id, err := s.repo().InsertAPIToken(ctx, repo.NewAPIToken{
+		UserID: user.ID, Name: name, Hash: HashToken(raw), Prefix: prefix, Scope: scope, ExpiresAt: expiresAt, Now: now,
 	})
 	if err != nil {
 		return "", nil, err
 	}
-	id, _ := res.LastInsertId()
 	return raw, &APIToken{
-		ID: id, UserID: user.ID, Name: name, Prefix: raw[:len(apiTokenPrefix)+4], Scope: scope,
-		ExpiresAt: expiresAt, CreatedAt: &now,
+		ID: id, UserID: user.ID, Name: name, Prefix: prefix, Scope: scope, ExpiresAt: expiresAt, CreatedAt: &now,
 	}, nil
 }
 
-func (s APITokens) count(ctx context.Context, userID int64) (int, error) {
-	rows, err := db.Q(s.DB).ListAPITokensByUser(ctx, userID)
-	return len(rows), err
-}
-
 func (s APITokens) List(ctx context.Context, userID int64) ([]APIToken, error) {
-	rows, err := db.Q(s.DB).ListAPITokensByUser(ctx, userID)
+	rows, err := s.repo().APITokens(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]APIToken, 0, len(rows))
-	for _, r := range rows {
-		out = append(out, tokenFromRow(r))
+	out := make([]APIToken, len(rows))
+	for i, r := range rows {
+		out[i] = toAPIToken(r)
 	}
 	return out, nil
 }
@@ -102,14 +94,11 @@ func (s APITokens) Resolve(ctx context.Context, raw string) (*APIToken, error) {
 	if !strings.HasPrefix(raw, apiTokenPrefix) {
 		return nil, nil
 	}
-	row, err := db.Q(s.DB).GetAPITokenByHash(ctx, HashToken(raw))
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	if err != nil {
+	row, err := s.repo().APITokenByHash(ctx, HashToken(raw))
+	if row == nil || err != nil {
 		return nil, err
 	}
-	t := tokenFromRow(row)
+	t := toAPIToken(*row)
 	now := time.Now().UTC()
 	if t.Expired(now) {
 		return nil, nil
@@ -120,32 +109,26 @@ func (s APITokens) Resolve(ctx context.Context, raw string) (*APIToken, error) {
 	}
 	t.User = u
 	if t.LastUsedAt == nil || now.Sub(*t.LastUsedAt) > apiTokenTouchEach {
-		_ = db.Q(s.DB).TouchAPIToken(ctx, sqlc.TouchAPITokenParams{LastUsedAt: db.NS(fmtTime(now)), ID: t.ID})
+		_ = s.repo().TouchAPIToken(ctx, t.ID, now)
 	}
 	return &t, nil
 }
 
+// Revoke deletes the user's token; ErrNotFound if they have no such one.
 func (s APITokens) Revoke(ctx context.Context, userID, id int64) error {
-	res, err := db.Q(s.DB).DeleteAPIToken(ctx, sqlc.DeleteAPITokenParams{ID: id, UserID: userID})
+	ok, err := s.repo().DeleteAPIToken(ctx, userID, id)
 	if err != nil {
 		return err
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return sql.ErrNoRows
+	if !ok {
+		return ErrNotFound
 	}
 	return nil
 }
 
-func tokenFromRow(r sqlc.ApiToken) APIToken {
-	t := APIToken{ID: r.ID, UserID: r.UserID, Name: r.Name, Prefix: r.Prefix, Scope: r.Scope}
-	if v, ok := parseTime(r.ExpiresAt); ok {
-		t.ExpiresAt = &v
+func toAPIToken(r repo.APIToken) APIToken {
+	return APIToken{
+		ID: r.ID, UserID: r.UserID, Name: r.Name, Prefix: r.Prefix, Scope: r.Scope,
+		ExpiresAt: r.ExpiresAt, LastUsedAt: r.LastUsedAt, CreatedAt: r.CreatedAt,
 	}
-	if v, ok := parseTime(r.LastUsedAt); ok {
-		t.LastUsedAt = &v
-	}
-	if v, ok := parseTime(r.CreatedAt); ok {
-		t.CreatedAt = &v
-	}
-	return t
 }

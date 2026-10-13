@@ -30,7 +30,7 @@ export default function SpaceBackupsPage() {
             laravel: {
                 targets: user?.role === 'guest' ? ['space'] : ['space', 'new'],
                 restore: async (file, target) => {
-                    if (target === 'space') return spacesApi.restoreLaravel(id, file)
+                    if (target === 'space') return spacesApi.upgradeLaravel(id, file)
                     await switchSpace((await spacesApi.importSpace(file)).id)
                 },
             },

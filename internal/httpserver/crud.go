@@ -9,12 +9,13 @@ import (
 	"strings"
 	"time"
 
-	"savvy-go/internal/domain"
-	"savvy-go/internal/httpserver/dto"
-	"savvy-go/internal/money"
-
 	"github.com/go-chi/chi/v5"
 	"github.com/shopspring/decimal"
+
+	"savvy-go/internal/httpserver/dto"
+	"savvy-go/internal/ledger"
+	"savvy-go/internal/money"
+	"savvy-go/internal/reports"
 )
 
 func (s *Server) currenciesIndex(w http.ResponseWriter, r *http.Request) {
@@ -32,7 +33,7 @@ func (s *Server) currenciesCatalog(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) currenciesStore(w http.ResponseWriter, r *http.Request) {
 	raw, _ := io.ReadAll(r.Body)
-	var body domain.Currency
+	var body ledger.Currency
 	var given struct {
 		Decimals *int `json:"decimals"`
 	}
@@ -49,10 +50,10 @@ func (s *Server) currenciesStore(w http.ResponseWriter, r *http.Request) {
 	}
 	c, err := sp(r).currencies.Create(r.Context(), body)
 	switch {
-	case errors.Is(err, domain.ErrInvalidDecimals):
+	case errors.Is(err, ledger.ErrInvalidDecimals):
 		writeValidation(w, map[string][]string{"decimals": {err.Error()}})
 		return
-	case errors.Is(err, domain.ErrInvalidRate):
+	case errors.Is(err, ledger.ErrInvalidRate):
 		writeValidation(w, map[string][]string{"rate": {err.Error()}})
 		return
 	case err != nil:
@@ -81,7 +82,7 @@ func (s *Server) currenciesUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c, err := sp(r).currencies.Update(r.Context(), cur.ID, body)
-	if errors.Is(err, domain.ErrDecimalsImmutable) {
+	if errors.Is(err, ledger.ErrDecimalsImmutable) {
 		writeMessage(w, 422, "Currency decimals cannot be changed after creation.")
 		return
 	}
@@ -150,7 +151,7 @@ func (s *Server) currenciesConvert(w http.ResponseWriter, r *http.Request) {
 	amount, err := money.FromInput(body.Amount, from.Unit())
 	var result money.Money
 	if err == nil {
-		result, err = domain.TryConvert(amount, *from, *to)
+		result, err = ledger.TryConvert(amount, *from, *to)
 	}
 	if err != nil {
 		writeValidation(w, map[string][]string{"amount": {"The amount is out of range."}})
@@ -221,7 +222,7 @@ func (s *Server) accountsStore(w http.ResponseWriter, r *http.Request) {
 	if body.IsActive != nil {
 		active = *body.IsActive
 	}
-	a, err := sp(r).accounts.Create(r.Context(), domain.AccountInput{
+	a, err := sp(r).accounts.Create(r.Context(), ledger.AccountInput{
 		Name: body.Name, Type: body.Type, CurrencyID: currencyID,
 		InitialBalance: body.InitialBalance, IsActive: active,
 	})
@@ -271,7 +272,7 @@ func (s *Server) accountsUpdate(w http.ResponseWriter, r *http.Request) {
 	if body.CurrencyCode != nil && *body.CurrencyCode != "" {
 		c, err := sp(r).currencies.ByCode(r.Context(), *body.CurrencyCode)
 		if err != nil || c == nil || c.ID != in.CurrencyID {
-			writeAccountError(w, domain.ErrAccountCurrencyImmutable)
+			writeAccountError(w, ledger.ErrAccountCurrencyImmutable)
 			return
 		}
 	}
@@ -292,9 +293,9 @@ func (s *Server) accountsUpdate(w http.ResponseWriter, r *http.Request) {
 // writeAccountError maps account create/update failures to responses.
 func writeAccountError(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, domain.ErrAccountCurrencyImmutable):
+	case errors.Is(err, ledger.ErrAccountCurrencyImmutable):
 		writeMessage(w, 422, "Account currency cannot be changed after creation.")
-	case errors.Is(err, domain.ErrUnknownCurrency):
+	case errors.Is(err, ledger.ErrUnknownCurrency):
 		writeValidation(w, map[string][]string{"currency_id": {"The selected currency is invalid."}})
 	default:
 		writeMessage(w, 422, err.Error())
@@ -350,7 +351,7 @@ func (s *Server) accountsBalanceHistory(w http.ResponseWriter, r *http.Request) 
 		}
 		data := make([]money.Money, len(dates)) // in the base currency
 		for i, bal := range native {
-			data[i] = domain.Convert(bal, *a.Currency, *base)
+			data[i] = ledger.Convert(bal, *a.Currency, *base)
 			total[i] = total[i].Add(data[i])
 		}
 		series = append(series, map[string]any{
@@ -369,7 +370,7 @@ func (s *Server) accountsBalanceHistory(w http.ResponseWriter, r *http.Request) 
 // shared default report period when either is missing or invalid.
 func (s *Server) queryPeriod(r *http.Request) (start, end string) {
 	q := r.URL.Query()
-	rng := domain.ReportFilter{
+	rng := reports.Filter{
 		PeriodType: "custom",
 		StartDate:  q.Get("start_date"),
 		EndDate:    q.Get("end_date"),
@@ -408,7 +409,7 @@ func (s *Server) categoriesIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) categoriesStore(w http.ResponseWriter, r *http.Request) {
-	var body domain.Category
+	var body ledger.Category
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Name == "" {
 		writeValidation(w, map[string][]string{"name": {"The name field is required."}})
 		return
@@ -512,7 +513,7 @@ func (s *Server) categoriesSummary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q := r.URL.Query()
-	list, total := sp(r).reports.CategorySummary(r.Context(), domain.ReportFilter{
+	list, total := sp(r).reports.CategorySummary(r.Context(), reports.Filter{
 		PeriodType: "custom",
 		StartDate:  q.Get("start_date"),
 		EndDate:    q.Get("end_date"),
@@ -591,7 +592,7 @@ func (s *Server) tagsDestroy(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s *Server) currencyParam(w http.ResponseWriter, r *http.Request) *domain.Currency {
+func (s *Server) currencyParam(w http.ResponseWriter, r *http.Request) *ledger.Currency {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	c, _ := sp(r).currencies.ByID(r.Context(), id)
 	if c == nil {
@@ -600,7 +601,7 @@ func (s *Server) currencyParam(w http.ResponseWriter, r *http.Request) *domain.C
 	return c
 }
 
-func (s *Server) accountParam(w http.ResponseWriter, r *http.Request) *domain.Account {
+func (s *Server) accountParam(w http.ResponseWriter, r *http.Request) *ledger.Account {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	a, _ := sp(r).accounts.ByID(r.Context(), id)
 	if a == nil {
@@ -609,7 +610,7 @@ func (s *Server) accountParam(w http.ResponseWriter, r *http.Request) *domain.Ac
 	return a
 }
 
-func (s *Server) categoryParam(w http.ResponseWriter, r *http.Request) *domain.Category {
+func (s *Server) categoryParam(w http.ResponseWriter, r *http.Request) *ledger.Category {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	c, _ := sp(r).categories.ByID(r.Context(), id)
 	if c == nil {
@@ -618,7 +619,7 @@ func (s *Server) categoryParam(w http.ResponseWriter, r *http.Request) *domain.C
 	return c
 }
 
-func (s *Server) tagParam(w http.ResponseWriter, r *http.Request) *domain.Tag {
+func (s *Server) tagParam(w http.ResponseWriter, r *http.Request) *ledger.Tag {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	t, _ := sp(r).tags.ByID(r.Context(), id)
 	if t == nil {

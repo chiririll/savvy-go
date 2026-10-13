@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
-
 )
 
 // Laravel-only tables that the Go runtime does not use.

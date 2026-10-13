@@ -11,17 +11,18 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/shopspring/decimal"
 
-	"savvy-go/internal/domain"
 	"savvy-go/internal/httpserver/dto"
 	"savvy-go/internal/money"
+	"savvy-go/internal/spaces"
 	"savvy-go/internal/store"
+	"savvy-go/internal/transfers"
 )
 
 func writeTransferError(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, domain.ErrTransferGone):
+	case errors.Is(err, transfers.ErrGone):
 		writeMessage(w, http.StatusNotFound, err.Error())
-	case errors.Is(err, domain.ErrTransferRights), errors.Is(err, domain.ErrLinkRights):
+	case errors.Is(err, transfers.ErrRights), errors.Is(err, transfers.ErrLinkRights):
 		writeMessage(w, http.StatusForbidden, err.Error())
 	case errors.Is(err, store.ErrQuotaExceeded):
 		writeMessage(w, http.StatusUnprocessableEntity, "A space involved has reached its storage limit.")
@@ -42,7 +43,7 @@ func (s *Server) linksIndex(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, dto.Map(list, func(x domain.Space) map[string]any {
+	writeData(w, http.StatusOK, dto.Map(list, func(x spaces.Space) map[string]any {
 		return map[string]any{"id": x.ID, "name": x.Name}
 	}))
 }
@@ -78,7 +79,7 @@ func (s *Server) linksDestroy(w http.ResponseWriter, r *http.Request) {
 
 // --- transfers -------------------------------------------------------------
 
-func sideJSON(side domain.TransferSide, withAccount bool) map[string]any {
+func sideJSON(side transfers.Side, withAccount bool) map[string]any {
 	out := map[string]any{
 		"amount":   decimal.New(side.Amount, -int32(side.Decimals)).String(),
 		"currency": side.Currency,
@@ -91,7 +92,7 @@ func sideJSON(side domain.TransferSide, withAccount bool) map[string]any {
 
 // transferJSON shows a transfer to a member of the request's space: the
 // other side's account only to who belongs to that space too (P30).
-func (s *Server) transferJSON(r *http.Request, v domain.TransferView) map[string]any {
+func (s *Server) transferJSON(r *http.Request, v transfers.View) map[string]any {
 	seesOther := false
 	if v.OtherSpace != nil {
 		role, _ := s.spaces.Role(r.Context(), v.OtherSpace.ID, userFrom(r).ID)
@@ -121,11 +122,11 @@ func (s *Server) transfersIndex(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, dto.Map(list, func(v domain.TransferView) map[string]any { return s.transferJSON(r, v) }))
+	writeData(w, http.StatusOK, dto.Map(list, func(v transfers.View) map[string]any { return s.transferJSON(r, v) }))
 }
 
 // findTransfer is a transfer of the request's space as its members see it.
-func (s *Server) findTransfer(r *http.Request, id string) (*domain.TransferView, error) {
+func (s *Server) findTransfer(r *http.Request, id string) (*transfers.View, error) {
 	list, err := s.transfers.List(r.Context(), sp(r).id)
 	if err != nil {
 		return nil, err
@@ -135,7 +136,7 @@ func (s *Server) findTransfer(r *http.Request, id string) (*domain.TransferView,
 			return &v, nil
 		}
 	}
-	return nil, domain.ErrTransferGone
+	return nil, transfers.ErrGone
 }
 
 func (s *Server) transferShow(w http.ResponseWriter, r *http.Request, id string, status int) {
@@ -171,7 +172,7 @@ func (s *Server) transfersStore(w http.ResponseWriter, r *http.Request) {
 		writeValidation(w, map[string][]string{"date": {"The date must be YYYY-MM-DD."}})
 		return
 	}
-	t, err := s.transfers.Create(r.Context(), userFrom(r), domain.TransferInput{
+	t, err := s.transfers.Create(r.Context(), userFrom(r), transfers.Input{
 		FromSpace: sp(r).id, FromAccount: body.FromAccountID, FromAmount: body.FromAmount,
 		ToSpace: body.ToSpaceID, ToAccount: body.ToAccountID, ToAmount: body.ToAmount,
 		Date: body.Date, Description: body.Description,
@@ -207,7 +208,7 @@ func (s *Server) transfersUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := chi.URLParam(r, "uuid")
-	_, err := s.transfers.Update(r.Context(), userFrom(r), sp(r).id, id, domain.TransferUpdate{
+	_, err := s.transfers.Update(r.Context(), userFrom(r), sp(r).id, id, transfers.Update{
 		FromAccount: body.FromAccountID, ToAccount: body.ToAccountID, FromAmount: body.FromAmount, ToAmount: body.ToAmount,
 		Date: body.Date, Description: body.Description, HasDescription: hasDescription,
 	})
@@ -233,7 +234,7 @@ func (s *Server) transfersResolve(accept bool) http.HandlerFunc {
 			writeTransferError(w, err)
 			return
 		}
-		if _, err := s.findTransfer(r, id); errors.Is(err, domain.ErrTransferGone) {
+		if _, err := s.findTransfer(r, id); errors.Is(err, transfers.ErrGone) {
 			w.WriteHeader(http.StatusNoContent) // the decision removed it here
 			return
 		}
@@ -261,7 +262,7 @@ func (s *Server) keysIndex(w http.ResponseWriter, r *http.Request) {
 	}
 	writeData(w, http.StatusOK, map[string]any{
 		"own": map[string]any{"kid": key.KID(), "publicKey": base64.StdEncoding.EncodeToString(key.Public())},
-		"trusted": dto.Map(trusted, func(k domain.TrustedKey) map[string]any {
+		"trusted": dto.Map(trusted, func(k transfers.TrustedKey) map[string]any {
 			return map[string]any{"kid": k.KID, "publicKey": k.PublicKey, "name": k.Name, "createdAt": timeOrNil(k.CreatedAt)}
 		}),
 	})

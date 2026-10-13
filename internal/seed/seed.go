@@ -9,10 +9,14 @@ import (
 	"github.com/shopspring/decimal"
 
 	"savvy-go/internal/auth"
-	appdb "savvy-go/internal/db"
-	"savvy-go/internal/domain"
+	automationrepo "savvy-go/internal/db/repo/automation"
+	ledgerrepo "savvy-go/internal/db/repo/ledger"
+	"savvy-go/internal/ledger"
 	"savvy-go/internal/settings"
+	"savvy-go/internal/signing"
+	"savvy-go/internal/spaces"
 	"savvy-go/internal/store"
+	"savvy-go/internal/transfers"
 )
 
 const demoSeededKey = "demo_seeded"
@@ -48,7 +52,7 @@ type Options struct {
 //     linked to Family Budget. It has open invitations.
 //
 // It returns what it created, or nil when it seeded nothing.
-func Demo(ctx context.Context, st store.Store, keys domain.KeyRing, opts Options) (*Manifest, error) {
+func Demo(ctx context.Context, st store.Store, keys signing.KeyRing, opts Options) (*Manifest, error) {
 	loc := opts.Loc
 	if loc == nil {
 		loc = time.UTC
@@ -75,45 +79,45 @@ func Demo(ctx context.Context, st store.Store, keys domain.KeyRing, opts Options
 	if err != nil {
 		return nil, err
 	}
-	spaces := domain.Spaces{Store: st}
-	d := &demo{ctx: ctx, st: st, spaces: spaces, people: people, now: now, manifest: &Manifest{Now: now}}
+	spaceSvc := spaces.Service{Store: st}
+	d := &demo{ctx: ctx, st: st, spaces: spaceSvc, people: people, now: now, manifest: &Manifest{Now: now}}
 	for _, u := range demoUsers {
 		d.manifest.Users = append(d.manifest.Users, ManifestUser{Key: u.key, Name: u.name, Email: u.email, Password: u.pass, Role: u.role})
 	}
 
-	d.demo, err = d.createSpace("Demo", userAlex, map[string]string{userJordan: domain.SpaceEditor, userDemo: domain.SpaceViewer})
+	d.demo, err = d.createSpace("Demo", userAlex, map[string]string{userJordan: spaces.RoleEditor, userDemo: spaces.RoleViewer})
 	if err != nil {
 		return nil, err
 	}
-	d.family, err = d.createSpace("Family Budget", userAlex, map[string]string{userJordan: domain.SpaceAdmin, userSam: domain.SpaceViewer})
+	d.family, err = d.createSpace("Family Budget", userAlex, map[string]string{userJordan: spaces.RoleAdmin, userSam: spaces.RoleViewer})
 	if err != nil {
 		return nil, err
 	}
-	d.studio, err = d.createSpace("Studio GmbH", userAlex, map[string]string{userJordan: domain.SpaceViewer})
+	d.studio, err = d.createSpace("Studio GmbH", userAlex, map[string]string{userJordan: spaces.RoleViewer})
 	if err != nil {
 		return nil, err
 	}
 
-	demoAccts, err := d.fill(d.demo, currencySet(usdCurrency, withRate(eurCurrency, "1.08")), func(db store.DB) (map[string]*domain.Account, error) {
+	demoAccts, err := d.fill(d.demo, currencySet(usdCurrency, withRate(eurCurrency, "1.08")), func(db store.DB) (map[string]*ledger.Account, error) {
 		return seedWorkspace(ctx, db, now)
 	})
 	if err != nil {
 		return nil, err
 	}
-	familyAccts, err := d.fill(d.family, currencySet(usdCurrency), func(db store.DB) (map[string]*domain.Account, error) {
+	familyAccts, err := d.fill(d.family, currencySet(usdCurrency), func(db store.DB) (map[string]*ledger.Account, error) {
 		return seedMini(ctx, db, d.now, familySpace)
 	})
 	if err != nil {
 		return nil, err
 	}
-	studioAccts, err := d.fill(d.studio, currencySet(eurCurrency, withRate(usdCurrency, "0.9259")), func(db store.DB) (map[string]*domain.Account, error) {
+	studioAccts, err := d.fill(d.studio, currencySet(eurCurrency, withRate(usdCurrency, "0.9259")), func(db store.DB) (map[string]*ledger.Account, error) {
 		return seedMini(ctx, db, d.now, studioSpace)
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	transfers := domain.Transfers{Spaces: spaces, Keys: keys}
+	transfers := transfers.Service{Spaces: spaceSvc, Keys: keys}
 	if err := d.linkAndTransfer(transfers, demoAccts, familyAccts, studioAccts); err != nil {
 		return nil, err
 	}
@@ -127,13 +131,13 @@ func Demo(ctx context.Context, st store.Store, keys domain.KeyRing, opts Options
 		return nil, fmt.Errorf("mark demo seeded: %w", err)
 	}
 
-	for _, sp := range []*domain.Space{d.demo, d.family, d.studio} {
+	for _, sp := range []*spaces.Space{d.demo, d.family, d.studio} {
 		db, err := st.Space(ctx, sp.ID)
 		if err != nil {
 			return nil, err
 		}
-		txs, _ := appdb.Q(db).CountAllTransactions(ctx)
-		accts, _ := appdb.Q(db).CountAccounts(ctx)
+		repo := ledgerrepo.Repo{DB: db}
+		txs, accts := repo.CountTransactions(ctx), repo.CountAccounts(ctx)
 		slog.Info("demo space seeded", "space", sp.Name, "transactions", txs, "accounts", accts)
 	}
 	return d.manifest, nil
@@ -166,16 +170,16 @@ func createDemoUsers(ctx context.Context, users auth.Users) (map[string]*auth.Us
 type demo struct {
 	ctx    context.Context
 	st     store.Store
-	spaces domain.Spaces
+	spaces spaces.Service
 	people map[string]*auth.User
 	now    time.Time
 
 	manifest             *Manifest
-	demo, family, studio *domain.Space
+	demo, family, studio *spaces.Space
 }
 
 // createSpace creates a space owned by owner and adds the other members.
-func (d *demo) createSpace(name, owner string, members map[string]string) (*domain.Space, error) {
+func (d *demo) createSpace(name, owner string, members map[string]string) (*spaces.Space, error) {
 	sp, err := d.spaces.Create(d.ctx, name, d.people[owner])
 	if err != nil {
 		return nil, fmt.Errorf("space %s: %w", name, err)
@@ -185,7 +189,7 @@ func (d *demo) createSpace(name, owner string, members map[string]string) (*doma
 			return nil, fmt.Errorf("space %s member %s: %w", name, key, err)
 		}
 	}
-	roles := map[string]string{owner: domain.SpaceAdmin}
+	roles := map[string]string{owner: spaces.RoleAdmin}
 	for key, role := range members {
 		roles[key] = role
 	}
@@ -194,7 +198,7 @@ func (d *demo) createSpace(name, owner string, members map[string]string) (*doma
 }
 
 // fill seeds a space's reference data and then its workspace.
-func (d *demo) fill(sp *domain.Space, currencies []domain.Currency, workspace func(store.DB) (map[string]*domain.Account, error)) (map[string]*domain.Account, error) {
+func (d *demo) fill(sp *spaces.Space, currencies []ledger.Currency, workspace func(store.DB) (map[string]*ledger.Account, error)) (map[string]*ledger.Account, error) {
 	db, err := d.st.Space(d.ctx, sp.ID)
 	if err != nil {
 		return nil, err
@@ -211,17 +215,17 @@ func (d *demo) fill(sp *domain.Space, currencies []domain.Currency, workspace fu
 
 // linkAndTransfer links Demo with the other two spaces and moves money across
 // each link, including a transfer between currencies.
-func (d *demo) linkAndTransfer(tr domain.Transfers, demoAccts, familyAccts, studioAccts map[string]*domain.Account) error {
+func (d *demo) linkAndTransfer(tr transfers.Service, demoAccts, familyAccts, studioAccts map[string]*ledger.Account) error {
 	alex := d.people[userAlex]
-	for _, other := range []*domain.Space{d.family, d.studio} {
+	for _, other := range []*spaces.Space{d.family, d.studio} {
 		if err := tr.Link(d.ctx, alex, d.demo.ID, other.ID); err != nil {
 			return fmt.Errorf("link %s: %w", other.Name, err)
 		}
 	}
 	for _, t := range []struct {
 		daysAgo              int
-		from, to             *domain.Space
-		fromAcct, toAcct     *domain.Account
+		from, to             *spaces.Space
+		fromAcct, toAcct     *ledger.Account
 		fromAmount, toAmount string
 		description          string
 	}{
@@ -234,7 +238,7 @@ func (d *demo) linkAndTransfer(tr domain.Transfers, demoAccts, familyAccts, stud
 	} {
 		date := d.now.AddDate(0, 0, -t.daysAgo).Format("2006-01-02")
 		desc := t.description
-		if _, err := tr.Create(d.ctx, alex, domain.TransferInput{
+		if _, err := tr.Create(d.ctx, alex, transfers.Input{
 			FromSpace: t.from.ID, FromAccount: t.fromAcct.ID, FromAmount: decimal.RequireFromString(t.fromAmount),
 			ToSpace: t.to.ID, ToAccount: t.toAcct.ID, ToAmount: decimal.RequireFromString(t.toAmount),
 			Date: date, Description: &desc,
@@ -250,8 +254,8 @@ func (d *demo) linkAndTransfer(tr domain.Transfers, demoAccts, familyAccts, stud
 func (d *demo) invite() error {
 	alex := d.people[userAlex]
 	for _, inv := range []struct{ email, role string }{
-		{"newhire@example.com", domain.SpaceEditor},
-		{"", domain.SpaceViewer},
+		{"newhire@example.com", spaces.RoleEditor},
+		{"", spaces.RoleViewer},
 	} {
 		token, err := d.spaces.Invite(d.ctx, d.studio.ID, alex, inv.email, inv.role)
 		if err != nil {
@@ -273,20 +277,12 @@ func (d *demo) recordAutomations() error {
 		if err != nil {
 			return err
 		}
-		rows, err := db.QueryContext(d.ctx, `SELECT id FROM automation_rules ORDER BY priority, id`)
+		rules, err := automationrepo.Repo{DB: db}.List(d.ctx, automationrepo.Filter{})
 		if err != nil {
 			return fmt.Errorf("space %s automation rules: %w", sp.Name, err)
 		}
-		for rows.Next() {
-			var id int64
-			if err := rows.Scan(&id); err != nil {
-				_ = rows.Close()
-				return err
-			}
-			sp.Automations = append(sp.Automations, id)
-		}
-		if err := rows.Close(); err != nil {
-			return err
+		for _, r := range rules {
+			sp.Automations = append(sp.Automations, r.ID)
 		}
 	}
 	return nil

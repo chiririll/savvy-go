@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"savvy-go/internal/domain"
 	"savvy-go/internal/httpserver/dto"
+	"savvy-go/internal/ledger"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/shopspring/decimal"
@@ -75,7 +75,7 @@ func (s *Server) budgetsDestroy(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s *Server) budgetParam(w http.ResponseWriter, r *http.Request) *domain.Budget {
+func (s *Server) budgetParam(w http.ResponseWriter, r *http.Request) *ledger.Budget {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	b, _ := sp(r).budgets.ByID(r.Context(), id)
 	if b == nil {
@@ -86,11 +86,11 @@ func (s *Server) budgetParam(w http.ResponseWriter, r *http.Request) *domain.Bud
 
 // decodeBudget reads a budget from the body; on update, over base (see
 // patch.go).
-func decodeBudget(w http.ResponseWriter, r *http.Request, base *domain.Budget) (domain.BudgetInput, bool) {
+func decodeBudget(w http.ResponseWriter, r *http.Request, base *ledger.Budget) (ledger.BudgetInput, bool) {
 	var raw map[string]json.RawMessage
 	if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
 		writeValidation(w, map[string][]string{"name": {"The name field is required."}})
-		return domain.BudgetInput{}, false
+		return ledger.BudgetInput{}, false
 	}
 	var body struct {
 		Name            string          `json:"name"`
@@ -114,11 +114,11 @@ func decodeBudget(w http.ResponseWriter, r *http.Request, base *domain.Budget) (
 	buf, _ := json.Marshal(raw)
 	if err := json.Unmarshal(buf, &body); err != nil {
 		writeValidation(w, map[string][]string{"name": {"The given data was invalid."}})
-		return domain.BudgetInput{}, false
+		return ledger.BudgetInput{}, false
 	}
 	_, hasCats := raw["category_ids"]
 	_, hasTags := raw["tag_ids"]
-	return domain.BudgetInput{
+	return ledger.BudgetInput{
 		Name: body.Name, Amount: body.Amount, CurrencyID: body.CurrencyID, Period: body.Period,
 		StartDate: body.StartDate, EndDate: body.EndDate, IsGlobal: body.IsGlobal,
 		NotifyAtPercent: body.NotifyAtPercent, IsActive: body.IsActive,

@@ -6,41 +6,41 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	"savvy-go/internal/domain"
+	"savvy-go/internal/ledger"
 	"savvy-go/internal/store"
 )
 
 var (
-	usdCurrency = domain.Currency{Code: "USD", Name: "US Dollar", Symbol: "$", Decimals: 2, Rate: decimal.NewFromInt(1)}
-	eurCurrency = domain.Currency{Code: "EUR", Name: "Euro", Symbol: "€", Decimals: 2, Rate: decimal.NewFromInt(1)}
+	usdCurrency = ledger.Currency{Code: "USD", Name: "US Dollar", Symbol: "$", Decimals: 2, Rate: decimal.NewFromInt(1)}
+	eurCurrency = ledger.Currency{Code: "EUR", Name: "Euro", Symbol: "€", Decimals: 2, Rate: decimal.NewFromInt(1)}
 )
 
 // currencySet is the currencies of a space: base first, the others priced in it.
-func currencySet(base domain.Currency, others ...domain.Currency) []domain.Currency {
+func currencySet(base ledger.Currency, others ...ledger.Currency) []ledger.Currency {
 	base.IsBase = true
 	base.Rate = decimal.NewFromInt(1)
-	return append([]domain.Currency{base}, others...)
+	return append([]ledger.Currency{base}, others...)
 }
 
-func withRate(c domain.Currency, rate string) domain.Currency {
+func withRate(c ledger.Currency, rate string) ledger.Currency {
 	c.Rate = decimal.RequireFromString(rate)
 	return c
 }
 
-func seedReference(ctx context.Context, db store.DB, currencies []domain.Currency) error {
-	if err := seedCurrencies(ctx, domain.Currencies{DB: db}, currencies); err != nil {
+func seedReference(ctx context.Context, db store.DB, currencies []ledger.Currency) error {
+	if err := seedCurrencies(ctx, ledger.Currencies{DB: db}, currencies); err != nil {
 		return fmt.Errorf("currencies: %w", err)
 	}
-	if err := seedCategories(ctx, domain.Categories{DB: db}); err != nil {
+	if err := seedCategories(ctx, ledger.Categories{DB: db}); err != nil {
 		return fmt.Errorf("categories: %w", err)
 	}
-	if err := seedTags(ctx, domain.Tags{DB: db}); err != nil {
+	if err := seedTags(ctx, ledger.Tags{DB: db}); err != nil {
 		return fmt.Errorf("tags: %w", err)
 	}
 	return nil
 }
 
-func seedCurrencies(ctx context.Context, curs domain.Currencies, list []domain.Currency) error {
+func seedCurrencies(ctx context.Context, curs ledger.Currencies, list []ledger.Currency) error {
 	for _, c := range list {
 		existing, err := curs.ByCode(ctx, c.Code)
 		if err != nil {
@@ -56,11 +56,11 @@ func seedCurrencies(ctx context.Context, curs domain.Currencies, list []domain.C
 	return nil
 }
 
-func seedCategories(ctx context.Context, cats domain.Categories) error {
+func seedCategories(ctx context.Context, cats ledger.Categories) error {
 	for _, c := range defaultCategories {
 		icon, color := c.icon, c.color
 		isDefault := c.name == "#OTHER" || c.name == "#OTHER_INCOME"
-		if _, err := cats.Create(ctx, domain.Category{
+		if _, err := cats.Create(ctx, ledger.Category{
 			Name: c.name, Type: c.typ, Icon: &icon, Color: &color, IsDefault: isDefault,
 		}); err != nil {
 			return err
@@ -69,7 +69,7 @@ func seedCategories(ctx context.Context, cats domain.Categories) error {
 	return nil
 }
 
-func seedTags(ctx context.Context, tags domain.Tags) error {
+func seedTags(ctx context.Context, tags ledger.Tags) error {
 	for _, name := range defaultTags {
 		if _, err := tags.Create(ctx, name); err != nil {
 			return err
