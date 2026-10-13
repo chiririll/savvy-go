@@ -14,13 +14,12 @@ services:
         # Marks what opens a dialog in the interface, so the runner finds it.
         APP_ENV: screenshots
     environment:
-      APP_URL: http://savvy
-      TZ: UTC
-      SEED_DEMO: "true"
-      # The seed writes who can sign in and the ids of its data here for the runner.
-      SEED_MANIFEST: /data/manifest.json
+      CONFIG_FILE: /config/config.toml
     volumes:
       - test-data:/data
+      - ./scripts/screenshots/config.toml:/config/config.toml:ro
+      - ./scripts/screenshots/seed.toml:/config/seed.toml:ro
+    command: ["--seed-config", "/config/seed.toml"]
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/livez"]
       interval: 3s

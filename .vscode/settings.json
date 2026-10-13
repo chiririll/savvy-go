@@ -1,0 +1,6 @@
+{
+    // magefile*.go are behind the "mage" build tag; without it gopls ignores them.
+    "gopls": {
+        "build.buildFlags": ["-tags=mage"]
+    }
+}

@@ -104,7 +104,8 @@ func copyPlain(src, dst string) error {
 	return out.Close()
 }
 
-func (s *Store) PrepareSpace(ctx context.Context, src string) (*store.PreparedSpace, error) {
+func (s *Store) PrepareSpace(ctx context.Context, src string, opts ...store.PrepareOption) (*store.PreparedSpace, error) {
+	o := store.ResolvePrepare(opts)
 	kind, err := inspect(ctx, src)
 	if err != nil {
 		return nil, err
@@ -121,7 +122,7 @@ func (s *Store) PrepareSpace(ctx context.Context, src string) (*store.PreparedSp
 	case kindSpace:
 	case kindLaravel:
 		// Its finances are copied below; users and other server tables are left out.
-		if src, err = s.convertLaravel(ctx, src, staging); err != nil {
+		if src, err = s.convertLaravel(ctx, src, staging, o.LegacyKey); err != nil {
 			return fail(err)
 		}
 	default:
@@ -142,7 +143,7 @@ func (s *Store) PrepareSpace(ctx context.Context, src string) (*store.PreparedSp
 // server and space tables still in one file, and returns its path. The copy is opened as a
 // live database, so its triggers and views are dropped first: the conversion
 // writes to it and must not run anything the file brought along.
-func (s *Store) convertLaravel(ctx context.Context, src, staging string) (string, error) {
+func (s *Store) convertLaravel(ctx context.Context, src, staging, appKey string) (string, error) {
 	dst := filepath.Join(staging, "laravel"+spaceExt)
 	if err := copyPlain(src, dst); err != nil {
 		return "", err
@@ -174,7 +175,7 @@ func (s *Store) convertLaravel(ctx context.Context, src, staging string) (string
 			return "", err
 		}
 	}
-	if err := legacy.Upgrade(ctx, d, s.opts.AppKey); err != nil {
+	if err := legacy.Upgrade(ctx, d, appKey); err != nil {
 		return "", err
 	}
 	if _, err := d.ExecContext(ctx, `PRAGMA wal_checkpoint(TRUNCATE)`); err != nil {
@@ -183,7 +184,13 @@ func (s *Store) convertLaravel(ctx context.Context, src, staging string) (string
 	return dst, nil
 }
 
-func (s *Store) PrepareServer(ctx context.Context, src string) (*store.PreparedServer, error) {
+func (s *Store) PrepareServer(ctx context.Context, src string, opts ...store.PrepareOption) (*store.PreparedServer, error) {
+	o := store.ResolvePrepare(opts)
+	if o.LegacyKey != "" {
+		if err := legacy.CheckKey(o.LegacyKey); err != nil {
+			return nil, err
+		}
+	}
 	staging, err := s.newStaging()
 	if err != nil {
 		return nil, err
@@ -207,7 +214,7 @@ func (s *Store) PrepareServer(ctx context.Context, src string) (*store.PreparedS
 		if kind != kindLaravel {
 			return fail(ErrWrongKind)
 		}
-		if src, err = s.convertLaravel(ctx, src, staging); err != nil {
+		if src, err = s.convertLaravel(ctx, src, staging, o.LegacyKey); err != nil {
 			return fail(err)
 		}
 		if err := splitLaravel(ctx, src, staging); err != nil {

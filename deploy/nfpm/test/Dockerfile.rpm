@@ -1,0 +1,10 @@
+# systemd-as-PID-1 image for deploy/nfpm/test/test-package.mts rpm.
+ARG BASE=rockylinux:9
+FROM ${BASE}
+
+ENV container=docker
+RUN dnf install -y systemd procps-ng \
+    && dnf clean all
+
+STOPSIGNAL SIGRTMIN+3
+CMD ["/sbin/init"]

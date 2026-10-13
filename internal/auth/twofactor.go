@@ -14,9 +14,15 @@ import (
 const recoveryChars = "abcdefghjkmnpqrstuvwxyz23456789"
 
 type TwoFactor struct {
-	DB     store.DB
-	Users  Users
-	AppKey string
+	DB    store.DB
+	Users Users
+}
+
+func (t TwoFactor) verifyTOTP(_ context.Context, u *User, code string) bool {
+	if u == nil || u.TwoFactorSecret == nil {
+		return false
+	}
+	return VerifyTOTP(*u.TwoFactorSecret, code)
 }
 
 func (t TwoFactor) Enable(ctx context.Context, u *User) (secret, uri string, err error) {

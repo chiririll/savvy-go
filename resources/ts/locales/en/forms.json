@@ -257,6 +257,7 @@
         "providerType": "Provider type",
         "selectProviderType": "Select a provider type",
         "secretKeepPlaceholder": "Leave blank to keep current",
+        "needAppUrl": "Set the public URL in Administration → System → Server first: the URLs to register in your identity provider are built from it, and single sign-on does not work without it.",
         "registerUrls": "Register these URLs in your identity provider.",
         "acsUrl": "ACS (Reply) URL",
         "spEntityId": "SP Entity ID / Metadata",

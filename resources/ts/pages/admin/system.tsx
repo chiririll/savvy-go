@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { Boxes, ShieldCheck, Lock } from 'lucide-react'
+import { Boxes, Globe, ShieldCheck, Lock } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Page, PageHeader, FormWrapper, SettingsSection, ToggleRow, SettingsRowSkeleton } from '@/components/shared'
 import { Button } from '@/components/ui/button'
@@ -42,6 +42,45 @@ function NumberRow({
                 <Input id={id} type="number" min={0} step="any" className="w-28" value={draft} onChange={(e) => setDraft(e.target.value)} />
                 {changed && (
                     <Button size="sm" disabled={!valid} onClick={() => onSave(parsed)}>
+                        {t('actions.save', { ns: 'common' })}
+                    </Button>
+                )}
+            </div>
+        </div>
+    )
+}
+
+/** A text field saved on demand; empty clears the setting. */
+function TextRow({
+    id,
+    label,
+    description,
+    placeholder,
+    value,
+    onSave,
+}: {
+    id: string
+    label: string
+    description: string
+    placeholder?: string
+    value: string
+    onSave: (value: string) => void
+}) {
+    const { t } = useTranslation('settings')
+    const [draft, setDraft] = useState(value)
+    useEffect(() => setDraft(value), [value])
+    const changed = draft.trim() !== value
+
+    return (
+        <div className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+                <Label htmlFor={id} className="text-sm font-medium">{label}</Label>
+                <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
+            </div>
+            <div className="flex items-center gap-2">
+                <Input id={id} type="url" className="w-full sm:w-72" placeholder={placeholder} value={draft} onChange={(e) => setDraft(e.target.value)} />
+                {changed && (
+                    <Button size="sm" onClick={() => onSave(draft.trim())}>
                         {t('actions.save', { ns: 'common' })}
                     </Button>
                 )}
@@ -133,6 +172,23 @@ export default function AdminSystemPage() {
                                         onChange={(checked) => save({ sso_require_verified_email: checked })}
                                     />
                                 </>
+                            )}
+                        </div>
+                    </SettingsSection>
+
+                    <SettingsSection icon={Globe} title={t('system.server.title')} description={t('system.server.description')}>
+                        <div className="divide-y rounded-lg border">
+                            {isLoading || !settings ? (
+                                <SettingsRowSkeleton />
+                            ) : (
+                                <TextRow
+                                    id="app-url"
+                                    label={t('system.server.appUrl')}
+                                    description={t('system.server.appUrlDescription')}
+                                    placeholder={t('system.server.appUrlPlaceholder')}
+                                    value={settings.app_url ?? ''}
+                                    onSave={(v) => save({ app_url: v })}
+                                />
                             )}
                         </div>
                     </SettingsSection>

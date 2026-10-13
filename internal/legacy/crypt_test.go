@@ -1,7 +1,6 @@
-package auth
+package legacy
 
 import (
-	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"testing"
@@ -63,24 +62,5 @@ func TestUnwrapLegacyTOTPSecrets(t *testing.T) {
 	}
 	if s, ok := UnwrapSecret(appKey, plain); ok || s != plain {
 		t.Fatalf("plaintext pass-through %q %v", s, ok)
-	}
-}
-
-func TestVerifyTOTPAfterLaravelUnwrap(t *testing.T) {
-	key := make([]byte, 32)
-	_, _ = rand.Read(key)
-	appKey := "base64:" + base64.StdEncoding.EncodeToString(key)
-	secret, err := NewTOTPSecret()
-	if err != nil {
-		t.Fatal(err)
-	}
-	ct, err := EncryptLaravel(appKey, secret)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tf := TwoFactor{AppKey: appKey}
-	u := &User{TwoFactorSecret: &ct, TwoFactorEnabled: true, TwoFactorConfirmed: true}
-	if !tf.verifyTOTP(context.Background(), u, TOTPNow(secret)) {
-		t.Fatal("legacy encrypted secret should verify")
 	}
 }

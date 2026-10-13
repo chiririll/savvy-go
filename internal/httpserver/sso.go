@@ -13,6 +13,10 @@ import (
 )
 
 func (s *Server) ssoProviders(w http.ResponseWriter, r *http.Request) {
+	if s.appURL(r.Context()) == "" {
+		writeData(w, http.StatusOK, []any{})
+		return
+	}
 	list, err := s.sso.Enabled(r.Context())
 	if err != nil {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
@@ -72,7 +76,7 @@ func (s *Server) ssoMetadata(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/xml")
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte(s.sso.SamlMetadata(*p)))
+	_, _ = w.Write([]byte(s.sso.SamlMetadata(r.Context(), *p)))
 }
 
 func (s *Server) ssoExchange(w http.ResponseWriter, r *http.Request) {
@@ -120,7 +124,7 @@ func (s *Server) finishSSO(w http.ResponseWriter, r *http.Request, p *domain.Ide
 		s.redirectSPAError(w, r, "sso_error")
 		return
 	}
-	http.Redirect(w, r, strings.TrimRight(s.cfg.AppURL, "/")+"/auth/sso/callback?ticket="+ticket, http.StatusFound)
+	http.Redirect(w, r, "/auth/sso/callback?ticket="+ticket, http.StatusFound)
 }
 
 func (s *Server) lookupProvider(r *http.Request, slug string) *domain.IdentityProvider {
@@ -132,11 +136,11 @@ func (s *Server) lookupProvider(r *http.Request, slug string) *domain.IdentityPr
 }
 
 func (s *Server) redirectLogin(w http.ResponseWriter, r *http.Request, code string) {
-	http.Redirect(w, r, strings.TrimRight(s.cfg.AppURL, "/")+"/login?sso_error="+code, http.StatusFound)
+	http.Redirect(w, r, "/login?sso_error="+code, http.StatusFound)
 }
 
 func (s *Server) redirectSPAError(w http.ResponseWriter, r *http.Request, code string) {
-	http.Redirect(w, r, strings.TrimRight(s.cfg.AppURL, "/")+"/auth/sso/callback?error="+code, http.StatusFound)
+	http.Redirect(w, r, "/auth/sso/callback?error="+code, http.StatusFound)
 }
 
 func ssoCode(err error) string {
@@ -154,7 +158,7 @@ func (s *Server) idpIndex(w http.ResponseWriter, r *http.Request) {
 	}
 	data := make([]any, 0, len(list))
 	for _, p := range list {
-		data = append(data, p.JSON(s.cfg.AppURL))
+		data = append(data, p.JSON(s.appURL(r.Context())))
 	}
 	writeData(w, http.StatusOK, data)
 }
@@ -164,7 +168,7 @@ func (s *Server) idpShow(w http.ResponseWriter, r *http.Request) {
 	if p == nil {
 		return
 	}
-	writeJSON(w, http.StatusOK, p.JSON(s.cfg.AppURL))
+	writeJSON(w, http.StatusOK, p.JSON(s.appURL(r.Context())))
 }
 
 func (s *Server) idpStore(w http.ResponseWriter, r *http.Request) {
@@ -177,7 +181,7 @@ func (s *Server) idpStore(w http.ResponseWriter, r *http.Request) {
 		writeSSOErr(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, p.JSON(s.cfg.AppURL))
+	writeJSON(w, http.StatusCreated, p.JSON(s.appURL(r.Context())))
 }
 
 func (s *Server) idpUpdate(w http.ResponseWriter, r *http.Request) {
@@ -194,7 +198,7 @@ func (s *Server) idpUpdate(w http.ResponseWriter, r *http.Request) {
 		writeSSOErr(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, updated.JSON(s.cfg.AppURL))
+	writeJSON(w, http.StatusOK, updated.JSON(s.appURL(r.Context())))
 }
 
 func (s *Server) idpDestroy(w http.ResponseWriter, r *http.Request) {

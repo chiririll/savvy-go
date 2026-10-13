@@ -21,6 +21,17 @@ export const backupsApi = {
         return response.data
     },
 
+    /** Replaces the whole server with a Laravel database; it is converted on the way, not kept. */
+    restoreLaravel: async (file: File, appKey?: string): Promise<void> => {
+        const formData = new FormData()
+        formData.append('file', file)
+        if (appKey) formData.append('app_key', appKey)
+        await apiClient.post(`${ENDPOINT}/restore-laravel`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            timeout: 0,
+        })
+    },
+
     download: (filename: string) =>
         `${apiClient.defaults.baseURL}${ENDPOINT}/${encodeURIComponent(filename)}/download`,
 

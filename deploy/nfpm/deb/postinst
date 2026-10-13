@@ -6,7 +6,7 @@ DATA_DIR=/var/lib/savvy-go
 case "$1" in
     configure)
         mkdir -p "$DATA_DIR"
-        chown -R www-data:www-data "$DATA_DIR" /opt/savvy-go 2>/dev/null || true
+        chown -R www-data:www-data "$DATA_DIR" 2>/dev/null || true
 
         if [ -d /run/systemd/system ]; then
             systemctl daemon-reload

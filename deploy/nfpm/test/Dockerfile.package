@@ -1,0 +1,6 @@
+# Runs the compiled mage (package:deb, package:rpm), so the host needs no nfpm.
+FROM goreleaser/nfpm:v2.47.0 AS nfpm
+
+FROM debian:12-slim
+COPY --from=nfpm /usr/bin/nfpm /usr/local/bin/nfpm
+WORKDIR /src

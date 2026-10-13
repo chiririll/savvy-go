@@ -491,8 +491,8 @@ func NewWebAuthnCred(c auth.WebAuthnCred) WebAuthnCred {
 }
 
 // Backup status: "current" is a backup signed by this server (or a key it
-// trusts), "unsigned" one made elsewhere or edited, "raw" a bare database file
-// (a Laravel one) and "invalid" one that cannot be read.
+// trusts), "unsigned" one made elsewhere or edited, and "invalid" one that cannot
+// be read.
 type Backup struct {
 	Filename   string     `json:"filename"`
 	Size       int64      `json:"size"`
@@ -510,8 +510,6 @@ func NewBackup(b domain.Backup) Backup {
 	status := "invalid"
 	switch {
 	case !b.Valid:
-	case b.Kind == "":
-		status = "raw"
 	case b.Signature == domain.SignedHere || b.Signature == domain.SignedTrusted:
 		status = "current"
 	default:

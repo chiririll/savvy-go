@@ -4,7 +4,9 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"crypto/rand"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"mime/multipart"
@@ -344,15 +346,14 @@ func TestP21RestoreLaravelBackupAsServer(t *testing.T) {
 	a := newTestApp(t)
 	sess := a.issue(a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
 	content, _ := os.ReadFile(laravelFile(t, true))
-	up := createdBackup(t, a.upload("/api/backups/upload", "laravel.sqlite", content, nil, sess))
-	if up["status"] != "raw" || up["restorable"] != true {
-		t.Fatalf("listed %v", up)
-	}
-	res := a.do("POST", "/api/backups/"+up["filename"].(string)+"/restore", nil, sess.Token, sess.CSRF)
+	res := a.upload("/api/backups/restore-laravel", "laravel.sqlite", content, nil, sess)
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("restore %d %v", res.StatusCode, decodeJSON(t, res))
 	}
 	res.Body.Close()
+	if list, _ := a.s.backups.ServerBackups(); len(list) != 0 {
+		t.Fatalf("the Laravel database was kept as a backup: %v", list)
+	}
 
 	ctx := context.Background()
 	ada, _ := a.s.users.ByEmail(ctx, "ada@example.com")
@@ -379,8 +380,7 @@ func TestRestoreOldLaravelBackupKeepsLiveData(t *testing.T) {
 	u := a.createUser("admin@test.com", "secret1", auth.RoleAdmin)
 	sess := a.issue(u, false)
 	content, _ := os.ReadFile(laravelFile(t, false))
-	up := createdBackup(t, a.upload("/api/backups/upload", "old.sqlite", content, nil, sess))
-	res := a.do("POST", "/api/backups/"+up["filename"].(string)+"/restore", nil, sess.Token, sess.CSRF)
+	res := a.upload("/api/backups/restore-laravel", "old.sqlite", content, nil, sess)
 	body := decodeJSON(t, res)
 	if res.StatusCode != http.StatusUnprocessableEntity {
 		t.Fatalf("restore %d %v", res.StatusCode, body)
@@ -439,5 +439,114 @@ func TestP27ImportCopyGetsNewUUID(t *testing.T) {
 	}
 	if body["data"].(map[string]any)["name"] != "Test" {
 		t.Fatalf("the copy should take the backup's space name: %v", body)
+	}
+}
+
+// A Laravel database is not kept as a backup archive.
+func TestLaravelDatabaseIsNotAcceptedAsBackup(t *testing.T) {
+	a := newTestApp(t)
+	sess := a.issue(a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
+	content, _ := os.ReadFile(laravelFile(t, true))
+	status(t, a.upload("/api/backups/upload", "laravel.sqlite", content, nil, sess), http.StatusUnprocessableEntity, "server upload")
+	status(t, a.upload(spacePath(a.space.ID, "/backups/upload"), "laravel.sqlite", content, nil, sess), http.StatusUnprocessableEntity, "space upload")
+	if list, _ := a.s.backups.ServerBackups(); len(list) != 0 {
+		t.Fatalf("kept as a backup: %v", list)
+	}
+}
+
+// laravelFileWithTOTP is a Laravel database whose admin has a two-factor
+// secret, encrypted with a fresh APP_KEY.
+func laravelFileWithTOTP(t *testing.T) (content []byte, appKey, secret string) {
+	t.Helper()
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err != nil {
+		t.Fatal(err)
+	}
+	appKey = "base64:" + base64.StdEncoding.EncodeToString(key)
+	secret, err := auth.NewTOTPSecret()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ct, err := legacy.EncryptLaravel(appKey, secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := laravelFile(t, true)
+	d, err := db.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.Exec(`UPDATE users SET two_factor_secret = ?, two_factor_enabled = 1, two_factor_confirmed = 1 WHERE email = 'ada@example.com'`, ct); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.Exec(`PRAGMA wal_checkpoint(TRUNCATE)`); err != nil {
+		t.Fatal(err)
+	}
+	_ = d.Close()
+	content, _ = os.ReadFile(path)
+	return content, appKey, secret
+}
+
+// The Laravel APP_KEY entered at upload decrypts the two-factor secrets while
+// the database is converted.
+func TestRestoreLaravelServerDecryptsTwoFactorWithKey(t *testing.T) {
+	a := newTestApp(t)
+	sess := a.issue(a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
+	content, appKey, secret := laravelFileWithTOTP(t)
+
+	status(t, a.upload("/api/backups/restore-laravel", "laravel.sqlite", content, map[string]string{"app_key": "nonsense"}, sess), http.StatusUnprocessableEntity, "invalid key")
+	status(t, a.upload("/api/backups/restore-laravel", "laravel.sqlite", content, map[string]string{"app_key": appKey}, sess), http.StatusOK, "restore")
+
+	ada, err := a.s.users.ByEmail(context.Background(), "ada@example.com")
+	if err != nil || ada == nil || ada.TwoFactorSecret == nil || *ada.TwoFactorSecret != secret {
+		t.Fatalf("two-factor secret after restore = %+v, %v; want the decrypted secret", ada, err)
+	}
+}
+
+// Without the key the secrets cannot be read, so they are reset and the user
+// can still sign in with the password.
+func TestRestoreLaravelServerWithoutKeyResetsTwoFactor(t *testing.T) {
+	a := newTestApp(t)
+	sess := a.issue(a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
+	content, _, _ := laravelFileWithTOTP(t)
+
+	status(t, a.upload("/api/backups/restore-laravel", "laravel.sqlite", content, nil, sess), http.StatusOK, "restore")
+
+	ada, err := a.s.users.ByEmail(context.Background(), "ada@example.com")
+	if err != nil || ada == nil {
+		t.Fatalf("laravel admin missing: %+v, %v", ada, err)
+	}
+	if ada.TwoFactorSecret != nil || ada.TwoFactorEnabled || ada.TwoFactorConfirmed {
+		t.Fatalf("two-factor left on with an unreadable secret: %+v", ada)
+	}
+}
+
+// A Laravel database replaces the current space's data in place, keeping the
+// space's identity, and is not kept as a backup.
+func TestRestoreLaravelIntoCurrentSpace(t *testing.T) {
+	a := newTestApp(t)
+	sess := a.issue(a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
+	content, _ := os.ReadFile(laravelFile(t, true))
+	before, _ := a.s.spaces.Get(context.Background(), a.space.ID)
+
+	res := a.upload(spacePath(a.space.ID, "/backups/restore-laravel"), "laravel.sqlite", content, nil, sess)
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("restore %d %v", res.StatusCode, decodeJSON(t, res))
+	}
+	res.Body.Close()
+
+	after, _ := a.s.spaces.Get(context.Background(), a.space.ID)
+	if after == nil || before == nil || after.UUID != before.UUID {
+		t.Fatalf("space identity changed: %+v -> %+v", before, after)
+	}
+	accounts := decodeJSON(t, a.inSpace(a.space.ID, "GET", "/api/accounts", nil, sess))["data"].([]any)
+	if len(accounts) == 0 {
+		t.Fatal("the space has none of the Laravel accounts")
+	}
+	if u, _ := a.s.users.ByEmail(context.Background(), "ada@example.com"); u != nil {
+		t.Fatal("restoring into a space brought the Laravel users")
+	}
+	if list, _ := a.s.backups.SpaceBackups(a.space.ID); len(list) != 0 {
+		t.Fatalf("kept as a backup: %v", list)
 	}
 }

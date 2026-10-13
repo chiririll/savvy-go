@@ -12,9 +12,9 @@ import (
 	"time"
 )
 
-func (s SSO) SamlMetadata(p IdentityProvider) string {
-	entity := strings.TrimRight(s.AppURL, "/") + "/api/auth/sso/" + p.Slug + "/metadata"
-	acs := s.ACSURL(p)
+func (s SSO) SamlMetadata(ctx context.Context, p IdentityProvider) string {
+	entity := s.AppURL() + "/api/auth/sso/" + p.Slug + "/metadata"
+	acs := s.ACSURL(ctx, p)
 	return fmt.Sprintf(`<?xml version="1.0"?>
 <EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata" entityID="%s">
   <SPSSODescriptor AuthnRequestsSigned="false" WantAssertionsSigned="true" protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
@@ -37,10 +37,10 @@ func (s SSO) samlRedirect(ctx context.Context, p IdentityProvider, redirectAfter
 	if err != nil {
 		return "", err
 	}
-	entity := strings.TrimRight(s.AppURL, "/") + "/api/auth/sso/" + p.Slug + "/metadata"
+	entity := s.AppURL() + "/api/auth/sso/" + p.Slug + "/metadata"
 	instant := time.Now().UTC().Format(time.RFC3339)
 	doc := fmt.Sprintf(`<samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="%s" Version="2.0" IssueInstant="%s" Destination="%s" AssertionConsumerServiceURL="%s" ProtocolBinding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"><saml:Issuer>%s</saml:Issuer></samlp:AuthnRequest>`,
-		xmlEscape(reqID), xmlEscape(instant), xmlEscape(ssoURL), xmlEscape(s.ACSURL(p)), xmlEscape(entity))
+		xmlEscape(reqID), xmlEscape(instant), xmlEscape(ssoURL), xmlEscape(s.ACSURL(ctx, p)), xmlEscape(entity))
 	encoded, err := deflateB64(doc)
 	if err != nil {
 		return "", err

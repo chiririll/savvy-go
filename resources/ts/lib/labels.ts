@@ -182,14 +182,12 @@ export const automationLogStatusLabel = (t: TFunction, status: AutomationLogStat
 export const backupStatusLabel = (t: TFunction, status: BackupStatus): string => ({
     current: t('settings:backups.status.current'),
     unsigned: t('settings:backups.status.unsigned'),
-    raw: t('settings:backups.status.raw'),
     invalid: t('settings:backups.status.invalid'),
 } satisfies Record<BackupStatus, string>)[status]
 
 export const backupStatusHelp = (t: TFunction, status: BackupStatus): string => ({
     current: t('settings:backups.statusHelp.current'),
     unsigned: t('settings:backups.statusHelp.unsigned'),
-    raw: t('settings:backups.statusHelp.raw'),
     invalid: t('settings:backups.statusHelp.invalid'),
 } satisfies Record<BackupStatus, string>)[status]
 

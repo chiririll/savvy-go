@@ -1,0 +1,3 @@
+# Seed config of the throwaway app of docker-compose.screenshots.yml (--seed-config).
+# Who can sign in and the ids of the seeded data, for the runner.
+manifest = "/data/manifest.json"

@@ -3,9 +3,12 @@ package httpserver
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"savvy-go/internal/settings"
+	"strings"
 	"time"
 )
 
@@ -16,6 +19,8 @@ func (s *Server) settingsIndex(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	// The public URL lives in the config file, not the database.
+	all["app_url"] = s.cfg.URL()
 	writeJSON(w, http.StatusOK, all)
 }
 
@@ -32,6 +37,21 @@ func (s *Server) settingsUpdate(w http.ResponseWriter, r *http.Request) {
 			"error":   "sso_required",
 		})
 		return
+	}
+	if v, ok := body["app_url"]; ok {
+		clean, err := cleanAppURL(v)
+		if err != nil {
+			writeValidation(w, map[string][]string{"app_url": {"Enter a full URL such as https://savvy.example.com."}})
+			return
+		}
+		if s.cfg.Live == nil {
+			writeMessage(w, http.StatusInternalServerError, "The config file is not available.")
+			return
+		}
+		if err := s.cfg.Live.SetAppURL(clean); err != nil {
+			writeValidation(w, map[string][]string{"app_url": {"Could not save the config file: " + err.Error()}})
+			return
+		}
 	}
 	for k, v := range body {
 		if !settings.IsServerKey(k) {
@@ -73,6 +93,24 @@ func (s *Server) spaceSettingsUpdate(w http.ResponseWriter, r *http.Request) {
 		}()
 	}
 	s.spaceSettingsIndex(w, r)
+}
+
+// cleanAppURL validates the app_url setting: empty (unset) or an
+// absolute http(s) URL, stored without a trailing slash.
+func cleanAppURL(v any) (string, error) {
+	raw, ok := v.(string)
+	if !ok {
+		return "", errors.New("not a string")
+	}
+	raw = strings.TrimRight(strings.TrimSpace(raw), "/")
+	if raw == "" {
+		return "", nil
+	}
+	u, err := url.Parse(raw)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.RawQuery != "" || u.Fragment != "" {
+		return "", errors.New("invalid url")
+	}
+	return raw, nil
 }
 
 func asBool(v any) bool {

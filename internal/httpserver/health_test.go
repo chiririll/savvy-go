@@ -18,13 +18,8 @@ import (
 func testConfig(t *testing.T) (config.Config, string) {
 	t.Helper()
 	dir := t.TempDir()
-	public := filepath.Join(dir, "public")
-	if err := os.MkdirAll(public, 0o755); err != nil {
-		t.Fatal(err)
-	}
 	cfg := config.Config{
 		AppURL:        "http://localhost:8080",
-		PublicDir:     public,
 		DataDir:       dir,
 		UploadsDir:    filepath.Join(dir, "uploads"),
 		BackupsDir:    filepath.Join(dir, "backups"),
@@ -146,14 +141,17 @@ func TestP15ReadyzWarnsAboutUnavailableSpace(t *testing.T) {
 
 func TestSPAServesIndexAndStatic(t *testing.T) {
 	cfg, _ := testConfig(t)
-	if err := os.WriteFile(filepath.Join(cfg.PublicDir, "favicon.svg"), []byte("<svg/>"), 0o644); err != nil {
+	public := t.TempDir()
+	if err := os.WriteFile(filepath.Join(public, "favicon.svg"), []byte("<svg/>"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	index := `<html><head></head><body><div id="app"></div><i>{{.Version}}</i></body></html>`
-	if err := os.WriteFile(filepath.Join(cfg.PublicDir, "index.html"), []byte(index), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(public, "index.html"), []byte(index), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	srv := httptest.NewServer(New(cfg, openTestStore(t, cfg), testKeys(t, cfg)).Handler())
+	s := New(cfg, openTestStore(t, cfg), testKeys(t, cfg))
+	s.assets = os.DirFS(public)
+	srv := httptest.NewServer(s.Handler())
 	t.Cleanup(srv.Close)
 
 	res, err := http.Get(srv.URL + "/favicon.svg")

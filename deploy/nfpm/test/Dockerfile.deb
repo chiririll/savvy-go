@@ -1,0 +1,11 @@
+# systemd-as-PID-1 image for deploy/nfpm/test/test-package.mts deb.
+ARG BASE=debian:12
+FROM ${BASE}
+
+ENV container=docker DEBIAN_FRONTEND=noninteractive
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends systemd systemd-sysv procps curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+STOPSIGNAL SIGRTMIN+3
+CMD ["/sbin/init"]

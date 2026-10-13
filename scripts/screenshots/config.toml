@@ -1,0 +1,4 @@
+# Config of the throwaway app of docker-compose.screenshots.yml; every other key keeps its default.
+[server]
+app_url = "http://savvy"
+timezone = "UTC"

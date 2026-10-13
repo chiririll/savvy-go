@@ -2,7 +2,7 @@
 set -e
 
 # $1: 1 = fresh install, 2 = upgrade.
-chown -R savvy-go:savvy-go /var/lib/savvy-go /opt/savvy-go 2>/dev/null || true
+chown -R savvy-go:savvy-go /var/lib/savvy-go 2>/dev/null || true
 
 if [ -d /run/systemd/system ]; then
     systemctl daemon-reload

@@ -27,6 +27,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { FormWrapper } from '@/components/shared/FormWrapper'
 import { identityProviderSchema, IdentityProviderFormValues } from '@/schemas/sso'
+import { useSettings } from '@/hooks/use-settings'
 import { useSsoPresets } from '@/hooks/use-sso'
 import { BrandIcon, brandVars } from './BrandIcon'
 import { ssoFieldLabel, ssoFieldPlaceholder, ssoPresetLabel } from './presetMeta'
@@ -72,8 +73,18 @@ function CopyableUrl({ label, value }: { label: string; value: string }) {
 
 function RedirectUrls({ slug, protocol }: { slug: string; protocol: string }) {
     const { t } = useTranslation('forms')
-    const origin = typeof window !== 'undefined' ? window.location.origin : ''
-    const base = `${origin}/api/auth/sso/${slug}`
+    const { data: settings } = useSettings()
+    // The server builds redirect URIs from the public URL, not from the address this page is opened at.
+    const appUrl = settings?.app_url?.trim().replace(/\/+$/, '')
+    const base = `${appUrl}/api/auth/sso/${slug}`
+
+    if (!appUrl) {
+        return (
+            <div className="rounded-lg border border-dashed bg-muted/30 p-4">
+                <p className="text-xs text-muted-foreground">{t('sso.needAppUrl')}</p>
+            </div>
+        )
+    }
 
     return (
         <div className="space-y-3 rounded-lg border border-dashed bg-muted/30 p-4">

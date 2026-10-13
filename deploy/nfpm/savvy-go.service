@@ -6,10 +6,8 @@ After=network.target
 Type=simple
 User=@APP_USER@
 Group=@APP_USER@
-Environment=DATA_DIR=/var/lib/savvy-go
-Environment=PUBLIC_DIR=/opt/savvy-go/public
-Environment=LISTEN_ADDR=:8080
-EnvironmentFile=-/etc/savvy-go/install.env
+# The only environment the app reads. The web UI is built into the binary.
+Environment=CONFIG_FILE=/etc/savvy-go/config.toml
 ExecStart=/usr/bin/savvy-go
 Restart=always
 RestartSec=3

@@ -1,6 +1,7 @@
-package auth
+package legacy
 
 import (
+	"errors"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/hmac"
@@ -49,6 +50,15 @@ func ParseLaravelKey(appKey string) ([]byte, error) {
 		return base64.StdEncoding.DecodeString(strings.TrimPrefix(appKey, "base64:"))
 	}
 	return []byte(appKey), nil
+}
+
+// CheckKey reports whether appKey can be a Laravel APP_KEY: AES-128 or AES-256.
+func CheckKey(appKey string) error {
+	raw, err := ParseLaravelKey(appKey)
+	if err != nil || (len(raw) != 16 && len(raw) != 32) {
+		return errors.New("This is not a valid Laravel APP_KEY.")
+	}
+	return nil
 }
 
 // DecryptLaravel decrypts a Laravel Encrypter payload (AES-256-CBC or AES-256-GCM)

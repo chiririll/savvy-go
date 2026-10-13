@@ -27,8 +27,15 @@ export default function SpaceBackupsPage() {
             downloadUrl: (name) => spacesApi.backupDownloadUrl(id, name),
             restore: (name) => spacesApi.restoreBackup(id, name),
             remove: (name) => spacesApi.deleteBackup(id, name),
+            laravel: {
+                targets: user?.role === 'guest' ? ['space'] : ['space', 'new'],
+                restore: async (file, target) => {
+                    if (target === 'space') return spacesApi.restoreLaravel(id, file)
+                    await switchSpace((await spacesApi.importSpace(file)).id)
+                },
+            },
         }
-    }, [space])
+    }, [space, user?.role, switchSpace])
 
     if (!space) return <></>
     if (space.role !== 'admin') {
