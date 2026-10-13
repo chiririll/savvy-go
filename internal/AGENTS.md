@@ -23,7 +23,7 @@ Dependencies point down. Each package may import the ones above it in this list,
 - On top of `ledger`, independent of each other: `reports`, `recurring`, `automation`, `importer` (CSV; also uses `uploads`), `uploads`.
 - `transfers`: signed transfers between linked spaces. Uses `spaces`, `signing`; not `ledger`.
 - `backup`: backup files, archive format, restore. Uses `spaces`, `transfers`, `signing`.
-- `sso`: identity providers, OIDC/OAuth/SAML, JIT provisioning. `ProvisionSpace` is injected.
+- `sso`: identity providers, OIDC/OAuth/SAML, JIT provisioning. A new user gets no space.
 - `store/arch_test.go` enforces this layering and that the core never imports `net/http`.
 - Shared test fixtures cannot live in `ledger` (its in-package tests would import-cycle), so `reports` keeps its own small copy.
 

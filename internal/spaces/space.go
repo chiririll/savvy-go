@@ -145,15 +145,6 @@ func (s Service) Get(ctx context.Context, id int64) (*Space, error) {
 	return &Space{ID: row.ID, UUID: row.UUID, Name: row.Name}, nil
 }
 
-// Provision gives a new user their personal space. Guests get none: they
-// only take part in spaces they were invited to.
-func (s Service) Provision(ctx context.Context, u *auth.User) (*Space, error) {
-	if u == nil || u.IsGuest() || s.Store == nil {
-		return nil, nil
-	}
-	return s.Create(ctx, u.Name, u)
-}
-
 // SetMember adds u to a space or changes their role.
 func (s Service) SetMember(ctx context.Context, spaceID int64, u *auth.User, role string) error {
 	if !ValidRole(role) {

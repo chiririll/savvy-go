@@ -80,10 +80,7 @@ func (s *Server) authRegister(w http.ResponseWriter, r *http.Request) {
 		writeValidation(w, errs)
 		return
 	}
-	var (
-		u            *auth.User
-		provisionErr error
-	)
+	var u *auth.User
 	// Verify, create and invalidate are one step, so two parallel requests
 	// with the right password still create one admin.
 	err = s.bootstrap.Register(body.BootstrapPassword, func() error {
@@ -97,9 +94,6 @@ func (s *Server) authRegister(w http.ResponseWriter, r *http.Request) {
 		if u, err = s.users.Create(r.Context(), strings.TrimSpace(body.Name), body.Email, &pass, auth.RoleAdmin); err != nil {
 			return errEmailTaken
 		}
-		// The admin exists from here on, so the password must be spent even
-		// if the personal space fails.
-		_, provisionErr = s.spaces.Provision(r.Context(), u)
 		return nil
 	})
 	switch {
@@ -112,8 +106,6 @@ func (s *Server) authRegister(w http.ResponseWriter, r *http.Request) {
 		writeValidation(w, map[string][]string{"email": {"The email has already been taken."}})
 	case err != nil:
 		writeMessage(w, http.StatusInternalServerError, err.Error())
-	case provisionErr != nil:
-		writeMessage(w, http.StatusInternalServerError, provisionErr.Error())
 	default:
 		s.issueSession(w, r, u, 201, true)
 	}

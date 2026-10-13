@@ -120,8 +120,6 @@ type Service struct {
 	DB       store.DB
 	Users    auth.Users
 	Settings settings.Store
-	// ProvisionSpace gives a freshly created Service user their personal space.
-	ProvisionSpace func(ctx context.Context, u *auth.User) error
 	// AppURL returns the public URL of the instance, empty when unset.
 	AppURL func() string
 	HTTP   *http.Client

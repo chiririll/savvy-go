@@ -104,7 +104,7 @@ func New(cfg config.Config, st store.Store, keys *signing.Holder, opts ...Option
 	if s.mail == nil {
 		s.mail = mailer.New(cfg.Mail)
 	}
-	s.sso = sso.Service{DB: srv, Users: s.users, Settings: s.settings, ProvisionSpace: func(ctx context.Context, u *auth.User) error { _, err := s.spaces.Provision(ctx, u); return err }, AppURL: cfg.URL}
+	s.sso = sso.Service{DB: srv, Users: s.users, Settings: s.settings, AppURL: cfg.URL}
 	_ = os.MkdirAll(cfg.UploadsDir, 0o775)
 	_ = os.MkdirAll(cfg.BackupsDir, 0o775)
 	s.mux = s.routes()

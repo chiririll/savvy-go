@@ -70,10 +70,6 @@ func (s *Server) usersStore(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	if _, err := s.spaces.Provision(r.Context(), u); err != nil {
-		writeMessage(w, http.StatusInternalServerError, err.Error())
-		return
-	}
 	payload := u.ResourceJSON()
 	if u.IsInactive() {
 		tok, exp, err := s.tokens.Issue(r.Context(), u)
