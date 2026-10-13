@@ -32,7 +32,8 @@
             "description": "По какому адресу этот инстанс доступен снаружи.",
             "appUrl": "Публичный адрес",
             "appUrlDescription": "Полный адрес, по которому пользователи открывают Savvy, например https://savvy.example.com. Нужен для SSO и passkeys; также можно задать как app_url в config.toml.",
-            "appUrlPlaceholder": "https://savvy.example.com"
+            "appUrlPlaceholder": "https://savvy.example.com",
+            "configReadOnly": "Savvy не может записывать config.toml, поэтому здесь это не изменить. Задайте app_url в файле и перезапустите."
         },
         "mail": {
             "title": "Почта",

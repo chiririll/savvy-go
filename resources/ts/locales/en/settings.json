@@ -32,7 +32,8 @@
             "description": "How this instance is reached from outside.",
             "appUrl": "Public URL",
             "appUrlDescription": "Full address users open Savvy at, for example https://savvy.example.com. Required for SSO and passkeys; can also be set as app_url in config.toml.",
-            "appUrlPlaceholder": "https://savvy.example.com"
+            "appUrlPlaceholder": "https://savvy.example.com",
+            "configReadOnly": "config.toml is read-only for Savvy, so this cannot be changed here. Set app_url in the file and restart."
         },
         "mail": {
             "title": "Email",

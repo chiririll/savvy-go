@@ -154,10 +154,12 @@ func Load(path string) (Config, error) {
 	if err != nil {
 		return Config{}, fmt.Errorf("encode config: %w", err)
 	}
-	if !bytes.Equal(raw, out) {
-		if err := writeFile(path, out); err != nil {
-			slog.Warn("could not write the config file; settings changed in the admin panel will not persist", "path", path, "err", err)
-		}
+	// Write even when nothing changed: it is the probe for "can this process
+	// save settings later" (a read-only mount or directory fails here).
+	writable := true
+	if err := writeFile(path, out); err != nil {
+		writable = false
+		slog.Warn("could not write the config file; settings changed in the admin panel are disabled", "path", path, "err", err)
 	}
 	cfg := f.resolve()
 	if cfg.AppURL == "" {
@@ -166,7 +168,7 @@ func Load(path string) (Config, error) {
 	if cfg.MailProblem != "" {
 		slog.Warn("mail is disabled: invalid [mailer] section in the config file", "problem", cfg.MailProblem)
 	}
-	cfg.Live = &Live{path: path, f: f, appURL: cfg.AppURL}
+	cfg.Live = &Live{path: path, f: f, appURL: cfg.AppURL, writable: writable}
 	return cfg, nil
 }
 
@@ -186,6 +188,9 @@ func writeFile(path string, data []byte) error {
 	return nil
 }
 
+// ErrReadOnly is returned when the config file cannot be written.
+var ErrReadOnly = errors.New("the config file is read-only")
+
 // Live is the part of the configuration the admin panel can change at run
 // time, persisted to the config file.
 type Live struct {
@@ -193,7 +198,13 @@ type Live struct {
 	path   string
 	f      file
 	appURL string
+	// writable is whether the config file could be written at start.
+	writable bool
 }
+
+// Writable reports whether the admin panel can change the config file. False
+// for a read-only mount; the settings it covers are then shown but locked.
+func (l *Live) Writable() bool { return l != nil && l.writable }
 
 // AppURL is the public URL of the instance, empty when unset.
 func (l *Live) AppURL() string {
@@ -204,6 +215,9 @@ func (l *Live) AppURL() string {
 
 // SetAppURL changes the public URL and writes the config file.
 func (l *Live) SetAppURL(v string) error {
+	if !l.writable {
+		return ErrReadOnly
+	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	prev := l.f.Server.AppURL

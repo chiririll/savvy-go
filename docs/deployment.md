@@ -38,7 +38,7 @@ Keys, with their defaults, are listed in the generated file itself:
 | `[security]` | `session_ttl`, `remember_ttl`, `challenge_ttl`, `session_cookie`, `csrf_cookie`, `csrf_header` |
 | `[mailer]`   | `enabled`, `host`, `port`, `protocol`, `user`, `password`, `from`, `skip_verify`, `timeout`       |
 
-`app_url` is the public `https://` URL of your instance. SSO and passkeys stay disabled without it. It can also be changed in the admin panel (System → Server), which writes it back to the file. Behind Docker, set it there, or edit `/data/config.toml` once.
+`app_url` is the public `https://` URL of your instance. SSO and passkeys stay disabled without it. It can also be changed in the admin panel (System → Server), which writes it back to the file. If Go Savvy cannot write the file (a read-only mount), the field is locked in the panel and you edit the file yourself. Behind Docker, set it there, or edit `/data/config.toml` once.
 
 Limits such as spaces per user, space quotas and the number of kept backups are not in the file: server admins set them in **Administration → System**.
 

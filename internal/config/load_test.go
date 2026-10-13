@@ -2,6 +2,7 @@ package config
 
 import (
 	"bytes"
+	"errors"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -136,6 +137,36 @@ func TestSetAppURLPersists(t *testing.T) {
 	again, _ := Load(path)
 	if again.AppURL != "https://b.example" {
 		t.Errorf("not persisted: %q", again.AppURL)
+	}
+}
+
+func TestWritableFlag(t *testing.T) {
+	path := write(t, "[server]\napp_url = \"https://a.example\"\n")
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.Live.Writable() {
+		t.Error("a normal file must be writable")
+	}
+
+	// A directory where the temp file goes makes every write fail, like a read-only mount.
+	path = write(t, "[server]\napp_url = \"https://a.example\"\n")
+	if err := os.Mkdir(path+".tmp", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err = Load(path)
+	if err != nil {
+		t.Fatalf("a read-only config must not stop the server: %v", err)
+	}
+	if cfg.Live.Writable() {
+		t.Error("write failed but the config is reported writable")
+	}
+	if err := cfg.Live.SetAppURL("https://b.example"); !errors.Is(err, ErrReadOnly) {
+		t.Errorf("SetAppURL on a read-only config: %v", err)
+	}
+	if cfg.URL() != "https://a.example" {
+		t.Errorf("url changed despite the failure: %q", cfg.URL())
 	}
 }
 
