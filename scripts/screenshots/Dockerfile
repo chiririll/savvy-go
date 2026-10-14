@@ -1,4 +1,5 @@
-# Runs scripts/screenshots/run.ts; see docker-compose.screenshots.yml. Build from the
+# Runs scripts/screenshots/run.ts; see docker-compose.screenshots.yml. `app` is the build context
+# of the app's image (compose: additional_contexts). Build from the
 # repository root. The image carries the browsers; the playwright package comes from
 # scripts/package.json, and its version must be the one of the image tag below.
 ARG PLAYWRIGHT_VERSION=1.63.0
@@ -10,6 +11,8 @@ RUN npm ci
 RUN test "$(node -p "require('playwright/package.json').version")" = "${PLAYWRIGHT_VERSION}" \
     || { echo "scripts/package-lock.json has another Playwright than PLAYWRIGHT_VERSION=${PLAYWRIGHT_VERSION}: update both" >&2; exit 1; }
 COPY scripts/screenshots ./screenshots
+# Scenarios start the app themselves, each on an empty data directory (scenarios/server.ts).
+COPY --from=app /usr/local/bin/savvy-go /usr/local/bin/savvy-go
 # The script reads the list of pages and the languages (a directory each) from the app's sources.
 COPY resources/ts/app/pages.ts /app/resources/ts/app/pages.ts
 COPY resources/ts/locales /app/resources/ts/locales

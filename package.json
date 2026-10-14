@@ -7,7 +7,7 @@
         "build": "vite build",
         "dev": "vite",
         "logos": "npm --prefix scripts run logos",
-        "screenshots": "npm --prefix scripts run screenshots",
+        "screenshots": "npm --prefix scripts run screenshots --",
         "screenshots:diff": "npm --prefix scripts run screenshots:diff",
         "test": "vitest run"
     },

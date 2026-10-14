@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { accountTypeLabel, categoryTypeLabel } from '@/lib/labels'
+import { testId } from '@/lib/test-id'
 import { localizeDefaultName, toStoredDefaultName } from '@/lib/localized-name'
 import type { CurrencyCatalogItem } from '@/types'
 import type { AccountType } from '@/types/accounts'
@@ -108,7 +109,7 @@ function Currencies({ content, catalog, catalogFailed, onRetryCatalog, onChange 
                     </span>
                 ))}
                 <Select value="" onValueChange={(code) => onChange({ currencies: [...content.currencies, code] })}>
-                    <SelectTrigger className="w-44" disabled={loading || !content.baseCurrency}>
+                    <SelectTrigger className="w-44" disabled={loading || !content.baseCurrency} {...testId('create-space-add-currency')}>
                         <SelectValue placeholder={t('spaces.create.currencies.add')} />
                     </SelectTrigger>
                     <SelectContent>
@@ -138,6 +139,7 @@ function Accounts({ content, onChange }: Pick<Props, 'content' | 'onChange'>) {
                 <div key={account.key} className="grid grid-cols-2 gap-2 rounded-lg border p-2 sm:grid-cols-[2fr_1fr_1fr_1fr_auto]">
                     <Input
                         className="col-span-2 sm:col-span-1"
+                        {...testId('create-space-account-name')}
                         aria-label={t('spaces.create.accounts.name')}
                         placeholder={t('spaces.create.accounts.name')}
                         value={account.name}
@@ -155,7 +157,7 @@ function Accounts({ content, onChange }: Pick<Props, 'content' | 'onChange'>) {
                         </SelectContent>
                     </Select>
                     <Select value={account.currency} onValueChange={(currency) => patch(account.key, { currency })}>
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger className="w-full" {...testId('create-space-account-currency')}>
                             <SelectValue placeholder={t('spaces.create.accounts.currency')} />
                         </SelectTrigger>
                         <SelectContent>
@@ -166,6 +168,7 @@ function Accounts({ content, onChange }: Pick<Props, 'content' | 'onChange'>) {
                     </Select>
                     <Input
                         inputMode="decimal"
+                        {...testId('create-space-account-balance')}
                         aria-label={t('spaces.create.accounts.balance')}
                         placeholder={t('spaces.create.accounts.balance')}
                         value={account.initialBalance}
@@ -187,6 +190,7 @@ function Accounts({ content, onChange }: Pick<Props, 'content' | 'onChange'>) {
                 type="button"
                 variant="outline"
                 size="sm"
+                {...testId('create-space-add-account')}
                 disabled={codes.length === 0}
                 onClick={() =>
                     onChange({

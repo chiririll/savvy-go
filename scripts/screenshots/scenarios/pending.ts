@@ -1,0 +1,37 @@
+// Pages (their `path` in resources/ts/app/pages.ts) that no scenario goes through yet, each with
+// the reason. The run fails for a page that is neither here nor in the `covers` of a scenario, and
+// for one that is both. This list should only get shorter: a new page gets a scenario in
+// flows/, not an entry here (unless it cannot have one; say why).
+export const pending: Record<string, string> = {
+    '/login': 'todo',
+    '/auth/sso/callback': 'todo: needs an identity provider',
+    '/set-password/:token': 'todo',
+    '/invite/:token': 'todo',
+    '/': 'todo',
+    '/transactions': 'todo',
+    '/accounts': 'todo',
+    '/categories': 'todo',
+    '/currencies': 'todo',
+    '/budgets': 'todo',
+    '/tags': 'todo',
+    '/debts': 'todo',
+    '/recurring': 'todo',
+    '/automation': 'todo',
+    '/automation/:id/logs': 'todo',
+    '/reports': 'todo',
+    '/settings/space': 'todo',
+    '/settings/import': 'todo',
+    '/settings/backups': 'todo',
+    '/settings/user': 'todo',
+    '/settings/security': 'todo',
+    '/settings/api': 'todo',
+    '/admin/system': 'todo',
+    '/admin/monitoring': 'todo',
+    '/admin/sso': 'todo',
+    '/admin/security': 'todo',
+    '/admin/providers/create': 'todo',
+    '/admin/providers/:id/edit': 'todo',
+    '/admin/backups': 'todo',
+    '/admin/users': 'todo',
+    '/admin/spaces': 'todo',
+}

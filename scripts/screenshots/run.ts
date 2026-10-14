@@ -1,4 +1,5 @@
-// Screenshots every page of a running app, per seeded user, space and viewport.
+// Screenshots every page of a running app, per seeded user, space and viewport, then runs the
+// scenarios (scenarios/): flows driven on servers of their own.
 //
 // The app must be seeded with `--seed-config` with a `manifest` (see
 // internal/seed/manifest.go); the manifest says who can sign in, which spaces
@@ -8,16 +9,19 @@
 // Run it with docker compose (docker-compose.screenshots.yml).
 // Env:   BASE_URL (http://localhost:8080), MANIFEST (<repo>/screenshots/manifest.json),
 //        OUT (<repo>/screenshots), RUN_NAME (the start time; the files go to OUT/RUN_NAME),
-//        CONFIG (the name of a file of configs/; none: the defaults), CONCURRENCY (4), TZ (UTC)
+//        CONFIG (the name of a file of configs/; none: the defaults), CONCURRENCY (4), TZ (UTC),
+//        SAVVY_BIN (the app's binary that scenarios start; see scenarios/server.ts)
 import { mkdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { chromium, devices, type Browser, type BrowserContextOptions } from 'playwright'
+import { chromium, type Browser } from 'playwright'
 import { loadConfig } from './config.ts'
+import { newContext, timezoneId, viewports } from './context.ts'
 import { captureDialogs } from './dialogs.ts'
 import type { Manifest } from './manifest.ts'
 import { plan } from './plan.ts'
 import { routes } from './routes.ts'
+import { runScenarios, shotsTaken } from './scenarios/runner.ts'
 import { log, state, type Job } from './shared.ts'
 import { captureViews } from './views.ts'
 
@@ -34,26 +38,46 @@ const runName = env('RUN_NAME', configName ? `${stamp}_${configName}` : stamp)
 const outDir = path.join(outRoot, runName)
 const manifestPath = path.resolve(env('MANIFEST', path.join(outRoot, 'manifest.json')))
 const concurrency = Number(env('CONCURRENCY', '4'))
-const timezoneId = env('TZ', 'UTC')
-
-const viewports: Record<string, BrowserContextOptions> = {
-    desktop: { viewport: { width: 1440, height: 900 } },
-    mobile: { ...devices['Pixel 7'] },
-}
-
-// Animations are switched off rather than waited for.
-const noMotion = `*, *::before, *::after {
-    animation: none !important;
-    transition: none !important;
-    caret-color: transparent !important;
-}`
 
 async function main() {
-    const manifest: Manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
-    state.config = await loadConfig(configName, manifest, {
+    const manifest = await readManifest()
+    state.config = await loadConfig(configName, manifest ?? emptyManifest, {
         viewports: Object.keys(viewports),
         pages: routes.map((r) => r.path),
     })
+    if (state.config.capture && !manifest) throw new Error(`no manifest at ${manifestPath}: seed the app with --seed-config, or set "capture": false`)
+    const browser = await chromium.launch()
+
+    if (state.config.capture && manifest) await capturePages(browser, manifest)
+    if (state.config.scenarios) {
+        const failures = await runScenarios(browser, {
+            config: state.config, outDir, concurrency, binary: env('SAVVY_BIN', ''),
+        })
+        state.saved += shotsTaken.shots
+        state.failures.push(...failures.map((f) => `scenario ${f}`))
+    }
+    await browser.close()
+
+    console.log(`${state.saved} screenshots in ${outDir}`)
+    if (state.failures.length) {
+        console.error(`${state.failures.length} failed:\n  ${state.failures.join('\n  ')}`)
+        process.exit(1)
+    }
+}
+
+const emptyManifest: Manifest = { now: new Date().toISOString(), users: [], spaces: [], invitations: [] }
+
+/** The manifest of the seeded app; undefined when there is none (scenarios start their own servers). */
+async function readManifest(): Promise<Manifest | undefined> {
+    try {
+        return JSON.parse(await readFile(manifestPath, 'utf8'))
+    } catch (e) {
+        if ((e as NodeJS.ErrnoException).code === 'ENOENT') return undefined
+        throw e
+    }
+}
+
+async function capturePages(browser: Browser, manifest: Manifest) {
     // The app works out some periods ("last 30 days") from the server's own clock,
     // so data seeded for another day only looks right if the server runs on that
     // day. The browser's clock is moved to the seeded day, but the server's is not.
@@ -61,7 +85,6 @@ async function main() {
     const day = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: timezoneId }).format(d)
     const now = day(seeded) === day(new Date()) ? null : seeded
     if (now) console.warn(`Data was seeded for ${day(seeded)}, not today (${day(new Date())}): server-side periods will be empty.`)
-    const browser = await chromium.launch()
 
     const jobs = await plan(manifest, state.config, (email, password) => signIn(browser, email, password))
 
@@ -78,13 +101,6 @@ async function main() {
             }
         }),
     )
-    await browser.close()
-
-    console.log(`${state.saved} screenshots in ${outDir}`)
-    if (state.failures.length) {
-        console.error(`${state.failures.length} failed:\n  ${state.failures.join('\n  ')}`)
-        process.exit(1)
-    }
 }
 
 /** Signs in through the API and returns the resulting cookies. */
@@ -98,30 +114,7 @@ async function signIn(browser: Browser, email: string, password: string) {
 }
 
 async function run(browser: Browser, job: Job, now: Date | null) {
-    const context = await browser.newContext({
-        ...viewports[job.viewport], baseURL, timezoneId, storageState: job.storageState,
-        // What the browser itself says; the app also keeps its own choice in storage (below).
-        locale: job.language, colorScheme: job.theme as 'light' | 'dark',
-        reducedMotion: 'reduce',
-    })
-    // install() keeps the time running: charts animate off the clock and stall on a frozen one.
-    if (now) await context.clock.install({ time: now })
-    await context.addInitScript(
-        ({ css, spaceId, language, theme }) => {
-            if (spaceId !== undefined) {
-                localStorage.setItem('savvy-space', JSON.stringify({ state: { currentId: spaceId }, version: 0 }))
-            }
-            // The keys of the app's language and theme choice (lib/i18n.ts, hooks/use-theme.ts).
-            localStorage.setItem('savvy.locale', language)
-            localStorage.setItem('theme', theme)
-            document.addEventListener('DOMContentLoaded', () => {
-                const style = document.createElement('style')
-                style.textContent = css
-                document.head.append(style)
-            })
-        },
-        { css: noMotion, spaceId: job.spaceId, language: job.language, theme: job.theme },
-    )
+    const context = await newContext(browser, { ...job, baseURL, now })
     const page = await context.newPage()
     const dir = path.join(outDir, job.dir, job.viewport)
     await mkdir(dir, { recursive: true })

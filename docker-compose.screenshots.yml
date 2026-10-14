@@ -31,6 +31,9 @@ services:
     build:
       context: .
       dockerfile: scripts/screenshots/Dockerfile
+      # The app's own image: scenarios copy its binary and start it on empty data.
+      additional_contexts:
+        app: service:savvy
     depends_on:
       savvy:
         condition: service_healthy
@@ -42,6 +45,8 @@ services:
       RUN_NAME: ${RUN_NAME:-}
       # The name of a file of scripts/screenshots/configs; the defaults when empty.
       CONFIG: ${CONFIG:-}
+      # Settings from the command line (--languages=en,ru), a JSON object of strings.
+      CONFIG_OVERRIDES: ${CONFIG_OVERRIDES:-}
       TZ: UTC
     # Chromium recommends sharing the host's IPC namespace in Docker.
     ipc: host
