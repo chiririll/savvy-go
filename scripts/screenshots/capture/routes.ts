@@ -1,7 +1,7 @@
 // The pages to capture are the app's own (resources/ts/app/pages.ts), so a new page
 // is picked up without touching this script. routes.test.ts requires that a page
 // with a ":param" is either left out below or has a value for it.
-import { pages, type Page } from '../../resources/ts/app/pages.ts'
+import { pages, type Page } from '../../../resources/ts/app/pages.ts'
 import type { Manifest, ManifestSpace } from './manifest.ts'
 
 export const routes: Page[] = Object.values(pages)

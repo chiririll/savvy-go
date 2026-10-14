@@ -17,13 +17,13 @@ import { fileURLToPath } from 'node:url'
 import { chromium, type Browser } from 'playwright'
 import { loadConfig } from './config.ts'
 import { newContext, timezoneId, viewports } from './context.ts'
-import { captureDialogs } from './dialogs.ts'
-import type { Manifest } from './manifest.ts'
-import { plan } from './plan.ts'
-import { routes } from './routes.ts'
+import { captureDialogs } from './capture/dialogs.ts'
+import type { Manifest } from './capture/manifest.ts'
+import { plan } from './capture/plan.ts'
+import { routes } from './capture/routes.ts'
 import { runScenarios, shotsTaken } from './scenarios/runner.ts'
 import { log, state, type Job } from './shared.ts'
-import { captureViews } from './views.ts'
+import { captureViews } from './capture/views.ts'
 
 const env = (name: string, fallback: string) => process.env[name]?.trim() || fallback
 const baseURL = env('BASE_URL', 'http://localhost:8080').replace(/\/$/, '')

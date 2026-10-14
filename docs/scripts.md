@@ -86,7 +86,7 @@ The script finds what to click by `data-testid` marks that the app adds only in 
 
 - **Dialogs**: put `{...testId('some-id')}` on the element that opens a dialog. Shots go to `dialogs/`. Escape closes each one, so nothing is confirmed.
 - **Tabs**: Radix tabs are found automatically; `SegmentedChoice` carries its own marks. Each unselected tab is clicked and shot.
-- **Controls** (`controls: true`): mark a group of choices with `testIdControls` and `testIdControl`, a select with `testIdSelect`. A name starting with `global-` applies to the whole page (e.g. report period); anything else to a tab. Dependencies between levels are described in [`views.ts`](../scripts/screenshots/views.ts).
+- **Controls** (`controls: true`): mark a group of choices with `testIdControls` and `testIdControl`, a select with `testIdSelect`. A name starting with `global-` applies to the whole page (e.g. report period); anything else to a tab. Dependencies between levels are described in [`views.ts`](../scripts/screenshots/capture/views.ts).
 
 A dialog reachable in several ways is shot once per run.
 
@@ -109,7 +109,7 @@ cd scripts && CONFIG=scenarios npx tsx screenshots/run.ts   # configs/scenarios.
 
 ### Good to know
 
-- **Pages** come from [`pages.ts`](../resources/ts/app/pages.ts), so new pages are picked up automatically. Pages with a `:param` need a source in [`routes.ts`](../scripts/screenshots/routes.ts); skipped ones are listed in the log.
+- **Pages** come from [`pages.ts`](../resources/ts/app/pages.ts), so new pages are picked up automatically. Pages with a `:param` need a source in [`routes.ts`](../scripts/screenshots/capture/routes.ts); skipped ones are listed in the log.
 - **Seed date**: the app computes periods from the current day, so the compose file seeds for today. Setting `date` in the seed config gives empty totals (the script warns).
 - **Animations** are off, so shots are still frames.
 - **Runs on different days differ** because dates on screen follow the current day. Exchange rates are fetched live, so those amounts can differ too.

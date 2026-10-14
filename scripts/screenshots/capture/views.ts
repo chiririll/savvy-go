@@ -10,7 +10,7 @@
 // page as it is, or the number of files would be the product of all the levels.
 import type { Locator, Page as PwPage } from 'playwright'
 import { captureControls } from './controls.ts'
-import { state, type Job } from './shared.ts'
+import { state, type Job } from '../shared.ts'
 import { captureTabs } from './tabs.ts'
 
 export async function captureViews(page: PwPage, job: Job, scope: Locator, base: string, folder: string) {

@@ -1,11 +1,11 @@
 // Works out what to take: a job for each language and theme, user, space and viewport, with the
 // pages the config asks for.
 import path from 'node:path'
-import { pages, type Page } from '../../resources/ts/app/pages.ts'
-import { pageWanted, type Config } from './config.ts'
+import { pages, type Page } from '../../../resources/ts/app/pages.ts'
+import { pageWanted, type Config } from '../config.ts'
 import type { Manifest, ManifestSpace } from './manifest.ts'
 import { paramValue, routes, skip } from './routes.ts'
-import { slug, type Job } from './shared.ts'
+import { slug, type Job } from '../shared.ts'
 
 const pageName = (p: string) => slug(p.replace(/^\//, '').replace(/\//g, '-')) || 'dashboard'
 

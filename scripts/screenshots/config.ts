@@ -6,7 +6,7 @@ import { existsSync, readdirSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { Manifest } from './manifest.ts'
+import type { Manifest } from './capture/manifest.ts'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 

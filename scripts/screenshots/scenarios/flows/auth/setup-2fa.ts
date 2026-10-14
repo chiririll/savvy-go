@@ -10,8 +10,8 @@ export const setup2fa = scenario(
     {
         name: 'auth/setup-2fa',
         covers: [pages.setup2fa.path],
-        shots: ['intro', 'qr', { name: 'verify', detail: true }, { name: 'wrong-code', detail: true }, 'recovery-codes', 'star'],
-        leaves: 'two-factor sign-in on for the admin, on the "star us" screen',
+        shots: ['intro', 'qr', { name: 'verify', detail: true }, { name: 'wrong-code', detail: true }, 'recovery-codes'],
+        leaves: 'two-factor sign-in on for the admin, no space yet: the create-space modal is open',
     },
     async ({ page, run, shot }) => {
         await run(serverSetup)
@@ -48,8 +48,7 @@ export const setup2fa = scenario(
         await shot('recovery-codes', { mask: [codes] })
 
         await page.getByTestId('2fa-done').click()
-        await expect(page.getByTestId('2fa-finish')).toBeVisible()
-        await shot('star')
+        await expect(page.locator('#space-name')).toBeVisible()
     },
 )
 
@@ -65,7 +64,6 @@ export const setup2faSkipped = scenario(
         await run(serverSetup)
         await expect(page).toHaveURL(/\/setup-2fa$/)
         await page.getByTestId('2fa-skip').click()
-        await page.getByTestId('2fa-finish').click()
         // A user without a space gets the create-space modal at once, and cannot close it.
         await expect(page.locator('#space-name')).toBeVisible()
     },
