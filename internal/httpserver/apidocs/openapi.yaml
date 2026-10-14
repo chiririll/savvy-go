@@ -406,6 +406,25 @@ paths:
         "403": {$ref: "#/components/responses/Forbidden"}
         "422": {$ref: "#/components/responses/Validation"}
 
+  /currencies/catalog:
+    get:
+      tags: [Currencies]
+      summary: Server-wide currency catalog
+      description: Every known currency with its rate in `base`, for any signed-in user. A space's own catalog hides what it already has; this one does not.
+      parameters:
+        - {name: base, in: query, schema: {type: string, default: USD}, description: Currency code the rates are priced in}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "422": {$ref: "#/components/responses/Validation"}
+  /presets:
+    get:
+      tags: [Spaces]
+      summary: Preset categories and tags for a new space
+      description: "`categories` (name token, type, icon, color, isDefault) and `tags` (plain names). Category tokens are translated by the client."
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
   /spaces/{space}/currencies:
     parameters: [{$ref: "#/components/parameters/Space"}]
     get:

@@ -185,6 +185,8 @@ func (s *Server) routes() *chi.Mux {
 				r.Delete("/auth/webauthn/credentials/{id}", s.webauthnDestroy)
 			})
 
+			r.Get("/currencies/catalog", s.serverCurrencyCatalog)
+			r.Get("/presets", s.presets)
 			r.Get("/spaces", s.spacesIndex)
 			r.With(s.sessionOnly).Post("/spaces", s.spacesStore)
 			r.With(s.sessionOnly).Post("/spaces/import", s.spacesImport)
