@@ -37,6 +37,10 @@ A new server has no users, and creating the first admin needs a one-time **boots
 
 A restart before the first user exists keeps the same password. A server started with demo data has users already and needs none.
 
+Moving from another server? Instead of creating an admin, choose to restore a server backup on the same page: enter the bootstrap password and upload the backup (for a database of the Laravel version, also its `APP_KEY`). The users, spaces, settings and signing key of the backup replace the empty server, the password stops working, and you sign in as the admin from the backup; admin and server setup are skipped. A failed restore (wrong file or key) changes nothing and the password stays valid. See [Data and backups](data-and-backups.md#restoring-on-first-run).
+
+The admin starts with no space; the first one is created from the app, see [Spaces](spaces.md#creating-a-space).
+
 Right after the admin is created, a short **server setup** follows. Step 1 is required: the public URL, filled in with the address you opened the app at. Step 2 is a list of optional things, each opening on its own screen and marked **Done** once configured: email (the same form as in the admin panel, and a test message) and single sign-on (add an identity provider). Finish or skip whenever you like. The server remembers that setup is pending, so if you reload, close the tab or sign in again, it comes back until you finish or skip it; after that it is hidden for good, and the same settings stay in **Administration → System**. If `config.toml` is read-only, the URL step only explains how to set `app_url` in the file.
 
 ## Configuration

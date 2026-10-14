@@ -2,11 +2,21 @@
 
 All finances live in a **space**: accounts, transactions, categories, tags, currencies, budgets, debts, recurring transactions and automation rules. Spaces are fully separate, each with its own base currency: say, a personal budget, a family one and a side project.
 
-Every user starts with a personal space. Switch spaces at the top of the sidebar.
+No space is created for you: a new user starts with none, and creates one or accepts an invitation to someone else's. Guests cannot create spaces and see a message asking for an invitation. Switch spaces at the top of the sidebar.
 
 ## Creating a space
 
-`POST /api/spaces` with only a `name` makes an empty space. It can also fill the space in the same request: `baseCurrency`, `currencies` (codes), `accounts` (`name`, `type`, `currency`, `initialBalance`), `categories` and `tags`. Currencies get their rates from the server's currency data; one without a known rate is refused rather than stored with a made-up rate. The default expense and income categories are always added. The request either creates the whole space or nothing. See the API reference for the fields.
+Use **Create a space** in the space switcher, or the window shown to a user who has no space yet (that one cannot be closed). It walks through:
+
+1. **What a space is**: a short explanation.
+2. **Name**.
+3. **Copy from another space?** Shown only if you belong to another space. Pick a source space, or start from the defaults, and tick what to copy: currencies, accounts (without balances), categories, tags. It is a one-time copy and the spaces stay independent; for categories and tags that stay in step, see [shared categories and tags](#shared-categories-and-tags). Anything not copied starts from the defaults.
+4. **Base entities**, all editable: the base currency (required) and other currencies from the server's currency list; accounts with an optional opening balance (a copied account brings its currency along); categories, which start from the defaults (the default category of each type cannot be removed); and tags.
+5. **Create**: a summary, then the space is made in one step. You can invite members right away or later in the space settings.
+
+Your progress is kept in your browser only, so you can close the window and come back to it; nothing reaches the server before the last step. It is dropped once the space is created.
+
+The same can be done through the API. `POST /api/spaces` with only a `name` makes an empty space. It can also fill the space in the same request: `baseCurrency`, `currencies` (codes), `accounts` (`name`, `type`, `currency`, `initialBalance`), `categories` and `tags`. Currencies get their rates from the server's currency data; one without a known rate is refused rather than stored with a made-up rate. The default expense and income categories are always added. The request either creates the whole space or nothing. See the API reference for the fields.
 
 ## Space roles
 
