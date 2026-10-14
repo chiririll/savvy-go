@@ -58,6 +58,7 @@ func spaceName(w http.ResponseWriter, raw string) (string, bool) {
 func (s *Server) spacesStore(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Name string `json:"name"`
+		spaceFill
 	}
 	if !decodeBody(w, r, &body) {
 		return
@@ -66,7 +67,12 @@ func (s *Server) spacesStore(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	space, err := s.spaces.CreateOwned(r.Context(), name, userFrom(r))
+	space, err := s.createSpace(r.Context(), name, userFrom(r), body.spaceFill)
+	var fe *fillError
+	if errors.As(err, &fe) {
+		writeValidation(w, map[string][]string{fe.field: {fe.msg}})
+		return
+	}
 	if err != nil {
 		writeSpaceError(w, err)
 		return

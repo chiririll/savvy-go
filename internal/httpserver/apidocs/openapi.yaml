@@ -149,7 +149,15 @@ paths:
     post:
       tags: [Spaces]
       summary: Create a space administered by the caller
-      description: Session only. Guests cannot create spaces; `max_spaces_per_user` limits how many a user administers.
+      description: >-
+        Session only. Guests cannot create spaces; `max_spaces_per_user` limits how many a user administers.
+        With only `name` the space is empty. Optional `baseCurrency` (required once anything else is
+        given), `currencies` (codes), `accounts` (`name`, `type`, `currency`, `initialBalance`, a JSON
+        number), `categories` (`name`, `type`, `icon`, `color`, `isDefault`) and `tags` (names) fill it in
+        the same request: the base currency first, then the others with rates from the server's rate
+        source, then the rest. The default `expense` and `income` categories are added when none is
+        given. Everything or nothing: if filling fails no space remains. A currency the server has no
+        rate for is refused with `422`.
       security: [{cookieAuth: []}]
       requestBody: {$ref: "#/components/requestBodies/Object"}
       responses:

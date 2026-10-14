@@ -4,6 +4,10 @@ All finances live in a **space**: accounts, transactions, categories, tags, curr
 
 Every user starts with a personal space. Switch spaces at the top of the sidebar.
 
+## Creating a space
+
+`POST /api/spaces` with only a `name` makes an empty space. It can also fill the space in the same request: `baseCurrency`, `currencies` (codes), `accounts` (`name`, `type`, `currency`, `initialBalance`), `categories` and `tags`. Currencies get their rates from the server's currency data; one without a known rate is refused rather than stored with a made-up rate. The default expense and income categories are always added. The request either creates the whole space or nothing. See the API reference for the fields.
+
 ## Space roles
 
 | Role       | Can                                                                                           |
