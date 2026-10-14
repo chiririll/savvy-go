@@ -481,7 +481,9 @@
                 "base": "Base currency",
                 "basePlaceholder": "Choose the base currency",
                 "add": "Add a currency",
-                "remove": "Remove {{code}}"
+                "remove": "Remove {{code}}",
+                "loading": "Loading currencies…",
+                "failed": "Could not load the currency list."
             },
             "accounts": {
                 "title": "Accounts",
@@ -567,7 +569,14 @@
             "emailFailed": "The email was not sent: {{error}} Send the link yourself.",
             "anyone": "Anyone with the link",
             "expires": "Expires {{date}}",
-            "revoke": "Revoke"
+            "revoke": "Revoke",
+            "copy": "Copy link",
+            "sent": "Email sent",
+            "cancel": "Cancel the invitation",
+            "cancelTitle": "Cancel this invitation?",
+            "cancelText": "The link for {{who}} will stop working. You can invite again at any time.",
+            "cancelConfirm": "Cancel invitation",
+            "keep": "Keep it"
         },
         "links": {
             "title": "Linked spaces",

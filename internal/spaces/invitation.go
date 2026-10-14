@@ -63,16 +63,17 @@ type invitation struct {
 }
 
 // Invite creates an invitation and returns its raw token, shown once.
-func (s Service) Invite(ctx context.Context, spaceID int64, inviter *auth.User, email, role string) (string, error) {
+func (s Service) Invite(ctx context.Context, spaceID int64, inviter *auth.User, email, role string) (string, int64, error) {
 	if !ValidRole(role) {
-		return "", errors.New("invalid space role")
+		return "", 0, errors.New("invalid space role")
 	}
 	token := auth.RandomString(40)
 	now := time.Now().UTC()
-	return token, s.registry().InsertInvitation(ctx, repo.NewInvitation{
+	id, err := s.registry().InsertInvitation(ctx, repo.NewInvitation{
 		SpaceID: spaceID, Email: strings.TrimSpace(email), Role: role, TokenHash: auth.HashToken(token),
 		InvitedBy: inviter.ID, ByServerAdmin: inviter.IsAdmin(), Expires: now.Add(invitationTTL), Now: now,
 	})
+	return token, id, err
 }
 
 // Invitations lists a space's invitations, newest first.

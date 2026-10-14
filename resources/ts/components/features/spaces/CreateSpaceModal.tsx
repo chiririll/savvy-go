@@ -112,11 +112,13 @@ export function CreateSpaceModal({ open, onOpenChange, dismissible = true }: Pro
         goTo(target, seeded ? {} : buildContent(draft.copy, sourceContent, presets.data!))
     }
 
-    const waiting = !loaded || !presets.data || !catalog.data
+    // Only the stored draft is needed to show a step. The presets are needed to leave the
+    // name/copy step, and the currency catalog (which may wait on the rate source) only by the currency selects.
+    const waiting = !loaded
 
     let body: React.ReactNode
     let footer: React.ReactNode
-    const back = step !== 'intro' && (
+    const back = step !== 'name' && (
         <Button type="button" variant="outline" onClick={() => goTo(previousStep(step, otherSpaces))}>
             {t('actions.back', { ns: 'common' })}
         </Button>
@@ -149,39 +151,32 @@ export function CreateSpaceModal({ open, onOpenChange, dismissible = true }: Pro
     } else if (waiting) {
         body = <Loader2 className="mx-auto size-6 animate-spin text-muted-foreground" />
         footer = cancel
-    } else if (step === 'intro') {
-        body = (
-            <ul className="list-disc space-y-2 pl-5 text-sm">
-                <li>{t('spaces.create.intro.finances')}</li>
-                <li>{t('spaces.create.intro.currency')}</li>
-                <li>{t('spaces.create.intro.members')}</li>
-                <li>{t('spaces.create.intro.separate')}</li>
-            </ul>
-        )
-        footer = (
-            <>
-                {cancel}
-                <Button type="button" onClick={() => goTo('name')}>{t('actions.continue', { ns: 'common' })}</Button>
-            </>
-        )
     } else if (step === 'name') {
         body = (
-            <div className="space-y-2">
-                <Label htmlFor="space-name">{t('spaces.fields.name')}</Label>
-                <Input
-                    id="space-name"
-                    value={draft.name}
-                    maxLength={100}
-                    autoFocus
-                    onChange={(e) => update({ name: e.target.value })}
-                    onKeyDown={(e) => e.key === 'Enter' && draft.name.trim() && seed()}
-                />
+            <div className="space-y-5">
+                <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
+                    <li>{t('spaces.create.intro.finances')}</li>
+                    <li>{t('spaces.create.intro.currency')}</li>
+                    <li>{t('spaces.create.intro.members')}</li>
+                    <li>{t('spaces.create.intro.separate')}</li>
+                </ul>
+                <div className="space-y-2">
+                    <Label htmlFor="space-name">{t('spaces.fields.name')}</Label>
+                    <Input
+                        id="space-name"
+                        value={draft.name}
+                        maxLength={100}
+                        autoFocus
+                        onChange={(e) => update({ name: e.target.value })}
+                        onKeyDown={(e) => e.key === 'Enter' && draft.name.trim() && seed()}
+                    />
+                </div>
             </div>
         )
         footer = (
             <>
-                {back}
-                <Button type="button" disabled={!draft.name.trim()} onClick={seed}>
+                {cancel}
+                <Button type="button" disabled={!draft.name.trim() || !presets.data} onClick={seed}>
                     {t('actions.continue', { ns: 'common' })}
                 </Button>
             </>
@@ -226,13 +221,13 @@ export function CreateSpaceModal({ open, onOpenChange, dismissible = true }: Pro
         footer = (
             <>
                 {back}
-                <Button type="button" disabled={sourceId !== null && source.isPending} onClick={seed}>
+                <Button type="button" disabled={!presets.data || (sourceId !== null && source.isPending)} onClick={seed}>
                     {t('actions.continue', { ns: 'common' })}
                 </Button>
             </>
         )
     } else if (step === 'entities') {
-        body = <EntitiesStep content={content} catalog={catalog.data} onChange={(patch) => update(patch)} />
+        body = <EntitiesStep content={content} catalog={catalog.data} catalogFailed={catalog.isError} onRetryCatalog={() => void catalog.refetch()} onChange={(patch) => update(patch)} />
         footer = (
             <>
                 {back}

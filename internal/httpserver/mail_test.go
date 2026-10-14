@@ -532,3 +532,24 @@ func flatten(v any) []string {
 		return nil
 	}
 }
+
+func TestInvitationReturnsAnIdThatRevokesIt(t *testing.T) {
+	a, sess, _ := newMailApp(t, &recorder{})
+	path := "/api/spaces/" + itoa(a.space.ID) + "/invitations"
+
+	res := a.do("POST", path, map[string]any{"role": "viewer"}, sess.Token, sess.CSRF)
+	data := decodeJSON(t, res)["data"].(map[string]any)
+	id, _ := data["id"].(float64)
+	if res.StatusCode != 201 || id == 0 {
+		t.Fatalf("invite %d %v", res.StatusCode, data)
+	}
+
+	res = a.do("DELETE", path+"/"+itoa(int64(id)), nil, sess.Token, sess.CSRF)
+	if res.StatusCode != 204 {
+		t.Fatalf("revoke %d", res.StatusCode)
+	}
+	list := decodeJSON(t, a.do("GET", path, nil, sess.Token, sess.CSRF))["data"].([]any)
+	if len(list) != 0 {
+		t.Errorf("invitation still listed: %v", list)
+	}
+}

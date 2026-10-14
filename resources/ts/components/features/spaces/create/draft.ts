@@ -2,7 +2,7 @@ import type { AccountType } from '@/types/accounts'
 import type { CategoryType } from '@/types/categories'
 import type { CreateSpaceInput, SpacePresets } from '@/types/spaces'
 
-export const DRAFT_STEPS = ['intro', 'name', 'copy', 'entities', 'confirm'] as const
+export const DRAFT_STEPS = ['name', 'copy', 'entities', 'confirm'] as const
 export type DraftStep = (typeof DRAFT_STEPS)[number]
 
 export const COPY_KINDS = ['currencies', 'accounts', 'categories', 'tags'] as const
@@ -56,7 +56,7 @@ export interface CopySource {
 export const noCopy = (): CopyKinds => ({ currencies: false, accounts: false, categories: false, tags: false })
 
 export const emptyDraft = (): SpaceDraft => ({
-    step: 'intro',
+    step: 'name',
     name: '',
     sourceId: null,
     copy: noCopy(),

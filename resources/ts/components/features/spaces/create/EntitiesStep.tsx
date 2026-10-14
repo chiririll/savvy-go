@@ -22,7 +22,10 @@ const ACCOUNT_TYPES: AccountType[] = ['bank', 'cash', 'crypto']
 
 interface Props {
     content: DraftContent
-    catalog: CurrencyCatalogItem[]
+    /** Undefined while the server is still loading it. */
+    catalog: CurrencyCatalogItem[] | undefined
+    catalogFailed?: boolean
+    onRetryCatalog?: () => void
     onChange: (patch: Partial<DraftContent>) => void
 }
 
@@ -47,10 +50,14 @@ function CurrencyOption({ item }: { item: CurrencyCatalogItem }) {
 }
 
 /** Base currency and the other currencies, from the server-wide catalog. */
-function Currencies({ content, catalog, onChange }: Props) {
+function Currencies({ content, catalog, catalogFailed, onRetryCatalog, onChange }: Props) {
     const { t } = useTranslation('settings')
     const taken = new Set([content.baseCurrency, ...content.currencies])
-    const free = catalog.filter((c) => !taken.has(c.code))
+    const loading = catalog === undefined
+    // While loading, the chosen base (e.g. from a draft) still has an item to show.
+    const options: CurrencyCatalogItem[] =
+        catalog ?? (content.baseCurrency ? [{ code: content.baseCurrency, name: '', symbol: '', decimals: 2, rate: null }] : [])
+    const free = (catalog ?? []).filter((c) => !taken.has(c.code))
 
     return (
         <Section title={t('spaces.create.currencies.title')} hint={t('spaces.create.currencies.hint')}>
@@ -66,17 +73,24 @@ function Currencies({ content, catalog, onChange }: Props) {
                         })
                     }
                 >
-                    <SelectTrigger className="w-full" data-testid="create-space-base">
+                    <SelectTrigger className="w-full" disabled={loading} data-testid="create-space-base">
                         <SelectValue placeholder={t('spaces.create.currencies.basePlaceholder')} />
                     </SelectTrigger>
                     <SelectContent>
-                        {catalog.map((c) => (
+                        {options.map((c) => (
                             <SelectItem key={c.code} value={c.code}>
                                 <CurrencyOption item={c} />
                             </SelectItem>
                         ))}
                     </SelectContent>
                 </Select>
+                {loading && !catalogFailed && <p className="text-xs text-muted-foreground">{t('spaces.create.currencies.loading')}</p>}
+                {catalogFailed && (
+                    <p className="text-xs text-destructive">
+                        {t('spaces.create.currencies.failed')}{' '}
+                        <button type="button" className="underline" onClick={onRetryCatalog}>{t('actions.retry', { ns: 'common' })}</button>
+                    </p>
+                )}
             </div>
             <div className="flex flex-wrap items-center gap-2">
                 {content.currencies.map((code) => (
@@ -94,7 +108,7 @@ function Currencies({ content, catalog, onChange }: Props) {
                     </span>
                 ))}
                 <Select value="" onValueChange={(code) => onChange({ currencies: [...content.currencies, code] })}>
-                    <SelectTrigger className="w-44" disabled={!content.baseCurrency}>
+                    <SelectTrigger className="w-44" disabled={loading || !content.baseCurrency}>
                         <SelectValue placeholder={t('spaces.create.currencies.add')} />
                     </SelectTrigger>
                     <SelectContent>
@@ -120,24 +134,16 @@ function Accounts({ content, onChange }: Pick<Props, 'content' | 'onChange'>) {
     return (
         <Section title={t('spaces.create.accounts.title')} hint={t('spaces.create.accounts.hint')}>
             {content.accounts.map((account) => (
-                <div key={account.key} className="grid grid-cols-[1fr_auto] gap-2 rounded-lg border p-2 sm:grid-cols-[2fr_1fr_1fr_1fr_auto]">
+                // Phone: name on top, type and currency side by side, balance and remove last.
+                <div key={account.key} className="grid grid-cols-2 gap-2 rounded-lg border p-2 sm:grid-cols-[2fr_1fr_1fr_1fr_auto]">
                     <Input
+                        className="col-span-2 sm:col-span-1"
                         aria-label={t('spaces.create.accounts.name')}
                         placeholder={t('spaces.create.accounts.name')}
                         value={account.name}
                         maxLength={255}
                         onChange={(e) => patch(account.key, { name: e.target.value })}
                     />
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="sm:order-last"
-                        aria-label={t('spaces.create.accounts.remove')}
-                        onClick={() => onChange({ accounts: content.accounts.filter((a) => a.key !== account.key) })}
-                    >
-                        <X className="size-4" />
-                    </Button>
                     <Select value={account.type} onValueChange={(type) => patch(account.key, { type: type as AccountType })}>
                         <SelectTrigger className="w-full">
                             <SelectValue />
@@ -165,6 +171,16 @@ function Accounts({ content, onChange }: Pick<Props, 'content' | 'onChange'>) {
                         value={account.initialBalance}
                         onChange={(e) => patch(account.key, { initialBalance: e.target.value })}
                     />
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="justify-self-end"
+                        aria-label={t('spaces.create.accounts.remove')}
+                        onClick={() => onChange({ accounts: content.accounts.filter((a) => a.key !== account.key) })}
+                    >
+                        <X className="size-4" />
+                    </Button>
                 </div>
             ))}
             <Button

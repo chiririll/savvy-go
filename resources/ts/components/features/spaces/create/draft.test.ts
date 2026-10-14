@@ -52,7 +52,7 @@ describe('steps', () => {
     })
 
     it('stays inside the first and last step', () => {
-        expect(previousStep('intro', 1)).toBe('intro')
+        expect(previousStep('name', 1)).toBe('name')
         expect(nextStep('confirm', 1)).toBe('confirm')
     })
 })
