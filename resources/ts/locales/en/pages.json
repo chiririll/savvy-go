@@ -1,10 +1,10 @@
 {
     "accounts": {
         "title": "Accounts",
-        "description": "Manage your bank accounts, cash and crypto wallets. Drag to set the order used in selectors.",
-        "create": "New Account",
-        "createTitle": "Create Account",
-        "editTitle": "Edit Account",
+        "description": "Bank accounts, cash and crypto wallets. Drag to set their order in selectors.",
+        "create": "New account",
+        "createTitle": "Create account",
+        "editTitle": "Edit account",
         "columns": {
             "account": "Account",
             "type": "Type",
@@ -30,9 +30,9 @@
     "categories": {
         "title": "Categories",
         "description": "Manage income and expense categories",
-        "create": "New Category",
-        "createTitle": "Create Category",
-        "editTitle": "Edit Category",
+        "create": "New category",
+        "createTitle": "Create category",
+        "editTitle": "Edit category",
         "columns": {
             "category": "Category",
             "type": "Type",
@@ -63,9 +63,9 @@
     "tags": {
         "title": "Tags",
         "description": "Organize transactions with tags",
-        "create": "New Tag",
-        "createTitle": "Create Tag",
-        "editTitle": "Edit Tag",
+        "create": "New tag",
+        "createTitle": "Create tag",
+        "editTitle": "Edit tag",
         "createDescription": "Add a new tag",
         "emptyTitle": "No tags found",
         "emptyDescription": "Create your first tag to organize transactions",
@@ -79,10 +79,10 @@
     "users": {
         "title": "Users",
         "description": "Manage user accounts",
-        "create": "New User",
-        "createTitle": "Create User",
+        "create": "New user",
+        "createTitle": "Create user",
         "createDescription": "Invite a user to set their own password, or set one now.",
-        "editTitle": "Edit User",
+        "editTitle": "Edit user",
         "editDescription": "Update the user's name, email, role, or password.",
         "resetPassword": "Reset password",
         "sendResetEmail": "Email a reset link",
@@ -99,9 +99,9 @@
     "currencies": {
         "title": "Currencies",
         "description": "Manage currencies and exchange rates",
-        "create": "New Currency",
-        "createTitle": "Create Currency",
-        "editTitle": "Edit Currency",
+        "create": "New currency",
+        "createTitle": "Create currency",
+        "editTitle": "Edit currency",
         "columns": {
             "code": "Code",
             "name": "Name",
@@ -120,19 +120,19 @@
     "transactions": {
         "title": "Transactions",
         "description": "Track your income, expenses and transfers",
-        "create": "New Transaction",
-        "createTitle": "New Transaction",
-        "editTitle": "Edit Transaction",
+        "create": "New transaction",
+        "createTitle": "New transaction",
+        "editTitle": "Edit transaction",
         "emptyTitle": "No transactions found",
         "emptyDescription": "Create your first transaction to start tracking",
         "emptyPendingTitle": "No pending transactions",
-        "emptyPendingDescription": "Future, scheduled, and undated transactions will appear here until you confirm them",
+        "emptyPendingDescription": "Future-dated and undated transactions stay here until you confirm them",
         "noDate": "No date",
         "today": "Today",
         "yesterday": "Yesterday",
         "tomorrow": "Tomorrow",
         "applyTitle": "Confirm transaction",
-        "applyDescription": "Which date should this transaction be posted on? The posted date cannot be in the future.",
+        "applyDescription": "Which date should this transaction be posted on? It can't be in the future.",
         "applyEstimatedDescription": "The amount is approximate. Enter the real amount to post it.",
         "applyAmount": "Actual amount",
         "applyToAmount": "Actual received amount",
@@ -149,7 +149,7 @@
             "pending": "Pending",
             "skipped": "Skipped"
         },
-        "upcomingTitle": "Due soon",
+        "upcomingTitle": "Due soon or overdue",
         "soonTitle": "Due soon",
         "overdueTitle": "Overdue",
         "skipTitle": "Skip this transaction?",
@@ -157,7 +157,7 @@
         "itemLabel": "transactions",
         "filters": "Filters",
         "clear": "Clear",
-        "dateRange": "Date Range",
+        "dateRange": "Date range",
         "to": "to",
         "categories": "Categories",
         "tags": "Tags",
@@ -190,10 +190,10 @@
             "income": "Income",
             "expense": "Expense",
             "transfer": "Transfer",
-            "debt_payment": "Debt Payment",
-            "debt_collection": "Debt Collection",
-            "debt_lend": "Debt Issued",
-            "debt_borrow": "Loan Received",
+            "debt_payment": "Debt payment",
+            "debt_collection": "Debt collection",
+            "debt_lend": "Debt issued",
+            "debt_borrow": "Loan received",
             "transfer_out": "Sent to another space",
             "transfer_in": "Received from another space"
         },
@@ -201,11 +201,11 @@
         "deleteDescription": "This action cannot be undone."
     },
     "recurring": {
-        "title": "Recurring Transactions",
+        "title": "Recurring transactions",
         "description": "Manage repeating transaction templates",
-        "create": "New Recurring",
-        "createTitle": "New Recurring Transaction",
-        "editTitle": "Edit Recurring Transaction",
+        "create": "New recurring",
+        "createTitle": "New recurring transaction",
+        "editTitle": "Edit recurring transaction",
         "everyInterval": "Every {{count}} {{frequency}}",
         "deleteTitle": "Delete recurring transaction?",
         "deleteDescription": "This action cannot be undone."
@@ -213,9 +213,9 @@
     "budgets": {
         "title": "Budgets",
         "description": "Set spending limits for categories",
-        "create": "New Budget",
-        "createTitle": "Create Budget",
-        "editTitle": "Edit Budget",
+        "create": "New budget",
+        "createTitle": "Create budget",
+        "editTitle": "Edit budget",
         "notFound": "Budget not found",
         "allExpenses": "All expenses",
         "periods": {
@@ -230,16 +230,16 @@
     "debts": {
         "title": "Debts",
         "description": "Track money you owe and money owed to you",
-        "create": "New Debt",
-        "createTitle": "Create Debt",
-        "editTitle": "Edit Debt",
-        "netPosition": "Net Position",
+        "create": "New debt",
+        "createTitle": "Create debt",
+        "editTitle": "Edit debt",
+        "netPosition": "Net position",
         "inYourFavor": "in your favor",
         "youOwe": "you owe",
         "notFound": "Debt not found",
-        "paidOff": "Paid Off",
-        "makePayment": "Make Payment",
-        "collectPayment": "Collect Payment",
+        "paidOff": "Paid off",
+        "makePayment": "Make payment",
+        "collectPayment": "Collect payment",
         "reopen": "Reopen",
         "columns": {
             "debt": "Debt",
@@ -247,12 +247,12 @@
             "progress": "Progress",
             "total": "Total",
             "remaining": "Remaining",
-            "dueDate": "Due Date",
+            "dueDate": "Due date",
             "status": "Status"
         },
         "types": {
-            "i_owe": "I Owe",
-            "owed_to_me": "Owed To Me"
+            "i_owe": "I owe",
+            "owed_to_me": "Owed to me"
         },
         "deleteTitle": "Delete debt?",
         "deleteDescription": "This action cannot be undone.",
@@ -263,12 +263,12 @@
         }
     },
     "automation": {
-        "title": "Automation Rules",
+        "title": "Automation rules",
         "description": "Create rules to automatically process transactions",
-        "create": "New Rule",
-        "createTitle": "New Automation Rule",
+        "create": "New rule",
+        "createTitle": "New automation rule",
         "createDescription": "Set up conditions and actions for automatic processing",
-        "editTitle": "Edit Automation Rule",
+        "editTitle": "Edit automation rule",
         "notFound": "Rule not found",
         "logsTitle": "Logs: {{name}}",
         "logsFallbackName": "Rule",
@@ -293,10 +293,10 @@
         "description": "Analyze your finances across different dimensions",
         "tabs": {
             "overview": "Overview",
-            "cashflow": "Cash Flow",
+            "cashflow": "Cash flow",
             "expenses": "Expenses",
             "income": "Income",
-            "networth": "Net Worth"
+            "networth": "Net worth"
         },
         "noData": "No data for selected period",
         "vsPreviousPeriod": "vs previous period",
@@ -333,15 +333,15 @@
         "metrics": {
             "income": "Income",
             "expenses": "Expenses",
-            "netCashFlow": "Net Cash Flow",
-            "savingsRate": "Savings Rate",
+            "netCashFlow": "Net cash flow",
+            "savingsRate": "Savings rate",
             "inflow": "Inflow",
             "outflow": "Outflow",
-            "totalExpenses": "Total Expenses",
-            "totalIncome": "Total Income",
+            "totalExpenses": "Total expenses",
+            "totalIncome": "Total income",
             "avgPerDay": "Avg. per day",
             "avgPerWeek": "Avg. per week",
-            "currentNetWorth": "Current Net Worth",
+            "currentNetWorth": "Current net worth",
             "percentagePoints": "{{value}}pp"
         },
         "series": {
@@ -349,12 +349,12 @@
             "expenses": "Expenses",
             "balance": "Balance",
             "flow": "Flow",
-            "prevIncome": "Prev Income",
-            "prevExpenses": "Prev Expenses",
-            "prevBalance": "Prev Balance",
-            "previousPeriod": "Previous Period",
-            "netWorth": "Net Worth",
-            "budgetPace": "Budget Pace",
+            "prevIncome": "Prev income",
+            "prevExpenses": "Prev expenses",
+            "prevBalance": "Prev balance",
+            "previousPeriod": "Previous period",
+            "netWorth": "Net worth",
+            "budgetPace": "Budget pace",
             "actual": "Actual",
             "current": "Current",
             "budget": "Budget",
@@ -379,15 +379,15 @@
             "expensesByCategory": "Failed to load expenses by category"
         },
         "moneyFlow": {
-            "title": "Money Flow",
+            "title": "Money flow",
             "subtitle": "Where your money comes from and where it goes"
         },
         "expensePace": {
-            "title": "Expense Pace",
+            "title": "Expense pace",
             "subtitleBudget": "Track your spending against the monthly budget",
             "subtitleDaily": "Track your daily spending progress",
-            "budgetRemaining": "Budget Remaining",
-            "spentSoFar": "Spent So Far",
+            "budgetRemaining": "Budget remaining",
+            "spentSoFar": "Spent so far",
             "noBudgetHint": "No budget set. Create a budget to track your spending goals.",
             "projectedEnd": "Projected by end of month",
             "totalSpent": "Total spent",
@@ -398,7 +398,7 @@
             "noData": "No expense data for selected period"
         },
         "heatmap": {
-            "title": "Spending Activity",
+            "title": "Spending activity",
             "subtitle": "Daily expense intensity",
             "less": "Less",
             "more": "More",
@@ -411,64 +411,63 @@
             "noData": "No expense data for selected period"
         },
         "expensesStructure": {
-            "title": "Expenses Structure",
+            "title": "Expenses structure",
             "subtitle": "Breakdown by category",
             "noData": "No expenses for selected period"
         },
         "incomeStructure": {
-            "title": "Income Structure",
+            "title": "Income structure",
             "subtitle": "Breakdown by source",
             "noData": "No income for selected period"
         },
         "expensesDynamics": {
-            "title": "Expenses Dynamics",
+            "title": "Expenses dynamics",
             "subtitle": "How your spending changes over time"
         },
         "incomeDynamics": {
-            "title": "Income Dynamics",
+            "title": "Income dynamics",
             "subtitle": "How your income changes over time"
         },
         "topExpenses": {
-            "title": "Top Expenses",
+            "title": "Top expenses",
             "subtitle": "Largest transactions this period",
             "topTotal": "Top {{count}} total",
             "noData": "No expenses for selected period"
         },
         "topIncome": {
-            "title": "Top Income",
+            "title": "Top income",
             "subtitle": "Largest income transactions this period",
             "topTotal": "Top {{count}} total",
             "noData": "No income for selected period"
         },
         "cashFlowChart": {
-            "title": "Cash Flow Over Time",
+            "title": "Cash flow over time",
             "subtitle": "Income, expenses, and running balance",
             "noIncomeOrExpenses": "No income or expenses for selected period",
             "noIncome": "No income data for selected period",
             "noExpenses": "No expenses data for selected period"
         },
         "netWorth": {
-            "accountsBreakdown": "Accounts Breakdown",
+            "accountsBreakdown": "Accounts breakdown",
             "distribution": "Distribution by account",
             "noAccounts": "No accounts found",
-            "chartTitle": "Net Worth Over Time",
+            "chartTitle": "Net worth over time",
             "chartSubtitle": "Track your wealth growth"
         }
     },
     "dashboard": {
         "title": "Dashboard",
         "welcome": "Welcome to your finance dashboard",
-        "totalBalance": "Total Balance",
+        "totalBalance": "Total balance",
         "income": "Income",
         "expenses": "Expenses",
         "pending": "Pending",
-        "pendingCount": "{{count}} transactions",
         "pendingCount": "{{count, plural(one: # transaction; other: # transactions)}}",
         "pendingEmpty": "No pending transactions",
-        "balanceDynamics": "Balance Dynamics",
-        "accountBalances": "Account Balances",
+        "balanceDynamics": "Balance dynamics",
+        "accountBalances": "Account balances",
         "expensesByCategory": "Expenses by Category",
-        "recentTransactions": "Recent Transactions",
+        "recentTransactions": "Recent transactions",
         "budgets": "Budgets",
         "noBudgets": "No budgets yet",
         "allExpenses": "All expenses",
@@ -483,9 +482,9 @@
         "noDataPeriod": "No data for this period",
         "noAccounts": "No active accounts",
         "noTransactions": "No transactions yet",
-        "createBudget": "Create Budget",
-        "addDebt": "Add Debt",
-        "createRecurring": "Create Recurring",
+        "createBudget": "Create budget",
+        "addDebt": "Add debt",
+        "createRecurring": "Create recurring",
         "percentPaid": "{{percent}}% paid",
         "toCounterparty": "To: {{name}}",
         "fromCounterparty": "From: {{name}}",
