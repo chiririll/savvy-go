@@ -24,6 +24,7 @@ Dependencies point down. Each package may import the ones above it in this list,
 - `transfers`: signed transfers between linked spaces. Uses `spaces`, `signing`; not `ledger`.
 - `backup`: backup files, archive format, restore. Uses `spaces`, `transfers`, `signing`.
 - `sso`: identity providers, OIDC/OAuth/SAML, JIT provisioning. A new user gets no space.
+- Create-space request: needs `spaces` and `ledger` together, so it lives in `httpserver/spaces_fill.go` (`createSpace`). All or nothing. No code may assume a user has a space.
 - `store/arch_test.go` enforces this layering and that the core never imports `net/http`.
 - Shared test fixtures cannot live in `ledger` (its in-package tests would import-cycle), so `reports` keeps its own small copy.
 
