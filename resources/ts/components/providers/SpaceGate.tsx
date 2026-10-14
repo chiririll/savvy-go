@@ -1,9 +1,8 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { spacesApi } from '@/api/spaces'
+import { CreateSpaceModal } from '@/components/features/spaces/CreateSpaceModal'
 import { useSpaces } from '@/hooks/use-spaces'
 import { useUser } from '@/stores/auth'
 import { useSpaceStore } from '@/stores/space'
@@ -17,15 +16,11 @@ function CenteredLoader() {
 }
 
 /** Shown to a user who belongs to no space yet. */
-function NoSpace() {
+export function NoSpace() {
     const { t } = useTranslation('common')
     const user = useUser()
-    const queryClient = useQueryClient()
-    const create = useMutation({
-        mutationFn: () => spacesApi.create(user?.name || t('spaces.defaultName')),
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['spaces'] }),
-    })
     const isGuest = user?.role === 'guest'
+    const [creating, setCreating] = useState(!isGuest)
 
     return (
         <div className="min-h-screen flex items-center justify-center p-4">
@@ -33,9 +28,11 @@ function NoSpace() {
                 <h1 className="text-xl font-semibold">{t('spaces.noneTitle')}</h1>
                 <p className="text-muted-foreground">{isGuest ? t('spaces.noneGuest') : t('spaces.noneText')}</p>
                 {!isGuest && (
-                    <Button onClick={() => create.mutate()} disabled={create.isPending}>
-                        {t('spaces.create')}
-                    </Button>
+                    <>
+                        <Button onClick={() => setCreating(true)}>{t('spaces.create')}</Button>
+                        {/* Without a space there is nothing to go back to, so it cannot be closed. */}
+                        <CreateSpaceModal open={creating} onOpenChange={setCreating} dismissible={false} />
+                    </>
                 )}
             </div>
         </div>

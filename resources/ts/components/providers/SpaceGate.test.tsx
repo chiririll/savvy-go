@@ -1,18 +1,24 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { SpaceGate } from './SpaceGate'
 
-const create = vi.fn().mockResolvedValue({})
 let role = 'user'
 
 vi.mock('react-i18next', async (importActual) => ({
     ...(await importActual<typeof import('react-i18next')>()),
     useTranslation: () => ({ t: (key: string) => key }),
 }))
-vi.mock('@/api/spaces', () => ({ spacesApi: { create: (name: string) => create(name) } }))
+vi.mock('@/components/features/spaces/CreateSpaceModal', () => ({
+    CreateSpaceModal: ({ open, onOpenChange, dismissible = true }: { open: boolean; onOpenChange: (open: boolean) => void; dismissible?: boolean }) =>
+        open ? (
+            <div role="dialog" data-dismissible={String(dismissible)}>
+                <button onClick={() => onOpenChange(false)}>close</button>
+            </div>
+        ) : null,
+}))
 vi.mock('@/hooks/use-spaces', () => ({ useSpaces: () => ({ data: [], isPending: false }) }))
 vi.mock('@/stores/auth', () => ({ useUser: () => ({ name: 'Jane', role }) }))
 vi.mock('@/stores/space', () => ({
@@ -27,18 +33,23 @@ function renderGate() {
     )
 }
 
-afterEach(() => {
-    cleanup()
-    create.mockClear()
-})
+afterEach(cleanup)
 
 describe('a user with no spaces', () => {
-    it('can create one in a click, named after them', async () => {
+    it('gets the create-space modal, which cannot be dismissed', () => {
         role = 'user'
         renderGate()
         expect(screen.queryByText('app')).toBeNull()
+        expect(screen.getByRole('dialog').getAttribute('data-dismissible')).toBe('false')
+    })
+
+    it('can open it again from the page', () => {
+        role = 'user'
+        renderGate()
+        fireEvent.click(screen.getByText('close'))
+        expect(screen.queryByRole('dialog')).toBeNull()
         fireEvent.click(screen.getByRole('button', { name: 'spaces.create' }))
-        await waitFor(() => expect(create).toHaveBeenCalledWith('Jane'))
+        expect(screen.getByRole('dialog')).toBeTruthy()
     })
 })
 
@@ -48,5 +59,6 @@ describe('a guest with no spaces', () => {
         renderGate()
         expect(screen.getByText('spaces.noneGuest')).toBeTruthy()
         expect(screen.queryByRole('button')).toBeNull()
+        expect(screen.queryByRole('dialog')).toBeNull()
     })
 })

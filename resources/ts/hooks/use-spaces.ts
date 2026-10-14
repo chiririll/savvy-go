@@ -3,7 +3,7 @@ import i18n from '@/lib/i18n'
 import { adminSpacesApi, spacesApi, syncGroupsApi } from '@/api/spaces'
 import { useUser } from '@/stores/auth'
 import { useCurrentSpaceId, useSpaceStore } from '@/stores/space'
-import { LinkedSpace, SpaceRole, SpaceTransferInput, SyncChange, SyncKind, SyncPlan } from '@/types/spaces'
+import { CreateSpaceInput, LinkedSpace, SpaceRole, SpaceTransferInput, SyncChange, SyncKind, SyncPlan } from '@/types/spaces'
 import { useResourceMutation } from './use-crud'
 
 export const SPACES_KEY = ['spaces']
@@ -61,10 +61,23 @@ export function pathAfterSwitch(pathname: string): string {
 
 export function useCreateSpace() {
     return useResourceMutation({
-        mutationFn: (name: string) => spacesApi.create(name),
+        mutationFn: (input: CreateSpaceInput) => spacesApi.create(input),
         invalidateKeys: [SPACES_KEY],
         successMessage: i18n.t('spaces.toasts.created', { ns: 'settings' }),
     })
+}
+
+export function useSpacePresets(enabled = true) {
+    return useQuery({ queryKey: ['presets'], queryFn: spacesApi.presets, enabled, staleTime: Infinity })
+}
+
+export function useServerCurrencyCatalog(enabled = true) {
+    return useQuery({ queryKey: ['currency-catalog'], queryFn: () => spacesApi.currencyCatalog(), enabled, staleTime: 10 * 60_000 })
+}
+
+/** What can be copied from another space; read only while `id` is set. */
+export function useSpaceContent(id: number | null) {
+    return useQuery({ queryKey: spaceKey(id, 'content'), queryFn: () => spacesApi.readContent(id!), enabled: id !== null })
 }
 
 export function useImportSpace() {

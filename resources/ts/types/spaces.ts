@@ -191,3 +191,25 @@ export interface SigningKeys {
     own: { kid: string; publicKey: string }
     trusted: { kid: string; publicKey: string; name: string; createdAt: string | null }[]
 }
+
+/** The categories and tags a new space can start with (GET /presets). */
+export interface SpacePresets {
+    categories: {
+        name: string
+        type: 'income' | 'expense'
+        icon: string
+        color: string
+        isDefault: boolean
+    }[]
+    tags: string[]
+}
+
+/** Optional content of POST /spaces beside the name. */
+export interface CreateSpaceInput {
+    name: string
+    baseCurrency?: string
+    currencies?: string[]
+    accounts?: { name: string; type?: string; currency: string; initialBalance?: string }[]
+    categories?: SpacePresets['categories']
+    tags?: string[]
+}
