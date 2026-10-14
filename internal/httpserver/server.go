@@ -143,6 +143,7 @@ func (s *Server) routes() *chi.Mux {
 		r.Get("/auth/me", s.authMe)
 		r.Post("/auth/bootstrap/verify", s.bootstrapVerify)
 		r.Post("/auth/register", s.authRegister)
+		r.Post("/onboarding/restore", s.onboardingRestore)
 		r.Post("/auth/login", s.authLogin)
 		r.Get("/auth/password/{token}", s.passwordPreview)
 		r.Post("/auth/password/{token}", s.passwordAccept)

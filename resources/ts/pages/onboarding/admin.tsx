@@ -13,7 +13,8 @@ import { Label } from '@/components/ui/label'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { BootstrapInstructions } from '@/components/features/onboarding/BootstrapInstructions'
 import { OnboardingLayout } from '@/components/features/onboarding/OnboardingLayout'
-import { authApi } from '@/api'
+import { authApi, onboardingApi } from '@/api'
+import { isLaravelFile } from '@/components/features/backups/LaravelRestoreOptions'
 import { useAuthStore } from '@/stores/auth'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { pages } from '@/app/pages'
@@ -35,11 +36,14 @@ export default function AdminSetupPage() {
     const navigate = useNavigate()
     const queryClient = useQueryClient()
     const register = useAuthStore((state) => state.register)
-    const [step, setStep] = useState<'bootstrap' | 'admin'>('bootstrap')
+    const [step, setStep] = useState<'bootstrap' | 'admin' | 'restore'>('bootstrap')
     const [isLoading, setIsLoading] = useState(false)
     // Not a form field: a field of the first screen would lose its value when the screen unmounts.
     const [bootstrapPassword, setBootstrapPassword] = useState('')
     const [bootstrapError, setBootstrapError] = useState<string | null>(null)
+    const [backupFile, setBackupFile] = useState<File | null>(null)
+    const [appKey, setAppKey] = useState('')
+    const [restoreError, setRestoreError] = useState<string | null>(null)
 
     const { data: status } = useQuery({ queryKey: ['auth', 'status'], queryFn: authApi.status, retry: false })
 
@@ -67,7 +71,7 @@ export default function AdminSetupPage() {
         defaultValues: { name: '', email: '', password: '', password_confirmation: '' },
     })
 
-    const goToAdmin = async () => {
+    const goTo = async (next: 'admin' | 'restore') => {
         const password = bootstrapPassword.trim()
         if (password === '') {
             setBootstrapError(t('setup.validation.bootstrapPassword'))
@@ -77,13 +81,46 @@ export default function AdminSetupPage() {
         try {
             await authApi.verifyBootstrap(password)
             setBootstrapError(null)
-            setStep('admin')
+            setStep(next)
         } catch (error: unknown) {
             const wrong = (error as ApiError).details?.bootstrap_password?.[0]
             if (wrong) {
                 setBootstrapError(wrong)
             } else {
                 toast.error(getApiErrorMessage(error, t('setup.failed')))
+            }
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    const onRestore = async () => {
+        if (!backupFile) {
+            setRestoreError(t('setup.validation.backupFile'))
+            return
+        }
+        setIsLoading(true)
+        setRestoreError(null)
+        try {
+            await onboardingApi.restore(
+                bootstrapPassword.trim(),
+                backupFile,
+                isLaravelFile(backupFile) && appKey.trim() !== '' ? appKey.trim() : undefined,
+            )
+            // The backup brought its own users and no session: drop the cached needs_registration=true and sign in.
+            registered.current = true
+            await queryClient.invalidateQueries({ queryKey: ['auth', 'status'] })
+            toast.success(t('setup.restored'))
+            navigate('/login', { replace: true })
+        } catch (error: unknown) {
+            const details = (error as ApiError).details
+            if (details?.bootstrap_password?.[0]) {
+                setBootstrapError(details.bootstrap_password[0])
+                setStep('bootstrap')
+            } else if (details?.file?.[0]) {
+                setRestoreError(details.file[0])
+            } else {
+                toast.error(getApiErrorMessage(error, t('setup.restoreFailed')))
             }
         } finally {
             setIsLoading(false)
@@ -130,8 +167,8 @@ export default function AdminSetupPage() {
 
     return (
         <OnboardingLayout
-            title={step === 'bootstrap' ? t('setup.title') : t('setup.adminTitle')}
-            description={step === 'bootstrap' ? t('setup.description') : t('setup.adminDescription')}
+            title={step === 'bootstrap' ? t('setup.title') : step === 'restore' ? t('setup.restoreTitle') : t('setup.adminTitle')}
+            description={step === 'bootstrap' ? t('setup.description') : step === 'restore' ? t('setup.restoreDescription') : t('setup.adminDescription')}
         >
             <Form {...form}>
                 <form
@@ -140,7 +177,12 @@ export default function AdminSetupPage() {
                         // not validating admin fields the user has not seen yet.
                         if (step === 'bootstrap') {
                             e.preventDefault()
-                            void goToAdmin()
+                            void goTo('admin')
+                            return
+                        }
+                        if (step === 'restore') {
+                            e.preventDefault()
+                            void onRestore()
                             return
                         }
                         void form.handleSubmit(onSubmit)(e)
@@ -164,10 +206,51 @@ export default function AdminSetupPage() {
                                 />
                                 {bootstrapError && <p className="text-sm text-destructive">{bootstrapError}</p>}
                             </div>
-                            {/* Restoring a server backup (task 08) becomes the second choice here. */}
-                            <Button type="button" className="w-full" disabled={isLoading} onClick={goToAdmin}>
+                            <Button type="button" className="w-full" disabled={isLoading} onClick={() => goTo('admin')}>
                                 {isLoading && <Loader2 className="mr-2 size-4 animate-spin" />}
                                 {t('setup.createAdmin')}
+                            </Button>
+                            <Button type="button" variant="outline" className="w-full" disabled={isLoading} onClick={() => goTo('restore')}>
+                                {t('setup.restore')}
+                            </Button>
+                        </>
+                    ) : step === 'restore' ? (
+                        <>
+                            <div className="space-y-2">
+                                <Label htmlFor="backup-file">{t('setup.backupFile')}</Label>
+                                <Input
+                                    id="backup-file"
+                                    type="file"
+                                    accept=".zip,.sqlite"
+                                    onChange={(e) => {
+                                        setBackupFile(e.target.files?.[0] ?? null)
+                                        setRestoreError(null)
+                                    }}
+                                    aria-invalid={restoreError !== null}
+                                />
+                                <p className="text-xs text-muted-foreground">{t('setup.backupFileHint')}</p>
+                                {restoreError && <p className="text-sm text-destructive">{restoreError}</p>}
+                            </div>
+                            {isLaravelFile(backupFile) && (
+                                <div className="space-y-2">
+                                    <Label htmlFor="restore-app-key">{t('setup.appKey')}</Label>
+                                    <Input
+                                        id="restore-app-key"
+                                        value={appKey}
+                                        onChange={(e) => setAppKey(e.target.value)}
+                                        placeholder="base64:..."
+                                        autoComplete="off"
+                                        spellCheck={false}
+                                    />
+                                    <p className="text-xs text-muted-foreground">{t('setup.appKeyHint')}</p>
+                                </div>
+                            )}
+                            <Button type="submit" className="w-full" disabled={isLoading}>
+                                {isLoading && <Loader2 className="mr-2 size-4 animate-spin" />}
+                                {t('setup.restoreSubmit')}
+                            </Button>
+                            <Button type="button" variant="ghost" className="w-full" disabled={isLoading} onClick={() => setStep('bootstrap')}>
+                                {t('setup.back')}
                             </Button>
                         </>
                     ) : (

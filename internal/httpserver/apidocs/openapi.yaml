@@ -122,6 +122,34 @@ paths:
         "404": {$ref: "#/components/responses/NotFound"}
         "419": {$ref: "#/components/responses/CsrfMismatch"}
 
+  /onboarding/restore:
+    post:
+      tags: [Other]
+      summary: Restore a server backup on first run
+      description: >-
+        Only while the server has no users. No session or token: the first-run bootstrap password
+        authorizes it. Restores a server backup archive, or a Laravel database (with its `app_key`,
+        which the upgrade needs to read encrypted data), in place of the empty server. Users,
+        settings, signing key and spaces come from the backup; every session is dropped, so the
+        caller then logs in as an administrator of the backup. A failed restore keeps the password
+        valid. Once it succeeds the endpoint answers `403`.
+      security: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [bootstrap_password, file]
+              properties:
+                bootstrap_password: {type: string}
+                file: {type: string, format: binary}
+                app_key: {type: string, description: Only for a Laravel database.}
+      responses:
+        "200": {$ref: "#/components/responses/Message"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "422": {$ref: "#/components/responses/Validation"}
+
   /users:
     get:
       tags: [Other]

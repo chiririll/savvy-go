@@ -9,13 +9,17 @@ import AdminSetupPage from './admin'
 const register = vi.fn()
 const status = vi.fn()
 const verifyBootstrap = vi.fn()
+const restore = vi.fn()
 const toastError = vi.fn()
 
 vi.mock('react-i18next', async (importActual) => ({
     ...(await importActual<typeof import('react-i18next')>()),
     useTranslation: () => ({ t: (key: string) => key }),
 }))
-vi.mock('@/api', () => ({ authApi: { status: () => status(), verifyBootstrap: (p: string) => verifyBootstrap(p) } }))
+vi.mock('@/api', () => ({
+    authApi: { status: () => status(), verifyBootstrap: (p: string) => verifyBootstrap(p) },
+    onboardingApi: { restore: (p: string, f: File, k?: string) => restore(p, f, k) },
+}))
 vi.mock('@/stores/auth', () => ({
     useAuthStore: (select: (state: object) => unknown) => select({ register }),
 }))
@@ -69,6 +73,7 @@ afterEach(() => {
     cleanup()
     register.mockReset()
     verifyBootstrap.mockReset()
+    restore.mockReset()
     toastError.mockClear()
 })
 
@@ -80,10 +85,83 @@ describe('admin setup', () => {
         expect(screen.queryByLabelText('setup.name')).toBeNull()
     })
 
-    it('does not offer a restore until there is one', async () => {
-        renderPage()
-        await screen.findByLabelText('setup.bootstrapPassword')
-        expect(screen.queryByText('setup.restore')).toBeNull()
+    describe('restore a backup', () => {
+        const backup = () => new File(['x'], 'backup.zip')
+
+        async function toRestoreScreen(password = 'RIGHT') {
+            await screen.findByLabelText('setup.bootstrapPassword')
+            type('setup.bootstrapPassword', password)
+            fireEvent.click(screen.getByRole('button', { name: 'setup.restore' }))
+            await screen.findByLabelText('setup.backupFile')
+        }
+
+        const chooseFile = (file: File) =>
+            fireEvent.change(screen.getByLabelText('setup.backupFile'), { target: { files: [file] } })
+
+        it('checks the password before asking for the file', async () => {
+            verifyBootstrap.mockRejectedValue({
+                message: 'x',
+                details: { bootstrap_password: ['The bootstrap password is missing or wrong.'] },
+            })
+            renderPage()
+            await screen.findByLabelText('setup.bootstrapPassword')
+            type('setup.bootstrapPassword', 'WRONG')
+            fireEvent.click(screen.getByRole('button', { name: 'setup.restore' }))
+            await screen.findByText('The bootstrap password is missing or wrong.')
+            expect(screen.queryByLabelText('setup.backupFile')).toBeNull()
+        })
+
+        it('sends the password and the file, then goes to the login page', async () => {
+            restore.mockResolvedValue(undefined)
+            const { queryClient } = renderPage()
+            const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
+            await toRestoreScreen()
+            const file = backup()
+            chooseFile(file)
+            fireEvent.click(screen.getByRole('button', { name: 'setup.restoreSubmit' }))
+            await screen.findByText('login')
+            expect(restore).toHaveBeenCalledWith('RIGHT', file, undefined)
+            expect(invalidate).toHaveBeenCalledWith({ queryKey: ['auth', 'status'] })
+        })
+
+        it('does not send without a file', async () => {
+            renderPage()
+            await toRestoreScreen()
+            fireEvent.click(screen.getByRole('button', { name: 'setup.restoreSubmit' }))
+            await screen.findByText('setup.validation.backupFile')
+            expect(restore).not.toHaveBeenCalled()
+        })
+
+        it('asks for the app key of a Laravel database only', async () => {
+            restore.mockResolvedValue(undefined)
+            renderPage()
+            await toRestoreScreen()
+            chooseFile(backup())
+            expect(screen.queryByLabelText('setup.appKey')).toBeNull()
+            const laravel = new File(['x'], 'database.sqlite')
+            chooseFile(laravel)
+            type('setup.appKey', ' base64:abc ')
+            fireEvent.click(screen.getByRole('button', { name: 'setup.restoreSubmit' }))
+            await screen.findByText('login')
+            expect(restore).toHaveBeenCalledWith('RIGHT', laravel, 'base64:abc')
+        })
+
+        it('shows why the backup was refused and stays on the screen', async () => {
+            restore.mockRejectedValue({ message: 'x', details: { file: ['The backup has no users.'] } })
+            renderPage()
+            await toRestoreScreen()
+            chooseFile(backup())
+            fireEvent.click(screen.getByRole('button', { name: 'setup.restoreSubmit' }))
+            await screen.findByText('The backup has no users.')
+            expect(screen.queryByText('login')).toBeNull()
+        })
+
+        it('goes back to the first screen', async () => {
+            renderPage()
+            await toRestoreScreen()
+            fireEvent.click(screen.getByRole('button', { name: 'setup.back' }))
+            await screen.findByLabelText('setup.bootstrapPassword')
+        })
     })
 
     it('does not go on without a bootstrap password', async () => {
