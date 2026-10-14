@@ -740,6 +740,34 @@
                 "assigned": "Admin assigned",
                 "restored": "Space restored"
             }
+        },
+        "mcp": {
+            "title": "AI assistants (MCP)",
+            "description": "Let an AI app such as Claude connect to this server and read your data. New apps can only register while you allow it, for a few minutes and for one app at a time.",
+            "closed": "Closed. No new app can register.",
+            "open": "Open until {{time}}. It closes by itself, or as soon as one app registers.",
+            "allow": "Allow a new app for 5 minutes",
+            "close": "Close now",
+            "endpoint": "Server address to add in the app",
+            "copy": "Copy",
+            "copied": "Address copied",
+            "openFailed": "Could not open registration.",
+            "closeFailed": "Could not close registration.",
+            "apps": {
+                "title": "Registered apps",
+                "none": "No app has registered yet.",
+                "help": "Every app a user has connected must first be allowed by that user on the consent page. Check the address an app registered from. The address is what the server saw, so behind a proxy it is only as reliable as the proxy's headers.",
+                "disconnect": "Disconnect",
+                "ip": "IP address",
+                "userAgent": "Client",
+                "origin": "Origin",
+                "redirects": "Returns to",
+                "registeredAt": "Registered",
+                "unknown": "not sent",
+                "removeTitle": "Remove {{name}}?",
+                "removeDescription": "The app and every connection it holds are deleted at once. It has to register again, which needs a new window.",
+                "removeFailed": "Could not remove the app."
+            }
         }
     },
     "invite": {

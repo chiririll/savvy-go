@@ -111,6 +111,27 @@ CREATE TABLE IF NOT EXISTS api_tokens (
     updated_at TEXT
 ) STRICT;
 CREATE INDEX IF NOT EXISTS api_tokens_user_idx ON api_tokens (user_id);
+CREATE TABLE IF NOT EXISTS oauth_clients (
+    client_id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    redirect_uris TEXT NOT NULL,
+    ip TEXT NOT NULL DEFAULT '',
+    user_agent TEXT NOT NULL DEFAULT '',
+    origin TEXT NOT NULL DEFAULT '',
+    created_at TEXT
+) STRICT;
+CREATE TABLE IF NOT EXISTS oauth_refresh_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    token_hash TEXT NOT NULL UNIQUE,
+    client_id TEXT NOT NULL REFERENCES oauth_clients(client_id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    api_token_id INTEGER NOT NULL REFERENCES api_tokens(id) ON DELETE CASCADE,
+    expires_at TEXT NOT NULL,
+    created_at TEXT
+) STRICT;
+CREATE INDEX IF NOT EXISTS oauth_refresh_tokens_user_idx ON oauth_refresh_tokens (user_id);
+CREATE INDEX IF NOT EXISTS oauth_refresh_tokens_client_idx ON oauth_refresh_tokens (client_id);
+CREATE INDEX IF NOT EXISTS oauth_refresh_tokens_api_token_idx ON oauth_refresh_tokens (api_token_id);
 CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT

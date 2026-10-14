@@ -163,6 +163,26 @@ type IdentityProvider struct {
 	UpdatedAt       sql.NullString
 }
 
+type OauthClient struct {
+	ClientID     string
+	Name         string
+	RedirectUris string
+	Ip           string
+	UserAgent    string
+	Origin       string
+	CreatedAt    sql.NullString
+}
+
+type OauthRefreshToken struct {
+	ID         int64
+	TokenHash  string
+	ClientID   string
+	UserID     int64
+	ApiTokenID int64
+	ExpiresAt  string
+	CreatedAt  sql.NullString
+}
+
 type PasswordToken struct {
 	ID         int64
 	UserID     int64

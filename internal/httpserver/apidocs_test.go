@@ -51,7 +51,7 @@ var undocumented = []string{
 	"/api/auth/password", "/api/auth/logout", "/api/auth/logout-others",
 	"/api/auth/2fa", "/api/auth/sso", "/api/auth/webauthn",
 	"/api/uploads", "/api/s3/multipart", "/api/transactions/import",
-	"/api/backups", "/api/identity-providers", "/api/spaces/import",
+	"/api/oauth", "/api/backups", "/api/identity-providers", "/api/spaces/import",
 	"/api/admin", "/api/monitoring", "/api/invitations",
 }
 

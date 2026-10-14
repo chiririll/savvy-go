@@ -7,7 +7,7 @@ go run ./cmd/savvy-go       # serves :8080, data in ./savvy-data
 
 ## Store boundary
 
-- `ledger`, `spaces`, `transfers`, `uploads`, `automation`, `recurring`, `reports`, `calendar`, `currencydata`, `sso`, `backup`, `importer`, `legacy/restore`, `httpserver`, `auth`, `settings`, `seed`, `signing`, `schedule`, `jobs` use storage only via `internal/store`. No `store/sqlite`, `migrate`, `legacy`, `modernc.org/sqlite`, `database/sql`, `db/sqlc` imports. No `PRAGMA`, `ATTACH`, `sqlite_master` in SQL. `store/arch_test.go` enforces. Reason: space DB may become Postgres schema later.
+- `ledger`, `spaces`, `transfers`, `uploads`, `automation`, `recurring`, `reports`, `calendar`, `currencydata`, `sso`, `oauth`, `backup`, `importer`, `legacy/restore`, `httpserver`, `auth`, `settings`, `seed`, `signing`, `schedule`, `jobs` use storage only via `internal/store`. No `store/sqlite`, `migrate`, `legacy`, `modernc.org/sqlite`, `database/sql`, `db/sqlc` imports. No `PRAGMA`, `ATTACH`, `sqlite_master` in SQL. `store/arch_test.go` enforces. Reason: space DB may become Postgres schema later.
 - Work touching two spaces: `store.InSpaces`.
 
 ## Packages
@@ -24,6 +24,8 @@ Dependencies point down. Each package may import the ones above it in this list,
 - `transfers`: signed transfers between linked spaces. Uses `spaces`, `signing`; not `ledger`.
 - `backup`: backup files, archive format, restore. Uses `spaces`, `transfers`, `signing`.
 - `sso`: identity providers, OIDC/OAuth/SAML, JIT provisioning. A new user gets no space.
+- `oauth`: authorization server for MCP clients (Claude web). Dynamic registration of public clients, closed unless an admin opened a 5-minute window (in memory, closes after one registration; closed, `/oauth/register` is a 404 and the metadata omits `registration_endpoint`, so nothing hints it exists). Capped, idle clients pruned, PKCE `S256` only, rotating refresh tokens. A client stores who registered it (`ip`, `user_agent`, `origin`, also logged). There is no per-app approval: the admin window plus each user's consent are the gates. The admin always sees the list and can remove a client (`/api/admin/oauth/clients`, session-only): its access tokens are deleted with it. An access token is a read-only `svy_` API token with a 1h expiry, so it shows in the user's token list and respects roles; the refresh row cascades from `api_tokens`, so revoking there ends the connection. Auth codes live in memory (60s, single use, process-local). The consent API (`/api/oauth/authorize`) is session-only: a token must never mint tokens. Needs `app_url`: it is the issuer.
+- MCP server (`httpserver/mcp.go`, `/mcp`, stateless): read-only tools with no data access of their own. Each one calls the app's own GET route in-process with the caller's bearer token, so roles, token scope and the DTO/money shape stay those of the REST API. A new tool is a validated mapping to an existing GET route; a write tool needs its own design (scope, confirmation), not a POST passthrough. The inner call needs a fresh chi route context, or it inherits the POST of `/mcp`.
 - Create-space request: needs `spaces` and `ledger` together, so it lives in `httpserver/spaces_fill.go` (`createSpace`). All or nothing. No code may assume a user has a space.
 - `store/arch_test.go` enforces this layering and that the core never imports `net/http`.
 - Shared test fixtures cannot live in `ledger` (its in-package tests would import-cycle), so `reports` keeps its own small copy.

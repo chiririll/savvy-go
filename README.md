@@ -63,6 +63,7 @@ Fully responsive design built with ShadCN/UI — track expenses from your phone 
 - [Deployment](docs/deployment.md) — Docker Compose, environment, reverse proxies, health checks, Kubernetes, Debian, updating
 - [Data and backups](docs/data-and-backups.md) — the data directory, the signing key, backups and upgrading from the Laravel version
 - [API](docs/api.md) — tokens, endpoints and the OpenAPI reference
+- [AI assistants (MCP)](docs/mcp.md) — connect Claude to your data, read-only
 - [Development](docs/development.md) — running from source and how the app is built
 
 ## 🔒 Privacy

@@ -1,0 +1,346 @@
+package httpserver
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/url"
+	"regexp"
+	"strconv"
+	"strings"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/modelcontextprotocol/go-sdk/auth"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"savvy-go/internal/version"
+)
+
+// The MCP server: read-only tools for AI assistants, served over Streamable
+// HTTP at /mcp. It has no data access of its own. Every tool calls the app's
+// own GET routes in-process with the caller's bearer token, so roles, token
+// scope, space membership and the JSON shape (money, currencies) are exactly
+// those of the REST API and cannot drift from it.
+
+const (
+	mcpMaxResult    = 256 << 10
+	mcpMaxPerPage   = 100
+	mcpInstructions = "Go Savvy is a multi-currency expense tracker. Data lives in spaces: call list_spaces first and pass a space's id as space_id. " +
+		"Amounts are exact decimal numbers in the currency of the account or transaction they belong to; never add amounts of different currencies, " +
+		"and always say which currency a figure is in. Dates are YYYY-MM-DD. All tools are read-only."
+)
+
+var dateRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+
+// mcpReports maps get_report's report names to the REST report routes.
+var mcpReports = map[string]string{
+	"overview":                 "overview",
+	"money_flow":               "money-flow",
+	"expense_pace":             "expense-pace",
+	"expenses_by_category":     "expenses-by-category",
+	"cash_flow_over_time":      "cash-flow-over-time",
+	"transactions_summary":     "transactions/summary",
+	"transactions_by_category": "transactions/by-category",
+	"transactions_dynamics":    "transactions/dynamics",
+	"transactions_top":         "transactions/top",
+	"net_worth":                "net-worth",
+	"net_worth_history":        "net-worth-history",
+}
+
+// mcpHandler serves /mcp. The OAuth metadata URL is read per request because
+// the public URL can change in the admin panel.
+func (s *Server) mcpHandler() http.Handler {
+	h := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return s.mcpServer() }, &mcp.StreamableHTTPOptions{
+		// Stateless: nothing to lose on restart, no session to hijack.
+		Stateless:    true,
+		JSONResponse: true,
+		// The check guards unauthenticated localhost servers against DNS
+		// rebinding. Here every request needs a bearer token a rebinding page
+		// cannot send, and behind a reverse proxy it would reject the public Host.
+		DisableLocalhostProtection: true,
+	})
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		oauthCORS(w)
+		opts := &auth.RequireBearerTokenOptions{
+			ResourceMetadataURL:    s.appURL(r.Context()) + "/.well-known/oauth-protected-resource",
+			AllowMissingExpiration: true,
+		}
+		auth.RequireBearerToken(s.verifyMCPToken, opts)(h).ServeHTTP(w, r)
+	})
+}
+
+// verifyMCPToken accepts any live API token: OAuth access tokens and tokens
+// made by hand in Settings alike. A browser session is not enough.
+func (s *Server) verifyMCPToken(ctx context.Context, raw string, _ *http.Request) (*auth.TokenInfo, error) {
+	t, err := s.apiTokens.Resolve(ctx, raw)
+	if err != nil {
+		return nil, err
+	}
+	if t == nil || t.User == nil {
+		return nil, fmt.Errorf("%w: unknown or expired token", auth.ErrInvalidToken)
+	}
+	info := &auth.TokenInfo{Scopes: []string{t.Scope}, UserID: strconv.FormatInt(t.UserID, 10)}
+	if t.ExpiresAt != nil {
+		info.Expiration = *t.ExpiresAt
+	}
+	return info, nil
+}
+
+type spaceArgs struct {
+	SpaceID int64 `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
+}
+
+type accountsArgs struct {
+	SpaceID     int64 `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
+	WithSummary bool  `json:"with_summary,omitempty" jsonschema:"Also return totals across the accounts."`
+}
+
+type idArgs struct {
+	SpaceID int64 `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
+	ID      int64 `json:"id" jsonschema:"Id of the item."`
+}
+
+type transactionsArgs struct {
+	SpaceID       int64   `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
+	StartDate     string  `json:"start_date,omitempty" jsonschema:"Earliest date, YYYY-MM-DD."`
+	EndDate       string  `json:"end_date,omitempty" jsonschema:"Latest date, YYYY-MM-DD."`
+	Type          string  `json:"type,omitempty" jsonschema:"income, expense or transfer."`
+	Status        string  `json:"status,omitempty" jsonschema:"completed, pending or skipped."`
+	AccountID     int64   `json:"account_id,omitempty" jsonschema:"Only this account."`
+	CategoryIDs   []int64 `json:"category_ids,omitempty" jsonschema:"Only these categories."`
+	TagIDs        []int64 `json:"tag_ids,omitempty" jsonschema:"Only these tags."`
+	SortBy        string  `json:"sort_by,omitempty" jsonschema:"date (default), amount or created_at."`
+	SortDirection string  `json:"sort_direction,omitempty" jsonschema:"desc (default) or asc."`
+	Page          int     `json:"page,omitempty" jsonschema:"Page number from 1."`
+	PerPage       int     `json:"per_page,omitempty" jsonschema:"Rows per page, at most 100 (default 25)."`
+	WithSummary   bool    `json:"with_summary,omitempty" jsonschema:"Also return totals."`
+}
+
+type reportArgs struct {
+	SpaceID     int64   `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
+	Report      string  `json:"report" jsonschema:"One of: overview, money_flow, expense_pace, expenses_by_category, cash_flow_over_time, transactions_summary, transactions_by_category, transactions_dynamics, transactions_top, net_worth, net_worth_history."`
+	PeriodType  string  `json:"period_type,omitempty" jsonschema:"last_30_days (default), month, quarter, year, ytd or custom."`
+	PeriodValue string  `json:"period_value,omitempty" jsonschema:"For month 2026-03, for quarter 2026-Q1, for year 2026."`
+	StartDate   string  `json:"start_date,omitempty" jsonschema:"With period_type custom: first day, YYYY-MM-DD."`
+	EndDate     string  `json:"end_date,omitempty" jsonschema:"With period_type custom: last day, YYYY-MM-DD."`
+	CompareWith string  `json:"compare_with,omitempty" jsonschema:"none (default), previous_period or same_period_last_year."`
+	AccountIDs  []int64 `json:"account_ids,omitempty" jsonschema:"Only these accounts."`
+	CategoryIDs []int64 `json:"category_ids,omitempty" jsonschema:"Only these categories."`
+	TagIDs      []int64 `json:"tag_ids,omitempty" jsonschema:"Only these tags."`
+}
+
+// mcpServer builds the tool set. It is cheap and holds nothing per user: each
+// call reads the caller's token from its own request.
+func (s *Server) mcpServer() *mcp.Server {
+	srv := mcp.NewServer(&mcp.Implementation{Name: "go-savvy", Version: version.Value}, &mcp.ServerOptions{Instructions: mcpInstructions})
+	ro := func(title string) *mcp.ToolAnnotations {
+		no := false
+		return &mcp.ToolAnnotations{Title: title, ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: &no}
+	}
+
+	mcp.AddTool(srv, &mcp.Tool{Name: "list_spaces", Description: "List the spaces (separate ledgers) you can read, with your role in each.", Annotations: ro("List spaces")},
+		func(ctx context.Context, req *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
+			return s.mcpGet(ctx, req, "/api/spaces", nil), nil, nil
+		})
+
+	spaceTool := func(name, title, desc, path string) {
+		mcp.AddTool(srv, &mcp.Tool{Name: name, Description: desc, Annotations: ro(title)},
+			func(ctx context.Context, req *mcp.CallToolRequest, in spaceArgs) (*mcp.CallToolResult, any, error) {
+				return s.mcpGet(ctx, req, mcpSpacePath(in.SpaceID, path), nil), nil, nil
+			})
+	}
+	spaceTool("list_categories", "List categories", "List the space's categories (expense and income).", "/categories")
+	spaceTool("list_tags", "List tags", "List the space's tags.", "/tags")
+	spaceTool("list_currencies", "List currencies", "List the currencies the space uses, with decimals, exchange rates and which one is the base currency.", "/currencies")
+	spaceTool("list_budgets", "List budgets", "List budgets with their progress.", "/budgets")
+	spaceTool("list_debts", "List debts", "List debts: what is owed and to whom, with payment progress.", "/debts")
+	spaceTool("get_debts_summary", "Debts summary", "Totals of the space's debts.", "/debts-summary")
+	spaceTool("get_transactions_summary", "Transactions summary", "Totals of the space's transactions.", "/transactions-summary")
+
+	mcp.AddTool(srv, &mcp.Tool{Name: "list_accounts", Description: "List the space's accounts with their currency and current balance.", Annotations: ro("List accounts")},
+		func(ctx context.Context, req *mcp.CallToolRequest, in accountsArgs) (*mcp.CallToolResult, any, error) {
+			q := url.Values{}
+			if in.WithSummary {
+				q.Set("with_summary", "1")
+			}
+			return s.mcpGet(ctx, req, mcpSpacePath(in.SpaceID, "/accounts"), q), nil, nil
+		})
+
+	mcp.AddTool(srv, &mcp.Tool{Name: "list_transactions", Description: "List transactions, newest first, with optional filters. Each row has its own currency. Returns at most 100 rows per page; use page to continue.", Annotations: ro("List transactions")},
+		func(ctx context.Context, req *mcp.CallToolRequest, in transactionsArgs) (*mcp.CallToolResult, any, error) {
+			q := url.Values{}
+			if err := firstErr(
+				setDate(q, "start_date", in.StartDate), setDate(q, "end_date", in.EndDate),
+				setEnum(q, "type", in.Type, "income", "expense", "transfer"),
+				setEnum(q, "status", in.Status, "completed", "pending", "skipped"),
+				setEnum(q, "sort_by", in.SortBy, "date", "amount", "created_at"),
+				setEnum(q, "sort_direction", in.SortDirection, "asc", "desc"),
+			); err != nil {
+				return mcpFail(err.Error()), nil, nil
+			}
+			setID(q, "account_id", in.AccountID)
+			setIDs(q, "category_ids", in.CategoryIDs)
+			setIDs(q, "tag_ids", in.TagIDs)
+			if in.Page > 0 {
+				q.Set("page", strconv.Itoa(in.Page))
+			}
+			per := in.PerPage
+			if per <= 0 {
+				per = 25
+			}
+			q.Set("per_page", strconv.Itoa(min(per, mcpMaxPerPage)))
+			if in.WithSummary {
+				q.Set("with_summary", "1")
+			}
+			return s.mcpGet(ctx, req, mcpSpacePath(in.SpaceID, "/transactions"), q), nil, nil
+		})
+
+	mcp.AddTool(srv, &mcp.Tool{Name: "get_transaction", Description: "Get one transaction with its items, tags and category.", Annotations: ro("Get transaction")},
+		func(ctx context.Context, req *mcp.CallToolRequest, in idArgs) (*mcp.CallToolResult, any, error) {
+			return s.mcpGet(ctx, req, mcpSpacePath(in.SpaceID, "/transactions/"+strconv.FormatInt(in.ID, 10)), nil), nil, nil
+		})
+
+	mcp.AddTool(srv, &mcp.Tool{Name: "get_report", Description: "Run one of the space's reports (spending by category, cash flow, net worth, ...) for a period. Totals are in the space's base currency unless the report says otherwise.", Annotations: ro("Get report")},
+		func(ctx context.Context, req *mcp.CallToolRequest, in reportArgs) (*mcp.CallToolResult, any, error) {
+			route, ok := mcpReports[in.Report]
+			if !ok {
+				return mcpFail("Unknown report " + strconv.Quote(in.Report) + "."), nil, nil
+			}
+			q := url.Values{}
+			if err := firstErr(
+				setDate(q, "start_date", in.StartDate), setDate(q, "end_date", in.EndDate),
+				setEnum(q, "period_type", in.PeriodType, "last_30_days", "month", "quarter", "year", "ytd", "custom"),
+				setEnum(q, "compare_with", in.CompareWith, "none", "previous_period", "same_period_last_year"),
+			); err != nil {
+				return mcpFail(err.Error()), nil, nil
+			}
+			if in.PeriodValue != "" {
+				q.Set("period_value", in.PeriodValue)
+			}
+			setIDs(q, "account_ids", in.AccountIDs)
+			setIDs(q, "category_ids", in.CategoryIDs)
+			setIDs(q, "tag_ids", in.TagIDs)
+			return s.mcpGet(ctx, req, mcpSpacePath(in.SpaceID, "/reports/"+route), q), nil, nil
+		})
+	return srv
+}
+
+func mcpSpacePath(id int64, rest string) string {
+	return "/api/spaces/" + strconv.FormatInt(id, 10) + rest
+}
+
+func mcpFail(msg string) *mcp.CallToolResult {
+	return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: msg}}}
+}
+
+func firstErr(errs ...error) error {
+	for _, e := range errs {
+		if e != nil {
+			return e
+		}
+	}
+	return nil
+}
+
+func setDate(q url.Values, key, v string) error {
+	if v == "" {
+		return nil
+	}
+	if !dateRe.MatchString(v) {
+		return fmt.Errorf("%s must be YYYY-MM-DD.", key)
+	}
+	q.Set(key, v)
+	return nil
+}
+
+func setEnum(q url.Values, key, v string, allowed ...string) error {
+	if v == "" {
+		return nil
+	}
+	for _, a := range allowed {
+		if v == a {
+			q.Set(key, v)
+			return nil
+		}
+	}
+	return fmt.Errorf("%s must be one of: %s.", key, strings.Join(allowed, ", "))
+}
+
+func setID(q url.Values, key string, id int64) {
+	if id > 0 {
+		q.Set(key, strconv.FormatInt(id, 10))
+	}
+}
+
+func setIDs(q url.Values, key string, ids []int64) {
+	var parts []string
+	for _, id := range ids {
+		if id > 0 {
+			parts = append(parts, strconv.FormatInt(id, 10))
+		}
+	}
+	if len(parts) > 0 {
+		q.Set(key, strings.Join(parts, ","))
+	}
+}
+
+// mcpGet runs a GET against the app's own router as the caller. The bearer
+// token comes from the caller's /mcp request, so the usual middleware decides
+// what they may see.
+func (s *Server) mcpGet(ctx context.Context, req *mcp.CallToolRequest, path string, q url.Values) *mcp.CallToolResult {
+	var authz string
+	if extra := req.GetExtra(); extra != nil {
+		authz = extra.Header.Get("Authorization")
+	}
+	if authz == "" {
+		return mcpFail("Unauthenticated.")
+	}
+	target := path
+	if len(q) > 0 {
+		target += "?" + q.Encode()
+	}
+	// chi would reuse the routing state of the /mcp request (method POST) for a
+	// context that carries it, so the call starts with a clean one.
+	ctx = context.WithValue(ctx, chi.RouteCtxKey, (*chi.Context)(nil))
+	hr, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
+	if err != nil {
+		return mcpFail(err.Error())
+	}
+	hr.Header.Set("Authorization", authz)
+	hr.Header.Set("Accept", "application/json")
+	rec := &memoryResponse{header: http.Header{}, status: http.StatusOK}
+	s.mux.ServeHTTP(rec, hr)
+
+	body := bytes.TrimSpace(rec.body.Bytes())
+	if rec.status >= 400 {
+		return mcpFail(apiErrorMessage(rec.status, body))
+	}
+	if len(body) > mcpMaxResult {
+		return mcpFail("The result is too large. Narrow it with filters (dates, account, category) or ask for a smaller page.")
+	}
+	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(body)}}}
+}
+
+// apiErrorMessage is the message of a REST error body, or its status.
+func apiErrorMessage(status int, body []byte) string {
+	var e struct {
+		Message string `json:"message"`
+	}
+	if json.Unmarshal(body, &e) == nil && e.Message != "" {
+		return e.Message
+	}
+	return http.StatusText(status)
+}
+
+// memoryResponse is a ResponseWriter that keeps the answer in memory.
+type memoryResponse struct {
+	header http.Header
+	status int
+	body   bytes.Buffer
+}
+
+func (m *memoryResponse) Header() http.Header         { return m.header }
+func (m *memoryResponse) WriteHeader(status int)      { m.status = status }
+func (m *memoryResponse) Write(b []byte) (int, error) { return m.body.Write(b) }

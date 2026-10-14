@@ -21,6 +21,7 @@ import (
 	"savvy-go/internal/jobs"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/mailer"
+	"savvy-go/internal/oauth"
 	"savvy-go/internal/refsync"
 	"savvy-go/internal/settings"
 	"savvy-go/internal/signing"
@@ -53,6 +54,7 @@ type Server struct {
 	uploads    uploads.Service
 	rates      ledger.RateSource // currency catalog and exchange rates, shared by every space
 	sso        sso.Service
+	oauth      *oauth.Service
 	twoFactor  auth.TwoFactor
 	webauthn   auth.WebAuthn
 	queue      *jobs.Queue
@@ -116,6 +118,7 @@ func New(cfg config.Config, st store.Store, keys *signing.Holder, opts ...Option
 		s.mail = s.newMailer(cfg.Mail)
 	}
 	s.sso = sso.Service{DB: srv, Users: s.users, Settings: s.settings, AppURL: cfg.URL}
+	s.oauth = oauth.New(srv)
 	_ = os.MkdirAll(cfg.UploadsDir, 0o775)
 	_ = os.MkdirAll(cfg.BackupsDir, 0o775)
 	s.mux = s.routes()
@@ -131,6 +134,7 @@ func (s *Server) routes() *chi.Mux {
 	r.Use(middleware.Recoverer)
 	r.Use(locale)
 	r.Use(noStoreAPI)
+	r.Use(noFraming)
 
 	r.Get("/livez", s.livez)
 	r.Get("/readyz", s.readyz)
@@ -175,6 +179,8 @@ func (s *Server) routes() *chi.Mux {
 				r.Get("/auth/api-tokens", s.apiTokensIndex)
 				r.Post("/auth/api-tokens", s.apiTokensStore)
 				r.Delete("/auth/api-tokens/{id}", s.apiTokensDestroy)
+				r.Get("/oauth/authorize", s.oauthConsentInfo)
+				r.Post("/oauth/authorize", s.oauthConsent)
 				r.Post("/auth/2fa/enable", s.twoFactorEnable)
 				r.Post("/auth/2fa/confirm", s.twoFactorConfirm)
 				r.Post("/auth/2fa/disable", s.twoFactorDisable)
@@ -271,6 +277,11 @@ func (s *Server) routes() *chi.Mux {
 				r.Use(s.requireAdmin)
 				r.Use(s.sessionOnly)
 				r.Patch("/settings", s.settingsUpdate)
+				r.Get("/admin/oauth/registration", s.oauthRegistrationShow)
+				r.Post("/admin/oauth/registration", s.oauthRegistrationOpen)
+				r.Delete("/admin/oauth/registration", s.oauthRegistrationClose)
+				r.Get("/admin/oauth/clients", s.oauthClientsIndex)
+				r.Delete("/admin/oauth/clients/{id}", s.oauthClientDestroy)
 				r.Get("/admin/mail", s.mailIndex)
 				r.Put("/admin/mail", s.mailUpdate)
 				r.Post("/admin/mail/test", s.mailTest)
@@ -299,6 +310,13 @@ func (s *Server) routes() *chi.Mux {
 		})
 	})
 
+	// MCP clients (Claude web) discover and sign in through these; they need
+	// the public URL because it is their issuer.
+	r.Group(func(r chi.Router) {
+		r.Use(s.needAppURL)
+		s.mcpRoutes(r)
+	})
+
 	r.Get("/*", s.spa)
 	return r
 }
@@ -308,6 +326,18 @@ func locale(next http.Handler) http.Handler {
 		if loc := strings.TrimSpace(r.Header.Get("X-Locale")); loc != "" {
 			w.Header().Set("Content-Language", loc)
 		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// noFraming forbids showing any page inside another site's frame, so a hidden
+// iframe cannot put its own button over ours (clickjacking), notably over
+// "Allow access" on the OAuth consent page. Nothing here is meant to be embedded.
+func noFraming(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("X-Frame-Options", "DENY")
+		h.Set("Content-Security-Policy", "frame-ancestors 'none'")
 		next.ServeHTTP(w, r)
 	})
 }
