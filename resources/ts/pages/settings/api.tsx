@@ -28,12 +28,42 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { useApiTokens, useCreateApiToken, useRevokeApiToken } from '@/hooks'
+import { useApiTokens, useCreateApiToken, useRevokeApiToken, useSpaces } from '@/hooks'
+import { PermissionGrid } from '@/components/features/api-tokens/PermissionGrid'
+import { SpacePicker, hasSpaces, type SpaceChoice } from '@/components/features/api-tokens/SpacePicker'
 import { intlLocale } from '@/lib/i18n'
-import type { ApiTokenScope } from '@/types'
-import { apiScopeHint, apiScopeLabel } from '@/lib/labels'
+import { API_RESOURCES, permissionLevel, type ApiPermission, type ApiResource, type ApiTokenSummary } from '@/types'
+import { apiResourceLabel } from '@/lib/labels'
 
 type Expiry = 'never' | '30' | '90' | '365'
+
+/** What a token holds, as two lists of resources: the ones it only reads and the ones it also changes. */
+function grantedResources(token: ApiTokenSummary): { read: ApiResource[]; write: ApiResource[] } {
+    const read: ApiResource[] = []
+    const write: ApiResource[] = []
+    for (const resource of API_RESOURCES) {
+        const level = permissionLevel(token.permissions, resource)
+        if (level === 'write') write.push(resource)
+        else if (level === 'read') read.push(resource)
+    }
+    return { read, write }
+}
+
+/** What a token may do, in words. */
+function TokenGrants({ token }: { token: ApiTokenSummary }) {
+    const { t } = useTranslation('settings')
+    const { read, write } = grantedResources(token)
+    const list = (items: ApiResource[]) => items.map((r) => apiResourceLabel(t, r)).join(', ')
+    if (read.length === 0 && write.length === 0) {
+        return <p className="text-xs text-muted-foreground">{t('api.tokens.noAccess')}</p>
+    }
+    return (
+        <div className="space-y-0.5 text-xs text-muted-foreground">
+            {read.length > 0 && <p>{t('api.tokens.canRead', { list: list(read) })}</p>}
+            {write.length > 0 && <p>{t('api.tokens.canWrite', { list: list(write) })}</p>}
+        </div>
+    )
+}
 
 function expiryToIso(expiry: Expiry): string | null {
     if (expiry === 'never') return null
@@ -49,10 +79,12 @@ export default function ApiSettingsPage() {
     const { data: tokens, isLoading } = useApiTokens()
     const createToken = useCreateApiToken()
     const revokeToken = useRevokeApiToken()
+    const { data: spaces = [] } = useSpaces()
 
     const [showCreate, setShowCreate] = useState(false)
     const [name, setName] = useState('')
-    const [scope, setScope] = useState<ApiTokenScope>('read')
+    const [permissions, setPermissions] = useState<ApiPermission[]>([])
+    const [spaceChoice, setSpaceChoice] = useState<SpaceChoice>({ all: false, ids: [] })
     const [expiry, setExpiry] = useState<Expiry>('never')
     const [createdToken, setCreatedToken] = useState<string | null>(null)
     const [copied, setCopied] = useState(false)
@@ -61,7 +93,8 @@ export default function ApiSettingsPage() {
 
     const resetForm = () => {
         setName('')
-        setScope('read')
+        setPermissions([])
+        setSpaceChoice({ all: false, ids: [] })
         setExpiry('never')
     }
 
@@ -69,7 +102,9 @@ export default function ApiSettingsPage() {
         try {
             const created = await createToken.mutateAsync({
                 name: name.trim(),
-                scope,
+                permissions,
+                all_spaces: spaceChoice.all,
+                space_ids: spaceChoice.ids,
                 expires_at: expiryToIso(expiry),
             })
             setShowCreate(false)
@@ -132,11 +167,14 @@ export default function ApiSettingsPage() {
                                         <div className="min-w-0 space-y-1">
                                             <div className="flex flex-wrap items-center gap-2">
                                                 <span className="truncate text-sm font-medium">{token.name}</span>
-                                                <Badge variant={token.scope === 'read' ? 'secondary' : 'default'}>
-                                                    {apiScopeLabel(t, token.scope)}
+                                                <Badge variant="secondary">
+                                                    {token.all_spaces
+                                                        ? t('api.tokens.allSpaces')
+                                                        : t('api.tokens.spaceCount', { count: token.space_ids.length })}
                                                 </Badge>
                                                 <code className="text-xs text-muted-foreground">{token.prefix}…</code>
                                             </div>
+                                            <TokenGrants token={token} />
                                             <p className="text-xs text-muted-foreground">
                                                 {token.last_used_at
                                                     ? t('api.tokens.lastUsed', { date: formatDate(token.last_used_at) })
@@ -198,7 +236,10 @@ export default function ApiSettingsPage() {
                         <Button variant="outline" onClick={() => setShowCreate(false)}>
                             {tCommon('actions.cancel')}
                         </Button>
-                        <Button onClick={handleCreate} disabled={!name.trim() || createToken.isPending}>
+                        <Button
+                            onClick={handleCreate}
+                            disabled={!name.trim() || !hasSpaces(spaceChoice) || createToken.isPending}
+                        >
                             {tCommon('actions.create')}
                         </Button>
                     </>
@@ -216,35 +257,32 @@ export default function ApiSettingsPage() {
                             onChange={(e) => setName(e.target.value)}
                         />
                     </div>
-                    <div className="grid grid-cols-2 items-start gap-3">
-                        <div className="space-y-2">
-                            <Label>{t('api.create.access')}</Label>
-                            <Select value={scope} onValueChange={(v) => setScope(v as ApiTokenScope)}>
-                                <SelectTrigger className="w-full">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="read">{t('api.scope.read')}</SelectItem>
-                                    <SelectItem value="read-write">{t('api.scope.read-write')}</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="space-y-2">
-                            <Label>{t('api.create.expiry')}</Label>
-                            <Select value={expiry} onValueChange={(v) => setExpiry(v as Expiry)}>
-                                <SelectTrigger className="w-full">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="never">{t('api.create.expiryNever')}</SelectItem>
-                                    <SelectItem value="30">{t('api.create.expiryDays', { count: 30 })}</SelectItem>
-                                    <SelectItem value="90">{t('api.create.expiryDays', { count: 90 })}</SelectItem>
-                                    <SelectItem value="365">{t('api.create.expiryDays', { count: 365 })}</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
+                    <div className="space-y-2">
+                        <Label>{t('api.create.spaces')}</Label>
+                        <SpacePicker idPrefix="token-space" spaces={spaces} value={spaceChoice} onChange={setSpaceChoice} />
+                        <p className="text-xs text-muted-foreground">
+                            {hasSpaces(spaceChoice) ? t('api.create.spacesHint') : t('api.spaces.none')}
+                        </p>
                     </div>
-                    <p className="text-xs text-muted-foreground">{apiScopeHint(t, scope)}</p>
+                    <div className="space-y-2">
+                        <Label>{t('api.create.permissions')}</Label>
+                        <PermissionGrid value={permissions} onChange={setPermissions} />
+                        <p className="text-xs text-muted-foreground">{t('api.create.permissionsHint')}</p>
+                    </div>
+                    <div className="space-y-2">
+                        <Label>{t('api.create.expiry')}</Label>
+                        <Select value={expiry} onValueChange={(v) => setExpiry(v as Expiry)}>
+                            <SelectTrigger className="w-full">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="never">{t('api.create.expiryNever')}</SelectItem>
+                                <SelectItem value="30">{t('api.create.expiryDays', { count: 30 })}</SelectItem>
+                                <SelectItem value="90">{t('api.create.expiryDays', { count: 90 })}</SelectItem>
+                                <SelectItem value="365">{t('api.create.expiryDays', { count: 365 })}</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
             </ResponsiveDialog>
 

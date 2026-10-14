@@ -2,7 +2,8 @@
 // clients such as Claude web: dynamic client registration, authorization
 // codes with PKCE, and rotating refresh tokens.
 //
-// Access tokens are ordinary read-only API tokens (internal/auth), so they
+// Access tokens are ordinary API tokens (internal/auth) that can only read what
+// the MCP tools show, in the spaces the user picked on the consent screen. They
 // show up in the user's token list, can be revoked there, and are limited by
 // the owner's role in every space exactly like other API tokens.
 package oauth
@@ -69,12 +70,23 @@ type TokenSet struct {
 type CodeRequest struct {
 	ClientID, RedirectURI, CodeChallenge, CodeChallengeMethod string
 	User                                                      *auth.User
+	// Spaces the user let the app read: every space, or just these.
+	AllSpaces bool
+	SpaceIDs  []int64
 }
 
 type codeEntry struct {
 	clientID, redirectURI, challenge string
 	user                             *auth.User
+	spaces                           spaceGrant
 	expires                          time.Time
+}
+
+// spaceGrant is which spaces a connection reaches. It is fixed when the user
+// approves and carried through every refresh.
+type spaceGrant struct {
+	all bool
+	ids []int64
 }
 
 // Service is shared by all requests: authorization codes are short-lived and
@@ -249,6 +261,9 @@ func (s *Service) IssueCode(ctx context.Context, req CodeRequest) (string, error
 	if req.User == nil {
 		return "", fail("invalid_request", "No user.")
 	}
+	if !req.AllSpaces && len(req.SpaceIDs) == 0 {
+		return "", fail("invalid_request", "Choose at least one space.")
+	}
 	now := s.Now()
 	code := auth.RandomString(48)
 	s.mu.Lock()
@@ -259,7 +274,8 @@ func (s *Service) IssueCode(ctx context.Context, req CodeRequest) (string, error
 		}
 	}
 	s.codes[auth.HashToken(code)] = codeEntry{
-		clientID: req.ClientID, redirectURI: req.RedirectURI, challenge: req.CodeChallenge, user: req.User, expires: now.Add(codeTTL),
+		clientID: req.ClientID, redirectURI: req.RedirectURI, challenge: req.CodeChallenge, user: req.User,
+		spaces: spaceGrant{all: req.AllSpaces, ids: req.SpaceIDs}, expires: now.Add(codeTTL),
 	}
 	return code, nil
 }
@@ -286,7 +302,7 @@ func (s *Service) Exchange(ctx context.Context, clientID, code, verifier, redire
 	if c == nil {
 		return nil, bad
 	}
-	access, tokenID, err := s.issueAccess(ctx, e.user, c)
+	access, tokenID, err := s.issueAccess(ctx, e.user, c, e.spaces)
 	if err != nil {
 		return nil, err
 	}
@@ -332,7 +348,18 @@ func (s *Service) Refresh(ctx context.Context, clientID, refreshToken string) (*
 	if user == nil || c == nil {
 		return nil, bad
 	}
-	access, tokenID, err := s.issueAccess(ctx, user, c)
+	prev, err := s.accessToken(ctx, row.UserID, row.APITokenID)
+	if err != nil {
+		return nil, fail("server_error", err.Error())
+	}
+	if prev == nil {
+		return nil, bad
+	}
+	access, tokenID, err := s.issueAccess(ctx, user, c, spaceGrant{all: prev.AllSpaces, ids: prev.SpaceIDs})
+	if errors.Is(err, auth.ErrBadGrant) {
+		// Every space the connection could reach is gone.
+		return nil, bad
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -349,12 +376,31 @@ func (s *Service) Refresh(ctx context.Context, clientID, refreshToken string) (*
 	return &TokenSet{AccessToken: access, RefreshToken: next, ExpiresIn: int(AccessTTL / time.Second)}, nil
 }
 
-// issueAccess creates the read-only API token an MCP client calls with.
-func (s *Service) issueAccess(ctx context.Context, user *auth.User, c *Client) (raw string, id int64, err error) {
+// accessToken is the user's API token with that id, nil when it is gone.
+func (s *Service) accessToken(ctx context.Context, userID, id int64) (*auth.APIToken, error) {
+	list, err := s.Tokens.List(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	for i := range list {
+		if list[i].ID == id {
+			return &list[i], nil
+		}
+	}
+	return nil, nil
+}
+
+// issueAccess creates the API token an MCP client calls with: read access to
+// what the MCP tools show, in the spaces the user chose, and nothing else.
+func (s *Service) issueAccess(ctx context.Context, user *auth.User, c *Client, spaces spaceGrant) (raw string, id int64, err error) {
 	exp := s.Now().Add(AccessTTL)
-	raw, tok, err := s.Tokens.Issue(ctx, user, "MCP: "+c.Name, auth.APIScopeRead, &exp)
+	grant := auth.Grant{Permissions: auth.ReadPerms(auth.MCPResources...), AllSpaces: spaces.all, SpaceIDs: spaces.ids}
+	raw, tok, err := s.Tokens.Issue(ctx, user, "MCP: "+c.Name, grant, &exp)
 	if errors.Is(err, auth.ErrTokenLimit) {
 		return "", 0, fail("server_error", "Too many API tokens: revoke some in Settings, then connect again.")
+	}
+	if errors.Is(err, auth.ErrBadGrant) {
+		return "", 0, err
 	}
 	if err != nil {
 		return "", 0, fail("server_error", err.Error())

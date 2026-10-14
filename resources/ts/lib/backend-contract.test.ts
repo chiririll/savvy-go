@@ -3,7 +3,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { ACCOUNT_TYPES } from '@/types/accounts'
-import { API_TOKEN_SCOPES } from '@/types/api-tokens'
+import { API_PERMISSION_LEVELS, API_RESOURCES } from '@/types/api-tokens'
 import { ACTION_TYPES, CONDITION_OPERATORS, TRIGGER_TYPES } from '@/types/automation'
 import { BACKUP_STATUSES } from '@/types/backup'
 import { BUDGET_PERIODS } from '@/types/budgets'
@@ -68,7 +68,6 @@ const spaceSchema = sqlEnums('internal/migrate/sql/space/0001_initial.sql')
 describe('enum columns in the database schema', () => {
     const cases: Array<[string, Map<string, string[]>, string, readonly string[]]> = [
         ['users.role', serverSchema, 'users.role', USER_ROLES],
-        ['api_tokens.scope', serverSchema, 'api_tokens.scope', API_TOKEN_SCOPES],
         ['space_members.role', serverSchema, 'space_members.role', SPACE_ROLES],
         ['space_invitations.role', serverSchema, 'space_invitations.role', SPACE_ROLES],
         ['accounts.type', spaceSchema, 'accounts.type', ACCOUNT_TYPES],
@@ -93,7 +92,8 @@ describe('enum columns in the database schema', () => {
 describe('frontend value lists', () => {
     const lists: Record<string, readonly string[]> = {
         USER_ROLES,
-        API_TOKEN_SCOPES,
+        API_RESOURCES,
+        API_PERMISSION_LEVELS,
         SPACE_ROLES,
         TRANSFER_REVIEWS,
         ACCOUNT_TYPES,
@@ -176,6 +176,21 @@ describe('API routes', () => {
         const roots = [...body.matchAll(/r\.(?:Get|Post|Put|Patch|Delete)\("\/([^/"{]+)/g)].map((m) => m[1])
         expect(roots.length).toBeGreaterThan(50)
         expect(sorted(SPACE_ROOTS)).toEqual(sorted(roots))
+    })
+})
+
+describe('API token permissions', () => {
+    const source = read('internal/auth/permissions.go')
+
+    it('offers the resources and levels the backend grants', () => {
+        const resources = /var APIResources = \[\]string\{([^}]*)\}/.exec(source)![1]
+        expect(sorted(API_RESOURCES)).toEqual(sorted(quoted(resources)))
+        const levels = [...source.matchAll(/Perm(?:Read|Write)\s*= "([a-z]+)"/g)].map((m) => m[1])
+        expect(sorted(API_PERMISSION_LEVELS)).toEqual(sorted(levels))
+    })
+
+    it('has a label for every resource', () => {
+        expect(sorted(Object.keys(enSettings.api.resource))).toEqual(sorted(API_RESOURCES))
     })
 })
 

@@ -108,7 +108,7 @@ func TestP1SpaceBackupsAreForSpaceAdmins(t *testing.T) {
 		status(t, a.do("POST", spacePath(a.space.ID, "/backups"), map[string]any{}, sess.Token, sess.CSRF), 403, role+" create")
 	}
 	admin := a.createUser("admin@test.com", "secret1", auth.RoleAdmin)
-	raw, _ := a.issueToken(admin, auth.APIScopeReadWrite, nil)
+	raw, _ := a.issueToken(admin, tokReadWrite, nil)
 	status(t, a.bearer("GET", spacePath(a.space.ID, "/backups"), nil, raw), 403, "API token")
 	outsider := a.issue(a.createUser("out@test.com", "secret1", auth.RoleUser), false)
 	status(t, a.do("GET", spacePath(a.space.ID, "/backups"), nil, outsider.Token, ""), 404, "not a member")

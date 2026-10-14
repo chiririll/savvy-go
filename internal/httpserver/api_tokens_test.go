@@ -33,9 +33,33 @@ func (a *testApp) bearer(method, path string, body any, token string) *http.Resp
 	return res
 }
 
+// Shorthands for tokens that reach every space of their owner: tokRead reads
+// everything, tokReadWrite also writes. Tests of finer grants use issueGrant.
+const (
+	tokRead      = "read"
+	tokReadWrite = "read-write"
+)
+
+func allPerms(level string) []string {
+	out := make([]string, len(auth.APIResources))
+	for i, r := range auth.APIResources {
+		out[i] = auth.Perm(r, level)
+	}
+	return out
+}
+
 func (a *testApp) issueToken(u *auth.User, scope string, exp *time.Time) (string, *auth.APIToken) {
 	a.t.Helper()
-	raw, tok, err := a.s.apiTokens.Issue(context.Background(), u, "app", scope, exp)
+	level := auth.PermRead
+	if scope == tokReadWrite {
+		level = auth.PermWrite
+	}
+	return a.issueGrant(u, auth.Grant{Permissions: allPerms(level), AllSpaces: true}, exp)
+}
+
+func (a *testApp) issueGrant(u *auth.User, g auth.Grant, exp *time.Time) (string, *auth.APIToken) {
+	a.t.Helper()
+	raw, tok, err := a.s.apiTokens.Issue(context.Background(), u, "app", g, exp)
 	if err != nil {
 		a.t.Fatal(err)
 	}
@@ -55,7 +79,7 @@ func TestAPITokenCreateListRevoke(t *testing.T) {
 	u := a.createUser("rw@a.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 
-	res := a.do("POST", "/api/auth/api-tokens", map[string]any{"name": "Zapier", "scope": "read-write"}, sess.Token, sess.CSRF)
+	res := a.do("POST", "/api/auth/api-tokens", map[string]any{"name": "Zapier", "permissions": allPerms(auth.PermWrite), "all_spaces": true}, sess.Token, sess.CSRF)
 	if res.StatusCode != http.StatusCreated {
 		t.Fatalf("create %d", res.StatusCode)
 	}
@@ -91,7 +115,7 @@ func TestAPITokenCreateListRevoke(t *testing.T) {
 func TestAPITokenBearerSkipsCSRF(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("rw@a.com", "secret1", roleEditor)
-	raw, _ := a.issueToken(u, auth.APIScopeReadWrite, nil)
+	raw, _ := a.issueToken(u, tokReadWrite, nil)
 
 	status(t, a.bearer("GET", "/api/accounts", nil, raw), 200, "bearer GET")
 	res := a.bearer("POST", "/api/tags", map[string]any{"name": "from-api"}, raw)
@@ -108,7 +132,7 @@ func TestAPITokenBearerSkipsCSRF(t *testing.T) {
 func TestAPITokenReadScopeBlocksWrites(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("rw@a.com", "secret1", roleEditor)
-	raw, _ := a.issueToken(u, auth.APIScopeRead, nil)
+	raw, _ := a.issueToken(u, tokRead, nil)
 
 	status(t, a.bearer("GET", "/api/tags", nil, raw), 200, "read GET")
 	status(t, a.bearer("POST", "/api/tags", map[string]any{"name": "nope"}, raw), 403, "read POST")
@@ -119,7 +143,7 @@ func TestAPITokenReadScopeBlocksWrites(t *testing.T) {
 func TestP4ViewerReadWriteTokenCannotWrite(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("ro@a.com", "secret1", roleViewer)
-	raw, _ := a.issueToken(u, auth.APIScopeReadWrite, nil)
+	raw, _ := a.issueToken(u, tokReadWrite, nil)
 
 	status(t, a.bearer("GET", "/api/tags", nil, raw), 200, "viewer token GET")
 	status(t, a.bearer("POST", "/api/tags", map[string]any{"name": "nope"}, raw), 403, "viewer token POST")
@@ -129,7 +153,7 @@ func TestAPITokenInvalidExpiredAndNoCookieFallback(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("rw@a.com", "secret1", roleEditor)
 	past := time.Now().Add(-time.Hour)
-	expired, _ := a.issueToken(u, auth.APIScopeRead, &past)
+	expired, _ := a.issueToken(u, tokRead, &past)
 
 	status(t, a.bearer("GET", "/api/accounts", nil, expired), 401, "expired")
 	status(t, a.bearer("GET", "/api/accounts", nil, "svy_garbage"), 401, "garbage")
@@ -150,7 +174,7 @@ func TestAPITokenInvalidExpiredAndNoCookieFallback(t *testing.T) {
 func TestAPITokenForbiddenOnSessionOnlyAndAdminRoutes(t *testing.T) {
 	a := newTestApp(t)
 	admin := a.createUser("admin@a.com", "secret1", auth.RoleAdmin)
-	raw, _ := a.issueToken(admin, auth.APIScopeReadWrite, nil)
+	raw, _ := a.issueToken(admin, tokReadWrite, nil)
 
 	status(t, a.bearer("POST", "/api/auth/api-tokens", map[string]any{"name": "x"}, raw), 403, "mint via token")
 	status(t, a.bearer("GET", "/api/auth/api-tokens", nil, raw), 403, "list via token")
@@ -164,7 +188,7 @@ func TestAPITokenForbiddenOnSessionOnlyAndAdminRoutes(t *testing.T) {
 func TestAPITokensDeletedWithUser(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("rw@a.com", "secret1", roleEditor)
-	a.issueToken(u, auth.APIScopeRead, nil)
+	a.issueToken(u, tokRead, nil)
 	if _, err := a.db.Exec(`PRAGMA foreign_keys = ON`); err != nil {
 		t.Fatal(err)
 	}
@@ -182,8 +206,8 @@ func TestAPITokenRevokeAndListAreScopedToOwner(t *testing.T) {
 	a := newTestApp(t)
 	alice := a.createUser("alice@a.com", "secret1", roleEditor)
 	bob := a.createUser("bob@a.com", "secret1", roleEditor)
-	aliceRaw, aliceTok := a.issueToken(alice, auth.APIScopeRead, nil)
-	a.issueToken(bob, auth.APIScopeRead, nil)
+	aliceRaw, aliceTok := a.issueToken(alice, tokRead, nil)
+	a.issueToken(bob, tokRead, nil)
 	sess := a.issue(bob, false)
 
 	items := decodeJSON(t, a.do("GET", "/api/auth/api-tokens", nil, sess.Token, ""))["data"].([]any)
@@ -198,7 +222,7 @@ func TestAPITokenRevokeAndListAreScopedToOwner(t *testing.T) {
 func TestAPITokenDemotedUserLosesWrite(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("rw@a.com", "secret1", roleEditor)
-	raw, _ := a.issueToken(u, auth.APIScopeReadWrite, nil)
+	raw, _ := a.issueToken(u, tokReadWrite, nil)
 	if err := a.s.spaces.SetMember(context.Background(), a.space.ID, u, roleViewer); err != nil {
 		t.Fatal(err)
 	}
@@ -223,7 +247,11 @@ func TestAPITokenStoreValidation(t *testing.T) {
 	}{
 		{"empty name", map[string]any{"name": "  "}, "name"},
 		{"long name", map[string]any{"name": string(long)}, "name"},
-		{"unknown scope", map[string]any{"name": "x", "scope": "admin"}, "scope"},
+		{"unknown permission", map[string]any{"name": "x", "all_spaces": true, "permissions": []string{"admin:all"}}, "permissions"},
+		{"unknown resource", map[string]any{"name": "x", "all_spaces": true, "permissions": []string{"users:read"}}, "permissions"},
+		{"no spaces", map[string]any{"name": "x", "permissions": []string{"accounts:read"}}, "space_ids"},
+		{"all and some spaces", map[string]any{"name": "x", "all_spaces": true, "space_ids": []int64{1}, "permissions": []string{"accounts:read"}}, "space_ids"},
+		{"foreign space", map[string]any{"name": "x", "space_ids": []int64{9999}, "permissions": []string{"accounts:read"}}, "space_ids"},
 		{"past expiry", map[string]any{"name": "x", "expires_at": time.Now().Add(-time.Hour).Format(time.RFC3339)}, "expires_at"},
 		{"bad expiry", map[string]any{"name": "x", "expires_at": "2030-01-01"}, "expires_at"},
 		{"malformed body", "not an object", "name"},
@@ -247,19 +275,19 @@ func TestAPITokenStoreValidation(t *testing.T) {
 	}
 }
 
-func TestAPITokenDefaultScopeAndFutureExpiry(t *testing.T) {
+func TestAPITokenGrantAndFutureExpiry(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("rw@a.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 	exp := time.Now().Add(24 * time.Hour).Truncate(time.Second)
 
-	res := a.do("POST", "/api/auth/api-tokens", map[string]any{"name": "ci", "expires_at": exp.Format(time.RFC3339)}, sess.Token, sess.CSRF)
+	res := a.do("POST", "/api/auth/api-tokens", map[string]any{"name": "ci", "all_spaces": true, "permissions": []string{"accounts:read"}, "expires_at": exp.Format(time.RFC3339)}, sess.Token, sess.CSRF)
 	if res.StatusCode != http.StatusCreated {
 		t.Fatalf("create %d", res.StatusCode)
 	}
 	data := decodeJSON(t, res)["data"].(map[string]any)
-	if data["scope"] != auth.APIScopeRead {
-		t.Fatalf("default scope %v", data["scope"])
+	if perms, _ := data["permissions"].([]any); len(perms) != 1 || perms[0] != "accounts:read" {
+		t.Fatalf("permissions %v", data["permissions"])
 	}
 	if data["expires_at"] != exp.UTC().Format(time.RFC3339) {
 		t.Fatalf("expires_at %v", data["expires_at"])
@@ -271,12 +299,12 @@ func TestAPITokenLimit(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("rw@a.com", "secret1", roleEditor)
 	for range 50 {
-		a.issueToken(u, auth.APIScopeRead, nil)
+		a.issueToken(u, tokRead, nil)
 	}
 	sess := a.issue(u, false)
 
 	status(t, a.do("POST", "/api/auth/api-tokens", map[string]any{"name": "51st"}, sess.Token, sess.CSRF), 422, "over limit")
-	if _, _, err := a.s.apiTokens.Issue(context.Background(), u, "x", auth.APIScopeRead, nil); err != auth.ErrTokenLimit {
+	if _, _, err := a.s.apiTokens.Issue(context.Background(), u, "x", auth.Grant{Permissions: allPerms(auth.PermRead), AllSpaces: true}, nil); err != auth.ErrTokenLimit {
 		t.Fatalf("issue over limit: %v", err)
 	}
 }
@@ -284,7 +312,7 @@ func TestAPITokenLimit(t *testing.T) {
 func TestAPITokenTouchesLastUsed(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("rw@a.com", "secret1", roleEditor)
-	raw, tok := a.issueToken(u, auth.APIScopeRead, nil)
+	raw, tok := a.issueToken(u, tokRead, nil)
 	lastUsed := func() string {
 		var v sql.NullString
 		if err := a.db.QueryRow(`SELECT last_used_at FROM api_tokens WHERE id = ?`, tok.ID).Scan(&v); err != nil {
@@ -338,7 +366,7 @@ func TestAPITokenMalformedAuthorizationHeader(t *testing.T) {
 func TestAPITokenForbiddenOnCredentialRoutes(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("rw@a.com", "secret1", roleEditor)
-	raw, _ := a.issueToken(u, auth.APIScopeReadWrite, nil)
+	raw, _ := a.issueToken(u, tokReadWrite, nil)
 	sess := a.issue(u, false)
 
 	status(t, a.bearer("POST", "/api/auth/logout", nil, raw), 403, "logout")

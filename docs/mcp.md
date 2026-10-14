@@ -10,7 +10,7 @@ Claude's servers call your instance from the internet, so it must be reachable o
 
 1. As an administrator, open **Administration → Security** and press **Allow a new app for 5 minutes**.
 2. In Claude, open **Settings → Connectors → Add custom connector**, enter `https://your-savvy.example/mcp` and add it.
-3. Claude opens a Go Savvy page that names the app and lists what it may do. Sign in if needed, then press **Allow access**.
+3. Claude opens a Go Savvy page that names the app and lists what it may do. Sign in if needed, **choose the spaces** it may read, then press **Allow access**.
 
 Disconnect it in **Settings → User → API**: the connection is listed there as an API token named `MCP: …`. Revoking it cuts the assistant off at once.
 
@@ -20,7 +20,7 @@ A new app can only register itself while an administrator has opened the window 
 
 ## Registered apps
 
-Opening the window is the administrator's approval of a new app. After that, each user decides for themselves on the consent page: pressing **Allow access** gives the app that user's own read-only access, nothing more. The app registers once and every user can connect it.
+Opening the window is the administrator's approval of a new app. After that, each user decides for themselves on the consent page: pressing **Allow access** gives the app that user's own read-only access to the spaces they chose, nothing more. The app registers once and every user can connect it.
 
 **Administration → Security → Registered apps** always lists every registered app with what the server saw when it registered, so you can tell whether it is the one you expected:
 
@@ -38,11 +38,11 @@ The same details are written to the server log (`oauth app registered`), and so 
 
 ## Other clients
 
-Any MCP client that supports remote servers with OAuth connects the same way. A client without OAuth support can send an API token from **Settings → User → API** as `Authorization: Bearer svy_…`. Whatever the token's scope, the tools stay read-only.
+Any MCP client that supports remote servers with OAuth connects the same way. A client without OAuth support can send an API token from **Settings → User → API** as `Authorization: Bearer svy_…`. Whatever the token holds, the tools stay read-only. A tool can only read what the token grants: give it read access to the parts the tools use (see the table below) and to the spaces it should see. A tool the token has no grant for answers with an error that names the missing permission.
 
 ## What an assistant can see
 
-It acts as you. A connection is a read-only API token, so in every space it sees what your own role there allows, and spaces you are not a member of do not exist for it. Access tokens last an hour and are renewed in the background; a connection that is not used for 30 days ends.
+It acts as you, but only in the spaces you chose on the consent page. A connection is a read-only API token, so in those spaces it sees what your own role there allows. Every other space, including ones you create or join later, does not exist for it. It reads accounts, categories, tags, currencies, transactions, budgets, debts and reports, and cannot see members, settings, links, transfers, recurring transactions or automation. Open **Settings → User → API** to see what a connection holds. Access tokens last an hour and are renewed in the background; a connection that is not used for 30 days ends.
 
 | Tool | Returns |
 |------|---------|

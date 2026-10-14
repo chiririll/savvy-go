@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"savvy-go/internal/auth"
 	"savvy-go/internal/oauth"
 )
 
@@ -21,7 +22,7 @@ import (
 
 const oauthBodyLimit = 64 << 10
 
-// oauthScopes: access tokens are read-only API tokens.
+// oauthScopes: access tokens only read (see auth.MCPResources).
 var oauthScopes = []string{"read"}
 
 // mcpRoutes mounts the OAuth endpoints and the MCP endpoint they protect.
@@ -200,25 +201,39 @@ func (s *Server) oauthAuthorize(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/oauth/consent?"+r.URL.RawQuery, http.StatusFound)
 }
 
-// oauthConsentInfo tells the consent screen which app is asking.
+// oauthConsentInfo tells the consent screen which app is asking, what it will
+// be able to read, and which of the user's spaces it can be given.
 func (s *Server) oauthConsentInfo(w http.ResponseWriter, r *http.Request) {
 	c, err := s.oauth.CheckAuthorize(r.Context(), r.URL.Query().Get("client_id"), r.URL.Query().Get("redirect_uri"))
 	if err != nil {
 		writeOAuthAPIError(w, err)
 		return
 	}
-	writeData(w, http.StatusOK, map[string]any{"client_name": c.Name})
+	mine, err := s.spaces.ForUser(r.Context(), userFrom(r).ID)
+	if err != nil {
+		writeMessage(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	spaceList := make([]map[string]any, len(mine))
+	for i, x := range mine {
+		spaceList[i] = map[string]any{"id": x.ID, "name": x.Name, "role": x.Role}
+	}
+	writeData(w, http.StatusOK, map[string]any{
+		"client_name": c.Name, "resources": auth.MCPResources, "spaces": spaceList,
+	})
 }
 
 // oauthConsent records the user's decision and says where to send the browser.
 func (s *Server) oauthConsent(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		ClientID            string `json:"client_id"`
-		RedirectURI         string `json:"redirect_uri"`
-		State               string `json:"state"`
-		CodeChallenge       string `json:"code_challenge"`
-		CodeChallengeMethod string `json:"code_challenge_method"`
-		Approve             bool   `json:"approve"`
+		ClientID            string  `json:"client_id"`
+		RedirectURI         string  `json:"redirect_uri"`
+		State               string  `json:"state"`
+		CodeChallenge       string  `json:"code_challenge"`
+		CodeChallengeMethod string  `json:"code_challenge_method"`
+		Approve             bool    `json:"approve"`
+		AllSpaces           bool    `json:"all_spaces"`
+		SpaceIDs            []int64 `json:"space_ids"`
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, oauthBodyLimit)
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -233,9 +248,21 @@ func (s *Server) oauthConsent(w http.ResponseWriter, r *http.Request) {
 		writeData(w, http.StatusOK, map[string]string{"redirect_url": redirectWith(body.RedirectURI, map[string]string{"error": "access_denied", "state": body.State})})
 		return
 	}
+	// The app gets only the spaces the user picked, and only ones they belong to.
+	if body.AllSpaces == (len(body.SpaceIDs) > 0) {
+		writeMessage(w, http.StatusUnprocessableEntity, "Choose all spaces, or at least one space.")
+		return
+	}
+	for _, id := range body.SpaceIDs {
+		if role, err := s.spaces.Role(r.Context(), id, userFrom(r).ID); err != nil || role == "" {
+			writeMessage(w, http.StatusUnprocessableEntity, "You can only choose spaces you belong to.")
+			return
+		}
+	}
 	code, err := s.oauth.IssueCode(r.Context(), oauth.CodeRequest{
 		ClientID: body.ClientID, RedirectURI: body.RedirectURI, CodeChallenge: body.CodeChallenge,
 		CodeChallengeMethod: body.CodeChallengeMethod, User: userFrom(r),
+		AllSpaces: body.AllSpaces, SpaceIDs: body.SpaceIDs,
 	})
 	if err != nil {
 		writeOAuthAPIError(w, err)

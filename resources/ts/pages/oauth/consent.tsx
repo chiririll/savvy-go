@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Logo } from '@/components/shared/Logo'
 import { oauthApi, type OAuthRequest } from '@/api/oauth'
+import { SpacePicker, hasSpaces, type SpaceChoice } from '@/components/features/api-tokens/SpacePicker'
 import { useUser } from '@/stores/auth'
 import { getApiErrorMessage } from '@/lib/api-error'
 
@@ -19,6 +20,7 @@ export default function OAuthConsentPage() {
     const [busy, setBusy] = useState<'allow' | 'deny' | null>(null)
     const [done, setDone] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [spaceChoice, setSpaceChoice] = useState<SpaceChoice>({ all: false, ids: [] })
 
     const request = useMemo<OAuthRequest | null>(() => {
         const get = (key: string) => params.get(key) ?? ''
@@ -54,7 +56,7 @@ export default function OAuthConsentPage() {
         setBusy(approve ? 'allow' : 'deny')
         setError(null)
         try {
-            const url = await oauthApi.decide(request, approve)
+            const url = await oauthApi.decide(request, approve, spaceChoice)
             setDone(true)
             window.location.assign(url)
         } catch (e) {
@@ -116,6 +118,18 @@ export default function OAuthConsentPage() {
                                     </li>
                                 </ul>
                             </div>
+                            <div>
+                                <p className="font-medium mb-1">{t('oauth.spacesTitle')}</p>
+                                <SpacePicker
+                                    idPrefix="oauth-space"
+                                    spaces={info?.spaces ?? []}
+                                    value={spaceChoice}
+                                    onChange={setSpaceChoice}
+                                />
+                                {!hasSpaces(spaceChoice) && (
+                                    <p className="mt-1 text-xs text-muted-foreground">{t('oauth.needSpace')}</p>
+                                )}
+                            </div>
                             <p className="text-muted-foreground">{t('oauth.revoke')}</p>
                             {host && <p className="font-medium">{t('oauth.returnsTo', { host })}</p>}
                             {user && <p className="text-xs text-muted-foreground">{t('oauth.signedInAs', { email: user.email })}</p>}
@@ -130,7 +144,7 @@ export default function OAuthConsentPage() {
                                 {busy === 'deny' && <Loader2 className="size-4 animate-spin" />}
                                 {t('oauth.deny')}
                             </Button>
-                            <Button className="flex-1" disabled={busy !== null} onClick={() => decide(true)}>
+                            <Button className="flex-1" disabled={busy !== null || !hasSpaces(spaceChoice)} onClick={() => decide(true)}>
                                 {busy === 'allow' && <Loader2 className="size-4 animate-spin" />}
                                 {t('oauth.allow')}
                             </Button>

@@ -397,10 +397,6 @@
         "description": "Connect external apps and scripts to your Savvy instance",
         "docs": "API docs",
         "copyFailed": "Could not copy to clipboard",
-        "scope": {
-            "read": "Read only",
-            "read-write": "Read & write"
-        },
         "tokens": {
             "title": "API tokens",
             "description": "Each connected app gets its own token. Revoke it any time.",
@@ -413,27 +409,55 @@
             "revokeAria": "Revoke token",
             "revokeTitle": "Revoke API token",
             "revokeDescription": "Apps using \"{{name}}\" will immediately lose access.",
-            "revoke": "Revoke"
+            "revoke": "Revoke",
+            "allSpaces": "All spaces",
+            "spaceCount": "{{count, plural(one: # space; other: # spaces)}}",
+            "canRead": "Read: {{list}}",
+            "canWrite": "Read & write: {{list}}",
+            "noAccess": "Cannot read any data"
         },
         "create": {
             "title": "New API token",
             "description": "Name the app that will use this token.",
             "name": "Name",
             "namePlaceholder": "e.g. Home automation",
-            "access": "Access",
-            "accessHint": {
-                "read": "The app can only read your data.",
-                "read-write": "The app can read and change your data, up to your own permissions."
-            },
             "expiry": "Expiration",
             "expiryNever": "Never",
-            "expiryDays": "{{count}} days"
+            "expiryDays": "{{count}} days",
+            "spaces": "Spaces",
+            "spacesHint": "The token cannot see any other space.",
+            "permissions": "What it may do",
+            "permissionsHint": "Grant only what the app needs. It can never do more than your own role in a space allows."
         },
         "created": {
             "title": "Copy your token",
             "description": "This is the only time it is shown. Store it somewhere safe.",
             "copy": "Copy token",
             "done": "Done"
+        },
+        "level": {
+            "none": "No access",
+            "read": "Read",
+            "write": "Read & write"
+        },
+        "resource": {
+            "accounts": "Accounts",
+            "automation": "Automation rules",
+            "budgets": "Budgets",
+            "categories": "Categories",
+            "currencies": "Currencies",
+            "debts": "Debts",
+            "recurring": "Recurring transactions",
+            "reports": "Reports",
+            "space": "Space info and members",
+            "tags": "Tags",
+            "transactions": "Transactions (and imports)",
+            "transfers": "Transfers between spaces"
+        },
+        "spaces": {
+            "all": "All my spaces",
+            "allHint": "Including spaces you join or create later. Leave it off to choose.",
+            "none": "Choose at least one space."
         }
     },
     "spaces": {

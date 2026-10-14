@@ -8,18 +8,32 @@ export interface OAuthRequest {
     code_challenge_method: string
 }
 
+export interface OAuthConsentInfo {
+    client_name: string
+    /** The parts of a space the app can read, as in API token permissions. */
+    resources: string[]
+    spaces: Array<{ id: number; name: string; role: string }>
+}
+
 export const oauthApi = {
-    /** The app that is asking, or an error when the client or redirect URI is not registered. */
-    info: async (clientId: string, redirectUri: string): Promise<{ client_name: string }> => {
+    /** The app that is asking, what it will read, and which of your spaces it can be given.
+     * Errors when the client or redirect URI is not registered. */
+    info: async (clientId: string, redirectUri: string): Promise<OAuthConsentInfo> => {
         const { data } = await apiClient.get('/oauth/authorize', {
             params: { client_id: clientId, redirect_uri: redirectUri },
         })
         return data.data
     },
 
-    /** Records the decision; returns where to send the browser (the app's redirect URI). */
-    decide: async (request: OAuthRequest, approve: boolean): Promise<string> => {
-        const { data } = await apiClient.post('/oauth/authorize', { ...request, approve })
+    /** Records the decision; returns where to send the browser (the app's redirect URI).
+     * An approval names the spaces the app may read. */
+    decide: async (request: OAuthRequest, approve: boolean, spaces: { all: boolean; ids: number[] }): Promise<string> => {
+        const { data } = await apiClient.post('/oauth/authorize', {
+            ...request,
+            approve,
+            all_spaces: spaces.all,
+            space_ids: spaces.ids,
+        })
         return data.data.redirect_url
     },
 }

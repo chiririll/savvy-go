@@ -6,6 +6,7 @@ package auth
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"savvy-go/internal/db"
@@ -260,31 +261,65 @@ func (r Repo) RevokeOtherSessions(ctx context.Context, userID, keepID int64, now
 
 type APIToken struct {
 	ID, UserID                       int64
-	Name, Prefix, Scope              string
+	Name, Prefix                     string
+	Permissions                      []string
+	AllSpaces                        bool
+	SpaceIDs                         []int64 // only the token's own list; empty when AllSpaces
 	ExpiresAt, LastUsedAt, CreatedAt *time.Time
 }
 
 type NewAPIToken struct {
-	UserID                    int64
-	Name, Hash, Prefix, Scope string
-	ExpiresAt                 *time.Time
-	Now                       time.Time
+	UserID             int64
+	Name, Hash, Prefix string
+	Permissions        []string
+	AllSpaces          bool
+	SpaceIDs           []int64
+	ExpiresAt          *time.Time
+	Now                time.Time
 }
 
+// InsertAPIToken stores the token and its spaces; call it inside a transaction.
 func (r Repo) InsertAPIToken(ctx context.Context, t NewAPIToken) (int64, error) {
 	res, err := r.q().InsertAPIToken(ctx, sqlc.InsertAPITokenParams{
-		UserID: t.UserID, Name: t.Name, TokenHash: t.Hash, Prefix: t.Prefix, Scope: t.Scope,
+		UserID: t.UserID, Name: t.Name, TokenHash: t.Hash, Prefix: t.Prefix,
+		Permissions: strings.Join(t.Permissions, ","), AllSpaces: boolInt(t.AllSpaces),
 		ExpiresAt: db.NullTime(t.ExpiresAt), CreatedAt: db.TimeNS(t.Now), UpdatedAt: db.TimeNS(t.Now),
 	})
 	if err != nil {
 		return 0, err
 	}
-	return res.LastInsertId()
+	id, err := res.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+	if !t.AllSpaces {
+		for _, sid := range t.SpaceIDs {
+			if err := r.q().InsertAPITokenSpace(ctx, sqlc.InsertAPITokenSpaceParams{ApiTokenID: id, SpaceID: sid}); err != nil {
+				return 0, err
+			}
+		}
+	}
+	return id, nil
 }
 
-func apiTokenFrom(row sqlc.ApiToken) APIToken {
+func boolInt(b bool) int64 {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+func apiTokenFrom(row sqlc.ApiToken, spaceIDs []int64) APIToken {
+	perms := []string{}
+	if row.Permissions != "" {
+		perms = strings.Split(row.Permissions, ",")
+	}
+	if spaceIDs == nil {
+		spaceIDs = []int64{}
+	}
 	return APIToken{
-		ID: row.ID, UserID: row.UserID, Name: row.Name, Prefix: row.Prefix, Scope: row.Scope,
+		ID: row.ID, UserID: row.UserID, Name: row.Name, Prefix: row.Prefix,
+		Permissions: perms, AllSpaces: row.AllSpaces == 1, SpaceIDs: spaceIDs,
 		ExpiresAt: optTime(row.ExpiresAt), LastUsedAt: optTime(row.LastUsedAt), CreatedAt: optTime(row.CreatedAt),
 	}
 }
@@ -294,16 +329,35 @@ func (r Repo) APITokens(ctx context.Context, userID int64) ([]APIToken, error) {
 	if err != nil {
 		return nil, err
 	}
+	links, err := r.q().ListAPITokenSpacesByUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	spaces := map[int64][]int64{}
+	for _, l := range links {
+		spaces[l.ApiTokenID] = append(spaces[l.ApiTokenID], l.SpaceID)
+	}
 	out := make([]APIToken, len(rows))
 	for i, row := range rows {
-		out[i] = apiTokenFrom(row)
+		out[i] = apiTokenFrom(row, spaces[row.ID])
 	}
 	return out, nil
 }
 
 func (r Repo) APITokenByHash(ctx context.Context, hash string) (*APIToken, error) {
 	row, err := r.q().GetAPITokenByHash(ctx, hash)
-	return mapFound(row, err, apiTokenFrom)
+	if err == db.ErrNotFound {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	ids, err := r.q().ListAPITokenSpaces(ctx, row.ID)
+	if err != nil {
+		return nil, err
+	}
+	t := apiTokenFrom(row, ids)
+	return &t, nil
 }
 
 func (r Repo) TouchAPIToken(ctx context.Context, id int64, now time.Time) error {

@@ -4,10 +4,13 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
+	"savvy-go/internal/auth"
 	"savvy-go/internal/automation"
 	"savvy-go/internal/importer"
 	"savvy-go/internal/ledger"
@@ -86,6 +89,11 @@ func (s *Server) withSpace(next http.Handler) http.Handler {
 				writeMessage(w, http.StatusInternalServerError, err.Error())
 				return
 			}
+			// A token reaches only the spaces it was given: for the rest the
+			// space does not exist, as for a non-member.
+			if t := apiTokenFrom(r); t != nil && !t.AllowsSpace(id) {
+				role = ""
+			}
 		}
 		if role == "" {
 			writeMessage(w, http.StatusNotFound, "Space not found.")
@@ -105,17 +113,64 @@ func (s *Server) withSpace(next http.Handler) http.Handler {
 	})
 }
 
-// requireWrite lets only space admins and editors change data; an API token
-// is further limited by its own scope.
+// spaceSegments maps the first path segment after /spaces/{id} to the
+// resource a token needs for it. A segment missing here is closed to tokens.
+var spaceSegments = map[string]string{
+	"": "space", "members": "space", "settings": "space", "links": "space", "sync-group": "space",
+	"accounts": "accounts", "accounts-balance-history": "accounts", "accounts-balance-comparison": "accounts",
+	"automation-rules": "automation",
+	"budgets":          "budgets",
+	"categories":       "categories", "categories-summary": "categories",
+	"currencies": "currencies",
+	"debts":      "debts", "debts-summary": "debts",
+	"recurring": "recurring", "recurring-upcoming": "recurring",
+	"reports": "reports",
+	"tags":    "tags",
+	// Uploads exist for importing transactions.
+	"transactions": "transactions", "transactions-summary": "transactions", "transactions-pending-summary": "transactions", "s3": "transactions",
+	"transfers": "transfers",
+}
+
+// spaceResource is the resource of a /spaces/{id}/... request path.
+func spaceResource(path string) (string, bool) {
+	_, rest, ok := strings.Cut(path, "/spaces/")
+	if !ok {
+		return "", false
+	}
+	_, rest, _ = strings.Cut(rest, "/") // the space id
+	seg, _, _ := strings.Cut(rest, "/")
+	res, ok := spaceSegments[seg]
+	return res, ok
+}
+
+// requireTokenGrant holds an API token to the permissions it was given: read
+// for a GET, write for anything that changes data. Sessions pass; for them the
+// space role is the only limit.
+func (s *Server) requireTokenGrant(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if t := apiTokenFrom(r); t != nil {
+			res, known := spaceResource(r.URL.Path)
+			write := r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions
+			if !known || !t.Allows(res, write) {
+				level := auth.PermRead
+				if write {
+					level = auth.PermWrite
+				}
+				writeMessage(w, http.StatusForbidden, "This API token has no "+auth.Perm(res, level)+" permission.")
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// requireWrite lets only space admins and editors change data. An API token
+// has also passed requireTokenGrant by now.
 func (s *Server) requireWrite(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mutating := r.Method != http.MethodGet && r.Method != http.MethodHead
 		if mutating {
 			if scope := sp(r); scope == nil || !spaces.CanWrite(scope.role) {
-				writeMessage(w, http.StatusForbidden, "Read-only access")
-				return
-			}
-			if t := apiTokenFrom(r); t != nil && !t.CanWrite() {
 				writeMessage(w, http.StatusForbidden, "Read-only access")
 				return
 			}
@@ -129,6 +184,9 @@ func (s *Server) spacesIndex(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+	if t := apiTokenFrom(r); t != nil {
+		mine = slices.DeleteFunc(mine, func(x spaces.Space) bool { return !t.AllowsSpace(x.ID) })
 	}
 	out := make([]map[string]any, len(mine))
 	for i, x := range mine {

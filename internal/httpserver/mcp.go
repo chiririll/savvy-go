@@ -21,7 +21,7 @@ import (
 // The MCP server: read-only tools for AI assistants, served over Streamable
 // HTTP at /mcp. It has no data access of its own. Every tool calls the app's
 // own GET routes in-process with the caller's bearer token, so roles, token
-// scope, space membership and the JSON shape (money, currencies) are exactly
+// permissions, token spaces, membership and the JSON shape (money, currencies) are exactly
 // those of the REST API and cannot drift from it.
 
 const (
@@ -72,7 +72,8 @@ func (s *Server) mcpHandler() http.Handler {
 }
 
 // verifyMCPToken accepts any live API token: OAuth access tokens and tokens
-// made by hand in Settings alike. A browser session is not enough.
+// made by hand in Settings alike. A browser session is not enough. What the
+// token may read is decided per call, by the REST routes the tools use.
 func (s *Server) verifyMCPToken(ctx context.Context, raw string, _ *http.Request) (*auth.TokenInfo, error) {
 	t, err := s.apiTokens.Resolve(ctx, raw)
 	if err != nil {
@@ -81,7 +82,7 @@ func (s *Server) verifyMCPToken(ctx context.Context, raw string, _ *http.Request
 	if t == nil || t.User == nil {
 		return nil, fmt.Errorf("%w: unknown or expired token", auth.ErrInvalidToken)
 	}
-	info := &auth.TokenInfo{Scopes: []string{t.Scope}, UserID: strconv.FormatInt(t.UserID, 10)}
+	info := &auth.TokenInfo{Scopes: t.Permissions, UserID: strconv.FormatInt(t.UserID, 10)}
 	if t.ExpiresAt != nil {
 		info.Expiration = *t.ExpiresAt
 	}

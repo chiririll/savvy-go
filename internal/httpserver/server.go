@@ -203,6 +203,7 @@ func (s *Server) routes() *chi.Mux {
 			r.With(s.sessionOnly).Post("/sync-groups/apply", s.syncGroupApply)
 			r.Route("/spaces/{space}", func(r chi.Router) {
 				r.Use(s.withSpace)
+				r.Use(s.requireTokenGrant)
 				r.Get("/", s.spaceShow)
 				r.Get("/members", s.membersIndex)
 				r.Get("/settings", s.spaceSettingsIndex)

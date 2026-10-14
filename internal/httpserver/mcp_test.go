@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"savvy-go/internal/auth"
 )
 
 type bearerTransport struct{ token string }
@@ -183,5 +185,45 @@ func TestMCPAcceptsTheOAuthAccessToken(t *testing.T) {
 	ms := a.mcpSession(access)
 	if res := a.call(ms, "list_spaces", nil); res.IsError {
 		t.Fatalf("list_spaces: %s", resultText(res))
+	}
+}
+
+// What a connection is given (auth.MCPResources) must cover every tool, or a
+// tool would answer 403 for every connected assistant; a token with less than
+// that gets an error naming the missing permission.
+func TestMCPToolsNeedTheirPermissions(t *testing.T) {
+	a := newTestApp(t)
+	u := a.createUser("mcp@a.com", "secret1", "admin")
+	sp := a.space.ID
+
+	granted, _ := a.issueGrant(u, auth.Grant{Permissions: auth.ReadPerms(auth.MCPResources...), AllSpaces: true}, nil)
+	gs := a.mcpSession(granted)
+	calls := map[string]map[string]any{
+		"list_spaces":              nil,
+		"list_accounts":            {"space_id": sp},
+		"list_categories":          {"space_id": sp},
+		"list_tags":                {"space_id": sp},
+		"list_currencies":          {"space_id": sp},
+		"list_budgets":             {"space_id": sp},
+		"list_debts":               {"space_id": sp},
+		"get_debts_summary":        {"space_id": sp},
+		"get_transactions_summary": {"space_id": sp},
+		"list_transactions":        {"space_id": sp},
+		"get_report":               {"space_id": sp, "report": "overview"},
+	}
+	for name, args := range calls {
+		if res := a.call(gs, name, args); res.IsError && strings.Contains(resultText(res), "permission") {
+			t.Errorf("%s is refused to a connection: %s", name, resultText(res))
+		}
+	}
+
+	narrow, _ := a.issueGrant(u, auth.Grant{Permissions: []string{"accounts:read"}, AllSpaces: true}, nil)
+	ns := a.mcpSession(narrow)
+	if res := a.call(ns, "list_accounts", map[string]any{"space_id": sp}); res.IsError {
+		t.Fatalf("list_accounts: %s", resultText(res))
+	}
+	res := a.call(ns, "list_transactions", map[string]any{"space_id": sp})
+	if !res.IsError || !strings.Contains(resultText(res), "transactions:read") {
+		t.Fatalf("list_transactions with accounts:read = %v %s", res.IsError, resultText(res))
 	}
 }

@@ -104,7 +104,11 @@ CREATE TABLE IF NOT EXISTS api_tokens (
     name TEXT NOT NULL,
     token_hash TEXT NOT NULL UNIQUE,
     prefix TEXT NOT NULL,
-    scope TEXT NOT NULL DEFAULT 'read' CHECK (scope IN ('read', 'read-write')),
+    -- Comma-separated "<resource>:<read|write>" grants (internal/auth/permissions.go).
+    -- Empty means the token can only list its spaces.
+    permissions TEXT NOT NULL DEFAULT '',
+    -- 1: every space of the owner, including future ones. 0: only api_token_spaces.
+    all_spaces INTEGER NOT NULL DEFAULT 0 CHECK (all_spaces IN (0, 1)),
     expires_at TEXT,
     last_used_at TEXT,
     created_at TEXT,
@@ -240,6 +244,15 @@ CREATE TABLE IF NOT EXISTS space_members (
     PRIMARY KEY (space_id, user_id)
 ) STRICT;
 CREATE INDEX IF NOT EXISTS space_members_user_idx ON space_members (user_id);
+
+-- The spaces a token with all_spaces = 0 may reach. A deleted space drops out;
+-- a token left with none reaches nothing.
+CREATE TABLE IF NOT EXISTS api_token_spaces (
+    api_token_id INTEGER NOT NULL REFERENCES api_tokens(id) ON DELETE CASCADE,
+    space_id INTEGER NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,
+    PRIMARY KEY (api_token_id, space_id)
+) STRICT;
+CREATE INDEX IF NOT EXISTS api_token_spaces_space_idx ON api_token_spaces (space_id);
 
 CREATE TABLE IF NOT EXISTS space_invitations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

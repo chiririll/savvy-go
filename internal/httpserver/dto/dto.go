@@ -529,7 +529,8 @@ func NewBackup(b backup.Entry) Backup {
 
 func APIToken(t auth.APIToken) map[string]any {
 	return map[string]any{
-		"id": t.ID, "name": t.Name, "prefix": t.Prefix, "scope": t.Scope,
+		"id": t.ID, "name": t.Name, "prefix": t.Prefix,
+		"permissions": t.Permissions, "all_spaces": t.AllSpaces, "space_ids": t.SpaceIDs,
 		"expires_at": timePtr(t.ExpiresAt), "last_used_at": timePtr(t.LastUsedAt), "created_at": timePtr(t.CreatedAt),
 	}
 }

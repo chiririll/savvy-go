@@ -83,7 +83,7 @@ func (a *testApp) approve(sessToken, csrf, clientID string, approve bool) string
 	a.t.Helper()
 	res := a.do("POST", "/api/oauth/authorize", map[string]any{
 		"client_id": clientID, "redirect_uri": oauthRedirect, "state": "st-1",
-		"code_challenge": oauthChallenge(), "code_challenge_method": "S256", "approve": approve,
+		"code_challenge": oauthChallenge(), "code_challenge_method": "S256", "approve": approve, "all_spaces": true,
 	}, sessToken, csrf)
 	if res.StatusCode != http.StatusOK {
 		a.t.Fatalf("approve: %d", res.StatusCode)

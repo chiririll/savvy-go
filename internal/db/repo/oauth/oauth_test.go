@@ -27,7 +27,7 @@ func newRepos(t *testing.T) (repo.Repo, authrepo.Repo, int64) {
 
 func token(t *testing.T, a authrepo.Repo, uid int64, hash string) int64 {
 	t.Helper()
-	id, err := a.InsertAPIToken(context.Background(), authrepo.NewAPIToken{UserID: uid, Name: "t", Hash: hash, Prefix: "svy_", Scope: "read", Now: time.Now()})
+	id, err := a.InsertAPIToken(context.Background(), authrepo.NewAPIToken{UserID: uid, Name: "t", Hash: hash, Prefix: "svy_", AllSpaces: true, Now: time.Now()})
 	if err != nil {
 		t.Fatal(err)
 	}

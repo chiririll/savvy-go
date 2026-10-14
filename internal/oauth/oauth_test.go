@@ -73,7 +73,7 @@ func (e *env) client(t *testing.T) string {
 func (e *env) code(t *testing.T, clientID, verifier string) string {
 	t.Helper()
 	code, err := e.svc.IssueCode(context.Background(), oauth.CodeRequest{
-		ClientID: clientID, RedirectURI: redirect, CodeChallenge: challenge(verifier), CodeChallengeMethod: "S256", User: e.user,
+		ClientID: clientID, RedirectURI: redirect, CodeChallenge: challenge(verifier), CodeChallengeMethod: "S256", User: e.user, AllSpaces: true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -143,7 +143,7 @@ func TestIssueCodeChecksClientRedirectAndPKCE(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
 	id := e.client(t)
-	base := oauth.CodeRequest{ClientID: id, RedirectURI: redirect, CodeChallenge: challenge(vOK), CodeChallengeMethod: "S256", User: e.user}
+	base := oauth.CodeRequest{ClientID: id, RedirectURI: redirect, CodeChallenge: challenge(vOK), CodeChallengeMethod: "S256", User: e.user, AllSpaces: true}
 
 	bad := base
 	bad.ClientID = "nope"
@@ -183,7 +183,7 @@ func TestExchangeIssuesAReadOnlyShortLivedAPIToken(t *testing.T) {
 	if err != nil || tok == nil {
 		t.Fatalf("access token does not resolve: %v %v", tok, err)
 	}
-	if tok.CanWrite() || tok.UserID != e.user.ID || tok.ExpiresAt == nil || !strings.Contains(tok.Name, "Claude") {
+	if tok.Allows("transactions", true) || !tok.Allows("transactions", false) || tok.Allows("transfers", false) || !tok.AllSpaces || tok.UserID != e.user.ID || tok.ExpiresAt == nil || !strings.Contains(tok.Name, "Claude") {
 		t.Fatalf("token = %+v", tok)
 	}
 }
