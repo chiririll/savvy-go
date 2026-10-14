@@ -8,7 +8,7 @@ Two parts, each its own screen (`/setup/server`, `/setup/server/more`, `/setup/s
 
 1. **Required: public URL.** `PATCH /api/settings` `app_url`, prefilled with the browser address (`window.location.origin`) when unset. Expose `config.Live.Writable()` as `config_writable` in `GET /api/settings`. When it is false, the step shows a note (configured through `config.toml`, see `docs/deployment.md`) instead of the input, and Continue still works.
 2. **Optional: a list**, each row a link with a chevron to its own screen and back, marked **Done** when configured (derived from live state, not stored):
-   - **Email**: status and test mail (`GET /api/admin/mail`, `POST /api/admin/mail/test`), pointer to `docs/deployment.md#email`. Done when mail is enabled. Not editable here (mail is configured only in `config.toml`).
+   - **Email**: the mail form (`GET`/`PUT /api/admin/mail`, saved to `config.toml`, live at once) and test mail (`POST /api/admin/mail/test`). Done when mail is enabled. Locked when `config.toml` is read-only.
    - **Single sign-on**: the preset chooser and provider form; after creating one the SPA returns to the list. Done when a provider exists. (The admin pages cannot be linked to: `ServerSetupGate` sends admins back here while setup is pending.)
 3. **Finish or skip** sets the server setting `onboarding_server_done` to `true`; the flow is never shown again. Users who are not server admins never see it.
 

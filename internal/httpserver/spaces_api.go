@@ -225,7 +225,7 @@ func (s *Server) invitationsStore(w http.ResponseWriter, r *http.Request) {
 	out := map[string]any{"token": token, "emailSent": false}
 	// The link is always returned; the email is a convenience that may fail
 	// without undoing the invitation.
-	if body.Email != "" && s.mail.Enabled() {
+	if body.Email != "" && s.mailer().Enabled() {
 		if err := s.emailInvitation(r, body.Email, body.Role, token); err != nil {
 			out["emailError"] = err.Error()
 		} else {

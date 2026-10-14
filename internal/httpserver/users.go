@@ -178,7 +178,7 @@ func (s *Server) usersIssueToken(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.Send {
 		switch {
-		case !s.mail.Enabled():
+		case !s.mailer().Enabled():
 			writeMessage(w, http.StatusUnprocessableEntity, s.mailOffReason())
 			return
 		case s.passwordLoginDisabled(r):

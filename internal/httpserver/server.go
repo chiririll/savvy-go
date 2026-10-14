@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -55,9 +56,15 @@ type Server struct {
 	twoFactor  auth.TwoFactor
 	webauthn   auth.WebAuthn
 	queue      *jobs.Queue
-	mail       mailer.Mailer
-	bootstrap  *bootstrap.Guard // first-run password; nil keeps registration closed
-	assets     fs.FS            // the frontend: index.html, icons and build/
+	// The mail server can be changed in the admin panel, so these are guarded by
+	// mailMu: read the mailer through mailer(), the settings through mailSettings().
+	mailMu      sync.RWMutex
+	mail        mailer.Mailer
+	mailCfg     mailer.Config
+	mailProblem string
+	newMailer   func(mailer.Config) mailer.Mailer // tests swap it to record instead of dialling
+	bootstrap   *bootstrap.Guard                  // first-run password; nil keeps registration closed
+	assets      fs.FS                             // the frontend: index.html, icons and build/
 }
 
 // Option configures New.
@@ -101,8 +108,12 @@ func New(cfg config.Config, st store.Store, keys *signing.Holder, opts ...Option
 	if s.rates == nil {
 		s.rates = currencydata.New()
 	}
+	s.mailCfg, s.mailProblem = cfg.Mail, cfg.MailProblem
+	if s.newMailer == nil {
+		s.newMailer = mailer.New
+	}
 	if s.mail == nil {
-		s.mail = mailer.New(cfg.Mail)
+		s.mail = s.newMailer(cfg.Mail)
 	}
 	s.sso = sso.Service{DB: srv, Users: s.users, Settings: s.settings, AppURL: cfg.URL}
 	_ = os.MkdirAll(cfg.UploadsDir, 0o775)
@@ -258,6 +269,7 @@ func (s *Server) routes() *chi.Mux {
 				r.Use(s.sessionOnly)
 				r.Patch("/settings", s.settingsUpdate)
 				r.Get("/admin/mail", s.mailIndex)
+				r.Put("/admin/mail", s.mailUpdate)
 				r.Post("/admin/mail/test", s.mailTest)
 				// P1: backups hold every space.
 				r.Get("/backups", s.backupsIndex)

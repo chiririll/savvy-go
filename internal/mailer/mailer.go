@@ -37,23 +37,37 @@ type Config struct {
 	Timeout    time.Duration
 }
 
-// Validate reports what is wrong with an enabled configuration. A disabled one is always valid.
+// InvalidError is a mistake in an enabled configuration. Field is the config
+// key it is about ("host", "port", ...), so a form can show it by the field.
+type InvalidError struct {
+	Field string
+	msg   string
+}
+
+func (e InvalidError) Error() string { return e.msg }
+
+func invalid(field, format string, args ...any) error {
+	return InvalidError{Field: field, msg: fmt.Sprintf(format, args...)}
+}
+
+// Validate reports what is wrong with an enabled configuration (an InvalidError).
+// A disabled one is always valid.
 func (c Config) Validate() error {
 	if !c.Enabled {
 		return nil
 	}
 	switch {
 	case strings.TrimSpace(c.Host) == "":
-		return errors.New("mailer.host is empty")
+		return invalid("host", "mailer.host is empty")
 	case c.Port < 1 || c.Port > 65535:
-		return fmt.Errorf("mailer.port %d is not a valid port", c.Port)
+		return invalid("port", "mailer.port %d is not a valid port", c.Port)
 	case c.Protocol != STARTTLS && c.Protocol != SMTPS && c.Protocol != Plain:
-		return fmt.Errorf("mailer.protocol %q must be %q, %q or %q", c.Protocol, STARTTLS, SMTPS, Plain)
+		return invalid("protocol", "mailer.protocol %q must be %q, %q or %q", c.Protocol, STARTTLS, SMTPS, Plain)
 	case c.User != "" && c.Password == "":
-		return errors.New("mailer.password is empty but mailer.user is set")
+		return invalid("password", "mailer.password is empty but mailer.user is set")
 	}
 	if _, err := mail.ParseAddress(c.From); err != nil {
-		return fmt.Errorf("mailer.from %q is not an email address", c.From)
+		return invalid("from", "mailer.from %q is not an email address", c.From)
 	}
 	return nil
 }

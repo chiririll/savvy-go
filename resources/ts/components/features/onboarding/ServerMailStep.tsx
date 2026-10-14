@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { MailSection } from '@/components/features/mail'
 import { serverSetupPaths } from './server-setup-paths'
 
-/** Server setup: the mail server is set in config.toml, so this shows its state and sends a test. */
+/** Server setup: the mail form (saved to config.toml, live at once) and a test email. */
 export function ServerMailStep() {
     const { t } = useTranslation('auth')
     return (

@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { mailApi } from '@/api/mail'
+import type { MailInput } from '@/types/mail'
 import { useResourceMutation } from './use-crud'
 import i18n from '@/lib/i18n'
 
@@ -11,6 +12,14 @@ export function useMailStatus(enabled = true) {
         queryKey: QUERY_KEY,
         queryFn: mailApi.status,
         enabled,
+    })
+}
+
+export function useUpdateMail() {
+    return useResourceMutation({
+        mutationFn: (input: MailInput) => mailApi.update(input),
+        invalidateKeys: [QUERY_KEY],
+        successMessage: i18n.t('system.mail.saved', { ns: 'settings' }),
     })
 }
 
