@@ -12,10 +12,20 @@ info:
     Authorization: Bearer svy_xxxxxxxx
     ```
 
-    A token acts as its owner, limited by its scope:
+    A token acts as its owner, limited by what it was given:
 
-    * `read` — only `GET`/`HEAD` requests.
-    * `read-write` — all methods, capped by the owner's role in the space (a viewer cannot write).
+    * **Spaces** — the spaces it may reach: a chosen list, or all of the owner's spaces. Any other
+      space answers `404`, as if it did not exist, and `GET /spaces` lists only the token's own.
+    * **Permissions** — one grant per resource: `<resource>:read`, `:write` or `:delete`. Read allows
+      `GET`/`HEAD`; write allows `POST`/`PUT`/`PATCH`; delete allows `DELETE`. Each level includes the
+      ones before it, so a token can add data without being able to remove it. Resources:
+      `accounts`, `automation`, `budgets`, `categories`, `currencies`, `debts`, `recurring`,
+      `reports`, `space` (the space itself, members, settings, links), `tags`, `transactions`
+      (also imports and uploads) and `transfers`. A request outside the grants answers `403`.
+    * The owner's role in the space still applies on top, on every request: a token is never more
+      powerful than its owner (a viewer's token cannot write, and a demotion takes effect at once).
+    * Categories and tags of a space in a sync group are mirrored into the group's other spaces, so
+      changing them needs a token that reaches every space of the group.
 
     ## Spaces
     Finances live in spaces; a user may belong to several, as `admin`, `editor` or `viewer`.
@@ -88,7 +98,22 @@ paths:
               required: [name]
               properties:
                 name: {type: string, maxLength: 100, example: Zapier}
-                scope: {type: string, enum: [read, read-write], default: read}
+                preset:
+                  type: string
+                  enum: [viewer, editor, admin]
+                  description: |
+                    Ready-made permissions instead of `permissions`. `viewer` reads everything; `editor` reads
+                    everything and adds and changes transactions; `admin` reads, writes and deletes everything.
+                allow_delete: {type: boolean, default: false, description: With `preset` editor, also allow deleting transactions.}
+                permissions:
+                  type: array
+                  description: Grants as `<resource>:read`, `:write` or `:delete`. None means the token can only list its spaces. Not with `preset`.
+                  items: {type: string, example: "transactions:read"}
+                all_spaces: {type: boolean, default: false, description: Reach every space of the owner, including future ones. Give this or `space_ids`, not both.}
+                space_ids:
+                  type: array
+                  description: Spaces the token may reach; the owner must belong to each. Required unless `all_spaces` is true.
+                  items: {type: integer}
                 expires_at: {type: string, format: date-time, nullable: true, description: Future RFC 3339 timestamp; omit for a token that never expires.}
       responses:
         "201":
@@ -1255,7 +1280,7 @@ components:
         application/json:
           schema: {$ref: "#/components/schemas/Message"}
     Forbidden:
-      description: Read-only access, insufficient token scope, or not available for API tokens
+      description: Read-only access, a permission the API token does not hold, or not available for API tokens
       content:
         application/json:
           schema: {$ref: "#/components/schemas/Message"}
@@ -1293,7 +1318,9 @@ components:
         id: {type: integer}
         name: {type: string}
         prefix: {type: string, example: svy_AbC1}
-        scope: {type: string, enum: [read, read-write]}
+        permissions: {type: array, items: {type: string, example: "transactions:read"}}
+        all_spaces: {type: boolean}
+        space_ids: {type: array, items: {type: integer}, description: Empty when `all_spaces` is true.}
         expires_at: {type: string, format: date-time, nullable: true}
         last_used_at: {type: string, format: date-time, nullable: true}
         created_at: {type: string, format: date-time, nullable: true}

@@ -80,7 +80,7 @@ type Group struct {
 	Members    []int64 // ascending
 }
 
-func (g Group) syncs(k Kind) bool {
+func (g Group) Syncs(k Kind) bool {
 	if k == Categories {
 		return g.Categories
 	}
@@ -139,7 +139,7 @@ func (s Service) mirror(ctx context.Context, actor *auth.User, spaceID int64, ki
 	ids := []int64{spaceID}
 	if g, err := s.GroupOf(ctx, spaceID); err != nil {
 		return err
-	} else if g != nil && g.syncs(kind) {
+	} else if g != nil && g.Syncs(kind) {
 		ids = g.Members
 	}
 	if len(ids) == 1 {

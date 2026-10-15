@@ -1,7 +1,7 @@
 import type { TFunction } from 'i18next'
 
 import type { AccountType } from '@/types/accounts'
-import type { ApiTokenScope } from '@/types/api-tokens'
+import type { ApiResource, ApiTokenPreset } from '@/types/api-tokens'
 import type { ActionType, ConditionOperator, TriggerType } from '@/types/automation'
 import type { BackupStatus } from '@/types/backup'
 import type { BudgetPeriod } from '@/types/budgets'
@@ -75,15 +75,34 @@ export const accountTypeLabelLoose = (t: TFunction, type: string): string =>
         debt: t('pages:accounts.types.debt'),
     }, type)
 
-export const apiScopeLabel = (t: TFunction, scope: ApiTokenScope): string => ({
-    'read': t('settings:api.scope.read'),
-    'read-write': t('settings:api.scope.read-write'),
-} satisfies Record<ApiTokenScope, string>)[scope]
+export const apiPresetLabel = (t: TFunction, preset: ApiTokenPreset | 'custom'): string => ({
+    viewer: t('settings:api.preset.viewer'),
+    editor: t('settings:api.preset.editor'),
+    admin: t('settings:api.preset.admin'),
+    custom: t('settings:api.preset.custom'),
+} satisfies Record<ApiTokenPreset | 'custom', string>)[preset]
 
-export const apiScopeHint = (t: TFunction, scope: ApiTokenScope): string => ({
-    'read': t('settings:api.create.accessHint.read'),
-    'read-write': t('settings:api.create.accessHint.read-write'),
-} satisfies Record<ApiTokenScope, string>)[scope]
+export const apiPresetHint = (t: TFunction, preset: ApiTokenPreset | 'custom'): string => ({
+    viewer: t('settings:api.presetHint.viewer'),
+    editor: t('settings:api.presetHint.editor'),
+    admin: t('settings:api.presetHint.admin'),
+    custom: t('settings:api.presetHint.custom'),
+} satisfies Record<ApiTokenPreset | 'custom', string>)[preset]
+
+export const apiResourceLabel = (t: TFunction, resource: ApiResource): string => ({
+    accounts: t('settings:api.resource.accounts'),
+    automation: t('settings:api.resource.automation'),
+    budgets: t('settings:api.resource.budgets'),
+    categories: t('settings:api.resource.categories'),
+    currencies: t('settings:api.resource.currencies'),
+    debts: t('settings:api.resource.debts'),
+    recurring: t('settings:api.resource.recurring'),
+    reports: t('settings:api.resource.reports'),
+    space: t('settings:api.resource.space'),
+    tags: t('settings:api.resource.tags'),
+    transactions: t('settings:api.resource.transactions'),
+    transfers: t('settings:api.resource.transfers'),
+} satisfies Record<ApiResource, string>)[resource]
 
 export const ssoErrorLabel = (t: TFunction, code: SsoErrorCode): string => ({
     audience_mismatch: t('auth:sso.errors.audience_mismatch'),

@@ -104,13 +104,38 @@ CREATE TABLE IF NOT EXISTS api_tokens (
     name TEXT NOT NULL,
     token_hash TEXT NOT NULL UNIQUE,
     prefix TEXT NOT NULL,
-    scope TEXT NOT NULL DEFAULT 'read' CHECK (scope IN ('read', 'read-write')),
+    -- Comma-separated "<resource>:<read|write>" grants (internal/auth/permissions.go).
+    -- Empty means the token can only list its spaces.
+    permissions TEXT NOT NULL DEFAULT '',
+    -- 1: every space of the owner, including future ones. 0: only api_token_spaces.
+    all_spaces INTEGER NOT NULL DEFAULT 0 CHECK (all_spaces IN (0, 1)),
     expires_at TEXT,
     last_used_at TEXT,
     created_at TEXT,
     updated_at TEXT
 ) STRICT;
 CREATE INDEX IF NOT EXISTS api_tokens_user_idx ON api_tokens (user_id);
+CREATE TABLE IF NOT EXISTS oauth_clients (
+    client_id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    redirect_uris TEXT NOT NULL,
+    ip TEXT NOT NULL DEFAULT '',
+    user_agent TEXT NOT NULL DEFAULT '',
+    origin TEXT NOT NULL DEFAULT '',
+    created_at TEXT
+) STRICT;
+CREATE TABLE IF NOT EXISTS oauth_refresh_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    token_hash TEXT NOT NULL UNIQUE,
+    client_id TEXT NOT NULL REFERENCES oauth_clients(client_id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    api_token_id INTEGER NOT NULL REFERENCES api_tokens(id) ON DELETE CASCADE,
+    expires_at TEXT NOT NULL,
+    created_at TEXT
+) STRICT;
+CREATE INDEX IF NOT EXISTS oauth_refresh_tokens_user_idx ON oauth_refresh_tokens (user_id);
+CREATE INDEX IF NOT EXISTS oauth_refresh_tokens_client_idx ON oauth_refresh_tokens (client_id);
+CREATE INDEX IF NOT EXISTS oauth_refresh_tokens_api_token_idx ON oauth_refresh_tokens (api_token_id);
 CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT
@@ -219,6 +244,15 @@ CREATE TABLE IF NOT EXISTS space_members (
     PRIMARY KEY (space_id, user_id)
 ) STRICT;
 CREATE INDEX IF NOT EXISTS space_members_user_idx ON space_members (user_id);
+
+-- The spaces a token with all_spaces = 0 may reach. A deleted space drops out;
+-- a token left with none reaches nothing.
+CREATE TABLE IF NOT EXISTS api_token_spaces (
+    api_token_id INTEGER NOT NULL REFERENCES api_tokens(id) ON DELETE CASCADE,
+    space_id INTEGER NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,
+    PRIMARY KEY (api_token_id, space_id)
+) STRICT;
+CREATE INDEX IF NOT EXISTS api_token_spaces_space_idx ON api_token_spaces (space_id);
 
 CREATE TABLE IF NOT EXISTS space_invitations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

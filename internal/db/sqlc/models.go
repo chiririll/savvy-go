@@ -39,16 +39,22 @@ type AdminAudit struct {
 }
 
 type ApiToken struct {
-	ID         int64
-	UserID     int64
-	Name       string
-	TokenHash  string
-	Prefix     string
-	Scope      string
-	ExpiresAt  sql.NullString
-	LastUsedAt sql.NullString
-	CreatedAt  sql.NullString
-	UpdatedAt  sql.NullString
+	ID          int64
+	UserID      int64
+	Name        string
+	TokenHash   string
+	Prefix      string
+	Permissions string
+	AllSpaces   int64
+	ExpiresAt   sql.NullString
+	LastUsedAt  sql.NullString
+	CreatedAt   sql.NullString
+	UpdatedAt   sql.NullString
+}
+
+type ApiTokenSpace struct {
+	ApiTokenID int64
+	SpaceID    int64
 }
 
 type AuthSession struct {
@@ -161,6 +167,26 @@ type IdentityProvider struct {
 	LinkByEmail     int64
 	CreatedAt       sql.NullString
 	UpdatedAt       sql.NullString
+}
+
+type OauthClient struct {
+	ClientID     string
+	Name         string
+	RedirectUris string
+	Ip           string
+	UserAgent    string
+	Origin       string
+	CreatedAt    sql.NullString
+}
+
+type OauthRefreshToken struct {
+	ID         int64
+	TokenHash  string
+	ClientID   string
+	UserID     int64
+	ApiTokenID int64
+	ExpiresAt  string
+	CreatedAt  sql.NullString
 }
 
 type PasswordToken struct {

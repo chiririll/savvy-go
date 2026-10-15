@@ -15,7 +15,7 @@ import (
 // packages below may use the store only through internal/store; only the
 // store's SQLite implementation (and the SQLite helpers it uses) know about
 // files, PRAGMAs and ATTACH.
-var businessPackages = []string{"ledger", "sso", "spaces", "transfers", "refsync", "uploads", "currencydata", "automation", "recurring", "reports", "calendar", "backup", "importer", "legacy/restore", "httpserver", "auth", "settings", "seed", "signing", "schedule", "jobs", "bootstrap"}
+var businessPackages = []string{"ledger", "sso", "oauth", "spaces", "transfers", "refsync", "uploads", "currencydata", "automation", "recurring", "reports", "calendar", "backup", "importer", "legacy/restore", "httpserver", "auth", "settings", "seed", "signing", "schedule", "jobs", "bootstrap"}
 
 var sqliteOnlyImports = []string{
 	"savvy-go/internal/store/sqlite",

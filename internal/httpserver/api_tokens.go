@@ -29,9 +29,13 @@ func (s *Server) apiTokensIndex(w http.ResponseWriter, r *http.Request) {
 func (s *Server) apiTokensStore(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r)
 	var body struct {
-		Name      string  `json:"name"`
-		Scope     string  `json:"scope"`
-		ExpiresAt *string `json:"expires_at"`
+		Name        string   `json:"name"`
+		Preset      string   `json:"preset"`
+		AllowDelete bool     `json:"allow_delete"`
+		Permissions []string `json:"permissions"`
+		AllSpaces   bool     `json:"all_spaces"`
+		SpaceIDs    []int64  `json:"space_ids"`
+		ExpiresAt   *string  `json:"expires_at"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeValidation(w, map[string][]string{"name": {"The given data was invalid."}})
@@ -42,14 +46,38 @@ func (s *Server) apiTokensStore(w http.ResponseWriter, r *http.Request) {
 	if name == "" || len(name) > 100 {
 		errs["name"] = []string{"The name is required and must be at most 100 characters."}
 	}
-	scope := body.Scope
-	if scope == "" {
-		scope = auth.APIScopeRead
+	// A token never gets more than it was asked for: no permissions means it
+	// can list its spaces and nothing else, and it must name its spaces. It
+	// writes only where its owner may too: the request is limited by the
+	// token's permissions and the owner's role in the space.
+	var perms []string
+	var err error
+	switch {
+	case body.Preset != "" && len(body.Permissions) > 0:
+		errs["permissions"] = []string{"Give a preset or a list of permissions, not both."}
+	case body.Preset != "":
+		if perms, err = auth.PresetPermissions(body.Preset, body.AllowDelete); err != nil {
+			errs["preset"] = []string{"The preset must be viewer, editor or admin."}
+		}
+	default:
+		if perms, err = auth.NormalizePermissions(body.Permissions); err != nil {
+			errs["permissions"] = []string{err.Error() + "."}
+		}
 	}
-	// A read-write token still writes only where its owner may: the request
-	// is limited by the token scope and the owner's role in the space.
-	if !auth.ValidAPIScope(scope) {
-		errs["scope"] = []string{"The scope must be read or read-write."}
+	var spaceIDs []int64
+	switch {
+	case body.AllSpaces && len(body.SpaceIDs) > 0:
+		errs["space_ids"] = []string{"Choose all spaces or a list of spaces, not both."}
+	case !body.AllSpaces && len(body.SpaceIDs) == 0:
+		errs["space_ids"] = []string{"Choose the spaces this token may reach."}
+	case !body.AllSpaces:
+		for _, id := range body.SpaceIDs {
+			if role, err := s.spaces.Role(r.Context(), id, u.ID); err != nil || role == "" {
+				errs["space_ids"] = []string{"You can only choose spaces you belong to."}
+				break
+			}
+		}
+		spaceIDs = body.SpaceIDs
 	}
 	var expires *time.Time
 	if body.ExpiresAt != nil && *body.ExpiresAt != "" {
@@ -65,7 +93,7 @@ func (s *Server) apiTokensStore(w http.ResponseWriter, r *http.Request) {
 		writeValidation(w, errs)
 		return
 	}
-	raw, tok, err := s.apiTokens.Issue(r.Context(), u, name, scope, expires)
+	raw, tok, err := s.apiTokens.Issue(r.Context(), u, name, auth.Grant{Permissions: perms, AllSpaces: body.AllSpaces, SpaceIDs: spaceIDs}, expires)
 	if err == auth.ErrTokenLimit {
 		writeMessage(w, http.StatusUnprocessableEntity, "You can create at most 50 API tokens.")
 		return

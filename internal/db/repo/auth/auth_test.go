@@ -81,7 +81,7 @@ func TestUserRoundTripAndPasswordOptional(t *testing.T) {
 func TestTombstoneKeepsTheRowAndDropsAccess(t *testing.T) {
 	r, id := newRepo(t)
 	ctx := context.Background()
-	if _, err := r.InsertAPIToken(ctx, authrepo.NewAPIToken{UserID: id, Name: "t", Hash: "h", Prefix: "svy_", Scope: "read", Now: time.Now()}); err != nil {
+	if _, err := r.InsertAPIToken(ctx, authrepo.NewAPIToken{UserID: id, Name: "t", Hash: "h", Prefix: "svy_", AllSpaces: true, Now: time.Now()}); err != nil {
 		t.Fatal(err)
 	}
 	if err := r.InsertRecoveryCode(ctx, id, "c", time.Now()); err != nil {

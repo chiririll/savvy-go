@@ -14,6 +14,7 @@ const Setup2FAPage = lazy(() => import('@/pages/auth/setup-2fa'))
 const SsoCallbackPage = lazy(() => import('@/pages/auth/sso-callback'))
 const SetPasswordPage = lazy(() => import('@/pages/auth/set-password'))
 const InvitePage = lazy(() => import('@/pages/invite'))
+const OAuthConsentPage = lazy(() => import('@/pages/oauth/consent'))
 
 // Protected pages
 const DashboardPage = lazy(() => import('@/pages/dashboard'))
@@ -118,6 +119,11 @@ export const router = createBrowserRouter([
     {
         element: <AuthProvider />,
         children: [
+            {
+                // An AI app asking for access: signed in, but no app chrome around it.
+                path: pages.oauthConsent.path,
+                element: withSuspense(OAuthConsentPage),
+            },
             {
                 // The layout sits at the root, where the dashboard is the index page.
                 path: pages.dashboard.path,

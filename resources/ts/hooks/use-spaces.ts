@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import i18n from '@/lib/i18n'
 import { adminSpacesApi, spacesApi, syncGroupsApi } from '@/api/spaces'
 import { useUser } from '@/stores/auth'
@@ -198,6 +198,14 @@ export function useUnlinkSpace(id: number) {
 
 export function useSyncGroup(id: number | null) {
     return useQuery({ queryKey: spaceKey(id, 'sync-group'), queryFn: () => spacesApi.syncGroup(id!), enabled: id !== null })
+}
+
+/** The sync group of each space, in order (undefined while loading or when it is in none). Shares the cache of useSyncGroup. */
+export function useSyncGroups(ids: number[]) {
+    return useQueries({
+        queries: ids.map((id) => ({ queryKey: spaceKey(id, 'sync-group'), queryFn: () => spacesApi.syncGroup(id) })),
+        combine: (results) => results.map((r) => r.data ?? undefined),
+    })
 }
 
 /** Whether categories (or tags) of the current space are kept identical with other spaces. */
