@@ -30,6 +30,8 @@ func (s *Server) apiTokensStore(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r)
 	var body struct {
 		Name        string   `json:"name"`
+		Preset      string   `json:"preset"`
+		AllowDelete bool     `json:"allow_delete"`
 		Permissions []string `json:"permissions"`
 		AllSpaces   bool     `json:"all_spaces"`
 		SpaceIDs    []int64  `json:"space_ids"`
@@ -48,9 +50,19 @@ func (s *Server) apiTokensStore(w http.ResponseWriter, r *http.Request) {
 	// can list its spaces and nothing else, and it must name its spaces. It
 	// writes only where its owner may too: the request is limited by the
 	// token's permissions and the owner's role in the space.
-	perms, err := auth.NormalizePermissions(body.Permissions)
-	if err != nil {
-		errs["permissions"] = []string{err.Error() + "."}
+	var perms []string
+	var err error
+	switch {
+	case body.Preset != "" && len(body.Permissions) > 0:
+		errs["permissions"] = []string{"Give a preset or a list of permissions, not both."}
+	case body.Preset != "":
+		if perms, err = auth.PresetPermissions(body.Preset, body.AllowDelete); err != nil {
+			errs["preset"] = []string{"The preset must be viewer, editor or admin."}
+		}
+	default:
+		if perms, err = auth.NormalizePermissions(body.Permissions); err != nil {
+			errs["permissions"] = []string{err.Error() + "."}
+		}
 	}
 	var spaceIDs []int64
 	switch {

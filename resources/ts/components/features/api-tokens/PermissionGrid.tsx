@@ -34,6 +34,7 @@ export function PermissionGrid({
                             <SelectItem value="none">{t('api.level.none')}</SelectItem>
                             <SelectItem value="read">{t('api.level.read')}</SelectItem>
                             <SelectItem value="write">{t('api.level.write')}</SelectItem>
+                            <SelectItem value="delete">{t('api.level.delete')}</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>

@@ -49,11 +49,13 @@ type APIToken struct {
 	User        *User
 }
 
-// Allows reports whether the token holds the grant for resource: write needs
-// "<resource>:write", read is met by either level.
-func (t *APIToken) Allows(resource string, write bool) bool {
+// Allows reports whether the token holds a grant for resource that covers
+// level (PermRead, PermWrite or PermDelete): a higher grant covers the lower.
+func (t *APIToken) Allows(resource, level string) bool {
+	need := permRank[level]
 	for _, p := range t.Permissions {
-		if p == Perm(resource, PermWrite) || (!write && p == Perm(resource, PermRead)) {
+		res, lv, _ := strings.Cut(p, ":")
+		if res == resource && need > 0 && permRank[lv] >= need {
 			return true
 		}
 	}

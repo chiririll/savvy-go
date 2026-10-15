@@ -3,7 +3,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { ACCOUNT_TYPES } from '@/types/accounts'
-import { API_PERMISSION_LEVELS, API_RESOURCES } from '@/types/api-tokens'
+import { API_PERMISSION_LEVELS, API_RESOURCES, API_TOKEN_PRESETS } from '@/types/api-tokens'
 import { ACTION_TYPES, CONDITION_OPERATORS, TRIGGER_TYPES } from '@/types/automation'
 import { BACKUP_STATUSES } from '@/types/backup'
 import { BUDGET_PERIODS } from '@/types/budgets'
@@ -185,7 +185,9 @@ describe('API token permissions', () => {
     it('offers the resources and levels the backend grants', () => {
         const resources = /var APIResources = \[\]string\{([^}]*)\}/.exec(source)![1]
         expect(sorted(API_RESOURCES)).toEqual(sorted(quoted(resources)))
-        const levels = [...source.matchAll(/Perm(?:Read|Write)\s*= "([a-z]+)"/g)].map((m) => m[1])
+        const presets = [...source.matchAll(/Preset(?:Viewer|Editor|Admin)\s*= "([a-z]+)"/g)].map((m) => m[1])
+        expect(sorted(API_TOKEN_PRESETS)).toEqual(sorted(presets))
+        const levels = [...source.matchAll(/Perm(?:Read|Write|Delete)\s*= "([a-z]+)"/g)].map((m) => m[1])
         expect(sorted(API_PERMISSION_LEVELS)).toEqual(sorted(levels))
     })
 

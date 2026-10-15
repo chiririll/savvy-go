@@ -414,7 +414,8 @@
             "spaceCount": "{{count, plural(one: # space; other: # spaces)}}",
             "canRead": "Read: {{list}}",
             "canWrite": "Read & write: {{list}}",
-            "noAccess": "Cannot read any data"
+            "noAccess": "Cannot read any data",
+            "canDelete": "Read, write & delete: {{list}}"
         },
         "create": {
             "title": "New API token",
@@ -427,7 +428,8 @@
             "spaces": "Spaces",
             "spacesHint": "The token cannot see any other space.",
             "permissions": "What it may do",
-            "permissionsHint": "Grant only what the app needs. It can never do more than your own role in a space allows."
+            "permissionsHint": "Grant only what the app needs. It can never do more than your own role in a space allows.",
+            "allowDelete": "Allow deleting transactions"
         },
         "created": {
             "title": "Copy your token",
@@ -438,7 +440,8 @@
         "level": {
             "none": "No access",
             "read": "Read",
-            "write": "Read & write"
+            "write": "Read & write",
+            "delete": "Read, write & delete"
         },
         "resource": {
             "accounts": "Accounts",
@@ -458,6 +461,27 @@
             "all": "All my spaces",
             "allHint": "Including spaces you join or create later. Leave it off to choose.",
             "none": "Choose at least one space."
+        },
+        "preset": {
+            "viewer": "Viewer",
+            "editor": "Editor",
+            "admin": "Admin",
+            "custom": "Custom"
+        },
+        "presetHint": {
+            "viewer": "Reads everything in the chosen spaces and changes nothing.",
+            "editor": "Reads everything and can add and change transactions.",
+            "admin": "Reads, changes and deletes everything in the chosen spaces. Space administration, backups and security stay with you.",
+            "custom": "Choose what the token may do for each part of a space."
+        },
+        "sync": {
+            "title": "Space synchronisation",
+            "both": "categories and tags",
+            "categories": "categories",
+            "tags": "tags",
+            "mirrored": "{{space}} keeps its {{kind}} identical with {{others}}: what this token changes there changes in those spaces too.",
+            "unreachable": "{{space}} keeps its {{kind}} identical with {{others}}, which this token cannot reach. It will be refused when it tries to change them in {{space}}. Choose those spaces too, or leave categories and tags out.",
+            "hidden": "{{count, plural(one: # space you are not a member of; other: # spaces you are not a member of)}}"
         }
     },
     "spaces": {

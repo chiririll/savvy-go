@@ -183,7 +183,7 @@ func TestExchangeIssuesAReadOnlyShortLivedAPIToken(t *testing.T) {
 	if err != nil || tok == nil {
 		t.Fatalf("access token does not resolve: %v %v", tok, err)
 	}
-	if tok.Allows("transactions", true) || !tok.Allows("transactions", false) || tok.Allows("transfers", false) || !tok.AllSpaces || tok.UserID != e.user.ID || tok.ExpiresAt == nil || !strings.Contains(tok.Name, "Claude") {
+	if tok.Allows("transactions", auth.PermWrite) || !tok.Allows("transactions", auth.PermRead) || tok.Allows("transfers", auth.PermRead) || !tok.AllSpaces || tok.UserID != e.user.ID || tok.ExpiresAt == nil || !strings.Contains(tok.Name, "Claude") {
 		t.Fatalf("token = %+v", tok)
 	}
 }

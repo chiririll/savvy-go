@@ -52,7 +52,7 @@ func (a *testApp) issueToken(u *auth.User, scope string, exp *time.Time) (string
 	a.t.Helper()
 	level := auth.PermRead
 	if scope == tokReadWrite {
-		level = auth.PermWrite
+		level = auth.PermDelete
 	}
 	return a.issueGrant(u, auth.Grant{Permissions: allPerms(level), AllSpaces: true}, exp)
 }

@@ -1,7 +1,7 @@
 import type { TFunction } from 'i18next'
 
 import type { AccountType } from '@/types/accounts'
-import type { ApiResource } from '@/types/api-tokens'
+import type { ApiResource, ApiTokenPreset } from '@/types/api-tokens'
 import type { ActionType, ConditionOperator, TriggerType } from '@/types/automation'
 import type { BackupStatus } from '@/types/backup'
 import type { BudgetPeriod } from '@/types/budgets'
@@ -74,6 +74,20 @@ export const accountTypeLabelLoose = (t: TFunction, type: string): string =>
         crypto: t('pages:accounts.types.crypto'),
         debt: t('pages:accounts.types.debt'),
     }, type)
+
+export const apiPresetLabel = (t: TFunction, preset: ApiTokenPreset | 'custom'): string => ({
+    viewer: t('settings:api.preset.viewer'),
+    editor: t('settings:api.preset.editor'),
+    admin: t('settings:api.preset.admin'),
+    custom: t('settings:api.preset.custom'),
+} satisfies Record<ApiTokenPreset | 'custom', string>)[preset]
+
+export const apiPresetHint = (t: TFunction, preset: ApiTokenPreset | 'custom'): string => ({
+    viewer: t('settings:api.presetHint.viewer'),
+    editor: t('settings:api.presetHint.editor'),
+    admin: t('settings:api.presetHint.admin'),
+    custom: t('settings:api.presetHint.custom'),
+} satisfies Record<ApiTokenPreset | 'custom', string>)[preset]
 
 export const apiResourceLabel = (t: TFunction, resource: ApiResource): string => ({
     accounts: t('settings:api.resource.accounts'),

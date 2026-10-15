@@ -15,6 +15,7 @@ import (
 	"savvy-go/internal/importer"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/recurring"
+	"savvy-go/internal/refsync"
 	"savvy-go/internal/reports"
 	"savvy-go/internal/settings"
 	"savvy-go/internal/spaces"
@@ -150,18 +151,48 @@ func (s *Server) requireTokenGrant(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if t := apiTokenFrom(r); t != nil {
 			res, known := spaceResource(r.URL.Path)
-			write := r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions
-			if !known || !t.Allows(res, write) {
-				level := auth.PermRead
-				if write {
-					level = auth.PermWrite
-				}
+			level := auth.LevelFor(r.Method)
+			if !known || !t.Allows(res, level) {
 				writeMessage(w, http.StatusForbidden, "This API token has no "+auth.Perm(res, level)+" permission.")
+				return
+			}
+			if level != auth.PermRead && !s.tokenReachesSyncGroup(r, t, res) {
+				writeMessage(w, http.StatusForbidden, "This space syncs its "+res+" with other spaces: the API token must reach all of them to change them.")
 				return
 			}
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// tokenReachesSyncGroup is false when changing this resource also changes other
+// spaces (a sync group mirrors categories and tags) that the token cannot
+// reach. Without this, a token limited to one space could rewrite its
+// neighbours. Whether the owner may edit each of them is checked by the
+// change itself, as for a session.
+func (s *Server) tokenReachesSyncGroup(r *http.Request, t *auth.APIToken, resource string) bool {
+	var kind refsync.Kind
+	switch resource {
+	case "categories":
+		kind = refsync.Categories
+	case "tags":
+		kind = refsync.Tags
+	default:
+		return true
+	}
+	g, err := s.refsync.GroupOf(r.Context(), sp(r).id)
+	if err != nil {
+		return false
+	}
+	if g == nil || !g.Syncs(kind) {
+		return true
+	}
+	for _, id := range g.Members {
+		if !t.AllowsSpace(id) {
+			return false
+		}
+	}
+	return true
 }
 
 // requireWrite lets only space admins and editors change data. An API token
