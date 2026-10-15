@@ -263,10 +263,8 @@ export default function Setup2FAPage() {
                     </>
                 )}
 
-                <div className="px-6 pb-6">
-                    <LanguageSwitcher variant="auth" className="pt-2" />
-                </div>
             </Card>
+            <LanguageSwitcher variant="auth" />
         </div>
     )
 }

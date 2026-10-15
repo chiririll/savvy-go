@@ -1,4 +1,4 @@
-import { Languages } from 'lucide-react'
+import { Check, Languages } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import {
@@ -70,48 +70,39 @@ export function LanguageSwitcher({ variant = 'compact', className }: LanguageSwi
         )
     }
 
-    if (variant === 'auth') {
-        return (
-            <div className={cn('flex items-center justify-center gap-2', className)}>
-                {SUPPORTED_LOCALES.map((code) => (
-                    <Button
-                        key={code}
-                        type="button"
-                        variant={locale === code ? 'secondary' : 'ghost'}
-                        size="sm"
-                        className="h-7 px-2 text-xs"
-                        onClick={() => change(code)}
-                    >
-                        {LOCALE_LABELS[code]}
-                    </Button>
-                ))}
-            </div>
-        )
-    }
+    // Same dropdown as the app header. On pages without a header (login, onboarding) it is pinned
+    // to the top-right corner, so it sits in the same place on every one of them.
+    const isAuth = variant === 'auth'
 
     return (
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className={className}
-                    aria-label={t('language.label')}
-                >
-                    <Languages className="h-5 w-5" />
-                </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-                {SUPPORTED_LOCALES.map((code) => (
-                    <DropdownMenuItem
-                        key={code}
-                        onClick={() => change(code)}
-                        className={locale === code ? 'font-medium' : undefined}
+        <div className={isAuth ? cn('fixed top-3 right-3 z-50', className) : undefined}>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button
+                        variant="ghost"
+                        size={isAuth ? 'sm' : 'icon'}
+                        className={isAuth ? 'gap-2' : className}
+                        aria-label={t('language.label')}
                     >
-                        {LOCALE_LABELS[code]}
-                    </DropdownMenuItem>
-                ))}
-            </DropdownMenuContent>
-        </DropdownMenu>
+                        <Languages className="h-5 w-5" />
+                        {isAuth && <span className="text-sm">{LOCALE_LABELS[locale]}</span>}
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                    {SUPPORTED_LOCALES.map((code) => (
+                        <DropdownMenuItem
+                            key={code}
+                            onClick={() => change(code)}
+                            className="justify-between gap-4"
+                        >
+                            <span className={locale === code ? 'font-medium' : undefined}>
+                                {LOCALE_LABELS[code]}
+                            </span>
+                            {locale === code && <Check className="size-4" />}
+                        </DropdownMenuItem>
+                    ))}
+                </DropdownMenuContent>
+            </DropdownMenu>
+        </div>
     )
 }

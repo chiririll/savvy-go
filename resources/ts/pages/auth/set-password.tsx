@@ -174,9 +174,9 @@ export default function SetPasswordPage() {
                             {t('setPassword.backToLogin')}
                         </Button>
                     )}
-                    <LanguageSwitcher variant="auth" className="pt-4" />
                 </CardContent>
             </Card>
+            <LanguageSwitcher variant="auth" />
         </div>
     )
 }

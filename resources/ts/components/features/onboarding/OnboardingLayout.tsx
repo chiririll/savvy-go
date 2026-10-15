@@ -28,9 +28,9 @@ export function OnboardingLayout({ title, description, children, className }: On
                 </CardHeader>
                 <CardContent className="px-4 sm:px-6">
                     {children}
-                    <LanguageSwitcher variant="auth" className="pt-4" />
                 </CardContent>
             </Card>
+            <LanguageSwitcher variant="auth" />
         </div>
     )
 }

@@ -283,10 +283,10 @@ export default function LoginPage() {
                                 <ArrowLeft className="mr-2 size-4" />
                                 {t('twoFactor.backToLogin')}
                             </Button>
-                            <LanguageSwitcher variant="auth" className="pt-2" />
                         </div>
                     </CardContent>
                 </Card>
+                <LanguageSwitcher variant="auth" />
             </div>
         )
     }
@@ -389,9 +389,9 @@ export default function LoginPage() {
                         </form>
                     </Form>
                     )}
-                    <LanguageSwitcher variant="auth" className="pt-2" />
                 </CardContent>
             </Card>
+            <LanguageSwitcher variant="auth" />
         </div>
     )
 }
