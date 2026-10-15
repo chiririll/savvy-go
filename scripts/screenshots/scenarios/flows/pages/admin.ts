@@ -7,6 +7,7 @@ import { createSpace } from '../onboarding/create-space.ts'
 
 const list = [
     ['system', pages.adminSystem],
+    ['checks', pages.adminChecks],
     ['monitoring', pages.adminMonitoring],
     ['sso', pages.adminSso],
     ['security', pages.adminSecurity],

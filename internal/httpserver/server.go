@@ -272,6 +272,7 @@ func (s *Server) routes() *chi.Mux {
 				r.Post("/identity-providers/{id}/test", s.idpTest)
 				r.Get("/monitoring/storage", s.monitoringStorage)
 				r.Get("/monitoring/resources", s.monitoringResources)
+				r.Get("/admin/checks", s.checksIndex)
 			})
 
 			r.Group(func(r chi.Router) {

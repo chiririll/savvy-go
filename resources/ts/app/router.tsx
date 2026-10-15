@@ -48,6 +48,7 @@ const ImportSettingsPage = lazy(() => import('@/pages/settings/import'))
 const SpaceBackupsPage = lazy(() => import('@/pages/settings/backups'))
 // Administration: server admins.
 const AdminSystemPage = lazy(() => import('@/pages/admin/system'))
+const AdminChecksPage = lazy(() => import('@/pages/admin/checks'))
 const AdminMonitoringPage = lazy(() => import('@/pages/admin/monitoring'))
 const AdminSsoPage = lazy(() => import('@/pages/admin/sso'))
 const AdminSecurityPage = lazy(() => import('@/pages/admin/security'))
@@ -150,6 +151,7 @@ export const router = createBrowserRouter([
                     { path: childPath(pages.importSettings), element: withSuspense(ImportSettingsPage) },
                     { path: childPath(pages.spaceBackups), element: withSuspense(SpaceBackupsPage) },
                     { path: childPath(pages.adminSystem), element: admin(AdminSystemPage) },
+                    { path: childPath(pages.adminChecks), element: admin(AdminChecksPage) },
                     { path: childPath(pages.adminMonitoring), element: admin(AdminMonitoringPage) },
                     { path: childPath(pages.adminSso), element: admin(AdminSsoPage) },
                     { path: childPath(pages.adminSecurity), element: admin(AdminSecurityPage) },

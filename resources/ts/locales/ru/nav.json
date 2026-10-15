@@ -35,5 +35,7 @@
     "systemBackups": "Копии сервера",
     "spaces": "Пространства",
     "transfer_out": "В другое пространство",
-    "sso": "SSO"
+    "sso": "SSO",
+    "needsAttention": "Найдены проблемы",
+    "checks": "Состояние"
 }

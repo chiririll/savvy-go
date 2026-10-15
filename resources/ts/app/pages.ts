@@ -48,6 +48,7 @@ export const pages = {
     oauthConsent: { path: '/oauth/consent', scope: 'user' },
 
     adminSystem: { path: '/admin/system', scope: 'admin' },
+    adminChecks: { path: '/admin/checks', scope: 'admin' },
     adminMonitoring: { path: '/admin/monitoring', scope: 'admin' },
     adminSso: { path: '/admin/sso', scope: 'admin' },
     adminSecurity: { path: '/admin/security', scope: 'admin' },

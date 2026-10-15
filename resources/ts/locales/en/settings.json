@@ -829,5 +829,49 @@
         "register": "Create account and join",
         "haveAccount": "Already have an account?",
         "signIn": "Sign in"
+    },
+    "checks": {
+        "title": "Status",
+        "fix": "Fix",
+        "items": {
+            "app_url_missing": {
+                "title": "Public URL is not set",
+                "description": "Invitation and password links point nowhere, and AI apps cannot connect.",
+                "action": "Set it in System"
+            },
+            "mail_off": {
+                "title": "Email is not set up",
+                "description": "The server cannot send invitations or password links. Share the links by hand.",
+                "action": "Set up email"
+            },
+            "mail_invalid": {
+                "title": "Email settings are invalid",
+                "description": "Email is switched off until the [mailer] section of the config file is fixed.",
+                "action": "Fix email settings"
+            },
+            "backup_missing": {
+                "title": "No server backup yet",
+                "description": "Backups are made by hand. Without one, a lost disk loses every space.",
+                "action": "Make a backup"
+            },
+            "backup_stale": {
+                "title": "{{count, plural(one: Last server backup is # day old; other: Last server backup is # days old)}}",
+                "description": "Backups are made by hand. Make a new one to keep recent changes safe.",
+                "action": "Make a backup"
+            },
+            "disk_filling": {
+                "title": "Data disk is {{count}}% full",
+                "description": "Uploads and backups need room. Free some space or move the data directory.",
+                "action": "Open monitoring"
+            },
+            "config_read_only": {
+                "title": "Config file is read-only",
+                "description": "Settings kept in config.toml, such as the public URL and email, cannot be changed here.",
+                "action": "Open System"
+            }
+        },
+        "pageTitle": "Server status",
+        "description": "Problems the server found with its own setup. Each one links to the page that fixes it.",
+        "allGood": "Everything looks fine. Nothing needs attention."
     }
 }

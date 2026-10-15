@@ -7,6 +7,7 @@ import { API_PERMISSION_LEVELS, API_RESOURCES, API_TOKEN_PRESETS } from '@/types
 import { ACTION_TYPES, CONDITION_OPERATORS, TRIGGER_TYPES } from '@/types/automation'
 import { BACKUP_STATUSES } from '@/types/backup'
 import { BUDGET_PERIODS } from '@/types/budgets'
+import { CHECK_IDS, CHECK_SEVERITIES } from '@/types/checks'
 import { CATEGORY_TYPES } from '@/types/categories'
 import { DEBT_TYPE_VALUES } from '@/types/debts'
 import { MAIL_PROTOCOLS } from '@/types/mail'
@@ -133,6 +134,27 @@ describe('mail protocols', () => {
         const source = read('internal/mailer/mailer.go')
         const fromGo = [...source.matchAll(/^	[A-Za-z]+\s+= "([a-z]+)"\s+\/\//gm)].map((m) => m[1])
         expect(sorted(MAIL_PROTOCOLS)).toEqual(sorted(fromGo))
+    })
+})
+
+describe('server checks', () => {
+    const source = () => read('internal/httpserver/checks.go')
+
+    it('are the ids the backend reports', () => {
+        const fromGo = [...source().matchAll(/add\("([a-z_]+)"/g)].map((m) => m[1])
+        expect(sorted(CHECK_IDS)).toEqual(sorted(fromGo))
+    })
+
+    it('have the severities the backend uses', () => {
+        const fromGo = [...source().matchAll(/^	severity[A-Za-z]+\s+= "([a-z]+)"/gm)].map((m) => m[1])
+        expect(sorted(CHECK_SEVERITIES)).toEqual(sorted(fromGo))
+    })
+
+    it('have a title and description', () => {
+        for (const id of CHECK_IDS) {
+            expect(enSettings.checks.items[id].title).toBeTruthy()
+            expect(enSettings.checks.items[id].description).toBeTruthy()
+        }
     })
 })
 

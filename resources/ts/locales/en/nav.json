@@ -35,5 +35,7 @@
     "systemBackups": "System backups",
     "spaces": "Spaces",
     "transfer_out": "To another space",
-    "sso": "SSO"
+    "sso": "SSO",
+    "needsAttention": "Problems found",
+    "checks": "Status"
 }

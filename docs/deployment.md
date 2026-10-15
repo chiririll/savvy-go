@@ -161,6 +161,22 @@ networks:
 
 During maintenance `/livez` stays up and `/readyz` returns `503`. A space whose migration fails answers `503` on its own; other spaces keep working.
 
+## Server checks
+
+Administration → Status lists what needs attention, and a dot on the Administration menu shows when something does. Each entry links to the page that fixes it. The list is worked out from the current state each time, so a fixed problem disappears by itself. Only server admins see it.
+
+| Check | Level | When |
+|-------|-------|------|
+| Public URL is not set | warning | `app_url` is empty |
+| Email is not set up | warning | the `[mailer]` section is off |
+| Email settings are invalid | error | the `[mailer]` section failed validation at start, so mail is off |
+| No server backup | warning | there is no valid server backup |
+| Server backup is old | warning | the newest valid server backup is over 30 days old |
+| Data disk is filling | warning at 75%, error at 90% | the volume that holds the uploads |
+| Config file is read-only | info | settings in `config.toml` cannot be edited from the panel |
+
+The same list is available to admins at `GET /api/admin/checks` (session only).
+
 ## Kubernetes
 
 Use a single-replica `Deployment` with a `PersistentVolumeClaim` at `/data` and `strategy: { type: Recreate }` (SQLite is single-writer). The container runs as non-root (`www-data`, uid 82), so grant `NET_BIND_SERVICE` to bind port 80. Probes:

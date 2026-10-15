@@ -6,6 +6,7 @@ import type { ActionType, ConditionOperator, TriggerType } from '@/types/automat
 import type { BackupStatus } from '@/types/backup'
 import type { BudgetPeriod } from '@/types/budgets'
 import type { CategoryType } from '@/types/categories'
+import type { CheckId } from '@/types/checks'
 import type { DebtType } from '@/types/debts'
 import type { MailProtocol } from '@/types/mail'
 import type { ImportStep } from '@/types/import'
@@ -355,7 +356,7 @@ export const transactionTypeLabel = (t: TFunction, type: TransactionType): strin
 export type NavKey =
     | 'dashboard' | 'transactions' | 'recurring' | 'budgets' | 'debts' | 'reports'
     | 'accounts' | 'categories' | 'tags' | 'currencies' | 'automation' | 'space' | 'user' | 'import'
-    | 'backups' | 'system' | 'monitoring' | 'sso' | 'security' | 'systemBackups' | 'users' | 'spaces'
+    | 'backups' | 'system' | 'checks' | 'monitoring' | 'sso' | 'security' | 'systemBackups' | 'users' | 'spaces'
 
 export const navLabel = (t: TFunction, key: NavKey): string => ({
     dashboard: t('nav:dashboard'),
@@ -374,6 +375,7 @@ export const navLabel = (t: TFunction, key: NavKey): string => ({
     import: t('nav:import'),
     backups: t('nav:backups'),
     system: t('nav:system'),
+    checks: t('nav:checks'),
     monitoring: t('nav:monitoring'),
     sso: t('nav:sso'),
     security: t('nav:security'),
@@ -381,6 +383,48 @@ export const navLabel = (t: TFunction, key: NavKey): string => ({
     users: t('nav:users'),
     spaces: t('nav:spaces'),
 } satisfies Record<NavKey, string>)[key]
+
+/** Wording of a server check (`GET /admin/checks`); `value` fills the count in the title. */
+export const checkText = (t: TFunction, id: CheckId, value: number | null): { title: string; description: string; action: string } => {
+    const count = Math.round(value ?? 0)
+    return ({
+        app_url_missing: {
+            title: t('settings:checks.items.app_url_missing.title'),
+            description: t('settings:checks.items.app_url_missing.description'),
+            action: t('settings:checks.items.app_url_missing.action'),
+        },
+        mail_off: {
+            title: t('settings:checks.items.mail_off.title'),
+            description: t('settings:checks.items.mail_off.description'),
+            action: t('settings:checks.items.mail_off.action'),
+        },
+        mail_invalid: {
+            title: t('settings:checks.items.mail_invalid.title'),
+            description: t('settings:checks.items.mail_invalid.description'),
+            action: t('settings:checks.items.mail_invalid.action'),
+        },
+        backup_missing: {
+            title: t('settings:checks.items.backup_missing.title'),
+            description: t('settings:checks.items.backup_missing.description'),
+            action: t('settings:checks.items.backup_missing.action'),
+        },
+        backup_stale: {
+            title: t('settings:checks.items.backup_stale.title', { count }),
+            description: t('settings:checks.items.backup_stale.description'),
+            action: t('settings:checks.items.backup_stale.action'),
+        },
+        disk_filling: {
+            title: t('settings:checks.items.disk_filling.title', { count }),
+            description: t('settings:checks.items.disk_filling.description'),
+            action: t('settings:checks.items.disk_filling.action'),
+        },
+        config_read_only: {
+            title: t('settings:checks.items.config_read_only.title'),
+            description: t('settings:checks.items.config_read_only.description'),
+            action: t('settings:checks.items.config_read_only.action'),
+        },
+    } satisfies Record<CheckId, { title: string; description: string; action: string }>)[id]
+}
 
 /** Entries of the "new transaction" menu; `transfer_out` is a transfer to another space. */
 export const createMenuLabel = (t: TFunction, type: 'income' | 'expense' | 'transfer' | 'transfer_out'): string => ({
