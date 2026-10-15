@@ -6,6 +6,8 @@ export interface User {
     email: string
     role?: UserRole
     isSsoOnly?: boolean
+    /** The user proved they own the address. Without it, an instance that requires it holds them back. */
+    emailVerified?: boolean
 }
 
 export interface LoginCredentials {
@@ -26,12 +28,15 @@ export interface AuthResponse {
     user: User
     expires_at: string
     refresh_at: string | null
+    /** The instance holds back users whose address is not verified. */
+    email_verification_required?: boolean
 }
 
 export interface MeResponse {
     user: User | null
     expires_at: string | null
     refresh_at: string | null
+    email_verification_required?: boolean
 }
 
 export interface TwoFactorAuthResponse {

@@ -9,6 +9,7 @@ export interface User {
     role: UserRole
     isInactive: boolean
     isSsoOnly: boolean
+    emailVerified: boolean
     createdAt: string
     token?: string
     expiresAt?: string

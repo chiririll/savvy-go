@@ -4,6 +4,8 @@ export interface Settings {
     sso_allow_signup: boolean
     password_login_enabled: boolean
     sso_require_verified_email: boolean
+    /** Users with an unconfirmed address can sign in but do nothing else. Needs mail and a verified admin. */
+    require_email_verification: boolean
     /** Size limit of a space in MB; 0 is unlimited. */
     space_quota_mb: number
     /** Backups a space keeps; 0 keeps all. */

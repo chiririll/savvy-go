@@ -1,9 +1,12 @@
 package httpserver
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -250,7 +253,11 @@ func (s *Server) emailInvitation(r *http.Request, to, role, token string) error 
 	if err != nil || space == nil {
 		return errors.New("could not read the space")
 	}
-	return s.sendMail(r.Context(), inviteMessage(to, userFrom(r).Name, space.Name, role, base+"/invite/"+token))
+	// The signature proves the link went to this mailbox. The link the app
+	// hands out for copying has none, so only the emailed one verifies the address.
+	to = strings.TrimSpace(to)
+	link := base + "/invite/" + token + "?email=" + url.QueryEscape(to) + "&sig=" + s.links.Invite(token, to)
+	return s.sendMail(r.Context(), inviteMessage(to, userFrom(r).Name, space.Name, role, link))
 }
 
 func (s *Server) invitationsDestroy(w http.ResponseWriter, r *http.Request) {
@@ -295,6 +302,7 @@ func (s *Server) invitationRegister(w http.ResponseWriter, r *http.Request) {
 		Name     string `json:"name"`
 		Email    string `json:"email"`
 		Password string `json:"password"`
+		Sig      string `json:"sig"` // from the emailed link: proves the mailbox
 	}
 	if !decodeBody(w, r, &body) {
 		return
@@ -317,12 +325,33 @@ func (s *Server) invitationRegister(w http.ResponseWriter, r *http.Request) {
 		writeValidation(w, map[string][]string{"email": {"Sign in with this email and open the invitation link again."}})
 		return
 	}
-	u, _, err := s.spaces.Register(r.Context(), s.users, chi.URLParam(r, "token"), strings.TrimSpace(body.Name), body.Email, body.Password)
+	token := chi.URLParam(r, "token")
+	u, _, err := s.spaces.Register(r.Context(), s.users, token, strings.TrimSpace(body.Name), body.Email, body.Password)
 	if err != nil {
 		writeSpaceError(w, err)
 		return
 	}
+	s.confirmInvitedAddress(r.Context(), u, s.links.InviteValid(token, body.Email, body.Sig))
 	s.issueSession(w, r, u, http.StatusCreated, false)
+}
+
+// confirmInvitedAddress marks the new account's address verified when it came
+// through the emailed invitation link. Otherwise, if the instance requires
+// verification, it asks the new user to confirm by email.
+func (s *Server) confirmInvitedAddress(ctx context.Context, u *auth.User, proven bool) {
+	if proven {
+		if err := s.users.SetEmailVerified(ctx, u.ID, true); err != nil {
+			slog.Warn("mark invited address verified", "err", err)
+			return
+		}
+		u.EmailVerified = true
+		return
+	}
+	if s.emailVerificationRequired(ctx) {
+		if problem := s.sendVerification(ctx, u); problem != "" {
+			slog.Warn("send verification email", "problem", problem)
+		}
+	}
 }
 
 // --- space settings and audit ----------------------------------------------

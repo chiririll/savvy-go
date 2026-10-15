@@ -5,17 +5,17 @@ SELECT COUNT(*) FROM users WHERE deleted_at IS NULL;
 SELECT COUNT(*) FROM users WHERE role = ? AND deleted_at IS NULL;
 
 -- name: GetUser :one
-SELECT id, name, email, password, role, is_sso_only,
+SELECT id, name, email, password, role, is_sso_only, email_verified,
 	two_factor_secret, two_factor_enabled, two_factor_confirmed, deleted_at, created_at, updated_at
 FROM users WHERE id = ?;
 
 -- name: GetUserByEmail :one
-SELECT id, name, email, password, role, is_sso_only,
+SELECT id, name, email, password, role, is_sso_only, email_verified,
 	two_factor_secret, two_factor_enabled, two_factor_confirmed, deleted_at, created_at, updated_at
 FROM users WHERE lower(email) = ?;
 
 -- name: ListUsers :many
-SELECT id, name, email, password, role, is_sso_only,
+SELECT id, name, email, password, role, is_sso_only, email_verified,
 	two_factor_secret, two_factor_enabled, two_factor_confirmed, deleted_at, created_at, updated_at
 FROM users WHERE deleted_at IS NULL ORDER BY name;
 
@@ -27,10 +27,16 @@ VALUES (?, ?, ?, ?, ?, ?);
 UPDATE users SET password = ?, updated_at = ? WHERE id = ?;
 
 -- name: UpdateUserWithPassword :exec
-UPDATE users SET name=?, email=?, role=?, password=?, updated_at=? WHERE id=?;
+UPDATE users SET name=?, email=?, role=?, email_verified=?, password=?, updated_at=? WHERE id=?;
 
 -- name: UpdateUserProfile :exec
-UPDATE users SET name=?, email=?, role=?, updated_at=? WHERE id=?;
+UPDATE users SET name=?, email=?, role=?, email_verified=?, updated_at=? WHERE id=?;
+
+-- name: SetUserEmailVerified :exec
+UPDATE users SET email_verified=?, updated_at=? WHERE id=?;
+
+-- name: CountVerifiedAdmins :one
+SELECT COUNT(*) FROM users WHERE role = ? AND email_verified = 1 AND deleted_at IS NULL;
 
 -- name: MarkUserSSOOnly :exec
 UPDATE users SET is_sso_only=1, updated_at=? WHERE id=?;
@@ -45,7 +51,7 @@ UPDATE users SET two_factor_secret=?, two_factor_enabled=?, two_factor_confirmed
 -- A deleted user keeps their row (ids in space databases still resolve) but
 -- loses everything that identifies them or lets them sign in.
 UPDATE users SET name = 'Deleted user', email = 'deleted-' || id || '@invalid', password = NULL,
-	is_sso_only = 0, two_factor_secret = NULL, two_factor_enabled = 0, two_factor_confirmed = 0,
+	is_sso_only = 0, email_verified = 0, two_factor_secret = NULL, two_factor_enabled = 0, two_factor_confirmed = 0,
 	deleted_at = sqlc.arg(now), updated_at = sqlc.arg(now)
 WHERE id = sqlc.arg(id);
 

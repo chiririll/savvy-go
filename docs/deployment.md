@@ -92,6 +92,19 @@ That page has a **Send test email** button, to try the saved settings. When mail
 - **Administration → Users → Email a reset link** sends a user a one-time password link (valid 7 days). It is not offered for yourself, for SSO-only users, or when password sign-in is off. **Reset password** still shows a link to copy.
 - Inviting someone by email from **Settings → Space** also emails the invitation link. The link is always shown too, in case the email fails.
 
+### Email confirmation
+
+Every account has a confirmed or unconfirmed email address. An address becomes confirmed when:
+
+- the user opens the link in a confirmation email (valid 7 days);
+- they register from the link in an invitation **email**. That link carries a signature for the invited address, so opening it proves the mailbox. The link shown in the app for copying has no signature: an account created from it starts unconfirmed;
+- they sign in through SSO and the provider reports the address as verified;
+- a server admin marks it in **Administration → Users** (**Mark email as confirmed**). Changing a user's address clears the mark.
+
+By default nothing depends on this. Turn on **Administration → System → Require email confirmation** and users with an unconfirmed address can still sign in, but see only a "confirm your email" page (with a button to resend the link) until they confirm. The same applies to their API tokens. The first admin starts unconfirmed too.
+
+The switch can only be turned on when mail and `app_url` are set up and your own address is confirmed, so you cannot lock yourself out; the page offers to email you a link. Turning it off is always possible. The setting is stored in the database, so restoring a backup brings it back as it was: if you restore a server whose admins are all unconfirmed while it is on, nobody can pass the page until mail works and someone confirms through the link (or you restore a backup where it is off). Confirmation links are signed with the server's signing key, so links sent before a restore that replaces the key stop working; ask for a new one.
+
 Any space admin can make the server email an address by creating an invitation. There is no rate limit yet; keep that in mind on a server open to untrusted space admins.
 
 ## Behind a reverse proxy

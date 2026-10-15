@@ -34,6 +34,14 @@ export function useUpdateUser() {
     })
 }
 
+export function useSetEmailVerified() {
+    return useResourceMutation({
+        mutationFn: ({ id, verified }: { id: number; verified: boolean }) => usersApi.setEmailVerified(id, verified),
+        invalidateKeys: [QUERY_KEY],
+        successMessage: i18n.t('toasts.user.updated'),
+    })
+}
+
 export function useDeleteUser() {
     return useResourceMutation({
         mutationFn: (id: string | number) => usersApi.delete(id),

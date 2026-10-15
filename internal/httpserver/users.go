@@ -40,6 +40,8 @@ func (s *Server) usersStore(w http.ResponseWriter, r *http.Request) {
 		Email    string  `json:"email"`
 		Password *string `json:"password"`
 		Role     string  `json:"role"`
+		// An admin vouching for the address, e.g. when mail is not set up.
+		EmailVerified bool `json:"emailVerified"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeValidation(w, map[string][]string{"email": {"The given data was invalid."}})
@@ -70,6 +72,13 @@ func (s *Server) usersStore(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	if body.EmailVerified {
+		if err := s.users.SetEmailVerified(r.Context(), u.ID, true); err != nil {
+			writeMessage(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		u.EmailVerified = true
+	}
 	payload := u.ResourceJSON()
 	if u.IsInactive() {
 		tok, exp, err := s.tokens.Issue(r.Context(), u)
@@ -93,6 +102,8 @@ func (s *Server) usersUpdate(w http.ResponseWriter, r *http.Request) {
 		Email    *string `json:"email"`
 		Password *string `json:"password"`
 		Role     *string `json:"role"`
+		// An admin's word that the address is theirs; without it a new address is unverified.
+		EmailVerified *bool `json:"emailVerified"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeValidation(w, map[string][]string{"email": {"The given data was invalid."}})
@@ -122,7 +133,7 @@ func (s *Server) usersUpdate(w http.ResponseWriter, r *http.Request) {
 	if body.Role != nil && u.IsGuest() && *body.Role != auth.RoleGuest {
 		_ = s.spaces.Audit(r.Context(), userFrom(r), "promote_guest", nil, &u.ID, *body.Role)
 	}
-	updated, err := s.users.Update(r.Context(), u.ID, body.Name, body.Email, body.Role, body.Password)
+	updated, err := s.users.Update(r.Context(), u.ID, body.Name, body.Email, body.Role, body.Password, body.EmailVerified)
 	if err != nil {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return

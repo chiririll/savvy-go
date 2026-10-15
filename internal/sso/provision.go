@@ -68,11 +68,16 @@ func (s Service) linkByEmail(ctx context.Context, p IdentityProvider, id Normali
 	if err != nil || user == nil {
 		return nil, err
 	}
+	// The provider vouches for the address, which is as good as a link in an email.
+	if !user.EmailVerified {
+		if err := s.Users.SetEmailVerified(ctx, user.ID, true); err != nil {
+			return nil, err
+		}
+	}
 	if p.SyncRoleOnLogin {
 		_ = s.syncRole(ctx, user, p, id)
-		user, _ = s.Users.ByID(ctx, user.ID)
 	}
-	return user, nil
+	return s.Users.ByID(ctx, user.ID)
 }
 
 func (s Service) justInTime(ctx context.Context, p IdentityProvider, id NormalizedIdentity) (*auth.User, error) {
@@ -107,6 +112,11 @@ func (s Service) justInTime(ctx context.Context, p IdentityProvider, id Normaliz
 	}
 	if err := s.Users.MarkSSOOnly(ctx, user.ID); err != nil {
 		return nil, err
+	}
+	if id.EmailVerified {
+		if err := s.Users.SetEmailVerified(ctx, user.ID, true); err != nil {
+			return nil, err
+		}
 	}
 	return s.Users.ByID(ctx, user.ID)
 }

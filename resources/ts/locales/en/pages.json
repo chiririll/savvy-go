@@ -94,7 +94,10 @@
             "role": "Role"
         },
         "deleteTitle": "Delete user?",
-        "deleteDescription": "This action cannot be undone. The user \"{{name}}\" will be permanently deleted."
+        "deleteDescription": "This action cannot be undone. The user \"{{name}}\" will be permanently deleted.",
+        "emailUnverified": "Unconfirmed",
+        "markVerified": "Mark email as confirmed",
+        "markUnverified": "Mark email as unconfirmed"
     },
     "currencies": {
         "title": "Currencies",

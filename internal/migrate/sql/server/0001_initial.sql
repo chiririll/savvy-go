@@ -15,6 +15,9 @@ CREATE TABLE IF NOT EXISTS users (
     -- user may do inside a space is the space_members role.
     role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'user', 'guest')),
     is_sso_only INTEGER NOT NULL DEFAULT 0 CHECK (is_sso_only IN (0, 1)),
+    -- The user proved they own the address (link from an email, or an SSO
+    -- provider that vouches for it). Changing the address clears it.
+    email_verified INTEGER NOT NULL DEFAULT 0 CHECK (email_verified IN (0, 1)),
     two_factor_secret TEXT,
     two_factor_enabled INTEGER NOT NULL DEFAULT 0 CHECK (two_factor_enabled IN (0, 1)),
     two_factor_confirmed INTEGER NOT NULL DEFAULT 0 CHECK (two_factor_confirmed IN (0, 1)),

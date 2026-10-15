@@ -6,7 +6,9 @@ import { Page, PageHeader, FormWrapper, SettingsSection, ToggleRow, SettingsRowS
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useSettings, useUpdateSettings, useSsoProviders } from '@/hooks'
+import { useSettings, useUpdateSettings, useSsoProviders, useMailStatus } from '@/hooks'
+import { authApi } from '@/api'
+import { useUser } from '@/stores/auth'
 import { MailSection } from '@/components/features/mail'
 import { Settings } from '@/types'
 
@@ -97,12 +99,27 @@ export default function AdminSystemPage() {
     const { data: settings, isLoading } = useSettings()
     const { data: ssoProviders } = useSsoProviders()
     const updateSettings = useUpdateSettings()
+    const { data: mail } = useMailStatus()
+    const me = useUser()
 
     const hasSso = (ssoProviders?.length ?? 0) > 0
     const passwordLoginEnabled = settings?.password_login_enabled ?? true
     const passwordLoginLocked = passwordLoginEnabled && !hasSso
     const ssoAllowSignup = settings?.sso_allow_signup ?? true
     const requireVerifiedEmail = settings?.sso_require_verified_email ?? false
+
+    const requireVerification = settings?.require_email_verification ?? false
+    // Links go out by email, and the admin switching it on must not lock themselves out.
+    const mailReady = !!mail?.enabled && !!mail.appUrlSet
+    const adminConfirmed = me?.emailVerified === true
+    const verificationBlocker = !mailReady
+        ? t('system.authentication.requireVerificationNeedsMail')
+        : !adminConfirmed ? t('system.authentication.requireVerificationNeedsYou') : null
+    const sendConfirmation = () => {
+        authApi.resendVerification()
+            .then(() => toast.success(t('system.authentication.confirmationSent')))
+            .catch((error: { message?: string }) => toast.error(error.message ?? ''))
+    }
 
     const save = (data: Partial<Settings>) => updateSettings.mutate(data)
 
@@ -174,6 +191,21 @@ export default function AdminSystemPage() {
                                         disabled={updateSettings.isPending || !ssoAllowSignup}
                                         onChange={(checked) => save({ sso_require_verified_email: checked })}
                                     />
+                                    <ToggleRow
+                                        id="require-email-verification"
+                                        label={t('system.authentication.requireVerification')}
+                                        description={(!requireVerification && verificationBlocker) || t('system.authentication.requireVerificationOn')}
+                                        checked={requireVerification}
+                                        disabled={updateSettings.isPending || (!requireVerification && verificationBlocker !== null)}
+                                        onChange={(checked) => save({ require_email_verification: checked })}
+                                    />
+                                    {!requireVerification && mailReady && !adminConfirmed && (
+                                        <div className="px-4 pb-3.5">
+                                            <Button size="sm" variant="outline" onClick={sendConfirmation}>
+                                                {t('system.authentication.sendConfirmation')}
+                                            </Button>
+                                        </div>
+                                    )}
                                 </>
                             )}
                         </div>

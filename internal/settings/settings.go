@@ -15,6 +15,9 @@ var serverDefaults = map[string]any{
 	"sso_allow_signup":           true,
 	"password_login_enabled":     true,
 	"sso_require_verified_email": false,
+	// Users who have not confirmed their email address can sign in but do
+	// nothing else until they do. Needs mail and a verified admin to switch on.
+	"require_email_verification": false,
 	// Size limit of a space in MB; 0 means unlimited.
 	"space_quota_mb": 0,
 	// Backups a space keeps; older ones are removed. 0 keeps all.

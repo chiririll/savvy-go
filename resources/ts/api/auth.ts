@@ -53,6 +53,16 @@ export const authApi = {
         return response.data
     },
 
+    /** Confirms the address named by an emailed link; works without a session. */
+    verifyEmail: async (token: string): Promise<void> => {
+        await apiClient.post('/auth/verify-email', { token })
+    },
+
+    /** Emails the signed-in user a new confirmation link. */
+    resendVerification: async (): Promise<void> => {
+        await apiClient.post('/auth/verify-email/resend')
+    },
+
     me: async (): Promise<MeResponse> => {
         const response = await apiClient.get('/auth/me')
         return response.data

@@ -24,6 +24,7 @@ export const pages = {
     setup2fa: { path: '/setup-2fa', scope: 'public' },
     ssoCallback: { path: '/auth/sso/callback', scope: 'public' },
     setPassword: { path: '/set-password/:token', scope: 'public' },
+    verifyEmail: { path: '/verify-email/:token', scope: 'public' },
     invite: { path: '/invite/:token', scope: 'public' },
 
     dashboard: { path: '/', scope: 'space' },

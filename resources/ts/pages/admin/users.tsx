@@ -4,6 +4,7 @@ import { ListPage } from '@/components/shared'
 import { createUserColumns, UserFormDialog, UserPasswordLinkDialog } from '@/components/features/users'
 import {
     useUsers, useDeleteUser, useCreateUser, useUpdateUser, useIssuePasswordToken, useResourceFormDialog,
+    useSetEmailVerified,
     useMailStatus, useSettings,
 } from '@/hooks'
 import { useUser as useCurrentUser } from '@/stores/auth'
@@ -23,6 +24,7 @@ export default function UsersPage() {
     const createUser = useCreateUser()
     const updateUser = useUpdateUser()
     const issueToken = useIssuePasswordToken()
+    const setEmailVerified = useSetEmailVerified()
     const { data: mail } = useMailStatus()
     const { data: settings } = useSettings()
     const isReadOnly = useReadOnly()
@@ -87,6 +89,7 @@ export default function UsersPage() {
         currentUser?.id,
         isReadOnly,
         canEmail ? handleEmailReset : undefined,
+        (user, verified) => setEmailVerified.mutate({ id: user.id, verified }),
     )
 
     return (

@@ -28,6 +28,13 @@ export const setOnUnauthorized = (handler: () => void) => {
     onUnauthorized = handler
 }
 
+// Called when the server holds a signed-in user back until they confirm their email.
+let onEmailUnverified: (() => void) | null = null
+
+export const setOnEmailUnverified = (handler: () => void) => {
+    onEmailUnverified = handler
+}
+
 const AUTH_EXEMPT_401 = [
     '/auth/login',
     '/auth/register',
@@ -75,6 +82,11 @@ const createApiClient = (baseURL: string): AxiosInstance => {
                 if (!isAuthExempt(url)) {
                     onUnauthorized?.()
                 }
+                return Promise.reject(error)
+            }
+
+            if (status === 403 && error.response?.data?.error === 'email_unverified') {
+                onEmailUnverified?.()
                 return Promise.reject(error)
             }
 

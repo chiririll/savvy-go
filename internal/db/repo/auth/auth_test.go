@@ -61,13 +61,13 @@ func TestUserRoundTripAndPasswordOptional(t *testing.T) {
 	}
 
 	// An empty hash on update keeps the password; a non-empty one replaces it.
-	if err := r.UpdateUser(ctx, id, "Ann B", "ann@test.com", "admin", "", time.Now()); err != nil {
+	if err := r.UpdateUser(ctx, id, "Ann B", "ann@test.com", "admin", "", false, time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	if u, _ := r.UserByID(ctx, id); u.Name != "Ann B" || u.Role != "admin" || *u.Password != "hash" {
 		t.Fatalf("after profile update: %+v", u)
 	}
-	if err := r.UpdateUser(ctx, id, "Ann B", "ann@test.com", "admin", "new", time.Now()); err != nil {
+	if err := r.UpdateUser(ctx, id, "Ann B", "ann@test.com", "admin", "new", false, time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	if u, _ := r.UserByID(ctx, id); *u.Password != "new" {
@@ -75,6 +75,45 @@ func TestUserRoundTripAndPasswordOptional(t *testing.T) {
 	}
 	if n, _ := r.CountAdmins(ctx, "admin"); n != 1 {
 		t.Fatalf("admins = %d", n)
+	}
+}
+
+func TestEmailVerifiedFlag(t *testing.T) {
+	r, id := newRepo(t)
+	ctx := context.Background()
+	if u, _ := r.UserByID(ctx, id); u.EmailVerified {
+		t.Fatal("a new user must start unverified")
+	}
+	if err := r.SetEmailVerified(ctx, id, true, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if u, _ := r.UserByEmail(ctx, "ann@test.com"); !u.EmailVerified {
+		t.Fatal("flag not stored")
+	}
+	if n, _ := r.CountVerifiedAdmins(ctx, "user"); n != 1 {
+		t.Fatalf("verified users of the role = %d", n)
+	}
+	if n, _ := r.CountVerifiedAdmins(ctx, "admin"); n != 0 {
+		t.Fatalf("verified admins = %d", n)
+	}
+
+	// The profile update writes the flag, so a changed address can drop it.
+	if err := r.UpdateUser(ctx, id, "Ann", "ann2@test.com", "user", "", false, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if u, _ := r.UserByID(ctx, id); u.EmailVerified || u.Email != "ann2@test.com" {
+		t.Fatalf("after email change: %+v", u)
+	}
+
+	// A tombstoned row has no real address left, so it cannot stay verified.
+	if err := r.SetEmailVerified(ctx, id, true, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Tombstone(ctx, id, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if u, _ := r.UserByID(ctx, id); u.EmailVerified {
+		t.Fatal("a deleted user must not stay verified")
 	}
 }
 

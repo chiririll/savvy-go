@@ -12,6 +12,7 @@ export const skip = new Set<string>([
     pages.setup2fa.path,
     pages.ssoCallback.path,
     pages.setPassword.path,
+    pages.verifyEmail.path,
     // The demo has no single sign-on providers to edit.
     pages.providerEdit.path,
 ])

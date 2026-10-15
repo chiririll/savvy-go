@@ -18,6 +18,7 @@ import (
 	"savvy-go/internal/bootstrap"
 	"savvy-go/internal/config"
 	"savvy-go/internal/currencydata"
+	"savvy-go/internal/emaillink"
 	"savvy-go/internal/jobs"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/mailer"
@@ -51,6 +52,7 @@ type Server struct {
 	transfers  *transfers.Service
 	refsync    refsync.Service
 	keys       *signing.Holder
+	links      emaillink.Signer // signs the links sent by email
 	uploads    uploads.Service
 	rates      ledger.RateSource // currency catalog and exchange rates, shared by every space
 	sso        sso.Service
@@ -101,6 +103,7 @@ func New(cfg config.Config, st store.Store, keys *signing.Holder, opts ...Option
 	}
 	keyRing := signing.KeyRing{Holder: keys, Trusted: transfers.TrustedKeys(srv)}
 	s.keys = keys
+	s.links = emaillink.Signer{Keys: keys}
 	s.transfers = &transfers.Service{Spaces: s.spaces, Keys: keyRing}
 	s.refsync = refsync.Service{Spaces: s.spaces}
 	s.backups = backup.Service{Store: st, Keys: keyRing, Dir: cfg.BackupsDir, DataDir: cfg.DataDir, Transfers: s.transfers}
@@ -149,6 +152,7 @@ func (s *Server) routes() *chi.Mux {
 		r.Post("/auth/register", s.authRegister)
 		r.Post("/onboarding/restore", s.onboardingRestore)
 		r.Post("/auth/login", s.authLogin)
+		r.Post("/auth/verify-email", s.verifyEmail)
 		r.Get("/auth/password/{token}", s.passwordPreview)
 		r.Post("/auth/password/{token}", s.passwordAccept)
 		r.Post("/auth/2fa/verify", s.twoFactorVerify)
@@ -167,11 +171,13 @@ func (s *Server) routes() *chi.Mux {
 		r.Group(func(r chi.Router) {
 			r.Use(s.requireSession)
 			r.Use(s.requireCSRF)
+			r.Use(s.requireVerifiedEmail)
 
 			// Credential management is limited to real sessions, never API tokens.
 			r.Group(func(r chi.Router) {
 				r.Use(s.sessionOnly)
 				r.Post("/auth/logout", s.authLogout)
+				r.Post("/auth/verify-email/resend", s.verifyEmailResend)
 				r.Post("/auth/logout-others", s.authLogoutOthers)
 				r.Put("/auth/password", s.authChangePassword)
 				r.Get("/auth/2fa/status", s.twoFactorStatus)

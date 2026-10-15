@@ -7,6 +7,7 @@ import { Loader2 } from 'lucide-react'
 import { SessionExpiredDialog } from './SessionExpiredDialog'
 import { ServerSetupGate } from './ServerSetupGate'
 import { SpaceGate } from './SpaceGate'
+import { EmailVerificationGate } from './EmailVerificationGate'
 
 const FOCUS_DEBOUNCE_MS = 1000
 
@@ -106,11 +107,13 @@ export function AuthProvider() {
 
     return (
         <>
-            <ServerSetupGate>
-                <SpaceGate>
-                    <Outlet />
-                </SpaceGate>
-            </ServerSetupGate>
+            <EmailVerificationGate>
+                <ServerSetupGate>
+                    <SpaceGate>
+                        <Outlet />
+                    </SpaceGate>
+                </ServerSetupGate>
+            </EmailVerificationGate>
             <SessionExpiredDialog />
         </>
     )

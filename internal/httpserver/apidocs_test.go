@@ -48,7 +48,7 @@ func specOperations(t *testing.T) map[string]bool {
 var undocumented = []string{
 	"/api/docs", "/api/openapi.yaml",
 	"/api/auth/status", "/api/auth/me", "/api/auth/register", "/api/auth/bootstrap", "/api/auth/login",
-	"/api/auth/password", "/api/auth/logout", "/api/auth/logout-others",
+	"/api/auth/password", "/api/auth/logout", "/api/auth/logout-others", "/api/auth/verify-email",
 	"/api/auth/2fa", "/api/auth/sso", "/api/auth/webauthn",
 	"/api/uploads", "/api/s3/multipart", "/api/transactions/import",
 	"/api/oauth", "/api/backups", "/api/identity-providers", "/api/spaces/import",

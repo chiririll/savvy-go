@@ -41,6 +41,7 @@ type User struct {
 	Password           *string
 	Role               string
 	IsSSOOnly          bool
+	EmailVerified      bool
 	TwoFactorSecret    *string
 	TwoFactorEnabled   bool
 	TwoFactorConfirmed bool
@@ -63,11 +64,12 @@ func (u User) IsGuest() bool { return u.Role == RoleGuest }
 
 func (u User) SessionJSON() map[string]any {
 	return map[string]any{
-		"id":        u.ID,
-		"name":      u.Name,
-		"email":     u.Email,
-		"role":      u.Role,
-		"isSsoOnly": u.IsSSOOnly,
+		"id":            u.ID,
+		"name":          u.Name,
+		"email":         u.Email,
+		"role":          u.Role,
+		"isSsoOnly":     u.IsSSOOnly,
+		"emailVerified": u.EmailVerified,
 	}
 }
 
@@ -77,13 +79,14 @@ func (u User) ResourceJSON() map[string]any {
 		created = u.CreatedAt.UTC().Format(time.RFC3339Nano)
 	}
 	return map[string]any{
-		"id":         u.ID,
-		"name":       u.Name,
-		"email":      u.Email,
-		"role":       u.Role,
-		"isInactive": u.IsInactive(),
-		"isSsoOnly":  u.IsSSOOnly,
-		"createdAt":  created,
+		"id":            u.ID,
+		"name":          u.Name,
+		"email":         u.Email,
+		"role":          u.Role,
+		"isInactive":    u.IsInactive(),
+		"isSsoOnly":     u.IsSSOOnly,
+		"emailVerified": u.EmailVerified,
+		"createdAt":     created,
 	}
 }
 
@@ -144,7 +147,8 @@ func (s Users) UpdatePassword(ctx context.Context, id int64, plain string) error
 	return s.repo().SetPassword(ctx, id, h, time.Now().UTC())
 }
 
-func (s Users) Update(ctx context.Context, id int64, name, email, role *string, password *string) (*User, error) {
+// A new address clears EmailVerified, unless verified says otherwise (an admin's word).
+func (s Users) Update(ctx context.Context, id int64, name, email, role *string, password *string, verified *bool) (*User, error) {
 	u, err := s.ByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -153,10 +157,17 @@ func (s Users) Update(ctx context.Context, id int64, name, email, role *string, 
 		u.Name = *name
 	}
 	if email != nil {
-		u.Email = strings.ToLower(*email)
+		// A new address has not been proven yet.
+		if e := strings.ToLower(*email); e != u.Email {
+			u.Email = e
+			u.EmailVerified = false
+		}
 	}
 	if role != nil {
 		u.Role = *role
+	}
+	if verified != nil {
+		u.EmailVerified = *verified
 	}
 	var hash string // empty keeps the current password
 	if password != nil && *password != "" {
@@ -166,10 +177,20 @@ func (s Users) Update(ctx context.Context, id int64, name, email, role *string, 
 		}
 		hash = h
 	}
-	if err := s.repo().UpdateUser(ctx, id, u.Name, u.Email, u.Role, hash, time.Now().UTC()); err != nil {
+	if err := s.repo().UpdateUser(ctx, id, u.Name, u.Email, u.Role, hash, u.EmailVerified, time.Now().UTC()); err != nil {
 		return nil, err
 	}
 	return s.ByID(ctx, id)
+}
+
+// SetEmailVerified records whether the user has proven they own their address.
+func (s Users) SetEmailVerified(ctx context.Context, id int64, verified bool) error {
+	return s.repo().SetEmailVerified(ctx, id, verified, time.Now().UTC())
+}
+
+// VerifiedAdminCount is the number of admins whose address is verified.
+func (s Users) VerifiedAdminCount(ctx context.Context) (int, error) {
+	return s.repo().CountVerifiedAdmins(ctx, RoleAdmin)
 }
 
 func (s Users) MarkSSOOnly(ctx context.Context, id int64) error {
@@ -205,7 +226,7 @@ func userFrom(r *repo.User, err error) (*User, error) {
 func toUser(r *repo.User) *User {
 	return &User{
 		ID: r.ID, Name: r.Name, Email: r.Email, Password: r.Password, Role: r.Role,
-		IsSSOOnly: r.SSOOnly, TwoFactorSecret: r.TwoFactorSecret,
+		IsSSOOnly: r.SSOOnly, EmailVerified: r.EmailVerified, TwoFactorSecret: r.TwoFactorSecret,
 		TwoFactorEnabled: r.TwoFactorEnabled, TwoFactorConfirmed: r.TwoFactorConfirmed,
 		Deleted: r.Deleted, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
 	}

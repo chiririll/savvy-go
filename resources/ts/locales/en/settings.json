@@ -25,7 +25,13 @@
             "jitDescription": "When off, only existing or linked users can sign in.",
             "verifiedEmail": "Require a verified email",
             "verifiedEmailOn": "New SSO sign-ups must arrive with an email the provider has verified.",
-            "verifiedEmailOff": "Turn on just-in-time provisioning to enforce this."
+            "verifiedEmailOff": "Turn on just-in-time provisioning to enforce this.",
+            "requireVerification": "Require email confirmation",
+            "requireVerificationOn": "Users with an unconfirmed address can sign in but cannot use the app until they open the link we email them. Accounts created from a link copied out of the app start unconfirmed.",
+            "requireVerificationNeedsMail": "Set up mail and the public URL first: confirmation links are sent by email.",
+            "requireVerificationNeedsYou": "Confirm your own email address first, or you would lock yourself out.",
+            "sendConfirmation": "Email me a confirmation link",
+            "confirmationSent": "Confirmation email sent"
         },
         "server": {
             "title": "Server",

@@ -40,6 +40,9 @@ func (s *Server) settingsUpdate(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+	if v, ok := body[settingRequireVerification]; ok && asBool(v) && !s.checkCanRequireVerification(w, r) {
+		return
+	}
 	if v, ok := body["app_url"]; ok {
 		clean, err := cleanAppURL(v)
 		if err != nil {

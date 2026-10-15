@@ -1,0 +1,372 @@
+package httpserver
+
+import (
+	"context"
+	"net/url"
+	"regexp"
+	"strings"
+	"testing"
+
+	"savvy-go/internal/auth"
+	"savvy-go/internal/mailer"
+	"savvy-go/internal/sso"
+)
+
+var linkRe = regexp.MustCompile(`https?://\S+`)
+
+// linkIn is the one link of an email.
+func linkIn(t *testing.T, m mailer.Message) *url.URL {
+	t.Helper()
+	raw := linkRe.FindString(m.Text)
+	u, err := url.Parse(raw)
+	if raw == "" || err != nil {
+		t.Fatalf("no link in %q", m.Text)
+	}
+	return u
+}
+
+func (a *testApp) setting(key string) any {
+	a.t.Helper()
+	return a.s.settings.Get(context.Background(), key, nil)
+}
+
+func (a *testApp) verified(id int64) bool {
+	a.t.Helper()
+	u, err := a.s.users.ByID(context.Background(), id)
+	if err != nil || u == nil {
+		a.t.Fatalf("user %d: %v", id, err)
+	}
+	return u.EmailVerified
+}
+
+func TestRequiringVerificationNeedsAVerifiedAdminAndMail(t *testing.T) {
+	a, sess, admin := newMailApp(t, &recorder{on: true})
+	on := map[string]any{"require_email_verification": true}
+
+	// The admin has not proven their address: switching it on would lock them out.
+	res := a.do("PATCH", "/api/settings", on, sess.Token, sess.CSRF)
+	body := decodeJSON(t, res)
+	if res.StatusCode != 422 || body["error"] != "email_unverified" {
+		t.Fatalf("unverified admin: %d %v", res.StatusCode, body)
+	}
+	if a.setting("require_email_verification") != false {
+		t.Fatal("the setting changed anyway")
+	}
+
+	if err := a.s.users.SetEmailVerified(context.Background(), admin.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	res = a.do("PATCH", "/api/settings", on, sess.Token, sess.CSRF)
+	body = decodeJSON(t, res)
+	if res.StatusCode != 200 || body["require_email_verification"] != true {
+		t.Fatalf("verified admin: %d %v", res.StatusCode, body)
+	}
+
+	// Switching it off is always allowed.
+	res = a.do("PATCH", "/api/settings", map[string]any{"require_email_verification": false}, sess.Token, sess.CSRF)
+	if res.StatusCode != 200 || a.setting("require_email_verification") != false {
+		t.Fatalf("switch off: %d", res.StatusCode)
+	}
+}
+
+func TestRequiringVerificationNeedsMail(t *testing.T) {
+	a, sess, admin := newMailApp(t, &recorder{on: false})
+	if err := a.s.users.SetEmailVerified(context.Background(), admin.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	res := a.do("PATCH", "/api/settings", map[string]any{"require_email_verification": true}, sess.Token, sess.CSRF)
+	body := decodeJSON(t, res)
+	if res.StatusCode != 422 || body["error"] != "mail_required" {
+		t.Fatalf("without mail: %d %v", res.StatusCode, body)
+	}
+	if a.setting("require_email_verification") != false {
+		t.Fatal("the setting changed anyway")
+	}
+}
+
+func TestUnverifiedUserIsHeldBackOnlyWhileVerificationIsRequired(t *testing.T) {
+	a, sess, admin := newMailApp(t, &recorder{on: true})
+	if err := a.s.users.SetEmailVerified(context.Background(), admin.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	user := a.createUser("u@test.com", "secret1", roleEditor)
+	us := a.issue(user, false)
+
+	// Not required: nothing changes.
+	if res := a.do("GET", "/api/spaces", nil, us.Token, us.CSRF); res.StatusCode != 200 {
+		t.Fatalf("not required: %d", res.StatusCode)
+	}
+
+	if err := a.s.settings.Set(context.Background(), "require_email_verification", true); err != nil {
+		t.Fatal(err)
+	}
+	res := a.do("GET", "/api/spaces", nil, us.Token, us.CSRF)
+	body := decodeJSON(t, res)
+	if res.StatusCode != 403 || body["error"] != "email_unverified" {
+		t.Fatalf("required: %d %v", res.StatusCode, body)
+	}
+	if res := a.do("GET", "/api/spaces", nil, sess.Token, sess.CSRF); res.StatusCode != 200 {
+		t.Fatalf("verified admin: %d", res.StatusCode)
+	}
+
+	// Signing in still works, and the session says what is missing.
+	res = a.do("POST", "/api/auth/login", map[string]any{"email": "u@test.com", "password": "secret1"}, "", "")
+	if res.StatusCode != 200 {
+		t.Fatalf("login: %d", res.StatusCode)
+	}
+	me := decodeJSON(t, a.do("GET", "/api/auth/me", nil, us.Token, us.CSRF))
+	u := me["user"].(map[string]any)
+	if u["emailVerified"] != false || me["email_verification_required"] != true {
+		t.Fatalf("me = %v", me)
+	}
+
+	// Leaving stays possible.
+	if res := a.do("POST", "/api/auth/logout", nil, us.Token, us.CSRF); res.StatusCode != 200 {
+		t.Fatalf("logout: %d", res.StatusCode)
+	}
+}
+
+func TestUnverifiedUserIsHeldBackOnAPITokensToo(t *testing.T) {
+	a, _, admin := newMailApp(t, &recorder{on: true})
+	if err := a.s.users.SetEmailVerified(context.Background(), admin.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	user := a.createUser("u@test.com", "secret1", roleEditor)
+	us := a.issue(user, false)
+	res := a.do("POST", "/api/auth/api-tokens", map[string]any{"name": "t", "permissions": allPerms(auth.PermRead), "all_spaces": true}, us.Token, us.CSRF)
+	raw, _ := decodeJSON(t, res)["data"].(map[string]any)["token"].(string)
+	if res.StatusCode != 201 || raw == "" {
+		t.Fatalf("mint a token: %d", res.StatusCode)
+	}
+	bearer := func() int {
+		req := a.request("GET", "/api/spaces", nil, "", "")
+		req.Header.Set("Authorization", "Bearer "+raw)
+		res, err := a.client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return res.StatusCode
+	}
+	if got := bearer(); got != 200 {
+		t.Fatalf("token while not required: %d", got)
+	}
+	if err := a.s.settings.Set(context.Background(), "require_email_verification", true); err != nil {
+		t.Fatal(err)
+	}
+	if got := bearer(); got != 403 {
+		t.Fatalf("token of an unverified user: %d", got)
+	}
+}
+
+func TestVerifyEmailByLink(t *testing.T) {
+	rec := &recorder{on: true}
+	a, _, _ := newMailApp(t, rec)
+	user := a.createUser("u@test.com", "secret1", roleEditor)
+	us := a.issue(user, false)
+
+	res := a.do("POST", "/api/auth/verify-email/resend", nil, us.Token, us.CSRF)
+	if res.StatusCode != 200 {
+		t.Fatalf("resend: %d %v", res.StatusCode, decodeJSON(t, res))
+	}
+	msgs := rec.messages()
+	if len(msgs) != 1 || msgs[0].To != "u@test.com" {
+		t.Fatalf("messages = %+v", msgs)
+	}
+	link := linkIn(t, msgs[0])
+	token := strings.TrimPrefix(link.Path, "/verify-email/")
+	if token == link.Path || token == "" {
+		t.Fatalf("link %s", link)
+	}
+
+	// The link is opened without a session, maybe on another device.
+	if res := a.do("POST", "/api/auth/verify-email", map[string]any{"token": token + "x"}, "", ""); res.StatusCode != 422 {
+		t.Fatalf("tampered token: %d", res.StatusCode)
+	}
+	if a.verified(user.ID) {
+		t.Fatal("verified by a bad token")
+	}
+	if res := a.do("POST", "/api/auth/verify-email", map[string]any{"token": token}, "", ""); res.StatusCode != 200 {
+		t.Fatalf("verify: %d", res.StatusCode)
+	}
+	if !a.verified(user.ID) {
+		t.Fatal("not verified")
+	}
+	// Nothing left to send.
+	if res := a.do("POST", "/api/auth/verify-email/resend", nil, us.Token, us.CSRF); res.StatusCode != 422 {
+		t.Fatalf("resend when verified: %d", res.StatusCode)
+	}
+}
+
+func TestVerificationLinkDiesWithTheAddress(t *testing.T) {
+	rec := &recorder{on: true}
+	a, admin, _ := newMailApp(t, rec)
+	user := a.createUser("u@test.com", "secret1", roleEditor)
+	us := a.issue(user, false)
+	a.do("POST", "/api/auth/verify-email/resend", nil, us.Token, us.CSRF)
+	token := strings.TrimPrefix(linkIn(t, rec.messages()[0]).Path, "/verify-email/")
+
+	if res := a.do("PATCH", "/api/users/"+itoa(user.ID), map[string]any{"email": "new@test.com"}, admin.Token, admin.CSRF); res.StatusCode != 200 {
+		t.Fatalf("change address: %d", res.StatusCode)
+	}
+	if res := a.do("POST", "/api/auth/verify-email", map[string]any{"token": token}, "", ""); res.StatusCode != 422 {
+		t.Fatalf("link for the old address: %d", res.StatusCode)
+	}
+	if a.verified(user.ID) {
+		t.Fatal("verified through an old link")
+	}
+}
+
+func TestResendNeedsMail(t *testing.T) {
+	a, _, _ := newMailApp(t, &recorder{on: false})
+	user := a.createUser("u@test.com", "secret1", roleEditor)
+	us := a.issue(user, false)
+	if res := a.do("POST", "/api/auth/verify-email/resend", nil, us.Token, us.CSRF); res.StatusCode != 422 {
+		t.Fatalf("without mail: %d", res.StatusCode)
+	}
+}
+
+func TestAdminSetsVerifiedByHandAndAddressChangeClearsIt(t *testing.T) {
+	a, sess, _ := newMailApp(t, &recorder{on: true})
+	create := a.do("POST", "/api/users", map[string]any{"name": "N", "email": "n@test.com", "password": "secret12", "role": "user", "emailVerified": true}, sess.Token, sess.CSRF)
+	data := decodeJSON(t, create)["data"].(map[string]any)
+	id := int64(data["id"].(float64))
+	if create.StatusCode != 201 || data["emailVerified"] != true {
+		t.Fatalf("create: %d %v", create.StatusCode, data)
+	}
+
+	res := a.do("PATCH", "/api/users/"+itoa(id), map[string]any{"emailVerified": false}, sess.Token, sess.CSRF)
+	if got := decodeJSON(t, res)["data"].(map[string]any); got["emailVerified"] != false {
+		t.Fatalf("unmark: %v", got)
+	}
+	res = a.do("PATCH", "/api/users/"+itoa(id), map[string]any{"emailVerified": true}, sess.Token, sess.CSRF)
+	if got := decodeJSON(t, res)["data"].(map[string]any); got["emailVerified"] != true {
+		t.Fatalf("mark: %v", got)
+	}
+
+	// Renaming keeps it; a new address does not.
+	a.do("PATCH", "/api/users/"+itoa(id), map[string]any{"name": "Other"}, sess.Token, sess.CSRF)
+	if !a.verified(id) {
+		t.Fatal("a rename cleared the flag")
+	}
+	a.do("PATCH", "/api/users/"+itoa(id), map[string]any{"email": "changed@test.com"}, sess.Token, sess.CSRF)
+	if a.verified(id) {
+		t.Fatal("a new address stayed verified")
+	}
+	// Changing the address and marking it verified in one request is the admin's word.
+	a.do("PATCH", "/api/users/"+itoa(id), map[string]any{"email": "again@test.com", "emailVerified": true}, sess.Token, sess.CSRF)
+	if !a.verified(id) {
+		t.Fatal("the admin's explicit mark was lost")
+	}
+}
+
+func TestEmailedInvitationVerifiesTheAddressAndACopiedLinkDoesNot(t *testing.T) {
+	rec := &recorder{on: true}
+	a, sess, admin := newMailApp(t, rec)
+	// Verification is required, so an unproven address gets a confirmation email.
+	if err := a.s.users.SetEmailVerified(context.Background(), admin.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.s.settings.Set(context.Background(), "require_email_verification", true); err != nil {
+		t.Fatal(err)
+	}
+	invite := func(email string) string {
+		res := a.do("POST", "/api/spaces/"+itoa(a.space.ID)+"/invitations", map[string]any{"email": email, "role": "editor"}, sess.Token, sess.CSRF)
+		data := decodeJSON(t, res)["data"].(map[string]any)
+		if res.StatusCode != 201 || data["emailSent"] != true {
+			t.Fatalf("invite %s: %d %v", email, res.StatusCode, data)
+		}
+		return data["token"].(string)
+	}
+	register := func(token, email, sig string) int64 {
+		body := map[string]any{"name": "New", "email": email, "password": "secret12", "sig": sig}
+		res := a.do("POST", "/api/invitations/"+token+"/register", body, "", "")
+		if res.StatusCode != 201 {
+			t.Fatalf("register %s: %d %v", email, res.StatusCode, decodeJSON(t, res))
+		}
+		u, _ := a.s.users.ByEmail(context.Background(), email)
+		return u.ID
+	}
+
+	// The link in the email carries a signature for that address.
+	token := invite("signed@example.org")
+	link := linkIn(t, rec.messages()[0])
+	if link.Path != "/invite/"+token || link.Query().Get("email") != "signed@example.org" || link.Query().Get("sig") == "" {
+		t.Fatalf("emailed link %s", link)
+	}
+	id := register(token, "signed@example.org", link.Query().Get("sig"))
+	if !a.verified(id) {
+		t.Fatal("registering from the emailed link left the address unverified")
+	}
+	if n := len(rec.messages()); n != 1 {
+		t.Fatalf("a verified address was sent a verification email (%d messages)", n)
+	}
+
+	// The link the app returns for copying has no signature: same invitation, no proof.
+	token = invite("copied@example.org")
+	id = register(token, "copied@example.org", "")
+	if a.verified(id) {
+		t.Fatal("registering from a copied link verified the address")
+	}
+	// The new account is asked to confirm by email instead.
+	msgs := rec.messages()
+	last := msgs[len(msgs)-1]
+	if last.To != "copied@example.org" || !strings.HasPrefix(linkIn(t, last).Path, "/verify-email/") {
+		t.Fatalf("expected a verification email, got %+v", last)
+	}
+
+	// A signature for another address or invitation is the same as none.
+	token = invite("forged@example.org")
+	other := linkIn(t, rec.messages()[0]).Query().Get("sig")
+	id = register(token, "forged@example.org", other)
+	if a.verified(id) {
+		t.Fatal("a signature made for someone else verified the address")
+	}
+}
+
+func TestFirstAdminStartsUnverified(t *testing.T) {
+	a := newTestApp(t)
+	if res := a.register(a.bootstrap.Password(), nil); res.StatusCode != 201 {
+		t.Fatalf("register: %d", res.StatusCode)
+	}
+	u, _ := a.s.users.ByEmail(context.Background(), "a@a.com")
+	if u == nil || u.EmailVerified {
+		t.Fatalf("the first admin must verify like everyone else: %+v", u)
+	}
+}
+
+func TestSSOAddressIsVerifiedOnlyWhenTheProviderVouchesForIt(t *testing.T) {
+	a := newTestApp(t)
+	a.createUser("root@test.com", "secret1", auth.RoleAdmin)
+	existing := a.createUser("jane@test.com", "secret1", roleEditor)
+	p, err := a.s.sso.Create(context.Background(), sso.IdPWrite{
+		Name: "IdP", Slug: "idp", Preset: "custom_oidc", Enabled: boolPtr(true),
+		Fields: map[string]any{
+			"discovery_url": "https://idp.test/.well-known/openid-configuration",
+			"client_id":     "c", "client_secret": "s",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	provision := func(subject, email string, verified bool) *auth.User {
+		t.Helper()
+		u, _, err := a.s.sso.Provision(context.Background(), *p, sso.NormalizedIdentity{
+			Subject: subject, Email: email, EmailVerified: verified, Name: "N",
+		})
+		if err != nil {
+			t.Fatalf("provision %s: %v", email, err)
+		}
+		return u
+	}
+
+	if u := provision("s1", "vouched@test.com", true); !u.EmailVerified || !a.verified(u.ID) {
+		t.Fatal("an address the provider vouches for must be verified")
+	}
+	if u := provision("s2", "unvouched@test.com", false); u.EmailVerified || a.verified(u.ID) {
+		t.Fatal("an address the provider does not vouch for must stay unverified")
+	}
+	// Linking an existing account by a vouched address proves the address too.
+	if u := provision("s3", "jane@test.com", true); u.ID != existing.ID || !a.verified(existing.ID) {
+		t.Fatalf("link by email: %+v", u)
+	}
+}

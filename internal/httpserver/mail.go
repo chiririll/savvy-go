@@ -195,6 +195,17 @@ func resetMessage(u *auth.User, link string, expires time.Time) mailer.Message {
 	}
 }
 
+// verifyMessage is the email with the link that confirms an address.
+func verifyMessage(u *auth.User, link string, expires time.Time) mailer.Message {
+	return mailer.Message{
+		To:      u.Email,
+		Subject: "Confirm your Go Savvy email address",
+		Text: fmt.Sprintf("Hello %s,\n\nOpen this link to confirm that this is your email address:\n\n%s\n\n"+
+			"The link expires on %s. If you did not expect this email, you can ignore it.\n",
+			oneLine(u.Name), link, expires.UTC().Format("2006-01-02 15:04 UTC")),
+	}
+}
+
 // inviteMessage is the email with the link to join a space.
 func inviteMessage(to, inviter, space, role, link string) mailer.Message {
 	return mailer.Message{

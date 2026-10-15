@@ -52,6 +52,7 @@ type User struct {
 	Password           *string
 	Role               string
 	SSOOnly            bool
+	EmailVerified      bool
 	TwoFactorSecret    *string
 	TwoFactorEnabled   bool
 	TwoFactorConfirmed bool
@@ -64,7 +65,7 @@ func userFrom(r sqlc.User) User {
 	return User{
 		ID: r.ID, Name: r.Name, Email: r.Email, Role: r.Role,
 		Password: optString(r.Password), TwoFactorSecret: optString(r.TwoFactorSecret),
-		SSOOnly: r.IsSsoOnly != 0, TwoFactorEnabled: r.TwoFactorEnabled != 0,
+		SSOOnly: r.IsSsoOnly != 0, EmailVerified: r.EmailVerified != 0, TwoFactorEnabled: r.TwoFactorEnabled != 0,
 		TwoFactorConfirmed: r.TwoFactorConfirmed != 0, Deleted: r.DeletedAt.Valid,
 		CreatedAt: optTime(r.CreatedAt), UpdatedAt: optTime(r.UpdatedAt),
 	}
@@ -128,15 +129,28 @@ func (r Repo) SetPassword(ctx context.Context, id int64, hash string, now time.T
 }
 
 // UpdateUser saves the profile; a non-empty hash replaces the password too.
-func (r Repo) UpdateUser(ctx context.Context, id int64, name, email, role, hash string, now time.Time) error {
+func (r Repo) UpdateUser(ctx context.Context, id int64, name, email, role, hash string, verified bool, now time.Time) error {
 	if hash != "" {
 		return r.q().UpdateUserWithPassword(ctx, sqlc.UpdateUserWithPasswordParams{
-			Name: name, Email: email, Role: role, Password: db.NS(hash), UpdatedAt: db.TimeNS(now), ID: id,
+			Name: name, Email: email, Role: role, EmailVerified: db.BoolInt(verified),
+			Password: db.NS(hash), UpdatedAt: db.TimeNS(now), ID: id,
 		})
 	}
 	return r.q().UpdateUserProfile(ctx, sqlc.UpdateUserProfileParams{
-		Name: name, Email: email, Role: role, UpdatedAt: db.TimeNS(now), ID: id,
+		Name: name, Email: email, Role: role, EmailVerified: db.BoolInt(verified), UpdatedAt: db.TimeNS(now), ID: id,
 	})
+}
+
+func (r Repo) SetEmailVerified(ctx context.Context, id int64, verified bool, now time.Time) error {
+	return r.q().SetUserEmailVerified(ctx, sqlc.SetUserEmailVerifiedParams{
+		EmailVerified: db.BoolInt(verified), UpdatedAt: db.TimeNS(now), ID: id,
+	})
+}
+
+// CountVerifiedAdmins counts the live users of adminRole whose email is verified.
+func (r Repo) CountVerifiedAdmins(ctx context.Context, adminRole string) (int, error) {
+	n, err := r.q().CountVerifiedAdmins(ctx, adminRole)
+	return int(n), err
 }
 
 func (r Repo) MarkSSOOnly(ctx context.Context, id int64, now time.Time) error {

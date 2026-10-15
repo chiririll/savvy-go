@@ -1,5 +1,5 @@
 import { ColumnDef } from '@tanstack/react-table'
-import { KeyRound, Mail } from 'lucide-react'
+import { KeyRound, Mail, MailCheck, MailX } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { RowActions, UserAvatar } from '@/components/shared'
@@ -15,6 +15,8 @@ export const createUserColumns = (
     isReadOnly?: boolean,
     /** Given when the server can send mail: adds "email a reset link". */
     onEmailReset?: (user: User) => void,
+    /** An admin vouching for (true) or withdrawing (false) a user's address. */
+    onSetEmailVerified?: (user: User, verified: boolean) => void,
 ): ColumnDef<User>[] => [
     {
         accessorKey: 'name',
@@ -27,6 +29,9 @@ export const createUserColumns = (
                         <p className="font-medium">{row.original.name}</p>
                         {row.original.isInactive && (
                             <Badge variant="secondary">{i18n.t('status.inactive')}</Badge>
+                        )}
+                        {!row.original.emailVerified && (
+                            <Badge variant="outline">{i18n.t('pages:users.emailUnverified')}</Badge>
                         )}
                     </div>
                     <p className="text-xs text-muted-foreground">{row.original.email}</p>
@@ -69,6 +74,12 @@ export const createUserColumns = (
                         <DropdownMenuItem onClick={() => onEmailReset(row.original)}>
                             <Mail className="mr-2 size-4" />
                             {i18n.t('pages:users.sendResetEmail')}
+                        </DropdownMenuItem>
+                    )}
+                    {!isReadOnly && onSetEmailVerified && (
+                        <DropdownMenuItem onClick={() => onSetEmailVerified(row.original, !row.original.emailVerified)}>
+                            {row.original.emailVerified ? <MailX className="mr-2 size-4" /> : <MailCheck className="mr-2 size-4" />}
+                            {row.original.emailVerified ? i18n.t('pages:users.markUnverified') : i18n.t('pages:users.markVerified')}
                         </DropdownMenuItem>
                     )}
                     {canReset && (

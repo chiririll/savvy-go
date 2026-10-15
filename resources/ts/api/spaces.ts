@@ -134,7 +134,8 @@ export const syncGroupsApi = {
 export const invitationsApi = {
     preview: (token: string) => api.get<InvitationPreview>(`/invitations/${token}`),
     accept: (token: string) => api.post<Space>(`/invitations/${token}/accept`),
-    register: (token: string, data: { name: string; email: string; password: string }) =>
+    /** `sig` comes from the emailed link and proves the mailbox; a copied link has none. */
+    register: (token: string, data: { name: string; email: string; password: string; sig?: string }) =>
         api.post<unknown, typeof data>(`/invitations/${token}/register`, data),
 }
 

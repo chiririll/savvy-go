@@ -14,10 +14,14 @@ const mocks = vi.hoisted(() => ({
     startAuthentication: vi.fn(),
     sessionStorage: { setItem: vi.fn() },
     unauthorized: { handler: null as null | (() => void) },
+    unverified: { handler: null as null | (() => void) },
 }))
 
 vi.mock('@/api', () => ({ authApi: mocks.authApi, webauthnApi: mocks.webauthnApi }))
-vi.mock('@/api/client', () => ({ setOnUnauthorized: (fn: () => void) => { mocks.unauthorized.handler = fn } }))
+vi.mock('@/api/client', () => ({
+    setOnUnauthorized: (fn: () => void) => { mocks.unauthorized.handler = fn },
+    setOnEmailUnverified: (fn: () => void) => { mocks.unverified.handler = fn },
+}))
 vi.mock('@simplewebauthn/browser', () => ({ startAuthentication: mocks.startAuthentication }))
 vi.stubGlobal('sessionStorage', mocks.sessionStorage)
 
@@ -236,5 +240,22 @@ describe('401 handler', () => {
     it('ignores a 401 for a visitor', () => {
         mocks.unauthorized.handler!()
         expect(state().sessionExpired).toBe(false)
+    })
+})
+
+describe('email verification', () => {
+    it('takes the requirement from the session and drops it on sign-out', () => {
+        state().applySession({ ...session, user: { ...user, emailVerified: false }, email_verification_required: true })
+        expect(state().emailVerificationRequired).toBe(true)
+        state().clear()
+        expect(state().emailVerificationRequired).toBe(false)
+    })
+
+    it('closes the app when the server refuses an unconfirmed user', () => {
+        state().applySession({ ...session, user: { ...user, emailVerified: true } })
+        expect(state().emailVerificationRequired).toBe(false)
+        mocks.unverified.handler?.()
+        expect(state().emailVerificationRequired).toBe(true)
+        expect(state().user?.emailVerified).toBe(false)
     })
 })

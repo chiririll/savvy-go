@@ -13,6 +13,7 @@ const ServerSetupPage = lazy(() => import('@/pages/onboarding/server'))
 const Setup2FAPage = lazy(() => import('@/pages/auth/setup-2fa'))
 const SsoCallbackPage = lazy(() => import('@/pages/auth/sso-callback'))
 const SetPasswordPage = lazy(() => import('@/pages/auth/set-password'))
+const VerifyEmailPage = lazy(() => import('@/pages/auth/verify-email'))
 const InvitePage = lazy(() => import('@/pages/invite'))
 const OAuthConsentPage = lazy(() => import('@/pages/oauth/consent'))
 
@@ -110,6 +111,10 @@ export const router = createBrowserRouter([
     {
         path: pages.setPassword.path,
         element: withSuspense(SetPasswordPage),
+    },
+    {
+        path: pages.verifyEmail.path,
+        element: withSuspense(VerifyEmailPage),
     },
     {
         path: pages.invite.path,

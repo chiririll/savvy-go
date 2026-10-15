@@ -458,6 +458,7 @@ type User struct {
 	Password           sql.NullString
 	Role               string
 	IsSsoOnly          int64
+	EmailVerified      int64
 	TwoFactorSecret    sql.NullString
 	TwoFactorEnabled   int64
 	TwoFactorConfirmed int64

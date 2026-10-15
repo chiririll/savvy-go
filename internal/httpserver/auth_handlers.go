@@ -195,7 +195,7 @@ func (s *Server) authMe(w http.ResponseWriter, r *http.Request) {
 	if refreshed != nil {
 		auth.SetSessionCookies(w, r, s.cfg, refreshed.Token, refreshed.CSRF, true)
 	}
-	s.writeSessionPayload(w, http.StatusOK, sess.User, sess)
+	s.writeSessionPayload(w, r, http.StatusOK, sess.User, sess)
 }
 
 func (s *Server) authChangePassword(w http.ResponseWriter, r *http.Request) {
@@ -309,10 +309,10 @@ func (s *Server) issueSession(w http.ResponseWriter, r *http.Request, u *auth.Us
 		return
 	}
 	auth.SetSessionCookies(w, r, s.cfg, issued.Token, issued.CSRF, remember)
-	s.writeSessionPayload(w, status, u, issued.Session)
+	s.writeSessionPayload(w, r, status, u, issued.Session)
 }
 
-func (s *Server) writeSessionPayload(w http.ResponseWriter, status int, u *auth.User, sess *auth.Session) {
+func (s *Server) writeSessionPayload(w http.ResponseWriter, r *http.Request, status int, u *auth.User, sess *auth.Session) {
 	var refresh *string // null when the session does not rotate
 	if at := sess.RefreshDueAt(); at != nil {
 		iso := at.UTC().Format(time.RFC3339)
@@ -322,6 +322,8 @@ func (s *Server) writeSessionPayload(w http.ResponseWriter, status int, u *auth.
 		"user":       u.SessionJSON(),
 		"expires_at": sess.AbsoluteExpiresAt.UTC().Format(time.RFC3339),
 		"refresh_at": refresh,
+		// The SPA shows the "confirm your email" page instead of the app.
+		"email_verification_required": s.emailVerificationRequired(r.Context()),
 	}
 	writeJSON(w, status, payload)
 }
