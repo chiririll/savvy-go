@@ -45,6 +45,8 @@ Open http://localhost:8080 and create your account. For Docker Compose, reverse 
 - **Backups** — signed backups of each space and of the whole server, restore or import as a new space
 - **Sign-in** — passwords, two-factor (TOTP), passkeys and single sign-on (OIDC)
 - **API** — tokens for scripts and other apps, with an OpenAPI reference
+- **AI assistants (MCP)** — connect Claude or another MCP client to ask about your spending, read-only, with access limited to the spaces you choose
+- **Localization** — support of several languages
 
 <p align="center">
   <img src="docs/images/report.jpg" alt="Go Savvy Reports" width="1920">
