@@ -10,7 +10,7 @@ let settings: { data?: Record<string, unknown>; isPending: boolean }
 const useSettings = vi.fn()
 
 vi.mock('@/stores/auth', () => ({ useUser: () => user }))
-vi.mock('@/hooks/use-settings', () => ({ useSettings: (enabled: boolean) => useSettings(enabled) }))
+vi.mock('@/hooks/use-settings', () => ({ useInstanceSettings: (enabled: boolean) => useSettings(enabled) }))
 
 function renderGate() {
     return render(

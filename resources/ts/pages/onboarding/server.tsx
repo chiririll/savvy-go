@@ -9,7 +9,7 @@ import { ServerMailStep } from '@/components/features/onboarding/ServerMailStep'
 import { ServerOptions } from '@/components/features/onboarding/ServerOptions'
 import { ServerSsoStep } from '@/components/features/onboarding/ServerSsoStep'
 import { serverSetupPaths } from '@/components/features/onboarding/server-setup-paths'
-import { useSettings, useUpdateSettings } from '@/hooks'
+import { useInstanceSettings, useUpdateSettings } from '@/hooks'
 import { useAuthLoading, useAuthStore, useUser } from '@/stores/auth'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { pages } from '@/app/pages'
@@ -36,7 +36,7 @@ export default function ServerSetupPage() {
     const user = useUser()
     const authLoading = useAuthLoading()
     const checkAuth = useAuthStore((state) => state.checkAuth)
-    const { data: settings } = useSettings(Boolean(user))
+    const { data: settings } = useInstanceSettings(Boolean(user))
     const update = useUpdateSettings()
     // Saving the flag makes onboarding_server_done true, which would send us home before navigate runs.
     const leaving = useRef(false)

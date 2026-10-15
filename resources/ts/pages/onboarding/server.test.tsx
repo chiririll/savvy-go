@@ -19,7 +19,7 @@ vi.mock('react-i18next', async (importActual) => ({
     useTranslation: () => ({ t: (key: string) => key }),
 }))
 vi.mock('@/hooks', () => ({
-    useSettings: () => ({ data: settings, isLoading: settings === undefined }),
+    useInstanceSettings: () => ({ data: settings, isLoading: settings === undefined }),
     useUpdateSettings: () => ({ mutateAsync: (data: object) => update(data), isPending: false }),
     useMailStatus: () => ({ data: mail }),
     useIdentityProviders: () => ({ data: providers }),

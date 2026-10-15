@@ -15,6 +15,15 @@ export function useSettings(enabled = true) {
     })
 }
 
+/** Instance settings alone, for what runs before the current space is validated. */
+export function useInstanceSettings(enabled = true) {
+    return useQuery({
+        queryKey: [...QUERY_KEY, 'instance'],
+        queryFn: settingsApi.getInstance,
+        enabled,
+    })
+}
+
 export function useUpdateSettings() {
     return useResourceMutation({
         mutationFn: (data: Partial<Settings>) => settingsApi.update(data),

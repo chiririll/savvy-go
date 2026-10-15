@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
-import { useSettings } from '@/hooks/use-settings'
+import { useInstanceSettings } from '@/hooks/use-settings'
 import { useUser } from '@/stores/auth'
 import { pages } from '@/app/pages'
 
@@ -12,7 +12,7 @@ import { pages } from '@/app/pages'
  */
 export function ServerSetupGate({ children }: { children: ReactNode }) {
     const isAdmin = useUser()?.role === 'admin'
-    const { data: settings, isPending } = useSettings(isAdmin)
+    const { data: settings, isPending } = useInstanceSettings(isAdmin)
 
     if (isAdmin && isPending) {
         return (
