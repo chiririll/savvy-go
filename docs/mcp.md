@@ -59,3 +59,19 @@ Amounts keep their own currency: the assistant is told never to add amounts of d
 ## How it works
 
 The sign-in uses OAuth 2.1 with PKCE and dynamic client registration, which is what Claude expects. The discovery documents are `/.well-known/oauth-protected-resource` and `/.well-known/oauth-authorization-server`. Behind a reverse proxy, forward `/mcp`, `/oauth/*` and `/.well-known/*` to Go Savvy like everything else.
+
+## Testing the sign-in on your own machine
+
+To check that OAuth works on a server, including one on `localhost`, run the small test app from the source tree:
+
+```bash
+go run ./cmd/oauth-probe -server http://localhost:8080
+```
+
+1. In **Administration → Security**, allow a new app (the window is 5 minutes).
+2. Run the command. It registers itself, prints an address and opens it in your browser. Sign in and press **Allow access**.
+3. It catches the redirect on a free `127.0.0.1` port and prints `PASS` or `FAIL` for each step: discovery, registration, code exchange, a spent code being refused, a call to `/mcp`, and a token refresh.
+
+`go tool mage probe:oauth` does the same; set `OAUTH_SERVER` to change the address.
+
+Pass the address exactly as the server's `app_url` spells it: `localhost` and `127.0.0.1` are different issuers, and the test app stops if they differ. The app it registers shows up under **Registered apps**; disconnect it when you are done. Use `-no-browser` to only print the address, `-port` to fix the redirect port.

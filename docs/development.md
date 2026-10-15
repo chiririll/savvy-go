@@ -47,6 +47,7 @@ go tool mage build:release   # frontend + dist/savvy-go with the frontend embedd
 go tool mage build:dev       # dist/savvy-go that serves public/ from disk
 go tool mage build:embed     # release without rebuilding the frontend
 go tool mage test:all        # Go (with and without the embed tag) and frontend tests
+go tool mage probe:oauth     # OAuth sign-in against a running server (OAUTH_SERVER, see mcp.md)
 go tool mage generate        # sqlc
 go tool mage release         # everything a release ships, into dist/ (needs APP_VERSION and nfpm)
 ```
