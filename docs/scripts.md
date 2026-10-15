@@ -36,6 +36,14 @@ Output goes to `screenshots/<start time>[_<config>]/` (git-ignored):
 
 Set `RUN_NAME` to name the run yourself, e.g. `RUN_NAME=before-redesign`.
 
+### Comparing runs
+
+```bash
+npm run screenshots:diff -- before-redesign latest   # <old> <new>; names are run directories, "latest" is the newest
+```
+
+Writes `screenshots/<old>_vs_<new>/`: the changed screenshots from the new run with changes boxed in red, and `report.txt` (changed areas per file, files only in one run). Small color differences (font smoothing) and specks under 12 px are ignored. Compare runs of the same day and config, or dates and amounts show up as changes (the script warns).
+
 ### Configs
 
 A config is a JSON file in [`scripts/screenshots/configs/`](../scripts/screenshots/configs). Included: `full` (English and Russian, both themes), `mobile`, `reports`. Without a name the defaults from [`config.ts`](../scripts/screenshots/config.ts) are used.
