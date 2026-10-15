@@ -4,6 +4,8 @@ export interface Settings {
     sso_allow_signup: boolean
     password_login_enabled: boolean
     sso_require_verified_email: boolean
+    /** Users with an unconfirmed address can sign in but do nothing else. Needs mail and a verified admin. */
+    require_email_verification: boolean
     /** Size limit of a space in MB; 0 is unlimited. */
     space_quota_mb: number
     /** Backups a space keeps; 0 keeps all. */
@@ -14,4 +16,8 @@ export interface Settings {
     space_invites_can_register: boolean
     /** Public URL of the instance; empty falls back to APP_URL. */
     app_url: string
+    /** False when config.toml is read-only: app_url cannot be changed here. */
+    config_writable: boolean
+    /** Server setup: false while it is pending, true once finished or skipped, null on a server that never had it. */
+    onboarding_server_done: boolean | null
 }

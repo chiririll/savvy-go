@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"savvy-go/internal/auth"
-	"savvy-go/internal/domain"
+	"savvy-go/internal/spaces"
 )
 
 // inSpace sends a data request to a given space.
@@ -65,7 +65,7 @@ func TestP3SpacesAreIsolated(t *testing.T) {
 	status(t, a.inSpace(999, "GET", "/api/tags", nil, bs), 404, "missing space")
 
 	// Joining as a viewer makes the space readable but not writable.
-	if err := a.s.spaces.SetMember(ctx, aliceSpace.ID, bob, domain.SpaceViewer); err != nil {
+	if err := a.s.spaces.SetMember(ctx, aliceSpace.ID, bob, spaces.RoleViewer); err != nil {
 		t.Fatal(err)
 	}
 	if names := tagNames(t, a.inSpace(aliceSpace.ID, "GET", "/api/tags", nil, bs)); len(names) != 1 {
@@ -82,38 +82,47 @@ func TestUserWithoutSpaceGets404ForData(t *testing.T) {
 	status(t, a.do("GET", "/api/settings", nil, sess.Token, ""), 200, "instance settings need no space")
 }
 
-func TestRegistrationProvisionsPersonalSpace(t *testing.T) {
+func TestRegistrationCreatesNoSpace(t *testing.T) {
 	a := newTestApp(t)
-	res := a.do("POST", "/api/auth/register", map[string]string{"name": "Owner", "email": "o@test.com", "password": "secret1"}, "", "")
+	res := a.register(a.bootstrap.Password(), map[string]string{"name": "Owner", "email": "o@test.com"})
 	session := cookieNamed(res, "svy_session")
 	res.Body.Close()
 	if res.StatusCode != 201 || session == nil {
 		t.Fatalf("register %d", res.StatusCode)
 	}
 	body := decodeJSON(t, a.do("GET", "/api/spaces", nil, session.Value, ""))
-	list := body["data"].([]any)
-	if len(list) != 1 || list[0].(map[string]any)["role"] != domain.SpaceAdmin || list[0].(map[string]any)["name"] != "Owner" {
+	if list := body["data"].([]any); len(list) != 0 {
 		t.Fatalf("spaces %v", list)
 	}
-	id := int64(list[0].(map[string]any)["id"].(float64))
-	status(t, a.do("GET", spacedPath(a.s, id, "/api/accounts"), nil, session.Value, ""), 200, "personal space works")
+	status(t, a.do("GET", "/api/auth/me", nil, session.Value, ""), 200, "logged in without a space")
 }
 
-// P8: a guest cannot administer a space and gets no personal space.
+func TestAdminCreatedUserHasNoSpace(t *testing.T) {
+	a := newTestApp(t)
+	admin := a.issue(a.createUser("a@test.com", "secret1", auth.RoleAdmin), false)
+	res := a.do("POST", "/api/users", map[string]any{"name": "New", "email": "n@test.com", "password": "secret12", "role": auth.RoleUser}, admin.Token, admin.CSRF)
+	status(t, res, 201, "create user")
+	u, err := a.s.users.ByEmail(context.Background(), "n@test.com")
+	if err != nil || u == nil {
+		t.Fatalf("user %v %v", u, err)
+	}
+	if list, err := a.s.spaces.ForUser(context.Background(), u.ID); err != nil || len(list) != 0 {
+		t.Fatalf("spaces %v %v", list, err)
+	}
+}
+
+// P8: a guest cannot administer a space.
 func TestP8GuestCannotBeSpaceAdmin(t *testing.T) {
 	a := newTestApp(t)
 	ctx := context.Background()
 	guest := a.createUser("guest@test.com", "secret1", auth.RoleGuest)
-	if sp, err := a.s.spaces.Provision(ctx, guest); err != nil || sp != nil {
-		t.Fatalf("guest got a personal space %v %v", sp, err)
-	}
-	if _, err := a.s.spaces.Create(ctx, "Mine", guest); !errors.Is(err, domain.ErrGuestCannotAdmin) {
+	if _, err := a.s.spaces.Create(ctx, "Mine", guest); !errors.Is(err, spaces.ErrGuestCannotAdmin) {
 		t.Fatalf("guest created a space: %v", err)
 	}
-	if err := a.s.spaces.SetMember(ctx, a.space.ID, guest, domain.SpaceAdmin); !errors.Is(err, domain.ErrGuestCannotAdmin) {
+	if err := a.s.spaces.SetMember(ctx, a.space.ID, guest, spaces.RoleAdmin); !errors.Is(err, spaces.ErrGuestCannotAdmin) {
 		t.Fatalf("guest made admin: %v", err)
 	}
-	if err := a.s.spaces.SetMember(ctx, a.space.ID, guest, domain.SpaceEditor); err != nil {
+	if err := a.s.spaces.SetMember(ctx, a.space.ID, guest, spaces.RoleEditor); err != nil {
 		t.Fatalf("guest as editor: %v", err)
 	}
 }
@@ -146,5 +155,5 @@ func TestSettingsUpdateRoles(t *testing.T) {
 // sp0 is the scope of the shared test space.
 func sp0(t *testing.T, a *testApp) *spaceScope {
 	t.Helper()
-	return a.s.newScope(a.space.ID, domain.SpaceAdmin, a.spaceDB())
+	return a.s.newScope(a.space.ID, spaces.RoleAdmin, a.spaceDB())
 }

@@ -7,18 +7,24 @@ import (
 	"testing"
 
 	"savvy-go/internal/auth"
-	"savvy-go/internal/domain"
+	"savvy-go/internal/spaces"
 	"savvy-go/internal/store"
 )
 
+// invite creates an invitation and returns its token. It goes through the
+// service, not the route: the route never hands out the token of an emailed
+// invitation, and these tests need the link.
 func (a *testApp) invite(spaceID int64, sess *auth.Issued, email, role string) string {
 	a.t.Helper()
-	res := a.do("POST", spacePath(spaceID, "/invitations"), map[string]any{"email": email, "role": role}, sess.Token, sess.CSRF)
-	body := decodeJSON(a.t, res)
-	if res.StatusCode != http.StatusCreated {
-		a.t.Fatalf("invite %d %v", res.StatusCode, body)
+	session, err := a.s.sessions.Resolve(context.Background(), sess.Token)
+	if err != nil || session == nil {
+		a.t.Fatalf("inviter: %v", err)
 	}
-	return body["data"].(map[string]any)["token"].(string)
+	token, _, err := a.s.spaces.Invite(context.Background(), spaceID, session.User, email, "", role)
+	if err != nil {
+		a.t.Fatal(err)
+	}
+	return token
 }
 
 func memberRole(t *testing.T, a *testApp, spaceID, userID int64) string {
@@ -78,7 +84,7 @@ func TestP7RegisterThroughInvitation(t *testing.T) {
 	ctx := context.Background()
 	serverAdmin := a.issue(a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
 	owner := a.createUser("owner@test.com", "secret1", auth.RoleUser)
-	if err := a.s.spaces.SetMember(ctx, a.space.ID, owner, domain.SpaceAdmin); err != nil {
+	if err := a.s.spaces.SetMember(ctx, a.space.ID, owner, spaces.RoleAdmin); err != nil {
 		t.Fatal(err)
 	}
 	spaceAdmin := a.issue(owner, false)
@@ -125,16 +131,16 @@ func TestP8GuestNeverSpaceAdmin(t *testing.T) {
 	guest := a.createUser("guest@test.com", "secret1", auth.RoleGuest)
 	gs := a.issue(guest, false)
 
-	status(t, a.do("POST", "/api/invitations/"+a.invite(a.space.ID, as, "", domain.SpaceAdmin)+"/accept", nil, gs.Token, gs.CSRF), 422, "admin invitation")
+	status(t, a.do("POST", "/api/invitations/"+a.invite(a.space.ID, as, "", spaces.RoleAdmin)+"/accept", nil, gs.Token, gs.CSRF), 422, "admin invitation")
 	status(t, a.do("POST", "/api/invitations/"+a.invite(a.space.ID, as, "", roleEditor)+"/accept", nil, gs.Token, gs.CSRF), 200, "editor invitation")
-	status(t, a.do("PATCH", spacePath(a.space.ID, "/members"+userPath(guest.ID)), map[string]any{"role": domain.SpaceAdmin}, as.Token, as.CSRF), 422, "promote")
+	status(t, a.do("PATCH", spacePath(a.space.ID, "/members"+userPath(guest.ID)), map[string]any{"role": spaces.RoleAdmin}, as.Token, as.CSRF), 422, "promote")
 	status(t, a.do("POST", "/api/spaces", map[string]any{"name": "Mine"}, gs.Token, gs.CSRF), 422, "create space")
 	status(t, a.do("POST", "/api/admin/spaces/"+strconv.FormatInt(a.space.ID, 10)+"/admins", map[string]any{"user_id": guest.ID}, as.Token, as.CSRF), 422, "assign admin")
 	// Registering through an admin invitation from a space admin would make
 	// a guest admin.
 	owner := a.createUser("owner@test.com", "secret1", auth.RoleUser)
-	_ = a.s.spaces.SetMember(context.Background(), a.space.ID, owner, domain.SpaceAdmin)
-	res := a.do("POST", "/api/invitations/"+a.invite(a.space.ID, a.issue(owner, false), "", domain.SpaceAdmin)+"/register",
+	_ = a.s.spaces.SetMember(context.Background(), a.space.ID, owner, spaces.RoleAdmin)
+	res := a.do("POST", "/api/invitations/"+a.invite(a.space.ID, a.issue(owner, false), "", spaces.RoleAdmin)+"/register",
 		map[string]any{"name": "N", "email": "n@test.com", "password": "password1"}, "", "")
 	if res.StatusCode != http.StatusUnprocessableEntity {
 		t.Fatalf("guest admin by registration %d %v", res.StatusCode, decodeJSON(t, res))
@@ -169,9 +175,9 @@ func TestP10SpaceLimit(t *testing.T) {
 
 	status(t, a.do("POST", "/api/spaces", map[string]any{"name": "First"}, us.Token, us.CSRF), 201, "first space")
 	status(t, a.do("POST", "/api/spaces", map[string]any{"name": "Second"}, us.Token, us.CSRF), 422, "second space")
-	status(t, a.do("POST", "/api/invitations/"+a.invite(a.space.ID, as, "", domain.SpaceAdmin)+"/accept", nil, us.Token, us.CSRF), 422, "admin invitation")
+	status(t, a.do("POST", "/api/invitations/"+a.invite(a.space.ID, as, "", spaces.RoleAdmin)+"/accept", nil, us.Token, us.CSRF), 422, "admin invitation")
 	status(t, a.do("POST", "/api/invitations/"+a.invite(a.space.ID, as, "", roleEditor)+"/accept", nil, us.Token, us.CSRF), 200, "editor invitation")
-	status(t, a.do("PATCH", spacePath(a.space.ID, "/members"+userPath(user.ID)), map[string]any{"role": domain.SpaceAdmin}, as.Token, as.CSRF), 422, "promotion")
+	status(t, a.do("PATCH", spacePath(a.space.ID, "/members"+userPath(user.ID)), map[string]any{"role": spaces.RoleAdmin}, as.Token, as.CSRF), 422, "promotion")
 	status(t, a.do("POST", "/api/admin/spaces/"+strconv.FormatInt(a.space.ID, 10)+"/admins", map[string]any{"user_id": user.ID}, as.Token, as.CSRF), 204, "server admin assigns")
 	status(t, a.do("POST", "/api/spaces", map[string]any{"name": "Admin's"}, as.Token, as.CSRF), 201, "server admin has no limit")
 
@@ -198,7 +204,7 @@ func TestP11LastAdmin(t *testing.T) {
 	admin := a.issue(a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
 	status(t, a.do("DELETE", "/api/users"+userPath(owner.ID), nil, admin.Token, admin.CSRF), 422, "delete last admin")
 
-	status(t, a.do("PATCH", spacePath(space.ID, "/members"+userPath(member.ID)), map[string]any{"role": domain.SpaceAdmin}, os.Token, os.CSRF), 200, "hand over")
+	status(t, a.do("PATCH", spacePath(space.ID, "/members"+userPath(member.ID)), map[string]any{"role": spaces.RoleAdmin}, os.Token, os.CSRF), 200, "hand over")
 	status(t, a.do("POST", spacePath(space.ID, "/leave"), nil, os.Token, os.CSRF), 204, "leave after hand-over")
 
 	ms := a.issue(member, false)

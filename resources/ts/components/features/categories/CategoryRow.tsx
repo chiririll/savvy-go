@@ -29,6 +29,12 @@ interface CategoryRowProps {
     isReadOnly?: boolean
     deleteDisabled?: boolean
     deleteDisabledLabel?: string
+    /**
+     * The categories are kept identical with other spaces: deleting also
+     * deletes them there, so the transactions of any of those spaces may need
+     * a replacement even when this space has none.
+     */
+    synced?: boolean
 }
 
 export function CategoryRow({
@@ -40,13 +46,14 @@ export function CategoryRow({
     isReadOnly,
     deleteDisabled,
     deleteDisabledLabel,
+    synced,
 }: CategoryRowProps) {
     const { t } = useTranslation(['common', 'pages'])
     const name = localizeDefaultName(category.name)
     const canEdit = !!onEdit && !isReadOnly
     const canDelete = !!onDelete && !isReadOnly
     const canSetDefault = !!onSetDefault && !isReadOnly && !category.isDefault
-    const needsReassign = canDelete && !deleteDisabled && (category.transactionsCount ?? 0) > 0
+    const needsReassign = canDelete && !deleteDisabled && ((category.transactionsCount ?? 0) > 0 || !!synced)
 
     return (
         <FeedRow
@@ -88,6 +95,8 @@ export function CategoryRow({
                             {(canEdit || canSetDefault) && <DropdownMenuSeparator />}
                             <ReassignDeleteItem
                                 category={category}
+                                optional={!!synced && (category.transactionsCount ?? 0) === 0}
+                                synced={!!synced}
                                 onConfirm={(successorId) => onDelete(category.id, successorId)}
                             />
                         </>
@@ -100,10 +109,13 @@ export function CategoryRow({
 
 interface ReassignDeleteItemProps {
     category: Category
-    onConfirm: (successorId: number) => void
+    /** A replacement may be left out: this space has no transactions in the category. */
+    optional?: boolean
+    synced?: boolean
+    onConfirm: (successorId?: number) => void
 }
 
-function ReassignDeleteItem({ category, onConfirm }: ReassignDeleteItemProps) {
+function ReassignDeleteItem({ category, optional, synced, onConfirm }: ReassignDeleteItemProps) {
     const { t } = useTranslation(['common', 'pages'])
     const name = localizeDefaultName(category.name)
     const count = category.transactionsCount ?? 0
@@ -125,7 +137,10 @@ function ReassignDeleteItem({ category, onConfirm }: ReassignDeleteItemProps) {
                 <AlertDialogHeader>
                     <AlertDialogTitle>{t('pages:categories.reassignTitle')}</AlertDialogTitle>
                     <AlertDialogDescription>
-                        {t('pages:categories.reassignDescription', { name, count })}
+                        {synced && count === 0
+                            ? t('pages:categories.syncedDeleteDescription', { name })
+                            : t('pages:categories.reassignDescription', { name, count })}
+                        {synced && count > 0 && ` ${t('pages:categories.syncedDeleteNote')}`}
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <CategorySelect
@@ -141,10 +156,10 @@ function ReassignDeleteItem({ category, onConfirm }: ReassignDeleteItemProps) {
                     <AlertDialogCancel>{t('actions.cancel')}</AlertDialogCancel>
                     <AlertDialogAction
                         variant="destructive"
-                        disabled={!successorId}
-                        onClick={() => successorId && onConfirm(successorId)}
+                        disabled={!optional && !successorId}
+                        onClick={() => onConfirm(successorId ?? undefined)}
                     >
-                        {t('pages:categories.reassignAndDelete')}
+                        {successorId || !optional ? t('pages:categories.reassignAndDelete') : t('actions.delete')}
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>

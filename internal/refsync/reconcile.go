@@ -1,0 +1,573 @@
+package refsync
+
+import (
+	"context"
+	"fmt"
+	"slices"
+	"strings"
+	"time"
+
+	"savvy-go/internal/auth"
+	repo "savvy-go/internal/db/repo/refsync"
+	"savvy-go/internal/ledger"
+	"savvy-go/internal/spaces"
+	"savvy-go/internal/store"
+)
+
+// Change is what the actor wants of a group: spaces in or out and what it
+// keeps identical afterwards. Categories and Tags are the end state, not a
+// delta. GroupID 0 starts a new group from Add.
+type Change struct {
+	GroupID    int64
+	Add        []int64
+	Remove     []int64
+	Categories bool
+	Tags       bool
+}
+
+// Plan is a Change with the decisions about the differences it brings out.
+type Plan struct {
+	Change
+	Decisions []Decision
+	Defaults  []DefaultDecision
+}
+
+// Decision settles one item that is not the same in every space.
+type Decision struct {
+	Kind Kind
+	Type string // categories only: "income" or "expense"
+	Name string
+	// Keep creates the item where it is missing; otherwise it is deleted
+	// where it exists.
+	Keep bool
+	// From is the space whose icon and color win when Keep and they differ.
+	From int64
+	// Successor is the name of a category of the same type that takes the
+	// transactions of a deleted one, in every space that has any.
+	Successor string
+}
+
+// DefaultDecision picks the default category of a type when the spaces
+// disagree about it.
+type DefaultDecision struct {
+	Type string
+	Name string
+}
+
+// CategoryState is a category as one space has it.
+type CategoryState struct {
+	Space        int64
+	Icon, Color  *string
+	IsDefault    bool
+	Transactions int
+}
+
+// CategoryConflict is a category that is missing in some spaces or looks
+// different in some.
+type CategoryConflict struct {
+	Type, Name string
+	Present    []CategoryState
+	Missing    []int64
+}
+
+// TagState is a tag as one space has it.
+type TagState struct {
+	Space        int64
+	Transactions int
+}
+
+// TagConflict is a tag that is missing in some spaces.
+type TagConflict struct {
+	Name    string
+	Present []TagState
+	Missing []int64
+}
+
+// DefaultConflict is a type whose spaces do not agree on the default.
+type DefaultConflict struct {
+	Type     string
+	Defaults map[int64]string // space -> name of its default, "" for none
+}
+
+// Diff is everything that makes the spaces of a group differ.
+type Diff struct {
+	Categories []CategoryConflict
+	Tags       []TagConflict
+	Defaults   []DefaultConflict
+}
+
+// Empty reports whether the spaces are identical.
+func (d Diff) Empty() bool {
+	return len(d.Categories) == 0 && len(d.Tags) == 0 && len(d.Defaults) == 0
+}
+
+// plan is a Change checked against the world.
+type resolved struct {
+	group      *repo.Group // nil for a new group
+	current    []int64
+	members    []int64 // after the change
+	removed    []int64
+	added      []int64
+	categories bool
+	tags       bool
+	reconcile  []Kind
+}
+
+func (r resolved) dissolved() bool { return len(r.members) < 2 }
+
+func containsID(ids []int64, id int64) bool { return slices.Contains(ids, id) }
+
+// resolve validates a Change and checks the actor's rights for it.
+func (s Service) resolve(ctx context.Context, actor *auth.User, c Change) (*resolved, error) {
+	r := &resolved{categories: c.Categories, tags: c.Tags}
+	srv := s.server()
+	if c.GroupID != 0 {
+		g, err := srv.Group(ctx, c.GroupID)
+		if err != nil {
+			return nil, err
+		}
+		if g == nil {
+			return nil, ErrNoGroup
+		}
+		r.group = g
+		if r.current, err = srv.Members(ctx, g.ID); err != nil {
+			return nil, err
+		}
+	}
+	for _, id := range c.Remove {
+		if !containsID(r.current, id) {
+			return nil, ErrNotMember
+		}
+		if !containsID(r.removed, id) {
+			r.removed = append(r.removed, id)
+		}
+	}
+	for _, id := range c.Add {
+		if containsID(r.current, id) || containsID(r.added, id) {
+			continue
+		}
+		if sp, err := s.Spaces.Get(ctx, id); err != nil {
+			return nil, err
+		} else if sp == nil {
+			return nil, fmt.Errorf("space %d: %w", id, store.ErrNotFound)
+		}
+		if other, err := srv.GroupOf(ctx, id); err != nil {
+			return nil, err
+		} else if other != nil {
+			return nil, ErrInGroup
+		}
+		r.added = append(r.added, id)
+	}
+	for _, id := range append(slices.Clone(r.current), r.added...) {
+		if !containsID(r.removed, id) {
+			r.members = append(r.members, id)
+		}
+	}
+	slices.Sort(r.members)
+	if r.group == nil && r.dissolved() {
+		return nil, ErrTooFew
+	}
+
+	wasCats, wasTags := r.group != nil && r.group.Categories, r.group != nil && r.group.Tags
+	switchedOn := map[Kind]bool{Categories: c.Categories && !wasCats, Tags: c.Tags && !wasTags}
+	flagsChanged := c.Categories != wasCats || c.Tags != wasTags
+	if !r.dissolved() {
+		for _, k := range []Kind{Categories, Tags} {
+			on := (k == Categories && c.Categories) || (k == Tags && c.Tags)
+			if on && (switchedOn[k] || len(r.added) > 0) {
+				r.reconcile = append(r.reconcile, k)
+			}
+		}
+	}
+
+	// Taking a space out is the business of its admins alone; everything
+	// else touches every space of the group, so every admin must agree.
+	for _, id := range r.removed {
+		if err := s.requireAdmin(ctx, actor, id); err != nil {
+			return nil, err
+		}
+	}
+	if len(r.added) > 0 || len(r.reconcile) > 0 || flagsChanged {
+		for _, id := range append(slices.Clone(r.current), r.added...) {
+			if err := s.requireAdmin(ctx, actor, id); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return r, nil
+}
+
+func (s Service) requireAdmin(ctx context.Context, actor *auth.User, id int64) error {
+	role, err := s.Spaces.Role(ctx, id, actor.ID)
+	if err != nil {
+		return err
+	}
+	if role != spaces.RoleAdmin {
+		return fmt.Errorf("%w (%s)", ErrNotAdmin, s.name(ctx, id))
+	}
+	return nil
+}
+
+// Diff previews what applying the change would have to reconcile.
+func (s Service) Diff(ctx context.Context, actor *auth.User, c Change) (Diff, error) {
+	r, err := s.resolve(ctx, actor, c)
+	if err != nil {
+		return Diff{}, err
+	}
+	var out Diff
+	if len(r.reconcile) == 0 {
+		return out, nil
+	}
+	err = s.st().InSpaces(ctx, r.members, func(dbs map[int64]store.DB) error {
+		var err error
+		out, err = diffSpaces(ctx, dbs, r.members, r.reconcile)
+		return err
+	})
+	return out, err
+}
+
+// Apply carries out the plan: reconciles the spaces by the decisions, then
+// changes the group. All of it is refused if a difference has no decision.
+// It returns the group afterwards, nil when it is dissolved.
+func (s Service) Apply(ctx context.Context, actor *auth.User, p Plan) (*Group, error) {
+	r, err := s.resolve(ctx, actor, p.Change)
+	if err != nil {
+		return nil, err
+	}
+	if len(r.reconcile) > 0 {
+		err = s.st().InSpaces(ctx, r.members, func(dbs map[int64]store.DB) error {
+			return reconcileSpaces(ctx, dbs, r.members, r.reconcile, p)
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+	// The membership is saved after the spaces are alike: a crash in between
+	// leaves identical spaces and the old group, and the same plan can simply
+	// be applied again.
+	var groupID int64
+	err = store.Tx(ctx, s.st().Server(), func(tx store.DB) error {
+		srv := repo.Server{DB: tx}
+		groupID = 0
+		if r.group != nil {
+			groupID = r.group.ID
+		}
+		if r.dissolved() {
+			if groupID != 0 {
+				return srv.DeleteGroup(ctx, groupID) // the memberships go with it
+			}
+			return nil
+		}
+		if groupID == 0 {
+			id, err := srv.InsertGroup(ctx, time.Now().UTC())
+			if err != nil {
+				return err
+			}
+			groupID = id
+		}
+		for _, id := range r.removed {
+			if _, err := srv.RemoveSpace(ctx, groupID, id); err != nil {
+				return err
+			}
+		}
+		for _, id := range r.added {
+			if err := srv.AddSpace(ctx, groupID, id); err != nil {
+				return err
+			}
+		}
+		return srv.SetFlags(ctx, groupID, r.categories, r.tags)
+	})
+	if err != nil || r.dissolved() {
+		return nil, err
+	}
+	return &Group{ID: groupID, Categories: r.categories, Tags: r.tags, Members: r.members}, nil
+}
+
+// --- finding the differences -------------------------------------------------
+
+func lower(s string) string { return strings.ToLower(s) }
+
+func sameText(a, b *string) bool {
+	x, y := "", ""
+	if a != nil {
+		x = *a
+	}
+	if b != nil {
+		y = *b
+	}
+	return x == y
+}
+
+func diffSpaces(ctx context.Context, dbs map[int64]store.DB, members []int64, kinds []Kind) (Diff, error) {
+	var out Diff
+	for _, k := range kinds {
+		switch k {
+		case Categories:
+			conflicts, defaults, err := diffCategories(ctx, dbs, members)
+			if err != nil {
+				return Diff{}, err
+			}
+			out.Categories, out.Defaults = conflicts, defaults
+		case Tags:
+			conflicts, err := diffTags(ctx, dbs, members)
+			if err != nil {
+				return Diff{}, err
+			}
+			out.Tags = conflicts
+		}
+	}
+	return out, nil
+}
+
+func diffCategories(ctx context.Context, dbs map[int64]store.DB, members []int64) ([]CategoryConflict, []DefaultConflict, error) {
+	type key struct{ typ, name string }
+	states := map[key][]CategoryState{}
+	names := map[key]string{}
+	defaults := map[string]map[int64]string{} // type -> space -> default name
+	for _, id := range members {
+		list, err := (ledger.Categories{DB: dbs[id]}).All(ctx, "")
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, c := range list {
+			k := key{c.Type, lower(c.Name)}
+			if _, ok := names[k]; !ok {
+				names[k] = c.Name
+			}
+			states[k] = append(states[k], CategoryState{Space: id, Icon: c.Icon, Color: c.Color, IsDefault: c.IsDefault, Transactions: c.TransactionsCount})
+			if defaults[c.Type] == nil {
+				defaults[c.Type] = map[int64]string{}
+			}
+			if c.IsDefault {
+				defaults[c.Type][id] = c.Name
+			}
+		}
+	}
+	var conflicts []CategoryConflict
+	for k, present := range states {
+		var missing []int64
+		for _, id := range members {
+			if !slices.ContainsFunc(present, func(s CategoryState) bool { return s.Space == id }) {
+				missing = append(missing, id)
+			}
+		}
+		differs := false
+		for _, s := range present[1:] {
+			if !sameText(s.Icon, present[0].Icon) || !sameText(s.Color, present[0].Color) {
+				differs = true
+			}
+		}
+		if len(missing) > 0 || differs {
+			conflicts = append(conflicts, CategoryConflict{Type: k.typ, Name: names[k], Present: present, Missing: missing})
+		}
+	}
+	slices.SortFunc(conflicts, func(a, b CategoryConflict) int {
+		return strings.Compare(a.Type+"\x00"+lower(a.Name), b.Type+"\x00"+lower(b.Name))
+	})
+
+	var conflictsOfDefault []DefaultConflict
+	for typ, bySpace := range defaults {
+		seen := map[string]bool{}
+		full := map[int64]string{}
+		for _, id := range members {
+			full[id] = bySpace[id]
+			seen[lower(bySpace[id])] = true
+		}
+		if len(seen) > 1 {
+			conflictsOfDefault = append(conflictsOfDefault, DefaultConflict{Type: typ, Defaults: full})
+		}
+	}
+	slices.SortFunc(conflictsOfDefault, func(a, b DefaultConflict) int { return strings.Compare(a.Type, b.Type) })
+	return conflicts, conflictsOfDefault, nil
+}
+
+func diffTags(ctx context.Context, dbs map[int64]store.DB, members []int64) ([]TagConflict, error) {
+	states := map[string][]TagState{}
+	names := map[string]string{}
+	for _, id := range members {
+		list, err := (ledger.Tags{DB: dbs[id]}).All(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, t := range list {
+			k := lower(t.Name)
+			if _, ok := names[k]; !ok {
+				names[k] = t.Name
+			}
+			states[k] = append(states[k], TagState{Space: id, Transactions: t.TransactionsCount})
+		}
+	}
+	var out []TagConflict
+	for k, present := range states {
+		var missing []int64
+		for _, id := range members {
+			if !slices.ContainsFunc(present, func(s TagState) bool { return s.Space == id }) {
+				missing = append(missing, id)
+			}
+		}
+		if len(missing) > 0 {
+			out = append(out, TagConflict{Name: names[k], Present: present, Missing: missing})
+		}
+	}
+	slices.SortFunc(out, func(a, b TagConflict) int { return strings.Compare(lower(a.Name), lower(b.Name)) })
+	return out, nil
+}
+
+// --- carrying out the decisions ----------------------------------------------
+
+func decisionKey(kind Kind, typ, name string) string {
+	return string(kind) + "\x00" + typ + "\x00" + lower(name)
+}
+
+// reconcileSpaces makes the spaces identical. Everything that has to exist
+// is made first and only then is anything deleted, so a successor is there
+// to receive the transactions of a category that goes.
+func reconcileSpaces(ctx context.Context, dbs map[int64]store.DB, members []int64, kinds []Kind, p Plan) error {
+	diff, err := diffSpaces(ctx, dbs, members, kinds)
+	if err != nil {
+		return err
+	}
+	decided := map[string]Decision{}
+	for _, d := range p.Decisions {
+		decided[decisionKey(d.Kind, d.Type, d.Name)] = d
+	}
+	defaults := map[string]string{}
+	for _, d := range p.Defaults {
+		defaults[d.Type] = d.Name
+	}
+	for _, c := range diff.Categories {
+		if _, ok := decided[decisionKey(Categories, c.Type, c.Name)]; !ok {
+			return fmt.Errorf("%w: category %q (%s)", ErrUnresolved, c.Name, c.Type)
+		}
+	}
+	for _, t := range diff.Tags {
+		if _, ok := decided[decisionKey(Tags, "", t.Name)]; !ok {
+			return fmt.Errorf("%w: tag %q", ErrUnresolved, t.Name)
+		}
+	}
+	for _, c := range diff.Defaults {
+		if _, ok := defaults[c.Type]; !ok {
+			return fmt.Errorf("%w: the default %s category", ErrUnresolved, c.Type)
+		}
+	}
+
+	cats := func(id int64) ledger.Categories { return ledger.Categories{DB: dbs[id]} }
+
+	// 1. Create what is kept and align how it looks.
+	for _, c := range diff.Categories {
+		d := decided[decisionKey(Categories, c.Type, c.Name)]
+		if !d.Keep {
+			continue
+		}
+		win := c.Present[0]
+		if d.From != 0 {
+			i := slices.IndexFunc(c.Present, func(s CategoryState) bool { return s.Space == d.From })
+			if i < 0 {
+				return fmt.Errorf("%w: category %q is not in space %d", ErrInvalid, c.Name, d.From)
+			}
+			win = c.Present[i]
+		} else {
+			for _, s := range c.Present[1:] {
+				if !sameText(s.Icon, win.Icon) || !sameText(s.Color, win.Color) {
+					return fmt.Errorf("%w: category %q looks different in the spaces; say which one to keep", ErrUnresolved, c.Name)
+				}
+			}
+		}
+		for _, id := range c.Missing {
+			if _, err := cats(id).Create(ctx, ledger.Category{Name: c.Name, Type: c.Type, Icon: win.Icon, Color: win.Color}); err != nil {
+				return err
+			}
+		}
+		for _, s := range c.Present {
+			if sameText(s.Icon, win.Icon) && sameText(s.Color, win.Color) {
+				continue
+			}
+			cur, err := findCategory(ctx, cats(s.Space), c.Type, c.Name)
+			if err != nil {
+				return err
+			}
+			if _, err := cats(s.Space).Update(ctx, cur.ID, ledger.Category{Name: cur.Name, Type: cur.Type, Icon: win.Icon, Color: win.Color, IsDefault: cur.IsDefault}); err != nil {
+				return err
+			}
+		}
+	}
+	for _, t := range diff.Tags {
+		if !decided[decisionKey(Tags, "", t.Name)].Keep {
+			continue
+		}
+		for _, id := range t.Missing {
+			if _, err := (ledger.Tags{DB: dbs[id]}).Create(ctx, t.Name); err != nil {
+				return err
+			}
+		}
+	}
+
+	// 2. Move the defaults, before anything that might be one is deleted.
+	for _, c := range diff.Defaults {
+		name := defaults[c.Type]
+		for _, id := range members {
+			cur, err := findCategory(ctx, cats(id), c.Type, name)
+			if err != nil {
+				return err
+			}
+			if cur == nil {
+				return fmt.Errorf("%w: %q is not a %s category everywhere", ErrInvalid, name, c.Type)
+			}
+			if _, err := cats(id).SetDefault(ctx, cur.ID); err != nil {
+				return err
+			}
+		}
+	}
+
+	// 3. Delete what is dropped, moving transactions to the successor.
+	for _, c := range diff.Categories {
+		d := decided[decisionKey(Categories, c.Type, c.Name)]
+		if d.Keep {
+			continue
+		}
+		for _, s := range c.Present {
+			cur, err := findCategory(ctx, cats(s.Space), c.Type, c.Name)
+			if err != nil {
+				return err
+			}
+			var succ *int64
+			if d.Successor != "" {
+				found, err := findCategory(ctx, cats(s.Space), c.Type, d.Successor)
+				if err != nil {
+					return err
+				}
+				if found == nil {
+					return fmt.Errorf("%w: the successor %q is not a %s category", ErrInvalid, d.Successor, c.Type)
+				}
+				succ = &found.ID
+			}
+			if err := cats(s.Space).Delete(ctx, cur.ID, succ); err != nil {
+				return fmt.Errorf("deleting %q: %w", c.Name, err)
+			}
+		}
+	}
+	for _, t := range diff.Tags {
+		if decided[decisionKey(Tags, "", t.Name)].Keep {
+			continue
+		}
+		for _, s := range t.Present {
+			tags := ledger.Tags{DB: dbs[s.Space]}
+			cur, err := findTag(ctx, tags, t.Name)
+			if err != nil {
+				return err
+			}
+			if err := tags.Delete(ctx, cur.ID); err != nil {
+				return err
+			}
+		}
+	}
+
+	left, err := diffSpaces(ctx, dbs, members, kinds)
+	if err != nil {
+		return err
+	}
+	if !left.Empty() {
+		return fmt.Errorf("%w: %+v", ErrInvalid, left)
+	}
+	return nil
+}

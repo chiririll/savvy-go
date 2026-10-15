@@ -47,12 +47,12 @@ func specOperations(t *testing.T) map[string]bool {
 // SSO plumbing, uploads, imports and backups (session-only), and admin-only management.
 var undocumented = []string{
 	"/api/docs", "/api/openapi.yaml",
-	"/api/auth/status", "/api/auth/me", "/api/auth/register", "/api/auth/login",
-	"/api/auth/password", "/api/auth/logout", "/api/auth/logout-others",
+	"/api/auth/status", "/api/auth/me", "/api/auth/register", "/api/auth/bootstrap", "/api/auth/login",
+	"/api/auth/password", "/api/auth/logout", "/api/auth/logout-others", "/api/auth/verify-email",
 	"/api/auth/2fa", "/api/auth/sso", "/api/auth/webauthn",
 	"/api/uploads", "/api/s3/multipart", "/api/transactions/import",
-	"/api/backups", "/api/identity-providers", "/api/spaces/import",
-	"/api/admin", "/api/monitoring", "/api/invitations",
+	"/api/oauth", "/api/backups", "/api/identity-providers", "/api/spaces/import",
+	"/api/admin", "/api/monitoring", "/api/invitations", "/api/invitation-methods",
 }
 
 // undocumentedInSpace lists routes under /api/spaces/{space} that are

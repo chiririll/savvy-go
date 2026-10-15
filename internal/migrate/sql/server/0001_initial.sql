@@ -15,6 +15,9 @@ CREATE TABLE IF NOT EXISTS users (
     -- user may do inside a space is the space_members role.
     role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'user', 'guest')),
     is_sso_only INTEGER NOT NULL DEFAULT 0 CHECK (is_sso_only IN (0, 1)),
+    -- The user proved they own the address (link from an email, or an SSO
+    -- provider that vouches for it). Changing the address clears it.
+    email_verified INTEGER NOT NULL DEFAULT 0 CHECK (email_verified IN (0, 1)),
     two_factor_secret TEXT,
     two_factor_enabled INTEGER NOT NULL DEFAULT 0 CHECK (two_factor_enabled IN (0, 1)),
     two_factor_confirmed INTEGER NOT NULL DEFAULT 0 CHECK (two_factor_confirmed IN (0, 1)),
@@ -53,6 +56,16 @@ CREATE TABLE IF NOT EXISTS password_tokens (
 ) STRICT;
 CREATE INDEX IF NOT EXISTS password_tokens_user_consumed_idx ON password_tokens (user_id, consumed_at);
 CREATE INDEX IF NOT EXISTS password_tokens_expires_idx ON password_tokens (expires_at);
+-- The link that confirms an email address. One per user: asking again replaces
+-- it. It names the address it was sent to, so changing the address ends it.
+CREATE TABLE IF NOT EXISTS email_verification_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+    email TEXT NOT NULL COLLATE NOCASE,
+    token_hash TEXT NOT NULL UNIQUE,
+    expires_at TEXT NOT NULL,
+    created_at TEXT
+) STRICT;
 CREATE TABLE IF NOT EXISTS two_factor_challenges (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -104,13 +117,41 @@ CREATE TABLE IF NOT EXISTS api_tokens (
     name TEXT NOT NULL,
     token_hash TEXT NOT NULL UNIQUE,
     prefix TEXT NOT NULL,
-    scope TEXT NOT NULL DEFAULT 'read' CHECK (scope IN ('read', 'read-write')),
+    -- What the token is for: 'personal' (made in Settings, any part of a space) or
+    -- 'mcp' (an OAuth access token of a connected AI app, only the parts its tools use).
+    kind TEXT NOT NULL DEFAULT 'personal' CHECK (kind IN ('personal', 'mcp')),
+    -- Comma-separated "<resource>:<read|write>" grants (internal/auth/permissions.go).
+    -- Empty means the token can only list its spaces.
+    permissions TEXT NOT NULL DEFAULT '',
+    -- 1: every space of the owner, including future ones. 0: only api_token_spaces.
+    all_spaces INTEGER NOT NULL DEFAULT 0 CHECK (all_spaces IN (0, 1)),
     expires_at TEXT,
     last_used_at TEXT,
     created_at TEXT,
     updated_at TEXT
 ) STRICT;
 CREATE INDEX IF NOT EXISTS api_tokens_user_idx ON api_tokens (user_id);
+CREATE TABLE IF NOT EXISTS oauth_clients (
+    client_id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    redirect_uris TEXT NOT NULL,
+    ip TEXT NOT NULL DEFAULT '',
+    user_agent TEXT NOT NULL DEFAULT '',
+    origin TEXT NOT NULL DEFAULT '',
+    created_at TEXT
+) STRICT;
+CREATE TABLE IF NOT EXISTS oauth_refresh_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    token_hash TEXT NOT NULL UNIQUE,
+    client_id TEXT NOT NULL REFERENCES oauth_clients(client_id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    api_token_id INTEGER NOT NULL REFERENCES api_tokens(id) ON DELETE CASCADE,
+    expires_at TEXT NOT NULL,
+    created_at TEXT
+) STRICT;
+CREATE INDEX IF NOT EXISTS oauth_refresh_tokens_user_idx ON oauth_refresh_tokens (user_id);
+CREATE INDEX IF NOT EXISTS oauth_refresh_tokens_client_idx ON oauth_refresh_tokens (client_id);
+CREATE INDEX IF NOT EXISTS oauth_refresh_tokens_api_token_idx ON oauth_refresh_tokens (api_token_id);
 CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT
@@ -220,11 +261,22 @@ CREATE TABLE IF NOT EXISTS space_members (
 ) STRICT;
 CREATE INDEX IF NOT EXISTS space_members_user_idx ON space_members (user_id);
 
+-- The spaces a token with all_spaces = 0 may reach. A deleted space drops out;
+-- a token left with none reaches nothing.
+CREATE TABLE IF NOT EXISTS api_token_spaces (
+    api_token_id INTEGER NOT NULL REFERENCES api_tokens(id) ON DELETE CASCADE,
+    space_id INTEGER NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,
+    PRIMARY KEY (api_token_id, space_id)
+) STRICT;
+CREATE INDEX IF NOT EXISTS api_token_spaces_space_idx ON api_token_spaces (space_id);
+
 CREATE TABLE IF NOT EXISTS space_invitations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     space_id INTEGER NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,
     -- When set, only a user with this email may accept.
     email TEXT COLLATE NOCASE,
+    -- Who a link invitation is for, in the inviter's words; shown in their list only.
+    note TEXT,
     role TEXT NOT NULL CHECK (role IN ('admin', 'editor', 'viewer')),
     token_hash TEXT NOT NULL UNIQUE,
     invited_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
@@ -267,6 +319,22 @@ CREATE TABLE IF NOT EXISTS space_links (
 ) STRICT;
 CREATE INDEX IF NOT EXISTS space_links_b_idx ON space_links (space_b_id);
 CREATE INDEX IF NOT EXISTS space_links_created_by_idx ON space_links (created_by);
+
+-- Spaces of a sync group keep their categories and/or tags identical: what
+-- one changes the others follow. Independent of space_links. A space is in at
+-- most one group; a group with fewer than two spaces does nothing.
+CREATE TABLE IF NOT EXISTS sync_groups (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sync_categories INTEGER NOT NULL DEFAULT 0 CHECK (sync_categories IN (0, 1)),
+    sync_tags INTEGER NOT NULL DEFAULT 0 CHECK (sync_tags IN (0, 1)),
+    created_at TEXT
+) STRICT;
+
+CREATE TABLE IF NOT EXISTS sync_group_spaces (
+    group_id INTEGER NOT NULL REFERENCES sync_groups(id) ON DELETE CASCADE,
+    space_id INTEGER NOT NULL UNIQUE REFERENCES spaces(id) ON DELETE CASCADE,
+    PRIMARY KEY (group_id, space_id)
+) STRICT;
 
 -- Public keys whose signatures this server accepts besides its own: the
 -- keys it used before a rotation and keys of servers spaces moved from.

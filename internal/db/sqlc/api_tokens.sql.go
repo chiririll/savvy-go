@@ -23,8 +23,17 @@ func (q *Queries) DeleteAPIToken(ctx context.Context, arg DeleteAPITokenParams) 
 	return q.db.ExecContext(ctx, deleteAPIToken, arg.ID, arg.UserID)
 }
 
+const deleteAPITokenSpaces = `-- name: DeleteAPITokenSpaces :exec
+DELETE FROM api_token_spaces WHERE api_token_id = ?
+`
+
+func (q *Queries) DeleteAPITokenSpaces(ctx context.Context, apiTokenID int64) error {
+	_, err := q.db.ExecContext(ctx, deleteAPITokenSpaces, apiTokenID)
+	return err
+}
+
 const getAPITokenByHash = `-- name: GetAPITokenByHash :one
-SELECT id, user_id, name, token_hash, prefix, scope, expires_at, last_used_at, created_at, updated_at
+SELECT id, user_id, name, token_hash, prefix, kind, permissions, all_spaces, expires_at, last_used_at, created_at, updated_at
 FROM api_tokens WHERE token_hash = ?
 `
 
@@ -37,7 +46,9 @@ func (q *Queries) GetAPITokenByHash(ctx context.Context, tokenHash string) (ApiT
 		&i.Name,
 		&i.TokenHash,
 		&i.Prefix,
-		&i.Scope,
+		&i.Kind,
+		&i.Permissions,
+		&i.AllSpaces,
 		&i.ExpiresAt,
 		&i.LastUsedAt,
 		&i.CreatedAt,
@@ -47,19 +58,21 @@ func (q *Queries) GetAPITokenByHash(ctx context.Context, tokenHash string) (ApiT
 }
 
 const insertAPIToken = `-- name: InsertAPIToken :execresult
-INSERT INTO api_tokens (user_id, name, token_hash, prefix, scope, expires_at, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO api_tokens (user_id, name, token_hash, prefix, kind, permissions, all_spaces, expires_at, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type InsertAPITokenParams struct {
-	UserID    int64
-	Name      string
-	TokenHash string
-	Prefix    string
-	Scope     string
-	ExpiresAt sql.NullString
-	CreatedAt sql.NullString
-	UpdatedAt sql.NullString
+	UserID      int64
+	Name        string
+	TokenHash   string
+	Prefix      string
+	Kind        string
+	Permissions string
+	AllSpaces   int64
+	ExpiresAt   sql.NullString
+	CreatedAt   sql.NullString
+	UpdatedAt   sql.NullString
 }
 
 func (q *Queries) InsertAPIToken(ctx context.Context, arg InsertAPITokenParams) (sql.Result, error) {
@@ -68,15 +81,87 @@ func (q *Queries) InsertAPIToken(ctx context.Context, arg InsertAPITokenParams) 
 		arg.Name,
 		arg.TokenHash,
 		arg.Prefix,
-		arg.Scope,
+		arg.Kind,
+		arg.Permissions,
+		arg.AllSpaces,
 		arg.ExpiresAt,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
 }
 
+const insertAPITokenSpace = `-- name: InsertAPITokenSpace :exec
+INSERT INTO api_token_spaces (api_token_id, space_id) VALUES (?, ?)
+`
+
+type InsertAPITokenSpaceParams struct {
+	ApiTokenID int64
+	SpaceID    int64
+}
+
+func (q *Queries) InsertAPITokenSpace(ctx context.Context, arg InsertAPITokenSpaceParams) error {
+	_, err := q.db.ExecContext(ctx, insertAPITokenSpace, arg.ApiTokenID, arg.SpaceID)
+	return err
+}
+
+const listAPITokenSpaces = `-- name: ListAPITokenSpaces :many
+SELECT space_id FROM api_token_spaces WHERE api_token_id = ? ORDER BY space_id
+`
+
+func (q *Queries) ListAPITokenSpaces(ctx context.Context, apiTokenID int64) ([]int64, error) {
+	rows, err := q.db.QueryContext(ctx, listAPITokenSpaces, apiTokenID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var space_id int64
+		if err := rows.Scan(&space_id); err != nil {
+			return nil, err
+		}
+		items = append(items, space_id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAPITokenSpacesByUser = `-- name: ListAPITokenSpacesByUser :many
+SELECT s.api_token_id, s.space_id
+FROM api_token_spaces s JOIN api_tokens t ON t.id = s.api_token_id
+WHERE t.user_id = ? ORDER BY s.api_token_id, s.space_id
+`
+
+func (q *Queries) ListAPITokenSpacesByUser(ctx context.Context, userID int64) ([]ApiTokenSpace, error) {
+	rows, err := q.db.QueryContext(ctx, listAPITokenSpacesByUser, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ApiTokenSpace{}
+	for rows.Next() {
+		var i ApiTokenSpace
+		if err := rows.Scan(&i.ApiTokenID, &i.SpaceID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAPITokensByUser = `-- name: ListAPITokensByUser :many
-SELECT id, user_id, name, token_hash, prefix, scope, expires_at, last_used_at, created_at, updated_at
+SELECT id, user_id, name, token_hash, prefix, kind, permissions, all_spaces, expires_at, last_used_at, created_at, updated_at
 FROM api_tokens WHERE user_id = ? ORDER BY id DESC
 `
 
@@ -95,7 +180,9 @@ func (q *Queries) ListAPITokensByUser(ctx context.Context, userID int64) ([]ApiT
 			&i.Name,
 			&i.TokenHash,
 			&i.Prefix,
-			&i.Scope,
+			&i.Kind,
+			&i.Permissions,
+			&i.AllSpaces,
 			&i.ExpiresAt,
 			&i.LastUsedAt,
 			&i.CreatedAt,
@@ -126,4 +213,26 @@ type TouchAPITokenParams struct {
 func (q *Queries) TouchAPIToken(ctx context.Context, arg TouchAPITokenParams) error {
 	_, err := q.db.ExecContext(ctx, touchAPIToken, arg.LastUsedAt, arg.ID)
 	return err
+}
+
+const updateAPITokenGrant = `-- name: UpdateAPITokenGrant :execresult
+UPDATE api_tokens SET permissions = ?, all_spaces = ?, updated_at = ? WHERE id = ? AND user_id = ?
+`
+
+type UpdateAPITokenGrantParams struct {
+	Permissions string
+	AllSpaces   int64
+	UpdatedAt   sql.NullString
+	ID          int64
+	UserID      int64
+}
+
+func (q *Queries) UpdateAPITokenGrant(ctx context.Context, arg UpdateAPITokenGrantParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, updateAPITokenGrant,
+		arg.Permissions,
+		arg.AllSpaces,
+		arg.UpdatedAt,
+		arg.ID,
+		arg.UserID,
+	)
 }

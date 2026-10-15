@@ -68,8 +68,8 @@ SELECT space_id FROM space_members WHERE user_id = ? AND role = 'admin' ORDER BY
 DELETE FROM space_members WHERE user_id = ?;
 
 -- name: InsertInvitation :one
-INSERT INTO space_invitations (space_id, email, role, token_hash, invited_by, invited_by_server_admin, expires_at, created_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO space_invitations (space_id, email, note, role, token_hash, invited_by, invited_by_server_admin, expires_at, created_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 RETURNING id;
 
 -- name: GetInvitationByHash :one
@@ -79,17 +79,42 @@ FROM space_invitations i JOIN spaces s ON s.id = i.space_id LEFT JOIN users u ON
 WHERE i.token_hash = ?;
 
 -- name: ListInvitations :many
-SELECT i.id, i.email, i.role, i.expires_at, i.accepted_at, i.created_at, COALESCE(u.name, '') AS inviter
+SELECT i.id, i.email, i.note, i.role, i.expires_at, i.accepted_at, i.created_at, COALESCE(u.name, '') AS inviter
 FROM space_invitations i LEFT JOIN users u ON u.id = i.invited_by
-WHERE i.space_id = ?
+WHERE i.space_id = ? AND (i.accepted_at IS NOT NULL OR i.expires_at > ?)
 ORDER BY i.id DESC;
 
 -- name: AcceptInvitation :execresult
 UPDATE space_invitations SET accepted_at = ?, accepted_by = ?
 WHERE id = ? AND accepted_at IS NULL;
 
--- name: DeleteInvitation :execresult
-DELETE FROM space_invitations WHERE id = ? AND space_id = ?;
+-- Revoking ends a pending invitation by expiring it. The row stays until the
+-- prune job: it is what holds the address in its cooldown.
+-- name: ExpireInvitation :execresult
+UPDATE space_invitations SET expires_at = ?
+WHERE id = ? AND space_id = ? AND accepted_at IS NULL AND expires_at > ?;
+
+-- name: DeleteAcceptedInvitation :execresult
+DELETE FROM space_invitations WHERE id = ? AND space_id = ? AND accepted_at IS NOT NULL;
+
+-- name: DeleteInvitationByID :exec
+DELETE FROM space_invitations WHERE id = ? AND accepted_at IS NULL;
+
+-- name: UnacceptedInvitationsForEmail :many
+SELECT space_id, expires_at FROM space_invitations WHERE email = ? AND accepted_at IS NULL;
+
+-- name: PruneInvitations :execresult
+DELETE FROM space_invitations WHERE accepted_at IS NULL AND expires_at < ?;
+
+-- name: ClearExpiredInvitations :execresult
+DELETE FROM space_invitations WHERE accepted_at IS NULL AND expires_at <= ?;
+
+-- name: ClearExpiredInvitationsForEmail :execresult
+DELETE FROM space_invitations WHERE accepted_at IS NULL AND expires_at <= ? AND email = ?;
+
+-- name: IsSpaceMemberByEmail :one
+SELECT COUNT(*) FROM space_members m JOIN users u ON u.id = m.user_id
+WHERE m.space_id = ? AND u.email = ? AND u.deleted_at IS NULL;
 
 -- name: InsertAudit :exec
 INSERT INTO admin_audit (actor_id, action, space_id, target_user_id, details, created_at)

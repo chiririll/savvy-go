@@ -12,6 +12,7 @@ interface UserFormDialogProps {
     onOpenChange: (open: boolean) => void
     onSubmit: (data: CreateUserFormData | UpdateUserFormData) => void
     isSubmitting?: boolean
+    mail?: { canEmail: boolean; mustEmail: boolean }
 }
 
 export function UserFormDialog({
@@ -20,6 +21,7 @@ export function UserFormDialog({
     onOpenChange,
     onSubmit,
     isSubmitting,
+    mail,
 }: UserFormDialogProps) {
     const { t } = useTranslation('pages')
 
@@ -50,6 +52,7 @@ export function UserFormDialog({
                     formId={formProps.formId}
                     hideSubmit
                     isEdit={isEdit}
+                    mail={mail}
                 />
             )}
         </EntityFormDialog>

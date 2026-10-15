@@ -1,6 +1,6 @@
 {
     "system": {
-        "title": "System Settings",
+        "title": "System settings",
         "heading": "System",
         "description": "Configure system settings",
         "language": {
@@ -8,7 +8,7 @@
             "description": "Appearance and language"
         },
         "currencyRates": {
-            "title": "Currency Rates",
+            "title": "Currency rates",
             "description": "Configure how currency exchange rates are managed",
             "autoUpdate": "Auto-update currency rates",
             "autoUpdateDescription": "When enabled, rates are pulled daily from an external API and manual rate editing is disabled."
@@ -17,38 +17,88 @@
             "title": "Authentication",
             "description": "Control how users sign in to Savvy",
             "passwordLogin": "Password sign-in",
-            "passwordLoginLocked": "Add and enable at least one SSO provider before you can turn this off — it keeps the instance from locking everyone out.",
+            "passwordLoginLocked": "Add and enable at least one SSO provider first. Otherwise everyone could be locked out.",
             "passwordLoginOpen": "When off, users can only sign in through SSO. Active sessions stay signed in.",
             "passwordLoginError": "Enable at least one SSO provider before turning off password sign-in.",
             "locked": "Locked",
-            "jit": "Just-in-time provisioning",
-            "jitDescription": "Automatically create an account on first SSO sign-in. When off, only existing or linked users can sign in.",
+            "jit": "Create accounts on first SSO sign-in",
+            "jitDescription": "When off, only existing or linked users can sign in.",
             "verifiedEmail": "Require a verified email",
             "verifiedEmailOn": "New SSO sign-ups must arrive with an email the provider has verified.",
-            "verifiedEmailOff": "Turn on just-in-time provisioning to enforce this."
+            "verifiedEmailOff": "Turn on just-in-time provisioning to enforce this.",
+            "requireVerification": "Require email confirmation",
+            "requireVerificationOn": "Users with an unconfirmed address can sign in but cannot use the app until they open the link we email them. Accounts created from a link copied out of the app start unconfirmed.",
+            "requireVerificationNeedsMail": "Set up mail and the public URL first: confirmation links are sent by email.",
+            "requireVerificationNeedsYou": "Confirm your own email address first, or you would lock yourself out.",
+            "sendConfirmation": "Email me a confirmation link",
+            "confirmationSent": "Confirmation email sent"
         },
         "server": {
             "title": "Server",
             "description": "How this instance is reached from outside.",
             "appUrl": "Public URL",
-            "appUrlDescription": "Full address users open Savvy at, for example https://savvy.example.com. Required for SSO and passkeys; leave empty to use the APP_URL environment variable.",
-            "appUrlPlaceholder": "https://savvy.example.com"
+            "appUrlDescription": "Full address users open Savvy at, e.g. https://savvy.example.com. Needed for SSO and passkeys. Can also be set as app_url in config.toml.",
+            "appUrlPlaceholder": "https://savvy.example.com",
+            "configReadOnly": "Savvy can't write to config.toml, so this can't be changed here. Set app_url in the file and restart."
+        },
+        "mail": {
+            "title": "Email",
+            "description": "Sends password reset links and invitations.",
+            "saved": "Mail settings saved",
+            "enabled": "Send email",
+            "enabledDescription": "Off keeps the settings below but sends nothing; links are shown to copy instead.",
+            "host": "SMTP server",
+            "protocol": "Connection",
+            "port": "Port",
+            "userHint": "Leave empty for a relay without login.",
+            "passwordHint": "Stored in config.toml in plain text; never shown again.",
+            "passwordKeep": "Leave empty to keep the current password",
+            "fromHint": "Name and address the emails come from.",
+            "skipVerify": "Accept any certificate",
+            "skipVerifyDescription": "Only for a server with a self-signed certificate.",
+            "timeout": "Timeout (seconds)",
+            "timeoutHint": "How long to wait for the server.",
+            "configReadOnly": "Savvy can't write to config.toml, so mail can't be changed here. Edit the [mailer] section in the file and restart.",
+            "working": "Working",
+            "off": "Not configured",
+            "problem": "Switched off: {{problem}}",
+            "protocols": {
+                "starttls": "STARTTLS",
+                "smtps": "SMTPS (TLS)",
+                "smtp": "No encryption"
+            },
+            "user": "Login",
+            "from": "Sender",
+            "password": "Password",
+            "noAppUrl": "The public URL is not set. Links in emails need it.",
+            "testTitle": "Send a test email",
+            "testPlaceholder": "Recipient (default: your email)",
+            "testSend": "Send",
+            "testSent": "Test email sent to {{to}}"
         },
         "spaces": {
             "title": "Spaces",
             "description": "Limits for spaces and invitations.",
             "invitesRegister": "Invitations create accounts",
-            "invitesRegisterDescription": "Someone without an account can register through an invitation link. Who is invited by a non-administrator becomes a guest.",
+            "invitesRegisterDescription": "Someone without an account can register through an invitation link. People invited by a non-administrator become guests.",
             "maxSpaces": "Spaces per user",
-            "maxSpacesDescription": "How many spaces a user may administer. Empty is unlimited, 0 none. Administrators have no limit.",
+            "maxSpacesDescription": "How many spaces a user can administer. Empty = no limit, 0 = none. Administrators have no limit.",
             "quota": "Default size limit (MB)",
             "quotaDescription": "For every space without its own limit. 0 is unlimited.",
             "backupsMax": "Backups per space",
             "backupsMaxDescription": "Older backups of a space are removed. 0 keeps all."
+        },
+        "invitations": {
+            "title": "Invitation cooldown",
+            "description": "After an invitation to an address is revoked or runs out, that address cannot be invited again for one to two hours, so nobody can be flooded with emails. Clear the wait here.",
+            "placeholder": "Address (empty: every address)",
+            "clearOne": "Clear for this address",
+            "clearAll": "Clear for all",
+            "cleared": "Cleared {{count, plural(one: # invitation; other: # invitations)}}"
         }
     },
     "security": {
-        "title": "Security Settings",
+        "title": "Security settings",
         "heading": "Security",
         "description": "Manage your account security settings",
         "password": {
@@ -67,15 +117,15 @@
         },
         "sessions": {
             "title": "Sessions",
-            "description": "Sign out anywhere you are not right now",
-            "logoutOthers": "Sign out of all devices",
+            "description": "Sign out of every other device",
+            "logoutOthers": "Sign out other devices",
             "logoutOthersDescription": "Other browsers and devices will need to sign in again. This one stays signed in.",
             "confirmTitle": "Sign out of other devices?",
             "confirmDescription": "Every other session will be revoked. You will stay signed in here.",
             "confirm": "Sign out everywhere else"
         },
         "twoFactor": {
-            "title": "Two-Factor Authentication",
+            "title": "Two-factor authentication",
             "description": "Require a verification code in addition to your password",
             "authenticator": "Authenticator app",
             "authenticatorDescription": "Use a TOTP app such as Google Authenticator or Authy to generate sign-in codes.",
@@ -92,7 +142,7 @@
             "deleteTitle": "Remove passkey",
             "deleteDescription": "This passkey will no longer be able to sign in to your account.",
             "empty": "No passkeys registered yet.",
-            "domainHint": "Passkeys require a secure origin and a valid domain. Open the app over HTTPS or via localhost — raw IP addresses are not allowed.",
+            "domainHint": "Passkeys need HTTPS or localhost and a real domain. IP addresses don't work.",
             "add": "Add passkey",
             "addTitle": "Add a passkey",
             "addDescription": "Give this passkey a name so you can recognize it later, then follow your browser's prompt.",
@@ -100,40 +150,40 @@
             "waiting": "Waiting for device..."
         },
         "recovery": {
-            "title": "Recovery Codes",
+            "title": "Recovery codes",
             "description": "Single-use codes to access your account if you lose your authenticator",
-            "backup": "Backup recovery codes",
+            "backup": "Backup codes",
             "remaining": "{{count, plural(one: # code remaining; other: # codes remaining)}}. Regenerating invalidates the old set.",
             "regenerate": "Regenerate",
             "regenerating": "Regenerating...",
-            "regenerateTitle": "Regenerate Recovery Codes",
-            "regenerateDescription": "This will invalidate all existing recovery codes. Enter a verification code from your authenticator app to continue."
+            "regenerateTitle": "Regenerate recovery codes",
+            "regenerateDescription": "This invalidates all existing recovery codes. Enter a code from your authenticator app to continue."
         },
         "dialogs": {
-            "enableTitle": "Set up Two-Factor Authentication",
+            "enableTitle": "Set up two-factor authentication",
             "enableDescription": "Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)",
             "manualCode": "Or enter this code manually:",
             "secretCopied": "Secret copied to clipboard",
-            "verifyTitle": "Verify Setup",
+            "verifyTitle": "Verify setup",
             "verifyDescription": "Enter the 6-digit code from your authenticator app to confirm setup.",
             "verifying": "Verifying...",
             "verify": "Verify",
-            "recoveryTitle": "Save Your Recovery Codes",
-            "recoveryDescription": "Store these codes in a safe place. Each code can only be used once.",
-            "copyCodes": "Copy All Codes",
+            "recoveryTitle": "Save your recovery codes",
+            "recoveryDescription": "Store these codes in a safe place. Each works once.",
+            "copyCodes": "Copy all codes",
             "codesCopied": "Recovery codes copied to clipboard",
-            "disableTitle": "Disable Two-Factor Authentication",
+            "disableTitle": "Disable two-factor authentication",
             "disableDescription": "Enter a verification code to disable 2FA. You can use a code from your authenticator app or a recovery code.",
             "disabling": "Disabling...",
             "disable": "Disable 2FA"
         }
     },
     "providers": {
-        "title": "Identity Providers",
-        "create": "Add Identity Provider",
-        "edit": "Edit Identity Provider",
+        "title": "Identity providers",
+        "create": "Add identity provider",
+        "edit": "Edit identity provider",
         "description": "Configure OIDC and SAML single sign-on",
-        "add": "Add Provider",
+        "add": "Add provider",
         "continueWith": "Continue with {{name}}",
         "or": "or",
         "active": "Active",
@@ -143,10 +193,10 @@
         "deleteTitle": "Delete provider?",
         "deleteDescription": "This action cannot be undone. \"{{name}}\" will be permanently removed.",
         "emptyTitle": "Connect your first identity provider",
-        "emptyDescription": "Let your team sign in with the accounts they already have — Microsoft, Google, GitHub, Okta and any OIDC or SAML provider. Endpoints come pre-filled for the popular ones.",
+        "emptyDescription": "Let your team sign in with accounts they already have: Microsoft, Google, GitHub, Okta or any OIDC or SAML provider. Endpoints are pre-filled for the popular ones.",
         "quickSetup": "Quick setup",
         "recommended": "Recommended",
-        "quickSetupDescription": "Pick a provider and connect it in seconds — endpoints and scopes are pre-filled for you.",
+        "quickSetupDescription": "Pick a provider and connect it in seconds. Endpoints and scopes are pre-filled.",
         "bringYourOwn": "Bring your own",
         "change": "Change",
         "connection": "Connection",
@@ -154,13 +204,13 @@
         "provisioning": "Provisioning",
         "provisioningDescription": "What happens when someone signs in through this provider",
         "roleMapping": "Role mapping",
-        "roleMappingDescription": "Assign roles from IdP claims — the first matching rule wins",
-        "noRules": "No rules yet — everyone gets the default role above.",
+        "roleMappingDescription": "Assign roles from IdP claims. The first matching rule wins",
+        "noRules": "No rules yet. Everyone gets the default role above.",
         "addRule": "Add rule",
         "previewTitle": "Login button preview",
         "previewProvider": "Provider",
         "previewVisible": "Visible on the sign-in screen",
-        "previewHidden": "Hidden — enable to show on login",
+        "previewHidden": "Hidden. Enable it to show on the sign-in screen",
         "registerUrls": "Register these URLs in your identity provider.",
         "acsUrl": "ACS (Reply) URL",
         "entityId": "SP Entity ID / Metadata",
@@ -168,10 +218,10 @@
         "copied": "Copied to clipboard"
     },
     "import": {
-        "title": "Import Transactions",
+        "title": "Import transactions",
         "description": "Import transactions from a CSV file",
-        "readOnlyTitle": "Read-Only Mode",
-        "readOnlyDescription": "You don't have permission to import transactions. Please contact an administrator if you need write access.",
+        "readOnlyTitle": "Read-only mode",
+        "readOnlyDescription": "You don't have permission to import transactions. Ask an administrator for write access.",
         "steps": {
             "upload": "Upload",
             "mapping": "Mapping",
@@ -184,28 +234,28 @@
         "importing": "Importing...",
         "importingProgress": "Importing transactions…",
         "importCount": "Import {{tilde}}{{count}} Transactions",
-        "importAnother": "Import Another File",
+        "importAnother": "Import another file",
         "processFailed": "Failed to process file",
         "dropzone": "Drop CSV file here or click to browse",
-        "dropzoneHint": "Parallel multipart upload — up to 512MB",
-        "uploading": "Uploading parts in parallel…",
-        "parsing": "Parsing file on the server…",
-        "filePreview": "File Preview",
+        "dropzoneHint": "Up to 512 MB",
+        "uploading": "Uploading…",
+        "parsing": "Reading the file…",
+        "filePreview": "File preview",
         "rowsDetected": "{{count}} rows detected",
         "dateFormat": "Date format:",
         "amountFormat": "Amount format:",
         "delimiter": "Delimiter:",
         "moreRows": "... and {{count}} more rows",
-        "requiredFields": "Required Fields",
-        "optionalFields": "Optional Fields",
-        "formatSettings": "Format Settings",
+        "requiredFields": "Required fields",
+        "optionalFields": "Optional fields",
+        "formatSettings": "Format settings",
         "willCreate": "Will be created",
         "duplicatesSkipped": "Duplicates (skipped)",
         "duplicatesSkippedSample": "Duplicates (skipped) in sample",
         "errors": "Errors",
         "errorsSample": "Errors in sample",
-        "sampledNote": "Large file: validated a sample of {{sampled}} of {{total}} rows. Exact created/skipped counts are reported after the import runs.",
-        "newEntities": "New entities will be created:",
+        "sampledNote": "Large file: checked a sample of {{sampled}} of {{total}} rows. Exact created and skipped counts are shown after the import runs.",
+        "newEntities": "New items will be created:",
         "categories": "Categories:",
         "categoryMapping": {
             "title": "Categories from the file",
@@ -230,17 +280,17 @@
         "warnings": "Warnings:",
         "errorsSkipped": "Errors (will be skipped):",
         "rowDetail": "Row {{row}}: {{detail}}",
-        "complete": "Import Complete!",
-        "noneImported": "No Transactions Imported",
+        "complete": "Import complete!",
+        "noneImported": "No transactions imported",
         "successCount": "Successfully imported {{count, plural(one: # transaction; other: # transactions)}}",
         "allSkipped": "All transactions were either duplicates or had errors",
         "created": "Created",
         "skippedDuplicates": "Skipped (duplicates)",
-        "newEntitiesCreated": "New Entities Created",
+        "newEntitiesCreated": "New entities created",
         "categoriesLabel": "Categories",
         "tagsLabel": "Tags",
         "errorsCount": "Errors ({{count}})",
-        "viewTransactions": "View Transactions"
+        "viewTransactions": "View transactions"
     },
     "monitoring": {
         "title": "Monitoring",
@@ -297,8 +347,8 @@
     "backups": {
         "title": "Backups",
         "description": "Manage database backups",
-        "create": "Create Backup",
-        "upload": "Upload Backup",
+        "create": "Create backup",
+        "upload": "Upload backup",
         "date": "Date",
         "size": "Size",
         "version": "Version",
@@ -312,47 +362,47 @@
         },
         "statusHelp": {
             "current": "This backup’s schema matches the running app.",
-            "unsigned": "This backup was made elsewhere or edited, so its signature is not trusted here. You can still restore it.",
+            "unsigned": "This backup was made elsewhere or edited, so its signature isn't trusted here. You can still restore it.",
             "invalid": "This file is not a database Savvy can read."
         },
-        "empty": "No backups yet. Create your first backup to get started.",
+        "empty": "No backups yet.",
         "download": "Download",
         "restore": "Restore",
-        "createTitle": "Create Backup",
+        "createTitle": "Create backup",
         "createDescription": "Create a new backup of the current database.",
         "noteOptional": "Note (optional)",
         "notePlaceholder": "e.g., Before major update",
-        "uploadTitle": "Upload Backup",
+        "uploadTitle": "Upload backup",
         "uploadDescription": "Upload a backup archive (.zip) or a database file (.sqlite).",
-            "laravel": {
-                "intro": "This is a database of the Laravel version. It is not kept as a backup: it is converted to the current format and restored right away. Choose what to restore it as.",
-                "target": {
-                    "server": {
-                        "title": "The whole server",
-                        "description": "Replaces everything on this server: users, spaces and settings. You will have to sign in with an account from the old database."
-                    },
-                    "space": {
-                        "title": "This space",
-                        "description": "Replaces the data of this space with the old finances. Users are not imported."
-                    },
-                    "new": {
-                        "title": "A new space",
-                        "description": "Creates a new space with the old finances and makes you its admin. Users are not imported."
-                    }
+        "laravel": {
+            "intro": "This is a database from the Laravel version. It will be upgraded to the current format and saved as a backup. Your file is not kept, so keep your own copy. Nothing changes until you restore that backup. Choose what to upgrade it for.",
+            "target": {
+                "server": {
+                    "title": "The whole server",
+                    "description": "Saves a server backup with the old users, spaces and settings. Restoring it replaces everything on this server, and you will have to sign in with an account from the old database."
                 },
-                "action": {
-                    "server": "Replace the server",
-                    "space": "Replace this space",
-                    "new": "Import as a new space"
+                "space": {
+                    "title": "This space",
+                    "description": "Saves a backup of this space with the old finances. Restoring it replaces the data of this space. Users are not imported."
                 },
-                "appKey": "Laravel APP_KEY (optional)",
-                "appKeyHint": "From the .env of the old install. It decrypts two-factor secrets. Without it two-factor sign-in is switched off for those users, so they can still sign in with their password."
+                "new": {
+                    "title": "A new space",
+                    "description": "Creates a new space with the old finances and makes you its admin. Users are not imported."
+                }
             },
-        "backupFile": "Backup File",
+            "action": {
+                "server": "Upgrade and save as backup",
+                "space": "Upgrade and save as backup",
+                "new": "Import as a new space"
+            },
+            "appKey": "Laravel APP_KEY (optional)",
+            "appKeyHint": "From the .env of the old install. Used to decrypt two-factor secrets. Without it, two-factor is switched off for those users and they sign in with a password only."
+        },
+        "backupFile": "Backup file",
         "uploadNotePlaceholder": "e.g., Backup from old device",
-        "restoreTitle": "Restore Backup?",
+        "restoreTitle": "Restore backup?",
         "restoreDescription": "This will replace all current data with the backup from {{date}}. This action cannot be undone.",
-        "deleteTitle": "Delete Backup?",
+        "deleteTitle": "Delete backup?",
         "deleteDescription": "This will permanently delete the backup from {{date}}."
     },
     "api": {
@@ -361,10 +411,6 @@
         "description": "Connect external apps and scripts to your Savvy instance",
         "docs": "API docs",
         "copyFailed": "Could not copy to clipboard",
-        "scope": {
-            "read": "Read only",
-            "read-write": "Read & write"
-        },
         "tokens": {
             "title": "API tokens",
             "description": "Each connected app gets its own token. Revoke it any time.",
@@ -374,30 +420,87 @@
             "neverUsed": "Never used",
             "expires": "Expires {{date}}",
             "noExpiry": "No expiration",
+            "editAria": "Change what the token may do",
             "revokeAria": "Revoke token",
             "revokeTitle": "Revoke API token",
             "revokeDescription": "Apps using \"{{name}}\" will immediately lose access.",
-            "revoke": "Revoke"
+            "revoke": "Revoke",
+            "allSpaces": "All spaces",
+            "spaceCount": "{{count, plural(one: # space; other: # spaces)}}",
+            "canRead": "Read: {{list}}",
+            "canWrite": "Read & write: {{list}}",
+            "noAccess": "Cannot read any data",
+            "canDelete": "Read, write & delete: {{list}}"
         },
         "create": {
             "title": "New API token",
             "description": "Name the app that will use this token.",
             "name": "Name",
             "namePlaceholder": "e.g. Home automation",
-            "access": "Access",
-            "accessHint": {
-                "read": "The app can only read your data.",
-                "read-write": "The app can read and change your data, up to your own permissions."
-            },
             "expiry": "Expiration",
             "expiryNever": "Never",
-            "expiryDays": "{{count}} days"
+            "expiryDays": "{{count}} days",
+            "spaces": "Spaces",
+            "spacesHint": "The token cannot see any other space.",
+            "permissions": "What it may do",
+            "permissionsDetails": "Permissions by part of a space",
+            "permissionsHint": "Grant only what the app needs. It can never do more than your own role in a space allows."
+        },
+        "edit": {
+            "title": "Change {{name}}",
+            "description": "The app keeps working with the new rights from its next request. Nothing has to be connected again.",
+            "hint": "Taking something away cuts the app off from it at once. It can never do more than your own role in a space allows."
         },
         "created": {
             "title": "Copy your token",
             "description": "This is the only time it is shown. Store it somewhere safe.",
             "copy": "Copy token",
             "done": "Done"
+        },
+        "column": {
+            "read": "Read",
+            "write": "Write",
+            "delete": "Delete"
+        },
+        "resource": {
+            "accounts": "Accounts",
+            "automation": "Automation rules",
+            "budgets": "Budgets",
+            "categories": "Categories",
+            "currencies": "Currencies",
+            "debts": "Debts",
+            "recurring": "Recurring transactions",
+            "reports": "Reports",
+            "space": "Space info and members",
+            "tags": "Tags",
+            "transactions": "Transactions (and imports)",
+            "transfers": "Transfers between spaces"
+        },
+        "spaces": {
+            "all": "All my spaces",
+            "allHint": "Including spaces you join or create later. Leave it off to choose.",
+            "none": "Choose at least one space."
+        },
+        "preset": {
+            "viewer": "Viewer",
+            "editor": "Editor",
+            "admin": "Admin",
+            "custom": "Custom"
+        },
+        "presetHint": {
+            "viewer": "Reads everything in the chosen spaces and changes nothing.",
+            "editor": "Can read all and edit almost everything.",
+            "admin": "Reads, changes and deletes everything in the chosen spaces. Space administration, backups and security stay with you.",
+            "custom": "Choose what the token may do for each part of a space."
+        },
+        "sync": {
+            "title": "Space synchronisation",
+            "both": "categories and tags",
+            "categories": "categories",
+            "tags": "tags",
+            "mirrored": "{{space}} keeps its {{kind}} identical with {{others}}: what this token changes there changes in those spaces too.",
+            "unreachable": "{{space}} keeps its {{kind}} identical with {{others}}, which this token cannot reach. It will be refused when it tries to change them in {{space}}. Choose those spaces too, or leave categories and tags out.",
+            "hidden": "{{count, plural(one: # space you are not a member of; other: # spaces you are not a member of)}}"
         }
     },
     "spaces": {
@@ -419,7 +522,85 @@
         "create": {
             "title": "New space",
             "description": "A space keeps its own accounts, categories and currencies. You will be its admin.",
-            "submit": "Create"
+            "submit": "Create",
+            "failed": "Could not create the space",
+            "intro": {
+                "finances": "A space holds its own finances: accounts, transactions, categories and tags.",
+                "currency": "It has its own base currency, and the other currencies you use in it.",
+                "members": "You can invite members to it and give each a role.",
+                "separate": "Spaces are separate from each other. You can switch between them at any time."
+            },
+            "copy": {
+                "source": "Start from",
+                "defaults": "The defaults",
+                "what": "Copy from this space",
+                "kinds": {
+                    "currencies": "Currencies",
+                    "accounts": "Accounts (without balances)",
+                    "categories": "Categories",
+                    "tags": "Tags"
+                },
+                "hint": "A one-time copy. The spaces stay independent. Anything not copied starts from the defaults."
+            },
+            "currencies": {
+                "title": "Currencies",
+                "hint": "Money in a space is kept in these currencies. Rates come from the rate source.",
+                "base": "Base currency",
+                "basePlaceholder": "Choose the base currency",
+                "add": "Add a currency",
+                "remove": "Remove {{code}}",
+                "loading": "Loading currencies…",
+                "failed": "Could not load the currency list."
+            },
+            "accounts": {
+                "title": "Accounts",
+                "hint": "Optional. Wallets and bank cards, each in one currency.",
+                "name": "Name",
+                "currency": "Currency",
+                "balance": "Opening balance",
+                "add": "Add an account",
+                "remove": "Remove the account"
+            },
+            "categories": {
+                "title": "Categories",
+                "hint": "Rename, remove or add. The default category of each type stays.",
+                "name": "Category name",
+                "new": "New category",
+                "add": "Add the category",
+                "remove": "Remove {{name}}",
+                "protected": "The default category of its type cannot be removed"
+            },
+            "tags": {
+                "title": "Tags",
+                "hint": "Optional.",
+                "new": "New tag",
+                "add": "Add the tag",
+                "remove": "Remove {{name}}"
+            },
+            "summary": {
+                "base": "Base currency",
+                "currencies": "Other currencies",
+                "accounts": "Accounts",
+                "categories": "Categories",
+                "tags": "Tags"
+            },
+            "done": {
+                "title": "Space created",
+                "invite": "Invite members",
+                "text": "\"{{name}}\" is ready. You can invite more members later in the space settings.",
+                "invitations": "Invitations",
+                "notSent": "Not sent: {{error}}",
+                "retry": "You can invite them again from the space settings."
+            },
+            "members": {
+                "add": "Add",
+                "remove": "Remove {{who}}",
+                "none": "No one added yet.",
+                "invalid": "Enter a valid email address.",
+                "duplicate": "This address is already in the list.",
+                "byEmail": "by email",
+                "byLink": "link to copy"
+            }
         },
         "toasts": {
             "created": "Space created",
@@ -432,6 +613,7 @@
             "invitationRevoked": "Invitation revoked",
             "linked": "Spaces linked",
             "unlinked": "Spaces unlinked",
+            "syncApplied": "Sync group updated",
             "transferSent": "Transfer sent",
             "transferResolved": "Transfer updated",
             "transferDeleted": "Transfer deleted",
@@ -457,14 +639,29 @@
         },
         "invitations": {
             "title": "Invitations",
-            "description": "Single-use links to join this space, valid for 7 days.",
-            "emailPlaceholder": "Email (optional: only this person can use it)",
-            "create": "Create link",
+            "description": "Invitations to join this space, valid for 7 days. One sent by email can only be used by that address.",
+            "emailPlaceholder": "Email address",
+            "notePlaceholder": "Note (optional)",
             "linkReady": "Send this link to the person you invite. It is shown only once.",
             "copied": "Link copied",
+            "emailSent": "Invitation emailed to {{email}}",
             "anyone": "Anyone with the link",
             "expires": "Expires {{date}}",
-            "revoke": "Revoke"
+            "revoke": "Revoke",
+            "copy": "Copy link",
+            "sent": "Email sent",
+            "cancel": "Cancel the invitation",
+            "cancelTitle": "Cancel this invitation?",
+            "cancelText": "The link for {{who}} will stop working. You can invite again at any time.",
+            "cancelConfirm": "Cancel invitation",
+            "keep": "Keep it",
+            "method": "Invite by",
+            "methodEmail": "By email",
+            "methodLink": "Copy a link",
+            "unavailable": "Invitations are unavailable: this server only invites by email, and email is off.",
+            "emailOff": "Invitations cannot be emailed: {{reason}}",
+            "emailRequired": "This server requires invitations by email, so the link goes only to the address you enter.",
+            "add": "Invite"
         },
         "links": {
             "title": "Linked spaces",
@@ -476,6 +673,45 @@
             "choose": "Space to link",
             "link": "Link",
             "howTo": "You can link spaces you administer. To link with someone else's space, ask them to invite you as an admin."
+        },
+        "sync": {
+            "title": "Shared categories and tags",
+            "description": "Spaces in a group keep their categories and tags identical: what is added, changed or deleted in one appears in the others.",
+            "none": "This space is not in a group. Pick the spaces to share with.",
+            "kinds": {
+                "categories": "Categories",
+                "tags": "Tags"
+            },
+            "types": {
+                "income": "income",
+                "expense": "expense"
+            },
+            "setup": "Set up…",
+            "choose": "Space to add",
+            "add": "Add",
+            "remove": "Remove from group",
+            "removeTitle": "Take {{name}} out of the group?",
+            "removeDescription": "Its categories and tags stay as they are but no longer follow the other spaces.",
+            "hidden": "{{count, plural(one: # more space you are not a member of; other: # more spaces you are not a member of)}}",
+            "rights": "Changing categories or tags needs the editor role in every space of the group.",
+            "howTo": "You can group spaces you administer. To share with someone else's space, ask them to invite you as an admin.",
+            "dialog": {
+                "title": "Make the spaces identical",
+                "description": "These differ between the spaces. Decide what stays; nothing changes until you apply.",
+                "loading": "Comparing the spaces…",
+                "identical": "The spaces are already identical.",
+                "presentIn": "In: {{spaces}}",
+                "missingIn": "missing in: {{spaces}}",
+                "keep": "Keep",
+                "keepAdd": "Keep and add where missing",
+                "drop": "Delete everywhere",
+                "dropTag": "Delete everywhere (transactions lose the tag)",
+                "look": "Use the icon and color from",
+                "successor": "Move its transactions to",
+                "successorPlaceholder": "Choose a category",
+                "defaultTitle": "Default {{type}} category",
+                "apply": "Apply"
+            }
         },
         "transfers": {
             "title": "Transfers needing attention",
@@ -589,6 +825,34 @@
                 "assigned": "Admin assigned",
                 "restored": "Space restored"
             }
+        },
+        "mcp": {
+            "title": "AI assistants (MCP)",
+            "description": "Let an AI app such as Claude connect to this server and read your data. New apps can only register while you allow it, for a few minutes and for one app at a time.",
+            "closed": "Closed. No new app can register.",
+            "open": "Open until {{time}}. It closes by itself, or as soon as one app registers.",
+            "allow": "Allow a new app for 5 minutes",
+            "close": "Close now",
+            "endpoint": "Server address to add in the app",
+            "copy": "Copy",
+            "copied": "Address copied",
+            "openFailed": "Could not open registration.",
+            "closeFailed": "Could not close registration.",
+            "apps": {
+                "title": "Registered apps",
+                "none": "No app has registered yet.",
+                "help": "Every app a user has connected must first be allowed by that user on the consent page. Check the address an app registered from. The address is what the server saw, so behind a proxy it is only as reliable as the proxy's headers.",
+                "disconnect": "Disconnect",
+                "ip": "IP address",
+                "userAgent": "Client",
+                "origin": "Origin",
+                "redirects": "Returns to",
+                "registeredAt": "Registered",
+                "unknown": "not sent",
+                "removeTitle": "Remove {{name}}?",
+                "removeDescription": "The app and every connection it holds are deleted at once. It has to register again, which needs a new window.",
+                "removeFailed": "Could not remove the app."
+            }
         }
     },
     "invite": {
@@ -604,5 +868,49 @@
         "register": "Create account and join",
         "haveAccount": "Already have an account?",
         "signIn": "Sign in"
+    },
+    "checks": {
+        "title": "Status",
+        "fix": "Fix",
+        "items": {
+            "app_url_missing": {
+                "title": "Public URL is not set",
+                "description": "Invitation and password links point nowhere, and AI apps cannot connect.",
+                "action": "Set it in System"
+            },
+            "mail_off": {
+                "title": "Email is not set up",
+                "description": "The server cannot send invitations or password links. Share the links by hand.",
+                "action": "Set up email"
+            },
+            "mail_invalid": {
+                "title": "Email settings are invalid",
+                "description": "Email is switched off until the [mailer] section of the config file is fixed.",
+                "action": "Fix email settings"
+            },
+            "backup_missing": {
+                "title": "No server backup yet",
+                "description": "Backups are made by hand. Without one, a lost disk loses every space.",
+                "action": "Make a backup"
+            },
+            "backup_stale": {
+                "title": "{{count, plural(one: Last server backup is # day old; other: Last server backup is # days old)}}",
+                "description": "Backups are made by hand. Make a new one to keep recent changes safe.",
+                "action": "Make a backup"
+            },
+            "disk_filling": {
+                "title": "Data disk is {{count}}% full",
+                "description": "Uploads and backups need room. Free some space or move the data directory.",
+                "action": "Open monitoring"
+            },
+            "config_read_only": {
+                "title": "Config file is read-only",
+                "description": "Settings kept in config.toml, such as the public URL and email, cannot be changed here.",
+                "action": "Open System"
+            }
+        },
+        "pageTitle": "Server status",
+        "description": "Problems the server found with its own setup. Each one links to the page that fixes it.",
+        "allGood": "Everything looks fine. Nothing needs attention."
     }
 }

@@ -12,6 +12,7 @@
 <p align="center">
 <a href="https://hub.docker.com/r/chiririll/savvy-go"><img src="https://img.shields.io/docker/v/chiririll/savvy-go?style=for-the-badge&logo=docker&logoColor=white" alt="Docker"></a>
 <a href="https://github.com/chiririll/savvy-go/releases/latest"><img src="https://img.shields.io/github/v/release/chiririll/savvy-go?style=for-the-badge&logo=github" alt="Version"></a>
+<img src="https://img.shields.io/badge/99%25-Vibe_Coded-D97757?style=for-the-badge&logo=claude&logoColor=white" alt="99% Vibe Coded">
 <img src="https://img.shields.io/github/license/chiririll/savvy-go?style=for-the-badge" alt="License">
 </p>
 
@@ -44,6 +45,8 @@ Open http://localhost:8080 and create your account. For Docker Compose, reverse 
 - **Backups** — signed backups of each space and of the whole server, restore or import as a new space
 - **Sign-in** — passwords, two-factor (TOTP), passkeys and single sign-on (OIDC)
 - **API** — tokens for scripts and other apps, with an OpenAPI reference
+- **MCP** — connect AI assistant to ask about your spending or let it edit or configure your space
+- **Localization** — support of several languages
 
 <p align="center">
   <img src="docs/images/report.jpg" alt="Go Savvy Reports" width="1920">
@@ -63,6 +66,7 @@ Fully responsive design built with ShadCN/UI — track expenses from your phone 
 - [Deployment](docs/deployment.md) — Docker Compose, environment, reverse proxies, health checks, Kubernetes, Debian, updating
 - [Data and backups](docs/data-and-backups.md) — the data directory, the signing key, backups and upgrading from the Laravel version
 - [API](docs/api.md) — tokens, endpoints and the OpenAPI reference
+- [MCP](docs/mcp.md) — connect AI assistant to your data
 - [Development](docs/development.md) — running from source and how the app is built
 
 ## 🔒 Privacy

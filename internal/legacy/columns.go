@@ -18,6 +18,7 @@ var extraColumns = map[string][]addColumn{
 	"users": {
 		{"role", "TEXT NOT NULL DEFAULT 'admin'"},
 		{"is_sso_only", "INTEGER NOT NULL DEFAULT 0"},
+		{"email_verified", "INTEGER NOT NULL DEFAULT 0"},
 		{"two_factor_secret", "TEXT"},
 		{"two_factor_enabled", "INTEGER NOT NULL DEFAULT 0"},
 		{"two_factor_confirmed", "INTEGER NOT NULL DEFAULT 0"},

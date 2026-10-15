@@ -3,12 +3,14 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { ACCOUNT_TYPES } from '@/types/accounts'
-import { API_TOKEN_SCOPES } from '@/types/api-tokens'
+import { API_PERMISSION_LEVELS } from '@/types/api-tokens'
 import { ACTION_TYPES, CONDITION_OPERATORS, TRIGGER_TYPES } from '@/types/automation'
 import { BACKUP_STATUSES } from '@/types/backup'
 import { BUDGET_PERIODS } from '@/types/budgets'
+import { CHECK_IDS, CHECK_SEVERITIES } from '@/types/checks'
 import { CATEGORY_TYPES } from '@/types/categories'
 import { DEBT_TYPE_VALUES } from '@/types/debts'
+import { MAIL_PROTOCOLS } from '@/types/mail'
 import { RECURRING_FREQUENCIES } from '@/types/recurring'
 import { SPACE_ROLES, TRANSFER_REVIEWS } from '@/types/spaces'
 import { ALL_TRANSACTION_TYPES, TRANSACTION_STATUSES } from '@/types/transactions'
@@ -67,7 +69,6 @@ const spaceSchema = sqlEnums('internal/migrate/sql/space/0001_initial.sql')
 describe('enum columns in the database schema', () => {
     const cases: Array<[string, Map<string, string[]>, string, readonly string[]]> = [
         ['users.role', serverSchema, 'users.role', USER_ROLES],
-        ['api_tokens.scope', serverSchema, 'api_tokens.scope', API_TOKEN_SCOPES],
         ['space_members.role', serverSchema, 'space_members.role', SPACE_ROLES],
         ['space_invitations.role', serverSchema, 'space_invitations.role', SPACE_ROLES],
         ['accounts.type', spaceSchema, 'accounts.type', ACCOUNT_TYPES],
@@ -92,7 +93,7 @@ describe('enum columns in the database schema', () => {
 describe('frontend value lists', () => {
     const lists: Record<string, readonly string[]> = {
         USER_ROLES,
-        API_TOKEN_SCOPES,
+        API_PERMISSION_LEVELS,
         SPACE_ROLES,
         TRANSFER_REVIEWS,
         ACCOUNT_TYPES,
@@ -107,6 +108,7 @@ describe('frontend value lists', () => {
         ACTION_TYPES,
         BACKUP_STATUSES,
         SSO_ERROR_CODES,
+        MAIL_PROTOCOLS,
     }
 
     it.each(Object.entries(lists))('%s has no duplicates', (_, values) => {
@@ -116,13 +118,42 @@ describe('frontend value lists', () => {
 
 describe('automation', () => {
     it('knows every condition operator the backend evaluates', () => {
-        const body = goFunc('internal/domain/automation.go', 'func evaluateCondition(')
+        const body = goFunc('internal/automation/automation.go', 'func evaluateCondition(')
         expect(sorted(CONDITION_OPERATORS)).toEqual(sorted(quoted(body.match(/case [^\n]*:/g)!.join('\n'))))
     })
 
     it('knows every action the backend executes', () => {
-        const body = goFunc('internal/domain/automation.go', 'func (s Automation) executeActions(')
+        const body = goFunc('internal/automation/automation.go', 'func (s Service) executeActions(')
         expect(sorted(ACTION_TYPES)).toEqual(sorted(quoted(body.match(/case [^\n]*:/g)!.join('\n'))))
+    })
+})
+
+describe('mail protocols', () => {
+    it('are the ones the mailer accepts', () => {
+        const source = read('internal/mailer/mailer.go')
+        const fromGo = [...source.matchAll(/^	[A-Za-z]+\s+= "([a-z]+)"\s+\/\//gm)].map((m) => m[1])
+        expect(sorted(MAIL_PROTOCOLS)).toEqual(sorted(fromGo))
+    })
+})
+
+describe('server checks', () => {
+    const source = () => read('internal/httpserver/checks.go')
+
+    it('are the ids the backend reports', () => {
+        const fromGo = [...source().matchAll(/add\("([a-z_]+)"/g)].map((m) => m[1])
+        expect(sorted(CHECK_IDS)).toEqual(sorted(fromGo))
+    })
+
+    it('have the severities the backend uses', () => {
+        const fromGo = [...source().matchAll(/^	severity[A-Za-z]+\s+= "([a-z]+)"/gm)].map((m) => m[1])
+        expect(sorted(CHECK_SEVERITIES)).toEqual(sorted(fromGo))
+    })
+
+    it('have a title and description', () => {
+        for (const id of CHECK_IDS) {
+            expect(enSettings.checks.items[id].title).toBeTruthy()
+            expect(enSettings.checks.items[id].description).toBeTruthy()
+        }
     })
 })
 
@@ -135,11 +166,11 @@ describe('backup status', () => {
 })
 
 describe('SSO sign-in errors', () => {
-    // Codes that can reach /auth/sso/callback?error=: everything in the sso_*.go
-    // files (provider round trip, provisioning), plus the generic code the
+    // Codes that can reach /auth/sso/callback?error=: everything in package sso
+    // but sso.go (provider round trip, provisioning), plus the generic code the
     // handler falls back to. sso.go itself only validates admin input, whose
     // errors go to the provider form, not the callback.
-    const callbackFiles = goFiles('internal/domain').filter((file) => /\/sso_\w+\.go$/.test(file))
+    const callbackFiles = goFiles('internal/sso').filter((file) => !file.endsWith('/sso.go'))
     const emitted = callbackFiles.flatMap((file) =>
         [...read(file).matchAll(/ssoErr\(\s*"([a-z_]+)"/g)].map((m) => m[1]),
     )
@@ -169,12 +200,30 @@ describe('API routes', () => {
     })
 })
 
+describe('API token permissions', () => {
+    const source = read('internal/auth/permissions.go')
+
+    // The parts of a space and the presets come from the server (api-token-capabilities);
+    // only the order of the levels, which the grid ticks by, lives here.
+    it('orders the levels the backend grants', () => {
+        const levels = [...source.matchAll(/Perm(?:Read|Write|Delete)\s*= "([a-z]+)"/g)].map((m) => m[1])
+        expect(sorted(API_PERMISSION_LEVELS)).toEqual(sorted(levels))
+    })
+
+    it('has a label for every resource and preset', () => {
+        const resources = /var APIResources = \[\]string\{([^}]*)\}/.exec(source)![1]
+        expect(sorted(Object.keys(enSettings.api.resource))).toEqual(sorted(quoted(resources)))
+        const presets = [...source.matchAll(/Preset(?:Viewer|Editor|Admin)\s*= "([a-z]+)"/g)].map((m) => m[1])
+        expect(sorted(Object.keys(enSettings.api.preset).filter((k) => k !== 'custom'))).toEqual(sorted(presets))
+    })
+})
+
 describe('space permissions', () => {
     it('lets the same roles write as the backend does', () => {
-        const source = read('internal/domain/space.go')
-        const consts = Object.fromEntries([...source.matchAll(/(Space\w+)\s*=\s*"([a-z]+)"/g)].map((m) => [m[1], m[2]]))
-        const body = /func CanWriteSpace\([^)]*\) bool \{([^}]*)\}/.exec(source)![1]
-        const writable = [...body.matchAll(/role == (Space\w+)/g)].map((m) => consts[m[1]])
+        const source = read('internal/spaces/space.go')
+        const consts = Object.fromEntries([...source.matchAll(/(Role\w+)\s*=\s*"([a-z]+)"/g)].map((m) => [m[1], m[2]]))
+        const body = /func CanWrite\([^)]*\) bool \{([^}]*)\}/.exec(source)![1]
+        const writable = [...body.matchAll(/role == (Role\w+)/g)].map((m) => consts[m[1]])
 
         expect(writable.length).toBeGreaterThan(0)
         expect(SPACE_ROLES.filter(canWriteSpace).sort()).toEqual(writable.sort())

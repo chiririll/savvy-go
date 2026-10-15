@@ -2,11 +2,14 @@ package httpserver
 
 import (
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"savvy-go/internal/auth"
+	"savvy-go/internal/mailer"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -38,6 +41,10 @@ func (s *Server) usersStore(w http.ResponseWriter, r *http.Request) {
 		Email    string  `json:"email"`
 		Password *string `json:"password"`
 		Role     string  `json:"role"`
+		// An admin vouching for the address, e.g. when mail is not set up.
+		EmailVerified bool `json:"emailVerified"`
+		// Email the set-password link instead of returning it. Needs a user without a password.
+		Send bool `json:"send"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeValidation(w, map[string][]string{"email": {"The given data was invalid."}})
@@ -59,6 +66,19 @@ func (s *Server) usersStore(w http.ResponseWriter, r *http.Request) {
 	if existing, _ := s.users.ByEmail(r.Context(), body.Email); existing != nil {
 		errs["email"] = []string{"The email has already been taken."}
 	}
+	hasPassword := body.Password != nil && *body.Password != ""
+	switch {
+	case body.Send && hasPassword:
+		errs["send"] = []string{"A user with a password needs no link."}
+	case body.Send:
+		if problem := s.linkMailProblem(r); problem != "" {
+			writeMessage(w, http.StatusUnprocessableEntity, problem)
+			return
+		}
+	case !hasPassword && !body.EmailVerified && s.emailVerificationRequired(r.Context()):
+		// A link handed over by the admin proves nothing about the mailbox.
+		errs["send"] = []string{"Email verification is required, so the link has to be emailed."}
+	}
 	if len(errs) > 0 {
 		writeValidation(w, errs)
 		return
@@ -68,9 +88,12 @@ func (s *Server) usersStore(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	if _, err := s.spaces.Provision(r.Context(), u); err != nil {
-		writeMessage(w, http.StatusInternalServerError, err.Error())
-		return
+	if body.EmailVerified {
+		if err := s.users.SetEmailVerified(r.Context(), u.ID, true); err != nil {
+			writeMessage(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		u.EmailVerified = true
 	}
 	payload := u.ResourceJSON()
 	if u.IsInactive() {
@@ -79,8 +102,17 @@ func (s *Server) usersStore(w http.ResponseWriter, r *http.Request) {
 			writeMessage(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		payload["token"] = tok
 		payload["expiresAt"] = exp.UTC().Format("2006-01-02T15:04:05.000000Z")
+		switch {
+		case !body.Send:
+			payload["token"] = tok
+		case s.sendMail(r.Context(), mailer.PasswordReset(u.Email, u.Name, s.cfg.URL()+"/set-password/"+tok, exp)) != nil:
+			// The user exists but nobody saw the link: do not leave it valid. A reset can try again.
+			_ = s.tokens.RevokeActive(r.Context(), u.ID)
+			payload["emailError"] = "Could not send the email."
+		default:
+			payload["emailSent"] = true
+		}
 	}
 	writeData(w, http.StatusCreated, payload)
 }
@@ -95,6 +127,8 @@ func (s *Server) usersUpdate(w http.ResponseWriter, r *http.Request) {
 		Email    *string `json:"email"`
 		Password *string `json:"password"`
 		Role     *string `json:"role"`
+		// An admin's word that the address is theirs; without it a new address is unverified.
+		EmailVerified *bool `json:"emailVerified"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeValidation(w, map[string][]string{"email": {"The given data was invalid."}})
@@ -124,7 +158,7 @@ func (s *Server) usersUpdate(w http.ResponseWriter, r *http.Request) {
 	if body.Role != nil && u.IsGuest() && *body.Role != auth.RoleGuest {
 		_ = s.spaces.Audit(r.Context(), userFrom(r), "promote_guest", nil, &u.ID, *body.Role)
 	}
-	updated, err := s.users.Update(r.Context(), u.ID, body.Name, body.Email, body.Role, body.Password)
+	updated, err := s.users.Update(r.Context(), u.ID, body.Name, body.Email, body.Role, body.Password, body.EmailVerified)
 	if err != nil {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
@@ -170,15 +204,54 @@ func (s *Server) usersIssueToken(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusUnprocessableEntity, "This user signs in with SSO and has no password.")
 		return
 	}
+	// The body is optional: {"send": true} emails the link instead of returning it.
+	var body struct {
+		Send bool `json:"send"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil && !errors.Is(err, io.EOF) {
+		writeValidation(w, map[string][]string{"body": {"The given data was invalid."}})
+		return
+	}
+	if body.Send {
+		if problem := s.linkMailProblem(r); problem != "" {
+			writeMessage(w, http.StatusUnprocessableEntity, problem)
+			return
+		}
+	}
 	tok, exp, err := s.tokens.Issue(r.Context(), u)
 	if err != nil {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	payload := u.ResourceJSON()
-	payload["token"] = tok
 	payload["expiresAt"] = exp.UTC().Format("2006-01-02T15:04:05.000000Z")
+	if !body.Send {
+		payload["token"] = tok
+		writeData(w, http.StatusOK, payload)
+		return
+	}
+	if err := s.sendMail(r.Context(), mailer.PasswordReset(u.Email, u.Name, s.cfg.URL()+"/set-password/"+tok, exp)); err != nil {
+		// The link was never seen by anyone: do not leave it valid.
+		_ = s.tokens.RevokeActive(r.Context(), u.ID)
+		writeMessage(w, http.StatusUnprocessableEntity, "Could not send the email: "+err.Error())
+		return
+	}
+	payload["emailSent"] = true
 	writeData(w, http.StatusOK, payload)
+}
+
+// linkMailProblem says why a set-password link cannot be emailed right now; ""
+// when it can.
+func (s *Server) linkMailProblem(r *http.Request) string {
+	switch {
+	case !s.mailer().Enabled():
+		return s.mailOffReason()
+	case s.passwordLoginDisabled(r):
+		return "Password sign-in is switched off, so a set-password link is of no use."
+	case s.cfg.URL() == "":
+		return noAppURLMessage
+	}
+	return ""
 }
 
 func (s *Server) userParam(w http.ResponseWriter, r *http.Request) *auth.User {

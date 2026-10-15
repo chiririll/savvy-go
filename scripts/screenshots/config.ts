@@ -6,7 +6,7 @@ import { existsSync, readdirSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { Manifest } from './manifest.ts'
+import type { Manifest } from './capture/manifest.ts'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 
@@ -39,6 +39,54 @@ export interface Config {
     tabs: boolean
     /** The type of a chart, its grouping, the period of a report: each choice, in each tab. Off unless asked for. */
     controls: boolean
+    /** The pages of the seeded app (needs its manifest). */
+    capture: boolean
+    /** The scenarios (scenarios/), each on a server of its own. */
+    scenarios: boolean
+    /** Names of scenarios, or the start of one ("onboarding/"); empty: all. */
+    scenarioNames: string[]
+    /** What the scenarios vary over; empty: what `languages`, `themes` and `viewports` say. */
+    scenarioLanguages: string[]
+    scenarioThemes: string[]
+    scenarioViewports: string[]
+    /** `key`: the shots a scenario marks as essential; `full`: also its error states and variants. */
+    detail: Detail
+}
+
+export const details = ['key', 'full'] as const
+export type Detail = (typeof details)[number]
+
+/** The keys that can be set from the command line (`--languages=en,ru`) and what each takes. */
+const kinds: Record<string, 'list' | 'flag' | 'detail'> = {
+    users: 'list', spaces: 'list', viewports: 'list', languages: 'list', themes: 'list', pages: 'list',
+    sidebar: 'flag', dialogs: 'flag', tabs: 'flag', controls: 'flag', capture: 'flag', scenarios: 'flag',
+    scenarioNames: 'list', scenarioLanguages: 'list', scenarioThemes: 'list', scenarioViewports: 'list', detail: 'detail',
+}
+
+/** Settings given as text (CONFIG_OVERRIDES, a JSON object of strings) turned into what a config file holds. */
+function overridden(raw: Record<string, unknown>, overrides: string): Record<string, unknown> {
+    if (!overrides.trim()) return raw
+    let given: Record<string, unknown>
+    try {
+        given = JSON.parse(overrides)
+    } catch (e) {
+        throw new Error(`CONFIG_OVERRIDES: ${(e as Error).message}`)
+    }
+    const out = { ...raw }
+    for (const [key, text] of Object.entries(given)) {
+        const kind = kinds[key]
+        if (!kind) throw new Error(`unknown setting --${key}; there are ${Object.keys(kinds).join(', ')}`)
+        const value = String(text)
+        if (kind === 'flag') {
+            if (value !== 'true' && value !== 'false') throw new Error(`--${key}: true or false is expected`)
+            out[key] = value === 'true'
+        } else if (kind === 'list') {
+            out[key] = value.split(',').map((v) => v.trim()).filter(Boolean)
+        } else {
+            out[key] = value
+        }
+    }
+    return out
 }
 
 export const configsDir = path.join(here, 'configs')
@@ -76,6 +124,7 @@ export async function loadConfig(name: string, manifest: Manifest, known: { view
             throw new Error(`config ${name}: ${(e as Error).message}`)
         }
     }
+    raw = overridden(raw, process.env.CONFIG_OVERRIDES ?? '')
 
     const list = (key: string): string[] => {
         const value = raw[key]
@@ -118,6 +167,17 @@ export async function loadConfig(name: string, manifest: Manifest, known: { view
         dialogs: flag('dialogs'),
         tabs: flag('tabs'),
         controls: flag('controls', false),
+        capture: flag('capture'),
+        scenarios: flag('scenarios'),
+        scenarioNames: list('scenarioNames'),
+        scenarioLanguages: oneOf('scenarioLanguages', list('scenarioLanguages'), languages, []),
+        scenarioThemes: oneOf('scenarioThemes', list('scenarioThemes'), themes, []),
+        scenarioViewports: oneOf('scenarioViewports', list('scenarioViewports'), known.viewports, []),
+        detail: ((): Detail => {
+            const value = raw.detail ?? 'full'
+            if (!details.includes(value as Detail)) throw new Error(`config "detail": ${details.join(' or ')} is expected`)
+            return value as Detail
+        })(),
     }
 
     // A path that matches nothing is most likely a typo.

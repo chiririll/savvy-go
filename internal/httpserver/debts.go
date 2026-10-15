@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"savvy-go/internal/domain"
 	"savvy-go/internal/httpserver/dto"
+	"savvy-go/internal/ledger"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/shopspring/decimal"
@@ -152,7 +152,7 @@ func (s *Server) debtsSummary(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, dto.NewDebtSummary(sp(r).debts.Summary(r.Context())))
 }
 
-func (s *Server) debtParam(w http.ResponseWriter, r *http.Request) *domain.Account {
+func (s *Server) debtParam(w http.ResponseWriter, r *http.Request) *ledger.Account {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	a, _ := sp(r).accounts.ByID(r.Context(), id)
 	if a == nil || a.Type != "debt" {

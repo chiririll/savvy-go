@@ -9,6 +9,12 @@ const ENDPOINT = '/settings'
 const SPACE_KEYS: string[] = ['auto_update_currencies']
 
 export const settingsApi = {
+    /**
+     * Instance settings only. Needs no space, so it is safe before SpaceGate
+     * has replaced a remembered space id that no longer exists.
+     */
+    getInstance: () => api.get<Settings>(ENDPOINT),
+
     /** Instance settings merged with those of the current space. */
     get: async (): Promise<Settings> => {
         const id = currentSpaceId()
@@ -29,6 +35,6 @@ export const settingsApi = {
         }
         if (Object.keys(own).length && id !== null) await spacesApi.updateSettings(id, own)
         if (Object.keys(instance).length) await api.patch<Settings, Record<string, unknown>>(ENDPOINT, instance)
-        return settingsApi.get()
+        return settingsApi.getInstance()
     },
 }

@@ -3,16 +3,18 @@ package config
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io/fs"
 	"log/slog"
-	"sync"
-	"fmt"
 	"os"
 	"path/filepath"
-		"strings"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/pelletier/go-toml/v2"
+
+	"savvy-go/internal/mailer"
 )
 
 // Config is process-wide runtime configuration loaded from the environment.
@@ -32,6 +34,11 @@ type Config struct {
 	SessionCookie string
 	CSRFCookie    string
 	CSRFHeader    string
+	// Mail is the SMTP server from [mailer] as loaded at start; the server keeps
+	// the current one, which the admin panel can change. It is disabled when
+	// MailProblem is set.
+	Mail        mailer.Config
+	MailProblem string
 }
 
 // file mirrors config.toml: it is decoded over defaults() and encoded back, so
@@ -56,6 +63,17 @@ type file struct {
 		CSRFCookie   string `toml:"csrf_cookie"`
 		CSRFHeader   string `toml:"csrf_header"`
 	} `toml:"security"`
+	Mailer struct {
+		Enabled    bool   `toml:"enabled"`
+		Host       string `toml:"host"`
+		Port       int    `toml:"port"`
+		Protocol   string `toml:"protocol" comment:"Supported: \"starttls\", \"smtps\" or \"smtp\""`
+		User       string `toml:"user"`
+		Password   string `toml:"password"`
+		From       string `toml:"from"`
+		SkipVerify bool   `toml:"skip_verify"`
+		Timeout    int    `toml:"timeout"`
+	} `toml:"mailer"`
 }
 
 // defaults is the configuration of a new install.
@@ -69,6 +87,9 @@ func defaults() file {
 	f.Security.Cookie = "svy_session"
 	f.Security.CSRFCookie = "svy_csrf"
 	f.Security.CSRFHeader = "X-CSRF-Token"
+	f.Mailer.Port = 587
+	f.Mailer.Protocol = mailer.STARTTLS
+	f.Mailer.Timeout = 10
 	return f
 }
 
@@ -134,16 +155,21 @@ func Load(path string) (Config, error) {
 	if err != nil {
 		return Config{}, fmt.Errorf("encode config: %w", err)
 	}
-	if !bytes.Equal(raw, out) {
-		if err := writeFile(path, out); err != nil {
-			slog.Warn("could not write the config file; settings changed in the admin panel will not persist", "path", path, "err", err)
-		}
+	// Write even when nothing changed: it is the probe for "can this process
+	// save settings later" (a read-only mount or directory fails here).
+	writable := true
+	if err := writeFile(path, out); err != nil {
+		writable = false
+		slog.Warn("could not write the config file; settings changed in the admin panel are disabled", "path", path, "err", err)
 	}
 	cfg := f.resolve()
 	if cfg.AppURL == "" {
 		slog.Warn("the public URL is not set; SSO and passkeys stay disabled until app_url is set in the config file or the admin panel")
 	}
-	cfg.Live = &Live{path: path, f: f, appURL: cfg.AppURL}
+	if cfg.MailProblem != "" {
+		slog.Warn("mail is disabled: invalid [mailer] section in the config file", "problem", cfg.MailProblem)
+	}
+	cfg.Live = &Live{path: path, f: f, appURL: cfg.AppURL, writable: writable}
 	return cfg, nil
 }
 
@@ -163,6 +189,9 @@ func writeFile(path string, data []byte) error {
 	return nil
 }
 
+// ErrReadOnly is returned when the config file cannot be written.
+var ErrReadOnly = errors.New("the config file is read-only")
+
 // Live is the part of the configuration the admin panel can change at run
 // time, persisted to the config file.
 type Live struct {
@@ -170,7 +199,13 @@ type Live struct {
 	path   string
 	f      file
 	appURL string
+	// writable is whether the config file could be written at start.
+	writable bool
 }
+
+// Writable reports whether the admin panel can change the config file. False
+// for a read-only mount; the settings it covers are then shown but locked.
+func (l *Live) Writable() bool { return l != nil && l.writable }
 
 // AppURL is the public URL of the instance, empty when unset.
 func (l *Live) AppURL() string {
@@ -181,19 +216,46 @@ func (l *Live) AppURL() string {
 
 // SetAppURL changes the public URL and writes the config file.
 func (l *Live) SetAppURL(v string) error {
+	return l.save(func(f *file) { f.Server.AppURL = v }, func() { l.appURL = v })
+}
+
+// SetMail replaces the [mailer] section and writes the config file. It does
+// not validate: the caller does, and may save a disabled, half-filled section.
+func (l *Live) SetMail(c mailer.Config) error {
+	return l.save(func(f *file) {
+		f.Mailer.Enabled = c.Enabled
+		f.Mailer.Host = c.Host
+		f.Mailer.Port = c.Port
+		f.Mailer.Protocol = c.Protocol
+		f.Mailer.User = c.User
+		f.Mailer.Password = c.Password
+		f.Mailer.From = c.From
+		f.Mailer.SkipVerify = c.SkipVerify
+		f.Mailer.Timeout = int(c.Timeout / time.Second)
+	}, nil)
+}
+
+// save applies change to a copy of the file, writes it, and only then keeps it
+// (and runs commit), so a failed write leaves memory and disk as they were.
+func (l *Live) save(change func(*file), commit func()) error {
+	if !l.Writable() {
+		return ErrReadOnly
+	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	prev := l.f.Server.AppURL
-	l.f.Server.AppURL = v
-	out, err := l.f.encode()
+	next := l.f
+	change(&next)
+	out, err := next.encode()
 	if err == nil {
 		err = writeFile(l.path, out)
 	}
 	if err != nil {
-		l.f.Server.AppURL = prev
 		return err
 	}
-	l.appURL = v
+	l.f = next
+	if commit != nil {
+		commit()
+	}
 	return nil
 }
 
@@ -220,6 +282,23 @@ func (f file) resolve() Config {
 		SessionCookie: firstNonEmpty(f.Security.Cookie, "svy_session"),
 		CSRFCookie:    firstNonEmpty(f.Security.CSRFCookie, "svy_csrf"),
 		CSRFHeader:    firstNonEmpty(f.Security.CSRFHeader, "X-CSRF-Token"),
+		Mail: mailer.Config{
+			Enabled:    f.Mailer.Enabled,
+			Host:       strings.TrimSpace(f.Mailer.Host),
+			Port:       f.Mailer.Port,
+			Protocol:   strings.ToLower(strings.TrimSpace(f.Mailer.Protocol)),
+			User:       f.Mailer.User,
+			Password:   f.Mailer.Password,
+			From:       strings.TrimSpace(f.Mailer.From),
+			SkipVerify: f.Mailer.SkipVerify,
+			Timeout:    seconds(f.Mailer.Timeout, 10),
+		},
+	}
+	// A mistake in [mailer] switches mail off instead of stopping the server;
+	// the admin panel shows the reason.
+	if err := cfg.Mail.Validate(); err != nil {
+		cfg.MailProblem = err.Error()
+		cfg.Mail.Enabled = false
 	}
 	return cfg
 }
@@ -248,6 +327,14 @@ func minutes(fromFile, fallback int) time.Duration {
 		return time.Duration(fromFile) * time.Minute
 	}
 	return time.Duration(fallback) * time.Minute
+}
+
+// seconds turns a timeout in seconds into a duration; non-positive values give fallback.
+func seconds(fromFile, fallback int) time.Duration {
+	if fromFile > 0 {
+		return time.Duration(fromFile) * time.Second
+	}
+	return time.Duration(fallback) * time.Second
 }
 
 // URL is the current public URL of the instance, empty when unset.

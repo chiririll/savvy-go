@@ -25,6 +25,27 @@ func (q *Queries) AcceptInvitation(ctx context.Context, arg AcceptInvitationPara
 	return q.db.ExecContext(ctx, acceptInvitation, arg.AcceptedAt, arg.AcceptedBy, arg.ID)
 }
 
+const clearExpiredInvitations = `-- name: ClearExpiredInvitations :execresult
+DELETE FROM space_invitations WHERE accepted_at IS NULL AND expires_at <= ?
+`
+
+func (q *Queries) ClearExpiredInvitations(ctx context.Context, expiresAt string) (sql.Result, error) {
+	return q.db.ExecContext(ctx, clearExpiredInvitations, expiresAt)
+}
+
+const clearExpiredInvitationsForEmail = `-- name: ClearExpiredInvitationsForEmail :execresult
+DELETE FROM space_invitations WHERE accepted_at IS NULL AND expires_at <= ? AND email = ?
+`
+
+type ClearExpiredInvitationsForEmailParams struct {
+	ExpiresAt string
+	Email     sql.NullString
+}
+
+func (q *Queries) ClearExpiredInvitationsForEmail(ctx context.Context, arg ClearExpiredInvitationsForEmailParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, clearExpiredInvitationsForEmail, arg.ExpiresAt, arg.Email)
+}
+
 const countSpaceLink = `-- name: CountSpaceLink :one
 SELECT COUNT(*) FROM space_links WHERE space_a_id = ? AND space_b_id = ?
 `
@@ -79,17 +100,26 @@ func (q *Queries) CountUserAdminSpaces(ctx context.Context, userID int64) (int64
 	return count, err
 }
 
-const deleteInvitation = `-- name: DeleteInvitation :execresult
-DELETE FROM space_invitations WHERE id = ? AND space_id = ?
+const deleteAcceptedInvitation = `-- name: DeleteAcceptedInvitation :execresult
+DELETE FROM space_invitations WHERE id = ? AND space_id = ? AND accepted_at IS NOT NULL
 `
 
-type DeleteInvitationParams struct {
+type DeleteAcceptedInvitationParams struct {
 	ID      int64
 	SpaceID int64
 }
 
-func (q *Queries) DeleteInvitation(ctx context.Context, arg DeleteInvitationParams) (sql.Result, error) {
-	return q.db.ExecContext(ctx, deleteInvitation, arg.ID, arg.SpaceID)
+func (q *Queries) DeleteAcceptedInvitation(ctx context.Context, arg DeleteAcceptedInvitationParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, deleteAcceptedInvitation, arg.ID, arg.SpaceID)
+}
+
+const deleteInvitationByID = `-- name: DeleteInvitationByID :exec
+DELETE FROM space_invitations WHERE id = ? AND accepted_at IS NULL
+`
+
+func (q *Queries) DeleteInvitationByID(ctx context.Context, id int64) error {
+	_, err := q.db.ExecContext(ctx, deleteInvitationByID, id)
+	return err
 }
 
 const deleteSpaceLink = `-- name: DeleteSpaceLink :execresult
@@ -143,6 +173,29 @@ DELETE FROM space_members WHERE user_id = ?
 func (q *Queries) DeleteUserMemberships(ctx context.Context, userID int64) error {
 	_, err := q.db.ExecContext(ctx, deleteUserMemberships, userID)
 	return err
+}
+
+const expireInvitation = `-- name: ExpireInvitation :execresult
+UPDATE space_invitations SET expires_at = ?
+WHERE id = ? AND space_id = ? AND accepted_at IS NULL AND expires_at > ?
+`
+
+type ExpireInvitationParams struct {
+	ExpiresAt   string
+	ID          int64
+	SpaceID     int64
+	ExpiresAt_2 string
+}
+
+// Revoking ends a pending invitation by expiring it. The row stays until the
+// prune job: it is what holds the address in its cooldown.
+func (q *Queries) ExpireInvitation(ctx context.Context, arg ExpireInvitationParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, expireInvitation,
+		arg.ExpiresAt,
+		arg.ID,
+		arg.SpaceID,
+		arg.ExpiresAt_2,
+	)
 }
 
 const getInvitationByHash = `-- name: GetInvitationByHash :one
@@ -265,14 +318,15 @@ func (q *Queries) InsertAudit(ctx context.Context, arg InsertAuditParams) error 
 }
 
 const insertInvitation = `-- name: InsertInvitation :one
-INSERT INTO space_invitations (space_id, email, role, token_hash, invited_by, invited_by_server_admin, expires_at, created_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO space_invitations (space_id, email, note, role, token_hash, invited_by, invited_by_server_admin, expires_at, created_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 RETURNING id
 `
 
 type InsertInvitationParams struct {
 	SpaceID              int64
 	Email                sql.NullString
+	Note                 sql.NullString
 	Role                 string
 	TokenHash            string
 	InvitedBy            sql.NullInt64
@@ -285,6 +339,7 @@ func (q *Queries) InsertInvitation(ctx context.Context, arg InsertInvitationPara
 	row := q.db.QueryRowContext(ctx, insertInvitation,
 		arg.SpaceID,
 		arg.Email,
+		arg.Note,
 		arg.Role,
 		arg.TokenHash,
 		arg.InvitedBy,
@@ -370,6 +425,23 @@ func (q *Queries) InsertTrustedKey(ctx context.Context, arg InsertTrustedKeyPara
 	return err
 }
 
+const isSpaceMemberByEmail = `-- name: IsSpaceMemberByEmail :one
+SELECT COUNT(*) FROM space_members m JOIN users u ON u.id = m.user_id
+WHERE m.space_id = ? AND u.email = ? AND u.deleted_at IS NULL
+`
+
+type IsSpaceMemberByEmailParams struct {
+	SpaceID int64
+	Email   string
+}
+
+func (q *Queries) IsSpaceMemberByEmail(ctx context.Context, arg IsSpaceMemberByEmailParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, isSpaceMemberByEmail, arg.SpaceID, arg.Email)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const listAllSpaceLinks = `-- name: ListAllSpaceLinks :many
 SELECT space_a_id, space_b_id FROM space_links ORDER BY space_a_id, space_b_id
 `
@@ -403,15 +475,21 @@ func (q *Queries) ListAllSpaceLinks(ctx context.Context) ([]ListAllSpaceLinksRow
 }
 
 const listInvitations = `-- name: ListInvitations :many
-SELECT i.id, i.email, i.role, i.expires_at, i.accepted_at, i.created_at, COALESCE(u.name, '') AS inviter
+SELECT i.id, i.email, i.note, i.role, i.expires_at, i.accepted_at, i.created_at, COALESCE(u.name, '') AS inviter
 FROM space_invitations i LEFT JOIN users u ON u.id = i.invited_by
-WHERE i.space_id = ?
+WHERE i.space_id = ? AND (i.accepted_at IS NOT NULL OR i.expires_at > ?)
 ORDER BY i.id DESC
 `
+
+type ListInvitationsParams struct {
+	SpaceID   int64
+	ExpiresAt string
+}
 
 type ListInvitationsRow struct {
 	ID         int64
 	Email      sql.NullString
+	Note       sql.NullString
 	Role       string
 	ExpiresAt  string
 	AcceptedAt sql.NullString
@@ -419,8 +497,8 @@ type ListInvitationsRow struct {
 	Inviter    string
 }
 
-func (q *Queries) ListInvitations(ctx context.Context, spaceID int64) ([]ListInvitationsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listInvitations, spaceID)
+func (q *Queries) ListInvitations(ctx context.Context, arg ListInvitationsParams) ([]ListInvitationsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listInvitations, arg.SpaceID, arg.ExpiresAt)
 	if err != nil {
 		return nil, err
 	}
@@ -431,6 +509,7 @@ func (q *Queries) ListInvitations(ctx context.Context, spaceID int64) ([]ListInv
 		if err := rows.Scan(
 			&i.ID,
 			&i.Email,
+			&i.Note,
 			&i.Role,
 			&i.ExpiresAt,
 			&i.AcceptedAt,
@@ -789,6 +868,14 @@ func (q *Queries) ListUserSpaces(ctx context.Context, userID int64) ([]ListUserS
 	return items, nil
 }
 
+const pruneInvitations = `-- name: PruneInvitations :execresult
+DELETE FROM space_invitations WHERE accepted_at IS NULL AND expires_at < ?
+`
+
+func (q *Queries) PruneInvitations(ctx context.Context, expiresAt string) (sql.Result, error) {
+	return q.db.ExecContext(ctx, pruneInvitations, expiresAt)
+}
+
 const renameSpace = `-- name: RenameSpace :exec
 UPDATE spaces SET name = ?, updated_at = ? WHERE id = ?
 `
@@ -828,6 +915,38 @@ func (q *Queries) SpaceIDByUUID(ctx context.Context, uuid string) (int64, error)
 	var id int64
 	err := row.Scan(&id)
 	return id, err
+}
+
+const unacceptedInvitationsForEmail = `-- name: UnacceptedInvitationsForEmail :many
+SELECT space_id, expires_at FROM space_invitations WHERE email = ? AND accepted_at IS NULL
+`
+
+type UnacceptedInvitationsForEmailRow struct {
+	SpaceID   int64
+	ExpiresAt string
+}
+
+func (q *Queries) UnacceptedInvitationsForEmail(ctx context.Context, email sql.NullString) ([]UnacceptedInvitationsForEmailRow, error) {
+	rows, err := q.db.QueryContext(ctx, unacceptedInvitationsForEmail, email)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []UnacceptedInvitationsForEmailRow{}
+	for rows.Next() {
+		var i UnacceptedInvitationsForEmailRow
+		if err := rows.Scan(&i.SpaceID, &i.ExpiresAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const upsertSpaceMember = `-- name: UpsertSpaceMember :exec

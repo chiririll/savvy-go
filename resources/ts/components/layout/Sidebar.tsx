@@ -1,8 +1,9 @@
 import { useEffect } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { Home, FolderTree, Coins, CreditCard, Settings, ChevronDown, Receipt, PiggyBank, Hash, BarChart3, HandCoins, Users, Cog, Repeat, Zap, Shield, Upload, Database, LucideIcon, Github, ExternalLink, Activity, KeyRound, UserRound, Boxes, ServerCog, HardDrive, Wrench } from 'lucide-react'
+import { Home, FolderTree, Coins, CreditCard, Settings, ChevronDown, Receipt, PiggyBank, Hash, BarChart3, HandCoins, Users, Cog, Repeat, Zap, Shield, Upload, Database, LucideIcon, Github, ExternalLink, Activity, KeyRound, UserRound, Boxes, ServerCog, HardDrive, Wrench, ClipboardCheck } from 'lucide-react'
 import { SpaceSwitcher } from '@/components/features/spaces/SpaceSwitcher'
 import { useUser } from '@/stores/auth'
+import { useServerChecks } from '@/hooks/use-server-checks'
 import {
     Sidebar,
     SidebarContent,
@@ -66,6 +67,7 @@ const settingsItems: MenuItem[] = [
 
 /** The server: server administrators only. */
 const adminItems: MenuItem[] = [
+    { to: '/admin/checks', icon: ClipboardCheck, labelKey: 'checks' },
     { to: '/admin/system', icon: Cog, labelKey: 'system' },
     { to: '/admin/monitoring', icon: Activity, labelKey: 'monitoring' },
     { to: '/admin/sso', icon: KeyRound, labelKey: 'sso', also: ['/admin/providers'] },
@@ -83,6 +85,8 @@ export function AppSidebar() {
     const adminOpen = useUiStore((state) => state.adminOpen)
     const setAdminOpen = useUiStore((state) => state.setAdminOpen)
     const isServerAdmin = useUser()?.role === 'admin'
+    const { data: checks } = useServerChecks(isServerAdmin)
+    const problems = checks?.filter((c) => c.severity !== 'info') ?? []
     const { setOpenMobile } = useSidebar()
 
     // Close mobile sidebar when navigating to a new page
@@ -140,6 +144,8 @@ export function AppSidebar() {
                         icon={Wrench}
                         label={t('administration')}
                         items={adminItems}
+                        counts={{ '/admin/checks': problems.length }}
+                        alert={problems.length === 0 ? undefined : problems.some((c) => c.severity === 'error') ? 'error' : 'warning'}
                         open={adminOpen}
                         onOpenChange={setAdminOpen}
                         isActive={isActive}
@@ -191,6 +197,8 @@ function NavGroup({
     icon: GroupIcon,
     label,
     items,
+    alert,
+    counts,
     open,
     onOpenChange,
     isActive,
@@ -198,6 +206,10 @@ function NavGroup({
     icon: LucideIcon
     label: string
     items: MenuItem[]
+    /** Something in the group needs attention: shows a dot on the header. */
+    alert?: 'error' | 'warning'
+    /** Number shown next to an item, by its path; zero shows nothing. */
+    counts?: Record<string, number>
     open: boolean
     onOpenChange: (open: boolean) => void
     isActive: (path: string, also?: string[]) => boolean
@@ -213,7 +225,14 @@ function NavGroup({
                                 <SidebarMenuButton tooltip={label}>
                                     <GroupIcon />
                                     <span>{label}</span>
-                                    <ChevronDown className={`ml-auto transition-transform duration-200 ${open ? '' : '-rotate-90'}`} />
+                                    {alert && (
+                                        <span
+                                            role="img"
+                                            aria-label={t('needsAttention')}
+                                            className={`ml-auto size-2 rounded-full ${alert === 'error' ? 'bg-red-500' : 'bg-amber-500'}`}
+                                        />
+                                    )}
+                                    <ChevronDown className={`${alert ? '' : 'ml-auto '}transition-transform duration-200 ${open ? '' : '-rotate-90'}`} />
                                 </SidebarMenuButton>
                             </CollapsibleTrigger>
                             <CollapsibleContent>
@@ -224,6 +243,11 @@ function NavGroup({
                                                 <NavLink to={to}>
                                                     <Icon />
                                                     <span>{navLabel(t, labelKey)}</span>
+                                                    {!!counts?.[to] && (
+                                                        <span className="ml-auto rounded-full bg-amber-500/15 px-1.5 text-xs font-medium tabular-nums text-amber-600 dark:text-amber-400">
+                                                            {counts[to]}
+                                                        </span>
+                                                    )}
                                                 </NavLink>
                                             </SidebarMenuSubButton>
                                         </SidebarMenuSubItem>

@@ -1,8 +1,11 @@
 package httpserver
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -11,25 +14,29 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"savvy-go/internal/auth"
-	"savvy-go/internal/domain"
 	"savvy-go/internal/httpserver/dto"
+	"savvy-go/internal/mailer"
+	"savvy-go/internal/spaces"
 )
 
-func spaceJSON(space domain.Space) map[string]any {
+func spaceJSON(space spaces.Space) map[string]any {
 	return map[string]any{"id": space.ID, "uuid": space.UUID, "name": space.Name, "role": space.Role}
 }
 
 // writeSpaceError maps space rules to 422 and forbidden ones to 403.
 func writeSpaceError(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, domain.ErrNotMember):
+	case errors.Is(err, spaces.ErrNotMember):
 		writeMessage(w, http.StatusNotFound, "Not a member of this space.")
-	case errors.Is(err, domain.ErrInvitationInvalid):
+	case errors.Is(err, spaces.ErrInvitationInvalid):
 		writeMessage(w, http.StatusNotFound, err.Error())
-	case errors.Is(err, domain.ErrRegistrationClosed):
+	case errors.Is(err, spaces.ErrRegistrationClosed):
 		writeMessage(w, http.StatusForbidden, err.Error())
-	case errors.Is(err, domain.ErrGuestCannotAdmin), errors.Is(err, domain.ErrLastAdmin), errors.Is(err, domain.ErrLastMember),
-		errors.Is(err, domain.ErrSpaceLimit), errors.Is(err, domain.ErrInvitationEmail):
+	case errors.Is(err, spaces.ErrInvitationCooldown):
+		writeMessage(w, http.StatusTooManyRequests, err.Error())
+	case errors.Is(err, spaces.ErrGuestCannotAdmin), errors.Is(err, spaces.ErrLastAdmin), errors.Is(err, spaces.ErrLastMember),
+		errors.Is(err, spaces.ErrSpaceLimit), errors.Is(err, spaces.ErrInvitationEmail),
+		errors.Is(err, spaces.ErrInvitationExists), errors.Is(err, spaces.ErrAlreadyMember):
 		writeMessage(w, http.StatusUnprocessableEntity, err.Error())
 	default:
 		writeMessage(w, http.StatusInternalServerError, err.Error())
@@ -58,6 +65,7 @@ func spaceName(w http.ResponseWriter, raw string) (string, bool) {
 func (s *Server) spacesStore(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Name string `json:"name"`
+		spaceFill
 	}
 	if !decodeBody(w, r, &body) {
 		return
@@ -66,7 +74,12 @@ func (s *Server) spacesStore(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	space, err := s.spaces.CreateOwned(r.Context(), name, userFrom(r))
+	space, err := s.createSpace(r.Context(), name, userFrom(r), body.spaceFill)
+	var fe *fillError
+	if errors.As(err, &fe) {
+		writeValidation(w, map[string][]string{fe.field: {fe.msg}})
+		return
+	}
 	if err != nil {
 		writeSpaceError(w, err)
 		return
@@ -124,7 +137,7 @@ func (s *Server) membersIndex(w http.ResponseWriter, r *http.Request) {
 		writeSpaceError(w, err)
 		return
 	}
-	writeData(w, http.StatusOK, dto.Map(list, func(m domain.Member) map[string]any {
+	writeData(w, http.StatusOK, dto.Map(list, func(m spaces.Member) map[string]any {
 		return map[string]any{"userId": m.UserID, "name": m.Name, "email": m.Email, "role": m.Role, "createdAt": timeOrNil(m.CreatedAt)}
 	}))
 }
@@ -154,7 +167,7 @@ func (s *Server) membersUpdate(w http.ResponseWriter, r *http.Request) {
 	if !decodeBody(w, r, &body) {
 		return
 	}
-	if !domain.ValidSpaceRole(body.Role) {
+	if !spaces.ValidRole(body.Role) {
 		writeValidation(w, map[string][]string{"role": {"The role must be admin, editor or viewer."}})
 		return
 	}
@@ -193,36 +206,120 @@ func (s *Server) invitationsIndex(w http.ResponseWriter, r *http.Request) {
 		writeSpaceError(w, err)
 		return
 	}
-	writeData(w, http.StatusOK, dto.Map(list, func(i domain.Invitation) map[string]any {
+	writeData(w, http.StatusOK, dto.Map(list, func(i spaces.Invitation) map[string]any {
 		return map[string]any{
-			"id": i.ID, "email": i.Email, "role": i.Role, "inviter": i.Inviter,
+			"id": i.ID, "email": i.Email, "note": i.Note, "role": i.Role, "inviter": i.Inviter,
 			"expiresAt": timeOrNil(i.ExpiresAt), "acceptedAt": timeOrNil(i.AcceptedAt), "createdAt": timeOrNil(i.CreatedAt),
 		}
 	}))
 }
 
+// inviteMethods says how invitations may be made right now: by email, which
+// needs working mail and a public URL, and by a link to copy, which an instance
+// that requires verified addresses does not allow. When email is off, reason
+// says why.
+func (s *Server) inviteMethods(ctx context.Context) (email, link bool, reason string) {
+	switch {
+	case !s.mailer().Enabled():
+		reason, _ = s.mailOffWhy()
+	case s.cfg.URL() == "":
+		reason = noAppURLMessage
+	default:
+		email = true
+	}
+	return email, !s.emailVerificationRequired(ctx), reason
+}
+
+func (s *Server) invitationMethods(w http.ResponseWriter, r *http.Request) {
+	email, link, reason := s.inviteMethods(r.Context())
+	out := map[string]any{"email": email, "link": link}
+	if reason != "" {
+		out["emailReason"] = reason
+	}
+	writeData(w, http.StatusOK, out)
+}
+
+// invitationsStore creates an invitation. With an address it is emailed and
+// its link is never returned, so the link proves the mailbox; without one the
+// link is returned to copy. The server decides which of the two is allowed.
 func (s *Server) invitationsStore(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Email string `json:"email"`
+		Note  string `json:"note"`
 		Role  string `json:"role"`
 	}
 	if !decodeBody(w, r, &body) {
 		return
 	}
-	if !domain.ValidSpaceRole(body.Role) {
+	if len([]rune(strings.TrimSpace(body.Note))) > spaces.MaxInvitationNote {
+		writeValidation(w, map[string][]string{"note": {fmt.Sprintf("The note may not be longer than %d characters.", spaces.MaxInvitationNote)}})
+		return
+	}
+	if !spaces.ValidRole(body.Role) {
 		writeValidation(w, map[string][]string{"role": {"The role must be admin, editor or viewer."}})
 		return
 	}
+	body.Email = strings.TrimSpace(body.Email)
 	if body.Email != "" && !looksLikeEmail(body.Email) {
 		writeValidation(w, map[string][]string{"email": {"The email field must be a valid email address."}})
 		return
 	}
-	token, err := s.spaces.Invite(r.Context(), sp(r).id, userFrom(r), body.Email, body.Role)
+	byEmail, byLink, reason := s.inviteMethods(r.Context())
+	switch {
+	case body.Email != "" && !byEmail:
+		writeValidation(w, map[string][]string{"email": {"Invitations cannot be emailed. " + reason}})
+		return
+	case body.Email == "" && !byLink:
+		writeValidation(w, map[string][]string{"email": {"This server requires invitations by email. Enter the address to invite."}})
+		return
+	}
+	token, id, err := s.spaces.Invite(r.Context(), sp(r).id, userFrom(r), body.Email, body.Note, body.Role)
 	if err != nil {
 		writeSpaceError(w, err)
 		return
 	}
-	writeData(w, http.StatusCreated, map[string]any{"token": token})
+	if body.Email == "" {
+		writeData(w, http.StatusCreated, map[string]any{"id": id, "token": token, "emailSent": false})
+		return
+	}
+	if err := s.emailInvitation(r, body.Email, body.Role, token); err != nil {
+		// Nobody received it, so it must not hold the address in a cooldown.
+		if derr := s.spaces.DiscardInvitation(r.Context(), id); derr != nil {
+			slog.Warn("discard unsent invitation", "err", derr)
+		}
+		writeMessage(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	writeData(w, http.StatusCreated, map[string]any{"id": id, "emailSent": true})
+}
+
+func (s *Server) emailInvitation(r *http.Request, to, role, token string) error {
+	space, err := s.spaces.Get(r.Context(), sp(r).id)
+	if err != nil || space == nil {
+		return errors.New("could not read the space")
+	}
+	link := s.cfg.URL() + "/invite/" + token
+	if err := s.sendMail(r.Context(), mailer.Invitation(to, userFrom(r).Name, space.Name, role, link)); err != nil {
+		return errors.New("Could not send the email: " + err.Error())
+	}
+	return nil
+}
+
+// invitationsClear ends the cooldown of revoked and expired invitations, for
+// one address or all of them. It is for server admins only.
+func (s *Server) invitationsClear(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Email string `json:"email"`
+	}
+	if !decodeBody(w, r, &body) {
+		return
+	}
+	n, err := s.spaces.ClearInvitationCooldowns(r.Context(), userFrom(r), body.Email)
+	if err != nil {
+		writeMessage(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeData(w, http.StatusOK, map[string]any{"cleared": n})
 }
 
 func (s *Server) invitationsDestroy(w http.ResponseWriter, r *http.Request) {
@@ -260,7 +357,7 @@ func (s *Server) invitationAccept(w http.ResponseWriter, r *http.Request) {
 // in. Password sign-in must be on.
 func (s *Server) invitationRegister(w http.ResponseWriter, r *http.Request) {
 	if s.passwordLoginDisabled(r) {
-		writeMessage(w, http.StatusForbidden, domain.ErrRegistrationClosed.Error())
+		writeMessage(w, http.StatusForbidden, spaces.ErrRegistrationClosed.Error())
 		return
 	}
 	var body struct {
@@ -289,12 +386,26 @@ func (s *Server) invitationRegister(w http.ResponseWriter, r *http.Request) {
 		writeValidation(w, map[string][]string{"email": {"Sign in with this email and open the invitation link again."}})
 		return
 	}
-	u, _, err := s.spaces.Register(r.Context(), s.users, chi.URLParam(r, "token"), strings.TrimSpace(body.Name), body.Email, body.Password)
+	token := chi.URLParam(r, "token")
+	u, _, err := s.spaces.Register(r.Context(), s.users, token, strings.TrimSpace(body.Name), body.Email, body.Password)
 	if err != nil {
 		writeSpaceError(w, err)
 		return
 	}
+	s.askToConfirmAddress(r.Context(), u)
 	s.issueSession(w, r, u, http.StatusCreated, false)
+}
+
+// askToConfirmAddress emails a new account a confirmation link when the
+// instance requires verified addresses and the invitation did not already
+// prove theirs (one that was emailed does).
+func (s *Server) askToConfirmAddress(ctx context.Context, u *auth.User) {
+	if u.EmailVerified || !s.emailVerificationRequired(ctx) {
+		return
+	}
+	if problem := s.sendVerification(ctx, u); problem != "" {
+		slog.Warn("send verification email", "problem", problem)
+	}
 }
 
 // --- space settings and audit ----------------------------------------------
@@ -317,7 +428,7 @@ func (s *Server) spaceAudit(w http.ResponseWriter, r *http.Request) {
 	writeData(w, http.StatusOK, dto.Map(list, auditJSON))
 }
 
-func auditJSON(e domain.AuditEntry) map[string]any {
+func auditJSON(e spaces.AuditEntry) map[string]any {
 	return map[string]any{"id": e.ID, "actor": e.Actor, "action": e.Action, "targetUserId": e.TargetUserID,
 		"details": e.Details, "createdAt": timeOrNil(e.CreatedAt)}
 }
@@ -331,13 +442,13 @@ func (s *Server) adminSpacesIndex(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeData(w, http.StatusOK, dto.Map(list, func(o domain.Overview) map[string]any {
+	writeData(w, http.StatusOK, dto.Map(list, func(o spaces.Overview) map[string]any {
 		return map[string]any{"id": o.ID, "uuid": o.UUID, "name": o.Name, "members": o.Members, "admins": o.Admins,
 			"size": o.Size, "quota": o.Quota, "unavailable": o.Unavailable, "createdAt": timeOrNil(o.CreatedAt)}
 	}))
 }
 
-func (s *Server) adminSpaceParam(w http.ResponseWriter, r *http.Request) *domain.Space {
+func (s *Server) adminSpaceParam(w http.ResponseWriter, r *http.Request) *spaces.Space {
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err == nil {
 		if space, _ := s.spaces.Get(r.Context(), id); space != nil {

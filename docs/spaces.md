@@ -2,7 +2,21 @@
 
 All finances live in a **space**: accounts, transactions, categories, tags, currencies, budgets, debts, recurring transactions and automation rules. Spaces are fully separate, each with its own base currency: say, a personal budget, a family one and a side project.
 
-Every user starts with a personal space. Switch spaces at the top of the sidebar.
+No space is created for you: a new user starts with none, and creates one or accepts an invitation to someone else's. Guests cannot create spaces and see a message asking for an invitation. Switch spaces at the top of the sidebar.
+
+## Creating a space
+
+Use **Create a space** in the space switcher, or the window shown to a user who has no space yet (that one cannot be closed). It walks through:
+
+1. **What a space is**: a short explanation.
+2. **Name**.
+3. **Copy from another space?** Shown only if you belong to another space. Pick a source space, or start from the defaults, and tick what to copy: currencies, accounts (without balances), categories, tags. It is a one-time copy and the spaces stay independent; for categories and tags that stay in step, see [shared categories and tags](#shared-categories-and-tags). Anything not copied starts from the defaults.
+4. **Base entities**, all editable: the base currency (required) and other currencies from the server's currency list; accounts with an optional opening balance (a copied account brings its currency along); categories, which start from the defaults (the default category of each type cannot be removed); and tags.
+5. **Create**: a summary, then the space is made in one step. The last screen has an optional **Invite members** button; the people you add there are invited when you press **Continue**. You can also invite members later in the space settings.
+
+Your progress is kept in your browser only, so you can close the window and come back to it; nothing reaches the server before the last step. It is dropped once the space is created.
+
+The same can be done through the API. `POST /api/spaces` with only a `name` makes an empty space. It can also fill the space in the same request: `baseCurrency`, `currencies` (codes), `accounts` (`name`, `type`, `currency`, `initialBalance`), `categories` and `tags`. Currencies get their rates from the server's currency data; one without a known rate is refused rather than stored with a made-up rate. The default expense and income categories are always added. The request either creates the whole space or nothing. See the API reference for the fields.
 
 ## Space roles
 
@@ -22,7 +36,20 @@ A space always keeps one admin: the last admin cannot leave or be demoted while 
 
 ## Invitations
 
-Space admins invite people from **Settings → Space** with a link for a chosen role, optionally tied to an email. Existing users join directly; new users can register through the link if the server admin allows it.
+Space admins invite people from **Settings → Space**, or from the last screen when they create a space. An invitation is for a chosen role, valid for 7 days and works once. Existing users join directly; new users can register through it if the server admin allows it.
+
+How an invitation is made depends on the server:
+
+| Server | Invite by |
+|---|---|
+| [Email confirmation](deployment.md#email-confirmation) is required | email only |
+| [Email](deployment.md#email) is set up | email, or a link to copy: you choose |
+| No email | a link to copy |
+
+- **By email**, the link is sent to that address and nobody else sees it, so the invited person can only use it with that address, and registering through it confirms the address. To invite someone else, revoke it and invite again.
+- **By a link**, you copy the link once and send it yourself. Anyone who has it can use it, and an account created through it starts unconfirmed. Instead of an address you can write an optional note (up to 100 characters, such as "Kim from work"); it only appears in your list of invitations, to tell links apart.
+- When you create a space, the people you add are only a list until you finish: emails go out after the space is created, and links appear on the last screen to copy. Remove someone from the list before that and nothing is sent.
+- An address cannot be invited to a space it is already invited to or belongs to. After an invitation is revoked or runs out, the address cannot be invited again for one to two hours. A server admin can end that wait in **Administration → System**.
 
 ## Linked spaces and transfers
 
@@ -34,6 +61,19 @@ A transfer is stored in both spaces and signed by the server. If one space is re
 
 - **Restore from an older backup**: the linked space is untouched. Differing transfers come back as **pending** transactions to accept or reject; they do not affect balances.
 - **Unlink, import elsewhere or bad signature**: the transfer is **frozen**. It stays in balances but cannot be edited, and syncs again once the spaces are relinked.
+
+## Shared categories and tags
+
+Spaces that should use the same categories and tags can be put in a **sync group** in **Settings → Space → Shared categories and tags**. A group is not a link: it needs no transfers and works between any spaces you administer. A space is in one group at most.
+
+Categories and tags are switched on separately. While a kind is on, whatever you add, edit, rename, set as default or delete in one space of the group is done in all of them at once, in one step: if it fails anywhere, it is done nowhere. Items are matched by name (categories also by type, income or expense), ignoring case.
+
+- **Rights.** To change categories or tags of a space in a group you need the **editor** role in *every* space of the group; otherwise the change is refused. Setting up the group, adding a space, and switching a kind on need an **admin** of every space involved. Taking a space out of the group needs only an admin of that space.
+- **Joining.** When a group is set up, a space is added or a kind is switched on, the spaces first have to become identical. The dialog lists everything that differs (a category or tag missing from some spaces, a different icon or color, a different default). For each you choose to keep it (and add it where it is missing) or to delete it everywhere, and which space's icon and color win. Nothing changes until you apply.
+- **Deleting.** Delete a category in one space and you pick one replacement; in every space of the group the transactions of the deleted category move to it, and where there are none it is simply deleted. Deleting a tag removes it from the transactions that carry it.
+- **Defaults.** The default category of each type is shared too.
+- **Leaving.** A space taken out of the group keeps its categories and tags, which no longer follow the others. A group left with a single space ends.
+- **Drift.** A crash between two spaces, a restored backup or a space that was unavailable can make the spaces differ again. At every server start the groups are brought back together without asking: whatever a space has and another lacks is added there, nothing is ever deleted, and where they disagree the space with the lowest id wins (its icon and color, its default category).
 
 ## Limits
 

@@ -1,27 +1,50 @@
 import { api, apiClient } from './client'
 import { toQueryString } from '@/lib/query-string'
 import { Backup } from '@/types/backup'
-import { Account } from '@/types'
+import { Account, Category, Currency, CurrencyCatalogItem, Tag } from '@/types'
 import {
     AuditEntry,
     InvitationPreview,
+    InviteMethods,
+    InviteResult,
     LinkedSpace,
     SigningKeys,
     Space,
     SpaceDetails,
     SpaceInvitation,
     SpaceMember,
+    CreateSpaceInput,
     SpaceOverview,
+    SpacePresets,
     SpaceRole,
     SpaceTransfer,
     SpaceTransferInput,
+    SyncChange,
+    SyncDiff,
+    SyncGroup,
+    SyncPlan,
 } from '@/types/spaces'
 
 const base = (id: number) => `/spaces/${id}`
 
 export const spacesApi = {
     list: () => api.get<Space[]>('/spaces'),
-    create: (name: string) => api.post<Space, { name: string }>('/spaces', { name }),
+    create: (input: CreateSpaceInput) => api.post<Space, CreateSpaceInput>('/spaces', input),
+
+    /** Categories and tags a new space can start with. */
+    presets: () => api.get<SpacePresets>('/presets'),
+    /** Every currency the server knows, priced in `base`; needs no space. */
+    currencyCatalog: (base?: string) => api.get<CurrencyCatalogItem[]>(`/currencies/catalog${toQueryString({ base })}`),
+    /** The currencies, accounts, categories and tags of a space, read with viewer rights. */
+    readContent: async (id: number) => {
+        const [currencies, accounts, categories, tags] = await Promise.all([
+            api.get<Currency[]>(`${base(id)}/currencies`),
+            api.get<Account[]>(`${base(id)}/accounts${toQueryString({ exclude_debts: true })}`),
+            api.get<Category[]>(`${base(id)}/categories`),
+            api.get<Tag[]>(`${base(id)}/tags`),
+        ])
+        return { currencies, accounts, categories, tags }
+    },
     get: (id: number) => api.get<SpaceDetails>(base(id)),
     rename: (id: number, name: string) => api.patch<SpaceDetails, { name: string }>(base(id), { name }),
     remove: (id: number) => api.delete<void>(base(id)),
@@ -37,14 +60,19 @@ export const spacesApi = {
     removeMember: (id: number, userId: number) => api.delete<void>(`${base(id)}/members/${userId}`),
 
     invitations: (id: number) => api.get<SpaceInvitation[]>(`${base(id)}/invitations`),
-    invite: (id: number, role: SpaceRole, email?: string) =>
-        api.post<{ token: string }, { role: SpaceRole; email?: string }>(`${base(id)}/invitations`, { role, email }),
+    invite: (id: number, role: SpaceRole, email?: string, note?: string) =>
+        api.post<InviteResult, { role: SpaceRole; email?: string; note?: string }>(`${base(id)}/invitations`, { role, email, note }),
     revokeInvitation: (id: number, invitationId: number) => api.delete<void>(`${base(id)}/invitations/${invitationId}`),
 
     links: (id: number) => api.get<LinkedSpace[]>(`${base(id)}/links`),
     link: (id: number, targetSpaceId: number) =>
         api.post<LinkedSpace[], { target_space_id: number }>(`${base(id)}/links`, { target_space_id: targetSpaceId }),
     unlink: (id: number, otherId: number) => api.delete<void>(`${base(id)}/links/${otherId}`),
+
+    /** The sync group of the space, null when it is in none. */
+    // The envelope drops a null `data`, so "no group" arrives as `{}`.
+    syncGroup: (id: number) =>
+        api.get<SyncGroup | null>(`${base(id)}/sync-group`).then((group) => (group && 'id' in group ? group : null)),
 
     /** Accounts of any space the caller belongs to (for the other side of a transfer). */
     accounts: (id: number, params?: { active?: boolean; exclude_debts?: boolean }) =>
@@ -72,14 +100,15 @@ export const spacesApi = {
         })
         return res.data?.data ?? res.data
     },
-    /** Replaces this space's data with a Laravel database; it is converted on the way, not kept. */
-    restoreLaravel: async (id: number, file: File): Promise<void> => {
+    /** Upgrades a Laravel database and keeps only the upgraded version as a backup of this space. */
+    upgradeLaravel: async (id: number, file: File): Promise<Backup> => {
         const form = new FormData()
         form.append('file', file)
-        await apiClient.post(`${base(id)}/backups/restore-laravel`, form, {
+        const res = await apiClient.post(`${base(id)}/backups/upgrade-laravel`, form, {
             headers: { 'Content-Type': 'multipart/form-data' },
             timeout: 0,
         })
+        return res.data?.data ?? res.data
     },
     backupDownloadUrl: (id: number, name: string) =>
         `${apiClient.defaults.baseURL}${base(id)}/backups/${encodeURIComponent(name)}/download`,
@@ -100,9 +129,16 @@ export const spacesApi = {
     },
 }
 
+export const syncGroupsApi = {
+    diff: (change: SyncChange) => api.post<SyncDiff, SyncChange>('/sync-groups/diff', change),
+    apply: (plan: SyncPlan) => api.post<{ id: number } | null, SyncPlan>('/sync-groups/apply', plan),
+}
+
 export const invitationsApi = {
     preview: (token: string) => api.get<InvitationPreview>(`/invitations/${token}`),
     accept: (token: string) => api.post<Space>(`/invitations/${token}/accept`),
+    /** An emailed invitation names its address, and registering through it confirms the address. */
+    methods: () => api.get<InviteMethods>('/invitation-methods'),
     register: (token: string, data: { name: string; email: string; password: string }) =>
         api.post<unknown, typeof data>(`/invitations/${token}/register`, data),
 }
@@ -121,4 +157,7 @@ export const adminSpacesApi = {
         api.post<SigningKeys, { name: string; public_key: string }>('/admin/keys', { name, public_key: publicKey }),
     untrustKey: (kid: string) => api.delete<void>(`/admin/keys/${kid}`),
     rotateKey: () => api.post<SigningKeys>('/admin/keys/rotate'),
+    /** Ends the wait before an address can be invited again: one address, or all when empty. */
+    clearInvitations: (email?: string) =>
+        api.post<{ cleared: number }, { email?: string }>('/admin/invitations/clear', { email }),
 }

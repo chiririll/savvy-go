@@ -7,7 +7,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	"savvy-go/internal/domain"
+	"savvy-go/internal/ledger"
 	"savvy-go/internal/store"
 )
 
@@ -80,19 +80,19 @@ var studioSpace = miniSpace{
 
 // seedMini fills a space with a miniSpace and returns its accounts by key. The
 // space's reference data (currencies, categories) must already exist.
-func seedMini(ctx context.Context, db store.DB, now time.Time, spec miniSpace) (map[string]*domain.Account, error) {
-	curs := domain.Currencies{DB: db}
-	accts := domain.Accounts{DB: db}
-	txs := domain.Transactions{DB: db}
-	cats := domain.Categories{DB: db}
+func seedMini(ctx context.Context, db store.DB, now time.Time, spec miniSpace) (map[string]*ledger.Account, error) {
+	curs := ledger.Currencies{DB: db}
+	accts := ledger.Accounts{DB: db}
+	txs := ledger.Transactions{DB: db}
+	cats := ledger.Categories{DB: db}
 
-	out := map[string]*domain.Account{}
+	out := map[string]*ledger.Account{}
 	for _, a := range spec.accounts {
 		cur, err := curs.ByCode(ctx, a.currency)
 		if err != nil || cur == nil {
 			return nil, fmt.Errorf("currency %s missing", a.currency)
 		}
-		created, err := accts.Create(ctx, domain.AccountInput{
+		created, err := accts.Create(ctx, ledger.AccountInput{
 			Name: a.name, Type: a.typ, CurrencyID: cur.ID,
 			InitialBalance: decimal.NewFromFloat(a.balance), IsActive: true,
 		})
@@ -102,7 +102,7 @@ func seedMini(ctx context.Context, db store.DB, now time.Time, spec miniSpace) (
 		out[a.key] = created
 	}
 
-	var all []domain.Category
+	var all []ledger.Category
 	for _, typ := range []string{"expense", "income"} {
 		list, err := cats.All(ctx, typ)
 		if err != nil {
@@ -111,7 +111,7 @@ func seedMini(ctx context.Context, db store.DB, now time.Time, spec miniSpace) (
 		all = append(all, list...)
 	}
 	for _, t := range spec.txs {
-		in := domain.TxInput{
+		in := ledger.TxInput{
 			Type: t.typ, AccountID: out[t.account].ID, Description: &t.desc,
 			Amount: decimal.NewFromFloat(t.amount), IsEstimated: t.estimated,
 		}
@@ -136,7 +136,7 @@ func seedMini(ctx context.Context, db store.DB, now time.Time, spec miniSpace) (
 		}
 		start := startOfMonth(now).Format("2006-01-02")
 		notify := 80
-		if _, err := (domain.Budgets{DB: db}).Create(ctx, domain.BudgetInput{
+		if _, err := (ledger.Budgets{DB: db}).Create(ctx, ledger.BudgetInput{
 			Name: spec.budget.name, Amount: decimal.NewFromInt(spec.budget.amount), CurrencyID: &cur.ID,
 			Period: "monthly", StartDate: &start, NotifyAtPercent: &notify, CategoryIDs: []int64{cat.ID},
 		}); err != nil {

@@ -9,10 +9,11 @@ import (
 	"time"
 
 	"savvy-go/internal/auth"
-	"savvy-go/internal/domain"
 	"savvy-go/internal/signing"
+	"savvy-go/internal/spaces"
 	"savvy-go/internal/store"
 	"savvy-go/internal/store/sqlite"
+	"savvy-go/internal/transfers"
 )
 
 func openStore(t *testing.T) *sqlite.Store {
@@ -21,7 +22,7 @@ func openStore(t *testing.T) *sqlite.Store {
 	return st
 }
 
-func openStoreKeys(t *testing.T) (*sqlite.Store, domain.KeyRing) {
+func openStoreKeys(t *testing.T) (*sqlite.Store, signing.KeyRing) {
 	t.Helper()
 	dir := t.TempDir()
 	st, err := sqlite.OpenApp(context.Background(), dir)
@@ -33,11 +34,11 @@ func openStoreKeys(t *testing.T) (*sqlite.Store, domain.KeyRing) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return st, domain.KeyRing{Holder: signing.NewHolder(key), Trusted: domain.TrustedKeys(st.Server())}
+	return st, signing.KeyRing{Holder: signing.NewHolder(key), Trusted: transfers.TrustedKeys(st.Server())}
 }
 
 // seedDemo seeds a fresh store and returns it with its keys.
-func seedDemo(t *testing.T) (*sqlite.Store, domain.KeyRing) {
+func seedDemo(t *testing.T) (*sqlite.Store, signing.KeyRing) {
 	t.Helper()
 	st, keys := openStoreKeys(t)
 	if _, err := Demo(context.Background(), st, keys, Options{Loc: time.UTC}); err != nil {
@@ -73,7 +74,7 @@ func TestDemoSkippedWhenDisabled(t *testing.T) {
 	st := openStore(t)
 	sqlDB := st.Server()
 	ctx := context.Background()
-	if err := Run(ctx, st, domain.KeyRing{}, Config{}, time.UTC); err != nil {
+	if err := Run(ctx, st, signing.KeyRing{}, Config{}, time.UTC); err != nil {
 		t.Fatal(err)
 	}
 	if n := countWhere(t, sqlDB, `SELECT COUNT(*) FROM users`); n != 0 {
@@ -118,21 +119,21 @@ func TestDemoSeedsEmptyDatabase(t *testing.T) {
 	if guest == nil || !guest.IsGuest() {
 		t.Fatalf("guest user: %v", guest)
 	}
-	spaces := domain.Spaces{Store: st}
+	sps := spaces.Service{Store: st}
 	for _, c := range []struct {
 		space string
 		user  *auth.User
 		role  string
 	}{
-		{"Demo", admin, domain.SpaceAdmin}, {"Demo", editor, domain.SpaceEditor}, {"Demo", demo, domain.SpaceViewer},
-		{"Family Budget", admin, domain.SpaceAdmin}, {"Family Budget", editor, domain.SpaceAdmin}, {"Family Budget", guest, domain.SpaceViewer},
-		{"Studio GmbH", admin, domain.SpaceAdmin}, {"Studio GmbH", editor, domain.SpaceViewer},
+		{"Demo", admin, spaces.RoleAdmin}, {"Demo", editor, spaces.RoleEditor}, {"Demo", demo, spaces.RoleViewer},
+		{"Family Budget", admin, spaces.RoleAdmin}, {"Family Budget", editor, spaces.RoleAdmin}, {"Family Budget", guest, spaces.RoleViewer},
+		{"Studio GmbH", admin, spaces.RoleAdmin}, {"Studio GmbH", editor, spaces.RoleViewer},
 	} {
 		var id int64
 		if err := sqlDB.QueryRowContext(ctx, `SELECT id FROM spaces WHERE name = ?`, c.space).Scan(&id); err != nil {
 			t.Fatal(err)
 		}
-		if role, _ := spaces.Role(ctx, id, c.user.ID); role != c.role {
+		if role, _ := sps.Role(ctx, id, c.user.ID); role != c.role {
 			t.Fatalf("%s has role %q in %s, want %q", c.user.Email, role, c.space, c.role)
 		}
 	}
@@ -161,6 +162,40 @@ func TestDemoSeedsEmptyDatabase(t *testing.T) {
 	}
 	if n := countWhere(t, space, `SELECT COUNT(*) FROM automation_rules`); n < 2 {
 		t.Fatalf("automation=%d", n)
+	}
+}
+
+func TestDemoSeedsExactlyTheExportedPresets(t *testing.T) {
+	st, _ := seedDemo(t)
+	space := spaceByName(t, st, "Demo")
+	cats, tags := DefaultCategories(), DefaultTags()
+	if len(cats) != 19 || len(tags) != 10 {
+		t.Fatalf("presets: %d categories, %d tags", len(cats), len(tags))
+	}
+	if n := countWhere(t, space, `SELECT COUNT(*) FROM categories`); n < len(cats) {
+		t.Fatalf("categories=%d, want at least %d", n, len(cats))
+	}
+	for _, c := range cats {
+		q := `SELECT COUNT(*) FROM categories WHERE name = '` + c.Name + `' AND type = '` + c.Type + `' AND icon = '` + c.Icon + `' AND color = '` + c.Color + `'`
+		if n := countWhere(t, space, q); n != 1 {
+			t.Fatalf("category %s seeded %d times", c.Name, n)
+		}
+	}
+	for _, tag := range tags {
+		if n := countWhere(t, space, `SELECT COUNT(*) FROM tags WHERE name = '`+tag+`'`); n != 1 {
+			t.Fatalf("tag %s seeded %d times", tag, n)
+		}
+	}
+	if n := countWhere(t, space, `SELECT COUNT(*) FROM categories WHERE is_default = 1`); n != 2 {
+		t.Fatalf("default categories=%d", n)
+	}
+}
+
+func TestPresetsAreCopies(t *testing.T) {
+	DefaultCategories()[0].Name = "changed"
+	DefaultTags()[0] = "changed"
+	if DefaultCategories()[0].Name != "#RENT" || DefaultTags()[0] != "Essential" {
+		t.Fatal("a caller changed the shared presets")
 	}
 }
 
@@ -227,7 +262,7 @@ func TestDemoSkipsWhenUsersExist(t *testing.T) {
 	if _, err := (auth.Users{DB: sqlDB}).Create(ctx, "Owner", "owner@example.com", &pass, auth.RoleAdmin); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Demo(ctx, st, domain.KeyRing{}, Options{Loc: time.UTC}); err != nil {
+	if _, err := Demo(ctx, st, signing.KeyRing{}, Options{Loc: time.UTC}); err != nil {
 		t.Fatal(err)
 	}
 	if n := countWhere(t, sqlDB, `SELECT COUNT(*) FROM users WHERE email = 'demo@demo.com'`); n != 0 {
@@ -274,7 +309,7 @@ func TestDemoPinnedDateIsReproducibleAndHasManifest(t *testing.T) {
 	if len(manifest.Invitations) != 2 || manifest.Invitations[0].Token == "" {
 		t.Fatalf("invitations: %+v", manifest.Invitations)
 	}
-	if len(manifest.Spaces[0].Automations) == 0 || manifest.Spaces[2].Members["alex"] != domain.SpaceAdmin {
+	if len(manifest.Spaces[0].Automations) == 0 || manifest.Spaces[2].Members["alex"] != spaces.RoleAdmin {
 		t.Fatalf("spaces: %+v", manifest.Spaces)
 	}
 }

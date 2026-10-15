@@ -10,12 +10,13 @@ import {
     InputOTPSeparator,
 } from '@/components/ui/input-otp'
 import { useEnableTwoFactor, useConfirmTwoFactor, useTheme } from '@/hooks'
-import { ShieldCheck, Copy, Loader2, ArrowLeft, Star } from 'lucide-react'
+import { ShieldCheck, Copy, Loader2, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { QRCode } from 'react-qrcode-logo'
 import { LanguageSwitcher } from '@/components/shared'
+import { testId } from '@/lib/test-id'
 
-type SetupStep = 'intro' | 'qr' | 'verify' | 'recovery' | 'star'
+type SetupStep = 'intro' | 'qr' | 'verify' | 'recovery'
 
 export default function Setup2FAPage() {
     const { t } = useTranslation('auth')
@@ -37,19 +38,19 @@ export default function Setup2FAPage() {
         }
     }, [navigate])
 
+    const handleFinish = () => {
+        sessionStorage.removeItem('just_registered')
+        navigate('/')
+    }
+
     const handleSkip = () => {
         toast.info(t('setup2fa.skipToast'))
-        setStep('star')
+        handleFinish()
     }
 
     const handleComplete = () => {
         toast.success(t('setup2fa.enabledToast'))
-        setStep('star')
-    }
-
-    const handleFinish = () => {
-        sessionStorage.removeItem('just_registered')
-        navigate('/')
+        handleFinish()
     }
 
     const handleEnable = async () => {
@@ -107,6 +108,7 @@ export default function Setup2FAPage() {
                                     onClick={handleEnable}
                                     disabled={enableMutation.isPending}
                                     className="w-full"
+                                    {...testId('2fa-enable')}
                                 >
                                     {enableMutation.isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
                                     {t('setup2fa.enable')}
@@ -115,6 +117,7 @@ export default function Setup2FAPage() {
                                     variant="ghost"
                                     onClick={handleSkip}
                                     className="w-full"
+                                    {...testId('2fa-skip')}
                                 >
                                     {t('setup2fa.skip')}
                                 </Button>
@@ -132,7 +135,7 @@ export default function Setup2FAPage() {
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="flex justify-center">
+                            <div className="flex justify-center" {...testId('2fa-qr')}>
                                 <QRCode
                                     value={qrData.qr_code_url}
                                     size={240}
@@ -149,7 +152,7 @@ export default function Setup2FAPage() {
                                     {t('setup2fa.manualCode')}
                                 </p>
                                 <div className="flex items-center gap-2 bg-muted p-2 rounded-md">
-                                    <code className="flex-1 text-sm font-mono break-all">
+                                    <code className="flex-1 text-sm font-mono break-all" {...testId('2fa-secret')}>
                                         {qrData.secret}
                                     </code>
                                     <Button variant="ghost" size="sm" onClick={copySecret}>
@@ -169,6 +172,7 @@ export default function Setup2FAPage() {
                                 <Button
                                     onClick={() => setStep('verify')}
                                     className="flex-1"
+                                    {...testId('2fa-continue')}
                                 >
                                     {tCommon('actions.continue')}
                                 </Button>
@@ -218,6 +222,7 @@ export default function Setup2FAPage() {
                                     onClick={handleConfirm}
                                     disabled={otpValue.length !== 6 || confirmMutation.isPending}
                                     className="flex-1"
+                                    {...testId('2fa-verify')}
                                 >
                                     {confirmMutation.isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
                                     {t('twoFactor.verify')}
@@ -236,7 +241,7 @@ export default function Setup2FAPage() {
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="bg-muted p-4 rounded-md font-mono text-sm grid grid-cols-2 gap-2">
+                            <div className="bg-muted p-4 rounded-md font-mono text-sm grid grid-cols-2 gap-2" {...testId('2fa-recovery-codes')}>
                                 {recoveryCodes.map((code, index) => (
                                     <div key={index} className="text-center">
                                         {code}
@@ -251,56 +256,15 @@ export default function Setup2FAPage() {
                                 <Copy className="h-4 w-4 mr-2" />
                                 {t('setup2fa.copyCodes')}
                             </Button>
-                            <Button onClick={handleComplete} className="w-full">
+                            <Button onClick={handleComplete} className="w-full" {...testId('2fa-done')}>
                                 {tCommon('actions.done')}
                             </Button>
                         </CardContent>
                     </>
                 )}
 
-                {step === 'star' && (
-                    <>
-                        <CardHeader className="text-center">
-                            <div className="flex justify-center mb-4">
-                                <div className="flex size-12 items-center justify-center rounded-xl bg-yellow-500 text-white">
-                                    <Star className="size-7" />
-                                </div>
-                            </div>
-                            <CardTitle className="text-2xl">{t('setup2fa.starTitle')}</CardTitle>
-                            <CardDescription>
-                                {t('setup2fa.starDescription')}
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex flex-col gap-2">
-                                <Button
-                                    asChild
-                                    className="w-full"
-                                >
-                                    <a
-                                        href="https://github.com/chiririll/savvy-go"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                    >
-                                        <Star className="mr-2 size-4" />
-                                        {t('setup2fa.starGithub')}
-                                    </a>
-                                </Button>
-                                <Button
-                                    variant="ghost"
-                                    onClick={handleFinish}
-                                    className="w-full"
-                                >
-                                    {tCommon('actions.skip')}
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </>
-                )}
-                <div className="px-6 pb-6">
-                    <LanguageSwitcher variant="auth" className="pt-2" />
-                </div>
             </Card>
+            <LanguageSwitcher variant="auth" />
         </div>
     )
 }

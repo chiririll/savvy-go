@@ -6,8 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"savvy-go/internal/db"
-	"savvy-go/internal/db/sqlc"
+	repo "savvy-go/internal/db/repo/auth"
 	"savvy-go/internal/store"
 )
 
@@ -17,6 +16,8 @@ type TwoFactor struct {
 	DB    store.DB
 	Users Users
 }
+
+func (t TwoFactor) repo() repo.Repo { return repo.Repo{DB: t.DB} }
 
 func (t TwoFactor) verifyTOTP(_ context.Context, u *User, code string) bool {
 	if u == nil || u.TwoFactorSecret == nil {
@@ -62,7 +63,7 @@ func (t TwoFactor) Disable(ctx context.Context, u *User, code string) error {
 	if err := t.Users.SetTwoFactor(ctx, u.ID, nil, false, false); err != nil {
 		return err
 	}
-	_ = db.Q(t.DB).DeleteRecoveryCodes(ctx, u.ID)
+	_ = t.repo().DeleteRecoveryCodes(ctx, u.ID)
 	return nil
 }
 
@@ -75,14 +76,13 @@ func (t TwoFactor) VerifyAny(ctx context.Context, u *User, code string) bool {
 
 func (t TwoFactor) ConsumeRecovery(ctx context.Context, userID int64, code string) bool {
 	code = strings.ToLower(strings.TrimSpace(code))
-	found, err := db.Q(t.DB).ListUnusedRecoveryCodes(ctx, userID)
+	unused, err := t.repo().UnusedRecoveryCodes(ctx, userID)
 	if err != nil {
 		return false
 	}
-	for _, r := range found {
-		if CheckPassword(r.Code, code) {
-			now := time.Now().UTC().Format(time.RFC3339)
-			_ = db.Q(t.DB).MarkRecoveryCodeUsed(ctx, sqlc.MarkRecoveryCodeUsedParams{UsedAt: db.NS(now), ID: r.ID})
+	for _, r := range unused {
+		if CheckPassword(r.Hash, code) {
+			_ = t.repo().MarkRecoveryCodeUsed(ctx, r.ID, time.Now().UTC())
 			return true
 		}
 	}
@@ -90,8 +90,8 @@ func (t TwoFactor) ConsumeRecovery(ctx context.Context, userID int64, code strin
 }
 
 func (t TwoFactor) Remaining(ctx context.Context, userID int64) int {
-	n, _ := db.Q(t.DB).CountUnusedRecoveryCodes(ctx, userID)
-	return int(n)
+	n, _ := t.repo().CountUnusedRecoveryCodes(ctx, userID)
+	return n
 }
 
 func (t TwoFactor) Regenerate(ctx context.Context, u *User, code string) ([]string, error) {
@@ -101,21 +101,20 @@ func (t TwoFactor) Regenerate(ctx context.Context, u *User, code string) ([]stri
 	if !t.verifyTOTP(ctx, u, code) {
 		return nil, fmtErr("invalid code")
 	}
-	now := time.Now().UTC().Format(time.RFC3339)
-	_ = db.Q(t.DB).InvalidateUnusedRecoveryCodes(ctx, sqlc.InvalidateUnusedRecoveryCodesParams{UsedAt: db.NS(now), UserID: u.ID})
+	_ = t.repo().InvalidateUnusedRecoveryCodes(ctx, u.ID, time.Now().UTC())
 	return t.generateCodes(ctx, u.ID)
 }
 
 func (t TwoFactor) generateCodes(ctx context.Context, userID int64) ([]string, error) {
 	var codes []string
-	now := time.Now().UTC().Format(time.RFC3339)
+	now := time.Now().UTC()
 	for i := 0; i < 8; i++ {
 		plain := recoveryCode()
 		h, err := HashPassword(plain)
 		if err != nil {
 			return nil, err
 		}
-		if err := db.Q(t.DB).InsertRecoveryCode(ctx, sqlc.InsertRecoveryCodeParams{UserID: userID, Code: h, CreatedAt: db.NS(now)}); err != nil {
+		if err := t.repo().InsertRecoveryCode(ctx, userID, h, now); err != nil {
 			return nil, err
 		}
 		codes = append(codes, plain)

@@ -1,15 +1,17 @@
 import type { TFunction } from 'i18next'
 
 import type { AccountType } from '@/types/accounts'
-import type { ApiTokenScope } from '@/types/api-tokens'
+import type { ApiResource, ApiTokenPreset } from '@/types/api-tokens'
 import type { ActionType, ConditionOperator, TriggerType } from '@/types/automation'
 import type { BackupStatus } from '@/types/backup'
 import type { BudgetPeriod } from '@/types/budgets'
 import type { CategoryType } from '@/types/categories'
+import type { CheckId } from '@/types/checks'
 import type { DebtType } from '@/types/debts'
+import type { MailProtocol } from '@/types/mail'
 import type { ImportStep } from '@/types/import'
 import type { RecurringFrequency } from '@/types/recurring'
-import type { SpaceRole, TransferReview } from '@/types/spaces'
+import type { SpaceRole, SyncKind, TransferReview } from '@/types/spaces'
 import type { TransactionType } from '@/types/transactions'
 import type { UserRole } from '@/types/users'
 
@@ -74,15 +76,37 @@ export const accountTypeLabelLoose = (t: TFunction, type: string): string =>
         debt: t('pages:accounts.types.debt'),
     }, type)
 
-export const apiScopeLabel = (t: TFunction, scope: ApiTokenScope): string => ({
-    'read': t('settings:api.scope.read'),
-    'read-write': t('settings:api.scope.read-write'),
-} satisfies Record<ApiTokenScope, string>)[scope]
+/** Presets and resources come from the server, so an unknown one falls back to its raw name. */
+export const apiPresetLabel = (t: TFunction, preset: ApiTokenPreset | 'custom'): string =>
+    orRaw({
+        viewer: t('settings:api.preset.viewer'),
+        editor: t('settings:api.preset.editor'),
+        admin: t('settings:api.preset.admin'),
+        custom: t('settings:api.preset.custom'),
+    }, preset)
 
-export const apiScopeHint = (t: TFunction, scope: ApiTokenScope): string => ({
-    'read': t('settings:api.create.accessHint.read'),
-    'read-write': t('settings:api.create.accessHint.read-write'),
-} satisfies Record<ApiTokenScope, string>)[scope]
+export const apiPresetHint = (t: TFunction, preset: ApiTokenPreset | 'custom'): string =>
+    orRaw({
+        viewer: t('settings:api.presetHint.viewer'),
+        editor: t('settings:api.presetHint.editor'),
+        admin: t('settings:api.presetHint.admin'),
+        custom: t('settings:api.presetHint.custom'),
+    }, preset)
+
+export const apiResourceLabel = (t: TFunction, resource: ApiResource): string => orRaw({
+    accounts: t('settings:api.resource.accounts'),
+    automation: t('settings:api.resource.automation'),
+    budgets: t('settings:api.resource.budgets'),
+    categories: t('settings:api.resource.categories'),
+    currencies: t('settings:api.resource.currencies'),
+    debts: t('settings:api.resource.debts'),
+    recurring: t('settings:api.resource.recurring'),
+    reports: t('settings:api.resource.reports'),
+    space: t('settings:api.resource.space'),
+    tags: t('settings:api.resource.tags'),
+    transactions: t('settings:api.resource.transactions'),
+    transfers: t('settings:api.resource.transfers'),
+}, resource)
 
 export const ssoErrorLabel = (t: TFunction, code: SsoErrorCode): string => ({
     audience_mismatch: t('auth:sso.errors.audience_mismatch'),
@@ -265,13 +289,29 @@ export const userRoleLabel = (t: TFunction, role: UserRole): string => ({
     guest: t('common:roles.guest'),
 } satisfies Record<UserRole, string>)[role]
 
+export const mailProtocolLabel = (t: TFunction, protocol: MailProtocol): string => ({
+    starttls: t('settings:system.mail.protocols.starttls'),
+    smtps: t('settings:system.mail.protocols.smtps'),
+    smtp: t('settings:system.mail.protocols.smtp'),
+} satisfies Record<MailProtocol, string>)[protocol]
+
 export const spaceRoleLabel = (t: TFunction, role: SpaceRole): string => ({
     admin: t('settings:spaces.roles.admin'),
     editor: t('settings:spaces.roles.editor'),
     viewer: t('settings:spaces.roles.viewer'),
 } satisfies Record<SpaceRole, string>)[role]
 
-export const transferReviewLabel = (t: TFunction, review: TransferReview): string => ({
+export const syncKindLabel = (t: TFunction, kind: SyncKind): string => ({
+    categories: t('settings:spaces.sync.kinds.categories'),
+    tags: t('settings:spaces.sync.kinds.tags'),
+} satisfies Record<SyncKind, string>)[kind]
+
+export const syncTypeLabel = (t: TFunction, type: CategoryType): string => ({
+    income: t('settings:spaces.sync.types.income'),
+    expense: t('settings:spaces.sync.types.expense'),
+} satisfies Record<CategoryType, string>)[type]
+
+export const transferReviewLabel =(t: TFunction, review: TransferReview): string => ({
     created_remote: t('settings:spaces.transfers.review.created_remote'),
     deleted_remote: t('settings:spaces.transfers.review.deleted_remote'),
     changed_remote: t('settings:spaces.transfers.review.changed_remote'),
@@ -319,7 +359,7 @@ export const transactionTypeLabel = (t: TFunction, type: TransactionType): strin
 export type NavKey =
     | 'dashboard' | 'transactions' | 'recurring' | 'budgets' | 'debts' | 'reports'
     | 'accounts' | 'categories' | 'tags' | 'currencies' | 'automation' | 'space' | 'user' | 'import'
-    | 'backups' | 'system' | 'monitoring' | 'sso' | 'security' | 'systemBackups' | 'users' | 'spaces'
+    | 'backups' | 'system' | 'checks' | 'monitoring' | 'sso' | 'security' | 'systemBackups' | 'users' | 'spaces'
 
 export const navLabel = (t: TFunction, key: NavKey): string => ({
     dashboard: t('nav:dashboard'),
@@ -338,6 +378,7 @@ export const navLabel = (t: TFunction, key: NavKey): string => ({
     import: t('nav:import'),
     backups: t('nav:backups'),
     system: t('nav:system'),
+    checks: t('nav:checks'),
     monitoring: t('nav:monitoring'),
     sso: t('nav:sso'),
     security: t('nav:security'),
@@ -345,6 +386,48 @@ export const navLabel = (t: TFunction, key: NavKey): string => ({
     users: t('nav:users'),
     spaces: t('nav:spaces'),
 } satisfies Record<NavKey, string>)[key]
+
+/** Wording of a server check (`GET /admin/checks`); `value` fills the count in the title. */
+export const checkText = (t: TFunction, id: CheckId, value: number | null): { title: string; description: string; action: string } => {
+    const count = Math.round(value ?? 0)
+    return ({
+        app_url_missing: {
+            title: t('settings:checks.items.app_url_missing.title'),
+            description: t('settings:checks.items.app_url_missing.description'),
+            action: t('settings:checks.items.app_url_missing.action'),
+        },
+        mail_off: {
+            title: t('settings:checks.items.mail_off.title'),
+            description: t('settings:checks.items.mail_off.description'),
+            action: t('settings:checks.items.mail_off.action'),
+        },
+        mail_invalid: {
+            title: t('settings:checks.items.mail_invalid.title'),
+            description: t('settings:checks.items.mail_invalid.description'),
+            action: t('settings:checks.items.mail_invalid.action'),
+        },
+        backup_missing: {
+            title: t('settings:checks.items.backup_missing.title'),
+            description: t('settings:checks.items.backup_missing.description'),
+            action: t('settings:checks.items.backup_missing.action'),
+        },
+        backup_stale: {
+            title: t('settings:checks.items.backup_stale.title', { count }),
+            description: t('settings:checks.items.backup_stale.description'),
+            action: t('settings:checks.items.backup_stale.action'),
+        },
+        disk_filling: {
+            title: t('settings:checks.items.disk_filling.title', { count }),
+            description: t('settings:checks.items.disk_filling.description'),
+            action: t('settings:checks.items.disk_filling.action'),
+        },
+        config_read_only: {
+            title: t('settings:checks.items.config_read_only.title'),
+            description: t('settings:checks.items.config_read_only.description'),
+            action: t('settings:checks.items.config_read_only.action'),
+        },
+    } satisfies Record<CheckId, { title: string; description: string; action: string }>)[id]
+}
 
 /** Entries of the "new transaction" menu; `transfer_out` is a transfer to another space. */
 export const createMenuLabel = (t: TFunction, type: 'income' | 'expense' | 'transfer' | 'transfer_out'): string => ({

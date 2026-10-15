@@ -8,68 +8,119 @@ import (
 	"net/http"
 	"os"
 	"strings"
-
-	"savvy-go/internal/auth"
-	"savvy-go/internal/config"
-	"savvy-go/internal/domain"
-	"savvy-go/internal/jobs"
-	"savvy-go/internal/settings"
-	"savvy-go/internal/signing"
-	"savvy-go/internal/store"
-	"savvy-go/internal/webui"
+	"sync"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+
+	"savvy-go/internal/auth"
+	"savvy-go/internal/backup"
+	"savvy-go/internal/bootstrap"
+	"savvy-go/internal/config"
+	"savvy-go/internal/currencydata"
+	"savvy-go/internal/jobs"
+	"savvy-go/internal/ledger"
+	"savvy-go/internal/mailer"
+	"savvy-go/internal/oauth"
+	"savvy-go/internal/refsync"
+	"savvy-go/internal/settings"
+	"savvy-go/internal/signing"
+	"savvy-go/internal/spaces"
+	"savvy-go/internal/sso"
+	"savvy-go/internal/store"
+	"savvy-go/internal/transfers"
+	"savvy-go/internal/uploads"
+	"savvy-go/internal/webui"
 )
 
 // Server is the HTTP front door: health probes, /api, and the Vite SPA.
 // Server-level services use the server database; the services of a space are
 // built per request by withSpace (see spaceScope).
 type Server struct {
-	cfg        config.Config
-	store      store.Store
-	mux        *chi.Mux
-	users      auth.Users
-	sessions   auth.Sessions
-	apiTokens  auth.APITokens
-	tokens     auth.PasswordTokens
-	challenges auth.Challenges
-	settings   settings.Store
-	spaces     domain.Spaces
-	backups    domain.Backups
-	transfers  *domain.Transfers
-	keys       *signing.Holder
-	uploads    domain.Uploads
-	sso        domain.SSO
-	twoFactor  auth.TwoFactor
-	webauthn   auth.WebAuthn
-	queue      *jobs.Queue
-	assets     fs.FS // the frontend: index.html, icons and build/
+	cfg           config.Config
+	store         store.Store
+	mux           *chi.Mux
+	users         auth.Users
+	sessions      auth.Sessions
+	apiTokens     auth.APITokens
+	tokens        auth.PasswordTokens
+	challenges    auth.Challenges
+	settings      settings.Store
+	spaces        spaces.Service
+	backups       backup.Service
+	transfers     *transfers.Service
+	refsync       refsync.Service
+	keys          *signing.Holder
+	verifications auth.EmailVerifications
+	uploads       uploads.Service
+	rates         ledger.RateSource // currency catalog and exchange rates, shared by every space
+	sso           sso.Service
+	oauth         *oauth.Service
+	twoFactor     auth.TwoFactor
+	webauthn      auth.WebAuthn
+	queue         *jobs.Queue
+	// The mail server can be changed in the admin panel, so these are guarded by
+	// mailMu: read the mailer through mailer(), the settings through mailSettings().
+	mailMu      sync.RWMutex
+	mail        mailer.Mailer
+	mailCfg     mailer.Config
+	mailProblem string
+	newMailer   func(mailer.Config) mailer.Mailer // tests swap it to record instead of dialling
+	bootstrap   *bootstrap.Guard                  // first-run password; nil keeps registration closed
+	assets      fs.FS                             // the frontend: index.html, icons and build/
 }
 
-func New(cfg config.Config, st store.Store, keys *signing.Holder) *Server {
-	domain.SetLocation(cfg.Location)
+// Option configures New.
+type Option func(*Server)
+
+// WithRates sets where currencies and exchange rates come from. The default
+// is the public data files; share one source with the scheduled rate update
+// so spaces do not each fetch their own.
+func WithRates(src ledger.RateSource) Option { return func(s *Server) { s.rates = src } }
+
+// WithBootstrap sets the first-run password that registration needs while the
+// server has no users. Without it, registration is always closed.
+func WithBootstrap(g *bootstrap.Guard) Option { return func(s *Server) { s.bootstrap = g } }
+
+func New(cfg config.Config, st store.Store, keys *signing.Holder, opts ...Option) *Server {
+	ledger.SetLocation(cfg.Location)
 	srv := st.Server()
 	s := &Server{
-		cfg:        cfg,
-		assets:     resolveAssets(webui.FS()),
-		store:      st,
-		users:      auth.Users{DB: srv},
-		sessions:   auth.Sessions{DB: srv, Cfg: cfg},
-		apiTokens:  auth.APITokens{DB: srv},
-		tokens:     auth.PasswordTokens{DB: srv},
-		challenges: auth.Challenges{DB: srv, Cfg: cfg},
-		settings:   settings.Store{DB: srv},
-		spaces:     domain.Spaces{Store: st},
-		uploads:    domain.Uploads{DB: srv, Root: cfg.UploadsDir, SignSecret: randomSecret()},
-		twoFactor:  auth.TwoFactor{DB: srv, Users: auth.Users{DB: srv}},
-		webauthn:   auth.WebAuthn{DB: srv, Cfg: cfg},
+		cfg:           cfg,
+		assets:        resolveAssets(webui.FS()),
+		store:         st,
+		users:         auth.Users{DB: srv},
+		sessions:      auth.Sessions{DB: srv, SessionTTL: cfg.SessionTTL, RememberTTL: cfg.RememberTTL},
+		apiTokens:     auth.APITokens{DB: srv},
+		tokens:        auth.PasswordTokens{DB: srv},
+		verifications: auth.EmailVerifications{DB: srv},
+		challenges:    auth.Challenges{DB: srv, Cfg: cfg},
+		settings:      settings.Store{DB: srv},
+		spaces:        spaces.Service{Store: st},
+		uploads:       uploads.Service{DB: srv, Root: cfg.UploadsDir, SignSecret: randomSecret()},
+		twoFactor:     auth.TwoFactor{DB: srv, Users: auth.Users{DB: srv}},
+		webauthn:      auth.WebAuthn{DB: srv, Cfg: cfg},
 	}
-	keyRing := domain.KeyRing{Holder: keys, Trusted: domain.TrustedKeys(srv)}
+	keyRing := signing.KeyRing{Holder: keys, Trusted: transfers.TrustedKeys(srv)}
 	s.keys = keys
-	s.transfers = &domain.Transfers{Spaces: s.spaces, Keys: keyRing}
-	s.backups = domain.Backups{Store: st, Keys: keyRing, Dir: cfg.BackupsDir, DataDir: cfg.DataDir, Transfers: s.transfers}
-	s.sso = domain.SSO{DB: srv, Users: s.users, Settings: s.settings, Spaces: s.spaces, AppURL: cfg.URL}
+	s.transfers = &transfers.Service{Spaces: s.spaces, Keys: keyRing}
+	s.refsync = refsync.Service{Spaces: s.spaces}
+	s.backups = backup.Service{Store: st, Keys: keyRing, Dir: cfg.BackupsDir, DataDir: cfg.DataDir, Transfers: s.transfers}
+	for _, opt := range opts {
+		opt(s)
+	}
+	if s.rates == nil {
+		s.rates = currencydata.New()
+	}
+	s.mailCfg, s.mailProblem = cfg.Mail, cfg.MailProblem
+	if s.newMailer == nil {
+		s.newMailer = mailer.New
+	}
+	if s.mail == nil {
+		s.mail = s.newMailer(cfg.Mail)
+	}
+	s.sso = sso.Service{DB: srv, Users: s.users, Settings: s.settings, AppURL: cfg.URL}
+	s.oauth = oauth.New(srv)
 	_ = os.MkdirAll(cfg.UploadsDir, 0o775)
 	_ = os.MkdirAll(cfg.BackupsDir, 0o775)
 	s.mux = s.routes()
@@ -85,6 +136,7 @@ func (s *Server) routes() *chi.Mux {
 	r.Use(middleware.Recoverer)
 	r.Use(locale)
 	r.Use(noStoreAPI)
+	r.Use(noFraming)
 
 	r.Get("/livez", s.livez)
 	r.Get("/readyz", s.readyz)
@@ -95,8 +147,11 @@ func (s *Server) routes() *chi.Mux {
 
 		r.Get("/auth/status", s.authStatus)
 		r.Get("/auth/me", s.authMe)
+		r.Post("/auth/bootstrap/verify", s.bootstrapVerify)
 		r.Post("/auth/register", s.authRegister)
+		r.Post("/onboarding/restore", s.onboardingRestore)
 		r.Post("/auth/login", s.authLogin)
+		r.Post("/auth/verify-email", s.verifyEmail)
 		r.Get("/auth/password/{token}", s.passwordPreview)
 		r.Post("/auth/password/{token}", s.passwordAccept)
 		r.Post("/auth/2fa/verify", s.twoFactorVerify)
@@ -115,18 +170,24 @@ func (s *Server) routes() *chi.Mux {
 		r.Group(func(r chi.Router) {
 			r.Use(s.requireSession)
 			r.Use(s.requireCSRF)
+			r.Use(s.requireVerifiedEmail)
 
 			// Credential management is limited to real sessions, never API tokens.
 			r.Group(func(r chi.Router) {
 				r.Use(s.sessionOnly)
 				r.Post("/auth/logout", s.authLogout)
+				r.Post("/auth/verify-email/resend", s.verifyEmailResend)
 				r.Post("/auth/logout-others", s.authLogoutOthers)
 				r.Put("/auth/password", s.authChangePassword)
 				r.Get("/auth/2fa/status", s.twoFactorStatus)
 				r.Get("/auth/webauthn/credentials", s.webauthnIndex)
+				r.Get("/auth/api-token-capabilities", s.apiTokenCapabilities)
 				r.Get("/auth/api-tokens", s.apiTokensIndex)
 				r.Post("/auth/api-tokens", s.apiTokensStore)
+				r.Patch("/auth/api-tokens/{id}", s.apiTokensUpdate)
 				r.Delete("/auth/api-tokens/{id}", s.apiTokensDestroy)
+				r.Get("/oauth/authorize", s.oauthConsentInfo)
+				r.Post("/oauth/authorize", s.oauthConsent)
 				r.Post("/auth/2fa/enable", s.twoFactorEnable)
 				r.Post("/auth/2fa/confirm", s.twoFactorConfirm)
 				r.Post("/auth/2fa/disable", s.twoFactorDisable)
@@ -138,16 +199,24 @@ func (s *Server) routes() *chi.Mux {
 				r.Delete("/auth/webauthn/credentials/{id}", s.webauthnDestroy)
 			})
 
+			r.Get("/currencies/catalog", s.serverCurrencyCatalog)
+			r.Get("/presets", s.presets)
+			r.Get("/invitation-methods", s.invitationMethods)
 			r.Get("/spaces", s.spacesIndex)
 			r.With(s.sessionOnly).Post("/spaces", s.spacesStore)
 			r.With(s.sessionOnly).Post("/spaces/import", s.spacesImport)
 			r.With(s.sessionOnly).Post("/invitations/{token}/accept", s.invitationAccept)
+			// Sync groups span several spaces; the rights are checked in each.
+			r.With(s.sessionOnly).Post("/sync-groups/diff", s.syncGroupDiff)
+			r.With(s.sessionOnly).Post("/sync-groups/apply", s.syncGroupApply)
 			r.Route("/spaces/{space}", func(r chi.Router) {
 				r.Use(s.withSpace)
+				r.Use(s.requireTokenGrant)
 				r.Get("/", s.spaceShow)
 				r.Get("/members", s.membersIndex)
 				r.Get("/settings", s.spaceSettingsIndex)
 				r.Get("/links", s.linksIndex)
+				r.Get("/sync-group", s.syncGroupShow)
 				r.Get("/transfers", s.transfersIndex)
 				r.With(s.sessionOnly).Post("/leave", s.spaceLeave)
 
@@ -170,7 +239,7 @@ func (s *Server) routes() *chi.Mux {
 					r.Get("/backups", s.spaceBackupsIndex)
 					r.Post("/backups", s.spaceBackupsStore)
 					r.Post("/backups/upload", s.spaceBackupsUpload)
-					r.Post("/backups/restore-laravel", s.spaceBackupsRestoreLaravel)
+					r.Post("/backups/upgrade-laravel", s.spaceBackupsUpgradeLaravel)
 					r.Get("/backups/{name}/download", s.spaceBackupsDownload)
 					r.Post("/backups/{name}/restore", s.spaceBackupsRestore)
 					r.Delete("/backups/{name}", s.spaceBackupsDestroy)
@@ -211,17 +280,27 @@ func (s *Server) routes() *chi.Mux {
 				r.Post("/identity-providers/{id}/test", s.idpTest)
 				r.Get("/monitoring/storage", s.monitoringStorage)
 				r.Get("/monitoring/resources", s.monitoringResources)
+				r.Get("/admin/checks", s.checksIndex)
 			})
 
 			r.Group(func(r chi.Router) {
 				r.Use(s.requireAdmin)
 				r.Use(s.sessionOnly)
 				r.Patch("/settings", s.settingsUpdate)
+				r.Get("/admin/oauth/registration", s.oauthRegistrationShow)
+				r.Post("/admin/oauth/registration", s.oauthRegistrationOpen)
+				r.Delete("/admin/oauth/registration", s.oauthRegistrationClose)
+				r.Get("/admin/oauth/clients", s.oauthClientsIndex)
+				r.Delete("/admin/oauth/clients/{id}", s.oauthClientDestroy)
+				r.Get("/admin/mail", s.mailIndex)
+				r.Put("/admin/mail", s.mailUpdate)
+				r.Post("/admin/mail/test", s.mailTest)
+				r.Post("/admin/invitations/clear", s.invitationsClear)
 				// P1: backups hold every space.
 				r.Get("/backups", s.backupsIndex)
 				r.Post("/backups", s.backupsStore)
 				r.Post("/backups/upload", s.backupsUpload)
-				r.Post("/backups/restore-laravel", s.backupsRestoreLaravel)
+				r.Post("/backups/upgrade-laravel", s.backupsUpgradeLaravel)
 				r.Get("/backups/{name}/download", s.backupsDownload)
 				r.Post("/backups/{name}/restore", s.backupsRestore)
 				r.Delete("/backups/{name}", s.backupsDestroy)
@@ -242,6 +321,13 @@ func (s *Server) routes() *chi.Mux {
 		})
 	})
 
+	// MCP clients (Claude web) discover and sign in through these; they need
+	// the public URL because it is their issuer.
+	r.Group(func(r chi.Router) {
+		r.Use(s.needAppURL)
+		s.mcpRoutes(r)
+	})
+
 	r.Get("/*", s.spa)
 	return r
 }
@@ -251,6 +337,18 @@ func locale(next http.Handler) http.Handler {
 		if loc := strings.TrimSpace(r.Header.Get("X-Locale")); loc != "" {
 			w.Header().Set("Content-Language", loc)
 		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// noFraming forbids showing any page inside another site's frame, so a hidden
+// iframe cannot put its own button over ours (clickjacking), notably over
+// "Allow access" on the OAuth consent page. Nothing here is meant to be embedded.
+func noFraming(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("X-Frame-Options", "DENY")
+		h.Set("Content-Security-Policy", "frame-ancestors 'none'")
 		next.ServeHTTP(w, r)
 	})
 }

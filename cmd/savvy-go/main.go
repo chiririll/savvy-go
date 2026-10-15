@@ -12,11 +12,12 @@ import (
 	"time"
 
 	"savvy-go/internal/config"
-	"savvy-go/internal/domain"
+	"savvy-go/internal/currencydata"
 	"savvy-go/internal/httpserver"
 	"savvy-go/internal/jobs"
 	"savvy-go/internal/seed"
 	"savvy-go/internal/store/sqlite"
+	"savvy-go/internal/uploads"
 	"savvy-go/internal/version"
 )
 
@@ -66,14 +67,20 @@ func run(cfg config.Config, seedCfg seed.Config) error {
 		return fmt.Errorf("seed demo: %w", err)
 	}
 
+	guard, err := startBootstrap(ctx, cfg, st)
+	if err != nil {
+		return err
+	}
+
 	queue := jobs.New(2)
 	jobsCtx, stopJobs := context.WithCancel(ctx)
 	defer stopJobs()
-	startJobs(jobsCtx, st, domain.Uploads{DB: st.Server(), Root: cfg.UploadsDir})
+	rates := currencydata.New()
+	startJobs(jobsCtx, st, uploads.Service{DB: st.Server(), Root: cfg.UploadsDir}, rates)
 
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,
-		Handler:           httpserver.New(cfg, st, keys).Handler(),
+		Handler:           httpserver.New(cfg, st, keys, httpserver.WithRates(rates), httpserver.WithBootstrap(guard)).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 	failed := make(chan error, 1)

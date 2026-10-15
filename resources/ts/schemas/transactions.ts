@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import i18n from '@/lib/i18n'
 import { isDateInFuture } from '@/lib/dates'
+import { isTransferType } from '@/lib/transaction-type'
 import {
     ITEM_QTY_DECIMALS,
     quantityDecimalPlaces,
@@ -18,10 +19,7 @@ export const transactionItemSchema = z.object({
     price_per_unit: z.coerce.number().min(0, i18n.t('validation.cannotBeNegative')),
 })
 
-/** Both kinds of transfer move money between accounts and have no category. */
-export function isTransferType(type?: string | null): boolean {
-    return type === 'transfer' || type === 'transfer_out'
-}
+export { isTransferType }
 
 export const transactionSchema = z.object({
     type: z.enum(['income', 'expense', 'transfer', 'transfer_out'], {

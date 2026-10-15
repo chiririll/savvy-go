@@ -2,9 +2,10 @@ import { testId } from '@/lib/test-id'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { toast } from 'sonner'
-import { AlertTriangle, ArrowLeftRight, Boxes, Copy, History, Link2, LogOut, Mail, Trash2, Unlink, Users } from 'lucide-react'
+import { AlertTriangle, ArrowLeftRight, Boxes, History, Link2, LogOut, Mail, Trash2, Unlink, Users } from 'lucide-react'
 import { Page, PageHeader, SettingsSection } from '@/components/shared'
+import { InviteForm } from '@/components/features/spaces/InviteForm'
+import { SyncGroupSection } from '@/components/features/spaces/SyncGroupSection'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,7 +27,6 @@ import {
     useCurrentSpace,
     useDeleteSpace,
     useDeleteTransfer,
-    useInvite,
     useLeaveSpace,
     useLinkSpace,
     useRemoveMember,
@@ -194,60 +194,19 @@ function Members({ space, isAdmin }: { space: Space; isAdmin: boolean }) {
 function Invitations({ space }: { space: Space }) {
     const { t } = useTranslation('settings')
     const { data: invitations = [] } = useSpaceInvitations(space.id)
-    const invite = useInvite(space.id)
     const revoke = useRevokeInvitation(space.id)
-    const [email, setEmail] = useState('')
-    const [role, setRole] = useState<SpaceRole>('editor')
-    const [link, setLink] = useState<string | null>(null)
     const open = invitations.filter((i) => !i.acceptedAt && (!i.expiresAt || new Date(i.expiresAt) > new Date()))
-
-    const copy = async (value: string) => {
-        await navigator.clipboard.writeText(value)
-        toast.success(t('spaces.invitations.copied'))
-    }
 
     return (
         <SettingsSection icon={Mail} title={t('spaces.invitations.title')} description={t('spaces.invitations.description')}>
             <div className="space-y-4">
-                <form
-                    className="grid gap-2 sm:grid-cols-[2fr_1fr_auto]"
-                    onSubmit={async (e) => {
-                        e.preventDefault()
-                        const { token } = await invite.mutateAsync({ role, email: email.trim() || undefined })
-                        setLink(`${window.location.origin}/invite/${token}`)
-                        setEmail('')
-                    }}
-                >
-                    <Input type="email" placeholder={t('spaces.invitations.emailPlaceholder')} value={email} onChange={(e) => setEmail(e.target.value)} />
-                    <Select value={role} onValueChange={(r) => setRole(r as SpaceRole)}>
-                        <SelectTrigger className="w-full">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {ROLES.map((r) => (
-                                <SelectItem key={r} value={r}>{spaceRoleLabel(t, r)}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <Button type="submit" disabled={invite.isPending}>{t('spaces.invitations.create')}</Button>
-                </form>
-                {link && (
-                    <div className="space-y-1.5 rounded-lg border bg-muted/40 p-3">
-                        <p className="text-sm">{t('spaces.invitations.linkReady')}</p>
-                        <div className="flex gap-2">
-                            <Input readOnly value={link} className="font-mono text-xs" />
-                            <Button variant="outline" size="icon" onClick={() => copy(link)}>
-                                <Copy className="size-4" />
-                            </Button>
-                        </div>
-                    </div>
-                )}
+                <InviteForm spaceId={space.id} />
                 {open.length > 0 && (
                     <ul className="divide-y rounded-lg border">
                         {open.map((i) => (
                             <li key={i.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
                                 <div className="min-w-0">
-                                    <p className="truncate">{i.email ?? t('spaces.invitations.anyone')} · {spaceRoleLabel(t, i.role)}</p>
+                                    <p className="truncate">{i.email ?? i.note ?? t('spaces.invitations.anyone')} · {spaceRoleLabel(t, i.role)}</p>
                                     <p className="truncate text-xs text-muted-foreground">
                                         {t('spaces.invitations.expires', { date: formatDateTime(i.expiresAt) })}
                                     </p>
@@ -469,6 +428,7 @@ export default function SpaceSettingsPage() {
                 <div className="space-y-6">
                     <TransfersNeedingAttention space={space} />
                     <Links space={space} isAdmin={isAdmin} />
+                    <SyncGroupSection space={space} isAdmin={isAdmin} />
                     {isAdmin && <Audit space={space} />}
                 </div>
             </div>

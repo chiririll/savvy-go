@@ -6,7 +6,11 @@ import { Page, PageHeader, FormWrapper, SettingsSection, ToggleRow, SettingsRowS
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useSettings, useUpdateSettings, useSsoProviders } from '@/hooks'
+import { useSettings, useUpdateSettings, useSsoProviders, useMailStatus } from '@/hooks'
+import { authApi } from '@/api'
+import { useUser } from '@/stores/auth'
+import { MailSection } from '@/components/features/mail'
+import { ClearInvitationsSection } from '@/components/features/spaces/ClearInvitationsSection'
 import { Settings } from '@/types'
 
 /** A number field saved on blur; empty means null when nullable. */
@@ -57,6 +61,7 @@ function TextRow({
     description,
     placeholder,
     value,
+    readOnly,
     onSave,
 }: {
     id: string
@@ -64,6 +69,7 @@ function TextRow({
     description: string
     placeholder?: string
     value: string
+    readOnly?: boolean
     onSave: (value: string) => void
 }) {
     const { t } = useTranslation('settings')
@@ -78,8 +84,8 @@ function TextRow({
                 <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
             </div>
             <div className="flex items-center gap-2">
-                <Input id={id} type="url" className="w-full sm:w-72" placeholder={placeholder} value={draft} onChange={(e) => setDraft(e.target.value)} />
-                {changed && (
+                <Input id={id} type="url" className="w-full sm:w-72" placeholder={placeholder} value={draft} readOnly={readOnly} onChange={(e) => setDraft(e.target.value)} />
+                {changed && !readOnly && (
                     <Button size="sm" onClick={() => onSave(draft.trim())}>
                         {t('actions.save', { ns: 'common' })}
                     </Button>
@@ -94,12 +100,27 @@ export default function AdminSystemPage() {
     const { data: settings, isLoading } = useSettings()
     const { data: ssoProviders } = useSsoProviders()
     const updateSettings = useUpdateSettings()
+    const { data: mail } = useMailStatus()
+    const me = useUser()
 
     const hasSso = (ssoProviders?.length ?? 0) > 0
     const passwordLoginEnabled = settings?.password_login_enabled ?? true
     const passwordLoginLocked = passwordLoginEnabled && !hasSso
     const ssoAllowSignup = settings?.sso_allow_signup ?? true
     const requireVerifiedEmail = settings?.sso_require_verified_email ?? false
+
+    const requireVerification = settings?.require_email_verification ?? false
+    // Links go out by email, and the admin switching it on must not lock themselves out.
+    const mailReady = !!mail?.enabled && !!mail.appUrlSet
+    const adminConfirmed = me?.emailVerified === true
+    const verificationBlocker = !mailReady
+        ? t('system.authentication.requireVerificationNeedsMail')
+        : !adminConfirmed ? t('system.authentication.requireVerificationNeedsYou') : null
+    const sendConfirmation = () => {
+        authApi.resendVerification()
+            .then(() => toast.success(t('system.authentication.confirmationSent')))
+            .catch((error: { message?: string }) => toast.error(error.message ?? ''))
+    }
 
     const save = (data: Partial<Settings>) => updateSettings.mutate(data)
 
@@ -171,6 +192,21 @@ export default function AdminSystemPage() {
                                         disabled={updateSettings.isPending || !ssoAllowSignup}
                                         onChange={(checked) => save({ sso_require_verified_email: checked })}
                                     />
+                                    <ToggleRow
+                                        id="require-email-verification"
+                                        label={t('system.authentication.requireVerification')}
+                                        description={(!requireVerification && verificationBlocker) || t('system.authentication.requireVerificationOn')}
+                                        checked={requireVerification}
+                                        disabled={updateSettings.isPending || (!requireVerification && verificationBlocker !== null)}
+                                        onChange={(checked) => save({ require_email_verification: checked })}
+                                    />
+                                    {!requireVerification && mailReady && !adminConfirmed && (
+                                        <div className="px-4 pb-3.5">
+                                            <Button size="sm" variant="outline" onClick={sendConfirmation}>
+                                                {t('system.authentication.sendConfirmation')}
+                                            </Button>
+                                        </div>
+                                    )}
                                 </>
                             )}
                         </div>
@@ -184,7 +220,12 @@ export default function AdminSystemPage() {
                                 <TextRow
                                     id="app-url"
                                     label={t('system.server.appUrl')}
-                                    description={t('system.server.appUrlDescription')}
+                                    description={
+                                        settings.config_writable === false
+                                            ? t('system.server.configReadOnly')
+                                            : t('system.server.appUrlDescription')
+                                    }
+                                    readOnly={settings.config_writable === false}
                                     placeholder={t('system.server.appUrlPlaceholder')}
                                     value={settings.app_url ?? ''}
                                     onSave={(v) => save({ app_url: v })}
@@ -192,6 +233,10 @@ export default function AdminSystemPage() {
                             )}
                         </div>
                     </SettingsSection>
+
+                    <MailSection />
+
+                    <ClearInvitationsSection />
 
                     <SettingsSection icon={Boxes} title={t('system.spaces.title')} description={t('system.spaces.description')}>
                         <div className="divide-y rounded-lg border">

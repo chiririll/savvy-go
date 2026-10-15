@@ -8,7 +8,6 @@
 package money
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"math"
@@ -171,23 +170,6 @@ func (m Money) String() string { return m.Decimal().String() }
 // MarshalJSON writes a JSON number in major units. The number carries no
 // currency; the response names it next to the value.
 func (m Money) MarshalJSON() ([]byte, error) { return []byte(m.Decimal().String()), nil }
-
-// FromNullMinor reads a nullable stored amount; nil when NULL.
-func FromNullMinor(v sql.NullInt64, unit Unit) *Money {
-	if !v.Valid {
-		return nil
-	}
-	m := New(v.Int64, unit)
-	return &m
-}
-
-// ToNullMinor is the stored form of an optional amount.
-func ToNullMinor(m *Money) sql.NullInt64 {
-	if m == nil {
-		return sql.NullInt64{}
-	}
-	return sql.NullInt64{Int64: m.minor, Valid: true}
-}
 
 // FromNullDecimal rounds an optional input amount into unit; nil stays nil.
 func FromNullDecimal(d *decimal.Decimal, unit Unit) *Money {

@@ -1,0 +1,256 @@
+package sso
+
+import (
+	"context"
+	"encoding/json"
+	"strconv"
+	"strings"
+	"time"
+
+	"savvy-go/internal/auth"
+)
+
+func (s Service) Provision(ctx context.Context, p IdentityProvider, id NormalizedIdentity) (*auth.User, bool, error) {
+	if id.Subject == "" {
+		return nil, false, ssoErr("missing_subject", "The identity is missing a subject.", 422)
+	}
+	if u, ok, err := s.loginExisting(ctx, p, id); err != nil || ok {
+		return u, u != nil && u.HasTwoFactor(), err
+	}
+	n, err := s.Users.Count(ctx)
+	if err != nil {
+		return nil, false, err
+	}
+	if n == 0 {
+		return nil, false, ssoErr("no_admin", "Create a local administrator before signing in with Service.", 403)
+	}
+	user, err := s.linkByEmail(ctx, p, id)
+	if err != nil {
+		return nil, false, err
+	}
+	if user == nil {
+		user, err = s.justInTime(ctx, p, id)
+		if err != nil {
+			return nil, false, err
+		}
+	}
+	if err := s.createLink(ctx, p, id, user.ID); err != nil {
+		return nil, false, err
+	}
+	return user, user.HasTwoFactor(), nil
+}
+
+func (s Service) loginExisting(ctx context.Context, p IdentityProvider, id NormalizedIdentity) (*auth.User, bool, error) {
+	link, err := s.repo().LinkBySubject(ctx, p.ID, id.Subject)
+	if link == nil || err != nil {
+		return nil, false, nil
+	}
+	userID := link.UserID
+	linkID := link.ID
+	user, err := s.Users.ByID(ctx, userID)
+	if err != nil || user == nil {
+		return nil, false, ssoErr("user_missing", "The linked user no longer exists.", 403)
+	}
+	if p.SyncRoleOnLogin {
+		_ = s.syncRole(ctx, user, p, id)
+		user, _ = s.Users.ByID(ctx, user.ID)
+	}
+	raw, _ := json.Marshal(id.Raw)
+	_ = s.repo().TouchLink(ctx, linkID, string(raw), time.Now().UTC())
+	return user, true, nil
+}
+
+func (s Service) linkByEmail(ctx context.Context, p IdentityProvider, id NormalizedIdentity) (*auth.User, error) {
+	if !p.LinkByEmail || id.Email == "" || !id.EmailVerified {
+		return nil, nil
+	}
+	user, err := s.Users.ByEmail(ctx, id.Email)
+	if err != nil || user == nil {
+		return nil, err
+	}
+	// The provider vouches for the address, which is as good as a link in an email.
+	if !user.EmailVerified {
+		if err := s.Users.SetEmailVerified(ctx, user.ID, true); err != nil {
+			return nil, err
+		}
+	}
+	if p.SyncRoleOnLogin {
+		_ = s.syncRole(ctx, user, p, id)
+	}
+	return s.Users.ByID(ctx, user.ID)
+}
+
+func (s Service) justInTime(ctx context.Context, p IdentityProvider, id NormalizedIdentity) (*auth.User, error) {
+	if !p.AllowJIT || !s.Settings.Bool(ctx, "sso_allow_signup", true) {
+		return nil, ssoErr("signup_disabled", "Sign-up with this provider is disabled.", 403)
+	}
+	if id.Email == "" {
+		return nil, ssoErr("no_email", "The identity provider did not return an email address.", 422)
+	}
+	if s.Settings.Bool(ctx, "sso_require_verified_email", false) && !id.EmailVerified {
+		return nil, ssoErr("email_unverified", "The email address is not verified.", 422)
+	}
+	if existing, _ := s.Users.ByEmail(ctx, id.Email); existing != nil {
+		return nil, ssoErr("email_in_use", "An account with this email already exists.", 409)
+	}
+	name := id.Name
+	if name == "" {
+		name = id.Email
+	}
+	role := s.mappedRole(p, id)
+	if role == "" {
+		role = p.DefaultRole
+	}
+	role = auth.NormalizeRole(role)
+	if !auth.ValidRole(role) {
+		role = auth.RoleUser
+	}
+	pass := auth.RandomString(40)
+	user, err := s.Users.Create(ctx, name, id.Email, &pass, role)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.Users.MarkSSOOnly(ctx, user.ID); err != nil {
+		return nil, err
+	}
+	if id.EmailVerified {
+		if err := s.Users.SetEmailVerified(ctx, user.ID, true); err != nil {
+			return nil, err
+		}
+	}
+	return s.Users.ByID(ctx, user.ID)
+}
+
+func (s Service) createLink(ctx context.Context, p IdentityProvider, id NormalizedIdentity, userID int64) error {
+	raw, _ := json.Marshal(id.Raw)
+	return s.repo().InsertLink(ctx, userID, p.ID, id.Subject, string(raw), time.Now().UTC())
+}
+
+func (s Service) syncRole(ctx context.Context, user *auth.User, p IdentityProvider, id NormalizedIdentity) error {
+	mapped := s.mappedRole(p, id)
+	if mapped == "" || mapped == user.Role {
+		return nil
+	}
+	if user.IsAdmin() && mapped != auth.RoleAdmin {
+		n, _ := s.Users.AdminCount(ctx)
+		if n <= 1 {
+			return nil
+		}
+	}
+	return s.Users.SetRole(ctx, user.ID, mapped)
+}
+
+func (s Service) mappedRole(p IdentityProvider, id NormalizedIdentity) string {
+	rules, _ := p.RoleMapping.([]any)
+	if rules == nil {
+		if typed, ok := p.RoleMapping.([]map[string]any); ok {
+			for _, rule := range typed {
+				if role := matchRoleRule(rule, id); role != "" {
+					return role
+				}
+			}
+		}
+		return ""
+	}
+	for _, raw := range rules {
+		rule, _ := raw.(map[string]any)
+		if role := matchRoleRule(rule, id); role != "" {
+			return role
+		}
+	}
+	return ""
+}
+
+func matchRoleRule(rule map[string]any, id NormalizedIdentity) string {
+	claim, _ := rule["claim"].(string)
+	role, _ := rule["role"].(string)
+	op, _ := rule["operator"].(string)
+	if claim == "" || role == "" {
+		return ""
+	}
+	if op == "" {
+		op = "equals"
+	}
+	var actual any
+	if claim == "groups" {
+		actual = id.Groups
+	} else if id.Raw != nil {
+		actual = id.Raw[claim]
+	}
+	if ruleMatches(op, actual, rule["value"]) {
+		if role = auth.NormalizeRole(role); auth.ValidRole(role) {
+			return role
+		}
+	}
+	return ""
+}
+
+func ruleMatches(op string, actual, value any) bool {
+	switch op {
+	case "equals":
+		return stringify(actual) == stringify(value)
+	case "contains":
+		if arr, ok := asAnySlice(actual); ok {
+			for _, v := range arr {
+				if stringify(v) == stringify(value) {
+					return true
+				}
+			}
+			return false
+		}
+		return strings.Contains(stringify(actual), stringify(value))
+	case "one_of":
+		want, _ := asAnySlice(value)
+		if want == nil {
+			want = []any{value}
+		}
+		if arr, ok := asAnySlice(actual); ok {
+			set := map[string]bool{}
+			for _, v := range arr {
+				set[stringify(v)] = true
+			}
+			for _, v := range want {
+				if set[stringify(v)] {
+					return true
+				}
+			}
+			return false
+		}
+		for _, v := range want {
+			if stringify(actual) == stringify(v) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func stringify(v any) string {
+	if v == nil {
+		return ""
+	}
+	switch t := v.(type) {
+	case string:
+		return t
+	case float64:
+		if t == float64(int64(t)) {
+			return strconv.FormatInt(int64(t), 10)
+		}
+	}
+	b, _ := json.Marshal(v)
+	return strings.Trim(string(b), `"`)
+}
+
+func asAnySlice(v any) ([]any, bool) {
+	switch t := v.(type) {
+	case []any:
+		return t, true
+	case []string:
+		out := make([]any, len(t))
+		for i, s := range t {
+			out[i] = s
+		}
+		return out, true
+	}
+	return nil, false
+}

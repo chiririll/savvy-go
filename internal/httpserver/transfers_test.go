@@ -19,7 +19,7 @@ import (
 
 	"savvy-go/internal/auth"
 	"savvy-go/internal/db"
-	"savvy-go/internal/domain"
+	"savvy-go/internal/spaces"
 )
 
 // pair is two linked spaces administered by one user: A keeps EUR, B USD.
@@ -27,7 +27,7 @@ type pair struct {
 	a          *testApp
 	owner      *auth.User
 	sess       *auth.Issued
-	A, B       *domain.Space
+	A, B       *spaces.Space
 	accA, accB int64
 }
 
@@ -167,7 +167,7 @@ func TestP30OtherSideAccountIsPrivate(t *testing.T) {
 	p := newPair(t)
 	id := p.send("5", "5")
 	bob := p.a.createUser("bob@test.com", "secret1", auth.RoleUser)
-	_ = p.a.s.spaces.SetMember(context.Background(), p.B.ID, bob, domain.SpaceViewer)
+	_ = p.a.s.spaces.SetMember(context.Background(), p.B.ID, bob, spaces.RoleViewer)
 	bs := p.a.issue(bob, false)
 	seen := p.transfers(p.B.ID, bs)[id]
 	from := seen["from"].(map[string]any)
@@ -191,7 +191,7 @@ func TestP52LinkRights(t *testing.T) {
 	other := p.a.createUser("other@test.com", "secret1", auth.RoleUser)
 	C, _ := p.a.s.spaces.Create(ctx, "Theirs", other)
 	status(t, p.a.do("POST", spacePath(p.A.ID, "/links"), map[string]any{"target_space_id": C.ID}, p.sess.Token, p.sess.CSRF), 404, "not a member of the target")
-	_ = p.a.s.spaces.SetMember(ctx, C.ID, p.owner, domain.SpaceEditor)
+	_ = p.a.s.spaces.SetMember(ctx, C.ID, p.owner, spaces.RoleEditor)
 	status(t, p.a.do("POST", spacePath(p.A.ID, "/links"), map[string]any{"target_space_id": C.ID}, p.sess.Token, p.sess.CSRF), 403, "editor of the target")
 	status(t, p.a.do("POST", spacePath(p.A.ID, "/links"), map[string]any{"target_space_id": p.A.ID}, p.sess.Token, p.sess.CSRF), 422, "link to itself")
 
@@ -331,7 +331,7 @@ func TestP24RestoreReviewsTransfers(t *testing.T) {
 
 	// A member without rights in B can only take B's version.
 	viewer := p.a.createUser("v@test.com", "secret1", auth.RoleUser)
-	_ = p.a.s.spaces.SetMember(context.Background(), p.A.ID, viewer, domain.SpaceEditor)
+	_ = p.a.s.spaces.SetMember(context.Background(), p.A.ID, viewer, spaces.RoleEditor)
 	vs := p.a.issue(viewer, false)
 	status(t, p.a.do("POST", spacePath(p.A.ID, "/transfers/"+changed+"/reject"), nil, vs.Token, vs.CSRF), 403, "reject without rights in B")
 

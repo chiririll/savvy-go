@@ -8,11 +8,14 @@ import { childPath, pages } from './pages'
 
 // Auth pages
 const LoginPage = lazy(() => import('@/pages/auth/login'))
-const SetupPage = lazy(() => import('@/pages/auth/setup'))
+const SetupPage = lazy(() => import('@/pages/onboarding/admin'))
+const ServerSetupPage = lazy(() => import('@/pages/onboarding/server'))
 const Setup2FAPage = lazy(() => import('@/pages/auth/setup-2fa'))
 const SsoCallbackPage = lazy(() => import('@/pages/auth/sso-callback'))
 const SetPasswordPage = lazy(() => import('@/pages/auth/set-password'))
+const VerifyEmailPage = lazy(() => import('@/pages/auth/verify-email'))
 const InvitePage = lazy(() => import('@/pages/invite'))
+const OAuthConsentPage = lazy(() => import('@/pages/oauth/consent'))
 
 // Protected pages
 const DashboardPage = lazy(() => import('@/pages/dashboard'))
@@ -46,6 +49,7 @@ const ImportSettingsPage = lazy(() => import('@/pages/settings/import'))
 const SpaceBackupsPage = lazy(() => import('@/pages/settings/backups'))
 // Administration: server admins.
 const AdminSystemPage = lazy(() => import('@/pages/admin/system'))
+const AdminChecksPage = lazy(() => import('@/pages/admin/checks'))
 const AdminMonitoringPage = lazy(() => import('@/pages/admin/monitoring'))
 const AdminSsoPage = lazy(() => import('@/pages/admin/sso'))
 const AdminSecurityPage = lazy(() => import('@/pages/admin/security'))
@@ -91,6 +95,12 @@ export const router = createBrowserRouter([
         element: withSuspense(SetupPage),
     },
     {
+        // Outside AuthProvider: an admin without a space must not land on the no-space screen.
+        // Several screens: /setup/server, /setup/server/more, /mail, /sso.
+        path: `${pages.serverSetup.path}/*`,
+        element: withSuspense(ServerSetupPage),
+    },
+    {
         path: pages.setup2fa.path,
         element: withSuspense(Setup2FAPage),
     },
@@ -103,6 +113,10 @@ export const router = createBrowserRouter([
         element: withSuspense(SetPasswordPage),
     },
     {
+        path: pages.verifyEmail.path,
+        element: withSuspense(VerifyEmailPage),
+    },
+    {
         path: pages.invite.path,
         element: withSuspense(InvitePage),
     },
@@ -111,6 +125,11 @@ export const router = createBrowserRouter([
     {
         element: <AuthProvider />,
         children: [
+            {
+                // An AI app asking for access: signed in, but no app chrome around it.
+                path: pages.oauthConsent.path,
+                element: withSuspense(OAuthConsentPage),
+            },
             {
                 // The layout sits at the root, where the dashboard is the index page.
                 path: pages.dashboard.path,
@@ -137,6 +156,7 @@ export const router = createBrowserRouter([
                     { path: childPath(pages.importSettings), element: withSuspense(ImportSettingsPage) },
                     { path: childPath(pages.spaceBackups), element: withSuspense(SpaceBackupsPage) },
                     { path: childPath(pages.adminSystem), element: admin(AdminSystemPage) },
+                    { path: childPath(pages.adminChecks), element: admin(AdminChecksPage) },
                     { path: childPath(pages.adminMonitoring), element: admin(AdminMonitoringPage) },
                     { path: childPath(pages.adminSso), element: admin(AdminSsoPage) },
                     { path: childPath(pages.adminSecurity), element: admin(AdminSecurityPage) },

@@ -156,6 +156,6 @@ func TestP1BackupsAreServerAdminOnly(t *testing.T) {
 		status(t, a.do("POST", "/api/backups/x.sqlite/restore", nil, sess.Token, sess.CSRF), 403, role+" restore")
 	}
 	admin := a.createUser("admin@test.com", "secret1", auth.RoleAdmin)
-	raw, _ := a.issueToken(admin, auth.APIScopeReadWrite, nil)
+	raw, _ := a.issueToken(admin, tokReadWrite, nil)
 	status(t, a.bearer("GET", "/api/backups", nil, raw), 403, "admin API token")
 }

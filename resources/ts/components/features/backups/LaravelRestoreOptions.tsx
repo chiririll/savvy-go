@@ -32,9 +32,9 @@ interface LaravelRestoreOptionsProps {
 }
 
 /**
- * A Laravel database is not kept as a backup: it is converted and restored at once.
- * This asks what to restore it as and, for the whole server, for the APP_KEY that
- * decrypts the two-factor secrets.
+ * A Laravel database is not kept as it is: it is upgraded and the upgraded version is
+ * saved as a backup (or becomes a new space). This asks what to upgrade it for and, for
+ * the whole server, for the APP_KEY that decrypts the two-factor secrets.
  */
 export function LaravelRestoreOptions({ targets, target, onTarget, appKey, onAppKey }: LaravelRestoreOptionsProps) {
     const { t } = useTranslation('settings')

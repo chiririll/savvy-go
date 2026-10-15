@@ -25,6 +25,10 @@ type Build mg.Namespace
 // Test groups the test targets.
 type Test mg.Namespace
 
+// Probe groups manual checks of a running server. They need a person in the
+// loop, so Test.All does not run them.
+type Probe mg.Namespace
+
 // Frontend builds the React app into public/build.
 func (Build) Frontend() error {
 	return sh.RunV(npm(), "run", "build")
@@ -81,6 +85,14 @@ func (Test) Frontend() error {
 // All runs every test.
 func (Test) All() {
 	mg.SerialDeps(Test.Go, Test.Frontend)
+}
+
+// Oauth walks a running server through the OAuth sign-in with a throwaway
+// client (cmd/oauth-probe). Open registration in Administration → Security
+// first. Honors OAUTH_SERVER (default http://localhost:8080, spelled like the
+// server's app_url).
+func (Probe) Oauth() error {
+	return sh.RunV("go", "run", "./cmd/oauth-probe", "-server", firstNonEmpty(os.Getenv("OAUTH_SERVER"), "http://localhost:8080"))
 }
 
 // Clean removes build output.

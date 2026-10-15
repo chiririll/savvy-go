@@ -7,7 +7,7 @@
 // and every case shows up as a named subtest.
 //
 // The package knows nothing about the application's storage, so tests of any
-// package (including domain itself) can import it.
+// package (including ledger itself) can import it.
 package moneytest
 
 import (

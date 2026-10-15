@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { startAuthentication } from '@simplewebauthn/browser'
 import { authApi, webauthnApi } from '@/api'
-import { setOnUnauthorized } from '@/api/client'
+import { setOnUnauthorized, setOnEmailUnverified } from '@/api/client'
 import { User, LoginCredentials, RegisterData, AuthResponse, TwoFactorAuthResponse, MeResponse } from '@/types'
 
 export type LoginResult =
@@ -15,6 +15,8 @@ interface AuthState {
     sessionExpired: boolean
     expiresAt: string | null
     refreshAt: string | null
+    /** The instance requires a confirmed address; with `user.emailVerified` false, the app is closed to them. */
+    emailVerificationRequired: boolean
 
     login: (credentials: LoginCredentials) => Promise<LoginResult>
     loginWith2FA: (twoFactorToken: string, code: string, rememberMe?: boolean) => Promise<void>
@@ -24,6 +26,8 @@ interface AuthState {
     checkAuth: () => Promise<void>
     applySession: (response: AuthResponse) => void
     setUser: (user: User) => void
+    /** The server refused a request because the address is unconfirmed. */
+    holdBackForVerification: () => void
     expire: () => void
     clear: () => void
 }
@@ -46,6 +50,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     sessionExpired: false,
     expiresAt: null,
     refreshAt: null,
+    emailVerificationRequired: false,
 
     login: async (credentials) => {
         const response = await authApi.login(credentials)
@@ -97,6 +102,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                     isAuthenticated: true,
                     isLoading: false,
                     sessionExpired: false,
+                    emailVerificationRequired: response.email_verification_required ?? false,
                     ...sessionTimes(response),
                 })
                 return
@@ -136,8 +142,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isAuthenticated: true,
         isLoading: false,
         sessionExpired: false,
+        emailVerificationRequired: response.email_verification_required ?? false,
         ...sessionTimes(response),
     }),
+
+    holdBackForVerification: () => set((state) => ({
+        emailVerificationRequired: true,
+        user: state.user ? { ...state.user, emailVerified: false } : state.user,
+    })),
 
     setUser: (user) => set({ user, isAuthenticated: true, isLoading: false, sessionExpired: false }),
 
@@ -155,6 +167,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         sessionExpired: false,
         expiresAt: null,
         refreshAt: null,
+        emailVerificationRequired: false,
     }),
 }))
 
@@ -164,6 +177,8 @@ setOnUnauthorized(() => {
         state.expire()
     }
 })
+
+setOnEmailUnverified(() => useAuthStore.getState().holdBackForVerification())
 
 export const useUser = () => useAuthStore((state) => state.user)
 export const useIsAuthenticated = () => useAuthStore((state) => state.isAuthenticated)

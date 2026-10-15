@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"strconv"
 
-	"savvy-go/internal/domain"
-	"savvy-go/internal/httpserver/dto"
-
 	"github.com/go-chi/chi/v5"
+
+	"savvy-go/internal/automation"
+	"savvy-go/internal/httpserver/dto"
 )
 
 func (s *Server) automationIndex(w http.ResponseWriter, r *http.Request) {
@@ -139,7 +139,7 @@ func (s *Server) automationLogs(w http.ResponseWriter, r *http.Request) {
 	writeData(w, http.StatusOK, dto.Map(logs, dto.NewAutomationLog))
 }
 
-func (s *Server) automationParam(w http.ResponseWriter, r *http.Request) *domain.AutomationRule {
+func (s *Server) automationParam(w http.ResponseWriter, r *http.Request) *automation.Rule {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	rule, _ := sp(r).automation.ByID(r.Context(), id)
 	if rule == nil {
@@ -150,7 +150,7 @@ func (s *Server) automationParam(w http.ResponseWriter, r *http.Request) *domain
 
 // decodeAutomation reads a rule from the body; on update, over base (see
 // patch.go).
-func decodeAutomation(w http.ResponseWriter, r *http.Request, base *domain.AutomationRule) (domain.AutomationInput, bool) {
+func decodeAutomation(w http.ResponseWriter, r *http.Request, base *automation.Rule) (automation.Input, bool) {
 	var body struct {
 		Name           string           `json:"name"`
 		Description    *string          `json:"description"`
@@ -175,17 +175,17 @@ func decodeAutomation(w http.ResponseWriter, r *http.Request, base *domain.Autom
 	}
 	if err != nil || body.Name == "" || body.TriggerType == "" {
 		writeValidation(w, map[string][]string{"name": {"The name field is required."}})
-		return domain.AutomationInput{}, false
+		return automation.Input{}, false
 	}
 	if body.Conditions == nil {
 		writeValidation(w, map[string][]string{"conditions": {"At least one condition is required."}})
-		return domain.AutomationInput{}, false
+		return automation.Input{}, false
 	}
 	if len(body.Actions) == 0 {
 		writeValidation(w, map[string][]string{"actions": {"At least one action is required."}})
-		return domain.AutomationInput{}, false
+		return automation.Input{}, false
 	}
-	return domain.AutomationInput{
+	return automation.Input{
 		Name: body.Name, Description: body.Description, TriggerType: body.TriggerType,
 		Priority: body.Priority, Conditions: body.Conditions, Actions: body.Actions,
 		IsActive: body.IsActive, StopProcessing: body.StopProcessing,

@@ -7,6 +7,8 @@ export const createUserSchema = z.object({
     name: z.string().min(1, i18n.t('validation.nameRequired')).max(255),
     email: z.string().min(1, i18n.t('validation.emailRequired')).email(i18n.t('validation.emailInvalid')),
     setPassword: z.boolean(),
+    /** Email the set-password link rather than showing it. Only without a password. */
+    sendEmail: z.boolean().optional(),
     password: z.string().optional().or(z.literal('')),
     role: roleSchema.default('user'),
 }).superRefine((data, ctx) => {
@@ -33,4 +35,5 @@ export type UserFormData = {
     email: string
     password?: string
     role?: z.infer<typeof roleSchema>
+    send?: boolean
 }

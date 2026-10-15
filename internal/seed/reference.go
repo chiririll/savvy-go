@@ -6,41 +6,41 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	"savvy-go/internal/domain"
+	"savvy-go/internal/ledger"
 	"savvy-go/internal/store"
 )
 
 var (
-	usdCurrency = domain.Currency{Code: "USD", Name: "US Dollar", Symbol: "$", Decimals: 2, Rate: decimal.NewFromInt(1)}
-	eurCurrency = domain.Currency{Code: "EUR", Name: "Euro", Symbol: "€", Decimals: 2, Rate: decimal.NewFromInt(1)}
+	usdCurrency = ledger.Currency{Code: "USD", Name: "US Dollar", Symbol: "$", Decimals: 2, Rate: decimal.NewFromInt(1)}
+	eurCurrency = ledger.Currency{Code: "EUR", Name: "Euro", Symbol: "€", Decimals: 2, Rate: decimal.NewFromInt(1)}
 )
 
 // currencySet is the currencies of a space: base first, the others priced in it.
-func currencySet(base domain.Currency, others ...domain.Currency) []domain.Currency {
+func currencySet(base ledger.Currency, others ...ledger.Currency) []ledger.Currency {
 	base.IsBase = true
 	base.Rate = decimal.NewFromInt(1)
-	return append([]domain.Currency{base}, others...)
+	return append([]ledger.Currency{base}, others...)
 }
 
-func withRate(c domain.Currency, rate string) domain.Currency {
+func withRate(c ledger.Currency, rate string) ledger.Currency {
 	c.Rate = decimal.RequireFromString(rate)
 	return c
 }
 
-func seedReference(ctx context.Context, db store.DB, currencies []domain.Currency) error {
-	if err := seedCurrencies(ctx, domain.Currencies{DB: db}, currencies); err != nil {
+func seedReference(ctx context.Context, db store.DB, currencies []ledger.Currency) error {
+	if err := seedCurrencies(ctx, ledger.Currencies{DB: db}, currencies); err != nil {
 		return fmt.Errorf("currencies: %w", err)
 	}
-	if err := seedCategories(ctx, domain.Categories{DB: db}); err != nil {
+	if err := seedCategories(ctx, ledger.Categories{DB: db}); err != nil {
 		return fmt.Errorf("categories: %w", err)
 	}
-	if err := seedTags(ctx, domain.Tags{DB: db}); err != nil {
+	if err := seedTags(ctx, ledger.Tags{DB: db}); err != nil {
 		return fmt.Errorf("tags: %w", err)
 	}
 	return nil
 }
 
-func seedCurrencies(ctx context.Context, curs domain.Currencies, list []domain.Currency) error {
+func seedCurrencies(ctx context.Context, curs ledger.Currencies, list []ledger.Currency) error {
 	for _, c := range list {
 		existing, err := curs.ByCode(ctx, c.Code)
 		if err != nil {
@@ -56,12 +56,11 @@ func seedCurrencies(ctx context.Context, curs domain.Currencies, list []domain.C
 	return nil
 }
 
-func seedCategories(ctx context.Context, cats domain.Categories) error {
-	for _, c := range defaultCategories {
-		icon, color := c.icon, c.color
-		isDefault := c.name == "#OTHER" || c.name == "#OTHER_INCOME"
-		if _, err := cats.Create(ctx, domain.Category{
-			Name: c.name, Type: c.typ, Icon: &icon, Color: &color, IsDefault: isDefault,
+func seedCategories(ctx context.Context, cats ledger.Categories) error {
+	for _, c := range DefaultCategories() {
+		icon, color := c.Icon, c.Color
+		if _, err := cats.Create(ctx, ledger.Category{
+			Name: c.Name, Type: c.Type, Icon: &icon, Color: &color, IsDefault: c.IsDefault,
 		}); err != nil {
 			return err
 		}
@@ -69,8 +68,8 @@ func seedCategories(ctx context.Context, cats domain.Categories) error {
 	return nil
 }
 
-func seedTags(ctx context.Context, tags domain.Tags) error {
-	for _, name := range defaultTags {
+func seedTags(ctx context.Context, tags ledger.Tags) error {
+	for _, name := range DefaultTags() {
 		if _, err := tags.Create(ctx, name); err != nil {
 			return err
 		}
@@ -78,30 +77,39 @@ func seedTags(ctx context.Context, tags domain.Tags) error {
 	return nil
 }
 
-type seededCategory struct {
-	name, typ, icon, color string
+// Category is a preset category. Names are translation tokens (#RENT) that the
+// SPA translates; IsDefault marks the default of its type.
+type Category struct {
+	Name, Type, Icon, Color string
+	IsDefault               bool
 }
 
-var defaultCategories = []seededCategory{
-	{"#RENT", "expense", "🏢", "#94a3b8"},
-	{"#HOUSING", "expense", "🏠", "#a78bfa"},
-	{"#UTILITIES", "expense", "⚡", "#fbbf24"},
-	{"#GROCERIES", "expense", "🛒", "#4ade80"},
-	{"#TRANSPORT", "expense", "🚗", "#60a5fa"},
-	{"#HEALTH", "expense", "🏥", "#f87171"},
-	{"#DINING", "expense", "🍽️", "#fb923c"},
-	{"#ENTERTAINMENT", "expense", "🎮", "#f472b6"},
-	{"#SHOPPING", "expense", "🛍️", "#2dd4bf"},
-	{"#PERSONAL_CARE", "expense", "✨", "#e879f9"},
-	{"#GIFTS", "expense", "🎁", "#fb7185"},
-	{"#TRAVEL", "expense", "✈️", "#38bdf8"},
-	{"#OTHER", "expense", "📌", "#94a3b8"},
-	{"#SALARY", "income", "💵", "#4ade80"},
-	{"#FREELANCE", "income", "💻", "#60a5fa"},
-	{"#INVESTMENTS", "income", "📈", "#a78bfa"},
-	{"#GIFTS_RECEIVED", "income", "🎀", "#f472b6"},
-	{"#REFUNDS", "income", "↩️", "#2dd4bf"},
-	{"#OTHER_INCOME", "income", "💰", "#94a3b8"},
+// DefaultCategories returns the preset categories, in display order.
+func DefaultCategories() []Category { return append([]Category(nil), defaultCategories...) }
+
+// DefaultTags returns the preset tag names, in display order.
+func DefaultTags() []string { return append([]string(nil), defaultTags...) }
+
+var defaultCategories = []Category{
+	{"#RENT", "expense", "🏢", "#94a3b8", false},
+	{"#HOUSING", "expense", "🏠", "#a78bfa", false},
+	{"#UTILITIES", "expense", "⚡", "#fbbf24", false},
+	{"#GROCERIES", "expense", "🛒", "#4ade80", false},
+	{"#TRANSPORT", "expense", "🚗", "#60a5fa", false},
+	{"#HEALTH", "expense", "🏥", "#f87171", false},
+	{"#DINING", "expense", "🍽️", "#fb923c", false},
+	{"#ENTERTAINMENT", "expense", "🎮", "#f472b6", false},
+	{"#SHOPPING", "expense", "🛍️", "#2dd4bf", false},
+	{"#PERSONAL_CARE", "expense", "✨", "#e879f9", false},
+	{"#GIFTS", "expense", "🎁", "#fb7185", false},
+	{"#TRAVEL", "expense", "✈️", "#38bdf8", false},
+	{"#OTHER", "expense", "📌", "#94a3b8", true},
+	{"#SALARY", "income", "💵", "#4ade80", false},
+	{"#FREELANCE", "income", "💻", "#60a5fa", false},
+	{"#INVESTMENTS", "income", "📈", "#a78bfa", false},
+	{"#GIFTS_RECEIVED", "income", "🎀", "#f472b6", false},
+	{"#REFUNDS", "income", "↩️", "#2dd4bf", false},
+	{"#OTHER_INCOME", "income", "💰", "#94a3b8", true},
 }
 
 var defaultTags = []string{

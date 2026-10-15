@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"savvy-go/internal/auth"
-	"savvy-go/internal/domain"
+	"savvy-go/internal/sso"
 )
 
 func TestTwoFactorEnableConfirmLoginAndRecovery(t *testing.T) {
@@ -274,7 +274,7 @@ func TestSSOTicketExchange(t *testing.T) {
 func TestSSOGithubCallbackAndSAMLMetadata(t *testing.T) {
 	a := newTestApp(t)
 	a.createUser("root@test.com", "secret1", auth.RoleAdmin)
-	_, err := a.s.sso.Create(context.Background(), domain.IdPWrite{
+	_, err := a.s.sso.Create(context.Background(), sso.IdPWrite{
 		Name: "GitHub", Slug: "github", Preset: "github", Enabled: boolPtr(true),
 		Fields: map[string]any{"client_id": "cid", "client_secret": "csecret"},
 	})
@@ -326,7 +326,7 @@ func TestSSOGithubCallbackAndSAMLMetadata(t *testing.T) {
 		t.Fatalf("provisioned %v", exBody)
 	}
 
-	saml, err := a.s.sso.Create(context.Background(), domain.IdPWrite{
+	saml, err := a.s.sso.Create(context.Background(), sso.IdPWrite{
 		Name: "Corp SAML", Slug: "saml", Preset: "custom_saml", Enabled: boolPtr(true),
 		Fields: map[string]any{
 			"idp_entity_id": "https://idp.example/saml",
@@ -367,7 +367,7 @@ func TestSSOProvisioningLinkAndJIT(t *testing.T) {
 	a := newTestApp(t)
 	a.createUser("root@test.com", "secret1", auth.RoleAdmin)
 	existing := a.createUser("jane@test.com", "secret1", roleEditor)
-	p, err := a.s.sso.Create(context.Background(), domain.IdPWrite{
+	p, err := a.s.sso.Create(context.Background(), sso.IdPWrite{
 		Name: "IdP", Slug: "idp", Preset: "custom_oidc", Enabled: boolPtr(true),
 		Fields: map[string]any{
 			"discovery_url": "https://idp.test/.well-known/openid-configuration",
@@ -378,41 +378,44 @@ func TestSSOProvisioningLinkAndJIT(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	user, _, err := a.s.sso.Provision(context.Background(), *p, domain.NormalizedIdentity{
+	user, _, err := a.s.sso.Provision(context.Background(), *p, sso.NormalizedIdentity{
 		Subject: "ext-1", Email: "jane@test.com", EmailVerified: true, Name: "Jane",
 	})
 	if err != nil || user.ID != existing.ID {
 		t.Fatalf("link %v %v", user, err)
 	}
-	_, _, err = a.s.sso.Provision(context.Background(), *p, domain.NormalizedIdentity{
+	_, _, err = a.s.sso.Provision(context.Background(), *p, sso.NormalizedIdentity{
 		Subject: "ext-2", Email: "jane@test.com", EmailVerified: false, Name: "Jane",
 	})
 	if err == nil {
 		t.Fatal("unverified should not JIT when email exists without link")
 	}
-	fresh, _, err := a.s.sso.Provision(context.Background(), *p, domain.NormalizedIdentity{
+	fresh, _, err := a.s.sso.Provision(context.Background(), *p, sso.NormalizedIdentity{
 		Subject: "ext-3", Email: "new@test.com", EmailVerified: true, Name: "New",
 		Groups: []string{"admins"}, Raw: map[string]any{"groups": []any{"admins"}},
 	})
 	if err != nil || fresh.Email != "new@test.com" || fresh.Role != auth.RoleAdmin || !fresh.IsSSOOnly {
 		t.Fatalf("jit %+v %v", fresh, err)
 	}
+	if list, err := a.s.spaces.ForUser(context.Background(), fresh.ID); err != nil || len(list) != 0 {
+		t.Fatalf("jit user has spaces %v %v", list, err)
+	}
 }
 
 func TestSSOPresetHelpers(t *testing.T) {
 	disco := "https://login.microsoftonline.com/{tenantid}/v2.0"
-	if !domain.MatchesIssuer("entra", disco, map[string]any{"iss": "https://login.microsoftonline.com/abc-123/v2.0", "tid": "abc-123"}) {
+	if !sso.MatchesIssuer("entra", disco, map[string]any{"iss": "https://login.microsoftonline.com/abc-123/v2.0", "tid": "abc-123"}) {
 		t.Fatal("entra tenant match")
 	}
-	if domain.MatchesIssuer("entra", disco, map[string]any{"iss": "https://login.microsoftonline.com/evil/v2.0", "tid": "abc-123"}) {
+	if sso.MatchesIssuer("entra", disco, map[string]any{"iss": "https://login.microsoftonline.com/evil/v2.0", "tid": "abc-123"}) {
 		t.Fatal("entra evil")
 	}
-	p := domain.IdentityProvider{Preset: "okta", Config: map[string]any{"domain": "example.okta.com"}}
-	if got := domain.PresetDiscoveryURL(p); got != "https://example.okta.com/.well-known/openid-configuration" {
+	p := sso.IdentityProvider{Preset: "okta", Config: map[string]any{"domain": "example.okta.com"}}
+	if got := sso.PresetDiscoveryURL(p); got != "https://example.okta.com/.well-known/openid-configuration" {
 		t.Fatalf("okta disco %s", got)
 	}
 	p.Config["auth_server_id"] = "aus1a2b3c"
-	if got := domain.PresetDiscoveryURL(p); got != "https://example.okta.com/oauth2/aus1a2b3c/.well-known/openid-configuration" {
+	if got := sso.PresetDiscoveryURL(p); got != "https://example.okta.com/oauth2/aus1a2b3c/.well-known/openid-configuration" {
 		t.Fatalf("okta custom %s", got)
 	}
 }

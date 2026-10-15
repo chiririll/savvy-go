@@ -6,6 +6,8 @@ export interface User {
     email: string
     role?: UserRole
     isSsoOnly?: boolean
+    /** The user proved they own the address. Without it, an instance that requires it holds them back. */
+    emailVerified?: boolean
 }
 
 export interface LoginCredentials {
@@ -18,18 +20,23 @@ export interface RegisterData {
     name: string
     email: string
     password: string
+    /** First-run password from the server log or file; required while the server has no users. */
+    bootstrap_password: string
 }
 
 export interface AuthResponse {
     user: User
     expires_at: string
     refresh_at: string | null
+    /** The instance holds back users whose address is not verified. */
+    email_verification_required?: boolean
 }
 
 export interface MeResponse {
     user: User | null
     expires_at: string | null
     refresh_at: string | null
+    email_verification_required?: boolean
 }
 
 export interface TwoFactorAuthResponse {
@@ -40,6 +47,13 @@ export interface TwoFactorAuthResponse {
 export interface AuthStatus {
     needs_registration: boolean
     password_login_enabled: boolean
+    /** Where to find the bootstrap password; null once the server has users. */
+    bootstrap_hint: BootstrapHint | null
+}
+
+export interface BootstrapHint {
+    environment: 'docker' | 'systemd' | 'binary'
+    file: string
 }
 
 // 2FA Types

@@ -34,6 +34,14 @@ export function useUpdateUser() {
     })
 }
 
+export function useSetEmailVerified() {
+    return useResourceMutation({
+        mutationFn: ({ id, verified }: { id: number; verified: boolean }) => usersApi.setEmailVerified(id, verified),
+        invalidateKeys: [QUERY_KEY],
+        successMessage: i18n.t('toasts.user.updated'),
+    })
+}
+
 export function useDeleteUser() {
     return useResourceMutation({
         mutationFn: (id: string | number) => usersApi.delete(id),
@@ -44,8 +52,9 @@ export function useDeleteUser() {
 
 export function useIssuePasswordToken() {
     return useResourceMutation({
-        mutationFn: (id: string | number) => usersApi.issuePasswordToken(id),
+        mutationFn: ({ id, send }: { id: string | number; send?: boolean }) => usersApi.issuePasswordToken(id, send),
         invalidateKeys: [QUERY_KEY],
-        successMessage: i18n.t('toasts.user.passwordLink'),
+        successMessage: (user, { send }) =>
+            send ? i18n.t('toasts.user.resetEmailSent', { email: user.email }) : i18n.t('toasts.user.passwordLink'),
     })
 }

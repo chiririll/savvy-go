@@ -10,7 +10,9 @@ import sharp from 'sharp'
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'screenshots')
 
 /** A channel difference above this is a change; lower is font smoothing. */
-const THRESHOLD = 24
+const THRESHOLD = 48
+/** A box smaller than this in both directions is a speck, not a change. */
+const MIN_SIDE = 12
 /** Changed pixels are grouped in cells of this size, and cells this close are one box. */
 const CELL = 8
 const PAD = 4
@@ -123,7 +125,7 @@ function compare(a: Awaited<ReturnType<typeof load>>, b: Awaited<ReturnType<type
                 }
             }
         }
-        boxes.push(merged)
+        if (merged.w >= MIN_SIDE || merged.h >= MIN_SIDE) boxes.push(merged)
     }
     return { boxes, changed, compared: w * h }
 }

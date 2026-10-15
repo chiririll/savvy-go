@@ -20,15 +20,18 @@ export function SettingsSection({
 }) {
     return (
         <section className="rounded-xl border bg-card shadow-sm">
-            <header className="flex items-start gap-3 border-b px-5 py-4">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-muted/50 text-muted-foreground">
-                    <Icon className="size-4" />
+            {/* On a phone the actions go under the text, so it is not squeezed into a narrow column. */}
+            <header className="flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-start">
+                <div className="flex flex-1 items-start gap-3">
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-muted/50 text-muted-foreground">
+                        <Icon className="size-4" />
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-0.5">
+                        <h3 className="text-sm font-semibold leading-none">{title}</h3>
+                        <p className="text-xs text-muted-foreground">{description}</p>
+                    </div>
                 </div>
-                <div className="flex-1 space-y-0.5">
-                    <h3 className="text-sm font-semibold leading-none">{title}</h3>
-                    <p className="text-xs text-muted-foreground">{description}</p>
-                </div>
-                {actions}
+                {actions && <div className="flex shrink-0 sm:self-start">{actions}</div>}
             </header>
             <div className="p-5">{children}</div>
         </section>

@@ -20,9 +20,11 @@ export interface Page {
 export const pages = {
     login: { path: '/login', scope: 'public' },
     setup: { path: '/setup', scope: 'public' },
+    serverSetup: { path: '/setup/server', scope: 'admin' },
     setup2fa: { path: '/setup-2fa', scope: 'public' },
     ssoCallback: { path: '/auth/sso/callback', scope: 'public' },
     setPassword: { path: '/set-password/:token', scope: 'public' },
+    verifyEmail: { path: '/verify-email/:token', scope: 'public' },
     invite: { path: '/invite/:token', scope: 'public' },
 
     dashboard: { path: '/', scope: 'space' },
@@ -44,8 +46,10 @@ export const pages = {
     userSettings: { path: '/settings/user', scope: 'user' },
     securitySettings: { path: '/settings/security', scope: 'user' },
     apiSettings: { path: '/settings/api', scope: 'user' },
+    oauthConsent: { path: '/oauth/consent', scope: 'user' },
 
     adminSystem: { path: '/admin/system', scope: 'admin' },
+    adminChecks: { path: '/admin/checks', scope: 'admin' },
     adminMonitoring: { path: '/admin/monitoring', scope: 'admin' },
     adminSso: { path: '/admin/sso', scope: 'admin' },
     adminSecurity: { path: '/admin/security', scope: 'admin' },

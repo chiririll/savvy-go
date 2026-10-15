@@ -12,7 +12,8 @@ import { Plus, Trash2 } from 'lucide-react'
 import type { Condition, ConditionGroup, ConditionOperator } from '@/types/automation'
 import { CONDITION_FIELDS } from '@/types/automation'
 import { TRANSACTION_TYPES } from '@/constants'
-import { AccountSelect, CategorySelect, SegmentedChoice, TagSelect } from '@/components/shared'
+import { AccountSelect } from '@/components/shared/AccountSelect'
+import { CategorySelect, SegmentedChoice, TagSelect } from '@/components/shared'
 import { conditionFieldLabel, operatorLabel, transactionTypeLabel } from '@/lib/labels'
 
 interface ConditionBuilderProps {

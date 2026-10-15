@@ -32,6 +32,17 @@ func (q *Queries) CountUsers(ctx context.Context) (int64, error) {
 	return count, err
 }
 
+const countVerifiedAdmins = `-- name: CountVerifiedAdmins :one
+SELECT COUNT(*) FROM users WHERE role = ? AND email_verified = 1 AND deleted_at IS NULL
+`
+
+func (q *Queries) CountVerifiedAdmins(ctx context.Context, role string) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countVerifiedAdmins, role)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const deleteUserAPITokens = `-- name: DeleteUserAPITokens :exec
 DELETE FROM api_tokens WHERE user_id = ?
 `
@@ -87,7 +98,7 @@ func (q *Queries) DeleteUserRecoveryCodes(ctx context.Context, userID int64) err
 }
 
 const getUser = `-- name: GetUser :one
-SELECT id, name, email, password, role, is_sso_only,
+SELECT id, name, email, password, role, is_sso_only, email_verified,
 	two_factor_secret, two_factor_enabled, two_factor_confirmed, deleted_at, created_at, updated_at
 FROM users WHERE id = ?
 `
@@ -102,6 +113,7 @@ func (q *Queries) GetUser(ctx context.Context, id int64) (User, error) {
 		&i.Password,
 		&i.Role,
 		&i.IsSsoOnly,
+		&i.EmailVerified,
 		&i.TwoFactorSecret,
 		&i.TwoFactorEnabled,
 		&i.TwoFactorConfirmed,
@@ -113,7 +125,7 @@ func (q *Queries) GetUser(ctx context.Context, id int64) (User, error) {
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, name, email, password, role, is_sso_only,
+SELECT id, name, email, password, role, is_sso_only, email_verified,
 	two_factor_secret, two_factor_enabled, two_factor_confirmed, deleted_at, created_at, updated_at
 FROM users WHERE lower(email) = ?
 `
@@ -128,6 +140,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.Password,
 		&i.Role,
 		&i.IsSsoOnly,
+		&i.EmailVerified,
 		&i.TwoFactorSecret,
 		&i.TwoFactorEnabled,
 		&i.TwoFactorConfirmed,
@@ -197,7 +210,7 @@ func (q *Queries) ListUserNames(ctx context.Context) ([]ListUserNamesRow, error)
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, name, email, password, role, is_sso_only,
+SELECT id, name, email, password, role, is_sso_only, email_verified,
 	two_factor_secret, two_factor_enabled, two_factor_confirmed, deleted_at, created_at, updated_at
 FROM users WHERE deleted_at IS NULL ORDER BY name
 `
@@ -218,6 +231,7 @@ func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
 			&i.Password,
 			&i.Role,
 			&i.IsSsoOnly,
+			&i.EmailVerified,
 			&i.TwoFactorSecret,
 			&i.TwoFactorEnabled,
 			&i.TwoFactorConfirmed,
@@ -285,6 +299,21 @@ func (q *Queries) MarkUserSSOOnly(ctx context.Context, arg MarkUserSSOOnlyParams
 	return err
 }
 
+const setUserEmailVerified = `-- name: SetUserEmailVerified :exec
+UPDATE users SET email_verified=?, updated_at=? WHERE id=?
+`
+
+type SetUserEmailVerifiedParams struct {
+	EmailVerified int64
+	UpdatedAt     sql.NullString
+	ID            int64
+}
+
+func (q *Queries) SetUserEmailVerified(ctx context.Context, arg SetUserEmailVerifiedParams) error {
+	_, err := q.db.ExecContext(ctx, setUserEmailVerified, arg.EmailVerified, arg.UpdatedAt, arg.ID)
+	return err
+}
+
 const setUserRole = `-- name: SetUserRole :exec
 UPDATE users SET role=?, updated_at=? WHERE id=?
 `
@@ -325,7 +354,7 @@ func (q *Queries) SetUserTwoFactor(ctx context.Context, arg SetUserTwoFactorPara
 
 const tombstoneUser = `-- name: TombstoneUser :exec
 UPDATE users SET name = 'Deleted user', email = 'deleted-' || id || '@invalid', password = NULL,
-	is_sso_only = 0, two_factor_secret = NULL, two_factor_enabled = 0, two_factor_confirmed = 0,
+	is_sso_only = 0, email_verified = 0, two_factor_secret = NULL, two_factor_enabled = 0, two_factor_confirmed = 0,
 	deleted_at = ?1, updated_at = ?1
 WHERE id = ?2
 `
@@ -358,15 +387,16 @@ func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPassword
 }
 
 const updateUserProfile = `-- name: UpdateUserProfile :exec
-UPDATE users SET name=?, email=?, role=?, updated_at=? WHERE id=?
+UPDATE users SET name=?, email=?, role=?, email_verified=?, updated_at=? WHERE id=?
 `
 
 type UpdateUserProfileParams struct {
-	Name      string
-	Email     string
-	Role      string
-	UpdatedAt sql.NullString
-	ID        int64
+	Name          string
+	Email         string
+	Role          string
+	EmailVerified int64
+	UpdatedAt     sql.NullString
+	ID            int64
 }
 
 func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) error {
@@ -374,6 +404,7 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 		arg.Name,
 		arg.Email,
 		arg.Role,
+		arg.EmailVerified,
 		arg.UpdatedAt,
 		arg.ID,
 	)
@@ -396,16 +427,17 @@ func (q *Queries) UpdateUserTwoFactorSecret(ctx context.Context, arg UpdateUserT
 }
 
 const updateUserWithPassword = `-- name: UpdateUserWithPassword :exec
-UPDATE users SET name=?, email=?, role=?, password=?, updated_at=? WHERE id=?
+UPDATE users SET name=?, email=?, role=?, email_verified=?, password=?, updated_at=? WHERE id=?
 `
 
 type UpdateUserWithPasswordParams struct {
-	Name      string
-	Email     string
-	Role      string
-	Password  sql.NullString
-	UpdatedAt sql.NullString
-	ID        int64
+	Name          string
+	Email         string
+	Role          string
+	EmailVerified int64
+	Password      sql.NullString
+	UpdatedAt     sql.NullString
+	ID            int64
 }
 
 func (q *Queries) UpdateUserWithPassword(ctx context.Context, arg UpdateUserWithPasswordParams) error {
@@ -413,6 +445,7 @@ func (q *Queries) UpdateUserWithPassword(ctx context.Context, arg UpdateUserWith
 		arg.Name,
 		arg.Email,
 		arg.Role,
+		arg.EmailVerified,
 		arg.Password,
 		arg.UpdatedAt,
 		arg.ID,
