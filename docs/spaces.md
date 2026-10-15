@@ -12,7 +12,7 @@ Use **Create a space** in the space switcher, or the window shown to a user who 
 2. **Name**.
 3. **Copy from another space?** Shown only if you belong to another space. Pick a source space, or start from the defaults, and tick what to copy: currencies, accounts (without balances), categories, tags. It is a one-time copy and the spaces stay independent; for categories and tags that stay in step, see [shared categories and tags](#shared-categories-and-tags). Anything not copied starts from the defaults.
 4. **Base entities**, all editable: the base currency (required) and other currencies from the server's currency list; accounts with an optional opening balance (a copied account brings its currency along); categories, which start from the defaults (the default category of each type cannot be removed); and tags.
-5. **Create**: a summary, then the space is made in one step. You can invite members right away or later in the space settings.
+5. **Create**: a summary, then the space is made in one step. The last screen has an optional **Invite members** button; the people you add there are invited when you press **Continue**. You can also invite members later in the space settings.
 
 Your progress is kept in your browser only, so you can close the window and come back to it; nothing reaches the server before the last step. It is dropped once the space is created.
 
@@ -36,7 +36,7 @@ A space always keeps one admin: the last admin cannot leave or be demoted while 
 
 ## Invitations
 
-Space admins invite people from **Settings → Space**, or from the **Invite people** step when they create a space. An invitation is for a chosen role, valid for 7 days and works once. Existing users join directly; new users can register through it if the server admin allows it.
+Space admins invite people from **Settings → Space**, or from the last screen when they create a space. An invitation is for a chosen role, valid for 7 days and works once. Existing users join directly; new users can register through it if the server admin allows it.
 
 How an invitation is made depends on the server:
 
@@ -47,7 +47,7 @@ How an invitation is made depends on the server:
 | No email | a link to copy |
 
 - **By email**, the link is sent to that address and nobody else sees it, so the invited person can only use it with that address, and registering through it confirms the address. To invite someone else, revoke it and invite again.
-- **By a link**, you copy the link once and send it yourself. Anyone who has it can use it, and an account created through it starts unconfirmed.
+- **By a link**, you copy the link once and send it yourself. Anyone who has it can use it, and an account created through it starts unconfirmed. Instead of an address you can write an optional note (up to 100 characters, such as "Kim from work"); it only appears in your list of invitations, to tell links apart.
 - When you create a space, the people you add are only a list until you finish: emails go out after the space is created, and links appear on the last screen to copy. Remove someone from the list before that and nothing is sent.
 - An address cannot be invited to a space it is already invited to or belongs to. After an invitation is revoked or runs out, the address cannot be invited again for one to two hours. A server admin can end that wait in **Administration → System**.
 

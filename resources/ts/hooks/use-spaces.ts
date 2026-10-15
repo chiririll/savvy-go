@@ -146,7 +146,7 @@ export function useSpaceInvitations(id: number | null, enabled = true) {
 
 export function useInvite(id: number) {
     return useResourceMutation({
-        mutationFn: ({ role, email }: { role: SpaceRole; email?: string }) => spacesApi.invite(id, role, email),
+        mutationFn: ({ role, email, note }: { role: SpaceRole; email?: string; note?: string }) => spacesApi.invite(id, role, email, note),
         invalidateKeys: [spaceKey(id, 'invitations')],
     })
 }

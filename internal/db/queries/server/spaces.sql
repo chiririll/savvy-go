@@ -68,8 +68,8 @@ SELECT space_id FROM space_members WHERE user_id = ? AND role = 'admin' ORDER BY
 DELETE FROM space_members WHERE user_id = ?;
 
 -- name: InsertInvitation :one
-INSERT INTO space_invitations (space_id, email, role, token_hash, invited_by, invited_by_server_admin, expires_at, created_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO space_invitations (space_id, email, note, role, token_hash, invited_by, invited_by_server_admin, expires_at, created_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 RETURNING id;
 
 -- name: GetInvitationByHash :one
@@ -79,7 +79,7 @@ FROM space_invitations i JOIN spaces s ON s.id = i.space_id LEFT JOIN users u ON
 WHERE i.token_hash = ?;
 
 -- name: ListInvitations :many
-SELECT i.id, i.email, i.role, i.expires_at, i.accepted_at, i.created_at, COALESCE(u.name, '') AS inviter
+SELECT i.id, i.email, i.note, i.role, i.expires_at, i.accepted_at, i.created_at, COALESCE(u.name, '') AS inviter
 FROM space_invitations i LEFT JOIN users u ON u.id = i.invited_by
 WHERE i.space_id = ? AND (i.accepted_at IS NOT NULL OR i.expires_at > ?)
 ORDER BY i.id DESC;

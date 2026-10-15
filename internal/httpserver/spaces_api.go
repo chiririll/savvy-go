@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -207,7 +208,7 @@ func (s *Server) invitationsIndex(w http.ResponseWriter, r *http.Request) {
 	}
 	writeData(w, http.StatusOK, dto.Map(list, func(i spaces.Invitation) map[string]any {
 		return map[string]any{
-			"id": i.ID, "email": i.Email, "role": i.Role, "inviter": i.Inviter,
+			"id": i.ID, "email": i.Email, "note": i.Note, "role": i.Role, "inviter": i.Inviter,
 			"expiresAt": timeOrNil(i.ExpiresAt), "acceptedAt": timeOrNil(i.AcceptedAt), "createdAt": timeOrNil(i.CreatedAt),
 		}
 	}))
@@ -220,7 +221,7 @@ func (s *Server) invitationsIndex(w http.ResponseWriter, r *http.Request) {
 func (s *Server) inviteMethods(ctx context.Context) (email, link bool, reason string) {
 	switch {
 	case !s.mailer().Enabled():
-		reason = s.mailOffReason()
+		reason, _ = s.mailOffWhy()
 	case s.cfg.URL() == "":
 		reason = noAppURLMessage
 	default:
@@ -244,9 +245,14 @@ func (s *Server) invitationMethods(w http.ResponseWriter, r *http.Request) {
 func (s *Server) invitationsStore(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Email string `json:"email"`
+		Note  string `json:"note"`
 		Role  string `json:"role"`
 	}
 	if !decodeBody(w, r, &body) {
+		return
+	}
+	if len([]rune(strings.TrimSpace(body.Note))) > spaces.MaxInvitationNote {
+		writeValidation(w, map[string][]string{"note": {fmt.Sprintf("The note may not be longer than %d characters.", spaces.MaxInvitationNote)}})
 		return
 	}
 	if !spaces.ValidRole(body.Role) {
@@ -267,7 +273,7 @@ func (s *Server) invitationsStore(w http.ResponseWriter, r *http.Request) {
 		writeValidation(w, map[string][]string{"email": {"This server requires invitations by email. Enter the address to invite."}})
 		return
 	}
-	token, id, err := s.spaces.Invite(r.Context(), sp(r).id, userFrom(r), body.Email, body.Role)
+	token, id, err := s.spaces.Invite(r.Context(), sp(r).id, userFrom(r), body.Email, body.Note, body.Role)
 	if err != nil {
 		writeSpaceError(w, err)
 		return

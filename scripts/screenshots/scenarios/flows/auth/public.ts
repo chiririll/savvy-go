@@ -19,7 +19,8 @@ export const publicPages = scenario(
         // The links are made while signed in as the admin.
         const user = await api<{ token: string }>(page, 'POST', '/users', { name: 'Sam Rivera', email: 'sam@example.com', role: 'user' })
         const space = await spaceId(page)
-        const invitation = await api<{ token: string }>(page, 'POST', `/spaces/${space}/invitations`, { role: 'viewer', email: 'kim@example.com' })
+        // A link: this app has no mail, so an invitation to an address would be refused.
+        const invitation = await api<{ token: string }>(page, 'POST', `/spaces/${space}/invitations`, { role: 'viewer', note: 'Kim' })
         expect(user.token).toBeTruthy()
 
         await api(page, 'POST', '/auth/logout')
@@ -35,5 +36,33 @@ export const publicPages = scenario(
         await page.goto(`/invite/${invitation.token}`)
         await expect(page.locator('#name')).toBeVisible()
         await shot('invite')
+    },
+)
+
+/**
+ * The page of the link in a confirmation email. The app has no mail, so no real link exists: a
+ * made-up one is refused by the server (the real answer), and the confirmed state is staged by
+ * answering the request ourselves.
+ */
+export const verifyEmailPage = scenario(
+    {
+        name: 'auth/verify-email',
+        covers: [pages.verifyEmail.path],
+        shots: ['invalid', 'confirmed'],
+        leaves: 'signed out, on the confirmation page',
+    },
+    async ({ page, run, shot }) => {
+        await run(createSpace)
+        await api(page, 'POST', '/auth/logout')
+
+        await page.goto('/verify-email/not-a-real-token')
+        await expect(page.getByRole('button')).toBeVisible()
+        await expect(page.locator('svg.text-destructive')).toBeVisible()
+        await shot('invalid')
+
+        await page.route('**/api/auth/verify-email', (route) => route.fulfill({ status: 204 }))
+        await page.goto('/verify-email/any-token')
+        await expect(page.locator('svg.text-primary')).toBeVisible()
+        await shot('confirmed')
     },
 )

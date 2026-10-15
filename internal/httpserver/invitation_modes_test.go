@@ -170,6 +170,38 @@ func TestRegisteringThroughAnEmailedInvitationVerifiesTheAddress(t *testing.T) {
 	}
 }
 
+func TestALinkInvitationKeepsItsNoteAndAnEmailedOneDoesNot(t *testing.T) {
+	rec := &recorder{on: true}
+	a, sess, _ := newMailApp(t, rec)
+	post := func(body map[string]any) (int, map[string]any) {
+		res := a.do("POST", a.invitePath(a.space.ID), body, sess.Token, sess.CSRF)
+		return res.StatusCode, decodeJSON(t, res)
+	}
+
+	if status, raw := post(map[string]any{"role": "editor", "note": "  Kim from work "}); status != 201 {
+		t.Fatalf("link with note: %d %v", status, raw)
+	}
+	if status, raw := post(map[string]any{"role": "editor", "email": "new@example.org", "note": "ignored"}); status != 201 {
+		t.Fatalf("email with note: %d %v", status, raw)
+	}
+	if status, _ := post(map[string]any{"role": "editor", "note": strings.Repeat("x", 101)}); status != 422 {
+		t.Fatalf("a note over the limit = %d, want 422", status)
+	}
+
+	res := a.do("GET", a.invitePath(a.space.ID), nil, sess.Token, sess.CSRF)
+	list, _ := decodeJSON(t, res)["data"].([]any)
+	if len(list) != 2 {
+		t.Fatalf("invitations = %v", list)
+	}
+	// Newest first: the emailed one, then the link.
+	if emailed := list[0].(map[string]any); emailed["note"] != nil {
+		t.Fatalf("an emailed invitation has a note: %v", emailed)
+	}
+	if link := list[1].(map[string]any); link["note"] != "Kim from work" {
+		t.Fatalf("link note = %v", link["note"])
+	}
+}
+
 func TestARegistrationThroughALinkInvitationIsAskedToConfirmByEmail(t *testing.T) {
 	rec := &recorder{on: true}
 	a, sess, _ := newMailApp(t, rec)

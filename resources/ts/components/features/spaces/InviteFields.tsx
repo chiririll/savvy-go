@@ -1,26 +1,30 @@
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useInviteMethods } from '@/hooks/use-spaces'
 import { spaceRoleLabel } from '@/lib/labels'
+import { testId } from '@/lib/test-id'
 import type { SpaceRole } from '@/types/spaces'
 import { chooseInviteMethod, type InviteMethod } from './invite-method'
 
 const ROLES: SpaceRole[] = ['admin', 'editor', 'viewer']
 
 interface Props {
-    submitLabel: ReactNode
+    /** The button is only a plus, so this is what a screen reader hears. */
+    submitLabel: string
     busy?: boolean
     /** Shown under the fields; the parent clears it through onEdit. */
     error?: string | null
     onEdit?: () => void
     /**
-     * Gets what was entered: an address for an invitation by email, null for a
-     * link. Returning false keeps the address in the field, as after a refusal.
+     * Gets what was entered: an address for an invitation by email, or null and
+     * the optional note for a link. Returning false keeps the address in the
+     * field, as after a refusal.
      */
-    onSubmit: (input: { email: string | null; role: SpaceRole }) => boolean | void | Promise<boolean | void>
+    onSubmit: (input: { email: string | null; note: string | null; role: SpaceRole }) => boolean | void | Promise<boolean | void>
 }
 
 /**
@@ -33,6 +37,7 @@ export function InviteFields({ submitLabel, busy, error, onEdit, onSubmit }: Pro
     const { data: methods } = useInviteMethods()
     const [preferred, setPreferred] = useState<InviteMethod>('email')
     const [email, setEmail] = useState('')
+    const [note, setNote] = useState('')
     const [role, setRole] = useState<SpaceRole>('editor')
 
     const method = chooseInviteMethod(methods, preferred)
@@ -41,8 +46,15 @@ export function InviteFields({ submitLabel, busy, error, onEdit, onSubmit }: Pro
         e.preventDefault()
         // An empty address is not a link invitation: that is the other method.
         if (method === null || (method === 'email' && !email.trim())) return
-        const keep = await onSubmit({ email: method === 'email' ? email.trim() : null, role })
-        if (keep !== false) setEmail('')
+        const keep = await onSubmit({
+            email: method === 'email' ? email.trim() : null,
+            note: method === 'link' ? note.trim() || null : null,
+            role,
+        })
+        if (keep !== false) {
+            setEmail('')
+            setNote('')
+        }
     }
 
     return (
@@ -57,6 +69,7 @@ export function InviteFields({ submitLabel, busy, error, onEdit, onSubmit }: Pro
                             size="sm"
                             variant={method === m ? 'secondary' : 'outline'}
                             aria-pressed={method === m}
+                            {...testId(`invite-method-${m}`)}
                             onClick={() => setPreferred(m)}
                         >
                             {m === 'email' ? t('spaces.invitations.methodEmail') : t('spaces.invitations.methodLink')}
@@ -66,20 +79,32 @@ export function InviteFields({ submitLabel, busy, error, onEdit, onSubmit }: Pro
             )}
             {method !== null && (
                 <form
-                    className={method === 'email' ? 'grid gap-2 sm:grid-cols-[1fr_9rem_auto]' : 'grid gap-2 sm:grid-cols-[9rem_auto]'}
+                    className="grid grid-cols-[1fr_2.25rem] gap-2 sm:grid-cols-[1fr_9rem_2.25rem]"
                     noValidate
                     onSubmit={(e) => void submit(e)}
                 >
-                    {method === 'email' && (
+                    {method === 'email' ? (
                         <Input
+                            className="col-span-2 sm:col-span-1"
                             type="email"
                             placeholder={t('spaces.invitations.emailPlaceholder')}
                             value={email}
                             aria-invalid={!!error}
+                            {...testId('invite-email')}
                             onChange={(e) => {
                                 setEmail(e.target.value)
                                 onEdit?.()
                             }}
+                        />
+                    ) : (
+                        <Input
+                            className="col-span-2 sm:col-span-1"
+                            placeholder={t('spaces.invitations.notePlaceholder')}
+                            aria-label={t('spaces.invitations.notePlaceholder')}
+                            value={note}
+                            maxLength={100}
+                            {...testId('invite-note')}
+                            onChange={(e) => setNote(e.target.value)}
                         />
                     )}
                     <Select value={role} onValueChange={(r) => setRole(r as SpaceRole)}>
@@ -92,7 +117,9 @@ export function InviteFields({ submitLabel, busy, error, onEdit, onSubmit }: Pro
                             ))}
                         </SelectContent>
                     </Select>
-                    <Button type="submit" disabled={busy}>{submitLabel}</Button>
+                    <Button type="submit" size="icon" disabled={busy} aria-label={submitLabel} title={submitLabel} {...testId('invite-add')}>
+                        <Plus className="size-4" />
+                    </Button>
                 </form>
             )}
             {error && <p className="text-sm text-destructive">{error}</p>}

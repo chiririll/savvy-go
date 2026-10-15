@@ -318,14 +318,15 @@ func (q *Queries) InsertAudit(ctx context.Context, arg InsertAuditParams) error 
 }
 
 const insertInvitation = `-- name: InsertInvitation :one
-INSERT INTO space_invitations (space_id, email, role, token_hash, invited_by, invited_by_server_admin, expires_at, created_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO space_invitations (space_id, email, note, role, token_hash, invited_by, invited_by_server_admin, expires_at, created_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 RETURNING id
 `
 
 type InsertInvitationParams struct {
 	SpaceID              int64
 	Email                sql.NullString
+	Note                 sql.NullString
 	Role                 string
 	TokenHash            string
 	InvitedBy            sql.NullInt64
@@ -338,6 +339,7 @@ func (q *Queries) InsertInvitation(ctx context.Context, arg InsertInvitationPara
 	row := q.db.QueryRowContext(ctx, insertInvitation,
 		arg.SpaceID,
 		arg.Email,
+		arg.Note,
 		arg.Role,
 		arg.TokenHash,
 		arg.InvitedBy,
@@ -473,7 +475,7 @@ func (q *Queries) ListAllSpaceLinks(ctx context.Context) ([]ListAllSpaceLinksRow
 }
 
 const listInvitations = `-- name: ListInvitations :many
-SELECT i.id, i.email, i.role, i.expires_at, i.accepted_at, i.created_at, COALESCE(u.name, '') AS inviter
+SELECT i.id, i.email, i.note, i.role, i.expires_at, i.accepted_at, i.created_at, COALESCE(u.name, '') AS inviter
 FROM space_invitations i LEFT JOIN users u ON u.id = i.invited_by
 WHERE i.space_id = ? AND (i.accepted_at IS NOT NULL OR i.expires_at > ?)
 ORDER BY i.id DESC
@@ -487,6 +489,7 @@ type ListInvitationsParams struct {
 type ListInvitationsRow struct {
 	ID         int64
 	Email      sql.NullString
+	Note       sql.NullString
 	Role       string
 	ExpiresAt  string
 	AcceptedAt sql.NullString
@@ -506,6 +509,7 @@ func (q *Queries) ListInvitations(ctx context.Context, arg ListInvitationsParams
 		if err := rows.Scan(
 			&i.ID,
 			&i.Email,
+			&i.Note,
 			&i.Role,
 			&i.ExpiresAt,
 			&i.AcceptedAt,

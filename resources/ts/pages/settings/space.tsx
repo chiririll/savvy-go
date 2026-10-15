@@ -206,7 +206,7 @@ function Invitations({ space }: { space: Space }) {
                         {open.map((i) => (
                             <li key={i.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
                                 <div className="min-w-0">
-                                    <p className="truncate">{i.email ?? t('spaces.invitations.anyone')} · {spaceRoleLabel(t, i.role)}</p>
+                                    <p className="truncate">{i.email ?? i.note ?? t('spaces.invitations.anyone')} · {spaceRoleLabel(t, i.role)}</p>
                                     <p className="truncate text-xs text-muted-foreground">
                                         {t('spaces.invitations.expires', { date: formatDateTime(i.expiresAt) })}
                                     </p>

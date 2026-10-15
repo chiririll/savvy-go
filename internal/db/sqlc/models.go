@@ -261,6 +261,7 @@ type SpaceInvitation struct {
 	ID                   int64
 	SpaceID              int64
 	Email                sql.NullString
+	Note                 sql.NullString
 	Role                 string
 	TokenHash            string
 	InvitedBy            sql.NullInt64

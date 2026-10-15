@@ -13,7 +13,7 @@ export interface InvitationOutcome {
     error: string | null
 }
 
-type Invite = (spaceId: number, role: SpaceRole, email?: string) => Promise<InviteResult>
+type Invite = (spaceId: number, role: SpaceRole, email?: string, note?: string) => Promise<InviteResult>
 
 /**
  * Sends the draft's invitations one by one once the space exists. One refused
@@ -29,7 +29,7 @@ export async function sendInvitations(
     const out: InvitationOutcome[] = []
     for (const invitation of invitations) {
         try {
-            const { token, emailSent } = await invite(spaceId, invitation.role, invitation.email ?? undefined)
+            const { token, emailSent } = await invite(spaceId, invitation.role, invitation.email ?? undefined, invitation.note ?? undefined)
             out.push({ invitation, link: token ? `${origin}/invite/${token}` : null, emailed: emailSent, error: null })
         } catch (error) {
             out.push({ invitation, link: null, emailed: false, error: (error as ApiError).message })

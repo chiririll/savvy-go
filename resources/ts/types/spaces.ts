@@ -25,6 +25,8 @@ export interface SpaceMember {
 export interface SpaceInvitation {
     id: number
     email: string | null
+    /** Who a link invitation is for, as its inviter wrote it. */
+    note: string | null
     role: SpaceRole
     inviter: string
     expiresAt: string | null

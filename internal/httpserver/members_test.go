@@ -20,7 +20,7 @@ func (a *testApp) invite(spaceID int64, sess *auth.Issued, email, role string) s
 	if err != nil || session == nil {
 		a.t.Fatalf("inviter: %v", err)
 	}
-	token, _, err := a.s.spaces.Invite(context.Background(), spaceID, session.User, email, role)
+	token, _, err := a.s.spaces.Invite(context.Background(), spaceID, session.User, email, "", role)
 	if err != nil {
 		a.t.Fatal(err)
 	}

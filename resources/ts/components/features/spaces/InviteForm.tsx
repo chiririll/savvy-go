@@ -27,6 +27,7 @@ interface Sent {
     /** Only a link invitation has one; an emailed one went to the mailbox and nowhere else. */
     link: string | null
     email: string | null
+    note: string | null
     role: SpaceRole
 }
 
@@ -50,11 +51,11 @@ export function InviteForm({ spaceId }: { spaceId: number }) {
         toast.success(t('spaces.invitations.copied'))
     }
 
-    const add = async ({ email, role }: { email: string | null; role: SpaceRole }) => {
+    const add = async ({ email, note, role }: { email: string | null; note: string | null; role: SpaceRole }) => {
         try {
-            const { id, token } = await invite.mutateAsync({ role, email: email || undefined })
+            const { id, token } = await invite.mutateAsync({ role, email: email || undefined, note: note || undefined })
             const link = token ? `${window.location.origin}/invite/${token}` : null
-            setSent((list) => [{ key: Date.now(), id, link, email: email || null, role }, ...list])
+            setSent((list) => [{ key: Date.now(), id, link, email: email || null, note, role }, ...list])
             if (email) toast.success(t('spaces.invitations.emailSent', { email }))
         } catch (error) {
             // The server's own reason: already invited, a recent invitation, a member, the mail failing...
@@ -68,7 +69,7 @@ export function InviteForm({ spaceId }: { spaceId: number }) {
             {sent.length > 0 && (
                 <ul className="max-h-48 divide-y overflow-y-auto rounded-lg border">
                     {sent.map((item) => (
-                        <InvitationRow key={item.key} email={item.email} role={item.role} note={item.email ? t('spaces.invitations.sent') : undefined}>
+                        <InvitationRow key={item.key} email={item.email} label={item.note} role={item.role} note={item.email ? t('spaces.invitations.sent') : undefined}>
                             {item.link && (
                                 <Button type="button" variant="outline" size="sm" onClick={() => void copy(item)}>
                                     {copied === item.key ? <Check className="size-4" /> : <Copy className="size-4" />}

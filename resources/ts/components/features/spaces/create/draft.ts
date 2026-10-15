@@ -2,7 +2,7 @@ import type { AccountType } from '@/types/accounts'
 import type { CategoryType } from '@/types/categories'
 import type { CreateSpaceInput, SpacePresets, SpaceRole } from '@/types/spaces'
 
-export const DRAFT_STEPS = ['name', 'copy', 'entities', 'members', 'confirm'] as const
+export const DRAFT_STEPS = ['name', 'copy', 'entities', 'confirm'] as const
 export type DraftStep = (typeof DRAFT_STEPS)[number]
 
 export const COPY_KINDS = ['currencies', 'accounts', 'categories', 'tags'] as const
@@ -36,18 +36,18 @@ export interface DraftContent {
     tags: string[]
 }
 
-/** Someone to invite once the space exists. No address means a link to copy. */
+/** Someone to invite right after the space is created. No address means a link to copy. */
 export interface DraftInvitation {
     /** Only a list key. */
     key: string
     email: string | null
+    /** Who a link is for; only kept when there is no address. */
+    note: string | null
     role: SpaceRole
 }
 
 export interface SpaceDraft extends DraftContent {
     step: DraftStep
-    /** Nothing is sent until the whole form is: the space is made first, then these. */
-    invitations: DraftInvitation[]
     name: string
     /** The space to copy from; null starts from the defaults. */
     sourceId: number | null
@@ -70,7 +70,6 @@ export const emptyDraft = (): SpaceDraft => ({
     name: '',
     sourceId: null,
     copy: noCopy(),
-    invitations: [],
     baseCurrency: null,
     currencies: [],
     accounts: [],
@@ -89,10 +88,14 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
  * already listed (any case), leaves the list as it was; entries without an
  * address are links and can repeat.
  */
-export function addInvitation(list: DraftInvitation[], input: { email: string | null; role: SpaceRole }): DraftInvitation[] {
+export function addInvitation(
+    list: DraftInvitation[],
+    input: { email: string | null; note?: string | null; role: SpaceRole }
+): DraftInvitation[] {
     const email = input.email?.trim() || null
     if (email !== null && (!EMAIL.test(email) || list.some((i) => i.email?.toLowerCase() === email.toLowerCase()))) return list
-    return [...list, { key: newInvitationKey(), email, role: input.role }]
+    const note = email === null ? input.note?.trim() || null : null
+    return [...list, { key: newInvitationKey(), email, note, role: input.role }]
 }
 
 export const removeInvitation = (list: DraftInvitation[], key: string): DraftInvitation[] => list.filter((i) => i.key !== key)

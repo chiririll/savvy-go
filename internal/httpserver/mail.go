@@ -173,10 +173,20 @@ func (s *Server) mailTest(w http.ResponseWriter, r *http.Request) {
 
 // mailOffReason says why mail cannot be used.
 func (s *Server) mailOffReason() string {
-	if _, problem := s.mailSettings(); problem != "" {
-		return "Mail is switched off: " + problem + "."
+	reason, hint := s.mailOffWhy()
+	if hint == "" {
+		return reason
 	}
-	return "Mail is not configured. Set it up in Administration → System → Email."
+	return reason + " " + hint
+}
+
+// mailOffWhy splits mailOffReason into the fact and, when there is one, where
+// an administrator fixes it. Pages that are not for administrators show the fact only.
+func (s *Server) mailOffWhy() (reason, hint string) {
+	if _, problem := s.mailSettings(); problem != "" {
+		return "Mail is switched off: " + problem + ".", ""
+	}
+	return "Mail is not configured.", "Set it up in Administration → System → Email."
 }
 
 const noAppURLMessage = "The public URL is not set, so the link would point nowhere. Set app_url first."

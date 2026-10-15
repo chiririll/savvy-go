@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { SpaceRole } from '@/types/spaces'
 import { InvitationRow } from '../InvitationRow'
@@ -13,15 +13,15 @@ interface Props {
 }
 
 /**
- * Collects who to invite. Nothing is sent from here: the list is part of the
- * draft, and the invitations go out only after the space is created.
+ * Collects who to invite. Nothing is sent from here: the caller keeps the list
+ * and sends it when the done screen of the new space is left.
  */
 export function MembersStep({ invitations, onChange }: Props) {
     const { t } = useTranslation('settings')
     const [problem, setProblem] = useState<'invalid' | 'duplicate' | null>(null)
 
-    const add = ({ email, role }: { email: string | null; role: SpaceRole }) => {
-        const next = addInvitation(invitations, { email, role })
+    const add = ({ email, note, role }: { email: string | null; note: string | null; role: SpaceRole }) => {
+        const next = addInvitation(invitations, { email, note, role })
         if (next === invitations) {
             // addInvitation refuses an address that is not one or is listed already.
             setProblem(invitations.some((i) => i.email?.toLowerCase() === email?.toLowerCase()) ? 'duplicate' : 'invalid')
@@ -33,24 +33,13 @@ export function MembersStep({ invitations, onChange }: Props) {
 
     return (
         <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">{t('spaces.create.members.hint')}</p>
-            <InviteFields
-                submitLabel={
-                    <>
-                        <Plus className="size-4" />
-                        {t('spaces.create.members.add')}
-                    </>
-                }
-                error={problem === 'invalid' ? t('spaces.create.members.invalid') : problem === 'duplicate' ? t('spaces.create.members.duplicate') : null}
-                onEdit={() => setProblem(null)}
-                onSubmit={add}
-            />
             {invitations.length > 0 ? (
                 <ul className="max-h-56 divide-y overflow-y-auto rounded-lg border">
                     {invitations.map((item) => (
                         <InvitationRow
                             key={item.key}
                             email={item.email}
+                            label={item.note}
                             role={item.role}
                             note={item.email ? t('spaces.create.members.byEmail') : t('spaces.create.members.byLink')}
                         >
@@ -69,6 +58,13 @@ export function MembersStep({ invitations, onChange }: Props) {
             ) : (
                 <p className="text-sm text-muted-foreground">{t('spaces.create.members.none')}</p>
             )}
+            <InviteFields
+                submitLabel={t('spaces.create.members.add')}
+                error={problem === 'invalid' ? t('spaces.create.members.invalid') : problem === 'duplicate' ? t('spaces.create.members.duplicate') : null}
+                onEdit={() => setProblem(null)}
+                onSubmit={add}
+            />
+
         </div>
     )
 }

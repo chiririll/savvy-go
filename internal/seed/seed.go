@@ -257,7 +257,7 @@ func (d *demo) invite() error {
 		{"newhire@example.com", spaces.RoleEditor},
 		{"", spaces.RoleViewer},
 	} {
-		token, _, err := d.spaces.Invite(d.ctx, d.studio.ID, alex, inv.email, inv.role)
+		token, _, err := d.spaces.Invite(d.ctx, d.studio.ID, alex, inv.email, "", inv.role)
 		if err != nil {
 			return fmt.Errorf("invitation: %w", err)
 		}

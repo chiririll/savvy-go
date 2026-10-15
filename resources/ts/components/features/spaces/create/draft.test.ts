@@ -53,10 +53,9 @@ describe('steps', () => {
         expect(previousStep('entities', 2)).toBe('copy')
     })
 
-    it('asks for members after the entities and before the summary', () => {
-        expect(nextStep('entities', 0)).toBe('members')
-        expect(nextStep('members', 0)).toBe('confirm')
-        expect(previousStep('confirm', 0)).toBe('members')
+    it('goes from the entities straight to the summary: inviting is not a step', () => {
+        expect(nextStep('entities', 0)).toBe('confirm')
+        expect(previousStep('confirm', 0)).toBe('entities')
     })
 
     it('stays inside the first and last step', () => {
@@ -201,11 +200,7 @@ describe('toCopySource', () => {
     })
 })
 
-describe('invitations in the draft', () => {
-    it('starts with nobody', () => {
-        expect(emptyDraft().invitations).toEqual([])
-    })
-
+describe('invitation list', () => {
     it('adds an email once, whatever its case', () => {
         let list = addInvitation([], { email: ' Bob@Example.org ', role: 'editor' })
         expect(list).toHaveLength(1)
@@ -225,13 +220,23 @@ describe('invitations in the draft', () => {
         expect(list[0].key).not.toBe(list[1].key)
     })
 
+    it('keeps the note of a link invitation, trimmed, and drops an empty one', () => {
+        const list = addInvitation([], { email: null, note: '  Kim from work ', role: 'viewer' })
+        expect(list[0].note).toBe('Kim from work')
+        expect(addInvitation([], { email: null, note: '   ', role: 'viewer' })[0].note).toBeNull()
+    })
+
+    it('has no note on an invitation by email', () => {
+        expect(addInvitation([], { email: 'a@example.org', note: 'ignored', role: 'viewer' })[0].note).toBeNull()
+    })
+
     it('removes one entry by its key', () => {
         const list = addInvitation(addInvitation([], { email: 'a@example.org', role: 'viewer' }), { email: 'b@example.org', role: 'viewer' })
         expect(removeInvitation(list, list[0].key).map((i) => i.email)).toEqual(['b@example.org'])
     })
 
-    it('is not part of the request that creates the space', () => {
-        const draft = { ...emptyDraft(), name: 'Home', baseCurrency: 'EUR', invitations: addInvitation([], { email: 'a@example.org', role: 'viewer' }) }
-        expect(toRequest(draft)).not.toHaveProperty('invitations')
+    it('is not part of the draft or the request that creates the space', () => {
+        expect(emptyDraft()).not.toHaveProperty('invitations')
+        expect(toRequest({ ...emptyDraft(), name: 'Home', baseCurrency: 'EUR' })).not.toHaveProperty('invitations')
     })
 })

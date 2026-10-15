@@ -232,6 +232,7 @@ func (r Repo) Audit(ctx context.Context, spaceID int64) ([]AuditEntry, error) {
 type NewInvitation struct {
 	SpaceID, InvitedBy int64
 	Email              string // empty: open to anyone
+	Note               string // empty: none
 	Role, TokenHash    string
 	ByServerAdmin      bool
 	Expires, Now       time.Time
@@ -240,7 +241,7 @@ type NewInvitation struct {
 // InsertInvitation stores an invitation and returns its id.
 func (r Repo) InsertInvitation(ctx context.Context, n NewInvitation) (int64, error) {
 	return r.q().InsertInvitation(ctx, sqlc.InsertInvitationParams{
-		SpaceID: n.SpaceID, Email: db.NullStringVal(n.Email), Role: n.Role, TokenHash: n.TokenHash,
+		SpaceID: n.SpaceID, Email: db.NullStringVal(n.Email), Note: db.NullStringVal(n.Note), Role: n.Role, TokenHash: n.TokenHash,
 		InvitedBy: db.NI(n.InvitedBy), InvitedByServerAdmin: db.BoolInt(n.ByServerAdmin),
 		ExpiresAt: db.FormatTime(n.Expires), CreatedAt: db.TimeNS(n.Now),
 	})
@@ -249,7 +250,7 @@ func (r Repo) InsertInvitation(ctx context.Context, n NewInvitation) (int64, err
 // Invitation is one as a space's admins list it.
 type Invitation struct {
 	ID                               int64
-	Email                            *string
+	Email, Note                      *string
 	Role, Inviter                    string
 	ExpiresAt, AcceptedAt, CreatedAt *time.Time
 }
@@ -267,6 +268,9 @@ func (r Repo) Invitations(ctx context.Context, spaceID int64, now time.Time) ([]
 			ExpiresAt: timePtr(row.ExpiresAt), AcceptedAt: optTime(row.AcceptedAt), CreatedAt: optTime(row.CreatedAt)}
 		if row.Email.Valid {
 			inv.Email = &row.Email.String
+		}
+		if row.Note.Valid {
+			inv.Note = &row.Note.String
 		}
 		out[i] = inv
 	}

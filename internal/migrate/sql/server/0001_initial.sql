@@ -275,6 +275,8 @@ CREATE TABLE IF NOT EXISTS space_invitations (
     space_id INTEGER NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,
     -- When set, only a user with this email may accept.
     email TEXT COLLATE NOCASE,
+    -- Who a link invitation is for, in the inviter's words; shown in their list only.
+    note TEXT,
     role TEXT NOT NULL CHECK (role IN ('admin', 'editor', 'viewer')),
     token_hash TEXT NOT NULL UNIQUE,
     invited_by INTEGER REFERENCES users(id) ON DELETE SET NULL,

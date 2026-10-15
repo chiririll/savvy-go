@@ -581,18 +581,17 @@
                 "currencies": "Other currencies",
                 "accounts": "Accounts",
                 "categories": "Categories",
-                "tags": "Tags",
-                "invitations": "Invitations"
+                "tags": "Tags"
             },
             "done": {
                 "title": "Space created",
+                "invite": "Invite members",
                 "text": "\"{{name}}\" is ready. You can invite more members later in the space settings.",
                 "invitations": "Invitations",
                 "notSent": "Not sent: {{error}}",
                 "retry": "You can invite them again from the space settings."
             },
             "members": {
-                "hint": "Optional. Nobody is invited until you create the space; emails go out then.",
                 "add": "Add",
                 "remove": "Remove {{who}}",
                 "none": "No one added yet.",
@@ -641,6 +640,7 @@
             "title": "Invitations",
             "description": "Invitations to join this space, valid for 7 days. One sent by email can only be used by that address.",
             "emailPlaceholder": "Email address",
+            "notePlaceholder": "Note (optional)",
             "linkReady": "Send this link to the person you invite. It is shown only once.",
             "copied": "Link copied",
             "emailSent": "Invitation emailed to {{email}}",

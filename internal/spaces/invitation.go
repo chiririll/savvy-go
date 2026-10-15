@@ -32,6 +32,8 @@ const (
 	invitationTTL = 7 * 24 * time.Hour
 	// A row must stay at least this long past its expiry before it is pruned.
 	invitationCooldown = time.Hour
+	// MaxInvitationNote is the longest note, in characters.
+	MaxInvitationNote = 100
 )
 
 var (
@@ -47,6 +49,8 @@ var (
 	// ErrInvitationCooldown is returned when an invitation to the address
 	// expired or was revoked a moment ago.
 	ErrInvitationCooldown = errors.New("this address was invited a moment ago; try again in a couple of hours")
+	// ErrInvitationNote is returned when the note is longer than MaxInvitationNote.
+	ErrInvitationNote = errors.New("the note is too long")
 	// ErrAlreadyMember is returned when the address belongs to a member.
 	ErrAlreadyMember = errors.New("this address already belongs to a member of the space")
 	// ErrRegistrationClosed is returned when invitations may not create accounts.
@@ -57,6 +61,7 @@ var (
 type Invitation struct {
 	ID         int64
 	Email      *string
+	Note       *string
 	Role       string
 	Inviter    string
 	ExpiresAt  *time.Time
@@ -88,11 +93,20 @@ type invitation struct {
 // Invite creates an invitation and returns its raw token, shown once. An
 // invitation bound to an address is refused when the address is a member, is
 // already invited to the space, or is in its cooldown.
-func (s Service) Invite(ctx context.Context, spaceID int64, inviter *auth.User, email, role string) (string, int64, error) {
+// The note says who a link is for, so the inviter can tell their links apart; it
+// is kept only for an invitation without an address.
+func (s Service) Invite(ctx context.Context, spaceID int64, inviter *auth.User, email, note, role string) (string, int64, error) {
 	if !ValidRole(role) {
 		return "", 0, errors.New("invalid space role")
 	}
 	email = strings.TrimSpace(email)
+	note = strings.TrimSpace(note)
+	if email != "" {
+		note = ""
+	}
+	if len([]rune(note)) > MaxInvitationNote {
+		return "", 0, ErrInvitationNote
+	}
 	token := auth.RandomString(40)
 	now := time.Now().UTC()
 	var id int64
@@ -105,7 +119,7 @@ func (s Service) Invite(ctx context.Context, spaceID int64, inviter *auth.User, 
 		}
 		var err error
 		id, err = reg.InsertInvitation(ctx, repo.NewInvitation{
-			SpaceID: spaceID, Email: email, Role: role, TokenHash: auth.HashToken(token),
+			SpaceID: spaceID, Email: email, Note: note, Role: role, TokenHash: auth.HashToken(token),
 			InvitedBy: inviter.ID, ByServerAdmin: inviter.IsAdmin(), Expires: now.Add(invitationTTL), Now: now,
 		})
 		return err
@@ -156,7 +170,7 @@ func (s Service) Invitations(ctx context.Context, spaceID int64) ([]Invitation, 
 	}
 	out := make([]Invitation, len(rows))
 	for i, r := range rows {
-		out[i] = Invitation{ID: r.ID, Email: r.Email, Role: r.Role, Inviter: r.Inviter,
+		out[i] = Invitation{ID: r.ID, Email: r.Email, Note: r.Note, Role: r.Role, Inviter: r.Inviter,
 			ExpiresAt: r.ExpiresAt, AcceptedAt: r.AcceptedAt, CreatedAt: r.CreatedAt}
 	}
 	return out, nil
