@@ -29,7 +29,7 @@ A token acts as its owner but only as far as you let it. Give each token the lea
 | Preset | The token can |
 |--------|---------------|
 | Viewer | read everything in its spaces |
-| Editor | read everything, add and change transactions. Tick **Allow deleting transactions** to let it delete those too |
+| Editor | read everything; edit transactions, accounts, budgets, debts, recurring payments, tags and automation (not categories, currencies, reports, transfers or the space). Tick **Allow deleting transactions** to let it delete transactions too |
 | Admin | read, change and delete everything in its spaces. Space administration, backups, invitations and security settings stay with you |
 | Custom | choose a level for each part below |
 

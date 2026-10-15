@@ -50,7 +50,8 @@ func TestPresetsViewerEditorAdmin(t *testing.T) {
 	}
 	status(t, a.bearer("POST", "/api/transactions", tx, viewer), 403, "viewer cannot add")
 
-	// Editor: adds and changes transactions, nothing else, and cannot delete.
+	// Editor: adds and changes the data of a space (transactions, accounts, tags, ...), but
+	// not categories, currencies, reports, transfers or the space itself, and cannot delete.
 	editor := presetToken(a, sess, tokenBody(map[string]any{"preset": "editor"}))
 	status(t, a.bearer("GET", "/api/accounts", nil, editor), 200, "editor reads")
 	r := a.bearer("POST", "/api/transactions", tx, editor)
@@ -58,8 +59,11 @@ func TestPresetsViewerEditorAdmin(t *testing.T) {
 		t.Fatalf("editor adds = %d", r.StatusCode)
 	}
 	id := int64(decodeJSON(t, r)["data"].(map[string]any)["id"].(float64))
-	status(t, a.bearer("POST", "/api/accounts", map[string]any{"name": "No"}, editor), 403, "editor cannot add accounts")
-	status(t, a.bearer("POST", "/api/tags", map[string]any{"name": "no"}, editor), 403, "editor cannot add tags")
+	status(t, a.bearer("POST", "/api/accounts", map[string]any{"name": "Card", "type": "cash", "currency_id": usd, "initial_balance": 0}, editor), 201, "editor adds accounts")
+	status(t, a.bearer("POST", "/api/tags", map[string]any{"name": "ok"}, editor), 201, "editor adds tags")
+	status(t, a.bearer("POST", "/api/categories", map[string]any{"name": "No", "type": "expense"}, editor), 403, "editor cannot add categories")
+	status(t, a.bearer("POST", "/api/currencies", map[string]any{"code": "EUR", "name": "Euro", "symbol": "€", "decimals": 2, "rate": 1}, editor), 403, "editor cannot add currencies")
+	status(t, a.bearer("PATCH", fmt.Sprintf("/api/spaces/%d", a.space.ID), map[string]any{"name": "Mine"}, editor), 403, "editor cannot change the space")
 	res = a.bearer("DELETE", "/api/transactions/"+itoa(id), nil, editor)
 	if res.StatusCode != 403 || decodeJSON(t, res)["message"] != "This API token has no transactions:delete permission." {
 		t.Fatalf("editor deletes = %d", res.StatusCode)
@@ -73,7 +77,7 @@ func TestPresetsViewerEditorAdmin(t *testing.T) {
 	// Admin: everything in the space, but not the space's administration, and
 	// never the sync groups.
 	admin := presetToken(a, sess, tokenBody(map[string]any{"preset": "admin"}))
-	status(t, a.bearer("POST", "/api/tags", map[string]any{"name": "ok"}, admin), 201, "admin writes")
+	status(t, a.bearer("POST", "/api/tags", map[string]any{"name": "ok2"}, admin), 201, "admin writes")
 	status(t, a.bearer("GET", fmt.Sprintf("/api/spaces/%d/backups", a.space.ID), nil, admin), 403, "no space administration")
 	status(t, a.bearer("POST", "/api/sync-groups/apply", map[string]any{}, admin), 403, "tokens never change sync groups")
 

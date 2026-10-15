@@ -41,12 +41,17 @@ func LevelFor(method string) string {
 // owner's role in a space allows anyway.
 const (
 	PresetViewer = "viewer" // read everything
-	PresetEditor = "editor" // read everything, add and change transactions
+	PresetEditor = "editor" // read everything, add and change the data in EditorResources
 	PresetAdmin  = "admin"  // read, write and delete everything
 )
 
 // Presets lists the presets, in the order a screen offers them.
 var Presets = []string{PresetViewer, PresetEditor, PresetAdmin}
+
+// EditorResources are the parts of a space the editor preset may add to and
+// change. Categories, currencies, reports, transfers and the space itself stay
+// read-only: they shape how everything else is counted or sent.
+var EditorResources = []string{"accounts", "automation", "budgets", "debts", "recurring", "tags", "transactions"}
 
 // PresetPermissions expands a preset over some parts of a space (those a kind
 // of token can hold, see ResourcesFor). allowDelete lets an editor delete
@@ -63,13 +68,16 @@ func PresetPermissions(preset string, allowDelete bool, resources []string) ([]s
 	case PresetViewer:
 		return grant(PermRead, resources...), nil
 	case PresetEditor:
-		level := PermWrite
-		if allowDelete {
-			level = PermDelete
-		}
 		out := grant(PermRead, resources...)
-		if slices.Contains(resources, "transactions") {
-			out = append(out, Perm("transactions", level))
+		for _, r := range EditorResources {
+			if !slices.Contains(resources, r) {
+				continue
+			}
+			level := PermWrite
+			if allowDelete && r == "transactions" {
+				level = PermDelete
+			}
+			out = append(out, Perm(r, level))
 		}
 		return NormalizePermissions(out)
 	case PresetAdmin:

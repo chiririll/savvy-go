@@ -489,7 +489,7 @@
         },
         "presetHint": {
             "viewer": "Reads everything in the chosen spaces and changes nothing.",
-            "editor": "Reads everything and can add and change transactions.",
+            "editor": "Can read all and edit almost everything.",
             "admin": "Reads, changes and deletes everything in the chosen spaces. Space administration, backups and security stay with you.",
             "custom": "Choose what the token may do for each part of a space."
         },
