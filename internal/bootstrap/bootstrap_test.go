@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"errors"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -38,6 +39,27 @@ func TestNewGeneratesGroupedPasswordAndWritesFile(t *testing.T) {
 	}
 	if g.Hint().File != path {
 		t.Fatalf("hint file %q, want %q", g.Hint().File, path)
+	}
+}
+
+func TestAnnounceLogsOneRecordPerLine(t *testing.T) {
+	var logs strings.Builder
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
+	g := New(t.TempDir(), Binary)
+	g.Announce("http://localhost:80")
+
+	out := logs.String()
+	if strings.Contains(out, `\n`) {
+		t.Fatalf("announcement has escaped newlines:\n%s", out)
+	}
+	if !strings.Contains(out, "Bootstrap password: "+g.Password()) {
+		t.Fatalf("password missing from announcement:\n%s", out)
+	}
+	if n := strings.Count(out, "\n"); n != 5 {
+		t.Fatalf("got %d log lines, want 5:\n%s", n, out)
 	}
 }
 
