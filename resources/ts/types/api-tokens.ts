@@ -57,6 +57,23 @@ export interface CreateApiTokenInput {
     expires_at: string | null
 }
 
+/**
+ * What a preset grants over some resources (all of them by default). Mirrors
+ * auth.PresetPermissions in Go; the editor's extra write is on transactions.
+ * Returns sorted grants, so two sets can be compared with `samePermissions`.
+ */
+export function presetPermissions(preset: ApiTokenPreset, resources: readonly ApiResource[] = API_RESOURCES): ApiPermission[] {
+    const level: ApiPermissionLevel = preset === 'admin' ? 'delete' : 'read'
+    return resources
+        .map((r) => `${r}:${preset === 'editor' && r === 'transactions' ? 'write' : level}` as ApiPermission)
+        .sort()
+}
+
+/** Whether two lists hold the same grant on every resource. */
+export function samePermissions(a: readonly string[], b: readonly string[]): boolean {
+    return API_RESOURCES.every((r) => permissionLevel(a, r) === permissionLevel(b, r))
+}
+
 /** Highest level a token holds on a resource, or null. */
 export function permissionLevel(permissions: readonly string[], resource: ApiResource): ApiPermissionLevel | null {
     if (permissions.includes(`${resource}:delete`)) return 'delete'

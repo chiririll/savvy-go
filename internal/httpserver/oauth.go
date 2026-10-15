@@ -226,14 +226,15 @@ func (s *Server) oauthConsentInfo(w http.ResponseWriter, r *http.Request) {
 // oauthConsent records the user's decision and says where to send the browser.
 func (s *Server) oauthConsent(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		ClientID            string  `json:"client_id"`
-		RedirectURI         string  `json:"redirect_uri"`
-		State               string  `json:"state"`
-		CodeChallenge       string  `json:"code_challenge"`
-		CodeChallengeMethod string  `json:"code_challenge_method"`
-		Approve             bool    `json:"approve"`
-		AllSpaces           bool    `json:"all_spaces"`
-		SpaceIDs            []int64 `json:"space_ids"`
+		ClientID            string   `json:"client_id"`
+		RedirectURI         string   `json:"redirect_uri"`
+		State               string   `json:"state"`
+		CodeChallenge       string   `json:"code_challenge"`
+		CodeChallengeMethod string   `json:"code_challenge_method"`
+		Approve             bool     `json:"approve"`
+		AllSpaces           bool     `json:"all_spaces"`
+		SpaceIDs            []int64  `json:"space_ids"`
+		Permissions         []string `json:"permissions"`
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, oauthBodyLimit)
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -262,7 +263,7 @@ func (s *Server) oauthConsent(w http.ResponseWriter, r *http.Request) {
 	code, err := s.oauth.IssueCode(r.Context(), oauth.CodeRequest{
 		ClientID: body.ClientID, RedirectURI: body.RedirectURI, CodeChallenge: body.CodeChallenge,
 		CodeChallengeMethod: body.CodeChallengeMethod, User: userFrom(r),
-		AllSpaces: body.AllSpaces, SpaceIDs: body.SpaceIDs,
+		AllSpaces: body.AllSpaces, SpaceIDs: body.SpaceIDs, Permissions: body.Permissions,
 	})
 	if err != nil {
 		writeOAuthAPIError(w, err)

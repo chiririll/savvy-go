@@ -1,4 +1,5 @@
 import { apiClient } from './client'
+import type { ApiPermission } from '@/types'
 
 export interface OAuthRequest {
     client_id: string
@@ -10,7 +11,7 @@ export interface OAuthRequest {
 
 export interface OAuthConsentInfo {
     client_name: string
-    /** The parts of a space the app can read, as in API token permissions. */
+    /** The parts of a space the app can be given (it only reads them), as in API token permissions. */
     resources: string[]
     spaces: Array<{ id: number; name: string; role: string }>
 }
@@ -26,13 +27,19 @@ export const oauthApi = {
     },
 
     /** Records the decision; returns where to send the browser (the app's redirect URI).
-     * An approval names the spaces the app may read. */
-    decide: async (request: OAuthRequest, approve: boolean, spaces: { all: boolean; ids: number[] }): Promise<string> => {
+     * An approval names the spaces the app may reach and what it may do there. */
+    decide: async (
+        request: OAuthRequest,
+        approve: boolean,
+        spaces: { all: boolean; ids: number[] },
+        permissions: ApiPermission[],
+    ): Promise<string> => {
         const { data } = await apiClient.post('/oauth/authorize', {
             ...request,
             approve,
             all_spaces: spaces.all,
             space_ids: spaces.ids,
+            permissions,
         })
         return data.data.redirect_url
     },

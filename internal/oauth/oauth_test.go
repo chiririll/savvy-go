@@ -372,3 +372,48 @@ func TestRemoveRevokesTheAppsTokens(t *testing.T) {
 		t.Fatal("removing twice must report false")
 	}
 }
+
+func TestChosenPermissionsReachTheTokenAndSurviveRefresh(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	id := e.client(t)
+	code, err := e.svc.IssueCode(ctx, oauth.CodeRequest{
+		ClientID: id, RedirectURI: redirect, CodeChallenge: challenge(vOK), CodeChallengeMethod: "S256", User: e.user,
+		AllSpaces: true, Permissions: []string{"transactions:read", "accounts:read"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts, err := e.svc.Exchange(ctx, id, code, vOK, redirect)
+	if err != nil {
+		t.Fatal(err)
+	}
+	check := func(raw string) {
+		t.Helper()
+		tok, err := e.tok.Resolve(ctx, raw)
+		if err != nil || tok == nil {
+			t.Fatalf("token does not resolve: %v %v", tok, err)
+		}
+		if !tok.Allows("transactions", auth.PermRead) || !tok.Allows("accounts", auth.PermRead) || tok.Allows("budgets", auth.PermRead) {
+			t.Fatalf("permissions = %v", tok.Permissions)
+		}
+	}
+	check(ts.AccessToken)
+	next, err := e.svc.Refresh(ctx, id, ts.RefreshToken)
+	if err != nil {
+		t.Fatal(err)
+	}
+	check(next.AccessToken)
+}
+
+func TestAppsCannotBeGivenMoreThanReading(t *testing.T) {
+	e := newEnv(t)
+	id := e.client(t)
+	for _, perms := range [][]string{{"transactions:write"}, {"transfers:read"}, {"nonsense"}} {
+		_, err := e.svc.IssueCode(context.Background(), oauth.CodeRequest{
+			ClientID: id, RedirectURI: redirect, CodeChallenge: challenge(vOK), CodeChallengeMethod: "S256", User: e.user,
+			AllSpaces: true, Permissions: perms,
+		})
+		wantCode(t, err, "invalid_request")
+	}
+}

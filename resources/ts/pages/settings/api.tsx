@@ -30,17 +30,13 @@ import {
 } from '@/components/ui/alert-dialog'
 import { useApiTokens, useCreateApiToken, useRevokeApiToken, useSpaces } from '@/hooks'
 import { SyncWarning } from '@/components/features/api-tokens/SyncWarning'
-import { PermissionGrid } from '@/components/features/api-tokens/PermissionGrid'
+import { PermissionPicker } from '@/components/features/api-tokens/PermissionPicker'
 import { SpacePicker, hasSpaces, type SpaceChoice } from '@/components/features/api-tokens/SpacePicker'
 import { intlLocale } from '@/lib/i18n'
-import { API_RESOURCES, API_TOKEN_PRESETS, permissionLevel, type ApiPermission, type ApiResource, type ApiTokenPreset, type ApiTokenSummary } from '@/types'
-import { Checkbox } from '@/components/ui/checkbox'
-import { apiPresetHint, apiPresetLabel, apiResourceLabel } from '@/lib/labels'
+import { API_RESOURCES, permissionLevel, presetPermissions, type ApiPermission, type ApiResource, type ApiTokenSummary } from '@/types'
+import { apiResourceLabel } from '@/lib/labels'
 
 type Expiry = 'never' | '30' | '90' | '365'
-
-/** How a new token's permissions are chosen: a preset, or resource by resource. */
-type AccessMode = ApiTokenPreset | 'custom'
 
 /** What a token holds, as lists of resources by their highest level. */
 function grantedResources(token: ApiTokenSummary): { read: ApiResource[]; write: ApiResource[]; remove: ApiResource[] } {
@@ -91,9 +87,7 @@ export default function ApiSettingsPage() {
 
     const [showCreate, setShowCreate] = useState(false)
     const [name, setName] = useState('')
-    const [mode, setMode] = useState<AccessMode>('viewer')
-    const [allowDelete, setAllowDelete] = useState(false)
-    const [permissions, setPermissions] = useState<ApiPermission[]>([])
+    const [permissions, setPermissions] = useState<ApiPermission[]>(() => presetPermissions('viewer'))
     const [spaceChoice, setSpaceChoice] = useState<SpaceChoice>({ all: false, ids: [] })
     const [expiry, setExpiry] = useState<Expiry>('never')
     const [createdToken, setCreatedToken] = useState<string | null>(null)
@@ -101,18 +95,15 @@ export default function ApiSettingsPage() {
 
     // Categories and tags are mirrored between spaces of a sync group, so only a
     // token that can change them needs the warning.
-    const changesSynced =
-        mode === 'admin' ||
-        (mode === 'custom' &&
-            (['categories', 'tags'] as const).some((r) => ['write', 'delete'].includes(permissionLevel(permissions, r) ?? '')))
+    const changesSynced = (['categories', 'tags'] as const).some((r) =>
+        ['write', 'delete'].includes(permissionLevel(permissions, r) ?? ''),
+    )
 
     const formatDate = (value: string) => new Date(value).toLocaleDateString(intlLocale())
 
     const resetForm = () => {
         setName('')
-        setMode('viewer')
-        setAllowDelete(false)
-        setPermissions([])
+        setPermissions(presetPermissions('viewer'))
         setSpaceChoice({ all: false, ids: [] })
         setExpiry('never')
     }
@@ -121,7 +112,7 @@ export default function ApiSettingsPage() {
         try {
             const created = await createToken.mutateAsync({
                 name: name.trim(),
-                ...(mode === 'custom' ? { permissions } : { preset: mode, allow_delete: mode === 'editor' && allowDelete }),
+                permissions,
                 all_spaces: spaceChoice.all,
                 space_ids: spaceChoice.ids,
                 expires_at: expiryToIso(expiry),
@@ -286,33 +277,7 @@ export default function ApiSettingsPage() {
                     {changesSynced && <SyncWarning spaces={spaces} choice={spaceChoice} />}
                     <div className="space-y-2">
                         <Label>{t('api.create.permissions')}</Label>
-                        <Select value={mode} onValueChange={(v) => setMode(v as AccessMode)}>
-                            <SelectTrigger className="w-full">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {API_TOKEN_PRESETS.map((preset) => (
-                                    <SelectItem key={preset} value={preset}>
-                                        {apiPresetLabel(t, preset)}
-                                    </SelectItem>
-                                ))}
-                                <SelectItem value="custom">{apiPresetLabel(t, 'custom')}</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <p className="text-xs text-muted-foreground">{apiPresetHint(t, mode)}</p>
-                        {mode === 'editor' && (
-                            <div className="flex items-center gap-2">
-                                <Checkbox
-                                    id="token-allow-delete"
-                                    checked={allowDelete}
-                                    onCheckedChange={(on) => setAllowDelete(on === true)}
-                                />
-                                <Label htmlFor="token-allow-delete" className="font-normal">
-                                    {t('api.create.allowDelete')}
-                                </Label>
-                            </div>
-                        )}
-                        {mode === 'custom' && <PermissionGrid value={permissions} onChange={setPermissions} />}
+                        <PermissionPicker value={permissions} onChange={setPermissions} />
                         <p className="text-xs text-muted-foreground">{t('api.create.permissionsHint')}</p>
                     </div>
                     <div className="space-y-2">

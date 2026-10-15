@@ -20,7 +20,7 @@ A new app can only register itself while an administrator has opened the window 
 
 ## Registered apps
 
-Opening the window is the administrator's approval of a new app. After that, each user decides for themselves on the consent page: pressing **Allow access** gives the app that user's own read-only access to the spaces they chose, nothing more. The app registers once and every user can connect it.
+Opening the window is the administrator's approval of a new app. After that, each user decides for themselves on the consent page: pressing **Allow access** gives the app that user's own read-only access to the spaces they chose, nothing more. The page offers the same permission tabs as API tokens (Viewer, or Custom to read only some parts of a space); an app can never be given more than reading. The app registers once and every user can connect it.
 
 **Administration → Security → Registered apps** always lists every registered app with what the server saw when it registered, so you can tell whether it is the one you expected:
 

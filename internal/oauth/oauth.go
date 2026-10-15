@@ -14,8 +14,10 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -73,6 +75,9 @@ type CodeRequest struct {
 	// Spaces the user let the app read: every space, or just these.
 	AllSpaces bool
 	SpaceIDs  []int64
+	// Permissions the user chose, read grants on auth.MCPResources. Empty means
+	// all of them.
+	Permissions []string
 }
 
 type codeEntry struct {
@@ -82,11 +87,12 @@ type codeEntry struct {
 	expires                          time.Time
 }
 
-// spaceGrant is which spaces a connection reaches. It is fixed when the user
+// spaceGrant is which spaces a connection reaches and what it may do there. It is fixed when the user
 // approves and carried through every refresh.
 type spaceGrant struct {
-	all bool
-	ids []int64
+	all   bool
+	ids   []int64
+	perms []string
 }
 
 // Service is shared by all requests: authorization codes are short-lived and
@@ -264,6 +270,10 @@ func (s *Service) IssueCode(ctx context.Context, req CodeRequest) (string, error
 	if !req.AllSpaces && len(req.SpaceIDs) == 0 {
 		return "", fail("invalid_request", "Choose at least one space.")
 	}
+	perms, err := mcpPermissions(req.Permissions)
+	if err != nil {
+		return "", fail("invalid_request", err.Error())
+	}
 	now := s.Now()
 	code := auth.RandomString(48)
 	s.mu.Lock()
@@ -275,7 +285,7 @@ func (s *Service) IssueCode(ctx context.Context, req CodeRequest) (string, error
 	}
 	s.codes[auth.HashToken(code)] = codeEntry{
 		clientID: req.ClientID, redirectURI: req.RedirectURI, challenge: req.CodeChallenge, user: req.User,
-		spaces: spaceGrant{all: req.AllSpaces, ids: req.SpaceIDs}, expires: now.Add(codeTTL),
+		spaces: spaceGrant{all: req.AllSpaces, ids: req.SpaceIDs, perms: perms}, expires: now.Add(codeTTL),
 	}
 	return code, nil
 }
@@ -355,7 +365,7 @@ func (s *Service) Refresh(ctx context.Context, clientID, refreshToken string) (*
 	if prev == nil {
 		return nil, bad
 	}
-	access, tokenID, err := s.issueAccess(ctx, user, c, spaceGrant{all: prev.AllSpaces, ids: prev.SpaceIDs})
+	access, tokenID, err := s.issueAccess(ctx, user, c, spaceGrant{all: prev.AllSpaces, ids: prev.SpaceIDs, perms: prev.Permissions})
 	if errors.Is(err, auth.ErrBadGrant) {
 		// Every space the connection could reach is gone.
 		return nil, bad
@@ -390,11 +400,30 @@ func (s *Service) accessToken(ctx context.Context, userID, id int64) (*auth.APIT
 	return nil, nil
 }
 
-// issueAccess creates the API token an MCP client calls with: read access to
-// what the MCP tools show, in the spaces the user chose, and nothing else.
+// mcpPermissions checks what the user let an app do: read grants on the
+// resources the MCP tools show, nothing else. None given means all of them.
+func mcpPermissions(in []string) ([]string, error) {
+	if len(in) == 0 {
+		return auth.ReadPerms(auth.MCPResources...), nil
+	}
+	perms, err := auth.NormalizePermissions(in)
+	if err != nil {
+		return nil, err
+	}
+	for _, p := range perms {
+		resource, level, _ := strings.Cut(p, ":")
+		if level != auth.PermRead || !slices.Contains(auth.MCPResources, resource) {
+			return nil, fmt.Errorf("an app can only read accounts, budgets, categories, currencies, debts, reports, tags and transactions, not %q", p)
+		}
+	}
+	return perms, nil
+}
+
+// issueAccess creates the API token an MCP client calls with: the read access
+// the user chose, in the spaces they chose, and nothing else.
 func (s *Service) issueAccess(ctx context.Context, user *auth.User, c *Client, spaces spaceGrant) (raw string, id int64, err error) {
 	exp := s.Now().Add(AccessTTL)
-	grant := auth.Grant{Permissions: auth.ReadPerms(auth.MCPResources...), AllSpaces: spaces.all, SpaceIDs: spaces.ids}
+	grant := auth.Grant{Permissions: spaces.perms, AllSpaces: spaces.all, SpaceIDs: spaces.ids}
 	raw, tok, err := s.Tokens.Issue(ctx, user, "MCP: "+c.Name, grant, &exp)
 	if errors.Is(err, auth.ErrTokenLimit) {
 		return "", 0, fail("server_error", "Too many API tokens: revoke some in Settings, then connect again.")

@@ -2,13 +2,15 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Check, Loader2, X } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Logo } from '@/components/shared/Logo'
 import { oauthApi, type OAuthRequest } from '@/api/oauth'
 import { SpacePicker, hasSpaces, type SpaceChoice } from '@/components/features/api-tokens/SpacePicker'
+import { PermissionPicker } from '@/components/features/api-tokens/PermissionPicker'
+import { presetPermissions, type ApiPermission, type ApiResource } from '@/types'
 import { useUser } from '@/stores/auth'
 import { getApiErrorMessage } from '@/lib/api-error'
 
@@ -21,6 +23,8 @@ export default function OAuthConsentPage() {
     const [done, setDone] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [spaceChoice, setSpaceChoice] = useState<SpaceChoice>({ all: false, ids: [] })
+    // Until the user changes it, the app gets read access to everything it can show.
+    const [chosen, setChosen] = useState<ApiPermission[] | null>(null)
 
     const request = useMemo<OAuthRequest | null>(() => {
         const get = (key: string) => params.get(key) ?? ''
@@ -41,6 +45,9 @@ export default function OAuthConsentPage() {
         retry: false,
     })
 
+    const resources = (info?.resources ?? []) as ApiResource[]
+    const permissions = chosen ?? presetPermissions('viewer', resources)
+
     const host = (() => {
         try {
             return new URL(request?.redirect_uri ?? '').host
@@ -56,7 +63,7 @@ export default function OAuthConsentPage() {
         setBusy(approve ? 'allow' : 'deny')
         setError(null)
         try {
-            const url = await oauthApi.decide(request, approve, spaceChoice)
+            const url = await oauthApi.decide(request, approve, spaceChoice, permissions)
             setDone(true)
             window.location.assign(url)
         } catch (e) {
@@ -79,7 +86,7 @@ export default function OAuthConsentPage() {
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-background p-4">
-            <Card className="w-full max-w-md">
+            <Card className="w-full max-w-lg">
                 {request !== null && isPending ? (
                     <CardContent className="flex justify-center py-12">
                         <Loader2 className="size-8 animate-spin text-muted-foreground" />
@@ -91,35 +98,14 @@ export default function OAuthConsentPage() {
                 ) : (
                     <>
                         {header(t('oauth.title', { client }), t('oauth.description', { client }))}
-                        <CardContent className="space-y-4 text-sm">
-                            <div>
-                                <p className="font-medium mb-1">{t('oauth.canTitle')}</p>
-                                <ul className="space-y-1 text-muted-foreground">
-                                    <li className="flex gap-2">
-                                        <Check className="size-4 mt-0.5 shrink-0 text-primary" />
-                                        {t('oauth.can1')}
-                                    </li>
-                                    <li className="flex gap-2">
-                                        <Check className="size-4 mt-0.5 shrink-0 text-primary" />
-                                        {t('oauth.can2')}
-                                    </li>
-                                </ul>
+                        <CardContent className="space-y-5 text-sm">
+                            <div className="space-y-2">
+                                <p className="font-medium">{t('oauth.canTitle')}</p>
+                                <PermissionPicker value={permissions} onChange={setChosen} resources={resources} maxLevel="read" />
+                                <p className="text-xs text-muted-foreground">{t('oauth.cannot')}</p>
                             </div>
                             <div>
-                                <p className="font-medium mb-1">{t('oauth.cannotTitle')}</p>
-                                <ul className="space-y-1 text-muted-foreground">
-                                    <li className="flex gap-2">
-                                        <X className="size-4 mt-0.5 shrink-0 text-destructive" />
-                                        {t('oauth.cannot1')}
-                                    </li>
-                                    <li className="flex gap-2">
-                                        <X className="size-4 mt-0.5 shrink-0 text-destructive" />
-                                        {t('oauth.cannot2')}
-                                    </li>
-                                </ul>
-                            </div>
-                            <div>
-                                <p className="font-medium mb-1">{t('oauth.spacesTitle')}</p>
+                                <p className="font-medium mb-2">{t('oauth.spacesTitle')}</p>
                                 <SpacePicker
                                     idPrefix="oauth-space"
                                     spaces={info?.spaces ?? []}
@@ -144,7 +130,7 @@ export default function OAuthConsentPage() {
                                 {busy === 'deny' && <Loader2 className="size-4 animate-spin" />}
                                 {t('oauth.deny')}
                             </Button>
-                            <Button className="flex-1" disabled={busy !== null || !hasSpaces(spaceChoice)} onClick={() => decide(true)}>
+                            <Button className="flex-1" disabled={busy !== null || !hasSpaces(spaceChoice) || permissions.length === 0} onClick={() => decide(true)}>
                                 {busy === 'allow' && <Loader2 className="size-4 animate-spin" />}
                                 {t('oauth.allow')}
                             </Button>

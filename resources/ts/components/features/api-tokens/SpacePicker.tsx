@@ -28,7 +28,7 @@ export function SpacePicker({
         onChange({ all: false, ids: on ? [...value.ids, id] : value.ids.filter((x) => x !== id) })
 
     return (
-        <div className="space-y-2">
+        <div className="space-y-4">
             <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border p-2">
                 {spaces.map((space) => (
                     <div key={space.id} className="flex items-center gap-2 px-1 py-1">

@@ -428,8 +428,7 @@
             "spaces": "Spaces",
             "spacesHint": "The token cannot see any other space.",
             "permissions": "What it may do",
-            "permissionsHint": "Grant only what the app needs. It can never do more than your own role in a space allows.",
-            "allowDelete": "Allow deleting transactions"
+            "permissionsHint": "Grant only what the app needs. It can never do more than your own role in a space allows."
         },
         "created": {
             "title": "Copy your token",
@@ -437,11 +436,10 @@
             "copy": "Copy token",
             "done": "Done"
         },
-        "level": {
-            "none": "No access",
+        "column": {
             "read": "Read",
-            "write": "Read & write",
-            "delete": "Read, write & delete"
+            "write": "Write",
+            "delete": "Delete"
         },
         "resource": {
             "accounts": "Accounts",
