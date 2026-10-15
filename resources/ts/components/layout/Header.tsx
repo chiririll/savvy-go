@@ -1,6 +1,7 @@
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Separator } from '@/components/ui/separator'
-import { LanguageSwitcher, ThemeSwitcher } from '@/components/shared'
+import { LanguageSwitcher } from '@/components/shared/LanguageSwitcher'
+import { ThemeSwitcher } from '@/components/shared/ThemeSwitcher'
 import { CreateTransactionMenu } from './header/CreateTransactionMenu'
 import { HeaderBalance } from './header/HeaderBalance'
 import { UserMenu } from './header/UserMenu'

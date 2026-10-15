@@ -1,9 +1,14 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react'
+import { createContext, lazy, Suspense, useCallback, useContext, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useCreateTransaction, useSendTransfer, useUpdateTransaction } from '@/hooks'
-import { TransactionFormValues } from '@/schemas'
-import { Transaction } from '@/types'
-import { TransactionFormDialog, toSpaceTransferInput } from './TransactionFormDialog'
+import type { TransactionFormValues } from '@/schemas'
+import type { Transaction } from '@/types'
+import { toSpaceTransferInput } from './space-transfer-input'
+
+// The form pulls in zod, react-hook-form and most shared inputs; keep it out of the entry chunk.
+const TransactionFormDialog = lazy(() =>
+    import('./TransactionFormDialog').then((m) => ({ default: m.TransactionFormDialog }))
+)
 
 export type CreateTransactionDefaults = Partial<TransactionFormValues>
 
@@ -21,12 +26,14 @@ export function CreateTransactionProvider({ children }: { children: React.ReactN
     const updateTransaction = useUpdateTransaction()
     const sendTransfer = useSendTransfer()
     const [open, setOpen] = useState(false)
+    const [mounted, setMounted] = useState(false)
     const [defaults, setDefaults] = useState<CreateTransactionDefaults>()
     const [transaction, setTransaction] = useState<Transaction | null>(null)
 
     const openCreate = useCallback((next?: CreateTransactionDefaults) => {
         setTransaction(null)
         setDefaults(next)
+        setMounted(true)
         setOpen(true)
     }, [])
 
@@ -37,6 +44,7 @@ export function CreateTransactionProvider({ children }: { children: React.ReactN
 
         setDefaults(undefined)
         setTransaction(next)
+        setMounted(true)
         setOpen(true)
     }, [])
 
@@ -69,14 +77,18 @@ export function CreateTransactionProvider({ children }: { children: React.ReactN
     return (
         <TransactionFormContext.Provider value={value}>
             {children}
-            <TransactionFormDialog
-                transaction={transaction}
-                open={open}
-                onOpenChange={setOpen}
-                onSubmit={handleSubmit}
-                isSubmitting={createTransaction.isPending || updateTransaction.isPending || sendTransfer.isPending}
-                defaultValues={defaults}
-            />
+            {mounted && (
+                <Suspense fallback={null}>
+                    <TransactionFormDialog
+                        transaction={transaction}
+                        open={open}
+                        onOpenChange={setOpen}
+                        onSubmit={handleSubmit}
+                        isSubmitting={createTransaction.isPending || updateTransaction.isPending || sendTransfer.isPending}
+                        defaultValues={defaults}
+                    />
+                </Suspense>
+            )}
         </TransactionFormContext.Provider>
     )
 }

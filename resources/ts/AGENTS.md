@@ -14,6 +14,11 @@ npm run build                          # -> public/build; release builds embed i
 - `pages/<name>` route pages. `schemas/` zod form schemas. `types/` backend shapes. `stores/` client state.
 - `locales/{en,ru}/<namespace>.json` strings.
 
+## Bundle
+
+- Code reachable from the entry (`components/layout`, `components/providers`, `app/`) imports from the concrete file, never from the `components/shared` or `features/*` barrels. A barrel pulls dnd-kit, zod and react-hook-form into the entry chunk.
+- Heavy dialogs opened from the layout use `lazy()`.
+
 ## Onboarding
 
 - `pages/onboarding/`: admin and server setup.

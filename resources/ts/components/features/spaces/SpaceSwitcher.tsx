@@ -14,7 +14,7 @@ import {
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar'
 import { pathAfterSwitch, useCurrentSpace, useSpaces, useSwitchSpace } from '@/hooks/use-spaces'
 import { useUser } from '@/stores/auth'
-import { CreateSpaceModal } from './CreateSpaceModal'
+import { LazyCreateSpaceModal } from './LazyCreateSpaceModal'
 import { spaceRoleLabel } from '@/lib/labels'
 
 function initials(name: string) {
@@ -103,7 +103,7 @@ export function SpaceSwitcher() {
                     </DropdownMenu>
                 </SidebarMenuItem>
             </SidebarMenu>
-            <CreateSpaceModal open={creating} onOpenChange={setCreating} />
+            <LazyCreateSpaceModal open={creating} onOpenChange={setCreating} />
         </>
     )
 }

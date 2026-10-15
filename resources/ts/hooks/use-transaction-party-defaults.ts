@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { isTransferType } from '@/schemas/transactions'
+import { isTransferType } from '@/lib/transaction-type'
 import type { Account, Category } from '@/types'
 
 interface TransactionPartyForm {

@@ -11,7 +11,8 @@ import {
 import { Plus, Trash2 } from 'lucide-react'
 import type { Action, ActionType } from '@/types/automation'
 import { ACTION_TYPES } from '@/types/automation'
-import { AccountSelect, CategorySelect, TagSelect } from '@/components/shared'
+import { AccountSelect } from '@/components/shared/AccountSelect'
+import { CategorySelect, TagSelect } from '@/components/shared'
 import { actionTypeLabel } from '@/lib/labels'
 
 interface ActionBuilderProps {

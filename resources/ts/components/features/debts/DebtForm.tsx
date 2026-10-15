@@ -17,8 +17,8 @@ import {
 import { getDebtSchema, DebtFormData } from '@/schemas'
 import { useCurrencies, useAccounts, useFormValuesChange } from '@/hooks'
 import { Banknote, HandCoins } from 'lucide-react'
+import { AccountSelect } from '@/components/shared/AccountSelect'
 import {
-    AccountSelect,
     CurrencyIdField,
     FieldHelp,
     FormDialogFooterStart,

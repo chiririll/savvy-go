@@ -36,17 +36,17 @@ function renderGate() {
 afterEach(cleanup)
 
 describe('a user with no spaces', () => {
-    it('gets the create-space modal, which cannot be dismissed', () => {
+    it('gets the create-space modal, which cannot be dismissed', async () => {
         role = 'user'
         renderGate()
         expect(screen.queryByText('app')).toBeNull()
-        expect(screen.getByRole('dialog').getAttribute('data-dismissible')).toBe('false')
+        expect((await screen.findByRole('dialog')).getAttribute('data-dismissible')).toBe('false')
     })
 
-    it('can open it again from the page', () => {
+    it('can open it again from the page', async () => {
         role = 'user'
         renderGate()
-        fireEvent.click(screen.getByText('close'))
+        fireEvent.click(await screen.findByText('close'))
         expect(screen.queryByRole('dialog')).toBeNull()
         fireEvent.click(screen.getByRole('button', { name: 'spaces.create' }))
         expect(screen.getByRole('dialog')).toBeTruthy()
