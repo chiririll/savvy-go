@@ -1,6 +1,10 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { ChevronRight } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { cn } from '@/lib/utils'
+import { testIdSpoiler } from '@/lib/test-id'
 import {
     API_PERMISSION_LEVELS,
     samePermissions,
@@ -36,6 +40,7 @@ export function PermissionPicker({
     const { t } = useTranslation('settings')
     // Custom was picked on purpose: stay on it even while the rights equal a preset.
     const [pinnedCustom, setPinnedCustom] = useState(false)
+    const [details, setDetails] = useState(false)
 
     const rank = (level: ApiPermissionLevel) => API_PERMISSION_LEVELS.indexOf(level)
     const { resources } = options
@@ -68,15 +73,26 @@ export function PermissionPicker({
                 </TabsList>
             </Tabs>
             <p className="text-xs text-muted-foreground">{apiPresetHint(t, tab)}</p>
-            <PermissionGrid
-                value={value}
-                resources={resources}
-                maxLevel={maxLevel}
-                onChange={(next) => {
-                    setPinnedCustom(false)
-                    onChange(next)
-                }}
-            />
+            <Collapsible open={details} onOpenChange={setDetails} className="space-y-3">
+                <CollapsibleTrigger
+                    className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+                    {...testIdSpoiler()}
+                >
+                    <ChevronRight className={cn('size-3.5 transition-transform', details && 'rotate-90')} />
+                    {t('api.create.permissionsDetails')}
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                    <PermissionGrid
+                        value={value}
+                        resources={resources}
+                        maxLevel={maxLevel}
+                        onChange={(next) => {
+                            setPinnedCustom(false)
+                            onChange(next)
+                        }}
+                    />
+                </CollapsibleContent>
+            </Collapsible>
         </div>
     )
 }

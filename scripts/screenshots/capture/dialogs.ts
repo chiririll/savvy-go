@@ -62,6 +62,20 @@ export async function captureDialogs(page: PwPage, job: Job, pageName: string, d
         state.saved++
         take(id)
         log(job, `  dialog ${name}`)
+        // What is folded in the dialog (data-testid-spoiler) is shot once more, unfolded.
+        const spoilers = page.locator(dialogSelector).first().locator('[data-testid-spoiler][data-state="closed"]')
+        if ((await spoilers.count()) > 0) {
+            try {
+                while ((await spoilers.count()) > 0) await spoilers.first().click({ timeout: 3000 })
+                await page.screenshot({ path: path.join(dialogs, `${name}-unfolded.png`), animations: 'disabled' })
+                state.saved++
+                log(job, `  dialog ${name}-unfolded`)
+                const open = page.locator(dialogSelector).first().locator('[data-testid-spoiler][data-state="open"]')
+                while ((await open.count()) > 0) await open.first().click({ timeout: 3000 })
+            } catch (e) {
+                log(job, `  could not unfold ${name}: ${(e as Error).message.split('\n')[0]}`)
+            }
+        }
         if (state.config.tabs) await captureTabs(page, job, page.locator(dialogSelector).first(), name, dialogs, 'dialog')
         await closeAll()
     }

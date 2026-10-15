@@ -443,6 +443,7 @@
             "spaces": "Spaces",
             "spacesHint": "The token cannot see any other space.",
             "permissions": "What it may do",
+            "permissionsDetails": "Permissions by part of a space",
             "permissionsHint": "Grant only what the app needs. It can never do more than your own role in a space allows."
         },
         "edit": {

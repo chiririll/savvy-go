@@ -13,7 +13,7 @@ export const oauthApp = scenario(
     {
         name: 'auth/oauth-app',
         covers: [pages.oauthConsent.path],
-        shots: ['registration-closed', 'registration-open', 'consent', 'redirected', 'connected'],
+        shots: ['registration-closed', 'registration-open', 'consent', 'consent-permissions', 'redirected', 'connected'],
         leaves: 'the admin in the space "Family Budget", on Security, with one connected app and registration closed again',
     },
     async ({ page, server, run, shot }) => {
@@ -45,6 +45,12 @@ export const oauthApp = scenario(
             await expect(allow).toBeEnabled()
             // The port the app listens on differs every run.
             await shot('consent', { mask: [page.getByText(/127\.0\.0\.1/)] })
+            // The permissions by part of a space are folded; shot again with them unfolded.
+            const spoiler = page.locator('[data-testid-spoiler]')
+            await spoiler.click()
+            await expect(spoiler).toHaveAttribute('data-state', 'open')
+            await shot('consent-permissions', { mask: [page.getByText(/127\.0\.0\.1/)] })
+            await spoiler.click()
 
             await allow.click()
             await expect(page).toHaveURL(/127\.0\.0\.1:\d+\/callback/)
