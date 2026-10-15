@@ -12,6 +12,7 @@
 <p align="center">
 <a href="https://hub.docker.com/r/chiririll/savvy-go"><img src="https://img.shields.io/docker/v/chiririll/savvy-go?style=for-the-badge&logo=docker&logoColor=white" alt="Docker"></a>
 <a href="https://github.com/chiririll/savvy-go/releases/latest"><img src="https://img.shields.io/github/v/release/chiririll/savvy-go?style=for-the-badge&logo=github" alt="Version"></a>
+<img src="https://img.shields.io/badge/99%25-Vibe_Coded-D97757?style=for-the-badge&logo=claude&logoColor=white" alt="99% Vibe Coded">
 <img src="https://img.shields.io/github/license/chiririll/savvy-go?style=for-the-badge" alt="License">
 </p>
 
