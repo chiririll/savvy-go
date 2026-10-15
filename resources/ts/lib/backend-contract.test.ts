@@ -3,7 +3,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { ACCOUNT_TYPES } from '@/types/accounts'
-import { API_PERMISSION_LEVELS, API_RESOURCES, API_TOKEN_PRESETS } from '@/types/api-tokens'
+import { API_PERMISSION_LEVELS } from '@/types/api-tokens'
 import { ACTION_TYPES, CONDITION_OPERATORS, TRIGGER_TYPES } from '@/types/automation'
 import { BACKUP_STATUSES } from '@/types/backup'
 import { BUDGET_PERIODS } from '@/types/budgets'
@@ -93,7 +93,6 @@ describe('enum columns in the database schema', () => {
 describe('frontend value lists', () => {
     const lists: Record<string, readonly string[]> = {
         USER_ROLES,
-        API_RESOURCES,
         API_PERMISSION_LEVELS,
         SPACE_ROLES,
         TRANSFER_REVIEWS,
@@ -204,17 +203,18 @@ describe('API routes', () => {
 describe('API token permissions', () => {
     const source = read('internal/auth/permissions.go')
 
-    it('offers the resources and levels the backend grants', () => {
-        const resources = /var APIResources = \[\]string\{([^}]*)\}/.exec(source)![1]
-        expect(sorted(API_RESOURCES)).toEqual(sorted(quoted(resources)))
-        const presets = [...source.matchAll(/Preset(?:Viewer|Editor|Admin)\s*= "([a-z]+)"/g)].map((m) => m[1])
-        expect(sorted(API_TOKEN_PRESETS)).toEqual(sorted(presets))
+    // The parts of a space and the presets come from the server (api-token-capabilities);
+    // only the order of the levels, which the grid ticks by, lives here.
+    it('orders the levels the backend grants', () => {
         const levels = [...source.matchAll(/Perm(?:Read|Write|Delete)\s*= "([a-z]+)"/g)].map((m) => m[1])
         expect(sorted(API_PERMISSION_LEVELS)).toEqual(sorted(levels))
     })
 
-    it('has a label for every resource', () => {
-        expect(sorted(Object.keys(enSettings.api.resource))).toEqual(sorted(API_RESOURCES))
+    it('has a label for every resource and preset', () => {
+        const resources = /var APIResources = \[\]string\{([^}]*)\}/.exec(source)![1]
+        expect(sorted(Object.keys(enSettings.api.resource))).toEqual(sorted(quoted(resources)))
+        const presets = [...source.matchAll(/Preset(?:Viewer|Editor|Admin)\s*= "([a-z]+)"/g)].map((m) => m[1])
+        expect(sorted(Object.keys(enSettings.api.preset).filter((k) => k !== 'custom'))).toEqual(sorted(presets))
     })
 })
 

@@ -261,7 +261,7 @@ func (r Repo) RevokeOtherSessions(ctx context.Context, userID, keepID int64, now
 
 type APIToken struct {
 	ID, UserID                       int64
-	Name, Prefix                     string
+	Name, Prefix, Kind               string
 	Permissions                      []string
 	AllSpaces                        bool
 	SpaceIDs                         []int64 // only the token's own list; empty when AllSpaces
@@ -271,6 +271,7 @@ type APIToken struct {
 type NewAPIToken struct {
 	UserID             int64
 	Name, Hash, Prefix string
+	Kind               string
 	Permissions        []string
 	AllSpaces          bool
 	SpaceIDs           []int64
@@ -280,8 +281,11 @@ type NewAPIToken struct {
 
 // InsertAPIToken stores the token and its spaces; call it inside a transaction.
 func (r Repo) InsertAPIToken(ctx context.Context, t NewAPIToken) (int64, error) {
+	if t.Kind == "" {
+		t.Kind = "personal"
+	}
 	res, err := r.q().InsertAPIToken(ctx, sqlc.InsertAPITokenParams{
-		UserID: t.UserID, Name: t.Name, TokenHash: t.Hash, Prefix: t.Prefix,
+		UserID: t.UserID, Name: t.Name, TokenHash: t.Hash, Prefix: t.Prefix, Kind: t.Kind,
 		Permissions: strings.Join(t.Permissions, ","), AllSpaces: boolInt(t.AllSpaces),
 		ExpiresAt: db.NullTime(t.ExpiresAt), CreatedAt: db.TimeNS(t.Now), UpdatedAt: db.TimeNS(t.Now),
 	})
@@ -318,7 +322,7 @@ func apiTokenFrom(row sqlc.ApiToken, spaceIDs []int64) APIToken {
 		spaceIDs = []int64{}
 	}
 	return APIToken{
-		ID: row.ID, UserID: row.UserID, Name: row.Name, Prefix: row.Prefix,
+		ID: row.ID, UserID: row.UserID, Name: row.Name, Prefix: row.Prefix, Kind: row.Kind,
 		Permissions: perms, AllSpaces: row.AllSpaces == 1, SpaceIDs: spaceIDs,
 		ExpiresAt: optTime(row.ExpiresAt), LastUsedAt: optTime(row.LastUsedAt), CreatedAt: optTime(row.CreatedAt),
 	}
@@ -362,6 +366,32 @@ func (r Repo) APITokenByHash(ctx context.Context, hash string) (*APIToken, error
 
 func (r Repo) TouchAPIToken(ctx context.Context, id int64, now time.Time) error {
 	return r.q().TouchAPIToken(ctx, sqlc.TouchAPITokenParams{LastUsedAt: db.TimeNS(now), ID: id})
+}
+
+// UpdateAPITokenGrant replaces what the user's token may do and which spaces it
+// reaches, and reports whether they had such a token. Call it inside a
+// transaction: the spaces are rewritten too.
+func (r Repo) UpdateAPITokenGrant(ctx context.Context, userID, id int64, perms []string, allSpaces bool, spaceIDs []int64, now time.Time) (bool, error) {
+	res, err := r.q().UpdateAPITokenGrant(ctx, sqlc.UpdateAPITokenGrantParams{
+		Permissions: strings.Join(perms, ","), AllSpaces: boolInt(allSpaces), UpdatedAt: db.TimeNS(now), ID: id, UserID: userID,
+	})
+	if err != nil {
+		return false, err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return false, nil
+	}
+	if err := r.q().DeleteAPITokenSpaces(ctx, id); err != nil {
+		return false, err
+	}
+	if !allSpaces {
+		for _, sid := range spaceIDs {
+			if err := r.q().InsertAPITokenSpace(ctx, sqlc.InsertAPITokenSpaceParams{ApiTokenID: id, SpaceID: sid}); err != nil {
+				return false, err
+			}
+		}
+	}
+	return true, nil
 }
 
 // DeleteAPIToken reports whether the user had such a token.

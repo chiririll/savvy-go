@@ -45,7 +45,7 @@ Open http://localhost:8080 and create your account. For Docker Compose, reverse 
 - **Backups** — signed backups of each space and of the whole server, restore or import as a new space
 - **Sign-in** — passwords, two-factor (TOTP), passkeys and single sign-on (OIDC)
 - **API** — tokens for scripts and other apps, with an OpenAPI reference
-- **AI assistants (MCP)** — connect Claude or another MCP client to ask about your spending, read-only, with access limited to the spaces you choose
+- **MCP** — connect AI assistant to ask about your spending or let it edit or configure your space
 - **Localization** — support of several languages
 
 <p align="center">
@@ -66,7 +66,7 @@ Fully responsive design built with ShadCN/UI — track expenses from your phone 
 - [Deployment](docs/deployment.md) — Docker Compose, environment, reverse proxies, health checks, Kubernetes, Debian, updating
 - [Data and backups](docs/data-and-backups.md) — the data directory, the signing key, backups and upgrading from the Laravel version
 - [API](docs/api.md) — tokens, endpoints and the OpenAPI reference
-- [AI assistants (MCP)](docs/mcp.md) — connect Claude to your data, read-only
+- [MCP](docs/mcp.md) — connect AI assistant to your data
 - [Development](docs/development.md) — running from source and how the app is built
 
 ## 🔒 Privacy

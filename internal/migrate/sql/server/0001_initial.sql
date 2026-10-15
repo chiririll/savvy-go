@@ -104,6 +104,9 @@ CREATE TABLE IF NOT EXISTS api_tokens (
     name TEXT NOT NULL,
     token_hash TEXT NOT NULL UNIQUE,
     prefix TEXT NOT NULL,
+    -- What the token is for: 'personal' (made in Settings, any part of a space) or
+    -- 'mcp' (an OAuth access token of a connected AI app, only the parts its tools use).
+    kind TEXT NOT NULL DEFAULT 'personal' CHECK (kind IN ('personal', 'mcp')),
     -- Comma-separated "<resource>:<read|write>" grants (internal/auth/permissions.go).
     -- Empty means the token can only list its spaces.
     permissions TEXT NOT NULL DEFAULT '',

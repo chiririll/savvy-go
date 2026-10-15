@@ -44,6 +44,7 @@ type ApiToken struct {
 	Name        string
 	TokenHash   string
 	Prefix      string
+	Kind        string
 	Permissions string
 	AllSpaces   int64
 	ExpiresAt   sql.NullString

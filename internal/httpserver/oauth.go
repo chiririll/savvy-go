@@ -10,7 +10,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"savvy-go/internal/auth"
 	"savvy-go/internal/oauth"
 )
 
@@ -220,7 +219,7 @@ func (s *Server) oauthConsentInfo(w http.ResponseWriter, r *http.Request) {
 		spaceList[i] = map[string]any{"id": x.ID, "name": x.Name, "role": x.Role}
 	}
 	writeData(w, http.StatusOK, map[string]any{
-		"client_name": c.Name, "resources": auth.MCPResources, "spaces": spaceList,
+		"client_name": c.Name, "spaces": spaceList,
 	})
 }
 

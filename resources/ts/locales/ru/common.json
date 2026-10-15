@@ -345,6 +345,8 @@
         "apiToken": {
             "created": "API-токен создан",
             "revoked": "API-токен отозван",
+            "updated": "API-токен обновлён",
+            "updateFailed": "Не удалось обновить API-токен",
             "createFailed": "Не удалось создать API-токен",
             "revokeFailed": "Не удалось отозвать API-токен"
         }

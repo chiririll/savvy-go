@@ -12,7 +12,7 @@ Claude's servers call your instance from the internet, so it must be reachable o
 2. In Claude, open **Settings → Connectors → Add custom connector**, enter `https://your-savvy.example/mcp` and add it.
 3. Claude opens a Go Savvy page that names the app and lists what it may do. Sign in if needed, **choose the spaces** it may read, then press **Allow access**.
 
-Disconnect it in **Settings → User → API**: the connection is listed there as an API token named `MCP: …`. Revoking it cuts the assistant off at once.
+Disconnect it in **Settings → User → API**: the connection is listed there as an API token named `MCP: …`. Revoking it cuts the assistant off at once. To give it more or less without connecting again, see [Changing a connection later](#changing-a-connection-later).
 
 ## Who may register an app
 
@@ -42,7 +42,7 @@ Any MCP client that supports remote servers with OAuth connects the same way. A 
 
 ## What an assistant can see
 
-It acts as you, but only in the spaces you chose on the consent page. A connection is an API token, so in those spaces it can do what your own role there allows, and no more than you ticked. Every other space, including ones you create or join later, does not exist for it. It works with accounts, categories, tags, currencies, transactions, budgets, debts and reports, and cannot see members, settings, links, transfers, recurring transactions or automation. Open **Settings → User → API** to see what a connection holds. Access tokens last an hour and are renewed in the background; a connection that is not used for 30 days ends.
+It acts as you, but only in the spaces you chose on the consent page. A connection is an API token, so in those spaces it can do what your own role there allows, and no more than you ticked. Every other space, including ones you create or join later, does not exist for it. It works with accounts, categories, tags, currencies, transactions, budgets, debts, automation rules and reports, and cannot see members, settings, links, transfers or recurring transactions. Open **Settings → User → API** to see what a connection holds. Access tokens last an hour and are renewed in the background; a connection that is not used for 30 days ends.
 
 | Tool | Returns |
 |------|---------|
@@ -52,6 +52,7 @@ It acts as you, but only in the spaces you chose on the consent page. A connecti
 | `get_transactions_summary` | transaction totals |
 | `list_budgets` | budgets with progress |
 | `list_debts`, `get_debts_summary` | debts and their totals |
+| `list_automation_rules`, `get_automation_rule`, `get_automation_rule_logs` | automation rules and what they did |
 | `get_report` | overview, money flow, expenses by category, cash flow, net worth and the other [reports](api.md) |
 
 Amounts keep their own currency: the assistant is told never to add amounts of different currencies.
@@ -69,10 +70,18 @@ Pick **Editor** or **Admin**, or tick Write and Delete under **Custom**, on the 
 | `create_tag`, `rename_tag` | tags: write | add or rename a tag |
 | `create_currency`, `update_currency`, `set_base_currency` | currencies: write | add a currency, change its rate or the base currency |
 | `create_budget`, `update_budget` | budgets: write | add or change a budget |
+| `create_automation_rule`, `update_automation_rule`, `toggle_automation_rule`, `test_automation_rule` | automation: write | add or change a rule, switch it on or off, try it on a transaction |
+| `delete_automation_rule` | automation: delete | remove a rule |
 | `create_debt`, `update_debt`, `add_debt_payment`, `collect_debt`, `reopen_debt` | debts: write | record a debt, a payment on it, or reopen it |
 | `delete_account`, `delete_category`, `delete_tag`, `delete_currency`, `delete_budget`, `delete_debt` | that part: delete | remove it |
 
-The tools are the same operations as the [API](api.md), made with the connection's token: the same checks, the same errors, the same limits by role. Amounts are exact decimals sent as text, in the currency of the account. Delete tools are marked destructive, so clients such as Claude ask before running them. Changes made by an assistant look like yours in the app; to see what a connection may do or to cut it off, open **Settings → User → API**.
+The tools are the same operations as the [API](api.md), made with the connection's token: the same checks, the same errors, the same limits by role. Amounts are exact decimals sent as text, in the currency of the account. Delete tools are marked destructive, so clients such as Claude ask before running them. Automation rules run by themselves on later transactions (and a rule can move money between accounts), so give automation write access only to an assistant you trust with that. Changes made by an assistant look like yours in the app; to see what a connection may do or to cut it off, open **Settings → User → API**.
+
+## Changing a connection later
+
+You do not have to connect the assistant again to change what it may do. Open **Settings → User → API**, press the pencil next to the `MCP: …` connection, and change the spaces or the permissions. Take something away and it is cut off from it at once; add something and it can use it from its next request, with no new consent screen. A connection can be given only the parts of a space the tools above use.
+
+The assistant is shown only the tools its connection can use: with read access to transactions only, it sees the reading tools for transactions and nothing that writes. After a change it may take a moment, or a reconnect on its side, before an assistant refreshes its list of tools; until then a call it should no longer make fails with an error naming the missing permission.
 
 ## How it works
 

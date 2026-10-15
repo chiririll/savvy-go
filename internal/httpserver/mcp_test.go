@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -278,7 +279,7 @@ func TestMCPWriteToolsRecordAndChangeMoney(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("mcp@a.com", "secret1", "admin")
 	sp := a.space.ID
-	perms, err := auth.PresetPermissions(auth.PresetAdmin, true)
+	perms, err := auth.PresetPermissions(auth.PresetAdmin, true, auth.MCPResources)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -319,7 +320,7 @@ func TestMCPWriteToolsRecordAndChangeMoney(t *testing.T) {
 func TestMCPWriteToolsAreMarkedForClients(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("mcp@a.com", "secret1", "admin")
-	tok, _ := a.issueToken(u, "read", nil)
+	tok, _ := a.issueGrant(u, auth.Grant{Permissions: []string{"transactions:delete", "accounts:read"}, AllSpaces: true}, nil)
 	sess := a.mcpSession(tok)
 	list, err := sess.ListTools(context.Background(), nil)
 	if err != nil {
@@ -352,4 +353,86 @@ func idOf(t *testing.T, res *mcp.CallToolResult) int64 {
 		t.Fatalf("no id in %s", resultText(res))
 	}
 	return body.Data.ID
+}
+
+// An assistant is offered only the tools its token can use, so it does not try
+// what would fail. Calling one anyway still gets the REST error.
+func TestMCPListsOnlyTheToolsTheTokenCanUse(t *testing.T) {
+	a := newTestApp(t)
+	u := a.createUser("mcp@a.com", "secret1", "admin")
+	names := func(perms ...string) []string {
+		tok, _ := a.issueGrant(u, auth.Grant{Permissions: perms, AllSpaces: true}, nil)
+		list, err := a.mcpSession(tok).ListTools(context.Background(), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out []string
+		for _, tl := range list.Tools {
+			out = append(out, tl.Name)
+		}
+		return out
+	}
+	has := func(list []string, name string) bool { return slices.Contains(list, name) }
+
+	viewer := names("accounts:read", "transactions:read")
+	if !has(viewer, "list_spaces") || !has(viewer, "list_accounts") || !has(viewer, "get_transaction") {
+		t.Fatalf("a reader is missing its tools: %v", viewer)
+	}
+	for _, hidden := range []string{"list_tags", "get_report", "create_transaction", "delete_transaction", "create_account"} {
+		if has(viewer, hidden) {
+			t.Errorf("%s is offered to a token that cannot use it: %v", hidden, viewer)
+		}
+	}
+
+	editor := names("accounts:read", "transactions:write")
+	if !has(editor, "create_transaction") || !has(editor, "update_transaction") || has(editor, "delete_transaction") || has(editor, "create_account") {
+		t.Fatalf("write without delete: %v", editor)
+	}
+	if all := names("transactions:delete"); !has(all, "delete_transaction") {
+		t.Fatalf("delete is missing: %v", all)
+	}
+}
+
+func TestMCPAutomationRules(t *testing.T) {
+	a := newTestApp(t)
+	u := a.createUser("mcp@a.com", "secret1", "admin")
+	sp := a.space.ID
+	perms, err := auth.PresetPermissions(auth.PresetAdmin, true, auth.MCPResources)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tok, _ := a.issueGrant(u, auth.Grant{Permissions: perms, AllSpaces: true}, nil)
+	s := a.mcpSession(tok)
+
+	res := a.call(s, "create_automation_rule", map[string]any{
+		"space_id": sp, "name": "Coffee", "trigger_type": "on_transaction_create",
+		"conditions": map[string]any{"match": "all", "conditions": []any{map[string]any{"field": "description", "op": "contains", "value": "coffee"}}},
+		"actions":    []any{map[string]any{"type": "set_description", "value": "Coffee"}},
+	})
+	if res.IsError {
+		t.Fatalf("create_automation_rule: %s", resultText(res))
+	}
+	id := idOf(t, res)
+
+	if res = a.call(s, "list_automation_rules", map[string]any{"space_id": sp}); res.IsError || !strings.Contains(resultText(res), "Coffee") {
+		t.Fatalf("list_automation_rules: %v %s", res.IsError, resultText(res))
+	}
+	if res = a.call(s, "toggle_automation_rule", map[string]any{"space_id": sp, "id": id}); res.IsError {
+		t.Fatalf("toggle_automation_rule: %s", resultText(res))
+	}
+	if res = a.call(s, "get_automation_rule_logs", map[string]any{"space_id": sp, "id": id}); res.IsError {
+		t.Fatalf("get_automation_rule_logs: %s", resultText(res))
+	}
+	if res = a.call(s, "delete_automation_rule", map[string]any{"space_id": sp, "id": id}); res.IsError {
+		t.Fatalf("delete_automation_rule: %s", resultText(res))
+	}
+
+	// Rules are their own part of a space: tokens for transactions do not see them.
+	narrow, _ := a.issueGrant(u, auth.Grant{Permissions: []string{"transactions:write"}, AllSpaces: true}, nil)
+	list, _ := a.mcpSession(narrow).ListTools(context.Background(), nil)
+	for _, tl := range list.Tools {
+		if strings.Contains(tl.Name, "automation") {
+			t.Errorf("%s is offered without automation access", tl.Name)
+		}
+	}
 }

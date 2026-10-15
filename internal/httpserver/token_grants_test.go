@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -149,9 +150,6 @@ func TestOAuthConsentChoosesTheSpaces(t *testing.T) {
 	if spaces, _ := info["spaces"].([]any); len(spaces) != 2 {
 		t.Fatalf("consent lists spaces %v", info["spaces"])
 	}
-	if res, _ := info["resources"].([]any); len(res) != len(auth.MCPResources) {
-		t.Fatalf("consent lists resources %v", info["resources"])
-	}
 
 	decide := func(body map[string]any) *http.Response {
 		body["client_id"], body["redirect_uri"], body["state"] = id, oauthRedirect, "st-1"
@@ -193,5 +191,101 @@ func TestOAuthConsentChoosesTheSpaces(t *testing.T) {
 	items := decodeJSON(t, a.do("GET", "/api/auth/api-tokens", nil, sess.Token, ""))["data"].([]any)
 	if len(items) != 1 || strings.Contains(fmt.Sprint(items[0].(map[string]any)["permissions"]), "write") || items[0].(map[string]any)["all_spaces"] != false {
 		t.Fatalf("connection token = %v", items)
+	}
+}
+
+// A token's rights can be changed later without issuing a new one: the app
+// that holds it keeps its secret and sees the change on its next request.
+func TestAPITokenGrantCanBeEditedInPlace(t *testing.T) {
+	a := newTestApp(t)
+	u := a.createUser("edit@a.com", "secret1", "admin")
+	sess := a.issue(u, false)
+	raw, tok := a.issueGrant(u, auth.Grant{Permissions: []string{"tags:write", "accounts:read"}, AllSpaces: true}, nil)
+	patch := func(body map[string]any) *http.Response {
+		return a.do("PATCH", "/api/auth/api-tokens/"+strconv.FormatInt(tok.ID, 10), body, sess.Token, sess.CSRF)
+	}
+
+	status(t, a.bearer("POST", "/api/tags", map[string]any{"name": "one"}, raw), http.StatusCreated, "before")
+
+	status(t, patch(map[string]any{"permissions": []string{"tags:read"}, "all_spaces": true}), http.StatusOK, "narrow")
+	status(t, a.bearer("POST", "/api/tags", map[string]any{"name": "two"}, raw), http.StatusForbidden, "write after narrowing")
+	status(t, a.bearer("GET", "/api/accounts", nil, raw), http.StatusForbidden, "a dropped resource")
+	status(t, a.bearer("GET", "/api/tags", nil, raw), http.StatusOK, "read after narrowing")
+
+	status(t, patch(map[string]any{"permissions": []string{"tags:write"}, "space_ids": []int64{a.space.ID}}), http.StatusOK, "expand")
+	status(t, a.bearer("POST", "/api/tags", map[string]any{"name": "three"}, raw), http.StatusCreated, "write after expanding")
+
+	// The edit is checked like a new token.
+	status(t, patch(map[string]any{"permissions": []string{"nonsense"}, "all_spaces": true}), http.StatusUnprocessableEntity, "unknown permission")
+	status(t, patch(map[string]any{"permissions": []string{"tags:read"}}), http.StatusUnprocessableEntity, "no spaces")
+
+	// Not another user's token, and not with a token.
+	other := a.createUser("other@a.com", "secret1", "admin")
+	os := a.issue(other, false)
+	status(t, a.do("PATCH", "/api/auth/api-tokens/"+strconv.FormatInt(tok.ID, 10), map[string]any{"permissions": []string{"tags:read"}, "all_spaces": true}, os.Token, os.CSRF), http.StatusNotFound, "someone else's token")
+	status(t, a.bearer("PATCH", "/api/auth/api-tokens/"+strconv.FormatInt(tok.ID, 10), map[string]any{"permissions": []string{"tags:delete"}, "all_spaces": true}, raw), http.StatusForbidden, "a token cannot edit tokens")
+}
+
+// A connected app can be narrowed or widened too, but only over the parts of a
+// space its tools use, and the change survives the hourly refresh.
+func TestConnectedAppGrantCanBeEdited(t *testing.T) {
+	a := newTestApp(t)
+	u := a.createUser("oauth@a.com", "secret1", roleEditor)
+	sess := a.issue(u, false)
+	id := a.registerClient()
+	code := codeFrom(t, a.approve(sess.Token, sess.CSRF, id, true))
+	_, tok := a.token(url.Values{"grant_type": {"authorization_code"}, "client_id": {id}, "code": {code}, "code_verifier": {oauthVerifier}, "redirect_uri": {oauthRedirect}})
+	access := tok["access_token"].(string)
+
+	var tokenID int64
+	list := decodeJSON(t, a.do("GET", "/api/auth/api-tokens", nil, sess.Token, sess.CSRF))["data"].([]any)
+	for _, it := range list {
+		if m := it.(map[string]any); m["kind"] == auth.TokenMCP {
+			tokenID = int64(m["id"].(float64))
+		}
+	}
+	if tokenID == 0 {
+		t.Fatalf("no connection in %v", list)
+	}
+	patch := func(perms ...string) *http.Response {
+		return a.do("PATCH", "/api/auth/api-tokens/"+strconv.FormatInt(tokenID, 10), map[string]any{"permissions": perms, "all_spaces": true}, sess.Token, sess.CSRF)
+	}
+
+	status(t, patch("transfers:write"), http.StatusUnprocessableEntity, "an app cannot get a part its tools do not use")
+	status(t, patch(), http.StatusUnprocessableEntity, "an app needs at least one permission")
+	status(t, patch("tags:write", "accounts:read"), http.StatusOK, "widen")
+	status(t, a.bearer("POST", "/api/tags", map[string]any{"name": "t"}, access), http.StatusCreated, "write after widening")
+	status(t, a.bearer("GET", "/api/transactions", nil, access), http.StatusForbidden, "a dropped part")
+
+	_, next := a.token(url.Values{"grant_type": {"refresh_token"}, "client_id": {id}, "refresh_token": {tok["refresh_token"].(string)}})
+	fresh := next["access_token"].(string)
+	status(t, a.bearer("POST", "/api/tags", map[string]any{"name": "t2"}, fresh), http.StatusCreated, "the edit survives a refresh")
+	status(t, a.bearer("GET", "/api/transactions", nil, fresh), http.StatusForbidden, "narrowing survives a refresh")
+}
+
+// The kind is set by how a token is made, not by its name, and a personal token
+// can never be turned into a connection (or the reverse) by editing.
+func TestTokenKindComesFromHowItWasMade(t *testing.T) {
+	a := newTestApp(t)
+	u := a.createUser("kind@a.com", "secret1", roleEditor)
+	sess := a.issue(u, false)
+
+	res := a.do("POST", "/api/auth/api-tokens", map[string]any{
+		"name": "MCP: looks like an app", "permissions": []string{"transfers:read"}, "all_spaces": true, "kind": "mcp",
+	}, sess.Token, sess.CSRF)
+	if res.StatusCode != http.StatusCreated {
+		t.Fatalf("create = %d", res.StatusCode)
+	}
+	data := decodeJSON(t, res)["data"].(map[string]any)
+	if data["kind"] != auth.TokenPersonal {
+		t.Fatalf("a token made in Settings is personal whatever it is called or asks for: %v", data["kind"])
+	}
+
+	// Only the OAuth flow makes a connection; Issue with that kind holds it to the tools' parts.
+	if _, _, err := a.s.apiTokens.Issue(context.Background(), u, "app", auth.Grant{Kind: auth.TokenMCP, Permissions: []string{"transfers:read"}, AllSpaces: true}, nil); err == nil {
+		t.Fatal("a connection must not be given a part its tools do not use")
+	}
+	if _, _, err := a.s.apiTokens.Issue(context.Background(), u, "app", auth.Grant{Kind: auth.TokenMCP, Permissions: []string{"tags:write"}, AllSpaces: true}, nil); err != nil {
+		t.Fatalf("a connection with a part its tools use: %v", err)
 	}
 }

@@ -406,6 +406,7 @@
             "neverUsed": "Never used",
             "expires": "Expires {{date}}",
             "noExpiry": "No expiration",
+            "editAria": "Change what the token may do",
             "revokeAria": "Revoke token",
             "revokeTitle": "Revoke API token",
             "revokeDescription": "Apps using \"{{name}}\" will immediately lose access.",
@@ -429,6 +430,11 @@
             "spacesHint": "The token cannot see any other space.",
             "permissions": "What it may do",
             "permissionsHint": "Grant only what the app needs. It can never do more than your own role in a space allows."
+        },
+        "edit": {
+            "title": "Change {{name}}",
+            "description": "The app keeps working with the new rights from its next request. Nothing has to be connected again.",
+            "hint": "Taking something away cuts the app off from it at once. It can never do more than your own role in a space allows."
         },
         "created": {
             "title": "Copy your token",

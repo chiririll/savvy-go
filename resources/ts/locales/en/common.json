@@ -345,6 +345,8 @@
         "apiToken": {
             "created": "API token created",
             "revoked": "API token revoked",
+            "updated": "API token updated",
+            "updateFailed": "Failed to update API token",
             "createFailed": "Failed to create API token",
             "revokeFailed": "Failed to revoke API token"
         }

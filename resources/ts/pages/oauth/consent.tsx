@@ -18,9 +18,10 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Logo } from '@/components/shared/Logo'
 import { oauthApi, type OAuthRequest } from '@/api/oauth'
+import { useApiTokenCapabilities } from '@/hooks'
 import { SpacePicker, hasSpaces, type SpaceChoice } from '@/components/features/api-tokens/SpacePicker'
 import { PermissionPicker } from '@/components/features/api-tokens/PermissionPicker'
-import { permissionLevel, presetPermissions, type ApiPermission, type ApiResource } from '@/types'
+import { kindOptions, permissionLevel, type ApiPermission, type ApiResource } from '@/types'
 import { apiResourceLabel } from '@/lib/labels'
 import { useUser } from '@/stores/auth'
 import { getApiErrorMessage } from '@/lib/api-error'
@@ -59,8 +60,11 @@ export default function OAuthConsentPage() {
         retry: false,
     })
 
-    const resources = (info?.resources ?? []) as ApiResource[]
-    const permissions = chosen ?? presetPermissions('viewer', resources)
+    // What a connected app can be given comes from the server; until the user changes it, it gets the lowest preset.
+    const { data: capabilities } = useApiTokenCapabilities()
+    const options = capabilities ? kindOptions(capabilities, 'mcp') : null
+    const resources: ApiResource[] = options?.resources ?? []
+    const permissions = chosen ?? options?.presets[0]?.permissions ?? []
 
     // Changing data is never the default: when the user ticked it, they confirm once more.
     const changes = resources.filter((r) => permissionLevel(permissions, r) !== null && permissionLevel(permissions, r) !== 'read')
@@ -120,7 +124,7 @@ export default function OAuthConsentPage() {
                         <CardContent className="space-y-5 text-sm">
                             <div className="space-y-2">
                                 <p className="font-medium">{t('oauth.canTitle')}</p>
-                                <PermissionPicker value={permissions} onChange={setChosen} resources={resources} />
+                                {options && <PermissionPicker value={permissions} onChange={setChosen} options={options} />}
                                 <p className="text-xs text-muted-foreground">
                                     {changes.length === 0 && `${t('oauth.readOnly')} `}
                                     {t('oauth.cannot')}

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/auth"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	savvyauth "savvy-go/internal/auth"
 	"savvy-go/internal/version"
 )
 
@@ -56,7 +58,13 @@ var mcpReports = map[string]string{
 // mcpHandler serves /mcp. The OAuth metadata URL is read per request because
 // the public URL can change in the admin panel.
 func (s *Server) mcpHandler() http.Handler {
-	h := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return s.mcpServer() }, &mcp.StreamableHTTPOptions{
+	h := mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
+		var perms []string
+		if info := auth.TokenInfoFromContext(r.Context()); info != nil {
+			perms = info.Scopes
+		}
+		return s.mcpServer(perms)
+	}, &mcp.StreamableHTTPOptions{
 		// Stateless: nothing to lose on restart, no session to hijack.
 		Stateless:    true,
 		JSONResponse: true,
@@ -136,9 +144,25 @@ type reportArgs struct {
 	TagIDs      []int64 `json:"tag_ids,omitempty" jsonschema:"Only these tags."`
 }
 
-// mcpServer builds the tool set. It is cheap and holds nothing per user: each
-// call reads the caller's token from its own request.
-func (s *Server) mcpServer() *mcp.Server {
+// mcpNeed is the grant a tool's REST route asks of a token.
+type mcpNeed struct{ resource, level string }
+
+// mcpReadNeeds is the resource each read tool needs; list_spaces needs none.
+var mcpReadNeeds = map[string]string{
+	"list_accounts": "accounts", "list_categories": "categories", "list_tags": "tags", "list_currencies": "currencies",
+	"list_budgets": "budgets", "list_debts": "debts", "get_debts_summary": "debts",
+	"list_transactions": "transactions", "get_transaction": "transactions", "get_transactions_summary": "transactions",
+	"get_report": "reports", "list_automation_rules": "automation", "get_automation_rule": "automation",
+	"get_automation_rule_logs": "automation",
+}
+
+// mcpServer builds the tool set for a token holding perms. It is cheap and
+// holds nothing per user: each call reads the caller's token from its own
+// request. Tools the token has no grant for are left out of the list, so an
+// assistant is not offered what would only fail. This is only a courtesy: a
+// call to one anyway still reaches the REST route, which checks the grant and
+// names the missing permission.
+func (s *Server) mcpServer(perms []string) *mcp.Server {
 	srv := mcp.NewServer(&mcp.Implementation{Name: "go-savvy", Version: version.Value}, &mcp.ServerOptions{Instructions: mcpInstructions})
 	ro := func(title string) *mcp.ToolAnnotations {
 		no := false
@@ -163,6 +187,17 @@ func (s *Server) mcpServer() *mcp.Server {
 	spaceTool("list_debts", "List debts", "List debts: what is owed and to whom, with payment progress.", "/debts")
 	spaceTool("get_debts_summary", "Debts summary", "Totals of the space's debts.", "/debts-summary")
 	spaceTool("get_transactions_summary", "Transactions summary", "Totals of the space's transactions.", "/transactions-summary")
+
+	spaceTool("list_automation_rules", "List automation rules", "List the space's automation rules: what they match, what they do, whether they are active and how often they ran.", "/automation-rules")
+	for name, d := range map[string][3]string{
+		"get_automation_rule":      {"Get automation rule", "Get one automation rule with its conditions and actions.", ""},
+		"get_automation_rule_logs": {"Automation rule log", "What a rule did to which transactions, newest first.", "/logs"},
+	} {
+		mcp.AddTool(srv, &mcp.Tool{Name: name, Description: d[1], Annotations: ro(d[0])},
+			func(ctx context.Context, req *mcp.CallToolRequest, in idArgs) (*mcp.CallToolResult, any, error) {
+				return s.mcpGet(ctx, req, mcpSpacePath(in.SpaceID, "/automation-rules/"+strconv.FormatInt(in.ID, 10)+d[2]), nil), nil, nil
+			})
+	}
 
 	mcp.AddTool(srv, &mcp.Tool{Name: "list_accounts", Description: "List the space's accounts with their currency and current balance.", Annotations: ro("List accounts")},
 		func(ctx context.Context, req *mcp.CallToolRequest, in accountsArgs) (*mcp.CallToolResult, any, error) {
@@ -229,7 +264,23 @@ func (s *Server) mcpServer() *mcp.Server {
 			setIDs(q, "tag_ids", in.TagIDs)
 			return s.mcpGet(ctx, req, mcpSpacePath(in.SpaceID, "/reports/"+route), q), nil, nil
 		})
-	s.addMCPWriteTools(srv)
+	needs := s.addMCPWriteTools(srv)
+	for name, resource := range mcpReadNeeds {
+		needs[name] = mcpNeed{resource, savvyauth.PermRead}
+	}
+	token := &savvyauth.APIToken{Permissions: perms}
+	srv.AddReceivingMiddleware(func(next mcp.MethodHandler) mcp.MethodHandler {
+		return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
+			res, err := next(ctx, method, req)
+			if list, ok := res.(*mcp.ListToolsResult); ok && err == nil {
+				list.Tools = slices.DeleteFunc(list.Tools, func(t *mcp.Tool) bool {
+					n, known := needs[t.Name]
+					return known && !token.Allows(n.resource, n.level)
+				})
+			}
+			return res, err
+		}
+	})
 	return srv
 }
 

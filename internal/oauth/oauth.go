@@ -15,10 +15,8 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/url"
-	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -412,11 +410,8 @@ func mcpPermissions(in []string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, p := range perms {
-		resource, _, _ := strings.Cut(p, ":")
-		if !slices.Contains(auth.MCPResources, resource) {
-			return nil, fmt.Errorf("an app can only be given access to accounts, budgets, categories, currencies, debts, reports, tags and transactions, not %q", p)
-		}
+	if err := auth.CheckKindPermissions(auth.TokenMCP, perms); err != nil {
+		return nil, err
 	}
 	return perms, nil
 }
@@ -425,7 +420,7 @@ func mcpPermissions(in []string) ([]string, error) {
 // the user chose, in the spaces they chose, and nothing else.
 func (s *Service) issueAccess(ctx context.Context, user *auth.User, c *Client, spaces spaceGrant) (raw string, id int64, err error) {
 	exp := s.Now().Add(AccessTTL)
-	grant := auth.Grant{Permissions: spaces.perms, AllSpaces: spaces.all, SpaceIDs: spaces.ids}
+	grant := auth.Grant{Kind: auth.TokenMCP, Permissions: spaces.perms, AllSpaces: spaces.all, SpaceIDs: spaces.ids}
 	raw, tok, err := s.Tokens.Issue(ctx, user, "MCP: "+c.Name, grant, &exp)
 	if errors.Is(err, auth.ErrTokenLimit) {
 		return "", 0, fail("server_error", "Too many API tokens: revoke some in Settings, then connect again.")

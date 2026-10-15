@@ -3,7 +3,7 @@ import { UserSettingsTabs } from '@/components/features/spaces/UserSettingsTabs'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { Check, Copy, ExternalLink, KeyRound, Plus, Trash2 } from 'lucide-react'
+import { Check, Copy, ExternalLink, KeyRound, Pencil, Plus, Trash2 } from 'lucide-react'
 import { Page, PageHeader, FormWrapper, ResponsiveDialog } from '@/components/shared'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -28,12 +28,13 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { useApiTokens, useCreateApiToken, useRevokeApiToken, useSpaces } from '@/hooks'
+import { useApiTokenCapabilities, useApiTokens, useCreateApiToken, useRevokeApiToken, useSpaces } from '@/hooks'
 import { SyncWarning } from '@/components/features/api-tokens/SyncWarning'
 import { PermissionPicker } from '@/components/features/api-tokens/PermissionPicker'
+import { EditTokenDialog } from '@/components/features/api-tokens/EditTokenDialog'
 import { SpacePicker, hasSpaces, type SpaceChoice } from '@/components/features/api-tokens/SpacePicker'
 import { intlLocale } from '@/lib/i18n'
-import { API_RESOURCES, permissionLevel, presetPermissions, type ApiPermission, type ApiResource, type ApiTokenSummary } from '@/types'
+import { kindOptions, permissionLevel, type ApiPermission, type ApiResource, type ApiTokenSummary } from '@/types'
 import { apiResourceLabel } from '@/lib/labels'
 
 type Expiry = 'never' | '30' | '90' | '365'
@@ -43,7 +44,8 @@ function grantedResources(token: ApiTokenSummary): { read: ApiResource[]; write:
     const read: ApiResource[] = []
     const write: ApiResource[] = []
     const remove: ApiResource[] = []
-    for (const resource of API_RESOURCES) {
+    const resources = new Set(token.permissions.map((p) => p.split(':')[0]))
+    for (const resource of resources) {
         const level = permissionLevel(token.permissions, resource)
         if (level === 'delete') remove.push(resource)
         else if (level === 'write') write.push(resource)
@@ -87,11 +89,16 @@ export default function ApiSettingsPage() {
 
     const [showCreate, setShowCreate] = useState(false)
     const [name, setName] = useState('')
-    const [permissions, setPermissions] = useState<ApiPermission[]>(() => presetPermissions('viewer'))
+    const { data: capabilities } = useApiTokenCapabilities()
+    const personal = capabilities ? kindOptions(capabilities, 'personal') : null
+    // Until the user changes it, a new token gets the lowest preset.
+    const [chosen, setChosen] = useState<ApiPermission[] | null>(null)
+    const permissions = chosen ?? personal?.presets[0]?.permissions ?? []
     const [spaceChoice, setSpaceChoice] = useState<SpaceChoice>({ all: false, ids: [] })
     const [expiry, setExpiry] = useState<Expiry>('never')
     const [createdToken, setCreatedToken] = useState<string | null>(null)
     const [copied, setCopied] = useState(false)
+    const [editing, setEditing] = useState<ApiTokenSummary | null>(null)
 
     // Categories and tags are mirrored between spaces of a sync group, so only a
     // token that can change them needs the warning.
@@ -103,7 +110,7 @@ export default function ApiSettingsPage() {
 
     const resetForm = () => {
         setName('')
-        setPermissions(presetPermissions('viewer'))
+        setChosen(null)
         setSpaceChoice({ all: false, ids: [] })
         setExpiry('never')
     }
@@ -195,32 +202,43 @@ export default function ApiSettingsPage() {
                                                     : t('api.tokens.noExpiry')}
                                             </p>
                                         </div>
-                                        <AlertDialog>
-                                            <AlertDialogTrigger asChild>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    disabled={revokeToken.isPending}
-                                                    aria-label={t('api.tokens.revokeAria')}
-                                                >
-                                                    <Trash2 className="size-4" />
-                                                </Button>
-                                            </AlertDialogTrigger>
-                                            <AlertDialogContent>
-                                                <AlertDialogHeader>
-                                                    <AlertDialogTitle>{t('api.tokens.revokeTitle')}</AlertDialogTitle>
-                                                    <AlertDialogDescription>
-                                                        {t('api.tokens.revokeDescription', { name: token.name })}
-                                                    </AlertDialogDescription>
-                                                </AlertDialogHeader>
-                                                <AlertDialogFooter>
-                                                    <AlertDialogCancel>{tCommon('actions.cancel')}</AlertDialogCancel>
-                                                    <AlertDialogAction onClick={() => revokeToken.mutate(token.id)}>
-                                                        {t('api.tokens.revoke')}
-                                                    </AlertDialogAction>
-                                                </AlertDialogFooter>
-                                            </AlertDialogContent>
-                                        </AlertDialog>
+                                        <div className="flex shrink-0 items-center">
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => setEditing(token)}
+                                                aria-label={t('api.tokens.editAria')}
+                                                {...testId(`edit-token-${token.id}`)}
+                                            >
+                                                <Pencil className="size-4" />
+                                            </Button>
+                                            <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        disabled={revokeToken.isPending}
+                                                        aria-label={t('api.tokens.revokeAria')}
+                                                    >
+                                                        <Trash2 className="size-4" />
+                                                    </Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                    <AlertDialogHeader>
+                                                        <AlertDialogTitle>{t('api.tokens.revokeTitle')}</AlertDialogTitle>
+                                                        <AlertDialogDescription>
+                                                            {t('api.tokens.revokeDescription', { name: token.name })}
+                                                        </AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                        <AlertDialogCancel>{tCommon('actions.cancel')}</AlertDialogCancel>
+                                                        <AlertDialogAction onClick={() => revokeToken.mutate(token.id)}>
+                                                            {t('api.tokens.revoke')}
+                                                        </AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -277,7 +295,7 @@ export default function ApiSettingsPage() {
                     {changesSynced && <SyncWarning spaces={spaces} choice={spaceChoice} />}
                     <div className="space-y-2">
                         <Label>{t('api.create.permissions')}</Label>
-                        <PermissionPicker value={permissions} onChange={setPermissions} />
+                        {personal && <PermissionPicker value={permissions} onChange={setChosen} options={personal} />}
                         <p className="text-xs text-muted-foreground">{t('api.create.permissionsHint')}</p>
                     </div>
                     <div className="space-y-2">
@@ -296,6 +314,8 @@ export default function ApiSettingsPage() {
                     </div>
                 </div>
             </ResponsiveDialog>
+
+            {editing && <EditTokenDialog key={editing.id} token={editing} spaces={spaces} onClose={() => setEditing(null)} />}
 
             <ResponsiveDialog
                 open={createdToken !== null}

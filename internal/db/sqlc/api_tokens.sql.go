@@ -23,8 +23,17 @@ func (q *Queries) DeleteAPIToken(ctx context.Context, arg DeleteAPITokenParams) 
 	return q.db.ExecContext(ctx, deleteAPIToken, arg.ID, arg.UserID)
 }
 
+const deleteAPITokenSpaces = `-- name: DeleteAPITokenSpaces :exec
+DELETE FROM api_token_spaces WHERE api_token_id = ?
+`
+
+func (q *Queries) DeleteAPITokenSpaces(ctx context.Context, apiTokenID int64) error {
+	_, err := q.db.ExecContext(ctx, deleteAPITokenSpaces, apiTokenID)
+	return err
+}
+
 const getAPITokenByHash = `-- name: GetAPITokenByHash :one
-SELECT id, user_id, name, token_hash, prefix, permissions, all_spaces, expires_at, last_used_at, created_at, updated_at
+SELECT id, user_id, name, token_hash, prefix, kind, permissions, all_spaces, expires_at, last_used_at, created_at, updated_at
 FROM api_tokens WHERE token_hash = ?
 `
 
@@ -37,6 +46,7 @@ func (q *Queries) GetAPITokenByHash(ctx context.Context, tokenHash string) (ApiT
 		&i.Name,
 		&i.TokenHash,
 		&i.Prefix,
+		&i.Kind,
 		&i.Permissions,
 		&i.AllSpaces,
 		&i.ExpiresAt,
@@ -48,8 +58,8 @@ func (q *Queries) GetAPITokenByHash(ctx context.Context, tokenHash string) (ApiT
 }
 
 const insertAPIToken = `-- name: InsertAPIToken :execresult
-INSERT INTO api_tokens (user_id, name, token_hash, prefix, permissions, all_spaces, expires_at, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO api_tokens (user_id, name, token_hash, prefix, kind, permissions, all_spaces, expires_at, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type InsertAPITokenParams struct {
@@ -57,6 +67,7 @@ type InsertAPITokenParams struct {
 	Name        string
 	TokenHash   string
 	Prefix      string
+	Kind        string
 	Permissions string
 	AllSpaces   int64
 	ExpiresAt   sql.NullString
@@ -70,6 +81,7 @@ func (q *Queries) InsertAPIToken(ctx context.Context, arg InsertAPITokenParams) 
 		arg.Name,
 		arg.TokenHash,
 		arg.Prefix,
+		arg.Kind,
 		arg.Permissions,
 		arg.AllSpaces,
 		arg.ExpiresAt,
@@ -149,7 +161,7 @@ func (q *Queries) ListAPITokenSpacesByUser(ctx context.Context, userID int64) ([
 }
 
 const listAPITokensByUser = `-- name: ListAPITokensByUser :many
-SELECT id, user_id, name, token_hash, prefix, permissions, all_spaces, expires_at, last_used_at, created_at, updated_at
+SELECT id, user_id, name, token_hash, prefix, kind, permissions, all_spaces, expires_at, last_used_at, created_at, updated_at
 FROM api_tokens WHERE user_id = ? ORDER BY id DESC
 `
 
@@ -168,6 +180,7 @@ func (q *Queries) ListAPITokensByUser(ctx context.Context, userID int64) ([]ApiT
 			&i.Name,
 			&i.TokenHash,
 			&i.Prefix,
+			&i.Kind,
 			&i.Permissions,
 			&i.AllSpaces,
 			&i.ExpiresAt,
@@ -200,4 +213,26 @@ type TouchAPITokenParams struct {
 func (q *Queries) TouchAPIToken(ctx context.Context, arg TouchAPITokenParams) error {
 	_, err := q.db.ExecContext(ctx, touchAPIToken, arg.LastUsedAt, arg.ID)
 	return err
+}
+
+const updateAPITokenGrant = `-- name: UpdateAPITokenGrant :execresult
+UPDATE api_tokens SET permissions = ?, all_spaces = ?, updated_at = ? WHERE id = ? AND user_id = ?
+`
+
+type UpdateAPITokenGrantParams struct {
+	Permissions string
+	AllSpaces   int64
+	UpdatedAt   sql.NullString
+	ID          int64
+	UserID      int64
+}
+
+func (q *Queries) UpdateAPITokenGrant(ctx context.Context, arg UpdateAPITokenGrantParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, updateAPITokenGrant,
+		arg.Permissions,
+		arg.AllSpaces,
+		arg.UpdatedAt,
+		arg.ID,
+		arg.UserID,
+	)
 }

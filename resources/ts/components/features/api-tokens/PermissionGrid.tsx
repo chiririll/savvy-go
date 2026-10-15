@@ -3,7 +3,6 @@ import { Eye, Pencil, Trash2, type LucideIcon } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
     API_PERMISSION_LEVELS,
-    API_RESOURCES,
     permissionLevel,
     type ApiPermission,
     type ApiPermissionLevel,
@@ -15,13 +14,13 @@ import { apiResourceLabel } from '@/lib/labels'
 export function PermissionGrid({
     value,
     onChange,
-    resources = API_RESOURCES,
+    resources,
     maxLevel = 'delete',
 }: {
     value: ApiPermission[]
     onChange: (value: ApiPermission[]) => void
-    /** Parts of a space on offer. */
-    resources?: readonly ApiResource[]
+    /** Parts of a space on offer, from the server. */
+    resources: readonly ApiResource[]
     /** Highest level on offer. */
     maxLevel?: ApiPermissionLevel
 }) {

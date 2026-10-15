@@ -76,21 +76,24 @@ export const accountTypeLabelLoose = (t: TFunction, type: string): string =>
         debt: t('pages:accounts.types.debt'),
     }, type)
 
-export const apiPresetLabel = (t: TFunction, preset: ApiTokenPreset | 'custom'): string => ({
-    viewer: t('settings:api.preset.viewer'),
-    editor: t('settings:api.preset.editor'),
-    admin: t('settings:api.preset.admin'),
-    custom: t('settings:api.preset.custom'),
-} satisfies Record<ApiTokenPreset | 'custom', string>)[preset]
+/** Presets and resources come from the server, so an unknown one falls back to its raw name. */
+export const apiPresetLabel = (t: TFunction, preset: ApiTokenPreset | 'custom'): string =>
+    orRaw({
+        viewer: t('settings:api.preset.viewer'),
+        editor: t('settings:api.preset.editor'),
+        admin: t('settings:api.preset.admin'),
+        custom: t('settings:api.preset.custom'),
+    }, preset)
 
-export const apiPresetHint = (t: TFunction, preset: ApiTokenPreset | 'custom'): string => ({
-    viewer: t('settings:api.presetHint.viewer'),
-    editor: t('settings:api.presetHint.editor'),
-    admin: t('settings:api.presetHint.admin'),
-    custom: t('settings:api.presetHint.custom'),
-} satisfies Record<ApiTokenPreset | 'custom', string>)[preset]
+export const apiPresetHint = (t: TFunction, preset: ApiTokenPreset | 'custom'): string =>
+    orRaw({
+        viewer: t('settings:api.presetHint.viewer'),
+        editor: t('settings:api.presetHint.editor'),
+        admin: t('settings:api.presetHint.admin'),
+        custom: t('settings:api.presetHint.custom'),
+    }, preset)
 
-export const apiResourceLabel = (t: TFunction, resource: ApiResource): string => ({
+export const apiResourceLabel = (t: TFunction, resource: ApiResource): string => orRaw({
     accounts: t('settings:api.resource.accounts'),
     automation: t('settings:api.resource.automation'),
     budgets: t('settings:api.resource.budgets'),
@@ -103,7 +106,7 @@ export const apiResourceLabel = (t: TFunction, resource: ApiResource): string =>
     tags: t('settings:api.resource.tags'),
     transactions: t('settings:api.resource.transactions'),
     transfers: t('settings:api.resource.transfers'),
-} satisfies Record<ApiResource, string>)[resource]
+}, resource)
 
 export const ssoErrorLabel = (t: TFunction, code: SsoErrorCode): string => ({
     audience_mismatch: t('auth:sso.errors.audience_mismatch'),

@@ -1,7 +1,10 @@
 package httpserver
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
+	"maps"
 	"net/http"
 	"strconv"
 	"strings"
@@ -50,35 +53,10 @@ func (s *Server) apiTokensStore(w http.ResponseWriter, r *http.Request) {
 	// can list its spaces and nothing else, and it must name its spaces. It
 	// writes only where its owner may too: the request is limited by the
 	// token's permissions and the owner's role in the space.
-	var perms []string
-	var err error
-	switch {
-	case body.Preset != "" && len(body.Permissions) > 0:
-		errs["permissions"] = []string{"Give a preset or a list of permissions, not both."}
-	case body.Preset != "":
-		if perms, err = auth.PresetPermissions(body.Preset, body.AllowDelete); err != nil {
-			errs["preset"] = []string{"The preset must be viewer, editor or admin."}
-		}
-	default:
-		if perms, err = auth.NormalizePermissions(body.Permissions); err != nil {
-			errs["permissions"] = []string{err.Error() + "."}
-		}
-	}
-	var spaceIDs []int64
-	switch {
-	case body.AllSpaces && len(body.SpaceIDs) > 0:
-		errs["space_ids"] = []string{"Choose all spaces or a list of spaces, not both."}
-	case !body.AllSpaces && len(body.SpaceIDs) == 0:
-		errs["space_ids"] = []string{"Choose the spaces this token may reach."}
-	case !body.AllSpaces:
-		for _, id := range body.SpaceIDs {
-			if role, err := s.spaces.Role(r.Context(), id, u.ID); err != nil || role == "" {
-				errs["space_ids"] = []string{"You can only choose spaces you belong to."}
-				break
-			}
-		}
-		spaceIDs = body.SpaceIDs
-	}
+	grant, grantErrs := s.grantFromBody(r.Context(), u, tokenGrantBody{
+		Preset: body.Preset, AllowDelete: body.AllowDelete, Permissions: body.Permissions, AllSpaces: body.AllSpaces, SpaceIDs: body.SpaceIDs,
+	})
+	maps.Copy(errs, grantErrs)
 	var expires *time.Time
 	if body.ExpiresAt != nil && *body.ExpiresAt != "" {
 		t, err := time.Parse(time.RFC3339, *body.ExpiresAt)
@@ -93,7 +71,7 @@ func (s *Server) apiTokensStore(w http.ResponseWriter, r *http.Request) {
 		writeValidation(w, errs)
 		return
 	}
-	raw, tok, err := s.apiTokens.Issue(r.Context(), u, name, auth.Grant{Permissions: perms, AllSpaces: body.AllSpaces, SpaceIDs: spaceIDs}, expires)
+	raw, tok, err := s.apiTokens.Issue(r.Context(), u, name, grant, expires)
 	if err == auth.ErrTokenLimit {
 		writeMessage(w, http.StatusUnprocessableEntity, "You can create at most 50 API tokens.")
 		return
@@ -118,4 +96,119 @@ func (s *Server) apiTokensDestroy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeMessage(w, http.StatusOK, "API token revoked.")
+}
+
+// apiTokenCapabilities says what each kind of token can be given: the parts of
+// a space, and what each preset grants over them. The screens that configure a
+// token offer exactly this and keep no list of their own. Session only, like
+// the rest of token management.
+func (s *Server) apiTokenCapabilities(w http.ResponseWriter, r *http.Request) {
+	kinds := map[string]any{}
+	for _, kind := range []string{auth.TokenPersonal, auth.TokenMCP} {
+		resources := auth.ResourcesFor(kind)
+		presets := map[string][]string{}
+		for _, p := range auth.Presets {
+			perms, err := auth.PresetPermissions(p, false, resources)
+			if err != nil {
+				writeMessage(w, http.StatusInternalServerError, err.Error())
+				return
+			}
+			presets[p] = perms
+		}
+		kinds[kind] = map[string]any{"resources": resources, "presets": presets}
+	}
+	writeData(w, http.StatusOK, map[string]any{"levels": auth.Levels, "presets": auth.Presets, "kinds": kinds})
+}
+
+// tokenGrantBody is the part of a token request that says what it may do: a
+// preset or a list of permissions, and the spaces it reaches.
+type tokenGrantBody struct {
+	Preset      string
+	AllowDelete bool
+	Permissions []string
+	AllSpaces   bool
+	SpaceIDs    []int64
+}
+
+// grantFromBody checks a token request and turns it into a grant, or says what
+// is wrong, by field. A token never gets more than it was asked for: no
+// permissions means it can list its spaces and nothing else, and it must name
+// its spaces, all of which the owner belongs to. It writes only where its owner
+// may too: the request is limited by the token's permissions and the owner's
+// role in the space.
+func (s *Server) grantFromBody(ctx context.Context, u *auth.User, b tokenGrantBody) (auth.Grant, map[string][]string) {
+	errs := map[string][]string{}
+	var perms []string
+	var err error
+	switch {
+	case b.Preset != "" && len(b.Permissions) > 0:
+		errs["permissions"] = []string{"Give a preset or a list of permissions, not both."}
+	case b.Preset != "":
+		if perms, err = auth.PresetPermissions(b.Preset, b.AllowDelete, auth.APIResources); err != nil {
+			errs["preset"] = []string{"The preset must be viewer, editor or admin."}
+		}
+	default:
+		if perms, err = auth.NormalizePermissions(b.Permissions); err != nil {
+			errs["permissions"] = []string{err.Error() + "."}
+		}
+	}
+	var spaceIDs []int64
+	switch {
+	case b.AllSpaces && len(b.SpaceIDs) > 0:
+		errs["space_ids"] = []string{"Choose all spaces or a list of spaces, not both."}
+	case !b.AllSpaces && len(b.SpaceIDs) == 0:
+		errs["space_ids"] = []string{"Choose the spaces this token may reach."}
+	case !b.AllSpaces:
+		for _, id := range b.SpaceIDs {
+			if role, err := s.spaces.Role(ctx, id, u.ID); err != nil || role == "" {
+				errs["space_ids"] = []string{"You can only choose spaces you belong to."}
+				break
+			}
+		}
+		spaceIDs = b.SpaceIDs
+	}
+	return auth.Grant{Permissions: perms, AllSpaces: b.AllSpaces, SpaceIDs: spaceIDs}, errs
+}
+
+// apiTokensUpdate changes what a token may do and which spaces it reaches,
+// without issuing a new one, so a connected app keeps working with less or
+// more. Like creating a token, it needs a real session. A connected AI app can
+// be given only the parts of a space its tools use.
+func (s *Server) apiTokensUpdate(w http.ResponseWriter, r *http.Request) {
+	u := userFrom(r)
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	var body struct {
+		Preset      string   `json:"preset"`
+		AllowDelete bool     `json:"allow_delete"`
+		Permissions []string `json:"permissions"`
+		AllSpaces   bool     `json:"all_spaces"`
+		SpaceIDs    []int64  `json:"space_ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeValidation(w, map[string][]string{"permissions": {"The given data was invalid."}})
+		return
+	}
+	grant, errs := s.grantFromBody(r.Context(), u, tokenGrantBody{
+		Preset: body.Preset, AllowDelete: body.AllowDelete, Permissions: body.Permissions, AllSpaces: body.AllSpaces, SpaceIDs: body.SpaceIDs,
+	})
+	if len(errs) > 0 {
+		writeValidation(w, errs)
+		return
+	}
+	tok, err := s.apiTokens.UpdateGrant(r.Context(), u.ID, id, grant)
+	switch {
+	case errors.Is(err, auth.ErrNotFound):
+		writeMessage(w, http.StatusNotFound, "Not found.")
+	case errors.Is(err, auth.ErrBadGrant):
+		// A connected app can be given only the parts of a space its tools use; the error says which.
+		msg := "The given data was invalid."
+		if err != auth.ErrBadGrant {
+			msg = err.Error() + "."
+		}
+		writeValidation(w, map[string][]string{"permissions": {msg}})
+	case err != nil:
+		writeMessage(w, http.StatusInternalServerError, err.Error())
+	default:
+		writeDataMsg(w, http.StatusOK, dto.APIToken(*tok), "API token updated.")
+	}
 }

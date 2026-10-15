@@ -18,8 +18,12 @@ const (
 	PermDelete = "delete"
 )
 
-// permRank orders the levels; a grant covers every level up to its own.
-var permRank = map[string]int{PermRead: 1, PermWrite: 2, PermDelete: 3}
+// Levels lists the permission levels, lowest first.
+var Levels = []string{PermRead, PermWrite, PermDelete}
+
+// permRank orders the levels (0 for an unknown one); a grant covers every level
+// up to its own.
+func permRank(level string) int { return slices.Index(Levels, level) + 1 }
 
 // LevelFor is the level a request method needs.
 func LevelFor(method string) string {
@@ -41,9 +45,13 @@ const (
 	PresetAdmin  = "admin"  // read, write and delete everything
 )
 
-// PresetPermissions expands a preset. allowDelete lets an editor delete
+// Presets lists the presets, in the order a screen offers them.
+var Presets = []string{PresetViewer, PresetEditor, PresetAdmin}
+
+// PresetPermissions expands a preset over some parts of a space (those a kind
+// of token can hold, see ResourcesFor). allowDelete lets an editor delete
 // transactions too; it means nothing for the other presets.
-func PresetPermissions(preset string, allowDelete bool) ([]string, error) {
+func PresetPermissions(preset string, allowDelete bool, resources []string) ([]string, error) {
 	grant := func(level string, resources ...string) []string {
 		out := make([]string, len(resources))
 		for i, r := range resources {
@@ -53,15 +61,19 @@ func PresetPermissions(preset string, allowDelete bool) ([]string, error) {
 	}
 	switch preset {
 	case PresetViewer:
-		return grant(PermRead, APIResources...), nil
+		return grant(PermRead, resources...), nil
 	case PresetEditor:
 		level := PermWrite
 		if allowDelete {
 			level = PermDelete
 		}
-		return NormalizePermissions(append(grant(PermRead, APIResources...), Perm("transactions", level)))
+		out := grant(PermRead, resources...)
+		if slices.Contains(resources, "transactions") {
+			out = append(out, Perm("transactions", level))
+		}
+		return NormalizePermissions(out)
 	case PresetAdmin:
-		return grant(PermDelete, APIResources...), nil
+		return grant(PermDelete, resources...), nil
 	}
 	return nil, fmt.Errorf("unknown preset %q", preset)
 }
@@ -76,7 +88,47 @@ var APIResources = []string{
 // MCPResources are the ones the MCP tools read: what an assistant is granted
 // when someone connects it.
 var MCPResources = []string{
-	"accounts", "budgets", "categories", "currencies", "debts", "reports", "tags", "transactions",
+	"accounts", "automation", "budgets", "categories", "currencies", "debts", "reports", "tags", "transactions",
+}
+
+// What a token is for. A personal token is made in Settings and may be given
+// any part of a space; an mcp token is the access token of a connected AI app
+// and only the parts its tools use. The kind is set when the token is issued
+// and never changes, so nothing has to guess it from the name.
+const (
+	TokenPersonal = "personal"
+	TokenMCP      = "mcp"
+)
+
+// ResourcesFor are the parts of a space a token of this kind can be given.
+func ResourcesFor(kind string) []string {
+	if kind == TokenMCP {
+		return MCPResources
+	}
+	return APIResources
+}
+
+// grantError is an ErrBadGrant that says what is wrong.
+type grantError string
+
+func (e grantError) Error() string      { return string(e) }
+func (grantError) Is(target error) bool { return target == ErrBadGrant }
+
+// CheckKindPermissions refuses a grant that reaches beyond what the kind of
+// token may hold. permissions are already normalized. The error is an
+// ErrBadGrant whose text can be shown to the user.
+func CheckKindPermissions(kind string, permissions []string) error {
+	if kind == TokenMCP && len(permissions) == 0 {
+		return grantError("A connected app needs at least one permission")
+	}
+	allowed := ResourcesFor(kind)
+	for _, p := range permissions {
+		resource, _, _ := strings.Cut(p, ":")
+		if !slices.Contains(allowed, resource) {
+			return grantError(fmt.Sprintf("A connected app can only be given access to %s, not %q", strings.Join(allowed, ", "), p))
+		}
+	}
+	return nil
 }
 
 // Perm is the grant string for a resource and level.
@@ -99,10 +151,10 @@ func NormalizePermissions(in []string) ([]string, error) {
 	level := map[string]string{}
 	for _, p := range in {
 		resource, lv, ok := strings.Cut(p, ":")
-		if !ok || !slices.Contains(APIResources, resource) || permRank[lv] == 0 {
+		if !ok || !slices.Contains(APIResources, resource) || permRank(lv) == 0 {
 			return nil, fmt.Errorf("unknown permission %q", p)
 		}
-		if permRank[lv] > permRank[level[resource]] {
+		if permRank(lv) > permRank(level[resource]) {
 			level[resource] = lv
 		}
 	}
