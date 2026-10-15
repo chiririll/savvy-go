@@ -108,9 +108,6 @@ func (s Service) justInTime(ctx context.Context, p IdentityProvider, id Normaliz
 	if err := s.Users.MarkSSOOnly(ctx, user.ID); err != nil {
 		return nil, err
 	}
-	if err := s.ProvisionSpace(ctx, user); err != nil {
-		return nil, err
-	}
 	return s.Users.ByID(ctx, user.ID)
 }
 

@@ -23,6 +23,10 @@ var serverDefaults = map[string]any{
 	"max_spaces_per_user": nil,
 	// Whether an invitation link may create an account.
 	"space_invites_can_register": true,
+	// Server setup after onboarding: false while it is pending (set when the
+	// first admin is created), true once finished or skipped. Unset (null) on
+	// a server that never went through onboarding: nothing to show.
+	"onboarding_server_done": nil,
 }
 
 // spaceDefaults are the settings of one space, kept in its own database.

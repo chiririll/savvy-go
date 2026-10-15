@@ -58,6 +58,7 @@ func spaceName(w http.ResponseWriter, raw string) (string, bool) {
 func (s *Server) spacesStore(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Name string `json:"name"`
+		spaceFill
 	}
 	if !decodeBody(w, r, &body) {
 		return
@@ -66,7 +67,12 @@ func (s *Server) spacesStore(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	space, err := s.spaces.CreateOwned(r.Context(), name, userFrom(r))
+	space, err := s.createSpace(r.Context(), name, userFrom(r), body.spaceFill)
+	var fe *fillError
+	if errors.As(err, &fe) {
+		writeValidation(w, map[string][]string{fe.field: {fe.msg}})
+		return
+	}
 	if err != nil {
 		writeSpaceError(w, err)
 		return
@@ -217,15 +223,15 @@ func (s *Server) invitationsStore(w http.ResponseWriter, r *http.Request) {
 		writeValidation(w, map[string][]string{"email": {"The email field must be a valid email address."}})
 		return
 	}
-	token, err := s.spaces.Invite(r.Context(), sp(r).id, userFrom(r), body.Email, body.Role)
+	token, id, err := s.spaces.Invite(r.Context(), sp(r).id, userFrom(r), body.Email, body.Role)
 	if err != nil {
 		writeSpaceError(w, err)
 		return
 	}
-	out := map[string]any{"token": token, "emailSent": false}
+	out := map[string]any{"id": id, "token": token, "emailSent": false}
 	// The link is always returned; the email is a convenience that may fail
 	// without undoing the invitation.
-	if body.Email != "" && s.mail.Enabled() {
+	if body.Email != "" && s.mailer().Enabled() {
 		if err := s.emailInvitation(r, body.Email, body.Role, token); err != nil {
 			out["emailError"] = err.Error()
 		} else {

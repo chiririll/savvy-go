@@ -34,8 +34,9 @@ type Config struct {
 	SessionCookie string
 	CSRFCookie    string
 	CSRFHeader    string
-	// Mail is the SMTP server from [mailer]; read-only at run time (changes need
-	// a restart). It is disabled when MailProblem is set.
+	// Mail is the SMTP server from [mailer] as loaded at start; the server keeps
+	// the current one, which the admin panel can change. It is disabled when
+	// MailProblem is set.
 	Mail        mailer.Config
 	MailProblem string
 }
@@ -63,15 +64,15 @@ type file struct {
 		CSRFHeader   string `toml:"csrf_header"`
 	} `toml:"security"`
 	Mailer struct {
-		Enabled    bool   `toml:"enabled" comment:"Send email (password reset links, invitations) through an SMTP server. Changes need a restart."`
-		Host       string `toml:"host" comment:"SMTP server, e.g. \"smtp.example.com\"."`
-		Port       int    `toml:"port" comment:"587 for starttls, 465 for smtps, 25 for smtp."`
-		Protocol   string `toml:"protocol" comment:"\"starttls\" (upgrade to TLS, required), \"smtps\" (TLS from the start) or \"smtp\" (no encryption; a trusted local relay only)."`
-		User       string `toml:"user" comment:"Leave empty when the server needs no login."`
-		Password   string `toml:"password" comment:"Stored in plain text: keep this file readable by the application only."`
-		From       string `toml:"from" comment:"Sender address, e.g. \"Go Savvy <savvy@example.com>\"."`
-		SkipVerify bool   `toml:"skip_verify" comment:"Accept any TLS certificate. Only for a server with a self-signed certificate."`
-		Timeout    int    `toml:"timeout" comment:"Seconds to wait for the server."`
+		Enabled    bool   `toml:"enabled"`
+		Host       string `toml:"host"`
+		Port       int    `toml:"port"`
+		Protocol   string `toml:"protocol" comment:"Supported: \"starttls\", \"smtps\" or \"smtp\""`
+		User       string `toml:"user"`
+		Password   string `toml:"password"`
+		From       string `toml:"from"`
+		SkipVerify bool   `toml:"skip_verify"`
+		Timeout    int    `toml:"timeout"`
 	} `toml:"mailer"`
 }
 
@@ -215,22 +216,46 @@ func (l *Live) AppURL() string {
 
 // SetAppURL changes the public URL and writes the config file.
 func (l *Live) SetAppURL(v string) error {
-	if !l.writable {
+	return l.save(func(f *file) { f.Server.AppURL = v }, func() { l.appURL = v })
+}
+
+// SetMail replaces the [mailer] section and writes the config file. It does
+// not validate: the caller does, and may save a disabled, half-filled section.
+func (l *Live) SetMail(c mailer.Config) error {
+	return l.save(func(f *file) {
+		f.Mailer.Enabled = c.Enabled
+		f.Mailer.Host = c.Host
+		f.Mailer.Port = c.Port
+		f.Mailer.Protocol = c.Protocol
+		f.Mailer.User = c.User
+		f.Mailer.Password = c.Password
+		f.Mailer.From = c.From
+		f.Mailer.SkipVerify = c.SkipVerify
+		f.Mailer.Timeout = int(c.Timeout / time.Second)
+	}, nil)
+}
+
+// save applies change to a copy of the file, writes it, and only then keeps it
+// (and runs commit), so a failed write leaves memory and disk as they were.
+func (l *Live) save(change func(*file), commit func()) error {
+	if !l.Writable() {
 		return ErrReadOnly
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	prev := l.f.Server.AppURL
-	l.f.Server.AppURL = v
-	out, err := l.f.encode()
+	next := l.f
+	change(&next)
+	out, err := next.encode()
 	if err == nil {
 		err = writeFile(l.path, out)
 	}
 	if err != nil {
-		l.f.Server.AppURL = prev
 		return err
 	}
-	l.appURL = v
+	l.f = next
+	if commit != nil {
+		commit()
+	}
 	return nil
 }
 

@@ -34,6 +34,7 @@ export interface SpaceInvitation {
 
 /** A new invitation. The link is always returned; the email is a convenience that may fail. */
 export interface InviteResult {
+    id: number
     token: string
     emailSent: boolean
     /** Why the email was not sent; absent when mail is off or the invitation has no address. */
@@ -190,4 +191,26 @@ export interface SpaceOverview {
 export interface SigningKeys {
     own: { kid: string; publicKey: string }
     trusted: { kid: string; publicKey: string; name: string; createdAt: string | null }[]
+}
+
+/** The categories and tags a new space can start with (GET /presets). */
+export interface SpacePresets {
+    categories: {
+        name: string
+        type: 'income' | 'expense'
+        icon: string
+        color: string
+        isDefault: boolean
+    }[]
+    tags: string[]
+}
+
+/** Optional content of POST /spaces beside the name. */
+export interface CreateSpaceInput {
+    name: string
+    baseCurrency?: string
+    currencies?: string[]
+    accounts?: { name: string; type?: string; currency: string; initialBalance?: string }[]
+    categories?: SpacePresets['categories']
+    tags?: string[]
 }

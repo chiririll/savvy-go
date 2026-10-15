@@ -77,12 +77,11 @@ func (s Service) Create(ctx context.Context, name string, owner *auth.User) (*Sp
 		return nil, err
 	}
 	if err := s.Store.CreateSpace(ctx, id); err != nil {
-		_ = s.registry().Delete(ctx, id)
+		s.Discard(ctx, id)
 		return nil, fmt.Errorf("create space database: %w", err)
 	}
 	if err := s.stampUUID(ctx, id, id7.String()); err != nil {
-		_ = s.Store.DeleteSpace(ctx, id)
-		_ = s.registry().Delete(ctx, id)
+		s.Discard(ctx, id)
 		return nil, err
 	}
 	sp := &Space{ID: id, UUID: id7.String(), Name: name}
@@ -93,6 +92,15 @@ func (s Service) Create(ctx context.Context, name string, owner *auth.User) (*Sp
 		sp.Role = RoleAdmin
 	}
 	return sp, nil
+}
+
+// Discard removes a space that was just created and could not be finished: its
+// database file and its registry row (members go with it). No final backup, no
+// error: it is cleanup after a failure, and runs even when ctx is cancelled.
+func (s Service) Discard(ctx context.Context, id int64) {
+	ctx = context.WithoutCancel(ctx)
+	_ = s.Store.DeleteSpace(ctx, id)
+	_ = s.registry().Delete(ctx, id)
 }
 
 // CreateFrom registers a space whose database is a prepared backup. It keeps
@@ -143,15 +151,6 @@ func (s Service) Get(ctx context.Context, id int64) (*Space, error) {
 		return nil, err
 	}
 	return &Space{ID: row.ID, UUID: row.UUID, Name: row.Name}, nil
-}
-
-// Provision gives a new user their personal space. Guests get none: they
-// only take part in spaces they were invited to.
-func (s Service) Provision(ctx context.Context, u *auth.User) (*Space, error) {
-	if u == nil || u.IsGuest() || s.Store == nil {
-		return nil, nil
-	}
-	return s.Create(ctx, u.Name, u)
 }
 
 // SetMember adds u to a space or changes their role.

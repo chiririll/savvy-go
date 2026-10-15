@@ -114,13 +114,13 @@ func TestQuotaIsOptional(t *testing.T) {
 func TestInvitationsAreUsedOnceAndRevokedByTheirSpace(t *testing.T) {
 	r := newRegistry(t)
 	now := time.Now().UTC().Truncate(time.Second)
-	if err := r.repo.InsertInvitation(ctx, spacesrepo.NewInvitation{
+	if _, err := r.repo.InsertInvitation(ctx, spacesrepo.NewInvitation{
 		SpaceID: r.space, InvitedBy: r.ann, Email: "carol@test.com", Role: "viewer", TokenHash: "h1",
 		ByServerAdmin: true, Expires: now.Add(time.Hour), Now: now,
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := r.repo.InsertInvitation(ctx, spacesrepo.NewInvitation{
+	if _, err := r.repo.InsertInvitation(ctx, spacesrepo.NewInvitation{
 		SpaceID: r.space, InvitedBy: r.ann, Role: "editor", TokenHash: "h2", Expires: now.Add(time.Hour), Now: now,
 	}); err != nil {
 		t.Fatal(err)

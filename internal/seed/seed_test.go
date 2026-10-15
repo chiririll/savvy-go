@@ -165,6 +165,40 @@ func TestDemoSeedsEmptyDatabase(t *testing.T) {
 	}
 }
 
+func TestDemoSeedsExactlyTheExportedPresets(t *testing.T) {
+	st, _ := seedDemo(t)
+	space := spaceByName(t, st, "Demo")
+	cats, tags := DefaultCategories(), DefaultTags()
+	if len(cats) != 19 || len(tags) != 10 {
+		t.Fatalf("presets: %d categories, %d tags", len(cats), len(tags))
+	}
+	if n := countWhere(t, space, `SELECT COUNT(*) FROM categories`); n < len(cats) {
+		t.Fatalf("categories=%d, want at least %d", n, len(cats))
+	}
+	for _, c := range cats {
+		q := `SELECT COUNT(*) FROM categories WHERE name = '` + c.Name + `' AND type = '` + c.Type + `' AND icon = '` + c.Icon + `' AND color = '` + c.Color + `'`
+		if n := countWhere(t, space, q); n != 1 {
+			t.Fatalf("category %s seeded %d times", c.Name, n)
+		}
+	}
+	for _, tag := range tags {
+		if n := countWhere(t, space, `SELECT COUNT(*) FROM tags WHERE name = '`+tag+`'`); n != 1 {
+			t.Fatalf("tag %s seeded %d times", tag, n)
+		}
+	}
+	if n := countWhere(t, space, `SELECT COUNT(*) FROM categories WHERE is_default = 1`); n != 2 {
+		t.Fatalf("default categories=%d", n)
+	}
+}
+
+func TestPresetsAreCopies(t *testing.T) {
+	DefaultCategories()[0].Name = "changed"
+	DefaultTags()[0] = "changed"
+	if DefaultCategories()[0].Name != "#RENT" || DefaultTags()[0] != "Essential" {
+		t.Fatal("a caller changed the shared presets")
+	}
+}
+
 func TestDemoSpacesAreLinkedAndTransfer(t *testing.T) {
 	st, _ := seedDemo(t)
 	sqlDB := st.Server()

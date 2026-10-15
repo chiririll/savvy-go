@@ -397,6 +397,9 @@ func TestSSOProvisioningLinkAndJIT(t *testing.T) {
 	if err != nil || fresh.Email != "new@test.com" || fresh.Role != auth.RoleAdmin || !fresh.IsSSOOnly {
 		t.Fatalf("jit %+v %v", fresh, err)
 	}
+	if list, err := a.s.spaces.ForUser(context.Background(), fresh.ID); err != nil || len(list) != 0 {
+		t.Fatalf("jit user has spaces %v %v", list, err)
+	}
 }
 
 func TestSSOPresetHelpers(t *testing.T) {

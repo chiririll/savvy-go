@@ -2,7 +2,7 @@
 export const MAIL_PROTOCOLS = ['starttls', 'smtps', 'smtp'] as const
 export type MailProtocol = (typeof MAIL_PROTOCOLS)[number]
 
-/** Mail configuration of the instance. Read-only: it lives in the [mailer] section of config.toml. */
+/** Mail configuration of the instance, kept in the [mailer] section of config.toml. */
 export interface MailStatus {
     /** Mail works: configured, valid and loaded. */
     enabled: boolean
@@ -14,8 +14,25 @@ export interface MailStatus {
     user: string
     from: string
     skipVerify: boolean
+    /** Seconds to wait for the server. */
+    timeout: number
     /** The password itself is never sent. */
     passwordSet: boolean
     /** Links in emails need the public URL. */
     appUrlSet: boolean
+    /** False when config.toml is read-only: the settings can be shown but not changed. */
+    writable: boolean
+}
+
+/** What PUT /admin/mail takes: every setting. Without `password` the stored one is kept; '' clears it. */
+export interface MailInput {
+    enabled: boolean
+    host: string
+    port: number
+    protocol: MailProtocol
+    user: string
+    password?: string
+    from: string
+    skipVerify: boolean
+    timeout: number
 }

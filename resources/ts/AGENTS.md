@@ -14,6 +14,12 @@ npm run build                          # -> public/build; release builds embed i
 - `pages/<name>` route pages. `schemas/` zod form schemas. `types/` backend shapes. `stores/` client state.
 - `locales/{en,ru}/<namespace>.json` strings.
 
+## Onboarding
+
+- `pages/onboarding/`: admin and server setup.
+- Create-space modal drafts (`stores/space-draft.ts`) live in the browser only. No server-side drafts; nothing is sent before the final `POST /api/spaces`.
+- "Copy from another space" is a one-time copy done in the SPA.
+
 ## i18n
 
 - Colon namespace: `t('forms:key')`, never `t('forms.key')`.

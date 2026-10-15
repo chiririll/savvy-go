@@ -236,13 +236,13 @@ type NewInvitation struct {
 	Expires, Now       time.Time
 }
 
-func (r Repo) InsertInvitation(ctx context.Context, n NewInvitation) error {
-	_, err := r.q().InsertInvitation(ctx, sqlc.InsertInvitationParams{
+// InsertInvitation stores an invitation and returns its id.
+func (r Repo) InsertInvitation(ctx context.Context, n NewInvitation) (int64, error) {
+	return r.q().InsertInvitation(ctx, sqlc.InsertInvitationParams{
 		SpaceID: n.SpaceID, Email: db.NullStringVal(n.Email), Role: n.Role, TokenHash: n.TokenHash,
 		InvitedBy: db.NI(n.InvitedBy), InvitedByServerAdmin: db.BoolInt(n.ByServerAdmin),
 		ExpiresAt: db.FormatTime(n.Expires), CreatedAt: db.TimeNS(n.Now),
 	})
-	return err
 }
 
 // Invitation is one as a space's admins list it.

@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"savvy-go/internal/mailer"
 )
 
 func write(t *testing.T, body string) string {
@@ -222,6 +224,53 @@ timeout = 3
 	}
 	if again.Mail != m {
 		t.Errorf("mail config changed by a rewrite: %+v", again.Mail)
+	}
+}
+
+func TestSetMailPersistsEveryKeyAndKeepsTheRest(t *testing.T) {
+	path := write(t, "[server]\napp_url = \"https://a.example\"\n")
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := mailer.Config{
+		Enabled: true, Host: "smtp.example.com", Port: 465, Protocol: mailer.SMTPS,
+		User: "savvy", Password: "s3cret", From: "Go Savvy <savvy@example.com>",
+		SkipVerify: true, Timeout: 3 * time.Second,
+	}
+	if err := cfg.Live.SetMail(want); err != nil {
+		t.Fatal(err)
+	}
+	again, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again.Mail != want || again.MailProblem != "" {
+		t.Errorf("not persisted: %+v %q", again.Mail, again.MailProblem)
+	}
+	if again.AppURL != "https://a.example" {
+		t.Errorf("app_url lost: %q", again.AppURL)
+	}
+	// Saving the URL afterwards keeps the mail block the panel wrote.
+	if err := cfg.Live.SetAppURL("https://b.example"); err != nil {
+		t.Fatal(err)
+	}
+	if again, _ = Load(path); again.Mail != want {
+		t.Errorf("mail lost by a URL change: %+v", again.Mail)
+	}
+}
+
+func TestSetMailOnAReadOnlyConfig(t *testing.T) {
+	path := write(t, "")
+	if err := os.Mkdir(path+".tmp", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cfg.Live.SetMail(mailer.Config{Enabled: false, Host: "x", Port: 25, Protocol: mailer.Plain}); !errors.Is(err, ErrReadOnly) {
+		t.Errorf("SetMail on a read-only config: %v", err)
 	}
 }
 

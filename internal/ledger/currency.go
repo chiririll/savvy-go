@@ -309,12 +309,18 @@ func (s Currencies) Catalog(ctx context.Context) []map[string]any {
 		if existing[item.Code] {
 			continue
 		}
-		out = append(out, map[string]any{
-			"code": item.Code, "name": item.Name, "symbol": item.Symbol,
-			"decimals": item.Decimals, "rate": item.Rate,
-		})
+		out = append(out, CatalogEntry(item))
 	}
 	return out
+}
+
+// CatalogEntry is how a catalog currency is listed: the same shape for a
+// space's catalog and the server-wide one.
+func CatalogEntry(c Currency) map[string]any {
+	return map[string]any{
+		"code": c.Code, "name": c.Name, "symbol": c.Symbol,
+		"decimals": c.Decimals, "rate": c.Rate,
+	}
 }
 
 func (s Currencies) baseCode(ctx context.Context) string {

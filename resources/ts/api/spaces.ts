@@ -1,7 +1,7 @@
 import { api, apiClient } from './client'
 import { toQueryString } from '@/lib/query-string'
 import { Backup } from '@/types/backup'
-import { Account } from '@/types'
+import { Account, Category, Currency, CurrencyCatalogItem, Tag } from '@/types'
 import {
     AuditEntry,
     InvitationPreview,
@@ -12,7 +12,9 @@ import {
     SpaceDetails,
     SpaceInvitation,
     SpaceMember,
+    CreateSpaceInput,
     SpaceOverview,
+    SpacePresets,
     SpaceRole,
     SpaceTransfer,
     SpaceTransferInput,
@@ -26,7 +28,22 @@ const base = (id: number) => `/spaces/${id}`
 
 export const spacesApi = {
     list: () => api.get<Space[]>('/spaces'),
-    create: (name: string) => api.post<Space, { name: string }>('/spaces', { name }),
+    create: (input: CreateSpaceInput) => api.post<Space, CreateSpaceInput>('/spaces', input),
+
+    /** Categories and tags a new space can start with. */
+    presets: () => api.get<SpacePresets>('/presets'),
+    /** Every currency the server knows, priced in `base`; needs no space. */
+    currencyCatalog: (base?: string) => api.get<CurrencyCatalogItem[]>(`/currencies/catalog${toQueryString({ base })}`),
+    /** The currencies, accounts, categories and tags of a space, read with viewer rights. */
+    readContent: async (id: number) => {
+        const [currencies, accounts, categories, tags] = await Promise.all([
+            api.get<Currency[]>(`${base(id)}/currencies`),
+            api.get<Account[]>(`${base(id)}/accounts${toQueryString({ exclude_debts: true })}`),
+            api.get<Category[]>(`${base(id)}/categories`),
+            api.get<Tag[]>(`${base(id)}/tags`),
+        ])
+        return { currencies, accounts, categories, tags }
+    },
     get: (id: number) => api.get<SpaceDetails>(base(id)),
     rename: (id: number, name: string) => api.patch<SpaceDetails, { name: string }>(base(id), { name }),
     remove: (id: number) => api.delete<void>(base(id)),

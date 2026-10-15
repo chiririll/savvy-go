@@ -25,6 +25,24 @@ volumes:
 
 All data is in the `/data` volume, see [Data and backups](data-and-backups.md).
 
+## First run
+
+A new server has no users, and creating the first admin needs a one-time **bootstrap password**, so nobody who finds the server first can claim it. The server prints it in the log at start and saves it in the file `bootstrap-password` in the data directory. Open the app, enter the password and create the admin account. The password stops working, and the file is removed, as soon as the first user exists.
+
+| Install          | Read the password                                                           |
+|------------------|-----------------------------------------------------------------------------|
+| Docker           | `docker logs savvy` or `docker exec savvy cat /data/bootstrap-password`     |
+| Debian/RPM       | `journalctl -u savvy-go` or `sudo cat /var/lib/savvy-go/bootstrap-password` |
+| Standalone binary| the terminal, or `bootstrap-password` in the data directory                 |
+
+A restart before the first user exists keeps the same password. A server started with demo data has users already and needs none.
+
+Moving from another server? Instead of creating an admin, choose to restore a server backup on the same page: enter the bootstrap password and upload the backup (for a database of the Laravel version, also its `APP_KEY`). The users, spaces, settings and signing key of the backup replace the empty server, the password stops working, and you sign in as the admin from the backup; admin and server setup are skipped. A failed restore (wrong file or key) changes nothing and the password stays valid. See [Data and backups](data-and-backups.md#restoring-on-first-run).
+
+The admin starts with no space; the first one is created from the app, see [Spaces](spaces.md#creating-a-space).
+
+Right after the admin is created, a short **server setup** follows. Step 1 is required: the public URL, filled in with the address you opened the app at. Step 2 is a list of optional things, each opening on its own screen and marked **Done** once configured: email (the same form as in the admin panel, and a test message) and single sign-on (add an identity provider). Finish or skip whenever you like. The server remembers that setup is pending, so if you reload, close the tab or sign in again, it comes back until you finish or skip it; after that it is hidden for good, and the same settings stay in **Administration → System**. If `config.toml` is read-only, the URL step only explains how to set `app_url` in the file.
+
 ## Configuration
 
 The application is configured by a TOML file and reads no environment variables for settings. `config.toml` is created with the defaults on the first start, in the data directory (`/data` in the image, `/var/lib/savvy-go` for the Debian package, `./savvy-data` otherwise); `-config <path>` or the `CONFIG_FILE` environment variable points elsewhere. Demo data is not configured here: see `--seed-config` in [Development](development.md). On every start the file is read and written back, so keys a newer version adds appear on their own; comments are regenerated, your values are kept. Edit it and restart. A read-only file works too, it is just not rewritten.
@@ -44,7 +62,7 @@ Limits such as spaces per user, space quotas and the number of kept backups are 
 
 ### Email
 
-Without a mail server everything works; reset and invitation links are shown to copy and send yourself. With one, Go Savvy can email them. Set it up in the `[mailer]` section and restart; there is no way to change it from the admin panel.
+Without a mail server everything works; reset and invitation links are shown to copy and send yourself. With one, Go Savvy can email them. Set it up in **Administration → System → Email**, or in the `[mailer]` section of `config.toml`. Saving in the panel writes the section and takes effect at once, no restart; if `config.toml` is read-only, the form is locked and you edit the file yourself.
 
 ```toml
 [mailer]
@@ -63,12 +81,13 @@ from = "Go Savvy <savvy@example.com>"
 | `smtps`              | 465  | TLS from the first byte.                                                             |
 | `smtp`               | 25   | No encryption. Only for a trusted relay on the same host or network.                 |
 
+- Settings are saved as a whole. The password field is write-only: leave it empty to keep the stored one, and it is cleared when you remove the login.
 - The TLS certificate is checked. `skip_verify = true` accepts any certificate, for a server with a self-signed one.
-- `user` and `password` are optional (leave `user` empty for a relay without login). The password is stored in plain text in `config.toml`, so keep the file readable by the application only. The admin panel never shows it.
+- `user` and `password` are optional (leave `user` empty for a relay without login). The password is stored in plain text in `config.toml`, so keep the file readable by the application only. The admin panel never shows it again after you save it.
 - `timeout` is how many seconds to wait for the server (default 10).
 - A mistake in the section does not stop the server: mail is switched off, the log says why, and **Administration → System → Email** shows the problem.
 
-That page shows the current settings and has a **Send test email** button. When mail works and `app_url` is set:
+That page has a **Send test email** button, to try the saved settings. When mail works and `app_url` is set:
 
 - **Administration → Users → Email a reset link** sends a user a one-time password link (valid 7 days). It is not offered for yourself, for SSO-only users, or when password sign-in is off. **Reset password** still shows a link to copy.
 - Inviting someone by email from **Settings → Space** also emails the invitation link. The link is always shown too, in case the email fails.

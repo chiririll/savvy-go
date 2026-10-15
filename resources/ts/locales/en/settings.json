@@ -38,26 +38,32 @@
         "mail": {
             "title": "Email",
             "description": "Sends password reset links and invitations.",
-            "configHint": "Mail is set up in the [mailer] section of config.toml. Restart the server after changing it.",
-            "status": "Status",
+            "saved": "Mail settings saved",
+            "enabled": "Send email",
+            "enabledDescription": "Off keeps the settings below but sends nothing; links are shown to copy instead.",
+            "host": "SMTP server",
+            "protocol": "Connection",
+            "port": "Port",
+            "userHint": "Leave empty for a relay without login.",
+            "passwordHint": "Stored in config.toml in plain text; never shown again.",
+            "passwordKeep": "Leave empty to keep the current password",
+            "fromHint": "Name and address the emails come from.",
+            "skipVerify": "Accept any certificate",
+            "skipVerifyDescription": "Only for a server with a self-signed certificate.",
+            "timeout": "Timeout (seconds)",
+            "timeoutHint": "How long to wait for the server.",
+            "configReadOnly": "config.toml is read-only for Savvy, so mail cannot be changed here. Edit the [mailer] section in the file and restart.",
             "working": "Working",
             "off": "Not configured",
             "problem": "Switched off: {{problem}}",
-            "server": "Server",
             "protocols": {
                 "starttls": "STARTTLS",
                 "smtps": "SMTPS (TLS)",
                 "smtp": "No encryption"
             },
             "user": "Login",
-            "noUser": "None",
             "from": "Sender",
             "password": "Password",
-            "passwordSet": "Set",
-            "passwordNotSet": "Not set",
-            "certificate": "TLS certificate",
-            "verified": "Checked",
-            "unverified": "Not checked",
             "noAppUrl": "The public URL is not set. Links in emails need it.",
             "testTitle": "Send a test email",
             "testPlaceholder": "Recipient (default: your email)",
@@ -354,30 +360,30 @@
         "notePlaceholder": "e.g., Before major update",
         "uploadTitle": "Upload Backup",
         "uploadDescription": "Upload a backup archive (.zip) or a database file (.sqlite).",
-            "laravel": {
-                "intro": "This is a database of the Laravel version. It will be upgraded to the current format and only the upgraded version is saved, as a backup. Your file is not kept, so keep your own copy. Nothing changes until you restore that backup. Choose what to upgrade it for.",
-                "target": {
-                    "server": {
-                        "title": "The whole server",
-                        "description": "Saves a server backup with the old users, spaces and settings. Restoring it replaces everything on this server, and you will have to sign in with an account from the old database."
-                    },
-                    "space": {
-                        "title": "This space",
-                        "description": "Saves a backup of this space with the old finances. Restoring it replaces the data of this space. Users are not imported."
-                    },
-                    "new": {
-                        "title": "A new space",
-                        "description": "Creates a new space with the old finances and makes you its admin. Users are not imported."
-                    }
+        "laravel": {
+            "intro": "This is a database of the Laravel version. It will be upgraded to the current format and only the upgraded version is saved, as a backup. Your file is not kept, so keep your own copy. Nothing changes until you restore that backup. Choose what to upgrade it for.",
+            "target": {
+                "server": {
+                    "title": "The whole server",
+                    "description": "Saves a server backup with the old users, spaces and settings. Restoring it replaces everything on this server, and you will have to sign in with an account from the old database."
                 },
-                "action": {
-                    "server": "Upgrade and save as backup",
-                    "space": "Upgrade and save as backup",
-                    "new": "Import as a new space"
+                "space": {
+                    "title": "This space",
+                    "description": "Saves a backup of this space with the old finances. Restoring it replaces the data of this space. Users are not imported."
                 },
-                "appKey": "Laravel APP_KEY (optional)",
-                "appKeyHint": "From the .env of the old install. It decrypts two-factor secrets. Without it two-factor sign-in is switched off for those users, so they can still sign in with their password."
+                "new": {
+                    "title": "A new space",
+                    "description": "Creates a new space with the old finances and makes you its admin. Users are not imported."
+                }
             },
+            "action": {
+                "server": "Upgrade and save as backup",
+                "space": "Upgrade and save as backup",
+                "new": "Import as a new space"
+            },
+            "appKey": "Laravel APP_KEY (optional)",
+            "appKeyHint": "From the .env of the old install. It decrypts two-factor secrets. Without it two-factor sign-in is switched off for those users, so they can still sign in with their password."
+        },
         "backupFile": "Backup File",
         "uploadNotePlaceholder": "e.g., Backup from old device",
         "restoreTitle": "Restore Backup?",
@@ -449,7 +455,73 @@
         "create": {
             "title": "New space",
             "description": "A space keeps its own accounts, categories and currencies. You will be its admin.",
-            "submit": "Create"
+            "submit": "Create",
+            "failed": "Could not create the space",
+            "intro": {
+                "finances": "A space holds its own finances: accounts, transactions, categories and tags.",
+                "currency": "It has its own base currency, and the other currencies you use in it.",
+                "members": "You can invite members to it and give each a role.",
+                "separate": "Spaces are separate from each other. You can switch between them at any time."
+            },
+            "copy": {
+                "source": "Start from",
+                "defaults": "The defaults",
+                "what": "Copy from this space",
+                "kinds": {
+                    "currencies": "Currencies",
+                    "accounts": "Accounts (without balances)",
+                    "categories": "Categories",
+                    "tags": "Tags"
+                },
+                "hint": "A one-time copy. The spaces stay independent. Anything not copied starts from the defaults."
+            },
+            "currencies": {
+                "title": "Currencies",
+                "hint": "Money in a space is kept in these currencies. Rates come from the rate source.",
+                "base": "Base currency",
+                "basePlaceholder": "Choose the base currency",
+                "add": "Add a currency",
+                "remove": "Remove {{code}}",
+                "loading": "Loading currencies…",
+                "failed": "Could not load the currency list."
+            },
+            "accounts": {
+                "title": "Accounts",
+                "hint": "Optional. Wallets and bank cards, each in one currency.",
+                "name": "Name",
+                "currency": "Currency",
+                "balance": "Opening balance",
+                "add": "Add an account",
+                "remove": "Remove the account"
+            },
+            "categories": {
+                "title": "Categories",
+                "hint": "Rename, remove or add. The default category of each type stays.",
+                "name": "Category name",
+                "new": "New category",
+                "add": "Add the category",
+                "remove": "Remove {{name}}",
+                "protected": "The default category of its type cannot be removed"
+            },
+            "tags": {
+                "title": "Tags",
+                "hint": "Optional.",
+                "new": "New tag",
+                "add": "Add the tag",
+                "remove": "Remove {{name}}"
+            },
+            "summary": {
+                "base": "Base currency",
+                "currencies": "Other currencies",
+                "accounts": "Accounts",
+                "categories": "Categories",
+                "tags": "Tags"
+            },
+            "done": {
+                "title": "Space created",
+                "text": "\"{{name}}\" is ready. You can invite members now or later in the space settings.",
+                "invite": "Invite members"
+            }
         },
         "toasts": {
             "created": "Space created",
@@ -497,7 +569,14 @@
             "emailFailed": "The email was not sent: {{error}} Send the link yourself.",
             "anyone": "Anyone with the link",
             "expires": "Expires {{date}}",
-            "revoke": "Revoke"
+            "revoke": "Revoke",
+            "copy": "Copy link",
+            "sent": "Email sent",
+            "cancel": "Cancel the invitation",
+            "cancelTitle": "Cancel this invitation?",
+            "cancelText": "The link for {{who}} will stop working. You can invite again at any time.",
+            "cancelConfirm": "Cancel invitation",
+            "keep": "Keep it"
         },
         "links": {
             "title": "Linked spaces",

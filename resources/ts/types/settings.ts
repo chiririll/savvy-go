@@ -16,4 +16,6 @@ export interface Settings {
     app_url: string
     /** False when config.toml is read-only: app_url cannot be changed here. */
     config_writable: boolean
+    /** Server setup: false while it is pending, true once finished or skipped, null on a server that never had it. */
+    onboarding_server_done: boolean | null
 }

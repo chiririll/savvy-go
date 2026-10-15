@@ -82,31 +82,40 @@ func TestUserWithoutSpaceGets404ForData(t *testing.T) {
 	status(t, a.do("GET", "/api/settings", nil, sess.Token, ""), 200, "instance settings need no space")
 }
 
-func TestRegistrationProvisionsPersonalSpace(t *testing.T) {
+func TestRegistrationCreatesNoSpace(t *testing.T) {
 	a := newTestApp(t)
-	res := a.do("POST", "/api/auth/register", map[string]string{"name": "Owner", "email": "o@test.com", "password": "secret1"}, "", "")
+	res := a.register(a.bootstrap.Password(), map[string]string{"name": "Owner", "email": "o@test.com"})
 	session := cookieNamed(res, "svy_session")
 	res.Body.Close()
 	if res.StatusCode != 201 || session == nil {
 		t.Fatalf("register %d", res.StatusCode)
 	}
 	body := decodeJSON(t, a.do("GET", "/api/spaces", nil, session.Value, ""))
-	list := body["data"].([]any)
-	if len(list) != 1 || list[0].(map[string]any)["role"] != spaces.RoleAdmin || list[0].(map[string]any)["name"] != "Owner" {
+	if list := body["data"].([]any); len(list) != 0 {
 		t.Fatalf("spaces %v", list)
 	}
-	id := int64(list[0].(map[string]any)["id"].(float64))
-	status(t, a.do("GET", spacedPath(a.s, id, "/api/accounts"), nil, session.Value, ""), 200, "personal space works")
+	status(t, a.do("GET", "/api/auth/me", nil, session.Value, ""), 200, "logged in without a space")
 }
 
-// P8: a guest cannot administer a space and gets no personal space.
+func TestAdminCreatedUserHasNoSpace(t *testing.T) {
+	a := newTestApp(t)
+	admin := a.issue(a.createUser("a@test.com", "secret1", auth.RoleAdmin), false)
+	res := a.do("POST", "/api/users", map[string]any{"name": "New", "email": "n@test.com", "password": "secret12", "role": auth.RoleUser}, admin.Token, admin.CSRF)
+	status(t, res, 201, "create user")
+	u, err := a.s.users.ByEmail(context.Background(), "n@test.com")
+	if err != nil || u == nil {
+		t.Fatalf("user %v %v", u, err)
+	}
+	if list, err := a.s.spaces.ForUser(context.Background(), u.ID); err != nil || len(list) != 0 {
+		t.Fatalf("spaces %v %v", list, err)
+	}
+}
+
+// P8: a guest cannot administer a space.
 func TestP8GuestCannotBeSpaceAdmin(t *testing.T) {
 	a := newTestApp(t)
 	ctx := context.Background()
 	guest := a.createUser("guest@test.com", "secret1", auth.RoleGuest)
-	if sp, err := a.s.spaces.Provision(ctx, guest); err != nil || sp != nil {
-		t.Fatalf("guest got a personal space %v %v", sp, err)
-	}
 	if _, err := a.s.spaces.Create(ctx, "Mine", guest); !errors.Is(err, spaces.ErrGuestCannotAdmin) {
 		t.Fatalf("guest created a space: %v", err)
 	}

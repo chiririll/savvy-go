@@ -8,12 +8,14 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
 	"savvy-go/internal/auth"
 	"savvy-go/internal/backup"
+	"savvy-go/internal/bootstrap"
 	"savvy-go/internal/config"
 	"savvy-go/internal/currencydata"
 	"savvy-go/internal/jobs"
@@ -54,8 +56,15 @@ type Server struct {
 	twoFactor  auth.TwoFactor
 	webauthn   auth.WebAuthn
 	queue      *jobs.Queue
-	mail       mailer.Mailer
-	assets     fs.FS // the frontend: index.html, icons and build/
+	// The mail server can be changed in the admin panel, so these are guarded by
+	// mailMu: read the mailer through mailer(), the settings through mailSettings().
+	mailMu      sync.RWMutex
+	mail        mailer.Mailer
+	mailCfg     mailer.Config
+	mailProblem string
+	newMailer   func(mailer.Config) mailer.Mailer // tests swap it to record instead of dialling
+	bootstrap   *bootstrap.Guard                  // first-run password; nil keeps registration closed
+	assets      fs.FS                             // the frontend: index.html, icons and build/
 }
 
 // Option configures New.
@@ -65,6 +74,10 @@ type Option func(*Server)
 // is the public data files; share one source with the scheduled rate update
 // so spaces do not each fetch their own.
 func WithRates(src ledger.RateSource) Option { return func(s *Server) { s.rates = src } }
+
+// WithBootstrap sets the first-run password that registration needs while the
+// server has no users. Without it, registration is always closed.
+func WithBootstrap(g *bootstrap.Guard) Option { return func(s *Server) { s.bootstrap = g } }
 
 func New(cfg config.Config, st store.Store, keys *signing.Holder, opts ...Option) *Server {
 	ledger.SetLocation(cfg.Location)
@@ -95,10 +108,14 @@ func New(cfg config.Config, st store.Store, keys *signing.Holder, opts ...Option
 	if s.rates == nil {
 		s.rates = currencydata.New()
 	}
-	if s.mail == nil {
-		s.mail = mailer.New(cfg.Mail)
+	s.mailCfg, s.mailProblem = cfg.Mail, cfg.MailProblem
+	if s.newMailer == nil {
+		s.newMailer = mailer.New
 	}
-	s.sso = sso.Service{DB: srv, Users: s.users, Settings: s.settings, ProvisionSpace: func(ctx context.Context, u *auth.User) error { _, err := s.spaces.Provision(ctx, u); return err }, AppURL: cfg.URL}
+	if s.mail == nil {
+		s.mail = s.newMailer(cfg.Mail)
+	}
+	s.sso = sso.Service{DB: srv, Users: s.users, Settings: s.settings, AppURL: cfg.URL}
 	_ = os.MkdirAll(cfg.UploadsDir, 0o775)
 	_ = os.MkdirAll(cfg.BackupsDir, 0o775)
 	s.mux = s.routes()
@@ -124,7 +141,9 @@ func (s *Server) routes() *chi.Mux {
 
 		r.Get("/auth/status", s.authStatus)
 		r.Get("/auth/me", s.authMe)
+		r.Post("/auth/bootstrap/verify", s.bootstrapVerify)
 		r.Post("/auth/register", s.authRegister)
+		r.Post("/onboarding/restore", s.onboardingRestore)
 		r.Post("/auth/login", s.authLogin)
 		r.Get("/auth/password/{token}", s.passwordPreview)
 		r.Post("/auth/password/{token}", s.passwordAccept)
@@ -167,6 +186,8 @@ func (s *Server) routes() *chi.Mux {
 				r.Delete("/auth/webauthn/credentials/{id}", s.webauthnDestroy)
 			})
 
+			r.Get("/currencies/catalog", s.serverCurrencyCatalog)
+			r.Get("/presets", s.presets)
 			r.Get("/spaces", s.spacesIndex)
 			r.With(s.sessionOnly).Post("/spaces", s.spacesStore)
 			r.With(s.sessionOnly).Post("/spaces/import", s.spacesImport)
@@ -251,6 +272,7 @@ func (s *Server) routes() *chi.Mux {
 				r.Use(s.sessionOnly)
 				r.Patch("/settings", s.settingsUpdate)
 				r.Get("/admin/mail", s.mailIndex)
+				r.Put("/admin/mail", s.mailUpdate)
 				r.Post("/admin/mail/test", s.mailTest)
 				// P1: backups hold every space.
 				r.Get("/backups", s.backupsIndex)

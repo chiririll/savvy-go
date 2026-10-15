@@ -36,6 +36,10 @@ When restoring:
 
 A database of the Laravel version is upgraded and only the upgraded version is kept as a backup, see [Upgrading from the Laravel version](#upgrading-from-the-laravel-version). A deleted space leaves a final backup in **Administration → Spaces**.
 
+### Restoring on first run
+
+A new server with no users can be filled from a server backup instead of creating an admin: this is how you move to another server. On the first-run page (see [Deployment](deployment.md#first-run)) enter the bootstrap password, upload the backup and, for a database of the Laravel version, its `APP_KEY`. Everything in the backup replaces the empty server (users, spaces, settings and the signing key), all sessions are dropped, and you sign in as usual. If the restore fails, nothing changes and the password stays valid. Once the server has a user, this option is gone; use **Administration → System backups**.
+
 ## Manual backups
 
 > [!WARNING]
