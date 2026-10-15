@@ -446,3 +446,35 @@ func TestNoPageCanBeFramed(t *testing.T) {
 		}
 	}
 }
+
+// Write access is a deliberate choice on the consent screen: it reaches only
+// the resources ticked, and the default stays read-only.
+func TestOAuthConsentCanGrantWriteToChosenResources(t *testing.T) {
+	a := newTestApp(t)
+	u := a.createUser("oauth@a.com", "secret1", roleEditor)
+	sess := a.issue(u, false)
+	id := a.registerClient()
+
+	res := a.do("POST", "/api/oauth/authorize", map[string]any{
+		"client_id": id, "redirect_uri": oauthRedirect, "state": "st-1",
+		"code_challenge": oauthChallenge(), "code_challenge_method": "S256", "approve": true, "all_spaces": true,
+		"permissions": []string{"tags:write", "transactions:read"},
+	}, sess.Token, sess.CSRF)
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("approve = %d", res.StatusCode)
+	}
+	code := codeFrom(t, decodeJSON(t, res)["data"].(map[string]any)["redirect_url"].(string))
+	status2, tok := a.token(url.Values{"grant_type": {"authorization_code"}, "client_id": {id}, "code": {code}, "code_verifier": {oauthVerifier}, "redirect_uri": {oauthRedirect}})
+	if status2 != 200 {
+		t.Fatalf("token = %d %v", status2, tok)
+	}
+	access := tok["access_token"].(string)
+
+	status(t, a.bearer("POST", "/api/tags", map[string]any{"name": "t"}, access), http.StatusCreated, "write on a ticked resource")
+	status(t, a.bearer("POST", "/api/accounts", map[string]any{"name": "X"}, access), http.StatusForbidden, "write on a resource left at read")
+	status(t, a.bearer("GET", "/api/transactions", nil, access), http.StatusOK, "read")
+
+	// The grant survives a refresh.
+	_, next := a.token(url.Values{"grant_type": {"refresh_token"}, "client_id": {id}, "refresh_token": {tok["refresh_token"].(string)}})
+	status(t, a.bearer("POST", "/api/tags", map[string]any{"name": "t2"}, next["access_token"].(string)), http.StatusCreated, "write after refresh")
+}

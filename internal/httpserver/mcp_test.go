@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
@@ -91,7 +92,7 @@ func TestMCPSessionCookieIsNotEnough(t *testing.T) {
 	status(t, res, http.StatusUnauthorized, "a browser session must not reach /mcp")
 }
 
-func TestMCPToolsAreAllReadOnly(t *testing.T) {
+func TestMCPToolsAreMarkedByWhatTheyDo(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("mcp@a.com", "secret1", roleEditor)
 	raw, _ := a.issueToken(u, "read-write", nil)
@@ -103,8 +104,11 @@ func TestMCPToolsAreAllReadOnly(t *testing.T) {
 	}
 	want := map[string]bool{"list_spaces": false, "list_accounts": false, "list_transactions": false, "get_report": false}
 	for _, tool := range tools.Tools {
-		if tool.Annotations == nil || !tool.Annotations.ReadOnlyHint {
-			t.Errorf("tool %s is not marked read-only", tool.Name)
+		// A list_ or get_ tool never changes anything; every other tool does,
+		// so no client may treat it as safe to run unasked.
+		reads := strings.HasPrefix(tool.Name, "list_") || strings.HasPrefix(tool.Name, "get_")
+		if tool.Annotations == nil || tool.Annotations.ReadOnlyHint != reads {
+			t.Errorf("tool %s: read-only hint must be %v", tool.Name, reads)
 		}
 		if _, ok := want[tool.Name]; ok {
 			want[tool.Name] = true
@@ -226,4 +230,126 @@ func TestMCPToolsNeedTheirPermissions(t *testing.T) {
 	if !res.IsError || !strings.Contains(resultText(res), "transactions:read") {
 		t.Fatalf("list_transactions with accounts:read = %v %s", res.IsError, resultText(res))
 	}
+}
+
+// The write tools are plain REST calls made with the caller's token, so a token
+// needs the grant of the route's level: write, and delete on top for deleting.
+func TestMCPWriteToolsNeedWriteAndDeleteGrants(t *testing.T) {
+	a := newTestApp(t)
+	u := a.createUser("mcp@a.com", "secret1", "admin")
+	sp := a.space.ID
+	session := func(perms ...string) *mcp.ClientSession {
+		tok, _ := a.issueGrant(u, auth.Grant{Permissions: perms, AllSpaces: true}, nil)
+		return a.mcpSession(tok)
+	}
+
+	reader := session("tags:read")
+	res := a.call(reader, "create_tag", map[string]any{"space_id": sp, "name": "food"})
+	if !res.IsError || !strings.Contains(resultText(res), "tags:write") {
+		t.Fatalf("create_tag with tags:read = %v %s", res.IsError, resultText(res))
+	}
+
+	writer := session("tags:write")
+	res = a.call(writer, "create_tag", map[string]any{"space_id": sp, "name": "food"})
+	if res.IsError {
+		t.Fatalf("create_tag: %s", resultText(res))
+	}
+	tag := idOf(t, res)
+	res = a.call(writer, "list_tags", map[string]any{"space_id": sp})
+	if !strings.Contains(resultText(res), `"food"`) {
+		t.Fatalf("the tag was not created: %s", resultText(res))
+	}
+	res = a.call(writer, "delete_tag", map[string]any{"space_id": sp, "id": tag})
+	if !res.IsError || !strings.Contains(resultText(res), "tags:delete") {
+		t.Fatalf("delete_tag with tags:write = %v %s", res.IsError, resultText(res))
+	}
+
+	res = a.call(session("tags:delete"), "delete_tag", map[string]any{"space_id": sp, "id": tag})
+	if res.IsError {
+		t.Fatalf("delete_tag: %s", resultText(res))
+	}
+	res = a.call(writer, "list_tags", map[string]any{"space_id": sp})
+	if strings.Contains(resultText(res), `"food"`) {
+		t.Fatalf("the tag is still there: %s", resultText(res))
+	}
+}
+
+func TestMCPWriteToolsRecordAndChangeMoney(t *testing.T) {
+	a := newTestApp(t)
+	u := a.createUser("mcp@a.com", "secret1", "admin")
+	sp := a.space.ID
+	perms, err := auth.PresetPermissions(auth.PresetAdmin, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tok, _ := a.issueGrant(u, auth.Grant{Permissions: perms, AllSpaces: true}, nil)
+	s := a.mcpSession(tok)
+
+	res := a.call(s, "create_account", map[string]any{"space_id": sp, "name": "Wallet", "type": "cash", "currency_code": "EUR", "initial_balance": "100.00"})
+	if res.IsError {
+		t.Fatalf("create_account: %s", resultText(res))
+	}
+	acc := idOf(t, res)
+
+	// Amounts travel as exact decimal strings and come back exact.
+	res = a.call(s, "create_transaction", map[string]any{"space_id": sp, "type": "expense", "account_id": acc, "amount": "12.34", "description": "lunch", "date": "2026-03-01"})
+	if res.IsError || !strings.Contains(resultText(res), "12.34") {
+		t.Fatalf("create_transaction: %v %s", res.IsError, resultText(res))
+	}
+	tx := idOf(t, res)
+
+	res = a.call(s, "update_transaction", map[string]any{"space_id": sp, "id": tx, "amount": "20.00"})
+	if res.IsError || !strings.Contains(resultText(res), "lunch") || !strings.Contains(resultText(res), "20") {
+		t.Fatalf("update_transaction must change only the amount: %v %s", res.IsError, resultText(res))
+	}
+
+	bad := a.call(s, "create_transaction", map[string]any{"space_id": sp, "type": "expense", "account_id": 0, "amount": "1"})
+	if !bad.IsError {
+		t.Fatalf("a transaction without an account must be refused: %s", resultText(bad))
+	}
+
+	if res = a.call(s, "delete_transaction", map[string]any{"space_id": sp, "id": tx}); res.IsError || !strings.Contains(resultText(res), "ok") {
+		t.Fatalf("delete_transaction: %v %s", res.IsError, resultText(res))
+	}
+	if res = a.call(s, "get_transaction", map[string]any{"space_id": sp, "id": tx}); !res.IsError {
+		t.Fatalf("the transaction is still there: %s", resultText(res))
+	}
+}
+
+func TestMCPWriteToolsAreMarkedForClients(t *testing.T) {
+	a := newTestApp(t)
+	u := a.createUser("mcp@a.com", "secret1", "admin")
+	tok, _ := a.issueToken(u, "read", nil)
+	sess := a.mcpSession(tok)
+	list, err := sess.ListTools(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hints := map[string]*mcp.ToolAnnotations{}
+	for _, tl := range list.Tools {
+		hints[tl.Name] = tl.Annotations
+	}
+	if h := hints["list_accounts"]; h == nil || !h.ReadOnlyHint {
+		t.Fatalf("list_accounts must be read-only: %+v", h)
+	}
+	if h := hints["create_transaction"]; h == nil || h.ReadOnlyHint || (h.DestructiveHint != nil && *h.DestructiveHint) {
+		t.Fatalf("create_transaction writes but does not destroy: %+v", h)
+	}
+	if h := hints["delete_transaction"]; h == nil || h.DestructiveHint == nil || !*h.DestructiveHint {
+		t.Fatalf("delete_transaction must be destructive: %+v", h)
+	}
+}
+
+// idOf reads the id of the item a write tool returned.
+func idOf(t *testing.T, res *mcp.CallToolResult) int64 {
+	t.Helper()
+	var body struct {
+		Data struct {
+			ID int64 `json:"id"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(resultText(res)), &body); err != nil || body.Data.ID == 0 {
+		t.Fatalf("no id in %s", resultText(res))
+	}
+	return body.Data.ID
 }

@@ -2,8 +2,9 @@
 // clients such as Claude web: dynamic client registration, authorization
 // codes with PKCE, and rotating refresh tokens.
 //
-// Access tokens are ordinary API tokens (internal/auth) that can only read what
-// the MCP tools show, in the spaces the user picked on the consent screen. They
+// Access tokens are ordinary API tokens (internal/auth) that hold what the user
+// ticked on the consent screen for the resources the MCP tools use (read unless
+// they chose more), in the spaces they picked. They
 // show up in the user's token list, can be revoked there, and are limited by
 // the owner's role in every space exactly like other API tokens.
 package oauth
@@ -75,8 +76,8 @@ type CodeRequest struct {
 	// Spaces the user let the app read: every space, or just these.
 	AllSpaces bool
 	SpaceIDs  []int64
-	// Permissions the user chose, read grants on auth.MCPResources. Empty means
-	// all of them.
+	// Permissions the user chose, grants on auth.MCPResources. Empty means read
+	// on all of them: write and delete are never given by default.
 	Permissions []string
 }
 
@@ -400,8 +401,9 @@ func (s *Service) accessToken(ctx context.Context, userID, id int64) (*auth.APIT
 	return nil, nil
 }
 
-// mcpPermissions checks what the user let an app do: read grants on the
-// resources the MCP tools show, nothing else. None given means all of them.
+// mcpPermissions checks what the user let an app do: grants on the resources
+// the MCP tools use, at any level the user ticked. None given means read on
+// all of them; write and delete are always a deliberate choice.
 func mcpPermissions(in []string) ([]string, error) {
 	if len(in) == 0 {
 		return auth.ReadPerms(auth.MCPResources...), nil
@@ -411,9 +413,9 @@ func mcpPermissions(in []string) ([]string, error) {
 		return nil, err
 	}
 	for _, p := range perms {
-		resource, level, _ := strings.Cut(p, ":")
-		if level != auth.PermRead || !slices.Contains(auth.MCPResources, resource) {
-			return nil, fmt.Errorf("an app can only read accounts, budgets, categories, currencies, debts, reports, tags and transactions, not %q", p)
+		resource, _, _ := strings.Cut(p, ":")
+		if !slices.Contains(auth.MCPResources, resource) {
+			return nil, fmt.Errorf("an app can only be given access to accounts, budgets, categories, currencies, debts, reports, tags and transactions, not %q", p)
 		}
 	}
 	return perms, nil

@@ -406,10 +406,10 @@ func TestChosenPermissionsReachTheTokenAndSurviveRefresh(t *testing.T) {
 	check(next.AccessToken)
 }
 
-func TestAppsCannotBeGivenMoreThanReading(t *testing.T) {
+func TestAppsOnlyGetResourcesTheToolsUse(t *testing.T) {
 	e := newEnv(t)
 	id := e.client(t)
-	for _, perms := range [][]string{{"transactions:write"}, {"transfers:read"}, {"nonsense"}} {
+	for _, perms := range [][]string{{"transfers:read"}, {"transfers:write"}, {"space:delete"}, {"nonsense"}} {
 		_, err := e.svc.IssueCode(context.Background(), oauth.CodeRequest{
 			ClientID: id, RedirectURI: redirect, CodeChallenge: challenge(vOK), CodeChallengeMethod: "S256", User: e.user,
 			AllSpaces: true, Permissions: perms,

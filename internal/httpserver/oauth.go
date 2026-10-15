@@ -6,7 +6,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -22,8 +21,10 @@ import (
 
 const oauthBodyLimit = 64 << 10
 
-// oauthScopes: access tokens only read (see auth.MCPResources).
-var oauthScopes = []string{"read"}
+// oauthScopes are advertised for clients that want to show something. They do
+// not grant anything: what a token may do is the per-resource permissions the
+// user ticked on the consent screen (see auth.MCPResources), read by default.
+var oauthScopes = []string{"read", "write"}
 
 // mcpRoutes mounts the OAuth endpoints and the MCP endpoint they protect.
 func (s *Server) mcpRoutes(r chi.Router) {
@@ -319,7 +320,6 @@ func (s *Server) oauthToken(w http.ResponseWriter, r *http.Request) {
 		"token_type":    "Bearer",
 		"expires_in":    ts.ExpiresIn,
 		"refresh_token": ts.RefreshToken,
-		"scope":         strings.Join(oauthScopes, " "),
 	})
 }
 

@@ -1,6 +1,6 @@
 # AI assistants (MCP)
 
-Go Savvy has a built-in [MCP](https://modelcontextprotocol.io) server, so an AI assistant such as Claude can read your finances and answer questions like "what did I spend on food last month?". It is **read-only**: an assistant cannot add, change or delete anything.
+Go Savvy has a built-in [MCP](https://modelcontextprotocol.io) server, so an AI assistant such as Claude can read your finances and answer questions like "what did I spend on food last month?". By default it is **read-only**. You can also let it record and change things ("add 12 EUR for lunch today"); that is a separate choice you make when you connect it, see [Letting it change data](#letting-it-change-data).
 
 The endpoint is `https://your-savvy.example/mcp`.
 
@@ -20,7 +20,7 @@ A new app can only register itself while an administrator has opened the window 
 
 ## Registered apps
 
-Opening the window is the administrator's approval of a new app. After that, each user decides for themselves on the consent page: pressing **Allow access** gives the app that user's own read-only access to the spaces they chose, nothing more. The page offers the same permission tabs as API tokens (Viewer, or Custom to read only some parts of a space); an app can never be given more than reading. The app registers once and every user can connect it.
+Opening the window is the administrator's approval of a new app. After that, each user decides for themselves on the consent page: pressing **Allow access** gives the app that user's own access to the spaces they chose, nothing more. The page offers the same permission tabs as API tokens: Viewer (the default, read-only), Editor, Admin, or Custom to pick a level for each part of a space. The app registers once and every user can connect it.
 
 **Administration → Security → Registered apps** always lists every registered app with what the server saw when it registered, so you can tell whether it is the one you expected:
 
@@ -38,11 +38,11 @@ The same details are written to the server log (`oauth app registered`), and so 
 
 ## Other clients
 
-Any MCP client that supports remote servers with OAuth connects the same way. A client without OAuth support can send an API token from **Settings → User → API** as `Authorization: Bearer svy_…`. Whatever the token holds, the tools stay read-only. A tool can only read what the token grants: give it read access to the parts the tools use (see the table below) and to the spaces it should see. A tool the token has no grant for answers with an error that names the missing permission.
+Any MCP client that supports remote servers with OAuth connects the same way. A client without OAuth support can send an API token from **Settings → User → API** as `Authorization: Bearer svy_…`. A tool can only do what the token grants: give it access to the parts the tools use (see the tables below) and to the spaces it should use. A tool the token has no grant for answers with an error that names the missing permission, so a read-only token can use every reading tool and none of the writing ones.
 
 ## What an assistant can see
 
-It acts as you, but only in the spaces you chose on the consent page. A connection is a read-only API token, so in those spaces it sees what your own role there allows. Every other space, including ones you create or join later, does not exist for it. It reads accounts, categories, tags, currencies, transactions, budgets, debts and reports, and cannot see members, settings, links, transfers, recurring transactions or automation. Open **Settings → User → API** to see what a connection holds. Access tokens last an hour and are renewed in the background; a connection that is not used for 30 days ends.
+It acts as you, but only in the spaces you chose on the consent page. A connection is an API token, so in those spaces it can do what your own role there allows, and no more than you ticked. Every other space, including ones you create or join later, does not exist for it. It works with accounts, categories, tags, currencies, transactions, budgets, debts and reports, and cannot see members, settings, links, transfers, recurring transactions or automation. Open **Settings → User → API** to see what a connection holds. Access tokens last an hour and are renewed in the background; a connection that is not used for 30 days ends.
 
 | Tool | Returns |
 |------|---------|
@@ -55,6 +55,24 @@ It acts as you, but only in the spaces you chose on the consent page. A connecti
 | `get_report` | overview, money flow, expenses by category, cash flow, net worth and the other [reports](api.md) |
 
 Amounts keep their own currency: the assistant is told never to add amounts of different currencies.
+
+## Letting it change data
+
+Pick **Editor** or **Admin**, or tick Write and Delete under **Custom**, on the consent page. Write lets it add and edit, Delete lets it remove, each per part of a space (for example write on transactions only). Because this changes your real data, pressing **Allow access** then asks once more and lists what the assistant will be able to change. The default stays read-only; nothing is written unless you chose it.
+
+| Tool | Needs | Does |
+|------|-------|------|
+| `create_transaction`, `update_transaction`, `confirm_transaction`, `skip_transaction`, `duplicate_transaction` | transactions: write | record an income, expense or transfer, change one, settle a scheduled one |
+| `delete_transaction` | transactions: delete | remove a transaction |
+| `create_account`, `update_account` | accounts: write | add or change an account |
+| `create_category`, `update_category`, `set_default_category` | categories: write | add or change a category |
+| `create_tag`, `rename_tag` | tags: write | add or rename a tag |
+| `create_currency`, `update_currency`, `set_base_currency` | currencies: write | add a currency, change its rate or the base currency |
+| `create_budget`, `update_budget` | budgets: write | add or change a budget |
+| `create_debt`, `update_debt`, `add_debt_payment`, `collect_debt`, `reopen_debt` | debts: write | record a debt, a payment on it, or reopen it |
+| `delete_account`, `delete_category`, `delete_tag`, `delete_currency`, `delete_budget`, `delete_debt` | that part: delete | remove it |
+
+The tools are the same operations as the [API](api.md), made with the connection's token: the same checks, the same errors, the same limits by role. Amounts are exact decimals sent as text, in the currency of the account. Delete tools are marked destructive, so clients such as Claude ask before running them. Changes made by an assistant look like yours in the app; to see what a connection may do or to cut it off, open **Settings → User → API**.
 
 ## How it works
 

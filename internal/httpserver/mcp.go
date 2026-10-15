@@ -18,18 +18,22 @@ import (
 	"savvy-go/internal/version"
 )
 
-// The MCP server: read-only tools for AI assistants, served over Streamable
-// HTTP at /mcp. It has no data access of its own. Every tool calls the app's
-// own GET routes in-process with the caller's bearer token, so roles, token
+// The MCP server: tools for AI assistants, served over Streamable HTTP at
+// /mcp. It has no data access of its own. Every tool calls one of the app's own
+// routes in-process with the caller's bearer token, so roles, token
 // permissions, token spaces, membership and the JSON shape (money, currencies) are exactly
-// those of the REST API and cannot drift from it.
+// those of the REST API and cannot drift from it. The read tools are here, the
+// write tools in mcp_write.go; a token that was only given read access can
+// call a write tool and gets the REST 403 naming the missing permission.
 
 const (
 	mcpMaxResult    = 256 << 10
 	mcpMaxPerPage   = 100
 	mcpInstructions = "Go Savvy is a multi-currency expense tracker. Data lives in spaces: call list_spaces first and pass a space's id as space_id. " +
 		"Amounts are exact decimal numbers in the currency of the account or transaction they belong to; never add amounts of different currencies, " +
-		"and always say which currency a figure is in. Dates are YYYY-MM-DD. All tools are read-only."
+		"and always say which currency a figure is in. Dates are YYYY-MM-DD. " +
+		"Tools that create, change or delete data work only when the user granted write access; they act as the user, so do not use them unless the user asked for the change, " +
+		"and ask before deleting. Amounts are strings, for example \"12.50\"."
 )
 
 var dateRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
@@ -225,6 +229,7 @@ func (s *Server) mcpServer() *mcp.Server {
 			setIDs(q, "tag_ids", in.TagIDs)
 			return s.mcpGet(ctx, req, mcpSpacePath(in.SpaceID, "/reports/"+route), q), nil, nil
 		})
+	s.addMCPWriteTools(srv)
 	return srv
 }
 
@@ -291,6 +296,11 @@ func setIDs(q url.Values, key string, ids []int64) {
 // token comes from the caller's /mcp request, so the usual middleware decides
 // what they may see.
 func (s *Server) mcpGet(ctx context.Context, req *mcp.CallToolRequest, path string, q url.Values) *mcp.CallToolResult {
+	return s.mcpCall(ctx, req, http.MethodGet, path, q, nil)
+}
+
+// mcpCall is mcpGet for any method. A body is sent as JSON.
+func (s *Server) mcpCall(ctx context.Context, req *mcp.CallToolRequest, method, path string, q url.Values, body []byte) *mcp.CallToolResult {
 	var authz string
 	if extra := req.GetExtra(); extra != nil {
 		authz = extra.Header.Get("Authorization")
@@ -305,23 +315,29 @@ func (s *Server) mcpGet(ctx context.Context, req *mcp.CallToolRequest, path stri
 	// chi would reuse the routing state of the /mcp request (method POST) for a
 	// context that carries it, so the call starts with a clean one.
 	ctx = context.WithValue(ctx, chi.RouteCtxKey, (*chi.Context)(nil))
-	hr, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
+	hr, err := http.NewRequestWithContext(ctx, method, target, bytes.NewReader(body))
 	if err != nil {
 		return mcpFail(err.Error())
 	}
 	hr.Header.Set("Authorization", authz)
 	hr.Header.Set("Accept", "application/json")
+	if body != nil {
+		hr.Header.Set("Content-Type", "application/json")
+	}
 	rec := &memoryResponse{header: http.Header{}, status: http.StatusOK}
 	s.mux.ServeHTTP(rec, hr)
 
-	body := bytes.TrimSpace(rec.body.Bytes())
+	out := bytes.TrimSpace(rec.body.Bytes())
 	if rec.status >= 400 {
-		return mcpFail(apiErrorMessage(rec.status, body))
+		return mcpFail(apiErrorMessage(rec.status, out))
 	}
-	if len(body) > mcpMaxResult {
+	if len(out) == 0 { // 204: a delete has nothing to return
+		out = []byte(`{"ok":true}`)
+	}
+	if len(out) > mcpMaxResult {
 		return mcpFail("The result is too large. Narrow it with filters (dates, account, category) or ask for a smaller page.")
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(body)}}}
+	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(out)}}}
 }
 
 // apiErrorMessage is the message of a REST error body, or its status.
