@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { CreateSpaceModal } from '@/components/features/spaces/CreateSpaceModal'
+import { LazyCreateSpaceModal } from '@/components/features/spaces/LazyCreateSpaceModal'
 import { useSpaces } from '@/hooks/use-spaces'
 import { useUser } from '@/stores/auth'
 import { useSpaceStore } from '@/stores/space'
@@ -31,7 +31,7 @@ export function NoSpace() {
                     <>
                         <Button onClick={() => setCreating(true)}>{t('spaces.create')}</Button>
                         {/* Without a space there is nothing to go back to, so it cannot be closed. */}
-                        <CreateSpaceModal open={creating} onOpenChange={setCreating} dismissible={false} />
+                        <LazyCreateSpaceModal open={creating} onOpenChange={setCreating} dismissible={false} />
                     </>
                 )}
             </div>
