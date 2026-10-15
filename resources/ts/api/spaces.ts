@@ -5,6 +5,7 @@ import { Account, Category, Currency, CurrencyCatalogItem, Tag } from '@/types'
 import {
     AuditEntry,
     InvitationPreview,
+    InviteMethods,
     InviteResult,
     LinkedSpace,
     SigningKeys,
@@ -134,8 +135,9 @@ export const syncGroupsApi = {
 export const invitationsApi = {
     preview: (token: string) => api.get<InvitationPreview>(`/invitations/${token}`),
     accept: (token: string) => api.post<Space>(`/invitations/${token}/accept`),
-    /** `sig` comes from the emailed link and proves the mailbox; a copied link has none. */
-    register: (token: string, data: { name: string; email: string; password: string; sig?: string }) =>
+    /** An emailed invitation names its address, and registering through it confirms the address. */
+    methods: () => api.get<InviteMethods>('/invitation-methods'),
+    register: (token: string, data: { name: string; email: string; password: string }) =>
         api.post<unknown, typeof data>(`/invitations/${token}/register`, data),
 }
 
@@ -153,4 +155,7 @@ export const adminSpacesApi = {
         api.post<SigningKeys, { name: string; public_key: string }>('/admin/keys', { name, public_key: publicKey }),
     untrustKey: (kid: string) => api.delete<void>(`/admin/keys/${kid}`),
     rotateKey: () => api.post<SigningKeys>('/admin/keys/rotate'),
+    /** Ends the wait before an address can be invited again: one address, or all when empty. */
+    clearInvitations: (email?: string) =>
+        api.post<{ cleared: number }, { email?: string }>('/admin/invitations/clear', { email }),
 }

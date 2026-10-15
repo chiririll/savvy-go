@@ -32,13 +32,24 @@ export interface SpaceInvitation {
     createdAt: string | null
 }
 
-/** A new invitation. The link is always returned; the email is a convenience that may fail. */
+/**
+ * A new invitation. One made with an address is emailed and has no link here:
+ * only the mailbox gets it. One made without an address returns the link to copy.
+ */
 export interface InviteResult {
     id: number
-    token: string
+    token?: string
     emailSent: boolean
-    /** Why the email was not sent; absent when mail is off or the invitation has no address. */
-    emailError?: string
+}
+
+/** How the server lets invitations be made right now. */
+export interface InviteMethods {
+    /** By email: needs working mail. */
+    email: boolean
+    /** By a link to copy: not allowed while verified addresses are required. */
+    link: boolean
+    /** Why email is off, when it is. */
+    emailReason?: string
 }
 
 export interface InvitationPreview {

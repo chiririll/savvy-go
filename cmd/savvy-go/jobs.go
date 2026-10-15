@@ -12,6 +12,7 @@ import (
 	"savvy-go/internal/recurring"
 	"savvy-go/internal/schedule"
 	"savvy-go/internal/settings"
+	"savvy-go/internal/spaces"
 	"savvy-go/internal/store"
 	"savvy-go/internal/store/sqlite"
 	"savvy-go/internal/uploads"
@@ -19,6 +20,7 @@ import (
 
 // startJobs runs the periodic jobs until ctx is cancelled.
 func startJobs(ctx context.Context, st *sqlite.Store, uploads uploads.Service, rates *currencydata.Source) {
+	spaceSvc := spaces.Service{Store: st}
 	// eachSpace runs a job in every available space; one failing space does
 	// not stop the others.
 	eachSpace := func(job func(context.Context, store.DB) error) func(context.Context) error {
@@ -61,5 +63,11 @@ func startJobs(ctx context.Context, st *sqlite.Store, uploads uploads.Service, r
 			return recurring.Service{DB: d, Txs: ledger.Transactions{DB: d}}.EnsureUpcoming(ctx)
 		})},
 		schedule.Job{Name: "uploads:prune", Interval: time.Hour, Run: uploads.PruneExpired},
+		// Expired invitations are kept an hour past their expiry: that is the
+		// cooldown on inviting the same address again.
+		schedule.Job{Name: "invitations:prune", Interval: time.Hour, Run: func(ctx context.Context) error {
+			_, err := spaceSvc.PruneInvitations(ctx)
+			return err
+		}},
 	).Start(ctx)
 }

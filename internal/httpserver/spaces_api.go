@@ -6,7 +6,6 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -15,6 +14,7 @@ import (
 
 	"savvy-go/internal/auth"
 	"savvy-go/internal/httpserver/dto"
+	"savvy-go/internal/mailer"
 	"savvy-go/internal/spaces"
 )
 
@@ -31,8 +31,11 @@ func writeSpaceError(w http.ResponseWriter, err error) {
 		writeMessage(w, http.StatusNotFound, err.Error())
 	case errors.Is(err, spaces.ErrRegistrationClosed):
 		writeMessage(w, http.StatusForbidden, err.Error())
+	case errors.Is(err, spaces.ErrInvitationCooldown):
+		writeMessage(w, http.StatusTooManyRequests, err.Error())
 	case errors.Is(err, spaces.ErrGuestCannotAdmin), errors.Is(err, spaces.ErrLastAdmin), errors.Is(err, spaces.ErrLastMember),
-		errors.Is(err, spaces.ErrSpaceLimit), errors.Is(err, spaces.ErrInvitationEmail):
+		errors.Is(err, spaces.ErrSpaceLimit), errors.Is(err, spaces.ErrInvitationEmail),
+		errors.Is(err, spaces.ErrInvitationExists), errors.Is(err, spaces.ErrAlreadyMember):
 		writeMessage(w, http.StatusUnprocessableEntity, err.Error())
 	default:
 		writeMessage(w, http.StatusInternalServerError, err.Error())
@@ -210,6 +213,34 @@ func (s *Server) invitationsIndex(w http.ResponseWriter, r *http.Request) {
 	}))
 }
 
+// inviteMethods says how invitations may be made right now: by email, which
+// needs working mail and a public URL, and by a link to copy, which an instance
+// that requires verified addresses does not allow. When email is off, reason
+// says why.
+func (s *Server) inviteMethods(ctx context.Context) (email, link bool, reason string) {
+	switch {
+	case !s.mailer().Enabled():
+		reason = s.mailOffReason()
+	case s.cfg.URL() == "":
+		reason = noAppURLMessage
+	default:
+		email = true
+	}
+	return email, !s.emailVerificationRequired(ctx), reason
+}
+
+func (s *Server) invitationMethods(w http.ResponseWriter, r *http.Request) {
+	email, link, reason := s.inviteMethods(r.Context())
+	out := map[string]any{"email": email, "link": link}
+	if reason != "" {
+		out["emailReason"] = reason
+	}
+	writeData(w, http.StatusOK, out)
+}
+
+// invitationsStore creates an invitation. With an address it is emailed and
+// its link is never returned, so the link proves the mailbox; without one the
+// link is returned to copy. The server decides which of the two is allowed.
 func (s *Server) invitationsStore(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Email string `json:"email"`
@@ -222,8 +253,18 @@ func (s *Server) invitationsStore(w http.ResponseWriter, r *http.Request) {
 		writeValidation(w, map[string][]string{"role": {"The role must be admin, editor or viewer."}})
 		return
 	}
+	body.Email = strings.TrimSpace(body.Email)
 	if body.Email != "" && !looksLikeEmail(body.Email) {
 		writeValidation(w, map[string][]string{"email": {"The email field must be a valid email address."}})
+		return
+	}
+	byEmail, byLink, reason := s.inviteMethods(r.Context())
+	switch {
+	case body.Email != "" && !byEmail:
+		writeValidation(w, map[string][]string{"email": {"Invitations cannot be emailed. " + reason}})
+		return
+	case body.Email == "" && !byLink:
+		writeValidation(w, map[string][]string{"email": {"This server requires invitations by email. Enter the address to invite."}})
 		return
 	}
 	token, id, err := s.spaces.Invite(r.Context(), sp(r).id, userFrom(r), body.Email, body.Role)
@@ -231,33 +272,48 @@ func (s *Server) invitationsStore(w http.ResponseWriter, r *http.Request) {
 		writeSpaceError(w, err)
 		return
 	}
-	out := map[string]any{"id": id, "token": token, "emailSent": false}
-	// The link is always returned; the email is a convenience that may fail
-	// without undoing the invitation.
-	if body.Email != "" && s.mailer().Enabled() {
-		if err := s.emailInvitation(r, body.Email, body.Role, token); err != nil {
-			out["emailError"] = err.Error()
-		} else {
-			out["emailSent"] = true
-		}
+	if body.Email == "" {
+		writeData(w, http.StatusCreated, map[string]any{"id": id, "token": token, "emailSent": false})
+		return
 	}
-	writeData(w, http.StatusCreated, out)
+	if err := s.emailInvitation(r, body.Email, body.Role, token); err != nil {
+		// Nobody received it, so it must not hold the address in a cooldown.
+		if derr := s.spaces.DiscardInvitation(r.Context(), id); derr != nil {
+			slog.Warn("discard unsent invitation", "err", derr)
+		}
+		writeMessage(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	writeData(w, http.StatusCreated, map[string]any{"id": id, "emailSent": true})
 }
 
 func (s *Server) emailInvitation(r *http.Request, to, role, token string) error {
-	base := s.cfg.URL()
-	if base == "" {
-		return errors.New(noAppURLMessage)
-	}
 	space, err := s.spaces.Get(r.Context(), sp(r).id)
 	if err != nil || space == nil {
 		return errors.New("could not read the space")
 	}
-	// The signature proves the link went to this mailbox. The link the app
-	// hands out for copying has none, so only the emailed one verifies the address.
-	to = strings.TrimSpace(to)
-	link := base + "/invite/" + token + "?email=" + url.QueryEscape(to) + "&sig=" + s.links.Invite(token, to)
-	return s.sendMail(r.Context(), inviteMessage(to, userFrom(r).Name, space.Name, role, link))
+	link := s.cfg.URL() + "/invite/" + token
+	if err := s.sendMail(r.Context(), mailer.Invitation(to, userFrom(r).Name, space.Name, role, link)); err != nil {
+		return errors.New("Could not send the email: " + err.Error())
+	}
+	return nil
+}
+
+// invitationsClear ends the cooldown of revoked and expired invitations, for
+// one address or all of them. It is for server admins only.
+func (s *Server) invitationsClear(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Email string `json:"email"`
+	}
+	if !decodeBody(w, r, &body) {
+		return
+	}
+	n, err := s.spaces.ClearInvitationCooldowns(r.Context(), userFrom(r), body.Email)
+	if err != nil {
+		writeMessage(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeData(w, http.StatusOK, map[string]any{"cleared": n})
 }
 
 func (s *Server) invitationsDestroy(w http.ResponseWriter, r *http.Request) {
@@ -302,7 +358,6 @@ func (s *Server) invitationRegister(w http.ResponseWriter, r *http.Request) {
 		Name     string `json:"name"`
 		Email    string `json:"email"`
 		Password string `json:"password"`
-		Sig      string `json:"sig"` // from the emailed link: proves the mailbox
 	}
 	if !decodeBody(w, r, &body) {
 		return
@@ -331,26 +386,19 @@ func (s *Server) invitationRegister(w http.ResponseWriter, r *http.Request) {
 		writeSpaceError(w, err)
 		return
 	}
-	s.confirmInvitedAddress(r.Context(), u, s.links.InviteValid(token, body.Email, body.Sig))
+	s.askToConfirmAddress(r.Context(), u)
 	s.issueSession(w, r, u, http.StatusCreated, false)
 }
 
-// confirmInvitedAddress marks the new account's address verified when it came
-// through the emailed invitation link. Otherwise, if the instance requires
-// verification, it asks the new user to confirm by email.
-func (s *Server) confirmInvitedAddress(ctx context.Context, u *auth.User, proven bool) {
-	if proven {
-		if err := s.users.SetEmailVerified(ctx, u.ID, true); err != nil {
-			slog.Warn("mark invited address verified", "err", err)
-			return
-		}
-		u.EmailVerified = true
+// askToConfirmAddress emails a new account a confirmation link when the
+// instance requires verified addresses and the invitation did not already
+// prove theirs (one that was emailed does).
+func (s *Server) askToConfirmAddress(ctx context.Context, u *auth.User) {
+	if u.EmailVerified || !s.emailVerificationRequired(ctx) {
 		return
 	}
-	if s.emailVerificationRequired(ctx) {
-		if problem := s.sendVerification(ctx, u); problem != "" {
-			slog.Warn("send verification email", "problem", problem)
-		}
+	if problem := s.sendVerification(ctx, u); problem != "" {
+		slog.Warn("send verification email", "problem", problem)
 	}
 }
 

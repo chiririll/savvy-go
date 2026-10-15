@@ -18,7 +18,6 @@ import (
 	"savvy-go/internal/bootstrap"
 	"savvy-go/internal/config"
 	"savvy-go/internal/currencydata"
-	"savvy-go/internal/emaillink"
 	"savvy-go/internal/jobs"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/mailer"
@@ -38,28 +37,28 @@ import (
 // Server-level services use the server database; the services of a space are
 // built per request by withSpace (see spaceScope).
 type Server struct {
-	cfg        config.Config
-	store      store.Store
-	mux        *chi.Mux
-	users      auth.Users
-	sessions   auth.Sessions
-	apiTokens  auth.APITokens
-	tokens     auth.PasswordTokens
-	challenges auth.Challenges
-	settings   settings.Store
-	spaces     spaces.Service
-	backups    backup.Service
-	transfers  *transfers.Service
-	refsync    refsync.Service
-	keys       *signing.Holder
-	links      emaillink.Signer // signs the links sent by email
-	uploads    uploads.Service
-	rates      ledger.RateSource // currency catalog and exchange rates, shared by every space
-	sso        sso.Service
-	oauth      *oauth.Service
-	twoFactor  auth.TwoFactor
-	webauthn   auth.WebAuthn
-	queue      *jobs.Queue
+	cfg           config.Config
+	store         store.Store
+	mux           *chi.Mux
+	users         auth.Users
+	sessions      auth.Sessions
+	apiTokens     auth.APITokens
+	tokens        auth.PasswordTokens
+	challenges    auth.Challenges
+	settings      settings.Store
+	spaces        spaces.Service
+	backups       backup.Service
+	transfers     *transfers.Service
+	refsync       refsync.Service
+	keys          *signing.Holder
+	verifications auth.EmailVerifications
+	uploads       uploads.Service
+	rates         ledger.RateSource // currency catalog and exchange rates, shared by every space
+	sso           sso.Service
+	oauth         *oauth.Service
+	twoFactor     auth.TwoFactor
+	webauthn      auth.WebAuthn
+	queue         *jobs.Queue
 	// The mail server can be changed in the admin panel, so these are guarded by
 	// mailMu: read the mailer through mailer(), the settings through mailSettings().
 	mailMu      sync.RWMutex
@@ -87,23 +86,23 @@ func New(cfg config.Config, st store.Store, keys *signing.Holder, opts ...Option
 	ledger.SetLocation(cfg.Location)
 	srv := st.Server()
 	s := &Server{
-		cfg:        cfg,
-		assets:     resolveAssets(webui.FS()),
-		store:      st,
-		users:      auth.Users{DB: srv},
-		sessions:   auth.Sessions{DB: srv, SessionTTL: cfg.SessionTTL, RememberTTL: cfg.RememberTTL},
-		apiTokens:  auth.APITokens{DB: srv},
-		tokens:     auth.PasswordTokens{DB: srv},
-		challenges: auth.Challenges{DB: srv, Cfg: cfg},
-		settings:   settings.Store{DB: srv},
-		spaces:     spaces.Service{Store: st},
-		uploads:    uploads.Service{DB: srv, Root: cfg.UploadsDir, SignSecret: randomSecret()},
-		twoFactor:  auth.TwoFactor{DB: srv, Users: auth.Users{DB: srv}},
-		webauthn:   auth.WebAuthn{DB: srv, Cfg: cfg},
+		cfg:           cfg,
+		assets:        resolveAssets(webui.FS()),
+		store:         st,
+		users:         auth.Users{DB: srv},
+		sessions:      auth.Sessions{DB: srv, SessionTTL: cfg.SessionTTL, RememberTTL: cfg.RememberTTL},
+		apiTokens:     auth.APITokens{DB: srv},
+		tokens:        auth.PasswordTokens{DB: srv},
+		verifications: auth.EmailVerifications{DB: srv},
+		challenges:    auth.Challenges{DB: srv, Cfg: cfg},
+		settings:      settings.Store{DB: srv},
+		spaces:        spaces.Service{Store: st},
+		uploads:       uploads.Service{DB: srv, Root: cfg.UploadsDir, SignSecret: randomSecret()},
+		twoFactor:     auth.TwoFactor{DB: srv, Users: auth.Users{DB: srv}},
+		webauthn:      auth.WebAuthn{DB: srv, Cfg: cfg},
 	}
 	keyRing := signing.KeyRing{Holder: keys, Trusted: transfers.TrustedKeys(srv)}
 	s.keys = keys
-	s.links = emaillink.Signer{Keys: keys}
 	s.transfers = &transfers.Service{Spaces: s.spaces, Keys: keyRing}
 	s.refsync = refsync.Service{Spaces: s.spaces}
 	s.backups = backup.Service{Store: st, Keys: keyRing, Dir: cfg.BackupsDir, DataDir: cfg.DataDir, Transfers: s.transfers}
@@ -202,6 +201,7 @@ func (s *Server) routes() *chi.Mux {
 
 			r.Get("/currencies/catalog", s.serverCurrencyCatalog)
 			r.Get("/presets", s.presets)
+			r.Get("/invitation-methods", s.invitationMethods)
 			r.Get("/spaces", s.spacesIndex)
 			r.With(s.sessionOnly).Post("/spaces", s.spacesStore)
 			r.With(s.sessionOnly).Post("/spaces/import", s.spacesImport)
@@ -295,6 +295,7 @@ func (s *Server) routes() *chi.Mux {
 				r.Get("/admin/mail", s.mailIndex)
 				r.Put("/admin/mail", s.mailUpdate)
 				r.Post("/admin/mail/test", s.mailTest)
+				r.Post("/admin/invitations/clear", s.invitationsClear)
 				// P1: backups hold every space.
 				r.Get("/backups", s.backupsIndex)
 				r.Post("/backups", s.backupsStore)

@@ -52,7 +52,7 @@ var undocumented = []string{
 	"/api/auth/2fa", "/api/auth/sso", "/api/auth/webauthn",
 	"/api/uploads", "/api/s3/multipart", "/api/transactions/import",
 	"/api/oauth", "/api/backups", "/api/identity-providers", "/api/spaces/import",
-	"/api/admin", "/api/monitoring", "/api/invitations",
+	"/api/admin", "/api/monitoring", "/api/invitations", "/api/invitation-methods",
 }
 
 // undocumentedInSpace lists routes under /api/spaces/{space} that are

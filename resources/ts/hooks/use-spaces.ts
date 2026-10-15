@@ -1,6 +1,6 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import i18n from '@/lib/i18n'
-import { adminSpacesApi, spacesApi, syncGroupsApi } from '@/api/spaces'
+import { adminSpacesApi, invitationsApi, spacesApi, syncGroupsApi } from '@/api/spaces'
 import { useUser } from '@/stores/auth'
 import { useCurrentSpaceId, useSpaceStore } from '@/stores/space'
 import { CreateSpaceInput, LinkedSpace, SpaceRole, SpaceTransferInput, SyncChange, SyncKind, SyncPlan } from '@/types/spaces'
@@ -148,6 +148,18 @@ export function useInvite(id: number) {
     return useResourceMutation({
         mutationFn: ({ role, email }: { role: SpaceRole; email?: string }) => spacesApi.invite(id, role, email),
         invalidateKeys: [spaceKey(id, 'invitations')],
+    })
+}
+
+/** How invitations may be made; the same for every space, so it is read once. */
+export function useInviteMethods(enabled = true) {
+    return useQuery({ queryKey: ['invitation-methods'], queryFn: invitationsApi.methods, enabled, staleTime: 60_000 })
+}
+
+export function useClearInvitations() {
+    return useResourceMutation({
+        mutationFn: (email?: string) => adminSpacesApi.clearInvitations(email),
+        successMessage: ({ cleared }) => i18n.t('system.invitations.cleared', { ns: 'settings', count: cleared }),
     })
 }
 

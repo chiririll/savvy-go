@@ -8,6 +8,7 @@ package spaces
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"savvy-go/internal/db"
@@ -253,8 +254,10 @@ type Invitation struct {
 	ExpiresAt, AcceptedAt, CreatedAt *time.Time
 }
 
-func (r Repo) Invitations(ctx context.Context, spaceID int64) ([]Invitation, error) {
-	rows, err := r.q().ListInvitations(ctx, spaceID)
+// Invitations lists what a space's admins still see: accepted ones and those
+// that have not expired at now. Expired ones are kept only for the cooldown.
+func (r Repo) Invitations(ctx context.Context, spaceID int64, now time.Time) ([]Invitation, error) {
+	rows, err := r.q().ListInvitations(ctx, sqlc.ListInvitationsParams{SpaceID: spaceID, ExpiresAt: db.FormatTime(now)})
 	if err != nil {
 		return nil, err
 	}
@@ -270,14 +273,85 @@ func (r Repo) Invitations(ctx context.Context, spaceID int64) ([]Invitation, err
 	return out, nil
 }
 
-// DeleteInvitation reports whether the space had such an invitation.
-func (r Repo) DeleteInvitation(ctx context.Context, spaceID, id int64) (bool, error) {
-	res, err := r.q().DeleteInvitation(ctx, sqlc.DeleteInvitationParams{ID: id, SpaceID: spaceID})
+// ExpireInvitation ends a pending invitation of the space at now and reports
+// whether it was pending. The row stays.
+func (r Repo) ExpireInvitation(ctx context.Context, spaceID, id int64, now time.Time) (bool, error) {
+	at := db.FormatTime(now)
+	res, err := r.q().ExpireInvitation(ctx, sqlc.ExpireInvitationParams{ExpiresAt: at, ID: id, SpaceID: spaceID, ExpiresAt_2: at})
 	if err != nil {
 		return false, err
 	}
 	n, _ := res.RowsAffected()
 	return n > 0, nil
+}
+
+// DeleteAcceptedInvitation removes an accepted invitation of the space from
+// its history and reports whether there was one.
+func (r Repo) DeleteAcceptedInvitation(ctx context.Context, spaceID, id int64) (bool, error) {
+	res, err := r.q().DeleteAcceptedInvitation(ctx, sqlc.DeleteAcceptedInvitationParams{ID: id, SpaceID: spaceID})
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
+}
+
+// DeletePending removes an unaccepted invitation outright, expired or not.
+func (r Repo) DeletePending(ctx context.Context, id int64) error {
+	return r.q().DeleteInvitationByID(ctx, id)
+}
+
+// Held is an unaccepted invitation to an address.
+type Held struct {
+	SpaceID int64
+	Expires time.Time
+}
+
+// UnacceptedFor lists the invitations to an address that nobody has accepted.
+func (r Repo) UnacceptedFor(ctx context.Context, email string) ([]Held, error) {
+	rows, err := r.q().UnacceptedInvitationsForEmail(ctx, db.NullStringVal(email))
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Held, len(rows))
+	for i, row := range rows {
+		out[i].SpaceID = row.SpaceID
+		out[i].Expires, _ = db.ParseTimeString(row.ExpiresAt)
+	}
+	return out, nil
+}
+
+// PruneInvitations deletes unaccepted invitations that expired before cutoff.
+func (r Repo) PruneInvitations(ctx context.Context, cutoff time.Time) (int, error) {
+	res, err := r.q().PruneInvitations(ctx, db.FormatTime(cutoff))
+	return affected(res, err)
+}
+
+// ClearExpiredInvitations deletes the unaccepted invitations that have expired
+// at now: those of one address, or of every address when email is empty.
+func (r Repo) ClearExpiredInvitations(ctx context.Context, email string, now time.Time) (int, error) {
+	if email == "" {
+		res, err := r.q().ClearExpiredInvitations(ctx, db.FormatTime(now))
+		return affected(res, err)
+	}
+	res, err := r.q().ClearExpiredInvitationsForEmail(ctx, sqlc.ClearExpiredInvitationsForEmailParams{
+		ExpiresAt: db.FormatTime(now), Email: db.NullStringVal(email),
+	})
+	return affected(res, err)
+}
+
+func affected(res sql.Result, err error) (int, error) {
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	return int(n), nil
+}
+
+// IsMemberByEmail reports whether a user with this address is in the space.
+func (r Repo) IsMemberByEmail(ctx context.Context, spaceID int64, email string) (bool, error) {
+	n, err := r.q().IsSpaceMemberByEmail(ctx, sqlc.IsSpaceMemberByEmailParams{SpaceID: spaceID, Email: email})
+	return n > 0, err
 }
 
 // InvitationByHash is an invitation found by its token's hash, with the space

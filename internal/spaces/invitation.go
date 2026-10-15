@@ -3,6 +3,7 @@ package spaces
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -16,8 +17,22 @@ import (
 // hash is stored. Whoever registers through an invitation from someone other
 // than a server admin becomes a guest: they cannot create spaces until a
 // server admin promotes them.
+//
+// A bound invitation is meant to be emailed and nothing else: the caller must
+// never show its token to the inviter, so holding the token proves the
+// mailbox and registering through it confirms the address.
+//
+// Revoking expires an invitation and keeps the row. An unaccepted row for an
+// address stops a new email to it: a pending one in the same space says "already
+// invited", an expired one anywhere is the cooldown that keeps an admin from
+// flooding a mailbox with invite, revoke, invite. PruneInvitations removes the
+// expired rows, which ends the cooldown.
 
-const invitationTTL = 7 * 24 * time.Hour
+const (
+	invitationTTL = 7 * 24 * time.Hour
+	// A row must stay at least this long past its expiry before it is pruned.
+	invitationCooldown = time.Hour
+)
 
 var (
 	// ErrInvitationInvalid covers unknown, expired and used invitations alike,
@@ -26,6 +41,14 @@ var (
 	// ErrInvitationEmail is returned when an email-bound invitation is used
 	// with another address.
 	ErrInvitationEmail = errors.New("this invitation is for another email address")
+	// ErrInvitationExists is returned when the address already has a pending
+	// invitation to the space.
+	ErrInvitationExists = errors.New("this address is already invited to the space")
+	// ErrInvitationCooldown is returned when an invitation to the address
+	// expired or was revoked a moment ago.
+	ErrInvitationCooldown = errors.New("this address was invited a moment ago; try again in a couple of hours")
+	// ErrAlreadyMember is returned when the address belongs to a member.
+	ErrAlreadyMember = errors.New("this address already belongs to a member of the space")
 	// ErrRegistrationClosed is returned when invitations may not create accounts.
 	ErrRegistrationClosed = errors.New("invitations cannot create accounts on this server; ask the server administrator")
 )
@@ -62,23 +85,72 @@ type invitation struct {
 	spaceName, inviter string
 }
 
-// Invite creates an invitation and returns its raw token, shown once.
+// Invite creates an invitation and returns its raw token, shown once. An
+// invitation bound to an address is refused when the address is a member, is
+// already invited to the space, or is in its cooldown.
 func (s Service) Invite(ctx context.Context, spaceID int64, inviter *auth.User, email, role string) (string, int64, error) {
 	if !ValidRole(role) {
 		return "", 0, errors.New("invalid space role")
 	}
+	email = strings.TrimSpace(email)
 	token := auth.RandomString(40)
 	now := time.Now().UTC()
-	id, err := s.registry().InsertInvitation(ctx, repo.NewInvitation{
-		SpaceID: spaceID, Email: strings.TrimSpace(email), Role: role, TokenHash: auth.HashToken(token),
-		InvitedBy: inviter.ID, ByServerAdmin: inviter.IsAdmin(), Expires: now.Add(invitationTTL), Now: now,
+	var id int64
+	err := store.Tx(ctx, s.Store.Server(), func(tx store.DB) error {
+		reg := repo.Repo{DB: tx}
+		if email != "" {
+			if err := checkInvitable(ctx, reg, spaceID, email, now); err != nil {
+				return err
+			}
+		}
+		var err error
+		id, err = reg.InsertInvitation(ctx, repo.NewInvitation{
+			SpaceID: spaceID, Email: email, Role: role, TokenHash: auth.HashToken(token),
+			InvitedBy: inviter.ID, ByServerAdmin: inviter.IsAdmin(), Expires: now.Add(invitationTTL), Now: now,
+		})
+		return err
 	})
-	return token, id, err
+	if err != nil {
+		return "", 0, err
+	}
+	return token, id, nil
 }
 
-// Invitations lists a space's invitations, newest first.
+func checkInvitable(ctx context.Context, reg repo.Repo, spaceID int64, email string, now time.Time) error {
+	if member, err := reg.IsMemberByEmail(ctx, spaceID, email); err != nil {
+		return err
+	} else if member {
+		return ErrAlreadyMember
+	}
+	held, err := reg.UnacceptedFor(ctx, email)
+	if err != nil {
+		return err
+	}
+	cooling := false
+	for _, h := range held {
+		switch {
+		case now.Before(h.Expires) && h.SpaceID == spaceID:
+			return ErrInvitationExists
+		case !now.Before(h.Expires):
+			cooling = true
+		}
+	}
+	if cooling {
+		return ErrInvitationCooldown
+	}
+	return nil
+}
+
+// DiscardInvitation deletes an unaccepted invitation outright, as when its email could
+// not be sent: nobody received it, so it should not hold the address.
+func (s Service) DiscardInvitation(ctx context.Context, id int64) error {
+	return s.registry().DeletePending(ctx, id)
+}
+
+// Invitations lists a space's invitations, newest first: accepted ones and
+// those still open.
 func (s Service) Invitations(ctx context.Context, spaceID int64) ([]Invitation, error) {
-	rows, err := s.registry().Invitations(ctx, spaceID)
+	rows, err := s.registry().Invitations(ctx, spaceID, time.Now().UTC())
 	if err != nil {
 		return nil, err
 	}
@@ -90,9 +162,15 @@ func (s Service) Invitations(ctx context.Context, spaceID int64) ([]Invitation, 
 	return out, nil
 }
 
-// Revoke deletes an invitation of a space.
+// Revoke ends a pending invitation of a space, or removes an accepted one from
+// its history. A revoked row stays until pruned, so its address is in the
+// cooldown.
 func (s Service) Revoke(ctx context.Context, spaceID, id int64) error {
-	ok, err := s.registry().DeleteInvitation(ctx, spaceID, id)
+	reg := s.registry()
+	ok, err := reg.ExpireInvitation(ctx, spaceID, id, time.Now().UTC())
+	if err == nil && !ok {
+		ok, err = reg.DeleteAcceptedInvitation(ctx, spaceID, id)
+	}
 	if err != nil {
 		return err
 	}
@@ -100,6 +178,28 @@ func (s Service) Revoke(ctx context.Context, spaceID, id int64) error {
 		return ErrInvitationInvalid
 	}
 	return nil
+}
+
+// PruneInvitations deletes the invitations that expired more than the cooldown
+// ago and returns how many. Run it often: the cooldown ends when the row goes.
+func (s Service) PruneInvitations(ctx context.Context) (int, error) {
+	return s.registry().PruneInvitations(ctx, time.Now().UTC().Add(-invitationCooldown))
+}
+
+// ClearInvitationCooldowns deletes the expired invitations of one address, or
+// of all when email is empty, and records it. It is for a server admin: a
+// space admin who could clear the cooldown would defeat it.
+func (s Service) ClearInvitationCooldowns(ctx context.Context, actor *auth.User, email string) (int, error) {
+	email = strings.TrimSpace(email)
+	n, err := s.registry().ClearExpiredInvitations(ctx, email, time.Now().UTC())
+	if err != nil {
+		return 0, err
+	}
+	details := fmt.Sprintf("%d cleared", n)
+	if email != "" {
+		details = fmt.Sprintf("%s: %d cleared", email, n)
+	}
+	return n, s.Audit(ctx, actor, "invitations.cleared", nil, nil, details)
 }
 
 func (s Service) lookupInvitation(ctx context.Context, reg repo.Repo, token string) (*invitation, error) {
@@ -200,6 +300,13 @@ func (s Service) Register(ctx context.Context, users auth.Users, token, name, em
 	if err != nil {
 		_ = users.Delete(ctx, u.ID)
 		return nil, nil, err
+	}
+	// The token of a bound invitation only ever went to that mailbox.
+	if inv.email != nil {
+		if err := users.SetEmailVerified(ctx, u.ID, true); err != nil {
+			return nil, nil, err
+		}
+		u.EmailVerified = true
 	}
 	return u, sp, nil
 }

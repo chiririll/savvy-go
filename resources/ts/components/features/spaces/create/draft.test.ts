@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { SpacePresets } from '@/types/spaces'
 import {
+    addInvitation,
     buildContent,
     canRemoveCurrency,
     draftProblems,
@@ -10,6 +11,7 @@ import {
     noCopy,
     previousStep,
     removeCategory,
+    removeInvitation,
     toCopySource,
     toRequest,
     type CopySource,
@@ -49,6 +51,12 @@ describe('steps', () => {
         expect(nextStep('name', 2)).toBe('copy')
         expect(nextStep('copy', 2)).toBe('entities')
         expect(previousStep('entities', 2)).toBe('copy')
+    })
+
+    it('asks for members after the entities and before the summary', () => {
+        expect(nextStep('entities', 0)).toBe('members')
+        expect(nextStep('members', 0)).toBe('confirm')
+        expect(previousStep('confirm', 0)).toBe('members')
     })
 
     it('stays inside the first and last step', () => {
@@ -190,5 +198,40 @@ describe('toCopySource', () => {
         expect(copy.accounts).toEqual([{ name: 'Card', type: 'bank', currency: 'EUR' }])
         expect(copy.categories[0]).toMatchObject({ icon: '', color: '' })
         expect(copy.tags).toEqual(['Mine'])
+    })
+})
+
+describe('invitations in the draft', () => {
+    it('starts with nobody', () => {
+        expect(emptyDraft().invitations).toEqual([])
+    })
+
+    it('adds an email once, whatever its case', () => {
+        let list = addInvitation([], { email: ' Bob@Example.org ', role: 'editor' })
+        expect(list).toHaveLength(1)
+        expect(list[0]).toMatchObject({ email: 'Bob@Example.org', role: 'editor' })
+        list = addInvitation(list, { email: 'bob@example.org', role: 'viewer' })
+        expect(list).toHaveLength(1)
+    })
+
+    it('does not add something that is not an address', () => {
+        expect(addInvitation([], { email: 'not-an-address', role: 'viewer' })).toEqual([])
+    })
+
+    it('adds a link invitation without an address, as many as asked', () => {
+        let list = addInvitation([], { email: null, role: 'viewer' })
+        list = addInvitation(list, { email: null, role: 'viewer' })
+        expect(list).toHaveLength(2)
+        expect(list[0].key).not.toBe(list[1].key)
+    })
+
+    it('removes one entry by its key', () => {
+        const list = addInvitation(addInvitation([], { email: 'a@example.org', role: 'viewer' }), { email: 'b@example.org', role: 'viewer' })
+        expect(removeInvitation(list, list[0].key).map((i) => i.email)).toEqual(['b@example.org'])
+    })
+
+    it('is not part of the request that creates the space', () => {
+        const draft = { ...emptyDraft(), name: 'Home', baseCurrency: 'EUR', invitations: addInvitation([], { email: 'a@example.org', role: 'viewer' }) }
+        expect(toRequest(draft)).not.toHaveProperty('invitations')
     })
 })

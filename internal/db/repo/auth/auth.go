@@ -176,7 +176,7 @@ func (r Repo) Tombstone(ctx context.Context, id int64, now time.Time) error {
 		q := db.Q(tx)
 		for _, del := range []func(context.Context, int64) error{
 			q.DeleteUserCredentials, q.DeleteUserAPITokens, q.DeleteUserPasskeys,
-			q.DeleteUserIdentities, q.DeleteUserPasswordTokens, q.DeleteUserRecoveryCodes,
+			q.DeleteUserIdentities, q.DeleteUserPasswordTokens, q.DeleteUserEmailVerificationTokens, q.DeleteUserRecoveryCodes,
 			q.DeleteUserMemberships,
 		} {
 			if err := del(ctx, id); err != nil {
@@ -469,6 +469,48 @@ func (r Repo) PasswordTokenByHash(ctx context.Context, hash string) (*OneTime, e
 	return mapFound(row, err, func(row sqlc.GetPasswordTokenByHashRow) OneTime {
 		return oneTimeFrom(row.ID, row.UserID, row.ExpiresAt)
 	})
+}
+
+// EmailVerification is the stored link that confirms an address.
+type EmailVerification struct {
+	UserID    int64
+	Email     string
+	ExpiresAt time.Time
+}
+
+// ReplaceEmailVerificationToken stores the user's confirmation link for an
+// address, ending any earlier one.
+func (r Repo) ReplaceEmailVerificationToken(ctx context.Context, userID int64, email, hash string, expires, now time.Time) error {
+	return store.Tx(ctx, r.DB, func(tx store.DB) error {
+		q := db.Q(tx)
+		if err := q.DeleteUserEmailVerificationTokens(ctx, userID); err != nil {
+			return err
+		}
+		return q.InsertEmailVerificationToken(ctx, sqlc.InsertEmailVerificationTokenParams{
+			UserID: userID, Email: email, TokenHash: hash, ExpiresAt: db.FormatTime(expires), CreatedAt: db.TimeNS(now),
+		})
+	})
+}
+
+// EmailVerificationTokenByHash finds a confirmation link, expired or not.
+func (r Repo) EmailVerificationTokenByHash(ctx context.Context, hash string) (*EmailVerification, error) {
+	row, err := r.q().GetEmailVerificationToken(ctx, hash)
+	return mapFound(row, err, func(row sqlc.GetEmailVerificationTokenRow) EmailVerification {
+		v := EmailVerification{UserID: row.UserID, Email: row.Email}
+		v.ExpiresAt, _ = db.ParseTimeString(row.ExpiresAt)
+		return v
+	})
+}
+
+// ConsumeEmailVerificationToken deletes a confirmation link and reports
+// whether there was one, so a link works once.
+func (r Repo) ConsumeEmailVerificationToken(ctx context.Context, hash string) (bool, error) {
+	res, err := r.q().ConsumeEmailVerificationToken(ctx, hash)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n == 1, nil
 }
 
 func (r Repo) InsertChallenge(ctx context.Context, userID int64, hash string, expires, now time.Time) error {

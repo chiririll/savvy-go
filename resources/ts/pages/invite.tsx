@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -18,8 +18,6 @@ export default function InvitePage() {
     const { t } = useTranslation('settings')
     const { token = '' } = useParams<{ token: string }>()
     const navigate = useNavigate()
-    // Only the emailed link carries this: it proves the mailbox, so the new account starts verified.
-    const sig = useSearchParams()[0].get('sig') ?? undefined
     const queryClient = useQueryClient()
     const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
     const authLoading = useAuthStore((state) => state.isLoading)
@@ -65,7 +63,7 @@ export default function InvitePage() {
     const register = (e: React.FormEvent) => {
         e.preventDefault()
         void run(async () => {
-            await invitationsApi.register(token, { ...form, sig })
+            await invitationsApi.register(token, form)
             await checkAuth()
             setCurrentId(null)
             navigate('/')

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMutation } from '@tanstack/react-query'
-import { Loader2 } from 'lucide-react'
+import { Check, Copy, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { ResponsiveDialog } from '@/components/shared/ResponsiveDialog'
 import { Button } from '@/components/ui/button'
@@ -15,8 +15,10 @@ import { useServerCurrencyCatalog, useSpaceContent, useSpacePresets, useSpaces, 
 import { loadSpaceDraft, useSpaceDraftStore } from '@/stores/space-draft'
 import type { Space } from '@/types/spaces'
 import { testId } from '@/lib/test-id'
-import { InviteForm } from './InviteForm'
+import { InvitationRow } from './InvitationRow'
 import { EntitiesStep } from './create/EntitiesStep'
+import { MembersStep } from './create/MembersStep'
+import { sendInvitations, type InvitationOutcome } from './create/send-invitations'
 import {
     buildContent,
     COPY_KINDS,
@@ -51,8 +53,8 @@ export function CreateSpaceModal({ open, onOpenChange, dismissible = true }: Pro
     const presets = useSpacePresets(open)
     const catalog = useServerCurrencyCatalog(open)
     const [loaded, setLoaded] = useState(false)
-    const [created, setCreated] = useState<Space | null>(null)
-    const [inviting, setInviting] = useState(false)
+    const [created, setCreated] = useState<{ space: Space; invitations: InvitationOutcome[] } | null>(null)
+    const [copied, setCopied] = useState<string | null>(null)
 
     const otherSpaces = spaces.length
     // Copying needs to read the other space; a source that is gone is ignored.
@@ -73,19 +75,22 @@ export function CreateSpaceModal({ open, onOpenChange, dismissible = true }: Pro
     const step: DraftStep = draft.step === 'copy' && otherSpaces === 0 ? 'name' : draft.step
     const problems = useMemo(() => draftProblems(draft), [draft])
 
+    // The space first, then the invitations: nobody is written to for a space that failed to be made.
     const create = useMutation({
-        mutationFn: () => spacesApi.create(toRequest(draft)),
-        onSuccess: (space) => {
+        mutationFn: async () => {
+            const space = await spacesApi.create(toRequest(draft))
+            return { space, invitations: await sendInvitations(space.id, draft.invitations) }
+        },
+        onSuccess: (result) => {
             clear()
-            setCreated(space)
+            setCreated(result)
         },
         onError: (error) => toast.error(getApiErrorMessage(error, t('spaces.create.failed'))),
     })
 
     const finish = async () => {
-        const space = created
+        const space = created?.space
         setCreated(null)
-        setInviting(false)
         onOpenChange(false)
         if (space) await switchSpace(space.id)
     }
@@ -131,23 +136,50 @@ export function CreateSpaceModal({ open, onOpenChange, dismissible = true }: Pro
     )
 
     if (created) {
+        const copyLink = async (outcome: InvitationOutcome) => {
+            if (!outcome.link) return
+            await navigator.clipboard.writeText(outcome.link)
+            setCopied(outcome.invitation.key)
+            toast.success(t('spaces.invitations.copied'))
+        }
         body = (
             <div className="space-y-4">
-                <p className="text-sm">{t('spaces.create.done.text', { name: created.name })}</p>
-                {inviting && <InviteForm spaceId={created.id} />}
+                <p className="text-sm">{t('spaces.create.done.text', { name: created.space.name })}</p>
+                {created.invitations.length > 0 && (
+                    <div className="space-y-2">
+                        <p className="text-sm font-medium">{t('spaces.create.done.invitations')}</p>
+                        <ul className="divide-y rounded-lg border">
+                            {created.invitations.map((outcome) => (
+                                <InvitationRow
+                                    key={outcome.invitation.key}
+                                    email={outcome.invitation.email}
+                                    role={outcome.invitation.role}
+                                    note={outcome.emailed ? t('spaces.invitations.sent') : undefined}
+                                    problem={outcome.error ? t('spaces.create.done.notSent', { error: outcome.error }) : undefined}
+                                >
+                                    {outcome.link && (
+                                        <Button type="button" variant="outline" size="sm" onClick={() => void copyLink(outcome)}>
+                                            {copied === outcome.invitation.key ? <Check className="size-4" /> : <Copy className="size-4" />}
+                                            {t('spaces.invitations.copy')}
+                                        </Button>
+                                    )}
+                                </InvitationRow>
+                            ))}
+                        </ul>
+                        {created.invitations.some((o) => o.error) && (
+                            <p className="text-xs text-muted-foreground">{t('spaces.create.done.retry')}</p>
+                        )}
+                        {created.invitations.some((o) => o.link) && (
+                            <p className="text-xs text-muted-foreground">{t('spaces.invitations.linkReady')}</p>
+                        )}
+                    </div>
+                )}
             </div>
         )
         footer = (
-            <>
-                {!inviting && (
-                    <Button type="button" variant="outline" onClick={() => setInviting(true)} {...testId('create-space-invite')}>
-                        {t('spaces.create.done.invite')}
-                    </Button>
-                )}
-                <Button type="button" onClick={() => void finish()} {...testId('create-space-done')}>
-                    {t('actions.done', { ns: 'common' })}
-                </Button>
-            </>
+            <Button type="button" onClick={() => void finish()} {...testId('create-space-done')}>
+                {t('actions.done', { ns: 'common' })}
+            </Button>
         )
     } else if (waiting) {
         body = <Loader2 className="mx-auto size-6 animate-spin text-muted-foreground" />
@@ -232,7 +264,17 @@ export function CreateSpaceModal({ open, onOpenChange, dismissible = true }: Pro
         footer = (
             <>
                 {back}
-                <Button type="button" disabled={!draft.baseCurrency || problems.includes('accounts') || problems.includes('balances')} onClick={() => goTo('confirm')} {...testId('create-space-next')}>
+                <Button type="button" disabled={!draft.baseCurrency || problems.includes('accounts') || problems.includes('balances')} onClick={() => goTo('members')} {...testId('create-space-next')}>
+                    {t('actions.continue', { ns: 'common' })}
+                </Button>
+            </>
+        )
+    } else if (step === 'members') {
+        body = <MembersStep invitations={draft.invitations} onChange={(invitations) => update({ invitations })} />
+        footer = (
+            <>
+                {back}
+                <Button type="button" onClick={() => goTo('confirm')} {...testId('create-space-next')}>
                     {t('actions.continue', { ns: 'common' })}
                 </Button>
             </>
@@ -253,6 +295,8 @@ export function CreateSpaceModal({ open, onOpenChange, dismissible = true }: Pro
                 <dd>{request.categories?.length ?? 0}</dd>
                 <dt className="text-muted-foreground">{t('spaces.create.summary.tags')}</dt>
                 <dd>{request.tags?.length ?? 0}</dd>
+                <dt className="text-muted-foreground">{t('spaces.create.summary.invitations')}</dt>
+                <dd>{draft.invitations.length}</dd>
             </dl>
         )
         footer = (

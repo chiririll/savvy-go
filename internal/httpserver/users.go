@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"savvy-go/internal/auth"
+	"savvy-go/internal/mailer"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -212,7 +213,7 @@ func (s *Server) usersIssueToken(w http.ResponseWriter, r *http.Request) {
 		writeData(w, http.StatusOK, payload)
 		return
 	}
-	if err := s.sendMail(r.Context(), resetMessage(u, s.cfg.URL()+"/set-password/"+tok, exp)); err != nil {
+	if err := s.sendMail(r.Context(), mailer.PasswordReset(u.Email, u.Name, s.cfg.URL()+"/set-password/"+tok, exp)); err != nil {
 		// The link was never seen by anyone: do not leave it valid.
 		_ = s.tokens.RevokeActive(r.Context(), u.ID)
 		writeMessage(w, http.StatusUnprocessableEntity, "Could not send the email: "+err.Error())

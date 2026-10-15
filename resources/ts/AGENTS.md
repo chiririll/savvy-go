@@ -22,7 +22,7 @@ npm run build                          # -> public/build; release builds embed i
 ## Onboarding
 
 - `pages/onboarding/`: admin and server setup.
-- Create-space modal drafts (`stores/space-draft.ts`) browser-only. No server drafts. Nothing sent before final `POST /api/spaces`.
+- Create-space modal drafts (`stores/space-draft.ts`) browser-only. No server drafts. Nothing sent before final `POST /api/spaces`; its invitation list is draft too, invitations go out only after create succeeds.
 - "Copy from another space" is one-time copy in SPA.
 
 ## i18n

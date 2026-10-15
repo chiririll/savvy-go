@@ -4,7 +4,7 @@ import { emptyDraft, type SpaceDraft } from '@/components/features/spaces/create
 import { useAuthStore } from '@/stores/auth'
 
 /** Bump when the shape of SpaceDraft changes: an older draft is dropped. */
-export const DRAFT_VERSION = 2
+export const DRAFT_VERSION = 3
 export const DRAFT_KEY = 'savvy-space-draft'
 
 /** One draft per user of this browser. */

@@ -4,15 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"net/url"
-	"time"
 
 	"savvy-go/internal/auth"
+	"savvy-go/internal/mailer"
 )
 
 const (
 	settingRequireVerification = "require_email_verification"
-	verificationTTL            = 7 * 24 * time.Hour
 	errEmailUnverified         = "email_unverified"
 )
 
@@ -78,9 +76,11 @@ func (s *Server) sendVerification(ctx context.Context, u *auth.User) string {
 	case s.cfg.URL() == "":
 		return noAppURLMessage
 	}
-	exp := time.Now().Add(verificationTTL)
-	link := s.cfg.URL() + "/verify-email/" + url.PathEscape(s.links.Verification(u.ID, u.Email, exp))
-	if err := s.sendMail(ctx, verifyMessage(u, link, exp)); err != nil {
+	token, exp, err := s.verifications.Issue(ctx, u)
+	if err != nil {
+		return "Could not create the link: " + err.Error()
+	}
+	if err := s.sendMail(ctx, mailer.EmailVerification(u.Email, u.Name, s.cfg.URL()+"/verify-email/"+token, exp)); err != nil {
 		return "Could not send the email: " + err.Error()
 	}
 	return ""
@@ -108,17 +108,12 @@ func (s *Server) verifyEmail(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
 	invalid := map[string][]string{"token": {"This link is invalid or has expired."}}
-	id, ok := s.links.VerificationUser(body.Token)
-	if !ok {
-		writeValidation(w, invalid)
-		return
-	}
-	u, err := s.users.ByID(r.Context(), id)
+	u, err := s.verifications.Consume(r.Context(), body.Token)
 	if err != nil {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	if u == nil || u.Deleted || !s.links.VerificationValid(body.Token, u.Email, time.Now()) {
+	if u == nil {
 		writeValidation(w, invalid)
 		return
 	}

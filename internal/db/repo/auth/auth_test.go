@@ -295,3 +295,29 @@ func TestPasskeyChallengeIsTakenOnceAndPerType(t *testing.T) {
 		t.Fatalf("anonymous challenge = %+v", c)
 	}
 }
+
+func TestEmailVerificationTokenIsOnePerUserAndSingleUse(t *testing.T) {
+	r, id := newRepo(t)
+	now := time.Now().UTC().Truncate(time.Second)
+	ctx := context.Background()
+
+	if err := r.ReplaceEmailVerificationToken(ctx, id, "ann@test.com", "first", now.Add(time.Hour), now); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.ReplaceEmailVerificationToken(ctx, id, "ann@test.com", "second", now.Add(time.Hour), now); err != nil {
+		t.Fatal(err)
+	}
+	if tok, _ := r.EmailVerificationTokenByHash(ctx, "first"); tok != nil {
+		t.Fatalf("the replaced token is still valid: %+v", tok)
+	}
+	tok, err := r.EmailVerificationTokenByHash(ctx, "second")
+	if err != nil || tok == nil || tok.UserID != id || tok.Email != "ann@test.com" || !tok.ExpiresAt.Equal(now.Add(time.Hour)) {
+		t.Fatalf("token = %+v, %v", tok, err)
+	}
+	if ok, _ := r.ConsumeEmailVerificationToken(ctx, "second"); !ok {
+		t.Fatal("first use failed")
+	}
+	if ok, _ := r.ConsumeEmailVerificationToken(ctx, "second"); ok {
+		t.Fatal("a token was used twice")
+	}
+}

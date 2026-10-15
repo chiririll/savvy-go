@@ -10,6 +10,7 @@ import { useSettings, useUpdateSettings, useSsoProviders, useMailStatus } from '
 import { authApi } from '@/api'
 import { useUser } from '@/stores/auth'
 import { MailSection } from '@/components/features/mail'
+import { ClearInvitationsSection } from '@/components/features/spaces/ClearInvitationsSection'
 import { Settings } from '@/types'
 
 /** A number field saved on blur; empty means null when nullable. */
@@ -234,6 +235,8 @@ export default function AdminSystemPage() {
                     </SettingsSection>
 
                     <MailSection />
+
+                    <ClearInvitationsSection />
 
                     <SettingsSection icon={Boxes} title={t('system.spaces.title')} description={t('system.spaces.description')}>
                         <div className="divide-y rounded-lg border">

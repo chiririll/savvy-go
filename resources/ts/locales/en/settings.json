@@ -87,6 +87,14 @@
             "quotaDescription": "For every space without its own limit. 0 is unlimited.",
             "backupsMax": "Backups per space",
             "backupsMaxDescription": "Older backups of a space are removed. 0 keeps all."
+        },
+        "invitations": {
+            "title": "Invitation cooldown",
+            "description": "After an invitation to an address is revoked or runs out, that address cannot be invited again for one to two hours, so nobody can be flooded with emails. Clear the wait here.",
+            "placeholder": "Address (empty: every address)",
+            "clearOne": "Clear for this address",
+            "clearAll": "Clear for all",
+            "cleared": "Cleared {{count, plural(one: # invitation; other: # invitations)}}"
         }
     },
     "security": {
@@ -573,12 +581,25 @@
                 "currencies": "Other currencies",
                 "accounts": "Accounts",
                 "categories": "Categories",
-                "tags": "Tags"
+                "tags": "Tags",
+                "invitations": "Invitations"
             },
             "done": {
                 "title": "Space created",
-                "text": "\"{{name}}\" is ready. You can invite members now or later in the space settings.",
-                "invite": "Invite members"
+                "text": "\"{{name}}\" is ready. You can invite more members later in the space settings.",
+                "invitations": "Invitations",
+                "notSent": "Not sent: {{error}}",
+                "retry": "You can invite them again from the space settings."
+            },
+            "members": {
+                "hint": "Optional. Nobody is invited until you create the space; emails go out then.",
+                "add": "Add",
+                "remove": "Remove {{who}}",
+                "none": "No one added yet.",
+                "invalid": "Enter a valid email address.",
+                "duplicate": "This address is already in the list.",
+                "byEmail": "by email",
+                "byLink": "link to copy"
             }
         },
         "toasts": {
@@ -618,13 +639,11 @@
         },
         "invitations": {
             "title": "Invitations",
-            "description": "Single-use links to join this space, valid for 7 days.",
-            "emailPlaceholder": "Email (optional: only this person can use it)",
-            "create": "Create link",
+            "description": "Invitations to join this space, valid for 7 days. One sent by email can only be used by that address.",
+            "emailPlaceholder": "Email address",
             "linkReady": "Send this link to the person you invite. It is shown only once.",
             "copied": "Link copied",
             "emailSent": "Invitation emailed to {{email}}",
-            "emailFailed": "The email was not sent: {{error}} Send the link yourself.",
             "anyone": "Anyone with the link",
             "expires": "Expires {{date}}",
             "revoke": "Revoke",
@@ -634,7 +653,14 @@
             "cancelTitle": "Cancel this invitation?",
             "cancelText": "The link for {{who}} will stop working. You can invite again at any time.",
             "cancelConfirm": "Cancel invitation",
-            "keep": "Keep it"
+            "keep": "Keep it",
+            "method": "Invite by",
+            "methodEmail": "By email",
+            "methodLink": "Copy a link",
+            "unavailable": "Invitations are unavailable: this server only invites by email, and email is off.",
+            "emailOff": "Invitations cannot be emailed: {{reason}}",
+            "emailRequired": "This server requires invitations by email, so the link goes only to the address you enter.",
+            "add": "Invite"
         },
         "links": {
             "title": "Linked spaces",

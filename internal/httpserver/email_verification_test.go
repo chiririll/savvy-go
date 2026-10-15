@@ -197,6 +197,42 @@ func TestVerifyEmailByLink(t *testing.T) {
 	}
 }
 
+func TestVerificationLinkIsOpaqueSingleUseAndReplacedByTheNextOne(t *testing.T) {
+	rec := &recorder{on: true}
+	a, _, _ := newMailApp(t, rec)
+	user := a.createUser("u@test.com", "secret1", roleEditor)
+	us := a.issue(user, false)
+	tokenOf := func(m mailer.Message) string {
+		return strings.TrimPrefix(linkIn(t, m).Path, "/verify-email/")
+	}
+	verify := func(token string) int {
+		res := a.do("POST", "/api/auth/verify-email", map[string]any{"token": token}, "", "")
+		res.Body.Close()
+		return res.StatusCode
+	}
+
+	a.do("POST", "/api/auth/verify-email/resend", nil, us.Token, us.CSRF)
+	a.do("POST", "/api/auth/verify-email/resend", nil, us.Token, us.CSRF)
+	msgs := rec.messages()
+	if len(msgs) != 2 {
+		t.Fatalf("messages = %d", len(msgs))
+	}
+	first, second := tokenOf(msgs[0]), tokenOf(msgs[1])
+	if link := linkIn(t, msgs[1]); link.RawQuery != "" || strings.ContainsAny(second, ".+/=") || len(second) < 40 {
+		t.Fatalf("link %s: want /verify-email/<one opaque token>", link)
+	}
+
+	if got := verify(first); got != 422 {
+		t.Fatalf("the replaced link: %d", got)
+	}
+	if got := verify(second); got != 200 || !a.verified(user.ID) {
+		t.Fatalf("the newest link: %d", got)
+	}
+	if got := verify(second); got != 422 {
+		t.Fatalf("a link used twice: %d", got)
+	}
+}
+
 func TestVerificationLinkDiesWithTheAddress(t *testing.T) {
 	rec := &recorder{on: true}
 	a, admin, _ := newMailApp(t, rec)
@@ -256,70 +292,6 @@ func TestAdminSetsVerifiedByHandAndAddressChangeClearsIt(t *testing.T) {
 	a.do("PATCH", "/api/users/"+itoa(id), map[string]any{"email": "again@test.com", "emailVerified": true}, sess.Token, sess.CSRF)
 	if !a.verified(id) {
 		t.Fatal("the admin's explicit mark was lost")
-	}
-}
-
-func TestEmailedInvitationVerifiesTheAddressAndACopiedLinkDoesNot(t *testing.T) {
-	rec := &recorder{on: true}
-	a, sess, admin := newMailApp(t, rec)
-	// Verification is required, so an unproven address gets a confirmation email.
-	if err := a.s.users.SetEmailVerified(context.Background(), admin.ID, true); err != nil {
-		t.Fatal(err)
-	}
-	if err := a.s.settings.Set(context.Background(), "require_email_verification", true); err != nil {
-		t.Fatal(err)
-	}
-	invite := func(email string) string {
-		res := a.do("POST", "/api/spaces/"+itoa(a.space.ID)+"/invitations", map[string]any{"email": email, "role": "editor"}, sess.Token, sess.CSRF)
-		data := decodeJSON(t, res)["data"].(map[string]any)
-		if res.StatusCode != 201 || data["emailSent"] != true {
-			t.Fatalf("invite %s: %d %v", email, res.StatusCode, data)
-		}
-		return data["token"].(string)
-	}
-	register := func(token, email, sig string) int64 {
-		body := map[string]any{"name": "New", "email": email, "password": "secret12", "sig": sig}
-		res := a.do("POST", "/api/invitations/"+token+"/register", body, "", "")
-		if res.StatusCode != 201 {
-			t.Fatalf("register %s: %d %v", email, res.StatusCode, decodeJSON(t, res))
-		}
-		u, _ := a.s.users.ByEmail(context.Background(), email)
-		return u.ID
-	}
-
-	// The link in the email carries a signature for that address.
-	token := invite("signed@example.org")
-	link := linkIn(t, rec.messages()[0])
-	if link.Path != "/invite/"+token || link.Query().Get("email") != "signed@example.org" || link.Query().Get("sig") == "" {
-		t.Fatalf("emailed link %s", link)
-	}
-	id := register(token, "signed@example.org", link.Query().Get("sig"))
-	if !a.verified(id) {
-		t.Fatal("registering from the emailed link left the address unverified")
-	}
-	if n := len(rec.messages()); n != 1 {
-		t.Fatalf("a verified address was sent a verification email (%d messages)", n)
-	}
-
-	// The link the app returns for copying has no signature: same invitation, no proof.
-	token = invite("copied@example.org")
-	id = register(token, "copied@example.org", "")
-	if a.verified(id) {
-		t.Fatal("registering from a copied link verified the address")
-	}
-	// The new account is asked to confirm by email instead.
-	msgs := rec.messages()
-	last := msgs[len(msgs)-1]
-	if last.To != "copied@example.org" || !strings.HasPrefix(linkIn(t, last).Path, "/verify-email/") {
-		t.Fatalf("expected a verification email, got %+v", last)
-	}
-
-	// A signature for another address or invitation is the same as none.
-	token = invite("forged@example.org")
-	other := linkIn(t, rec.messages()[0]).Query().Get("sig")
-	id = register(token, "forged@example.org", other)
-	if a.verified(id) {
-		t.Fatal("a signature made for someone else verified the address")
 	}
 }
 

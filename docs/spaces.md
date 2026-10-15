@@ -36,7 +36,20 @@ A space always keeps one admin: the last admin cannot leave or be demoted while 
 
 ## Invitations
 
-Space admins invite people from **Settings → Space** with a link for a chosen role, optionally tied to an email. Existing users join directly; new users can register through the link if the server admin allows it. When the server has [email](deployment.md#email) set up and the invitation has an address, the link is emailed too; it is always shown on screen as well. Only the emailed link confirms the new user's address (see [email confirmation](deployment.md#email-confirmation)); the copied one does not.
+Space admins invite people from **Settings → Space**, or from the **Invite people** step when they create a space. An invitation is for a chosen role, valid for 7 days and works once. Existing users join directly; new users can register through it if the server admin allows it.
+
+How an invitation is made depends on the server:
+
+| Server | Invite by |
+|---|---|
+| [Email confirmation](deployment.md#email-confirmation) is required | email only |
+| [Email](deployment.md#email) is set up | email, or a link to copy: you choose |
+| No email | a link to copy |
+
+- **By email**, the link is sent to that address and nobody else sees it, so the invited person can only use it with that address, and registering through it confirms the address. To invite someone else, revoke it and invite again.
+- **By a link**, you copy the link once and send it yourself. Anyone who has it can use it, and an account created through it starts unconfirmed.
+- When you create a space, the people you add are only a list until you finish: emails go out after the space is created, and links appear on the last screen to copy. Remove someone from the list before that and nothing is sent.
+- An address cannot be invited to a space it is already invited to or belongs to. After an invitation is revoked or runs out, the address cannot be invited again for one to two hours. A server admin can end that wait in **Administration → System**.
 
 ## Linked spaces and transfers
 

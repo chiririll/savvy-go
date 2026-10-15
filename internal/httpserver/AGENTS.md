@@ -6,8 +6,9 @@
 
 ## Mailer and bootstrap
 
-- Mailer: config.toml only, never DB. Read via `s.mailer()` / `s.mailSettings()`, never `cfg.Mail`. Email is convenience: invitations always return link, failed send never undoes them. Bad section disables mail, does not stop startup.
-- Emailed links are stateless, signed with the server key (`emaillink`), so a restore that replaces the key ends them. Only the emailed invitation link carries `sig` and verifies the address; the link returned for copying never does.
+- Mailer: config.toml only, never DB. Read via `s.mailer()` / `s.mailSettings()`, never `cfg.Mail`. Bad section disables mail, does not stop startup.
+- Emailed links are random tokens stored hashed, never signed. Invitation with address is email-only: route never returns its token, so holding it proves the mailbox and registering confirms the address. Failed send deletes the row.
+- Revoke expires invitation, keeps row: unaccepted row per address is the cooldown. Hourly `invitations:prune` and admin clear delete it. Never hard-delete on revoke.
 - Email-verification gate (`requireVerifiedEmail`) covers API tokens too. Routes an unverified user may still call: `verificationExempt`.
 - Bootstrap: first-run restore runs inside `Guard.Register`, so failed restore keeps password. Any other route creating first user must call `Invalidate`.
 

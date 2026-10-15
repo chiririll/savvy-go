@@ -150,6 +150,15 @@ type Currency struct {
 	UpdatedAt sql.NullString
 }
 
+type EmailVerificationToken struct {
+	ID        int64
+	UserID    int64
+	Email     string
+	TokenHash string
+	ExpiresAt string
+	CreatedAt sql.NullString
+}
+
 type IdentityProvider struct {
 	ID              int64
 	Name            string

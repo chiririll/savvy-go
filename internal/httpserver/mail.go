@@ -3,12 +3,10 @@ package httpserver
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
-	"savvy-go/internal/auth"
 	"savvy-go/internal/mailer"
 )
 
@@ -182,45 +180,6 @@ func (s *Server) mailOffReason() string {
 }
 
 const noAppURLMessage = "The public URL is not set, so the link would point nowhere. Set app_url first."
-
-// resetMessage is the email with a one-time link to choose a new password.
-func resetMessage(u *auth.User, link string, expires time.Time) mailer.Message {
-	return mailer.Message{
-		To:      u.Email,
-		Subject: "Set your Go Savvy password",
-		Text: fmt.Sprintf("Hello %s,\n\nAn administrator asked to reset your Go Savvy password. "+
-			"Open this link to choose a new one:\n\n%s\n\n"+
-			"The link works once and expires on %s. If you did not expect this email, you can ignore it.\n",
-			oneLine(u.Name), link, expires.UTC().Format("2006-01-02 15:04 UTC")),
-	}
-}
-
-// verifyMessage is the email with the link that confirms an address.
-func verifyMessage(u *auth.User, link string, expires time.Time) mailer.Message {
-	return mailer.Message{
-		To:      u.Email,
-		Subject: "Confirm your Go Savvy email address",
-		Text: fmt.Sprintf("Hello %s,\n\nOpen this link to confirm that this is your email address:\n\n%s\n\n"+
-			"The link expires on %s. If you did not expect this email, you can ignore it.\n",
-			oneLine(u.Name), link, expires.UTC().Format("2006-01-02 15:04 UTC")),
-	}
-}
-
-// inviteMessage is the email with the link to join a space.
-func inviteMessage(to, inviter, space, role, link string) mailer.Message {
-	return mailer.Message{
-		To:      to,
-		Subject: "You are invited to " + oneLine(space) + " on Go Savvy",
-		Text: fmt.Sprintf("%s invited you to the space \"%s\" on Go Savvy as %s.\n\n"+
-			"Open this link to join:\n\n%s\n\nIf you did not expect this email, you can ignore it.\n",
-			oneLine(inviter), oneLine(space), role, link),
-	}
-}
-
-// oneLine keeps a name from breaking out of a header line.
-func oneLine(s string) string {
-	return strings.Join(strings.Fields(s), " ")
-}
 
 func nullIfEmpty(s string) any {
 	if s == "" {

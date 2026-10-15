@@ -56,6 +56,16 @@ CREATE TABLE IF NOT EXISTS password_tokens (
 ) STRICT;
 CREATE INDEX IF NOT EXISTS password_tokens_user_consumed_idx ON password_tokens (user_id, consumed_at);
 CREATE INDEX IF NOT EXISTS password_tokens_expires_idx ON password_tokens (expires_at);
+-- The link that confirms an email address. One per user: asking again replaces
+-- it. It names the address it was sent to, so changing the address ends it.
+CREATE TABLE IF NOT EXISTS email_verification_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+    email TEXT NOT NULL COLLATE NOCASE,
+    token_hash TEXT NOT NULL UNIQUE,
+    expires_at TEXT NOT NULL,
+    created_at TEXT
+) STRICT;
 CREATE TABLE IF NOT EXISTS two_factor_challenges (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

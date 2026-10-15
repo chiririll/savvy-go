@@ -11,14 +11,20 @@ import (
 	"savvy-go/internal/store"
 )
 
+// invite creates an invitation and returns its token. It goes through the
+// service, not the route: the route never hands out the token of an emailed
+// invitation, and these tests need the link.
 func (a *testApp) invite(spaceID int64, sess *auth.Issued, email, role string) string {
 	a.t.Helper()
-	res := a.do("POST", spacePath(spaceID, "/invitations"), map[string]any{"email": email, "role": role}, sess.Token, sess.CSRF)
-	body := decodeJSON(a.t, res)
-	if res.StatusCode != http.StatusCreated {
-		a.t.Fatalf("invite %d %v", res.StatusCode, body)
+	session, err := a.s.sessions.Resolve(context.Background(), sess.Token)
+	if err != nil || session == nil {
+		a.t.Fatalf("inviter: %v", err)
 	}
-	return body["data"].(map[string]any)["token"].(string)
+	token, _, err := a.s.spaces.Invite(context.Background(), spaceID, session.User, email, role)
+	if err != nil {
+		a.t.Fatal(err)
+	}
+	return token
 }
 
 func memberRole(t *testing.T, a *testApp, spaceID, userID int64) string {

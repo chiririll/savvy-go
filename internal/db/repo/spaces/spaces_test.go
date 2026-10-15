@@ -8,12 +8,14 @@ import (
 	"savvy-go/internal/db/dbtest"
 	authrepo "savvy-go/internal/db/repo/auth"
 	spacesrepo "savvy-go/internal/db/repo/spaces"
+	"savvy-go/internal/store"
 )
 
 var ctx = context.Background()
 
 // registry is a server database with two users and one space owned by the first.
 type registry struct {
+	db       store.DB
 	repo     spacesrepo.Repo
 	ann, bob int64
 	space    int64
@@ -29,7 +31,7 @@ func newRegistry(t *testing.T) *registry {
 		t.Fatal(err)
 	}
 	bob, _ := users.InsertUser(ctx, "Bob", "bob@test.com", "h", "user", now)
-	r := &registry{repo: spacesrepo.Repo{DB: d}, ann: ann, bob: bob}
+	r := &registry{db: d, repo: spacesrepo.Repo{DB: d}, ann: ann, bob: bob}
 	r.space, err = r.repo.Insert(ctx, "uuid-1", "Home", &ann, now)
 	if err != nil {
 		t.Fatal(err)
@@ -148,15 +150,101 @@ func TestInvitationsAreUsedOnceAndRevokedByTheirSpace(t *testing.T) {
 		t.Fatal("the invitation is not marked used")
 	}
 
-	list, _ := r.repo.Invitations(ctx, r.space)
+	list, _ := r.repo.Invitations(ctx, r.space, now)
 	if len(list) != 2 || list[0].ID < list[1].ID { // newest first
 		t.Fatalf("invitations = %+v", list)
 	}
-	if ok, _ := r.repo.DeleteInvitation(ctx, r.space+1, inv.ID); ok {
+	if ok, _ := r.repo.DeleteAcceptedInvitation(ctx, r.space+1, inv.ID); ok {
 		t.Fatal("another space deleted the invitation")
 	}
-	if ok, _ := r.repo.DeleteInvitation(ctx, r.space, inv.ID); !ok {
-		t.Fatal("the space could not delete its invitation")
+	if ok, _ := r.repo.DeleteAcceptedInvitation(ctx, r.space, list[0].ID); ok {
+		t.Fatal("a pending invitation was deleted as if accepted")
+	}
+	if ok, _ := r.repo.DeleteAcceptedInvitation(ctx, r.space, inv.ID); !ok {
+		t.Fatal("the space could not delete its accepted invitation")
+	}
+}
+
+func TestExpiringAnInvitationKeepsTheRowForItsCooldown(t *testing.T) {
+	r := newRegistry(t)
+	now := time.Now().UTC().Truncate(time.Second)
+	id, err := r.repo.InsertInvitation(ctx, spacesrepo.NewInvitation{
+		SpaceID: r.space, InvitedBy: r.ann, Email: "carol@test.com", Role: "editor", TokenHash: "h1",
+		Expires: now.Add(time.Hour), Now: now,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if ok, _ := r.repo.ExpireInvitation(ctx, r.space+1, id, now); ok {
+		t.Fatal("another space expired the invitation")
+	}
+	if ok, _ := r.repo.ExpireInvitation(ctx, r.space, id, now); !ok {
+		t.Fatal("the space could not expire its invitation")
+	}
+	if ok, _ := r.repo.ExpireInvitation(ctx, r.space, id, now); ok {
+		t.Fatal("an expired invitation was expired again")
+	}
+	if list, _ := r.repo.Invitations(ctx, r.space, now); len(list) != 0 {
+		t.Fatalf("an expired invitation is still listed: %+v", list)
+	}
+	held, err := r.repo.UnacceptedFor(ctx, "CAROL@test.com")
+	if err != nil || len(held) != 1 || held[0].SpaceID != r.space || held[0].Expires.After(now) {
+		t.Fatalf("held = %+v, %v; the expired row must remain, found by address in any case", held, err)
+	}
+	if n, _ := r.repo.PruneInvitations(ctx, now.Add(-time.Minute)); n != 0 {
+		t.Fatalf("pruned %d rows that expired after the cutoff", n)
+	}
+	if n, _ := r.repo.PruneInvitations(ctx, now.Add(time.Minute)); n != 1 {
+		t.Fatalf("pruned %d rows, want 1", n)
+	}
+}
+
+func TestClearingExpiredInvitationsSparesPendingAndAccepted(t *testing.T) {
+	r := newRegistry(t)
+	now := time.Now().UTC().Truncate(time.Second)
+	add := func(email, hash string, expires time.Time) int64 {
+		id, err := r.repo.InsertInvitation(ctx, spacesrepo.NewInvitation{
+			SpaceID: r.space, InvitedBy: r.ann, Email: email, Role: "editor", TokenHash: hash, Expires: expires, Now: now,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	add("a@test.com", "a", now.Add(-time.Minute))
+	add("b@test.com", "b", now.Add(-time.Minute))
+	add("c@test.com", "c", now.Add(time.Hour))
+	done := add("d@test.com", "d", now.Add(-time.Minute))
+	if ok, _ := r.repo.AcceptInvitation(ctx, done, r.bob, now); !ok {
+		t.Fatal("accept")
+	}
+
+	if n, _ := r.repo.ClearExpiredInvitations(ctx, "A@test.com", now); n != 1 {
+		t.Fatalf("cleared %d for one address, want 1", n)
+	}
+	if n, _ := r.repo.ClearExpiredInvitations(ctx, "", now); n != 1 {
+		t.Fatalf("cleared %d for all, want only b", n)
+	}
+	var left int
+	if err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM space_invitations`).Scan(&left); err != nil || left != 2 {
+		t.Fatalf("left %d, %v; the pending and the accepted row stay", left, err)
+	}
+}
+
+func TestMemberByEmail(t *testing.T) {
+	r := newRegistry(t)
+	if err := r.repo.UpsertMember(ctx, r.space, r.ann, "admin", time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := r.repo.IsMemberByEmail(ctx, r.space, "ann@test.com"); err != nil || !ok {
+		t.Fatalf("ann is a member: %v, %v", ok, err)
+	}
+	if ok, _ := r.repo.IsMemberByEmail(ctx, r.space+1, "ann@test.com"); ok {
+		t.Fatal("membership of another space counted")
+	}
+	if ok, _ := r.repo.IsMemberByEmail(ctx, r.space, "nobody@test.com"); ok {
+		t.Fatal("an unknown address is not a member")
 	}
 }
 

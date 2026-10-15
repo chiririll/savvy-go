@@ -451,55 +451,6 @@ func TestResetLinkStillReturnsTheTokenWhenNotSending(t *testing.T) {
 	}
 }
 
-func TestInvitationEmailIsSentAndNeverBlocksTheInvitation(t *testing.T) {
-	rec := &recorder{on: true}
-	a, sess, _ := newMailApp(t, rec)
-	path := "/api/spaces/" + itoa(a.space.ID) + "/invitations"
-
-	res := a.do("POST", path, map[string]any{"email": "new@example.org", "role": "editor"}, sess.Token, sess.CSRF)
-	body := decodeJSON(t, res)
-	data, _ := body["data"].(map[string]any)
-	if res.StatusCode != 201 || data["emailSent"] != true {
-		t.Fatalf("invite %d %v", res.StatusCode, body)
-	}
-	token, _ := data["token"].(string)
-	got := rec.messages()
-	if token == "" || len(got) != 1 || got[0].To != "new@example.org" ||
-		!strings.Contains(got[0].Text, "http://localhost:8080/invite/"+token) {
-		t.Fatalf("token %q sent %+v", token, got)
-	}
-
-	// Mail failing must not undo the invitation: the link is still returned.
-	rec.sendErr = errors.New("connection refused")
-	res = a.do("POST", path, map[string]any{"email": "second@example.org", "role": "viewer"}, sess.Token, sess.CSRF)
-	data = decodeJSON(t, res)["data"].(map[string]any)
-	if res.StatusCode != 201 || data["token"] == "" || data["emailSent"] != false ||
-		!strings.Contains(toString(data["emailError"]), "connection refused") {
-		t.Errorf("failed send: %d %v", res.StatusCode, data)
-	}
-
-	// An open invitation has nobody to write to.
-	rec.sendErr = nil
-	before := len(rec.messages())
-	res = a.do("POST", path, map[string]any{"role": "viewer"}, sess.Token, sess.CSRF)
-	data = decodeJSON(t, res)["data"].(map[string]any)
-	if res.StatusCode != 201 || data["emailSent"] != false || len(rec.messages()) != before {
-		t.Errorf("open invitation: %d %v", res.StatusCode, data)
-	}
-}
-
-func TestInvitationWithoutMailOrURLJustReturnsTheLink(t *testing.T) {
-	a, sess, _ := newMailApp(t, &recorder{})
-	res := a.do("POST", "/api/spaces/"+itoa(a.space.ID)+"/invitations", map[string]any{"email": "new@example.org", "role": "editor"}, sess.Token, sess.CSRF)
-	data := decodeJSON(t, res)["data"].(map[string]any)
-	if res.StatusCode != 201 || data["token"] == "" || data["emailSent"] != false {
-		t.Errorf("%d %v", res.StatusCode, data)
-	}
-	if _, has := data["emailError"]; has {
-		t.Errorf("mail off is not an error: %v", data)
-	}
-}
-
 func toString(v any) string {
 	switch t := v.(type) {
 	case nil:
