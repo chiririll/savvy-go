@@ -1,7 +1,7 @@
 import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import type { Locator, Page as PwPage } from 'playwright'
-import { log, slug, state, type Job } from './shared.ts'
+import { log, slug, state, type Job } from '../shared.ts'
 
 // Controls: what changes the way a page shows its data, such as the type of a chart, its grouping or
 // the period of a report. A group of choices is marked data-testid-controls and a select

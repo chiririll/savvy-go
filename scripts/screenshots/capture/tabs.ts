@@ -2,7 +2,7 @@ import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import type { Locator, Page as PwPage } from 'playwright'
 import { captureControls } from './controls.ts'
-import { log, slug, state, type Job } from './shared.ts'
+import { log, slug, state, type Job } from '../shared.ts'
 
 // Tabs: a group of choices of which one is selected. Radix tabs are found by their role; the
 // app's SegmentedChoice has no role and carries test ids instead (resources/ts/lib/test-id.ts).

@@ -18,6 +18,7 @@ import { isLaravelFile } from '@/components/features/backups/LaravelRestoreOptio
 import { useAuthStore } from '@/stores/auth'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { pages } from '@/app/pages'
+import { testId } from '@/lib/test-id'
 import type { ApiError } from '@/types'
 
 type AdminSetupValues = {
@@ -206,11 +207,11 @@ export default function AdminSetupPage() {
                                 />
                                 {bootstrapError && <p className="text-sm text-destructive">{bootstrapError}</p>}
                             </div>
-                            <Button type="button" className="w-full" disabled={isLoading} onClick={() => goTo('admin')}>
+                            <Button type="button" className="w-full" disabled={isLoading} onClick={() => goTo('admin')} {...testId('setup-create-admin')}>
                                 {isLoading && <Loader2 className="mr-2 size-4 animate-spin" />}
                                 {t('setup.createAdmin')}
                             </Button>
-                            <Button type="button" variant="outline" className="w-full" disabled={isLoading} onClick={() => goTo('restore')}>
+                            <Button type="button" variant="outline" className="w-full" disabled={isLoading} onClick={() => goTo('restore')} {...testId('setup-restore')}>
                                 {t('setup.restore')}
                             </Button>
                         </>
@@ -249,7 +250,7 @@ export default function AdminSetupPage() {
                                 {isLoading && <Loader2 className="mr-2 size-4 animate-spin" />}
                                 {t('setup.restoreSubmit')}
                             </Button>
-                            <Button type="button" variant="ghost" className="w-full" disabled={isLoading} onClick={() => setStep('bootstrap')}>
+                            <Button type="button" variant="ghost" className="w-full" disabled={isLoading} onClick={() => setStep('bootstrap')} {...testId('setup-back')}>
                                 {t('setup.back')}
                             </Button>
                         </>
@@ -311,7 +312,7 @@ export default function AdminSetupPage() {
                                 {isLoading && <Loader2 className="mr-2 size-4 animate-spin" />}
                                 {t('setup.submit')}
                             </Button>
-                            <Button type="button" variant="ghost" className="w-full" disabled={isLoading} onClick={() => setStep('bootstrap')}>
+                            <Button type="button" variant="ghost" className="w-full" disabled={isLoading} onClick={() => setStep('bootstrap')} {...testId('setup-back')}>
                                 {t('setup.back')}
                             </Button>
                         </>

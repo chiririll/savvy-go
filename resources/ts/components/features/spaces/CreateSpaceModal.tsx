@@ -14,6 +14,7 @@ import { getApiErrorMessage } from '@/lib/api-error'
 import { useServerCurrencyCatalog, useSpaceContent, useSpacePresets, useSpaces, useSwitchSpace } from '@/hooks/use-spaces'
 import { loadSpaceDraft, useSpaceDraftStore } from '@/stores/space-draft'
 import type { Space } from '@/types/spaces'
+import { testId } from '@/lib/test-id'
 import { InviteForm } from './InviteForm'
 import { EntitiesStep } from './create/EntitiesStep'
 import {
@@ -119,7 +120,7 @@ export function CreateSpaceModal({ open, onOpenChange, dismissible = true }: Pro
     let body: React.ReactNode
     let footer: React.ReactNode
     const back = step !== 'name' && (
-        <Button type="button" variant="outline" onClick={() => goTo(previousStep(step, otherSpaces))}>
+        <Button type="button" variant="outline" onClick={() => goTo(previousStep(step, otherSpaces))} {...testId('create-space-back')}>
             {t('actions.back', { ns: 'common' })}
         </Button>
     )
@@ -139,11 +140,11 @@ export function CreateSpaceModal({ open, onOpenChange, dismissible = true }: Pro
         footer = (
             <>
                 {!inviting && (
-                    <Button type="button" variant="outline" onClick={() => setInviting(true)}>
+                    <Button type="button" variant="outline" onClick={() => setInviting(true)} {...testId('create-space-invite')}>
                         {t('spaces.create.done.invite')}
                     </Button>
                 )}
-                <Button type="button" onClick={() => void finish()}>
+                <Button type="button" onClick={() => void finish()} {...testId('create-space-done')}>
                     {t('actions.done', { ns: 'common' })}
                 </Button>
             </>
@@ -176,7 +177,7 @@ export function CreateSpaceModal({ open, onOpenChange, dismissible = true }: Pro
         footer = (
             <>
                 {cancel}
-                <Button type="button" disabled={!draft.name.trim() || !presets.data} onClick={seed}>
+                <Button type="button" disabled={!draft.name.trim() || !presets.data} onClick={seed} {...testId('create-space-next')}>
                     {t('actions.continue', { ns: 'common' })}
                 </Button>
             </>
@@ -221,7 +222,7 @@ export function CreateSpaceModal({ open, onOpenChange, dismissible = true }: Pro
         footer = (
             <>
                 {back}
-                <Button type="button" disabled={!presets.data || (sourceId !== null && source.isPending)} onClick={seed}>
+                <Button type="button" disabled={!presets.data || (sourceId !== null && source.isPending)} onClick={seed} {...testId('create-space-next')}>
                     {t('actions.continue', { ns: 'common' })}
                 </Button>
             </>
@@ -231,7 +232,7 @@ export function CreateSpaceModal({ open, onOpenChange, dismissible = true }: Pro
         footer = (
             <>
                 {back}
-                <Button type="button" disabled={!draft.baseCurrency || problems.includes('accounts') || problems.includes('balances')} onClick={() => goTo('confirm')}>
+                <Button type="button" disabled={!draft.baseCurrency || problems.includes('accounts') || problems.includes('balances')} onClick={() => goTo('confirm')} {...testId('create-space-next')}>
                     {t('actions.continue', { ns: 'common' })}
                 </Button>
             </>
@@ -257,7 +258,7 @@ export function CreateSpaceModal({ open, onOpenChange, dismissible = true }: Pro
         footer = (
             <>
                 {back}
-                <Button type="button" disabled={problems.length > 0 || create.isPending} onClick={() => create.mutate()}>
+                <Button type="button" disabled={problems.length > 0 || create.isPending} onClick={() => create.mutate()} {...testId('create-space-submit')}>
                     {create.isPending && <Loader2 className="size-4 animate-spin" />}
                     {t('spaces.create.submit')}
                 </Button>

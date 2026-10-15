@@ -5,6 +5,7 @@ import { Check, ChevronRight, KeyRound, Loader2, Mail } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useIdentityProviders, useMailStatus } from '@/hooks'
 import { serverSetupPaths } from './server-setup-paths'
+import { testId } from '@/lib/test-id'
 
 interface OptionProps {
     to: string
@@ -73,7 +74,7 @@ export function ServerOptions({ busy, onFinish }: ServerOptionsProps) {
                 />
             </div>
             <div className="flex flex-col gap-2">
-                <Button type="button" className="w-full" disabled={busy} onClick={onFinish}>
+                <Button type="button" className="w-full" disabled={busy} onClick={onFinish} {...testId('server-setup-finish')}>
                     {busy && <Loader2 className="mr-2 size-4 animate-spin" />}
                     {mailDone || ssoDone ? t('serverSetup.finish') : t('serverSetup.skip')}
                 </Button>

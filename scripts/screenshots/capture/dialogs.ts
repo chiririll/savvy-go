@@ -2,7 +2,7 @@ import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import type { Locator, Page as PwPage } from 'playwright'
 import { captureTabs, fresh } from './tabs.ts'
-import { log, state, type Job } from './shared.ts'
+import { log, state, type Job } from '../shared.ts'
 
 // Dialogs are found by the marks the app puts on what opens them (resources/ts/lib/test-id.ts),
 // which exist only in a build made with APP_ENV=screenshots. Another build has none and gets no shots.

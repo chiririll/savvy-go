@@ -4,6 +4,7 @@
 //
 //   npm run screenshots              the default config: everything, in English and the light theme
 //   npm run screenshots -- <name>    the config configs/<name>.json
+//   npm run screenshots -- <name> --languages=en,ru --detail=key    settings on top of it
 import { spawn, type ChildProcess } from 'node:child_process'
 import { existsSync, readdirSync } from 'node:fs'
 import path from 'node:path'
@@ -15,7 +16,14 @@ const root = path.resolve(here, '..', '..')
 // The config is a file of configs/, which goes into the image with the script, so only its name is passed on.
 const configsDir = path.join(here, 'configs')
 const names = existsSync(configsDir) ? readdirSync(configsDir).filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -5)).sort() : []
-const config = (process.argv[2] ?? '').replace(/\.json$/, '')
+// `--key=value` settings (see docs/scripts.md) go to the container as they are; config.ts checks them.
+const args = process.argv.slice(2)
+const overrides: Record<string, string> = {}
+for (const arg of args.filter((a) => a.startsWith('--'))) {
+    const [key, ...rest] = arg.slice(2).split('=')
+    overrides[key] = rest.length ? rest.join('=') : 'true'
+}
+const config = (args.find((a) => !a.startsWith('--')) ?? '').replace(/\.json$/, '')
 if (config && !names.includes(config)) {
     console.error(`No config "${config}"; there are ${names.join(', ') || 'none'} in scripts/screenshots/configs.`)
     process.exit(2)
@@ -34,7 +42,7 @@ const compose = (...args: string[]) =>
         const child = spawn('docker', ['compose', '-f', 'docker-compose.screenshots.yml', ...args], {
             cwd: root,
             stdio: 'inherit',
-            env: { ...process.env, RUN_NAME: runName, CONFIG: config },
+            env: { ...process.env, RUN_NAME: runName, CONFIG: config, CONFIG_OVERRIDES: JSON.stringify(overrides) },
         })
         current = child
         child.on('error', (e) => {
