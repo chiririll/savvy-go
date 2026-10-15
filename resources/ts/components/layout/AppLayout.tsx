@@ -3,7 +3,7 @@ import { AppSidebar } from './Sidebar'
 import { Header } from './Header'
 import { StatusBar } from './StatusBar'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
-import { CreateTransactionProvider } from '@/components/features/transactions'
+import { CreateTransactionProvider } from '@/components/features/transactions/CreateTransactionProvider'
 import { useCurrencies } from '@/hooks/use-currencies'
 import { useUiStore } from '@/stores/ui'
 

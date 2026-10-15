@@ -16,7 +16,8 @@ import {
     FormDescription,
 } from '@/components/ui/form'
 import { debtPaymentSchema, DebtPaymentFormData } from '@/schemas'
-import { AccountSelect, useNegativeBalanceConfirm } from '@/components/shared'
+import { AccountSelect } from '@/components/shared/AccountSelect'
+import { useNegativeBalanceConfirm } from '@/components/shared'
 import { useAccounts } from '@/hooks'
 import { warningsForAccountOutflow } from '@/lib/negative-balance'
 import { Debt } from '@/types'

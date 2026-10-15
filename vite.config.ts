@@ -31,6 +31,8 @@ export default defineConfig(({ mode }) => {
                 output: {
                     manualChunks(id) {
                         if (/node_modules\/(react|react-dom|react-router|react-router-dom|scheduler)\//.test(id)) return 'react'
+                        // Name the chart engine chunk (dashboard and reports only). Not echarts-for-react: it is CJS and its interop helper would make react and echarts import each other.
+                        if (/node_modules\/(echarts|zrender)\//.test(id)) return 'echarts'
                     },
                 },
             },
