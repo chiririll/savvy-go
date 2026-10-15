@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next'
+import { cn } from '@/lib/utils'
 import { Separator } from '@/components/ui/separator'
 import { useSsoProviders } from '@/hooks/use-sso'
 import { ssoRedirectUrl } from '@/api/sso'
@@ -23,7 +24,14 @@ export function SsoButtons({ showDivider = true }: { showDivider?: boolean }) {
                         onClick={() => {
                             window.location.href = ssoRedirectUrl(provider.slug)
                         }}
-                        className="group inline-flex h-10 w-full items-center justify-center gap-2.5 rounded-md border bg-background px-4 text-sm font-medium shadow-sm transition-all hover:-translate-y-px hover:border-[color-mix(in_oklab,var(--brand)_55%,var(--border))] hover:bg-[color-mix(in_oklab,var(--brand)_6%,var(--background))] hover:shadow-[0_4px_16px_-6px_color-mix(in_oklab,var(--brand)_60%,transparent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:translate-y-0"
+                        className={cn(
+                            'group inline-flex h-10 w-full items-center justify-center gap-2.5 rounded-md border',
+                            'bg-background px-4 text-sm font-medium shadow-sm transition-all',
+                            'hover:-translate-y-px hover:border-[color-mix(in_oklab,var(--brand)_55%,var(--border))]',
+                            'hover:bg-[color-mix(in_oklab,var(--brand)_6%,var(--background))]',
+                            'hover:shadow-[0_4px_16px_-6px_color-mix(in_oklab,var(--brand)_60%,transparent)]',
+                            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:translate-y-0',
+                        )}
                     >
                         <BrandIcon preset={provider.preset} className="size-4 transition-transform group-hover:scale-110" />
                         {t('providers.continueWith', { name: provider.name })}

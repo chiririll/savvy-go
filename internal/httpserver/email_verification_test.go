@@ -197,7 +197,7 @@ func TestVerifyEmailByLink(t *testing.T) {
 	}
 }
 
-func TestVerificationLinkIsOpaqueSingleUseAndReplacedByTheNextOne(t *testing.T) {
+func TestVerificationLinkIsOpaqueSingleUseAndReplaced(t *testing.T) {
 	rec := &recorder{on: true}
 	a, _, _ := newMailApp(t, rec)
 	user := a.createUser("u@test.com", "secret1", roleEditor)
@@ -306,7 +306,7 @@ func TestFirstAdminStartsUnverified(t *testing.T) {
 	}
 }
 
-func TestSSOAddressIsVerifiedOnlyWhenTheProviderVouchesForIt(t *testing.T) {
+func TestSSOAddressVerifiedOnlyWhenProviderVouches(t *testing.T) {
 	a := newTestApp(t)
 	a.createUser("root@test.com", "secret1", auth.RoleAdmin)
 	existing := a.createUser("jane@test.com", "secret1", roleEditor)

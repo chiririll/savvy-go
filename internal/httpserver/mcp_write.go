@@ -193,8 +193,8 @@ type createRuleArgs struct {
 	Description    string           `json:"description,omitempty"`
 	TriggerType    string           `json:"trigger_type" jsonschema:"on_transaction_create or on_transaction_update."`
 	Priority       int              `json:"priority,omitempty" jsonschema:"Lower runs first."`
-	Conditions     map[string]any   `json:"conditions" jsonschema:"When the rule applies. Shape: An object with match (all or any) and conditions, a list of objects with field, op and value, for example field description, op contains, value coffee. Fields: type, amount, description, date, status, account_id, to_account_id, category_id, tags. Ops: equals, not_equals, in, not_in, gt, gte, lt, lte, between, contains, not_contains, starts_with, ends_with, matches, is_null, is_not_null, has_any, has_all, has_none."`
-	Actions        []map[string]any `json:"actions" jsonschema:"What the rule does. Each is an object with a type: set_category (category_id), add_tags (tag_ids), remove_tags (tag_ids), set_description (value), or create_transfer, which moves money (from_account_id, to_account_id, amount_formula)."`
+	Conditions     map[string]any   `json:"conditions" jsonschema:"When the rule applies: an object with match (all or any) and conditions, a list of {field, op, value}. See the tool description for fields and ops."`
+	Actions        []map[string]any `json:"actions" jsonschema:"What the rule does. Each is an object with a type: set_category (category_id), add_tags (tag_ids), remove_tags (tag_ids), set_description (value), or create_transfer (from_account_id, to_account_id, amount_formula)."`
 	IsActive       *bool            `json:"is_active,omitempty"`
 	StopProcessing *bool            `json:"stop_processing,omitempty" jsonschema:"True to skip the rules after this one when it matches."`
 }
@@ -206,8 +206,8 @@ type updateRuleArgs struct {
 	Description    *string          `json:"description,omitempty"`
 	TriggerType    string           `json:"trigger_type,omitempty"`
 	Priority       *int             `json:"priority,omitempty"`
-	Conditions     map[string]any   `json:"conditions,omitempty" jsonschema:"Replaces the conditions as a whole. Shape: An object with match (all or any) and conditions, a list of objects with field, op and value, for example field description, op contains, value coffee. Fields: type, amount, description, date, status, account_id, to_account_id, category_id, tags. Ops: equals, not_equals, in, not_in, gt, gte, lt, lte, between, contains, not_contains, starts_with, ends_with, matches, is_null, is_not_null, has_any, has_all, has_none."`
-	Actions        []map[string]any `json:"actions,omitempty" jsonschema:"Replaces the actions as a whole. Each is an object with a type: set_category (category_id), add_tags (tag_ids), remove_tags (tag_ids), set_description (value), or create_transfer, which moves money (from_account_id, to_account_id, amount_formula)."`
+	Conditions     map[string]any   `json:"conditions,omitempty" jsonschema:"Replaces the conditions as a whole: an object with match (all or any) and conditions, a list of {field, op, value}. See the create_automation_rule description for fields and ops."`
+	Actions        []map[string]any `json:"actions,omitempty" jsonschema:"Replaces the actions as a whole. Same shapes as create_automation_rule."`
 	IsActive       *bool            `json:"is_active,omitempty"`
 	StopProcessing *bool            `json:"stop_processing,omitempty"`
 }
@@ -277,7 +277,10 @@ func (s *Server) addMCPWriteTools(srv *mcp.Server) map[string]mcpNeed {
 		return t
 	}
 
-	addWrite[createTxArgs](s, srv, w("create_transaction", "Create transaction", "Record an income, expense or transfer between two accounts. The amount is in the account's currency; a transfer between accounts of different currencies also needs to_amount. Say which currency you used.", http.MethodPost, "transactions"))
+	addWrite[createTxArgs](s, srv, w("create_transaction", "Create transaction",
+		"Record an income, expense or transfer between two accounts. The amount is in the account's currency; "+
+			"a transfer between accounts of different currencies also needs to_amount. Say which currency you used.",
+		http.MethodPost, "transactions"))
 	addWrite[updateTxArgs](s, srv, w("update_transaction", "Update transaction", "Change a transaction. Send only the fields that change.", http.MethodPatch, "transactions/{id}"))
 	addWrite[idArgs](s, srv, del("delete_transaction", "Delete transaction", "Permanently delete a transaction. Ask the user first.", "transactions/{id}"))
 	addWrite[idArgs](s, srv, w("confirm_transaction", "Confirm transaction", "Confirm a pending (scheduled) transaction so it counts.", http.MethodPost, "transactions/{id}/confirm"))
@@ -313,7 +316,14 @@ func (s *Server) addMCPWriteTools(srv *mcp.Server) map[string]mcpNeed {
 	addWrite[idArgs](s, srv, w("reopen_debt", "Reopen debt", "Reopen a settled debt.", http.MethodPost, "debts/{id}/reopen"))
 	addWrite[idArgs](s, srv, del("delete_debt", "Delete debt", "Permanently delete a debt. Ask the user first.", "debts/{id}"))
 
-	addWrite[createRuleArgs](s, srv, w("create_automation_rule", "Create automation rule", "Add a rule that changes new or edited transactions that match its conditions. Rules run by themselves from then on, so show the user what it will do and test it on a transaction first.", http.MethodPost, "automation-rules"))
+	addWrite[createRuleArgs](s, srv, w("create_automation_rule", "Create automation rule",
+		"Add a rule that changes new or edited transactions that match its conditions. Rules run by themselves "+
+			"from then on, so show the user what it will do and test it on a transaction first. "+
+			"Condition fields: type, amount, description, date, status, account_id, to_account_id, category_id, tags. "+
+			"Condition ops: equals, not_equals, in, not_in, gt, gte, lt, lte, between, contains, not_contains, "+
+			"starts_with, ends_with, matches, is_null, is_not_null, has_any, has_all, has_none. "+
+			"Example condition: field description, op contains, value coffee.",
+		http.MethodPost, "automation-rules"))
 	addWrite[updateRuleArgs](s, srv, w("update_automation_rule", "Update automation rule", "Change a rule. Send only the fields that change; conditions and actions are replaced whole.", http.MethodPatch, "automation-rules/{id}"))
 	addWrite[idArgs](s, srv, w("toggle_automation_rule", "Turn rule on or off", "Switch a rule between active and inactive.", http.MethodPost, "automation-rules/{id}/toggle"))
 	addWrite[testRuleArgs](s, srv, w("test_automation_rule", "Test automation rule", "Try a rule on one existing transaction and report what it would do.", http.MethodPost, "automation-rules/{id}/test"))

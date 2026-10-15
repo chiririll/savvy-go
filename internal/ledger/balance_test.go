@@ -32,7 +32,7 @@ func TestBalanceFollowsEveryTransactionType(t *testing.T) {
 	e := newMoneyEnv(t)
 	usd, jpy := e.usdAcc.ID, e.jpyAcc.ID // start at 100 USD and 3000 JPY
 	debt, err := (Debts{Accounts: Accounts{DB: e.db}, Transactions: e.txs}).Create(
-		e.ctx, "loan", "owed_to_me", e.usd.ID, 0, dec("1"), "", "", nil, nil, nil)
+		e.ctx, DebtInput{Name: "loan", DebtType: "owed_to_me", CurrencyID: e.usd.ID, Amount: dec("1")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +129,7 @@ func TestDebtBalanceDoesNotDependOnTheDate(t *testing.T) {
 	e := newMoneyEnv(t)
 	accts := Accounts{DB: e.db}
 	debts := Debts{Accounts: accts, Transactions: e.txs}
-	debt, err := debts.Create(e.ctx, "loan", "i_owe", e.usd.ID, 0, dec("100"), "", "", nil, nil, nil)
+	debt, err := debts.Create(e.ctx, DebtInput{Name: "loan", DebtType: "i_owe", CurrencyID: e.usd.ID, Amount: dec("100")})
 	if err != nil {
 		t.Fatal(err)
 	}

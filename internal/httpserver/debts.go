@@ -43,7 +43,11 @@ func (s *Server) debtsStore(w http.ResponseWriter, r *http.Request) {
 		writeValidation(w, map[string][]string{"name": {"The name field is required."}})
 		return
 	}
-	d, err := sp(r).debts.Create(r.Context(), body.Name, body.DebtType, body.CurrencyID, body.AccountID, body.Amount, body.Date, body.Origin, body.DueDate, body.Counterparty, body.Description)
+	d, err := sp(r).debts.Create(r.Context(), ledger.DebtInput{
+		Name: body.Name, DebtType: body.DebtType, CurrencyID: body.CurrencyID, AccountID: body.AccountID,
+		Amount: body.Amount, Date: body.Date, Origin: body.Origin,
+		DueDate: body.DueDate, Counterparty: body.Counterparty, Description: body.Description,
+	})
 	if err != nil {
 		writeAccountError(w, err)
 		return

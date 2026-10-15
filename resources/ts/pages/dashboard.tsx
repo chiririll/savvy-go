@@ -41,7 +41,7 @@ import { useTranslation } from 'react-i18next'
 import ReactECharts from '@/components/shared/ReactECharts'
 import { legendTextStyle, useChartTheme } from '@/lib/chart-theme'
 import { Link } from 'react-router-dom'
-import { AccountType } from '@/types'
+import { AccountType, type Account, type Budget, type Debt, type DebtSummary } from '@/types'
 import { ACCOUNT_TYPE_CONFIG, CATEGORY_COLORS } from '@/constants'
 import { DEFAULT_FILTERS, type ReportFilters } from '@/pages/reports/types'
 import { accountTypeLabelLoose } from '@/lib/labels'
@@ -140,6 +140,280 @@ function toReportFilters(
         default:
             return { ...filters, periodType: 'custom' }
     }
+}
+
+function BudgetsCard({ budgets }: { budgets: Budget[] }) {
+    const { t } = useTranslation('pages')
+    const { t: tCommon } = useTranslation('common')
+
+    return (
+        <Card className="min-w-0">
+            <CardHeader className="flex min-w-0 flex-row items-center justify-between gap-2">
+                <CardTitle className="flex min-w-0 items-center gap-2">
+                    <PiggyBank className="size-5 shrink-0" />
+                    {t('dashboard.budgets')}
+                </CardTitle>
+                <Button variant="ghost" size="sm" asChild>
+                    <Link to="/budgets">
+                        {tCommon('actions.viewAll')}
+                        <ArrowRight className="ml-1 size-4" />
+                    </Link>
+                </Button>
+            </CardHeader>
+            <CardContent className="min-w-0">
+                {budgets.length > 0 ? (
+                    <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                        {budgets.map((budget) => {
+                            const progress = budget.progress
+                            const percent = progress ? Math.min(progress.percent, 100) : 0
+                            const isExceeded = progress?.isExceeded ?? false
+
+                            return (
+                                <Link
+                                    key={budget.id}
+                                    to={`/budgets?edit=${budget.id}`}
+                                    className="block p-4 rounded-lg border hover:bg-muted/50 transition-colors"
+                                >
+                                    <div className="flex items-center justify-between mb-2">
+                                        <p className="font-medium text-sm truncate">{budget.name}</p>
+                                        <span className={`text-xs font-medium ${isExceeded ? 'text-red-600' : 'text-muted-foreground'}`}>
+                                            {progress?.percent.toFixed(0)}%
+                                        </span>
+                                    </div>
+                                    <Progress
+                                        value={percent}
+                                        className={`h-2 mb-2 ${isExceeded ? '[&>div]:bg-red-500' : ''}`}
+                                    />
+                                    <div className="flex justify-between text-xs text-muted-foreground">
+                                        <span>{formatCurrency(progress?.spent ?? 0, budget.currency)}</span>
+                                        <span>{formatCurrency(budget.amount, budget.currency)}</span>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        {budget.isGlobal
+                                            ? t('dashboard.allExpenses')
+                                            : budget.categories.map(c => localizeDefaultName(c.name)).join(', ') || t('dashboard.noCategories')}
+                                    </p>
+                                </Link>
+                            )
+                        })}
+                    </div>
+                ) : (
+                    <div className="text-center py-8">
+                        <PiggyBank className="size-12 mx-auto text-muted-foreground/50 mb-3" />
+                        <p className="text-muted-foreground mb-3">{t('dashboard.noBudgets')}</p>
+                        <Button asChild size="sm">
+                            <Link to="/budgets?create=1">
+                                <Plus className="size-4 mr-1" />
+                                {t('dashboard.createBudget')}
+                            </Link>
+                        </Button>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    )
+}
+
+function DebtsCard({ summary: debtSummary, debts: activeDebts }: { summary?: DebtSummary; debts: Debt[] }) {
+    const { t } = useTranslation('pages')
+    const { t: tCommon } = useTranslation('common')
+
+    return (
+        <Card className="min-w-0">
+            <CardHeader className="flex min-w-0 flex-row items-center justify-between gap-2">
+                <CardTitle className="flex min-w-0 items-center gap-2">
+                    <HandCoins className="size-5 shrink-0" />
+                    {t('dashboard.debts')}
+                </CardTitle>
+                <Button variant="ghost" size="sm" asChild>
+                    <Link to="/debts">
+                        {tCommon('actions.viewAll')}
+                        <ArrowRight className="ml-1 size-4" />
+                    </Link>
+                </Button>
+            </CardHeader>
+            <CardContent className="min-w-0">
+                {debtSummary && (debtSummary.totalIOwe > 0 || debtSummary.totalOwedToMe > 0) ? (
+                    <div className="min-w-0 space-y-4">
+                        <div className="grid min-w-0 gap-4 sm:grid-cols-3">
+                            <div className="flex items-center gap-3 p-3 rounded-lg bg-red-50 dark:bg-red-950/20">
+                                <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30">
+                                    <TrendingDown className="size-4 text-red-600" />
+                                </div>
+                                <div>
+                                    <p className="text-xs text-muted-foreground">{t('debts.types.i_owe')}</p>
+                                    <p className="font-mono font-semibold text-red-600 break-all">
+                                        {formatCurrency(debtSummary.totalIOwe, debtSummary.currency)}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3 p-3 rounded-lg bg-green-50 dark:bg-green-950/20">
+                                <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
+                                    <TrendingUp className="size-4 text-green-600" />
+                                </div>
+                                <div>
+                                    <p className="text-xs text-muted-foreground">{t('debts.types.owed_to_me')}</p>
+                                    <p className="font-mono font-semibold text-green-600 break-all">
+                                        {formatCurrency(debtSummary.totalOwedToMe, debtSummary.currency)}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className={`flex items-center gap-3 p-3 rounded-lg ${debtSummary.netDebt >= 0 ? 'bg-green-50 dark:bg-green-950/20' : 'bg-red-50 dark:bg-red-950/20'}`}>
+                                <div className={`p-2 rounded-lg ${debtSummary.netDebt >= 0 ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30'}`}>
+                                    {debtSummary.netDebt >= 0 ? (
+                                        <HandCoins className="size-4 text-green-600" />
+                                    ) : (
+                                        <Banknote className="size-4 text-red-600" />
+                                    )}
+                                </div>
+                                <div>
+                                    <p className="text-xs text-muted-foreground">{t('debts.netPosition')}</p>
+                                    <p className={`font-mono font-semibold break-all ${debtSummary.netDebt >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                        {formatCurrency(Math.abs(debtSummary.netDebt), debtSummary.currency)}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {activeDebts.length > 0 && (
+                            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                                {activeDebts.map((debt) => (
+                                    <Link
+                                        key={debt.id}
+                                        to={`/debts?edit=${debt.id}`}
+                                        className="block p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                                    >
+                                        <div className="flex items-center gap-2 mb-2">
+                                            {debt.debtType === 'i_owe' ? (
+                                                <Banknote className="size-4 text-red-600" />
+                                            ) : (
+                                                <HandCoins className="size-4 text-green-600" />
+                                            )}
+                                            <p className="font-medium text-sm truncate">{debt.name}</p>
+                                        </div>
+                                        <Progress
+                                            value={debt.paymentProgress}
+                                            className="h-1.5 mb-2"
+                                        />
+                                        <div className="flex justify-between text-xs">
+                                            <span className="text-muted-foreground">
+                                                {t('dashboard.percentPaid', { percent: debt.paymentProgress.toFixed(0) })}
+                                            </span>
+                                            <span className={debt.debtType === 'i_owe' ? 'text-red-600' : 'text-green-600'}>
+                                                {formatCurrency(debt.currentBalance, debt.currency)}
+                                            </span>
+                                        </div>
+                                        {debt.counterparty && (
+                                            <p className="text-xs text-muted-foreground mt-1 truncate">
+                                                {debt.debtType === 'i_owe'
+                                                    ? t('dashboard.toCounterparty', { name: debt.counterparty })
+                                                    : t('dashboard.fromCounterparty', { name: debt.counterparty })}
+                                            </p>
+                                        )}
+                                    </Link>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <div className="text-center py-8">
+                        <HandCoins className="size-12 mx-auto text-muted-foreground/50 mb-3" />
+                        <p className="text-muted-foreground mb-3">{t('dashboard.noDebts')}</p>
+                        <Button asChild size="sm">
+                            <Link to="/debts?create=1">
+                                <Plus className="size-4 mr-1" />
+                                {t('dashboard.addDebt')}
+                            </Link>
+                        </Button>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    )
+}
+
+function AccountBalancesCard({ accounts, openCreate }: { accounts?: Account[]; openCreate: ReturnType<typeof useCreateTransactionDialog>['openCreate'] }) {
+    const { t } = useTranslation('pages')
+    const { t: tNav } = useTranslation('nav')
+
+    return (
+        <Card className="min-w-0">
+            <CardHeader>
+                <CardTitle>{t('dashboard.accountBalances')}</CardTitle>
+            </CardHeader>
+            <CardContent className="min-w-0">
+                <div className="min-w-0 space-y-3">
+                    {accounts && accounts.length > 0 ? (
+                        accounts.map((account) => (
+                            <div
+                                key={account.id}
+                                className="flex min-w-0 items-center justify-between gap-2"
+                            >
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                    {(() => {
+                                        const config = ACCOUNT_TYPE_CONFIG[account.type as AccountType]
+                                        const Icon = config?.icon || Wallet
+                                        return (
+                                            <div className={`flex size-9 items-center justify-center rounded-lg shrink-0 ${config?.color || 'bg-muted'}`}>
+                                                <Icon className="size-4" />
+                                            </div>
+                                        )
+                                    })()}
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-medium truncate">{account.name}</p>
+                                        <p className="text-xs text-muted-foreground capitalize">
+                                            {accountTypeLabelLoose(t, account.type)}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex min-w-0 items-center gap-2">
+                                    <div className="min-w-0 text-right">
+                                        <p className="text-sm font-mono font-medium break-all">
+                                            {formatCurrency(account.currentBalance ?? 0, account.currency, { showSymbol: false })}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                            {account.currency?.symbol ?? ''}
+                                        </p>
+                                    </div>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="size-8 shrink-0">
+                                                <Plus className="size-4" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            <DropdownMenuItem
+                                                onClick={() => openCreate({ type: 'income', account_id: account.id })}
+                                            >
+                                                <ArrowDownLeft className="size-4 mr-2 text-green-600" />
+                                                {tNav('income')}
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onClick={() => openCreate({ type: 'expense', account_id: account.id })}
+                                            >
+                                                <ArrowUpRight className="size-4 mr-2 text-red-600" />
+                                                {tNav('expense')}
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onClick={() => openCreate({ type: 'transfer', account_id: account.id })}
+                                            >
+                                                <ArrowLeftRight className="size-4 mr-2 text-blue-600" />
+                                                {tNav('transfer')}
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        <div className="text-center text-muted-foreground py-4">
+                            {t('dashboard.noAccounts')}
+                        </div>
+                    )}
+                </div>
+            </CardContent>
+        </Card>
+    )
 }
 
 export default function DashboardPage() {
@@ -439,82 +713,7 @@ export default function DashboardPage() {
                     endDate={periodDates.end_date}
                 />
 
-                <Card className="min-w-0">
-                    <CardHeader>
-                        <CardTitle>{t('dashboard.accountBalances')}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="min-w-0">
-                        <div className="min-w-0 space-y-3">
-                            {accounts && accounts.length > 0 ? (
-                                accounts.map((account) => (
-                                    <div
-                                        key={account.id}
-                                        className="flex min-w-0 items-center justify-between gap-2"
-                                    >
-                                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                                            {(() => {
-                                                const config = ACCOUNT_TYPE_CONFIG[account.type as AccountType]
-                                                const Icon = config?.icon || Wallet
-                                                return (
-                                                    <div className={`flex size-9 items-center justify-center rounded-lg shrink-0 ${config?.color || 'bg-muted'}`}>
-                                                        <Icon className="size-4" />
-                                                    </div>
-                                                )
-                                            })()}
-                                            <div className="min-w-0">
-                                                <p className="text-sm font-medium truncate">{account.name}</p>
-                                                <p className="text-xs text-muted-foreground capitalize">
-                                                    {accountTypeLabelLoose(t, account.type)}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div className="flex min-w-0 items-center gap-2">
-                                            <div className="min-w-0 text-right">
-                                                <p className="text-sm font-mono font-medium break-all">
-                                                    {formatCurrency(account.currentBalance ?? 0, account.currency, { showSymbol: false })}
-                                                </p>
-                                                <p className="text-xs text-muted-foreground">
-                                                    {account.currency?.symbol ?? ''}
-                                                </p>
-                                            </div>
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="size-8 shrink-0">
-                                                        <Plus className="size-4" />
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end">
-                                                    <DropdownMenuItem
-                                                        onClick={() => openCreate({ type: 'income', account_id: account.id })}
-                                                    >
-                                                        <ArrowDownLeft className="size-4 mr-2 text-green-600" />
-                                                        {tNav('income')}
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem
-                                                        onClick={() => openCreate({ type: 'expense', account_id: account.id })}
-                                                    >
-                                                        <ArrowUpRight className="size-4 mr-2 text-red-600" />
-                                                        {tNav('expense')}
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem
-                                                        onClick={() => openCreate({ type: 'transfer', account_id: account.id })}
-                                                    >
-                                                        <ArrowLeftRight className="size-4 mr-2 text-blue-600" />
-                                                        {tNav('transfer')}
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </div>
-                                    </div>
-                                ))
-                            ) : (
-                                <div className="text-center text-muted-foreground py-4">
-                                    {t('dashboard.noAccounts')}
-                                </div>
-                            )}
-                        </div>
-                    </CardContent>
-                </Card>
+                <AccountBalancesCard accounts={accounts} openCreate={openCreate} />
             </div>
 
             <div className="grid min-w-0 gap-4 lg:grid-cols-2">
@@ -574,181 +773,9 @@ export default function DashboardPage() {
                 </Card>
             </div>
 
-            <Card className="min-w-0">
-                <CardHeader className="flex min-w-0 flex-row items-center justify-between gap-2">
-                    <CardTitle className="flex min-w-0 items-center gap-2">
-                        <PiggyBank className="size-5 shrink-0" />
-                        {t('dashboard.budgets')}
-                    </CardTitle>
-                    <Button variant="ghost" size="sm" asChild>
-                        <Link to="/budgets">
-                            {tCommon('actions.viewAll')}
-                            <ArrowRight className="ml-1 size-4" />
-                        </Link>
-                    </Button>
-                </CardHeader>
-                <CardContent className="min-w-0">
-                    {activeBudgets.length > 0 ? (
-                        <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                            {activeBudgets.map((budget) => {
-                                const progress = budget.progress
-                                const percent = progress ? Math.min(progress.percent, 100) : 0
-                                const isExceeded = progress?.isExceeded ?? false
+            <BudgetsCard budgets={activeBudgets} />
 
-                                return (
-                                    <Link
-                                        key={budget.id}
-                                        to={`/budgets?edit=${budget.id}`}
-                                        className="block p-4 rounded-lg border hover:bg-muted/50 transition-colors"
-                                    >
-                                        <div className="flex items-center justify-between mb-2">
-                                            <p className="font-medium text-sm truncate">{budget.name}</p>
-                                            <span className={`text-xs font-medium ${isExceeded ? 'text-red-600' : 'text-muted-foreground'}`}>
-                                                {progress?.percent.toFixed(0)}%
-                                            </span>
-                                        </div>
-                                        <Progress
-                                            value={percent}
-                                            className={`h-2 mb-2 ${isExceeded ? '[&>div]:bg-red-500' : ''}`}
-                                        />
-                                        <div className="flex justify-between text-xs text-muted-foreground">
-                                            <span>{formatCurrency(progress?.spent ?? 0, budget.currency)}</span>
-                                            <span>{formatCurrency(budget.amount, budget.currency)}</span>
-                                        </div>
-                                        <p className="text-xs text-muted-foreground mt-1">
-                                            {budget.isGlobal
-                                                ? t('dashboard.allExpenses')
-                                                : budget.categories.map(c => localizeDefaultName(c.name)).join(', ') || t('dashboard.noCategories')}
-                                        </p>
-                                    </Link>
-                                )
-                            })}
-                        </div>
-                    ) : (
-                        <div className="text-center py-8">
-                            <PiggyBank className="size-12 mx-auto text-muted-foreground/50 mb-3" />
-                            <p className="text-muted-foreground mb-3">{t('dashboard.noBudgets')}</p>
-                            <Button asChild size="sm">
-                                <Link to="/budgets?create=1">
-                                    <Plus className="size-4 mr-1" />
-                                    {t('dashboard.createBudget')}
-                                </Link>
-                            </Button>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-
-            <Card className="min-w-0">
-                <CardHeader className="flex min-w-0 flex-row items-center justify-between gap-2">
-                    <CardTitle className="flex min-w-0 items-center gap-2">
-                        <HandCoins className="size-5 shrink-0" />
-                        {t('dashboard.debts')}
-                    </CardTitle>
-                    <Button variant="ghost" size="sm" asChild>
-                        <Link to="/debts">
-                            {tCommon('actions.viewAll')}
-                            <ArrowRight className="ml-1 size-4" />
-                        </Link>
-                    </Button>
-                </CardHeader>
-                <CardContent className="min-w-0">
-                    {debtSummary && (debtSummary.totalIOwe > 0 || debtSummary.totalOwedToMe > 0) ? (
-                        <div className="min-w-0 space-y-4">
-                            <div className="grid min-w-0 gap-4 sm:grid-cols-3">
-                                <div className="flex items-center gap-3 p-3 rounded-lg bg-red-50 dark:bg-red-950/20">
-                                    <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30">
-                                        <TrendingDown className="size-4 text-red-600" />
-                                    </div>
-                                    <div>
-                                        <p className="text-xs text-muted-foreground">{t('debts.types.i_owe')}</p>
-                                        <p className="font-mono font-semibold text-red-600 break-all">
-                                            {formatCurrency(debtSummary.totalIOwe, debtSummary.currency)}
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-3 p-3 rounded-lg bg-green-50 dark:bg-green-950/20">
-                                    <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
-                                        <TrendingUp className="size-4 text-green-600" />
-                                    </div>
-                                    <div>
-                                        <p className="text-xs text-muted-foreground">{t('debts.types.owed_to_me')}</p>
-                                        <p className="font-mono font-semibold text-green-600 break-all">
-                                            {formatCurrency(debtSummary.totalOwedToMe, debtSummary.currency)}
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className={`flex items-center gap-3 p-3 rounded-lg ${debtSummary.netDebt >= 0 ? 'bg-green-50 dark:bg-green-950/20' : 'bg-red-50 dark:bg-red-950/20'}`}>
-                                    <div className={`p-2 rounded-lg ${debtSummary.netDebt >= 0 ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30'}`}>
-                                        {debtSummary.netDebt >= 0 ? (
-                                            <HandCoins className="size-4 text-green-600" />
-                                        ) : (
-                                            <Banknote className="size-4 text-red-600" />
-                                        )}
-                                    </div>
-                                    <div>
-                                        <p className="text-xs text-muted-foreground">{t('debts.netPosition')}</p>
-                                        <p className={`font-mono font-semibold break-all ${debtSummary.netDebt >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                            {formatCurrency(Math.abs(debtSummary.netDebt), debtSummary.currency)}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {activeDebts.length > 0 && (
-                                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                                    {activeDebts.map((debt) => (
-                                        <Link
-                                            key={debt.id}
-                                            to={`/debts?edit=${debt.id}`}
-                                            className="block p-3 rounded-lg border hover:bg-muted/50 transition-colors"
-                                        >
-                                            <div className="flex items-center gap-2 mb-2">
-                                                {debt.debtType === 'i_owe' ? (
-                                                    <Banknote className="size-4 text-red-600" />
-                                                ) : (
-                                                    <HandCoins className="size-4 text-green-600" />
-                                                )}
-                                                <p className="font-medium text-sm truncate">{debt.name}</p>
-                                            </div>
-                                            <Progress
-                                                value={debt.paymentProgress}
-                                                className="h-1.5 mb-2"
-                                            />
-                                            <div className="flex justify-between text-xs">
-                                                <span className="text-muted-foreground">
-                                                    {t('dashboard.percentPaid', { percent: debt.paymentProgress.toFixed(0) })}
-                                                </span>
-                                                <span className={debt.debtType === 'i_owe' ? 'text-red-600' : 'text-green-600'}>
-                                                    {formatCurrency(debt.currentBalance, debt.currency)}
-                                                </span>
-                                            </div>
-                                            {debt.counterparty && (
-                                                <p className="text-xs text-muted-foreground mt-1 truncate">
-                                                    {debt.debtType === 'i_owe'
-                                                        ? t('dashboard.toCounterparty', { name: debt.counterparty })
-                                                        : t('dashboard.fromCounterparty', { name: debt.counterparty })}
-                                                </p>
-                                            )}
-                                        </Link>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    ) : (
-                        <div className="text-center py-8">
-                            <HandCoins className="size-12 mx-auto text-muted-foreground/50 mb-3" />
-                            <p className="text-muted-foreground mb-3">{t('dashboard.noDebts')}</p>
-                            <Button asChild size="sm">
-                                <Link to="/debts?create=1">
-                                    <Plus className="size-4 mr-1" />
-                                    {t('dashboard.addDebt')}
-                                </Link>
-                            </Button>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
+            <DebtsCard summary={debtSummary} debts={activeDebts} />
         </div>
     )
 }

@@ -39,7 +39,12 @@ func (s Service) samlRedirect(ctx context.Context, p IdentityProvider, redirectA
 	}
 	entity := s.AppURL() + "/api/auth/sso/" + p.Slug + "/metadata"
 	instant := time.Now().UTC().Format(time.RFC3339)
-	doc := fmt.Sprintf(`<samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="%s" Version="2.0" IssueInstant="%s" Destination="%s" AssertionConsumerServiceURL="%s" ProtocolBinding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"><saml:Issuer>%s</saml:Issuer></samlp:AuthnRequest>`,
+	doc := fmt.Sprintf(`<samlp:AuthnRequest`+
+		` xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"`+
+		` xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"`+
+		` ID="%s" Version="2.0" IssueInstant="%s" Destination="%s" AssertionConsumerServiceURL="%s"`+
+		` ProtocolBinding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST">`+
+		`<saml:Issuer>%s</saml:Issuer></samlp:AuthnRequest>`,
 		xmlEscape(reqID), xmlEscape(instant), xmlEscape(ssoURL), xmlEscape(s.ACSURL(ctx, p)), xmlEscape(entity))
 	encoded, err := deflateB64(doc)
 	if err != nil {

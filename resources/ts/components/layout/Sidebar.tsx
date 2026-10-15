@@ -1,6 +1,36 @@
 import { useEffect } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { Home, FolderTree, Coins, CreditCard, Settings, ChevronDown, Receipt, PiggyBank, Hash, BarChart3, HandCoins, Users, Cog, Repeat, Zap, Shield, Upload, Database, LucideIcon, Github, ExternalLink, Activity, KeyRound, UserRound, Boxes, ServerCog, HardDrive, Wrench, ClipboardCheck } from 'lucide-react'
+import {
+    Home,
+    FolderTree,
+    Coins,
+    CreditCard,
+    Settings,
+    ChevronDown,
+    Receipt,
+    PiggyBank,
+    Hash,
+    BarChart3,
+    HandCoins,
+    Users,
+    Cog,
+    Repeat,
+    Zap,
+    Shield,
+    Upload,
+    Database,
+    LucideIcon,
+    Github,
+    ExternalLink,
+    Activity,
+    KeyRound,
+    UserRound,
+    Boxes,
+    ServerCog,
+    HardDrive,
+    Wrench,
+    ClipboardCheck,
+} from 'lucide-react'
 import { SpaceSwitcher } from '@/components/features/spaces/SpaceSwitcher'
 import { useUser } from '@/stores/auth'
 import { useServerChecks } from '@/hooks/use-server-checks'

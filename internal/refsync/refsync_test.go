@@ -254,7 +254,7 @@ func TestDeletingMovesTransactionsOfEverySpaceToOneSuccessor(t *testing.T) {
 	}
 }
 
-func TestADeleteWithTransactionsOnlyInAnotherSpaceNeedsTheSuccessor(t *testing.T) {
+func TestDeleteUsedOnlyInAnotherSpaceNeedsSuccessor(t *testing.T) {
 	e := newEnv(t)
 	e.group(t, 0, 1)
 	for _, name := range []string{"Taxi", "Transport"} {

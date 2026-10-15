@@ -81,7 +81,7 @@ func TestRegisterIsClosedOnceAUserExists(t *testing.T) {
 	}
 }
 
-func TestRegisterIsClosedWhenUsersExistEvenWithTheRightPassword(t *testing.T) {
+func TestRegisterClosedWhenUsersExistDespiteRightPassword(t *testing.T) {
 	a := newTestApp(t)
 	a.createUser("someone@test.com", "secret1", "user")
 	status(t, a.register(a.bootstrap.Password(), nil), http.StatusForbidden, "users present")

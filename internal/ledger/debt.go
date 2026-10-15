@@ -22,7 +22,25 @@ func (s Debts) All(ctx context.Context, includeCompleted bool) ([]Account, error
 	return s.Accounts.Debts(ctx, includeCompleted)
 }
 
-func (s Debts) Create(ctx context.Context, name, debtType string, currencyID, accountID int64, amount decimal.Decimal, date, origin string, due, counter, desc *string) (*Account, error) {
+// DebtInput describes a new debt. Origin "new" with an AccountID records the
+// issuance as a transaction on that account and takes its currency.
+type DebtInput struct {
+	Name         string
+	DebtType     string
+	CurrencyID   int64
+	AccountID    int64
+	Amount       decimal.Decimal
+	Date         string
+	Origin       string
+	DueDate      *string
+	Counterparty *string
+	Description  *string
+}
+
+func (s Debts) Create(ctx context.Context, in DebtInput) (*Account, error) {
+	name, debtType, currencyID, accountID := in.Name, in.DebtType, in.CurrencyID, in.AccountID
+	amount, date, origin := in.Amount, in.Date, in.Origin
+	due, counter, desc := in.DueDate, in.Counterparty, in.Description
 	if origin == "new" && accountID != 0 {
 		src, err := s.Accounts.ByID(ctx, accountID)
 		if err != nil || src == nil {

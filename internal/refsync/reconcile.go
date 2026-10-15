@@ -419,6 +419,21 @@ func decisionKey(kind Kind, typ, name string) string {
 	return string(kind) + "\x00" + typ + "\x00" + lower(name)
 }
 
+// reconciler carries what the phases of reconcileSpaces share.
+type reconciler struct {
+	dbs      map[int64]store.DB
+	members  []int64
+	diff     Diff
+	decided  map[string]Decision
+	defaults map[string]string
+}
+
+func (r reconciler) cats(id int64) ledger.Categories { return ledger.Categories{DB: r.dbs[id]} }
+
+func (r reconciler) decision(kind Kind, typ, name string) Decision {
+	return r.decided[decisionKey(kind, typ, name)]
+}
+
 // reconcileSpaces makes the spaces identical. Everything that has to exist
 // is made first and only then is anything deleted, so a successor is there
 // to receive the transactions of a category that goes.
@@ -427,138 +442,24 @@ func reconcileSpaces(ctx context.Context, dbs map[int64]store.DB, members []int6
 	if err != nil {
 		return err
 	}
-	decided := map[string]Decision{}
+	r := reconciler{dbs: dbs, members: members, diff: diff, decided: map[string]Decision{}, defaults: map[string]string{}}
 	for _, d := range p.Decisions {
-		decided[decisionKey(d.Kind, d.Type, d.Name)] = d
+		r.decided[decisionKey(d.Kind, d.Type, d.Name)] = d
 	}
-	defaults := map[string]string{}
 	for _, d := range p.Defaults {
-		defaults[d.Type] = d.Name
+		r.defaults[d.Type] = d.Name
 	}
-	for _, c := range diff.Categories {
-		if _, ok := decided[decisionKey(Categories, c.Type, c.Name)]; !ok {
-			return fmt.Errorf("%w: category %q (%s)", ErrUnresolved, c.Name, c.Type)
-		}
+	if err := r.checkResolved(); err != nil {
+		return err
 	}
-	for _, t := range diff.Tags {
-		if _, ok := decided[decisionKey(Tags, "", t.Name)]; !ok {
-			return fmt.Errorf("%w: tag %q", ErrUnresolved, t.Name)
-		}
+	steps := []func(context.Context) error{
+		r.createKept,    // 1. Create what is kept and align how it looks.
+		r.moveDefaults,  // 2. Move the defaults, before anything that might be one is deleted.
+		r.deleteDropped, // 3. Delete what is dropped, moving transactions to the successor.
 	}
-	for _, c := range diff.Defaults {
-		if _, ok := defaults[c.Type]; !ok {
-			return fmt.Errorf("%w: the default %s category", ErrUnresolved, c.Type)
-		}
-	}
-
-	cats := func(id int64) ledger.Categories { return ledger.Categories{DB: dbs[id]} }
-
-	// 1. Create what is kept and align how it looks.
-	for _, c := range diff.Categories {
-		d := decided[decisionKey(Categories, c.Type, c.Name)]
-		if !d.Keep {
-			continue
-		}
-		win := c.Present[0]
-		if d.From != 0 {
-			i := slices.IndexFunc(c.Present, func(s CategoryState) bool { return s.Space == d.From })
-			if i < 0 {
-				return fmt.Errorf("%w: category %q is not in space %d", ErrInvalid, c.Name, d.From)
-			}
-			win = c.Present[i]
-		} else {
-			for _, s := range c.Present[1:] {
-				if !sameText(s.Icon, win.Icon) || !sameText(s.Color, win.Color) {
-					return fmt.Errorf("%w: category %q looks different in the spaces; say which one to keep", ErrUnresolved, c.Name)
-				}
-			}
-		}
-		for _, id := range c.Missing {
-			if _, err := cats(id).Create(ctx, ledger.Category{Name: c.Name, Type: c.Type, Icon: win.Icon, Color: win.Color}); err != nil {
-				return err
-			}
-		}
-		for _, s := range c.Present {
-			if sameText(s.Icon, win.Icon) && sameText(s.Color, win.Color) {
-				continue
-			}
-			cur, err := findCategory(ctx, cats(s.Space), c.Type, c.Name)
-			if err != nil {
-				return err
-			}
-			if _, err := cats(s.Space).Update(ctx, cur.ID, ledger.Category{Name: cur.Name, Type: cur.Type, Icon: win.Icon, Color: win.Color, IsDefault: cur.IsDefault}); err != nil {
-				return err
-			}
-		}
-	}
-	for _, t := range diff.Tags {
-		if !decided[decisionKey(Tags, "", t.Name)].Keep {
-			continue
-		}
-		for _, id := range t.Missing {
-			if _, err := (ledger.Tags{DB: dbs[id]}).Create(ctx, t.Name); err != nil {
-				return err
-			}
-		}
-	}
-
-	// 2. Move the defaults, before anything that might be one is deleted.
-	for _, c := range diff.Defaults {
-		name := defaults[c.Type]
-		for _, id := range members {
-			cur, err := findCategory(ctx, cats(id), c.Type, name)
-			if err != nil {
-				return err
-			}
-			if cur == nil {
-				return fmt.Errorf("%w: %q is not a %s category everywhere", ErrInvalid, name, c.Type)
-			}
-			if _, err := cats(id).SetDefault(ctx, cur.ID); err != nil {
-				return err
-			}
-		}
-	}
-
-	// 3. Delete what is dropped, moving transactions to the successor.
-	for _, c := range diff.Categories {
-		d := decided[decisionKey(Categories, c.Type, c.Name)]
-		if d.Keep {
-			continue
-		}
-		for _, s := range c.Present {
-			cur, err := findCategory(ctx, cats(s.Space), c.Type, c.Name)
-			if err != nil {
-				return err
-			}
-			var succ *int64
-			if d.Successor != "" {
-				found, err := findCategory(ctx, cats(s.Space), c.Type, d.Successor)
-				if err != nil {
-					return err
-				}
-				if found == nil {
-					return fmt.Errorf("%w: the successor %q is not a %s category", ErrInvalid, d.Successor, c.Type)
-				}
-				succ = &found.ID
-			}
-			if err := cats(s.Space).Delete(ctx, cur.ID, succ); err != nil {
-				return fmt.Errorf("deleting %q: %w", c.Name, err)
-			}
-		}
-	}
-	for _, t := range diff.Tags {
-		if decided[decisionKey(Tags, "", t.Name)].Keep {
-			continue
-		}
-		for _, s := range t.Present {
-			tags := ledger.Tags{DB: dbs[s.Space]}
-			cur, err := findTag(ctx, tags, t.Name)
-			if err != nil {
-				return err
-			}
-			if err := tags.Delete(ctx, cur.ID); err != nil {
-				return err
-			}
+	for _, step := range steps {
+		if err := step(ctx); err != nil {
+			return err
 		}
 	}
 
@@ -568,6 +469,157 @@ func reconcileSpaces(ctx context.Context, dbs map[int64]store.DB, members []int6
 	}
 	if !left.Empty() {
 		return fmt.Errorf("%w: %+v", ErrInvalid, left)
+	}
+	return nil
+}
+
+func (r reconciler) checkResolved() error {
+	for _, c := range r.diff.Categories {
+		if _, ok := r.decided[decisionKey(Categories, c.Type, c.Name)]; !ok {
+			return fmt.Errorf("%w: category %q (%s)", ErrUnresolved, c.Name, c.Type)
+		}
+	}
+	for _, t := range r.diff.Tags {
+		if _, ok := r.decided[decisionKey(Tags, "", t.Name)]; !ok {
+			return fmt.Errorf("%w: tag %q", ErrUnresolved, t.Name)
+		}
+	}
+	for _, c := range r.diff.Defaults {
+		if _, ok := r.defaults[c.Type]; !ok {
+			return fmt.Errorf("%w: the default %s category", ErrUnresolved, c.Type)
+		}
+	}
+	return nil
+}
+
+func (r reconciler) createKept(ctx context.Context) error {
+	for _, c := range r.diff.Categories {
+		d := r.decision(Categories, c.Type, c.Name)
+		if !d.Keep {
+			continue
+		}
+		win, err := winningLook(c, d)
+		if err != nil {
+			return err
+		}
+		for _, id := range c.Missing {
+			if _, err := r.cats(id).Create(ctx, ledger.Category{Name: c.Name, Type: c.Type, Icon: win.Icon, Color: win.Color}); err != nil {
+				return err
+			}
+		}
+		for _, s := range c.Present {
+			if sameText(s.Icon, win.Icon) && sameText(s.Color, win.Color) {
+				continue
+			}
+			cur, err := findCategory(ctx, r.cats(s.Space), c.Type, c.Name)
+			if err != nil {
+				return err
+			}
+			if _, err := r.cats(s.Space).Update(ctx, cur.ID, ledger.Category{Name: cur.Name, Type: cur.Type, Icon: win.Icon, Color: win.Color, IsDefault: cur.IsDefault}); err != nil {
+				return err
+			}
+		}
+	}
+	for _, t := range r.diff.Tags {
+		if !r.decision(Tags, "", t.Name).Keep {
+			continue
+		}
+		for _, id := range t.Missing {
+			if _, err := (ledger.Tags{DB: r.dbs[id]}).Create(ctx, t.Name); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// winningLook picks the state of a kept category whose icon and color the
+// other spaces take over.
+func winningLook(c CategoryConflict, d Decision) (CategoryState, error) {
+	if d.From != 0 {
+		i := slices.IndexFunc(c.Present, func(s CategoryState) bool { return s.Space == d.From })
+		if i < 0 {
+			return CategoryState{}, fmt.Errorf("%w: category %q is not in space %d", ErrInvalid, c.Name, d.From)
+		}
+		return c.Present[i], nil
+	}
+	win := c.Present[0]
+	for _, s := range c.Present[1:] {
+		if !sameText(s.Icon, win.Icon) || !sameText(s.Color, win.Color) {
+			return CategoryState{}, fmt.Errorf("%w: category %q looks different in the spaces; say which one to keep", ErrUnresolved, c.Name)
+		}
+	}
+	return win, nil
+}
+
+func (r reconciler) moveDefaults(ctx context.Context) error {
+	for _, c := range r.diff.Defaults {
+		name := r.defaults[c.Type]
+		for _, id := range r.members {
+			cur, err := findCategory(ctx, r.cats(id), c.Type, name)
+			if err != nil {
+				return err
+			}
+			if cur == nil {
+				return fmt.Errorf("%w: %q is not a %s category everywhere", ErrInvalid, name, c.Type)
+			}
+			if _, err := r.cats(id).SetDefault(ctx, cur.ID); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (r reconciler) deleteDropped(ctx context.Context) error {
+	for _, c := range r.diff.Categories {
+		d := r.decision(Categories, c.Type, c.Name)
+		if d.Keep {
+			continue
+		}
+		for _, s := range c.Present {
+			if err := r.deleteCategory(ctx, s.Space, c, d); err != nil {
+				return err
+			}
+		}
+	}
+	for _, t := range r.diff.Tags {
+		if r.decision(Tags, "", t.Name).Keep {
+			continue
+		}
+		for _, s := range t.Present {
+			tags := ledger.Tags{DB: r.dbs[s.Space]}
+			cur, err := findTag(ctx, tags, t.Name)
+			if err != nil {
+				return err
+			}
+			if err := tags.Delete(ctx, cur.ID); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (r reconciler) deleteCategory(ctx context.Context, space int64, c CategoryConflict, d Decision) error {
+	cats := r.cats(space)
+	cur, err := findCategory(ctx, cats, c.Type, c.Name)
+	if err != nil {
+		return err
+	}
+	var succ *int64
+	if d.Successor != "" {
+		found, err := findCategory(ctx, cats, c.Type, d.Successor)
+		if err != nil {
+			return err
+		}
+		if found == nil {
+			return fmt.Errorf("%w: the successor %q is not a %s category", ErrInvalid, d.Successor, c.Type)
+		}
+		succ = &found.ID
+	}
+	if err := cats.Delete(ctx, cur.ID, succ); err != nil {
+		return fmt.Errorf("deleting %q: %w", c.Name, err)
 	}
 	return nil
 }

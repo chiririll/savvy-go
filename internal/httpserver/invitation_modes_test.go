@@ -170,7 +170,7 @@ func TestRegisteringThroughAnEmailedInvitationVerifiesTheAddress(t *testing.T) {
 	}
 }
 
-func TestALinkInvitationKeepsItsNoteAndAnEmailedOneDoesNot(t *testing.T) {
+func TestLinkInvitationKeepsNoteEmailedDoesNot(t *testing.T) {
 	rec := &recorder{on: true}
 	a, sess, _ := newMailApp(t, rec)
 	post := func(body map[string]any) (int, map[string]any) {
@@ -202,7 +202,7 @@ func TestALinkInvitationKeepsItsNoteAndAnEmailedOneDoesNot(t *testing.T) {
 	}
 }
 
-func TestARegistrationThroughALinkInvitationIsAskedToConfirmByEmail(t *testing.T) {
+func TestLinkInvitationRegistrationAsksEmailConfirmation(t *testing.T) {
 	rec := &recorder{on: true}
 	a, sess, _ := newMailApp(t, rec)
 	_, data, _ := a.postInvite(sess, a.space.ID, "")

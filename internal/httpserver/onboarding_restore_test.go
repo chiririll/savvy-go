@@ -160,7 +160,7 @@ func TestFirstRunRestoreOfALaravelDatabase(t *testing.T) {
 	}
 }
 
-func TestFirstRunRestoreOfABackupWithoutUsersKeepsSetupOpen(t *testing.T) {
+func TestFirstRunRestoreWithoutUsersKeepsSetupOpen(t *testing.T) {
 	a := newTestApp(t)
 	pass := a.bootstrap.Password()
 	empty := newTestApp(t)
