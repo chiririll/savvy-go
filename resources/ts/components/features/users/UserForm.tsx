@@ -39,6 +39,8 @@ interface UserFormProps {
     isEdit?: boolean
     formId?: string
     hideSubmit?: boolean
+    /** Whether the set-password link can be emailed, and whether it must be (verification is required). */
+    mail?: { canEmail: boolean; mustEmail: boolean }
 }
 
 export function UserForm({
@@ -50,6 +52,7 @@ export function UserForm({
     isEdit = false,
     formId,
     hideSubmit = false,
+    mail = { canEmail: false, mustEmail: false },
 }: UserFormProps) {
     const { t } = useTranslation(['common', 'forms'])
     const currentUser = useUser()
@@ -63,6 +66,7 @@ export function UserForm({
             password: '',
             role: 'user',
             setPassword: false,
+            sendEmail: mail.canEmail,
             ...defaultValues,
         },
     })
@@ -124,6 +128,34 @@ export function UserForm({
                                         <FormLabel>{t('forms:users.setPassword')}</FormLabel>
                                         <FormDescription>
                                             {t('forms:users.setPasswordHelp')}
+                                        </FormDescription>
+                                    </div>
+                                </FormItem>
+                            )}
+                        />
+                    )}
+
+                    {!isEdit && !setPassword && (mail.canEmail || mail.mustEmail) && (
+                        <FormField
+                            control={form.control}
+                            name="sendEmail"
+                            render={({ field }) => (
+                                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                                    <FormControl>
+                                        <Checkbox
+                                            checked={mail.mustEmail || Boolean(field.value)}
+                                            disabled={mail.mustEmail || !mail.canEmail}
+                                            onCheckedChange={field.onChange}
+                                        />
+                                    </FormControl>
+                                    <div className="space-y-1 leading-none">
+                                        <FormLabel>{t('forms:users.sendEmail')}</FormLabel>
+                                        <FormDescription>
+                                            {mail.mustEmail
+                                                ? mail.canEmail
+                                                    ? t('forms:users.sendEmailRequired')
+                                                    : t('forms:users.sendEmailUnavailable')
+                                                : t('forms:users.sendEmailHelp')}
                                         </FormDescription>
                                     </div>
                                 </FormItem>

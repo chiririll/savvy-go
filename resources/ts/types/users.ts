@@ -15,6 +15,8 @@ export interface User {
     expiresAt?: string
     /** Set when the reset link was emailed instead of returned as `token`. */
     emailSent?: boolean
+    /** Set when a new user was created but the link could not be emailed. */
+    emailError?: string
 }
 
 export interface PasswordTokenPreview {

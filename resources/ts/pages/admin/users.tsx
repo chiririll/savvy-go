@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
 import { ListPage } from '@/components/shared'
 import { createUserColumns, UserFormDialog, UserPasswordLinkDialog } from '@/components/features/users'
@@ -29,6 +30,11 @@ export default function UsersPage() {
     const { data: settings } = useSettings()
     const isReadOnly = useReadOnly()
 
+    // Emailing needs a working mail server, the public URL for the link, and password sign-in.
+    const canEmail = !!mail?.enabled && mail.appUrlSet && settings?.password_login_enabled !== false
+    // With verification on, a link the admin hands over proves nothing about the mailbox: only email will do.
+    const mustEmail = !!settings?.require_email_verification
+
     const [linkUrl, setLinkUrl] = useState<string | null>(null)
     const form = useResourceFormDialog<User, CreateUserFormData | UpdateUserFormData>({
         items: users ?? [],
@@ -53,18 +59,24 @@ export default function UsersPage() {
         }
 
         const createData = data as CreateUserFormData
+        const send = !createData.setPassword && canEmail && (mustEmail || !!createData.sendEmail)
         createUser.mutate(
             {
                 name: createData.name,
                 email: createData.email,
                 role: createData.role,
                 password: createData.setPassword ? createData.password : undefined,
+                send: send || undefined,
             },
             {
                 onSuccess: (user) => {
                     if (user.token) {
                         showLink(user.token)
+                    } else if (user.emailError) {
+                        form.setOpen(false)
+                        toast.error(t('users.linkEmailFailed', { email: user.email }))
                     } else {
+                        if (user.emailSent) toast.success(t('users.linkEmailed', { email: user.email }))
                         form.setOpen(false)
                     }
                 },
@@ -78,8 +90,6 @@ export default function UsersPage() {
         })
     }
 
-    // Emailing needs a working mail server, the public URL for the link, and password sign-in.
-    const canEmail = !!mail?.enabled && mail.appUrlSet && settings?.password_login_enabled !== false
     const handleEmailReset = (user: User) => issueToken.mutate({ id: user.id, send: true })
 
     const columns = createUserColumns(
@@ -110,6 +120,7 @@ export default function UsersPage() {
                 onOpenChange={form.setOpen}
                 onSubmit={handleSubmit}
                 isSubmitting={createUser.isPending || updateUser.isPending}
+                mail={{ canEmail, mustEmail }}
             />
 
             <UserPasswordLinkDialog

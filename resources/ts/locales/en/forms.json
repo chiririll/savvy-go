@@ -84,7 +84,11 @@
         "passwordKeepHelp": "Leave empty to keep the current password",
         "cannotChangeOwnRole": "You cannot change your own role",
         "setPassword": "Set password",
-        "setPasswordHelp": "If unchecked, the user will get a link to choose their own password"
+        "setPasswordHelp": "If unchecked, the user will get a link to choose their own password",
+        "sendEmail": "Email the link to the user",
+        "sendEmailHelp": "Sends the set-password link to their address instead of showing it to you.",
+        "sendEmailRequired": "Email verification is on, so the link is sent to the user's address.",
+        "sendEmailUnavailable": "Email verification is on, but mail is not set up. Configure mail in Administration → System, or set a password."
     },
     "debts": {
         "targetAmount": "Target amount",

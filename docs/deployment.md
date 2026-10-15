@@ -90,6 +90,7 @@ from = "Go Savvy <savvy@example.com>"
 That page has a **Send test email** button, to try the saved settings. When mail works and `app_url` is set:
 
 - **Administration → Users → Email a reset link** sends a user a one-time password link (valid 7 days). It is not offered for yourself, for SSO-only users, or when password sign-in is off. **Reset password** still shows a link to copy.
+- **Administration → Users → New user** (without a password) can email the set-password link to the new user instead of showing it. With email verification switched on, emailing is the only option, since a link you hand over proves nothing about the mailbox.
 - Inviting someone by email from **Settings → Space** emails them the invitation link. The link is not shown to the inviter, so it can only be used by that mailbox. Which invitations a server allows is described under [Invitations](spaces.md#invitations).
 
 ### Email confirmation

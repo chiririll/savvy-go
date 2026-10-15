@@ -9,6 +9,8 @@ import {
     DropdownMenuRadioItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useTheme, type Theme, type ThemePreference } from '@/hooks/use-theme'
 import { cn } from '@/lib/utils'
 
@@ -50,18 +52,44 @@ function TriggerIcon({ preference, theme }: { preference: ThemePreference; theme
 }
 
 interface ThemeSwitcherProps {
+    /** `select` is a labelled settings row (like the language one); `icon` is the header button. */
+    variant?: 'icon' | 'select'
     className?: string
 }
 
-export function ThemeSwitcher({ className }: ThemeSwitcherProps) {
+export function ThemeSwitcher({ variant = 'icon', className }: ThemeSwitcherProps) {
     const { t } = useTranslation()
     const { theme, preference, setTheme } = useTheme()
     const triggerRef = useRef<HTMLButtonElement>(null)
 
     const handleChange = (value: string) => {
         if (value !== 'light' && value !== 'dark' && value !== 'auto') return
-        const rect = triggerRef.current?.getBoundingClientRect()
+        // The select row has no trigger button to ripple from: fade instead.
+        const rect = variant === 'icon' ? triggerRef.current?.getBoundingClientRect() : undefined
         setTheme(value, rect && { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 })
+    }
+
+    if (variant === 'select') {
+        return (
+            <div className={cn('flex items-center justify-between gap-4 px-4 py-3.5', className)}>
+                <div className="space-y-1">
+                    <Label htmlFor="interface-theme" className="text-sm font-medium">
+                        {t('theme.label')}
+                    </Label>
+                    <p className="text-sm leading-relaxed text-muted-foreground">{t('settings:user.theme.description')}</p>
+                </div>
+                <Select value={preference} onValueChange={handleChange}>
+                    <SelectTrigger id="interface-theme" className="w-40">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="light">{t('theme.light')}</SelectItem>
+                        <SelectItem value="dark">{t('theme.dark')}</SelectItem>
+                        <SelectItem value="auto">{t('theme.auto')}</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+        )
     }
 
     return (

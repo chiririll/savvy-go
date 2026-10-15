@@ -70,7 +70,9 @@ export const spacesApi = {
     unlink: (id: number, otherId: number) => api.delete<void>(`${base(id)}/links/${otherId}`),
 
     /** The sync group of the space, null when it is in none. */
-    syncGroup: (id: number) => api.get<SyncGroup | null>(`${base(id)}/sync-group`),
+    // The envelope drops a null `data`, so "no group" arrives as `{}`.
+    syncGroup: (id: number) =>
+        api.get<SyncGroup | null>(`${base(id)}/sync-group`).then((group) => (group && 'id' in group ? group : null)),
 
     /** Accounts of any space the caller belongs to (for the other side of a transfer). */
     accounts: (id: number, params?: { active?: boolean; exclude_debts?: boolean }) =>

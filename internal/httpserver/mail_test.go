@@ -451,6 +451,72 @@ func TestResetLinkStillReturnsTheTokenWhenNotSending(t *testing.T) {
 	}
 }
 
+func TestNewUserGetsTheSetPasswordLinkByEmail(t *testing.T) {
+	rec := &recorder{on: true}
+	a, sess, _ := newMailApp(t, rec)
+
+	res := a.do("POST", "/api/users", map[string]any{"name": "New", "email": "new@test.com", "role": "user", "send": true}, sess.Token, sess.CSRF)
+	body := decodeJSON(t, res)
+	data, _ := body["data"].(map[string]any)
+	if res.StatusCode != 201 || data["emailSent"] != true {
+		t.Fatalf("create %d %v", res.StatusCode, body)
+	}
+	if _, leaked := data["token"]; leaked {
+		t.Error("the token is in the response although the link was emailed")
+	}
+	got := rec.messages()
+	if len(got) != 1 || got[0].To != "new@test.com" || !strings.Contains(got[0].Text, "/set-password/") {
+		t.Fatalf("sent %+v", got)
+	}
+}
+
+func TestNewUserEmailNeedsMailAndNoPassword(t *testing.T) {
+	rec := &recorder{on: true}
+	a, sess, _ := newMailApp(t, rec)
+	create := func(email string, extra map[string]any) int {
+		in := map[string]any{"name": "New", "email": email, "role": "user"}
+		for k, v := range extra {
+			in[k] = v
+		}
+		return a.do("POST", "/api/users", in, sess.Token, sess.CSRF).StatusCode
+	}
+
+	if code := create("pw@test.com", map[string]any{"send": true, "password": "longenough1"}); code != 422 {
+		t.Errorf("send with a password: %d", code)
+	}
+	// SMTP down: the user exists, nobody got the link, and the response says so.
+	rec.sendErr = errors.New("connection refused")
+	res := a.do("POST", "/api/users", map[string]any{"name": "New", "email": "down@test.com", "role": "user", "send": true}, sess.Token, sess.CSRF)
+	data, _ := decodeJSON(t, res)["data"].(map[string]any)
+	if res.StatusCode != 201 || data["emailError"] == nil || data["token"] != nil {
+		t.Errorf("smtp down: %d %v", res.StatusCode, data)
+	}
+
+	off := &recorder{}
+	a, sess, _ = newMailApp(t, off)
+	if code := create("off@test.com", map[string]any{"send": true}); code != 422 {
+		t.Errorf("mail off: %d", code)
+	}
+}
+
+// With verification required a link handed over by the admin proves nothing
+// about the mailbox, so a user without a password has to be emailed.
+func TestNewUserLinkIsRefusedWhenVerificationIsRequired(t *testing.T) {
+	rec := &recorder{on: true}
+	a, sess, admin := newMailApp(t, rec)
+	_ = a.s.users.SetEmailVerified(context.Background(), admin.ID, true)
+	_ = settings.Store{DB: a.db}.Set(context.Background(), "require_email_verification", true)
+
+	res := a.do("POST", "/api/users", map[string]any{"name": "New", "email": "new@test.com", "role": "user"}, sess.Token, sess.CSRF)
+	if res.StatusCode != 422 {
+		t.Errorf("link instead of email: %d", res.StatusCode)
+	}
+	res = a.do("POST", "/api/users", map[string]any{"name": "New", "email": "new@test.com", "role": "user", "send": true}, sess.Token, sess.CSRF)
+	if res.StatusCode != 201 {
+		t.Errorf("emailed: %d", res.StatusCode)
+	}
+}
+
 func toString(v any) string {
 	switch t := v.(type) {
 	case nil:

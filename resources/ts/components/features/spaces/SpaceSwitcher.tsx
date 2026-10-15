@@ -11,6 +11,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { useReadOnly } from '@/components/providers/ReadOnlyProvider'
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar'
 import { pathAfterSwitch, useCurrentSpace, useSpaces, useSwitchSpace } from '@/hooks/use-spaces'
 import { useUser } from '@/stores/auth'
@@ -32,6 +33,7 @@ export function SpaceSwitcher() {
     const navigate = useNavigate()
     const location = useLocation()
     const user = useUser()
+    const isReadOnly = useReadOnly()
     const { isMobile } = useSidebar()
     const { data: spaces = [] } = useSpaces()
     const current = useCurrentSpace()
@@ -93,7 +95,7 @@ export function SpaceSwitcher() {
                                 <Settings2 className="size-4" />
                                 {t('spaces.switcher.settings')}
                             </DropdownMenuItem>
-                            {user?.role !== 'guest' && (
+                            {user?.role !== 'guest' && !isReadOnly && (
                                 <DropdownMenuItem onClick={() => setCreating(true)} className="gap-2 p-2" {...testId('layout-space-create')}>
                                     <Plus className="size-4" />
                                     {t('spaces.switcher.create')}

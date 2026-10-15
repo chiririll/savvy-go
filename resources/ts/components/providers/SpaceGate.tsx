@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { LazyCreateSpaceModal } from '@/components/features/spaces/LazyCreateSpaceModal'
+import { useReadOnly } from '@/components/providers/ReadOnlyProvider'
 import { useSpaces } from '@/hooks/use-spaces'
 import { useUser } from '@/stores/auth'
 import { useSpaceStore } from '@/stores/space'
@@ -19,15 +20,17 @@ function CenteredLoader() {
 export function NoSpace() {
     const { t } = useTranslation('common')
     const user = useUser()
+    const isReadOnly = useReadOnly()
     const isGuest = user?.role === 'guest'
-    const [creating, setCreating] = useState(!isGuest)
+    const canCreate = !isGuest && !isReadOnly
+    const [creating, setCreating] = useState(canCreate)
 
     return (
         <div className="min-h-screen flex items-center justify-center p-4">
             <div className="max-w-sm space-y-4 text-center">
                 <h1 className="text-xl font-semibold">{t('spaces.noneTitle')}</h1>
                 <p className="text-muted-foreground">{isGuest ? t('spaces.noneGuest') : t('spaces.noneText')}</p>
-                {!isGuest && (
+                {canCreate && (
                     <>
                         <Button onClick={() => setCreating(true)}>{t('spaces.create')}</Button>
                         {/* Without a space there is nothing to go back to, so it cannot be closed. */}
