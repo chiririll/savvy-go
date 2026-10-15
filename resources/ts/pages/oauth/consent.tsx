@@ -13,6 +13,7 @@ import { PermissionPicker } from '@/components/features/api-tokens/PermissionPic
 import { presetPermissions, type ApiPermission, type ApiResource } from '@/types'
 import { useUser } from '@/stores/auth'
 import { getApiErrorMessage } from '@/lib/api-error'
+import { testId } from '@/lib/test-id'
 
 /** Where an AI app (Claude web, ...) sends the browser to ask for read access. */
 export default function OAuthConsentPage() {
@@ -126,11 +127,11 @@ export default function OAuthConsentPage() {
                             )}
                         </CardContent>
                         <CardFooter className="gap-2">
-                            <Button variant="outline" className="flex-1" disabled={busy !== null} onClick={() => decide(false)}>
+                            <Button variant="outline" className="flex-1" disabled={busy !== null} onClick={() => decide(false)} {...testId('oauth-deny')}>
                                 {busy === 'deny' && <Loader2 className="size-4 animate-spin" />}
                                 {t('oauth.deny')}
                             </Button>
-                            <Button className="flex-1" disabled={busy !== null || !hasSpaces(spaceChoice) || permissions.length === 0} onClick={() => decide(true)}>
+                            <Button className="flex-1" disabled={busy !== null || !hasSpaces(spaceChoice) || permissions.length === 0} onClick={() => decide(true)} {...testId('oauth-allow')}>
                                 {busy === 'allow' && <Loader2 className="size-4 animate-spin" />}
                                 {t('oauth.allow')}
                             </Button>

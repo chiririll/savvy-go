@@ -193,7 +193,7 @@ function McpAccess() {
             title={t('admin.mcp.title')}
             description={t('admin.mcp.description')}
             actions={
-                <Button variant={open ? 'outline' : 'default'} size="sm" disabled={setOpen.isPending} onClick={() => setOpen.mutate(!open)}>
+                <Button variant={open ? 'outline' : 'default'} size="sm" disabled={setOpen.isPending} onClick={() => setOpen.mutate(!open)} {...testId('mcp-registration')}>
                     {open ? t('admin.mcp.close') : t('admin.mcp.allow')}
                 </Button>
             }
