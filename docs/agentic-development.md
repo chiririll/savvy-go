@@ -5,13 +5,15 @@ Project rules for AI coding agents live in plain files in the repository, so any
 - [`AGENTS.md`](../AGENTS.md): commands, layout, rules for the whole project.
 - [`internal/AGENTS.md`](../internal/AGENTS.md): backend rules.
 - [`resources/ts/AGENTS.md`](../resources/ts/AGENTS.md): frontend rules.
+- Nested files under `internal/` (`db/`, `httpserver/`, `migrate/`, `legacy/`): rules for that directory.
 
 Agents that read `AGENTS.md` (Codex, Cursor, Copilot, Gemini CLI and others) need no setup. Nested files load when the agent works in that directory.
 
 ## Onboarding an agent
 
-- **Claude Code:** reads `CLAUDE.md`, not `AGENTS.md`. `CLAUDE.md` files are git-ignored, so create them locally: one line, `@AGENTS.md`, next to each `AGENTS.md` (root, `internal/`, `resources/ts/`).
+- **Claude Code:** reads `CLAUDE.md`, not `AGENTS.md`. `CLAUDE.md` files are git-ignored, so create them locally: one line, `@AGENTS.md`, next to each `AGENTS.md`.
 - **Other agents:** point them at `AGENTS.md` if they do not pick it up on their own.
+- **Skills:** Claude Code reads `.claude/skills/`, not `.agents/skills/`. Symlink each skill: `ln -s ../../.agents/skills/<name> .claude/skills/<name>` (Windows: `mklink /D`, needs developer mode or admin). `.claude/` is git-ignored, so the link stays local.
 
 Agent-specific files and folders (`CLAUDE.md`, `.claude/`, `.cursor/`, `.codex/`, `.gemini/`, `.windsurf/`) are git-ignored. Keep personal settings and permission allowlists there.
 
