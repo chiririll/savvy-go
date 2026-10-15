@@ -164,11 +164,19 @@ var mcpReadNeeds = map[string]string{
 // names the missing permission.
 func (s *Server) mcpServer(perms []string) *mcp.Server {
 	srv := mcp.NewServer(&mcp.Implementation{Name: "go-savvy", Version: version.Value}, &mcp.ServerOptions{Instructions: mcpInstructions})
-	ro := func(title string) *mcp.ToolAnnotations {
-		no := false
-		return &mcp.ToolAnnotations{Title: title, ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: &no}
-	}
+	s.addSimpleReadTools(srv)
+	s.addQueryReadTools(srv)
+	s.hideUngrantedTools(srv, s.addMCPWriteTools(srv), perms)
+	return srv
+}
 
+func ro(title string) *mcp.ToolAnnotations {
+	no := false
+	return &mcp.ToolAnnotations{Title: title, ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: &no}
+}
+
+// addSimpleReadTools adds the read tools that take no filters.
+func (s *Server) addSimpleReadTools(srv *mcp.Server) {
 	mcp.AddTool(srv, &mcp.Tool{Name: "list_spaces", Description: "List the spaces (separate ledgers) you can read, with your role in each.", Annotations: ro("List spaces")},
 		func(ctx context.Context, req *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
 			return s.mcpGet(ctx, req, "/api/spaces", nil), nil, nil
@@ -199,6 +207,10 @@ func (s *Server) mcpServer(perms []string) *mcp.Server {
 			})
 	}
 
+}
+
+// addQueryReadTools adds the read tools that turn their arguments into a query.
+func (s *Server) addQueryReadTools(srv *mcp.Server) {
 	mcp.AddTool(srv, &mcp.Tool{Name: "list_accounts", Description: "List the space's accounts with their currency and current balance.", Annotations: ro("List accounts")},
 		func(ctx context.Context, req *mcp.CallToolRequest, in accountsArgs) (*mcp.CallToolResult, any, error) {
 			q := url.Values{}
@@ -264,7 +276,10 @@ func (s *Server) mcpServer(perms []string) *mcp.Server {
 			setIDs(q, "tag_ids", in.TagIDs)
 			return s.mcpGet(ctx, req, mcpSpacePath(in.SpaceID, "/reports/"+route), q), nil, nil
 		})
-	needs := s.addMCPWriteTools(srv)
+}
+
+// hideUngrantedTools leaves out of the tool list what the token has no grant for.
+func (s *Server) hideUngrantedTools(srv *mcp.Server, needs map[string]mcpNeed, perms []string) {
 	for name, resource := range mcpReadNeeds {
 		needs[name] = mcpNeed{resource, savvyauth.PermRead}
 	}
@@ -281,7 +296,6 @@ func (s *Server) mcpServer(perms []string) *mcp.Server {
 			return res, err
 		}
 	})
-	return srv
 }
 
 func mcpSpacePath(id int64, rest string) string {

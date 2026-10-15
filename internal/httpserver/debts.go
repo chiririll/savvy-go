@@ -165,3 +165,16 @@ func (s *Server) debtParam(w http.ResponseWriter, r *http.Request) *ledger.Accou
 	}
 	return a
 }
+
+func (s *Server) debtRoutes(r chi.Router) {
+	r.Get("/debts", s.debtsIndex)
+	r.Post("/debts", s.debtsStore)
+	r.Get("/debts/{id}", s.debtsShow)
+	r.Put("/debts/{id}", s.debtsUpdate)
+	r.Patch("/debts/{id}", s.debtsUpdate)
+	r.Delete("/debts/{id}", s.debtsDestroy)
+	r.Post("/debts/{id}/payment", s.debtsPayment)
+	r.Post("/debts/{id}/collect", s.debtsCollect)
+	r.Post("/debts/{id}/reopen", s.debtsReopen)
+	r.Get("/debts-summary", s.debtsSummary)
+}

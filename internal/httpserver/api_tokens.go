@@ -212,3 +212,11 @@ func (s *Server) apiTokensUpdate(w http.ResponseWriter, r *http.Request) {
 		writeDataMsg(w, http.StatusOK, dto.APIToken(*tok), "API token updated.")
 	}
 }
+
+func (s *Server) credentialApiTokensRoutes(r chi.Router) {
+	r.Get("/auth/api-token-capabilities", s.apiTokenCapabilities)
+	r.Get("/auth/api-tokens", s.apiTokensIndex)
+	r.Post("/auth/api-tokens", s.apiTokensStore)
+	r.Patch("/auth/api-tokens/{id}", s.apiTokensUpdate)
+	r.Delete("/auth/api-tokens/{id}", s.apiTokensDestroy)
+}

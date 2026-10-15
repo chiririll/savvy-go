@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"github.com/go-chi/chi/v5"
 	"net/http"
 	"sort"
 	"time"
@@ -115,3 +116,7 @@ func (s *Server) diskPercent() *float64 {
 }
 
 func addr[T any](v T) *T { return &v }
+
+func (s *Server) adminChecksRoutes(r chi.Router) {
+	r.Get("/admin/checks", s.checksIndex)
+}

@@ -328,3 +328,23 @@ func writeSSOErr(w http.ResponseWriter, err error) {
 	}
 	writeMessage(w, http.StatusInternalServerError, err.Error())
 }
+
+func (s *Server) publicSsoRoutes(r chi.Router) {
+	r.Get("/auth/sso/providers", s.ssoProviders)
+	r.Post("/auth/sso/exchange", s.ssoExchange)
+	r.With(s.needAppURL).Get("/auth/sso/{slug}/redirect", s.ssoRedirect)
+	r.With(s.needAppURL).Get("/auth/sso/{slug}/callback", s.ssoCallback)
+	r.With(s.needAppURL).Post("/auth/sso/{slug}/acs", s.ssoACS)
+	r.With(s.needAppURL).Get("/auth/sso/{slug}/metadata", s.ssoMetadata)
+}
+
+func (s *Server) adminSsoRoutes(r chi.Router) {
+	r.Get("/auth/sso/presets", s.ssoPresets)
+	r.Get("/identity-providers", s.idpIndex)
+	r.Post("/identity-providers", s.idpStore)
+	r.Get("/identity-providers/{id}", s.idpShow)
+	r.Put("/identity-providers/{id}", s.idpUpdate)
+	r.Patch("/identity-providers/{id}", s.idpUpdate)
+	r.Delete("/identity-providers/{id}", s.idpDestroy)
+	r.Post("/identity-providers/{id}/test", s.idpTest)
+}

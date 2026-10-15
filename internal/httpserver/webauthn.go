@@ -153,3 +153,16 @@ func (s *Server) webauthnLoginVerify(w http.ResponseWriter, r *http.Request) {
 	}
 	s.issueSession(w, r, u, http.StatusOK, true)
 }
+
+func (s *Server) publicWebauthnRoutes(r chi.Router) {
+	r.With(s.needAppURL).Post("/auth/webauthn/login/options", s.webauthnLoginOptions)
+	r.With(s.needAppURL).Post("/auth/webauthn/login/verify", s.webauthnLoginVerify)
+}
+
+func (s *Server) credentialWebauthnRoutes(r chi.Router) {
+	r.Get("/auth/webauthn/credentials", s.webauthnIndex)
+	r.With(s.needAppURL).Post("/auth/webauthn/register/options", s.webauthnRegisterOptions)
+	r.With(s.needAppURL).Post("/auth/webauthn/register/verify", s.webauthnRegisterVerify)
+	r.Patch("/auth/webauthn/credentials/{id}", s.webauthnUpdate)
+	r.Delete("/auth/webauthn/credentials/{id}", s.webauthnDestroy)
+}

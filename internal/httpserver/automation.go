@@ -191,3 +191,17 @@ func decodeAutomation(w http.ResponseWriter, r *http.Request, base *automation.R
 		IsActive: body.IsActive, StopProcessing: body.StopProcessing,
 	}, true
 }
+
+func (s *Server) automationRoutes(r chi.Router) {
+	r.Get("/automation-rules/triggers", s.automationTriggers)
+	r.Post("/automation-rules/reorder", s.automationReorder)
+	r.Get("/automation-rules", s.automationIndex)
+	r.Post("/automation-rules", s.automationStore)
+	r.Get("/automation-rules/{id}", s.automationShow)
+	r.Put("/automation-rules/{id}", s.automationUpdate)
+	r.Patch("/automation-rules/{id}", s.automationUpdate)
+	r.Delete("/automation-rules/{id}", s.automationDestroy)
+	r.Post("/automation-rules/{id}/toggle", s.automationToggle)
+	r.Post("/automation-rules/{id}/test", s.automationTest)
+	r.Get("/automation-rules/{id}/logs", s.automationLogs)
+}

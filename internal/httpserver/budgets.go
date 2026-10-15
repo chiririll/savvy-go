@@ -126,3 +126,12 @@ func decodeBudget(w http.ResponseWriter, r *http.Request, base *ledger.Budget) (
 		HasCategoryIDs: hasCats, HasTagIDs: hasTags,
 	}, true
 }
+
+func (s *Server) budgetRoutes(r chi.Router) {
+	r.Get("/budgets", s.budgetsIndex)
+	r.Post("/budgets", s.budgetsStore)
+	r.Get("/budgets/{id}", s.budgetsShow)
+	r.Put("/budgets/{id}", s.budgetsUpdate)
+	r.Patch("/budgets/{id}", s.budgetsUpdate)
+	r.Delete("/budgets/{id}", s.budgetsDestroy)
+}

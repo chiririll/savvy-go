@@ -334,3 +334,29 @@ func (s *Server) requireSpaceAdmin(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+
+func (s *Server) adminSessionBackupsRoutes(r chi.Router) {
+	// P1: backups hold every space.
+	r.Get("/backups", s.backupsIndex)
+	r.Post("/backups", s.backupsStore)
+	r.Post("/backups/upload", s.backupsUpload)
+	r.Post("/backups/upgrade-laravel", s.backupsUpgradeLaravel)
+	r.Get("/backups/{name}/download", s.backupsDownload)
+	r.Post("/backups/{name}/restore", s.backupsRestore)
+	r.Delete("/backups/{name}", s.backupsDestroy)
+}
+
+func (s *Server) spaceAdminBackupsRoutes(r chi.Router) {
+	// P1: a space's backups are for its admins, never for API tokens.
+	r.Get("/backups", s.spaceBackupsIndex)
+	r.Post("/backups", s.spaceBackupsStore)
+	r.Post("/backups/upload", s.spaceBackupsUpload)
+	r.Post("/backups/upgrade-laravel", s.spaceBackupsUpgradeLaravel)
+	r.Get("/backups/{name}/download", s.spaceBackupsDownload)
+	r.Post("/backups/{name}/restore", s.spaceBackupsRestore)
+	r.Delete("/backups/{name}", s.spaceBackupsDestroy)
+}
+
+func (s *Server) accountBackupsRoutes(r chi.Router) {
+	r.With(s.sessionOnly).Post("/spaces/import", s.spacesImport)
+}

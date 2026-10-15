@@ -10,6 +10,8 @@ import (
 
 	"savvy-go/internal/auth"
 	"savvy-go/internal/bootstrap"
+	"savvy-go/internal/config"
+	"savvy-go/internal/store"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -326,4 +328,45 @@ func (s *Server) writeSessionPayload(w http.ResponseWriter, r *http.Request, sta
 		"email_verification_required": s.emailVerificationRequired(r.Context()),
 	}
 	writeJSON(w, status, payload)
+}
+
+func (s *Server) publicAuthRoutes(r chi.Router) {
+	r.Get("/auth/status", s.authStatus)
+	r.Get("/auth/me", s.authMe)
+	r.Post("/auth/bootstrap/verify", s.bootstrapVerify)
+	r.Post("/auth/register", s.authRegister)
+	r.Post("/auth/login", s.authLogin)
+	r.Get("/auth/password/{token}", s.passwordPreview)
+	r.Post("/auth/password/{token}", s.passwordAccept)
+}
+
+func (s *Server) credentialAuthRoutes(r chi.Router) {
+	r.Post("/auth/logout", s.authLogout)
+	r.Post("/auth/logout-others", s.authLogoutOthers)
+	r.Put("/auth/password", s.authChangePassword)
+}
+
+// accountServices are the server-level services behind sign-in and accounts.
+type accountServices struct {
+	users         auth.Users
+	sessions      auth.Sessions
+	apiTokens     auth.APITokens
+	tokens        auth.PasswordTokens
+	challenges    auth.Challenges
+	verifications auth.EmailVerifications
+	twoFactor     auth.TwoFactor
+	webauthn      auth.WebAuthn
+}
+
+func newAccountServices(cfg config.Config, srv store.DB) accountServices {
+	return accountServices{
+		users:         auth.Users{DB: srv},
+		sessions:      auth.Sessions{DB: srv, SessionTTL: cfg.SessionTTL, RememberTTL: cfg.RememberTTL},
+		apiTokens:     auth.APITokens{DB: srv},
+		tokens:        auth.PasswordTokens{DB: srv},
+		challenges:    auth.Challenges{DB: srv, Cfg: cfg},
+		verifications: auth.EmailVerifications{DB: srv},
+		twoFactor:     auth.TwoFactor{DB: srv, Users: auth.Users{DB: srv}},
+		webauthn:      auth.WebAuthn{DB: srv, Cfg: cfg},
+	}
 }

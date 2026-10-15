@@ -548,3 +548,42 @@ func timeOrNil(t *time.Time) any {
 	}
 	return t.UTC().Format(time.RFC3339)
 }
+
+func (s *Server) publicSpacesApiRoutes(r chi.Router) {
+	r.Get("/invitations/{token}", s.invitationPreview)
+	r.Post("/invitations/{token}/register", s.invitationRegister)
+}
+
+func (s *Server) adminSessionSpacesApiRoutes(r chi.Router) {
+	r.Post("/admin/invitations/clear", s.invitationsClear)
+	r.Get("/admin/spaces", s.adminSpacesIndex)
+	r.Patch("/admin/spaces/{id}", s.adminSpaceUpdate)
+	r.Delete("/admin/spaces/{id}", s.adminSpaceDestroy)
+	r.Post("/admin/spaces/{id}/admins", s.adminSpaceAssignAdmin)
+	r.Get("/admin/deleted-spaces", s.adminDeletedIndex)
+	r.Post("/admin/deleted-spaces/{name}/restore", s.adminDeletedRestore)
+}
+
+func (s *Server) spaceReadSpacesApiRoutes(r chi.Router) {
+	r.Get("/", s.spaceShow)
+	r.Get("/members", s.membersIndex)
+	r.Get("/settings", s.spaceSettingsIndex)
+	r.With(s.sessionOnly).Post("/leave", s.spaceLeave)
+}
+
+func (s *Server) spaceAdminSpacesApiRoutes(r chi.Router) {
+	r.Patch("/", s.spaceUpdate)
+	r.Delete("/", s.spaceDestroy)
+	r.Patch("/members/{user}", s.membersUpdate)
+	r.Delete("/members/{user}", s.membersDestroy)
+	r.Get("/invitations", s.invitationsIndex)
+	r.Post("/invitations", s.invitationsStore)
+	r.Delete("/invitations/{id}", s.invitationsDestroy)
+	r.Get("/audit", s.spaceAudit)
+}
+
+func (s *Server) accountSpacesApiRoutes(r chi.Router) {
+	r.Get("/invitation-methods", s.invitationMethods)
+	r.With(s.sessionOnly).Post("/spaces", s.spacesStore)
+	r.With(s.sessionOnly).Post("/invitations/{token}/accept", s.invitationAccept)
+}

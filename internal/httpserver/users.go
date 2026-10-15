@@ -35,29 +35,30 @@ func (s *Server) usersShow(w http.ResponseWriter, r *http.Request) {
 	writeData(w, http.StatusOK, u.ResourceJSON())
 }
 
-func (s *Server) usersStore(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		Name     string  `json:"name"`
-		Email    string  `json:"email"`
-		Password *string `json:"password"`
-		Role     string  `json:"role"`
-		// An admin vouching for the address, e.g. when mail is not set up.
-		EmailVerified bool `json:"emailVerified"`
-		// Email the set-password link instead of returning it. Needs a user without a password.
-		Send bool `json:"send"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeValidation(w, map[string][]string{"email": {"The given data was invalid."}})
-		return
-	}
-	errs := map[string][]string{}
+type userStoreBody struct {
+	Name     string  `json:"name"`
+	Email    string  `json:"email"`
+	Password *string `json:"password"`
+	Role     string  `json:"role"`
+	// An admin vouching for the address, e.g. when mail is not set up.
+	EmailVerified bool `json:"emailVerified"`
+	// Email the set-password link instead of returning it. Needs a user without a password.
+	Send bool `json:"send"`
+}
+
+func (b userStoreBody) hasPassword() bool { return b.Password != nil && *b.Password != "" }
+
+// validateNewUser returns the field errors of a new user; a mail problem comes back
+// separately because it is not a field error.
+func (s *Server) validateNewUser(r *http.Request, body userStoreBody) (errs map[string][]string, mailProblem string) {
+	errs = map[string][]string{}
 	if strings.TrimSpace(body.Name) == "" {
 		errs["name"] = []string{"The name field is required."}
 	}
 	if !looksLikeEmail(body.Email) {
 		errs["email"] = []string{"The email field must be a valid email address."}
 	}
-	if body.Password != nil && *body.Password != "" && len(*body.Password) < 8 {
+	if body.hasPassword() && len(*body.Password) < 8 {
 		errs["password"] = []string{"The password must be at least 8 characters."}
 	}
 	if body.Role != "" && !validRole(body.Role) {
@@ -66,18 +67,49 @@ func (s *Server) usersStore(w http.ResponseWriter, r *http.Request) {
 	if existing, _ := s.users.ByEmail(r.Context(), body.Email); existing != nil {
 		errs["email"] = []string{"The email has already been taken."}
 	}
-	hasPassword := body.Password != nil && *body.Password != ""
 	switch {
-	case body.Send && hasPassword:
+	case body.Send && body.hasPassword():
 		errs["send"] = []string{"A user with a password needs no link."}
 	case body.Send:
-		if problem := s.linkMailProblem(r); problem != "" {
-			writeMessage(w, http.StatusUnprocessableEntity, problem)
-			return
-		}
-	case !hasPassword && !body.EmailVerified && s.emailVerificationRequired(r.Context()):
+		mailProblem = s.linkMailProblem(r)
+	case !body.hasPassword() && !body.EmailVerified && s.emailVerificationRequired(r.Context()):
 		// A link handed over by the admin proves nothing about the mailbox.
 		errs["send"] = []string{"Email verification is required, so the link has to be emailed."}
+	}
+	return errs, mailProblem
+}
+
+// attachSetupLink issues the set-password token of a user without a password
+// and either returns it in the payload or emails it.
+func (s *Server) attachSetupLink(r *http.Request, u *auth.User, send bool, payload map[string]any) error {
+	tok, exp, err := s.tokens.Issue(r.Context(), u)
+	if err != nil {
+		return err
+	}
+	payload["expiresAt"] = exp.UTC().Format("2006-01-02T15:04:05.000000Z")
+	switch {
+	case !send:
+		payload["token"] = tok
+	case s.sendMail(r.Context(), mailer.PasswordReset(u.Email, u.Name, s.cfg.URL()+"/set-password/"+tok, exp)) != nil:
+		// The user exists but nobody saw the link: do not leave it valid. A reset can try again.
+		_ = s.tokens.RevokeActive(r.Context(), u.ID)
+		payload["emailError"] = "Could not send the email."
+	default:
+		payload["emailSent"] = true
+	}
+	return nil
+}
+
+func (s *Server) usersStore(w http.ResponseWriter, r *http.Request) {
+	var body userStoreBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeValidation(w, map[string][]string{"email": {"The given data was invalid."}})
+		return
+	}
+	errs, mailProblem := s.validateNewUser(r, body)
+	if mailProblem != "" {
+		writeMessage(w, http.StatusUnprocessableEntity, mailProblem)
+		return
 	}
 	if len(errs) > 0 {
 		writeValidation(w, errs)
@@ -97,21 +129,9 @@ func (s *Server) usersStore(w http.ResponseWriter, r *http.Request) {
 	}
 	payload := u.ResourceJSON()
 	if u.IsInactive() {
-		tok, exp, err := s.tokens.Issue(r.Context(), u)
-		if err != nil {
+		if err := s.attachSetupLink(r, u, body.Send, payload); err != nil {
 			writeMessage(w, http.StatusInternalServerError, err.Error())
 			return
-		}
-		payload["expiresAt"] = exp.UTC().Format("2006-01-02T15:04:05.000000Z")
-		switch {
-		case !body.Send:
-			payload["token"] = tok
-		case s.sendMail(r.Context(), mailer.PasswordReset(u.Email, u.Name, s.cfg.URL()+"/set-password/"+tok, exp)) != nil:
-			// The user exists but nobody saw the link: do not leave it valid. A reset can try again.
-			_ = s.tokens.RevokeActive(r.Context(), u.ID)
-			payload["emailError"] = "Could not send the email."
-		default:
-			payload["emailSent"] = true
 		}
 	}
 	writeData(w, http.StatusCreated, payload)
@@ -269,3 +289,13 @@ func (s *Server) userParam(w http.ResponseWriter, r *http.Request) *auth.User {
 }
 
 func validRole(role string) bool { return auth.ValidRole(role) }
+
+func (s *Server) adminUsersRoutes(r chi.Router) {
+	r.Get("/users", s.usersIndex)
+	r.Get("/users/{id}", s.usersShow)
+	r.Post("/users", s.usersStore)
+	r.Post("/users/{id}/password-token", s.usersIssueToken)
+	r.Put("/users/{id}", s.usersUpdate)
+	r.Patch("/users/{id}", s.usersUpdate)
+	r.Delete("/users/{id}", s.usersDestroy)
+}

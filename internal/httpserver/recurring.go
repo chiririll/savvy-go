@@ -142,3 +142,13 @@ func decodeRecurring(w http.ResponseWriter, r *http.Request, base *recurring.Rec
 		EndDate: body.EndDate, IsActive: body.IsActive, TagIDs: body.TagIDs, HasTagIDs: hasTags,
 	}, true
 }
+
+func (s *Server) recurringRoutes(r chi.Router) {
+	r.Get("/recurring", s.recurringIndex)
+	r.Get("/recurring-upcoming", s.recurringUpcoming)
+	r.Post("/recurring", s.recurringStore)
+	r.Get("/recurring/{id}", s.recurringShow)
+	r.Put("/recurring/{id}", s.recurringUpdate)
+	r.Patch("/recurring/{id}", s.recurringUpdate)
+	r.Delete("/recurring/{id}", s.recurringDestroy)
+}

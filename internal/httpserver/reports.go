@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"github.com/go-chi/chi/v5"
 	"net/http"
 	"strconv"
 	"strings"
@@ -103,4 +104,19 @@ func (s *Server) reportsNetWorth(w http.ResponseWriter, r *http.Request) {
 func (s *Server) reportsNetWorthHistory(w http.ResponseWriter, r *http.Request) {
 	group := firstQuery(r.URL.Query().Get("group_by"), "day")
 	writeJSON(w, http.StatusOK, sp(r).reports.NetWorthHistory(r.Context(), s.reportFilter(r), group))
+}
+
+func (s *Server) reportRoutes(r chi.Router) {
+	r.Get("/reports/overview", s.reportsOverview)
+	r.Get("/reports/money-flow", s.reportsMoneyFlow)
+	r.Get("/reports/expense-pace", s.reportsExpensePace)
+	r.Get("/reports/expenses-by-category", s.reportsByCategory)
+	r.Get("/reports/cash-flow-over-time", s.reportsCashFlow)
+	r.Get("/reports/activity-heatmap", s.reportsHeatmap)
+	r.Get("/reports/transactions/summary", s.reportsTxSummary)
+	r.Get("/reports/transactions/by-category", s.reportsTxByCategory)
+	r.Get("/reports/transactions/dynamics", s.reportsTxDynamics)
+	r.Get("/reports/transactions/top", s.reportsTxTop)
+	r.Get("/reports/net-worth", s.reportsNetWorth)
+	r.Get("/reports/net-worth-history", s.reportsNetWorthHistory)
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/go-chi/chi/v5"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -129,4 +130,17 @@ func asBool(v any) bool {
 	default:
 		return false
 	}
+}
+
+func (s *Server) adminSessionSettingsRoutes(r chi.Router) {
+	r.Patch("/settings", s.settingsUpdate)
+}
+
+func (s *Server) spaceAdminSettingsRoutes(r chi.Router) {
+	r.Patch("/settings", s.spaceSettingsUpdate)
+}
+
+func (s *Server) accountSettingsRoutes(r chi.Router) {
+	// Instance settings everyone may read (sign-in options).
+	r.Get("/settings", s.settingsIndex)
 }

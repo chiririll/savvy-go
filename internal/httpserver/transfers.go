@@ -298,3 +298,31 @@ func (s *Server) keysRotate(w http.ResponseWriter, r *http.Request) {
 	}
 	s.keysIndex(w, r)
 }
+
+func (s *Server) adminSessionTransfersRoutes(r chi.Router) {
+	r.Get("/admin/keys", s.keysIndex)
+	r.Post("/admin/keys", s.keysStore)
+	r.Delete("/admin/keys/{kid}", s.keysDestroy)
+	r.Post("/admin/keys/rotate", s.keysRotate)
+}
+
+func (s *Server) spaceReadTransfersRoutes(r chi.Router) {
+	r.Get("/links", s.linksIndex)
+	r.Get("/transfers", s.transfersIndex)
+}
+
+func (s *Server) spaceAdminTransfersRoutes(r chi.Router) {
+	r.Post("/links", s.linksStore)
+	r.Delete("/links/{other}", s.linksDestroy)
+}
+
+func (s *Server) spaceWriteTransfersRoutes(r chi.Router) {
+	// Transfers with linked spaces; the other space's rights
+	// are checked by the transfer itself.
+	r.Post("/transfers", s.transfersStore)
+	r.Patch("/transfers/{uuid}", s.transfersUpdate)
+	r.Delete("/transfers/{uuid}", s.transfersDestroy)
+	r.Post("/transfers/{uuid}/accept", s.transfersResolve(true))
+	r.Post("/transfers/{uuid}/reject", s.transfersResolve(false))
+	r.Post("/transfers/{uuid}/trust", s.transfersTrust)
+}

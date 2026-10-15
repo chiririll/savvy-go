@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"errors"
+	"github.com/go-chi/chi/v5"
 	"net/http"
 	"os"
 	"strings"
@@ -94,4 +95,8 @@ func (s *Server) restoreFirstRun(r *http.Request, tmp, name string) (string, err
 		return "", err
 	}
 	return b.Filename, s.backups.RestoreServer(r.Context(), b.Filename)
+}
+
+func (s *Server) publicOnboardingRestoreRoutes(r chi.Router) {
+	r.Post("/onboarding/restore", s.onboardingRestore)
 }

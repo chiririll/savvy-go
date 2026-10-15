@@ -197,27 +197,9 @@ var inPlaceMoney = []struct {
 // It avoids a table rebuild, which would cascade through foreign keys. One
 // transaction; upgradeInPlace calls it once; Upgrade skips stamped databases.
 func convertMoneyInPlace(ctx context.Context, db *sql.DB) error {
-	type plan struct {
-		table string
-		read  []string
-		write []moneyCol
-		fill  bool
-	}
-	var plans []plan
-	for _, spec := range inPlaceMoney {
-		have, err := columns(ctx, db, spec.table)
-		if err != nil {
-			return err
-		}
-		p := plan{table: spec.table, read: intersect(spec.read, have), fill: spec.table == "budgets" && slices.Contains(have, "currency_id")}
-		for _, c := range spec.write {
-			if slices.Contains(have, c.name) {
-				p.write = append(p.write, c)
-			}
-		}
-		if len(p.write) > 0 {
-			plans = append(plans, p)
-		}
+	plans, err := planMoney(ctx, db)
+	if err != nil {
+		return err
 	}
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
@@ -229,87 +211,8 @@ func convertMoneyInPlace(ctx context.Context, db *sql.DB) error {
 		return err
 	}
 	for _, p := range plans {
-		cols := append([]string{"id"}, p.read...)
-		rows, err := tx.QueryContext(ctx, fmt.Sprintf("SELECT %s FROM %s", strings.Join(quoteAll(cols), ", "), p.table))
-		if err != nil {
+		if err := p.convert(ctx, tx, sc); err != nil {
 			return err
-		}
-		var all [][]any
-		for rows.Next() {
-			raw := make([]any, len(cols))
-			ptrs := make([]any, len(cols))
-			for i := range raw {
-				ptrs[i] = &raw[i]
-			}
-			if err := rows.Scan(ptrs...); err != nil {
-				_ = rows.Close()
-				return err
-			}
-			all = append(all, raw)
-		}
-		if err := rows.Err(); err != nil {
-			return err
-		}
-		_ = rows.Close()
-
-		for _, c := range p.write {
-			ddl := fmt.Sprintf(`ALTER TABLE %s ADD COLUMN "%s__minor" INTEGER`, p.table, c.name)
-			if c.notNull {
-				ddl += " NOT NULL DEFAULT 0"
-			}
-			if _, err := tx.ExecContext(ctx, ddl); err != nil {
-				return fmt.Errorf("%s: %w", ddl, err)
-			}
-		}
-		sets := make([]string, 0, len(p.write)+1)
-		for _, c := range p.write {
-			sets = append(sets, fmt.Sprintf(`"%s__minor" = ?`, c.name))
-		}
-		if p.fill {
-			sets = append(sets, `"currency_id" = ?`)
-		}
-		update := fmt.Sprintf("UPDATE %s SET %s WHERE id = ?", p.table, strings.Join(sets, ", "))
-		for _, raw := range all {
-			if err := sc.fixMoney(p.table, cols, raw); err != nil {
-				return err
-			}
-			byName := make(map[string]any, len(cols))
-			for i, c := range cols {
-				byName[c] = raw[i]
-			}
-			args := make([]any, 0, len(sets)+1)
-			for _, c := range p.write {
-				v := byName[c.name]
-				if v == nil && c.notNull {
-					v = int64(0)
-				}
-				args = append(args, v)
-			}
-			if p.fill {
-				args = append(args, byName["currency_id"])
-			}
-			args = append(args, byName["id"])
-			if _, err := tx.ExecContext(ctx, update, args...); err != nil {
-				return fmt.Errorf("%s: %w", p.table, err)
-			}
-		}
-
-		old := make([]string, len(p.write))
-		for i, c := range p.write {
-			old[i] = c.name
-		}
-		if err := dropIndexesOn(ctx, tx, p.table, old); err != nil {
-			return err
-		}
-		for _, c := range p.write {
-			for _, ddl := range []string{
-				fmt.Sprintf(`ALTER TABLE %s DROP COLUMN "%s"`, p.table, c.name),
-				fmt.Sprintf(`ALTER TABLE %s RENAME COLUMN "%s__minor" TO "%s"`, p.table, c.name, c.name),
-			} {
-				if _, err := tx.ExecContext(ctx, ddl); err != nil {
-					return fmt.Errorf("%s: %w", ddl, err)
-				}
-			}
 		}
 	}
 	if err := tx.Commit(); err != nil {
@@ -317,6 +220,142 @@ func convertMoneyInPlace(ctx context.Context, db *sql.DB) error {
 	}
 	// Indexes on the swapped columns were dropped; recreate every declared index.
 	return ensureIndexes(ctx, db)
+}
+
+// moneyPlan is what convertMoneyInPlace does to one table that has money.
+type moneyPlan struct {
+	table string
+	read  []string
+	write []moneyCol
+	fill  bool
+}
+
+// planMoney keeps, per table, only the columns that exist in this database.
+func planMoney(ctx context.Context, db *sql.DB) ([]moneyPlan, error) {
+	var plans []moneyPlan
+	for _, spec := range inPlaceMoney {
+		have, err := columns(ctx, db, spec.table)
+		if err != nil {
+			return nil, err
+		}
+		p := moneyPlan{table: spec.table, read: intersect(spec.read, have), fill: spec.table == "budgets" && slices.Contains(have, "currency_id")}
+		for _, c := range spec.write {
+			if slices.Contains(have, c.name) {
+				p.write = append(p.write, c)
+			}
+		}
+		if len(p.write) > 0 {
+			plans = append(plans, p)
+		}
+	}
+	return plans, nil
+}
+
+func (p moneyPlan) convert(ctx context.Context, tx *sql.Tx, sc *scales) error {
+	cols := append([]string{"id"}, p.read...)
+	all, err := p.readRows(ctx, tx, cols)
+	if err != nil {
+		return err
+	}
+	if err := p.addMinorColumns(ctx, tx); err != nil {
+		return err
+	}
+	if err := p.rewriteRows(ctx, tx, sc, cols, all); err != nil {
+		return err
+	}
+	return p.swapColumns(ctx, tx)
+}
+
+func (p moneyPlan) readRows(ctx context.Context, tx *sql.Tx, cols []string) ([][]any, error) {
+	rows, err := tx.QueryContext(ctx, fmt.Sprintf("SELECT %s FROM %s", strings.Join(quoteAll(cols), ", "), p.table))
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	var all [][]any
+	for rows.Next() {
+		raw := make([]any, len(cols))
+		ptrs := make([]any, len(cols))
+		for i := range raw {
+			ptrs[i] = &raw[i]
+		}
+		if err := rows.Scan(ptrs...); err != nil {
+			return nil, err
+		}
+		all = append(all, raw)
+	}
+	return all, rows.Err()
+}
+
+func (p moneyPlan) addMinorColumns(ctx context.Context, tx *sql.Tx) error {
+	for _, c := range p.write {
+		ddl := fmt.Sprintf(`ALTER TABLE %s ADD COLUMN "%s__minor" INTEGER`, p.table, c.name)
+		if c.notNull {
+			ddl += " NOT NULL DEFAULT 0"
+		}
+		if _, err := tx.ExecContext(ctx, ddl); err != nil {
+			return fmt.Errorf("%s: %w", ddl, err)
+		}
+	}
+	return nil
+}
+
+func (p moneyPlan) rewriteRows(ctx context.Context, tx *sql.Tx, sc *scales, cols []string, all [][]any) error {
+	sets := make([]string, 0, len(p.write)+1)
+	for _, c := range p.write {
+		sets = append(sets, fmt.Sprintf(`"%s__minor" = ?`, c.name))
+	}
+	if p.fill {
+		sets = append(sets, `"currency_id" = ?`)
+	}
+	update := fmt.Sprintf("UPDATE %s SET %s WHERE id = ?", p.table, strings.Join(sets, ", "))
+	for _, raw := range all {
+		if err := sc.fixMoney(p.table, cols, raw); err != nil {
+			return err
+		}
+		byName := make(map[string]any, len(cols))
+		for i, c := range cols {
+			byName[c] = raw[i]
+		}
+		args := make([]any, 0, len(sets)+1)
+		for _, c := range p.write {
+			v := byName[c.name]
+			if v == nil && c.notNull {
+				v = int64(0)
+			}
+			args = append(args, v)
+		}
+		if p.fill {
+			args = append(args, byName["currency_id"])
+		}
+		args = append(args, byName["id"])
+		if _, err := tx.ExecContext(ctx, update, args...); err != nil {
+			return fmt.Errorf("%s: %w", p.table, err)
+		}
+	}
+	return nil
+}
+
+// swapColumns drops each old column and renames its __minor twin into place.
+func (p moneyPlan) swapColumns(ctx context.Context, tx *sql.Tx) error {
+	old := make([]string, len(p.write))
+	for i, c := range p.write {
+		old[i] = c.name
+	}
+	if err := dropIndexesOn(ctx, tx, p.table, old); err != nil {
+		return err
+	}
+	for _, c := range p.write {
+		for _, ddl := range []string{
+			fmt.Sprintf(`ALTER TABLE %s DROP COLUMN "%s"`, p.table, c.name),
+			fmt.Sprintf(`ALTER TABLE %s RENAME COLUMN "%s__minor" TO "%s"`, p.table, c.name, c.name),
+		} {
+			if _, err := tx.ExecContext(ctx, ddl); err != nil {
+				return fmt.Errorf("%s: %w", ddl, err)
+			}
+		}
+	}
+	return nil
 }
 
 // dropIndexesOn drops the CREATE INDEX indexes of table that include any of cols.

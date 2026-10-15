@@ -225,3 +225,7 @@ func (s *Server) spacesIndex(w http.ResponseWriter, r *http.Request) {
 	}
 	writeData(w, http.StatusOK, out)
 }
+
+func (s *Server) accountSpaceRoutes(r chi.Router) {
+	r.Get("/spaces", s.spacesIndex)
+}

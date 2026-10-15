@@ -1,6 +1,8 @@
 package httpserver
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -148,4 +150,27 @@ func (s *Server) uploadOwned(w http.ResponseWriter, r *http.Request) *uploads.Up
 		return nil
 	}
 	return up
+}
+
+func (s *Server) publicUploadsRoutes(r chi.Router) {
+	r.Put("/uploads/{id}/parts/{part}", s.uploadPart)
+}
+
+func (s *Server) uploadRoutes(r chi.Router) {
+	r.Post("/s3/multipart", s.uploadCreate)
+	r.Get("/s3/multipart/{upload}", s.uploadListParts)
+	r.Get("/s3/multipart/{upload}/{part}", s.uploadSignPart)
+	r.Post("/s3/multipart/{upload}/complete", s.uploadComplete)
+	r.Delete("/s3/multipart/{upload}", s.uploadAbort)
+}
+
+// randomSecret is a fresh secret for signing upload part URLs. It lives as long
+// as the process: those URLs expire within minutes, and an upload interrupted
+// by a restart starts over.
+func randomSecret() string {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		panic(err) // the system's random source is broken: nothing safe to do
+	}
+	return hex.EncodeToString(b)
 }

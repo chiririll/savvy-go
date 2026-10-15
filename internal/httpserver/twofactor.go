@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"encoding/json"
+	"github.com/go-chi/chi/v5"
 	"net/http"
 )
 
@@ -142,4 +143,17 @@ func (s *Server) twoFactorStatus(w http.ResponseWriter, r *http.Request) {
 		"pending_confirmation":     u.TwoFactorEnabled && !u.TwoFactorConfirmed,
 		"recovery_codes_remaining": remaining,
 	})
+}
+
+func (s *Server) publicTwofactorRoutes(r chi.Router) {
+	r.Post("/auth/2fa/verify", s.twoFactorVerify)
+}
+
+func (s *Server) credentialTwofactorRoutes(r chi.Router) {
+	r.Get("/auth/2fa/status", s.twoFactorStatus)
+	r.Post("/auth/2fa/enable", s.twoFactorEnable)
+	r.Post("/auth/2fa/confirm", s.twoFactorConfirm)
+	r.Post("/auth/2fa/disable", s.twoFactorDisable)
+	r.Get("/auth/2fa/recovery-codes", s.twoFactorRecoveryCodes)
+	r.Post("/auth/2fa/recovery-codes/regenerate", s.twoFactorRegenerate)
 }

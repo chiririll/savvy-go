@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"github.com/go-chi/chi/v5"
 	"net/http"
 	"regexp"
 	"strings"
@@ -46,4 +47,9 @@ func (s *Server) presets(w http.ResponseWriter, r *http.Request) {
 		out[i] = category(c)
 	}
 	writeData(w, http.StatusOK, map[string]any{"categories": out, "tags": seed.DefaultTags()})
+}
+
+func (s *Server) accountCatalogRoutes(r chi.Router) {
+	r.Get("/currencies/catalog", s.serverCurrencyCatalog)
+	r.Get("/presets", s.presets)
 }

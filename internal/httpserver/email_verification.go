@@ -3,6 +3,7 @@ package httpserver
 import (
 	"context"
 	"encoding/json"
+	"github.com/go-chi/chi/v5"
 	"net/http"
 
 	"savvy-go/internal/auth"
@@ -122,4 +123,12 @@ func (s *Server) verifyEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeMessage(w, http.StatusOK, "Email address confirmed.")
+}
+
+func (s *Server) publicEmailVerificationRoutes(r chi.Router) {
+	r.Post("/auth/verify-email", s.verifyEmail)
+}
+
+func (s *Server) credentialEmailVerificationRoutes(r chi.Router) {
+	r.Post("/auth/verify-email/resend", s.verifyEmailResend)
 }

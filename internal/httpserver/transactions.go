@@ -266,3 +266,17 @@ func decodeTx(w http.ResponseWriter, r *http.Request, base *ledger.Transaction) 
 	}
 	return in, true
 }
+
+func (s *Server) transactionRoutes(r chi.Router) {
+	r.Get("/transactions", s.transactionsIndex)
+	r.Post("/transactions", s.transactionsStore)
+	r.Get("/transactions/{id}", s.transactionsShow)
+	r.Put("/transactions/{id}", s.transactionsUpdate)
+	r.Patch("/transactions/{id}", s.transactionsUpdate)
+	r.Delete("/transactions/{id}", s.transactionsDestroy)
+	r.Post("/transactions/{id}/duplicate", s.transactionsDuplicate)
+	r.Post("/transactions/{id}/confirm", s.transactionsConfirm)
+	r.Post("/transactions/{id}/skip", s.transactionsSkip)
+	r.Get("/transactions-summary", s.transactionsSummary)
+	r.Get("/transactions-pending-summary", s.transactionsPendingSummary)
+}

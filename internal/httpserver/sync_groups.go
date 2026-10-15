@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"errors"
+	"github.com/go-chi/chi/v5"
 	"net/http"
 	"slices"
 
@@ -213,4 +214,14 @@ func sortedKeys[V any](m map[int64]V) []int64 {
 	}
 	slices.Sort(keys)
 	return keys
+}
+
+func (s *Server) spaceReadSyncGroupsRoutes(r chi.Router) {
+	r.Get("/sync-group", s.syncGroupShow)
+}
+
+func (s *Server) accountSyncGroupsRoutes(r chi.Router) {
+	// Sync groups span several spaces; the rights are checked in each.
+	r.With(s.sessionOnly).Post("/sync-groups/diff", s.syncGroupDiff)
+	r.With(s.sessionOnly).Post("/sync-groups/apply", s.syncGroupApply)
 }

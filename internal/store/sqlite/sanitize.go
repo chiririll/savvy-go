@@ -190,11 +190,10 @@ func sanitize(ctx context.Context, src, dst string, set migrate.Set) error {
 	if err := set.Up(ctx, fresh); err != nil {
 		return fmt.Errorf("prepare schema: %w", err)
 	}
-	if _, err := fresh.ExecContext(ctx, `PRAGMA trusted_schema = OFF`); err != nil {
-		return err
-	}
-	if _, err := fresh.ExecContext(ctx, `PRAGMA foreign_keys = OFF`); err != nil {
-		return err
+	for _, pragma := range []string{`PRAGMA trusted_schema = OFF`, `PRAGMA foreign_keys = OFF`} {
+		if _, err := fresh.ExecContext(ctx, pragma); err != nil {
+			return err
+		}
 	}
 	if err := attachSource(ctx, fresh, src); err != nil {
 		return err
@@ -203,68 +202,8 @@ func sanitize(ctx context.Context, src, dst string, set migrate.Set) error {
 	if err != nil {
 		return errNotSQLite
 	}
-	rows, err := fresh.QueryContext(ctx, `SELECT name FROM main.sqlite_master
-		WHERE type = 'table' AND name NOT IN ('schema_migrations', 'sqlite_sequence') ORDER BY name`)
-	if err != nil {
+	if err := copyTables(ctx, fresh, set, have); err != nil {
 		return err
-	}
-	var tables []string
-	for rows.Next() {
-		var t string
-		if err := rows.Scan(&t); err != nil {
-			rows.Close()
-			return err
-		}
-		tables = append(tables, t)
-	}
-	rows.Close()
-
-	tx, err := fresh.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback() }()
-	for _, t := range tables {
-		if !have[t] {
-			continue
-		}
-		dstCols, err := tableColumns(ctx, tx, "main", t)
-		if err != nil {
-			return err
-		}
-		srcCols, err := tableColumns(ctx, tx, "src", t)
-		if err != nil {
-			return err
-		}
-		var cols []string
-		for _, c := range dstCols {
-			if slices.Contains(srcCols, c) {
-				cols = append(cols, quoteIdent(c))
-			}
-		}
-		if len(cols) == 0 {
-			continue
-		}
-		q := fmt.Sprintf(`INSERT INTO main.%s (%s) SELECT %s FROM src.%s`,
-			quoteIdent(t), strings.Join(cols, ", "), strings.Join(cols, ", "), quoteIdent(t))
-		if _, err := tx.ExecContext(ctx, q); err != nil {
-			return fmt.Errorf("copy %s: %w", t, mapErr(err))
-		}
-		// Keep AUTOINCREMENT counters, so ids freed before the copy are never
-		// handed out again.
-		if have["sqlite_sequence"] {
-			if err := copySequence(ctx, tx, t); err != nil {
-				return err
-			}
-		}
-	}
-	if set == migrate.Space && have["settings"] {
-		if err := copySpaceSettings(ctx, tx); err != nil {
-			return err
-		}
-	}
-	if err := tx.Commit(); err != nil {
-		return mapErr(err)
 	}
 	if _, err := fresh.ExecContext(ctx, `DETACH DATABASE src`); err != nil {
 		return err
@@ -278,6 +217,84 @@ func sanitize(ctx context.Context, src, dst string, set migrate.Set) error {
 	}
 	_, err = fresh.ExecContext(ctx, `PRAGMA wal_checkpoint(TRUNCATE)`)
 	return err
+}
+
+// destTables lists the tables the fresh schema made.
+func destTables(ctx context.Context, fresh *sql.DB) ([]string, error) {
+	rows, err := fresh.QueryContext(ctx, `SELECT name FROM main.sqlite_master
+		WHERE type = 'table' AND name NOT IN ('schema_migrations', 'sqlite_sequence') ORDER BY name`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var tables []string
+	for rows.Next() {
+		var t string
+		if err := rows.Scan(&t); err != nil {
+			return nil, err
+		}
+		tables = append(tables, t)
+	}
+	return tables, rows.Err()
+}
+
+// copyTables copies, in one transaction, the rows of every table that src has.
+func copyTables(ctx context.Context, fresh *sql.DB, set migrate.Set, have map[string]bool) error {
+	tables, err := destTables(ctx, fresh)
+	if err != nil {
+		return err
+	}
+	tx, err := fresh.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	for _, t := range tables {
+		if !have[t] {
+			continue
+		}
+		if err := copyTable(ctx, tx, t, have["sqlite_sequence"]); err != nil {
+			return err
+		}
+	}
+	if set == migrate.Space && have["settings"] {
+		if err := copySpaceSettings(ctx, tx); err != nil {
+			return err
+		}
+	}
+	return mapErr(tx.Commit())
+}
+
+// copyTable copies the columns table t shares between src and main.
+func copyTable(ctx context.Context, tx *sql.Tx, t string, withSequence bool) error {
+	dstCols, err := tableColumns(ctx, tx, "main", t)
+	if err != nil {
+		return err
+	}
+	srcCols, err := tableColumns(ctx, tx, "src", t)
+	if err != nil {
+		return err
+	}
+	var cols []string
+	for _, c := range dstCols {
+		if slices.Contains(srcCols, c) {
+			cols = append(cols, quoteIdent(c))
+		}
+	}
+	if len(cols) == 0 {
+		return nil
+	}
+	q := fmt.Sprintf(`INSERT INTO main.%s (%s) SELECT %s FROM src.%s`,
+		quoteIdent(t), strings.Join(cols, ", "), strings.Join(cols, ", "), quoteIdent(t))
+	if _, err := tx.ExecContext(ctx, q); err != nil {
+		return fmt.Errorf("copy %s: %w", t, mapErr(err))
+	}
+	// Keep AUTOINCREMENT counters, so ids freed before the copy are never
+	// handed out again.
+	if withSequence {
+		return copySequence(ctx, tx, t)
+	}
+	return nil
 }
 
 // copySequence raises table's AUTOINCREMENT counter in main to the source's.

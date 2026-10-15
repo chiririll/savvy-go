@@ -3,10 +3,13 @@ package httpserver
 import (
 	"context"
 	"errors"
+	"github.com/go-chi/chi/v5"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
+	"savvy-go/internal/config"
 	"savvy-go/internal/mailer"
 )
 
@@ -196,4 +199,31 @@ func nullIfEmpty(s string) any {
 		return nil
 	}
 	return s
+}
+
+func (s *Server) adminSessionMailRoutes(r chi.Router) {
+	r.Get("/admin/mail", s.mailIndex)
+	r.Put("/admin/mail", s.mailUpdate)
+	r.Post("/admin/mail/test", s.mailTest)
+}
+
+// mailState is the mail server in use. It can be changed in the admin panel,
+// so it is guarded by mailMu: read the mailer through mailer(), the settings
+// through mailSettings().
+type mailState struct {
+	mailMu      sync.RWMutex
+	mail        mailer.Mailer
+	mailCfg     mailer.Config
+	mailProblem string
+	newMailer   func(mailer.Config) mailer.Mailer // tests swap it to record instead of dialling
+}
+
+func (s *Server) initMail(cfg config.Config) {
+	s.mailCfg, s.mailProblem = cfg.Mail, cfg.MailProblem
+	if s.newMailer == nil {
+		s.newMailer = mailer.New
+	}
+	if s.mail == nil {
+		s.mail = s.newMailer(cfg.Mail)
+	}
 }

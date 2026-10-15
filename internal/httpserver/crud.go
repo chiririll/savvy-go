@@ -678,3 +678,48 @@ func dateRange(start, end string) []string {
 	}
 	return out
 }
+
+func (s *Server) currencyRoutes(r chi.Router) {
+	r.Get("/currencies/catalog", s.currenciesCatalog)
+	r.Get("/currencies", s.currenciesIndex)
+	r.Post("/currencies", s.currenciesStore)
+	r.Get("/currencies/{id}", s.currenciesShow)
+	r.Put("/currencies/{id}", s.currenciesUpdate)
+	r.Patch("/currencies/{id}", s.currenciesUpdate)
+	r.Delete("/currencies/{id}", s.currenciesDestroy)
+	r.Post("/currencies/{id}/set-base", s.currenciesSetBase)
+	r.Post("/currencies/convert", s.currenciesConvert)
+}
+
+func (s *Server) accountRoutes(r chi.Router) {
+	r.Post("/accounts/reorder", s.accountsReorder)
+	r.Get("/accounts", s.accountsIndex)
+	r.Post("/accounts", s.accountsStore)
+	r.Get("/accounts/{id}", s.accountsShow)
+	r.Put("/accounts/{id}", s.accountsUpdate)
+	r.Patch("/accounts/{id}", s.accountsUpdate)
+	r.Delete("/accounts/{id}", s.accountsDestroy)
+	r.Get("/accounts-balance-history", s.accountsBalanceHistory)
+	r.Get("/accounts-balance-comparison", s.accountsBalanceComparison)
+}
+
+func (s *Server) categoryRoutes(r chi.Router) {
+	r.Get("/categories", s.categoriesIndex)
+	r.Post("/categories", s.categoriesStore)
+	r.Get("/categories/{id}", s.categoriesShow)
+	r.Put("/categories/{id}", s.categoriesUpdate)
+	r.Patch("/categories/{id}", s.categoriesUpdate)
+	r.Delete("/categories/{id}", s.categoriesDestroy)
+	r.Post("/categories/{id}/set-default", s.categoriesSetDefault)
+	r.Get("/categories/{id}/statistics", s.categoriesStatistics)
+	r.Get("/categories-summary", s.categoriesSummary)
+}
+
+func (s *Server) tagRoutes(r chi.Router) {
+	r.Get("/tags", s.tagsIndex)
+	r.Post("/tags", s.tagsStore)
+	r.Get("/tags/{id}", s.tagsShow)
+	r.Put("/tags/{id}", s.tagsUpdate)
+	r.Patch("/tags/{id}", s.tagsUpdate)
+	r.Delete("/tags/{id}", s.tagsDestroy)
+}

@@ -378,3 +378,16 @@ func (s *Server) oauthClientDestroy(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func (s *Server) credentialOauthRoutes(r chi.Router) {
+	r.Get("/oauth/authorize", s.oauthConsentInfo)
+	r.Post("/oauth/authorize", s.oauthConsent)
+}
+
+func (s *Server) adminSessionOauthRoutes(r chi.Router) {
+	r.Get("/admin/oauth/registration", s.oauthRegistrationShow)
+	r.Post("/admin/oauth/registration", s.oauthRegistrationOpen)
+	r.Delete("/admin/oauth/registration", s.oauthRegistrationClose)
+	r.Get("/admin/oauth/clients", s.oauthClientsIndex)
+	r.Delete("/admin/oauth/clients/{id}", s.oauthClientDestroy)
+}
