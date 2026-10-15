@@ -82,6 +82,16 @@ func (Test) Frontend() error {
 	return sh.RunV(npm(), "test")
 }
 
+// Audit prints the Go and frontend code that is above the soft size and
+// naming limits (internal/archtest, resources/ts/lib/code-shape). It never
+// fails on what it finds.
+func (Test) Audit() error {
+	if err := sh.RunV("go", "test", "-tags", "audit", "./internal/archtest", "-run", "Audit", "-v", "-count=1"); err != nil {
+		return err
+	}
+	return sh.RunV(npm(), "run", "audit")
+}
+
 // All runs every test.
 func (Test) All() {
 	mg.SerialDeps(Test.Go, Test.Frontend)
