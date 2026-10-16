@@ -31,7 +31,7 @@ export function binary(wanted: string): string {
     if (!built) {
         const out = path.join(os.tmpdir(), 'savvy-scenarios', `savvy-go${exe}`)
         console.log(`scenarios: no SAVVY_BIN; building ${out}`)
-        const res = spawnSync('go', ['build', '-o', out, './cmd/savvy-go'], { cwd: root, stdio: 'inherit' })
+        const res = spawnSync('go', ['build', '-o', out, '.'], { cwd: root, stdio: 'inherit' })
         if (res.status !== 0) throw new Error('go build failed; set SAVVY_BIN to a built binary')
         built = out
     }

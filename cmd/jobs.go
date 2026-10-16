@@ -1,4 +1,4 @@
-package main
+package cmd
 
 import (
 	"context"
@@ -7,20 +7,19 @@ import (
 	"log/slog"
 	"time"
 
+	"savvy-go/internal/app"
 	"savvy-go/internal/currencydata"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/recurring"
 	"savvy-go/internal/runtime"
 	"savvy-go/internal/settings"
-	"savvy-go/internal/spaces"
 	"savvy-go/internal/store"
-	"savvy-go/internal/store/sqlite"
-	"savvy-go/internal/uploads"
 )
 
-// startJobs runs the periodic jobs until ctx is cancelled.
-func startJobs(ctx context.Context, st *sqlite.Store, uploads uploads.Service, rates *currencydata.Source) {
-	spaceSvc := spaces.Service{Store: st}
+// startJobs runs the periodic jobs until ctx is cancelled. rates is the source svc was
+// built with: the update expires its cache.
+func startJobs(ctx context.Context, svc *app.Services, rates *currencydata.Source) {
+	st := svc.Store
 	// eachSpace runs a job in every available space; one failing space does
 	// not stop the others.
 	eachSpace := func(job func(context.Context, store.DB) error) func(context.Context) error {
@@ -62,11 +61,11 @@ func startJobs(ctx context.Context, st *sqlite.Store, uploads uploads.Service, r
 		runtime.Job{Name: "recurring:ensure-upcoming", Interval: time.Hour, Run: eachSpace(func(ctx context.Context, d store.DB) error {
 			return recurring.Service{DB: d, Txs: ledger.Transactions{DB: d}}.EnsureUpcoming(ctx)
 		})},
-		runtime.Job{Name: "uploads:prune", Interval: time.Hour, Run: uploads.PruneExpired},
+		runtime.Job{Name: "uploads:prune", Interval: time.Hour, Run: svc.Uploads.PruneExpired},
 		// Expired invitations are kept an hour past their expiry: that is the
 		// cooldown on inviting the same address again.
 		runtime.Job{Name: "invitations:prune", Interval: time.Hour, Run: func(ctx context.Context) error {
-			_, err := spaceSvc.PruneInvitations(ctx)
+			_, err := svc.Spaces.PruneInvitations(ctx)
 			return err
 		}},
 	).Start(ctx)

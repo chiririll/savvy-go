@@ -6,7 +6,6 @@ import (
 
 	"savvy-go/internal/db"
 	"savvy-go/internal/httpserver/httpx"
-	"savvy-go/internal/platform/version"
 	"savvy-go/internal/store"
 )
 
@@ -26,12 +25,15 @@ type healthChk struct {
 }
 
 // Handler serves the liveness and readiness probes.
-type Handler struct{ Store store.Store }
+type Handler struct {
+	Store   store.Store
+	Version string // the release, reported as releaseId
+}
 
 func (h Handler) Live(w http.ResponseWriter, _ *http.Request) {
 	httpx.WriteHealth(w, http.StatusOK, healthReport{
 		Status:    "pass",
-		ReleaseID: version.Value,
+		ReleaseID: h.Version,
 	})
 }
 
@@ -73,7 +75,7 @@ func (h Handler) Ready(w http.ResponseWriter, r *http.Request) {
 	}
 	httpx.WriteHealth(w, status, healthReport{
 		Status:    reportStatus,
-		ReleaseID: version.Value,
+		ReleaseID: h.Version,
 		Checks:    checks,
 	})
 }

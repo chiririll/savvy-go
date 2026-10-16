@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	pkg      = "./cmd/savvy-go"
+	pkg      = "."
 	outDir   = "dist"
 	embedDir = "internal/platform/webui/dist" // what the embed build tag compiles in
 )
@@ -147,9 +147,9 @@ func compile(o buildOpts) error {
 		}
 	}
 
-	ldflags := "-X savvy-go/internal/platform/version.Value=" + firstNonEmpty(os.Getenv("APP_VERSION"), "dev")
+	ldflags := "-X main.Version=" + firstNonEmpty(os.Getenv("APP_VERSION"), "dev")
 	if o.env != "" {
-		ldflags += " -X savvy-go/internal/platform/version.Env=" + o.env
+		ldflags += " -X main.Env=" + o.env
 	}
 	args := []string{"build"}
 	if o.embed {

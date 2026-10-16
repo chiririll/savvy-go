@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"savvy-go/internal/auth"
-	"savvy-go/internal/platform/version"
 	"savvy-go/internal/signing"
 	"savvy-go/internal/spaces"
 	"savvy-go/internal/store"
@@ -54,6 +53,8 @@ type Service struct {
 	KeepPerSpace int
 	// Transfers reviews a restored space's transfers with its linked spaces.
 	Transfers *transfers.Service
+	// AppVersion is recorded in every backup manifest.
+	AppVersion string
 }
 
 var (
@@ -229,7 +230,7 @@ func (s Service) write(dir string, m Manifest, files map[string]string) (*Entry,
 		return nil, err
 	}
 	now := time.Now().UTC()
-	m.Format, m.Store, m.AppVersion, m.CreatedAt = 1, "sqlite", version.Value, now.Format(time.RFC3339)
+	m.Format, m.Store, m.AppVersion, m.CreatedAt = 1, "sqlite", s.AppVersion, now.Format(time.RFC3339)
 	name := stamp(now) + archiveExt
 	for i := 2; fileExists(filepath.Join(dir, name)); i++ {
 		name = stamp(now) + "-" + strconv.Itoa(i) + archiveExt

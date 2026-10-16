@@ -30,10 +30,16 @@ type Server struct {
 
 // New builds the services and serves them.
 func New(cfg config.Config, st store.Store, keys *signing.Holder, opts ...Option) *Server {
-	svc := app.New(cfg, st, keys, opts...)
+	return FromServices(app.New(cfg, st, keys, opts...))
+}
+
+// FromServices serves services the caller built, so it can share them with other parts of
+// the process (the scheduled jobs).
+func FromServices(svc *app.Services) *Server {
+	cfg := svc.Cfg
 	s := &Server{
 		Services: svc,
-		spa:      &spa.Handler{Assets: spa.Resolve(webui.FS())},
+		spa:      &spa.Handler{Assets: spa.Resolve(webui.FS()), Version: svc.Build.Version, Env: svc.Build.Env},
 		login:    login.Service{Policy: svc.SignIn, Cfg: cfg, Sessions: svc.Sessions},
 	}
 	s.guard = s.newGuard()

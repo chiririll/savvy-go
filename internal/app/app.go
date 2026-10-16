@@ -33,6 +33,7 @@ type Services struct {
 	Store store.Store
 	Keys  *signing.Holder
 	Rates ledger.RateSource // currency catalog and exchange rates, shared by every space
+	Build Build             // which release is running
 
 	// Bootstrap is the first-run password; nil keeps registration closed.
 	Bootstrap *bootstrap.Guard
@@ -61,6 +62,10 @@ type Services struct {
 	EmailVerify mail.Verifier
 }
 
+// Build says which release is running. The binary sets it at link time; it is handed down
+// here so no package reads a global.
+type Build struct{ Version, Env string }
+
 // Option configures New.
 type Option func(*Services)
 
@@ -68,6 +73,9 @@ type Option func(*Services)
 // data files; share one source with the scheduled rate update so spaces do not each
 // fetch their own.
 func WithRates(src ledger.RateSource) Option { return func(s *Services) { s.Rates = src } }
+
+// WithBuild sets the release the services report. The default is "dev" in "development".
+func WithBuild(b Build) Option { return func(s *Services) { s.Build = b } }
 
 // WithBootstrap sets the first-run password that registration needs while the server has
 // no users. Without it, registration is always closed.
@@ -106,10 +114,16 @@ func New(cfg config.Config, st store.Store, keys *signing.Holder, opts ...Option
 	keyRing := signing.KeyRing{Holder: keys, Trusted: transfers.TrustedKeys(db)}
 	s.Transfers = &transfers.Service{Spaces: s.Spaces, Keys: keyRing}
 	s.Refsync = refsync.Service{Spaces: s.Spaces}
-	s.Backups = backup.Service{Store: st, Keys: keyRing, Dir: cfg.BackupsDir, DataDir: cfg.DataDir, Transfers: s.Transfers}
 	for _, opt := range opts {
 		opt(s)
 	}
+	if s.Build.Version == "" {
+		s.Build.Version = "dev"
+	}
+	if s.Build.Env == "" {
+		s.Build.Env = "development"
+	}
+	s.Backups = backup.Service{Store: st, Keys: keyRing, Dir: cfg.BackupsDir, DataDir: cfg.DataDir, Transfers: s.Transfers, AppVersion: s.Build.Version}
 	if s.Rates == nil {
 		s.Rates = currencydata.New()
 	}

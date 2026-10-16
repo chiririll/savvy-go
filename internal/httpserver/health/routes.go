@@ -8,7 +8,7 @@ import (
 
 func init() {
 	routing.Register(nil, func(d *routing.Deps) []routing.Mount {
-		h := Handler{Store: d.Store}
+		h := Handler{Store: d.Store, Version: d.Build.Version}
 		return []routing.Mount{
 			routing.Root(h.Routes),
 		}

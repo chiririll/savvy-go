@@ -10,4 +10,5 @@ var (
 	WithBootstrap = app.WithBootstrap
 	WithMailer    = app.WithMailer
 	WithQueue     = app.WithQueue
+	WithBuild     = app.WithBuild
 )

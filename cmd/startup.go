@@ -1,4 +1,4 @@
-package main
+package cmd
 
 import (
 	"context"
@@ -21,12 +21,14 @@ import (
 
 // prepare brings the databases to a servable state: loads the signing key,
 // checks the spaces and finishes interrupted transfers between them.
-func prepare(ctx context.Context, cfg config.Config, st *sqlite.Store) (*signing.Holder, transfers.Service, error) {
+func prepare(ctx context.Context, cfg config.Config, st *sqlite.Store) (*signing.Holder, signing.KeyRing, error) {
 	keys, err := loadSigningKey(ctx, cfg.DataDir, st)
 	if err != nil {
-		return nil, transfers.Service{}, fmt.Errorf("signing key: %w", err)
+		return nil, signing.KeyRing{}, fmt.Errorf("signing key: %w", err)
 	}
-	if missing, orphans, err := (spaces.Service{Store: st}).Reconcile(ctx); err == nil {
+	if missing, orphans, err := (spaces.Service{Store: st}).Reconcile(ctx); err != nil {
+		slog.Warn("check the spaces against their database files", "err", err)
+	} else {
 		for _, id := range missing {
 			slog.Error("space has no database file", "space", id)
 		}
@@ -36,11 +38,8 @@ func prepare(ctx context.Context, cfg config.Config, st *sqlite.Store) (*signing
 	}
 	// Finish transfers a crash left half-written and review spaces restored
 	// just before it; an unavailable space is merged on a later start.
-	transfers := transfers.Service{
-		Spaces: spaces.Service{Store: st},
-		Keys:   signing.KeyRing{Holder: keys, Trusted: transfers.TrustedKeys(st.Server())},
-	}
-	if err := transfers.SyncAll(ctx); err != nil {
+	ring := signing.KeyRing{Holder: keys, Trusted: transfers.TrustedKeys(st.Server())}
+	if err := (transfers.Service{Spaces: spaces.Service{Store: st}, Keys: ring}).SyncAll(ctx); err != nil {
 		slog.Warn("merge transfers between spaces", "err", err)
 	}
 	// Bring the spaces of sync groups back together if they drifted apart.
@@ -50,7 +49,7 @@ func prepare(ctx context.Context, cfg config.Config, st *sqlite.Store) (*signing
 	for id, why := range st.Status().Unavailable {
 		slog.Error("space unavailable", "space", id, "reason", why)
 	}
-	return keys, transfers, nil
+	return keys, ring, nil
 }
 
 // startBootstrap creates the first-run password when the server has no users

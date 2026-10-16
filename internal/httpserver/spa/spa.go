@@ -10,8 +10,6 @@ import (
 	"os"
 	"path"
 	"strings"
-
-	"savvy-go/internal/platform/version"
 )
 
 type viteChunk struct {
@@ -31,7 +29,11 @@ func Resolve(embedded fs.FS) fs.FS {
 }
 
 // Handler serves the files of Assets.
-type Handler struct{ Assets fs.FS }
+type Handler struct {
+	Assets  fs.FS
+	Version string // the release, shown in the page shell
+	Env     string // the build environment
+}
 
 // ServeHTTP serves the file asked for, or index.html for a client-side route.
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -82,7 +84,7 @@ func (h *Handler) renderIndex() ([]byte, error) {
 		return nil, err
 	}
 
-	data := indexData{Version: version.Value, Env: version.Env}
+	data := indexData{Version: h.Version, Env: h.Env}
 	data.JS, data.CSS = h.viteAssets()
 
 	var buf bytes.Buffer

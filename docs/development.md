@@ -5,7 +5,7 @@
 ```bash
 go generate ./internal/db   # sqlc: internal/db/queries → internal/db/sqlc
 go test ./...
-go run ./cmd/savvy-go
+go run .
 ```
 
 ### Code shape checks

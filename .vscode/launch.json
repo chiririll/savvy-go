@@ -9,11 +9,11 @@
             "type": "go",
             "request": "launch",
             "mode": "debug",
-            "program": "${workspaceFolder}/cmd/savvy-go", 
+            "program": "${workspaceFolder}", 
             "cwd": "${workspaceFolder}",
             "envFile": "${workspaceFolder}/.env",
             "buildFlags": [
-                "-ldflags=-s -w -X savvy-go/internal/platform/version.Value=dev -X savvy-go/internal/platform/version.Env=local"
+                "-ldflags=-s -w -X main.Version=dev -X main.Env=local"
             ],
             "preLaunchTask": "build:frontend-dev"
         }

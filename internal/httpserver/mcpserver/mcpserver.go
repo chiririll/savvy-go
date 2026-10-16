@@ -11,7 +11,6 @@ import (
 	savvyauth "savvy-go/internal/auth"
 	"savvy-go/internal/config"
 	"savvy-go/internal/httpserver/httpx"
-	"savvy-go/internal/platform/version"
 
 	"github.com/modelcontextprotocol/go-sdk/auth"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -41,6 +40,7 @@ type Handler struct {
 	Cfg       config.Config
 	APITokens savvyauth.APITokens
 	Inner     http.Handler
+	Version   string // the release, reported to MCP clients
 }
 
 // Endpoint is the handler to mount at /mcp. The OAuth metadata URL is read per
@@ -99,7 +99,7 @@ type mcpNeed struct{ resource, level string }
 // call to one anyway still reaches the REST route, which checks the grant and
 // names the missing permission.
 func (h Handler) mcpServer(perms []string) *mcp.Server {
-	srv := mcp.NewServer(&mcp.Implementation{Name: "go-savvy", Version: version.Value}, &mcp.ServerOptions{Instructions: mcpInstructions})
+	srv := mcp.NewServer(&mcp.Implementation{Name: "go-savvy", Version: h.Version}, &mcp.ServerOptions{Instructions: mcpInstructions})
 	h.addSimpleReadTools(srv)
 	h.addQueryReadTools(srv)
 	h.hideUngrantedTools(srv, h.addMCPWriteTools(srv), perms)

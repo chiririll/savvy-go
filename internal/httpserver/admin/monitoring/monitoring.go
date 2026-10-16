@@ -9,7 +9,6 @@ import (
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/importer"
 	"savvy-go/internal/platform/sysinfo"
-	"savvy-go/internal/platform/version"
 	"savvy-go/internal/store"
 	"savvy-go/internal/uploads"
 )
@@ -21,6 +20,8 @@ type Handler struct {
 	Store      store.Store
 	Uploads    uploads.Service
 	UploadsDir string
+	Version    string // the release
+	Env        string // the build environment
 }
 
 func (h Handler) storage(w http.ResponseWriter, r *http.Request) {
@@ -146,7 +147,7 @@ func (h Handler) importStats(ctx context.Context) (byStatus map[string]int, tota
 	return byStatus, total
 }
 
-func (Handler) resources(w http.ResponseWriter, r *http.Request) {
+func (h Handler) resources(w http.ResponseWriter, r *http.Request) {
 	var ms runtime.MemStats
 	runtime.ReadMemStats(&ms)
 	httpx.WriteJSON(w, http.StatusOK, resourcesBody{
@@ -156,8 +157,8 @@ func (Handler) resources(w http.ResponseWriter, r *http.Request) {
 			MemoryBytes: ms.Alloc, PeakBytes: ms.Sys, Goroutines: runtime.NumGoroutine(), GCCycles: ms.NumGC,
 		},
 		Runtime: runtimeBody{
-			GoVersion: runtime.Version(), AppVersion: version.Value,
-			Environment: version.Env, UptimeSeconds: int(time.Since(processStarted).Seconds()),
+			GoVersion: runtime.Version(), AppVersion: h.Version,
+			Environment: h.Env, UptimeSeconds: int(time.Since(processStarted).Seconds()),
 		},
 	})
 }
