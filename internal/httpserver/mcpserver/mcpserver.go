@@ -8,12 +8,13 @@ import (
 	"slices"
 	"strconv"
 
-	"github.com/modelcontextprotocol/go-sdk/auth"
-	"github.com/modelcontextprotocol/go-sdk/mcp"
 	savvyauth "savvy-go/internal/auth"
 	"savvy-go/internal/config"
 	"savvy-go/internal/httpserver/api"
 	"savvy-go/internal/version"
+
+	"github.com/modelcontextprotocol/go-sdk/auth"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 // The MCP server: tools for AI assistants, served over Streamable HTTP at

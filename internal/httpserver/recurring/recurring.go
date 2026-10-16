@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"savvy-go/internal/httpserver/api"
-	"savvy-go/internal/httpserver/apidocs"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
@@ -145,18 +144,4 @@ func decodeRecurring(w http.ResponseWriter, r *http.Request, base *recurring.Rec
 		DayOfWeek: body.DayOfWeek, DayOfMonth: body.DayOfMonth, StartDate: body.StartDate,
 		EndDate: body.EndDate, IsActive: body.IsActive, TagIDs: body.TagIDs, HasTagIDs: hasTags,
 	}, true
-}
-
-//go:embed openapi.yaml
-var spec []byte
-
-func Routes(r chi.Router) {
-	apidocs.Add(spec)
-	r.Get("/recurring", recurringIndex)
-	r.Get("/recurring-upcoming", recurringUpcoming)
-	r.Post("/recurring", recurringStore)
-	r.Get("/recurring/{id}", recurringShow)
-	r.Put("/recurring/{id}", recurringUpdate)
-	r.Patch("/recurring/{id}", recurringUpdate)
-	r.Delete("/recurring/{id}", recurringDestroy)
 }

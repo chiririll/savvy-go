@@ -6,13 +6,10 @@ import (
 	"net/http"
 	"slices"
 
-	"github.com/go-chi/chi/v5"
-
 	"savvy-go/internal/auth"
 	"savvy-go/internal/backup"
 	"savvy-go/internal/config"
 	"savvy-go/internal/httpserver/api"
-	"savvy-go/internal/httpserver/apidocs"
 	"savvy-go/internal/httpserver/emailverify"
 	"savvy-go/internal/httpserver/guard"
 	"savvy-go/internal/httpserver/mailing"
@@ -36,45 +33,6 @@ type Handler struct {
 	Guard   *guard.Guard
 }
 
-//go:embed openapi.yaml
-var spec []byte
-
-func (h Handler) PublicRoutes(r chi.Router) {
-	apidocs.Add(spec)
-	r.Get("/invitations/{token}", h.invitationPreview)
-	r.Post("/invitations/{token}/register", h.invitationRegister)
-}
-
-func (h Handler) AdminSessionRoutes(r chi.Router) {
-	apidocs.Add(spec)
-	r.Post("/admin/invitations/clear", h.invitationsClear)
-	r.Get("/admin/spaces", h.adminSpacesIndex)
-	r.Patch("/admin/spaces/{id}", h.adminSpaceUpdate)
-	r.Delete("/admin/spaces/{id}", h.adminSpaceDestroy)
-	r.Post("/admin/spaces/{id}/admins", h.adminSpaceAssignAdmin)
-	r.Get("/admin/deleted-spaces", h.adminDeletedIndex)
-	r.Post("/admin/deleted-spaces/{name}/restore", h.adminDeletedRestore)
-}
-
-func (h Handler) ReadRoutes(r chi.Router) {
-	apidocs.Add(spec)
-	r.Get("/", h.spaceShow)
-	r.Get("/members", h.membersIndex)
-	r.With(h.Guard.SessionOnly).Post("/leave", h.spaceLeave)
-}
-
-func (h Handler) AdminRoutes(r chi.Router) {
-	apidocs.Add(spec)
-	r.Patch("/", h.spaceUpdate)
-	r.Delete("/", h.spaceDestroy)
-	r.Patch("/members/{user}", h.membersUpdate)
-	r.Delete("/members/{user}", h.membersDestroy)
-	r.Get("/invitations", h.invitationsIndex)
-	r.Post("/invitations", h.invitationsStore)
-	r.Delete("/invitations/{id}", h.invitationsDestroy)
-	r.Get("/audit", h.spaceAudit)
-}
-
 func (h Handler) index(w http.ResponseWriter, r *http.Request) {
 	mine, err := h.Spaces.ForUser(r.Context(), api.User(r).ID)
 	if err != nil {
@@ -89,12 +47,4 @@ func (h Handler) index(w http.ResponseWriter, r *http.Request) {
 		out[i] = api.SpaceJSON(x)
 	}
 	api.WriteData(w, http.StatusOK, out)
-}
-
-func (h Handler) AccountRoutes(r chi.Router) {
-	apidocs.Add(spec)
-	r.Get("/spaces", h.index)
-	r.Get("/invitation-methods", h.invitationMethods)
-	r.With(h.Guard.SessionOnly).Post("/spaces", h.spacesStore)
-	r.With(h.Guard.SessionOnly).Post("/invitations/{token}/accept", h.invitationAccept)
 }

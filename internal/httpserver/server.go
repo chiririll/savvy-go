@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 
 	"savvy-go/internal/backup"
 	"savvy-go/internal/bootstrap"
@@ -13,8 +14,10 @@ import (
 	"savvy-go/internal/httpserver/emailverify"
 	"savvy-go/internal/httpserver/guard"
 	"savvy-go/internal/httpserver/mailing"
+	"savvy-go/internal/httpserver/routing"
 	"savvy-go/internal/httpserver/signin"
 	"savvy-go/internal/httpserver/spa"
+	"savvy-go/internal/httpserver/spacefill"
 	"savvy-go/internal/jobs"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/oauth"
@@ -96,3 +99,35 @@ func New(cfg config.Config, st store.Store, keys *signing.Holder, opts ...Option
 }
 
 func (s *Server) Handler() http.Handler { return s.mux }
+
+func (s *Server) routes() *chi.Mux {
+	r := chi.NewRouter()
+	r.Use(middleware.RequestID)
+	r.Use(middleware.RealIP)
+	r.Use(middleware.Recoverer)
+	r.Use(locale)
+	r.Use(noStoreAPI)
+	r.Use(noFraming)
+
+	routing.Build(r, s.deps())
+
+	r.Get("/*", s.spa.ServeHTTP)
+	return r
+}
+
+func (s *Server) spaceCreator() spacefill.Creator {
+	return spacefill.Creator{Spaces: s.spaces, Store: s.store, Rates: s.rates}
+}
+
+// deps are the services handed to the packages that register routes.
+func (s *Server) deps() *routing.Deps {
+	return &routing.Deps{
+		Cfg: s.cfg, Store: s.store, Rates: s.rates, Bootstrap: s.bootstrap, Queue: s.queue, Keys: s.keys,
+		Users: s.users, Sessions: s.sessions, APITokens: s.apiTokens, PasswordTokens: s.tokens,
+		Challenges: s.challenges, Verifications: s.verifications, TwoFactor: s.twoFactor, WebAuthn: s.webauthn,
+		Mail: s.mail, Settings: s.settings, Spaces: s.spaces, Backups: s.backups, Transfers: s.transfers,
+		Refsync: s.refsync, Uploads: s.uploads, SSO: &s.sso, OAuth: s.oauth, Login: s.login, Guard: s.guard,
+		// The MCP tools call the finished router, which exists after New.
+		Inner: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { s.mux.ServeHTTP(w, r) }),
+	}
+}

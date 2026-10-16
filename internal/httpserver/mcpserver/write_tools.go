@@ -7,9 +7,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/modelcontextprotocol/go-sdk/mcp"
 	savvyauth "savvy-go/internal/auth"
 	"savvy-go/internal/httpserver/guard"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 // The MCP write tools. Like the read tools they hold no logic of their own:

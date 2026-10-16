@@ -19,6 +19,7 @@ import (
 	"savvy-go/internal/bootstrap"
 	"savvy-go/internal/config"
 	"savvy-go/internal/currencydata"
+	"savvy-go/internal/httpserver/routing"
 	"savvy-go/internal/settings"
 	"savvy-go/internal/signing"
 	"savvy-go/internal/spaces"
@@ -131,7 +132,7 @@ func (a *testApp) issue(u *auth.User, remember bool) *auth.Issued {
 // dataRoots are the first path segments of the space data routes.
 func dataRoots(s *Server) map[string]bool {
 	r := chi.NewRouter()
-	dataRoutes(s, r)
+	routing.SpaceWriteRoutes(r, s.deps())
 	roots := map[string]bool{}
 	_ = chi.Walk(r, func(_, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
 		roots[strings.SplitN(strings.TrimPrefix(route, "/"), "/", 2)[0]] = true

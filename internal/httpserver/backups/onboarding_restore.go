@@ -6,10 +6,7 @@ import (
 	"net/http"
 	"os"
 	"savvy-go/internal/httpserver/api"
-	"savvy-go/internal/httpserver/apidocs"
 	"strings"
-
-	"github.com/go-chi/chi/v5"
 
 	"savvy-go/internal/bootstrap"
 	"savvy-go/internal/legacy/restore"
@@ -99,12 +96,4 @@ func (h Handler) restoreFirstRun(r *http.Request, tmp, name string) (string, err
 		return "", err
 	}
 	return b.Filename, h.Backups.RestoreServer(r.Context(), b.Filename)
-}
-
-//go:embed openapi.yaml
-var spec []byte
-
-func (h Handler) PublicRoutes(r chi.Router) {
-	apidocs.Add(spec)
-	r.Post("/onboarding/restore", h.onboardingRestore)
 }

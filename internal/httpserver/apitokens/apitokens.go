@@ -9,7 +9,6 @@ import (
 	"maps"
 	"net/http"
 	"savvy-go/internal/httpserver/api"
-	"savvy-go/internal/httpserver/apidocs"
 	"savvy-go/internal/spaces"
 	"strconv"
 	"strings"
@@ -222,16 +221,4 @@ func (h Handler) apiTokensUpdate(w http.ResponseWriter, r *http.Request) {
 	default:
 		api.WriteDataMsg(w, http.StatusOK, dto.APIToken(*tok), "API token updated.")
 	}
-}
-
-//go:embed openapi.yaml
-var spec []byte
-
-func (h Handler) Routes(r chi.Router) {
-	apidocs.Add(spec)
-	r.Get("/auth/api-token-capabilities", h.apiTokenCapabilities)
-	r.Get("/auth/api-tokens", h.apiTokensIndex)
-	r.Post("/auth/api-tokens", h.apiTokensStore)
-	r.Patch("/auth/api-tokens/{id}", h.apiTokensUpdate)
-	r.Delete("/auth/api-tokens/{id}", h.apiTokensDestroy)
 }

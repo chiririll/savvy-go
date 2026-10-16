@@ -1,0 +1,36 @@
+package httpserver
+
+// Every package that serves routes registers them from its routes.go; linking it in is
+// what mounts them. Add a new handler package here.
+import (
+	_ "savvy-go/internal/httpserver/accounts"
+	_ "savvy-go/internal/httpserver/apitokens"
+	_ "savvy-go/internal/httpserver/authapi"
+	_ "savvy-go/internal/httpserver/automation"
+	_ "savvy-go/internal/httpserver/backups"
+	_ "savvy-go/internal/httpserver/budgets"
+	_ "savvy-go/internal/httpserver/catalog"
+	_ "savvy-go/internal/httpserver/categories"
+	_ "savvy-go/internal/httpserver/checks"
+	_ "savvy-go/internal/httpserver/currencies"
+	_ "savvy-go/internal/httpserver/debts"
+	_ "savvy-go/internal/httpserver/emailverify"
+	_ "savvy-go/internal/httpserver/health"
+	_ "savvy-go/internal/httpserver/imports"
+	_ "savvy-go/internal/httpserver/mailapi"
+	_ "savvy-go/internal/httpserver/monitoring"
+	_ "savvy-go/internal/httpserver/oauthapi"
+	_ "savvy-go/internal/httpserver/recurring"
+	_ "savvy-go/internal/httpserver/reports"
+	_ "savvy-go/internal/httpserver/settingsapi"
+	_ "savvy-go/internal/httpserver/spaceapi"
+	_ "savvy-go/internal/httpserver/ssoapi"
+	_ "savvy-go/internal/httpserver/syncgroups"
+	_ "savvy-go/internal/httpserver/tags"
+	_ "savvy-go/internal/httpserver/transactions"
+	_ "savvy-go/internal/httpserver/transferapi"
+	_ "savvy-go/internal/httpserver/twofactor"
+	_ "savvy-go/internal/httpserver/uploadapi"
+	_ "savvy-go/internal/httpserver/users"
+	_ "savvy-go/internal/httpserver/webauthn"
+)

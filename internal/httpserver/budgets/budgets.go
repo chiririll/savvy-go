@@ -8,7 +8,6 @@ import (
 	"strconv"
 
 	"savvy-go/internal/httpserver/api"
-	"savvy-go/internal/httpserver/apidocs"
 	"savvy-go/internal/httpserver/dto"
 	"savvy-go/internal/ledger"
 
@@ -129,18 +128,4 @@ func decodeBudget(w http.ResponseWriter, r *http.Request, base *ledger.Budget) (
 		CategoryIDs: body.CategoryIDs, TagIDs: body.TagIDs,
 		HasCategoryIDs: hasCats, HasTagIDs: hasTags,
 	}, true
-}
-
-//go:embed openapi.yaml
-var spec []byte
-
-// Routes registers the budget routes.
-func Routes(r chi.Router) {
-	apidocs.Add(spec)
-	r.Get("/budgets", index)
-	r.Post("/budgets", store)
-	r.Get("/budgets/{id}", show)
-	r.Put("/budgets/{id}", update)
-	r.Patch("/budgets/{id}", update)
-	r.Delete("/budgets/{id}", destroy)
 }

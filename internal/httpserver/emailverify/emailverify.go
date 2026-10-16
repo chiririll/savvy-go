@@ -9,8 +9,6 @@ import (
 	"savvy-go/internal/httpserver/api"
 	"savvy-go/internal/httpserver/mailing"
 
-	"github.com/go-chi/chi/v5"
-
 	"savvy-go/internal/auth"
 	"savvy-go/internal/mailer"
 )
@@ -106,12 +104,4 @@ func (h Handler) verifyEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	api.WriteMessage(w, http.StatusOK, "Email address confirmed.")
-}
-
-func (h Handler) PublicRoutes(r chi.Router) {
-	r.Post("/auth/verify-email", h.verifyEmail)
-}
-
-func (h Handler) CredentialRoutes(r chi.Router) {
-	r.Post("/auth/verify-email/resend", h.verifyEmailResend)
 }

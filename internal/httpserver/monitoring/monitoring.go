@@ -8,8 +8,6 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/go-chi/chi/v5"
-
 	"savvy-go/internal/httpserver/api"
 	"savvy-go/internal/importer"
 	"savvy-go/internal/store"
@@ -158,9 +156,4 @@ func memorySnapshot() map[string]any {
 	return map[string]any{
 		"total_bytes": nil, "used_bytes": nil, "free_bytes": nil, "used_percent": nil, "source": nil,
 	}
-}
-
-func (h Handler) Routes(r chi.Router) {
-	r.Get("/monitoring/storage", h.storage)
-	r.Get("/monitoring/resources", h.resources)
 }

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"savvy-go/internal/httpserver/api"
-	"savvy-go/internal/httpserver/apidocs"
 	"strconv"
 
 	"savvy-go/internal/httpserver/dto"
@@ -168,21 +167,4 @@ func debtParam(w http.ResponseWriter, r *http.Request) *ledger.Account {
 		return nil
 	}
 	return a
-}
-
-//go:embed openapi.yaml
-var spec []byte
-
-func Routes(r chi.Router) {
-	apidocs.Add(spec)
-	r.Get("/debts", debtsIndex)
-	r.Post("/debts", debtsStore)
-	r.Get("/debts/{id}", debtsShow)
-	r.Put("/debts/{id}", debtsUpdate)
-	r.Patch("/debts/{id}", debtsUpdate)
-	r.Delete("/debts/{id}", debtsDestroy)
-	r.Post("/debts/{id}/payment", debtsPayment)
-	r.Post("/debts/{id}/collect", debtsCollect)
-	r.Post("/debts/{id}/reopen", debtsReopen)
-	r.Get("/debts-summary", debtsSummary)
 }

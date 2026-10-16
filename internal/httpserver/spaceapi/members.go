@@ -4,11 +4,12 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
 	"savvy-go/internal/auth"
 	"savvy-go/internal/httpserver/api"
 	"savvy-go/internal/httpserver/dto"
 	"savvy-go/internal/spaces"
+
+	"github.com/go-chi/chi/v5"
 )
 
 func (h Handler) membersIndex(w http.ResponseWriter, r *http.Request) {

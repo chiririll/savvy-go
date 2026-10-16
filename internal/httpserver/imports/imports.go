@@ -122,10 +122,3 @@ func (s Handler) runJob(fn func(context.Context)) {
 	}
 	fn(context.Background())
 }
-
-func (s Handler) Routes(r chi.Router) {
-	r.Post("/transactions/import/parse", s.importParse)
-	r.Post("/transactions/import/preview", s.importPreview)
-	r.Post("/transactions/import/execute", s.importExecute)
-	r.Get("/transactions/import/{import}", s.importShow)
-}

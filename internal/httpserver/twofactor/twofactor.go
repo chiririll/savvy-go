@@ -7,8 +7,6 @@ import (
 	"savvy-go/internal/auth"
 	"savvy-go/internal/httpserver/api"
 	"savvy-go/internal/httpserver/signin"
-
-	"github.com/go-chi/chi/v5"
 )
 
 // Handler holds what the two-factor routes need.
@@ -156,17 +154,4 @@ func (h Handler) twoFactorStatus(w http.ResponseWriter, r *http.Request) {
 		"pending_confirmation":     u.TwoFactorEnabled && !u.TwoFactorConfirmed,
 		"recovery_codes_remaining": remaining,
 	})
-}
-
-func (h Handler) PublicRoutes(r chi.Router) {
-	r.Post("/auth/2fa/verify", h.twoFactorVerify)
-}
-
-func (h Handler) CredentialRoutes(r chi.Router) {
-	r.Get("/auth/2fa/status", h.twoFactorStatus)
-	r.Post("/auth/2fa/enable", h.twoFactorEnable)
-	r.Post("/auth/2fa/confirm", h.twoFactorConfirm)
-	r.Post("/auth/2fa/disable", h.twoFactorDisable)
-	r.Get("/auth/2fa/recovery-codes", h.twoFactorRecoveryCodes)
-	r.Post("/auth/2fa/recovery-codes/regenerate", h.twoFactorRegenerate)
 }

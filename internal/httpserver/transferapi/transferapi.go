@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"savvy-go/internal/config"
 	"savvy-go/internal/httpserver/api"
-	"savvy-go/internal/httpserver/apidocs"
 	"savvy-go/internal/signing"
 	"strconv"
 	"time"
@@ -311,37 +310,4 @@ func (h Handler) keysRotate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.keysIndex(w, r)
-}
-
-func (h Handler) AdminSessionRoutes(r chi.Router) {
-	r.Get("/admin/keys", h.keysIndex)
-	r.Post("/admin/keys", h.keysStore)
-	r.Delete("/admin/keys/{kid}", h.keysDestroy)
-	r.Post("/admin/keys/rotate", h.keysRotate)
-}
-
-//go:embed openapi.yaml
-var spec []byte
-
-func (h Handler) ReadRoutes(r chi.Router) {
-	apidocs.Add(spec)
-	r.Get("/links", h.linksIndex)
-	r.Get("/transfers", h.transfersIndex)
-}
-
-func (h Handler) AdminRoutes(r chi.Router) {
-	r.Post("/links", h.linksStore)
-	r.Delete("/links/{other}", h.linksDestroy)
-}
-
-func (h Handler) WriteRoutes(r chi.Router) {
-	apidocs.Add(spec)
-	// Transfers with linked spaces; the other space's rights
-	// are checked by the transfer itself.
-	r.Post("/transfers", h.transfersStore)
-	r.Patch("/transfers/{uuid}", h.transfersUpdate)
-	r.Delete("/transfers/{uuid}", h.transfersDestroy)
-	r.Post("/transfers/{uuid}/accept", h.transfersResolve(true))
-	r.Post("/transfers/{uuid}/reject", h.transfersResolve(false))
-	r.Post("/transfers/{uuid}/trust", h.transfersTrust)
 }

@@ -4,11 +4,12 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
 	"savvy-go/internal/httpserver/api"
 	"savvy-go/internal/httpserver/backups"
 	"savvy-go/internal/httpserver/dto"
 	"savvy-go/internal/spaces"
+
+	"github.com/go-chi/chi/v5"
 )
 
 // adminSpacesIndex is the overview of every space: metadata only (P5).

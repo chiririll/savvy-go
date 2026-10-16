@@ -14,7 +14,7 @@ import (
 // NoAppURLMessage is why a link cannot be sent while app_url is unset.
 const NoAppURLMessage = "The public URL is not set, so the link would point nowhere. Set app_url first."
 
-const defaultTimeout = 10 * time.Second
+const DefaultTimeout = 10 * time.Second
 
 // Service is the mail server in use. An admin can change it, so it is guarded
 // by a lock: read the sender through Mailer and the settings through Settings.
@@ -63,7 +63,7 @@ func (s *Service) UseConfig(cfg config.Config) {
 	s.cfg = cfg
 }
 
-func (s *Service) config() config.Config {
+func (s *Service) Config() config.Config {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.cfg
@@ -81,7 +81,7 @@ func (s *Service) Send(ctx context.Context, m mailer.Message) error {
 	cfg, _ := s.Settings()
 	timeout := cfg.Timeout
 	if timeout <= 0 {
-		timeout = defaultTimeout
+		timeout = DefaultTimeout
 	}
 	ctx, cancel := context.WithTimeout(ctx, 3*timeout)
 	defer cancel()
@@ -112,9 +112,9 @@ func (s *Service) OffWhy() (reason, hint string) {
 	return "Mail is not configured.", "Set it up in Administration → System → Email."
 }
 
-// apply validates, saves and activates next. A nil password keeps the stored
+// Apply validates, saves and activates next. A nil password keeps the stored
 // one. It holds the lock for the whole save, so two admins cannot mix values.
-func (s *Service) apply(next mailer.Config, password *string) error {
+func (s *Service) Apply(next mailer.Config, password *string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	next.Password = s.conf.Password

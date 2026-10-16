@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"savvy-go/internal/httpserver/api"
-	"savvy-go/internal/httpserver/apidocs"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
@@ -194,22 +193,4 @@ func decodeAutomation(w http.ResponseWriter, r *http.Request, base *automation.R
 		Priority: body.Priority, Conditions: body.Conditions, Actions: body.Actions,
 		IsActive: body.IsActive, StopProcessing: body.StopProcessing,
 	}, true
-}
-
-//go:embed openapi.yaml
-var spec []byte
-
-func Routes(r chi.Router) {
-	apidocs.Add(spec)
-	r.Get("/automation-rules/triggers", automationTriggers)
-	r.Post("/automation-rules/reorder", automationReorder)
-	r.Get("/automation-rules", automationIndex)
-	r.Post("/automation-rules", automationStore)
-	r.Get("/automation-rules/{id}", automationShow)
-	r.Put("/automation-rules/{id}", automationUpdate)
-	r.Patch("/automation-rules/{id}", automationUpdate)
-	r.Delete("/automation-rules/{id}", automationDestroy)
-	r.Post("/automation-rules/{id}/toggle", automationToggle)
-	r.Post("/automation-rules/{id}/test", automationTest)
-	r.Get("/automation-rules/{id}/logs", automationLogs)
 }

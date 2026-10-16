@@ -4,9 +4,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/go-chi/chi/v5"
 	"savvy-go/internal/httpserver/api"
 	"savvy-go/internal/oauth"
+
+	"github.com/go-chi/chi/v5"
 )
 
 // Registration window: an admin opens it from Administration → Security.

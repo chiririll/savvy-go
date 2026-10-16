@@ -14,7 +14,6 @@ import (
 	"github.com/shopspring/decimal"
 
 	"savvy-go/internal/httpserver/api"
-	"savvy-go/internal/httpserver/apidocs"
 	"savvy-go/internal/httpserver/dto"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/money"
@@ -174,20 +173,4 @@ func currencyParam(w http.ResponseWriter, r *http.Request) *ledger.Currency {
 		api.WriteMessage(w, http.StatusNotFound, "Not found.")
 	}
 	return c
-}
-
-//go:embed openapi.yaml
-var spec []byte
-
-func Routes(r chi.Router) {
-	apidocs.Add(spec)
-	r.Get("/currencies/catalog", currenciesCatalog)
-	r.Get("/currencies", currenciesIndex)
-	r.Post("/currencies", currenciesStore)
-	r.Get("/currencies/{id}", currenciesShow)
-	r.Put("/currencies/{id}", currenciesUpdate)
-	r.Patch("/currencies/{id}", currenciesUpdate)
-	r.Delete("/currencies/{id}", currenciesDestroy)
-	r.Post("/currencies/{id}/set-base", currenciesSetBase)
-	r.Post("/currencies/convert", currenciesConvert)
 }

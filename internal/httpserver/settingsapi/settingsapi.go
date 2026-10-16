@@ -11,15 +11,12 @@ import (
 	"net/url"
 	"savvy-go/internal/config"
 	"savvy-go/internal/httpserver/api"
-	"savvy-go/internal/httpserver/apidocs"
 	"savvy-go/internal/httpserver/emailverify"
 	"savvy-go/internal/httpserver/signin"
 	"savvy-go/internal/settings"
 	"savvy-go/internal/sso"
 	"strings"
 	"time"
-
-	"github.com/go-chi/chi/v5"
 )
 
 // Handler holds what the settings routes need.
@@ -143,28 +140,4 @@ func (h Handler) spaceSettingsIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	api.WriteJSON(w, http.StatusOK, all)
-}
-
-//go:embed openapi.yaml
-var spec []byte
-
-func (h Handler) AdminSessionRoutes(r chi.Router) {
-	apidocs.Add(spec)
-	r.Patch("/settings", h.settingsUpdate)
-}
-
-func (h Handler) SpaceReadRoutes(r chi.Router) {
-	apidocs.Add(spec)
-	r.Get("/settings", h.spaceSettingsIndex)
-}
-
-func (h Handler) SpaceAdminRoutes(r chi.Router) {
-	apidocs.Add(spec)
-	r.Patch("/settings", h.spaceSettingsUpdate)
-}
-
-func (h Handler) AccountRoutes(r chi.Router) {
-	apidocs.Add(spec)
-	// Instance settings everyone may read (sign-in options).
-	r.Get("/settings", h.settingsIndex)
 }

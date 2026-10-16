@@ -1,4 +1,4 @@
-package mailing
+package mailapi
 
 import (
 	"context"
@@ -7,20 +7,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-chi/chi/v5"
-
 	"savvy-go/internal/httpserver/api"
+	"savvy-go/internal/httpserver/mailing"
 	"savvy-go/internal/mailer"
 )
 
 // Handler is the admin's view of the mail settings.
-type Handler struct{ Mail *Service }
-
-func (h Handler) Routes(r chi.Router) {
-	r.Get("/admin/mail", h.index)
-	r.Put("/admin/mail", h.update)
-	r.Post("/admin/mail/test", h.test)
-}
+type Handler struct{ Mail *mailing.Service }
 
 func nullIfEmpty(s string) any {
 	if s == "" {
@@ -44,8 +37,8 @@ func (h Handler) index(w http.ResponseWriter, r *http.Request) {
 		"skipVerify":  c.SkipVerify,
 		"timeout":     int(c.Timeout / time.Second),
 		"passwordSet": c.Password != "",
-		"appUrlSet":   h.Mail.config().URL() != "",
-		"writable":    h.Mail.config().Live.Writable(),
+		"appUrlSet":   h.Mail.Config().URL() != "",
+		"writable":    h.Mail.Config().Live.Writable(),
 	})
 }
 
@@ -68,7 +61,7 @@ func (h Handler) update(w http.ResponseWriter, r *http.Request) {
 	if !api.DecodeBody(w, r, &body) {
 		return
 	}
-	if !h.Mail.config().Live.Writable() {
+	if !h.Mail.Config().Live.Writable() {
 		api.WriteMessage(w, http.StatusUnprocessableEntity, "The config file is read-only. Set the [mailer] section in config.toml.")
 		return
 	}
@@ -83,9 +76,9 @@ func (h Handler) update(w http.ResponseWriter, r *http.Request) {
 		Timeout:    time.Duration(body.Timeout) * time.Second,
 	}
 	if next.Timeout <= 0 {
-		next.Timeout = defaultTimeout
+		next.Timeout = mailing.DefaultTimeout
 	}
-	if err := h.Mail.apply(next, body.Password); err != nil {
+	if err := h.Mail.Apply(next, body.Password); err != nil {
 		var invalid mailer.InvalidError
 		if errors.As(err, &invalid) {
 			api.WriteValidation(w, map[string][]string{invalid.Field: {invalid.Error()}})

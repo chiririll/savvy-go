@@ -11,7 +11,6 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"savvy-go/internal/httpserver/api"
-	"savvy-go/internal/httpserver/apidocs"
 	"savvy-go/internal/httpserver/dto"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/refsync"
@@ -183,20 +182,4 @@ func (s Handler) categoryParam(w http.ResponseWriter, r *http.Request) *ledger.C
 		api.WriteMessage(w, http.StatusNotFound, "Not found.")
 	}
 	return c
-}
-
-//go:embed openapi.yaml
-var spec []byte
-
-func (s Handler) Routes(r chi.Router) {
-	apidocs.Add(spec)
-	r.Get("/categories", s.categoriesIndex)
-	r.Post("/categories", s.categoriesStore)
-	r.Get("/categories/{id}", s.categoriesShow)
-	r.Put("/categories/{id}", s.categoriesUpdate)
-	r.Patch("/categories/{id}", s.categoriesUpdate)
-	r.Delete("/categories/{id}", s.categoriesDestroy)
-	r.Post("/categories/{id}/set-default", s.categoriesSetDefault)
-	r.Get("/categories/{id}/statistics", s.categoriesStatistics)
-	r.Get("/categories-summary", s.categoriesSummary)
 }

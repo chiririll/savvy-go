@@ -165,16 +165,3 @@ func (h Handler) webauthnLoginVerify(w http.ResponseWriter, r *http.Request) {
 	}
 	h.Login.Issue(w, r, u, http.StatusOK, true)
 }
-
-func (h Handler) PublicRoutes(r chi.Router) {
-	r.With(h.Guard.NeedAppURL).Post("/auth/webauthn/login/options", h.webauthnLoginOptions)
-	r.With(h.Guard.NeedAppURL).Post("/auth/webauthn/login/verify", h.webauthnLoginVerify)
-}
-
-func (h Handler) CredentialRoutes(r chi.Router) {
-	r.Get("/auth/webauthn/credentials", h.webauthnIndex)
-	r.With(h.Guard.NeedAppURL).Post("/auth/webauthn/register/options", h.webauthnRegisterOptions)
-	r.With(h.Guard.NeedAppURL).Post("/auth/webauthn/register/verify", h.webauthnRegisterVerify)
-	r.Patch("/auth/webauthn/credentials/{id}", h.webauthnUpdate)
-	r.Delete("/auth/webauthn/credentials/{id}", h.webauthnDestroy)
-}

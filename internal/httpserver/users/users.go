@@ -10,7 +10,6 @@ import (
 	"savvy-go/internal/backup"
 	"savvy-go/internal/config"
 	"savvy-go/internal/httpserver/api"
-	"savvy-go/internal/httpserver/apidocs"
 	"savvy-go/internal/httpserver/mailing"
 	"savvy-go/internal/httpserver/signin"
 	"savvy-go/internal/spaces"
@@ -309,17 +308,3 @@ func (h Handler) userParam(w http.ResponseWriter, r *http.Request) *auth.User {
 }
 
 func validRole(role string) bool { return auth.ValidRole(role) }
-
-//go:embed openapi.yaml
-var spec []byte
-
-func (h Handler) Routes(r chi.Router) {
-	apidocs.Add(spec)
-	r.Get("/users", h.usersIndex)
-	r.Get("/users/{id}", h.usersShow)
-	r.Post("/users", h.usersStore)
-	r.Post("/users/{id}/password-token", h.usersIssueToken)
-	r.Put("/users/{id}", h.usersUpdate)
-	r.Patch("/users/{id}", h.usersUpdate)
-	r.Delete("/users/{id}", h.usersDestroy)
-}

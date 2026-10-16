@@ -5,8 +5,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/go-chi/chi/v5"
-
 	"savvy-go/internal/backup"
 	"savvy-go/internal/config"
 	"savvy-go/internal/httpserver/api"
@@ -131,7 +129,3 @@ func (h Handler) diskPercent() *float64 {
 }
 
 func addr[T any](v T) *T { return &v }
-
-func (h Handler) Routes(r chi.Router) {
-	r.Get("/admin/checks", h.index)
-}
