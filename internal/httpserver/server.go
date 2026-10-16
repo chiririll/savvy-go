@@ -8,9 +8,8 @@ import (
 
 	"savvy-go/internal/app"
 	"savvy-go/internal/config"
-	"savvy-go/internal/httpserver/auth/emailverify"
-	"savvy-go/internal/httpserver/auth/signin"
 	"savvy-go/internal/httpserver/httpx/guard"
+	"savvy-go/internal/httpserver/httpx/login"
 	"savvy-go/internal/httpserver/httpx/routing"
 	"savvy-go/internal/httpserver/spa"
 	"savvy-go/internal/signing"
@@ -23,11 +22,10 @@ import (
 type Server struct {
 	*app.Services
 
-	mux    *chi.Mux
-	spa    *spa.Handler // the frontend: index.html, icons and build/
-	login  signin.Service
-	guard  *guard.Guard
-	verify emailverify.Handler
+	mux   *chi.Mux
+	spa   *spa.Handler // the frontend: index.html, icons and build/
+	login login.Service
+	guard *guard.Guard
 }
 
 // New builds the services and serves them.
@@ -36,10 +34,9 @@ func New(cfg config.Config, st store.Store, keys *signing.Holder, opts ...Option
 	s := &Server{
 		Services: svc,
 		spa:      &spa.Handler{Assets: spa.Resolve(webui.FS())},
-		login:    signin.Service{Cfg: cfg, Sessions: svc.Sessions, Settings: svc.Settings, SSO: svc.SSO},
+		login:    login.Service{Policy: svc.SignIn, Cfg: cfg, Sessions: svc.Sessions},
 	}
 	s.guard = s.newGuard()
-	s.verify = emailverify.Handler{Cfg: cfg, Mail: svc.Mail, Verifications: svc.Verifications, Users: svc.Users}
 	s.mux = s.routes()
 	return s
 }

@@ -1,28 +1,23 @@
-// Package signin is what every way of signing in shares: starting a session,
-// the answer the SPA expects, and the instance policy on how people may sign in.
-package signin
+// Package login is what every way of signing in shares: starting a session and the
+// answer the SPA expects. The policy on how people may sign in is in internal/signin.
+package login
 
 import (
-	"context"
 	"net/http"
 	"time"
 
 	"savvy-go/internal/auth"
 	"savvy-go/internal/config"
 	"savvy-go/internal/httpserver/httpx"
-	"savvy-go/internal/settings"
-	"savvy-go/internal/sso"
+	"savvy-go/internal/signin"
 )
 
-// SettingRequireVerification is the instance setting that holds back users
-// whose email address is not confirmed.
-const SettingRequireVerification = "require_email_verification"
-
+// Service starts sessions. It embeds the sign-in policy, so callers ask it the
+// policy questions too.
 type Service struct {
+	signin.Policy
 	Cfg      config.Config
 	Sessions auth.Sessions
-	Settings settings.Store
-	SSO      *sso.Service
 }
 
 // Issue starts a session for u and answers with it.
@@ -50,18 +45,4 @@ func (s Service) WritePayload(w http.ResponseWriter, r *http.Request, status int
 		// The SPA shows the "confirm your email" page instead of the app.
 		"email_verification_required": s.EmailRequired(r.Context()),
 	})
-}
-
-// PasswordLoginDisabled is true when an admin turned password sign-in off and
-// at least one SSO provider is there to replace it.
-func (s Service) PasswordLoginDisabled(ctx context.Context) bool {
-	if s.Settings.Bool(ctx, "password_login_enabled", true) {
-		return false
-	}
-	return s.SSO.AnyEnabled(ctx)
-}
-
-// EmailRequired is true while the instance holds back unverified users.
-func (s Service) EmailRequired(ctx context.Context) bool {
-	return s.Settings.Bool(ctx, SettingRequireVerification, false)
 }

@@ -18,7 +18,7 @@ import (
 var businessPackages = []string{
 	"ledger", "sso", "oauth", "spaces", "transfers", "refsync", "uploads", "currencydata", "automation",
 	"recurring", "reports", "calendar", "backup", "importer", "legacy/restore", "httpserver", "auth",
-	"settings", "seed", "signing", "schedule", "jobs", "bootstrap", "spacefill", "app",
+	"settings", "seed", "signing", "schedule", "jobs", "bootstrap", "spacefill", "app", "signin", "emailverify",
 }
 
 var sqliteOnlyImports = []string{
@@ -111,14 +111,16 @@ var forbiddenImports = map[string][]string{
 		"savvy-go/internal/automation", "savvy-go/internal/transfers", "savvy-go/internal/uploads",
 		"savvy-go/internal/currencydata", "savvy-go/internal/spaces",
 	},
-	"spaces":     {"net/http", "savvy-go/internal/ledger", "savvy-go/internal/transfers", "savvy-go/internal/backup"},
-	"transfers":  {"net/http", "savvy-go/internal/ledger", "savvy-go/internal/backup"},
-	"refsync":    {"net/http", "savvy-go/internal/httpserver", "savvy-go/internal/backup", "savvy-go/internal/transfers"},
-	"reports":    {"net/http", "savvy-go/internal/recurring", "savvy-go/internal/automation"},
-	"recurring":  {"net/http", "savvy-go/internal/reports", "savvy-go/internal/automation"},
-	"automation": {"net/http", "savvy-go/internal/reports", "savvy-go/internal/recurring"},
-	"uploads":    {"savvy-go/internal/ledger", "savvy-go/internal/importer"},
-	"calendar":   {"savvy-go/internal/ledger", "savvy-go/internal/db"},
+	"spaces":      {"net/http", "savvy-go/internal/ledger", "savvy-go/internal/transfers", "savvy-go/internal/backup"},
+	"transfers":   {"net/http", "savvy-go/internal/ledger", "savvy-go/internal/backup"},
+	"refsync":     {"net/http", "savvy-go/internal/httpserver", "savvy-go/internal/backup", "savvy-go/internal/transfers"},
+	"reports":     {"net/http", "savvy-go/internal/recurring", "savvy-go/internal/automation"},
+	"recurring":   {"net/http", "savvy-go/internal/reports", "savvy-go/internal/automation"},
+	"automation":  {"net/http", "savvy-go/internal/reports", "savvy-go/internal/recurring"},
+	"uploads":     {"savvy-go/internal/ledger", "savvy-go/internal/importer"},
+	"calendar":    {"savvy-go/internal/ledger", "savvy-go/internal/db"},
+	"signin":      {"net/http", "savvy-go/internal/httpserver"},
+	"emailverify": {"net/http", "savvy-go/internal/httpserver"},
 }
 
 func TestPackagesRespectTheLayering(t *testing.T) {

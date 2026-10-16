@@ -12,8 +12,8 @@ import (
 
 	"savvy-go/internal/app"
 	"savvy-go/internal/httpserver/apidocs"
-	"savvy-go/internal/httpserver/auth/signin"
 	"savvy-go/internal/httpserver/httpx/guard"
+	"savvy-go/internal/httpserver/httpx/login"
 )
 
 // Deps are what the registered packages draw on: the core services and the HTTP-level
@@ -21,7 +21,7 @@ import (
 type Deps struct {
 	*app.Services
 
-	Login signin.Service
+	Login login.Service
 	Guard *guard.Guard
 
 	// Inner is the finished router, for handlers that call the API in-process (MCP).

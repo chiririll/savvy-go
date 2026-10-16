@@ -5,7 +5,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"savvy-go/internal/httpserver/auth/emailverify"
 	"savvy-go/internal/httpserver/httpx/routing"
 	"savvy-go/internal/spacefill"
 )
@@ -17,7 +16,7 @@ func init() {
 	routing.Register(spec, func(d *routing.Deps) []routing.Mount {
 		h := Handler{
 			Cfg: d.Cfg, Store: d.Store, Spaces: d.Spaces, Users: d.Users, Backups: d.Backups, Mail: d.Mail,
-			Login: d.Login, Verify: emailverify.FromDeps(d), Guard: d.Guard,
+			Login: d.Login, Verify: d.EmailVerify, Guard: d.Guard,
 			Creator: spacefill.Creator{Spaces: d.Spaces, Store: d.Store, Rates: d.Rates},
 		}
 		return []routing.Mount{

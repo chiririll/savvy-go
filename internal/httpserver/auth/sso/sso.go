@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"savvy-go/internal/auth"
 	"savvy-go/internal/config"
-	"savvy-go/internal/httpserver/auth/signin"
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/httpserver/httpx/guard"
+	"savvy-go/internal/httpserver/httpx/login"
 
 	"github.com/go-chi/chi/v5"
 
@@ -21,7 +21,7 @@ type Handler struct {
 	SSO        *sso.Service
 	Users      auth.Users
 	Challenges auth.Challenges
-	Login      signin.Service
+	Login      login.Service
 	Guard      *guard.Guard
 }
 

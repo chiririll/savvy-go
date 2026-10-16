@@ -6,8 +6,8 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"savvy-go/internal/httpserver/auth/signin"
 	"savvy-go/internal/httpserver/httpx"
+	"savvy-go/internal/httpserver/httpx/login"
 	"savvy-go/internal/settings"
 	"strings"
 
@@ -27,7 +27,7 @@ type Handler struct {
 	Challenges auth.Challenges
 	Settings   settings.Store
 	Bootstrap  *bootstrap.Guard
-	Login      signin.Service
+	Login      login.Service
 }
 
 func (h Handler) authStatus(w http.ResponseWriter, r *http.Request) {

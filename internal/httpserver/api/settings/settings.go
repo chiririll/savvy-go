@@ -10,10 +10,10 @@ import (
 	"net/http"
 	"net/url"
 	"savvy-go/internal/config"
-	"savvy-go/internal/httpserver/auth/emailverify"
-	"savvy-go/internal/httpserver/auth/signin"
+	"savvy-go/internal/emailverify"
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/settings"
+	"savvy-go/internal/signin"
 	"savvy-go/internal/sso"
 	"strings"
 	"time"
@@ -24,7 +24,7 @@ type Handler struct {
 	Cfg      config.Config
 	Settings settings.Store
 	SSO      *sso.Service
-	Verify   emailverify.Handler
+	Verify   emailverify.Service
 }
 
 // settingsIndex lists the instance settings.
@@ -55,7 +55,7 @@ func (h Handler) settingsUpdate(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	if v, ok := body[signin.SettingRequireVerification]; ok && httpx.AsBool(v) && !h.Verify.CanRequire(w, r) {
+	if v, ok := body[signin.SettingRequireVerification]; ok && httpx.AsBool(v) && !h.canRequireVerification(w, r) {
 		return
 	}
 	if v, ok := body["app_url"]; ok {
@@ -83,6 +83,24 @@ func (h Handler) settingsUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	h.settingsIndex(w, r)
+}
+
+// canRequireVerification answers 422 and returns false when the requirement cannot be
+// switched on without locking the admin out.
+func (h Handler) canRequireVerification(w http.ResponseWriter, r *http.Request) bool {
+	err := h.Verify.CanRequire(httpx.User(r))
+	switch {
+	case err == nil:
+		return true
+	case errors.Is(err, emailverify.ErrOwnAddressUnverified):
+		httpx.WriteJSON(w, http.StatusUnprocessableEntity, map[string]any{
+			"message": "Confirm your own email address first, or you would lock yourself out.",
+			"error":   "email_unverified",
+		})
+	default:
+		httpx.WriteJSON(w, http.StatusUnprocessableEntity, map[string]any{"message": err.Error(), "error": "mail_required"})
+	}
+	return false
 }
 
 // spaceSettingsUpdate changes the settings of a space (its admins, by route).

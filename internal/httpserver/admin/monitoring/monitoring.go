@@ -3,14 +3,13 @@ package monitoring
 import (
 	"context"
 	"net/http"
-	"os"
-	"path/filepath"
 	"runtime"
 	"time"
 
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/importer"
 	"savvy-go/internal/store"
+	"savvy-go/internal/sysinfo"
 	"savvy-go/internal/uploads"
 	"savvy-go/internal/version"
 )
@@ -37,7 +36,7 @@ func (h Handler) storage(w http.ResponseWriter, r *http.Request) {
 
 // volumeStats describes the disk the uploads live on; sizes are null when unknown.
 func volumeStats(root string) map[string]any {
-	total, free, ok := VolumeSpace(root)
+	total, free, ok := sysinfo.VolumeSpace(root)
 	var used, usedPct, totalB, freeB any
 	if ok {
 		u := max(total-free, 0)
@@ -128,23 +127,6 @@ func (Handler) resources(w http.ResponseWriter, r *http.Request) {
 			"environment": version.Env, "uptime_seconds": int(time.Since(processStarted).Seconds()),
 		},
 	})
-}
-
-// VolumeSpace is the size and free space of the volume holding path, or of its
-// nearest existing parent.
-func VolumeSpace(path string) (total, free int64, ok bool) {
-	probe := path
-	for probe != "" {
-		if st, err := os.Stat(probe); err == nil && st.IsDir() {
-			return diskUsage(probe)
-		}
-		parent := filepath.Dir(probe)
-		if parent == probe {
-			break
-		}
-		probe = parent
-	}
-	return 0, 0, false
 }
 
 func cpuSnapshot() map[string]any {

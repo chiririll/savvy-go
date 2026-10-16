@@ -1,6 +1,6 @@
 //go:build !windows
 
-package monitoring
+package sysinfo
 
 import "golang.org/x/sys/unix"
 

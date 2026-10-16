@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"savvy-go/internal/auth"
-	"savvy-go/internal/httpserver/auth/signin"
 	"savvy-go/internal/httpserver/httpx"
+	"savvy-go/internal/httpserver/httpx/login"
 )
 
 // Handler holds what the two-factor routes need.
@@ -14,7 +14,7 @@ type Handler struct {
 	TwoFactor  auth.TwoFactor
 	Users      auth.Users
 	Challenges auth.Challenges
-	Login      signin.Service
+	Login      login.Service
 }
 
 func (h Handler) twoFactorEnable(w http.ResponseWriter, r *http.Request) {

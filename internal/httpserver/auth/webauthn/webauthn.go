@@ -4,9 +4,9 @@ package webauthn
 import (
 	"encoding/json"
 	"net/http"
-	"savvy-go/internal/httpserver/auth/signin"
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/httpserver/httpx/guard"
+	"savvy-go/internal/httpserver/httpx/login"
 	"strconv"
 
 	"savvy-go/internal/auth"
@@ -19,7 +19,7 @@ import (
 type Handler struct {
 	WebAuthn   auth.WebAuthn
 	Challenges auth.Challenges
-	Login      signin.Service
+	Login      login.Service
 	Guard      *guard.Guard
 }
 

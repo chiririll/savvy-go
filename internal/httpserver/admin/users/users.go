@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"savvy-go/internal/backup"
 	"savvy-go/internal/config"
-	"savvy-go/internal/httpserver/auth/signin"
 	"savvy-go/internal/httpserver/httpx"
+	"savvy-go/internal/httpserver/httpx/login"
 	"savvy-go/internal/mailing"
 	"savvy-go/internal/spaces"
 	"strconv"
@@ -30,7 +30,7 @@ type Handler struct {
 	Spaces  spaces.Service
 	Mail    *mailing.Service
 	Backups backup.Service
-	Login   signin.Service
+	Login   login.Service
 }
 
 func (h Handler) usersIndex(w http.ResponseWriter, r *http.Request) {

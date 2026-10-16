@@ -7,8 +7,8 @@ import (
 
 	"savvy-go/internal/backup"
 	"savvy-go/internal/config"
-	"savvy-go/internal/httpserver/admin/monitoring"
 	"savvy-go/internal/httpserver/httpx"
+	"savvy-go/internal/sysinfo"
 )
 
 // Server checks tell an admin what is misconfigured or running out. They are
@@ -120,7 +120,7 @@ func (h Handler) index(w http.ResponseWriter, r *http.Request) {
 // diskPercent is the used share of the volume that holds the uploads, nil when
 // the platform cannot tell.
 func (h Handler) diskPercent() *float64 {
-	total, free, ok := monitoring.VolumeSpace(h.Cfg.UploadsDir)
+	total, free, ok := sysinfo.VolumeSpace(h.Cfg.UploadsDir)
 	if !ok || total <= 0 {
 		return nil
 	}

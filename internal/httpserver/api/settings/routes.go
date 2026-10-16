@@ -5,7 +5,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"savvy-go/internal/httpserver/auth/emailverify"
 	"savvy-go/internal/httpserver/httpx/routing"
 )
 
@@ -14,7 +13,7 @@ var spec []byte
 
 func init() {
 	routing.Register(spec, func(d *routing.Deps) []routing.Mount {
-		h := Handler{Cfg: d.Cfg, Settings: d.Settings, SSO: d.SSO, Verify: emailverify.FromDeps(d)}
+		h := Handler{Cfg: d.Cfg, Settings: d.Settings, SSO: d.SSO, Verify: d.EmailVerify}
 		return []routing.Mount{
 			routing.AdminSession(h.AdminSessionRoutes),
 			routing.Account(h.AccountRoutes),
