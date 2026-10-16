@@ -1,12 +1,14 @@
 package auth
 
 import (
+	"savvy-go/internal/config/shared"
+
 	"errors"
 	"testing"
 )
 
 func TestWebAuthnEngineUsesTheOriginOfThePublicURL(t *testing.T) {
-	w := WebAuthn{AppURL: func() string { return "https://savvy.example.com:8443/app" }}
+	w := WebAuthn{Cfg: shared.Config{}.WithAppURL("https://savvy.example.com:8443/app")}
 	wa, err := w.engine()
 	if err != nil {
 		t.Fatal(err)
@@ -21,7 +23,7 @@ func TestWebAuthnEngineUsesTheOriginOfThePublicURL(t *testing.T) {
 
 func TestWebAuthnEngineNeedsAPublicURL(t *testing.T) {
 	for _, url := range []string{"", "not a url", "/relative"} {
-		if _, err := (WebAuthn{AppURL: func() string { return url }}).engine(); !errors.Is(err, ErrNoPublicURL) {
+		if _, err := (WebAuthn{Cfg: shared.Config{}.WithAppURL(url)}).engine(); !errors.Is(err, ErrNoPublicURL) {
 			t.Errorf("engine(%q) = %v, want ErrNoPublicURL", url, err)
 		}
 	}

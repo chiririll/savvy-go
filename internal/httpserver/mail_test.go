@@ -3,13 +3,12 @@ package httpserver
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
-	"savvy-go/internal/app"
 	"savvy-go/internal/auth"
 	"savvy-go/internal/config"
 	"savvy-go/internal/currencydata"

@@ -13,7 +13,7 @@ import (
 )
 
 func (s Service) SamlMetadata(ctx context.Context, p IdentityProvider) string {
-	entity := s.AppURL() + "/api/auth/sso/" + p.Slug + "/metadata"
+	entity := s.Cfg.AppURL() + "/api/auth/sso/" + p.Slug + "/metadata"
 	acs := s.ACSURL(ctx, p)
 	return fmt.Sprintf(`<?xml version="1.0"?>
 <EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata" entityID="%s">
@@ -37,7 +37,7 @@ func (s Service) samlRedirect(ctx context.Context, p IdentityProvider, redirectA
 	if err != nil {
 		return "", err
 	}
-	entity := s.AppURL() + "/api/auth/sso/" + p.Slug + "/metadata"
+	entity := s.Cfg.AppURL() + "/api/auth/sso/" + p.Slug + "/metadata"
 	instant := time.Now().UTC().Format(time.RFC3339)
 	doc := fmt.Sprintf(`<samlp:AuthnRequest`+
 		` xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"`+

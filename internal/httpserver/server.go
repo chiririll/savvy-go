@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"savvy-go/internal/app"
+	"savvy-go/internal/config/shared"
 	"savvy-go/internal/httpserver/httpx/guard"
 	"savvy-go/internal/httpserver/httpx/login"
 	"savvy-go/internal/httpserver/httpx/routing"
@@ -28,7 +29,7 @@ type Server struct {
 }
 
 // New builds the services and serves them.
-func New(cfg app.Config, st store.Store, keys *signing.Holder, opts ...Option) *Server {
+func New(cfg shared.Config, st store.Store, keys *signing.Holder, opts ...Option) *Server {
 	return FromServices(app.New(cfg, st, keys, opts...))
 }
 

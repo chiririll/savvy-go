@@ -14,11 +14,11 @@ import (
 )
 
 func (s Service) CallbackURL(ctx context.Context, p IdentityProvider) string {
-	return s.AppURL() + "/api/auth/sso/" + p.Slug + "/callback"
+	return s.Cfg.AppURL() + "/api/auth/sso/" + p.Slug + "/callback"
 }
 
 func (s Service) ACSURL(ctx context.Context, p IdentityProvider) string {
-	return s.AppURL() + "/api/auth/sso/" + p.Slug + "/acs"
+	return s.Cfg.AppURL() + "/api/auth/sso/" + p.Slug + "/acs"
 }
 
 func (s Service) AuthorizeURL(ctx context.Context, p IdentityProvider, redirectAfter string) (string, error) {

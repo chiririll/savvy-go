@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"savvy-go/internal/auth"
+	"savvy-go/internal/config/shared"
 	repo "savvy-go/internal/db/repo/sso"
 	"savvy-go/internal/settings"
 	"savvy-go/internal/store"
@@ -121,8 +122,8 @@ type Service struct {
 	Users    auth.Users
 	Settings settings.Store
 	// AppURL returns the public URL of the instance, empty when unset.
-	AppURL func() string
-	HTTP   *http.Client
+	Cfg  shared.Config
+	HTTP *http.Client
 }
 
 func (s Service) client() *http.Client {

@@ -11,6 +11,7 @@ import (
 	"savvy-go/internal/backup"
 	"savvy-go/internal/bootstrap"
 	"savvy-go/internal/config"
+	"savvy-go/internal/config/shared"
 	"savvy-go/internal/currencydata"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/mail"
@@ -30,9 +31,8 @@ import (
 // Services are the server-level services. Server-level ones use the server database;
 // the services of a space are built per request from the space's own database.
 type Services struct {
-	Cfg      Config
+	Cfg      shared.Config
 	conf     *config.Config // each package pulls its own sections from it; not shared
-	appURL   func() string  // the public URL, read each time
 	sender   smtp.Mailer
 	Security auth.Security
 	Store    store.Store
@@ -104,7 +104,7 @@ func WithConfig(f *config.Config) Option { return func(s *Services) { s.conf = f
 func WithMailer(m smtp.Mailer) Option { return func(s *Services) { s.sender = m } }
 
 // New builds the services.
-func New(cfg Config, st store.Store, keys *signing.Holder, opts ...Option) *Services {
+func New(cfg shared.Config, st store.Store, keys *signing.Holder, opts ...Option) *Services {
 	s := &Services{
 		Cfg:   cfg,
 		Store: st,
@@ -117,8 +117,8 @@ func New(cfg Config, st store.Store, keys *signing.Holder, opts ...Option) *Serv
 		s.conf = config.Empty()
 	}
 	s.Security = config.Of(s.conf, auth.SecuritySection).Get()
-	server := config.Of(s.conf, serverSection)
-	s.appURL = func() string { return server.Get().AppURL }
+	cfg = cfg.Follow(s.conf)
+	s.Cfg = cfg
 	if s.Build.Version == "" {
 		s.Build.Version = "dev"
 	}
@@ -141,16 +141,16 @@ func New(cfg Config, st store.Store, keys *signing.Holder, opts ...Option) *Serv
 	s.Settings = settings.Store{DB: db}
 	s.Spaces = spaces.Service{Store: st}
 	s.Uploads = uploads.Service{DB: db, Root: cfg.UploadsDir, SignSecret: randomSecret()}
-	s.WebAuthn = auth.WebAuthn{DB: db, AppURL: s.AppURL}
+	s.WebAuthn = auth.WebAuthn{DB: db, Cfg: cfg}
 	keyRing := signing.KeyRing{Holder: keys, Trusted: transfers.TrustedKeys(db)}
 	s.Transfers = &transfers.Service{Spaces: s.Spaces, Keys: keyRing}
 	s.Refsync = refsync.Service{Spaces: s.Spaces}
 	s.Backups = backup.Service{Store: st, Keys: keyRing, Dir: cfg.BackupsDir, DataDir: cfg.DataDir, Transfers: s.Transfers, AppVersion: s.Build.Version}
-	s.Mail = mail.New(s.conf, s.AppURL, s.sender)
-	s.SSO = &sso.Service{DB: db, Users: s.Users, Settings: s.Settings, AppURL: s.AppURL}
+	s.Mail = mail.New(s.conf, cfg, s.sender)
+	s.SSO = &sso.Service{DB: db, Users: s.Users, Settings: s.Settings, Cfg: cfg}
 	s.OAuth = oauth.New(db)
 	s.SignIn = signin.Policy{Settings: s.Settings, SSO: s.SSO}
-	s.EmailVerify = mail.Verifier{AppURL: s.AppURL, Mail: s.Mail, Verifications: s.Verifications, Users: s.Users}
+	s.EmailVerify = mail.Verifier{Cfg: cfg, Mail: s.Mail, Verifications: s.Verifications, Users: s.Users}
 	_ = os.MkdirAll(cfg.UploadsDir, 0o775)
 	_ = os.MkdirAll(cfg.BackupsDir, 0o775)
 	return s

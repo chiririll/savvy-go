@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"savvy-go/internal/backup"
+	"savvy-go/internal/config/shared"
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/platform/sysinfo"
 )
@@ -29,8 +30,8 @@ const (
 
 // Handler lists the checks of a running server.
 type Handler struct {
-	AppURL     func() string // the public URL of the instance, empty when unset
-	Writable   func() bool   // whether the config file can be changed
+	Cfg        shared.Config
+	Writable   func() bool // whether the config file can be changed
 	UploadsDir string
 	Backups    backup.Service
 	// Mail reports whether mail works, and what is wrong with its settings.
@@ -100,7 +101,7 @@ func Run(in Input, now time.Time) []Check {
 func (h Handler) index(w http.ResponseWriter, r *http.Request) {
 	enabled, problem := h.Mail()
 	in := Input{
-		AppURL:      h.AppURL(),
+		AppURL:      h.Cfg.AppURL(),
 		MailEnabled: enabled,
 		MailProblem: problem,
 		Writable:    h.Writable(),

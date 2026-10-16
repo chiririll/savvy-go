@@ -36,7 +36,7 @@ func (s *Server) newScope(id int64, role string, d store.DB) *httpx.SpaceScope {
 
 func (s *Server) newGuard() *guard.Guard {
 	return &guard.Guard{
-		AppURL:        s.AppURL,
+		Cfg:           s.Cfg,
 		Security:      s.Security,
 		Sessions:      s.Sessions,
 		APITokens:     s.APITokens,

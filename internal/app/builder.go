@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"savvy-go/internal/config"
+	"savvy-go/internal/config/shared"
 	"savvy-go/internal/currencydata"
 	"savvy-go/internal/runtime"
 	"savvy-go/internal/seed"
@@ -36,13 +37,11 @@ func (b *Builder) SeedFile(path string) *Builder { b.seedPath = path; return b }
 
 // Build runs the startup phases and returns the services. The caller closes them.
 func (b *Builder) Build(ctx context.Context) (*Services, error) {
-	file, err := config.Open(ConfigPath(b.configPath))
+	file, err := config.Open(shared.FilePath(b.configPath))
 	if err != nil {
 		return nil, fmt.Errorf("load config: %w", err)
 	}
-	server := config.Of(file, serverSection)
-	paths := config.Of(file, pathsSection)
-	cfg := NewConfig(server.Get(), paths.Get())
+	cfg := shared.Load(file)
 	var seedCfg seed.Config
 	if b.seedPath != "" {
 		if seedCfg, err = seed.LoadConfig(b.seedPath); err != nil {
@@ -65,7 +64,7 @@ func (b *Builder) Build(ctx context.Context) (*Services, error) {
 		}
 	}()
 
-	if server.Get().AppURL == "" {
+	if cfg.AppURL() == "" {
 		slog.Warn("the public URL is not set; SSO and passkeys stay disabled until app_url is set in the config file")
 	}
 	keys, ring, err := prepare(ctx, cfg, st)
@@ -75,7 +74,7 @@ func (b *Builder) Build(ctx context.Context) (*Services, error) {
 	if err := seed.Run(ctx, st, ring, seedCfg, cfg.Location); err != nil {
 		return nil, fmt.Errorf("seed demo: %w", err)
 	}
-	guard, err := startBootstrap(ctx, cfg, server.Get().AppURL, st)
+	guard, err := startBootstrap(ctx, cfg, st)
 	if err != nil {
 		return nil, err
 	}

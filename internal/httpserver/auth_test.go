@@ -15,9 +15,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"savvy-go/internal/app"
 	"savvy-go/internal/auth"
 	"savvy-go/internal/bootstrap"
+	"savvy-go/internal/config/shared"
 	"savvy-go/internal/currencydata"
 	"savvy-go/internal/httpserver/httpx/routing"
 	"savvy-go/internal/settings"
@@ -47,7 +47,7 @@ type testApp struct {
 }
 
 // openTestStore opens a store in cfg.DataDir with the embedded migrations.
-func openTestStore(t *testing.T, cfg app.Config) *sqlite.Store {
+func openTestStore(t *testing.T, cfg shared.Config) *sqlite.Store {
 	t.Helper()
 	st, err := sqlite.OpenApp(context.Background(), cfg.DataDir)
 	if err != nil {
@@ -58,7 +58,7 @@ func openTestStore(t *testing.T, cfg app.Config) *sqlite.Store {
 }
 
 // testKeys is a signing key in the test's data directory.
-func testKeys(t *testing.T, cfg app.Config) *signing.Holder {
+func testKeys(t *testing.T, cfg shared.Config) *signing.Holder {
 	t.Helper()
 	key, err := signing.Load(cfg.DataDir, false)
 	if err != nil {

@@ -8,12 +8,13 @@ import (
 	"strings"
 
 	"savvy-go/internal/auth"
+	"savvy-go/internal/config/shared"
 	"savvy-go/internal/httpserver/httpx"
 )
 
 // Guard is built once by the server from its own services.
 type Guard struct {
-	AppURL    func() string // the public URL of the instance, empty when unset
+	Cfg       shared.Config
 	Security  auth.Security
 	Sessions  auth.Sessions
 	APITokens auth.APITokens
@@ -119,7 +120,7 @@ func secureCompare(a, b string) bool {
 // from request headers: without APP_URL these features are simply unavailable.
 func (g *Guard) NeedAppURL(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if g.AppURL() == "" {
+		if g.Cfg.AppURL() == "" {
 			httpx.WriteMessage(w, http.StatusServiceUnavailable, "APP_URL is not configured.")
 			return
 		}

@@ -8,7 +8,7 @@ import (
 
 func init() {
 	routing.Register(nil, func(d *routing.Deps) []routing.Mount {
-		h := Handler{AppURL: d.AppURL, Writable: d.ConfigWritable, UploadsDir: d.Cfg.UploadsDir, Backups: d.Backups, Mail: d.Mail.Status}
+		h := Handler{Cfg: d.Cfg, Writable: d.ConfigWritable, UploadsDir: d.Cfg.UploadsDir, Backups: d.Backups, Mail: d.Mail.Status}
 		return []routing.Mount{
 			routing.Admin(h.Routes),
 		}

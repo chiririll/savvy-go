@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"savvy-go/internal/auth"
+	"savvy-go/internal/config/shared"
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/httpserver/httpx/dto"
 	"savvy-go/internal/httpserver/httpx/guard"
@@ -17,7 +18,7 @@ import (
 
 // Handler holds what the sign-in and provider routes need.
 type Handler struct {
-	AppURL     func() string // the public URL of the instance, empty when unset
+	Cfg        shared.Config
 	SSO        *sso.Service
 	Users      auth.Users
 	Challenges auth.Challenges
@@ -26,7 +27,7 @@ type Handler struct {
 }
 
 func (h Handler) ssoProviders(w http.ResponseWriter, r *http.Request) {
-	if h.AppURL() == "" {
+	if h.Cfg.AppURL() == "" {
 		httpx.WriteData(w, http.StatusOK, []any{})
 		return
 	}

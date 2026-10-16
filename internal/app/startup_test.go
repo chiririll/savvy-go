@@ -8,12 +8,13 @@ import (
 
 	"savvy-go/internal/auth"
 	"savvy-go/internal/bootstrap"
+	"savvy-go/internal/config/shared"
 	"savvy-go/internal/store/sqlite"
 )
 
-func openStore(t *testing.T) (*sqlite.Store, Config) {
+func openStore(t *testing.T) (*sqlite.Store, shared.Config) {
 	t.Helper()
-	cfg := Config{DataDir: t.TempDir()}
+	cfg := shared.Config{DataDir: t.TempDir()}
 	st, err := sqlite.OpenApp(context.Background(), cfg.DataDir)
 	if err != nil {
 		t.Fatal(err)
@@ -24,14 +25,14 @@ func openStore(t *testing.T) (*sqlite.Store, Config) {
 
 func TestStartBootstrapOnAnEmptyServer(t *testing.T) {
 	st, cfg := openStore(t)
-	g, err := startBootstrap(context.Background(), cfg, "", st)
+	g, err := startBootstrap(context.Background(), cfg, st)
 	if err != nil || !g.Active() {
 		t.Fatalf("guard %v, err %v", g, err)
 	}
 	if _, err := os.Stat(filepath.Join(cfg.DataDir, bootstrap.FileName)); err != nil {
 		t.Fatal(err)
 	}
-	again, _ := startBootstrap(context.Background(), cfg, "", st)
+	again, _ := startBootstrap(context.Background(), cfg, st)
 	if again.Password() != g.Password() {
 		t.Fatal("a restart must reuse the password while there are no users")
 	}
@@ -47,7 +48,7 @@ func TestStartBootstrapSkipsAServerWithUsers(t *testing.T) {
 	if err := os.WriteFile(stale, []byte("old\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	g, err := startBootstrap(context.Background(), cfg, "", st)
+	g, err := startBootstrap(context.Background(), cfg, st)
 	if err != nil || g != nil {
 		t.Fatalf("guard %v, err %v", g, err)
 	}

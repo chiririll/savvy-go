@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"savvy-go/internal/app/signin"
+	"savvy-go/internal/config/shared"
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/mail"
 	"savvy-go/internal/settings"
@@ -20,8 +21,8 @@ import (
 
 // Handler holds what the settings routes need.
 type Handler struct {
-	AppURL   func() string // the public URL of the instance, empty when unset
-	Writable func() bool   // whether the config file can be changed
+	Cfg      shared.Config
+	Writable func() bool // whether the config file can be changed
 	Settings settings.Store
 	SSO      *sso.Service
 	Verify   mail.Verifier
@@ -35,7 +36,7 @@ func (h Handler) settingsIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// The public URL lives in the config file, not the database.
-	all["app_url"] = h.AppURL()
+	all["app_url"] = h.Cfg.AppURL()
 	// False when the config file cannot be changed from the application: the fields it holds
 	// are locked.
 	all["config_writable"] = h.Writable()
@@ -63,7 +64,7 @@ func (h Handler) settingsUpdate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		// The application does not write the config file for now: edit it and restart.
-		if clean != h.AppURL() {
+		if clean != h.Cfg.AppURL() {
 			httpx.WriteValidation(w, map[string][]string{"app_url": {"Set app_url in config.toml and restart."}})
 			return
 		}

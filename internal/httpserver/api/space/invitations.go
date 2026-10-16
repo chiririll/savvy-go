@@ -36,7 +36,7 @@ func (h Handler) inviteMethods(ctx context.Context) (email, link bool, reason st
 	switch {
 	case !h.Mail.Mailer().Enabled():
 		reason, _ = h.Mail.OffWhy()
-	case h.AppURL() == "":
+	case h.Cfg.AppURL() == "":
 		reason = mail.NoAppURLMessage
 	default:
 		email = true
@@ -108,7 +108,7 @@ func (h Handler) emailInvitation(r *http.Request, to, role, token string) error 
 	if err != nil || space == nil {
 		return errors.New("could not read the space")
 	}
-	link := h.AppURL() + "/invite/" + token
+	link := h.Cfg.AppURL() + "/invite/" + token
 	if err := h.Mail.Send(r.Context(), smtp.Invitation(to, httpx.User(r).Name, space.Name, role, link)); err != nil {
 		return errors.New("Could not send the email: " + err.Error())
 	}
