@@ -115,7 +115,8 @@ func (h serverHandle) db() (*sql.DB, func()) {
 func (h serverHandle) ExecContext(ctx context.Context, q string, args ...any) (sql.Result, error) {
 	d, done := h.db()
 	defer done()
-	return d.ExecContext(ctx, q, args...)
+	res, err := d.ExecContext(ctx, q, args...)
+	return res, mapErr(err)
 }
 
 func (h serverHandle) PrepareContext(ctx context.Context, q string) (*sql.Stmt, error) {
@@ -145,9 +146,9 @@ func (h serverHandle) Tx(ctx context.Context, fn func(store.DB) error) error {
 	}
 	defer func() { _ = tx.Rollback() }()
 	if err := fn(txHandle{tx}); err != nil {
-		return err
+		return mapErr(err)
 	}
-	return tx.Commit()
+	return mapErr(tx.Commit())
 }
 
 // SQL is the server *sql.DB, for tests that run raw statements.
