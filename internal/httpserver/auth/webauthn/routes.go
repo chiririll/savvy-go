@@ -3,12 +3,13 @@ package webauthn
 import (
 	"github.com/go-chi/chi/v5"
 
+	"savvy-go/internal/auth"
 	"savvy-go/internal/httpserver/httpx/routing"
 )
 
 func init() {
-	routing.Register(nil, func(d *routing.Deps) []routing.Mount {
-		h := Handler{WebAuthn: d.WebAuthn, Challenges: d.Challenges, Login: d.Login, Guard: d.Guard}
+	routing.Register(func(d *routing.Deps) []routing.Mount {
+		h := Handler{WebAuthn: routing.Get[auth.WebAuthn](d), Challenges: routing.Get[auth.Challenges](d), Login: d.Login, Guard: d.Guard}
 		return []routing.Mount{
 			routing.Public(h.PublicRoutes),
 			routing.Credential(h.CredentialRoutes),

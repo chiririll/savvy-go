@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"savvy-go/internal/app/signin"
-	"savvy-go/internal/config/shared"
+	"savvy-go/internal/appconfig"
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/mail"
 	"savvy-go/internal/settings"
@@ -21,7 +21,7 @@ import (
 
 // Handler holds what the settings routes need.
 type Handler struct {
-	Cfg      shared.Config
+	Cfg      appconfig.Config
 	Writable func() bool // whether the config file can be changed
 	Settings settings.Store
 	SSO      *sso.Service

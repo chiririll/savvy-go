@@ -5,15 +5,19 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"savvy-go/internal/auth"
 	"savvy-go/internal/httpserver/httpx/routing"
+	"savvy-go/internal/httpserver/ui"
+	"savvy-go/internal/spaces"
 )
 
 //go:embed openapi.yaml
 var spec []byte
 
 func init() {
-	routing.Register(spec, func(d *routing.Deps) []routing.Mount {
-		h := Handler{Tokens: d.APITokens, Spaces: d.Spaces}
+	ui.AddSpec(spec)
+	routing.Register(func(d *routing.Deps) []routing.Mount {
+		h := Handler{Tokens: routing.Get[auth.APITokens](d), Spaces: routing.Get[spaces.Service](d)}
 		return []routing.Mount{
 			routing.Credential(h.Routes),
 		}

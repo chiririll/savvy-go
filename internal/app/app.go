@@ -1,19 +1,19 @@
-// Package app is the composition root of the core: it builds every service from the
-// config, the store and the signing keys, so the HTTP layer only picks what it needs.
+// Package app registers the core services on a locator, from the config, the store and the
+// signing keys. The HTTP layer asks the locator for what it needs.
 package app
 
 import (
-	"context"
 	"os"
 
 	"savvy-go/internal/app/signin"
+	"savvy-go/internal/appconfig"
 	"savvy-go/internal/auth"
 	"savvy-go/internal/backup"
 	"savvy-go/internal/bootstrap"
 	"savvy-go/internal/config"
-	"savvy-go/internal/config/shared"
 	"savvy-go/internal/currencydata"
 	"savvy-go/internal/ledger"
+	"savvy-go/internal/locator"
 	"savvy-go/internal/mail"
 	"savvy-go/internal/mail/smtp"
 	"savvy-go/internal/oauth"
@@ -28,130 +28,87 @@ import (
 	"savvy-go/internal/uploads"
 )
 
-// Services are the server-level services. Server-level ones use the server database;
-// the services of a space are built per request from the space's own database.
-type Services struct {
-	Cfg      shared.Config
-	conf     *config.Config // each package pulls its own sections from it; not shared
-	sender   smtp.Mailer
-	Security auth.Security
-	Store    store.Store
-	Keys     *signing.Holder
-	Rates    ledger.RateSource // currency catalog and exchange rates, shared by every space
-	Build    Build             // which release is running
-
-	// Bootstrap is the first-run password; nil keeps registration closed.
-	Bootstrap *bootstrap.Guard
-	Queue     *runtime.Queue
-
-	Users          auth.Users
-	Sessions       auth.Sessions
-	APITokens      auth.APITokens
-	PasswordTokens auth.PasswordTokens
-	Challenges     auth.Challenges
-	Verifications  auth.EmailVerifications
-	TwoFactor      auth.TwoFactor
-	WebAuthn       auth.WebAuthn
-
-	Mail      *mail.Service
-	Settings  settings.Store
-	Spaces    spaces.Service
-	Backups   backup.Service
-	Transfers *transfers.Service
-	Refsync   refsync.Service
-	Uploads   uploads.Service
-	SSO       *sso.Service
-	OAuth     *oauth.Service
-
-	SignIn      signin.Policy
-	EmailVerify mail.Verifier
-
-	// rates is Rates when it is the public data source: the scheduled update expires its cache.
-	rates *currencydata.Source
-	// closers release what the Builder acquired, in the order Close runs them.
-	closers []func(context.Context) error
+// inputs are what the process makes before the services and hands to New.
+type inputs struct {
+	conf   *config.Config // each package pulls its own sections from it; not shared
+	sender smtp.Mailer
+	rates  ledger.RateSource
+	build  appconfig.Build
+	guard  *bootstrap.Guard
+	queue  *runtime.Queue
 }
 
-// Build says which release is running. The binary sets it at link time; it is handed down
-// here so no package reads a global.
-type Build struct{ Version, Env string }
-
 // Option configures New.
-type Option func(*Services)
+type Option func(*inputs)
 
 // WithRates sets where currencies and exchange rates come from. The default is the public
 // data files; share one source with the scheduled rate update so spaces do not each
 // fetch their own.
-func WithRates(src ledger.RateSource) Option { return func(s *Services) { s.Rates = src } }
+func WithRates(src ledger.RateSource) Option { return func(s *inputs) { s.rates = src } }
 
 // WithBuild sets the release the services report. The default is "dev" in "development".
-func WithBuild(b Build) Option { return func(s *Services) { s.Build = b } }
+func WithBuild(b appconfig.Build) Option { return func(s *inputs) { s.build = b } }
 
 // WithBootstrap sets the first-run password that registration needs while the server has
 // no users. Without it, registration is always closed.
-func WithBootstrap(g *bootstrap.Guard) Option { return func(s *Services) { s.Bootstrap = g } }
+func WithBootstrap(g *bootstrap.Guard) Option { return func(s *inputs) { s.guard = g } }
 
 // WithQueue sets the worker pool that background jobs (imports) run on. Without it they
 // run at once, inside the request.
-func WithQueue(q *runtime.Queue) Option { return func(s *Services) { s.Queue = q } }
+func WithQueue(q *runtime.Queue) Option { return func(s *inputs) { s.queue = q } }
 
 // WithConfig sets the config file the services pull their sections from. The default is an
 // empty one, so every section has its defaults.
-func WithConfig(f *config.Config) Option { return func(s *Services) { s.conf = f } }
+func WithConfig(f *config.Config) Option { return func(s *inputs) { s.conf = f } }
 
 // WithMailer sets how email is sent, whatever the [mailer] section says; tests pass a
 // recorder. The default is the SMTP server of the section.
-func WithMailer(m smtp.Mailer) Option { return func(s *Services) { s.sender = m } }
+func WithMailer(m smtp.Mailer) Option { return func(s *inputs) { s.sender = m } }
 
-// New builds the services.
-func New(cfg shared.Config, st store.Store, keys *signing.Holder, opts ...Option) *Services {
-	s := &Services{
-		Cfg:   cfg,
-		Store: st,
-		Keys:  keys,
-	}
+// New registers every service on a locator and builds them all, so a wiring bug fails the
+// start. The caller owns the locator and closes it.
+func New(cfg appconfig.Config, st store.Store, keys *signing.Holder, opts ...Option) (*locator.Locator, error) {
+	in := &inputs{}
 	for _, opt := range opts {
-		opt(s)
+		opt(in)
 	}
-	if s.conf == nil {
-		s.conf = config.Empty()
+	if in.conf == nil {
+		in.conf = config.Empty()
 	}
-	s.Security = config.Of(s.conf, auth.SecuritySection).Get()
-	cfg = cfg.Follow(s.conf)
-	s.Cfg = cfg
-	if s.Build.Version == "" {
-		s.Build.Version = "dev"
+	if in.build.Version == "" {
+		in.build.Version = "dev"
 	}
-	if s.Build.Env == "" {
-		s.Build.Env = "development"
+	if in.build.Env == "" {
+		in.build.Env = "development"
 	}
-	if s.Rates == nil {
-		s.Rates = currencydata.New()
+	if in.rates == nil {
+		in.rates = currencydata.New()
 	}
 	ledger.SetLocation(cfg.Location)
-	db := st.Server()
-	sec := s.Security
-	s.Users = auth.Users{DB: db}
-	s.Sessions = auth.Sessions{DB: db, SessionTTL: sec.SessionTTL, RememberTTL: sec.RememberTTL}
-	s.APITokens = auth.APITokens{DB: db}
-	s.PasswordTokens = auth.PasswordTokens{DB: db}
-	s.Challenges = auth.Challenges{DB: db, TTL: sec.ChallengeTTL}
-	s.Verifications = auth.EmailVerifications{DB: db}
-	s.TwoFactor = auth.TwoFactor{DB: db, Users: auth.Users{DB: db}}
-	s.Settings = settings.Store{DB: db}
-	s.Spaces = spaces.Service{Store: st}
-	s.Uploads = uploads.Service{DB: db, Root: cfg.UploadsDir, SignSecret: randomSecret()}
-	s.WebAuthn = auth.WebAuthn{DB: db, Cfg: cfg}
-	keyRing := signing.KeyRing{Holder: keys, Trusted: transfers.TrustedKeys(db)}
-	s.Transfers = &transfers.Service{Spaces: s.Spaces, Keys: keyRing}
-	s.Refsync = refsync.Service{Spaces: s.Spaces}
-	s.Backups = backup.Service{Store: st, Keys: keyRing, Dir: cfg.BackupsDir, DataDir: cfg.DataDir, Transfers: s.Transfers, AppVersion: s.Build.Version}
-	s.Mail = mail.New(s.conf, cfg, s.sender)
-	s.SSO = &sso.Service{DB: db, Users: s.Users, Settings: s.Settings, Cfg: cfg}
-	s.OAuth = oauth.New(db)
-	s.SignIn = signin.Policy{Settings: s.Settings, SSO: s.SSO}
-	s.EmailVerify = mail.Verifier{Cfg: cfg, Mail: s.Mail, Verifications: s.Verifications, Users: s.Users}
+	l := locator.New()
+	// What the process makes before the services: they only read it.
+	locator.Set[store.DB](l, st.Server())
+	locator.Set(l, st)
+	locator.Set(l, keys)
+	locator.Set(l, in.conf)
+	locator.Set(l, cfg)
+	locator.Set(l, in.build)
+	locator.Set(l, in.rates)
+	locator.Set(l, in.guard)
+	locator.Set(l, in.queue)
+	if in.sender != nil {
+		locator.Set(l, in.sender)
+	}
+	for _, register := range []func(*locator.Locator){
+		auth.Register, settings.Register, spaces.Register, refsync.Register, transfers.Register,
+		backup.Register, uploads.Register, sso.Register, oauth.Register, mail.Register, signin.Register,
+	} {
+		register(l)
+	}
+	if err := l.Build(); err != nil {
+		return nil, err
+	}
 	_ = os.MkdirAll(cfg.UploadsDir, 0o775)
 	_ = os.MkdirAll(cfg.BackupsDir, 0o775)
-	return s
+	return l, nil
 }

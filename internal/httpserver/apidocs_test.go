@@ -9,7 +9,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"savvy-go/internal/httpserver/apidocs"
+	"savvy-go/internal/httpserver/ui"
 )
 
 var (
@@ -22,7 +22,7 @@ var (
 // parameter names normalised so {id} and {upload} compare equal.
 func specOperations(t *testing.T) map[string]bool {
 	t.Helper()
-	raw, err := apidocs.Spec()
+	raw, err := ui.Spec()
 	if err != nil {
 		t.Fatal(err)
 	}

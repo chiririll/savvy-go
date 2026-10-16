@@ -3,12 +3,15 @@ package keys
 import (
 	"github.com/go-chi/chi/v5"
 
+	"savvy-go/internal/appconfig"
 	"savvy-go/internal/httpserver/httpx/routing"
+	"savvy-go/internal/signing"
+	"savvy-go/internal/transfers"
 )
 
 func init() {
-	routing.Register(nil, func(d *routing.Deps) []routing.Mount {
-		h := Handler{DataDir: d.Cfg.DataDir, Transfers: d.Transfers, Keys: d.Keys}
+	routing.Register(func(d *routing.Deps) []routing.Mount {
+		h := Handler{DataDir: routing.Get[appconfig.Config](d).DataDir, Transfers: routing.Get[*transfers.Service](d), Keys: routing.Get[*signing.Holder](d)}
 		return []routing.Mount{
 			routing.AdminSession(h.Routes),
 		}

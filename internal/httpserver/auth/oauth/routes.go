@@ -3,15 +3,19 @@ package oauth
 import (
 	"github.com/go-chi/chi/v5"
 
+	"savvy-go/internal/appconfig"
+	"savvy-go/internal/auth"
 	"savvy-go/internal/httpserver/httpx/routing"
 	"savvy-go/internal/httpserver/mcpserver"
+	"savvy-go/internal/oauth"
+	"savvy-go/internal/spaces"
 )
 
 func init() {
-	routing.Register(nil, func(d *routing.Deps) []routing.Mount {
+	routing.Register(func(d *routing.Deps) []routing.Mount {
 		h := Handler{
-			Cfg: d.Cfg, OAuth: d.OAuth, Spaces: d.Spaces,
-			MCP: mcpserver.Handler{Cfg: d.Cfg, APITokens: d.APITokens, Inner: d.Inner, Version: d.Build.Version}.Endpoint(),
+			Cfg: routing.Get[appconfig.Config](d), OAuth: routing.Get[*oauth.Service](d), Spaces: routing.Get[spaces.Service](d),
+			MCP: mcpserver.Handler{Cfg: routing.Get[appconfig.Config](d), APITokens: routing.Get[auth.APITokens](d), Inner: d.Inner, Version: routing.Get[appconfig.Build](d).Version}.Endpoint(),
 		}
 		return []routing.Mount{
 			routing.Credential(h.CredentialRoutes),

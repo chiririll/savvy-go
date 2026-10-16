@@ -1,31 +1,40 @@
-package app
+package boot
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 
+	"savvy-go/internal/app"
+	"savvy-go/internal/appconfig"
 	"savvy-go/internal/config"
-	"savvy-go/internal/config/shared"
 	"savvy-go/internal/currencydata"
+	"savvy-go/internal/httpserver"
+	"savvy-go/internal/locator"
 	"savvy-go/internal/runtime"
 	"savvy-go/internal/seed"
 	"savvy-go/internal/store/sqlite"
 )
 
+// Process is the running application: the locator that holds the services, and the rate
+// source the scheduled update expires. The locator also closes what Build acquired.
+type Process struct {
+	Loc   *locator.Locator
+	rates *currencydata.Source
+}
+
 // Builder starts the application: it reads the config, opens the databases, brings them to
-// a servable state and then calls New. It only holds inputs; Build runs the phases once,
+// a servable state and then registers the services with app.New. It only holds inputs; Build runs the phases once,
 // in a fixed order.
 type Builder struct {
-	build      Build
+	build      appconfig.Build
 	configPath string
 	seedPath   string
 }
 
 // NewBuilder starts a Builder for the given release.
-func NewBuilder(b Build) *Builder { return &Builder{build: b} }
+func NewBuilder(b appconfig.Build) *Builder { return &Builder{build: b} }
 
 // ConfigFile sets the config file. Empty means $CONFIG_FILE, else config.toml in the data
 // directory; it is created when missing.
@@ -35,13 +44,15 @@ func (b *Builder) ConfigFile(path string) *Builder { b.configPath = path; return
 // boot seed the demo data.
 func (b *Builder) SeedFile(path string) *Builder { b.seedPath = path; return b }
 
-// Build runs the startup phases and returns the services. The caller closes them.
-func (b *Builder) Build(ctx context.Context) (*Services, error) {
-	file, err := config.Open(shared.FilePath(b.configPath))
+// Build runs the startup phases and returns the running process. The caller closes it.
+func (b *Builder) Build(ctx context.Context) (*Process, error) {
+	file, err := config.Open(appconfig.FilePath(b.configPath))
 	if err != nil {
 		return nil, fmt.Errorf("load config: %w", err)
 	}
-	cfg := shared.Load(file)
+	server := config.Of(file, httpserver.ServerSection)
+	srv := server.Get()
+	cfg := appconfig.Load(file).WithServer(srv.TZ, srv.Location, func() string { return server.Get().AppURL })
 	var seedCfg seed.Config
 	if b.seedPath != "" {
 		if seedCfg, err = seed.LoadConfig(b.seedPath); err != nil {
@@ -74,36 +85,30 @@ func (b *Builder) Build(ctx context.Context) (*Services, error) {
 	if err := seed.Run(ctx, st, ring, seedCfg, cfg.Location); err != nil {
 		return nil, fmt.Errorf("seed demo: %w", err)
 	}
-	guard, err := startBootstrap(ctx, cfg, st)
+	guard, err := startBootstrap(ctx, cfg, srv.Listen, st)
 	if err != nil {
 		return nil, err
 	}
 
 	queue := runtime.NewQueue(2)
 	rates := currencydata.New()
-	svc := New(cfg, st, keys,
-		WithConfig(file),
-		WithBuild(b.build), WithRates(rates), WithBootstrap(guard), WithQueue(queue))
+	loc, err := app.New(cfg, st, keys,
+		app.WithConfig(file),
+		app.WithBuild(b.build), app.WithRates(rates), app.WithBootstrap(guard), app.WithQueue(queue))
+	if err != nil {
+		return nil, fmt.Errorf("build services: %w", err)
+	}
+	// Closed in reverse order of registration: a queued job may still use the store.
+	locator.OnClose(loc, func(context.Context) error { return st.Close() })
+	locator.OnClose(loc, func(ctx context.Context) error { queue.Shutdown(ctx); return nil })
 	// Every package has asked for its sections by now.
 	if err := file.Finish(); err != nil {
 		return nil, fmt.Errorf("load config: %w", err)
 	}
-	svc.rates = rates
-	// Closed in this order: a queued job may still use the store.
-	svc.closers = []func(context.Context) error{
-		func(ctx context.Context) error { queue.Shutdown(ctx); return nil },
-		func(context.Context) error { return st.Close() },
-	}
 	built = true
-	return svc, nil
+	return &Process{Loc: loc, rates: rates}, nil
 }
 
 // Close releases what Build acquired: it drains the queue, then closes the store. Stop
 // taking requests first, as a running request could still enqueue work.
-func (s *Services) Close(ctx context.Context) error {
-	var errs []error
-	for _, c := range s.closers {
-		errs = append(errs, c(ctx))
-	}
-	return errors.Join(errs...)
-}
+func (p *Process) Close(ctx context.Context) error { return p.Loc.Close(ctx) }

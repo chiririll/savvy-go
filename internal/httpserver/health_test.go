@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"savvy-go/internal/appconfig"
 	"savvy-go/internal/config"
-	"savvy-go/internal/config/shared"
 	"savvy-go/internal/signing"
 	"savvy-go/internal/store"
 )
@@ -20,10 +20,10 @@ import (
 // testURL is the public URL of the test servers.
 const testURL = "http://localhost:8080"
 
-func testConfig(t *testing.T) (shared.Config, string) {
+func testConfig(t *testing.T) (appconfig.Config, string) {
 	t.Helper()
 	dir := t.TempDir()
-	cfg := shared.Config{
+	cfg := appconfig.Config{
 		DataDir:    dir,
 		UploadsDir: filepath.Join(dir, "uploads"),
 		BackupsDir: filepath.Join(dir, "backups"),
@@ -43,7 +43,7 @@ func testFile(toml string) *config.Config {
 }
 
 // newServer is New with the public URL set to testURL; opts may replace it.
-func newServer(cfg shared.Config, st store.Store, keys *signing.Holder, opts ...Option) *Server {
+func newServer(cfg appconfig.Config, st store.Store, keys *signing.Holder, opts ...Option) *Server {
 	opts = append([]Option{WithConfig(testFile("[server]\napp_url = \"" + testURL + "\"\n"))}, opts...)
 	return New(cfg, st, keys, opts...)
 }

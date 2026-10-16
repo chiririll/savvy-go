@@ -3,7 +3,7 @@ package main
 
 import (
 	"savvy-go/cmd"
-	"savvy-go/internal/app"
+	"savvy-go/internal/appconfig"
 )
 
 // Set at link time: -ldflags "-X main.Version=… -X main.Env=…". They are handed down from
@@ -15,4 +15,4 @@ var (
 	Env = "development"
 )
 
-func main() { cmd.Main(app.Build{Version: Version, Env: Env}) }
+func main() { cmd.Main(appconfig.Build{Version: Version, Env: Env}) }

@@ -38,4 +38,5 @@ import (
 	_ "savvy-go/internal/httpserver/auth/twofactor"
 	_ "savvy-go/internal/httpserver/auth/webauthn"
 	_ "savvy-go/internal/httpserver/health"
+	_ "savvy-go/internal/httpserver/ui"
 )

@@ -6,14 +6,17 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"savvy-go/internal/httpserver/httpx/routing"
+	"savvy-go/internal/httpserver/ui"
+	"savvy-go/internal/ledger"
 )
 
 //go:embed openapi.yaml
 var spec []byte
 
 func init() {
-	routing.Register(spec, func(d *routing.Deps) []routing.Mount {
-		h := Handler{Rates: d.Rates}
+	ui.AddSpec(spec)
+	routing.Register(func(d *routing.Deps) []routing.Mount {
+		h := Handler{Rates: routing.Get[ledger.RateSource](d)}
 		return []routing.Mount{
 			routing.Account(h.Routes),
 		}

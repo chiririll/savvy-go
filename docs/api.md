@@ -58,4 +58,4 @@ From a script, the body is `{"name": "Budget bot", "preset": "editor", "space_id
 
 ## Reference
 
-Interactive reference (Swagger UI): `/api/docs`. Raw OpenAPI 3 spec: `/api/openapi.yaml`. Both are served by the API itself, so they work without the frontend. The spec is merged at startup from `internal/httpserver/apidocs/base.yaml` and the `openapi.yaml` that each handler package embeds next to its routes.
+Interactive reference (Swagger UI): `/api/docs`. Raw OpenAPI 3 spec: `/api/openapi.yaml`. Both are served by the API itself, so they work without the frontend. The spec is merged at startup from `internal/httpserver/ui/base.yaml` and the `openapi.yaml` that each handler package embeds next to its routes.

@@ -1,7 +1,6 @@
 //go:build embed
 
-// Package webui holds the frontend built into the binary by release builds.
-package webui
+package ui
 
 import (
 	"embed"
@@ -13,9 +12,9 @@ import (
 //go:embed all:dist
 var dist embed.FS
 
-// FS is the built frontend (index.html, icons, build/), or nil when the binary
+// embeddedFS is the built frontend (index.html, icons, build/), or nil when the binary
 // was built without the embed tag and serves it from disk instead.
-func FS() fs.FS {
+func embeddedFS() fs.FS {
 	sub, err := fs.Sub(dist, "dist")
 	if err != nil {
 		return nil

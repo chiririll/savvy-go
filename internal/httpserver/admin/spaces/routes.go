@@ -3,12 +3,15 @@ package spaces
 import (
 	"github.com/go-chi/chi/v5"
 
+	"savvy-go/internal/auth"
+	"savvy-go/internal/backup"
 	"savvy-go/internal/httpserver/httpx/routing"
+	"savvy-go/internal/spaces"
 )
 
 func init() {
-	routing.Register(nil, func(d *routing.Deps) []routing.Mount {
-		h := Handler{Spaces: d.Spaces, Users: d.Users, Backups: d.Backups}
+	routing.Register(func(d *routing.Deps) []routing.Mount {
+		h := Handler{Spaces: routing.Get[spaces.Service](d), Users: routing.Get[auth.Users](d), Backups: routing.Get[backup.Service](d)}
 		return []routing.Mount{
 			routing.AdminSession(h.Routes),
 		}

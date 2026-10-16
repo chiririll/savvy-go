@@ -4,11 +4,12 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"savvy-go/internal/httpserver/httpx/routing"
+	"savvy-go/internal/oauth"
 )
 
 func init() {
-	routing.Register(nil, func(d *routing.Deps) []routing.Mount {
-		h := Handler{OAuth: d.OAuth}
+	routing.Register(func(d *routing.Deps) []routing.Mount {
+		h := Handler{OAuth: routing.Get[*oauth.Service](d)}
 		return []routing.Mount{
 			routing.AdminSession(h.Routes),
 		}

@@ -5,8 +5,8 @@ import (
 	"sort"
 	"time"
 
+	"savvy-go/internal/appconfig"
 	"savvy-go/internal/backup"
-	"savvy-go/internal/config/shared"
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/platform/sysinfo"
 )
@@ -30,7 +30,7 @@ const (
 
 // Handler lists the checks of a running server.
 type Handler struct {
-	Cfg        shared.Config
+	Cfg        appconfig.Config
 	Writable   func() bool // whether the config file can be changed
 	UploadsDir string
 	Backups    backup.Service

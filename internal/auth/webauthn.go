@@ -10,7 +10,7 @@ import (
 	"net/url"
 	"time"
 
-	"savvy-go/internal/config/shared"
+	"savvy-go/internal/appconfig"
 	repo "savvy-go/internal/db/repo/auth"
 	"savvy-go/internal/store"
 
@@ -27,7 +27,7 @@ const (
 type WebAuthn struct {
 	DB store.DB
 	// AppURL is the public URL of the instance, empty when unset.
-	Cfg shared.Config
+	Cfg appconfig.Config
 }
 
 func (w WebAuthn) repo() repo.Repo { return repo.Repo{DB: w.DB} }

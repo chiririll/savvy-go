@@ -6,8 +6,8 @@ package mail
 import (
 	"context"
 
+	"savvy-go/internal/appconfig"
 	"savvy-go/internal/config"
-	"savvy-go/internal/config/shared"
 	"savvy-go/internal/mail/smtp"
 )
 
@@ -20,14 +20,14 @@ const DefaultTimeout = smtp.DefaultTimeout
 // Service is the mail server in use: the [mailer] section of the config file, read each
 // time it is needed.
 type Service struct {
-	cfg     shared.Config
+	cfg     appconfig.Config
 	section *config.Ref[smtp.Setup]
 	sender  smtp.Mailer // given to New: used whatever the section says
 }
 
 // New sends mail as the [mailer] section of f says. A non-nil sender replaces the SMTP one,
 // which is how tests record the mail.
-func New(f *config.Config, cfg shared.Config, sender smtp.Mailer) *Service {
+func New(f *config.Config, cfg appconfig.Config, sender smtp.Mailer) *Service {
 	return &Service{cfg: cfg, section: config.Of(f, smtp.Section), sender: sender}
 }
 

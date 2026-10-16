@@ -11,13 +11,14 @@ import (
 	"syscall"
 	"time"
 
-	"savvy-go/internal/app"
+	"savvy-go/internal/boot"
+	"savvy-go/internal/appconfig"
 	"savvy-go/internal/httpserver"
 )
 
 // Main runs the application and exits non-zero when it fails. build says which release
 // this binary is; the root package sets it at link time.
-func Main(build app.Build) {
+func Main(build appconfig.Build) {
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
 
 	configPath := flag.String("config", "", "path to config.toml (default: $CONFIG_FILE, else config.toml in the data directory; created if missing)")
@@ -31,22 +32,22 @@ func Main(build app.Build) {
 }
 
 // run serves the application until it is interrupted.
-func run(build app.Build, configPath, seedPath string) error {
+func run(build appconfig.Build, configPath, seedPath string) error {
 	// Cancelled by the first interrupt: it stops the jobs and then the server.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	svc, err := app.NewBuilder(build).ConfigFile(configPath).SeedFile(seedPath).Build(ctx)
+	proc, err := boot.NewBuilder(build).ConfigFile(configPath).SeedFile(seedPath).Build(ctx)
 	if err != nil {
 		return err
 	}
 	defer func() {
 		closeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
 		defer cancel()
-		if err := svc.Close(closeCtx); err != nil {
+		if err := proc.Close(closeCtx); err != nil {
 			slog.Warn("close", "err", err)
 		}
 	}()
-	svc.Start(ctx)
-	return httpserver.Serve(ctx, svc)
+	proc.Start(ctx)
+	return httpserver.Serve(ctx, proc.Loc)
 }

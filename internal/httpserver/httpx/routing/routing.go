@@ -10,16 +10,15 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"savvy-go/internal/app"
-	"savvy-go/internal/httpserver/apidocs"
 	"savvy-go/internal/httpserver/httpx/guard"
 	"savvy-go/internal/httpserver/httpx/login"
+	"savvy-go/internal/locator"
 )
 
-// Deps are what the registered packages draw on: the core services and the HTTP-level
-// pieces built on them.
+// Deps are what the registered packages draw on: the locator that holds the core services,
+// and the HTTP-level pieces built on them.
 type Deps struct {
-	*app.Services
+	Loc *locator.Locator
 
 	Login login.Service
 	Guard *guard.Guard
@@ -27,6 +26,15 @@ type Deps struct {
 	// Inner is the finished router, for handlers that call the API in-process (MCP).
 	Inner http.Handler
 }
+
+// Get is the T a package asks the locator for when its routes are built. A missing service
+// is a wiring bug and panics at start.
+func Get[T any](d *Deps) T { return locator.Get[T](d.Loc) }
+
+// ConfigWritable is whether the application changes the config file. It does not for now:
+// the file is edited by hand. Section.Update and config.Writable stay for when that is
+// switched back on.
+func (d *Deps) ConfigWritable() bool { return false }
 
 // Tier is who may reach a set of routes, and so which middleware wraps it.
 type Tier int
@@ -42,6 +50,7 @@ const (
 	spaceWrite               // /api/spaces/{space}, members who may write
 	admin                    // /api, server admins
 	adminSession             // /api, server admins in a real session
+	fallback                 // outside /api, answers what no other route does (the SPA)
 )
 
 // Mount is a set of routes in a tier.
@@ -60,18 +69,16 @@ func SpaceAdmin(fn func(chi.Router)) Mount   { return Mount{spaceAdmin, fn} }
 func SpaceWrite(fn func(chi.Router)) Mount   { return Mount{spaceWrite, fn} }
 func Admin(fn func(chi.Router)) Mount        { return Mount{admin, fn} }
 func AdminSession(fn func(chi.Router)) Mount { return Mount{adminSession, fn} }
+func Fallback(fn func(chi.Router)) Mount     { return Mount{fallback, fn} }
 
 var (
 	mu      sync.Mutex
 	modules []func(*Deps) []Mount
 )
 
-// Register adds a package's routes. spec is its embedded openapi.yaml, nil when it
-// documents nothing. build runs once per server, so a handler gets that server's Deps.
-func Register(spec []byte, build func(*Deps) []Mount) {
-	if spec != nil {
-		apidocs.Add(spec)
-	}
+// Register adds a package's routes. build runs once per server, so a handler gets that
+// server's Deps. A package that documents its routes hands its openapi.yaml to ui.AddSpec.
+func Register(build func(*Deps) []Mount) {
 	mu.Lock()
 	defer mu.Unlock()
 	modules = append(modules, build)
@@ -98,7 +105,6 @@ func Build(r chi.Router, d *Deps) {
 
 	mount(root, r)
 	r.Route("/api", func(r chi.Router) {
-		apidocs.Routes(r)
 		mount(public, r)
 
 		r.Group(func(r chi.Router) {
@@ -152,6 +158,8 @@ func Build(r chi.Router, d *Deps) {
 		r.Use(g.NeedAppURL)
 		mount(rootAppURL, r)
 	})
+
+	mount(fallback, r)
 }
 
 // SpaceWriteRoutes mounts only the finance routes of a space on r, with no middleware. The

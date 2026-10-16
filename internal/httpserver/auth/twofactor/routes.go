@@ -3,12 +3,13 @@ package twofactor
 import (
 	"github.com/go-chi/chi/v5"
 
+	"savvy-go/internal/auth"
 	"savvy-go/internal/httpserver/httpx/routing"
 )
 
 func init() {
-	routing.Register(nil, func(d *routing.Deps) []routing.Mount {
-		h := Handler{TwoFactor: d.TwoFactor, Users: d.Users, Challenges: d.Challenges, Login: d.Login}
+	routing.Register(func(d *routing.Deps) []routing.Mount {
+		h := Handler{TwoFactor: routing.Get[auth.TwoFactor](d), Users: routing.Get[auth.Users](d), Challenges: routing.Get[auth.Challenges](d), Login: d.Login}
 		return []routing.Mount{
 			routing.Public(h.PublicRoutes),
 			routing.Credential(h.CredentialRoutes),

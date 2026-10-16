@@ -7,8 +7,8 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"savvy-go/internal/appconfig"
 	"savvy-go/internal/backup"
-	"savvy-go/internal/config/shared"
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/httpserver/httpx/dto"
 	"savvy-go/internal/httpserver/httpx/login"
@@ -25,7 +25,7 @@ import (
 
 // Handler holds what the user administration needs.
 type Handler struct {
-	Cfg     shared.Config
+	Cfg     appconfig.Config
 	Users   auth.Users
 	Tokens  auth.PasswordTokens
 	Spaces  spaces.Service

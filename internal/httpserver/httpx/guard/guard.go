@@ -7,14 +7,14 @@ import (
 	"net/http"
 	"strings"
 
+	"savvy-go/internal/appconfig"
 	"savvy-go/internal/auth"
-	"savvy-go/internal/config/shared"
 	"savvy-go/internal/httpserver/httpx"
 )
 
 // Guard is built once by the server from its own services.
 type Guard struct {
-	Cfg       shared.Config
+	Cfg       appconfig.Config
 	Security  auth.Security
 	Sessions  auth.Sessions
 	APITokens auth.APITokens

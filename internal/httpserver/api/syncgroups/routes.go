@@ -6,14 +6,18 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"savvy-go/internal/httpserver/httpx/routing"
+	"savvy-go/internal/httpserver/ui"
+	"savvy-go/internal/refsync"
+	"savvy-go/internal/spaces"
 )
 
 //go:embed openapi.yaml
 var spec []byte
 
 func init() {
-	routing.Register(spec, func(d *routing.Deps) []routing.Mount {
-		h := Handler{Spaces: d.Spaces, Refsync: d.Refsync, Guard: d.Guard}
+	ui.AddSpec(spec)
+	routing.Register(func(d *routing.Deps) []routing.Mount {
+		h := Handler{Spaces: routing.Get[spaces.Service](d), Refsync: routing.Get[refsync.Service](d), Guard: d.Guard}
 		return []routing.Mount{
 			routing.Account(h.AccountRoutes),
 			routing.SpaceRead(h.ReadRoutes),

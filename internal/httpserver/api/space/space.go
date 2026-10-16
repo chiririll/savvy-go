@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"slices"
 
+	"savvy-go/internal/appconfig"
 	"savvy-go/internal/auth"
 	"savvy-go/internal/backup"
-	"savvy-go/internal/config/shared"
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/httpserver/httpx/dto"
 	"savvy-go/internal/httpserver/httpx/guard"
@@ -21,7 +21,7 @@ import (
 
 // Handler holds what the space routes need.
 type Handler struct {
-	Cfg     shared.Config
+	Cfg     appconfig.Config
 	Store   store.Store
 	Spaces  spaces.Service
 	Users   auth.Users

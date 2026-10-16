@@ -4,11 +4,12 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"savvy-go/internal/httpserver/httpx/routing"
+	"savvy-go/internal/mail"
 )
 
 func init() {
-	routing.Register(nil, func(d *routing.Deps) []routing.Mount {
-		h := Handler{Mail: d.Mail, Writable: d.ConfigWritable}
+	routing.Register(func(d *routing.Deps) []routing.Mount {
+		h := Handler{Mail: routing.Get[*mail.Service](d), Writable: d.ConfigWritable}
 		return []routing.Mount{
 			routing.AdminSession(h.Routes),
 		}

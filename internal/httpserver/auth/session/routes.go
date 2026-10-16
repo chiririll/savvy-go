@@ -3,12 +3,15 @@ package session
 import (
 	"github.com/go-chi/chi/v5"
 
+	"savvy-go/internal/auth"
+	"savvy-go/internal/bootstrap"
 	"savvy-go/internal/httpserver/httpx/routing"
+	"savvy-go/internal/settings"
 )
 
 func init() {
-	routing.Register(nil, func(d *routing.Deps) []routing.Mount {
-		h := Handler{Security: d.Security, Users: d.Users, Sessions: d.Sessions, Tokens: d.PasswordTokens, Challenges: d.Challenges, Settings: d.Settings, Bootstrap: d.Bootstrap, Login: d.Login}
+	routing.Register(func(d *routing.Deps) []routing.Mount {
+		h := Handler{Security: routing.Get[auth.Security](d), Users: routing.Get[auth.Users](d), Sessions: routing.Get[auth.Sessions](d), Tokens: routing.Get[auth.PasswordTokens](d), Challenges: routing.Get[auth.Challenges](d), Settings: routing.Get[settings.Store](d), Bootstrap: routing.Get[*bootstrap.Guard](d), Login: d.Login}
 		return []routing.Mount{
 			routing.Public(h.PublicRoutes),
 			routing.Credential(h.CredentialRoutes),

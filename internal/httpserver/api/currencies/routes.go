@@ -6,13 +6,15 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"savvy-go/internal/httpserver/httpx/routing"
+	"savvy-go/internal/httpserver/ui"
 )
 
 //go:embed openapi.yaml
 var spec []byte
 
 func init() {
-	routing.Register(spec, func(d *routing.Deps) []routing.Mount {
+	ui.AddSpec(spec)
+	routing.Register(func(d *routing.Deps) []routing.Mount {
 		return []routing.Mount{
 			routing.SpaceWrite(Routes),
 		}

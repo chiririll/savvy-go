@@ -3,12 +3,14 @@ package backups
 import (
 	"github.com/go-chi/chi/v5"
 
+	"savvy-go/internal/appconfig"
+	"savvy-go/internal/backup"
 	"savvy-go/internal/httpserver/httpx/routing"
 )
 
 func init() {
-	routing.Register(nil, func(d *routing.Deps) []routing.Mount {
-		h := Handler{BackupsDir: d.Cfg.BackupsDir, Backups: d.Backups}
+	routing.Register(func(d *routing.Deps) []routing.Mount {
+		h := Handler{BackupsDir: routing.Get[appconfig.Config](d).BackupsDir, Backups: routing.Get[backup.Service](d)}
 		return []routing.Mount{
 			routing.AdminSession(h.Routes),
 		}

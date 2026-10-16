@@ -4,7 +4,7 @@ package oauth
 import (
 	"net/http"
 
-	"savvy-go/internal/config/shared"
+	"savvy-go/internal/appconfig"
 	"savvy-go/internal/oauth"
 	"savvy-go/internal/spaces"
 )
@@ -23,7 +23,7 @@ var oauthScopes = []string{"read", "write"}
 
 // Handler holds what the OAuth endpoints need. MCP is the endpoint they protect.
 type Handler struct {
-	Cfg    shared.Config
+	Cfg    appconfig.Config
 	OAuth  *oauth.Service
 	Spaces spaces.Service
 	MCP    http.Handler

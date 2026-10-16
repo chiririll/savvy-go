@@ -5,19 +5,28 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"savvy-go/internal/appconfig"
+	"savvy-go/internal/auth"
+	"savvy-go/internal/backup"
 	"savvy-go/internal/httpserver/httpx/routing"
+	"savvy-go/internal/httpserver/ui"
+	"savvy-go/internal/ledger"
+	"savvy-go/internal/mail"
 	"savvy-go/internal/spacefill"
+	"savvy-go/internal/spaces"
+	"savvy-go/internal/store"
 )
 
 //go:embed openapi.yaml
 var spec []byte
 
 func init() {
-	routing.Register(spec, func(d *routing.Deps) []routing.Mount {
+	ui.AddSpec(spec)
+	routing.Register(func(d *routing.Deps) []routing.Mount {
 		h := Handler{
-			Cfg: d.Cfg, Store: d.Store, Spaces: d.Spaces, Users: d.Users, Backups: d.Backups, Mail: d.Mail,
-			Login: d.Login, Verify: d.EmailVerify, Guard: d.Guard,
-			Creator: spacefill.Creator{Spaces: d.Spaces, Store: d.Store, Rates: d.Rates},
+			Cfg: routing.Get[appconfig.Config](d), Store: routing.Get[store.Store](d), Spaces: routing.Get[spaces.Service](d), Users: routing.Get[auth.Users](d), Backups: routing.Get[backup.Service](d), Mail: routing.Get[*mail.Service](d),
+			Login: d.Login, Verify: routing.Get[mail.Verifier](d), Guard: d.Guard,
+			Creator: spacefill.Creator{Spaces: routing.Get[spaces.Service](d), Store: routing.Get[store.Store](d), Rates: routing.Get[ledger.RateSource](d)},
 		}
 		return []routing.Mount{
 			routing.Public(h.PublicRoutes),

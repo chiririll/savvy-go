@@ -5,15 +5,22 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"savvy-go/internal/appconfig"
+	"savvy-go/internal/auth"
+	"savvy-go/internal/backup"
 	"savvy-go/internal/httpserver/httpx/routing"
+	"savvy-go/internal/httpserver/ui"
+	"savvy-go/internal/mail"
+	"savvy-go/internal/spaces"
 )
 
 //go:embed openapi.yaml
 var spec []byte
 
 func init() {
-	routing.Register(spec, func(d *routing.Deps) []routing.Mount {
-		h := Handler{Cfg: d.Cfg, Users: d.Users, Tokens: d.PasswordTokens, Spaces: d.Spaces, Mail: d.Mail, Backups: d.Backups, Login: d.Login}
+	ui.AddSpec(spec)
+	routing.Register(func(d *routing.Deps) []routing.Mount {
+		h := Handler{Cfg: routing.Get[appconfig.Config](d), Users: routing.Get[auth.Users](d), Tokens: routing.Get[auth.PasswordTokens](d), Spaces: routing.Get[spaces.Service](d), Mail: routing.Get[*mail.Service](d), Backups: routing.Get[backup.Service](d), Login: d.Login}
 		return []routing.Mount{
 			routing.Admin(h.Routes),
 		}

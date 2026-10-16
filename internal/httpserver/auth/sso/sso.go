@@ -4,8 +4,8 @@ package sso
 import (
 	"encoding/json"
 	"net/http"
+	"savvy-go/internal/appconfig"
 	"savvy-go/internal/auth"
-	"savvy-go/internal/config/shared"
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/httpserver/httpx/dto"
 	"savvy-go/internal/httpserver/httpx/guard"
@@ -18,7 +18,7 @@ import (
 
 // Handler holds what the sign-in and provider routes need.
 type Handler struct {
-	Cfg        shared.Config
+	Cfg        appconfig.Config
 	SSO        *sso.Service
 	Users      auth.Users
 	Challenges auth.Challenges

@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
+	"savvy-go/internal/appconfig"
 	"savvy-go/internal/auth"
-	"savvy-go/internal/config/shared"
 	"savvy-go/internal/mail/smtp"
 )
 
@@ -22,7 +22,7 @@ func (e MailRequiredError) Error() string {
 
 // Verifier sends confirmation links and confirms addresses.
 type Verifier struct {
-	Cfg           shared.Config
+	Cfg           appconfig.Config
 	Mail          *Service
 	Verifications auth.EmailVerifications
 	Users         auth.Users

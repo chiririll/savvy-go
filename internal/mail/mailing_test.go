@@ -4,8 +4,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"savvy-go/internal/appconfig"
 	"savvy-go/internal/config"
-	"savvy-go/internal/config/shared"
 	"savvy-go/internal/mail/smtp"
 )
 
@@ -14,7 +14,7 @@ func TestServiceReadsTheMailerSection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := New(file, shared.Config{}, nil)
+	svc := New(file, appconfig.Config{}, nil)
 	if err := file.Finish(); err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +45,7 @@ func TestServiceReadsTheMailerSection(t *testing.T) {
 
 func TestServiceUsesTheSenderItWasGiven(t *testing.T) {
 	sender := smtp.Disabled{}
-	svc := New(config.Empty(), shared.Config{}, sender)
+	svc := New(config.Empty(), appconfig.Config{}, sender)
 	if svc.Mailer() != sender {
 		t.Error("the given sender was replaced")
 	}

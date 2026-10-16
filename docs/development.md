@@ -64,7 +64,7 @@ go tool mage generate        # sqlc
 go tool mage release         # everything a release ships, into dist/ (needs APP_VERSION and nfpm)
 ```
 
-`build:release` honors `APP_VERSION`, `APP_ENV` (default `production`), `TARGET_GOOS` and `TARGET_GOARCH`. The target falls back to `GOOS` and `GOARCH`, but those also change how Mage itself is compiled, so cross-building from Windows or macOS needs `TARGET_*`. It copies `public/` to `internal/platform/webui/dist` (git-ignored) and builds with the `embed` tag; without the tag the Go build never touches the frontend, so `go test ./...` needs no frontend build.
+`build:release` honors `APP_VERSION`, `APP_ENV` (default `production`), `TARGET_GOOS` and `TARGET_GOARCH`. The target falls back to `GOOS` and `GOARCH`, but those also change how Mage itself is compiled, so cross-building from Windows or macOS needs `TARGET_*`. It copies `public/` to `internal/httpserver/ui/dist` (git-ignored) and builds with the `embed` tag; without the tag the Go build never touches the frontend, so `go test ./...` needs no frontend build.
 
 Logo and screenshot scripts: [Scripts](scripts.md).
 

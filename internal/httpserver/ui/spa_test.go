@@ -1,4 +1,4 @@
-package spa
+package ui
 
 import (
 	"io"
@@ -32,7 +32,7 @@ func TestSPAServesEmbeddedFrontend(t *testing.T) {
 		"build/.vite/manifest.json": {Data: []byte(`{"resources/ts/main.tsx":{"file":"assets/main-abc.js","isEntry":true,"src":"resources/ts/main.tsx"}}`)},
 		"build/assets/main-abc.js":  {Data: []byte("console.log(1)")},
 	}
-	srv := httptest.NewServer(&Handler{Assets: assets})
+	srv := httptest.NewServer(&SPA{Assets: assets})
 	t.Cleanup(srv.Close)
 
 	get := func(path string) (*http.Response, string) {

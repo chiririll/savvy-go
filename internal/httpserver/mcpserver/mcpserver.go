@@ -8,8 +8,8 @@ import (
 	"slices"
 	"strconv"
 
+	"savvy-go/internal/appconfig"
 	savvyauth "savvy-go/internal/auth"
-	"savvy-go/internal/config/shared"
 	"savvy-go/internal/httpserver/httpx"
 
 	"github.com/modelcontextprotocol/go-sdk/auth"
@@ -37,7 +37,7 @@ const (
 // Handler is the /mcp endpoint. Inner is the app's own router: tools call it
 // in-process with the caller's bearer token, so the REST rules apply.
 type Handler struct {
-	Cfg       shared.Config
+	Cfg       appconfig.Config
 	APITokens savvyauth.APITokens
 	Inner     http.Handler
 	Version   string // the release, reported to MCP clients

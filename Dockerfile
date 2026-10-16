@@ -27,12 +27,12 @@ COPY main.go ./
 COPY cmd ./cmd
 COPY internal ./internal
 # The frontend is embedded into the binary (build tag "embed").
-COPY public ./internal/platform/webui/dist
-COPY --from=frontend /app/public/build ./internal/platform/webui/dist/build
+COPY public ./internal/httpserver/ui/dist
+COPY --from=frontend /app/public/build ./internal/httpserver/ui/dist/build
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -tags embed -trimpath \
-    -ldflags="-s -w -X savvy-go/internal/config/shared.DefaultListen=:80 -X main.Version=${APP_VERSION} -X main.Env=${APP_ENV}" \
+    -ldflags="-s -w -X savvy-go/internal/httpserver.DefaultListen=:80 -X main.Version=${APP_VERSION} -X main.Env=${APP_ENV}" \
     -o /out/savvy-go .
 
 # Build the final image

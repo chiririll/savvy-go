@@ -4,11 +4,12 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"savvy-go/internal/httpserver/httpx/routing"
+	"savvy-go/internal/uploads"
 )
 
 func init() {
-	routing.Register(nil, func(d *routing.Deps) []routing.Mount {
-		h := Handler{Uploads: d.Uploads}
+	routing.Register(func(d *routing.Deps) []routing.Mount {
+		h := Handler{Uploads: routing.Get[uploads.Service](d)}
 		return []routing.Mount{
 			routing.Public(h.PublicRoutes),
 			routing.SpaceWrite(h.Routes),

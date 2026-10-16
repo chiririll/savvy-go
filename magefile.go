@@ -16,7 +16,7 @@ import (
 const (
 	pkg      = "."
 	outDir   = "dist"
-	embedDir = "internal/platform/webui/dist" // what the embed build tag compiles in
+	embedDir = "internal/httpserver/ui/dist" // what the embed build tag compiles in
 )
 
 // Build groups the build targets.
@@ -74,7 +74,7 @@ func (Test) Go() error {
 	if err := stageFrontend(); err != nil {
 		return err
 	}
-	return sh.RunV("go", "test", "-tags", "embed", "./internal/platform/webui/...", "./internal/httpserver/...")
+	return sh.RunV("go", "test", "-tags", "embed", "./internal/httpserver/...")
 }
 
 // Frontend runs the frontend tests.

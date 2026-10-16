@@ -3,12 +3,15 @@ package sso
 import (
 	"github.com/go-chi/chi/v5"
 
+	"savvy-go/internal/appconfig"
+	"savvy-go/internal/auth"
 	"savvy-go/internal/httpserver/httpx/routing"
+	"savvy-go/internal/sso"
 )
 
 func init() {
-	routing.Register(nil, func(d *routing.Deps) []routing.Mount {
-		h := Handler{Cfg: d.Cfg, SSO: d.SSO, Users: d.Users, Challenges: d.Challenges, Login: d.Login, Guard: d.Guard}
+	routing.Register(func(d *routing.Deps) []routing.Mount {
+		h := Handler{Cfg: routing.Get[appconfig.Config](d), SSO: routing.Get[*sso.Service](d), Users: routing.Get[auth.Users](d), Challenges: routing.Get[auth.Challenges](d), Login: d.Login, Guard: d.Guard}
 		return []routing.Mount{
 			routing.Public(h.PublicRoutes),
 		}

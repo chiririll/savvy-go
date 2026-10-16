@@ -1,7 +1,10 @@
-// Package spa serves the frontend: static files, and index.html for every other path.
-package spa
+// Package ui serves what a browser opens: the frontend (static files, and index.html for every
+// other path) and the API reference (Swagger UI and the OpenAPI document).
+package ui
 
 import (
+	"github.com/go-chi/chi/v5"
+
 	"bytes"
 	"encoding/json"
 	"html/template"
@@ -9,6 +12,8 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"savvy-go/internal/appconfig"
+	"savvy-go/internal/httpserver/httpx/routing"
 	"strings"
 )
 
@@ -17,6 +22,20 @@ type viteChunk struct {
 	CSS     []string `json:"css"`
 	IsEntry bool     `json:"isEntry"`
 	Src     string   `json:"src"`
+}
+
+func init() {
+	routing.Register(func(d *routing.Deps) []routing.Mount {
+		b := routing.Get[appconfig.Build](d)
+		spa := NewSPA(b.Version, b.Env)
+		return []routing.Mount{routing.Fallback(func(r chi.Router) { r.Get("/*", spa.ServeHTTP) })}
+	})
+}
+
+// NewSPA is the frontend of the running binary: the copy built into it, or public/ next to
+// the working directory in development builds. version and env show in the page shell.
+func NewSPA(version, env string) *SPA {
+	return &SPA{Assets: Resolve(embeddedFS()), Version: version, Env: env}
 }
 
 // Resolve picks where the frontend comes from: the copy built into the
@@ -28,15 +47,15 @@ func Resolve(embedded fs.FS) fs.FS {
 	return os.DirFS("public")
 }
 
-// Handler serves the files of Assets.
-type Handler struct {
+// SPA serves the files of Assets.
+type SPA struct {
 	Assets  fs.FS
 	Version string // the release, shown in the page shell
 	Env     string // the build environment
 }
 
 // ServeHTTP serves the file asked for, or index.html for a client-side route.
-func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *SPA) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -78,7 +97,7 @@ type indexData struct {
 }
 
 // renderIndex renders the public/index.html template.
-func (h *Handler) renderIndex() ([]byte, error) {
+func (h *SPA) renderIndex() ([]byte, error) {
 	tpl, err := template.ParseFS(h.Assets, "index.html")
 	if err != nil {
 		return nil, err
@@ -94,7 +113,7 @@ func (h *Handler) renderIndex() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (h *Handler) viteAssets() (js []string, css []string) {
+func (h *SPA) viteAssets() (js []string, css []string) {
 	raw, err := fs.ReadFile(h.Assets, "build/manifest.json")
 	if err != nil {
 		raw, err = fs.ReadFile(h.Assets, "build/.vite/manifest.json")

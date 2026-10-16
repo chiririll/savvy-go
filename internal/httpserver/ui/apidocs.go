@@ -1,7 +1,8 @@
-// Package apidocs assembles the OpenAPI document. Each handler package embeds its own
-// openapi.yaml (paths plus the schemas it owns) and passes it to Add from its Routes
-// function; base.yaml holds what is shared. Spec merges them all.
-package apidocs
+// The OpenAPI document. Each handler package embeds its own openapi.yaml (paths plus the
+// schemas it owns) and passes it to AddSpec from its Routes function; base.yaml holds what is
+// shared. Spec merges them all.
+
+package ui
 
 import (
 	"bytes"
@@ -15,6 +16,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"gopkg.in/yaml.v3"
+
+	"savvy-go/internal/httpserver/httpx/routing"
 )
 
 //go:embed base.yaml
@@ -30,9 +33,9 @@ var (
 	cached []byte
 )
 
-// Add registers a package's fragment. Adding the same bytes again is a no-op, so a package
+// AddSpec registers a package's fragment. Adding the same bytes again is a no-op, so a package
 // may call it from every one of its route functions.
-func Add(fragment []byte) {
+func AddSpec(fragment []byte) {
 	sum := sha256.Sum256(fragment)
 	mu.Lock()
 	defer mu.Unlock()
@@ -59,8 +62,14 @@ func Spec() ([]byte, error) {
 	return out, nil
 }
 
-// Routes serves the Swagger UI page and the spec, relative to the /api mount.
-func Routes(r chi.Router) {
+func init() {
+	routing.Register(func(*routing.Deps) []routing.Mount {
+		return []routing.Mount{routing.Public(docsRoutes)}
+	})
+}
+
+// docsRoutes serves the Swagger UI page and the spec, relative to the /api mount.
+func docsRoutes(r chi.Router) {
 	r.Get("/docs", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = w.Write(swaggerPage)
