@@ -237,7 +237,7 @@ func (s Service) Execute(ctx context.Context, importID string, mapping, options 
 	return nil
 }
 
-func (s Service) Preview(ctx context.Context, im *Import, mapping, options map[string]any) (map[string]any, error) {
+func (s Service) Preview(ctx context.Context, im *Import, mapping, options map[string]any) (*PreviewResult, error) {
 	if im.UploadID == nil {
 		return nil, fmt.Errorf("file gone")
 	}
@@ -257,7 +257,7 @@ func (s Service) Preview(ctx context.Context, im *Import, mapping, options map[s
 	if err := s.matchImportCategories(ctx, cats); err != nil {
 		return nil, err
 	}
-	var preview []map[string]any
+	var preview []PreviewRow
 	willCreate, willSkip, hasErrors := 0, 0, 0
 	for i, row := range rows {
 		res := processImportRow(row, mapping, options, i+1)
@@ -269,31 +269,26 @@ func (s Service) Preview(ctx context.Context, im *Import, mapping, options map[s
 			willCreate++
 		}
 		if len(preview) < 200 {
-			preview = append(preview, map[string]any{
-				"row": i + 1, "date": res.date, "type": res.typ, "amount": res.amount,
-				"description": res.desc, "status": status, "error": nilOr(res.err),
-				"category": nilOr(res.category), "tags": []string{}, "duplicateOf": nil, "warnings": []string{},
+			preview = append(preview, PreviewRow{
+				Row: i + 1, Date: res.date, Type: res.typ, Amount: res.amount,
+				Description: res.desc, Status: status, Error: nilOr(res.err), Category: nilOr(res.category),
 			})
 		}
 	}
 	_ = willSkip
-	categories, categoriesToCreate := []map[string]any{}, []string{}
+	categories, categoriesToCreate := []PreviewCategory{}, []string{}
 	for _, c := range cats {
-		var matchID any
-		if c.MatchID != nil {
-			matchID = *c.MatchID
-		} else {
+		if c.MatchID == nil {
 			categoriesToCreate = append(categoriesToCreate, c.Name)
 		}
-		categories = append(categories, map[string]any{"name": c.Name, "type": c.Type, "count": c.Count, "matchId": matchID})
+		categories = append(categories, PreviewCategory{Name: c.Name, Type: c.Type, Count: c.Count, MatchID: c.MatchID})
 	}
-	return map[string]any{
-		"previewTransactions": preview,
-		"summary": map[string]any{
-			"willCreate": willCreate, "willSkip": willSkip, "hasErrors": hasErrors,
-			"totalRows": im.TotalRows, "sampled": willCreate + willSkip + hasErrors,
-			"currenciesToCreate": []any{}, "tagsToCreate": []any{},
-			"categoriesToCreate": categoriesToCreate, "categories": categories,
+	return &PreviewResult{
+		Transactions: preview,
+		Summary: PreviewSummary{
+			WillCreate: willCreate, WillSkip: willSkip, HasErrors: hasErrors,
+			TotalRows: im.TotalRows, Sampled: willCreate + willSkip + hasErrors,
+			CategoriesToCreate: categoriesToCreate, Categories: categories,
 		},
 	}, nil
 }
@@ -462,9 +457,9 @@ func asInt64(v any) (int64, bool) {
 	return 0, false
 }
 
-func nilOr(s string) any {
+func nilOr(s string) *string {
 	if s == "" {
 		return nil
 	}
-	return s
+	return &s
 }

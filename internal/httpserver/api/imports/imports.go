@@ -86,7 +86,7 @@ func (s Handler) importPreview(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, 422, err.Error())
 		return
 	}
-	httpx.WriteData(w, http.StatusOK, result)
+	httpx.WriteData(w, http.StatusOK, dto.NewImportPreview(*result))
 }
 
 func (s Handler) importExecute(w http.ResponseWriter, r *http.Request) {

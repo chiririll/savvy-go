@@ -85,3 +85,65 @@ func orEmpty[T any](s []T) []T {
 	}
 	return s
 }
+
+type ImportPreviewRow struct {
+	Row         int     `json:"row"`
+	Date        string  `json:"date"`
+	Type        string  `json:"type"`
+	Amount      Number  `json:"amount"`
+	Description string  `json:"description"`
+	Status      string  `json:"status"`
+	Error       *string `json:"error"`
+	Category    *string `json:"category"`
+	// The importer does not look for duplicates, tags or warnings yet; the
+	// client still reads these keys.
+	Tags        []string `json:"tags"`
+	DuplicateOf *int64   `json:"duplicateOf"`
+	Warnings    []string `json:"warnings"`
+}
+
+type ImportPreviewCategory struct {
+	Name    string `json:"name"`
+	Type    string `json:"type"`
+	Count   int    `json:"count"`
+	MatchID *int64 `json:"matchId"`
+}
+
+type ImportPreviewSummary struct {
+	WillCreate         int                     `json:"willCreate"`
+	WillSkip           int                     `json:"willSkip"`
+	HasErrors          int                     `json:"hasErrors"`
+	TotalRows          *int                    `json:"totalRows"`
+	Sampled            int                     `json:"sampled"`
+	CurrenciesToCreate []string                `json:"currenciesToCreate"`
+	TagsToCreate       []string                `json:"tagsToCreate"`
+	CategoriesToCreate []string                `json:"categoriesToCreate"`
+	Categories         []ImportPreviewCategory `json:"categories"`
+}
+
+type ImportPreview struct {
+	PreviewTransactions []ImportPreviewRow   `json:"previewTransactions"`
+	Summary             ImportPreviewSummary `json:"summary"`
+}
+
+func NewImportPreview(p importer.PreviewResult) ImportPreview {
+	s := p.Summary
+	return ImportPreview{
+		PreviewTransactions: Map(p.Transactions, func(r importer.PreviewRow) ImportPreviewRow {
+			return ImportPreviewRow{
+				Row: r.Row, Date: r.Date, Type: r.Type, Amount: Number(r.Amount), Description: r.Description,
+				Status: r.Status, Error: r.Error, Category: r.Category,
+				Tags: []string{}, Warnings: []string{},
+			}
+		}),
+		Summary: ImportPreviewSummary{
+			WillCreate: s.WillCreate, WillSkip: s.WillSkip, HasErrors: s.HasErrors,
+			TotalRows: s.TotalRows, Sampled: s.Sampled,
+			CurrenciesToCreate: []string{}, TagsToCreate: []string{},
+			CategoriesToCreate: orEmpty(s.CategoriesToCreate),
+			Categories: Map(s.Categories, func(c importer.PreviewCategory) ImportPreviewCategory {
+				return ImportPreviewCategory(c)
+			}),
+		},
+	}
+}
