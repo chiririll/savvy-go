@@ -5,9 +5,7 @@ package cmd
 import (
 	"context"
 	"flag"
-	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -50,36 +48,5 @@ func run(build app.Build, configPath, seedPath string) error {
 		}
 	}()
 	svc.Start(ctx)
-	return serve(ctx, svc)
-}
-
-// serve answers requests until ctx is cancelled, then drains them.
-func serve(ctx context.Context, svc *app.Services) error {
-	cfg := svc.Cfg
-	srv := &http.Server{
-		Addr:              cfg.ListenAddr,
-		Handler:           httpserver.FromServices(svc).Handler(),
-		ReadHeaderTimeout: 10 * time.Second,
-	}
-	failed := make(chan error, 1)
-	go func() {
-		slog.Info("go savvy listening", "addr", cfg.ListenAddr, "data", cfg.DataDir, "version", svc.Build.Version)
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			failed <- fmt.Errorf("http server: %w", err)
-		}
-	}()
-
-	select {
-	case err := <-failed:
-		return err
-	case <-ctx.Done():
-	}
-
-	shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
-	defer cancel()
-	// The deferred Close in run drains the queue after this: stop taking requests first.
-	if err := srv.Shutdown(shutdownCtx); err != nil {
-		return fmt.Errorf("shutdown: %w", err)
-	}
-	return nil
+	return httpserver.Serve(ctx, svc)
 }
