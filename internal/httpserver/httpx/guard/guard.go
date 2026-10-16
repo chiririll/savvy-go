@@ -141,10 +141,7 @@ func (g *Guard) RequireVerifiedEmail(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		u := httpx.User(r)
 		if u != nil && !u.EmailVerified && !verificationExempt[r.URL.Path] && g.EmailRequired(r.Context()) {
-			httpx.WriteJSON(w, http.StatusForbidden, map[string]any{
-				"message": "Confirm your email address to continue.",
-				"error":   "email_unverified",
-			})
+			httpx.WriteCoded(w, http.StatusForbidden, "Confirm your email address to continue.", "email_unverified")
 			return
 		}
 		next.ServeHTTP(w, r)

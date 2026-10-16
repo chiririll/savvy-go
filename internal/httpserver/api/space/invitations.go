@@ -152,7 +152,7 @@ func (h Handler) invitationAccept(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteSpaceError(w, err)
 		return
 	}
-	httpx.WriteData(w, http.StatusOK, httpx.SpaceJSON(*space))
+	httpx.WriteData(w, http.StatusOK, dto.NewSpace(*space))
 }
 
 // invitationRegister creates an account through an invitation and signs it

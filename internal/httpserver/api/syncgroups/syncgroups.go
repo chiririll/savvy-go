@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"net/http"
 	"savvy-go/internal/httpserver/httpx"
+	"savvy-go/internal/httpserver/httpx/dto"
 	"savvy-go/internal/httpserver/httpx/guard"
 	"savvy-go/internal/spaces"
 	"slices"
@@ -87,7 +88,7 @@ func (h Handler) syncGroupShow(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteData(w, http.StatusOK, nil)
 		return
 	}
-	members, hidden := []map[string]any{}, 0
+	members, hidden := []dto.Space{}, 0
 	for _, id := range g.Members {
 		role, _ := h.Spaces.Role(r.Context(), id, httpx.User(r).ID)
 		sps, _ := h.Spaces.Get(r.Context(), id)
@@ -95,7 +96,9 @@ func (h Handler) syncGroupShow(w http.ResponseWriter, r *http.Request) {
 			hidden++
 			continue
 		}
-		members = append(members, map[string]any{"id": id, "name": sps.Name, "role": role})
+		member := dto.NewSpace(*sps)
+		member.Role = role
+		members = append(members, member)
 	}
 	httpx.WriteData(w, http.StatusOK, map[string]any{
 		"id": g.ID, "categories": g.Categories, "tags": g.Tags, "members": members, "hidden": hidden,

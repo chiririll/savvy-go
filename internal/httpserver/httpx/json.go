@@ -36,8 +36,32 @@ func WriteDataMsg(w http.ResponseWriter, status int, data any, message string) {
 	WriteJSON(w, status, Envelope{Data: data, Message: message})
 }
 
+// MessageBody is a reply that carries only a human-readable message.
+type MessageBody struct {
+	Message string `json:"message"`
+}
+
 func WriteMessage(w http.ResponseWriter, status int, message string) {
-	WriteJSON(w, status, map[string]string{"message": message})
+	WriteJSON(w, status, MessageBody{Message: message})
+}
+
+// CodedBody is a message with a machine-readable code the SPA switches on.
+type CodedBody struct {
+	Message string `json:"message"`
+	Error   string `json:"error"`
+}
+
+func WriteCoded(w http.ResponseWriter, status int, message, code string) {
+	WriteJSON(w, status, CodedBody{Message: message, Error: code})
+}
+
+// SuccessBody acknowledges an action that returns nothing else.
+type SuccessBody struct {
+	Success bool `json:"success"`
+}
+
+func WriteSuccess(w http.ResponseWriter) {
+	WriteJSON(w, http.StatusOK, SuccessBody{Success: true})
 }
 
 func WriteValidation(w http.ResponseWriter, errors map[string][]string) {

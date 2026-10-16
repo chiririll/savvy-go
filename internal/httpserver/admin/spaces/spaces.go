@@ -126,7 +126,7 @@ func (h Handler) adminDeletedRestore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = h.Spaces.Audit(r.Context(), httpx.User(r), "restore_deleted_space", &space.ID, nil, space.Name)
-	httpx.WriteData(w, http.StatusCreated, httpx.SpaceJSON(*space))
+	httpx.WriteData(w, http.StatusCreated, dto.NewSpace(*space))
 }
 
 // invitationsClear ends the cooldown of revoked and expired invitations, for

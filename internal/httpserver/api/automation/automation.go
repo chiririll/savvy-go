@@ -106,7 +106,7 @@ func automationReorder(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, 422, err.Error())
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true})
+	httpx.WriteSuccess(w)
 }
 
 func automationTest(w http.ResponseWriter, r *http.Request) {

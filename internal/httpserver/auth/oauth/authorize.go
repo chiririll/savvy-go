@@ -7,6 +7,7 @@ import (
 	"net/url"
 
 	"savvy-go/internal/httpserver/httpx"
+	"savvy-go/internal/httpserver/httpx/dto"
 	"savvy-go/internal/oauth"
 )
 
@@ -69,12 +70,8 @@ func (h Handler) oauthConsentInfo(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	spaceList := make([]map[string]any, len(mine))
-	for i, x := range mine {
-		spaceList[i] = map[string]any{"id": x.ID, "name": x.Name, "role": x.Role}
-	}
 	httpx.WriteData(w, http.StatusOK, map[string]any{
-		"client_name": c.Name, "spaces": spaceList,
+		"client_name": c.Name, "spaces": dto.Map(mine, dto.NewSpace),
 	})
 }
 

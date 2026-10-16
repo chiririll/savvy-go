@@ -159,7 +159,7 @@ func (s Handler) accountsReorder(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, 422, err.Error())
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true})
+	httpx.WriteSuccess(w)
 }
 
 func (s Handler) accountsDestroy(w http.ResponseWriter, r *http.Request) {

@@ -7,6 +7,7 @@ import (
 	backupx "savvy-go/internal/httpserver/httpx/backups"
 
 	"savvy-go/internal/httpserver/httpx"
+	"savvy-go/internal/httpserver/httpx/dto"
 	"savvy-go/internal/legacy/restore"
 	"savvy-go/internal/spaces"
 )
@@ -42,5 +43,5 @@ func (h Handler) spacesImport(w http.ResponseWriter, r *http.Request) {
 		backupx.WriteError(w, err)
 		return
 	}
-	httpx.WriteData(w, http.StatusCreated, map[string]any{"id": space.ID, "uuid": space.UUID, "name": space.Name, "role": space.Role})
+	httpx.WriteData(w, http.StatusCreated, dto.NewSpace(*space))
 }

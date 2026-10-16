@@ -98,12 +98,12 @@ func (h Handler) ssoExchange(w http.ResponseWriter, r *http.Request) {
 	}
 	userID, requires2FA, ok := h.SSO.ConsumeTicket(r.Context(), body.Ticket)
 	if !ok {
-		httpx.WriteJSON(w, http.StatusGone, map[string]any{"message": "Login ticket is invalid or expired.", "error": "invalid_ticket"})
+		httpx.WriteCoded(w, http.StatusGone, "Login ticket is invalid or expired.", "invalid_ticket")
 		return
 	}
 	u, err := h.Users.ByID(r.Context(), userID)
 	if err != nil || u == nil {
-		httpx.WriteJSON(w, http.StatusGone, map[string]any{"message": "Login ticket is invalid or expired.", "error": "invalid_ticket"})
+		httpx.WriteCoded(w, http.StatusGone, "Login ticket is invalid or expired.", "invalid_ticket")
 		return
 	}
 	if requires2FA {

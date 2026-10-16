@@ -11,6 +11,7 @@ import (
 	"savvy-go/internal/config"
 	"savvy-go/internal/emailverify"
 	"savvy-go/internal/httpserver/httpx"
+	"savvy-go/internal/httpserver/httpx/dto"
 	"savvy-go/internal/httpserver/httpx/guard"
 	"savvy-go/internal/httpserver/httpx/login"
 	"savvy-go/internal/mailing"
@@ -42,9 +43,5 @@ func (h Handler) index(w http.ResponseWriter, r *http.Request) {
 	if t := httpx.Token(r); t != nil {
 		mine = slices.DeleteFunc(mine, func(x spaces.Space) bool { return !t.AllowsSpace(x.ID) })
 	}
-	out := make([]map[string]any, len(mine))
-	for i, x := range mine {
-		out[i] = httpx.SpaceJSON(x)
-	}
-	httpx.WriteData(w, http.StatusOK, out)
+	httpx.WriteData(w, http.StatusOK, dto.Map(mine, dto.NewSpace))
 }

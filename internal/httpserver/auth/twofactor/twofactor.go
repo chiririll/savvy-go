@@ -78,7 +78,7 @@ func (h Handler) twoFactorDisable(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"message": "Two-factor authentication has been disabled."})
+	httpx.WriteMessage(w, http.StatusOK, "Two-factor authentication has been disabled.")
 }
 
 func (h Handler) twoFactorVerify(w http.ResponseWriter, r *http.Request) {

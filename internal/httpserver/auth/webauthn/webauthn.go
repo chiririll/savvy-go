@@ -88,7 +88,7 @@ func (h Handler) webauthnUpdate(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"message": "Passkey renamed."})
+	httpx.WriteMessage(w, http.StatusOK, "Passkey renamed.")
 }
 
 func (h Handler) webauthnDestroy(w http.ResponseWriter, r *http.Request) {
@@ -101,7 +101,7 @@ func (h Handler) webauthnDestroy(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"message": "Passkey removed."})
+	httpx.WriteMessage(w, http.StatusOK, "Passkey removed.")
 }
 
 func (h Handler) webauthnLoginOptions(w http.ResponseWriter, r *http.Request) {

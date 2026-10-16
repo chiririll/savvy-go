@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"savvy-go/internal/httpserver/httpx"
+	"savvy-go/internal/httpserver/httpx/dto"
 	"savvy-go/internal/spacefill"
 )
 
@@ -30,7 +31,7 @@ func (h Handler) spacesStore(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteSpaceError(w, err)
 		return
 	}
-	httpx.WriteData(w, http.StatusCreated, httpx.SpaceJSON(*space))
+	httpx.WriteData(w, http.StatusCreated, dto.NewSpace(*space))
 }
 
 func (h Handler) spaceShow(w http.ResponseWriter, r *http.Request) {
@@ -39,10 +40,10 @@ func (h Handler) spaceShow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	space.Role = httpx.Scope(r).Role
-	out := httpx.SpaceJSON(*space)
-	out["quota"] = h.Spaces.Quota(r.Context(), space.ID)
-	out["size"], _ = h.Store.SpaceSize(r.Context(), space.ID)
-	httpx.WriteData(w, http.StatusOK, out)
+	size, _ := h.Store.SpaceSize(r.Context(), space.ID)
+	httpx.WriteData(w, http.StatusOK, dto.SpaceDetail{
+		Space: dto.NewSpace(*space), Quota: h.Spaces.Quota(r.Context(), space.ID), Size: size,
+	})
 }
 
 func (h Handler) spaceUpdate(w http.ResponseWriter, r *http.Request) {

@@ -82,7 +82,7 @@ func (h Handler) idpDestroy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.SSO.Delete(r.Context(), p.ID); err != nil {
-		httpx.WriteJSON(w, http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
+		httpx.WriteMessage(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -198,7 +198,7 @@ func writeSSOErr(w http.ResponseWriter, err error) {
 			httpx.WriteValidation(w, map[string][]string{"slug": {e.Message}})
 			return
 		}
-		httpx.WriteJSON(w, e.Status, map[string]any{"message": e.Message, "error": e.Code})
+		httpx.WriteCoded(w, e.Status, e.Message, e.Code)
 		return
 	}
 	httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())

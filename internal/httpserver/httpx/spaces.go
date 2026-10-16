@@ -8,11 +8,6 @@ import (
 	"savvy-go/internal/spaces"
 )
 
-// SpaceJSON is a space as the API lists it.
-func SpaceJSON(space spaces.Space) map[string]any {
-	return map[string]any{"id": space.ID, "uuid": space.UUID, "name": space.Name, "role": space.Role}
-}
-
 // WriteSpaceError maps space rules to 422 and forbidden ones to 403.
 func WriteSpaceError(w http.ResponseWriter, err error) {
 	switch {
