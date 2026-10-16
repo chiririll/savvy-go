@@ -601,3 +601,18 @@ func TestReusedIDIsNotTheTransfer(t *testing.T) {
 		t.Fatalf("A balance %s, want the expense (2) and the transfer (5)", b)
 	}
 }
+
+// A write that breaks a database constraint answers 422 without the schema.
+func TestConstraintErrorHidesSchema(t *testing.T) {
+	p := newPair(t)
+	res := p.a.do("POST", spacePath(p.A.ID, "/transactions"), map[string]any{"type": "bogus", "account_id": p.accA, "amount": 1, "date": "2026-10-01"}, p.sess.Token, p.sess.CSRF)
+	body := toString(decodeJSON(t, res))
+	if res.StatusCode != 422 {
+		t.Fatalf("status %d, want 422: %s", res.StatusCode, body)
+	}
+	for _, leak := range []string{"CHECK", "constraint", "IN (", "SQL"} {
+		if strings.Contains(body, leak) {
+			t.Errorf("response leaks %q: %s", leak, body)
+		}
+	}
+}

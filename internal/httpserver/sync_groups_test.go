@@ -3,6 +3,7 @@ package httpserver
 import (
 	"context"
 	"net/http"
+	"slices"
 	"strconv"
 	"testing"
 
@@ -66,15 +67,6 @@ func (p *syncPair) names(spaceID int64, kind string) []string {
 	return names
 }
 
-func contains(list []string, want string) bool {
-	for _, s := range list {
-		if s == want {
-			return true
-		}
-	}
-	return false
-}
-
 func TestSyncGroupMirrorsCategoriesAndTagsOverHTTP(t *testing.T) {
 	p := newSyncPair(t)
 	p.group(nil)
@@ -90,13 +82,13 @@ func TestSyncGroupMirrorsCategoriesAndTagsOverHTTP(t *testing.T) {
 			t.Fatalf("create %d %v", code, out)
 		}
 	}
-	if !contains(p.names(p.B.ID, "categories"), "Rent") {
+	if !slices.Contains(p.names(p.B.ID, "categories"), "Rent") {
 		t.Fatal("the category did not reach space B")
 	}
 	if code, out := p.call(p.sess, "POST", spacePath(p.B.ID, "/tags"), map[string]any{"name": "trip"}); code != 201 {
 		t.Fatalf("tag %d %v", code, out)
 	}
-	if !contains(p.names(p.A.ID, "tags"), "trip") {
+	if !slices.Contains(p.names(p.A.ID, "tags"), "trip") {
 		t.Fatal("the tag did not reach space A")
 	}
 
@@ -110,7 +102,7 @@ func TestSyncGroupMirrorsCategoriesAndTagsOverHTTP(t *testing.T) {
 	if code, _ := p.call(p.sess, "DELETE", spacePath(p.A.ID, "/categories/"+strconv.Itoa(int(rent))), nil); code != http.StatusNoContent {
 		t.Fatalf("delete %d", code)
 	}
-	if contains(p.names(p.B.ID, "categories"), "Rent") {
+	if slices.Contains(p.names(p.B.ID, "categories"), "Rent") {
 		t.Fatal("the delete did not reach space B")
 	}
 }
@@ -132,7 +124,7 @@ func TestSyncGroupRefusesAnEditorWhoOnlyViewsAnotherSpace(t *testing.T) {
 	if code != http.StatusForbidden {
 		t.Fatalf("create %d %v", code, out)
 	}
-	if contains(p.names(p.A.ID, "categories"), "Gifts") {
+	if slices.Contains(p.names(p.A.ID, "categories"), "Gifts") {
 		t.Fatal("the refused category was created")
 	}
 
@@ -180,7 +172,7 @@ func TestSyncGroupDifferencesNeedDecisions(t *testing.T) {
 	if code, out := p.call(p.sess, "POST", "/api/sync-groups/apply", body); code != 200 {
 		t.Fatalf("apply %d %v", code, out)
 	}
-	if !contains(p.names(p.A.ID, "tags"), "extra") {
+	if !slices.Contains(p.names(p.A.ID, "tags"), "extra") {
 		t.Fatal("the kept tag did not reach space A")
 	}
 }
@@ -203,5 +195,67 @@ func TestSyncGroupDoesNotLetSpacesBeProbed(t *testing.T) {
 	body = map[string]any{"add_space_ids": []int64{p.A.ID, p.B.ID}, "categories": true}
 	if code, _ := p.call(p.a.issue(bob, false), "POST", "/api/sync-groups/apply", body); code != http.StatusForbidden {
 		t.Fatalf("an editor created a group: %d", code)
+	}
+}
+
+// A sync group mirrors a change into every space of the group, so a token may
+// make it only if it reaches them all. Without that, a token limited to one
+// space could rewrite its neighbours.
+func TestSyncGroupChangeNeedsATokenReachingEverySpace(t *testing.T) {
+	p := newSyncPair(t)
+	p.group(nil)
+	solo, err := p.a.svc.Spaces.Create(context.Background(), "Solo", p.owner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	grant := func(ids ...int64) string {
+		raw, _ := p.a.issueGrant(p.owner, auth.Grant{Permissions: []string{"categories:write"}, SpaceIDs: ids}, nil)
+		return raw
+	}
+	create := func(raw string, space int64, name string) *http.Response {
+		return p.a.bearer("POST", spacePath(space, "/categories"), map[string]any{"name": name, "type": "expense"}, raw)
+	}
+
+	status(t, create(grant(p.A.ID), p.A.ID, "Food"), http.StatusForbidden, "token reaching one space of the group")
+	if slices.Contains(p.names(p.B.ID, "categories"), "Food") || slices.Contains(p.names(p.A.ID, "categories"), "Food") {
+		t.Fatal("the refused change reached a space")
+	}
+	status(t, p.a.bearer("GET", spacePath(p.A.ID, "/categories"), nil, grant(p.A.ID)), http.StatusOK, "reading needs no more than its own space")
+	status(t, create(grant(p.A.ID, p.B.ID), p.A.ID, "Food"), http.StatusCreated, "token reaching the whole group")
+	if !slices.Contains(p.names(p.B.ID, "categories"), "Food") {
+		t.Fatal("the change did not reach space B")
+	}
+	status(t, create(grant(solo.ID), solo.ID, "Solo food"), http.StatusCreated, "a space outside any group")
+}
+
+// Groups are managed from the settings screen only: a token, whatever it was
+// granted, cannot form, change or preview one.
+func TestSyncGroupsAreManagedWithASessionOnly(t *testing.T) {
+	p := newSyncPair(t)
+	raw, _ := p.a.issueGrant(p.owner, auth.Grant{Permissions: allPerms(auth.PermWrite), AllSpaces: true}, nil)
+	body := map[string]any{"add_space_ids": []int64{p.A.ID, p.B.ID}, "categories": true}
+	for _, path := range []string{"/api/sync-groups/diff", "/api/sync-groups/apply"} {
+		status(t, p.a.bearer("POST", path, body, raw), http.StatusForbidden, path)
+	}
+	if code, out := p.call(p.sess, "GET", spacePath(p.A.ID, "/sync-group"), nil); code != 200 || out["data"] != nil {
+		t.Fatalf("a refused token still formed a group: %d %v", code, out)
+	}
+}
+
+func TestSyncGroupDiffIsHeldToTheSameRulesAsApply(t *testing.T) {
+	p := newSyncPair(t)
+	stranger := p.a.createUser("stranger@test.com", "secret1", auth.RoleUser)
+	other, err := p.a.svc.Spaces.Create(context.Background(), "Private", stranger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code, _ := p.call(p.sess, "POST", "/api/sync-groups/diff", map[string]any{"add_space_ids": []int64{p.A.ID, other.ID}, "categories": true}); code != http.StatusNotFound {
+		t.Fatalf("diff with a space the caller is not in: %d", code)
+	}
+	bob := p.a.createUser("bob@test.com", "secret1", auth.RoleUser)
+	_ = p.a.svc.Spaces.SetMember(context.Background(), p.A.ID, bob, spaces.RoleEditor)
+	_ = p.a.svc.Spaces.SetMember(context.Background(), p.B.ID, bob, spaces.RoleEditor)
+	if code, _ := p.call(p.a.issue(bob, false), "POST", "/api/sync-groups/diff", map[string]any{"add_space_ids": []int64{p.A.ID, p.B.ID}, "categories": true}); code != http.StatusForbidden {
+		t.Fatalf("an editor previewed a group: %d", code)
 	}
 }

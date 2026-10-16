@@ -221,50 +221,60 @@ func TestResetLinkIsEmailedWithoutRevealingTheToken(t *testing.T) {
 	}
 }
 
+// sendResetLink asks for the reset link of a user to be emailed.
+func sendResetLink(t *testing.T, a *testApp, sess *auth.Issued, userID int64) (int, map[string]any) {
+	t.Helper()
+	res := a.do("POST", "/api/users/"+itoa(userID)+"/password-token", map[string]any{"send": true}, sess.Token, sess.CSRF)
+	return res.StatusCode, decodeJSON(t, res)
+}
+
 func TestResetLinkIsNotSentWhenItCannotWork(t *testing.T) {
-	rec := &recorder{on: true}
-	a, sess, admin := newMailApp(t, rec)
-	target := a.createUser("target@test.com", "oldpass12", roleEditor)
-	send := func(id int64) (int, map[string]any) {
-		res := a.do("POST", "/api/users/"+itoa(id)+"/password-token", map[string]any{"send": true}, sess.Token, sess.CSRF)
-		return res.StatusCode, decodeJSON(t, res)
+	cases := []struct {
+		name string
+		// setup prepares the app and returns the user to send to.
+		setup func(t *testing.T, rec *recorder) (*testApp, *auth.Issued, int64)
+		// say is a word the refusal must contain, so the admin learns why.
+		say string
+	}{
+		{"own account", func(t *testing.T, rec *recorder) (*testApp, *auth.Issued, int64) {
+			a, sess, admin := newMailApp(t, rec)
+			return a, sess, admin.ID
+		}, ""},
+		{"no public URL, so the link would point nowhere", func(t *testing.T, rec *recorder) (*testApp, *auth.Issued, int64) {
+			a, sess, _ := newMailAppAt(t, "", rec)
+			return a, sess, a.createUser("target@test.com", "oldpass12", roleEditor).ID
+		}, "public URL"},
+		{"password sign-in is off in favour of SSO", func(t *testing.T, rec *recorder) (*testApp, *auth.Issued, int64) {
+			a, sess, _ := newMailApp(t, rec)
+			insertSSO(t, a.db, true)
+			if err := (settings.Store{DB: a.db}).Set(context.Background(), "password_login_enabled", false); err != nil {
+				t.Fatal(err)
+			}
+			return a, sess, a.createUser("target@test.com", "oldpass12", roleEditor).ID
+		}, ""},
+		{"SMTP is down", func(t *testing.T, rec *recorder) (*testApp, *auth.Issued, int64) {
+			rec.sendErr = errors.New("connection refused")
+			a, sess, _ := newMailApp(t, rec)
+			return a, sess, a.createUser("target@test.com", "oldpass12", roleEditor).ID
+		}, "connection refused"},
+		{"mail is off: asking to send is an error, not a silent fallback", func(t *testing.T, rec *recorder) (*testApp, *auth.Issued, int64) {
+			rec.on = false
+			a, sess, _ := newMailApp(t, rec)
+			return a, sess, a.createUser("target@test.com", "oldpass12", roleEditor).ID
+		}, ""},
 	}
-
-	if code, _ := send(admin.ID); code != 422 {
-		t.Errorf("own account: %d", code)
-	}
-
-	// No public URL: the link would point nowhere.
-	noURL, noURLSess, _ := newMailAppAt(t, "", rec)
-	other := noURL.createUser("target@test.com", "oldpass12", roleEditor)
-	res := noURL.do("POST", "/api/users/"+itoa(other.ID)+"/password-token", map[string]any{"send": true}, noURLSess.Token, noURLSess.CSRF)
-	if body := decodeJSON(t, res); res.StatusCode != 422 || !strings.Contains(toString(body), "public URL") {
-		t.Errorf("no app_url: %d %v", res.StatusCode, body)
-	}
-
-	// Password sign-in switched off in favour of SSO.
-	insertSSO(t, a.db, true)
-	_ = settings.Store{DB: a.db}.Set(context.Background(), "password_login_enabled", false)
-	if code, _ := send(target.ID); code != 422 {
-		t.Errorf("password login off: %d", code)
-	}
-	_ = settings.Store{DB: a.db}.Set(context.Background(), "password_login_enabled", true)
-
-	// SMTP down: say so, and keep the old token usable for nobody else.
-	rec.sendErr = errors.New("connection refused")
-	if code, body := send(target.ID); code != 422 || !strings.Contains(toString(body), "connection refused") {
-		t.Errorf("smtp down: %d %v", code, body)
-	}
-	if n := len(rec.messages()); n != 0 {
-		t.Errorf("%d emails recorded", n)
-	}
-
-	// Mail off: asking to send is an error, not a silent fallback.
-	off := &recorder{}
-	a, sess, _ = newMailApp(t, off)
-	target = a.createUser("target@test.com", "oldpass12", roleEditor)
-	if code, _ := send(target.ID); code != 422 {
-		t.Errorf("mail off: %d", code)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			rec := &recorder{on: true}
+			a, sess, id := c.setup(t, rec)
+			code, body := sendResetLink(t, a, sess, id)
+			if code != 422 || !strings.Contains(toString(body), c.say) {
+				t.Errorf("%d %v, want 422 mentioning %q", code, body, c.say)
+			}
+			if n := len(rec.messages()); n != 0 {
+				t.Errorf("%d emails recorded", n)
+			}
+		})
 	}
 }
 
@@ -305,32 +315,42 @@ func TestNewUserGetsTheSetPasswordLinkByEmail(t *testing.T) {
 }
 
 func TestNewUserEmailNeedsMailAndNoPassword(t *testing.T) {
-	rec := &recorder{on: true}
-	a, sess, _ := newMailApp(t, rec)
-	create := func(email string, extra map[string]any) int {
-		in := map[string]any{"name": "New", "email": email, "role": "user"}
+	create := func(a *testApp, sess *auth.Issued, email string, extra map[string]any) (int, map[string]any) {
+		in := map[string]any{"name": "New", "email": email, "role": "user", "send": true}
 		for k, v := range extra {
 			in[k] = v
 		}
-		return a.do("POST", "/api/users", in, sess.Token, sess.CSRF).StatusCode
+		res := a.do("POST", "/api/users", in, sess.Token, sess.CSRF)
+		return res.StatusCode, decodeJSON(t, res)
 	}
 
-	if code := create("pw@test.com", map[string]any{"send": true, "password": "longenough1"}); code != 422 {
-		t.Errorf("send with a password: %d", code)
-	}
-	// SMTP down: the user exists, nobody got the link, and the response says so.
-	rec.sendErr = errors.New("connection refused")
-	res := a.do("POST", "/api/users", map[string]any{"name": "New", "email": "down@test.com", "role": "user", "send": true}, sess.Token, sess.CSRF)
-	data, _ := decodeJSON(t, res)["data"].(map[string]any)
-	if res.StatusCode != 201 || data["emailError"] == nil || data["token"] != nil {
-		t.Errorf("smtp down: %d %v", res.StatusCode, data)
-	}
+	t.Run("a password and a link are exclusive", func(t *testing.T) {
+		rec := &recorder{on: true}
+		a, sess, _ := newMailApp(t, rec)
+		if code, body := create(a, sess, "pw@test.com", map[string]any{"password": "longenough1"}); code != 422 {
+			t.Errorf("send with a password: %d %v", code, body)
+		}
+		if n := len(rec.messages()); n != 0 {
+			t.Errorf("%d emails sent", n)
+		}
+	})
 
-	off := &recorder{}
-	a, sess, _ = newMailApp(t, off)
-	if code := create("off@test.com", map[string]any{"send": true}); code != 422 {
-		t.Errorf("mail off: %d", code)
-	}
+	// The user exists, nobody got the link, and the response says so.
+	t.Run("SMTP down", func(t *testing.T) {
+		a, sess, _ := newMailApp(t, &recorder{on: true, sendErr: errors.New("connection refused")})
+		code, body := create(a, sess, "down@test.com", nil)
+		data, _ := body["data"].(map[string]any)
+		if code != 201 || data["emailError"] == nil || data["token"] != nil || data["emailSent"] == true {
+			t.Errorf("smtp down: %d %v", code, body)
+		}
+	})
+
+	t.Run("mail off", func(t *testing.T) {
+		a, sess, _ := newMailApp(t, &recorder{})
+		if code, body := create(a, sess, "off@test.com", nil); code != 422 {
+			t.Errorf("mail off: %d %v", code, body)
+		}
+	})
 }
 
 // With verification required a link handed over by the admin proves nothing
@@ -381,26 +401,5 @@ func flatten(v any) []string {
 		return out
 	default:
 		return nil
-	}
-}
-
-func TestInvitationReturnsAnIdThatRevokesIt(t *testing.T) {
-	a, sess, _ := newMailApp(t, &recorder{})
-	path := "/api/spaces/" + itoa(a.space.ID) + "/invitations"
-
-	res := a.do("POST", path, map[string]any{"role": "viewer"}, sess.Token, sess.CSRF)
-	data := decodeJSON(t, res)["data"].(map[string]any)
-	id, _ := data["id"].(float64)
-	if res.StatusCode != 201 || id == 0 {
-		t.Fatalf("invite %d %v", res.StatusCode, data)
-	}
-
-	res = a.do("DELETE", path+"/"+itoa(int64(id)), nil, sess.Token, sess.CSRF)
-	if res.StatusCode != 204 {
-		t.Fatalf("revoke %d", res.StatusCode)
-	}
-	list := decodeJSON(t, a.do("GET", path, nil, sess.Token, sess.CSRF))["data"].([]any)
-	if len(list) != 0 {
-		t.Errorf("invitation still listed: %v", list)
 	}
 }

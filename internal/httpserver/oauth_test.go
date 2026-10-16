@@ -95,13 +95,19 @@ func (a *testApp) approve(sessToken, csrf, clientID string, approve bool) string
 // connect plays the whole sign-in of an app and returns its client id and access token.
 func (a *testApp) connect(sess *auth.Issued) (clientID, access string) {
 	a.t.Helper()
+	clientID, access, _ = a.connectWithRefresh(sess)
+	return clientID, access
+}
+
+func (a *testApp) connectWithRefresh(sess *auth.Issued) (clientID, access, refresh string) {
+	a.t.Helper()
 	id := a.registerClient()
 	code := codeFrom(a.t, a.approve(sess.Token, sess.CSRF, id, true))
 	status2, tok := a.token(url.Values{"grant_type": {"authorization_code"}, "client_id": {id}, "code": {code}, "code_verifier": {oauthVerifier}, "redirect_uri": {oauthRedirect}})
 	if status2 != 200 {
 		a.t.Fatalf("token = %d %v", status2, tok)
 	}
-	return id, tok["access_token"].(string)
+	return id, tok["access_token"].(string), tok["refresh_token"].(string)
 }
 
 func codeFrom(t *testing.T, redirectURL string) string {
@@ -131,7 +137,7 @@ func TestOAuthMetadata(t *testing.T) {
 	}
 
 	// Registration is advertised only while an admin has it open.
-	if _, closed := func() (int, map[string]any) { return a.getJSON("/.well-known/oauth-authorization-server") }(); closed["registration_endpoint"] != nil {
+	if _, closed := a.getJSON("/.well-known/oauth-authorization-server"); closed["registration_endpoint"] != nil {
 		t.Fatalf("closed registration is advertised: %v", closed)
 	}
 	a.svc.OAuth.OpenRegistration(oauth.RegistrationWindow)
@@ -301,26 +307,52 @@ func TestOAuthDenyReturnsAccessDenied(t *testing.T) {
 
 func TestOAuthTokenErrors(t *testing.T) {
 	a := newTestApp(t)
+	u := a.issue(a.createUser("oauth@a.com", "secret1", roleEditor), false)
 	id := a.registerClient()
-	cases := map[string]url.Values{
-		"unsupported_grant_type": {"grant_type": {"password"}, "client_id": {id}},
-		"invalid_client":         {"grant_type": {"authorization_code"}, "client_id": {"unknown"}, "code": {"x"}},
-		"invalid_grant":          {"grant_type": {"authorization_code"}, "client_id": {id}, "code": {"x"}, "code_verifier": {oauthVerifier}, "redirect_uri": {oauthRedirect}},
+	exchange := func(code, verifier, redirect string) url.Values {
+		return url.Values{"grant_type": {"authorization_code"}, "client_id": {id}, "code": {code}, "code_verifier": {verifier}, "redirect_uri": {redirect}}
 	}
-	for want, form := range cases {
-		_, body := a.token(form)
-		if body["error"] != want {
-			t.Errorf("%s: got %v", want, body)
+	freshCode := func() string { return codeFrom(t, a.approve(u.Token, u.CSRF, id, true)) }
+
+	cases := []struct {
+		name string
+		form url.Values
+		want string
+	}{
+		{"unknown grant type", url.Values{"grant_type": {"password"}, "client_id": {id}}, "unsupported_grant_type"},
+		{"unknown client", url.Values{"grant_type": {"authorization_code"}, "client_id": {"unknown"}, "code": {"x"}}, "invalid_client"},
+		{"unknown code", exchange("x", oauthVerifier, oauthRedirect), "invalid_grant"},
+		{"wrong PKCE verifier", exchange(freshCode(), strings.Repeat("w", 43), oauthRedirect), "invalid_grant"},
+		{"other redirect URI", exchange(freshCode(), oauthVerifier, "https://claude.ai/other"), "invalid_grant"},
+	}
+	for _, c := range cases {
+		code, body := a.token(c.form)
+		if code != http.StatusBadRequest && code != http.StatusUnauthorized || body["error"] != c.want {
+			t.Errorf("%s: %d %v, want %s", c.name, code, body, c.want)
 		}
+	}
+
+	// A code works once: a replay is refused, whoever sends it.
+	code := freshCode()
+	if st, body := a.token(exchange(code, oauthVerifier, oauthRedirect)); st != 200 {
+		t.Fatalf("first exchange = %d %v", st, body)
+	}
+	if _, body := a.token(exchange(code, oauthVerifier, oauthRedirect)); body["error"] != "invalid_grant" {
+		t.Errorf("replayed code: %v", body)
 	}
 }
 
 func TestOAuthRegistrationIsClosedByDefault(t *testing.T) {
 	a := newTestApp(t)
 	raw, _ := json.Marshal(map[string]any{"client_name": "Claude", "redirect_uris": []string{oauthRedirect}})
-	res, _ := a.client.Post(a.srv.URL+"/oauth/register", "application/json", bytes.NewReader(raw))
+	res, err := a.client.Post(a.srv.URL+"/oauth/register", "application/json", bytes.NewReader(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
 	body := decodeJSON(t, res)
-	if res.StatusCode != http.StatusNotFound || body["error"] != nil || strings.Contains(strings.ToLower(body["message"].(string)), "admin") {
+	// A plain "not found": nothing says a window exists or an admin can open it.
+	msg, _ := body["message"].(string)
+	if res.StatusCode != http.StatusNotFound || body["error"] != nil || msg != "Not found." {
 		t.Fatalf("closed registration must look absent: %d %v", res.StatusCode, body)
 	}
 }
@@ -405,13 +437,16 @@ func TestRemovingAnAppCutsItOffAtOnce(t *testing.T) {
 	a := newTestApp(t)
 	user := a.issue(a.createUser("u@a.com", "secret1", roleEditor), false)
 	admin := a.issue(a.createUser("admin@a.com", "secret1", "admin"), false)
-	id, access := a.connect(user)
+	id, access, refresh := a.connectWithRefresh(user)
 	if res := a.bearer("GET", "/api/spaces", nil, access); res.StatusCode != http.StatusOK {
 		t.Fatalf("read = %d", res.StatusCode)
 	}
 	status(t, a.do("DELETE", "/api/admin/oauth/clients/"+id, nil, admin.Token, admin.CSRF), http.StatusNoContent, "remove")
 	if res := a.bearer("GET", "/api/spaces", nil, access); res.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("read after removal = %d, want 401", res.StatusCode)
+	}
+	if _, body := a.token(url.Values{"grant_type": {"refresh_token"}, "client_id": {id}, "refresh_token": {refresh}}); body["error"] == nil {
+		t.Fatalf("a removed app refreshed its tokens: %v", body)
 	}
 	status(t, a.do("DELETE", "/api/admin/oauth/clients/"+id, nil, admin.Token, admin.CSRF), http.StatusNotFound, "remove twice")
 }
@@ -476,4 +511,28 @@ func TestOAuthConsentCanGrantWriteToChosenResources(t *testing.T) {
 	// The grant survives a refresh.
 	_, next := a.token(url.Values{"grant_type": {"refresh_token"}, "client_id": {id}, "refresh_token": {tok["refresh_token"].(string)}})
 	status(t, a.bearer("POST", "/api/tags", map[string]any{"name": "t2"}, next["access_token"].(string)), http.StatusCreated, "write after refresh")
+}
+
+// Browser-based MCP clients ask before they call the discovery and token endpoints.
+// /mcp is not listed: its OPTIONS route is replaced by the catch-all Handle, so a
+// preflight meets the bearer check and gets 401.
+func TestOAuthPreflightAllowsBrowserClients(t *testing.T) {
+	a := newTestApp(t)
+	for _, path := range []string{"/.well-known/oauth-protected-resource", "/.well-known/oauth-authorization-server", "/oauth/register", "/oauth/token"} {
+		req, _ := http.NewRequest("OPTIONS", a.srv.URL+path, nil)
+		req.Header.Set("Origin", "https://claude.ai")
+		req.Header.Set("Access-Control-Request-Method", "POST")
+		res, err := a.client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		if res.StatusCode != http.StatusNoContent || res.Header.Get("Access-Control-Allow-Origin") == "" ||
+			!strings.Contains(res.Header.Get("Access-Control-Allow-Headers"), "Authorization") {
+			t.Errorf("%s: %d %v", path, res.StatusCode, res.Header)
+		}
+		if res.Header.Get("Access-Control-Allow-Credentials") != "" {
+			t.Errorf("%s: the endpoints take no cookies, so credentials must not be allowed", path)
+		}
+	}
 }

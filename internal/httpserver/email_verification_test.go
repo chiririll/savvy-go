@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"savvy-go/internal/auth"
 	"savvy-go/internal/mail/smtp"
@@ -39,7 +40,7 @@ func (a *testApp) verified(id int64) bool {
 	return u.EmailVerified
 }
 
-func TestRequiringVerificationNeedsAVerifiedAdminAndMail(t *testing.T) {
+func TestRequiringVerificationNeedsAVerifiedAdmin(t *testing.T) {
 	a, sess, admin := newMailApp(t, &recorder{on: true})
 	on := map[string]any{"require_email_verification": true}
 
@@ -249,6 +250,32 @@ func TestVerificationLinkDiesWithTheAddress(t *testing.T) {
 	}
 	if a.verified(user.ID) {
 		t.Fatal("verified through an old link")
+	}
+}
+
+func TestVerificationLinkExpires(t *testing.T) {
+	rec := &recorder{on: true}
+	a, _, _ := newMailApp(t, rec)
+	user := a.createUser("u@test.com", "secret1", roleEditor)
+	us := a.issue(user, false)
+	a.do("POST", "/api/auth/verify-email/resend", nil, us.Token, us.CSRF).Body.Close()
+	token := strings.TrimPrefix(linkIn(t, rec.messages()[0]).Path, "/verify-email/")
+
+	if _, err := a.db.Exec(`UPDATE email_verification_tokens SET expires_at = ?`, time.Now().Add(-time.Minute).UTC()); err != nil {
+		t.Fatal(err)
+	}
+	if res := a.do("POST", "/api/auth/verify-email", map[string]any{"token": token}, "", ""); res.StatusCode != 422 {
+		t.Fatalf("an expired link: %d", res.StatusCode)
+	}
+	if a.verified(user.ID) {
+		t.Fatal("verified through an expired link")
+	}
+
+	// The user asks again and the new link works.
+	a.do("POST", "/api/auth/verify-email/resend", nil, us.Token, us.CSRF).Body.Close()
+	fresh := strings.TrimPrefix(linkIn(t, rec.messages()[1]).Path, "/verify-email/")
+	if res := a.do("POST", "/api/auth/verify-email", map[string]any{"token": fresh}, "", ""); res.StatusCode != 200 || !a.verified(user.ID) {
+		t.Fatalf("the new link: %d", res.StatusCode)
 	}
 }
 
