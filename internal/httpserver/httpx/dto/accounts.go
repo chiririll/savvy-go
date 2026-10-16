@@ -41,17 +41,8 @@ type Debt struct {
 }
 
 func NewDebt(a ledger.Account) Debt {
-	target := money.Zero(a.Currency.Unit())
-	if a.TargetAmount != nil {
-		target = *a.TargetAmount
-	}
-	progress := 0.0
-	if target.IsPositive() {
-		paid := target.Sub(a.Balance)
-		progress = max(0, 100*float64(paid.Minor())/float64(target.Minor()))
-	}
 	return Debt{
-		Account: NewAccount(a), DebtType: a.DebtType, TargetAmount: target, PaymentProgress: progress,
+		Account: NewAccount(a), DebtType: a.DebtType, TargetAmount: a.DebtTarget(), PaymentProgress: a.PaymentProgress(),
 		DueDate: a.DueDate, Counterparty: a.Counterparty, Description: a.DebtDesc, IsPaidOff: a.IsPaidOff,
 	}
 }
@@ -80,7 +71,7 @@ type DebtSummary struct {
 
 func NewDebtSummary(s ledger.DebtSummary) DebtSummary {
 	return DebtSummary{
-		TotalIOwe: s.IOwe, TotalOwedToMe: s.OwedToMe, NetDebt: s.OwedToMe.Sub(s.IOwe), DebtsCount: s.Count,
+		TotalIOwe: s.IOwe, TotalOwedToMe: s.OwedToMe, NetDebt: s.Net(), DebtsCount: s.Count,
 		Currency: currencyCode(s.Currency), Decimals: currencyDecimals(s.Currency),
 	}
 }

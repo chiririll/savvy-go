@@ -3,24 +3,22 @@ package dto
 import (
 	"time"
 
-	"github.com/shopspring/decimal"
-
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/money"
 )
 
 type Currency struct {
-	ID       int64           `json:"id"`
-	Code     string          `json:"code"`
-	Name     string          `json:"name"`
-	Symbol   string          `json:"symbol"`
-	Decimals int             `json:"decimals"`
-	IsBase   bool            `json:"isBase"`
-	Rate     decimal.Decimal `json:"rate"`
+	ID       int64  `json:"id"`
+	Code     string `json:"code"`
+	Name     string `json:"name"`
+	Symbol   string `json:"symbol"`
+	Decimals int    `json:"decimals"`
+	IsBase   bool   `json:"isBase"`
+	Rate     Number `json:"rate"`
 }
 
 func NewCurrency(c ledger.Currency) Currency {
-	return Currency{ID: c.ID, Code: c.Code, Name: c.Name, Symbol: c.Symbol, Decimals: c.Decimals, IsBase: c.IsBase, Rate: c.Rate}
+	return Currency{ID: c.ID, Code: c.Code, Name: c.Name, Symbol: c.Symbol, Decimals: c.Decimals, IsBase: c.IsBase, Rate: Number(c.Rate)}
 }
 
 type Tag struct {

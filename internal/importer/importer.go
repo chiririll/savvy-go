@@ -49,9 +49,45 @@ type Import struct {
 	CreatedCount  int
 	SkippedCount  int
 	ErrorCount    int
-	Errors        any
-	Meta          map[string]any
+	Errors        []RowError
+	Meta          Meta
 	Message       *string
+}
+
+// RowError is a row the import could not take, numbered from 1.
+type RowError struct {
+	Row     int    `json:"row"`
+	Message string `json:"message"`
+}
+
+// Formats are the CSV conventions found in the sample.
+type Formats struct {
+	DateFormat   string `json:"date_format"`
+	AmountFormat string `json:"amount_format"`
+	HasHeader    bool   `json:"has_header"`
+	Delimiter    string `json:"delimiter"`
+}
+
+// ParseMeta describes how the file was read.
+type ParseMeta struct {
+	Delimiter string `json:"delimiter"`
+	HasHeader bool   `json:"has_header"`
+	Encoding  string `json:"encoding"`
+}
+
+// Meta is what an import keeps next to its row counts, stored as JSON with
+// snake_case keys. The first group is set when the file is parsed, the second
+// when the import completes.
+type Meta struct {
+	Headers          []string       `json:"headers,omitempty"`
+	PreviewRows      [][]string     `json:"preview_rows,omitempty"`
+	DetectedFormats  Formats        `json:"detected_formats"`
+	SuggestedMapping map[string]int `json:"suggested_mapping,omitempty"`
+	ParseMeta        ParseMeta      `json:"parse_meta"`
+
+	CreatedCurrencies []string `json:"created_currencies"`
+	CreatedTags       []string `json:"created_tags"`
+	CreatedCategories []string `json:"created_categories"`
 }
 
 func (s Service) Create(ctx context.Context, userID int64, uploadID string) (*Import, error) {
@@ -79,15 +115,10 @@ func (s Service) ByID(ctx context.Context, id string) (*Import, error) {
 		_ = json.Unmarshal([]byte(*row.Options), &im.Options)
 	}
 	if row.Errors != nil && *row.Errors != "" {
-		var v any
-		_ = json.Unmarshal([]byte(*row.Errors), &v)
-		im.Errors = v
+		_ = json.Unmarshal([]byte(*row.Errors), &im.Errors)
 	}
 	if row.Meta != nil && *row.Meta != "" {
 		_ = json.Unmarshal([]byte(*row.Meta), &im.Meta)
-	}
-	if im.Meta == nil {
-		im.Meta = map[string]any{}
 	}
 	return &im, nil
 }
@@ -114,14 +145,12 @@ func (s Service) Parse(ctx context.Context, importID, uploadID string) error {
 	if len(preview) > 10 {
 		preview = preview[:10]
 	}
-	meta := map[string]any{
-		"headers": headers, "preview_rows": preview,
-		"detected_formats": map[string]any{
-			"date_format": detected.dateFormat, "amount_format": detected.amountFormat,
-			"has_header": true, "delimiter": string(detected.delimiter),
-		},
-		"suggested_mapping": detected.mapping,
-		"parse_meta":        map[string]any{"delimiter": string(detected.delimiter), "has_header": true, "encoding": "utf-8"},
+	delim := string(detected.delimiter)
+	meta := Meta{
+		Headers: headers, PreviewRows: preview,
+		DetectedFormats:  Formats{DateFormat: detected.dateFormat, AmountFormat: detected.amountFormat, HasHeader: true, Delimiter: delim},
+		SuggestedMapping: detected.mapping,
+		ParseMeta:        ParseMeta{Delimiter: delim, HasHeader: true, Encoding: "utf-8"},
 	}
 	rawMeta, _ := json.Marshal(meta)
 	return s.repo().MarkParsed(ctx, importID, len(rows), string(rawMeta), time.Now().UTC())
@@ -153,7 +182,7 @@ func (s Service) Execute(ctx context.Context, importID string, mapping, options 
 		return s.fail(ctx, importID, err.Error())
 	}
 	created, skipped := 0, 0
-	var errs []map[string]any
+	errs := []RowError{}
 	accountID, _ := asInt64(options["default_account_id"])
 	resolver, err := s.newCategoryResolver(ctx, collectImportCategories(rows, mapping, options), options)
 	if err != nil {
@@ -167,14 +196,14 @@ func (s Service) Execute(ctx context.Context, importID string, mapping, options 
 		res := processImportRow(row, mapping, options, i+1)
 		if res.err != "" {
 			if len(errs) < 200 {
-				errs = append(errs, map[string]any{"row": i + 1, "message": res.err})
+				errs = append(errs, RowError{Row: i + 1, Message: res.err})
 			}
 			continue
 		}
 		amount, err := money.FromInput(res.amount, unit)
 		if err != nil {
 			if len(errs) < 200 {
-				errs = append(errs, map[string]any{"row": i + 1, "message": err.Error()})
+				errs = append(errs, RowError{Row: i + 1, Message: err.Error()})
 			}
 			continue
 		}
@@ -184,7 +213,7 @@ func (s Service) Execute(ctx context.Context, importID string, mapping, options 
 			Description: res.desc, Date: res.date, Status: "confirmed", DedupHash: hash,
 		}, now)
 		if err != nil {
-			errs = append(errs, map[string]any{"row": i + 1, "message": err.Error()})
+			errs = append(errs, RowError{Row: i + 1, Message: err.Error()})
 			continue
 		}
 		if added {
@@ -195,12 +224,7 @@ func (s Service) Execute(ctx context.Context, importID string, mapping, options 
 	}
 	errJSON, _ := json.Marshal(errs)
 	meta := im.Meta
-	if meta == nil {
-		meta = map[string]any{}
-	}
-	meta["created_currencies"] = []any{}
-	meta["created_tags"] = []any{}
-	meta["created_categories"] = resolver.created
+	meta.CreatedCurrencies, meta.CreatedTags, meta.CreatedCategories = []string{}, []string{}, resolver.created
 	metaJSON, _ := json.Marshal(meta)
 	err = s.repo().MarkCompleted(ctx, importID, repo.Result{
 		Processed: created + skipped + len(errs), Created: created, Skipped: skipped, Errors: len(errs),

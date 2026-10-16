@@ -141,6 +141,9 @@ type DebtSummary struct {
 	Currency *Currency
 }
 
+// Net is what is owed to the user less what the user owes.
+func (s DebtSummary) Net() money.Money { return s.OwedToMe.Sub(s.IOwe) }
+
 func (s Debts) Summary(ctx context.Context) DebtSummary {
 	debts, _ := s.All(ctx, false)
 	base, _ := (Currencies{DB: s.Accounts.DB}).Base(ctx)
@@ -165,4 +168,26 @@ func (s Debts) Delete(ctx context.Context, id int64) error {
 		return fmt.Errorf("has history")
 	}
 	return s.repo().DeleteDebt(ctx, id)
+}
+
+// DebtTarget is the amount the debt was taken at, zero when none was set. It is
+// in the account's currency.
+func (a Account) DebtTarget() money.Money {
+	if a.TargetAmount != nil {
+		return *a.TargetAmount
+	}
+	return money.Zero(a.Balance.Unit())
+}
+
+// PaymentProgress is the share of the target already paid, as a percentage
+// rounded to one decimal and kept within 0..100: an overpaid debt is 100, a
+// debt that has grown beyond its target is 0.
+func (a Account) PaymentProgress() float64 {
+	target := a.DebtTarget()
+	if !target.IsPositive() {
+		return 0
+	}
+	paid := target.Sub(a.Balance)
+	pct := paid.Decimal().Div(target.Decimal()).Mul(decimal.NewFromInt(100)).Round(1)
+	return min(100, max(0, pct.InexactFloat64()))
 }

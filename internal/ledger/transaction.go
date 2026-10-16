@@ -98,6 +98,30 @@ var ErrTransferRow = errors.New("this transaction is one side of a transfer betw
 // they are written only by Transfers.
 func transferSideType(typ string) bool { return typ == "transfer_out" || typ == "transfer_in" }
 
+// TxActions is what may be done to a transaction. The Transactions service
+// refuses what is not allowed, and the API reports the same flags to clients.
+type TxActions struct {
+	Edit, Delete, Duplicate, Confirm, Skip bool
+}
+
+// Allowed is the single source of truth for TxActions. One side of a transfer
+// between spaces changes only through the transfer, never as a transaction.
+func (t Transaction) Allowed() TxActions {
+	if transferSideType(t.Type) {
+		return TxActions{}
+	}
+	pending := t.Status == "pending"
+	skipped := t.Status == "skipped"
+	recurring := t.RecurringID != nil
+	return TxActions{
+		Edit:      !skipped && !recurring,
+		Delete:    !recurring,
+		Duplicate: !recurring && !skipped,
+		Confirm:   pending,
+		Skip:      pending && recurring,
+	}
+}
+
 func (s Transactions) Create(ctx context.Context, in TxInput) (*Transaction, error) {
 	if transferSideType(in.Type) {
 		return nil, ErrTransferRow
@@ -153,7 +177,7 @@ func (s Transactions) Update(ctx context.Context, id int64, in TxInput) (*Transa
 	if err != nil || cur == nil {
 		return cur, err
 	}
-	if cur.Status == "skipped" || cur.RecurringID != nil {
+	if !cur.Allowed().Edit {
 		return nil, fmt.Errorf("cannot edit")
 	}
 	amount, toAmount, err := s.amounts(ctx, in)
@@ -236,7 +260,7 @@ func (s Transactions) Delete(ctx context.Context, id int64) error {
 	if err != nil || cur == nil {
 		return err
 	}
-	if cur.RecurringID != nil {
+	if !cur.Allowed().Delete {
 		return fmt.Errorf("cannot delete recurring")
 	}
 	return s.repo().DeleteTransaction(ctx, id)
@@ -253,7 +277,7 @@ func (s Transactions) Confirm(ctx context.Context, id int64, date string, amount
 	if err != nil || cur == nil {
 		return cur, err
 	}
-	if cur.Status != "pending" {
+	if !cur.Allowed().Confirm {
 		return nil, fmt.Errorf("not pending")
 	}
 	if date == "" && cur.Date != nil {
@@ -292,7 +316,7 @@ func (s Transactions) Skip(ctx context.Context, id int64) (*Transaction, error) 
 	if err != nil || cur == nil {
 		return cur, err
 	}
-	if cur.Status != "pending" || cur.RecurringID == nil {
+	if !cur.Allowed().Skip {
 		return nil, fmt.Errorf("cannot skip")
 	}
 	if err := s.repo().SkipTransaction(ctx, id, time.Now().UTC()); err != nil {
@@ -309,7 +333,7 @@ func (s Transactions) Duplicate(ctx context.Context, id int64) (*Transaction, er
 	if err != nil || cur == nil {
 		return cur, err
 	}
-	if cur.RecurringID != nil {
+	if !cur.Allowed().Duplicate {
 		return nil, fmt.Errorf("cannot duplicate")
 	}
 	today := time.Now().In(appLocation).Format("2006-01-02")
@@ -371,6 +395,9 @@ type TransactionSummary struct {
 	Count    int
 	Currency *Currency
 }
+
+// Balance is income less expense.
+func (s TransactionSummary) Balance() money.Money { return s.Income.Sub(s.Expense) }
 
 func (s Transactions) Summary(ctx context.Context, pendingOnly bool) TransactionSummary {
 	status := "confirmed"

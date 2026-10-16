@@ -5,27 +5,32 @@ import (
 )
 
 type ImportFormats struct {
-	DateFormat   any  `json:"dateFormat"`
-	AmountFormat any  `json:"amountFormat"`
-	HasHeader    bool `json:"hasHeader"`
-	Delimiter    any  `json:"delimiter"`
+	DateFormat   string `json:"dateFormat"`
+	AmountFormat string `json:"amountFormat"`
+	HasHeader    bool   `json:"hasHeader"`
+	Delimiter    string `json:"delimiter"`
 }
 
 type ImportParse struct {
-	Headers          any           `json:"headers"`
-	PreviewRows      any           `json:"previewRows"`
-	TotalRows        *int          `json:"totalRows"`
-	DetectedFormats  ImportFormats `json:"detectedFormats"`
-	SuggestedMapping any           `json:"suggestedMapping"`
+	Headers          []string       `json:"headers"`
+	PreviewRows      [][]string     `json:"previewRows"`
+	TotalRows        *int           `json:"totalRows"`
+	DetectedFormats  ImportFormats  `json:"detectedFormats"`
+	SuggestedMapping map[string]int `json:"suggestedMapping"`
+}
+
+type ImportRowError struct {
+	Row     int    `json:"row"`
+	Message string `json:"message"`
 }
 
 type ImportResult struct {
-	Created           int `json:"created"`
-	SkippedDuplicates int `json:"skippedDuplicates"`
-	Errors            any `json:"errors"`
-	CreatedCurrencies any `json:"createdCurrencies"`
-	CreatedTags       any `json:"createdTags"`
-	CreatedCategories any `json:"createdCategories"`
+	Created           int              `json:"created"`
+	SkippedDuplicates int              `json:"skippedDuplicates"`
+	Errors            []ImportRowError `json:"errors"`
+	CreatedCurrencies []string         `json:"createdCurrencies"`
+	CreatedTags       []string         `json:"createdTags"`
+	CreatedCategories []string         `json:"createdCategories"`
 }
 
 type Import struct {
@@ -41,37 +46,42 @@ type Import struct {
 	Result        *ImportResult `json:"result"`
 }
 
-// NewImport reads the parse/result details from im.Meta, which the domain
-// stores as JSON with snake_case keys.
+// NewImport renames the parse and result details of im to wire keys.
 func NewImport(im importer.Import) Import {
 	out := Import{
 		ImportID: im.ID, Status: im.Status, TotalRows: im.TotalRows, ProcessedRows: im.ProcessedRows,
 		Created: im.CreatedCount, Skipped: im.SkippedCount, Errors: im.ErrorCount, Message: im.Message,
 	}
-	parsed := im.Status == "parsed" || im.Status == "importing" || im.Status == "completed"
-	if parsed && im.Meta != nil {
-		formats, _ := im.Meta["detected_formats"].(map[string]any)
-		hasHeader, _ := formats["has_header"].(bool)
+	meta := im.Meta
+	if im.Status == "parsed" || im.Status == "importing" || im.Status == "completed" {
+		f := meta.DetectedFormats
 		out.Parse = &ImportParse{
-			Headers:     im.Meta["headers"],
-			PreviewRows: im.Meta["preview_rows"],
+			Headers:     orEmpty(meta.Headers),
+			PreviewRows: orEmpty(meta.PreviewRows),
 			TotalRows:   im.TotalRows,
 			DetectedFormats: ImportFormats{
-				DateFormat: formats["date_format"], AmountFormat: formats["amount_format"],
-				HasHeader: hasHeader, Delimiter: formats["delimiter"],
+				DateFormat: f.DateFormat, AmountFormat: f.AmountFormat, HasHeader: f.HasHeader, Delimiter: f.Delimiter,
 			},
-			SuggestedMapping: im.Meta["suggested_mapping"],
+			SuggestedMapping: meta.SuggestedMapping,
 		}
 	}
 	if im.Status == "completed" {
 		out.Result = &ImportResult{
 			Created:           im.CreatedCount,
 			SkippedDuplicates: im.SkippedCount,
-			Errors:            im.Errors,
-			CreatedCurrencies: im.Meta["created_currencies"],
-			CreatedTags:       im.Meta["created_tags"],
-			CreatedCategories: im.Meta["created_categories"],
+			Errors:            Map(im.Errors, func(e importer.RowError) ImportRowError { return ImportRowError(e) }),
+			CreatedCurrencies: orEmpty(meta.CreatedCurrencies),
+			CreatedTags:       orEmpty(meta.CreatedTags),
+			CreatedCategories: orEmpty(meta.CreatedCategories),
 		}
 	}
 	return out
+}
+
+// orEmpty makes a nil slice serialize as [].
+func orEmpty[T any](s []T) []T {
+	if s == nil {
+		return []T{}
+	}
+	return s
 }

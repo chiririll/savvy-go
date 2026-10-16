@@ -3,22 +3,20 @@ package dto
 import (
 	"time"
 
-	"github.com/shopspring/decimal"
-
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/money"
 )
 
 type TxItem struct {
-	ID           int64           `json:"id"`
-	Name         string          `json:"name"`
-	Quantity     decimal.Decimal `json:"quantity"`
-	PricePerUnit money.Money     `json:"pricePerUnit"`
-	TotalPrice   money.Money     `json:"totalPrice"`
+	ID           int64       `json:"id"`
+	Name         string      `json:"name"`
+	Quantity     Number      `json:"quantity"`
+	PricePerUnit money.Money `json:"pricePerUnit"`
+	TotalPrice   money.Money `json:"totalPrice"`
 }
 
 func NewTxItem(i ledger.TxItem) TxItem {
-	return TxItem{ID: i.ID, Name: i.Name, Quantity: i.Quantity, PricePerUnit: i.PricePerUnit, TotalPrice: i.TotalPrice}
+	return TxItem{ID: i.ID, Name: i.Name, Quantity: Number(i.Quantity), PricePerUnit: i.PricePerUnit, TotalPrice: i.TotalPrice}
 }
 
 type TxActions struct {
@@ -62,23 +60,7 @@ func NewTransaction(t ledger.Transaction) Transaction {
 	}
 }
 
-func transactionActions(t ledger.Transaction) TxActions {
-	// One side of a transfer between spaces changes only through the
-	// transfer (in the space settings), never as a transaction.
-	if t.Type == "transfer_out" || t.Type == "transfer_in" {
-		return TxActions{}
-	}
-	pending := t.Status == "pending"
-	skipped := t.Status == "skipped"
-	recurring := t.RecurringID != nil
-	return TxActions{
-		Edit:      !skipped && !recurring,
-		Delete:    !recurring,
-		Duplicate: !recurring && !skipped,
-		Confirm:   pending,
-		Skip:      pending && recurring,
-	}
-}
+func transactionActions(t ledger.Transaction) TxActions { return TxActions(t.Allowed()) }
 
 type TransactionSummary struct {
 	Income            money.Money `json:"income"`
@@ -90,7 +72,7 @@ type TransactionSummary struct {
 
 func NewTransactionSummary(s ledger.TransactionSummary) TransactionSummary {
 	return TransactionSummary{
-		Income: s.Income, Expense: s.Expense, Balance: s.Income.Sub(s.Expense),
+		Income: s.Income, Expense: s.Expense, Balance: s.Balance(),
 		TransactionsCount: s.Count, Currency: currencyCode(s.Currency),
 	}
 }

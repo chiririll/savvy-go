@@ -47,8 +47,8 @@ type WebAuthnCred struct {
 	ID         int64
 	Name       *string
 	AAGUID     *string
-	LastUsedAt *string
-	CreatedAt  *string
+	LastUsedAt *time.Time
+	CreatedAt  *time.Time
 }
 
 // ErrNoPublicURL means passkeys cannot work: the relying party is the public
@@ -141,8 +141,7 @@ func (w WebAuthn) FinishRegistration(ctx context.Context, u *User, token, name s
 	if err != nil {
 		return nil, err
 	}
-	created := now.Format(time.RFC3339)
-	return &WebAuthnCred{ID: id, Name: &name, AAGUID: &aaguid, CreatedAt: &created}, nil
+	return &WebAuthnCred{ID: id, Name: &name, AAGUID: &aaguid, CreatedAt: &now}, nil
 }
 
 func (w WebAuthn) BeginLogin(ctx context.Context, u *User) (token string, options any, err error) {

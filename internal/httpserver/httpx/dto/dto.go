@@ -2,21 +2,11 @@
 // Keeping serialization here lets domain types stay free of JSON/HTTP concerns.
 //
 // Conventions: keys are camelCase; optional values are always present and null
-// when unset; money is a JSON number at the scale the domain stored it with.
+// when unset; money is a JSON number at the scale the domain stored it with
+// (money.Money encodes itself; other decimals use Number).
 package dto
 
-import (
-	"time"
-
-	"github.com/shopspring/decimal"
-)
-
-func init() {
-	// Money goes over the wire as a JSON number, not a string. Values read from
-	// storage already carry their currency's scale; computed totals are rounded
-	// to it in the domain.
-	decimal.MarshalJSONWithoutQuotes = true
-}
+import "time"
 
 // Map converts every element of in with fn. It never returns nil, so empty
 // lists serialize as [].
@@ -37,6 +27,7 @@ func ptr[T, R any](v *T, fn func(T) R) *R {
 	return &r
 }
 
+// utc converts an optional timestamp to UTC; nil stays nil.
 func utc(t *time.Time) *time.Time {
 	if t == nil {
 		return nil

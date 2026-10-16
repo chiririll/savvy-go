@@ -593,8 +593,9 @@ func (r Repo) DeleteRecoveryCodes(ctx context.Context, userID int64) error {
 
 // Passkey is a registered credential as the settings page lists it.
 type Passkey struct {
-	ID                                  int64
-	Name, AAGUID, LastUsedAt, CreatedAt *string
+	ID                    int64
+	Name, AAGUID          *string
+	LastUsedAt, CreatedAt *time.Time
 }
 
 func (r Repo) Passkeys(ctx context.Context, userID int64) ([]Passkey, error) {
@@ -605,7 +606,7 @@ func (r Repo) Passkeys(ctx context.Context, userID int64) ([]Passkey, error) {
 	out := make([]Passkey, len(rows))
 	for i, row := range rows {
 		out[i] = Passkey{ID: row.ID, Name: optString(row.Name), AAGUID: optString(row.Aaguid),
-			LastUsedAt: optString(row.LastUsedAt), CreatedAt: optString(row.CreatedAt)}
+			LastUsedAt: optTime(row.LastUsedAt), CreatedAt: optTime(row.CreatedAt)}
 	}
 	return out, nil
 }

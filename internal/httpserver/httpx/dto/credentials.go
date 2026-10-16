@@ -7,28 +7,53 @@ import (
 )
 
 type WebAuthnCred struct {
-	ID         int64   `json:"id"`
-	Name       *string `json:"name"`
-	AAGUID     *string `json:"aaguid"`
-	LastUsedAt *string `json:"lastUsedAt"`
-	CreatedAt  *string `json:"createdAt"`
+	ID         int64      `json:"id"`
+	Name       *string    `json:"name"`
+	AAGUID     *string    `json:"aaguid"`
+	LastUsedAt *time.Time `json:"lastUsedAt"`
+	CreatedAt  *time.Time `json:"createdAt"`
 }
 
 func NewWebAuthnCred(c auth.WebAuthnCred) WebAuthnCred {
-	return WebAuthnCred{ID: c.ID, Name: c.Name, AAGUID: c.AAGUID, LastUsedAt: c.LastUsedAt, CreatedAt: c.CreatedAt}
+	return WebAuthnCred{ID: c.ID, Name: c.Name, AAGUID: c.AAGUID, LastUsedAt: utc(c.LastUsedAt), CreatedAt: utc(c.CreatedAt)}
 }
 
-func APIToken(t auth.APIToken) map[string]any {
-	return map[string]any{
-		"id": t.ID, "name": t.Name, "prefix": t.Prefix, "kind": t.Kind,
-		"permissions": t.Permissions, "all_spaces": t.AllSpaces, "space_ids": t.SpaceIDs,
-		"expires_at": timePtr(t.ExpiresAt), "last_used_at": timePtr(t.LastUsedAt), "created_at": timePtr(t.CreatedAt),
+// APIToken keeps snake_case keys, unlike the rest of the package: clients send
+// the same names (all_spaces, space_ids, expires_at) when they create or edit a
+// token, and read them back unchanged.
+type APIToken struct {
+	ID          int64      `json:"id"`
+	Name        string     `json:"name"`
+	Prefix      string     `json:"prefix"`
+	Kind        string     `json:"kind"`
+	Permissions []string   `json:"permissions"`
+	AllSpaces   bool       `json:"all_spaces"`
+	SpaceIDs    []int64    `json:"space_ids"`
+	ExpiresAt   *time.Time `json:"expires_at"`
+	LastUsedAt  *time.Time `json:"last_used_at"`
+	CreatedAt   *time.Time `json:"created_at"`
+}
+
+func NewAPIToken(t auth.APIToken) APIToken {
+	perms, ids := t.Permissions, t.SpaceIDs
+	if perms == nil {
+		perms = []string{}
+	}
+	if ids == nil {
+		ids = []int64{}
+	}
+	return APIToken{
+		ID: t.ID, Name: t.Name, Prefix: t.Prefix, Kind: t.Kind, Permissions: perms, AllSpaces: t.AllSpaces, SpaceIDs: ids,
+		ExpiresAt: utc(t.ExpiresAt), LastUsedAt: utc(t.LastUsedAt), CreatedAt: utc(t.CreatedAt),
 	}
 }
 
-func timePtr(t *time.Time) any {
-	if t == nil {
-		return nil
-	}
-	return t.UTC().Format(time.RFC3339)
+// CreatedAPIToken is a new token with its secret, shown only once.
+type CreatedAPIToken struct {
+	APIToken
+	Token string `json:"token"`
+}
+
+func NewCreatedAPIToken(t auth.APIToken, secret string) CreatedAPIToken {
+	return CreatedAPIToken{APIToken: NewAPIToken(t), Token: secret}
 }

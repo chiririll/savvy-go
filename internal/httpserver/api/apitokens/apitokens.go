@@ -34,7 +34,7 @@ func (h Handler) apiTokensIndex(w http.ResponseWriter, r *http.Request) {
 	}
 	data := make([]any, 0, len(list))
 	for _, t := range list {
-		data = append(data, dto.APIToken(t))
+		data = append(data, dto.NewAPIToken(t))
 	}
 	httpx.WriteData(w, http.StatusOK, data)
 }
@@ -90,9 +90,7 @@ func (h Handler) apiTokensStore(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	out := dto.APIToken(*tok)
-	out["token"] = raw
-	httpx.WriteDataMsg(w, http.StatusCreated, out, "API token created.")
+	httpx.WriteDataMsg(w, http.StatusCreated, dto.NewCreatedAPIToken(*tok, raw), "API token created.")
 }
 
 func (h Handler) apiTokensDestroy(w http.ResponseWriter, r *http.Request) {
@@ -219,6 +217,6 @@ func (h Handler) apiTokensUpdate(w http.ResponseWriter, r *http.Request) {
 	case err != nil:
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 	default:
-		httpx.WriteDataMsg(w, http.StatusOK, dto.APIToken(*tok), "API token updated.")
+		httpx.WriteDataMsg(w, http.StatusOK, dto.NewAPIToken(*tok), "API token updated.")
 	}
 }
