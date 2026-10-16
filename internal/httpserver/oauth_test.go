@@ -513,12 +513,10 @@ func TestOAuthConsentCanGrantWriteToChosenResources(t *testing.T) {
 	status(t, a.bearer("POST", "/api/tags", map[string]any{"name": "t2"}, next["access_token"].(string)), http.StatusCreated, "write after refresh")
 }
 
-// Browser-based MCP clients ask before they call the discovery and token endpoints.
-// /mcp is not listed: its OPTIONS route is replaced by the catch-all Handle, so a
-// preflight meets the bearer check and gets 401.
+// Browser-based MCP clients ask before they call the discovery, token and MCP endpoints.
 func TestOAuthPreflightAllowsBrowserClients(t *testing.T) {
 	a := newTestApp(t)
-	for _, path := range []string{"/.well-known/oauth-protected-resource", "/.well-known/oauth-authorization-server", "/oauth/register", "/oauth/token"} {
+	for _, path := range []string{"/.well-known/oauth-protected-resource", "/.well-known/oauth-authorization-server", "/oauth/register", "/oauth/token", "/mcp"} {
 		req, _ := http.NewRequest("OPTIONS", a.srv.URL+path, nil)
 		req.Header.Set("Origin", "https://claude.ai")
 		req.Header.Set("Access-Control-Request-Method", "POST")

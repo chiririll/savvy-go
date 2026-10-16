@@ -370,36 +370,3 @@ func TestNewUserLinkIsRefusedWhenVerificationIsRequired(t *testing.T) {
 		t.Errorf("emailed: %d", res.StatusCode)
 	}
 }
-
-func toString(v any) string {
-	switch t := v.(type) {
-	case nil:
-		return ""
-	case string:
-		return t
-	default:
-		return strings.TrimSpace(strings.Join(flatten(v), " "))
-	}
-}
-
-func flatten(v any) []string {
-	switch t := v.(type) {
-	case string:
-		return []string{t}
-	case map[string]any:
-		var out []string
-		for k, x := range t {
-			out = append(out, k)
-			out = append(out, flatten(x)...)
-		}
-		return out
-	case []any:
-		var out []string
-		for _, x := range t {
-			out = append(out, flatten(x)...)
-		}
-		return out
-	default:
-		return nil
-	}
-}

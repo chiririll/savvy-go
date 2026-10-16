@@ -1,6 +1,8 @@
 package oauth
 
 import (
+	"net/http"
+
 	"github.com/go-chi/chi/v5"
 
 	"savvy-go/internal/appconfig"
@@ -38,7 +40,10 @@ func (h Handler) Routes(r chi.Router) {
 	r.Post("/oauth/register", h.oauthRegister)
 	r.Get("/oauth/authorize", h.oauthAuthorize)
 	r.Post("/oauth/token", h.oauthToken)
-	r.Handle("/mcp", h.MCP)
+	// Per method, not Handle: Handle matches OPTIONS too and would replace the preflight route.
+	for _, method := range []string{http.MethodGet, http.MethodPost, http.MethodDelete} {
+		r.Method(method, "/mcp", h.MCP)
+	}
 }
 
 func (h Handler) CredentialRoutes(r chi.Router) {

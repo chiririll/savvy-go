@@ -211,6 +211,20 @@ func decodeJSON(t *testing.T, res *http.Response) map[string]any {
 	return out
 }
 
+// toString renders a decoded JSON value as text, for asserting that a response
+// mentions some phrase. JSON escaping applies, so keep phrases free of quotes,
+// angle brackets and ampersands.
+func toString(v any) string {
+	if s, ok := v.(string); ok {
+		return s
+	}
+	if v == nil {
+		return ""
+	}
+	b, _ := json.Marshal(v)
+	return string(b)
+}
+
 func cookieNamed(res *http.Response, name string) *http.Cookie {
 	for _, c := range res.Cookies() {
 		if c.Name == name {
