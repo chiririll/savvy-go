@@ -18,26 +18,26 @@ func TestServiceReadsTheMailerSection(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if conf, problem := svc.Settings(); conf.Enabled || problem != "" || svc.Mailer().Enabled() {
+	if conf, problem := svc.Config(); conf.Enabled || problem != "" || svc.Mailer().Enabled() {
 		t.Fatalf("a new install must have mail off without a problem: %+v %q", conf, problem)
 	}
 
-	err = smtp.Section.Update(file, func(s *smtp.Settings) {
+	err = smtp.Section.Update(file, func(s *smtp.MailerConfig) {
 		s.Enabled, s.Host, s.From = true, " smtp.example.com ", "savvy@example.com"
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	conf, problem := svc.Settings()
+	conf, problem := svc.Config()
 	if !conf.Enabled || conf.Host != "smtp.example.com" || problem != "" || !svc.Mailer().Enabled() {
 		t.Fatalf("change not seen: %+v %q", conf, problem)
 	}
 
 	// A mistake switches mail off and says why.
-	if err = smtp.Section.Update(file, func(s *smtp.Settings) { s.Host = "" }); err != nil {
+	if err = smtp.Section.Update(file, func(s *smtp.MailerConfig) { s.Host = "" }); err != nil {
 		t.Fatal(err)
 	}
-	if conf, problem := svc.Settings(); conf.Enabled || problem == "" || svc.Mailer().Enabled() {
+	if conf, problem := svc.Config(); conf.Enabled || problem == "" || svc.Mailer().Enabled() {
 		t.Errorf("invalid section kept mail on: %+v %q", conf, problem)
 	}
 }

@@ -8,8 +8,8 @@ import (
 	"savvy-go/internal/config"
 )
 
-// Settings is the [mailer] table of the config file: the SMTP server.
-type Settings struct {
+// MailerConfig is the [mailer] table of the config file: the SMTP server.
+type MailerConfig struct {
 	Enabled    bool   `toml:"enabled"`
 	Host       string `toml:"host"`
 	Port       int    `toml:"port"`
@@ -22,8 +22,8 @@ type Settings struct {
 }
 
 // Defaults are the values of the keys the file lacks.
-func (Settings) Defaults() Settings {
-	return Settings{Port: 587, Protocol: STARTTLS, Timeout: int(DefaultTimeout / time.Second)}
+func (MailerConfig) Defaults() MailerConfig {
+	return MailerConfig{Port: 587, Protocol: STARTTLS, Timeout: int(DefaultTimeout / time.Second)}
 }
 
 // Setup is the [mailer] section as the mailer uses it.
@@ -34,13 +34,13 @@ type Setup struct {
 	Problem string
 }
 
-// Section is where the config file keeps Settings.
-var Section = config.Section[Settings, Setup]{Name: "mailer", Decode: decode}
+// Section is where the config file keeps MailerConfig.
+var Section = config.Section[MailerConfig, Setup]{Name: "mailer", Decode: decode}
 
 // decode trims spaces and lower-cases the protocol. A timeout that is not positive becomes
 // DefaultTimeout. A mistake does not stop the server: it switches mail off, and Problem
 // says why.
-func decode(m Settings) (Setup, error) {
+func decode(m MailerConfig) (Setup, error) {
 	timeout := DefaultTimeout
 	if m.Timeout > 0 {
 		timeout = time.Duration(m.Timeout) * time.Second

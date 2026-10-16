@@ -128,11 +128,11 @@ func (f *Config) finish() error {
 		return fmt.Errorf("encode config: %w", err)
 	}
 	// Write even when nothing changed: it is the probe for "can this process
-	// save settings later" (a read-only mount or directory fails here).
+	// save the config later" (a read-only mount or directory fails here).
 	f.writable = true
 	if err := writeFile(f.path, out); err != nil {
 		f.writable = false
-		slog.Warn("could not write the config file; the settings in it cannot be changed from the application", "path", f.path, "err", err)
+		slog.Warn("could not write the config file; the values in it cannot be changed from the application", "path", f.path, "err", err)
 	}
 	return nil
 }

@@ -45,7 +45,7 @@ Right after the admin is created, a short **server setup** follows. Step 1 is re
 
 ## Configuration
 
-The application is configured by a TOML file and reads no environment variables for settings. `config.toml` is created with the defaults on the first start, in the data directory (`/data` in the image, `/var/lib/savvy-go` for the Debian package, `./savvy-data` otherwise); `-config <path>` or the `CONFIG_FILE` environment variable points elsewhere. Demo data is not configured here: see `--seed-config` in [Development](development.md). On every start the file is read and written back, so keys a newer version adds appear on their own; comments are regenerated, your values are kept. Edit it and restart. A read-only file works too, it is just not rewritten.
+The application is configured by a TOML file and reads no environment variables for configuration. `config.toml` is created with the defaults on the first start, in the data directory (`/data` in the image, `/var/lib/savvy-go` for the Debian package, `./savvy-data` otherwise); `-config <path>` or the `CONFIG_FILE` environment variable points elsewhere. Demo data is not configured here: see `--seed-config` in [Development](development.md). On every start the file is read and written back, so keys a newer version adds appear on their own; comments are regenerated, your values are kept. Edit it and restart. A read-only file works too, it is just not rewritten.
 
 Keys, with their defaults, are listed in the generated file itself:
 
@@ -64,7 +64,7 @@ Limits such as spaces per user, space quotas and the number of kept backups are 
 
 ### Email
 
-Without a mail server everything works; reset and invitation links are shown to copy and send yourself. With one, Go Savvy can email them, and some things need it: see [how invitations are made](spaces.md#invitations). Set it up in the `[mailer]` section of `config.toml` and restart. **Administration → System → Email** shows the settings and tests them, but does not save changes for now: the form is locked.
+Without a mail server everything works; reset and invitation links are shown to copy and send yourself. With one, Go Savvy can email them, and some things need it: see [how invitations are made](spaces.md#invitations). Set it up in the `[mailer]` section of `config.toml` and restart. **Administration → System → Email** shows the mail configuration and tests it, but does not save changes for now: the form is locked.
 
 ```toml
 [mailer]
@@ -188,7 +188,7 @@ Administration → Status lists what needs attention, and a dot on the Administr
 | No server backup | warning | there is no valid server backup |
 | Server backup is old | warning | the newest valid server backup is over 30 days old |
 | Data disk is filling | warning at 75%, error at 90% | the volume that holds the uploads |
-| Config file is read-only | info | the application does not change `config.toml` for now, so its settings are edited in the file |
+| Config file is read-only | info | the application does not change `config.toml` for now, so its values are edited in the file |
 
 The same list is available to admins at `GET /api/admin/checks` (session only).
 
@@ -218,7 +218,7 @@ curl -fsSLO https://github.com/chiririll/savvy-go/releases/latest/download/savvy
 sudo apt install ./savvy-go.deb
 ```
 
-It runs as the `savvy-go` systemd service (`/usr/bin/savvy-go`). Data is in `/var/lib/savvy-go`; settings are in `/etc/savvy-go/config.toml`, which the service creates and maintains itself (restart after editing). It listens on `127.0.0.1:8080` only; put a reverse proxy in front, or set `listen = ":8080"` under `[server]` to expose it. `apt purge savvy-go` deletes the data.
+It runs as the `savvy-go` systemd service (`/usr/bin/savvy-go`). Data is in `/var/lib/savvy-go`; configuration is in `/etc/savvy-go/config.toml`, which the service creates and maintains itself (restart after editing). It listens on `127.0.0.1:8080` only; put a reverse proxy in front, or set `listen = ":8080"` under `[server]` to expose it. `apt purge savvy-go` deletes the data.
 
 ## RPM package
 

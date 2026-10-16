@@ -20,7 +20,7 @@ export interface MailStatus {
     passwordSet: boolean
     /** Links in emails need the public URL. */
     appUrlSet: boolean
-    /** False when config.toml is read-only: the settings can be shown but not changed. */
+    /** False when config.toml is read-only: the values can be shown but not changed. */
     writable: boolean
 }
 

@@ -63,7 +63,7 @@ const kinds: Record<string, 'list' | 'flag' | 'detail'> = {
     scenarioNames: 'list', scenarioLanguages: 'list', scenarioThemes: 'list', scenarioViewports: 'list', detail: 'detail',
 }
 
-/** Settings given as text (CONFIG_OVERRIDES, a JSON object of strings) turned into what a config file holds. */
+/** Config values given as text (CONFIG_OVERRIDES, a JSON object of strings) turned into what a config file holds. */
 function overridden(raw: Record<string, unknown>, overrides: string): Record<string, unknown> {
     if (!overrides.trim()) return raw
     let given: Record<string, unknown>

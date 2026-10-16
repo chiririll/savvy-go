@@ -49,7 +49,7 @@ type testedBody struct {
 // whether one is set. "writable" is false when the config file cannot be changed from the
 // application: the settings are then shown, not edited.
 func (h Handler) index(w http.ResponseWriter, r *http.Request) {
-	c, problem := h.Mail.Settings()
+	c, problem := h.Mail.Config()
 	httpx.WriteData(w, http.StatusOK, settingsBody{
 		Enabled: h.Mail.Mailer().Enabled(), Problem: nullIfEmpty(problem),
 		Host: c.Host, Port: c.Port, Protocol: c.Protocol, User: c.User, From: c.From,
@@ -79,7 +79,7 @@ func (h Handler) test(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusUnprocessableEntity, h.Mail.OffReason())
 		return
 	}
-	cfg, _ := h.Mail.Settings()
+	cfg, _ := h.Mail.Config()
 	ctx, cancel := context.WithTimeout(r.Context(), 3*max(cfg.Timeout, time.Second))
 	defer cancel()
 	if err := h.Mail.Mailer().Check(ctx); err != nil {

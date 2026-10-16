@@ -1,5 +1,5 @@
 // Package mail is the mail side of the application: the mail server of the instance
-// (the sender in use and the settings it was built from) and the confirmation of
+// (the sender in use and the configuration it was built from) and the confirmation of
 // email addresses. SMTP itself lives in mail/smtp.
 package mail
 
@@ -38,9 +38,9 @@ func (s *Service) Mailer() smtp.Mailer {
 	return smtp.New(s.section.Get().Config)
 }
 
-// Settings is the current SMTP configuration and why it is switched off, if
+// Config is the current SMTP configuration and why it is switched off, if
 // the section was invalid.
-func (s *Service) Settings() (smtp.Config, string) {
+func (s *Service) Config() (smtp.Config, string) {
 	setup := s.section.Get()
 	return setup.Config, setup.Problem
 }
@@ -50,7 +50,7 @@ func (s *Service) AppURL() string { return s.appURL() }
 
 // Send sends one email, giving up after a few connection timeouts.
 func (s *Service) Send(ctx context.Context, m smtp.Message) error {
-	cfg, _ := s.Settings()
+	cfg, _ := s.Config()
 	timeout := cfg.Timeout
 	if timeout <= 0 {
 		timeout = DefaultTimeout
@@ -62,7 +62,7 @@ func (s *Service) Send(ctx context.Context, m smtp.Message) error {
 
 // Status is whether mail works, and what is wrong with the mail section.
 func (s *Service) Status() (enabled bool, problem string) {
-	conf, problem := s.Settings()
+	conf, problem := s.Config()
 	return s.Mailer().Enabled() && conf.Enabled, problem
 }
 
@@ -78,7 +78,7 @@ func (s *Service) OffReason() string {
 // OffWhy splits OffReason into the fact and, when there is one, where
 // an administrator fixes it. Pages that are not for administrators show the fact only.
 func (s *Service) OffWhy() (reason, hint string) {
-	if _, problem := s.Settings(); problem != "" {
+	if _, problem := s.Config(); problem != "" {
 		return "Mail is switched off: " + problem + ".", ""
 	}
 	return "Mail is not configured.", "Set it up in the [mailer] section of the config file."

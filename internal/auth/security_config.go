@@ -19,8 +19,8 @@ type Security struct {
 	CSRFHeader    string
 }
 
-// SecuritySettings is the [security] table of the config file.
-type SecuritySettings struct {
+// SecurityConfig is the [security] table of the config file.
+type SecurityConfig struct {
 	SessionTTL   int    `toml:"session_ttl" comment:"Lifetimes in minutes."`
 	RememberTTL  int    `toml:"remember_ttl"`
 	ChallengeTTL int    `toml:"challenge_ttl"`
@@ -30,8 +30,8 @@ type SecuritySettings struct {
 }
 
 // Defaults are the values of the keys the file lacks.
-func (SecuritySettings) Defaults() SecuritySettings {
-	return SecuritySettings{
+func (SecurityConfig) Defaults() SecurityConfig {
+	return SecurityConfig{
 		SessionTTL:   60 * 24,
 		RememberTTL:  60 * 24 * 7,
 		ChallengeTTL: 5,
@@ -41,11 +41,11 @@ func (SecuritySettings) Defaults() SecuritySettings {
 	}
 }
 
-// SecuritySection is where the config file keeps SecuritySettings.
-var SecuritySection = config.Section[SecuritySettings, Security]{Name: "security", Decode: decodeSecurity}
+// SecuritySection is where the config file keeps SecurityConfig.
+var SecuritySection = config.Section[SecurityConfig, Security]{Name: "security", Decode: decodeSecurity}
 
 // decodeSecurity refuses a lifetime that is not positive and a name that is empty.
-func decodeSecurity(c SecuritySettings) (Security, error) {
+func decodeSecurity(c SecurityConfig) (Security, error) {
 	switch {
 	case c.SessionTTL <= 0:
 		return Security{}, errors.New("session_ttl must be a positive number of minutes")
