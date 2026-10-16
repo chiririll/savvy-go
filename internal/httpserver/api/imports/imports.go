@@ -6,19 +6,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"savvy-go/internal/httpserver/httpx"
-	"savvy-go/internal/runtime"
-	"savvy-go/internal/uploads"
 
 	"savvy-go/internal/httpserver/httpx/dto"
 
 	"github.com/go-chi/chi/v5"
 )
-
-// Handler serves the import routes. Jobs run on Queue, or at once when it is nil.
-type Handler struct {
-	Uploads uploads.Service
-	Queue   *runtime.Queue
-}
 
 func (s Handler) importParse(w http.ResponseWriter, r *http.Request) {
 	var body struct {

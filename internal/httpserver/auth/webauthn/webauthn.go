@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"savvy-go/internal/httpserver/httpx"
-	"savvy-go/internal/httpserver/httpx/guard"
-	"savvy-go/internal/httpserver/httpx/login"
 	"strconv"
 
 	"savvy-go/internal/auth"
@@ -14,14 +12,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 )
-
-// Handler holds what the passkey routes need.
-type Handler struct {
-	WebAuthn   auth.WebAuthn
-	Challenges auth.Challenges
-	Login      login.Service
-	Guard      *guard.Guard
-}
 
 func (h Handler) webauthnIndex(w http.ResponseWriter, r *http.Request) {
 	list, err := h.WebAuthn.List(r.Context(), httpx.User(r).ID)

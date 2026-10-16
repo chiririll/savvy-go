@@ -5,8 +5,6 @@ import (
 	"sort"
 	"time"
 
-	"savvy-go/internal/appconfig"
-	"savvy-go/internal/backup"
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/platform/sysinfo"
 )
@@ -27,16 +25,6 @@ const (
 	diskWarnPercent  = 75.0
 	diskErrorPercent = 90.0
 )
-
-// Handler lists the checks of a running server.
-type Handler struct {
-	Cfg        appconfig.Config
-	Writable   func() bool // whether the config file can be changed
-	UploadsDir string
-	Backups    backup.Service
-	// Mail reports whether mail works, and what is wrong with its settings.
-	Mail func() (enabled bool, problem string)
-}
 
 type Check struct {
 	ID       string `json:"id"`

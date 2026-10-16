@@ -5,6 +5,7 @@ import (
 
 	"savvy-go/internal/auth"
 	"savvy-go/internal/bootstrap"
+	"savvy-go/internal/httpserver/httpx/login"
 	"savvy-go/internal/httpserver/httpx/routing"
 	"savvy-go/internal/settings"
 )
@@ -17,6 +18,18 @@ func init() {
 			routing.Credential(h.CredentialRoutes),
 		}
 	})
+}
+
+// Handler holds what the account routes need.
+type Handler struct {
+	Security   auth.Security
+	Users      auth.Users
+	Sessions   auth.Sessions
+	Tokens     auth.PasswordTokens
+	Challenges auth.Challenges
+	Settings   settings.Store
+	Bootstrap  *bootstrap.Guard
+	Login      login.Service
 }
 
 func (h Handler) PublicRoutes(r chi.Router) {

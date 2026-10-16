@@ -10,16 +10,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"savvy-go/internal/appconfig"
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/sso"
 )
-
-// Handler holds what the identity provider routes need.
-type Handler struct {
-	Cfg appconfig.Config
-	SSO *sso.Service
-}
 
 func (h Handler) ssoPresets(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, sso.PresetCatalog())

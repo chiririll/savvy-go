@@ -27,6 +27,13 @@ func init() {
 	})
 }
 
+// Handler holds what the transfer routes need.
+type Handler struct {
+	Spaces    spaces.Service
+	Transfers *transfers.Service
+	Keys      *signing.Holder
+}
+
 func (h Handler) ReadRoutes(r chi.Router) {
 	r.Get("/links", h.linksIndex)
 	r.Get("/transfers", h.transfersIndex)

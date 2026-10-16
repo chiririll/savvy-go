@@ -7,13 +7,9 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"savvy-go/internal/appconfig"
-	"savvy-go/internal/backup"
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/httpserver/httpx/dto"
-	"savvy-go/internal/httpserver/httpx/login"
 	"savvy-go/internal/mail"
-	"savvy-go/internal/spaces"
 	"strconv"
 	"strings"
 
@@ -22,17 +18,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 )
-
-// Handler holds what the user administration needs.
-type Handler struct {
-	Cfg     appconfig.Config
-	Users   auth.Users
-	Tokens  auth.PasswordTokens
-	Spaces  spaces.Service
-	Mail    *mail.Service
-	Backups backup.Service
-	Login   login.Service
-}
 
 func (h Handler) usersIndex(w http.ResponseWriter, r *http.Request) {
 	list, err := h.Users.All(r.Context())

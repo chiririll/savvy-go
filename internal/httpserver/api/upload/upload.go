@@ -13,9 +13,6 @@ import (
 	"savvy-go/internal/uploads"
 )
 
-// Handler serves the upload routes.
-type Handler struct{ Uploads uploads.Service }
-
 func (s Handler) uploadCreate(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Bucket   string  `json:"bucket"`

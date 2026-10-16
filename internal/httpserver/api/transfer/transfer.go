@@ -7,7 +7,6 @@ import (
 	"errors"
 	"net/http"
 	"savvy-go/internal/httpserver/httpx"
-	"savvy-go/internal/signing"
 	"strconv"
 	"time"
 
@@ -16,7 +15,6 @@ import (
 
 	"savvy-go/internal/httpserver/httpx/dto"
 	"savvy-go/internal/money"
-	"savvy-go/internal/spaces"
 	"savvy-go/internal/store"
 	"savvy-go/internal/transfers"
 )
@@ -39,13 +37,6 @@ func writeTransferError(w http.ResponseWriter, err error) {
 }
 
 // --- links -----------------------------------------------------------------
-
-// Handler holds what the transfer routes need.
-type Handler struct {
-	Spaces    spaces.Service
-	Transfers *transfers.Service
-	Keys      *signing.Holder
-}
 
 func (h Handler) linksIndex(w http.ResponseWriter, r *http.Request) {
 	list, err := h.Transfers.Links(r.Context(), httpx.Scope(r).ID)

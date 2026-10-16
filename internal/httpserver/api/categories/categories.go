@@ -17,9 +17,6 @@ import (
 	"savvy-go/internal/reports"
 )
 
-// Handler serves the categories routes; changes go through the sync groups.
-type Handler struct{ Refsync refsync.Service }
-
 func (s Handler) categoriesIndex(w http.ResponseWriter, r *http.Request) {
 	list, err := httpx.Scope(r).Categories.All(r.Context(), r.URL.Query().Get("type"))
 	if err != nil {

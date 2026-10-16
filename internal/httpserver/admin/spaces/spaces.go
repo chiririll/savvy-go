@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"savvy-go/internal/auth"
-	"savvy-go/internal/backup"
 	"savvy-go/internal/httpserver/httpx"
 	backupx "savvy-go/internal/httpserver/httpx/backups"
 	"savvy-go/internal/httpserver/httpx/dto"
@@ -15,13 +13,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 )
-
-// Handler holds what the space admin routes need.
-type Handler struct {
-	Spaces  core.Service
-	Users   auth.Users
-	Backups backup.Service
-}
 
 // clearedBody says how many invitation cooldowns were lifted.
 type clearedBody struct {

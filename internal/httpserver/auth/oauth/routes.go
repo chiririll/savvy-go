@@ -26,6 +26,14 @@ func init() {
 	})
 }
 
+// Handler holds what the OAuth endpoints need. MCP is the endpoint they protect.
+type Handler struct {
+	Cfg    appconfig.Config
+	OAuth  *oauth.Service
+	Spaces spaces.Service
+	MCP    http.Handler
+}
+
 // Routes mounts the OAuth endpoints and the MCP endpoint they protect.
 func (h Handler) Routes(r chi.Router) {
 	for _, p := range []string{

@@ -10,23 +10,12 @@ import (
 	"net/http"
 	"net/url"
 	"savvy-go/internal/app/signin"
-	"savvy-go/internal/appconfig"
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/mail"
 	"savvy-go/internal/settings"
-	"savvy-go/internal/sso"
 	"strings"
 	"time"
 )
-
-// Handler holds what the settings routes need.
-type Handler struct {
-	Cfg      appconfig.Config
-	Writable func() bool // whether the config file can be changed
-	Settings settings.Store
-	SSO      *sso.Service
-	Verify   mail.Verifier
-}
 
 // settingsIndex lists the instance settings.
 func (h Handler) settingsIndex(w http.ResponseWriter, r *http.Request) {

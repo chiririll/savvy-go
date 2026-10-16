@@ -2,6 +2,7 @@ package accounts
 
 import (
 	_ "embed"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -22,6 +23,9 @@ func init() {
 		}
 	})
 }
+
+// Handler serves the account routes; Loc is the server location for default periods.
+type Handler struct{ Loc *time.Location }
 
 func (s Handler) Routes(r chi.Router) {
 	r.Post("/accounts/reorder", s.accountsReorder)

@@ -19,9 +19,6 @@ import (
 	"savvy-go/internal/reports"
 )
 
-// Handler serves the account routes; Loc is the server location for default periods.
-type Handler struct{ Loc *time.Location }
-
 func (s Handler) accountsIndex(w http.ResponseWriter, r *http.Request) {
 	onlyActive := r.URL.Query().Get("active") == "1" || r.URL.Query().Get("active") == "true"
 	excludeDebts := r.URL.Query().Get("exclude_debts") == "1" || r.URL.Query().Get("exclude_debts") == "true"

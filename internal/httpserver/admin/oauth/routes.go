@@ -16,6 +16,11 @@ func init() {
 	})
 }
 
+// Handler holds what the OAuth admin routes need.
+type Handler struct {
+	OAuth *oauth.Service
+}
+
 func (h Handler) Routes(r chi.Router) {
 	r.Get("/admin/oauth/registration", h.oauthRegistrationShow)
 	r.Post("/admin/oauth/registration", h.oauthRegistrationOpen)

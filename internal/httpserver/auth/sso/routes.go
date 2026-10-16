@@ -5,6 +5,8 @@ import (
 
 	"savvy-go/internal/appconfig"
 	"savvy-go/internal/auth"
+	"savvy-go/internal/httpserver/httpx/guard"
+	"savvy-go/internal/httpserver/httpx/login"
 	"savvy-go/internal/httpserver/httpx/routing"
 	"savvy-go/internal/sso"
 )
@@ -16,6 +18,16 @@ func init() {
 			routing.Public(h.PublicRoutes),
 		}
 	})
+}
+
+// Handler holds what the sign-in and provider routes need.
+type Handler struct {
+	Cfg        appconfig.Config
+	SSO        *sso.Service
+	Users      auth.Users
+	Challenges auth.Challenges
+	Login      login.Service
+	Guard      *guard.Guard
 }
 
 func (h Handler) PublicRoutes(r chi.Router) {

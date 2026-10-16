@@ -8,8 +8,6 @@ import (
 	"net/http"
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/httpserver/httpx/dto"
-	"savvy-go/internal/httpserver/httpx/login"
-	"savvy-go/internal/settings"
 	"strings"
 
 	"savvy-go/internal/auth"
@@ -17,18 +15,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 )
-
-// Handler holds what the account routes need.
-type Handler struct {
-	Security   auth.Security
-	Users      auth.Users
-	Sessions   auth.Sessions
-	Tokens     auth.PasswordTokens
-	Challenges auth.Challenges
-	Settings   settings.Store
-	Bootstrap  *bootstrap.Guard
-	Login      login.Service
-}
 
 func (h Handler) authStatus(w http.ResponseWriter, r *http.Request) {
 	n, err := h.Users.Count(r.Context())

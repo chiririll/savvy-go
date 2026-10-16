@@ -18,6 +18,16 @@ func init() {
 	})
 }
 
+// Handler lists the checks of a running server.
+type Handler struct {
+	Cfg        appconfig.Config
+	Writable   func() bool // whether the config file can be changed
+	UploadsDir string
+	Backups    backup.Service
+	// Mail reports whether mail works, and what is wrong with its settings.
+	Mail func() (enabled bool, problem string)
+}
+
 func (h Handler) Routes(r chi.Router) {
 	r.Get("/admin/checks", h.index)
 }

@@ -18,6 +18,13 @@ func init() {
 	})
 }
 
+// Handler holds what the key routes need.
+type Handler struct {
+	DataDir   string
+	Transfers *transfers.Service
+	Keys      *signing.Holder
+}
+
 func (h Handler) Routes(r chi.Router) {
 	r.Get("/admin/keys", h.keysIndex)
 	r.Post("/admin/keys", h.keysStore)

@@ -17,6 +17,12 @@ func init() {
 	})
 }
 
+// Handler serves the import routes. Jobs run on Queue, or at once when it is nil.
+type Handler struct {
+	Uploads uploads.Service
+	Queue   *runtime.Queue
+}
+
 func (s Handler) Routes(r chi.Router) {
 	r.Post("/transactions/import/parse", s.importParse)
 	r.Post("/transactions/import/preview", s.importPreview)

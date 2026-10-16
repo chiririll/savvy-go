@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/httpserver/httpx/dto"
-	"savvy-go/internal/httpserver/httpx/guard"
-	"savvy-go/internal/spaces"
 	"slices"
 
 	"savvy-go/internal/refsync"
@@ -55,13 +53,6 @@ func (b syncBody) plan() refsync.Plan {
 
 // decodeSync reads a syncBody. A space the caller does not belong to answers
 // 404, so spaces cannot be probed (as for links).
-// Handler holds what the sync group routes need.
-type Handler struct {
-	Spaces  spaces.Service
-	Refsync refsync.Service
-	Guard   *guard.Guard
-}
-
 func (h Handler) decodeSync(w http.ResponseWriter, r *http.Request) (syncBody, bool) {
 	var body syncBody
 	if !httpx.DecodeBody(w, r, &body) {

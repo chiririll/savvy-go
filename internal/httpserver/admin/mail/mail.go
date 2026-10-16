@@ -7,15 +7,8 @@ import (
 	"time"
 
 	"savvy-go/internal/httpserver/httpx"
-	"savvy-go/internal/mail"
 	"savvy-go/internal/mail/smtp"
 )
-
-// Handler is the admin's view of the mail settings.
-type Handler struct {
-	Mail     *mail.Service
-	Writable func() bool // whether the config file can be changed
-}
 
 func nullIfEmpty(s string) *string {
 	if s == "" {

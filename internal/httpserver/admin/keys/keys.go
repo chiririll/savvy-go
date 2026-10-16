@@ -11,16 +11,8 @@ import (
 
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/httpserver/httpx/dto"
-	"savvy-go/internal/signing"
 	"savvy-go/internal/transfers"
 )
-
-// Handler holds what the key routes need.
-type Handler struct {
-	DataDir   string
-	Transfers *transfers.Service
-	Keys      *signing.Holder
-}
 
 func (h Handler) keysIndex(w http.ResponseWriter, r *http.Request) {
 	key := h.Keys.Key()

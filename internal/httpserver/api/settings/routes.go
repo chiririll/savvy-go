@@ -29,6 +29,15 @@ func init() {
 	})
 }
 
+// Handler holds what the settings routes need.
+type Handler struct {
+	Cfg      appconfig.Config
+	Writable func() bool // whether the config file can be changed
+	Settings settings.Store
+	SSO      *sso.Service
+	Verify   mail.Verifier
+}
+
 func (h Handler) AdminSessionRoutes(r chi.Router) {
 	r.Patch("/settings", h.settingsUpdate)
 }

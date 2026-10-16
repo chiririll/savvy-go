@@ -16,6 +16,12 @@ func init() {
 	})
 }
 
+// Handler is the admin's view of the mail settings.
+type Handler struct {
+	Mail     *mail.Service
+	Writable func() bool // whether the config file can be changed
+}
+
 func (h Handler) Routes(r chi.Router) {
 	r.Get("/admin/mail", h.index)
 	r.Post("/admin/mail/test", h.test)

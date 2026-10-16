@@ -17,6 +17,12 @@ func init() {
 	})
 }
 
+// Handler serves the liveness and readiness probes.
+type Handler struct {
+	Store   store.Store
+	Version string // the release, reported as releaseId
+}
+
 // Routes mounts the probes outside /api.
 func (h Handler) Routes(r chi.Router) {
 	r.Get("/livez", h.Live)

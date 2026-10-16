@@ -17,6 +17,9 @@ func init() {
 	})
 }
 
+// Handler serves the upload routes.
+type Handler struct{ Uploads uploads.Service }
+
 func (s Handler) PublicRoutes(r chi.Router) {
 	r.Put("/uploads/{id}/parts/{part}", s.uploadPart)
 }

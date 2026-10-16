@@ -13,11 +13,7 @@ import (
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/httpserver/httpx/dto"
 	"savvy-go/internal/ledger"
-	"savvy-go/internal/refsync"
 )
-
-// Handler serves the tags routes; changes go through the sync groups.
-type Handler struct{ Refsync refsync.Service }
 
 func (s Handler) tagsIndex(w http.ResponseWriter, r *http.Request) {
 	list, err := httpx.Scope(r).Tags.All(r.Context())

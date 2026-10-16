@@ -9,7 +9,6 @@ import (
 	"maps"
 	"net/http"
 	"savvy-go/internal/httpserver/httpx"
-	"savvy-go/internal/spaces"
 	"strconv"
 	"strings"
 	"time"
@@ -19,12 +18,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 )
-
-// Handler holds what the API token routes need.
-type Handler struct {
-	Tokens auth.APITokens
-	Spaces spaces.Service
-}
 
 func (h Handler) apiTokensIndex(w http.ResponseWriter, r *http.Request) {
 	list, err := h.Tokens.List(r.Context(), httpx.User(r).ID)

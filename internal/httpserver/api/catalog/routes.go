@@ -23,6 +23,9 @@ func init() {
 	})
 }
 
+// Handler serves what a new space can start with, before the space exists.
+type Handler struct{ Rates ledger.RateSource }
+
 func (h Handler) Routes(r chi.Router) {
 	r.Get("/currencies/catalog", h.currencies)
 	r.Get("/presets", h.presets)

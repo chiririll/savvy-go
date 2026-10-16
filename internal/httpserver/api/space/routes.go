@@ -8,6 +8,8 @@ import (
 	"savvy-go/internal/appconfig"
 	"savvy-go/internal/auth"
 	"savvy-go/internal/backup"
+	"savvy-go/internal/httpserver/httpx/guard"
+	"savvy-go/internal/httpserver/httpx/login"
 	"savvy-go/internal/httpserver/httpx/routing"
 	"savvy-go/internal/httpserver/ui"
 	"savvy-go/internal/ledger"
@@ -35,6 +37,20 @@ func init() {
 			routing.SpaceAdmin(h.AdminRoutes),
 		}
 	})
+}
+
+// Handler holds what the space routes need.
+type Handler struct {
+	Cfg     appconfig.Config
+	Store   store.Store
+	Spaces  spaces.Service
+	Users   auth.Users
+	Backups backup.Service
+	Mail    *mail.Service
+	Login   login.Service
+	Verify  mail.Verifier
+	Creator spacefill.Creator
+	Guard   *guard.Guard
 }
 
 func (h Handler) PublicRoutes(r chi.Router) {

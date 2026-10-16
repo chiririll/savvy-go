@@ -8,7 +8,6 @@ import (
 
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/httpserver/httpx/dto"
-	"savvy-go/internal/ledger"
 	"savvy-go/internal/seed"
 )
 
@@ -53,6 +52,3 @@ func (Handler) presets(w http.ResponseWriter, r *http.Request) {
 	}
 	httpx.WriteData(w, http.StatusOK, presetsBody{Categories: out, Tags: seed.DefaultTags()})
 }
-
-// Handler serves what a new space can start with, before the space exists.
-type Handler struct{ Rates ledger.RateSource }

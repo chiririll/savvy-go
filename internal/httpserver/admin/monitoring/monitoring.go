@@ -9,20 +9,9 @@ import (
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/importer"
 	"savvy-go/internal/platform/sysinfo"
-	"savvy-go/internal/store"
-	"savvy-go/internal/uploads"
 )
 
 var processStarted = time.Now()
-
-// Handler is the monitoring of the instance: disk, uploads, imports, process.
-type Handler struct {
-	Store      store.Store
-	Uploads    uploads.Service
-	UploadsDir string
-	Version    string // the release
-	Env        string // the build environment
-}
 
 func (h Handler) storage(w http.ResponseWriter, r *http.Request) {
 	managed, uploads := h.uploadStats(r.Context())

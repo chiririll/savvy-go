@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"savvy-go/internal/httpserver/httpx/guard"
 	"savvy-go/internal/httpserver/httpx/routing"
 	"savvy-go/internal/httpserver/ui"
 	"savvy-go/internal/refsync"
@@ -23,6 +24,13 @@ func init() {
 			routing.SpaceRead(h.ReadRoutes),
 		}
 	})
+}
+
+// Handler holds what the sync group routes need.
+type Handler struct {
+	Spaces  spaces.Service
+	Refsync refsync.Service
+	Guard   *guard.Guard
 }
 
 func (h Handler) ReadRoutes(r chi.Router) {

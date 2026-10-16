@@ -9,18 +9,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"savvy-go/internal/backup"
 	"savvy-go/internal/httpserver/httpx"
 	backupx "savvy-go/internal/httpserver/httpx/backups"
 	"savvy-go/internal/httpserver/httpx/dto"
 	"savvy-go/internal/legacy/restore"
 )
-
-// Handler holds what the server backup routes need.
-type Handler struct {
-	BackupsDir string
-	Backups    backup.Service
-}
 
 func (h Handler) backupsIndex(w http.ResponseWriter, r *http.Request) {
 	list, err := h.Backups.ServerBackups()

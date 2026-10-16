@@ -18,6 +18,13 @@ func init() {
 	})
 }
 
+// Handler holds what the space admin routes need.
+type Handler struct {
+	Spaces  spaces.Service
+	Users   auth.Users
+	Backups backup.Service
+}
+
 func (h Handler) Routes(r chi.Router) {
 	r.Post("/admin/invitations/clear", h.invitationsClear)
 	r.Get("/admin/spaces", h.adminSpacesIndex)

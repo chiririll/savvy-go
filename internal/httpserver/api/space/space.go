@@ -6,32 +6,10 @@ import (
 	"net/http"
 	"slices"
 
-	"savvy-go/internal/appconfig"
-	"savvy-go/internal/auth"
-	"savvy-go/internal/backup"
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/httpserver/httpx/dto"
-	"savvy-go/internal/httpserver/httpx/guard"
-	"savvy-go/internal/httpserver/httpx/login"
-	"savvy-go/internal/mail"
-	"savvy-go/internal/spacefill"
 	"savvy-go/internal/spaces"
-	"savvy-go/internal/store"
 )
-
-// Handler holds what the space routes need.
-type Handler struct {
-	Cfg     appconfig.Config
-	Store   store.Store
-	Spaces  spaces.Service
-	Users   auth.Users
-	Backups backup.Service
-	Mail    *mail.Service
-	Login   login.Service
-	Verify  mail.Verifier
-	Creator spacefill.Creator
-	Guard   *guard.Guard
-}
 
 func (h Handler) index(w http.ResponseWriter, r *http.Request) {
 	mine, err := h.Spaces.ForUser(r.Context(), httpx.User(r).ID)

@@ -4,6 +4,8 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"savvy-go/internal/auth"
+	"savvy-go/internal/httpserver/httpx/guard"
+	"savvy-go/internal/httpserver/httpx/login"
 	"savvy-go/internal/httpserver/httpx/routing"
 )
 
@@ -15,6 +17,14 @@ func init() {
 			routing.Credential(h.CredentialRoutes),
 		}
 	})
+}
+
+// Handler holds what the passkey routes need.
+type Handler struct {
+	WebAuthn   auth.WebAuthn
+	Challenges auth.Challenges
+	Login      login.Service
+	Guard      *guard.Guard
 }
 
 func (h Handler) PublicRoutes(r chi.Router) {

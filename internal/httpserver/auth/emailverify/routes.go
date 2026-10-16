@@ -17,6 +17,11 @@ func init() {
 	})
 }
 
+// Handler holds what the confirmation routes need.
+type Handler struct {
+	Verify mail.Verifier
+}
+
 func (h Handler) PublicRoutes(r chi.Router) {
 	r.Post("/auth/verify-email", h.verifyEmail)
 }

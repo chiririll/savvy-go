@@ -18,6 +18,15 @@ func init() {
 	})
 }
 
+// Handler is the monitoring of the instance: disk, uploads, imports, process.
+type Handler struct {
+	Store      store.Store
+	Uploads    uploads.Service
+	UploadsDir string
+	Version    string // the release
+	Env        string // the build environment
+}
+
 func (h Handler) Routes(r chi.Router) {
 	r.Get("/monitoring/storage", h.storage)
 	r.Get("/monitoring/resources", h.resources)

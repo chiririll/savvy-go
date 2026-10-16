@@ -23,6 +23,9 @@ func init() {
 	})
 }
 
+// Handler serves the tags routes; changes go through the sync groups.
+type Handler struct{ Refsync refsync.Service }
+
 func (s Handler) Routes(r chi.Router) {
 	r.Get("/tags", s.tagsIndex)
 	r.Post("/tags", s.tagsStore)

@@ -4,6 +4,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"savvy-go/internal/auth"
+	"savvy-go/internal/httpserver/httpx/login"
 	"savvy-go/internal/httpserver/httpx/routing"
 )
 
@@ -15,6 +16,14 @@ func init() {
 			routing.Credential(h.CredentialRoutes),
 		}
 	})
+}
+
+// Handler holds what the two-factor routes need.
+type Handler struct {
+	TwoFactor  auth.TwoFactor
+	Users      auth.Users
+	Challenges auth.Challenges
+	Login      login.Service
 }
 
 func (h Handler) PublicRoutes(r chi.Router) {

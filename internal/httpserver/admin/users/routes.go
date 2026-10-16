@@ -8,6 +8,7 @@ import (
 	"savvy-go/internal/appconfig"
 	"savvy-go/internal/auth"
 	"savvy-go/internal/backup"
+	"savvy-go/internal/httpserver/httpx/login"
 	"savvy-go/internal/httpserver/httpx/routing"
 	"savvy-go/internal/httpserver/ui"
 	"savvy-go/internal/mail"
@@ -25,6 +26,17 @@ func init() {
 			routing.Admin(h.Routes),
 		}
 	})
+}
+
+// Handler holds what the user administration needs.
+type Handler struct {
+	Cfg     appconfig.Config
+	Users   auth.Users
+	Tokens  auth.PasswordTokens
+	Spaces  spaces.Service
+	Mail    *mail.Service
+	Backups backup.Service
+	Login   login.Service
 }
 
 func (h Handler) Routes(r chi.Router) {

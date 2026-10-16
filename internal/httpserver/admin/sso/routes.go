@@ -17,6 +17,12 @@ func init() {
 	})
 }
 
+// Handler holds what the identity provider routes need.
+type Handler struct {
+	Cfg appconfig.Config
+	SSO *sso.Service
+}
+
 func (h Handler) Routes(r chi.Router) {
 	r.Get("/auth/sso/presets", h.ssoPresets)
 	r.Get("/identity-providers", h.idpIndex)

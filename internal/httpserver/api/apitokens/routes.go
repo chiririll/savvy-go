@@ -24,6 +24,12 @@ func init() {
 	})
 }
 
+// Handler holds what the API token routes need.
+type Handler struct {
+	Tokens auth.APITokens
+	Spaces spaces.Service
+}
+
 func (h Handler) Routes(r chi.Router) {
 	r.Get("/auth/api-token-capabilities", h.apiTokenCapabilities)
 	r.Get("/auth/api-tokens", h.apiTokensIndex)

@@ -4,30 +4,13 @@ package backups
 import (
 	"net/http"
 
-	"savvy-go/internal/auth"
 	"savvy-go/internal/backup"
-	"savvy-go/internal/bootstrap"
 	"savvy-go/internal/httpserver/httpx"
-	"savvy-go/internal/httpserver/httpx/guard"
 	"savvy-go/internal/settings"
-	"savvy-go/internal/spaces"
-	"savvy-go/internal/store"
 )
 
 // Server backups hold every database and the signing key: server admins only
 // (requireAdmin on the routes). Space backups hold one space: its admins.
-
-// Handler holds what the backup routes need.
-type Handler struct {
-	BackupsDir string
-	Store      store.Store
-	Backups    backup.Service
-	Spaces     spaces.Service
-	Settings   settings.Store
-	Users      auth.Users
-	Bootstrap  *bootstrap.Guard
-	Guard      *guard.Guard
-}
 
 func (h Handler) backupsService(r *http.Request) backup.Service {
 	b := h.Backups

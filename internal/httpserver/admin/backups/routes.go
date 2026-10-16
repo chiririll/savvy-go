@@ -17,6 +17,12 @@ func init() {
 	})
 }
 
+// Handler holds what the server backup routes need.
+type Handler struct {
+	BackupsDir string
+	Backups    backup.Service
+}
+
 func (h Handler) Routes(r chi.Router) {
 	// P1: backups hold every space.
 	r.Get("/backups", h.backupsIndex)

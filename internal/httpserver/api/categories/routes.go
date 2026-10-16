@@ -23,6 +23,9 @@ func init() {
 	})
 }
 
+// Handler serves the categories routes; changes go through the sync groups.
+type Handler struct{ Refsync refsync.Service }
+
 func (s Handler) Routes(r chi.Router) {
 	r.Get("/categories", s.categoriesIndex)
 	r.Post("/categories", s.categoriesStore)

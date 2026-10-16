@@ -9,6 +9,7 @@ import (
 	"savvy-go/internal/auth"
 	"savvy-go/internal/backup"
 	"savvy-go/internal/bootstrap"
+	"savvy-go/internal/httpserver/httpx/guard"
 	"savvy-go/internal/httpserver/httpx/routing"
 	"savvy-go/internal/httpserver/ui"
 	"savvy-go/internal/settings"
@@ -29,6 +30,18 @@ func init() {
 			routing.SpaceAdmin(h.SpaceRoutes),
 		}
 	})
+}
+
+// Handler holds what the backup routes need.
+type Handler struct {
+	BackupsDir string
+	Store      store.Store
+	Backups    backup.Service
+	Spaces     spaces.Service
+	Settings   settings.Store
+	Users      auth.Users
+	Bootstrap  *bootstrap.Guard
+	Guard      *guard.Guard
 }
 
 func (h Handler) SpaceRoutes(r chi.Router) {

@@ -13,11 +13,6 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// Handler holds what the OAuth admin routes need.
-type Handler struct {
-	OAuth *oauth.Service
-}
-
 // Registration window: an admin opens it from Administration → Security.
 
 // registrationBody says whether dynamic client registration is open, and until when.

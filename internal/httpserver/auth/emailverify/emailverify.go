@@ -6,13 +6,7 @@ import (
 	"net/http"
 
 	"savvy-go/internal/httpserver/httpx"
-	"savvy-go/internal/mail"
 )
-
-// Handler holds what the confirmation routes need.
-type Handler struct {
-	Verify mail.Verifier
-}
 
 // verifyEmailResend sends the signed-in user a new confirmation link.
 func (h Handler) verifyEmailResend(w http.ResponseWriter, r *http.Request) {

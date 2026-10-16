@@ -6,7 +6,6 @@ import (
 
 	"savvy-go/internal/db"
 	"savvy-go/internal/httpserver/httpx"
-	"savvy-go/internal/store"
 )
 
 type healthReport struct {
@@ -22,12 +21,6 @@ type healthChk struct {
 	ObservedValue *int   `json:"observedValue,omitempty"`
 	ObservedUnit  string `json:"observedUnit,omitempty"`
 	Output        string `json:"output,omitempty"`
-}
-
-// Handler serves the liveness and readiness probes.
-type Handler struct {
-	Store   store.Store
-	Version string // the release, reported as releaseId
 }
 
 func (h Handler) Live(w http.ResponseWriter, _ *http.Request) {

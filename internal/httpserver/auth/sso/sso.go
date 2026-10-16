@@ -4,27 +4,13 @@ package sso
 import (
 	"encoding/json"
 	"net/http"
-	"savvy-go/internal/appconfig"
-	"savvy-go/internal/auth"
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/httpserver/httpx/dto"
-	"savvy-go/internal/httpserver/httpx/guard"
-	"savvy-go/internal/httpserver/httpx/login"
 
 	"github.com/go-chi/chi/v5"
 
 	"savvy-go/internal/sso"
 )
-
-// Handler holds what the sign-in and provider routes need.
-type Handler struct {
-	Cfg        appconfig.Config
-	SSO        *sso.Service
-	Users      auth.Users
-	Challenges auth.Challenges
-	Login      login.Service
-	Guard      *guard.Guard
-}
 
 func (h Handler) ssoProviders(w http.ResponseWriter, r *http.Request) {
 	if h.Cfg.AppURL() == "" {
