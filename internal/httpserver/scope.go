@@ -2,8 +2,8 @@ package httpserver
 
 import (
 	"savvy-go/internal/automation"
-	"savvy-go/internal/httpserver/api"
-	"savvy-go/internal/httpserver/guard"
+	"savvy-go/internal/httpserver/httpx"
+	"savvy-go/internal/httpserver/httpx/guard"
 	"savvy-go/internal/importer"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/recurring"
@@ -12,10 +12,10 @@ import (
 	"savvy-go/internal/store"
 )
 
-func (s *Server) newScope(id int64, role string, d store.DB) *api.SpaceScope {
+func (s *Server) newScope(id int64, role string, d store.DB) *httpx.SpaceScope {
 	txs := ledger.Transactions{DB: d}
 	accounts := ledger.Accounts{DB: d}
-	return &api.SpaceScope{
+	return &httpx.SpaceScope{
 		ID:         id,
 		Role:       role,
 		DB:         d,

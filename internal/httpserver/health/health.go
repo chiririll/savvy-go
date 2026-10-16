@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"savvy-go/internal/db"
-	"savvy-go/internal/httpserver/api"
+	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/store"
 	"savvy-go/internal/version"
 )
@@ -29,7 +29,7 @@ type healthChk struct {
 type Handler struct{ Store store.Store }
 
 func (h Handler) Live(w http.ResponseWriter, _ *http.Request) {
-	api.WriteHealth(w, http.StatusOK, healthReport{
+	httpx.WriteHealth(w, http.StatusOK, healthReport{
 		Status:    "pass",
 		ReleaseID: version.Value,
 	})
@@ -71,7 +71,7 @@ func (h Handler) Ready(w http.ResponseWriter, r *http.Request) {
 		status = http.StatusServiceUnavailable
 		reportStatus = "fail"
 	}
-	api.WriteHealth(w, status, healthReport{
+	httpx.WriteHealth(w, status, healthReport{
 		Status:    reportStatus,
 		ReleaseID: version.Value,
 		Checks:    checks,

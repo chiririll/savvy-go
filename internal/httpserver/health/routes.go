@@ -3,7 +3,7 @@ package health
 import (
 	"github.com/go-chi/chi/v5"
 
-	"savvy-go/internal/httpserver/routing"
+	"savvy-go/internal/httpserver/httpx/routing"
 )
 
 func init() {

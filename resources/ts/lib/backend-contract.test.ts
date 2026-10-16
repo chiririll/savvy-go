@@ -137,7 +137,7 @@ describe('mail protocols', () => {
 })
 
 describe('server checks', () => {
-    const source = () => read('internal/httpserver/checks/checks.go')
+    const source = () => read('internal/httpserver/admin/checks/checks.go')
 
     it('are the ids the backend reports', () => {
         const fromGo = [...source().matchAll(/add\("([a-z_]+)"/g)].map((m) => m[1])
@@ -159,7 +159,7 @@ describe('server checks', () => {
 
 describe('backup status', () => {
     it('is one of the statuses the API can return', () => {
-        const body = goFunc('internal/httpserver/dto/dto.go', 'func NewBackup(')
+        const body = goFunc('internal/httpserver/httpx/dto/backups.go', 'func NewBackup(')
         const fromGo = [...body.matchAll(/status\s*:?=\s*"([a-z]+)"/g)].map((m) => m[1])
         expect(sorted(BACKUP_STATUSES)).toEqual(sorted(fromGo))
     })
@@ -203,14 +203,14 @@ const SPACE_DATA_PACKAGES = [
     'recurring',
     'budgets',
     'automation',
-    'uploadapi',
+    'upload',
 ]
 
 describe('API routes', () => {
     it('sends every space data route through /spaces/{id}', () => {
         // Each data domain is a package under internal/httpserver that mounts its own Routes.
         const bodies = SPACE_DATA_PACKAGES.map((pkg) => {
-            const file = `internal/httpserver/${pkg}/${pkg}.go`
+            const file = `internal/httpserver/api/${pkg}/routes.go`
             const signature = read(file).includes('func Routes(') ? 'func Routes(' : ') Routes('
             return goFunc(file, signature)
         })

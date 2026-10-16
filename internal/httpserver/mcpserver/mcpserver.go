@@ -10,7 +10,7 @@ import (
 
 	savvyauth "savvy-go/internal/auth"
 	"savvy-go/internal/config"
-	"savvy-go/internal/httpserver/api"
+	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/version"
 
 	"github.com/modelcontextprotocol/go-sdk/auth"
@@ -62,7 +62,7 @@ func (h Handler) Endpoint() http.Handler {
 		DisableLocalhostProtection: true,
 	})
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		api.OpenCORS(w)
+		httpx.OpenCORS(w)
 		opts := &auth.RequireBearerTokenOptions{
 			ResourceMetadataURL:    h.Cfg.URL() + "/.well-known/oauth-protected-resource",
 			AllowMissingExpiration: true,

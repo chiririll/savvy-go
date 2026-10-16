@@ -19,7 +19,7 @@ import (
 	"savvy-go/internal/bootstrap"
 	"savvy-go/internal/config"
 	"savvy-go/internal/currencydata"
-	"savvy-go/internal/httpserver/routing"
+	"savvy-go/internal/httpserver/httpx/routing"
 	"savvy-go/internal/settings"
 	"savvy-go/internal/signing"
 	"savvy-go/internal/spaces"

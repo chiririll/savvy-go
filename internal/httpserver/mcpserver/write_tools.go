@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	savvyauth "savvy-go/internal/auth"
-	"savvy-go/internal/httpserver/guard"
+	"savvy-go/internal/httpserver/httpx/guard"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )

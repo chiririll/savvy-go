@@ -35,6 +35,8 @@ In the seed config file, `date` (`YYYY-MM-DD`) places the data relative to that 
 
 One Go process serves the API, the React frontend, the scheduler and workers. Server data is in `server.sqlite`, each space has its own SQLite file. Business logic uses the storage interface in `internal/store` and asks the repositories in `internal/db/repo/<area>` for rows, so it holds no SQL; SQLite code stays in `internal/store/sqlite`, and operations spanning two spaces use `store.InSpaces`. Migrations run on startup.
 
+The HTTP layer in `internal/httpserver` is split by role: `api/<resource>` holds one thin handler package per resource (each with its own `routes.go` and `openapi.yaml`), `auth/` the sign-in, two-factor, OAuth and SSO flows, `admin/` what only server admins use (server backups, signing keys, spaces overview, users, mail, SSO providers, checks, monitoring) and `httpx/` what they share (JSON replies, request and scope helpers, `dto`, `guard`, `routing`). Handlers only adapt HTTP; the logic that scheduled jobs also need lives in the top-level `internal/` packages. A new handler package is linked in from `httpserver/modules.go`.
+
 ## Frontend
 
 React, Vite, react-query, ShadCN/UI. Source in `resources/ts`; run from the repo root:

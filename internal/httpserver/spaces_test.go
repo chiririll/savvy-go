@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"savvy-go/internal/auth"
-	"savvy-go/internal/httpserver/api"
+	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/spaces"
 )
 
@@ -154,7 +154,7 @@ func TestSettingsUpdateRoles(t *testing.T) {
 }
 
 // sp0 is the scope of the shared test space.
-func sp0(t *testing.T, a *testApp) *api.SpaceScope {
+func sp0(t *testing.T, a *testApp) *httpx.SpaceScope {
 	t.Helper()
 	return a.s.newScope(a.space.ID, spaces.RoleAdmin, a.spaceDB())
 }

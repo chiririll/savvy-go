@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"savvy-go/internal/auth"
-	"savvy-go/internal/httpserver/guard"
+	"savvy-go/internal/httpserver/httpx/guard"
 )
 
 // Every data route must belong to a resource, or tokens are locked out of it
