@@ -11,31 +11,46 @@ import (
 	"testing"
 	"time"
 
+	"savvy-go/internal/app"
 	"savvy-go/internal/config"
+	"savvy-go/internal/signing"
 	"savvy-go/internal/store"
 )
 
-func testConfig(t *testing.T) (config.Config, string) {
+// testURL is the public URL of the test servers.
+const testURL = "http://localhost:8080"
+
+func testConfig(t *testing.T) (app.Config, string) {
 	t.Helper()
 	dir := t.TempDir()
-	cfg := config.Config{
-		AppURL:        "http://localhost:8080",
-		DataDir:       dir,
-		UploadsDir:    filepath.Join(dir, "uploads"),
-		BackupsDir:    filepath.Join(dir, "backups"),
-		SessionTTL:    24 * time.Hour,
-		RememberTTL:   7 * 24 * time.Hour,
-		ChallengeTTL:  5 * time.Minute,
-		SessionCookie: "svy_session",
-		CSRFCookie:    "svy_csrf",
-		CSRFHeader:    "X-CSRF-Token",
+	cfg := app.Config{
+		DataDir:    dir,
+		UploadsDir: filepath.Join(dir, "uploads"),
+		BackupsDir: filepath.Join(dir, "backups"),
+		TZ:         "UTC",
+		Location:   time.UTC,
 	}
 	return cfg, dir
 }
 
+// testFile is a config file with the given TOML.
+func testFile(toml string) *config.Config {
+	f, err := config.Parse(toml)
+	if err != nil {
+		panic(err)
+	}
+	return f
+}
+
+// newServer is New with the public URL set to testURL; opts may replace it.
+func newServer(cfg app.Config, st store.Store, keys *signing.Holder, opts ...Option) *Server {
+	opts = append([]Option{WithConfig(testFile("[server]\napp_url = \""+testURL+"\"\n"))}, opts...)
+	return New(cfg, st, keys, opts...)
+}
+
 func TestLivezPass(t *testing.T) {
 	cfg, _ := testConfig(t)
-	srv := httptest.NewServer(New(cfg, openTestStore(t, cfg), testKeys(t, cfg)).Handler())
+	srv := httptest.NewServer(newServer(cfg, openTestStore(t, cfg), testKeys(t, cfg)).Handler())
 	t.Cleanup(srv.Close)
 
 	res, err := http.Get(srv.URL + "/livez")
@@ -73,7 +88,7 @@ func (brokenSpaceStore) Status() store.Status {
 func readyz(t *testing.T, st store.Store) (int, map[string]any) {
 	t.Helper()
 	cfg, _ := testConfig(t)
-	srv := httptest.NewServer(New(cfg, st, testKeys(t, cfg)).Handler())
+	srv := httptest.NewServer(newServer(cfg, st, testKeys(t, cfg)).Handler())
 	t.Cleanup(srv.Close)
 	res, err := http.Get(srv.URL + "/readyz")
 	if err != nil {
@@ -149,7 +164,7 @@ func TestSPAServesIndexAndStatic(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(public, "index.html"), []byte(index), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	s := New(cfg, openTestStore(t, cfg), testKeys(t, cfg))
+	s := newServer(cfg, openTestStore(t, cfg), testKeys(t, cfg))
 	s.spa.Assets = os.DirFS(public)
 	srv := httptest.NewServer(s.Handler())
 	t.Cleanup(srv.Close)

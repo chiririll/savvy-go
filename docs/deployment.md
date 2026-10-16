@@ -41,7 +41,7 @@ Moving from another server? Instead of creating an admin, choose to restore a se
 
 The admin starts with no space; the first one is created from the app, see [Spaces](spaces.md#creating-a-space).
 
-Right after the admin is created, a short **server setup** follows. Step 1 is required: the public URL, filled in with the address you opened the app at. Step 2 is a list of optional things, each opening on its own screen and marked **Done** once configured: email (the same form as in the admin panel, and a test message) and single sign-on (add an identity provider). Finish or skip whenever you like. The server remembers that setup is pending, so if you reload, close the tab or sign in again, it comes back until you finish or skip it; after that it is hidden for good, and the same settings stay in **Administration → System**. If `config.toml` is read-only, the URL step only explains how to set `app_url` in the file.
+Right after the admin is created, a short **server setup** follows. Step 1 is required: the public URL, filled in with the address you opened the app at. Step 2 is a list of optional things, each opening on its own screen and marked **Done** once configured: email (the same form as in the admin panel, and a test message) and single sign-on (add an identity provider). Finish or skip whenever you like. The server remembers that setup is pending, so if you reload, close the tab or sign in again, it comes back until you finish or skip it; after that it is hidden for good, and the same settings stay in **Administration → System**. While the application does not change `config.toml`, the URL step only explains how to set `app_url` in the file.
 
 ## Configuration
 
@@ -56,13 +56,15 @@ Keys, with their defaults, are listed in the generated file itself:
 | `[security]` | `session_ttl`, `remember_ttl`, `challenge_ttl`, `session_cookie`, `csrf_cookie`, `csrf_header` |
 | `[mailer]`   | `enabled`, `host`, `port`, `protocol`, `user`, `password`, `from`, `skip_verify`, `timeout`       |
 
-`app_url` is the public `https://` URL of your instance. SSO and passkeys stay disabled without it. It can also be changed in the admin panel (System → Server), which writes it back to the file. If Go Savvy cannot write the file (a read-only mount), the field is locked in the panel and you edit the file yourself. Behind Docker, set it there, or edit `/data/config.toml` once.
+A value the application cannot run with, such as a lifetime that is not a positive number or an empty cookie name under `[security]`, stops it at start with the section and key in the error. `[mailer]` is the exception: see [Email](#email).
+
+`app_url` is the public `https://` URL of your instance. SSO and passkeys stay disabled without it. The admin panel (System → Server) shows it but does not change it for now: edit the file and restart. Behind Docker, edit `/data/config.toml` once.
 
 Limits such as spaces per user, space quotas and the number of kept backups are not in the file: server admins set them in **Administration → System**.
 
 ### Email
 
-Without a mail server everything works; reset and invitation links are shown to copy and send yourself. With one, Go Savvy can email them, and some things need it: see [how invitations are made](spaces.md#invitations). Set it up in **Administration → System → Email**, or in the `[mailer]` section of `config.toml`. Saving in the panel writes the section and takes effect at once, no restart; if `config.toml` is read-only, the form is locked and you edit the file yourself.
+Without a mail server everything works; reset and invitation links are shown to copy and send yourself. With one, Go Savvy can email them, and some things need it: see [how invitations are made](spaces.md#invitations). Set it up in the `[mailer]` section of `config.toml` and restart. **Administration → System → Email** shows the settings and tests them, but does not save changes for now: the form is locked.
 
 ```toml
 [mailer]
@@ -81,9 +83,8 @@ from = "Go Savvy <savvy@example.com>"
 | `smtps`              | 465  | TLS from the first byte.                                                             |
 | `smtp`               | 25   | No encryption. Only for a trusted relay on the same host or network.                 |
 
-- Settings are saved as a whole. The password field is write-only: leave it empty to keep the stored one, and it is cleared when you remove the login.
 - The TLS certificate is checked. `skip_verify = true` accepts any certificate, for a server with a self-signed one.
-- `user` and `password` are optional (leave `user` empty for a relay without login). The password is stored in plain text in `config.toml`, so keep the file readable by the application only. The admin panel never shows it again after you save it.
+- `user` and `password` are optional (leave `user` empty for a relay without login). The password is stored in plain text in `config.toml`, so keep the file readable by the application only. The admin panel never shows it.
 - `timeout` is how many seconds to wait for the server (default 10).
 - A mistake in the section does not stop the server: mail is switched off, the log says why, and **Administration → System → Email** shows the problem.
 
@@ -187,7 +188,7 @@ Administration → Status lists what needs attention, and a dot on the Administr
 | No server backup | warning | there is no valid server backup |
 | Server backup is old | warning | the newest valid server backup is over 30 days old |
 | Data disk is filling | warning at 75%, error at 90% | the volume that holds the uploads |
-| Config file is read-only | info | settings in `config.toml` cannot be edited from the panel |
+| Config file is read-only | info | the application does not change `config.toml` for now, so its settings are edited in the file |
 
 The same list is available to admins at `GET /api/admin/checks` (session only).
 

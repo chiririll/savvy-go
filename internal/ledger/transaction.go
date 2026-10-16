@@ -16,7 +16,7 @@ import (
 
 // appLocation is the timezone used for calendar-day concepts across this
 // package: "today", and whether a date is in the future. Configured once at
-// startup from the TZ env var (see config.Config.Location); defaults to UTC.
+// startup from the TZ env var (see app.Config.Location); defaults to UTC.
 // A raw time.Now().UTC() day boundary would disagree with a client whose
 // local day has already rolled over, wrongly flagging same-day dates as future.
 var appLocation = time.UTC

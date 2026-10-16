@@ -57,7 +57,7 @@ func appWithGuard(t *testing.T, g *bootstrap.Guard) *testApp {
 	if g != nil {
 		opts = append(opts, WithBootstrap(g))
 	}
-	s := New(cfg, st, testKeys(t, cfg), opts...)
+	s := newServer(cfg, st, testKeys(t, cfg), opts...)
 	ts := httptest.NewServer(s.Handler())
 	t.Cleanup(ts.Close)
 	return &testApp{t: t, db: st.SQL(), store: st, srv: ts, s: s, client: ts.Client(), bootstrap: g}

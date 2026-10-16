@@ -10,7 +10,6 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"savvy-go/internal/backup"
-	"savvy-go/internal/config"
 	"savvy-go/internal/httpserver/httpx"
 	backupx "savvy-go/internal/httpserver/httpx/backups"
 	"savvy-go/internal/httpserver/httpx/dto"
@@ -19,8 +18,8 @@ import (
 
 // Handler holds what the server backup routes need.
 type Handler struct {
-	Cfg     config.Config
-	Backups backup.Service
+	BackupsDir string
+	Backups    backup.Service
 }
 
 func (h Handler) backupsIndex(w http.ResponseWriter, r *http.Request) {
@@ -38,7 +37,7 @@ func (h Handler) backupsStore(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h Handler) backupsUpload(w http.ResponseWriter, r *http.Request) {
-	tmp, name, ok := backupx.ReceiveUpload(w, r, h.Cfg.BackupsDir, backupx.MaxServerUpload)
+	tmp, name, ok := backupx.ReceiveUpload(w, r, h.BackupsDir, backupx.MaxServerUpload)
 	if !ok {
 		return
 	}
@@ -83,7 +82,7 @@ func (h Handler) backupsDestroy(w http.ResponseWriter, r *http.Request) {
 // the upgraded version as a server backup. Nothing live changes until the
 // admin restores it (server admins, by route).
 func (h Handler) backupsUpgradeLaravel(w http.ResponseWriter, r *http.Request) {
-	tmp, _, ok := backupx.ReceiveUpload(w, r, h.Cfg.BackupsDir, backupx.MaxServerUpload)
+	tmp, _, ok := backupx.ReceiveUpload(w, r, h.BackupsDir, backupx.MaxServerUpload)
 	if !ok {
 		return
 	}

@@ -9,7 +9,6 @@ import (
 	"strconv"
 
 	savvyauth "savvy-go/internal/auth"
-	"savvy-go/internal/config"
 	"savvy-go/internal/httpserver/httpx"
 
 	"github.com/modelcontextprotocol/go-sdk/auth"
@@ -37,7 +36,7 @@ const (
 // Handler is the /mcp endpoint. Inner is the app's own router: tools call it
 // in-process with the caller's bearer token, so the REST rules apply.
 type Handler struct {
-	Cfg       config.Config
+	AppURL    func() string // the public URL of the instance, empty when unset
 	APITokens savvyauth.APITokens
 	Inner     http.Handler
 	Version   string // the release, reported to MCP clients
@@ -64,7 +63,7 @@ func (h Handler) Endpoint() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		httpx.OpenCORS(w)
 		opts := &auth.RequireBearerTokenOptions{
-			ResourceMetadataURL:    h.Cfg.URL() + "/.well-known/oauth-protected-resource",
+			ResourceMetadataURL:    h.AppURL() + "/.well-known/oauth-protected-resource",
 			AllowMissingExpiration: true,
 		}
 		auth.RequireBearerToken(h.verifyMCPToken, opts)(streamable).ServeHTTP(w, r)

@@ -20,7 +20,7 @@ func (h Handler) spacesImport(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusForbidden, "Guests cannot create spaces.")
 		return
 	}
-	tmp, name, ok := backupx.ReceiveUpload(w, r, h.Cfg.BackupsDir, h.spaceUploadLimit(r))
+	tmp, name, ok := backupx.ReceiveUpload(w, r, h.BackupsDir, h.spaceUploadLimit(r))
 	if !ok {
 		return
 	}

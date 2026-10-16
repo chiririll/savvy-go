@@ -130,7 +130,7 @@ describe('automation', () => {
 
 describe('mail protocols', () => {
     it('are the ones the mailer accepts', () => {
-        const source = read('internal/mailer/mailer.go')
+        const source = read('internal/mail/smtp/mailer.go')
         const fromGo = [...source.matchAll(/^	[A-Za-z]+\s+= "([a-z]+)"\s+\/\//gm)].map((m) => m[1])
         expect(sorted(MAIL_PROTOCOLS)).toEqual(sorted(fromGo))
     })

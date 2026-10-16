@@ -13,7 +13,7 @@ var spec []byte
 
 func init() {
 	routing.Register(spec, func(d *routing.Deps) []routing.Mount {
-		h := Handler{Cfg: d.Cfg, Store: d.Store, Backups: d.Backups, Spaces: d.Spaces, Settings: d.Settings, Users: d.Users, Bootstrap: d.Bootstrap, Guard: d.Guard}
+		h := Handler{BackupsDir: d.Cfg.BackupsDir, Store: d.Store, Backups: d.Backups, Spaces: d.Spaces, Settings: d.Settings, Users: d.Users, Bootstrap: d.Bootstrap, Guard: d.Guard}
 		return []routing.Mount{
 			routing.Public(h.PublicRoutes),
 			routing.Account(h.AccountRoutes),

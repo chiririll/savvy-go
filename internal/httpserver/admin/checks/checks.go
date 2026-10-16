@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"savvy-go/internal/backup"
-	"savvy-go/internal/config"
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/platform/sysinfo"
 )
@@ -30,8 +29,10 @@ const (
 
 // Handler lists the checks of a running server.
 type Handler struct {
-	Cfg     config.Config
-	Backups backup.Service
+	AppURL     func() string // the public URL of the instance, empty when unset
+	Writable   func() bool   // whether the config file can be changed
+	UploadsDir string
+	Backups    backup.Service
 	// Mail reports whether mail works, and what is wrong with its settings.
 	Mail func() (enabled bool, problem string)
 }
@@ -84,6 +85,7 @@ func Run(in Input, now time.Time) []Check {
 			add("disk_filling", severityWarning, p)
 		}
 	}
+
 	if !in.Writable {
 		add("config_read_only", severityInfo, nil)
 	}
@@ -98,10 +100,10 @@ func Run(in Input, now time.Time) []Check {
 func (h Handler) index(w http.ResponseWriter, r *http.Request) {
 	enabled, problem := h.Mail()
 	in := Input{
-		AppURL:      h.Cfg.URL(),
+		AppURL:      h.AppURL(),
 		MailEnabled: enabled,
 		MailProblem: problem,
-		Writable:    h.Cfg.Live.Writable(),
+		Writable:    h.Writable(),
 		DiskPercent: h.diskPercent(),
 	}
 	if list, err := h.Backups.ServerBackups(); err == nil {
@@ -120,7 +122,7 @@ func (h Handler) index(w http.ResponseWriter, r *http.Request) {
 // diskPercent is the used share of the volume that holds the uploads, nil when
 // the platform cannot tell.
 func (h Handler) diskPercent() *float64 {
-	total, free, ok := sysinfo.VolumeSpace(h.Cfg.UploadsDir)
+	total, free, ok := sysinfo.VolumeSpace(h.UploadsDir)
 	if !ok || total <= 0 {
 		return nil
 	}

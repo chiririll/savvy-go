@@ -10,7 +10,6 @@ import (
 	"net/url"
 	"time"
 
-	"savvy-go/internal/config"
 	repo "savvy-go/internal/db/repo/auth"
 	"savvy-go/internal/store"
 
@@ -25,8 +24,9 @@ const (
 )
 
 type WebAuthn struct {
-	DB  store.DB
-	Cfg config.Config
+	DB store.DB
+	// AppURL is the public URL of the instance, empty when unset.
+	AppURL func() string
 }
 
 func (w WebAuthn) repo() repo.Repo { return repo.Repo{DB: w.DB} }
@@ -56,7 +56,7 @@ type WebAuthnCred struct {
 var ErrNoPublicURL = errors.New("the public URL is not set")
 
 func (w WebAuthn) engine() (*webauthn.WebAuthn, error) {
-	u, err := url.Parse(w.Cfg.URL())
+	u, err := url.Parse(w.AppURL())
 	if err != nil || u.Host == "" || u.Hostname() == "" {
 		return nil, ErrNoPublicURL
 	}

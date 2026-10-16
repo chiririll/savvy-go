@@ -10,8 +10,8 @@ import (
 func init() {
 	routing.Register(nil, func(d *routing.Deps) []routing.Mount {
 		h := Handler{
-			Cfg: d.Cfg, OAuth: d.OAuth, Spaces: d.Spaces,
-			MCP: mcpserver.Handler{Cfg: d.Cfg, APITokens: d.APITokens, Inner: d.Inner, Version: d.Build.Version}.Endpoint(),
+			AppURL: d.AppURL, OAuth: d.OAuth, Spaces: d.Spaces,
+			MCP: mcpserver.Handler{AppURL: d.AppURL, APITokens: d.APITokens, Inner: d.Inner, Version: d.Build.Version}.Endpoint(),
 		}
 		return []routing.Mount{
 			routing.Credential(h.CredentialRoutes),

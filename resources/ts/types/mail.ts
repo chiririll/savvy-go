@@ -1,4 +1,4 @@
-/** How the SMTP connection is secured; mirrors the constants of internal/mailer. */
+/** How the SMTP connection is secured; mirrors the constants of internal/mail/smtp. */
 export const MAIL_PROTOCOLS = ['starttls', 'smtps', 'smtp'] as const
 export type MailProtocol = (typeof MAIL_PROTOCOLS)[number]
 

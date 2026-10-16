@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"savvy-go/internal/backup"
-	"savvy-go/internal/config"
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/httpserver/httpx/dto"
 	"savvy-go/internal/httpserver/httpx/login"
@@ -25,7 +24,7 @@ import (
 
 // Handler holds what the user administration needs.
 type Handler struct {
-	Cfg     config.Config
+	AppURL  func() string // the public URL of the instance, empty when unset
 	Users   auth.Users
 	Tokens  auth.PasswordTokens
 	Spaces  spaces.Service
@@ -106,7 +105,7 @@ func (h Handler) attachSetupLink(r *http.Request, u *auth.User, send bool) (*dto
 	switch {
 	case !send:
 		link.Token = tok
-	case h.Mail.Send(r.Context(), smtp.PasswordReset(u.Email, u.Name, h.Cfg.URL()+"/set-password/"+tok, exp)) != nil:
+	case h.Mail.Send(r.Context(), smtp.PasswordReset(u.Email, u.Name, h.AppURL()+"/set-password/"+tok, exp)) != nil:
 		// The user exists but nobody saw the link: do not leave it valid. A reset can try again.
 		_ = h.Tokens.RevokeActive(r.Context(), u.ID)
 		link.EmailError = "Could not send the email."
@@ -267,7 +266,7 @@ func (h Handler) usersIssueToken(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteData(w, http.StatusOK, payload)
 		return
 	}
-	if err := h.Mail.Send(r.Context(), smtp.PasswordReset(u.Email, u.Name, h.Cfg.URL()+"/set-password/"+tok, exp)); err != nil {
+	if err := h.Mail.Send(r.Context(), smtp.PasswordReset(u.Email, u.Name, h.AppURL()+"/set-password/"+tok, exp)); err != nil {
 		// The link was never seen by anyone: do not leave it valid.
 		_ = h.Tokens.RevokeActive(r.Context(), u.ID)
 		httpx.WriteMessage(w, http.StatusUnprocessableEntity, "Could not send the email: "+err.Error())
@@ -285,7 +284,7 @@ func (h Handler) linkMailProblem(r *http.Request) string {
 		return h.Mail.OffReason()
 	case h.Login.PasswordLoginDisabled(r.Context()):
 		return "Password sign-in is switched off, so a set-password link is of no use."
-	case h.Cfg.URL() == "":
+	case h.AppURL() == "":
 		return mail.NoAppURLMessage
 	}
 	return ""

@@ -39,7 +39,7 @@ func (h Handler) spaceUploadLimit(r *http.Request) int64 {
 }
 
 func (h Handler) spaceBackupsUpload(w http.ResponseWriter, r *http.Request) {
-	tmp, name, ok := backupx.ReceiveUpload(w, r, h.Cfg.BackupsDir, h.spaceUploadLimit(r))
+	tmp, name, ok := backupx.ReceiveUpload(w, r, h.BackupsDir, h.spaceUploadLimit(r))
 	if !ok {
 		return
 	}

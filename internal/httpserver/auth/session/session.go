@@ -14,14 +14,13 @@ import (
 
 	"savvy-go/internal/auth"
 	"savvy-go/internal/bootstrap"
-	"savvy-go/internal/config"
 
 	"github.com/go-chi/chi/v5"
 )
 
 // Handler holds what the account routes need.
 type Handler struct {
-	Cfg        config.Config
+	Security   auth.Security
 	Users      auth.Users
 	Sessions   auth.Sessions
 	Tokens     auth.PasswordTokens
@@ -180,7 +179,7 @@ func (h Handler) authLogin(w http.ResponseWriter, r *http.Request) {
 
 func (h Handler) authMe(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
-	token := auth.ReadToken(r, h.Cfg)
+	token := h.Security.ReadToken(r)
 	sess, err := h.Sessions.Resolve(r.Context(), token)
 	if err != nil || sess == nil || sess.User == nil {
 		httpx.WriteJSON(w, http.StatusOK, dto.SessionPayload{})
@@ -192,7 +191,7 @@ func (h Handler) authMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if refreshed != nil {
-		auth.SetSessionCookies(w, r, h.Cfg, refreshed.Token, refreshed.CSRF, true)
+		h.Security.SetSessionCookies(w, r, refreshed.Token, refreshed.CSRF, true)
 	}
 	h.Login.WritePayload(w, r, http.StatusOK, sess.User, sess)
 }
@@ -248,7 +247,7 @@ func (h Handler) authLogout(w http.ResponseWriter, r *http.Request) {
 	if sess := httpx.Session(r); sess != nil {
 		_ = h.Sessions.Revoke(r.Context(), sess)
 	}
-	auth.ClearSessionCookies(w, r, h.Cfg)
+	h.Security.ClearSessionCookies(w, r)
 	httpx.WriteMessage(w, http.StatusOK, "Logged out.")
 }
 

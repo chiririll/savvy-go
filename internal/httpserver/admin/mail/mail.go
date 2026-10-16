@@ -2,7 +2,6 @@ package mail
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -13,7 +12,10 @@ import (
 )
 
 // Handler is the admin's view of the mail settings.
-type Handler struct{ Mail *mail.Service }
+type Handler struct {
+	Mail     *mail.Service
+	Writable func() bool // whether the config file can be changed
+}
 
 func nullIfEmpty(s string) *string {
 	if s == "" {
@@ -44,63 +46,16 @@ type testedBody struct {
 }
 
 // index shows the mail configuration. The password is never sent, only
-// whether one is set. "writable" is false when the config file is read-only.
+// whether one is set. "writable" is false when the config file cannot be changed from the
+// application: the settings are then shown, not edited.
 func (h Handler) index(w http.ResponseWriter, r *http.Request) {
 	c, problem := h.Mail.Settings()
 	httpx.WriteData(w, http.StatusOK, settingsBody{
 		Enabled: h.Mail.Mailer().Enabled(), Problem: nullIfEmpty(problem),
 		Host: c.Host, Port: c.Port, Protocol: c.Protocol, User: c.User, From: c.From,
 		SkipVerify: c.SkipVerify, Timeout: int(c.Timeout / time.Second), PasswordSet: c.Password != "",
-		AppURLSet: h.Mail.Config().URL() != "", Writable: h.Mail.Config().Live.Writable(),
+		AppURLSet: h.Mail.AppURL() != "", Writable: h.Writable(),
 	})
-}
-
-// update replaces the whole mail configuration, writes it to the config
-// file and starts using it at once. A missing "password" keeps the stored one;
-// an empty string clears it. An enabled configuration must be valid; a disabled
-// one is saved as it is, so it can be filled in before it is switched on.
-func (h Handler) update(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		Enabled    bool    `json:"enabled"`
-		Host       string  `json:"host"`
-		Port       int     `json:"port"`
-		Protocol   string  `json:"protocol"`
-		User       string  `json:"user"`
-		Password   *string `json:"password"`
-		From       string  `json:"from"`
-		SkipVerify bool    `json:"skipVerify"`
-		Timeout    int     `json:"timeout"`
-	}
-	if !httpx.DecodeBody(w, r, &body) {
-		return
-	}
-	if !h.Mail.Config().Live.Writable() {
-		httpx.WriteMessage(w, http.StatusUnprocessableEntity, "The config file is read-only. Set the [mailer] section in config.toml.")
-		return
-	}
-	next := smtp.Config{
-		Enabled:    body.Enabled,
-		Host:       strings.TrimSpace(body.Host),
-		Port:       body.Port,
-		Protocol:   strings.ToLower(strings.TrimSpace(body.Protocol)),
-		User:       body.User,
-		From:       strings.TrimSpace(body.From),
-		SkipVerify: body.SkipVerify,
-		Timeout:    time.Duration(body.Timeout) * time.Second,
-	}
-	if next.Timeout <= 0 {
-		next.Timeout = mail.DefaultTimeout
-	}
-	if err := h.Mail.Apply(next, body.Password); err != nil {
-		var invalid smtp.InvalidError
-		if errors.As(err, &invalid) {
-			httpx.WriteValidation(w, map[string][]string{invalid.Field: {invalid.Error()}})
-			return
-		}
-		httpx.WriteMessage(w, http.StatusUnprocessableEntity, "Could not save the config file: "+err.Error())
-		return
-	}
-	h.index(w, r)
 }
 
 // test checks the connection and sends a test message to the given address

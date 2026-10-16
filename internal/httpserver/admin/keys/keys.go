@@ -9,7 +9,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"savvy-go/internal/config"
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/httpserver/httpx/dto"
 	"savvy-go/internal/signing"
@@ -18,7 +17,7 @@ import (
 
 // Handler holds what the key routes need.
 type Handler struct {
-	Cfg       config.Config
+	DataDir   string
 	Transfers *transfers.Service
 	Keys      *signing.Holder
 }
@@ -60,7 +59,7 @@ func (h Handler) keysDestroy(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h Handler) keysRotate(w http.ResponseWriter, r *http.Request) {
-	if _, err := h.Transfers.RotateKey(r.Context(), httpx.User(r), h.Cfg.DataDir); err != nil {
+	if _, err := h.Transfers.RotateKey(r.Context(), httpx.User(r), h.DataDir); err != nil {
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}

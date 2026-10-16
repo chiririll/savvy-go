@@ -15,7 +15,7 @@ var spec []byte
 func init() {
 	routing.Register(spec, func(d *routing.Deps) []routing.Mount {
 		h := Handler{
-			Cfg: d.Cfg, Store: d.Store, Spaces: d.Spaces, Users: d.Users, Backups: d.Backups, Mail: d.Mail,
+			AppURL: d.AppURL, Store: d.Store, Spaces: d.Spaces, Users: d.Users, Backups: d.Backups, Mail: d.Mail,
 			Login: d.Login, Verify: d.EmailVerify, Guard: d.Guard,
 			Creator: spacefill.Creator{Spaces: d.Spaces, Store: d.Store, Rates: d.Rates},
 		}

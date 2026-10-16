@@ -3,6 +3,7 @@
 package app
 
 import (
+	"context"
 	"os"
 
 	"savvy-go/internal/app/signin"
@@ -29,11 +30,15 @@ import (
 // Services are the server-level services. Server-level ones use the server database;
 // the services of a space are built per request from the space's own database.
 type Services struct {
-	Cfg   config.Config
-	Store store.Store
-	Keys  *signing.Holder
-	Rates ledger.RateSource // currency catalog and exchange rates, shared by every space
-	Build Build             // which release is running
+	Cfg      Config
+	conf     *config.Config // each package pulls its own sections from it; not shared
+	appURL   func() string  // the public URL, read each time
+	sender   smtp.Mailer
+	Security auth.Security
+	Store    store.Store
+	Keys     *signing.Holder
+	Rates    ledger.RateSource // currency catalog and exchange rates, shared by every space
+	Build    Build             // which release is running
 
 	// Bootstrap is the first-run password; nil keeps registration closed.
 	Bootstrap *bootstrap.Guard
@@ -60,6 +65,11 @@ type Services struct {
 
 	SignIn      signin.Policy
 	EmailVerify mail.Verifier
+
+	// rates is Rates when it is the public data source: the scheduled update expires its cache.
+	rates *currencydata.Source
+	// closers release what the Builder acquired, in the order Close runs them.
+	closers []func(context.Context) error
 }
 
 // Build says which release is running. The binary sets it at link time; it is handed down
@@ -85,55 +95,62 @@ func WithBootstrap(g *bootstrap.Guard) Option { return func(s *Services) { s.Boo
 // run at once, inside the request.
 func WithQueue(q *runtime.Queue) Option { return func(s *Services) { s.Queue = q } }
 
-// WithMailer sets how email is sent. The default is the SMTP server of the [mailer]
-// section of the config file; tests pass a recorder.
-func WithMailer(m smtp.Mailer) Option {
-	return func(s *Services) { s.Mail = mail.New(s.Cfg, m) }
-}
+// WithConfig sets the config file the services pull their sections from. The default is an
+// empty one, so every section has its defaults.
+func WithConfig(f *config.Config) Option { return func(s *Services) { s.conf = f } }
+
+// WithMailer sets how email is sent, whatever the [mailer] section says; tests pass a
+// recorder. The default is the SMTP server of the section.
+func WithMailer(m smtp.Mailer) Option { return func(s *Services) { s.sender = m } }
 
 // New builds the services.
-func New(cfg config.Config, st store.Store, keys *signing.Holder, opts ...Option) *Services {
-	ledger.SetLocation(cfg.Location)
-	db := st.Server()
+func New(cfg Config, st store.Store, keys *signing.Holder, opts ...Option) *Services {
 	s := &Services{
-		Cfg:            cfg,
-		Store:          st,
-		Keys:           keys,
-		Users:          auth.Users{DB: db},
-		Sessions:       auth.Sessions{DB: db, SessionTTL: cfg.SessionTTL, RememberTTL: cfg.RememberTTL},
-		APITokens:      auth.APITokens{DB: db},
-		PasswordTokens: auth.PasswordTokens{DB: db},
-		Challenges:     auth.Challenges{DB: db, Cfg: cfg},
-		Verifications:  auth.EmailVerifications{DB: db},
-		TwoFactor:      auth.TwoFactor{DB: db, Users: auth.Users{DB: db}},
-		WebAuthn:       auth.WebAuthn{DB: db, Cfg: cfg},
-		Settings:       settings.Store{DB: db},
-		Spaces:         spaces.Service{Store: st},
-		Uploads:        uploads.Service{DB: db, Root: cfg.UploadsDir, SignSecret: randomSecret()},
+		Cfg:   cfg,
+		Store: st,
+		Keys:  keys,
 	}
-	keyRing := signing.KeyRing{Holder: keys, Trusted: transfers.TrustedKeys(db)}
-	s.Transfers = &transfers.Service{Spaces: s.Spaces, Keys: keyRing}
-	s.Refsync = refsync.Service{Spaces: s.Spaces}
 	for _, opt := range opts {
 		opt(s)
 	}
+	if s.conf == nil {
+		s.conf = config.Empty()
+	}
+	s.Security = config.Of(s.conf, auth.SecuritySection).Get()
+	server := config.Of(s.conf, serverSection)
+	s.appURL = func() string { return server.Get().AppURL }
 	if s.Build.Version == "" {
 		s.Build.Version = "dev"
 	}
 	if s.Build.Env == "" {
 		s.Build.Env = "development"
 	}
-	s.Backups = backup.Service{Store: st, Keys: keyRing, Dir: cfg.BackupsDir, DataDir: cfg.DataDir, Transfers: s.Transfers, AppVersion: s.Build.Version}
 	if s.Rates == nil {
 		s.Rates = currencydata.New()
 	}
-	if s.Mail == nil {
-		s.Mail = mail.New(cfg, nil)
-	}
-	s.SSO = &sso.Service{DB: db, Users: s.Users, Settings: s.Settings, AppURL: cfg.URL}
+	ledger.SetLocation(cfg.Location)
+	db := st.Server()
+	sec := s.Security
+	s.Users = auth.Users{DB: db}
+	s.Sessions = auth.Sessions{DB: db, SessionTTL: sec.SessionTTL, RememberTTL: sec.RememberTTL}
+	s.APITokens = auth.APITokens{DB: db}
+	s.PasswordTokens = auth.PasswordTokens{DB: db}
+	s.Challenges = auth.Challenges{DB: db, TTL: sec.ChallengeTTL}
+	s.Verifications = auth.EmailVerifications{DB: db}
+	s.TwoFactor = auth.TwoFactor{DB: db, Users: auth.Users{DB: db}}
+	s.Settings = settings.Store{DB: db}
+	s.Spaces = spaces.Service{Store: st}
+	s.Uploads = uploads.Service{DB: db, Root: cfg.UploadsDir, SignSecret: randomSecret()}
+	s.WebAuthn = auth.WebAuthn{DB: db, AppURL: s.AppURL}
+	keyRing := signing.KeyRing{Holder: keys, Trusted: transfers.TrustedKeys(db)}
+	s.Transfers = &transfers.Service{Spaces: s.Spaces, Keys: keyRing}
+	s.Refsync = refsync.Service{Spaces: s.Spaces}
+	s.Backups = backup.Service{Store: st, Keys: keyRing, Dir: cfg.BackupsDir, DataDir: cfg.DataDir, Transfers: s.Transfers, AppVersion: s.Build.Version}
+	s.Mail = mail.New(s.conf, s.AppURL, s.sender)
+	s.SSO = &sso.Service{DB: db, Users: s.Users, Settings: s.Settings, AppURL: s.AppURL}
 	s.OAuth = oauth.New(db)
 	s.SignIn = signin.Policy{Settings: s.Settings, SSO: s.SSO}
-	s.EmailVerify = mail.Verifier{Cfg: cfg, Mail: s.Mail, Verifications: s.Verifications, Users: s.Users}
+	s.EmailVerify = mail.Verifier{AppURL: s.AppURL, Mail: s.Mail, Verifications: s.Verifications, Users: s.Users}
 	_ = os.MkdirAll(cfg.UploadsDir, 0o775)
 	_ = os.MkdirAll(cfg.BackupsDir, 0o775)
 	return s

@@ -15,9 +15,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"savvy-go/internal/app"
 	"savvy-go/internal/auth"
 	"savvy-go/internal/bootstrap"
-	"savvy-go/internal/config"
 	"savvy-go/internal/currencydata"
 	"savvy-go/internal/httpserver/httpx/routing"
 	"savvy-go/internal/settings"
@@ -47,7 +47,7 @@ type testApp struct {
 }
 
 // openTestStore opens a store in cfg.DataDir with the embedded migrations.
-func openTestStore(t *testing.T, cfg config.Config) *sqlite.Store {
+func openTestStore(t *testing.T, cfg app.Config) *sqlite.Store {
 	t.Helper()
 	st, err := sqlite.OpenApp(context.Background(), cfg.DataDir)
 	if err != nil {
@@ -58,7 +58,7 @@ func openTestStore(t *testing.T, cfg config.Config) *sqlite.Store {
 }
 
 // testKeys is a signing key in the test's data directory.
-func testKeys(t *testing.T, cfg config.Config) *signing.Holder {
+func testKeys(t *testing.T, cfg app.Config) *signing.Holder {
 	t.Helper()
 	key, err := signing.Load(cfg.DataDir, false)
 	if err != nil {
@@ -73,7 +73,7 @@ func newTestApp(t *testing.T, opts ...Option) *testApp {
 	st := openTestStore(t, cfg)
 	guard := bootstrap.New(cfg.DataDir, bootstrap.Binary)
 	opts = append([]Option{WithRates(currencydata.NewOffline()), WithBootstrap(guard)}, opts...)
-	s := New(cfg, st, testKeys(t, cfg), opts...)
+	s := newServer(cfg, st, testKeys(t, cfg), opts...)
 	space, err := s.Spaces.Create(context.Background(), "Test", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -271,7 +271,7 @@ func TestSessionSmokeRegisterMeLogout(t *testing.T) {
 func TestHostPrefixedCookieOverTLS(t *testing.T) {
 	cfg, _ := testConfig(t)
 	guard := bootstrap.New(cfg.DataDir, bootstrap.Binary)
-	s := New(cfg, openTestStore(t, cfg), testKeys(t, cfg), WithBootstrap(guard))
+	s := newServer(cfg, openTestStore(t, cfg), testKeys(t, cfg), WithBootstrap(guard))
 	ts := httptest.NewTLSServer(s.Handler())
 	t.Cleanup(ts.Close)
 	client := ts.Client()

@@ -11,4 +11,5 @@ var (
 	WithMailer    = app.WithMailer
 	WithQueue     = app.WithQueue
 	WithBuild     = app.WithBuild
+	WithConfig    = app.WithConfig
 )

@@ -32,7 +32,7 @@ COPY --from=frontend /app/public/build ./internal/platform/webui/dist/build
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -tags embed -trimpath \
-    -ldflags="-s -w -X savvy-go/internal/config.DefaultListen=:80 -X main.Version=${APP_VERSION} -X main.Env=${APP_ENV}" \
+    -ldflags="-s -w -X savvy-go/internal/app.DefaultListen=:80 -X main.Version=${APP_VERSION} -X main.Env=${APP_ENV}" \
     -o /out/savvy-go .
 
 # Build the final image

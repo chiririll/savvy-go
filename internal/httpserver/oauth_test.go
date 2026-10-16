@@ -153,7 +153,6 @@ func TestOAuthMetadata(t *testing.T) {
 func TestOAuthNeedsAppURL(t *testing.T) {
 	a := newTestApp(t)
 	cfg, _ := testConfig(t)
-	cfg.AppURL = ""
 	s := New(cfg, a.store, testKeys(t, cfg))
 	for _, p := range []string{"/.well-known/oauth-authorization-server", "/.well-known/oauth-protected-resource"} {
 		rec := httptest.NewRecorder()

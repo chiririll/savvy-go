@@ -7,7 +7,6 @@ import (
 	"savvy-go/internal/auth"
 	"savvy-go/internal/backup"
 	"savvy-go/internal/bootstrap"
-	"savvy-go/internal/config"
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/httpserver/httpx/guard"
 	"savvy-go/internal/settings"
@@ -20,14 +19,14 @@ import (
 
 // Handler holds what the backup routes need.
 type Handler struct {
-	Cfg       config.Config
-	Store     store.Store
-	Backups   backup.Service
-	Spaces    spaces.Service
-	Settings  settings.Store
-	Users     auth.Users
-	Bootstrap *bootstrap.Guard
-	Guard     *guard.Guard
+	BackupsDir string
+	Store      store.Store
+	Backups    backup.Service
+	Spaces     spaces.Service
+	Settings   settings.Store
+	Users      auth.Users
+	Bootstrap  *bootstrap.Guard
+	Guard      *guard.Guard
 }
 
 func (h Handler) backupsService(r *http.Request) backup.Service {

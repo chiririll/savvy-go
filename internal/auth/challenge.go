@@ -4,14 +4,14 @@ import (
 	"context"
 	"time"
 
-	"savvy-go/internal/config"
 	repo "savvy-go/internal/db/repo/auth"
 	"savvy-go/internal/store"
 )
 
 type Challenges struct {
-	DB  store.DB
-	Cfg config.Config
+	DB store.DB
+	// TTL is how long a challenge can be answered.
+	TTL time.Duration
 }
 
 func (c Challenges) repo() repo.Repo { return repo.Repo{DB: c.DB} }
@@ -19,7 +19,7 @@ func (c Challenges) repo() repo.Repo { return repo.Repo{DB: c.DB} }
 func (c Challenges) Issue(ctx context.Context, user *User) (string, error) {
 	token := RandomString(48)
 	now := time.Now().UTC()
-	err := c.repo().InsertChallenge(ctx, user.ID, HashToken(token), now.Add(c.Cfg.ChallengeTTL), now)
+	err := c.repo().InsertChallenge(ctx, user.ID, HashToken(token), now.Add(c.TTL), now)
 	return token, err
 }
 

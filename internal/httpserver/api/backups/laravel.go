@@ -29,7 +29,7 @@ func (h Handler) spaceBackupsUpgradeLaravel(w http.ResponseWriter, r *http.Reque
 	if space == nil {
 		return
 	}
-	tmp, _, ok := backupx.ReceiveUpload(w, r, h.Cfg.BackupsDir, h.spaceUploadLimit(r))
+	tmp, _, ok := backupx.ReceiveUpload(w, r, h.BackupsDir, h.spaceUploadLimit(r))
 	if !ok {
 		return
 	}

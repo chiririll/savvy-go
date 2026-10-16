@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"savvy-go/internal/config"
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/signing"
 	"strconv"
@@ -43,7 +42,6 @@ func writeTransferError(w http.ResponseWriter, err error) {
 
 // Handler holds what the transfer routes need.
 type Handler struct {
-	Cfg       config.Config
 	Spaces    spaces.Service
 	Transfers *transfers.Service
 	Keys      *signing.Holder

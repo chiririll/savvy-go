@@ -5,8 +5,6 @@ package mail
 
 import (
 	"context"
-	"sync"
-	"time"
 
 	"savvy-go/internal/config"
 	"savvy-go/internal/mail/smtp"
@@ -15,67 +13,40 @@ import (
 // NoAppURLMessage is why a link cannot be sent while app_url is unset.
 const NoAppURLMessage = "The public URL is not set, so the link would point nowhere. Set app_url first."
 
-const DefaultTimeout = 10 * time.Second
+// DefaultTimeout is the connection timeout when none is set.
+const DefaultTimeout = smtp.DefaultTimeout
 
-// Service is the mail server in use. An admin can change it, so it is guarded
-// by a lock: read the sender through Mailer and the settings through Settings.
+// Service is the mail server in use: the [mailer] section of the config file, read each
+// time it is needed.
 type Service struct {
-	cfg config.Config
-
-	// NewMailer builds a sender from settings; tests swap it to record
-	// instead of dialling.
-	NewMailer func(smtp.Config) smtp.Mailer
-
-	mu      sync.RWMutex
-	sender  smtp.Mailer
-	conf    smtp.Config
-	problem string
+	appURL  func() string
+	section *config.Ref[smtp.Setup]
+	sender  smtp.Mailer // given to New: used whatever the section says
 }
 
-// New starts from the [mailer] section of cfg. A non-nil sender replaces the
-// SMTP one, which is how tests record the mail.
-func New(cfg config.Config, sender smtp.Mailer) *Service {
-	s := &Service{cfg: cfg, NewMailer: smtp.New, sender: sender, conf: cfg.Mail, problem: cfg.MailProblem}
-	if s.sender == nil {
-		s.sender = s.NewMailer(cfg.Mail)
-	}
-	return s
+// New sends mail as the [mailer] section of f says. A non-nil sender replaces the SMTP one,
+// which is how tests record the mail.
+func New(f *config.Config, appURL func() string, sender smtp.Mailer) *Service {
+	return &Service{appURL: appURL, section: config.Of(f, smtp.Section), sender: sender}
 }
 
-// Mailer is the current sender. It changes when an admin saves new settings.
+// Mailer is the current sender.
 func (s *Service) Mailer() smtp.Mailer {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.sender
+	if s.sender != nil {
+		return s.sender
+	}
+	return smtp.New(s.section.Get().Config)
 }
 
 // Settings is the current SMTP configuration and why it is switched off, if
-// a saved section was invalid.
+// the section was invalid.
 func (s *Service) Settings() (smtp.Config, string) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.conf, s.problem
+	setup := s.section.Get()
+	return setup.Config, setup.Problem
 }
 
-// UseConfig replaces the config the service reads the URL and the config file from.
-func (s *Service) UseConfig(cfg config.Config) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.cfg = cfg
-}
-
-func (s *Service) Config() config.Config {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.cfg
-}
-
-// SetProblem records why the saved mail section cannot be used.
-func (s *Service) SetProblem(problem string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.problem = problem
-}
+// AppURL is the public URL of the instance, empty when unset.
+func (s *Service) AppURL() string { return s.appURL() }
 
 // Send sends one email, giving up after a few connection timeouts.
 func (s *Service) Send(ctx context.Context, m smtp.Message) error {
@@ -110,25 +81,5 @@ func (s *Service) OffWhy() (reason, hint string) {
 	if _, problem := s.Settings(); problem != "" {
 		return "Mail is switched off: " + problem + ".", ""
 	}
-	return "Mail is not configured.", "Set it up in Administration → System → Email."
-}
-
-// Apply validates, saves and activates next. A nil password keeps the stored
-// one. It holds the lock for the whole save, so two admins cannot mix values.
-func (s *Service) Apply(next smtp.Config, password *string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	next.Password = s.conf.Password
-	if password != nil {
-		next.Password = *password
-	}
-	if err := next.Validate(); err != nil {
-		return err
-	}
-	if err := s.cfg.Live.SetMail(next); err != nil {
-		return err
-	}
-	s.conf, s.problem = next, ""
-	s.sender = s.NewMailer(next)
-	return nil
+	return "Mail is not configured.", "Set it up in the [mailer] section of the config file."
 }

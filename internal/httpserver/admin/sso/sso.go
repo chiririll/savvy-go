@@ -10,15 +10,14 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"savvy-go/internal/config"
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/sso"
 )
 
 // Handler holds what the identity provider routes need.
 type Handler struct {
-	Cfg config.Config
-	SSO *sso.Service
+	AppURL func() string // the public URL of the instance, empty when unset
+	SSO    *sso.Service
 }
 
 func (h Handler) ssoPresets(w http.ResponseWriter, r *http.Request) {
@@ -33,7 +32,7 @@ func (h Handler) idpIndex(w http.ResponseWriter, r *http.Request) {
 	}
 	data := make([]any, 0, len(list))
 	for _, p := range list {
-		data = append(data, p.JSON(h.Cfg.URL()))
+		data = append(data, p.JSON(h.AppURL()))
 	}
 	httpx.WriteData(w, http.StatusOK, data)
 }
@@ -43,7 +42,7 @@ func (h Handler) idpShow(w http.ResponseWriter, r *http.Request) {
 	if p == nil {
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, p.JSON(h.Cfg.URL()))
+	httpx.WriteJSON(w, http.StatusOK, p.JSON(h.AppURL()))
 }
 
 func (h Handler) idpStore(w http.ResponseWriter, r *http.Request) {
@@ -56,7 +55,7 @@ func (h Handler) idpStore(w http.ResponseWriter, r *http.Request) {
 		writeSSOErr(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusCreated, p.JSON(h.Cfg.URL()))
+	httpx.WriteJSON(w, http.StatusCreated, p.JSON(h.AppURL()))
 }
 
 func (h Handler) idpUpdate(w http.ResponseWriter, r *http.Request) {
@@ -73,7 +72,7 @@ func (h Handler) idpUpdate(w http.ResponseWriter, r *http.Request) {
 		writeSSOErr(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, updated.JSON(h.Cfg.URL()))
+	httpx.WriteJSON(w, http.StatusOK, updated.JSON(h.AppURL()))
 }
 
 func (h Handler) idpDestroy(w http.ResponseWriter, r *http.Request) {

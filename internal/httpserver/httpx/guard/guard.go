@@ -8,13 +8,13 @@ import (
 	"strings"
 
 	"savvy-go/internal/auth"
-	"savvy-go/internal/config"
 	"savvy-go/internal/httpserver/httpx"
 )
 
 // Guard is built once by the server from its own services.
 type Guard struct {
-	Cfg       config.Config
+	AppURL    func() string // the public URL of the instance, empty when unset
+	Security  auth.Security
 	Sessions  auth.Sessions
 	APITokens auth.APITokens
 	Space     SpaceDeps
@@ -48,7 +48,7 @@ func (g *Guard) RequireSession(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		}
-		token := auth.ReadToken(r, g.Cfg)
+		token := g.Security.ReadToken(r)
 		sess, err := g.Sessions.Resolve(r.Context(), token)
 		if err != nil || sess == nil || sess.User == nil {
 			httpx.WriteMessage(w, http.StatusUnauthorized, "Unauthenticated.")
@@ -72,7 +72,7 @@ func (g *Guard) RequireCSRF(next http.Handler) http.Handler {
 			return
 		}
 		sess := httpx.Session(r)
-		header := r.Header.Get(g.Cfg.CSRFHeader)
+		header := r.Header.Get(g.Security.CSRFHeader)
 		if sess == nil || header == "" || !secureCompare(sess.CSRF, header) {
 			httpx.WriteMessage(w, 419, "CSRF token mismatch.")
 			return
@@ -119,7 +119,7 @@ func secureCompare(a, b string) bool {
 // from request headers: without APP_URL these features are simply unavailable.
 func (g *Guard) NeedAppURL(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if g.Cfg.URL() == "" {
+		if g.AppURL() == "" {
 			httpx.WriteMessage(w, http.StatusServiceUnavailable, "APP_URL is not configured.")
 			return
 		}

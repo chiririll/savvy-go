@@ -13,7 +13,7 @@ var spec []byte
 
 func init() {
 	routing.Register(spec, func(d *routing.Deps) []routing.Mount {
-		h := Handler{Cfg: d.Cfg, Spaces: d.Spaces, Transfers: d.Transfers, Keys: d.Keys}
+		h := Handler{Spaces: d.Spaces, Transfers: d.Transfers, Keys: d.Keys}
 		return []routing.Mount{
 			routing.SpaceRead(h.ReadRoutes),
 			routing.SpaceAdmin(h.AdminRoutes),

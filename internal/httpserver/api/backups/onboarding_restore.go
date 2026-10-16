@@ -43,7 +43,7 @@ func (h Handler) onboardingRestore(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteValidation(w, map[string][]string{"bootstrap_password": {"The bootstrap password is missing or wrong."}})
 		return
 	}
-	tmp, name, ok := backupx.ReceiveUpload(w, r, h.Cfg.BackupsDir, backupx.MaxServerUpload)
+	tmp, name, ok := backupx.ReceiveUpload(w, r, h.BackupsDir, backupx.MaxServerUpload)
 	if !ok {
 		return
 	}

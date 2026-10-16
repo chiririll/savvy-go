@@ -1,4 +1,4 @@
-package cmd
+package app
 
 import (
 	"context"
@@ -8,13 +8,12 @@ import (
 
 	"savvy-go/internal/auth"
 	"savvy-go/internal/bootstrap"
-	"savvy-go/internal/config"
 	"savvy-go/internal/store/sqlite"
 )
 
-func openStore(t *testing.T) (*sqlite.Store, config.Config) {
+func openStore(t *testing.T) (*sqlite.Store, Config) {
 	t.Helper()
-	cfg := config.Config{DataDir: t.TempDir()}
+	cfg := Config{DataDir: t.TempDir()}
 	st, err := sqlite.OpenApp(context.Background(), cfg.DataDir)
 	if err != nil {
 		t.Fatal(err)
@@ -25,14 +24,14 @@ func openStore(t *testing.T) (*sqlite.Store, config.Config) {
 
 func TestStartBootstrapOnAnEmptyServer(t *testing.T) {
 	st, cfg := openStore(t)
-	g, err := startBootstrap(context.Background(), cfg, st)
+	g, err := startBootstrap(context.Background(), cfg, "", st)
 	if err != nil || !g.Active() {
 		t.Fatalf("guard %v, err %v", g, err)
 	}
 	if _, err := os.Stat(filepath.Join(cfg.DataDir, bootstrap.FileName)); err != nil {
 		t.Fatal(err)
 	}
-	again, _ := startBootstrap(context.Background(), cfg, st)
+	again, _ := startBootstrap(context.Background(), cfg, "", st)
 	if again.Password() != g.Password() {
 		t.Fatal("a restart must reuse the password while there are no users")
 	}
@@ -48,7 +47,7 @@ func TestStartBootstrapSkipsAServerWithUsers(t *testing.T) {
 	if err := os.WriteFile(stale, []byte("old\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	g, err := startBootstrap(context.Background(), cfg, st)
+	g, err := startBootstrap(context.Background(), cfg, "", st)
 	if err != nil || g != nil {
 		t.Fatalf("guard %v, err %v", g, err)
 	}
@@ -64,11 +63,11 @@ func TestOpenURL(t *testing.T) {
 		"127.0.0.1:8080": "http://127.0.0.1:8080",
 		"garbage":        "http://localhost",
 	} {
-		if got := openURL(config.Config{ListenAddr: addr}); got != want {
+		if got := openURL(addr, ""); got != want {
 			t.Errorf("%q: got %q, want %q", addr, got, want)
 		}
 	}
-	if got := openURL(config.Config{AppURL: "https://savvy.example.com", ListenAddr: ":8080"}); got != "https://savvy.example.com" {
+	if got := openURL(":8080", "https://savvy.example.com"); got != "https://savvy.example.com" {
 		t.Errorf("public URL ignored: %q", got)
 	}
 }

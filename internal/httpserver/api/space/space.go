@@ -8,7 +8,6 @@ import (
 
 	"savvy-go/internal/auth"
 	"savvy-go/internal/backup"
-	"savvy-go/internal/config"
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/httpserver/httpx/dto"
 	"savvy-go/internal/httpserver/httpx/guard"
@@ -21,7 +20,7 @@ import (
 
 // Handler holds what the space routes need.
 type Handler struct {
-	Cfg     config.Config
+	AppURL  func() string // the public URL of the instance, empty when unset
 	Store   store.Store
 	Spaces  spaces.Service
 	Users   auth.Users

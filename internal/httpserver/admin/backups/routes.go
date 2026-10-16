@@ -8,7 +8,7 @@ import (
 
 func init() {
 	routing.Register(nil, func(d *routing.Deps) []routing.Mount {
-		h := Handler{Cfg: d.Cfg, Backups: d.Backups}
+		h := Handler{BackupsDir: d.Cfg.BackupsDir, Backups: d.Backups}
 		return []routing.Mount{
 			routing.AdminSession(h.Routes),
 		}

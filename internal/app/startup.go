@@ -1,4 +1,4 @@
-package cmd
+package app
 
 import (
 	"context"
@@ -10,7 +10,6 @@ import (
 
 	"savvy-go/internal/auth"
 	"savvy-go/internal/bootstrap"
-	"savvy-go/internal/config"
 	"savvy-go/internal/refsync"
 	"savvy-go/internal/settings"
 	"savvy-go/internal/signing"
@@ -21,7 +20,7 @@ import (
 
 // prepare brings the databases to a servable state: loads the signing key,
 // checks the spaces and finishes interrupted transfers between them.
-func prepare(ctx context.Context, cfg config.Config, st *sqlite.Store) (*signing.Holder, signing.KeyRing, error) {
+func prepare(ctx context.Context, cfg Config, st *sqlite.Store) (*signing.Holder, signing.KeyRing, error) {
 	keys, err := loadSigningKey(ctx, cfg.DataDir, st)
 	if err != nil {
 		return nil, signing.KeyRing{}, fmt.Errorf("signing key: %w", err)
@@ -56,7 +55,7 @@ func prepare(ctx context.Context, cfg config.Config, st *sqlite.Store) (*signing
 // and prints it. It returns nil, which keeps registration closed, otherwise;
 // that includes a demo-seeded server. A password file left from an earlier run
 // is removed once users exist.
-func startBootstrap(ctx context.Context, cfg config.Config, st *sqlite.Store) (*bootstrap.Guard, error) {
+func startBootstrap(ctx context.Context, cfg Config, appURL string, st *sqlite.Store) (*bootstrap.Guard, error) {
 	n, err := (auth.Users{DB: st.Server()}).Count(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("count users: %w", err)
@@ -68,17 +67,17 @@ func startBootstrap(ctx context.Context, cfg config.Config, st *sqlite.Store) (*
 		return nil, nil
 	}
 	guard := bootstrap.New(cfg.DataDir, bootstrap.DetectEnv())
-	guard.Announce(openURL(cfg))
+	guard.Announce(openURL(cfg.ListenAddr, appURL))
 	return guard, nil
 }
 
 // openURL is where the operator opens the app: the public URL when set,
 // otherwise the listen address on localhost.
-func openURL(cfg config.Config) string {
-	if u := cfg.URL(); u != "" {
-		return u
+func openURL(listenAddr, publicURL string) string {
+	if publicURL != "" {
+		return publicURL
 	}
-	host, port, err := net.SplitHostPort(cfg.ListenAddr)
+	host, port, err := net.SplitHostPort(listenAddr)
 	if err != nil {
 		return "http://localhost"
 	}

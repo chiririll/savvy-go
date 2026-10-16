@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	"savvy-go/internal/auth"
-	"savvy-go/internal/config"
 	"savvy-go/internal/mail/smtp"
 )
 
@@ -22,7 +21,7 @@ func (e MailRequiredError) Error() string {
 
 // Verifier sends confirmation links and confirms addresses.
 type Verifier struct {
-	Cfg           config.Config
+	AppURL        func() string // the public URL of the instance, empty when unset
 	Mail          *Service
 	Verifications auth.EmailVerifications
 	Users         auth.Users
@@ -31,7 +30,7 @@ type Verifier struct {
 // CanRequire reports why the requirement cannot be switched on by admin: links
 // need mail and a public URL, and the admin must have confirmed their own address.
 func (s Verifier) CanRequire(admin *auth.User) error {
-	if !s.Mail.Mailer().Enabled() || s.Cfg.URL() == "" {
+	if !s.Mail.Mailer().Enabled() || s.AppURL() == "" {
 		reason := s.Mail.OffReason()
 		if s.Mail.Mailer().Enabled() {
 			reason = NoAppURLMessage
@@ -50,14 +49,14 @@ func (s Verifier) Send(ctx context.Context, u *auth.User) string {
 	switch {
 	case !s.Mail.Mailer().Enabled():
 		return s.Mail.OffReason()
-	case s.Cfg.URL() == "":
+	case s.AppURL() == "":
 		return NoAppURLMessage
 	}
 	token, exp, err := s.Verifications.Issue(ctx, u)
 	if err != nil {
 		return "Could not create the link: " + err.Error()
 	}
-	if err := s.Mail.Send(ctx, smtp.EmailVerification(u.Email, u.Name, s.Cfg.URL()+"/verify-email/"+token, exp)); err != nil {
+	if err := s.Mail.Send(ctx, smtp.EmailVerification(u.Email, u.Name, s.AppURL()+"/verify-email/"+token, exp)); err != nil {
 		return "Could not send the email: " + err.Error()
 	}
 	return ""

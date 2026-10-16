@@ -8,7 +8,6 @@ import (
 
 	"savvy-go/internal/app/signin"
 	"savvy-go/internal/auth"
-	"savvy-go/internal/config"
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/httpserver/httpx/dto"
 )
@@ -17,7 +16,7 @@ import (
 // policy questions too.
 type Service struct {
 	signin.Policy
-	Cfg      config.Config
+	Security auth.Security
 	Sessions auth.Sessions
 }
 
@@ -28,7 +27,7 @@ func (s Service) Issue(w http.ResponseWriter, r *http.Request, u *auth.User, sta
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	auth.SetSessionCookies(w, r, s.Cfg, issued.Token, issued.CSRF, remember)
+	s.Security.SetSessionCookies(w, r, issued.Token, issued.CSRF, remember)
 	s.WritePayload(w, r, status, u, issued.Session)
 }
 

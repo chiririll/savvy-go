@@ -16,7 +16,7 @@ func oauthPreflight(w http.ResponseWriter, r *http.Request) {
 }
 
 // mcpResourceURL is the identifier of the MCP endpoint, what clients bind tokens to.
-func (h Handler) mcpResourceURL(r *http.Request) string { return h.Cfg.URL() + "/mcp" }
+func (h Handler) mcpResourceURL(r *http.Request) string { return h.AppURL() + "/mcp" }
 
 // resourceMetadata is the protected resource metadata of RFC 9728.
 type resourceMetadata struct {
@@ -42,7 +42,7 @@ type serverMetadata struct {
 
 func (h Handler) oauthResourceMetadata(w http.ResponseWriter, r *http.Request) {
 	httpx.OpenCORS(w)
-	base := h.Cfg.URL()
+	base := h.AppURL()
 	httpx.WriteJSON(w, http.StatusOK, resourceMetadata{
 		Resource:               h.mcpResourceURL(r),
 		AuthorizationServers:   []string{base},
@@ -54,7 +54,7 @@ func (h Handler) oauthResourceMetadata(w http.ResponseWriter, r *http.Request) {
 
 func (h Handler) oauthServerMetadata(w http.ResponseWriter, r *http.Request) {
 	httpx.OpenCORS(w)
-	base := h.Cfg.URL()
+	base := h.AppURL()
 	meta := serverMetadata{
 		Issuer:                        base,
 		AuthorizationEndpoint:         base + "/oauth/authorize",

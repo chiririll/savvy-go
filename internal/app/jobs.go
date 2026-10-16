@@ -1,4 +1,4 @@
-package cmd
+package app
 
 import (
 	"context"
@@ -7,8 +7,6 @@ import (
 	"log/slog"
 	"time"
 
-	"savvy-go/internal/app"
-	"savvy-go/internal/currencydata"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/recurring"
 	"savvy-go/internal/runtime"
@@ -16,9 +14,8 @@ import (
 	"savvy-go/internal/store"
 )
 
-// startJobs runs the periodic jobs until ctx is cancelled. rates is the source svc was
-// built with: the update expires its cache.
-func startJobs(ctx context.Context, svc *app.Services, rates *currencydata.Source) {
+// Start runs the periodic jobs until ctx is cancelled.
+func (svc *Services) Start(ctx context.Context) {
 	st := svc.Store
 	// eachSpace runs a job in every available space; one failing space does
 	// not stop the others.
@@ -46,12 +43,14 @@ func startJobs(ctx context.Context, svc *app.Services, rates *currencydata.Sourc
 			// Rates are cached by base currency in the shared source, so spaces
 			// with the same base share one request. Expiring them here makes
 			// each base fetch once per run, and only if some space asks.
-			rates.Expire()
+			if svc.rates != nil {
+				svc.rates.Expire()
+			}
 			return eachSpace(func(ctx context.Context, d store.DB) error {
 				if !(settings.Store{DB: d, Space: true}).Bool(ctx, "auto_update_currencies", true) {
 					return nil
 				}
-				updated, skipped, err := ledger.Currencies{DB: d, Source: rates}.UpdateRates(ctx)
+				updated, skipped, err := ledger.Currencies{DB: d, Source: svc.Rates}.UpdateRates(ctx)
 				if err == nil {
 					slog.Info("currency rates updated", "updated", updated, "skipped", skipped)
 				}

@@ -37,6 +37,9 @@ type Config struct {
 	Timeout    time.Duration
 }
 
+// DefaultTimeout is the connection timeout when none is set.
+const DefaultTimeout = 10 * time.Second
+
 // InvalidError is a mistake in an enabled configuration. Field is the config
 // key it is about ("host", "port", ...), so a form can show it by the field.
 type InvalidError struct {
