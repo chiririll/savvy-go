@@ -2,8 +2,10 @@
 package syncgroups
 
 import (
+	_ "embed"
 	"net/http"
 	"savvy-go/internal/httpserver/api"
+	"savvy-go/internal/httpserver/apidocs"
 	"savvy-go/internal/httpserver/guard"
 	"savvy-go/internal/spaces"
 	"slices"
@@ -205,11 +207,16 @@ func sortedKeys[V any](m map[int64]V) []int64 {
 	return keys
 }
 
+//go:embed openapi.yaml
+var spec []byte
+
 func (h Handler) ReadRoutes(r chi.Router) {
+	apidocs.Add(spec)
 	r.Get("/sync-group", h.syncGroupShow)
 }
 
 func (h Handler) AccountRoutes(r chi.Router) {
+	apidocs.Add(spec)
 	// Sync groups span several spaces; the rights are checked in each.
 	r.With(h.Guard.SessionOnly).Post("/sync-groups/diff", h.syncGroupDiff)
 	r.With(h.Guard.SessionOnly).Post("/sync-groups/apply", h.syncGroupApply)

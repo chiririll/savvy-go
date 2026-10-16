@@ -1,0 +1,165 @@
+paths:
+  /auth/api-token-capabilities:
+    get:
+      tags: [API tokens]
+      summary: What each kind of token can be given
+      description: >-
+        Session only. For each token kind, the parts of a space it can hold and what each preset grants
+        over them; plus the permission levels (lowest first). Screens that configure a token offer
+        exactly this.
+      security: [{cookieAuth: []}]
+      responses:
+        "200":
+          description: Capabilities
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      levels: {type: array, items: {type: string}, example: [read, write, delete]}
+                      presets: {type: array, items: {type: string}, example: [viewer, editor, admin]}
+                      kinds:
+                        type: object
+                        description: Keyed by token kind (`personal`, `mcp`).
+                        additionalProperties:
+                          type: object
+                          properties:
+                            resources: {type: array, items: {type: string}}
+                            presets:
+                              type: object
+                              description: Grants per preset, over `resources`.
+                              additionalProperties: {type: array, items: {type: string}}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+
+  /auth/api-tokens:
+    get:
+      tags: [API tokens]
+      summary: List your API tokens
+      description: Session only. Raw token values are never returned after creation.
+      security: [{cookieAuth: []}]
+      responses:
+        "200":
+          description: Tokens
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: {$ref: "#/components/schemas/ApiToken"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+    post:
+      tags: [API tokens]
+      summary: Create an API token
+      description: Session only. The raw `token` is shown once, in this response.
+      security: [{cookieAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: {type: string, maxLength: 100, example: Zapier}
+                preset:
+                  type: string
+                  enum: [viewer, editor, admin]
+                  description: |
+                    Ready-made permissions instead of `permissions`. `viewer` reads everything; `editor` reads
+                    everything and adds and changes transactions; `admin` reads, writes and deletes everything.
+                allow_delete: {type: boolean, default: false, description: With `preset` editor, also allow deleting transactions.}
+                permissions:
+                  type: array
+                  description: Grants as `<resource>:read`, `:write` or `:delete`. None means the token can only list its spaces. Not with `preset`.
+                  items: {type: string, example: "transactions:read"}
+                all_spaces: {type: boolean, default: false, description: Reach every space of the owner, including future ones. Give this or `space_ids`, not both.}
+                space_ids:
+                  type: array
+                  description: Spaces the token may reach; the owner must belong to each. Required unless `all_spaces` is true.
+                  items: {type: integer}
+                expires_at: {type: string, format: date-time, nullable: true, description: Future RFC 3339 timestamp; omit for a token that never expires.}
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    allOf:
+                      - {$ref: "#/components/schemas/ApiToken"}
+                      - type: object
+                        properties:
+                          token: {type: string, example: svy_AbC123...}
+                  message: {type: string}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "419": {$ref: "#/components/responses/CsrfMismatch"}
+        "422": {$ref: "#/components/responses/Validation"}
+  /auth/api-tokens/{id}:
+    patch:
+      tags: [API tokens]
+      summary: Change what an API token may do
+      description: >-
+        Session only. Replaces the token's permissions and spaces; the secret and name stay, so the app
+        that holds the token needs nothing new and sees the change on its next request. Send the whole
+        grant, as when creating. A token of a connected AI app (MCP) may only hold the parts of a space
+        its tools use.
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/Id"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                preset:
+                  type: string
+                  enum: [viewer, editor, admin]
+                  description: Ready-made permissions instead of `permissions`.
+                allow_delete: {type: boolean, default: false, description: With `preset` editor, also allow deleting transactions.}
+                permissions:
+                  type: array
+                  description: Grants as `<resource>:read`, `:write` or `:delete`. Not with `preset`.
+                  items: {type: string, example: "transactions:read"}
+                all_spaces: {type: boolean, default: false, description: Give this or `space_ids`, not both.}
+                space_ids:
+                  type: array
+                  description: Spaces the token may reach; the owner must belong to each. Required unless `all_spaces` is true.
+                  items: {type: integer}
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: {$ref: "#/components/schemas/ApiToken"}
+                  message: {type: string}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "419": {$ref: "#/components/responses/CsrfMismatch"}
+        "422": {$ref: "#/components/responses/Validation"}
+    delete:
+      tags: [API tokens]
+      summary: Revoke an API token
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/Id"}]
+      responses:
+        "200": {$ref: "#/components/responses/Message"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "419": {$ref: "#/components/responses/CsrfMismatch"}
+

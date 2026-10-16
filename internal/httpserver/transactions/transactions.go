@@ -2,11 +2,13 @@
 package transactions
 
 import (
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"net/url"
 	"savvy-go/internal/httpserver/api"
+	"savvy-go/internal/httpserver/apidocs"
 	"strconv"
 	"strings"
 
@@ -269,7 +271,11 @@ func decodeTx(w http.ResponseWriter, r *http.Request, base *ledger.Transaction) 
 	return in, true
 }
 
+//go:embed openapi.yaml
+var spec []byte
+
 func Routes(r chi.Router) {
+	apidocs.Add(spec)
 	r.Get("/transactions", transactionsIndex)
 	r.Post("/transactions", transactionsStore)
 	r.Get("/transactions/{id}", transactionsShow)

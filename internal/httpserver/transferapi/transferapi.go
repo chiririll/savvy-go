@@ -2,12 +2,14 @@
 package transferapi
 
 import (
+	_ "embed"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"savvy-go/internal/config"
 	"savvy-go/internal/httpserver/api"
+	"savvy-go/internal/httpserver/apidocs"
 	"savvy-go/internal/signing"
 	"strconv"
 	"time"
@@ -318,7 +320,11 @@ func (h Handler) AdminSessionRoutes(r chi.Router) {
 	r.Post("/admin/keys/rotate", h.keysRotate)
 }
 
+//go:embed openapi.yaml
+var spec []byte
+
 func (h Handler) ReadRoutes(r chi.Router) {
+	apidocs.Add(spec)
 	r.Get("/links", h.linksIndex)
 	r.Get("/transfers", h.transfersIndex)
 }
@@ -329,6 +335,7 @@ func (h Handler) AdminRoutes(r chi.Router) {
 }
 
 func (h Handler) WriteRoutes(r chi.Router) {
+	apidocs.Add(spec)
 	// Transfers with linked spaces; the other space's rights
 	// are checked by the transfer itself.
 	r.Post("/transfers", h.transfersStore)

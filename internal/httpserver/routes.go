@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"savvy-go/internal/httpserver/accounts"
+	"savvy-go/internal/httpserver/apidocs"
 	"savvy-go/internal/httpserver/apitokens"
 	"savvy-go/internal/httpserver/authapi"
 	"savvy-go/internal/httpserver/automation"
@@ -78,9 +79,7 @@ func (s *Server) routes() *chi.Mux {
 	settingsH := s.settingsHandler()
 
 	r.Route("/api", func(r chi.Router) {
-		// The reference and its spec are static files of the frontend, in public/.
-		r.Get("/docs", http.RedirectHandler("/api-docs.html", http.StatusFound).ServeHTTP)
-		r.Get("/openapi.yaml", http.RedirectHandler("/openapi.yaml", http.StatusFound).ServeHTTP)
+		apidocs.Routes(r)
 
 		authHandler.PublicRoutes(r)
 		backupsH.PublicRoutes(r)

@@ -2,6 +2,7 @@
 package currencies
 
 import (
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"io"
@@ -13,6 +14,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"savvy-go/internal/httpserver/api"
+	"savvy-go/internal/httpserver/apidocs"
 	"savvy-go/internal/httpserver/dto"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/money"
@@ -174,7 +176,11 @@ func currencyParam(w http.ResponseWriter, r *http.Request) *ledger.Currency {
 	return c
 }
 
+//go:embed openapi.yaml
+var spec []byte
+
 func Routes(r chi.Router) {
+	apidocs.Add(spec)
 	r.Get("/currencies/catalog", currenciesCatalog)
 	r.Get("/currencies", currenciesIndex)
 	r.Post("/currencies", currenciesStore)

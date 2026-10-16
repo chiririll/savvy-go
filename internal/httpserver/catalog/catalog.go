@@ -1,6 +1,7 @@
 package catalog
 
 import (
+	_ "embed"
 	"net/http"
 	"regexp"
 	"strings"
@@ -8,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"savvy-go/internal/httpserver/api"
+	"savvy-go/internal/httpserver/apidocs"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/seed"
 )
@@ -54,7 +56,11 @@ func (Handler) presets(w http.ResponseWriter, r *http.Request) {
 // Handler serves what a new space can start with, before the space exists.
 type Handler struct{ Rates ledger.RateSource }
 
+//go:embed openapi.yaml
+var spec []byte
+
 func (h Handler) Routes(r chi.Router) {
+	apidocs.Add(spec)
 	r.Get("/currencies/catalog", h.currencies)
 	r.Get("/presets", h.presets)
 }

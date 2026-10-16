@@ -2,9 +2,11 @@
 package recurring
 
 import (
+	_ "embed"
 	"encoding/json"
 	"net/http"
 	"savvy-go/internal/httpserver/api"
+	"savvy-go/internal/httpserver/apidocs"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
@@ -145,7 +147,11 @@ func decodeRecurring(w http.ResponseWriter, r *http.Request, base *recurring.Rec
 	}, true
 }
 
+//go:embed openapi.yaml
+var spec []byte
+
 func Routes(r chi.Router) {
+	apidocs.Add(spec)
 	r.Get("/recurring", recurringIndex)
 	r.Get("/recurring-upcoming", recurringUpcoming)
 	r.Post("/recurring", recurringStore)

@@ -2,9 +2,11 @@
 package debts
 
 import (
+	_ "embed"
 	"encoding/json"
 	"net/http"
 	"savvy-go/internal/httpserver/api"
+	"savvy-go/internal/httpserver/apidocs"
 	"strconv"
 
 	"savvy-go/internal/httpserver/dto"
@@ -168,7 +170,11 @@ func debtParam(w http.ResponseWriter, r *http.Request) *ledger.Account {
 	return a
 }
 
+//go:embed openapi.yaml
+var spec []byte
+
 func Routes(r chi.Router) {
+	apidocs.Add(spec)
 	r.Get("/debts", debtsIndex)
 	r.Post("/debts", debtsStore)
 	r.Get("/debts/{id}", debtsShow)

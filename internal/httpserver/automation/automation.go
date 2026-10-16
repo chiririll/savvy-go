@@ -2,9 +2,11 @@
 package automation
 
 import (
+	_ "embed"
 	"encoding/json"
 	"net/http"
 	"savvy-go/internal/httpserver/api"
+	"savvy-go/internal/httpserver/apidocs"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
@@ -194,7 +196,11 @@ func decodeAutomation(w http.ResponseWriter, r *http.Request, base *automation.R
 	}, true
 }
 
+//go:embed openapi.yaml
+var spec []byte
+
 func Routes(r chi.Router) {
+	apidocs.Add(spec)
 	r.Get("/automation-rules/triggers", automationTriggers)
 	r.Post("/automation-rules/reorder", automationReorder)
 	r.Get("/automation-rules", automationIndex)

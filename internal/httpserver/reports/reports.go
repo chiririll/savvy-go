@@ -2,9 +2,11 @@
 package reports
 
 import (
+	_ "embed"
 	"github.com/go-chi/chi/v5"
 	"net/http"
 	"savvy-go/internal/httpserver/api"
+	"savvy-go/internal/httpserver/apidocs"
 	"strconv"
 	"strings"
 
@@ -108,7 +110,11 @@ func reportsNetWorthHistory(w http.ResponseWriter, r *http.Request) {
 	api.WriteJSON(w, http.StatusOK, api.Scope(r).Reports.NetWorthHistory(r.Context(), reportFilter(r), group))
 }
 
+//go:embed openapi.yaml
+var spec []byte
+
 func Routes(r chi.Router) {
+	apidocs.Add(spec)
 	r.Get("/reports/overview", reportsOverview)
 	r.Get("/reports/money-flow", reportsMoneyFlow)
 	r.Get("/reports/expense-pace", reportsExpensePace)

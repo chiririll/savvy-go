@@ -2,6 +2,7 @@
 package tags
 
 import (
+	_ "embed"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"savvy-go/internal/httpserver/api"
+	"savvy-go/internal/httpserver/apidocs"
 	"savvy-go/internal/httpserver/dto"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/refsync"
@@ -101,7 +103,11 @@ func (s Handler) tagParam(w http.ResponseWriter, r *http.Request) *ledger.Tag {
 	return t
 }
 
+//go:embed openapi.yaml
+var spec []byte
+
 func (s Handler) Routes(r chi.Router) {
+	apidocs.Add(spec)
 	r.Get("/tags", s.tagsIndex)
 	r.Post("/tags", s.tagsStore)
 	r.Get("/tags/{id}", s.tagsShow)

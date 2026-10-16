@@ -2,6 +2,7 @@
 package accounts
 
 import (
+	_ "embed"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -12,6 +13,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"savvy-go/internal/httpserver/api"
+	"savvy-go/internal/httpserver/apidocs"
 	"savvy-go/internal/httpserver/dto"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/money"
@@ -266,7 +268,11 @@ func dateRange(start, end string) []string {
 	return out
 }
 
+//go:embed openapi.yaml
+var spec []byte
+
 func (s Handler) Routes(r chi.Router) {
+	apidocs.Add(spec)
 	r.Post("/accounts/reorder", s.accountsReorder)
 	r.Get("/accounts", s.accountsIndex)
 	r.Post("/accounts", s.accountsStore)
