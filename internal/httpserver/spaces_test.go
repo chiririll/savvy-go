@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"savvy-go/internal/auth"
+	"savvy-go/internal/httpserver/api"
 	"savvy-go/internal/spaces"
 )
 
@@ -147,13 +148,13 @@ func TestSettingsUpdateRoles(t *testing.T) {
 	if body := decodeJSON(t, res); res.StatusCode != 200 || body["auto_update_currencies"] != false {
 		t.Fatalf("admin space update %d %v", res.StatusCode, body)
 	}
-	if v, _ := sp0(t, a).settings.All(context.Background()); v["auto_update_currencies"] != false {
+	if v, _ := sp0(t, a).Settings.All(context.Background()); v["auto_update_currencies"] != false {
 		t.Fatalf("space setting not stored in the space: %v", v)
 	}
 }
 
 // sp0 is the scope of the shared test space.
-func sp0(t *testing.T, a *testApp) *spaceScope {
+func sp0(t *testing.T, a *testApp) *api.SpaceScope {
 	t.Helper()
 	return a.s.newScope(a.space.ID, spaces.RoleAdmin, a.spaceDB())
 }

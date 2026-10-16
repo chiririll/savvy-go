@@ -58,4 +58,4 @@ From a script, the body is `{"name": "Budget bot", "preset": "editor", "space_id
 
 ## Reference
 
-Interactive reference (Swagger UI): `/api/docs`. Raw OpenAPI 3 spec: `/api/openapi.yaml`.
+Interactive reference (Swagger UI): `/api/docs`. Raw OpenAPI 3 spec: `/api/openapi.yaml`. Both lead to static files of the frontend, `public/api-docs.html` and `public/openapi.yaml`.

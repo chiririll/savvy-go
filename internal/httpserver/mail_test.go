@@ -124,7 +124,7 @@ func TestMailStatusIsAdminOnlyAndHidesThePassword(t *testing.T) {
 func TestMailStatusReportsAConfigProblem(t *testing.T) {
 	rec := &recorder{}
 	a, sess, _ := newMailApp(t, rec)
-	a.s.mailProblem = "mailer.host is empty"
+	a.s.mail.SetProblem("mailer.host is empty")
 	data := decodeJSON(t, a.do("GET", "/api/admin/mail", nil, sess.Token, sess.CSRF))["data"].(map[string]any)
 	if data["enabled"] != false || data["problem"] != "mailer.host is empty" {
 		t.Errorf("status %v", data)
@@ -164,7 +164,7 @@ func TestMailSettingsSaveApplyAndPersist(t *testing.T) {
 	a, sess, _ := newMailApp(t, &recorder{})
 	next := &recorder{on: true}
 	var built mailer.Config
-	a.s.newMailer = func(c mailer.Config) mailer.Mailer { built = c; return next }
+	a.s.mail.NewMailer = func(c mailer.Config) mailer.Mailer { built = c; return next }
 
 	res := a.do("PUT", "/api/admin/mail", mailForm(nil), sess.Token, sess.CSRF)
 	raw := decodeJSON(t, res)
@@ -208,7 +208,7 @@ func TestMailSettingsSaveApplyAndPersist(t *testing.T) {
 func TestMailSettingsKeepThePasswordWhenOmitted(t *testing.T) {
 	a, sess, _ := newMailApp(t, &recorder{on: true})
 	var built mailer.Config
-	a.s.newMailer = func(c mailer.Config) mailer.Mailer { built = c; return &recorder{on: c.Enabled} }
+	a.s.mail.NewMailer = func(c mailer.Config) mailer.Mailer { built = c; return &recorder{on: c.Enabled} }
 
 	form := mailForm(nil)
 	delete(form, "password")
@@ -291,6 +291,7 @@ func TestMailSettingsOnAReadOnlyConfig(t *testing.T) {
 		t.Fatalf("setup: %v writable=%v", err, loaded.Live.Writable())
 	}
 	a.s.cfg.Live = loaded.Live
+	a.s.mail.UseConfig(a.s.cfg)
 
 	data := decodeJSON(t, a.do("GET", "/api/admin/mail", nil, sess.Token, sess.CSRF))["data"].(map[string]any)
 	if data["writable"] != false {

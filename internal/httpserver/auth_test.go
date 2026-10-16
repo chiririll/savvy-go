@@ -66,12 +66,13 @@ func testKeys(t *testing.T, cfg config.Config) *signing.Holder {
 	return signing.NewHolder(key)
 }
 
-func newTestApp(t *testing.T) *testApp {
+func newTestApp(t *testing.T, opts ...Option) *testApp {
 	t.Helper()
 	cfg, _ := testConfig(t)
 	st := openTestStore(t, cfg)
 	guard := bootstrap.New(cfg.DataDir, bootstrap.Binary)
-	s := New(cfg, st, testKeys(t, cfg), WithRates(currencydata.NewOffline()), WithBootstrap(guard))
+	opts = append([]Option{WithRates(currencydata.NewOffline()), WithBootstrap(guard)}, opts...)
+	s := New(cfg, st, testKeys(t, cfg), opts...)
 	space, err := s.spaces.Create(context.Background(), "Test", nil)
 	if err != nil {
 		t.Fatal(err)

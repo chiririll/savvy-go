@@ -150,7 +150,7 @@ func TestSPAServesIndexAndStatic(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := New(cfg, openTestStore(t, cfg), testKeys(t, cfg))
-	s.assets = os.DirFS(public)
+	s.spa.Assets = os.DirFS(public)
 	srv := httptest.NewServer(s.Handler())
 	t.Cleanup(srv.Close)
 

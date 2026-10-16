@@ -2,7 +2,9 @@ package httpserver
 
 import (
 	"savvy-go/internal/bootstrap"
+	"savvy-go/internal/httpserver/mailing"
 	"savvy-go/internal/ledger"
+	"savvy-go/internal/mailer"
 )
 
 // Option configures New.
@@ -16,3 +18,7 @@ func WithRates(src ledger.RateSource) Option { return func(s *Server) { s.rates 
 // WithBootstrap sets the first-run password that registration needs while the
 // server has no users. Without it, registration is always closed.
 func WithBootstrap(g *bootstrap.Guard) Option { return func(s *Server) { s.bootstrap = g } }
+
+// WithMailer sets how email is sent. The default is the SMTP server of the
+// [mailer] section of the config file; tests pass a recorder.
+func WithMailer(m mailer.Mailer) Option { return func(s *Server) { s.mail = mailing.New(s.cfg, m) } }

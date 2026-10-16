@@ -1,7 +1,6 @@
 package httpserver
 
 import (
-	"io/fs"
 	"net/http"
 	"os"
 
@@ -11,6 +10,11 @@ import (
 	"savvy-go/internal/bootstrap"
 	"savvy-go/internal/config"
 	"savvy-go/internal/currencydata"
+	"savvy-go/internal/httpserver/emailverify"
+	"savvy-go/internal/httpserver/guard"
+	"savvy-go/internal/httpserver/mailing"
+	"savvy-go/internal/httpserver/signin"
+	"savvy-go/internal/httpserver/spa"
 	"savvy-go/internal/jobs"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/oauth"
@@ -27,7 +31,7 @@ import (
 
 // Server is the HTTP front door: health probes, /api, and the Vite SPA.
 // Server-level services use the server database; the services of a space are
-// built per request by withSpace (see spaceScope).
+// built per request by guard.WithSpace (see spaceScope).
 type Server struct {
 	cfg       config.Config
 	store     store.Store
@@ -35,11 +39,11 @@ type Server struct {
 	keys      *signing.Holder
 	rates     ledger.RateSource // currency catalog and exchange rates, shared by every space
 	bootstrap *bootstrap.Guard  // first-run password; nil keeps registration closed
-	assets    fs.FS             // the frontend: index.html, icons and build/
+	spa       *spa.Handler      // the frontend: index.html, icons and build/
 	queue     *jobs.Queue
 
 	accountServices
-	mailState
+	mail *mailing.Service
 
 	settings  settings.Store
 	spaces    spaces.Service
@@ -48,6 +52,9 @@ type Server struct {
 	refsync   refsync.Service
 	uploads   uploads.Service
 	sso       sso.Service
+	guard     *guard.Guard
+	login     signin.Service
+	verify    emailverify.Handler
 	oauth     *oauth.Service
 }
 
@@ -56,7 +63,7 @@ func New(cfg config.Config, st store.Store, keys *signing.Holder, opts ...Option
 	srv := st.Server()
 	s := &Server{
 		cfg:             cfg,
-		assets:          resolveAssets(webui.FS()),
+		spa:             &spa.Handler{Assets: spa.Resolve(webui.FS())},
 		store:           st,
 		keys:            keys,
 		accountServices: newAccountServices(cfg, srv),
@@ -74,9 +81,14 @@ func New(cfg config.Config, st store.Store, keys *signing.Holder, opts ...Option
 	if s.rates == nil {
 		s.rates = currencydata.New()
 	}
-	s.initMail(cfg)
+	if s.mail == nil {
+		s.mail = mailing.New(cfg, nil)
+	}
 	s.sso = sso.Service{DB: srv, Users: s.users, Settings: s.settings, AppURL: cfg.URL}
 	s.oauth = oauth.New(srv)
+	s.login = signin.Service{Cfg: cfg, Sessions: s.sessions, Settings: s.settings, SSO: &s.sso}
+	s.guard = s.newGuard()
+	s.verify = emailverify.Handler{Cfg: cfg, Mail: s.mail, Verifications: s.verifications, Users: s.users}
 	_ = os.MkdirAll(cfg.UploadsDir, 0o775)
 	_ = os.MkdirAll(cfg.BackupsDir, 0o775)
 	s.mux = s.routes()

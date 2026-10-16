@@ -1,8 +1,8 @@
 package httpserver
 
 import (
-	"io"
 	"net/http"
+	"os"
 	"regexp"
 	"strings"
 	"testing"
@@ -20,10 +20,14 @@ var (
 // parameter names normalised so {id} and {upload} compare equal.
 func specOperations(t *testing.T) map[string]bool {
 	t.Helper()
+	spec, err := os.ReadFile("../../public/openapi.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
 	ops := map[string]bool{}
 	path := ""
 	inPaths := false
-	for _, line := range strings.Split(string(openAPISpec), "\n") {
+	for _, line := range strings.Split(string(spec), "\n") {
 		line = strings.TrimRight(line, "\r")
 		if strings.HasPrefix(line, "paths:") {
 			inPaths = true
@@ -102,7 +106,7 @@ func TestOpenAPICoversRoutes(t *testing.T) {
 
 	for op := range routes {
 		if !spec[op] {
-			t.Errorf("route %s is missing from apidocs/openapi.yaml", op)
+			t.Errorf("route %s is missing from public/openapi.yaml", op)
 		}
 	}
 	for op := range spec {
@@ -112,17 +116,24 @@ func TestOpenAPICoversRoutes(t *testing.T) {
 	}
 }
 
-func TestAPIDocsServed(t *testing.T) {
+// The reference and its spec are static files of the frontend; the documented
+// /api URLs lead to them.
+func TestAPIDocsPage(t *testing.T) {
 	a := newTestApp(t)
-	for path, want := range map[string]string{
-		"/api/docs":         "swagger-ui",
-		"/api/openapi.yaml": "openapi: 3.0.3",
-	} {
-		res := a.do("GET", path, nil, "", "")
-		body, _ := io.ReadAll(res.Body)
+	a.client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	for from, to := range map[string]string{"/api/docs": "/api-docs.html", "/api/openapi.yaml": "/openapi.yaml"} {
+		res := a.do("GET", from, nil, "", "")
 		res.Body.Close()
-		if res.StatusCode != 200 || !strings.Contains(string(body), want) {
-			t.Fatalf("%s: %d", path, res.StatusCode)
+		if res.StatusCode != http.StatusFound || res.Header.Get("Location") != to {
+			t.Errorf("%s: %d to %q, want %s", from, res.StatusCode, res.Header.Get("Location"), to)
 		}
+	}
+	page, err := os.ReadFile("../../public/api-docs.html")
+	if err != nil || !strings.Contains(string(page), "swagger-ui") || !strings.Contains(string(page), `"/openapi.yaml"`) {
+		t.Fatalf("public/api-docs.html: %v", err)
+	}
+	spec, err := os.ReadFile("../../public/openapi.yaml")
+	if err != nil || !strings.Contains(string(spec), "openapi: 3.0.3") {
+		t.Fatalf("public/openapi.yaml: %v", err)
 	}
 }

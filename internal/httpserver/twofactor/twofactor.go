@@ -1,0 +1,172 @@
+// Package twofactor serves two-factor authentication.
+package twofactor
+
+import (
+	"encoding/json"
+	"net/http"
+	"savvy-go/internal/auth"
+	"savvy-go/internal/httpserver/api"
+	"savvy-go/internal/httpserver/signin"
+
+	"github.com/go-chi/chi/v5"
+)
+
+// Handler holds what the two-factor routes need.
+type Handler struct {
+	TwoFactor  auth.TwoFactor
+	Users      auth.Users
+	Challenges auth.Challenges
+	Login      signin.Service
+}
+
+func (h Handler) twoFactorEnable(w http.ResponseWriter, r *http.Request) {
+	u := api.User(r)
+	secret, uri, err := h.TwoFactor.Enable(r.Context(), u)
+	if err != nil {
+		if err.Error() == "already enabled" {
+			api.WriteMessage(w, http.StatusBadRequest, "Two-factor authentication is already enabled.")
+			return
+		}
+		api.WriteMessage(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	api.WriteJSON(w, http.StatusOK, map[string]any{"secret": secret, "qr_code_url": uri})
+}
+
+func (h Handler) twoFactorConfirm(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Code string `json:"code"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Code == "" {
+		api.WriteValidation(w, map[string][]string{"code": {"The given data was invalid."}})
+		return
+	}
+	u, _ := h.Users.ByID(r.Context(), api.User(r).ID)
+	codes, err := h.TwoFactor.Confirm(r.Context(), u, body.Code)
+	if err != nil {
+		switch err.Error() {
+		case "not pending":
+			api.WriteMessage(w, http.StatusBadRequest, "Two-factor authentication is not pending confirmation.")
+		case "invalid code":
+			api.WriteMessage(w, http.StatusUnprocessableEntity, "Invalid verification code.")
+		default:
+			api.WriteMessage(w, http.StatusInternalServerError, err.Error())
+		}
+		return
+	}
+	api.WriteJSON(w, http.StatusOK, map[string]any{
+		"message":        "Two-factor authentication has been enabled.",
+		"recovery_codes": codes,
+	})
+}
+
+func (h Handler) twoFactorDisable(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Code string `json:"code"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Code == "" {
+		api.WriteValidation(w, map[string][]string{"code": {"The given data was invalid."}})
+		return
+	}
+	u, _ := h.Users.ByID(r.Context(), api.User(r).ID)
+	if err := h.TwoFactor.Disable(r.Context(), u, body.Code); err != nil {
+		switch err.Error() {
+		case "not enabled":
+			api.WriteMessage(w, http.StatusBadRequest, "Two-factor authentication is not enabled.")
+		case "invalid code":
+			api.WriteMessage(w, http.StatusUnprocessableEntity, "Invalid verification code.")
+		default:
+			api.WriteMessage(w, http.StatusInternalServerError, err.Error())
+		}
+		return
+	}
+	api.WriteJSON(w, http.StatusOK, map[string]any{"message": "Two-factor authentication has been disabled."})
+}
+
+func (h Handler) twoFactorVerify(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Token      string `json:"two_factor_token"`
+		Code       string `json:"code"`
+		RememberMe bool   `json:"remember_me"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Token == "" || body.Code == "" {
+		api.WriteValidation(w, map[string][]string{"code": {"The given data was invalid."}})
+		return
+	}
+	u, err := h.Challenges.Resolve(r.Context(), body.Token)
+	if err != nil || u == nil {
+		api.WriteMessage(w, http.StatusUnauthorized, "Invalid or expired token.")
+		return
+	}
+	if !h.TwoFactor.VerifyAny(r.Context(), u, body.Code) {
+		api.WriteMessage(w, http.StatusUnprocessableEntity, "Invalid verification code.")
+		return
+	}
+	if _, err := h.Challenges.Consume(r.Context(), body.Token); err != nil {
+		api.WriteMessage(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	h.Login.Issue(w, r, u, http.StatusOK, body.RememberMe)
+}
+
+func (h Handler) twoFactorRecoveryCodes(w http.ResponseWriter, r *http.Request) {
+	u := api.User(r)
+	if !u.HasTwoFactor() {
+		api.WriteMessage(w, http.StatusBadRequest, "Two-factor authentication is not enabled.")
+		return
+	}
+	api.WriteJSON(w, http.StatusOK, map[string]any{"remaining_count": h.TwoFactor.Remaining(r.Context(), u.ID)})
+}
+
+func (h Handler) twoFactorRegenerate(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Code string `json:"code"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Code == "" {
+		api.WriteValidation(w, map[string][]string{"code": {"The given data was invalid."}})
+		return
+	}
+	u, _ := h.Users.ByID(r.Context(), api.User(r).ID)
+	codes, err := h.TwoFactor.Regenerate(r.Context(), u, body.Code)
+	if err != nil {
+		switch err.Error() {
+		case "not enabled":
+			api.WriteMessage(w, http.StatusBadRequest, "Two-factor authentication is not enabled.")
+		case "invalid code":
+			api.WriteMessage(w, http.StatusUnprocessableEntity, "Invalid verification code.")
+		default:
+			api.WriteMessage(w, http.StatusInternalServerError, err.Error())
+		}
+		return
+	}
+	api.WriteJSON(w, http.StatusOK, map[string]any{
+		"message":        "Recovery codes have been regenerated.",
+		"recovery_codes": codes,
+	})
+}
+
+func (h Handler) twoFactorStatus(w http.ResponseWriter, r *http.Request) {
+	u := api.User(r)
+	var remaining any
+	if u.HasTwoFactor() {
+		remaining = h.TwoFactor.Remaining(r.Context(), u.ID)
+	}
+	api.WriteJSON(w, http.StatusOK, map[string]any{
+		"enabled":                  u.HasTwoFactor(),
+		"pending_confirmation":     u.TwoFactorEnabled && !u.TwoFactorConfirmed,
+		"recovery_codes_remaining": remaining,
+	})
+}
+
+func (h Handler) PublicRoutes(r chi.Router) {
+	r.Post("/auth/2fa/verify", h.twoFactorVerify)
+}
+
+func (h Handler) CredentialRoutes(r chi.Router) {
+	r.Get("/auth/2fa/status", h.twoFactorStatus)
+	r.Post("/auth/2fa/enable", h.twoFactorEnable)
+	r.Post("/auth/2fa/confirm", h.twoFactorConfirm)
+	r.Post("/auth/2fa/disable", h.twoFactorDisable)
+	r.Get("/auth/2fa/recovery-codes", h.twoFactorRecoveryCodes)
+	r.Post("/auth/2fa/recovery-codes/regenerate", h.twoFactorRegenerate)
+}

@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"savvy-go/internal/auth"
+	"savvy-go/internal/httpserver/guard"
 )
 
 // Every data route must belong to a resource, or tokens are locked out of it
@@ -19,7 +20,7 @@ import (
 func TestEveryDataRouteMapsToAResource(t *testing.T) {
 	a := newTestApp(t)
 	for root := range dataRoots(a.s) {
-		res, ok := spaceResource("/api/spaces/1/" + root)
+		res, ok := guard.SpaceResource("/api/spaces/1/" + root)
 		if !ok {
 			t.Errorf("data route /%s has no API token resource: add it to spaceSegments", root)
 		} else if !slices.Contains(auth.APIResources, res) {
@@ -27,12 +28,12 @@ func TestEveryDataRouteMapsToAResource(t *testing.T) {
 		}
 	}
 	for _, path := range []string{"/api/spaces/1", "/api/spaces/1/", "/api/spaces/1/members", "/api/spaces/1/transfers/abc/accept"} {
-		if _, ok := spaceResource(path); !ok {
+		if _, ok := guard.SpaceResource(path); !ok {
 			t.Errorf("%s has no resource", path)
 		}
 	}
 	for _, path := range []string{"/api/spaces/1/audit", "/api/spaces/1/backups", "/api/spaces/1/invitations", "/api/spaces/1/nope"} {
-		if res, ok := spaceResource(path); ok {
+		if res, ok := guard.SpaceResource(path); ok {
 			t.Errorf("%s maps to %q: tokens must not reach it", path, res)
 		}
 	}

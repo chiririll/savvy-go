@@ -316,6 +316,7 @@ func TestP42UnavailableSpaceIsHiddenFromOutsiders(t *testing.T) {
 	member := a.issue(a.createUser("m@test.com", "secret1", roleViewer), false)
 	outsider := a.issue(a.createUser("o@test.com", "secret1", auth.RoleUser), false)
 	a.s.store = unavailableStore{a.store, a.space.ID}
+	*a.s.guard = *a.s.newGuard() // the guard copied the store
 	status(t, a.do("GET", "/api/tags", nil, member.Token, ""), 503, "member")
 	status(t, a.do("GET", "/api/tags", nil, outsider.Token, ""), 404, "outsider")
 }
