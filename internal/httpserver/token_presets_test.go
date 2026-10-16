@@ -102,7 +102,7 @@ func TestTokenNeverExceedsItsOwner(t *testing.T) {
 	status(t, a.bearer("POST", "/api/tags", map[string]any{"name": "t"}, admin), 201, "editor owner writes")
 	status(t, a.bearer("PATCH", fmt.Sprintf("/api/spaces/%d", a.space.ID), map[string]any{"name": "Mine"}, admin), 403, "no space administration")
 
-	if err := a.s.Spaces.SetMember(context.Background(), a.space.ID, owner, spaces.RoleViewer); err != nil {
+	if err := a.svc.Spaces.SetMember(context.Background(), a.space.ID, owner, spaces.RoleViewer); err != nil {
 		t.Fatal(err)
 	}
 	status(t, a.bearer("POST", "/api/tags", map[string]any{"name": "t2"}, admin), 403, "demoted owner: the token cannot write")
@@ -139,10 +139,10 @@ func TestTokenChangingSyncedDataNeedsEverySpaceOfTheGroup(t *testing.T) {
 	// Reaching both is not enough when the owner may not edit one of them.
 	other := p.a.createUser("other@test.com", "secret1", auth.RoleUser)
 	ctx := context.Background()
-	if err := p.a.s.Spaces.SetMember(ctx, p.B.ID, other, spaces.RoleAdmin); err != nil {
+	if err := p.a.svc.Spaces.SetMember(ctx, p.B.ID, other, spaces.RoleAdmin); err != nil {
 		t.Fatal(err)
 	}
-	if err := p.a.s.Spaces.SetMember(ctx, p.B.ID, p.owner, spaces.RoleViewer); err != nil {
+	if err := p.a.svc.Spaces.SetMember(ctx, p.B.ID, p.owner, spaces.RoleViewer); err != nil {
 		t.Fatal(err)
 	}
 	res = p.a.bearer("POST", inA, map[string]any{"name": "Second", "type": "expense"}, both)

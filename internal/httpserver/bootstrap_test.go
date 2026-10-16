@@ -60,7 +60,7 @@ func appWithGuard(t *testing.T, g *bootstrap.Guard) *testApp {
 	s := newServer(cfg, st, testKeys(t, cfg), opts...)
 	ts := httptest.NewServer(s.Handler())
 	t.Cleanup(ts.Close)
-	return &testApp{t: t, db: st.SQL(), store: st, srv: ts, s: s, client: ts.Client(), bootstrap: g}
+	return &testApp{t: t, db: st.SQL(), store: st, srv: ts, s: s, svc: servicesOf(s), client: ts.Client(), bootstrap: g}
 }
 
 func TestRegisterWithoutAGuardIsClosed(t *testing.T) {
@@ -76,7 +76,7 @@ func TestRegisterIsClosedOnceAUserExists(t *testing.T) {
 	if a.bootstrap.Active() {
 		t.Fatal("password still valid after the first user")
 	}
-	if _, err := os.Stat(filepath.Join(a.s.Cfg.DataDir, bootstrap.FileName)); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(a.svc.Cfg.DataDir, bootstrap.FileName)); !os.IsNotExist(err) {
 		t.Fatalf("password file still there: %v", err)
 	}
 }
@@ -131,7 +131,7 @@ func TestStatusCarriesTheBootstrapHint(t *testing.T) {
 	body := decodeJSON(t, a.do("GET", "/api/auth/status", nil, "", ""))
 	hint, _ := body["bootstrap_hint"].(map[string]any)
 	if body["needs_registration"] != true || hint["environment"] != "binary" ||
-		hint["file"] != filepath.Join(a.s.Cfg.DataDir, bootstrap.FileName) {
+		hint["file"] != filepath.Join(a.svc.Cfg.DataDir, bootstrap.FileName) {
 		t.Fatalf("status %v", body)
 	}
 	if _, leaked := hint["password"]; leaked || len(hint) != 2 {

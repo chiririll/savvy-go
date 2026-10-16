@@ -99,8 +99,8 @@ func tagCount(t *testing.T, a *testApp, spaceID int64, sess *auth.Issued) int {
 	return len(tagNames(t, a.inSpace(spaceID, "GET", "/api/tags", nil, sess)))
 }
 
-// P1: space backups are for the space's admins only.
-func TestP1SpaceBackupsAreForSpaceAdmins(t *testing.T) {
+// Space backups are for the space's admins only.
+func TestSpaceBackupsAreForSpaceAdmins(t *testing.T) {
 	a := newTestApp(t)
 	for _, role := range []string{roleEditor, roleViewer} {
 		sess := a.issue(a.createUser(role+"@test.com", "secret1", role), false)
@@ -114,8 +114,8 @@ func TestP1SpaceBackupsAreForSpaceAdmins(t *testing.T) {
 	status(t, a.do("GET", spacePath(a.space.ID, "/backups"), nil, outsider.Token, ""), 404, "not a member")
 }
 
-// P19: a space admin backs a space up and restores it.
-func TestP19SpaceBackupRestore(t *testing.T) {
+// A space admin backs a space up and restores it.
+func TestSpaceBackupRestore(t *testing.T) {
 	a := newTestApp(t)
 	sess := a.issue(a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
 	status(t, a.inSpace(a.space.ID, "POST", "/api/tags", map[string]any{"name": "before"}, sess), 201, "tag")
@@ -161,19 +161,19 @@ func TestSpaceBackupRetention(t *testing.T) {
 	}
 }
 
-// P36: a space backup cannot overwrite another space, even when the admin
+// A space backup cannot overwrite another space, even when the admin
 // of both moves the file between them.
-func TestP36BackupOfAnotherSpaceIsRefused(t *testing.T) {
+func TestBackupOfAnotherSpaceIsRefused(t *testing.T) {
 	a := newTestApp(t)
 	ctx := context.Background()
 	admin := a.createUser("admin@test.com", "secret1", auth.RoleAdmin)
 	sess := a.issue(admin, false)
-	other, err := a.s.Spaces.Create(ctx, "Other", admin)
+	other, err := a.svc.Spaces.Create(ctx, "Other", admin)
 	if err != nil {
 		t.Fatal(err)
 	}
 	b := createdBackup(t, a.do("POST", spacePath(a.space.ID, "/backups"), map[string]any{}, sess.Token, sess.CSRF))
-	content, _ := os.ReadFile(a.s.Backups.SpacePath(a.space.ID, b["filename"].(string)))
+	content, _ := os.ReadFile(a.svc.Backups.SpacePath(a.space.ID, b["filename"].(string)))
 	up := createdBackup(t, a.upload(spacePath(other.ID, "/backups/upload"), "x.zip", content, nil, sess))
 	res := a.do("POST", spacePath(other.ID, "/backups/"+up["filename"].(string)+"/restore"), nil, sess.Token, sess.CSRF)
 	body := decodeJSON(t, res)
@@ -210,14 +210,14 @@ func rezip(t *testing.T, src string, edit func(name string, data []byte) ([]byte
 	return buf.Bytes()
 }
 
-// P44, P55: how a tampered archive shows through the API: an edited manifest
+// How a tampered archive shows through the API: an edited manifest
 // is listed "unsigned" but restores, an inconsistent archive is a 422. The
 // archive checks themselves are tested in internal/backup.
-func TestP44P55TamperedArchives(t *testing.T) {
+func TestTamperedArchives(t *testing.T) {
 	a := newTestApp(t)
 	sess := a.issue(a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
 	b := createdBackup(t, a.do("POST", spacePath(a.space.ID, "/backups"), map[string]any{}, sess.Token, sess.CSRF))
-	orig := a.s.Backups.SpacePath(a.space.ID, b["filename"].(string))
+	orig := a.svc.Backups.SpacePath(a.space.ID, b["filename"].(string))
 
 	restore := func(content []byte) (int, map[string]any) {
 		up := createdBackup(t, a.upload(spacePath(a.space.ID, "/backups/upload"), "x.zip", content, nil, sess))
@@ -259,16 +259,16 @@ func TestP44P55TamperedArchives(t *testing.T) {
 	}
 }
 
-// P39: a backup larger than the space quota is refused before it replaces
+// A backup larger than the space quota is refused before it replaces
 // anything.
-func TestP39BackupOverQuotaIsRefused(t *testing.T) {
+func TestBackupOverQuotaIsRefused(t *testing.T) {
 	a := newTestApp(t)
 	sess := a.issue(a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
 	for i := 0; i < 50; i++ {
 		status(t, a.inSpace(a.space.ID, "POST", "/api/tags", map[string]any{"name": strings.Repeat("t", 200) + strconv.Itoa(i)}, sess), 201, "tag")
 	}
 	b := createdBackup(t, a.do("POST", spacePath(a.space.ID, "/backups"), map[string]any{}, sess.Token, sess.CSRF))
-	_ = a.s.Settings.Set(context.Background(), "space_quota_mb", 0.01)
+	_ = a.svc.Settings.Set(context.Background(), "space_quota_mb", 0.01)
 	res := a.do("POST", spacePath(a.space.ID, "/backups/"+b["filename"].(string)+"/restore"), nil, sess.Token, sess.CSRF)
 	body := decodeJSON(t, res)
 	if res.StatusCode != http.StatusUnprocessableEntity {
@@ -279,8 +279,8 @@ func TestP39BackupOverQuotaIsRefused(t *testing.T) {
 	}
 }
 
-// P48: the signing key travels in server backups only.
-func TestP48KeyOnlyInServerBackups(t *testing.T) {
+// The signing key travels in server backups only.
+func TestSigningKeyTravelsOnlyInServerBackups(t *testing.T) {
 	a := newTestApp(t)
 	sess := a.issue(a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
 	names := func(path string) []string {
@@ -296,19 +296,19 @@ func TestP48KeyOnlyInServerBackups(t *testing.T) {
 		return out
 	}
 	sb := createdBackup(t, a.do("POST", spacePath(a.space.ID, "/backups"), map[string]any{}, sess.Token, sess.CSRF))
-	for _, n := range names(a.s.Backups.SpacePath(a.space.ID, sb["filename"].(string))) {
+	for _, n := range names(a.svc.Backups.SpacePath(a.space.ID, sb["filename"].(string))) {
 		if strings.HasPrefix(n, "keys/") {
 			t.Fatalf("space backup holds %s", n)
 		}
 	}
 	srv := createdBackup(t, a.do("POST", "/api/backups", map[string]any{}, sess.Token, sess.CSRF))
-	if !strings.Contains(strings.Join(names(a.s.Backups.ServerPath(srv["filename"].(string))), " "), "keys/server.ed25519") {
+	if !strings.Contains(strings.Join(names(a.svc.Backups.ServerPath(srv["filename"].(string))), " "), "keys/server.ed25519") {
 		t.Fatal("server backup lacks the signing key")
 	}
 }
 
-// P20: a server backup restores the server and every space.
-func TestP20ServerBackupRestore(t *testing.T) {
+// A server backup restores the server and every space.
+func TestServerBackupRestore(t *testing.T) {
 	a := newTestApp(t)
 	admin := a.createUser("admin@test.com", "secret1", auth.RoleAdmin)
 	sess := a.issue(admin, false)
@@ -325,7 +325,7 @@ func TestP20ServerBackupRestore(t *testing.T) {
 		t.Fatalf("restore %d %v", res.StatusCode, decodeJSON(t, res))
 	}
 	res.Body.Close()
-	if u, _ := a.s.Users.ByEmail(context.Background(), "later@test.com"); u != nil {
+	if u, _ := a.svc.Users.ByEmail(context.Background(), "later@test.com"); u != nil {
 		t.Fatal("a user created after the backup survived the restore")
 	}
 	if n := tagCount(t, a, a.space.ID, sess); n != 1 {
@@ -345,33 +345,33 @@ func upgradeLaravelServer(t *testing.T, a *testApp, sess *auth.Issued, content [
 	return body["data"].(map[string]any)["filename"].(string)
 }
 
-// P21: a Laravel database is upgraded and saved as a server backup, and the
+// A Laravel database is upgraded and saved as a server backup, and the
 // live data stays as it is until that backup is restored. Restoring it brings
 // the Laravel admin, and its dates come back date-only.
-func TestP21UpgradeLaravelBackupAsServer(t *testing.T) {
+func TestUpgradeLaravelBackupAsServer(t *testing.T) {
 	a := newTestApp(t)
 	sess := a.issue(a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
 	content, _ := os.ReadFile(laravelFile(t, true))
 	name := upgradeLaravelServer(t, a, sess, content, nil)
 
-	list, _ := a.s.Backups.ServerBackups()
+	list, _ := a.svc.Backups.ServerBackups()
 	if len(list) != 1 || list[0].Filename != name || !list[0].Valid || list[0].Kind != "server" {
 		t.Fatalf("saved backups %+v; want only the upgraded one", list)
 	}
-	if u, _ := a.s.Users.ByEmail(context.Background(), "ada@example.com"); u != nil {
+	if u, _ := a.svc.Users.ByEmail(context.Background(), "ada@example.com"); u != nil {
 		t.Fatal("the upgrade changed live data")
 	}
-	if u, _ := a.s.Users.ByEmail(context.Background(), "admin@test.com"); u == nil {
+	if u, _ := a.svc.Users.ByEmail(context.Background(), "admin@test.com"); u == nil {
 		t.Fatal("the upgrade removed a live user")
 	}
 	status(t, a.do("POST", "/api/backups/"+name+"/restore", nil, sess.Token, sess.CSRF), http.StatusOK, "restore")
 
 	ctx := context.Background()
-	ada, _ := a.s.Users.ByEmail(ctx, "ada@example.com")
+	ada, _ := a.svc.Users.ByEmail(ctx, "ada@example.com")
 	if ada == nil || ada.Role != auth.RoleAdmin {
 		t.Fatalf("laravel admin %+v", ada)
 	}
-	if role, _ := a.s.Spaces.Role(ctx, 1, ada.ID); role != spaces.RoleAdmin {
+	if role, _ := a.svc.Spaces.Role(ctx, 1, ada.ID); role != spaces.RoleAdmin {
 		t.Fatalf("laravel admin's space role %q", role)
 	}
 	d, err := a.store.Space(ctx, 1)
@@ -396,17 +396,17 @@ func TestUpgradeOldLaravelBackupSavesNothing(t *testing.T) {
 	if res.StatusCode != http.StatusUnprocessableEntity {
 		t.Fatalf("upgrade %d %v", res.StatusCode, body)
 	}
-	if list, _ := a.s.Backups.ServerBackups(); len(list) != 0 {
+	if list, _ := a.svc.Backups.ServerBackups(); len(list) != 0 {
 		t.Fatalf("saved %v", list)
 	}
-	if got, _ := a.s.Users.ByEmail(context.Background(), "admin@test.com"); got == nil {
+	if got, _ := a.svc.Users.ByEmail(context.Background(), "admin@test.com"); got == nil {
 		t.Fatal("live data damaged")
 	}
 }
 
-// P21: a Laravel backup imports as a new space owned by the caller, without
+// A Laravel backup imports as a new space owned by the caller, without
 // its users; guests cannot import.
-func TestP21ImportLaravelBackupAsSpace(t *testing.T) {
+func TestImportLaravelBackupAsSpace(t *testing.T) {
 	a := newTestApp(t)
 	user := a.createUser("owner@test.com", "secret1", auth.RoleUser)
 	sess := a.issue(user, false)
@@ -426,7 +426,7 @@ func TestP21ImportLaravelBackupAsSpace(t *testing.T) {
 	if len(accounts) == 0 {
 		t.Fatal("imported space has no accounts")
 	}
-	if u, _ := a.s.Users.ByEmail(context.Background(), "ada@example.com"); u != nil {
+	if u, _ := a.svc.Users.ByEmail(context.Background(), "ada@example.com"); u != nil {
 		t.Fatal("a space import brought the Laravel users")
 	}
 
@@ -434,14 +434,14 @@ func TestP21ImportLaravelBackupAsSpace(t *testing.T) {
 	status(t, a.upload("/api/spaces/import", "laravel.sqlite", content, nil, guest), 403, "guest import")
 }
 
-// P27: importing a backup next to its original gives the copy a new uuid, so
+// Importing a backup next to its original gives the copy a new uuid, so
 // the two are never taken for one space.
-func TestP27ImportCopyGetsNewUUID(t *testing.T) {
+func TestImportCopyGetsNewUUID(t *testing.T) {
 	a := newTestApp(t)
 	admin := a.createUser("admin@test.com", "secret1", auth.RoleAdmin)
 	sess := a.issue(admin, false)
 	b := createdBackup(t, a.do("POST", spacePath(a.space.ID, "/backups"), map[string]any{}, sess.Token, sess.CSRF))
-	content, _ := os.ReadFile(a.s.Backups.SpacePath(a.space.ID, b["filename"].(string)))
+	content, _ := os.ReadFile(a.svc.Backups.SpacePath(a.space.ID, b["filename"].(string)))
 	res := a.upload("/api/spaces/import", "copy.zip", content, nil, sess)
 	body := decodeJSON(t, res)
 	if res.StatusCode != http.StatusCreated {
@@ -464,7 +464,7 @@ func TestLaravelDatabaseIsNotAcceptedAsBackup(t *testing.T) {
 	content, _ := os.ReadFile(laravelFile(t, true))
 	status(t, a.upload("/api/backups/upload", "laravel.sqlite", content, nil, sess), http.StatusUnprocessableEntity, "server upload")
 	status(t, a.upload(spacePath(a.space.ID, "/backups/upload"), "laravel.sqlite", content, nil, sess), http.StatusUnprocessableEntity, "space upload")
-	if list, _ := a.s.Backups.ServerBackups(); len(list) != 0 {
+	if list, _ := a.svc.Backups.ServerBackups(); len(list) != 0 {
 		t.Fatalf("kept as a backup: %v", list)
 	}
 }
@@ -513,7 +513,7 @@ func TestRestoreLaravelServerDecryptsTwoFactorWithKey(t *testing.T) {
 	name := upgradeLaravelServer(t, a, sess, content, map[string]string{"app_key": appKey})
 	status(t, a.do("POST", "/api/backups/"+name+"/restore", nil, sess.Token, sess.CSRF), http.StatusOK, "restore")
 
-	ada, err := a.s.Users.ByEmail(context.Background(), "ada@example.com")
+	ada, err := a.svc.Users.ByEmail(context.Background(), "ada@example.com")
 	if err != nil || ada == nil || ada.TwoFactorSecret == nil || *ada.TwoFactorSecret != secret {
 		t.Fatalf("two-factor secret after restore = %+v, %v; want the decrypted secret", ada, err)
 	}
@@ -529,7 +529,7 @@ func TestRestoreLaravelServerWithoutKeyResetsTwoFactor(t *testing.T) {
 	name := upgradeLaravelServer(t, a, sess, content, nil)
 	status(t, a.do("POST", "/api/backups/"+name+"/restore", nil, sess.Token, sess.CSRF), http.StatusOK, "restore")
 
-	ada, err := a.s.Users.ByEmail(context.Background(), "ada@example.com")
+	ada, err := a.svc.Users.ByEmail(context.Background(), "ada@example.com")
 	if err != nil || ada == nil {
 		t.Fatalf("laravel admin missing: %+v, %v", ada, err)
 	}
@@ -545,7 +545,7 @@ func TestUpgradeLaravelIntoCurrentSpaceBackup(t *testing.T) {
 	a := newTestApp(t)
 	sess := a.issue(a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
 	content, _ := os.ReadFile(laravelFile(t, true))
-	before, _ := a.s.Spaces.Get(context.Background(), a.space.ID)
+	before, _ := a.svc.Spaces.Get(context.Background(), a.space.ID)
 	accountsBefore := len(decodeJSON(t, a.inSpace(a.space.ID, "GET", "/api/accounts", nil, sess))["data"].([]any))
 
 	res := a.upload(spacePath(a.space.ID, "/backups/upgrade-laravel"), "laravel.sqlite", content, nil, sess)
@@ -554,7 +554,7 @@ func TestUpgradeLaravelIntoCurrentSpaceBackup(t *testing.T) {
 		t.Fatalf("upgrade %d %v", res.StatusCode, body)
 	}
 	name := body["data"].(map[string]any)["filename"].(string)
-	list, _ := a.s.Backups.SpaceBackups(a.space.ID)
+	list, _ := a.svc.Backups.SpaceBackups(a.space.ID)
 	if len(list) != 1 || list[0].Filename != name || !list[0].Valid || list[0].Kind != "space" || list[0].SpaceUUID != before.UUID {
 		t.Fatalf("saved backups %+v; want the upgraded one, of this space", list)
 	}
@@ -564,7 +564,7 @@ func TestUpgradeLaravelIntoCurrentSpaceBackup(t *testing.T) {
 
 	status(t, a.do("POST", spacePath(a.space.ID, "/backups/"+name+"/restore"), nil, sess.Token, sess.CSRF), http.StatusOK, "restore")
 
-	after, _ := a.s.Spaces.Get(context.Background(), a.space.ID)
+	after, _ := a.svc.Spaces.Get(context.Background(), a.space.ID)
 	if after == nil || before == nil || after.UUID != before.UUID {
 		t.Fatalf("space identity changed: %+v -> %+v", before, after)
 	}
@@ -572,7 +572,23 @@ func TestUpgradeLaravelIntoCurrentSpaceBackup(t *testing.T) {
 	if len(accounts) == 0 {
 		t.Fatal("the space has none of the Laravel accounts")
 	}
-	if u, _ := a.s.Users.ByEmail(context.Background(), "ada@example.com"); u != nil {
+	if u, _ := a.svc.Users.ByEmail(context.Background(), "ada@example.com"); u != nil {
 		t.Fatal("restoring into a space brought the Laravel users")
 	}
+}
+
+// Backups hold every space, so only server admins reach them; space
+// admins, editors, viewers and API tokens are refused.
+func TestServerBackupsAreForServerAdmins(t *testing.T) {
+	a := newTestApp(t)
+	for _, role := range []string{roleEditor, roleViewer} {
+		u := a.createUser(role+"@test.com", "secret1", role)
+		sess := a.issue(u, false)
+		status(t, a.do("GET", "/api/backups", nil, sess.Token, ""), 403, role+" list")
+		status(t, a.do("POST", "/api/backups", map[string]any{}, sess.Token, sess.CSRF), 403, role+" create")
+		status(t, a.do("POST", "/api/backups/x.sqlite/restore", nil, sess.Token, sess.CSRF), 403, role+" restore")
+	}
+	admin := a.createUser("admin@test.com", "secret1", auth.RoleAdmin)
+	raw, _ := a.issueToken(admin, tokReadWrite, nil)
+	status(t, a.bearer("GET", "/api/backups", nil, raw), 403, "admin API token")
 }

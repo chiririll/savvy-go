@@ -35,7 +35,7 @@ func TestServerSetupSettings(t *testing.T) {
 func TestFirstAdminLeavesServerSetupPending(t *testing.T) {
 	a := newTestApp(t)
 	status(t, a.register(a.bootstrap.Password(), nil), 201, "register")
-	all, err := a.s.Settings.All(context.Background())
+	all, err := a.svc.Settings.All(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

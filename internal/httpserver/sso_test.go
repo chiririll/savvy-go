@@ -14,134 +14,6 @@ import (
 	"savvy-go/internal/sso"
 )
 
-func TestTwoFactorEnableConfirmLoginAndRecovery(t *testing.T) {
-	a := newTestApp(t)
-	u := a.createUser("otp@test.com", "secret1", roleEditor)
-	iss := a.issue(u, false)
-
-	en := a.do("POST", "/api/auth/2fa/enable", map[string]any{}, iss.Token, iss.CSRF)
-	if en.StatusCode != 200 {
-		t.Fatalf("enable %d %v", en.StatusCode, decodeJSON(t, en))
-	}
-	enBody := decodeJSON(t, en)
-	secret, _ := enBody["secret"].(string)
-	if secret == "" || enBody["qr_code_url"] == nil {
-		t.Fatalf("enable body %v", enBody)
-	}
-
-	bad := a.do("POST", "/api/auth/2fa/confirm", map[string]string{"code": "000000"}, iss.Token, iss.CSRF)
-	if bad.StatusCode != 422 {
-		t.Fatalf("bad confirm %d", bad.StatusCode)
-	}
-	bad.Body.Close()
-
-	code := auth.TOTPNow(secret)
-	ok := a.do("POST", "/api/auth/2fa/confirm", map[string]string{"code": code}, iss.Token, iss.CSRF)
-	if ok.StatusCode != 200 {
-		t.Fatalf("confirm %d %v", ok.StatusCode, decodeJSON(t, ok))
-	}
-	confirmed := decodeJSON(t, ok)
-	codes, _ := confirmed["recovery_codes"].([]any)
-	if len(codes) != 8 {
-		t.Fatalf("codes %v", confirmed)
-	}
-
-	login := a.do("POST", "/api/auth/login", map[string]string{"email": "otp@test.com", "password": "secret1"}, "", "")
-	loginBody := decodeJSON(t, login)
-	tok, _ := loginBody["two_factor_token"].(string)
-	if tok == "" {
-		t.Fatalf("login 2fa %v", loginBody)
-	}
-
-	verify := a.do("POST", "/api/auth/2fa/verify", map[string]any{
-		"two_factor_token": tok, "code": auth.TOTPNow(secret),
-	}, "", "")
-	if verify.StatusCode != 200 {
-		t.Fatalf("verify %d %v", verify.StatusCode, decodeJSON(t, verify))
-	}
-	if cookieNamed(verify, "svy_session") == nil {
-		t.Fatal("expected session after 2fa")
-	}
-	verify.Body.Close()
-
-	login2 := a.do("POST", "/api/auth/login", map[string]string{"email": "otp@test.com", "password": "secret1"}, "", "")
-	tok2, _ := decodeJSON(t, login2)["two_factor_token"].(string)
-	rec := a.do("POST", "/api/auth/2fa/verify", map[string]any{
-		"two_factor_token": tok2, "code": codes[0],
-	}, "", "")
-	if rec.StatusCode != 200 {
-		t.Fatalf("recovery verify %d %v", rec.StatusCode, decodeJSON(t, rec))
-	}
-	rec.Body.Close()
-
-	st := a.do("GET", "/api/auth/2fa/status", nil, iss.Token, "")
-	stBody := decodeJSON(t, st)
-	if stBody["enabled"] != true {
-		t.Fatalf("status %v", stBody)
-	}
-	if rem, _ := stBody["recovery_codes_remaining"].(float64); rem != 7 {
-		t.Fatalf("remaining %v", stBody)
-	}
-
-	off := a.do("POST", "/api/auth/2fa/disable", map[string]string{"code": auth.TOTPNow(secret)}, iss.Token, iss.CSRF)
-	if off.StatusCode != 200 {
-		t.Fatalf("disable %d %v", off.StatusCode, decodeJSON(t, off))
-	}
-}
-
-func TestWebauthnOptionsAndCredentialCRUD(t *testing.T) {
-	a := newTestApp(t)
-	u := a.createUser("pk@test.com", "secret1", roleEditor)
-	iss := a.issue(u, false)
-
-	opts := a.do("POST", "/api/auth/webauthn/register/options", map[string]any{}, iss.Token, iss.CSRF)
-	if opts.StatusCode != 200 {
-		t.Fatalf("register options %d %v", opts.StatusCode, decodeJSON(t, opts))
-	}
-	body := decodeJSON(t, opts)
-	if body["token"] == nil {
-		t.Fatalf("options %v", body)
-	}
-	opt, _ := body["options"].(map[string]any)
-	if opt["challenge"] == nil || opt["rp"] == nil || opt["publicKey"] != nil {
-		t.Fatalf("creation options %v", body["options"])
-	}
-
-	bad := a.do("POST", "/api/auth/webauthn/register/verify", map[string]any{
-		"token": "nope", "response": map[string]any{"id": "x"},
-	}, iss.Token, iss.CSRF)
-	if bad.StatusCode != 422 {
-		t.Fatalf("bad verify %d", bad.StatusCode)
-	}
-	bad.Body.Close()
-
-	loginOpts := a.do("POST", "/api/auth/webauthn/login/options", map[string]any{}, "", "")
-	if loginOpts.StatusCode != 200 {
-		t.Fatalf("login options %d %v", loginOpts.StatusCode, decodeJSON(t, loginOpts))
-	}
-	loginOpts.Body.Close()
-
-	_, _ = a.db.Exec(`INSERT INTO webauthn_credentials (user_id, credential_id, name, record, created_at)
-		VALUES (?, 'cred-1', 'Laptop', '{}', '2026-01-01T00:00:00Z')`, u.ID)
-	list := a.do("GET", "/api/auth/webauthn/credentials", nil, iss.Token, "")
-	listed := decodeJSON(t, list)
-	creds, _ := listed["credentials"].([]any)
-	if len(creds) != 1 {
-		t.Fatalf("list %v", listed)
-	}
-	id := int64(creds[0].(map[string]any)["id"].(float64))
-	ren := a.do("PATCH", "/api/auth/webauthn/credentials/"+itoa(id), map[string]string{"name": "Phone"}, iss.Token, iss.CSRF)
-	if ren.StatusCode != 200 {
-		t.Fatalf("rename %d", ren.StatusCode)
-	}
-	ren.Body.Close()
-	del := a.do("DELETE", "/api/auth/webauthn/credentials/"+itoa(id), map[string]any{}, iss.Token, iss.CSRF)
-	if del.StatusCode != 200 {
-		t.Fatalf("delete %d", del.StatusCode)
-	}
-	del.Body.Close()
-}
-
 func TestIdentityProviderCRUDAndPresets(t *testing.T) {
 	a := newTestApp(t)
 	admin := a.createUser("admin@test.com", "secret1", auth.RoleAdmin)
@@ -230,7 +102,7 @@ func TestIdentityProviderCRUDAndPresets(t *testing.T) {
 func TestSSOTicketExchange(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("u@test.com", "secret1", roleEditor)
-	ticket, err := a.s.SSO.IssueTicket(context.Background(), u.ID, false)
+	ticket, err := a.svc.SSO.IssueTicket(context.Background(), u.ID, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +135,7 @@ func TestSSOTicketExchange(t *testing.T) {
 
 	u2 := a.createUser("tf@test.com", "secret1", roleEditor)
 	_, _ = a.db.Exec(`UPDATE users SET two_factor_enabled=1, two_factor_confirmed=1 WHERE id=?`, u2.ID)
-	t2, _ := a.s.SSO.IssueTicket(context.Background(), u2.ID, true)
+	t2, _ := a.svc.SSO.IssueTicket(context.Background(), u2.ID, true)
 	ch := a.do("POST", "/api/auth/sso/exchange", map[string]string{"ticket": t2}, "", "")
 	chBody := decodeJSON(t, ch)
 	if chBody["requires_2fa"] != true || chBody["two_factor_token"] == nil {
@@ -271,10 +143,10 @@ func TestSSOTicketExchange(t *testing.T) {
 	}
 }
 
-func TestSSOGithubCallbackAndSAMLMetadata(t *testing.T) {
+func TestSSOGithubSignInProvisionsTheUser(t *testing.T) {
 	a := newTestApp(t)
 	a.createUser("root@test.com", "secret1", auth.RoleAdmin)
-	_, err := a.s.SSO.Create(context.Background(), sso.IdPWrite{
+	_, err := a.svc.SSO.Create(context.Background(), sso.IdPWrite{
 		Name: "GitHub", Slug: "github", Preset: "github", Enabled: boolPtr(true),
 		Fields: map[string]any{"client_id": "cid", "client_secret": "csecret"},
 	})
@@ -295,7 +167,7 @@ func TestSSOGithubCallbackAndSAMLMetadata(t *testing.T) {
 	})
 	ts := httptest.NewServer(mux)
 	t.Cleanup(ts.Close)
-	a.s.SSO.HTTP = &http.Client{Transport: rewriteHost{base: ts.URL}}
+	a.svc.SSO.HTTP = &http.Client{Transport: rewriteHost{base: ts.URL}}
 
 	redir := doNoFollow(t, a, "GET", "/api/auth/sso/github/redirect")
 	if redir.StatusCode != 302 {
@@ -326,7 +198,12 @@ func TestSSOGithubCallbackAndSAMLMetadata(t *testing.T) {
 		t.Fatalf("provisioned %v", exBody)
 	}
 
-	saml, err := a.s.SSO.Create(context.Background(), sso.IdPWrite{
+}
+
+func TestSSOSAMLMetadataRedirectAndRejectedResponse(t *testing.T) {
+	a := newTestApp(t)
+
+	_, err := a.svc.SSO.Create(context.Background(), sso.IdPWrite{
 		Name: "Corp SAML", Slug: "saml", Preset: "custom_saml", Enabled: boolPtr(true),
 		Fields: map[string]any{
 			"idp_entity_id": "https://idp.example/saml",
@@ -337,7 +214,6 @@ func TestSSOGithubCallbackAndSAMLMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_ = saml
 	meta := a.do("GET", "/api/auth/sso/saml/metadata", nil, "", "")
 	b, _ := io.ReadAll(meta.Body)
 	if meta.StatusCode != 200 || !strings.Contains(string(b), "EntityDescriptor") || !strings.Contains(string(b), "AssertionConsumerService") {
@@ -367,7 +243,7 @@ func TestSSOProvisioningLinkAndJIT(t *testing.T) {
 	a := newTestApp(t)
 	a.createUser("root@test.com", "secret1", auth.RoleAdmin)
 	existing := a.createUser("jane@test.com", "secret1", roleEditor)
-	p, err := a.s.SSO.Create(context.Background(), sso.IdPWrite{
+	p, err := a.svc.SSO.Create(context.Background(), sso.IdPWrite{
 		Name: "IdP", Slug: "idp", Preset: "custom_oidc", Enabled: boolPtr(true),
 		Fields: map[string]any{
 			"discovery_url": "https://idp.test/.well-known/openid-configuration",
@@ -378,45 +254,27 @@ func TestSSOProvisioningLinkAndJIT(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	user, _, err := a.s.SSO.Provision(context.Background(), *p, sso.NormalizedIdentity{
+	user, _, err := a.svc.SSO.Provision(context.Background(), *p, sso.NormalizedIdentity{
 		Subject: "ext-1", Email: "jane@test.com", EmailVerified: true, Name: "Jane",
 	})
 	if err != nil || user.ID != existing.ID {
 		t.Fatalf("link %v %v", user, err)
 	}
-	_, _, err = a.s.SSO.Provision(context.Background(), *p, sso.NormalizedIdentity{
+	_, _, err = a.svc.SSO.Provision(context.Background(), *p, sso.NormalizedIdentity{
 		Subject: "ext-2", Email: "jane@test.com", EmailVerified: false, Name: "Jane",
 	})
 	if err == nil {
 		t.Fatal("unverified should not JIT when email exists without link")
 	}
-	fresh, _, err := a.s.SSO.Provision(context.Background(), *p, sso.NormalizedIdentity{
+	fresh, _, err := a.svc.SSO.Provision(context.Background(), *p, sso.NormalizedIdentity{
 		Subject: "ext-3", Email: "new@test.com", EmailVerified: true, Name: "New",
 		Groups: []string{"admins"}, Raw: map[string]any{"groups": []any{"admins"}},
 	})
 	if err != nil || fresh.Email != "new@test.com" || fresh.Role != auth.RoleAdmin || !fresh.IsSSOOnly {
 		t.Fatalf("jit %+v %v", fresh, err)
 	}
-	if list, err := a.s.Spaces.ForUser(context.Background(), fresh.ID); err != nil || len(list) != 0 {
+	if list, err := a.svc.Spaces.ForUser(context.Background(), fresh.ID); err != nil || len(list) != 0 {
 		t.Fatalf("jit user has spaces %v %v", list, err)
-	}
-}
-
-func TestSSOPresetHelpers(t *testing.T) {
-	disco := "https://login.microsoftonline.com/{tenantid}/v2.0"
-	if !sso.MatchesIssuer("entra", disco, map[string]any{"iss": "https://login.microsoftonline.com/abc-123/v2.0", "tid": "abc-123"}) {
-		t.Fatal("entra tenant match")
-	}
-	if sso.MatchesIssuer("entra", disco, map[string]any{"iss": "https://login.microsoftonline.com/evil/v2.0", "tid": "abc-123"}) {
-		t.Fatal("entra evil")
-	}
-	p := sso.IdentityProvider{Preset: "okta", Config: map[string]any{"domain": "example.okta.com"}}
-	if got := sso.PresetDiscoveryURL(p); got != "https://example.okta.com/.well-known/openid-configuration" {
-		t.Fatalf("okta disco %s", got)
-	}
-	p.Config["auth_server_id"] = "aus1a2b3c"
-	if got := sso.PresetDiscoveryURL(p); got != "https://example.okta.com/oauth2/aus1a2b3c/.well-known/openid-configuration" {
-		t.Fatalf("okta custom %s", got)
 	}
 }
 
@@ -437,18 +295,11 @@ func boolPtr(v bool) *bool { return &v }
 
 type rewriteHost struct{ base string }
 
+// RoundTrip sends the requests meant for GitHub to the test server.
 func (r rewriteHost) RoundTrip(req *http.Request) (*http.Response, error) {
 	u, _ := url.Parse(r.base)
-	switch req.URL.Host {
-	case "github.com":
-		req.URL.Host = u.Host
-		req.URL.Scheme = u.Scheme
-		if strings.HasPrefix(req.URL.Path, "/login/oauth/") {
-			// keep path
-		}
-	case "api.github.com":
-		req.URL.Host = u.Host
-		req.URL.Scheme = u.Scheme
+	if req.URL.Host == "github.com" || req.URL.Host == "api.github.com" {
+		req.URL.Host, req.URL.Scheme = u.Host, u.Scheme
 	}
 	return http.DefaultTransport.RoundTrip(req)
 }

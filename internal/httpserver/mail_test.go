@@ -53,13 +53,10 @@ func (r *recorder) messages() []smtp.Message {
 	return append([]smtp.Message(nil), r.sent...)
 }
 
-// mailFile is a config file with the [mailer] section of newMailApp and the public URL;
-// host replaces the mail server's host.
-func mailFile(on bool, appURL, host string) *config.Config {
-	return testFile(fmt.Sprintf(`[server]
-app_url = %q
-
-[mailer]
+// mailFile is a config file with the [mailer] section of newMailApp; host replaces the mail
+// server's host.
+func mailFile(on bool, host string) *config.Config {
+	return testFile(fmt.Sprintf(`[mailer]
 enabled = %t
 host = %q
 port = 587
@@ -68,7 +65,7 @@ user = "savvy"
 password = "s3cret-smtp-password"
 from = "Go Savvy <savvy@example.com>"
 timeout = 5
-`, appURL, on, host))
+`, on, host))
 }
 
 // newMailApp is newTestApp with mail configured (a recorder stands in for the
@@ -76,17 +73,23 @@ timeout = 5
 // section.
 func newMailApp(t *testing.T, rec *recorder, opts ...Option) (*testApp, *auth.Issued, *auth.User) {
 	t.Helper()
+	return newMailAppAt(t, testURL, rec, opts...)
+}
+
+// newMailAppAt is newMailApp with the given public URL; "" is a server that has none.
+func newMailAppAt(t *testing.T, appURL string, rec *recorder, opts ...Option) (*testApp, *auth.Issued, *auth.User) {
+	t.Helper()
 	cfg, _ := testConfig(t)
 	st := openTestStore(t, cfg)
-	opts = append([]Option{WithRates(currencydata.NewOffline()), WithConfig(mailFile(rec.on, testURL, "smtp.example.com")), WithMailer(rec)}, opts...)
-	s := newServer(cfg, st, testKeys(t, cfg), opts...)
-	space, err := s.Spaces.Create(context.Background(), "Test", nil)
+	opts = append([]Option{WithRates(currencydata.NewOffline()), WithConfig(mailFile(rec.on, "smtp.example.com")), WithMailer(rec)}, opts...)
+	s := New(cfg.WithAppURL(appURL), st, testKeys(t, cfg), opts...)
+	space, err := servicesOf(s).Spaces.Create(context.Background(), "Test", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ts := httptest.NewServer(s.Handler())
 	t.Cleanup(ts.Close)
-	a := &testApp{t: t, db: st.SQL(), store: st, space: space, srv: ts, s: s, client: ts.Client()}
+	a := &testApp{t: t, db: st.SQL(), store: st, space: space, srv: ts, s: s, svc: servicesOf(s), client: ts.Client()}
 	admin := a.createUser("admin@test.com", "secret1", auth.RoleAdmin)
 	return a, a.issue(admin, false), admin
 }
@@ -126,7 +129,7 @@ func TestMailStatusIsAdminOnlyAndHidesThePassword(t *testing.T) {
 }
 
 func TestMailStatusReportsAConfigProblem(t *testing.T) {
-	a, sess, _ := newMailApp(t, &recorder{}, WithConfig(mailFile(true, testURL, "")))
+	a, sess, _ := newMailApp(t, &recorder{}, WithConfig(mailFile(true, "")))
 	data := decodeJSON(t, a.do("GET", "/api/admin/mail", nil, sess.Token, sess.CSRF))["data"].(map[string]any)
 	if data["enabled"] != false || data["problem"] != "mailer.host is empty" {
 		t.Errorf("status %v", data)
@@ -232,7 +235,7 @@ func TestResetLinkIsNotSentWhenItCannotWork(t *testing.T) {
 	}
 
 	// No public URL: the link would point nowhere.
-	noURL, noURLSess, _ := newMailApp(t, rec, WithConfig(mailFile(rec.on, "", "smtp.example.com")))
+	noURL, noURLSess, _ := newMailAppAt(t, "", rec)
 	other := noURL.createUser("target@test.com", "oldpass12", roleEditor)
 	res := noURL.do("POST", "/api/users/"+itoa(other.ID)+"/password-token", map[string]any{"send": true}, noURLSess.Token, noURLSess.CSRF)
 	if body := decodeJSON(t, res); res.StatusCode != 422 || !strings.Contains(toString(body), "public URL") {
@@ -335,7 +338,7 @@ func TestNewUserEmailNeedsMailAndNoPassword(t *testing.T) {
 func TestNewUserLinkIsRefusedWhenVerificationIsRequired(t *testing.T) {
 	rec := &recorder{on: true}
 	a, sess, admin := newMailApp(t, rec)
-	_ = a.s.Users.SetEmailVerified(context.Background(), admin.ID, true)
+	_ = a.svc.Users.SetEmailVerified(context.Background(), admin.ID, true)
 	_ = settings.Store{DB: a.db}.Set(context.Background(), "require_email_verification", true)
 
 	res := a.do("POST", "/api/users", map[string]any{"name": "New", "email": "new@test.com", "role": "user"}, sess.Token, sess.CSRF)

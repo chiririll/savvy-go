@@ -3,6 +3,7 @@ package httpserver
 import (
 	"context"
 	"net/http"
+	"savvy-go/internal/locator"
 	"strconv"
 	"testing"
 
@@ -16,11 +17,11 @@ import (
 // invitation, and these tests need the link.
 func (a *testApp) invite(spaceID int64, sess *auth.Issued, email, role string) string {
 	a.t.Helper()
-	session, err := a.s.Sessions.Resolve(context.Background(), sess.Token)
+	session, err := a.svc.Sessions.Resolve(context.Background(), sess.Token)
 	if err != nil || session == nil {
 		a.t.Fatalf("inviter: %v", err)
 	}
-	token, _, err := a.s.Spaces.Invite(context.Background(), spaceID, session.User, email, "", role)
+	token, _, err := a.svc.Spaces.Invite(context.Background(), spaceID, session.User, email, "", role)
 	if err != nil {
 		a.t.Fatal(err)
 	}
@@ -29,7 +30,7 @@ func (a *testApp) invite(spaceID int64, sess *auth.Issued, email, role string) s
 
 func memberRole(t *testing.T, a *testApp, spaceID, userID int64) string {
 	t.Helper()
-	role, err := a.s.Spaces.Role(context.Background(), spaceID, userID)
+	role, err := a.svc.Spaces.Role(context.Background(), spaceID, userID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,9 +39,9 @@ func memberRole(t *testing.T, a *testApp, spaceID, userID int64) string {
 
 func userPath(id int64) string { return "/" + strconv.FormatInt(id, 10) }
 
-// P6: an invitation is single use, bound to its email when it has one, and
+// An invitation is single use, bound to its email when it has one, and
 // can be revoked; its preview does not need an account.
-func TestP6InvitationLifecycle(t *testing.T) {
+func TestInvitationLifecycle(t *testing.T) {
 	a := newTestApp(t)
 	admin := a.issue(a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
 	alice := a.createUser("alice@test.com", "secret1", auth.RoleUser)
@@ -76,15 +77,15 @@ func TestP6InvitationLifecycle(t *testing.T) {
 	status(t, a.do("POST", spacePath(a.space.ID, "/invitations"), map[string]any{"role": roleViewer}, as.Token, as.CSRF), 403, "editor invites")
 }
 
-// P7: registering through an invitation from a space admin makes a guest,
+// Registering through an invitation from a space admin makes a guest,
 // from a server admin a user; neither gets a personal space; the server can
 // switch it off.
-func TestP7RegisterThroughInvitation(t *testing.T) {
+func TestRegisterThroughInvitation(t *testing.T) {
 	a := newTestApp(t)
 	ctx := context.Background()
 	serverAdmin := a.issue(a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
 	owner := a.createUser("owner@test.com", "secret1", auth.RoleUser)
-	if err := a.s.Spaces.SetMember(ctx, a.space.ID, owner, spaces.RoleAdmin); err != nil {
+	if err := a.svc.Spaces.SetMember(ctx, a.space.ID, owner, spaces.RoleAdmin); err != nil {
 		t.Fatal(err)
 	}
 	spaceAdmin := a.issue(owner, false)
@@ -96,19 +97,19 @@ func TestP7RegisterThroughInvitation(t *testing.T) {
 	if code, body := register(a.invite(a.space.ID, spaceAdmin, "", roleEditor), "guest@test.com"); code != http.StatusCreated {
 		t.Fatalf("register %d %v", code, body)
 	}
-	guest, _ := a.s.Users.ByEmail(ctx, "guest@test.com")
+	guest, _ := a.svc.Users.ByEmail(ctx, "guest@test.com")
 	if guest.Role != auth.RoleGuest || memberRole(t, a, a.space.ID, guest.ID) != roleEditor {
 		t.Fatalf("guest %+v", guest)
 	}
 	if code, _ := register(a.invite(a.space.ID, serverAdmin, "", roleViewer), "user@test.com"); code != http.StatusCreated {
 		t.Fatal("register through a server admin's invitation")
 	}
-	user, _ := a.s.Users.ByEmail(ctx, "user@test.com")
+	user, _ := a.svc.Users.ByEmail(ctx, "user@test.com")
 	if user.Role != auth.RoleUser {
 		t.Fatalf("role %s", user.Role)
 	}
 	for _, u := range []*auth.User{guest, user} {
-		if mine, _ := a.s.Spaces.ForUser(ctx, u.ID); len(mine) != 1 {
+		if mine, _ := a.svc.Spaces.ForUser(ctx, u.ID); len(mine) != 1 {
 			t.Fatalf("%s is in %d spaces, want only the invited one", u.Email, len(mine))
 		}
 	}
@@ -116,15 +117,15 @@ func TestP7RegisterThroughInvitation(t *testing.T) {
 		t.Fatalf("register with a taken email: %d", code)
 	}
 
-	_ = a.s.Settings.Set(ctx, "space_invites_can_register", false)
+	_ = a.svc.Settings.Set(ctx, "space_invites_can_register", false)
 	if code, _ := register(a.invite(a.space.ID, spaceAdmin, "", roleViewer), "late@test.com"); code != http.StatusForbidden {
 		t.Fatalf("registration closed: %d", code)
 	}
 }
 
-// P8: a guest is never a space admin: not through an invitation, a role
+// A guest is never a space admin: not through an invitation, a role
 // change or the last-admin hand-over; guests cannot create spaces.
-func TestP8GuestNeverSpaceAdmin(t *testing.T) {
+func TestGuestNeverSpaceAdmin(t *testing.T) {
 	a := newTestApp(t)
 	admin := a.createUser("admin@test.com", "secret1", auth.RoleAdmin)
 	as := a.issue(admin, false)
@@ -139,7 +140,7 @@ func TestP8GuestNeverSpaceAdmin(t *testing.T) {
 	// Registering through an admin invitation from a space admin would make
 	// a guest admin.
 	owner := a.createUser("owner@test.com", "secret1", auth.RoleUser)
-	_ = a.s.Spaces.SetMember(context.Background(), a.space.ID, owner, spaces.RoleAdmin)
+	_ = a.svc.Spaces.SetMember(context.Background(), a.space.ID, owner, spaces.RoleAdmin)
 	res := a.do("POST", "/api/invitations/"+a.invite(a.space.ID, a.issue(owner, false), "", spaces.RoleAdmin)+"/register",
 		map[string]any{"name": "N", "email": "n@test.com", "password": "password1"}, "", "")
 	if res.StatusCode != http.StatusUnprocessableEntity {
@@ -148,12 +149,12 @@ func TestP8GuestNeverSpaceAdmin(t *testing.T) {
 	res.Body.Close()
 }
 
-// P9: a server admin cannot demote to guest someone who administers a space.
-func TestP9NoGuestWhileSpaceAdmin(t *testing.T) {
+// A server admin cannot demote to guest someone who administers a space.
+func TestSpaceAdminCannotBeDemotedToGuest(t *testing.T) {
 	a := newTestApp(t)
 	as := a.issue(a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
 	owner := a.createUser("owner@test.com", "secret1", auth.RoleUser)
-	if _, err := a.s.Spaces.Create(context.Background(), "Owned", owner); err != nil {
+	if _, err := a.svc.Spaces.Create(context.Background(), "Owned", owner); err != nil {
 		t.Fatal(err)
 	}
 	status(t, a.do("PATCH", "/api/users"+userPath(owner.ID), map[string]any{"role": auth.RoleGuest}, as.Token, as.CSRF), 422, "demote space admin")
@@ -161,17 +162,17 @@ func TestP9NoGuestWhileSpaceAdmin(t *testing.T) {
 	status(t, a.do("PATCH", "/api/users"+userPath(plain.ID), map[string]any{"role": auth.RoleGuest}, as.Token, as.CSRF), 200, "demote plain user")
 }
 
-// P10: max_spaces_per_user counts admin memberships: creating, accepting an
+// Max_spaces_per_user counts admin memberships: creating, accepting an
 // admin invitation and promotion are refused beyond it; server admins and
 // their assignments are exempt.
-func TestP10SpaceLimit(t *testing.T) {
+func TestSpaceLimit(t *testing.T) {
 	a := newTestApp(t)
 	ctx := context.Background()
 	admin := a.createUser("admin@test.com", "secret1", auth.RoleAdmin)
 	as := a.issue(admin, false)
 	user := a.createUser("user@test.com", "secret1", auth.RoleUser)
 	us := a.issue(user, false)
-	_ = a.s.Settings.Set(ctx, "max_spaces_per_user", 1)
+	_ = a.svc.Settings.Set(ctx, "max_spaces_per_user", 1)
 
 	status(t, a.do("POST", "/api/spaces", map[string]any{"name": "First"}, us.Token, us.CSRF), 201, "first space")
 	status(t, a.do("POST", "/api/spaces", map[string]any{"name": "Second"}, us.Token, us.CSRF), 422, "second space")
@@ -181,23 +182,23 @@ func TestP10SpaceLimit(t *testing.T) {
 	status(t, a.do("POST", "/api/admin/spaces/"+strconv.FormatInt(a.space.ID, 10)+"/admins", map[string]any{"user_id": user.ID}, as.Token, as.CSRF), 204, "server admin assigns")
 	status(t, a.do("POST", "/api/spaces", map[string]any{"name": "Admin's"}, as.Token, as.CSRF), 201, "server admin has no limit")
 
-	_ = a.s.Settings.Set(ctx, "max_spaces_per_user", 0)
+	_ = a.svc.Settings.Set(ctx, "max_spaces_per_user", 0)
 	other := a.issue(a.createUser("other@test.com", "secret1", auth.RoleUser), false)
 	status(t, a.do("POST", "/api/spaces", map[string]any{"name": "None"}, other.Token, other.CSRF), 422, "limit zero")
 }
 
-// P11: a space keeps an admin while it has other members.
-func TestP11LastAdmin(t *testing.T) {
+// A space keeps an admin while it has other members.
+func TestSpaceKeepsItsLastAdmin(t *testing.T) {
 	a := newTestApp(t)
 	ctx := context.Background()
 	owner := a.createUser("owner@test.com", "secret1", auth.RoleUser)
 	os := a.issue(owner, false)
-	space, err := a.s.Spaces.Create(ctx, "Family", owner)
+	space, err := a.svc.Spaces.Create(ctx, "Family", owner)
 	if err != nil {
 		t.Fatal(err)
 	}
 	member := a.createUser("member@test.com", "secret1", auth.RoleUser)
-	_ = a.s.Spaces.SetMember(ctx, space.ID, member, roleEditor)
+	_ = a.svc.Spaces.SetMember(ctx, space.ID, member, roleEditor)
 
 	status(t, a.do("POST", spacePath(space.ID, "/leave"), nil, os.Token, os.CSRF), 422, "last admin leaves")
 	status(t, a.do("PATCH", spacePath(space.ID, "/members"+userPath(owner.ID)), map[string]any{"role": roleEditor}, os.Token, os.CSRF), 422, "last admin demotes")
@@ -211,27 +212,27 @@ func TestP11LastAdmin(t *testing.T) {
 	status(t, a.do("POST", spacePath(space.ID, "/leave"), nil, ms.Token, ms.CSRF), 422, "only member leaves")
 }
 
-// P12, P41: deleting a user tombstones them; spaces they were alone in go
+// Deleting a user tombstones them; spaces they were alone in go
 // with them, leaving a final backup only server admins see.
-func TestP12P41DeleteUserAndTheirSpaces(t *testing.T) {
+func TestDeleteUserAndTheirSpaces(t *testing.T) {
 	a := newTestApp(t)
 	ctx := context.Background()
 	admin := a.issue(a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
 	gone := a.createUser("gone@test.com", "secret1", auth.RoleUser)
 	gs := a.issue(gone, false)
-	alone, err := a.s.Spaces.Create(ctx, "Alone", gone)
+	alone, err := a.svc.Spaces.Create(ctx, "Alone", gone)
 	if err != nil {
 		t.Fatal(err)
 	}
 	status(t, a.inSpace(alone.ID, "POST", "/api/tags", map[string]any{"name": "keepsake"}, gs), 201, "tag")
 
 	status(t, a.do("DELETE", "/api/users"+userPath(gone.ID), nil, admin.Token, admin.CSRF), 204, "delete")
-	u, _ := a.s.Users.ByID(ctx, gone.ID)
+	u, _ := a.svc.Users.ByID(ctx, gone.ID)
 	if u == nil || !u.Deleted || u.Email == "gone@test.com" || u.Password != nil {
 		t.Fatalf("tombstone %+v", u)
 	}
 	status(t, a.do("GET", "/api/spaces", nil, gs.Token, ""), 401, "session revoked")
-	if sp, _ := a.s.Spaces.Get(ctx, alone.ID); sp != nil {
+	if sp, _ := a.svc.Spaces.Get(ctx, alone.ID); sp != nil {
 		t.Fatal("the space the user was alone in survived")
 	}
 	status(t, a.do("GET", "/api/users"+userPath(gone.ID), nil, admin.Token, ""), 404, "deleted user hidden")
@@ -254,15 +255,15 @@ func TestP12P41DeleteUserAndTheirSpaces(t *testing.T) {
 	}
 }
 
-// P5: the overview shows every space's metadata, never its data; a server
+// The overview shows every space's metadata, never its data; a server
 // admin outside a space cannot read it.
-func TestP5AdminOverviewIsMetadataOnly(t *testing.T) {
+func TestAdminOverviewIsMetadataOnly(t *testing.T) {
 	a := newTestApp(t)
 	ctx := context.Background()
 	admin := a.createUser("admin@test.com", "secret1", auth.RoleAdmin)
 	as := a.issue(admin, false)
 	owner := a.createUser("owner@test.com", "secret1", auth.RoleUser)
-	private, _ := a.s.Spaces.Create(ctx, "Private", owner)
+	private, _ := a.svc.Spaces.Create(ctx, "Private", owner)
 
 	status(t, a.inSpace(private.ID, "GET", "/api/accounts", nil, as), 404, "server admin reads data")
 	list := decodeJSON(t, a.do("GET", "/api/admin/spaces", nil, as.Token, ""))["data"].([]any)
@@ -284,14 +285,14 @@ func TestP5AdminOverviewIsMetadataOnly(t *testing.T) {
 	status(t, a.do("GET", "/api/admin/spaces", nil, user.Token, ""), 403, "non-admin overview")
 }
 
-// P53: what a server admin does to a space is in the space's audit log.
-func TestP53AdminActionsAreAudited(t *testing.T) {
+// What a server admin does to a space is in the space's audit log.
+func TestAdminActionsAreAudited(t *testing.T) {
 	a := newTestApp(t)
 	ctx := context.Background()
 	admin := a.createUser("admin@test.com", "secret1", auth.RoleAdmin)
 	as := a.issue(admin, false)
 	owner := a.createUser("owner@test.com", "secret1", auth.RoleUser)
-	space, _ := a.s.Spaces.Create(ctx, "Watched", owner)
+	space, _ := a.svc.Spaces.Create(ctx, "Watched", owner)
 	os := a.issue(owner, false)
 
 	id := strconv.FormatInt(space.ID, 10)
@@ -305,17 +306,17 @@ func TestP53AdminActionsAreAudited(t *testing.T) {
 	if !actions["assign_admin"] || !actions["set_quota"] {
 		t.Fatalf("audit %v", log)
 	}
-	if q := a.s.Spaces.Quota(ctx, space.ID); q != 10<<20 {
+	if q := a.svc.Spaces.Quota(ctx, space.ID); q != 10<<20 {
 		t.Fatalf("quota %d", q)
 	}
 }
 
-// P42: a broken space is a 503 for its members and a 404 for everyone else.
-func TestP42UnavailableSpaceIsHiddenFromOutsiders(t *testing.T) {
+// A broken space is a 503 for its members and a 404 for everyone else.
+func TestUnavailableSpaceIsHiddenFromOutsiders(t *testing.T) {
 	a := newTestApp(t)
 	member := a.issue(a.createUser("m@test.com", "secret1", roleViewer), false)
 	outsider := a.issue(a.createUser("o@test.com", "secret1", auth.RoleUser), false)
-	a.s.Store = unavailableStore{a.store, a.space.ID}
+	locator.Set[store.Store](a.s.loc, unavailableStore{a.store, a.space.ID})
 	*a.s.guard = *a.s.newGuard() // the guard copied the store
 	status(t, a.do("GET", "/api/tags", nil, member.Token, ""), 503, "member")
 	status(t, a.do("GET", "/api/tags", nil, outsider.Token, ""), 404, "outsider")
@@ -326,9 +327,9 @@ func TestSpaceRenameAndDelete(t *testing.T) {
 	ctx := context.Background()
 	owner := a.createUser("owner@test.com", "secret1", auth.RoleUser)
 	os := a.issue(owner, false)
-	space, _ := a.s.Spaces.Create(ctx, "Old", owner)
+	space, _ := a.svc.Spaces.Create(ctx, "Old", owner)
 	viewer := a.createUser("v@test.com", "secret1", auth.RoleUser)
-	_ = a.s.Spaces.SetMember(ctx, space.ID, viewer, roleViewer)
+	_ = a.svc.Spaces.SetMember(ctx, space.ID, viewer, roleViewer)
 	vs := a.issue(viewer, false)
 
 	status(t, a.do("PATCH", spacePath(space.ID, ""), map[string]any{"name": "New"}, vs.Token, vs.CSRF), 403, "viewer renames")
@@ -359,9 +360,9 @@ func (u unavailableStore) Space(ctx context.Context, id int64) (store.DB, error)
 	return u.Store.Space(ctx, id)
 }
 
-// P16: a registered space without a database and a database without a
+// A registered space without a database and a database without a
 // registered space are both reported, never silently dropped.
-func TestP16ReconcileRegistryAndFiles(t *testing.T) {
+func TestReconcileRegistryAndFiles(t *testing.T) {
 	a := newTestApp(t)
 	ctx := context.Background()
 	admin := a.issue(a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
@@ -371,7 +372,7 @@ func TestP16ReconcileRegistryAndFiles(t *testing.T) {
 	if err := a.store.CreateSpace(ctx, 901); err != nil {
 		t.Fatal(err)
 	}
-	missing, orphans, err := a.s.Spaces.Reconcile(ctx)
+	missing, orphans, err := a.svc.Spaces.Reconcile(ctx)
 	if err != nil || len(missing) != 1 || missing[0] != 900 || len(orphans) != 1 || orphans[0] != 901 {
 		t.Fatalf("reconcile %v %v %v", missing, orphans, err)
 	}
