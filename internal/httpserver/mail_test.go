@@ -76,7 +76,7 @@ func newMailApp(t *testing.T, rec *recorder) (*testApp, *auth.Issued, *auth.User
 	cfg.Live = loaded.Live
 	st := openTestStore(t, cfg)
 	s := New(cfg, st, testKeys(t, cfg), WithRates(currencydata.NewOffline()), WithMailer(rec))
-	space, err := s.spaces.Create(context.Background(), "Test", nil)
+	space, err := s.Spaces.Create(context.Background(), "Test", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,7 +124,7 @@ func TestMailStatusIsAdminOnlyAndHidesThePassword(t *testing.T) {
 func TestMailStatusReportsAConfigProblem(t *testing.T) {
 	rec := &recorder{}
 	a, sess, _ := newMailApp(t, rec)
-	a.s.mail.SetProblem("mailer.host is empty")
+	a.s.Mail.SetProblem("mailer.host is empty")
 	data := decodeJSON(t, a.do("GET", "/api/admin/mail", nil, sess.Token, sess.CSRF))["data"].(map[string]any)
 	if data["enabled"] != false || data["problem"] != "mailer.host is empty" {
 		t.Errorf("status %v", data)
@@ -164,7 +164,7 @@ func TestMailSettingsSaveApplyAndPersist(t *testing.T) {
 	a, sess, _ := newMailApp(t, &recorder{})
 	next := &recorder{on: true}
 	var built mailer.Config
-	a.s.mail.NewMailer = func(c mailer.Config) mailer.Mailer { built = c; return next }
+	a.s.Mail.NewMailer = func(c mailer.Config) mailer.Mailer { built = c; return next }
 
 	res := a.do("PUT", "/api/admin/mail", mailForm(nil), sess.Token, sess.CSRF)
 	raw := decodeJSON(t, res)
@@ -192,7 +192,7 @@ func TestMailSettingsSaveApplyAndPersist(t *testing.T) {
 	}
 
 	// And it is on disk, so a restart keeps it.
-	again, err := config.Load(filepath.Join(a.s.cfg.DataDir, "config.toml"))
+	again, err := config.Load(filepath.Join(a.s.Cfg.DataDir, "config.toml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -208,7 +208,7 @@ func TestMailSettingsSaveApplyAndPersist(t *testing.T) {
 func TestMailSettingsKeepThePasswordWhenOmitted(t *testing.T) {
 	a, sess, _ := newMailApp(t, &recorder{on: true})
 	var built mailer.Config
-	a.s.mail.NewMailer = func(c mailer.Config) mailer.Mailer { built = c; return &recorder{on: c.Enabled} }
+	a.s.Mail.NewMailer = func(c mailer.Config) mailer.Mailer { built = c; return &recorder{on: c.Enabled} }
 
 	form := mailForm(nil)
 	delete(form, "password")
@@ -236,7 +236,7 @@ func TestMailSettingsKeepThePasswordWhenOmitted(t *testing.T) {
 
 func TestMailSettingsRejectAMistakeAndChangeNothing(t *testing.T) {
 	a, sess, _ := newMailApp(t, &recorder{on: true})
-	path := filepath.Join(a.s.cfg.DataDir, "config.toml")
+	path := filepath.Join(a.s.Cfg.DataDir, "config.toml")
 	before, _ := os.ReadFile(path)
 
 	for name, over := range map[string]map[string]any{
@@ -280,18 +280,18 @@ func TestMailSettingsCanSwitchMailOffAndKeepTheValues(t *testing.T) {
 func TestMailSettingsOnAReadOnlyConfig(t *testing.T) {
 	a, sess, _ := newMailApp(t, &recorder{on: true})
 	// Same trick as the config tests: a directory where the temp file goes.
-	if err := os.Mkdir(filepath.Join(a.s.cfg.DataDir, "ro"), 0o755); err != nil {
+	if err := os.Mkdir(filepath.Join(a.s.Cfg.DataDir, "ro"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Mkdir(filepath.Join(a.s.cfg.DataDir, "ro", "config.toml.tmp"), 0o755); err != nil {
+	if err := os.Mkdir(filepath.Join(a.s.Cfg.DataDir, "ro", "config.toml.tmp"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	loaded, err := config.Load(filepath.Join(a.s.cfg.DataDir, "ro", "config.toml"))
+	loaded, err := config.Load(filepath.Join(a.s.Cfg.DataDir, "ro", "config.toml"))
 	if err != nil || loaded.Live.Writable() {
 		t.Fatalf("setup: %v writable=%v", err, loaded.Live.Writable())
 	}
-	a.s.cfg.Live = loaded.Live
-	a.s.mail.UseConfig(a.s.cfg)
+	a.s.Cfg.Live = loaded.Live
+	a.s.Mail.UseConfig(a.s.Cfg)
 
 	data := decodeJSON(t, a.do("GET", "/api/admin/mail", nil, sess.Token, sess.CSRF))["data"].(map[string]any)
 	if data["writable"] != false {
@@ -403,11 +403,11 @@ func TestResetLinkIsNotSentWhenItCannotWork(t *testing.T) {
 	}
 
 	// No public URL: the link would point nowhere.
-	_ = a.s.cfg.Live.SetAppURL("")
+	_ = a.s.Cfg.Live.SetAppURL("")
 	if code, body := send(target.ID); code != 422 || !strings.Contains(toString(body), "public URL") {
 		t.Errorf("no app_url: %d %v", code, body)
 	}
-	_ = a.s.cfg.Live.SetAppURL("http://localhost:8080")
+	_ = a.s.Cfg.Live.SetAppURL("http://localhost:8080")
 
 	// Password sign-in switched off in favour of SSO.
 	insertSSO(t, a.db, true)
@@ -505,7 +505,7 @@ func TestNewUserEmailNeedsMailAndNoPassword(t *testing.T) {
 func TestNewUserLinkIsRefusedWhenVerificationIsRequired(t *testing.T) {
 	rec := &recorder{on: true}
 	a, sess, admin := newMailApp(t, rec)
-	_ = a.s.users.SetEmailVerified(context.Background(), admin.ID, true)
+	_ = a.s.Users.SetEmailVerified(context.Background(), admin.ID, true)
 	_ = settings.Store{DB: a.db}.Set(context.Background(), "require_email_verification", true)
 
 	res := a.do("POST", "/api/users", map[string]any{"name": "New", "email": "new@test.com", "role": "user"}, sess.Token, sess.CSRF)

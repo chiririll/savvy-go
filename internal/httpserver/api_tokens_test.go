@@ -59,7 +59,7 @@ func (a *testApp) issueToken(u *auth.User, scope string, exp *time.Time) (string
 
 func (a *testApp) issueGrant(u *auth.User, g auth.Grant, exp *time.Time) (string, *auth.APIToken) {
 	a.t.Helper()
-	raw, tok, err := a.s.apiTokens.Issue(context.Background(), u, "app", g, exp)
+	raw, tok, err := a.s.APITokens.Issue(context.Background(), u, "app", g, exp)
 	if err != nil {
 		a.t.Fatal(err)
 	}
@@ -192,7 +192,7 @@ func TestAPITokensDeletedWithUser(t *testing.T) {
 	if _, err := a.db.Exec(`PRAGMA foreign_keys = ON`); err != nil {
 		t.Fatal(err)
 	}
-	if err := a.s.users.Delete(context.Background(), u.ID); err != nil {
+	if err := a.s.Users.Delete(context.Background(), u.ID); err != nil {
 		t.Fatal(err)
 	}
 	var n int
@@ -223,7 +223,7 @@ func TestAPITokenDemotedUserLosesWrite(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("rw@a.com", "secret1", roleEditor)
 	raw, _ := a.issueToken(u, tokReadWrite, nil)
-	if err := a.s.spaces.SetMember(context.Background(), a.space.ID, u, roleViewer); err != nil {
+	if err := a.s.Spaces.SetMember(context.Background(), a.space.ID, u, roleViewer); err != nil {
 		t.Fatal(err)
 	}
 
@@ -304,7 +304,7 @@ func TestAPITokenLimit(t *testing.T) {
 	sess := a.issue(u, false)
 
 	status(t, a.do("POST", "/api/auth/api-tokens", map[string]any{"name": "51st"}, sess.Token, sess.CSRF), 422, "over limit")
-	if _, _, err := a.s.apiTokens.Issue(context.Background(), u, "x", auth.Grant{Permissions: allPerms(auth.PermRead), AllSpaces: true}, nil); err != auth.ErrTokenLimit {
+	if _, _, err := a.s.APITokens.Issue(context.Background(), u, "x", auth.Grant{Permissions: allPerms(auth.PermRead), AllSpaces: true}, nil); err != auth.ErrTokenLimit {
 		t.Fatalf("issue over limit: %v", err)
 	}
 }

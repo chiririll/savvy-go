@@ -7,7 +7,7 @@ import (
 
 	"savvy-go/internal/httpserver/emailverify"
 	"savvy-go/internal/httpserver/routing"
-	"savvy-go/internal/httpserver/spacefill"
+	"savvy-go/internal/spacefill"
 )
 
 //go:embed openapi.yaml

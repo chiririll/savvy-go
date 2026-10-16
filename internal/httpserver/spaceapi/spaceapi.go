@@ -12,9 +12,9 @@ import (
 	"savvy-go/internal/httpserver/api"
 	"savvy-go/internal/httpserver/emailverify"
 	"savvy-go/internal/httpserver/guard"
-	"savvy-go/internal/httpserver/mailing"
 	"savvy-go/internal/httpserver/signin"
-	"savvy-go/internal/httpserver/spacefill"
+	"savvy-go/internal/mailing"
+	"savvy-go/internal/spacefill"
 	"savvy-go/internal/spaces"
 	"savvy-go/internal/store"
 )

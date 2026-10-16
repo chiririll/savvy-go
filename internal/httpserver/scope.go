@@ -20,7 +20,7 @@ func (s *Server) newScope(id int64, role string, d store.DB) *api.SpaceScope {
 		Role:       role,
 		DB:         d,
 		Settings:   settings.Store{DB: d, Space: true},
-		Currencies: ledger.Currencies{DB: d, Source: s.rates},
+		Currencies: ledger.Currencies{DB: d, Source: s.Rates},
 		Accounts:   accounts,
 		Categories: ledger.Categories{DB: d},
 		Tags:       ledger.Tags{DB: d},
@@ -29,19 +29,19 @@ func (s *Server) newScope(id int64, role string, d store.DB) *api.SpaceScope {
 		Recurring:  recurring.Service{DB: d, Txs: txs},
 		Budgets:    ledger.Budgets{DB: d},
 		Automation: automation.Service{DB: d, Txs: txs},
-		Reports:    reports.Service{DB: d, Loc: s.cfg.Location},
-		Imports:    importer.Service{DB: d, Uploads: s.uploads, Txs: txs},
+		Reports:    reports.Service{DB: d, Loc: s.Cfg.Location},
+		Imports:    importer.Service{DB: d, Uploads: s.Uploads, Txs: txs},
 	}
 }
 
 func (s *Server) newGuard() *guard.Guard {
 	return &guard.Guard{
-		Cfg:           s.cfg,
-		Sessions:      s.sessions,
-		APITokens:     s.apiTokens,
+		Cfg:           s.Cfg,
+		Sessions:      s.Sessions,
+		APITokens:     s.APITokens,
 		EmailRequired: s.login.EmailRequired,
 		Space: guard.SpaceDeps{
-			Spaces: s.spaces, Store: s.store, Refsync: s.refsync, NewScope: s.newScope,
+			Spaces: s.Spaces, Store: s.Store, Refsync: s.Refsync, NewScope: s.newScope,
 		},
 	}
 }

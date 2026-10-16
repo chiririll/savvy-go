@@ -43,7 +43,7 @@ func (a *testApp) registerClient(redirects ...string) string {
 	if len(redirects) == 0 {
 		redirects = []string{oauthRedirect}
 	}
-	a.s.oauth.OpenRegistration(oauth.RegistrationWindow)
+	a.s.OAuth.OpenRegistration(oauth.RegistrationWindow)
 	raw, _ := json.Marshal(map[string]any{"client_name": "Claude", "redirect_uris": redirects})
 	res, err := a.client.Post(a.srv.URL+"/oauth/register", "application/json", bytes.NewReader(raw))
 	if err != nil {
@@ -134,7 +134,7 @@ func TestOAuthMetadata(t *testing.T) {
 	if _, closed := func() (int, map[string]any) { return a.getJSON("/.well-known/oauth-authorization-server") }(); closed["registration_endpoint"] != nil {
 		t.Fatalf("closed registration is advertised: %v", closed)
 	}
-	a.s.oauth.OpenRegistration(oauth.RegistrationWindow)
+	a.s.OAuth.OpenRegistration(oauth.RegistrationWindow)
 	code, as := a.getJSON("/.well-known/oauth-authorization-server")
 	if code != 200 || as["issuer"] != "http://localhost:8080" ||
 		as["authorization_endpoint"] != "http://localhost:8080/oauth/authorize" ||
@@ -166,7 +166,7 @@ func TestOAuthNeedsAppURL(t *testing.T) {
 
 func TestOAuthRegisterRejectsBadRedirects(t *testing.T) {
 	a := newTestApp(t)
-	a.s.oauth.OpenRegistration(oauth.RegistrationWindow)
+	a.s.OAuth.OpenRegistration(oauth.RegistrationWindow)
 	for _, uris := range [][]string{{}, {"http://evil.example/cb"}, {"javascript:alert(1)"}} {
 		raw, _ := json.Marshal(map[string]any{"client_name": "X", "redirect_uris": uris})
 		res, _ := a.client.Post(a.srv.URL+"/oauth/register", "application/json", bytes.NewReader(raw))
@@ -370,7 +370,7 @@ func TestOnlyAdminSessionsControlRegistration(t *testing.T) {
 	admin := a.createUser("admin@a.com", "secret1", "admin")
 	raw, _ := a.issueToken(admin, "read-write", nil)
 	status(t, a.bearer("POST", "/api/admin/oauth/registration", nil, raw), http.StatusForbidden, "an admin's API token")
-	if _, open := a.s.oauth.RegistrationOpenUntil(); open {
+	if _, open := a.s.OAuth.RegistrationOpenUntil(); open {
 		t.Fatal("a refused request opened registration")
 	}
 }
@@ -378,7 +378,7 @@ func TestOnlyAdminSessionsControlRegistration(t *testing.T) {
 func TestAdminSeesWhereTheRegistrationCameFrom(t *testing.T) {
 	a := newTestApp(t)
 	admin := a.issue(a.createUser("admin@a.com", "secret1", "admin"), false)
-	a.s.oauth.OpenRegistration(oauth.RegistrationWindow)
+	a.s.OAuth.OpenRegistration(oauth.RegistrationWindow)
 	raw, _ := json.Marshal(map[string]any{"client_name": "Claude", "redirect_uris": []string{oauthRedirect}})
 	req, _ := http.NewRequest("POST", a.srv.URL+"/oauth/register", bytes.NewReader(raw))
 	req.Header.Set("Content-Type", "application/json")

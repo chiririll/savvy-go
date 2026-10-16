@@ -81,7 +81,7 @@ func TestTokenPermissionsAreCheckedPerResource(t *testing.T) {
 func TestTokenReachesOnlyItsSpaces(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("two@a.com", "secret1", roleEditor)
-	other, err := a.s.spaces.Create(context.Background(), "Other", u)
+	other, err := a.s.Spaces.Create(context.Background(), "Other", u)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,7 +140,7 @@ func TestCreateTokenKeepsTheChosenSpaces(t *testing.T) {
 func TestOAuthConsentChoosesTheSpaces(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("oauth@a.com", "secret1", roleEditor)
-	other, err := a.s.spaces.Create(context.Background(), "Other", u)
+	other, err := a.s.Spaces.Create(context.Background(), "Other", u)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -283,10 +283,10 @@ func TestTokenKindComesFromHowItWasMade(t *testing.T) {
 	}
 
 	// Only the OAuth flow makes a connection; Issue with that kind holds it to the tools' parts.
-	if _, _, err := a.s.apiTokens.Issue(context.Background(), u, "app", auth.Grant{Kind: auth.TokenMCP, Permissions: []string{"transfers:read"}, AllSpaces: true}, nil); err == nil {
+	if _, _, err := a.s.APITokens.Issue(context.Background(), u, "app", auth.Grant{Kind: auth.TokenMCP, Permissions: []string{"transfers:read"}, AllSpaces: true}, nil); err == nil {
 		t.Fatal("a connection must not be given a part its tools do not use")
 	}
-	if _, _, err := a.s.apiTokens.Issue(context.Background(), u, "app", auth.Grant{Kind: auth.TokenMCP, Permissions: []string{"tags:write"}, AllSpaces: true}, nil); err != nil {
+	if _, _, err := a.s.APITokens.Issue(context.Background(), u, "app", auth.Grant{Kind: auth.TokenMCP, Permissions: []string{"tags:write"}, AllSpaces: true}, nil); err != nil {
 		t.Fatalf("a connection with a part its tools use: %v", err)
 	}
 }

@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"savvy-go/internal/config"
 	"savvy-go/internal/httpserver/api"
-	"savvy-go/internal/httpserver/mailing"
+	"savvy-go/internal/mailing"
 
 	"savvy-go/internal/auth"
 	"savvy-go/internal/mailer"

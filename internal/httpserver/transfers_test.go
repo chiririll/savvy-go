@@ -53,11 +53,11 @@ func newPair(t *testing.T) *pair {
 	a := newTestApp(t)
 	ctx := context.Background()
 	owner := a.createUser("owner@test.com", "secret1", auth.RoleUser)
-	A, err := a.s.spaces.Create(ctx, "Personal", owner)
+	A, err := a.s.Spaces.Create(ctx, "Personal", owner)
 	if err != nil {
 		t.Fatal(err)
 	}
-	B, err := a.s.spaces.Create(ctx, "Family", owner)
+	B, err := a.s.Spaces.Create(ctx, "Family", owner)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,7 +167,7 @@ func TestP30OtherSideAccountIsPrivate(t *testing.T) {
 	p := newPair(t)
 	id := p.send("5", "5")
 	bob := p.a.createUser("bob@test.com", "secret1", auth.RoleUser)
-	_ = p.a.s.spaces.SetMember(context.Background(), p.B.ID, bob, spaces.RoleViewer)
+	_ = p.a.s.Spaces.SetMember(context.Background(), p.B.ID, bob, spaces.RoleViewer)
 	bs := p.a.issue(bob, false)
 	seen := p.transfers(p.B.ID, bs)[id]
 	from := seen["from"].(map[string]any)
@@ -189,9 +189,9 @@ func TestP52LinkRights(t *testing.T) {
 	p := newPair(t)
 	ctx := context.Background()
 	other := p.a.createUser("other@test.com", "secret1", auth.RoleUser)
-	C, _ := p.a.s.spaces.Create(ctx, "Theirs", other)
+	C, _ := p.a.s.Spaces.Create(ctx, "Theirs", other)
 	status(t, p.a.do("POST", spacePath(p.A.ID, "/links"), map[string]any{"target_space_id": C.ID}, p.sess.Token, p.sess.CSRF), 404, "not a member of the target")
-	_ = p.a.s.spaces.SetMember(ctx, C.ID, p.owner, spaces.RoleEditor)
+	_ = p.a.s.Spaces.SetMember(ctx, C.ID, p.owner, spaces.RoleEditor)
 	status(t, p.a.do("POST", spacePath(p.A.ID, "/links"), map[string]any{"target_space_id": C.ID}, p.sess.Token, p.sess.CSRF), 403, "editor of the target")
 	status(t, p.a.do("POST", spacePath(p.A.ID, "/links"), map[string]any{"target_space_id": p.A.ID}, p.sess.Token, p.sess.CSRF), 422, "link to itself")
 
@@ -233,7 +233,7 @@ func TestP28UnlinkFreezesRelinkSyncs(t *testing.T) {
 func TestP29TransferBlockedByQuotaWritesNothing(t *testing.T) {
 	p := newPair(t)
 	ctx := context.Background()
-	if err := p.a.s.spaces.SetQuota(ctx, p.owner, p.B.ID, 1); err != nil {
+	if err := p.a.s.Spaces.SetQuota(ctx, p.owner, p.B.ID, 1); err != nil {
 		t.Fatal(err)
 	}
 	var code int
@@ -331,7 +331,7 @@ func TestP24RestoreReviewsTransfers(t *testing.T) {
 
 	// A member without rights in B can only take B's version.
 	viewer := p.a.createUser("v@test.com", "secret1", auth.RoleUser)
-	_ = p.a.s.spaces.SetMember(context.Background(), p.A.ID, viewer, spaces.RoleEditor)
+	_ = p.a.s.Spaces.SetMember(context.Background(), p.A.ID, viewer, spaces.RoleEditor)
 	vs := p.a.issue(viewer, false)
 	status(t, p.a.do("POST", spacePath(p.A.ID, "/transfers/"+changed+"/reject"), nil, vs.Token, vs.CSRF), 403, "reject without rights in B")
 
@@ -358,16 +358,16 @@ func TestP24ReviewMarkSurvivesCrash(t *testing.T) {
 	backup := p.backupA()
 	created := p.send("8", "8")
 	ctx := context.Background()
-	space, _ := p.a.s.spaces.Get(ctx, p.A.ID)
+	space, _ := p.a.s.Spaces.Get(ctx, p.A.ID)
 
 	// Restore without the review merge, as if the process died right after
 	// the swap: the mark is in the file.
-	b := p.a.s.backups
+	b := p.a.s.Backups
 	b.Transfers = nil
 	if err := b.RestoreSpace(ctx, *space, backup, 0); err != nil {
 		t.Fatal(err)
 	}
-	if err := p.a.s.transfers.SyncAll(ctx); err != nil {
+	if err := p.a.s.Transfers.SyncAll(ctx); err != nil {
 		t.Fatal(err)
 	}
 	if tr := p.transfers(p.A.ID, p.sess)[created]; tr == nil || tr["status"] != "pending" {
@@ -447,7 +447,7 @@ func TestP37ForgedBackupCannotReachOtherSpace(t *testing.T) {
 	real := p.send("5", "5")
 	backup := p.backupA()
 	uuidA, uuidB := p.A.UUID, p.B.UUID
-	forged := forgeBackup(t, p.a.s.backups.SpacePath(p.A.ID, backup),
+	forged := forgeBackup(t, p.a.s.Backups.SpacePath(p.A.ID, backup),
 		`UPDATE space_transfers SET version = 99, from_amount = 1 WHERE uuid = '`+real+`'`,
 		`INSERT INTO space_transfers (uuid, from_space_uuid, from_account_id, from_amount, from_currency, from_decimals,
 			to_space_uuid, to_account_id, to_amount, to_currency, to_decimals, date, version, signer_kid, signature)
@@ -477,7 +477,7 @@ func TestP37ForgedBackupCannotReachOtherSpace(t *testing.T) {
 	}
 	status(t, p.a.do("POST", spacePath(p.A.ID, "/transfers/forged/reject"), nil, p.sess.Token, p.sess.CSRF), 422, "push forged")
 	status(t, p.a.do("POST", spacePath(p.A.ID, "/transfers/"+real+"/reject"), nil, p.sess.Token, p.sess.CSRF), 422, "push raised version")
-	if err := p.a.s.transfers.SyncAll(context.Background()); err != nil {
+	if err := p.a.s.Transfers.SyncAll(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	if _, ok := p.transfers(p.B.ID, p.sess)["forged"]; ok || p.balance(p.B.ID, p.accB) != bBefore {
@@ -551,10 +551,10 @@ func TestP45ServerMovesWithItsKey(t *testing.T) {
 	admin := p.a.issue(p.a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
 	id := p.send("6", "6")
 	b := createdBackup(t, p.a.do("POST", "/api/backups", map[string]any{}, admin.Token, admin.CSRF))
-	content, _ := os.ReadFile(p.a.s.backups.ServerPath(b["filename"].(string)))
+	content, _ := os.ReadFile(p.a.s.Backups.ServerPath(b["filename"].(string)))
 
 	fresh := newTestApp(t)
-	if fresh.s.keys.Key().KID() == p.a.s.keys.Key().KID() {
+	if fresh.s.Keys.Key().KID() == p.a.s.Keys.Key().KID() {
 		t.Fatal("the test servers share a key")
 	}
 	fa := fresh.issue(fresh.createUser("admin@new.test", "secret1", auth.RoleAdmin), false)
@@ -564,10 +564,10 @@ func TestP45ServerMovesWithItsKey(t *testing.T) {
 		t.Fatalf("restore %d %v", res.StatusCode, decodeJSON(t, res))
 	}
 	res.Body.Close()
-	if fresh.s.keys.Key().KID() != p.a.s.keys.Key().KID() {
+	if fresh.s.Keys.Key().KID() != p.a.s.Keys.Key().KID() {
 		t.Fatal("the restored server does not use the backup's key")
 	}
-	list, err := fresh.s.transfers.List(context.Background(), p.A.ID)
+	list, err := fresh.s.Transfers.List(context.Background(), p.A.ID)
 	if err != nil || len(list) != 1 || list[0].UUID != id || !list[0].Verified || list[0].Frozen {
 		t.Fatalf("transfers after the move %+v %v", list, err)
 	}

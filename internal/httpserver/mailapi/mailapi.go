@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"savvy-go/internal/httpserver/api"
-	"savvy-go/internal/httpserver/mailing"
 	"savvy-go/internal/mailer"
+	"savvy-go/internal/mailing"
 )
 
 // Handler is the admin's view of the mail settings.

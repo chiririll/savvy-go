@@ -33,10 +33,10 @@ func (a *testApp) postInvite(sess *auth.Issued, spaceID int64, email string) (in
 // has confirmed their own address.
 func (a *testApp) requireVerification(admin *auth.User) {
 	a.t.Helper()
-	if err := a.s.users.SetEmailVerified(context.Background(), admin.ID, true); err != nil {
+	if err := a.s.Users.SetEmailVerified(context.Background(), admin.ID, true); err != nil {
 		a.t.Fatal(err)
 	}
-	if err := a.s.settings.Set(context.Background(), "require_email_verification", true); err != nil {
+	if err := a.s.Settings.Set(context.Background(), "require_email_verification", true); err != nil {
 		a.t.Fatal(err)
 	}
 }
@@ -52,11 +52,11 @@ func (a *testApp) invitationRows() int {
 
 func (a *testApp) secondSpace() int64 {
 	a.t.Helper()
-	admin, err := a.s.users.ByEmail(context.Background(), "admin@test.com")
+	admin, err := a.s.Users.ByEmail(context.Background(), "admin@test.com")
 	if err != nil || admin == nil {
 		a.t.Fatalf("admin: %v", err)
 	}
-	sp, err := a.s.spaces.Create(context.Background(), "Other", admin)
+	sp, err := a.s.Spaces.Create(context.Background(), "Other", admin)
 	if err != nil {
 		a.t.Fatal(err)
 	}
@@ -161,7 +161,7 @@ func TestRegisteringThroughAnEmailedInvitationVerifiesTheAddress(t *testing.T) {
 		t.Fatalf("register: %d %v", res.StatusCode, decodeJSON(t, res))
 	}
 	res.Body.Close()
-	u, _ := a.s.users.ByEmail(context.Background(), "bob@example.org")
+	u, _ := a.s.Users.ByEmail(context.Background(), "bob@example.org")
 	if u == nil || !a.verified(u.ID) {
 		t.Fatal("registering from the emailed link left the address unverified")
 	}
@@ -214,7 +214,7 @@ func TestLinkInvitationRegistrationAsksEmailConfirmation(t *testing.T) {
 		t.Fatalf("register: %d %v", res.StatusCode, decodeJSON(t, res))
 	}
 	res.Body.Close()
-	u, _ := a.s.users.ByEmail(context.Background(), "carol@example.org")
+	u, _ := a.s.Users.ByEmail(context.Background(), "carol@example.org")
 	if u == nil || a.verified(u.ID) {
 		t.Fatalf("a link nobody mailed proved an address: %+v", u)
 	}
@@ -329,7 +329,7 @@ func TestPruningEndsTheCooldownOfOldRowsOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	n, err := a.s.spaces.PruneInvitations(ctx)
+	n, err := a.s.Spaces.PruneInvitations(ctx)
 	if err != nil || n != 1 {
 		t.Fatalf("pruned %d, %v; want only the row that expired two hours ago", n, err)
 	}

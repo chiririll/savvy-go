@@ -12,8 +12,8 @@ import (
 	"savvy-go/internal/auth"
 	"savvy-go/internal/httpserver/api"
 	"savvy-go/internal/httpserver/dto"
-	"savvy-go/internal/httpserver/mailing"
 	"savvy-go/internal/mailer"
+	"savvy-go/internal/mailing"
 	"savvy-go/internal/spaces"
 
 	"github.com/go-chi/chi/v5"

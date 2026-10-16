@@ -43,11 +43,11 @@ func serverBackupFile(t *testing.T) []byte {
 	t.Helper()
 	src := newTestApp(t)
 	src.createUser("ada@source.com", "secret1", auth.RoleAdmin)
-	entry, err := src.s.backups.CreateServer(context.Background(), nil)
+	entry, err := src.s.Backups.CreateServer(context.Background(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw, err := os.ReadFile(src.s.backups.ServerPath(entry.Filename))
+	raw, err := os.ReadFile(src.s.Backups.ServerPath(entry.Filename))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +108,7 @@ func TestFailedFirstRunRestoreKeepsThePasswordValid(t *testing.T) {
 	if n := userCount(t, a); n != 0 {
 		t.Fatalf("%d users after failed restores", n)
 	}
-	if list, _ := a.s.backups.ServerBackups(); len(list) != 0 {
+	if list, _ := a.s.Backups.ServerBackups(); len(list) != 0 {
 		t.Fatalf("failed restores left backups behind: %+v", list)
 	}
 }
@@ -123,13 +123,13 @@ func TestFirstRunRestoreLoadsTheBackupAndClosesSetup(t *testing.T) {
 	}
 	res.Body.Close()
 
-	if u, _ := a.s.users.ByEmail(context.Background(), "ada@source.com"); u == nil || u.Role != auth.RoleAdmin {
+	if u, _ := a.s.Users.ByEmail(context.Background(), "ada@source.com"); u == nil || u.Role != auth.RoleAdmin {
 		t.Fatalf("restored admin %+v", u)
 	}
 	if a.bootstrap.Active() {
 		t.Fatal("password still valid after the restore")
 	}
-	if _, err := os.Stat(filepath.Join(a.s.cfg.DataDir, bootstrap.FileName)); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(a.s.Cfg.DataDir, bootstrap.FileName)); !os.IsNotExist(err) {
 		t.Fatalf("password file still there: %v", err)
 	}
 	body := decodeJSON(t, a.do("GET", "/api/auth/status", nil, "", ""))
@@ -152,7 +152,7 @@ func TestFirstRunRestoreOfALaravelDatabase(t *testing.T) {
 		t.Fatalf("restore %d %v", res.StatusCode, decodeJSON(t, res))
 	}
 	res.Body.Close()
-	if u, _ := a.s.users.ByEmail(context.Background(), "ada@example.com"); u == nil || u.Role != auth.RoleAdmin {
+	if u, _ := a.s.Users.ByEmail(context.Background(), "ada@example.com"); u == nil || u.Role != auth.RoleAdmin {
 		t.Fatalf("laravel admin %+v", u)
 	}
 	if a.bootstrap.Active() {
@@ -164,11 +164,11 @@ func TestFirstRunRestoreWithoutUsersKeepsSetupOpen(t *testing.T) {
 	a := newTestApp(t)
 	pass := a.bootstrap.Password()
 	empty := newTestApp(t)
-	entry, err := empty.s.backups.CreateServer(context.Background(), nil)
+	entry, err := empty.s.Backups.CreateServer(context.Background(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw, _ := os.ReadFile(empty.s.backups.ServerPath(entry.Filename))
+	raw, _ := os.ReadFile(empty.s.Backups.ServerPath(entry.Filename))
 
 	status(t, a.firstRunRestore(pass, "b.zip", raw, nil), http.StatusUnprocessableEntity, "backup without users")
 	if !a.bootstrap.Active() {

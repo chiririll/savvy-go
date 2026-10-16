@@ -230,7 +230,7 @@ func TestIdentityProviderCRUDAndPresets(t *testing.T) {
 func TestSSOTicketExchange(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("u@test.com", "secret1", roleEditor)
-	ticket, err := a.s.sso.IssueTicket(context.Background(), u.ID, false)
+	ticket, err := a.s.SSO.IssueTicket(context.Background(), u.ID, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +263,7 @@ func TestSSOTicketExchange(t *testing.T) {
 
 	u2 := a.createUser("tf@test.com", "secret1", roleEditor)
 	_, _ = a.db.Exec(`UPDATE users SET two_factor_enabled=1, two_factor_confirmed=1 WHERE id=?`, u2.ID)
-	t2, _ := a.s.sso.IssueTicket(context.Background(), u2.ID, true)
+	t2, _ := a.s.SSO.IssueTicket(context.Background(), u2.ID, true)
 	ch := a.do("POST", "/api/auth/sso/exchange", map[string]string{"ticket": t2}, "", "")
 	chBody := decodeJSON(t, ch)
 	if chBody["requires_2fa"] != true || chBody["two_factor_token"] == nil {
@@ -274,7 +274,7 @@ func TestSSOTicketExchange(t *testing.T) {
 func TestSSOGithubCallbackAndSAMLMetadata(t *testing.T) {
 	a := newTestApp(t)
 	a.createUser("root@test.com", "secret1", auth.RoleAdmin)
-	_, err := a.s.sso.Create(context.Background(), sso.IdPWrite{
+	_, err := a.s.SSO.Create(context.Background(), sso.IdPWrite{
 		Name: "GitHub", Slug: "github", Preset: "github", Enabled: boolPtr(true),
 		Fields: map[string]any{"client_id": "cid", "client_secret": "csecret"},
 	})
@@ -295,7 +295,7 @@ func TestSSOGithubCallbackAndSAMLMetadata(t *testing.T) {
 	})
 	ts := httptest.NewServer(mux)
 	t.Cleanup(ts.Close)
-	a.s.sso.HTTP = &http.Client{Transport: rewriteHost{base: ts.URL}}
+	a.s.SSO.HTTP = &http.Client{Transport: rewriteHost{base: ts.URL}}
 
 	redir := doNoFollow(t, a, "GET", "/api/auth/sso/github/redirect")
 	if redir.StatusCode != 302 {
@@ -326,7 +326,7 @@ func TestSSOGithubCallbackAndSAMLMetadata(t *testing.T) {
 		t.Fatalf("provisioned %v", exBody)
 	}
 
-	saml, err := a.s.sso.Create(context.Background(), sso.IdPWrite{
+	saml, err := a.s.SSO.Create(context.Background(), sso.IdPWrite{
 		Name: "Corp SAML", Slug: "saml", Preset: "custom_saml", Enabled: boolPtr(true),
 		Fields: map[string]any{
 			"idp_entity_id": "https://idp.example/saml",
@@ -367,7 +367,7 @@ func TestSSOProvisioningLinkAndJIT(t *testing.T) {
 	a := newTestApp(t)
 	a.createUser("root@test.com", "secret1", auth.RoleAdmin)
 	existing := a.createUser("jane@test.com", "secret1", roleEditor)
-	p, err := a.s.sso.Create(context.Background(), sso.IdPWrite{
+	p, err := a.s.SSO.Create(context.Background(), sso.IdPWrite{
 		Name: "IdP", Slug: "idp", Preset: "custom_oidc", Enabled: boolPtr(true),
 		Fields: map[string]any{
 			"discovery_url": "https://idp.test/.well-known/openid-configuration",
@@ -378,26 +378,26 @@ func TestSSOProvisioningLinkAndJIT(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	user, _, err := a.s.sso.Provision(context.Background(), *p, sso.NormalizedIdentity{
+	user, _, err := a.s.SSO.Provision(context.Background(), *p, sso.NormalizedIdentity{
 		Subject: "ext-1", Email: "jane@test.com", EmailVerified: true, Name: "Jane",
 	})
 	if err != nil || user.ID != existing.ID {
 		t.Fatalf("link %v %v", user, err)
 	}
-	_, _, err = a.s.sso.Provision(context.Background(), *p, sso.NormalizedIdentity{
+	_, _, err = a.s.SSO.Provision(context.Background(), *p, sso.NormalizedIdentity{
 		Subject: "ext-2", Email: "jane@test.com", EmailVerified: false, Name: "Jane",
 	})
 	if err == nil {
 		t.Fatal("unverified should not JIT when email exists without link")
 	}
-	fresh, _, err := a.s.sso.Provision(context.Background(), *p, sso.NormalizedIdentity{
+	fresh, _, err := a.s.SSO.Provision(context.Background(), *p, sso.NormalizedIdentity{
 		Subject: "ext-3", Email: "new@test.com", EmailVerified: true, Name: "New",
 		Groups: []string{"admins"}, Raw: map[string]any{"groups": []any{"admins"}},
 	})
 	if err != nil || fresh.Email != "new@test.com" || fresh.Role != auth.RoleAdmin || !fresh.IsSSOOnly {
 		t.Fatalf("jit %+v %v", fresh, err)
 	}
-	if list, err := a.s.spaces.ForUser(context.Background(), fresh.ID); err != nil || len(list) != 0 {
+	if list, err := a.s.Spaces.ForUser(context.Background(), fresh.ID); err != nil || len(list) != 0 {
 		t.Fatalf("jit user has spaces %v %v", list, err)
 	}
 }

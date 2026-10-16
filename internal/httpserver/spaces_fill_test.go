@@ -8,8 +8,8 @@ import (
 	"github.com/shopspring/decimal"
 
 	"savvy-go/internal/auth"
-	"savvy-go/internal/httpserver/spacefill"
 	"savvy-go/internal/ledger"
+	"savvy-go/internal/spacefill"
 	"savvy-go/internal/spaces"
 )
 
@@ -58,7 +58,7 @@ func fullFill() spacefill.Fill {
 
 func spaceCount(t *testing.T, a *testApp) int {
 	t.Helper()
-	all, err := a.s.spaces.All(context.Background())
+	all, err := a.s.Spaces.All(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +113,7 @@ func TestCreateSpaceFilledOverHTTP(t *testing.T) {
 
 func TestCreateSpaceFilledBuildsEverything(t *testing.T) {
 	a := newTestApp(t)
-	a.s.rates = fixedRates{"USD": "0.9", "EUR": "1", "GBP": "1.2"}
+	a.s.Rates = fixedRates{"USD": "0.9", "EUR": "1", "GBP": "1.2"}
 	ctx := context.Background()
 	owner := a.createUser("o@test.com", "secret1", auth.RoleUser)
 
@@ -176,7 +176,7 @@ func TestCreateSpaceFilledBuildsEverything(t *testing.T) {
 
 func TestCreateSpaceKeepsTheDefaultsTheRequestNames(t *testing.T) {
 	a := newTestApp(t)
-	a.s.rates = fixedRates{"EUR": "1"}
+	a.s.Rates = fixedRates{"EUR": "1"}
 	ctx := context.Background()
 	owner := a.createUser("o@test.com", "secret1", auth.RoleUser)
 
@@ -203,7 +203,7 @@ func TestCreateSpaceKeepsTheDefaultsTheRequestNames(t *testing.T) {
 
 func TestCreateSpaceRefusesBadInputBeforeCreatingAnything(t *testing.T) {
 	a := newTestApp(t)
-	a.s.rates = fixedRates{"USD": "1", "EUR": "1"}
+	a.s.Rates = fixedRates{"USD": "1", "EUR": "1"}
 	owner := a.createUser("o@test.com", "secret1", auth.RoleUser)
 	before := spaceCount(t, a)
 
@@ -231,7 +231,7 @@ func TestCreateSpaceRefusesBadInputBeforeCreatingAnything(t *testing.T) {
 
 func TestCreateSpaceEnforcesGuestAndLimit(t *testing.T) {
 	a := newTestApp(t)
-	a.s.rates = fixedRates{"EUR": "1"}
+	a.s.Rates = fixedRates{"EUR": "1"}
 	ctx := context.Background()
 	fill := spacefill.Fill{BaseCurrency: "EUR"}
 
@@ -241,7 +241,7 @@ func TestCreateSpaceEnforcesGuestAndLimit(t *testing.T) {
 	}
 
 	user := a.createUser("u@test.com", "secret1", auth.RoleUser)
-	_ = a.s.settings.Set(ctx, "max_spaces_per_user", 1)
+	_ = a.s.Settings.Set(ctx, "max_spaces_per_user", 1)
 	if _, err := a.s.spaceCreator().Create(ctx, "One", user, fill); err != nil {
 		t.Fatal(err)
 	}
@@ -257,16 +257,16 @@ func TestCreateSpaceEnforcesGuestAndLimit(t *testing.T) {
 func TestCreateSpaceFailureInTheMiddleLeavesNoSpace(t *testing.T) {
 	a := newTestApp(t)
 	// ZZZ is well formed but not in the catalog: it fails after the base exists.
-	a.s.rates = fixedRates{"USD": "1", "EUR": "1"}
+	a.s.Rates = fixedRates{"USD": "1", "EUR": "1"}
 	ctx := context.Background()
 	owner := a.createUser("o@test.com", "secret1", auth.RoleUser)
-	before, _ := a.s.spaces.All(ctx)
+	before, _ := a.s.Spaces.All(ctx)
 
 	fill := spacefill.Fill{BaseCurrency: "EUR", Currencies: []string{"USD", "ZZZ"}}
 	if _, err := a.s.spaceCreator().Create(ctx, "Broken", owner, fill); err == nil {
 		t.Fatal("want an error")
 	}
-	after, _ := a.s.spaces.All(ctx)
+	after, _ := a.s.Spaces.All(ctx)
 	if len(after) != len(before) {
 		t.Fatalf("registry: %d spaces, was %d", len(after), len(before))
 	}
@@ -283,7 +283,7 @@ func TestCreateSpaceFailureInTheMiddleLeavesNoSpace(t *testing.T) {
 			t.Fatalf("space file %d still exists", id)
 		}
 	}
-	mine, _ := a.s.spaces.ForUser(ctx, owner.ID)
+	mine, _ := a.s.Spaces.ForUser(ctx, owner.ID)
 	if len(mine) != 0 {
 		t.Fatalf("owner still has %v", mine)
 	}
@@ -291,7 +291,7 @@ func TestCreateSpaceFailureInTheMiddleLeavesNoSpace(t *testing.T) {
 
 func TestCreateSpaceRefusesAForeignCurrencyWithoutARate(t *testing.T) {
 	a := newTestApp(t)
-	a.s.rates = fixedRates{"EUR": "1", "USD": "1.1", "JPY": "0"}
+	a.s.Rates = fixedRates{"EUR": "1", "USD": "1.1", "JPY": "0"}
 	ctx := context.Background()
 	owner := a.createUser("o@test.com", "secret1", auth.RoleUser)
 	before := spaceCount(t, a)
@@ -306,7 +306,7 @@ func TestCreateSpaceRefusesAForeignCurrencyWithoutARate(t *testing.T) {
 	}
 
 	// A base without a known rate is fine: its rate is 1 by definition.
-	a.s.rates = fixedRates{"JPY": "0", "EUR": "0.006"}
+	a.s.Rates = fixedRates{"JPY": "0", "EUR": "0.006"}
 	if _, err := a.s.spaceCreator().Create(ctx, "Yen base", owner, spacefill.Fill{BaseCurrency: "JPY", Currencies: []string{"EUR"}}); err != nil {
 		t.Fatal(err)
 	}

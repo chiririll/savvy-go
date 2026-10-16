@@ -22,11 +22,11 @@ func newSyncPair(t *testing.T) *syncPair {
 	t.Helper()
 	a := newTestApp(t)
 	owner := a.createUser("owner@test.com", "secret1", auth.RoleUser)
-	A, err := a.s.spaces.Create(context.Background(), "Personal", owner)
+	A, err := a.s.Spaces.Create(context.Background(), "Personal", owner)
 	if err != nil {
 		t.Fatal(err)
 	}
-	B, err := a.s.spaces.Create(context.Background(), "Family", owner)
+	B, err := a.s.Spaces.Create(context.Background(), "Family", owner)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,10 +120,10 @@ func TestSyncGroupRefusesAnEditorWhoOnlyViewsAnotherSpace(t *testing.T) {
 	p.group(nil)
 	bob := p.a.createUser("bob@test.com", "secret1", auth.RoleUser)
 	ctx := context.Background()
-	if err := p.a.s.spaces.SetMember(ctx, p.A.ID, bob, spaces.RoleEditor); err != nil {
+	if err := p.a.s.Spaces.SetMember(ctx, p.A.ID, bob, spaces.RoleEditor); err != nil {
 		t.Fatal(err)
 	}
-	if err := p.a.s.spaces.SetMember(ctx, p.B.ID, bob, spaces.RoleViewer); err != nil {
+	if err := p.a.s.Spaces.SetMember(ctx, p.B.ID, bob, spaces.RoleViewer); err != nil {
 		t.Fatal(err)
 	}
 	bobSess := p.a.issue(bob, false)
@@ -143,7 +143,7 @@ func TestSyncGroupRefusesAnEditorWhoOnlyViewsAnotherSpace(t *testing.T) {
 		t.Fatalf("members %v", g["members"])
 	}
 	carol := p.a.createUser("carol@test.com", "secret1", auth.RoleUser)
-	_ = p.a.s.spaces.SetMember(ctx, p.A.ID, carol, spaces.RoleViewer)
+	_ = p.a.s.Spaces.SetMember(ctx, p.A.ID, carol, spaces.RoleViewer)
 	_, out = p.call(p.a.issue(carol, false), "GET", spacePath(p.A.ID, "/sync-group"), nil)
 	if g := out["data"].(map[string]any); len(g["members"].([]any)) != 1 || g["hidden"] != float64(1) {
 		t.Fatalf("carol sees %v", g)
@@ -188,7 +188,7 @@ func TestSyncGroupDifferencesNeedDecisions(t *testing.T) {
 func TestSyncGroupDoesNotLetSpacesBeProbed(t *testing.T) {
 	p := newSyncPair(t)
 	stranger := p.a.createUser("stranger@test.com", "secret1", auth.RoleUser)
-	other, err := p.a.s.spaces.Create(context.Background(), "Private", stranger)
+	other, err := p.a.s.Spaces.Create(context.Background(), "Private", stranger)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -198,8 +198,8 @@ func TestSyncGroupDoesNotLetSpacesBeProbed(t *testing.T) {
 	}
 	// Not an admin of one's own space either: refused, not probed.
 	bob := p.a.createUser("bob@test.com", "secret1", auth.RoleUser)
-	_ = p.a.s.spaces.SetMember(context.Background(), p.A.ID, bob, spaces.RoleEditor)
-	_ = p.a.s.spaces.SetMember(context.Background(), p.B.ID, bob, spaces.RoleEditor)
+	_ = p.a.s.Spaces.SetMember(context.Background(), p.A.ID, bob, spaces.RoleEditor)
+	_ = p.a.s.Spaces.SetMember(context.Background(), p.B.ID, bob, spaces.RoleEditor)
 	body = map[string]any{"add_space_ids": []int64{p.A.ID, p.B.ID}, "categories": true}
 	if code, _ := p.call(p.a.issue(bob, false), "POST", "/api/sync-groups/apply", body); code != http.StatusForbidden {
 		t.Fatalf("an editor created a group: %d", code)

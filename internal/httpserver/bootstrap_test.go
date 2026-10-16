@@ -76,7 +76,7 @@ func TestRegisterIsClosedOnceAUserExists(t *testing.T) {
 	if a.bootstrap.Active() {
 		t.Fatal("password still valid after the first user")
 	}
-	if _, err := os.Stat(filepath.Join(a.s.cfg.DataDir, bootstrap.FileName)); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(a.s.Cfg.DataDir, bootstrap.FileName)); !os.IsNotExist(err) {
 		t.Fatalf("password file still there: %v", err)
 	}
 }
@@ -131,7 +131,7 @@ func TestStatusCarriesTheBootstrapHint(t *testing.T) {
 	body := decodeJSON(t, a.do("GET", "/api/auth/status", nil, "", ""))
 	hint, _ := body["bootstrap_hint"].(map[string]any)
 	if body["needs_registration"] != true || hint["environment"] != "binary" ||
-		hint["file"] != filepath.Join(a.s.cfg.DataDir, bootstrap.FileName) {
+		hint["file"] != filepath.Join(a.s.Cfg.DataDir, bootstrap.FileName) {
 		t.Fatalf("status %v", body)
 	}
 	if _, leaked := hint["password"]; leaked || len(hint) != 2 {

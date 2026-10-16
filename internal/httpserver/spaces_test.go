@@ -42,11 +42,11 @@ func TestP3SpacesAreIsolated(t *testing.T) {
 	ctx := context.Background()
 	alice := a.createUser("alice@test.com", "secret1", auth.RoleUser)
 	bob := a.createUser("bob@test.com", "secret1", auth.RoleUser)
-	aliceSpace, err := a.s.spaces.Create(ctx, "Alice", alice)
+	aliceSpace, err := a.s.Spaces.Create(ctx, "Alice", alice)
 	if err != nil {
 		t.Fatal(err)
 	}
-	bobSpace, err := a.s.spaces.Create(ctx, "Bob", bob)
+	bobSpace, err := a.s.Spaces.Create(ctx, "Bob", bob)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +66,7 @@ func TestP3SpacesAreIsolated(t *testing.T) {
 	status(t, a.inSpace(999, "GET", "/api/tags", nil, bs), 404, "missing space")
 
 	// Joining as a viewer makes the space readable but not writable.
-	if err := a.s.spaces.SetMember(ctx, aliceSpace.ID, bob, spaces.RoleViewer); err != nil {
+	if err := a.s.Spaces.SetMember(ctx, aliceSpace.ID, bob, spaces.RoleViewer); err != nil {
 		t.Fatal(err)
 	}
 	if names := tagNames(t, a.inSpace(aliceSpace.ID, "GET", "/api/tags", nil, bs)); len(names) != 1 {
@@ -103,11 +103,11 @@ func TestAdminCreatedUserHasNoSpace(t *testing.T) {
 	admin := a.issue(a.createUser("a@test.com", "secret1", auth.RoleAdmin), false)
 	res := a.do("POST", "/api/users", map[string]any{"name": "New", "email": "n@test.com", "password": "secret12", "role": auth.RoleUser}, admin.Token, admin.CSRF)
 	status(t, res, 201, "create user")
-	u, err := a.s.users.ByEmail(context.Background(), "n@test.com")
+	u, err := a.s.Users.ByEmail(context.Background(), "n@test.com")
 	if err != nil || u == nil {
 		t.Fatalf("user %v %v", u, err)
 	}
-	if list, err := a.s.spaces.ForUser(context.Background(), u.ID); err != nil || len(list) != 0 {
+	if list, err := a.s.Spaces.ForUser(context.Background(), u.ID); err != nil || len(list) != 0 {
 		t.Fatalf("spaces %v %v", list, err)
 	}
 }
@@ -117,13 +117,13 @@ func TestP8GuestCannotBeSpaceAdmin(t *testing.T) {
 	a := newTestApp(t)
 	ctx := context.Background()
 	guest := a.createUser("guest@test.com", "secret1", auth.RoleGuest)
-	if _, err := a.s.spaces.Create(ctx, "Mine", guest); !errors.Is(err, spaces.ErrGuestCannotAdmin) {
+	if _, err := a.s.Spaces.Create(ctx, "Mine", guest); !errors.Is(err, spaces.ErrGuestCannotAdmin) {
 		t.Fatalf("guest created a space: %v", err)
 	}
-	if err := a.s.spaces.SetMember(ctx, a.space.ID, guest, spaces.RoleAdmin); !errors.Is(err, spaces.ErrGuestCannotAdmin) {
+	if err := a.s.Spaces.SetMember(ctx, a.space.ID, guest, spaces.RoleAdmin); !errors.Is(err, spaces.ErrGuestCannotAdmin) {
 		t.Fatalf("guest made admin: %v", err)
 	}
-	if err := a.s.spaces.SetMember(ctx, a.space.ID, guest, spaces.RoleEditor); err != nil {
+	if err := a.s.Spaces.SetMember(ctx, a.space.ID, guest, spaces.RoleEditor); err != nil {
 		t.Fatalf("guest as editor: %v", err)
 	}
 }

@@ -16,11 +16,11 @@ import (
 // invitation, and these tests need the link.
 func (a *testApp) invite(spaceID int64, sess *auth.Issued, email, role string) string {
 	a.t.Helper()
-	session, err := a.s.sessions.Resolve(context.Background(), sess.Token)
+	session, err := a.s.Sessions.Resolve(context.Background(), sess.Token)
 	if err != nil || session == nil {
 		a.t.Fatalf("inviter: %v", err)
 	}
-	token, _, err := a.s.spaces.Invite(context.Background(), spaceID, session.User, email, "", role)
+	token, _, err := a.s.Spaces.Invite(context.Background(), spaceID, session.User, email, "", role)
 	if err != nil {
 		a.t.Fatal(err)
 	}
@@ -29,7 +29,7 @@ func (a *testApp) invite(spaceID int64, sess *auth.Issued, email, role string) s
 
 func memberRole(t *testing.T, a *testApp, spaceID, userID int64) string {
 	t.Helper()
-	role, err := a.s.spaces.Role(context.Background(), spaceID, userID)
+	role, err := a.s.Spaces.Role(context.Background(), spaceID, userID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +84,7 @@ func TestP7RegisterThroughInvitation(t *testing.T) {
 	ctx := context.Background()
 	serverAdmin := a.issue(a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
 	owner := a.createUser("owner@test.com", "secret1", auth.RoleUser)
-	if err := a.s.spaces.SetMember(ctx, a.space.ID, owner, spaces.RoleAdmin); err != nil {
+	if err := a.s.Spaces.SetMember(ctx, a.space.ID, owner, spaces.RoleAdmin); err != nil {
 		t.Fatal(err)
 	}
 	spaceAdmin := a.issue(owner, false)
@@ -96,19 +96,19 @@ func TestP7RegisterThroughInvitation(t *testing.T) {
 	if code, body := register(a.invite(a.space.ID, spaceAdmin, "", roleEditor), "guest@test.com"); code != http.StatusCreated {
 		t.Fatalf("register %d %v", code, body)
 	}
-	guest, _ := a.s.users.ByEmail(ctx, "guest@test.com")
+	guest, _ := a.s.Users.ByEmail(ctx, "guest@test.com")
 	if guest.Role != auth.RoleGuest || memberRole(t, a, a.space.ID, guest.ID) != roleEditor {
 		t.Fatalf("guest %+v", guest)
 	}
 	if code, _ := register(a.invite(a.space.ID, serverAdmin, "", roleViewer), "user@test.com"); code != http.StatusCreated {
 		t.Fatal("register through a server admin's invitation")
 	}
-	user, _ := a.s.users.ByEmail(ctx, "user@test.com")
+	user, _ := a.s.Users.ByEmail(ctx, "user@test.com")
 	if user.Role != auth.RoleUser {
 		t.Fatalf("role %s", user.Role)
 	}
 	for _, u := range []*auth.User{guest, user} {
-		if mine, _ := a.s.spaces.ForUser(ctx, u.ID); len(mine) != 1 {
+		if mine, _ := a.s.Spaces.ForUser(ctx, u.ID); len(mine) != 1 {
 			t.Fatalf("%s is in %d spaces, want only the invited one", u.Email, len(mine))
 		}
 	}
@@ -116,7 +116,7 @@ func TestP7RegisterThroughInvitation(t *testing.T) {
 		t.Fatalf("register with a taken email: %d", code)
 	}
 
-	_ = a.s.settings.Set(ctx, "space_invites_can_register", false)
+	_ = a.s.Settings.Set(ctx, "space_invites_can_register", false)
 	if code, _ := register(a.invite(a.space.ID, spaceAdmin, "", roleViewer), "late@test.com"); code != http.StatusForbidden {
 		t.Fatalf("registration closed: %d", code)
 	}
@@ -139,7 +139,7 @@ func TestP8GuestNeverSpaceAdmin(t *testing.T) {
 	// Registering through an admin invitation from a space admin would make
 	// a guest admin.
 	owner := a.createUser("owner@test.com", "secret1", auth.RoleUser)
-	_ = a.s.spaces.SetMember(context.Background(), a.space.ID, owner, spaces.RoleAdmin)
+	_ = a.s.Spaces.SetMember(context.Background(), a.space.ID, owner, spaces.RoleAdmin)
 	res := a.do("POST", "/api/invitations/"+a.invite(a.space.ID, a.issue(owner, false), "", spaces.RoleAdmin)+"/register",
 		map[string]any{"name": "N", "email": "n@test.com", "password": "password1"}, "", "")
 	if res.StatusCode != http.StatusUnprocessableEntity {
@@ -153,7 +153,7 @@ func TestP9NoGuestWhileSpaceAdmin(t *testing.T) {
 	a := newTestApp(t)
 	as := a.issue(a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
 	owner := a.createUser("owner@test.com", "secret1", auth.RoleUser)
-	if _, err := a.s.spaces.Create(context.Background(), "Owned", owner); err != nil {
+	if _, err := a.s.Spaces.Create(context.Background(), "Owned", owner); err != nil {
 		t.Fatal(err)
 	}
 	status(t, a.do("PATCH", "/api/users"+userPath(owner.ID), map[string]any{"role": auth.RoleGuest}, as.Token, as.CSRF), 422, "demote space admin")
@@ -171,7 +171,7 @@ func TestP10SpaceLimit(t *testing.T) {
 	as := a.issue(admin, false)
 	user := a.createUser("user@test.com", "secret1", auth.RoleUser)
 	us := a.issue(user, false)
-	_ = a.s.settings.Set(ctx, "max_spaces_per_user", 1)
+	_ = a.s.Settings.Set(ctx, "max_spaces_per_user", 1)
 
 	status(t, a.do("POST", "/api/spaces", map[string]any{"name": "First"}, us.Token, us.CSRF), 201, "first space")
 	status(t, a.do("POST", "/api/spaces", map[string]any{"name": "Second"}, us.Token, us.CSRF), 422, "second space")
@@ -181,7 +181,7 @@ func TestP10SpaceLimit(t *testing.T) {
 	status(t, a.do("POST", "/api/admin/spaces/"+strconv.FormatInt(a.space.ID, 10)+"/admins", map[string]any{"user_id": user.ID}, as.Token, as.CSRF), 204, "server admin assigns")
 	status(t, a.do("POST", "/api/spaces", map[string]any{"name": "Admin's"}, as.Token, as.CSRF), 201, "server admin has no limit")
 
-	_ = a.s.settings.Set(ctx, "max_spaces_per_user", 0)
+	_ = a.s.Settings.Set(ctx, "max_spaces_per_user", 0)
 	other := a.issue(a.createUser("other@test.com", "secret1", auth.RoleUser), false)
 	status(t, a.do("POST", "/api/spaces", map[string]any{"name": "None"}, other.Token, other.CSRF), 422, "limit zero")
 }
@@ -192,12 +192,12 @@ func TestP11LastAdmin(t *testing.T) {
 	ctx := context.Background()
 	owner := a.createUser("owner@test.com", "secret1", auth.RoleUser)
 	os := a.issue(owner, false)
-	space, err := a.s.spaces.Create(ctx, "Family", owner)
+	space, err := a.s.Spaces.Create(ctx, "Family", owner)
 	if err != nil {
 		t.Fatal(err)
 	}
 	member := a.createUser("member@test.com", "secret1", auth.RoleUser)
-	_ = a.s.spaces.SetMember(ctx, space.ID, member, roleEditor)
+	_ = a.s.Spaces.SetMember(ctx, space.ID, member, roleEditor)
 
 	status(t, a.do("POST", spacePath(space.ID, "/leave"), nil, os.Token, os.CSRF), 422, "last admin leaves")
 	status(t, a.do("PATCH", spacePath(space.ID, "/members"+userPath(owner.ID)), map[string]any{"role": roleEditor}, os.Token, os.CSRF), 422, "last admin demotes")
@@ -219,19 +219,19 @@ func TestP12P41DeleteUserAndTheirSpaces(t *testing.T) {
 	admin := a.issue(a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
 	gone := a.createUser("gone@test.com", "secret1", auth.RoleUser)
 	gs := a.issue(gone, false)
-	alone, err := a.s.spaces.Create(ctx, "Alone", gone)
+	alone, err := a.s.Spaces.Create(ctx, "Alone", gone)
 	if err != nil {
 		t.Fatal(err)
 	}
 	status(t, a.inSpace(alone.ID, "POST", "/api/tags", map[string]any{"name": "keepsake"}, gs), 201, "tag")
 
 	status(t, a.do("DELETE", "/api/users"+userPath(gone.ID), nil, admin.Token, admin.CSRF), 204, "delete")
-	u, _ := a.s.users.ByID(ctx, gone.ID)
+	u, _ := a.s.Users.ByID(ctx, gone.ID)
 	if u == nil || !u.Deleted || u.Email == "gone@test.com" || u.Password != nil {
 		t.Fatalf("tombstone %+v", u)
 	}
 	status(t, a.do("GET", "/api/spaces", nil, gs.Token, ""), 401, "session revoked")
-	if sp, _ := a.s.spaces.Get(ctx, alone.ID); sp != nil {
+	if sp, _ := a.s.Spaces.Get(ctx, alone.ID); sp != nil {
 		t.Fatal("the space the user was alone in survived")
 	}
 	status(t, a.do("GET", "/api/users"+userPath(gone.ID), nil, admin.Token, ""), 404, "deleted user hidden")
@@ -262,7 +262,7 @@ func TestP5AdminOverviewIsMetadataOnly(t *testing.T) {
 	admin := a.createUser("admin@test.com", "secret1", auth.RoleAdmin)
 	as := a.issue(admin, false)
 	owner := a.createUser("owner@test.com", "secret1", auth.RoleUser)
-	private, _ := a.s.spaces.Create(ctx, "Private", owner)
+	private, _ := a.s.Spaces.Create(ctx, "Private", owner)
 
 	status(t, a.inSpace(private.ID, "GET", "/api/accounts", nil, as), 404, "server admin reads data")
 	list := decodeJSON(t, a.do("GET", "/api/admin/spaces", nil, as.Token, ""))["data"].([]any)
@@ -291,7 +291,7 @@ func TestP53AdminActionsAreAudited(t *testing.T) {
 	admin := a.createUser("admin@test.com", "secret1", auth.RoleAdmin)
 	as := a.issue(admin, false)
 	owner := a.createUser("owner@test.com", "secret1", auth.RoleUser)
-	space, _ := a.s.spaces.Create(ctx, "Watched", owner)
+	space, _ := a.s.Spaces.Create(ctx, "Watched", owner)
 	os := a.issue(owner, false)
 
 	id := strconv.FormatInt(space.ID, 10)
@@ -305,7 +305,7 @@ func TestP53AdminActionsAreAudited(t *testing.T) {
 	if !actions["assign_admin"] || !actions["set_quota"] {
 		t.Fatalf("audit %v", log)
 	}
-	if q := a.s.spaces.Quota(ctx, space.ID); q != 10<<20 {
+	if q := a.s.Spaces.Quota(ctx, space.ID); q != 10<<20 {
 		t.Fatalf("quota %d", q)
 	}
 }
@@ -315,7 +315,7 @@ func TestP42UnavailableSpaceIsHiddenFromOutsiders(t *testing.T) {
 	a := newTestApp(t)
 	member := a.issue(a.createUser("m@test.com", "secret1", roleViewer), false)
 	outsider := a.issue(a.createUser("o@test.com", "secret1", auth.RoleUser), false)
-	a.s.store = unavailableStore{a.store, a.space.ID}
+	a.s.Store = unavailableStore{a.store, a.space.ID}
 	*a.s.guard = *a.s.newGuard() // the guard copied the store
 	status(t, a.do("GET", "/api/tags", nil, member.Token, ""), 503, "member")
 	status(t, a.do("GET", "/api/tags", nil, outsider.Token, ""), 404, "outsider")
@@ -326,9 +326,9 @@ func TestSpaceRenameAndDelete(t *testing.T) {
 	ctx := context.Background()
 	owner := a.createUser("owner@test.com", "secret1", auth.RoleUser)
 	os := a.issue(owner, false)
-	space, _ := a.s.spaces.Create(ctx, "Old", owner)
+	space, _ := a.s.Spaces.Create(ctx, "Old", owner)
 	viewer := a.createUser("v@test.com", "secret1", auth.RoleUser)
-	_ = a.s.spaces.SetMember(ctx, space.ID, viewer, roleViewer)
+	_ = a.s.Spaces.SetMember(ctx, space.ID, viewer, roleViewer)
 	vs := a.issue(viewer, false)
 
 	status(t, a.do("PATCH", spacePath(space.ID, ""), map[string]any{"name": "New"}, vs.Token, vs.CSRF), 403, "viewer renames")
@@ -371,7 +371,7 @@ func TestP16ReconcileRegistryAndFiles(t *testing.T) {
 	if err := a.store.CreateSpace(ctx, 901); err != nil {
 		t.Fatal(err)
 	}
-	missing, orphans, err := a.s.spaces.Reconcile(ctx)
+	missing, orphans, err := a.s.Spaces.Reconcile(ctx)
 	if err != nil || len(missing) != 1 || missing[0] != 900 || len(orphans) != 1 || orphans[0] != 901 {
 		t.Fatalf("reconcile %v %v %v", missing, orphans, err)
 	}

@@ -74,7 +74,7 @@ func newTestApp(t *testing.T, opts ...Option) *testApp {
 	guard := bootstrap.New(cfg.DataDir, bootstrap.Binary)
 	opts = append([]Option{WithRates(currencydata.NewOffline()), WithBootstrap(guard)}, opts...)
 	s := New(cfg, st, testKeys(t, cfg), opts...)
-	space, err := s.spaces.Create(context.Background(), "Test", nil)
+	space, err := s.Spaces.Create(context.Background(), "Test", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,12 +105,12 @@ func (a *testApp) createUser(email, password, role string, opts ...func(*auth.Us
 	case roleEditor, roleViewer:
 		serverRole, spaceRole = auth.RoleUser, role
 	}
-	u, err := a.s.users.Create(context.Background(), "U", email, &password, serverRole)
+	u, err := a.s.Users.Create(context.Background(), "U", email, &password, serverRole)
 	if err != nil {
 		a.t.Fatal(err)
 	}
 	if spaceRole != "" {
-		if err := a.s.spaces.SetMember(context.Background(), a.space.ID, u, spaceRole); err != nil {
+		if err := a.s.Spaces.SetMember(context.Background(), a.space.ID, u, spaceRole); err != nil {
 			a.t.Fatal(err)
 		}
 	}
@@ -122,7 +122,7 @@ func (a *testApp) createUser(email, password, role string, opts ...func(*auth.Us
 
 func (a *testApp) issue(u *auth.User, remember bool) *auth.Issued {
 	a.t.Helper()
-	issued, err := a.s.sessions.Issue(context.Background(), u, "127.0.0.1", "test", remember)
+	issued, err := a.s.Sessions.Issue(context.Background(), u, "127.0.0.1", "test", remember)
 	if err != nil {
 		a.t.Fatal(err)
 	}
@@ -331,7 +331,7 @@ func TestSessionIdleAbsoluteRevokeAndRefresh(t *testing.T) {
 	res.Body.Close()
 
 	issued = a.issue(u, false)
-	_ = a.s.sessions.Revoke(context.Background(), issued.Session)
+	_ = a.s.Sessions.Revoke(context.Background(), issued.Session)
 	res = a.do("GET", "/api/auth/2fa/status", nil, issued.Token, "")
 	if res.StatusCode != 401 {
 		t.Fatalf("revoked %d", res.StatusCode)
@@ -452,7 +452,7 @@ func TestLoginSSOOnlyAnd2FAChallenge(t *testing.T) {
 	if cookieNamed(res, "svy_session") != nil {
 		t.Fatal("no session cookie during 2fa")
 	}
-	n, _ := a.s.challenges.Count(context.Background())
+	n, _ := a.s.Challenges.Count(context.Background())
 	if n != 1 {
 		t.Fatalf("challenges %d", n)
 	}
@@ -461,30 +461,30 @@ func TestLoginSSOOnlyAnd2FAChallenge(t *testing.T) {
 func TestTwoFactorChallengePeekAndConsume(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("u@test.com", "secret1", roleEditor)
-	tok, err := a.s.challenges.Issue(context.Background(), u)
+	tok, err := a.s.Challenges.Issue(context.Background(), u)
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := a.s.challenges.Resolve(context.Background(), tok)
+	got, err := a.s.Challenges.Resolve(context.Background(), tok)
 	if err != nil || got == nil || got.ID != u.ID {
 		t.Fatalf("resolve %v %v", got, err)
 	}
-	got, _ = a.s.challenges.Resolve(context.Background(), tok)
+	got, _ = a.s.Challenges.Resolve(context.Background(), tok)
 	if got == nil {
 		t.Fatal("peek should not consume")
 	}
-	got, _ = a.s.challenges.Consume(context.Background(), tok)
+	got, _ = a.s.Challenges.Consume(context.Background(), tok)
 	if got == nil {
 		t.Fatal("first consume")
 	}
-	got, _ = a.s.challenges.Consume(context.Background(), tok)
+	got, _ = a.s.Challenges.Consume(context.Background(), tok)
 	if got != nil {
 		t.Fatal("second consume")
 	}
 
-	tok, _ = a.s.challenges.Issue(context.Background(), u)
+	tok, _ = a.s.Challenges.Issue(context.Background(), u)
 	_, _ = a.db.Exec(`UPDATE two_factor_challenges SET expires_at = ?`, time.Now().Add(-time.Minute).UTC().Format(time.RFC3339Nano))
-	got, _ = a.s.challenges.Resolve(context.Background(), tok)
+	got, _ = a.s.Challenges.Resolve(context.Background(), tok)
 	if got != nil {
 		t.Fatal("expired challenge")
 	}
@@ -514,7 +514,7 @@ func TestChangePasswordAndLogoutOthers(t *testing.T) {
 	}
 	denied.Body.Close()
 
-	u, _ = a.s.users.ByID(context.Background(), u.ID)
+	u, _ = a.s.Users.ByID(context.Background(), u.ID)
 	if !auth.CheckPassword(*u.Password, "newsecret1") {
 		t.Fatal("password not updated")
 	}
@@ -537,7 +537,7 @@ func TestChangePasswordAndLogoutOthers(t *testing.T) {
 
 	sso := a.createUser("sso2@test.com", "secret1", roleEditor)
 	_, _ = a.db.Exec(`UPDATE users SET is_sso_only = 1 WHERE id = ?`, sso.ID)
-	sso, _ = a.s.users.ByID(context.Background(), sso.ID)
+	sso, _ = a.s.Users.ByID(context.Background(), sso.ID)
 	iss := a.issue(sso, false)
 	res = a.do("PUT", "/api/auth/password", map[string]string{
 		"current_password": "secret1", "password": "newsecret1", "password_confirmation": "newsecret1",
@@ -569,7 +569,7 @@ func TestChangePasswordAndLogoutOthers(t *testing.T) {
 
 func TestPasswordTokensAndUsers(t *testing.T) {
 	a := newTestApp(t)
-	admin, err := a.s.users.Create(context.Background(), "Admin", "admin@test.com", ptr("secret1"), auth.RoleAdmin)
+	admin, err := a.s.Users.Create(context.Background(), "Admin", "admin@test.com", ptr("secret1"), auth.RoleAdmin)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -600,7 +600,7 @@ func TestPasswordTokensAndUsers(t *testing.T) {
 	}
 	inviteTok := data["token"].(string)
 
-	rw, _ := a.s.users.Create(context.Background(), "RW", "rw@test.com", ptr("secret1"), auth.RoleUser)
+	rw, _ := a.s.Users.Create(context.Background(), "RW", "rw@test.com", ptr("secret1"), auth.RoleUser)
 	rws := a.issue(rw, false)
 	res = a.do("POST", "/api/users", map[string]any{"name": "Nope", "email": "nope@test.com"}, rws.Token, rws.CSRF)
 	if res.StatusCode != 403 {
@@ -608,7 +608,7 @@ func TestPasswordTokensAndUsers(t *testing.T) {
 	}
 	res.Body.Close()
 
-	_, _ = a.s.users.Create(context.Background(), "Pending", "pending@test.com", nil, auth.RoleUser)
+	_, _ = a.s.Users.Create(context.Background(), "Pending", "pending@test.com", nil, auth.RoleUser)
 	res = a.do("POST", "/api/auth/login", map[string]string{"email": "pending@test.com", "password": "anything1"}, "", "")
 	if res.StatusCode != 422 {
 		t.Fatalf("inactive login %d", res.StatusCode)
@@ -647,8 +647,8 @@ func TestPasswordTokensAndUsers(t *testing.T) {
 	}
 	res.Body.Close()
 
-	target, _ := a.s.users.Create(context.Background(), "Target", "target@test.com", ptr("oldpass12"), auth.RoleUser)
-	first, _, _ := a.s.tokens.Issue(context.Background(), target)
+	target, _ := a.s.Users.Create(context.Background(), "Target", "target@test.com", ptr("oldpass12"), auth.RoleUser)
+	first, _, _ := a.s.PasswordTokens.Issue(context.Background(), target)
 	res = a.do("POST", "/api/users/"+itoa(target.ID)+"/password-token", map[string]any{}, sess.Token, sess.CSRF)
 	body = decodeJSON(t, res)
 	newTok := body["data"].(map[string]any)["token"].(string)
@@ -672,7 +672,7 @@ func TestPasswordTokensAndUsers(t *testing.T) {
 	}
 	res.Body.Close()
 
-	sso, _ := a.s.users.Create(context.Background(), "Sso", "sso@test.com", ptr("x"), auth.RoleUser)
+	sso, _ := a.s.Users.Create(context.Background(), "Sso", "sso@test.com", ptr("x"), auth.RoleUser)
 	_, _ = a.db.Exec(`UPDATE users SET is_sso_only = 1 WHERE id = ?`, sso.ID)
 	res = a.do("POST", "/api/users/"+itoa(sso.ID)+"/password-token", map[string]any{}, sess.Token, sess.CSRF)
 	if res.StatusCode != 422 {
@@ -680,8 +680,8 @@ func TestPasswordTokensAndUsers(t *testing.T) {
 	}
 	res.Body.Close()
 
-	inv, _ := a.s.users.Create(context.Background(), "Inv2", "inv2@test.com", nil, auth.RoleUser)
-	issued, _, _ := a.s.tokens.Issue(context.Background(), inv)
+	inv, _ := a.s.Users.Create(context.Background(), "Inv2", "inv2@test.com", nil, auth.RoleUser)
+	issued, _, _ := a.s.PasswordTokens.Issue(context.Background(), inv)
 	res = a.do("PATCH", "/api/users/"+itoa(inv.ID), map[string]string{"password": "setbyadmin"}, sess.Token, sess.CSRF)
 	body = decodeJSON(t, res)
 	if res.StatusCode != 200 || body["data"].(map[string]any)["isInactive"] != false {
@@ -733,7 +733,7 @@ func TestPasswordLoginToggle(t *testing.T) {
 		t.Fatalf("status enabled %v", body)
 	}
 
-	admin, _ := a.s.users.Create(context.Background(), "Ad", "ad@test.com", ptr("secret1"), auth.RoleAdmin)
+	admin, _ := a.s.Users.Create(context.Background(), "Ad", "ad@test.com", ptr("secret1"), auth.RoleAdmin)
 	iss := a.issue(admin, false)
 	_, _ = a.db.Exec(`DELETE FROM identity_providers`)
 	res = a.do("PATCH", "/api/settings", map[string]any{"password_login_enabled": false}, iss.Token, iss.CSRF)

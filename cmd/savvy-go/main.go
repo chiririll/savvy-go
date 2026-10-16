@@ -80,7 +80,7 @@ func run(cfg config.Config, seedCfg seed.Config) error {
 
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,
-		Handler:           httpserver.New(cfg, st, keys, httpserver.WithRates(rates), httpserver.WithBootstrap(guard)).Handler(),
+		Handler:           httpserver.New(cfg, st, keys, httpserver.WithRates(rates), httpserver.WithBootstrap(guard), httpserver.WithQueue(queue)).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 	failed := make(chan error, 1)
@@ -102,8 +102,10 @@ func run(cfg config.Config, seedCfg seed.Config) error {
 	shutdownCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	stopJobs()
+	// Stop taking requests before the queue closes: a request still running could enqueue.
+	err = srv.Shutdown(shutdownCtx)
 	queue.Shutdown(shutdownCtx)
-	if err := srv.Shutdown(shutdownCtx); err != nil {
+	if err != nil {
 		return fmt.Errorf("shutdown: %w", err)
 	}
 	return nil

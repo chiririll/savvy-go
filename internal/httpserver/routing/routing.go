@@ -10,56 +10,19 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"savvy-go/internal/auth"
-	"savvy-go/internal/backup"
-	"savvy-go/internal/bootstrap"
-	"savvy-go/internal/config"
+	"savvy-go/internal/app"
 	"savvy-go/internal/httpserver/apidocs"
 	"savvy-go/internal/httpserver/guard"
-	"savvy-go/internal/httpserver/mailing"
 	"savvy-go/internal/httpserver/signin"
-	"savvy-go/internal/jobs"
-	"savvy-go/internal/ledger"
-	"savvy-go/internal/oauth"
-	"savvy-go/internal/refsync"
-	"savvy-go/internal/settings"
-	"savvy-go/internal/signing"
-	"savvy-go/internal/spaces"
-	"savvy-go/internal/sso"
-	"savvy-go/internal/store"
-	"savvy-go/internal/transfers"
-	"savvy-go/internal/uploads"
 )
 
-// Deps are the services the server owns and its handlers draw on.
+// Deps are what the registered packages draw on: the core services and the HTTP-level
+// pieces built on them.
 type Deps struct {
-	Cfg       config.Config
-	Store     store.Store
-	Rates     ledger.RateSource
-	Bootstrap *bootstrap.Guard
-	Queue     *jobs.Queue
-	Keys      *signing.Holder
+	*app.Services
 
-	Users          auth.Users
-	Sessions       auth.Sessions
-	APITokens      auth.APITokens
-	PasswordTokens auth.PasswordTokens
-	Challenges     auth.Challenges
-	Verifications  auth.EmailVerifications
-	TwoFactor      auth.TwoFactor
-	WebAuthn       auth.WebAuthn
-
-	Mail      *mailing.Service
-	Settings  settings.Store
-	Spaces    spaces.Service
-	Backups   backup.Service
-	Transfers *transfers.Service
-	Refsync   refsync.Service
-	Uploads   uploads.Service
-	SSO       *sso.Service
-	OAuth     *oauth.Service
-	Login     signin.Service
-	Guard     *guard.Guard
+	Login signin.Service
+	Guard *guard.Guard
 
 	// Inner is the finished router, for handlers that call the API in-process (MCP).
 	Inner http.Handler

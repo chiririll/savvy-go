@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"savvy-go/internal/httpserver/api"
-	"savvy-go/internal/httpserver/spacefill"
+	"savvy-go/internal/spacefill"
 )
 
 func (h Handler) spacesStore(w http.ResponseWriter, r *http.Request) {
