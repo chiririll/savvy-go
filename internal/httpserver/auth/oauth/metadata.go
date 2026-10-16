@@ -18,35 +18,57 @@ func oauthPreflight(w http.ResponseWriter, r *http.Request) {
 // mcpResourceURL is the identifier of the MCP endpoint, what clients bind tokens to.
 func (h Handler) mcpResourceURL(r *http.Request) string { return h.Cfg.URL() + "/mcp" }
 
+// resourceMetadata is the protected resource metadata of RFC 9728.
+type resourceMetadata struct {
+	Resource               string   `json:"resource"`
+	AuthorizationServers   []string `json:"authorization_servers"`
+	ScopesSupported        []string `json:"scopes_supported"`
+	BearerMethodsSupported []string `json:"bearer_methods_supported"`
+	ResourceName           string   `json:"resource_name"`
+}
+
+// serverMetadata is the authorization server metadata of RFC 8414.
+type serverMetadata struct {
+	Issuer                        string   `json:"issuer"`
+	AuthorizationEndpoint         string   `json:"authorization_endpoint"`
+	TokenEndpoint                 string   `json:"token_endpoint"`
+	RegistrationEndpoint          string   `json:"registration_endpoint,omitempty"`
+	ResponseTypesSupported        []string `json:"response_types_supported"`
+	GrantTypesSupported           []string `json:"grant_types_supported"`
+	CodeChallengeMethodsSupported []string `json:"code_challenge_methods_supported"`
+	TokenEndpointAuthMethods      []string `json:"token_endpoint_auth_methods_supported"`
+	ScopesSupported               []string `json:"scopes_supported"`
+}
+
 func (h Handler) oauthResourceMetadata(w http.ResponseWriter, r *http.Request) {
 	httpx.OpenCORS(w)
 	base := h.Cfg.URL()
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{
-		"resource":                 h.mcpResourceURL(r),
-		"authorization_servers":    []string{base},
-		"scopes_supported":         oauthScopes,
-		"bearer_methods_supported": []string{"header"},
-		"resource_name":            "Go Savvy",
+	httpx.WriteJSON(w, http.StatusOK, resourceMetadata{
+		Resource:               h.mcpResourceURL(r),
+		AuthorizationServers:   []string{base},
+		ScopesSupported:        oauthScopes,
+		BearerMethodsSupported: []string{"header"},
+		ResourceName:           "Go Savvy",
 	})
 }
 
 func (h Handler) oauthServerMetadata(w http.ResponseWriter, r *http.Request) {
 	httpx.OpenCORS(w)
 	base := h.Cfg.URL()
-	meta := map[string]any{
-		"issuer":                                base,
-		"authorization_endpoint":                base + "/oauth/authorize",
-		"token_endpoint":                        base + "/oauth/token",
-		"response_types_supported":              []string{"code"},
-		"grant_types_supported":                 []string{"authorization_code", "refresh_token"},
-		"code_challenge_methods_supported":      []string{"S256"},
-		"token_endpoint_auth_methods_supported": []string{"none"},
-		"scopes_supported":                      oauthScopes,
+	meta := serverMetadata{
+		Issuer:                        base,
+		AuthorizationEndpoint:         base + "/oauth/authorize",
+		TokenEndpoint:                 base + "/oauth/token",
+		ResponseTypesSupported:        []string{"code"},
+		GrantTypesSupported:           []string{"authorization_code", "refresh_token"},
+		CodeChallengeMethodsSupported: []string{"S256"},
+		TokenEndpointAuthMethods:      []string{"none"},
+		ScopesSupported:               oauthScopes,
 	}
 	// Registration exists only while an admin has it open; closed, nothing
 	// hints that it could be, and clients must not cache the answer.
 	if _, open := h.OAuth.RegistrationOpenUntil(); open {
-		meta["registration_endpoint"] = base + "/oauth/register"
+		meta.RegistrationEndpoint = base + "/oauth/register"
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	httpx.WriteJSON(w, http.StatusOK, meta)

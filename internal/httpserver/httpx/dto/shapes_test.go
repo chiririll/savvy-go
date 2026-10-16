@@ -5,7 +5,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/shopspring/decimal"
+
 	"savvy-go/internal/httpserver/httpx/dto"
+	"savvy-go/internal/ledger"
 	"savvy-go/internal/money"
 	"savvy-go/internal/refsync"
 	"savvy-go/internal/spaces"
@@ -116,5 +119,12 @@ func TestInvitationAndMember(t *testing.T) {
 	}
 	if m["createdAt"] != "2030-01-02T03:04:05Z" || m["userId"] != 1.0 {
 		t.Errorf("member = %v", m)
+	}
+}
+
+func TestCatalogCurrencyRateIsANumber(t *testing.T) {
+	got := marshal(t, dto.NewCatalogCurrency(ledger.Currency{Code: "EUR", Name: "Euro", Symbol: "€", Decimals: 2, Rate: decimal.RequireFromString("1.1")}))
+	if want := `{"code":"EUR","name":"Euro","symbol":"€","decimals":2,"rate":1.1}`; got != want {
+		t.Fatalf("got %s, want %s", got, want)
 	}
 }

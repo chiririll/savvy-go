@@ -168,11 +168,7 @@ func (s Handler) categoriesSummary(w http.ResponseWriter, r *http.Request) {
 	if base != nil {
 		code = base.Code
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{
-		"data":     dto.Map(list, dto.NewCategory),
-		"total":    total,
-		"currency": code,
-	})
+	httpx.WriteJSON(w, http.StatusOK, dto.CategorySummary{Data: dto.Map(list, dto.NewCategory), Total: total, Currency: code})
 }
 
 func (s Handler) categoryParam(w http.ResponseWriter, r *http.Request) *ledger.Category {

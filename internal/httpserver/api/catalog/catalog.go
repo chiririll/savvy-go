@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"savvy-go/internal/httpserver/httpx"
+	"savvy-go/internal/httpserver/httpx/dto"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/seed"
 )
@@ -26,28 +27,31 @@ func (h Handler) currencies(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	list := h.Rates.Catalog(r.Context(), base)
-	out := make([]map[string]any, 0, len(list))
-	for _, c := range list {
-		out = append(out, ledger.CatalogEntry(c))
-	}
-	httpx.WriteData(w, http.StatusOK, out)
+	httpx.WriteData(w, http.StatusOK, dto.Map(list, dto.NewCatalogCurrency))
 }
 
-// presets are the categories and tags a new space can start with.
+type presetCategory struct {
+	Name      string `json:"name"`
+	Type      string `json:"type"`
+	Icon      string `json:"icon"`
+	Color     string `json:"color"`
+	IsDefault bool   `json:"isDefault"`
+}
+
+// presetsBody is the categories and tags a new space can start with.
+type presetsBody struct {
+	Categories []presetCategory `json:"categories"`
+	Tags       []string         `json:"tags"`
+}
+
+// presets answers with what a new space can start with.
 func (Handler) presets(w http.ResponseWriter, r *http.Request) {
-	type category struct {
-		Name      string `json:"name"`
-		Type      string `json:"type"`
-		Icon      string `json:"icon"`
-		Color     string `json:"color"`
-		IsDefault bool   `json:"isDefault"`
-	}
 	cats := seed.DefaultCategories()
-	out := make([]category, len(cats))
+	out := make([]presetCategory, len(cats))
 	for i, c := range cats {
-		out[i] = category(c)
+		out[i] = presetCategory(c)
 	}
-	httpx.WriteData(w, http.StatusOK, map[string]any{"categories": out, "tags": seed.DefaultTags()})
+	httpx.WriteData(w, http.StatusOK, presetsBody{Categories: out, Tags: seed.DefaultTags()})
 }
 
 // Handler serves what a new space can start with, before the space exists.

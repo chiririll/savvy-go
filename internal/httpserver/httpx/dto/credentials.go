@@ -57,3 +57,17 @@ type CreatedAPIToken struct {
 func NewCreatedAPIToken(t auth.APIToken, secret string) CreatedAPIToken {
 	return CreatedAPIToken{APIToken: NewAPIToken(t), Token: secret}
 }
+
+// TokenKindCapabilities is what one kind of API token can be given: the parts
+// of a space, and what each preset grants over them.
+type TokenKindCapabilities struct {
+	Resources []string            `json:"resources"`
+	Presets   map[string][]string `json:"presets"`
+}
+
+// TokenCapabilities is what the screens that configure a token offer.
+type TokenCapabilities struct {
+	Levels  []string                         `json:"levels"`
+	Presets []string                         `json:"presets"`
+	Kinds   map[string]TokenKindCapabilities `json:"kinds"`
+}

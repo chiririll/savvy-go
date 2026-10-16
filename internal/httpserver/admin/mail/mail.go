@@ -15,30 +15,43 @@ import (
 // Handler is the admin's view of the mail settings.
 type Handler struct{ Mail *mailing.Service }
 
-func nullIfEmpty(s string) any {
+func nullIfEmpty(s string) *string {
 	if s == "" {
 		return nil
 	}
-	return s
+	return &s
+}
+
+// settingsBody is the mail configuration without its password.
+type settingsBody struct {
+	Enabled     bool    `json:"enabled"`
+	Problem     *string `json:"problem"`
+	Host        string  `json:"host"`
+	Port        int     `json:"port"`
+	Protocol    string  `json:"protocol"`
+	User        string  `json:"user"`
+	From        string  `json:"from"`
+	SkipVerify  bool    `json:"skipVerify"`
+	Timeout     int     `json:"timeout"`
+	PasswordSet bool    `json:"passwordSet"`
+	AppURLSet   bool    `json:"appUrlSet"`
+	Writable    bool    `json:"writable"`
+}
+
+// testedBody names the address a test message went to.
+type testedBody struct {
+	To string `json:"to"`
 }
 
 // index shows the mail configuration. The password is never sent, only
 // whether one is set. "writable" is false when the config file is read-only.
 func (h Handler) index(w http.ResponseWriter, r *http.Request) {
 	c, problem := h.Mail.Settings()
-	httpx.WriteData(w, http.StatusOK, map[string]any{
-		"enabled":     h.Mail.Mailer().Enabled(),
-		"problem":     nullIfEmpty(problem),
-		"host":        c.Host,
-		"port":        c.Port,
-		"protocol":    c.Protocol,
-		"user":        c.User,
-		"from":        c.From,
-		"skipVerify":  c.SkipVerify,
-		"timeout":     int(c.Timeout / time.Second),
-		"passwordSet": c.Password != "",
-		"appUrlSet":   h.Mail.Config().URL() != "",
-		"writable":    h.Mail.Config().Live.Writable(),
+	httpx.WriteData(w, http.StatusOK, settingsBody{
+		Enabled: h.Mail.Mailer().Enabled(), Problem: nullIfEmpty(problem),
+		Host: c.Host, Port: c.Port, Protocol: c.Protocol, User: c.User, From: c.From,
+		SkipVerify: c.SkipVerify, Timeout: int(c.Timeout / time.Second), PasswordSet: c.Password != "",
+		AppURLSet: h.Mail.Config().URL() != "", Writable: h.Mail.Config().Live.Writable(),
 	})
 }
 
@@ -127,5 +140,5 @@ func (h Handler) test(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusUnprocessableEntity, "The mail server did not accept the message: "+err.Error())
 		return
 	}
-	httpx.WriteData(w, http.StatusOK, map[string]any{"to": to})
+	httpx.WriteData(w, http.StatusOK, testedBody{To: to})
 }

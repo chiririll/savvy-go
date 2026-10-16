@@ -294,14 +294,15 @@ func (s Currencies) catalogItem(ctx context.Context, code string) *Currency {
 	return nil
 }
 
-func (s Currencies) Catalog(ctx context.Context) []map[string]any {
+// Catalog lists the currencies of the source the space does not have yet.
+func (s Currencies) Catalog(ctx context.Context) []Currency {
 	existing := map[string]bool{}
 	if codes, err := s.repo().CurrencyCodes(ctx); err == nil {
 		for _, code := range codes {
 			existing[strings.ToUpper(code)] = true
 		}
 	}
-	out := []map[string]any{}
+	out := []Currency{}
 	if s.Source == nil {
 		return out
 	}
@@ -309,18 +310,9 @@ func (s Currencies) Catalog(ctx context.Context) []map[string]any {
 		if existing[item.Code] {
 			continue
 		}
-		out = append(out, CatalogEntry(item))
+		out = append(out, item)
 	}
 	return out
-}
-
-// CatalogEntry is how a catalog currency is listed: the same shape for a
-// space's catalog and the server-wide one.
-func CatalogEntry(c Currency) map[string]any {
-	return map[string]any{
-		"code": c.Code, "name": c.Name, "symbol": c.Symbol,
-		"decimals": c.Decimals, "rate": c.Rate,
-	}
 }
 
 func (s Currencies) baseCode(ctx context.Context) string {

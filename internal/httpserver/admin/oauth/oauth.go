@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"savvy-go/internal/httpserver/httpx"
+	"savvy-go/internal/httpserver/httpx/dto"
 	"savvy-go/internal/oauth"
 
 	"github.com/go-chi/chi/v5"
@@ -19,11 +20,29 @@ type Handler struct {
 
 // Registration window: an admin opens it from Administration → Security.
 
-func registrationState(until time.Time, open bool) map[string]any {
+// registrationBody says whether dynamic client registration is open, and until when.
+type registrationBody struct {
+	Open      bool       `json:"open"`
+	ExpiresAt *time.Time `json:"expires_at"`
+}
+
+func registrationState(until time.Time, open bool) registrationBody {
 	if !open {
-		return map[string]any{"open": false, "expires_at": nil}
+		return registrationBody{}
 	}
-	return map[string]any{"open": true, "expires_at": until.UTC()}
+	u := until.UTC()
+	return registrationBody{Open: true, ExpiresAt: &u}
+}
+
+// clientBody is a registered app as the admin sees it. Its keys follow RFC 7591.
+type clientBody struct {
+	ClientID     string    `json:"client_id"`
+	Name         string    `json:"name"`
+	RedirectURIs []string  `json:"redirect_uris"`
+	IP           string    `json:"ip"`
+	UserAgent    string    `json:"user_agent"`
+	Origin       string    `json:"origin"`
+	RegisteredAt time.Time `json:"registered_at"`
 }
 
 func (h Handler) oauthRegistrationShow(w http.ResponseWriter, r *http.Request) {
@@ -50,15 +69,12 @@ func (h Handler) oauthClientsIndex(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	out := make([]map[string]any, len(list))
-	for i, c := range list {
-		out[i] = map[string]any{
-			"client_id": c.ID, "name": c.Name, "redirect_uris": c.RedirectURIs,
-			"ip": c.Request.IP, "user_agent": c.Request.UserAgent, "origin": c.Request.Origin,
-			"registered_at": c.CreatedAt,
+	httpx.WriteData(w, http.StatusOK, dto.Map(list, func(c oauth.Client) clientBody {
+		return clientBody{
+			ClientID: c.ID, Name: c.Name, RedirectURIs: c.RedirectURIs,
+			IP: c.Request.IP, UserAgent: c.Request.UserAgent, Origin: c.Request.Origin, RegisteredAt: c.CreatedAt,
 		}
-	}
-	httpx.WriteData(w, http.StatusOK, out)
+	}))
 }
 
 func (h Handler) oauthClientDestroy(w http.ResponseWriter, r *http.Request) {

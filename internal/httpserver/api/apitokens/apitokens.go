@@ -111,7 +111,7 @@ func (h Handler) apiTokensDestroy(w http.ResponseWriter, r *http.Request) {
 // token offer exactly this and keep no list of their own. Session only, like
 // the rest of token management.
 func (h Handler) apiTokenCapabilities(w http.ResponseWriter, r *http.Request) {
-	kinds := map[string]any{}
+	kinds := map[string]dto.TokenKindCapabilities{}
 	for _, kind := range []string{auth.TokenPersonal, auth.TokenMCP} {
 		resources := auth.ResourcesFor(kind)
 		presets := map[string][]string{}
@@ -123,9 +123,9 @@ func (h Handler) apiTokenCapabilities(w http.ResponseWriter, r *http.Request) {
 			}
 			presets[p] = perms
 		}
-		kinds[kind] = map[string]any{"resources": resources, "presets": presets}
+		kinds[kind] = dto.TokenKindCapabilities{Resources: resources, Presets: presets}
 	}
-	httpx.WriteData(w, http.StatusOK, map[string]any{"levels": auth.Levels, "presets": auth.Presets, "kinds": kinds})
+	httpx.WriteData(w, http.StatusOK, dto.TokenCapabilities{Levels: auth.Levels, Presets: auth.Presets, Kinds: kinds})
 }
 
 // tokenGrantBody is the part of a token request that says what it may do: a

@@ -64,3 +64,33 @@ func NewCategoryStatistics(s ledger.CategoryStatistics) CategoryStatistics {
 		TransactionsCount: s.Count, TotalAmount: s.Total,
 	}
 }
+
+// CatalogCurrency is a currency that can be added: the same shape for a
+// space's catalog and the server-wide one.
+type CatalogCurrency struct {
+	Code     string `json:"code"`
+	Name     string `json:"name"`
+	Symbol   string `json:"symbol"`
+	Decimals int    `json:"decimals"`
+	Rate     Number `json:"rate"`
+}
+
+func NewCatalogCurrency(c ledger.Currency) CatalogCurrency {
+	return CatalogCurrency{Code: c.Code, Name: c.Name, Symbol: c.Symbol, Decimals: c.Decimals, Rate: Number(c.Rate)}
+}
+
+// CategorySummary lists categories with what they hold in a period, in the
+// base currency.
+type CategorySummary struct {
+	Data     []Category  `json:"data"`
+	Total    money.Money `json:"total"`
+	Currency string      `json:"currency"`
+}
+
+// CurrencyConversion is an amount converted between two of the space's currencies.
+type CurrencyConversion struct {
+	Amount money.Money `json:"amount"`
+	From   Currency    `json:"from"`
+	To     Currency    `json:"to"`
+	Result money.Money `json:"result"`
+}

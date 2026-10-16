@@ -37,14 +37,36 @@ func (s Handler) uploadCreate(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, 422, err.Error())
 		return
 	}
-	var exp any
+	var exp *string
 	if up.ExpiresAt != nil {
-		exp = up.ExpiresAt.UTC().Format("2006-01-02T15:04:05-07:00")
+		s := up.ExpiresAt.UTC().Format("2006-01-02T15:04:05-07:00")
+		exp = &s
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{
-		"uploadId": up.ID, "key": up.ObjectKey, "bucket": up.Bucket,
-		"partSize": up.PartSize, "expiresAt": exp,
+	httpx.WriteJSON(w, http.StatusOK, createdBody{
+		UploadID: up.ID, Key: up.ObjectKey, Bucket: up.Bucket, PartSize: up.PartSize, ExpiresAt: exp,
 	})
+}
+
+// createdBody, completedBody and storedPartBody follow the multipart upload
+// protocol the uploader client speaks, so their keys are not all camelCase.
+type createdBody struct {
+	UploadID  string  `json:"uploadId"`
+	Key       string  `json:"key"`
+	Bucket    string  `json:"bucket"`
+	PartSize  int     `json:"partSize"`
+	ExpiresAt *string `json:"expiresAt"`
+}
+
+type completedBody struct {
+	Location string `json:"location"`
+	Key      string `json:"key"`
+	UploadID string `json:"uploadId"`
+}
+
+type storedPartBody struct {
+	PartNumber int    `json:"part_number"`
+	ETag       string `json:"etag"`
+	Size       int64  `json:"size"`
 }
 
 func (s Handler) uploadSignPart(w http.ResponseWriter, r *http.Request) {
@@ -99,9 +121,7 @@ func (s Handler) uploadComplete(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, 422, err.Error())
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{
-		"location": s.Uploads.Location(out), "key": out.ObjectKey, "uploadId": out.ID,
-	})
+	httpx.WriteJSON(w, http.StatusOK, completedBody{Location: s.Uploads.Location(out), Key: out.ObjectKey, UploadID: out.ID})
 }
 
 func (s Handler) uploadAbort(w http.ResponseWriter, r *http.Request) {
@@ -110,7 +130,7 @@ func (s Handler) uploadAbort(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = s.Uploads.Abort(r.Context(), up)
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{})
+	httpx.WriteJSON(w, http.StatusOK, struct{}{})
 }
 
 func (s Handler) uploadPart(w http.ResponseWriter, r *http.Request) {
@@ -133,7 +153,7 @@ func (s Handler) uploadPart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("ETag", `"`+etag+`"`)
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"part_number": part, "etag": etag, "size": size})
+	httpx.WriteJSON(w, http.StatusOK, storedPartBody{PartNumber: part, ETag: etag, Size: size})
 }
 
 func (s Handler) uploadOwned(w http.ResponseWriter, r *http.Request) *uploads.Upload {

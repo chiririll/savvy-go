@@ -125,3 +125,9 @@ type BalanceComparison struct {
 	Currency *string      `json:"currency"`
 	Decimals int          `json:"decimals"`
 }
+
+// DebtList is debts with the summary the caller asked for.
+type DebtList struct {
+	Data    []Debt       `json:"data"`
+	Summary *DebtSummary `json:"summary,omitempty"`
+}

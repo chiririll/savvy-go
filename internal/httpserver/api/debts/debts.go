@@ -22,9 +22,10 @@ func debtsIndex(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	payload := map[string]any{"data": dto.Map(list, dto.NewDebt)}
+	payload := dto.DebtList{Data: dto.Map(list, dto.NewDebt)}
 	if r.URL.Query().Get("with_summary") == "1" || r.URL.Query().Get("with_summary") == "true" {
-		payload["summary"] = dto.NewDebtSummary(httpx.Scope(r).Debts.Summary(r.Context()))
+		summary := dto.NewDebtSummary(httpx.Scope(r).Debts.Summary(r.Context()))
+		payload.Summary = &summary
 	}
 	httpx.WriteJSON(w, http.StatusOK, payload)
 }

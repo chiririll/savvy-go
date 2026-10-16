@@ -31,14 +31,21 @@ func (h Handler) oauthRegister(w http.ResponseWriter, r *http.Request) {
 	}
 	httpx.OpenCORS(w)
 	w.Header().Set("Cache-Control", "no-store")
-	httpx.WriteJSON(w, http.StatusCreated, map[string]any{
-		"client_id":                  c.ID,
-		"client_name":                c.Name,
-		"redirect_uris":              c.RedirectURIs,
-		"grant_types":                []string{"authorization_code", "refresh_token"},
-		"response_types":             []string{"code"},
-		"token_endpoint_auth_method": "none",
+	httpx.WriteJSON(w, http.StatusCreated, registeredClient{
+		ClientID: c.ID, ClientName: c.Name, RedirectURIs: c.RedirectURIs,
+		GrantTypes: []string{"authorization_code", "refresh_token"}, ResponseTypes: []string{"code"},
+		TokenEndpointAuthMethod: "none",
 	})
+}
+
+// registeredClient is the client information response of RFC 7591.
+type registeredClient struct {
+	ClientID                string   `json:"client_id"`
+	ClientName              string   `json:"client_name"`
+	RedirectURIs            []string `json:"redirect_uris"`
+	GrantTypes              []string `json:"grant_types"`
+	ResponseTypes           []string `json:"response_types"`
+	TokenEndpointAuthMethod string   `json:"token_endpoint_auth_method"`
 }
 
 // registrationInfo is what the admin sees when deciding on a new app. RealIP

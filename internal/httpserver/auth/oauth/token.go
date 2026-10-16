@@ -39,10 +39,15 @@ func (h Handler) oauthToken(w http.ResponseWriter, r *http.Request) {
 	}
 	httpx.OpenCORS(w)
 	w.Header().Set("Cache-Control", "no-store")
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{
-		"access_token":  ts.AccessToken,
-		"token_type":    "Bearer",
-		"expires_in":    ts.ExpiresIn,
-		"refresh_token": ts.RefreshToken,
+	httpx.WriteJSON(w, http.StatusOK, tokenResponse{
+		AccessToken: ts.AccessToken, TokenType: "Bearer", ExpiresIn: ts.ExpiresIn, RefreshToken: ts.RefreshToken,
 	})
+}
+
+// tokenResponse is the successful token response of RFC 6749.
+type tokenResponse struct {
+	AccessToken  string `json:"access_token"`
+	TokenType    string `json:"token_type"`
+	ExpiresIn    int    `json:"expires_in"`
+	RefreshToken string `json:"refresh_token"`
 }

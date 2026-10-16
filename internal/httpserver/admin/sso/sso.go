@@ -88,6 +88,13 @@ func (h Handler) idpDestroy(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// testResult is the outcome of a connection test.
+type testResult struct {
+	Status  string `json:"status"`
+	Message string `json:"message,omitempty"`
+	Error   string `json:"error,omitempty"`
+}
+
 func (h Handler) idpTest(w http.ResponseWriter, r *http.Request) {
 	p := h.idpParam(w, r)
 	if p == nil {
@@ -100,10 +107,10 @@ func (h Handler) idpTest(w http.ResponseWriter, r *http.Request) {
 		if e := sso.AsError(err); e != nil {
 			code, status, msg = e.Code, e.Status, e.Message
 		}
-		httpx.WriteJSON(w, status, map[string]any{"status": "error", "message": msg, "error": code})
+		httpx.WriteJSON(w, status, testResult{Status: "error", Message: msg, Error: code})
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"status": "ok"})
+	httpx.WriteJSON(w, http.StatusOK, testResult{Status: "ok"})
 }
 
 func (h Handler) idpParam(w http.ResponseWriter, r *http.Request) *sso.IdentityProvider {

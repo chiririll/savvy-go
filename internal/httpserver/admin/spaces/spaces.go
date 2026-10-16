@@ -23,6 +23,11 @@ type Handler struct {
 	Backups backup.Service
 }
 
+// clearedBody says how many invitation cooldowns were lifted.
+type clearedBody struct {
+	Cleared int `json:"cleared"`
+}
+
 // adminSpacesIndex is the overview of every space: metadata only (P5).
 func (h Handler) adminSpacesIndex(w http.ResponseWriter, r *http.Request) {
 	list, err := h.Spaces.Overview(r.Context())
@@ -140,5 +145,5 @@ func (h Handler) invitationsClear(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	httpx.WriteData(w, http.StatusOK, map[string]any{"cleared": n})
+	httpx.WriteData(w, http.StatusOK, clearedBody{Cleared: n})
 }

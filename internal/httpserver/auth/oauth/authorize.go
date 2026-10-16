@@ -70,9 +70,7 @@ func (h Handler) oauthConsentInfo(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	httpx.WriteData(w, http.StatusOK, map[string]any{
-		"client_name": c.Name, "spaces": dto.Map(mine, dto.NewSpace),
-	})
+	httpx.WriteData(w, http.StatusOK, consentBody{ClientName: c.Name, Spaces: dto.Map(mine, dto.NewSpace)})
 }
 
 // oauthConsent records the user's decision and says where to send the browser.
@@ -122,4 +120,10 @@ func (h Handler) oauthConsent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.WriteData(w, http.StatusOK, map[string]string{"redirect_url": redirectWith(body.RedirectURI, map[string]string{"code": code, "state": body.State})})
+}
+
+// consentBody is what the consent screen shows: the app and the spaces it may be given.
+type consentBody struct {
+	ClientName string      `json:"client_name"`
+	Spaces     []dto.Space `json:"spaces"`
 }

@@ -29,7 +29,7 @@ func currenciesIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func currenciesCatalog(w http.ResponseWriter, r *http.Request) {
-	httpx.WriteData(w, http.StatusOK, httpx.Scope(r).Currencies.Catalog(r.Context()))
+	httpx.WriteData(w, http.StatusOK, dto.Map(httpx.Scope(r).Currencies.Catalog(r.Context()), dto.NewCatalogCurrency))
 }
 
 func currenciesStore(w http.ResponseWriter, r *http.Request) {
@@ -158,12 +158,7 @@ func currenciesConvert(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteValidation(w, map[string][]string{"amount": {"The amount is out of range."}})
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{
-		"amount": amount,
-		"from":   dto.NewCurrency(*from),
-		"to":     dto.NewCurrency(*to),
-		"result": result,
-	})
+	httpx.WriteJSON(w, http.StatusOK, dto.CurrencyConversion{Amount: amount, From: dto.NewCurrency(*from), To: dto.NewCurrency(*to), Result: result})
 }
 
 func currencyParam(w http.ResponseWriter, r *http.Request) *ledger.Currency {
