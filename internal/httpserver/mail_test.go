@@ -14,7 +14,7 @@ import (
 	"savvy-go/internal/auth"
 	"savvy-go/internal/config"
 	"savvy-go/internal/currencydata"
-	"savvy-go/internal/mailer"
+	"savvy-go/internal/mail/smtp"
 	"savvy-go/internal/settings"
 )
 
@@ -22,18 +22,18 @@ import (
 type recorder struct {
 	mu       sync.Mutex
 	on       bool
-	sent     []mailer.Message
+	sent     []smtp.Message
 	sendErr  error
 	checkErr error
 }
 
 func (r *recorder) Enabled() bool { return r.on }
 
-func (r *recorder) Send(_ context.Context, m mailer.Message) error {
+func (r *recorder) Send(_ context.Context, m smtp.Message) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !r.on {
-		return mailer.ErrNotConfigured
+		return smtp.ErrNotConfigured
 	}
 	if r.sendErr != nil {
 		return r.sendErr
@@ -44,15 +44,15 @@ func (r *recorder) Send(_ context.Context, m mailer.Message) error {
 
 func (r *recorder) Check(context.Context) error {
 	if !r.on {
-		return mailer.ErrNotConfigured
+		return smtp.ErrNotConfigured
 	}
 	return r.checkErr
 }
 
-func (r *recorder) messages() []mailer.Message {
+func (r *recorder) messages() []smtp.Message {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return append([]mailer.Message(nil), r.sent...)
+	return append([]smtp.Message(nil), r.sent...)
 }
 
 // newMailApp is newTestApp with mail configured (a recorder stands in for the
@@ -60,8 +60,8 @@ func (r *recorder) messages() []mailer.Message {
 func newMailApp(t *testing.T, rec *recorder) (*testApp, *auth.Issued, *auth.User) {
 	t.Helper()
 	cfg, dir := testConfig(t)
-	cfg.Mail = mailer.Config{
-		Enabled: rec.on, Host: "smtp.example.com", Port: 587, Protocol: mailer.STARTTLS,
+	cfg.Mail = smtp.Config{
+		Enabled: rec.on, Host: "smtp.example.com", Port: 587, Protocol: smtp.STARTTLS,
 		User: "savvy", Password: "s3cret-smtp-password", From: "Go Savvy <savvy@example.com>",
 		Timeout: 5 * time.Second,
 	}
@@ -163,8 +163,8 @@ func TestMailSettingsAreAdminOnly(t *testing.T) {
 func TestMailSettingsSaveApplyAndPersist(t *testing.T) {
 	a, sess, _ := newMailApp(t, &recorder{})
 	next := &recorder{on: true}
-	var built mailer.Config
-	a.s.Mail.NewMailer = func(c mailer.Config) mailer.Mailer { built = c; return next }
+	var built smtp.Config
+	a.s.Mail.NewMailer = func(c smtp.Config) smtp.Mailer { built = c; return next }
 
 	res := a.do("PUT", "/api/admin/mail", mailForm(nil), sess.Token, sess.CSRF)
 	raw := decodeJSON(t, res)
@@ -196,8 +196,8 @@ func TestMailSettingsSaveApplyAndPersist(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := mailer.Config{
-		Enabled: true, Host: "smtp.new.example", Port: 465, Protocol: mailer.SMTPS, User: "bot",
+	want := smtp.Config{
+		Enabled: true, Host: "smtp.new.example", Port: 465, Protocol: smtp.SMTPS, User: "bot",
 		Password: "new-password", From: "Savvy <bot@new.example>", SkipVerify: true, Timeout: 7 * time.Second,
 	}
 	if again.Mail != want {
@@ -207,8 +207,8 @@ func TestMailSettingsSaveApplyAndPersist(t *testing.T) {
 
 func TestMailSettingsKeepThePasswordWhenOmitted(t *testing.T) {
 	a, sess, _ := newMailApp(t, &recorder{on: true})
-	var built mailer.Config
-	a.s.Mail.NewMailer = func(c mailer.Config) mailer.Mailer { built = c; return &recorder{on: c.Enabled} }
+	var built smtp.Config
+	a.s.Mail.NewMailer = func(c smtp.Config) smtp.Mailer { built = c; return &recorder{on: c.Enabled} }
 
 	form := mailForm(nil)
 	delete(form, "password")

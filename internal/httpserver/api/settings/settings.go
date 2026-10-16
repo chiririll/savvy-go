@@ -9,11 +9,11 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"savvy-go/internal/app/signin"
 	"savvy-go/internal/config"
-	"savvy-go/internal/emailverify"
 	"savvy-go/internal/httpserver/httpx"
+	"savvy-go/internal/mail"
 	"savvy-go/internal/settings"
-	"savvy-go/internal/signin"
 	"savvy-go/internal/sso"
 	"strings"
 	"time"
@@ -24,7 +24,7 @@ type Handler struct {
 	Cfg      config.Config
 	Settings settings.Store
 	SSO      *sso.Service
-	Verify   emailverify.Service
+	Verify   mail.Verifier
 }
 
 // settingsIndex lists the instance settings.
@@ -89,7 +89,7 @@ func (h Handler) canRequireVerification(w http.ResponseWriter, r *http.Request) 
 	switch {
 	case err == nil:
 		return true
-	case errors.Is(err, emailverify.ErrOwnAddressUnverified):
+	case errors.Is(err, mail.ErrOwnAddressUnverified):
 		httpx.WriteCoded(w, http.StatusUnprocessableEntity, "Confirm your own email address first, or you would lock yourself out.", "email_unverified")
 	default:
 		httpx.WriteCoded(w, http.StatusUnprocessableEntity, err.Error(), "mail_required")

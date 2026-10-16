@@ -12,10 +12,10 @@ import (
 	"savvy-go/internal/httpserver/httpx/login"
 	"savvy-go/internal/httpserver/httpx/routing"
 	"savvy-go/internal/httpserver/spa"
+	"savvy-go/internal/platform/webui"
 	"savvy-go/internal/signing"
 	"savvy-go/internal/spacefill"
 	"savvy-go/internal/store"
-	"savvy-go/internal/webui"
 )
 
 // Server is the HTTP front door: health probes, /api, and the Vite SPA.

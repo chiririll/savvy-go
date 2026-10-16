@@ -12,13 +12,13 @@ import (
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/httpserver/httpx/dto"
 	"savvy-go/internal/httpserver/httpx/login"
-	"savvy-go/internal/mailing"
+	"savvy-go/internal/mail"
 	"savvy-go/internal/spaces"
 	"strconv"
 	"strings"
 
 	"savvy-go/internal/auth"
-	"savvy-go/internal/mailer"
+	"savvy-go/internal/mail/smtp"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -29,7 +29,7 @@ type Handler struct {
 	Users   auth.Users
 	Tokens  auth.PasswordTokens
 	Spaces  spaces.Service
-	Mail    *mailing.Service
+	Mail    *mail.Service
 	Backups backup.Service
 	Login   login.Service
 }
@@ -106,7 +106,7 @@ func (h Handler) attachSetupLink(r *http.Request, u *auth.User, send bool) (*dto
 	switch {
 	case !send:
 		link.Token = tok
-	case h.Mail.Send(r.Context(), mailer.PasswordReset(u.Email, u.Name, h.Cfg.URL()+"/set-password/"+tok, exp)) != nil:
+	case h.Mail.Send(r.Context(), smtp.PasswordReset(u.Email, u.Name, h.Cfg.URL()+"/set-password/"+tok, exp)) != nil:
 		// The user exists but nobody saw the link: do not leave it valid. A reset can try again.
 		_ = h.Tokens.RevokeActive(r.Context(), u.ID)
 		link.EmailError = "Could not send the email."
@@ -267,7 +267,7 @@ func (h Handler) usersIssueToken(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteData(w, http.StatusOK, payload)
 		return
 	}
-	if err := h.Mail.Send(r.Context(), mailer.PasswordReset(u.Email, u.Name, h.Cfg.URL()+"/set-password/"+tok, exp)); err != nil {
+	if err := h.Mail.Send(r.Context(), smtp.PasswordReset(u.Email, u.Name, h.Cfg.URL()+"/set-password/"+tok, exp)); err != nil {
 		// The link was never seen by anyone: do not leave it valid.
 		_ = h.Tokens.RevokeActive(r.Context(), u.ID)
 		httpx.WriteMessage(w, http.StatusUnprocessableEntity, "Could not send the email: "+err.Error())
@@ -286,7 +286,7 @@ func (h Handler) linkMailProblem(r *http.Request) string {
 	case h.Login.PasswordLoginDisabled(r.Context()):
 		return "Password sign-in is switched off, so a set-password link is of no use."
 	case h.Cfg.URL() == "":
-		return mailing.NoAppURLMessage
+		return mail.NoAppURLMessage
 	}
 	return ""
 }

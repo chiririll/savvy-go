@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"savvy-go/internal/mailer"
+	"savvy-go/internal/mail/smtp"
 )
 
 func write(t *testing.T, body string) string {
@@ -233,8 +233,8 @@ func TestSetMailPersistsEveryKeyAndKeepsTheRest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := mailer.Config{
-		Enabled: true, Host: "smtp.example.com", Port: 465, Protocol: mailer.SMTPS,
+	want := smtp.Config{
+		Enabled: true, Host: "smtp.example.com", Port: 465, Protocol: smtp.SMTPS,
 		User: "savvy", Password: "s3cret", From: "Go Savvy <savvy@example.com>",
 		SkipVerify: true, Timeout: 3 * time.Second,
 	}
@@ -269,7 +269,7 @@ func TestSetMailOnAReadOnlyConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := cfg.Live.SetMail(mailer.Config{Enabled: false, Host: "x", Port: 25, Protocol: mailer.Plain}); !errors.Is(err, ErrReadOnly) {
+	if err := cfg.Live.SetMail(smtp.Config{Enabled: false, Host: "x", Port: 25, Protocol: smtp.Plain}); !errors.Is(err, ErrReadOnly) {
 		t.Errorf("SetMail on a read-only config: %v", err)
 	}
 }

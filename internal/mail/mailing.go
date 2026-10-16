@@ -1,6 +1,7 @@
-// Package mailing is the mail server of the instance: the sender in use, the
-// settings it was built from, and the admin routes that change them.
-package mailing
+// Package mail is the mail side of the application: the mail server of the instance
+// (the sender in use and the settings it was built from) and the confirmation of
+// email addresses. SMTP itself lives in mail/smtp.
+package mail
 
 import (
 	"context"
@@ -8,7 +9,7 @@ import (
 	"time"
 
 	"savvy-go/internal/config"
-	"savvy-go/internal/mailer"
+	"savvy-go/internal/mail/smtp"
 )
 
 // NoAppURLMessage is why a link cannot be sent while app_url is unset.
@@ -23,18 +24,18 @@ type Service struct {
 
 	// NewMailer builds a sender from settings; tests swap it to record
 	// instead of dialling.
-	NewMailer func(mailer.Config) mailer.Mailer
+	NewMailer func(smtp.Config) smtp.Mailer
 
 	mu      sync.RWMutex
-	sender  mailer.Mailer
-	conf    mailer.Config
+	sender  smtp.Mailer
+	conf    smtp.Config
 	problem string
 }
 
 // New starts from the [mailer] section of cfg. A non-nil sender replaces the
 // SMTP one, which is how tests record the mail.
-func New(cfg config.Config, sender mailer.Mailer) *Service {
-	s := &Service{cfg: cfg, NewMailer: mailer.New, sender: sender, conf: cfg.Mail, problem: cfg.MailProblem}
+func New(cfg config.Config, sender smtp.Mailer) *Service {
+	s := &Service{cfg: cfg, NewMailer: smtp.New, sender: sender, conf: cfg.Mail, problem: cfg.MailProblem}
 	if s.sender == nil {
 		s.sender = s.NewMailer(cfg.Mail)
 	}
@@ -42,7 +43,7 @@ func New(cfg config.Config, sender mailer.Mailer) *Service {
 }
 
 // Mailer is the current sender. It changes when an admin saves new settings.
-func (s *Service) Mailer() mailer.Mailer {
+func (s *Service) Mailer() smtp.Mailer {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.sender
@@ -50,7 +51,7 @@ func (s *Service) Mailer() mailer.Mailer {
 
 // Settings is the current SMTP configuration and why it is switched off, if
 // a saved section was invalid.
-func (s *Service) Settings() (mailer.Config, string) {
+func (s *Service) Settings() (smtp.Config, string) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.conf, s.problem
@@ -77,7 +78,7 @@ func (s *Service) SetProblem(problem string) {
 }
 
 // Send sends one email, giving up after a few connection timeouts.
-func (s *Service) Send(ctx context.Context, m mailer.Message) error {
+func (s *Service) Send(ctx context.Context, m smtp.Message) error {
 	cfg, _ := s.Settings()
 	timeout := cfg.Timeout
 	if timeout <= 0 {
@@ -114,7 +115,7 @@ func (s *Service) OffWhy() (reason, hint string) {
 
 // Apply validates, saves and activates next. A nil password keeps the stored
 // one. It holds the lock for the whole save, so two admins cannot mix values.
-func (s *Service) Apply(next mailer.Config, password *string) error {
+func (s *Service) Apply(next smtp.Config, password *string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	next.Password = s.conf.Password

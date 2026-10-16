@@ -5,20 +5,19 @@ package app
 import (
 	"os"
 
+	"savvy-go/internal/app/signin"
 	"savvy-go/internal/auth"
 	"savvy-go/internal/backup"
 	"savvy-go/internal/bootstrap"
 	"savvy-go/internal/config"
 	"savvy-go/internal/currencydata"
-	"savvy-go/internal/emailverify"
-	"savvy-go/internal/jobs"
 	"savvy-go/internal/ledger"
-	"savvy-go/internal/mailer"
-	"savvy-go/internal/mailing"
+	"savvy-go/internal/mail"
+	"savvy-go/internal/mail/smtp"
 	"savvy-go/internal/oauth"
 	"savvy-go/internal/refsync"
+	"savvy-go/internal/runtime"
 	"savvy-go/internal/settings"
-	"savvy-go/internal/signin"
 	"savvy-go/internal/signing"
 	"savvy-go/internal/spaces"
 	"savvy-go/internal/sso"
@@ -37,7 +36,7 @@ type Services struct {
 
 	// Bootstrap is the first-run password; nil keeps registration closed.
 	Bootstrap *bootstrap.Guard
-	Queue     *jobs.Queue
+	Queue     *runtime.Queue
 
 	Users          auth.Users
 	Sessions       auth.Sessions
@@ -48,7 +47,7 @@ type Services struct {
 	TwoFactor      auth.TwoFactor
 	WebAuthn       auth.WebAuthn
 
-	Mail      *mailing.Service
+	Mail      *mail.Service
 	Settings  settings.Store
 	Spaces    spaces.Service
 	Backups   backup.Service
@@ -59,7 +58,7 @@ type Services struct {
 	OAuth     *oauth.Service
 
 	SignIn      signin.Policy
-	EmailVerify emailverify.Service
+	EmailVerify mail.Verifier
 }
 
 // Option configures New.
@@ -76,12 +75,12 @@ func WithBootstrap(g *bootstrap.Guard) Option { return func(s *Services) { s.Boo
 
 // WithQueue sets the worker pool that background jobs (imports) run on. Without it they
 // run at once, inside the request.
-func WithQueue(q *jobs.Queue) Option { return func(s *Services) { s.Queue = q } }
+func WithQueue(q *runtime.Queue) Option { return func(s *Services) { s.Queue = q } }
 
 // WithMailer sets how email is sent. The default is the SMTP server of the [mailer]
 // section of the config file; tests pass a recorder.
-func WithMailer(m mailer.Mailer) Option {
-	return func(s *Services) { s.Mail = mailing.New(s.Cfg, m) }
+func WithMailer(m smtp.Mailer) Option {
+	return func(s *Services) { s.Mail = mail.New(s.Cfg, m) }
 }
 
 // New builds the services.
@@ -115,12 +114,12 @@ func New(cfg config.Config, st store.Store, keys *signing.Holder, opts ...Option
 		s.Rates = currencydata.New()
 	}
 	if s.Mail == nil {
-		s.Mail = mailing.New(cfg, nil)
+		s.Mail = mail.New(cfg, nil)
 	}
 	s.SSO = &sso.Service{DB: db, Users: s.Users, Settings: s.Settings, AppURL: cfg.URL}
 	s.OAuth = oauth.New(db)
 	s.SignIn = signin.Policy{Settings: s.Settings, SSO: s.SSO}
-	s.EmailVerify = emailverify.Service{Cfg: cfg, Mail: s.Mail, Verifications: s.Verifications, Users: s.Users}
+	s.EmailVerify = mail.Verifier{Cfg: cfg, Mail: s.Mail, Verifications: s.Verifications, Users: s.Users}
 	_ = os.MkdirAll(cfg.UploadsDir, 0o775)
 	_ = os.MkdirAll(cfg.BackupsDir, 0o775)
 	return s

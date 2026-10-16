@@ -8,10 +8,10 @@ import (
 
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/importer"
+	"savvy-go/internal/platform/sysinfo"
+	"savvy-go/internal/platform/version"
 	"savvy-go/internal/store"
-	"savvy-go/internal/sysinfo"
 	"savvy-go/internal/uploads"
-	"savvy-go/internal/version"
 )
 
 var processStarted = time.Now()

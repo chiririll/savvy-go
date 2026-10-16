@@ -1,4 +1,4 @@
-package schedule
+package runtime
 
 import (
 	"context"
@@ -18,7 +18,7 @@ type Scheduler struct {
 	jobs []Job
 }
 
-func New(jobs ...Job) *Scheduler {
+func NewScheduler(jobs ...Job) *Scheduler {
 	return &Scheduler{jobs: jobs}
 }
 

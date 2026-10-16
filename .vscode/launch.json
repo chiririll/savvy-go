@@ -13,7 +13,7 @@
             "cwd": "${workspaceFolder}",
             "envFile": "${workspaceFolder}/.env",
             "buildFlags": [
-                "-ldflags=-s -w -X savvy-go/internal/version.Value=dev -X savvy-go/internal/version.Env=local"
+                "-ldflags=-s -w -X savvy-go/internal/platform/version.Value=dev -X savvy-go/internal/platform/version.Env=local"
             ],
             "preLaunchTask": "build:frontend-dev"
         }

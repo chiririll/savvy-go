@@ -16,7 +16,7 @@ import (
 const (
 	pkg      = "./cmd/savvy-go"
 	outDir   = "dist"
-	embedDir = "internal/webui/dist" // what the embed build tag compiles in
+	embedDir = "internal/platform/webui/dist" // what the embed build tag compiles in
 )
 
 // Build groups the build targets.
@@ -74,7 +74,7 @@ func (Test) Go() error {
 	if err := stageFrontend(); err != nil {
 		return err
 	}
-	return sh.RunV("go", "test", "-tags", "embed", "./internal/webui/...", "./internal/httpserver/...")
+	return sh.RunV("go", "test", "-tags", "embed", "./internal/platform/webui/...", "./internal/httpserver/...")
 }
 
 // Frontend runs the frontend tests.
@@ -147,9 +147,9 @@ func compile(o buildOpts) error {
 		}
 	}
 
-	ldflags := "-X savvy-go/internal/version.Value=" + firstNonEmpty(os.Getenv("APP_VERSION"), "dev")
+	ldflags := "-X savvy-go/internal/platform/version.Value=" + firstNonEmpty(os.Getenv("APP_VERSION"), "dev")
 	if o.env != "" {
-		ldflags += " -X savvy-go/internal/version.Env=" + o.env
+		ldflags += " -X savvy-go/internal/platform/version.Env=" + o.env
 	}
 	args := []string{"build"}
 	if o.embed {

@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"savvy-go/internal/emailverify"
 	"savvy-go/internal/httpserver/httpx"
+	"savvy-go/internal/mail"
 )
 
 // Handler holds what the confirmation routes need.
 type Handler struct {
-	Verify emailverify.Service
+	Verify mail.Verifier
 }
 
 // verifyEmailResend sends the signed-in user a new confirmation link.

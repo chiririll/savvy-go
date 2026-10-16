@@ -1,6 +1,6 @@
 // Package mailer sends plain-text email through an SMTP server. It is a leaf:
 // it knows nothing of users, spaces or HTTP.
-package mailer
+package smtp
 
 import (
 	"context"

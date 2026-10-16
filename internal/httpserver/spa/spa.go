@@ -11,7 +11,7 @@ import (
 	"path"
 	"strings"
 
-	"savvy-go/internal/version"
+	"savvy-go/internal/platform/version"
 )
 
 type viteChunk struct {

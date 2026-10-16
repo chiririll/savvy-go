@@ -12,11 +12,11 @@ import (
 	"time"
 
 	"savvy-go/internal/auth"
+	"savvy-go/internal/platform/version"
 	"savvy-go/internal/signing"
 	"savvy-go/internal/spaces"
 	"savvy-go/internal/store"
 	"savvy-go/internal/transfers"
-	"savvy-go/internal/version"
 )
 
 // Backups of the whole server live in <Dir>/server, backups of a space in

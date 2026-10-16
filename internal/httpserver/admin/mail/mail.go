@@ -8,12 +8,12 @@ import (
 	"time"
 
 	"savvy-go/internal/httpserver/httpx"
-	"savvy-go/internal/mailer"
-	"savvy-go/internal/mailing"
+	"savvy-go/internal/mail"
+	"savvy-go/internal/mail/smtp"
 )
 
 // Handler is the admin's view of the mail settings.
-type Handler struct{ Mail *mailing.Service }
+type Handler struct{ Mail *mail.Service }
 
 func nullIfEmpty(s string) *string {
 	if s == "" {
@@ -78,7 +78,7 @@ func (h Handler) update(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusUnprocessableEntity, "The config file is read-only. Set the [mailer] section in config.toml.")
 		return
 	}
-	next := mailer.Config{
+	next := smtp.Config{
 		Enabled:    body.Enabled,
 		Host:       strings.TrimSpace(body.Host),
 		Port:       body.Port,
@@ -89,10 +89,10 @@ func (h Handler) update(w http.ResponseWriter, r *http.Request) {
 		Timeout:    time.Duration(body.Timeout) * time.Second,
 	}
 	if next.Timeout <= 0 {
-		next.Timeout = mailing.DefaultTimeout
+		next.Timeout = mail.DefaultTimeout
 	}
 	if err := h.Mail.Apply(next, body.Password); err != nil {
-		var invalid mailer.InvalidError
+		var invalid smtp.InvalidError
 		if errors.As(err, &invalid) {
 			httpx.WriteValidation(w, map[string][]string{invalid.Field: {invalid.Error()}})
 			return
@@ -131,7 +131,7 @@ func (h Handler) test(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusUnprocessableEntity, "Could not connect to the mail server: "+err.Error())
 		return
 	}
-	err := h.Mail.Send(r.Context(), mailer.Message{
+	err := h.Mail.Send(r.Context(), smtp.Message{
 		To:      to,
 		Subject: "Go Savvy test email",
 		Text:    "This is a test email from Go Savvy. Your mail settings work.\n",

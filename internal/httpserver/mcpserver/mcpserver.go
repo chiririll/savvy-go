@@ -11,7 +11,7 @@ import (
 	savvyauth "savvy-go/internal/auth"
 	"savvy-go/internal/config"
 	"savvy-go/internal/httpserver/httpx"
-	"savvy-go/internal/version"
+	"savvy-go/internal/platform/version"
 
 	"github.com/modelcontextprotocol/go-sdk/auth"
 	"github.com/modelcontextprotocol/go-sdk/mcp"

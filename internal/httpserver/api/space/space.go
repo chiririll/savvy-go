@@ -9,12 +9,11 @@ import (
 	"savvy-go/internal/auth"
 	"savvy-go/internal/backup"
 	"savvy-go/internal/config"
-	"savvy-go/internal/emailverify"
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/httpserver/httpx/dto"
 	"savvy-go/internal/httpserver/httpx/guard"
 	"savvy-go/internal/httpserver/httpx/login"
-	"savvy-go/internal/mailing"
+	"savvy-go/internal/mail"
 	"savvy-go/internal/spacefill"
 	"savvy-go/internal/spaces"
 	"savvy-go/internal/store"
@@ -27,9 +26,9 @@ type Handler struct {
 	Spaces  spaces.Service
 	Users   auth.Users
 	Backups backup.Service
-	Mail    *mailing.Service
+	Mail    *mail.Service
 	Login   login.Service
-	Verify  emailverify.Service
+	Verify  mail.Verifier
 	Creator spacefill.Creator
 	Guard   *guard.Guard
 }

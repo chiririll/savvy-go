@@ -7,10 +7,10 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	"savvy-go/internal/calendar"
 	repo "savvy-go/internal/db/repo/recurring"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/money"
+	"savvy-go/internal/platform/calendar"
 	"savvy-go/internal/store"
 )
 

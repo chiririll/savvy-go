@@ -8,11 +8,11 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	"savvy-go/internal/calendar"
 	"savvy-go/internal/db/filter"
 	ledgerrepo "savvy-go/internal/db/repo/ledger"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/money"
+	"savvy-go/internal/platform/calendar"
 )
 
 // Every amount a report returns is a money.Money in the base currency. Sums

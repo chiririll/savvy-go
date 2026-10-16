@@ -14,7 +14,7 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 
-	"savvy-go/internal/mailer"
+	"savvy-go/internal/mail/smtp"
 )
 
 // Config is process-wide runtime configuration loaded from the environment.
@@ -37,7 +37,7 @@ type Config struct {
 	// Mail is the SMTP server from [mailer] as loaded at start; the server keeps
 	// the current one, which the admin panel can change. It is disabled when
 	// MailProblem is set.
-	Mail        mailer.Config
+	Mail        smtp.Config
 	MailProblem string
 }
 
@@ -88,7 +88,7 @@ func defaults() file {
 	f.Security.CSRFCookie = "svy_csrf"
 	f.Security.CSRFHeader = "X-CSRF-Token"
 	f.Mailer.Port = 587
-	f.Mailer.Protocol = mailer.STARTTLS
+	f.Mailer.Protocol = smtp.STARTTLS
 	f.Mailer.Timeout = 10
 	return f
 }
@@ -221,7 +221,7 @@ func (l *Live) SetAppURL(v string) error {
 
 // SetMail replaces the [mailer] section and writes the config file. It does
 // not validate: the caller does, and may save a disabled, half-filled section.
-func (l *Live) SetMail(c mailer.Config) error {
+func (l *Live) SetMail(c smtp.Config) error {
 	return l.save(func(f *file) {
 		f.Mailer.Enabled = c.Enabled
 		f.Mailer.Host = c.Host
@@ -282,7 +282,7 @@ func (f file) resolve() Config {
 		SessionCookie: firstNonEmpty(f.Security.Cookie, "svy_session"),
 		CSRFCookie:    firstNonEmpty(f.Security.CSRFCookie, "svy_csrf"),
 		CSRFHeader:    firstNonEmpty(f.Security.CSRFHeader, "X-CSRF-Token"),
-		Mail: mailer.Config{
+		Mail: smtp.Config{
 			Enabled:    f.Mailer.Enabled,
 			Host:       strings.TrimSpace(f.Mailer.Host),
 			Port:       f.Mailer.Port,

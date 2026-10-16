@@ -12,8 +12,8 @@ import (
 	"savvy-go/internal/auth"
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/httpserver/httpx/dto"
-	"savvy-go/internal/mailer"
-	"savvy-go/internal/mailing"
+	"savvy-go/internal/mail"
+	"savvy-go/internal/mail/smtp"
 	"savvy-go/internal/spaces"
 
 	"github.com/go-chi/chi/v5"
@@ -37,7 +37,7 @@ func (h Handler) inviteMethods(ctx context.Context) (email, link bool, reason st
 	case !h.Mail.Mailer().Enabled():
 		reason, _ = h.Mail.OffWhy()
 	case h.Cfg.URL() == "":
-		reason = mailing.NoAppURLMessage
+		reason = mail.NoAppURLMessage
 	default:
 		email = true
 	}
@@ -109,7 +109,7 @@ func (h Handler) emailInvitation(r *http.Request, to, role, token string) error 
 		return errors.New("could not read the space")
 	}
 	link := h.Cfg.URL() + "/invite/" + token
-	if err := h.Mail.Send(r.Context(), mailer.Invitation(to, httpx.User(r).Name, space.Name, role, link)); err != nil {
+	if err := h.Mail.Send(r.Context(), smtp.Invitation(to, httpx.User(r).Name, space.Name, role, link)); err != nil {
 		return errors.New("Could not send the email: " + err.Error())
 	}
 	return nil

@@ -8,14 +8,14 @@ import (
 	"testing"
 
 	"savvy-go/internal/auth"
-	"savvy-go/internal/mailer"
+	"savvy-go/internal/mail/smtp"
 	"savvy-go/internal/sso"
 )
 
 var linkRe = regexp.MustCompile(`https?://\S+`)
 
 // linkIn is the one link of an email.
-func linkIn(t *testing.T, m mailer.Message) *url.URL {
+func linkIn(t *testing.T, m smtp.Message) *url.URL {
 	t.Helper()
 	raw := linkRe.FindString(m.Text)
 	u, err := url.Parse(raw)
@@ -202,7 +202,7 @@ func TestVerificationLinkIsOpaqueSingleUseAndReplaced(t *testing.T) {
 	a, _, _ := newMailApp(t, rec)
 	user := a.createUser("u@test.com", "secret1", roleEditor)
 	us := a.issue(user, false)
-	tokenOf := func(m mailer.Message) string {
+	tokenOf := func(m smtp.Message) string {
 		return strings.TrimPrefix(linkIn(t, m).Path, "/verify-email/")
 	}
 	verify := func(token string) int {

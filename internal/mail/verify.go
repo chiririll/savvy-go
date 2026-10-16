@@ -1,5 +1,4 @@
-// Package emailverify confirms email addresses: it sends the link and consumes it.
-package emailverify
+package mail
 
 import (
 	"context"
@@ -7,8 +6,7 @@ import (
 
 	"savvy-go/internal/auth"
 	"savvy-go/internal/config"
-	"savvy-go/internal/mailer"
-	"savvy-go/internal/mailing"
+	"savvy-go/internal/mail/smtp"
 )
 
 // ErrOwnAddressUnverified is returned when an admin would require verified
@@ -22,21 +20,21 @@ func (e MailRequiredError) Error() string {
 	return "Email verification needs working mail and a public URL. " + e.Reason
 }
 
-// Service sends confirmation links and confirms addresses.
-type Service struct {
+// Verifier sends confirmation links and confirms addresses.
+type Verifier struct {
 	Cfg           config.Config
-	Mail          *mailing.Service
+	Mail          *Service
 	Verifications auth.EmailVerifications
 	Users         auth.Users
 }
 
 // CanRequire reports why the requirement cannot be switched on by admin: links
 // need mail and a public URL, and the admin must have confirmed their own address.
-func (s Service) CanRequire(admin *auth.User) error {
+func (s Verifier) CanRequire(admin *auth.User) error {
 	if !s.Mail.Mailer().Enabled() || s.Cfg.URL() == "" {
 		reason := s.Mail.OffReason()
 		if s.Mail.Mailer().Enabled() {
-			reason = mailing.NoAppURLMessage
+			reason = NoAppURLMessage
 		}
 		return MailRequiredError{Reason: reason}
 	}
@@ -48,18 +46,18 @@ func (s Service) CanRequire(admin *auth.User) error {
 
 // Send emails u a link that confirms their address. It says what
 // is missing when mail cannot be sent.
-func (s Service) Send(ctx context.Context, u *auth.User) string {
+func (s Verifier) Send(ctx context.Context, u *auth.User) string {
 	switch {
 	case !s.Mail.Mailer().Enabled():
 		return s.Mail.OffReason()
 	case s.Cfg.URL() == "":
-		return mailing.NoAppURLMessage
+		return NoAppURLMessage
 	}
 	token, exp, err := s.Verifications.Issue(ctx, u)
 	if err != nil {
 		return "Could not create the link: " + err.Error()
 	}
-	if err := s.Mail.Send(ctx, mailer.EmailVerification(u.Email, u.Name, s.Cfg.URL()+"/verify-email/"+token, exp)); err != nil {
+	if err := s.Mail.Send(ctx, smtp.EmailVerification(u.Email, u.Name, s.Cfg.URL()+"/verify-email/"+token, exp)); err != nil {
 		return "Could not send the email: " + err.Error()
 	}
 	return ""
@@ -67,7 +65,7 @@ func (s Service) Send(ctx context.Context, u *auth.User) string {
 
 // Confirm marks the address named by the emailed token as confirmed. It reports
 // false for a token that is invalid or has expired.
-func (s Service) Confirm(ctx context.Context, token string) (bool, error) {
+func (s Verifier) Confirm(ctx context.Context, token string) (bool, error) {
 	u, err := s.Verifications.Consume(ctx, token)
 	if err != nil || u == nil {
 		return false, err

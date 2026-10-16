@@ -14,11 +14,11 @@ import (
 	"savvy-go/internal/config"
 	"savvy-go/internal/currencydata"
 	"savvy-go/internal/httpserver"
-	"savvy-go/internal/jobs"
+	"savvy-go/internal/platform/version"
+	"savvy-go/internal/runtime"
 	"savvy-go/internal/seed"
 	"savvy-go/internal/store/sqlite"
 	"savvy-go/internal/uploads"
-	"savvy-go/internal/version"
 )
 
 func main() {
@@ -72,7 +72,7 @@ func run(cfg config.Config, seedCfg seed.Config) error {
 		return err
 	}
 
-	queue := jobs.New(2)
+	queue := runtime.NewQueue(2)
 	jobsCtx, stopJobs := context.WithCancel(ctx)
 	defer stopJobs()
 	rates := currencydata.New()

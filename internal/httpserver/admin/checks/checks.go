@@ -8,7 +8,7 @@ import (
 	"savvy-go/internal/backup"
 	"savvy-go/internal/config"
 	"savvy-go/internal/httpserver/httpx"
-	"savvy-go/internal/sysinfo"
+	"savvy-go/internal/platform/sysinfo"
 )
 
 // Server checks tell an admin what is misconfigured or running out. They are

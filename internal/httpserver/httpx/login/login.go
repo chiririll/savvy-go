@@ -1,16 +1,16 @@
 // Package login is what every way of signing in shares: starting a session and the
-// answer the SPA expects. The policy on how people may sign in is in internal/signin.
+// answer the SPA expects. The policy on how people may sign in is in internal/app/signin.
 package login
 
 import (
 	"net/http"
 	"time"
 
+	"savvy-go/internal/app/signin"
 	"savvy-go/internal/auth"
 	"savvy-go/internal/config"
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/httpserver/httpx/dto"
-	"savvy-go/internal/signin"
 )
 
 // Service starts sessions. It embeds the sign-in policy, so callers ask it the

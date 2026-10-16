@@ -6,8 +6,8 @@ import (
 
 	"savvy-go/internal/db"
 	"savvy-go/internal/httpserver/httpx"
+	"savvy-go/internal/platform/version"
 	"savvy-go/internal/store"
-	"savvy-go/internal/version"
 )
 
 type healthReport struct {
