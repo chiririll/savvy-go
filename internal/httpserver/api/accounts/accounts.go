@@ -30,7 +30,7 @@ func (s Handler) accountsIndex(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	payload := httpx.Envelope{Data: dto.Map(list, dto.NewAccount)}
+	data := dto.Map(list, dto.NewAccount)
 	if r.URL.Query().Get("with_summary") == "1" || r.URL.Query().Get("with_summary") == "true" {
 		base, _ := httpx.Scope(r).Currencies.Base(r.Context())
 		if id := r.URL.Query().Get("base_currency_id"); id != "" {
@@ -38,14 +38,13 @@ func (s Handler) accountsIndex(w http.ResponseWriter, r *http.Request) {
 				base, _ = httpx.Scope(r).Currencies.ByID(r.Context(), n)
 			}
 		}
-		payload.Meta = nil
-		httpx.WriteJSON(w, http.StatusOK, map[string]any{
-			"data":    payload.Data,
-			"summary": dto.NewAccountsSummary(httpx.Scope(r).Accounts.Summary(r.Context(), base)),
+		httpx.WriteJSON(w, http.StatusOK, dto.AccountList{
+			Data:    data,
+			Summary: dto.NewAccountsSummary(httpx.Scope(r).Accounts.Summary(r.Context(), base)),
 		})
 		return
 	}
-	httpx.WriteData(w, http.StatusOK, payload.Data)
+	httpx.WriteData(w, http.StatusOK, data)
 }
 
 func (s Handler) accountsStore(w http.ResponseWriter, r *http.Request) {
@@ -178,12 +177,12 @@ func (s Handler) accountsBalanceHistory(w http.ResponseWriter, r *http.Request) 
 	base, _ := httpx.Scope(r).Currencies.Base(r.Context())
 	start, end := s.queryPeriod(r)
 	if base == nil {
-		httpx.WriteJSON(w, http.StatusOK, map[string]any{"dates": []string{}, "series": []any{}, "currency": nil, "decimals": 2})
+		httpx.WriteJSON(w, http.StatusOK, dto.BalanceHistory{Dates: []string{}, Series: []dto.BalanceSeries{}, Decimals: 2})
 		return
 	}
 	accts, _ := httpx.Scope(r).Accounts.All(r.Context(), true, true)
 	dates := dateRange(start, end)
-	series := []map[string]any{}
+	series := []dto.BalanceSeries{}
 	total := make([]money.Money, len(dates))
 	for i := range total {
 		total[i] = money.Zero(base.Unit())
@@ -199,16 +198,14 @@ func (s Handler) accountsBalanceHistory(w http.ResponseWriter, r *http.Request) 
 			data[i] = ledger.Convert(bal, *a.Currency, *base)
 			total[i] = total[i].Add(data[i])
 		}
-		series = append(series, map[string]any{
-			"id": a.ID, "name": a.Name, "type": a.Type, "data": data, "native_data": native, "currency": a.Currency.Code,
+		series = append(series, dto.BalanceSeries{
+			ID: &a.ID, Name: a.Name, Type: a.Type, Data: data, NativeData: native, Currency: a.Currency.Code,
 		})
 	}
 	if len(accts) > 1 {
-		series = append([]map[string]any{{"id": nil, "name": "Total", "type": "total", "data": total, "currency": base.Code}}, series...)
+		series = append([]dto.BalanceSeries{{Name: "Total", Type: "total", Data: total, Currency: base.Code}}, series...)
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{
-		"dates": dates, "series": series, "currency": base.Code, "decimals": base.Decimals,
-	})
+	httpx.WriteJSON(w, http.StatusOK, dto.BalanceHistory{Dates: dates, Series: series, Currency: &base.Code, Decimals: base.Decimals})
 }
 
 // queryPeriod resolves start_date/end_date from the query, falling back to the
@@ -236,11 +233,8 @@ func (s Handler) accountsBalanceComparison(w http.ResponseWriter, r *http.Reques
 			previous = &total
 		}
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{
-		"current":  sum.TotalBalance,
-		"previous": previous,
-		"currency": sum.Currency,
-		"decimals": sum.Decimals,
+	httpx.WriteJSON(w, http.StatusOK, dto.BalanceComparison{
+		Current: sum.TotalBalance, Previous: previous, Currency: sum.Currency, Decimals: sum.Decimals,
 	})
 }
 

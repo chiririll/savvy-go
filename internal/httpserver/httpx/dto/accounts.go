@@ -90,3 +90,38 @@ func currencyDecimals(c *ledger.Currency) int {
 	}
 	return c.Decimals
 }
+
+// AccountList is accounts with the summary the caller asked for.
+type AccountList struct {
+	Data    []Account       `json:"data"`
+	Summary AccountsSummary `json:"summary"`
+}
+
+// BalanceSeries is the balance of one account, or of all, over the dates of a
+// BalanceHistory. Data is in the base currency; NativeData is in the account's
+// own and absent for the total.
+type BalanceSeries struct {
+	ID         *int64        `json:"id"`
+	Name       string        `json:"name"`
+	Type       string        `json:"type"`
+	Data       []money.Money `json:"data"`
+	NativeData []money.Money `json:"native_data,omitempty"`
+	Currency   string        `json:"currency"`
+}
+
+// BalanceHistory has snake_case keys inside its series, like the chart client
+// that reads them.
+type BalanceHistory struct {
+	Dates    []string        `json:"dates"`
+	Series   []BalanceSeries `json:"series"`
+	Currency *string         `json:"currency"`
+	Decimals int             `json:"decimals"`
+}
+
+// BalanceComparison is the total balance now against the day before a period.
+type BalanceComparison struct {
+	Current  money.Money  `json:"current"`
+	Previous *money.Money `json:"previous"`
+	Currency *string      `json:"currency"`
+	Decimals int          `json:"decimals"`
+}

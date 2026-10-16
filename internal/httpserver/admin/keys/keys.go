@@ -30,11 +30,9 @@ func (h Handler) keysIndex(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	httpx.WriteData(w, http.StatusOK, map[string]any{
-		"own": map[string]any{"kid": key.KID(), "publicKey": base64.StdEncoding.EncodeToString(key.Public())},
-		"trusted": dto.Map(trusted, func(k transfers.TrustedKey) map[string]any {
-			return map[string]any{"kid": k.KID, "publicKey": k.PublicKey, "name": k.Name, "createdAt": httpx.TimeOrNil(k.CreatedAt)}
-		}),
+	httpx.WriteData(w, http.StatusOK, dto.Keys{
+		Own:     dto.SigningKey{KID: key.KID(), PublicKey: base64.StdEncoding.EncodeToString(key.Public())},
+		Trusted: dto.Map(trusted, dto.NewTrustedKey),
 	})
 }
 

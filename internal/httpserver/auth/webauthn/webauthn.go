@@ -29,7 +29,7 @@ func (h Handler) webauthnIndex(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"credentials": dto.Map(list, dto.NewWebAuthnCred)})
+	httpx.WriteJSON(w, http.StatusOK, dto.PasskeyList{Credentials: dto.Map(list, dto.NewWebAuthnCred)})
 }
 
 func (h Handler) webauthnRegisterOptions(w http.ResponseWriter, r *http.Request) {
@@ -42,7 +42,7 @@ func (h Handler) webauthnRegisterOptions(w http.ResponseWriter, r *http.Request)
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"token": token, "options": options})
+	httpx.WriteJSON(w, http.StatusOK, dto.WebAuthnChallenge{Token: token, Options: options})
 }
 
 func (h Handler) webauthnRegisterVerify(w http.ResponseWriter, r *http.Request) {
@@ -65,10 +65,7 @@ func (h Handler) webauthnRegisterVerify(w http.ResponseWriter, r *http.Request) 
 		}
 		return
 	}
-	httpx.WriteJSON(w, http.StatusCreated, map[string]any{
-		"message":    "Passkey registered.",
-		"credential": dto.NewWebAuthnCred(*cred),
-	})
+	httpx.WriteJSON(w, http.StatusCreated, dto.PasskeyRegistered{Message: "Passkey registered.", Credential: dto.NewWebAuthnCred(*cred)})
 }
 
 func (h Handler) webauthnUpdate(w http.ResponseWriter, r *http.Request) {
@@ -123,7 +120,7 @@ func (h Handler) webauthnLoginOptions(w http.ResponseWriter, r *http.Request) {
 			httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		httpx.WriteJSON(w, http.StatusOK, map[string]any{"token": token, "options": options})
+		httpx.WriteJSON(w, http.StatusOK, dto.WebAuthnChallenge{Token: token, Options: options})
 		return
 	}
 	_ = userID
@@ -132,7 +129,7 @@ func (h Handler) webauthnLoginOptions(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"token": token, "options": options})
+	httpx.WriteJSON(w, http.StatusOK, dto.WebAuthnChallenge{Token: token, Options: options})
 }
 
 func (h Handler) webauthnLoginVerify(w http.ResponseWriter, r *http.Request) {

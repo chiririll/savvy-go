@@ -62,34 +62,6 @@ func (u User) IsAdmin() bool { return u.Role == RoleAdmin }
 
 func (u User) IsGuest() bool { return u.Role == RoleGuest }
 
-func (u User) SessionJSON() map[string]any {
-	return map[string]any{
-		"id":            u.ID,
-		"name":          u.Name,
-		"email":         u.Email,
-		"role":          u.Role,
-		"isSsoOnly":     u.IsSSOOnly,
-		"emailVerified": u.EmailVerified,
-	}
-}
-
-func (u User) ResourceJSON() map[string]any {
-	var created any
-	if u.CreatedAt != nil {
-		created = u.CreatedAt.UTC().Format(time.RFC3339Nano)
-	}
-	return map[string]any{
-		"id":            u.ID,
-		"name":          u.Name,
-		"email":         u.Email,
-		"role":          u.Role,
-		"isInactive":    u.IsInactive(),
-		"isSsoOnly":     u.IsSSOOnly,
-		"emailVerified": u.EmailVerified,
-		"createdAt":     created,
-	}
-}
-
 type Users struct {
 	DB store.DB
 }

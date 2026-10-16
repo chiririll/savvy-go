@@ -5,7 +5,6 @@ package httpx
 import (
 	"encoding/json"
 	"net/http"
-	"time"
 )
 
 type Envelope struct {
@@ -88,12 +87,4 @@ func WriteHealth(w http.ResponseWriter, status int, v any) {
 func OpenCORS(w http.ResponseWriter) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Expose-Headers", "WWW-Authenticate, Mcp-Session-Id")
-}
-
-// TimeOrNil renders a timestamp as RFC 3339 UTC, or null.
-func TimeOrNil(t *time.Time) any {
-	if t == nil {
-		return nil
-	}
-	return t.UTC().Format(time.RFC3339)
 }

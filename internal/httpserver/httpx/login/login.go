@@ -9,6 +9,7 @@ import (
 	"savvy-go/internal/auth"
 	"savvy-go/internal/config"
 	"savvy-go/internal/httpserver/httpx"
+	"savvy-go/internal/httpserver/httpx/dto"
 	"savvy-go/internal/signin"
 )
 
@@ -33,16 +34,16 @@ func (s Service) Issue(w http.ResponseWriter, r *http.Request, u *auth.User, sta
 
 // WritePayload answers with the user and when the session ends.
 func (s Service) WritePayload(w http.ResponseWriter, r *http.Request, status int, u *auth.User, sess *auth.Session) {
-	var refresh *string // null when the session does not rotate
+	user := dto.NewSessionUser(*u)
+	expires := sess.AbsoluteExpiresAt.UTC().Truncate(time.Second)
+	var refresh *time.Time // null when the session does not rotate
 	if at := sess.RefreshDueAt(); at != nil {
-		iso := at.UTC().Format(time.RFC3339)
-		refresh = &iso
+		t := at.UTC().Truncate(time.Second)
+		refresh = &t
 	}
-	httpx.WriteJSON(w, status, map[string]any{
-		"user":       u.SessionJSON(),
-		"expires_at": sess.AbsoluteExpiresAt.UTC().Format(time.RFC3339),
-		"refresh_at": refresh,
+	httpx.WriteJSON(w, status, dto.SessionPayload{
+		User: &user, ExpiresAt: &expires, RefreshAt: refresh,
 		// The SPA shows the "confirm your email" page instead of the app.
-		"email_verification_required": s.EmailRequired(r.Context()),
+		EmailVerificationRequired: s.EmailRequired(r.Context()),
 	})
 }

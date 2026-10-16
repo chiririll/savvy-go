@@ -76,3 +76,18 @@ func NewTransactionSummary(s ledger.TransactionSummary) TransactionSummary {
 		TransactionsCount: s.Count, Currency: currencyCode(s.Currency),
 	}
 }
+
+// PageMeta describes one page of a paginated list.
+type PageMeta struct {
+	CurrentPage int `json:"current_page"`
+	LastPage    int `json:"last_page"`
+	PerPage     int `json:"per_page"`
+	Total       int `json:"total"`
+}
+
+// TransactionPage is a page of transactions, with the summary when asked for.
+type TransactionPage struct {
+	Data    []Transaction       `json:"data"`
+	Meta    PageMeta            `json:"meta"`
+	Summary *TransactionSummary `json:"summary,omitempty"`
+}

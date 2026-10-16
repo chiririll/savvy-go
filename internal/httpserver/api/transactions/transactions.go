@@ -51,14 +51,13 @@ func transactionsIndex(w http.ResponseWriter, r *http.Request) {
 	if last < 1 {
 		last = 1
 	}
-	payload := map[string]any{
-		"data": dto.Map(list, dto.NewTransaction),
-		"meta": map[string]any{
-			"current_page": page, "last_page": last, "per_page": per, "total": total,
-		},
+	payload := dto.TransactionPage{
+		Data: dto.Map(list, dto.NewTransaction),
+		Meta: dto.PageMeta{CurrentPage: page, LastPage: last, PerPage: per, Total: total},
 	}
 	if r.URL.Query().Get("with_summary") == "1" || r.URL.Query().Get("with_summary") == "true" {
-		payload["summary"] = dto.NewTransactionSummary(httpx.Scope(r).Txs.Summary(r.Context(), false))
+		summary := dto.NewTransactionSummary(httpx.Scope(r).Txs.Summary(r.Context(), false))
+		payload.Summary = &summary
 	}
 	httpx.WriteJSON(w, http.StatusOK, payload)
 }

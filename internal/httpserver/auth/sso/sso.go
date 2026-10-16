@@ -7,6 +7,7 @@ import (
 	"savvy-go/internal/auth"
 	"savvy-go/internal/config"
 	"savvy-go/internal/httpserver/httpx"
+	"savvy-go/internal/httpserver/httpx/dto"
 	"savvy-go/internal/httpserver/httpx/guard"
 	"savvy-go/internal/httpserver/httpx/login"
 
@@ -112,7 +113,7 @@ func (h Handler) ssoExchange(w http.ResponseWriter, r *http.Request) {
 			httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		httpx.WriteJSON(w, http.StatusOK, map[string]any{"requires_2fa": true, "two_factor_token": tok})
+		httpx.WriteJSON(w, http.StatusOK, dto.NewTwoFactorRequired(tok))
 		return
 	}
 	h.Login.Issue(w, r, u, http.StatusOK, true)

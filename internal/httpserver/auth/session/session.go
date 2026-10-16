@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"savvy-go/internal/httpserver/httpx"
+	"savvy-go/internal/httpserver/httpx/dto"
 	"savvy-go/internal/httpserver/httpx/login"
 	"savvy-go/internal/settings"
 	"strings"
@@ -38,15 +39,15 @@ func (h Handler) authStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	// Tells the setup page where to find the first-run password; the password
 	// itself never leaves the server.
-	var hint any
+	var hint *dto.BootstrapHint
 	if n == 0 && h.Bootstrap.Active() {
-		h := h.Bootstrap.Hint()
-		hint = map[string]any{"environment": h.Environment, "file": h.File}
+		b := h.Bootstrap.Hint()
+		hint = &dto.BootstrapHint{Environment: b.Environment, File: b.File}
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{
-		"needs_registration":     n == 0,
-		"password_login_enabled": !h.Login.PasswordLoginDisabled(r.Context()),
-		"bootstrap_hint":         hint,
+	httpx.WriteJSON(w, http.StatusOK, dto.SetupStatus{
+		NeedsRegistration:    n == 0,
+		PasswordLoginEnabled: !h.Login.PasswordLoginDisabled(r.Context()),
+		BootstrapHint:        hint,
 	})
 }
 
@@ -171,10 +172,7 @@ func (h Handler) authLogin(w http.ResponseWriter, r *http.Request) {
 			httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		httpx.WriteJSON(w, http.StatusOK, map[string]any{
-			"requires_2fa":     true,
-			"two_factor_token": tok,
-		})
+		httpx.WriteJSON(w, http.StatusOK, dto.NewTwoFactorRequired(tok))
 		return
 	}
 	h.Login.Issue(w, r, u, http.StatusOK, body.RememberMe)
@@ -185,11 +183,7 @@ func (h Handler) authMe(w http.ResponseWriter, r *http.Request) {
 	token := auth.ReadToken(r, h.Cfg)
 	sess, err := h.Sessions.Resolve(r.Context(), token)
 	if err != nil || sess == nil || sess.User == nil {
-		httpx.WriteJSON(w, http.StatusOK, map[string]any{
-			"user":       nil,
-			"expires_at": nil,
-			"refresh_at": nil,
-		})
+		httpx.WriteJSON(w, http.StatusOK, dto.SessionPayload{})
 		return
 	}
 	refreshed, err := h.Sessions.MaybeRefresh(r.Context(), sess)
@@ -247,10 +241,7 @@ func (h Handler) authLogoutOthers(w http.ResponseWriter, r *http.Request) {
 	if sess != nil {
 		revoked, _ = h.Sessions.RevokeOthers(r.Context(), u.ID, sess.ID)
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{
-		"message": "Signed out of other devices.",
-		"revoked": revoked,
-	})
+	httpx.WriteJSON(w, http.StatusOK, dto.SignedOutOthers{Message: "Signed out of other devices.", Revoked: revoked})
 }
 
 func (h Handler) authLogout(w http.ResponseWriter, r *http.Request) {
@@ -267,11 +258,8 @@ func (h Handler) passwordPreview(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusNotFound, "This link is invalid or has expired.")
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{
-		"name":       row.User.Name,
-		"email":      row.User.Email,
-		"isInactive": row.User.IsInactive(),
-		"expiresAt":  row.ExpiresAt.UTC().Format("2006-01-02T15:04:05.000000Z"),
+	httpx.WriteJSON(w, http.StatusOK, dto.PasswordLink{
+		Name: row.User.Name, Email: row.User.Email, IsInactive: row.User.IsInactive(), ExpiresAt: row.ExpiresAt.UTC(),
 	})
 }
 
@@ -301,7 +289,7 @@ func (h Handler) passwordAccept(w http.ResponseWriter, r *http.Request) {
 			httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		httpx.WriteJSON(w, http.StatusOK, map[string]any{"requires_2fa": true, "two_factor_token": tok})
+		httpx.WriteJSON(w, http.StatusOK, dto.NewTwoFactorRequired(tok))
 		return
 	}
 	h.Login.Issue(w, r, u, http.StatusOK, true)

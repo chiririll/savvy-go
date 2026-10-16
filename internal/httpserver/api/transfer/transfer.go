@@ -55,9 +55,7 @@ func (h Handler) linksIndex(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	httpx.WriteData(w, http.StatusOK, dto.Map(list, func(x spaces.Space) map[string]any {
-		return map[string]any{"id": x.ID, "name": x.Name}
-	}))
+	httpx.WriteData(w, http.StatusOK, dto.Map(list, dto.NewSpaceName))
 }
 
 // linksStore links the space with another the caller administers. A target
@@ -91,41 +89,15 @@ func (h Handler) linksDestroy(w http.ResponseWriter, r *http.Request) {
 
 // --- transfers -------------------------------------------------------------
 
-func sideJSON(side transfers.Side, withAccount bool) map[string]any {
-	out := map[string]any{
-		"amount":   decimal.New(side.Amount, -int32(side.Decimals)).String(),
-		"currency": side.Currency,
-	}
-	if withAccount {
-		out["accountId"] = side.AccountID
-	}
-	return out
-}
-
 // transferJSON shows a transfer to a member of the request's space: the
 // other side's account only to who belongs to that space too (P30).
-func (h Handler) transferJSON(r *http.Request, v transfers.View) map[string]any {
+func (h Handler) transferJSON(r *http.Request, v transfers.View) dto.Transfer {
 	seesOther := false
 	if v.OtherSpace != nil {
 		role, _ := h.Spaces.Role(r.Context(), v.OtherSpace.ID, httpx.User(r).ID)
 		seesOther = role != ""
 	}
-	from, to := sideJSON(v.From, v.Outgoing || seesOther), sideJSON(v.To, !v.Outgoing || seesOther)
-	out := map[string]any{
-		"uuid": v.UUID, "from": from, "to": to, "outgoing": v.Outgoing, "date": v.Date, "description": v.Description,
-		"version": v.Version, "status": v.Status, "review": v.Review, "frozen": v.Frozen, "verified": v.Verified,
-		"deleted": v.DeletedAt != nil,
-	}
-	if v.OtherSpace != nil {
-		out["otherSpace"] = map[string]any{"id": v.OtherSpace.ID, "name": v.OtherSpace.Name}
-	}
-	if v.Remote != nil {
-		out["remote"] = map[string]any{
-			"from": sideJSON(v.Remote.From, false), "to": sideJSON(v.Remote.To, false),
-			"date": v.Remote.Date, "description": v.Remote.Description, "deleted": v.Remote.DeletedAt != nil,
-		}
-	}
-	return out
+	return dto.NewTransfer(v, seesOther)
 }
 
 func (h Handler) transfersIndex(w http.ResponseWriter, r *http.Request) {
@@ -134,7 +106,7 @@ func (h Handler) transfersIndex(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	httpx.WriteData(w, http.StatusOK, dto.Map(list, func(v transfers.View) map[string]any { return h.transferJSON(r, v) }))
+	httpx.WriteData(w, http.StatusOK, dto.Map(list, func(v transfers.View) dto.Transfer { return h.transferJSON(r, v) }))
 }
 
 // findTransfer is a transfer of the request's space as its members see it.

@@ -18,9 +18,7 @@ func (h Handler) membersIndex(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteSpaceError(w, err)
 		return
 	}
-	httpx.WriteData(w, http.StatusOK, dto.Map(list, func(m spaces.Member) map[string]any {
-		return map[string]any{"userId": m.UserID, "name": m.Name, "email": m.Email, "role": m.Role, "createdAt": httpx.TimeOrNil(m.CreatedAt)}
-	}))
+	httpx.WriteData(w, http.StatusOK, dto.Map(list, dto.NewMember))
 }
 
 // memberParam is the user named by {user}, if they belong to the space.

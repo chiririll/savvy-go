@@ -10,6 +10,7 @@ import (
 	"savvy-go/internal/backup"
 	"savvy-go/internal/config"
 	"savvy-go/internal/httpserver/httpx"
+	"savvy-go/internal/httpserver/httpx/dto"
 	"savvy-go/internal/httpserver/httpx/login"
 	"savvy-go/internal/mailing"
 	"savvy-go/internal/spaces"
@@ -39,11 +40,7 @@ func (h Handler) usersIndex(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	data := make([]any, 0, len(list))
-	for _, u := range list {
-		data = append(data, u.ResourceJSON())
-	}
-	httpx.WriteData(w, http.StatusOK, data)
+	httpx.WriteData(w, http.StatusOK, dto.Map(list, dto.NewUser))
 }
 
 func (h Handler) usersShow(w http.ResponseWriter, r *http.Request) {
@@ -51,7 +48,7 @@ func (h Handler) usersShow(w http.ResponseWriter, r *http.Request) {
 	if u == nil {
 		return
 	}
-	httpx.WriteData(w, http.StatusOK, u.ResourceJSON())
+	httpx.WriteData(w, http.StatusOK, dto.NewUser(*u))
 }
 
 type userStoreBody struct {
@@ -100,23 +97,23 @@ func (h Handler) validateNewUser(r *http.Request, body userStoreBody) (errs map[
 
 // attachSetupLink issues the set-password token of a user without a password
 // and either returns it in the payload or emails it.
-func (h Handler) attachSetupLink(r *http.Request, u *auth.User, send bool, payload map[string]any) error {
+func (h Handler) attachSetupLink(r *http.Request, u *auth.User, send bool) (*dto.SetupLink, error) {
 	tok, exp, err := h.Tokens.Issue(r.Context(), u)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	payload["expiresAt"] = exp.UTC().Format("2006-01-02T15:04:05.000000Z")
+	link := &dto.SetupLink{ExpiresAt: exp.UTC()}
 	switch {
 	case !send:
-		payload["token"] = tok
+		link.Token = tok
 	case h.Mail.Send(r.Context(), mailer.PasswordReset(u.Email, u.Name, h.Cfg.URL()+"/set-password/"+tok, exp)) != nil:
 		// The user exists but nobody saw the link: do not leave it valid. A reset can try again.
 		_ = h.Tokens.RevokeActive(r.Context(), u.ID)
-		payload["emailError"] = "Could not send the email."
+		link.EmailError = "Could not send the email."
 	default:
-		payload["emailSent"] = true
+		link.EmailSent = true
 	}
-	return nil
+	return link, nil
 }
 
 func (h Handler) usersStore(w http.ResponseWriter, r *http.Request) {
@@ -146,12 +143,14 @@ func (h Handler) usersStore(w http.ResponseWriter, r *http.Request) {
 		}
 		u.EmailVerified = true
 	}
-	payload := u.ResourceJSON()
+	payload := dto.UserWithLink{User: dto.NewUser(*u)}
 	if u.IsInactive() {
-		if err := h.attachSetupLink(r, u, body.Send, payload); err != nil {
+		link, err := h.attachSetupLink(r, u, body.Send)
+		if err != nil {
 			httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 			return
 		}
+		payload.SetupLink = link
 	}
 	httpx.WriteData(w, http.StatusCreated, payload)
 }
@@ -202,7 +201,7 @@ func (h Handler) usersUpdate(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	httpx.WriteData(w, http.StatusOK, updated.ResourceJSON())
+	httpx.WriteData(w, http.StatusOK, dto.NewUser(*updated))
 }
 
 func (h Handler) usersDestroy(w http.ResponseWriter, r *http.Request) {
@@ -262,10 +261,9 @@ func (h Handler) usersIssueToken(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	payload := u.ResourceJSON()
-	payload["expiresAt"] = exp.UTC().Format("2006-01-02T15:04:05.000000Z")
+	payload := dto.UserWithLink{User: dto.NewUser(*u), SetupLink: &dto.SetupLink{ExpiresAt: exp.UTC()}}
 	if !body.Send {
-		payload["token"] = tok
+		payload.Token = tok
 		httpx.WriteData(w, http.StatusOK, payload)
 		return
 	}
@@ -275,7 +273,7 @@ func (h Handler) usersIssueToken(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusUnprocessableEntity, "Could not send the email: "+err.Error())
 		return
 	}
-	payload["emailSent"] = true
+	payload.EmailSent = true
 	httpx.WriteData(w, http.StatusOK, payload)
 }
 

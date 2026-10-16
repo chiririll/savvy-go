@@ -100,8 +100,8 @@ func (h Handler) syncGroupShow(w http.ResponseWriter, r *http.Request) {
 		member.Role = role
 		members = append(members, member)
 	}
-	httpx.WriteData(w, http.StatusOK, map[string]any{
-		"id": g.ID, "categories": g.Categories, "tags": g.Tags, "members": members, "hidden": hidden,
+	httpx.WriteData(w, http.StatusOK, dto.SyncGroupView{
+		ID: g.ID, Categories: g.Categories, Tags: g.Tags, Members: members, Hidden: hidden,
 	})
 }
 
@@ -118,7 +118,13 @@ func (h Handler) syncGroupDiff(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	httpx.WriteData(w, http.StatusOK, h.diffJSON(r, diff))
+	httpx.WriteData(w, http.StatusOK, dto.NewSyncDiff(diff, func(id int64) (string, bool) {
+		sps, _ := h.Spaces.Get(r.Context(), id)
+		if sps == nil {
+			return "", false
+		}
+		return sps.Name, true
+	}))
 }
 
 // syncGroupApply reconciles the spaces by the decisions and changes the group.
@@ -138,71 +144,5 @@ func (h Handler) syncGroupApply(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteData(w, http.StatusOK, nil)
 		return
 	}
-	httpx.WriteData(w, http.StatusOK, map[string]any{"id": g.ID, "categories": g.Categories, "tags": g.Tags, "members": g.Members})
-}
-
-func (h Handler) diffJSON(r *http.Request, d refsync.Diff) map[string]any {
-	names := map[int64]string{}
-	note := func(ids ...int64) {
-		for _, id := range ids {
-			if _, seen := names[id]; seen {
-				continue
-			}
-			if sps, _ := h.Spaces.Get(r.Context(), id); sps != nil {
-				names[id] = sps.Name
-			}
-		}
-	}
-	cats := []map[string]any{}
-	for _, c := range d.Categories {
-		present := []map[string]any{}
-		for _, p := range c.Present {
-			note(p.Space)
-			present = append(present, map[string]any{
-				"spaceId": p.Space, "icon": p.Icon, "color": p.Color, "isDefault": p.IsDefault, "transactions": p.Transactions,
-			})
-		}
-		note(c.Missing...)
-		cats = append(cats, map[string]any{"type": c.Type, "name": c.Name, "present": present, "missing": nonNil(c.Missing)})
-	}
-	tags := []map[string]any{}
-	for _, t := range d.Tags {
-		present := []map[string]any{}
-		for _, p := range t.Present {
-			note(p.Space)
-			present = append(present, map[string]any{"spaceId": p.Space, "transactions": p.Transactions})
-		}
-		note(t.Missing...)
-		tags = append(tags, map[string]any{"name": t.Name, "present": present, "missing": nonNil(t.Missing)})
-	}
-	defaults := []map[string]any{}
-	for _, c := range d.Defaults {
-		list := []map[string]any{}
-		for _, id := range sortedKeys(c.Defaults) {
-			note(id)
-			list = append(list, map[string]any{"spaceId": id, "name": c.Defaults[id]})
-		}
-		defaults = append(defaults, map[string]any{"type": c.Type, "defaults": list})
-	}
-	spaces := []map[string]any{}
-	for _, id := range sortedKeys(names) {
-		spaces = append(spaces, map[string]any{"id": id, "name": names[id]})
-	}
-	return map[string]any{"categories": cats, "tags": tags, "defaults": defaults, "spaces": spaces}
-}
-
-func nonNil(ids []int64) []int64 {
-	if ids == nil {
-		return []int64{}
-	}
-	return ids
-}
-
-func sortedKeys[V any](m map[int64]V) []int64 {
-	keys := make([]int64, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
-	return keys
+	httpx.WriteData(w, http.StatusOK, dto.NewSyncGroup(*g))
 }

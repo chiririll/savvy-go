@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"savvy-go/internal/auth"
 	"savvy-go/internal/httpserver/httpx"
+	"savvy-go/internal/httpserver/httpx/dto"
 	"savvy-go/internal/httpserver/httpx/login"
 )
 
@@ -28,7 +29,7 @@ func (h Handler) twoFactorEnable(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"secret": secret, "qr_code_url": uri})
+	httpx.WriteJSON(w, http.StatusOK, dto.TwoFactorSetup{Secret: secret, QRCodeURL: uri})
 }
 
 func (h Handler) twoFactorConfirm(w http.ResponseWriter, r *http.Request) {
@@ -52,10 +53,7 @@ func (h Handler) twoFactorConfirm(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{
-		"message":        "Two-factor authentication has been enabled.",
-		"recovery_codes": codes,
-	})
+	httpx.WriteJSON(w, http.StatusOK, dto.RecoveryCodes{Message: "Two-factor authentication has been enabled.", Codes: codes})
 }
 
 func (h Handler) twoFactorDisable(w http.ResponseWriter, r *http.Request) {
@@ -113,7 +111,7 @@ func (h Handler) twoFactorRecoveryCodes(w http.ResponseWriter, r *http.Request) 
 		httpx.WriteMessage(w, http.StatusBadRequest, "Two-factor authentication is not enabled.")
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"remaining_count": h.TwoFactor.Remaining(r.Context(), u.ID)})
+	httpx.WriteJSON(w, http.StatusOK, dto.RecoveryCodesRemaining{Remaining: h.TwoFactor.Remaining(r.Context(), u.ID)})
 }
 
 func (h Handler) twoFactorRegenerate(w http.ResponseWriter, r *http.Request) {
@@ -137,21 +135,19 @@ func (h Handler) twoFactorRegenerate(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{
-		"message":        "Recovery codes have been regenerated.",
-		"recovery_codes": codes,
-	})
+	httpx.WriteJSON(w, http.StatusOK, dto.RecoveryCodes{Message: "Recovery codes have been regenerated.", Codes: codes})
 }
 
 func (h Handler) twoFactorStatus(w http.ResponseWriter, r *http.Request) {
 	u := httpx.User(r)
-	var remaining any
+	var remaining *int
 	if u.HasTwoFactor() {
-		remaining = h.TwoFactor.Remaining(r.Context(), u.ID)
+		n := h.TwoFactor.Remaining(r.Context(), u.ID)
+		remaining = &n
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{
-		"enabled":                  u.HasTwoFactor(),
-		"pending_confirmation":     u.TwoFactorEnabled && !u.TwoFactorConfirmed,
-		"recovery_codes_remaining": remaining,
+	httpx.WriteJSON(w, http.StatusOK, dto.TwoFactorStatus{
+		Enabled:                u.HasTwoFactor(),
+		PendingConfirmation:    u.TwoFactorEnabled && !u.TwoFactorConfirmed,
+		RecoveryCodesRemaining: remaining,
 	})
 }

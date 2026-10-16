@@ -25,12 +25,7 @@ func (h Handler) invitationsIndex(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteSpaceError(w, err)
 		return
 	}
-	httpx.WriteData(w, http.StatusOK, dto.Map(list, func(i spaces.Invitation) map[string]any {
-		return map[string]any{
-			"id": i.ID, "email": i.Email, "note": i.Note, "role": i.Role, "inviter": i.Inviter,
-			"expiresAt": httpx.TimeOrNil(i.ExpiresAt), "acceptedAt": httpx.TimeOrNil(i.AcceptedAt), "createdAt": httpx.TimeOrNil(i.CreatedAt),
-		}
-	}))
+	httpx.WriteData(w, http.StatusOK, dto.Map(list, dto.NewInvitation))
 }
 
 // inviteMethods says how invitations may be made right now: by email, which
@@ -51,11 +46,7 @@ func (h Handler) inviteMethods(ctx context.Context) (email, link bool, reason st
 
 func (h Handler) invitationMethods(w http.ResponseWriter, r *http.Request) {
 	email, link, reason := h.inviteMethods(r.Context())
-	out := map[string]any{"email": email, "link": link}
-	if reason != "" {
-		out["emailReason"] = reason
-	}
-	httpx.WriteData(w, http.StatusOK, out)
+	httpx.WriteData(w, http.StatusOK, dto.InvitationMethods{Email: email, Link: link, EmailReason: reason})
 }
 
 // invitationsStore creates an invitation. With an address it is emailed and
@@ -98,7 +89,7 @@ func (h Handler) invitationsStore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if body.Email == "" {
-		httpx.WriteData(w, http.StatusCreated, map[string]any{"id": id, "token": token, "emailSent": false})
+		httpx.WriteData(w, http.StatusCreated, dto.InvitationCreated{ID: id, Token: token})
 		return
 	}
 	if err := h.emailInvitation(r, body.Email, body.Role, token); err != nil {
@@ -109,7 +100,7 @@ func (h Handler) invitationsStore(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
-	httpx.WriteData(w, http.StatusCreated, map[string]any{"id": id, "emailSent": true})
+	httpx.WriteData(w, http.StatusCreated, dto.InvitationCreated{ID: id, EmailSent: true})
 }
 
 func (h Handler) emailInvitation(r *http.Request, to, role, token string) error {
@@ -140,10 +131,7 @@ func (h Handler) invitationPreview(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteSpaceError(w, err)
 		return
 	}
-	httpx.WriteData(w, http.StatusOK, map[string]any{
-		"spaceName": p.SpaceName, "role": p.Role, "inviter": p.Inviter, "email": p.Email,
-		"expiresAt": p.ExpiresAt.UTC().Format("2006-01-02T15:04:05Z"), "canRegister": p.CanRegister,
-	})
+	httpx.WriteData(w, http.StatusOK, dto.NewInvitationPreview(*p))
 }
 
 func (h Handler) invitationAccept(w http.ResponseWriter, r *http.Request) {

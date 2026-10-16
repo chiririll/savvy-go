@@ -30,10 +30,7 @@ func (h Handler) adminSpacesIndex(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	httpx.WriteData(w, http.StatusOK, dto.Map(list, func(o core.Overview) map[string]any {
-		return map[string]any{"id": o.ID, "uuid": o.UUID, "name": o.Name, "members": o.Members, "admins": o.Admins,
-			"size": o.Size, "quota": o.Quota, "unavailable": o.Unavailable, "createdAt": httpx.TimeOrNil(o.CreatedAt)}
-	}))
+	httpx.WriteData(w, http.StatusOK, dto.Map(list, dto.NewSpaceOverview))
 }
 
 func (h Handler) adminSpaceParam(w http.ResponseWriter, r *http.Request) *core.Space {
