@@ -8,17 +8,19 @@ go test ./...
 go run .
 ```
 
+`go run .` listens on `localhost:8080`. Data and the generated `config.toml` go to `./savvy-data`, see [Data and backups](data-and-backups.md) and [Configuration](deployment.md#configuration). A plain `go build` or `go run` serves the frontend from `public/` on disk; release builds embed it, see [Build tasks](#build-tasks).
+
 ### Code shape checks
 
 `internal/archtest` fails `go test ./...` on code that is clearly out of hand: a function over 500 lines, nesting deeper than 8, a name over 10 words, a line over 300 characters and similar. A justified exception goes in the doc comment: `//archtest:ignore funcLines <reason>`.
 
-`mage test:audit` (or `go test -tags audit ./internal/archtest -run Audit -v` and `npm run audit`) prints everything above the softer limits, worst first. It never fails; use it as a worklist when cleaning up.
+`mage test:audit` (or `go test -tags audit ./internal/archtest -run Audit -v`, `npm run audit`) prints everything above the softer limits, worst first. It never fails; use it as a cleanup worklist.
 
-The frontend has the same two layers in `resources/ts/lib/code-shape` (`npm test` runs the hard one). Limits differ where the language does: a component may be 500 lines before it fails, and a test title is counted in words instead of an identifier. Opt out with `// archtest:ignore funcLines <reason>` above the declaration.
+The frontend has the same two layers in `resources/ts/lib/code-shape` (`npm test` runs the hard one). Limits differ where the language does: a component may be 500 lines, and test titles count words. Opt out with `// archtest:ignore funcLines <reason>` above the declaration.
 
-Listens on `localhost:8080`. Data and the generated `config.toml` go to `./savvy-data`, see [Data and backups](data-and-backups.md) and [Configuration](deployment.md#configuration). A plain `go build` or `go run` serves the frontend from `public/` on disk; release builds have it built into the binary, see [Build tasks](#build-tasks).
+### Demo data
 
-With `--seed-config <file>` (any TOML file, even an empty one), the first boot creates demo users, three spaces with ~12 months of data, linked spaces and open invitations:
+With `--seed-config <file>` (any TOML file, even empty), the first boot creates demo users, three spaces with ~12 months of data, linked spaces and open invitations:
 
 | Email              | Password   | Server role |
 |--------------------|------------|-------------|
