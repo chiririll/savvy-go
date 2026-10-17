@@ -23,7 +23,16 @@ var spec []byte
 func init() {
 	ui.AddSpec(spec)
 	routing.Register(func(d *routing.Deps) []routing.Mount {
-		h := Handler{BackupsDir: routing.Get[appconfig.Config](d).BackupsDir, Store: routing.Get[store.Store](d), Backups: routing.Get[backup.Service](d), Spaces: routing.Get[spaces.Service](d), Settings: routing.Get[settings.Store](d), Users: routing.Get[auth.Users](d), Bootstrap: routing.Get[*bootstrap.Guard](d), Guard: d.Guard}
+		h := Handler{
+			BackupsDir: routing.Get[appconfig.Config](d).BackupsDir,
+			Store:      routing.Get[store.Store](d),
+			Backups:    routing.Get[backup.Service](d),
+			Spaces:     routing.Get[spaces.Service](d),
+			Settings:   routing.Get[settings.Store](d),
+			Users:      routing.Get[auth.Users](d),
+			Bootstrap:  routing.Get[*bootstrap.Guard](d),
+			Guard:      d.Guard,
+		}
 		return []routing.Mount{
 			routing.Public(h.PublicRoutes),
 			routing.Account(h.AccountRoutes),

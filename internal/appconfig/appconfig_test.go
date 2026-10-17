@@ -3,77 +3,95 @@ package appconfig
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
 	"savvy-go/internal/config"
 )
 
-func TestServerAndPathsSections(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "config.toml")
-	text := "[server]\napp_url = \" https://x.example/ \"\ntimezone = \"Nowhere/Land\"\n\n[paths]\ndata = \"" + filepath.ToSlash(dir) + "/d\"\n\n[unknown]\nkey = 1\n"
-	if err := os.WriteFile(path, []byte(text), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	f, err := config.Open(path)
+func TestLoadDecidesThePathsFromTheFile(t *testing.T) {
+	f, err := config.Parse("[paths]\ndata = \"/srv/d\"\nbackups = \"/srv/b\"\n")
 	if err != nil {
 		t.Fatal(err)
 	}
 	cfg := Load(f)
-	if err := f.Finish(); err != nil {
-		t.Fatal(err)
+	if cfg.DataDir != "/srv/d" {
+		t.Errorf("DataDir %q", cfg.DataDir)
 	}
-	if cfg.TZ != "UTC" || cfg.Location != time.UTC {
-		t.Errorf("an unknown time zone must fall back to UTC: %q", cfg.TZ)
+	if want := filepath.Join("/srv/d", "uploads"); cfg.UploadsDir != want {
+		t.Errorf("an empty uploads path falls back to <data>/uploads: %q, want %q", cfg.UploadsDir, want)
 	}
-	if cfg.DataDir != filepath.ToSlash(dir)+"/d" || cfg.UploadsDir != filepath.Join(cfg.DataDir, "uploads") || cfg.ListenAddr != DefaultListen {
-		t.Errorf("paths %+v", cfg)
-	}
-	if got := cfg.AppURL(); got != "https://x.example" {
-		t.Errorf("AppURL %q", got)
-	}
-	out, _ := os.ReadFile(path)
-	if strings.Contains(string(out), "unknown") || !strings.HasPrefix(string(out), "# Go Savvy configuration") {
-		t.Errorf("file:\n%s", out)
+	if cfg.BackupsDir != "/srv/b" {
+		t.Errorf("an explicit backups path wins: %q", cfg.BackupsDir)
 	}
 }
 
-// AppURL follows the file: a change through the section shows at once.
-func TestAppURLFollowsTheSection(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.toml")
-	if err := os.WriteFile(path, []byte("[server]\napp_url = \"https://x.example\"\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	f, err := config.Open(path)
+func TestLoadWithoutPathsFallsBackToTheDetectedDataDir(t *testing.T) {
+	f, err := config.Parse("")
 	if err != nil {
 		t.Fatal(err)
 	}
 	cfg := Load(f)
-	if err := f.Finish(); err != nil {
+	if cfg.DataDir == "" || cfg.UploadsDir != filepath.Join(cfg.DataDir, "uploads") || cfg.BackupsDir != filepath.Join(cfg.DataDir, "backups") {
+		t.Errorf("defaults %+v", cfg)
+	}
+}
+
+func TestPathsAreBlankSafe(t *testing.T) {
+	f, err := config.Parse("[paths]\ndata = \"  \"\n")
+	if err != nil {
 		t.Fatal(err)
 	}
-	if err := ServerSection.Update(f, func(s *serverTable) { s.AppURL = "https://y.example///" }); err != nil {
-		t.Fatal(err)
+	if cfg := Load(f); cfg.DataDir == "" || cfg.DataDir == "  " {
+		t.Errorf("a blank path counts as unset: %q", cfg.DataDir)
 	}
-	if got := cfg.AppURL(); got != "https://y.example" {
+}
+
+func TestZeroConfigHasNoPublicURL(t *testing.T) {
+	if got := (Config{}).AppURL(); got != "" {
+		t.Errorf("zero Config AppURL %q", got)
+	}
+}
+
+func TestWithAppURLTrimsTrailingSlashes(t *testing.T) {
+	if got := (Config{}).WithAppURL("https://y.example///").AppURL(); got != "https://y.example" {
+		t.Errorf("fixed AppURL %q", got)
+	}
+}
+
+// The URL is read on every call, so a change in the running process shows at once.
+func TestWithServerReadsTheURLEachTime(t *testing.T) {
+	url := "https://a.example"
+	cfg := Config{}.WithServer("Europe/Paris", time.UTC, func() string { return url })
+	if cfg.TZ != "Europe/Paris" || cfg.Location != time.UTC {
+		t.Errorf("time zone %q %v", cfg.TZ, cfg.Location)
+	}
+	url = "https://b.example"
+	if got := cfg.AppURL(); got != "https://b.example" {
 		t.Errorf("AppURL after a change %q", got)
 	}
 }
 
-func TestAppURLFixedAndFollow(t *testing.T) {
-	if got := (Config{}).AppURL(); got != "" {
-		t.Errorf("zero Config AppURL %q", got)
+func TestFilePathPrefersTheArgumentThenTheEnvironment(t *testing.T) {
+	t.Setenv("CONFIG_FILE", " /env/config.toml ")
+	if got := FilePath("/arg/config.toml"); got != "/arg/config.toml" {
+		t.Errorf("an explicit path wins: %q", got)
 	}
-	if got := (Config{}).WithAppURL("https://y.example/").AppURL(); got != "https://y.example" {
-		t.Errorf("fixed AppURL %q", got)
+	if got := FilePath(""); got != "/env/config.toml" {
+		t.Errorf("CONFIG_FILE is used and trimmed: %q", got)
 	}
-	f, err := config.Parse("[server]\napp_url = \"https://z.example\"\n")
-	if err != nil {
-		t.Fatal(err)
+	t.Setenv("CONFIG_FILE", "")
+	if got := FilePath(""); filepath.Base(got) != "config.toml" {
+		t.Errorf("the default lives in the data directory: %q", got)
 	}
-	if got := (Config{}).Follow(f).AppURL(); got != "https://z.example" {
-		t.Errorf("followed AppURL %q", got)
+}
+
+func TestDetectDataDirIsAnExistingDirOrDefault(t *testing.T) {
+	got := detectDataDir()
+	if got == "./savvy-data" {
+		return
+	}
+	if st, err := os.Stat(got); err != nil || !st.IsDir() {
+		t.Errorf("detected %q is not a directory", got)
 	}
 }

@@ -271,7 +271,7 @@ func TestMCPListTransactionsForwardsFiltersAndBoundsThePage(t *testing.T) {
 	}
 }
 
-func TestMCPAcceptsTheOAuthAccessTokenButStaysReadOnly(t *testing.T) {
+func TestMCPAcceptsOAuthTokenButStaysReadOnly(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("mcp@a.com", "secret1", "admin")
 	_, access := a.connect(a.issue(u, false))

@@ -242,7 +242,7 @@ func TestSyncGroupsAreManagedWithASessionOnly(t *testing.T) {
 	}
 }
 
-func TestSyncGroupDiffIsHeldToTheSameRulesAsApply(t *testing.T) {
+func TestSyncGroupDiffFollowsTheRulesOfApply(t *testing.T) {
 	p := newSyncPair(t)
 	stranger := p.a.createUser("stranger@test.com", "secret1", auth.RoleUser)
 	other, err := p.a.svc.Spaces.Create(context.Background(), "Private", stranger)

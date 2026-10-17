@@ -73,12 +73,21 @@ func findSAML(el *etree.Element, name string) *etree.Element {
 // VerifySAMLXML checks an enveloped XML signature on the Response or Assertion
 // against the IdP certificate(s). Unsigned documents are rejected.
 func VerifySAMLXML(xmlBytes []byte, certs []*x509.Certificate) error {
+	_, err := verifiedSAML(xmlBytes, certs)
+	return err
+}
+
+// verifiedSAML is the part of the document the signature vouches for: the Response
+// or the Assertion that carries a valid signature. Only that part may be read.
+// Whatever else the document holds was put there by whoever sent it, and an
+// unsigned element beside a signed one would otherwise decide who logs in.
+func verifiedSAML(xmlBytes []byte, certs []*x509.Certificate) (*etree.Element, error) {
 	if len(certs) == 0 {
-		return ssoErr("saml_invalid", "The SAML identity provider has no certificate.", 401)
+		return nil, ssoErr("saml_invalid", "The SAML identity provider has no certificate.", 401)
 	}
 	doc := etree.NewDocument()
 	if err := doc.ReadFromBytes(xmlBytes); err != nil || doc.Root() == nil {
-		return ssoErr("saml_invalid", "The SAML response is invalid.", 401)
+		return nil, ssoErr("saml_invalid", "The SAML response is invalid.", 401)
 	}
 	store := &dsig.MemoryX509CertificateStore{Roots: certs}
 	ctx := dsig.NewDefaultValidationContext(store)
@@ -89,14 +98,14 @@ func VerifySAMLXML(xmlBytes []byte, certs []*x509.Certificate) error {
 		if !hasSignature(el) {
 			continue
 		}
-		if _, err := ctx.Validate(el); err == nil {
-			return nil
-		} else {
-			last = err
+		signed, err := ctx.Validate(el)
+		if err == nil {
+			return signed, nil
 		}
+		last = err
 	}
 	if last != nil {
-		return ssoErr("saml_invalid", "The SAML signature is invalid.", 401)
+		return nil, ssoErr("saml_invalid", "The SAML signature is invalid.", 401)
 	}
-	return ssoErr("saml_invalid", "The SAML assertion is unsigned.", 401)
+	return nil, ssoErr("saml_invalid", "The SAML assertion is unsigned.", 401)
 }

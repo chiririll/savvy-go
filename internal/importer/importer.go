@@ -303,7 +303,7 @@ func parseCSV(raw []byte) ([]string, [][]string, error) {
 }
 
 func parseCSVWithDelimiter(raw []byte) (rune, []string, [][]string, error) {
-	raw = bytes.TrimPrefix(raw, []byte("ï»¿"))
+	raw = bytes.TrimPrefix(raw, []byte("\xef\xbb\xbf"))
 	delimiter := sniffDelimiter(raw)
 	r := csv.NewReader(bytes.NewReader(raw))
 	r.Comma = delimiter
@@ -426,9 +426,16 @@ func mappingIndex(mapping map[string]any, key string) (int, bool) {
 	return int(n), ok
 }
 
+// dedupHash identifies a row by its date, amount and description. The amount keeps
+// every decimal it has, at least two: cutting it to cents would make 0.0000015 and
+// 0.0000025 of an eight-decimal currency the same row.
 func dedupHash(date string, amount decimal.Decimal, desc string) string {
 	norm := strings.ToLower(strings.Join(strings.Fields(strings.TrimSpace(desc)), " "))
-	sum := md5.Sum([]byte(fmt.Sprintf("%s|%s|%s", date, amount.StringFixed(2), norm)))
+	places := 2
+	if _, frac, ok := strings.Cut(amount.String(), "."); ok { // String drops trailing zeros
+		places = max(places, len(frac))
+	}
+	sum := md5.Sum([]byte(fmt.Sprintf("%s|%s|%s", date, amount.StringFixed(int32(places)), norm)))
 	return hex.EncodeToString(sum[:])
 }
 

@@ -456,4 +456,7 @@ func TestConcurrentReadsAndUpdates(t *testing.T) {
 		go func() { defer wg.Done(); _ = serverSection.Update(cur, func(s *server) { s.AppURL = "u" }) }()
 	}
 	wg.Wait()
+	if got := h.server.Get().AppURL; got != "u" {
+		t.Errorf("the update is lost: %q", got)
+	}
 }

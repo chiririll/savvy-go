@@ -12,7 +12,16 @@ import (
 
 func init() {
 	routing.Register(func(d *routing.Deps) []routing.Mount {
-		h := Handler{Security: routing.Get[auth.Security](d), Users: routing.Get[auth.Users](d), Sessions: routing.Get[auth.Sessions](d), Tokens: routing.Get[auth.PasswordTokens](d), Challenges: routing.Get[auth.Challenges](d), Settings: routing.Get[settings.Store](d), Bootstrap: routing.Get[*bootstrap.Guard](d), Login: d.Login}
+		h := Handler{
+			Security:   routing.Get[auth.Security](d),
+			Users:      routing.Get[auth.Users](d),
+			Sessions:   routing.Get[auth.Sessions](d),
+			Tokens:     routing.Get[auth.PasswordTokens](d),
+			Challenges: routing.Get[auth.Challenges](d),
+			Settings:   routing.Get[settings.Store](d),
+			Bootstrap:  routing.Get[*bootstrap.Guard](d),
+			Login:      d.Login,
+		}
 		return []routing.Mount{
 			routing.Public(h.PublicRoutes),
 			routing.Credential(h.CredentialRoutes),

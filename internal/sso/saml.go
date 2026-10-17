@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/beevik/etree"
 )
 
 func (s Service) SamlMetadata(ctx context.Context, p IdentityProvider) string {
@@ -70,10 +72,18 @@ func (s Service) HandleACS(ctx context.Context, p IdentityProvider, samlResponse
 	if err != nil || len(raw) == 0 {
 		return NormalizedIdentity{}, ssoErr("saml_invalid", "The SAML response is invalid.", 401)
 	}
-	if err := VerifySAMLXML(raw, idpCerts(p)); err != nil {
+	signed, err := verifiedSAML(raw, idpCerts(p))
+	if err != nil {
 		return NormalizedIdentity{}, err
 	}
-	nameID, inResponseTo, attrs, ok := parseSAMLResponse(string(raw))
+	// Read only what the signature covers.
+	vouched := etree.NewDocument()
+	vouched.SetRoot(signed.Copy())
+	signedXML, err := vouched.WriteToString()
+	if err != nil {
+		return NormalizedIdentity{}, ssoErr("saml_invalid", "The SAML response is invalid.", 401)
+	}
+	nameID, inResponseTo, attrs, ok := parseSAMLResponse(signedXML)
 	if !ok {
 		return NormalizedIdentity{}, ssoErr("saml_invalid", "The SAML assertion is invalid.", 401)
 	}
@@ -145,6 +155,12 @@ func parseSAMLResponse(raw string) (nameID, inResponseTo string, attrs map[strin
 			case "Response":
 				for _, a := range t.Attr {
 					if local(a.Name.Local) == "InResponseTo" {
+						inResponseTo = a.Value
+					}
+				}
+			case "SubjectConfirmationData":
+				for _, a := range t.Attr {
+					if local(a.Name.Local) == "InResponseTo" && inResponseTo == "" {
 						inResponseTo = a.Value
 					}
 				}

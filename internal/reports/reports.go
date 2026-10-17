@@ -141,21 +141,26 @@ func (f Filter) Sparkline(now time.Time, count int) []dateRange {
 
 type periodPoint struct{ Key string }
 
+// generatePeriods lists the buckets that hold the days from start to end, by the
+// first day of each. Stepping begins at the bucket that holds start, so a range
+// beginning on the 31st still reaches every month it touches.
 func generatePeriods(start, end time.Time, groupBy string) []periodPoint {
 	var out []periodPoint
 	cur := start
+	switch groupBy {
+	case "week":
+		cur = startOfWeekSunday(start)
+	case "month":
+		cur = calendar.StartOfMonth(start)
+	}
 	for !cur.After(end) {
+		out = append(out, periodPoint{Key: cur.Format("2006-01-02")})
 		switch groupBy {
 		case "week":
-			wk := startOfWeekSunday(cur)
-			out = append(out, periodPoint{Key: wk.Format("2006-01-02")})
 			cur = cur.AddDate(0, 0, 7)
 		case "month":
-			m := calendar.StartOfMonth(cur)
-			out = append(out, periodPoint{Key: m.Format("2006-01-02")})
 			cur = calendar.AddMonths(cur, 1)
 		default:
-			out = append(out, periodPoint{Key: cur.Format("2006-01-02")})
 			cur = cur.AddDate(0, 0, 1)
 		}
 	}
