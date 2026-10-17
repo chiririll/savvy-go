@@ -694,7 +694,6 @@ func (s Service) sync(ctx context.Context, a, b, review int64) error {
 	if err != nil {
 		return err
 	}
-	ua, ub := byID[a].UUID, byID[b].UUID
 	return s.st().InSpaces(ctx, []int64{a, b}, func(dbs map[int64]store.DB) error {
 		ra, err := loadTransfers(ctx, dbs[a])
 		if err != nil {
@@ -704,70 +703,85 @@ func (s Service) sync(ctx context.Context, a, b, review int64) error {
 		if err != nil {
 			return err
 		}
-		ids := map[string]bool{}
-		for id := range ra {
-			ids[id] = true
-		}
-		for id := range rb {
-			ids[id] = true
-		}
-		keys := make([]string, 0, len(ids))
-		for id := range ids {
-			keys = append(keys, id)
-		}
-		slices.Sort(keys)
-		for _, id := range keys {
+		sa := syncSide{id: a, uuid: byID[a].UUID, db: dbs[a]}
+		sb := syncSide{id: b, uuid: byID[b].UUID, db: dbs[b]}
+		for _, id := range unionKeys(ra, rb) {
 			x, inA := ra[id]
 			y, inB := rb[id]
-			rec := x
-			if !inA {
-				rec = y
-			}
-			if !rec.involves(ua, ub) {
-				continue
-			}
-			if review != 0 {
-				own, ownUUID, mine, theirs, haveMine, haveTheirs := dbs[a], ua, x, y, inA, inB
-				if review == b {
-					own, ownUUID, mine, theirs, haveMine, haveTheirs = dbs[b], ub, y, x, inB, inA
-				}
-				if err := s.reviewOne(ctx, own, ownUUID, mine, theirs, haveMine, haveTheirs); err != nil {
-					return err
-				}
-				continue
-			}
-			if (inA && x.Status == transferPending) || (inB && y.Status == transferPending) {
-				continue // waits for a decision; never moved automatically
-			}
-			switch {
-			case inA && !inB:
-				if verifyTransfer(s.Keys, x) {
-					if err := writeRecord(ctx, dbs[b], ub, x, "confirmed", nil, nil); err != nil {
-						return err
-					}
-				}
-			case inB && !inA:
-				if verifyTransfer(s.Keys, y) {
-					if err := writeRecord(ctx, dbs[a], ua, y, "confirmed", nil, nil); err != nil {
-						return err
-					}
-				}
-			case !x.same(y):
-				w := winner(x, y)
-				if !verifyTransfer(s.Keys, w) {
-					continue
-				}
-				target, targetUUID := dbs[b], ub
-				if w.same(y) {
-					target, targetUUID = dbs[a], ua
-				}
-				if err := writeRecord(ctx, target, targetUUID, w, "confirmed", nil, nil); err != nil {
-					return err
-				}
+			sa.rec, sa.has, sb.rec, sb.has = x, inA, y, inB
+			if err := s.syncOne(ctx, sa, sb, review); err != nil {
+				return err
 			}
 		}
 		return nil
 	})
+}
+
+// syncSide is one space of a sync with its copy of the transfer at hand.
+type syncSide struct {
+	id   int64
+	uuid string
+	db   store.DB
+	rec  Transfer
+	has  bool
+}
+
+func unionKeys(a, b map[string]Transfer) []string {
+	ids := map[string]bool{}
+	for id := range a {
+		ids[id] = true
+	}
+	for id := range b {
+		ids[id] = true
+	}
+	keys := make([]string, 0, len(ids))
+	for id := range ids {
+		keys = append(keys, id)
+	}
+	slices.Sort(keys)
+	return keys
+}
+
+func (s Service) syncOne(ctx context.Context, a, b syncSide, review int64) error {
+	rec := a.rec
+	if !a.has {
+		rec = b.rec
+	}
+	if !rec.involves(a.uuid, b.uuid) {
+		return nil
+	}
+	if review != 0 {
+		own, other := a, b
+		if review == b.id {
+			own, other = b, a
+		}
+		return s.reviewOne(ctx, own.db, own.uuid, own.rec, other.rec, own.has, other.has)
+	}
+	if (a.has && a.rec.Status == transferPending) || (b.has && b.rec.Status == transferPending) {
+		return nil // waits for a decision; never moved automatically
+	}
+	switch {
+	case a.has && !b.has:
+		return s.copyVerified(ctx, b, a.rec)
+	case b.has && !a.has:
+		return s.copyVerified(ctx, a, b.rec)
+	case !a.rec.same(b.rec):
+		w := winner(a.rec, b.rec)
+		target := b
+		if w.same(b.rec) {
+			target = a
+		}
+		return s.copyVerified(ctx, target, w)
+	}
+	return nil
+}
+
+// copyVerified writes rec into the side behind, if its signature holds.
+func (s Service) copyVerified(ctx context.Context, to syncSide, rec Transfer) error {
+	if !verifyTransfer(s.Keys, rec) {
+		return nil
+	}
+	return writeRecord(ctx, to.db, to.uuid, rec, "confirmed", nil, nil)
 }
 
 // reviewOne records, in a restored space, how its copy of a transfer differs

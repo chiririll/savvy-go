@@ -8,11 +8,11 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	"savvy-go/internal/calendar"
 	"savvy-go/internal/db/filter"
 	ledgerrepo "savvy-go/internal/db/repo/ledger"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/money"
+	"savvy-go/internal/platform/calendar"
 )
 
 // Every amount a report returns is a money.Money in the base currency. Sums
@@ -42,10 +42,10 @@ func (s Service) open(ctx context.Context, f Filter) report {
 
 func (q report) zero() money.Money { return money.Zero(q.unit) }
 
-// code is the base currency code for the response; null without a base.
-func (q report) code() any {
+// code is the base currency code; empty without a base.
+func (q report) code() string {
 	if q.base == nil {
-		return nil
+		return ""
 	}
 	return q.base.Code
 }
@@ -135,7 +135,7 @@ func (q report) byPeriod(typ string, r dateRange, groupBy string, categoryID int
 	return out
 }
 
-func (s Service) Overview(ctx context.Context, f Filter) map[string]any {
+func (s Service) Overview(ctx context.Context, f Filter) OverviewReport {
 	q := s.open(ctx, f)
 	now := s.now()
 	cur := q.metrics(f.Range(now))
@@ -153,12 +153,12 @@ func (s Service) Overview(ctx context.Context, f Filter) map[string]any {
 		netSpark = append(netSpark, m.Net)
 		savSpark = append(savSpark, m.SavingsRate)
 	}
-	return map[string]any{
-		"income":      metric(cur.Income, prevMetric(prev, func(m reportMetrics) money.Money { return m.Income }), incSpark),
-		"expenses":    metric(cur.Expenses, prevMetric(prev, func(m reportMetrics) money.Money { return m.Expenses }), expSpark),
-		"netCashFlow": metric(cur.Net, prevMetric(prev, func(m reportMetrics) money.Money { return m.Net }), netSpark),
-		"savingsRate": metric(cur.SavingsRate, prevMetric(prev, func(m reportMetrics) float64 { return m.SavingsRate }), savSpark),
-		"currency":    q.code(),
+	return OverviewReport{
+		Income:      Metric[money.Money]{cur.Income, prevMetric(prev, func(m reportMetrics) money.Money { return m.Income }), incSpark},
+		Expenses:    Metric[money.Money]{cur.Expenses, prevMetric(prev, func(m reportMetrics) money.Money { return m.Expenses }), expSpark},
+		NetCashFlow: Metric[money.Money]{cur.Net, prevMetric(prev, func(m reportMetrics) money.Money { return m.Net }), netSpark},
+		SavingsRate: Metric[float64]{cur.SavingsRate, prevMetric(prev, func(m reportMetrics) float64 { return m.SavingsRate }), savSpark},
+		Currency:    q.code(),
 	}
 }
 
@@ -180,19 +180,15 @@ func (q report) metrics(r dateRange) reportMetrics {
 	return reportMetrics{Income: income, Expenses: expenses, Net: net, SavingsRate: rate}
 }
 
-func metric(value, previous, sparkline any) map[string]any {
-	return map[string]any{"value": value, "previous": previous, "sparkline": sparkline}
-}
-
-// prevMetric is a metric of the comparison period; null without one.
-func prevMetric[T any](p *reportMetrics, get func(reportMetrics) T) any {
+// prevMetric is a metric of the comparison period; nil without one.
+func prevMetric[T any](p *reportMetrics, get func(reportMetrics) T) *T {
 	if p == nil {
 		return nil
 	}
-	return get(*p)
+	return ptrTo(get(*p))
 }
 
-func (s Service) MoneyFlow(ctx context.Context, f Filter) map[string]any {
+func (s Service) MoneyFlow(ctx context.Context, f Filter) MoneyFlowReport {
 	q := s.open(ctx, f)
 	r := f.Range(s.now())
 	income, expenses := q.byCategory("income", r), q.byCategory("expense", r)
@@ -222,46 +218,46 @@ func (s Service) MoneyFlow(ctx context.Context, f Filter) map[string]any {
 	savings := totalInc.Sub(totalExp)
 	incomeColors := []string{"#22c55e", "#16a34a", "#15803d", "#14532d", "#166534", "#4ade80"}
 	expenseColors := []string{"#ef4444", "#f97316", "#eab308", "#ec4899", "#8b5cf6", "#06b6d4", "#f43f5e", "#a855f7"}
-	nodes := []map[string]any{}
+	nodes := []FlowNode{}
 	for i, x := range income {
-		nodes = append(nodes, map[string]any{"name": x.Node, "itemStyle": map[string]any{"color": incomeColors[i%len(incomeColors)]}})
+		nodes = append(nodes, FlowNode{Name: x.Node, Color: incomeColors[i%len(incomeColors)]})
 	}
 	for i, x := range expenses {
-		nodes = append(nodes, map[string]any{"name": x.Node, "itemStyle": map[string]any{"color": expenseColors[i%len(expenseColors)]}})
+		nodes = append(nodes, FlowNode{Name: x.Node, Color: expenseColors[i%len(expenseColors)]})
 	}
 	if savings.IsPositive() {
-		nodes = append(nodes, map[string]any{"name": savingsNode, "itemStyle": map[string]any{"color": "#3b82f6"}})
+		nodes = append(nodes, FlowNode{Name: savingsNode, Color: "#3b82f6"})
 	}
-	links := []map[string]any{}
+	links := []FlowLink{}
 	if totalInc.IsPositive() && totalExp.IsPositive() {
 		for _, inc := range income {
 			for _, exp := range expenses {
 				if v := q.portion(exp.Total, inc.Total, totalInc); v.IsPositive() {
-					links = append(links, map[string]any{"source": inc.Node, "target": exp.Node, "value": v})
+					links = append(links, FlowLink{Source: inc.Node, Target: exp.Node, Value: v})
 				}
 			}
 			if savings.IsPositive() {
 				if v := q.portion(savings, inc.Total, totalInc); v.IsPositive() {
-					links = append(links, map[string]any{"source": inc.Node, "target": savingsNode, "value": v})
+					links = append(links, FlowLink{Source: inc.Node, Target: savingsNode, Value: v})
 				}
 			}
 		}
 	}
-	return map[string]any{
-		"nodes": nodes, "links": links,
-		"totals":   map[string]any{"income": totalInc, "expenses": totalExp, "savings": money.Max(q.zero(), savings)},
-		"currency": q.code(),
+	return MoneyFlowReport{
+		Nodes: nodes, Links: links,
+		Totals:   FlowTotals{Income: totalInc, Expenses: totalExp, Savings: money.Max(q.zero(), savings)},
+		Currency: q.code(),
 	}
 }
 
-func (s Service) ExpensePace(ctx context.Context, f Filter) map[string]any {
+func (s Service) ExpensePace(ctx context.Context, f Filter) ExpensePaceReport {
 	q := s.open(ctx, f)
 	now := s.now()
 	r := f.Range(now)
 	daily := q.daily("expense", r)
 	budget := q.monthlyBudget()
 	today := dateOnly(now)
-	months := []map[string]any{}
+	months := []PaceMonth{}
 	cursor := calendar.StartOfMonth(r.Start)
 	for !cursor.After(r.End) {
 		if cursor.After(today) && (cursor.Year() != today.Year() || cursor.Month() != today.Month()) {
@@ -277,21 +273,21 @@ func (s Service) ExpensePace(ctx context.Context, f Filter) map[string]any {
 			}
 			cumulative = append(cumulative, total)
 		}
-		var currentDay any
+		var currentDay *int
 		if cursor.Year() == today.Year() && cursor.Month() == today.Month() {
-			currentDay = today.Day()
+			currentDay = ptrTo(today.Day())
 		}
-		months = append(months, map[string]any{
-			"budget": budget, "dailyExpenses": cumulative,
-			"currentDay": currentDay, "daysInMonth": days, "totalSpent": total,
-			"monthStart": cursor.Format("2006-01-02"), "monthEnd": calendar.EndOfMonth(cursor).Format("2006-01-02"),
+		months = append(months, PaceMonth{
+			Budget: budget, DailyExpenses: cumulative,
+			CurrentDay: currentDay, DaysInMonth: days, TotalSpent: total,
+			MonthStart: cursor.Format("2006-01-02"), MonthEnd: calendar.EndOfMonth(cursor).Format("2006-01-02"),
 		})
 		cursor = calendar.StartOfMonth(calendar.AddMonths(cursor, 1))
 	}
-	return map[string]any{"months": months, "currency": q.code()}
+	return ExpensePaceReport{Months: months, Currency: q.code()}
 }
 
-func (s Service) ExpensesByCategory(ctx context.Context, f Filter) map[string]any {
+func (s Service) ExpensesByCategory(ctx context.Context, f Filter) ExpensesByCategoryReport {
 	q := s.open(ctx, f)
 	now := s.now()
 	cur := q.byCategory("expense", f.Range(now))
@@ -301,14 +297,14 @@ func (s Service) ExpensesByCategory(ctx context.Context, f Filter) map[string]an
 			prev.m[x.ID] = x.Total
 		}
 	}
-	cats := []map[string]any{}
+	cats := []CategoryExpense{}
 	for _, x := range cur {
-		cats = append(cats, map[string]any{
-			"id": x.ID, "name": x.Name, "icon": x.Icon, "color": x.Color,
-			"current": x.Total, "previous": prev.at(x.ID),
+		cats = append(cats, CategoryExpense{
+			ID: x.ID, Name: x.Name, Icon: x.Icon, Color: x.Color,
+			Current: x.Total, Previous: prev.at(x.ID),
 		})
 	}
-	return map[string]any{"categories": cats, "currency": q.code()}
+	return ExpensesByCategoryReport{Categories: cats, Currency: q.code()}
 }
 
 // CategorySummary returns per-category totals of the given type for the period
@@ -345,7 +341,7 @@ func (q report) cashFlow(r dateRange, groupBy string) []cashPoint {
 	return out
 }
 
-func (s Service) CashFlowOverTime(ctx context.Context, f Filter, groupBy string) map[string]any {
+func (s Service) CashFlowOverTime(ctx context.Context, f Filter, groupBy string) CashFlowReport {
 	q := s.open(ctx, f)
 	now := s.now()
 	current := q.cashFlow(f.Range(now), groupBy)
@@ -353,86 +349,86 @@ func (s Service) CashFlowOverTime(ctx context.Context, f Filter, groupBy string)
 	if cmp := f.Comparison(now); cmp != nil {
 		comparison = q.cashFlow(*cmp, groupBy)
 	}
-	items := []map[string]any{}
+	items := []CashFlowPoint{}
 	bal, prevBal := q.zero(), q.zero()
 	for i, p := range current {
 		bal = bal.Add(p.Income).Sub(p.Expenses)
-		entry := map[string]any{"date": p.Date, "income": p.Income, "expenses": p.Expenses, "balance": bal}
+		entry := CashFlowPoint{Date: p.Date, Income: p.Income, Expenses: p.Expenses, Balance: bal}
 		if i < len(comparison) {
 			c := comparison[i]
 			prevBal = prevBal.Add(c.Income).Sub(c.Expenses)
-			entry["prevIncome"], entry["prevExpenses"], entry["prevBalance"] = c.Income, c.Expenses, prevBal
+			entry.PrevIncome, entry.PrevExpenses, entry.PrevBalance = &c.Income, &c.Expenses, ptrTo(prevBal)
 		}
 		items = append(items, entry)
 	}
-	return map[string]any{"items": items, "currency": q.code()}
+	return CashFlowReport{Items: items, Currency: q.code()}
 }
 
-func (s Service) Heatmap(ctx context.Context, f Filter) map[string]any {
+func (s Service) Heatmap(ctx context.Context, f Filter) HeatmapReport {
 	q := s.open(ctx, f)
 	r := f.Range(s.now())
 	daily := q.daily("expense", r)
-	items := []map[string]any{}
+	items := []HeatmapDay{}
 	peak := q.zero()
 	for d := r.Start; !d.After(r.End); d = d.AddDate(0, 0, 1) {
 		key := d.Format("2006-01-02")
 		row := daily.at(key)
-		items = append(items, map[string]any{"date": key, "value": row.Total, "count": row.Count})
+		items = append(items, HeatmapDay{Date: key, Value: row.Total, Count: row.Count})
 		if row.Total.Cmp(peak) > 0 {
 			peak = row.Total
 		}
 	}
-	return map[string]any{"items": items, "max": peak, "currency": q.code()}
+	return HeatmapReport{Items: items, Max: peak, Currency: q.code()}
 }
 
-func (s Service) TxSummary(ctx context.Context, f Filter, typ string) map[string]any {
+func (s Service) TxSummary(ctx context.Context, f Filter, typ string) TxSummaryReport {
 	q := s.open(ctx, f)
 	now := s.now()
 	r := f.Range(now)
 	days := int(r.End.Sub(r.Start).Hours()/24) + 1
 	total := q.sum(typ, r, 0)
-	var previous, prevAvgDay, prevAvgWeek any
+	var previous, prevAvgDay, prevAvgWeek *money.Money
 	if cmp := f.Comparison(now); cmp != nil {
 		prev := q.sum(typ, *cmp, 0)
-		previous = prev
+		previous = &prev
 		if prevDays := int(cmp.End.Sub(cmp.Start).Hours()/24) + 1; prevDays > 0 {
-			prevAvgDay, prevAvgWeek = q.average(prev, prevDays, 1), q.average(prev, prevDays, 7)
+			prevAvgDay, prevAvgWeek = ptrTo(q.average(prev, prevDays, 1)), ptrTo(q.average(prev, prevDays, 7))
 		}
 	}
 	avgDay, avgWeek := q.zero(), q.zero()
 	if days > 0 {
 		avgDay, avgWeek = q.average(total, days, 1), q.average(total, days, 7)
 	}
-	return map[string]any{
-		"total": total, "previous": previous,
-		"avgPerDay": avgDay, "avgPerWeek": avgWeek,
-		"prevAvgPerDay": prevAvgDay, "prevAvgPerWeek": prevAvgWeek,
-		"daysInPeriod": days, "currency": q.code(),
+	return TxSummaryReport{
+		Total: total, Previous: previous,
+		AvgPerDay: avgDay, AvgPerWeek: avgWeek,
+		PrevAvgPerDay: prevAvgDay, PrevAvgPerWeek: prevAvgWeek,
+		DaysInPeriod: days, Currency: q.code(),
 	}
 }
 
-func (s Service) TxByCategory(ctx context.Context, f Filter, typ string) map[string]any {
+func (s Service) TxByCategory(ctx context.Context, f Filter, typ string) TxByCategoryReport {
 	q := s.open(ctx, f)
 	cats := q.byCategory(typ, f.Range(s.now()))
 	total := q.zero()
 	for _, c := range cats {
 		total = total.Add(c.Total)
 	}
-	items := []map[string]any{}
+	items := []CategoryShare{}
 	for _, c := range cats {
 		pct := 0.0
 		if total.IsPositive() {
 			pct = percent(c.Total, total)
 		}
-		items = append(items, map[string]any{
-			"id": c.ID, "name": c.Name, "icon": c.Icon, "color": c.Color,
-			"value": c.Total, "percentage": pct,
+		items = append(items, CategoryShare{
+			ID: c.ID, Name: c.Name, Icon: c.Icon, Color: c.Color,
+			Value: c.Total, Percentage: pct,
 		})
 	}
-	return map[string]any{"items": items, "total": total, "currency": q.code()}
+	return TxByCategoryReport{Items: items, Total: total, Currency: q.code()}
 }
 
-func (s Service) TxDynamics(ctx context.Context, f Filter, typ, groupBy string) map[string]any {
+func (s Service) TxDynamics(ctx context.Context, f Filter, typ, groupBy string) TxDynamicsReport {
 	q := s.open(ctx, f)
 	r := f.Range(s.now())
 	periods := generatePeriods(r.Start, r.End, groupBy)
@@ -452,33 +448,33 @@ func (s Service) TxDynamics(ctx context.Context, f Filter, typ, groupBy string) 
 	if typ == "expense" {
 		color = "#ef4444"
 	}
-	datasets := []map[string]any{{"id": 0, "name": "Total", "color": color, "data": series(0)}}
+	datasets := []DynamicsSeries{{ID: 0, Name: "Total", Color: color, Data: series(0)}}
 	for _, c := range q.byCategory(typ, r) {
-		datasets = append(datasets, map[string]any{"id": c.ID, "name": c.Name, "color": c.Color, "data": series(c.ID)})
+		datasets = append(datasets, DynamicsSeries{ID: c.ID, Name: c.Name, Color: c.Color, Data: series(c.ID)})
 	}
-	return map[string]any{"dates": dates, "datasets": datasets, "currency": q.code()}
+	return TxDynamicsReport{Dates: dates, Datasets: datasets, Currency: q.code()}
 }
 
-func (s Service) TxTop(ctx context.Context, f Filter, typ string, limit int) map[string]any {
+func (s Service) TxTop(ctx context.Context, f Filter, typ string, limit int) TxTopReport {
 	if limit <= 0 {
 		limit = 10
 	}
 	q := s.open(ctx, f)
-	items := []map[string]any{}
+	items := []TopTransaction{}
 	for _, x := range filter.TopTransactions(ctx, s.DB, q.where(typ, f.Range(s.now()), 0), limit, q.unit) {
-		var cat any
+		var cat *TopCategory
 		if x.CatID.Valid {
-			cat = map[string]any{
-				"id": x.CatID.Int64, "name": x.CatName.String,
-				"icon": coalesce(x.Icon.String, "circle"), "color": coalesce(x.Color.String, "#64748b"),
+			cat = &TopCategory{
+				ID: x.CatID.Int64, Name: x.CatName.String,
+				Icon: coalesce(x.Icon.String, "circle"), Color: coalesce(x.Color.String, "#64748b"),
 			}
 		}
-		items = append(items, map[string]any{
-			"id": x.ID, "description": nilOr(x.Description.String), "amount": x.Amount, "date": x.Date.String,
-			"category": cat, "account": map[string]any{"id": x.AccID, "name": x.AccName.String},
+		items = append(items, TopTransaction{
+			ID: x.ID, Description: nilOr(x.Description.String), Amount: x.Amount, Date: x.Date.String,
+			Category: cat, Account: TopAccount{ID: x.AccID, Name: x.AccName.String},
 		})
 	}
-	return map[string]any{"items": items, "currency": q.code()}
+	return TxTopReport{Items: items, Currency: q.code()}
 }
 
 type nwAccount struct {
@@ -530,40 +526,40 @@ func (q report) totalOf(list []nwAccount) money.Money {
 	return total
 }
 
-func (s Service) NetWorth(ctx context.Context, f Filter) map[string]any {
+func (s Service) NetWorth(ctx context.Context, f Filter) NetWorthReport {
 	q := s.open(ctx, f)
 	now := s.now()
 	accts := q.accounts()
 	current := q.netWorthAt(accts, f.Range(now).End)
 	curTotal := q.totalOf(current)
-	var previous any
+	var previous *money.Money
 	change := q.zero()
 	changePct := 0.0
 	if cmp := f.Comparison(now); cmp != nil {
 		prevTotal := q.totalOf(q.netWorthAt(accts, cmp.End))
-		previous = prevTotal
+		previous = &prevTotal
 		change = curTotal.Sub(prevTotal)
 		if !prevTotal.IsZero() {
 			changePct = percent(change, prevTotal.Abs())
 		}
 	}
 	sort.SliceStable(current, func(i, j int) bool { return current[i].Balance.Cmp(current[j].Balance) > 0 })
-	rows := []map[string]any{}
+	rows := []NetWorthAccount{}
 	for _, a := range current {
 		pct := 0.0
 		if curTotal.IsPositive() {
 			pct = percent(a.Balance, curTotal)
 		}
-		rows = append(rows, map[string]any{"id": a.ID, "name": a.Name, "type": a.Type, "balance": a.Balance, "percentage": pct})
+		rows = append(rows, NetWorthAccount{ID: a.ID, Name: a.Name, Type: a.Type, Balance: a.Balance, Percentage: pct})
 	}
-	return map[string]any{
-		"current": curTotal, "previous": previous,
-		"change": change, "changePercent": changePct,
-		"accounts": rows, "currency": q.code(),
+	return NetWorthReport{
+		Current: curTotal, Previous: previous,
+		Change: change, ChangePercent: changePct,
+		Accounts: rows, Currency: q.code(),
 	}
 }
 
-func (s Service) NetWorthHistory(ctx context.Context, f Filter, groupBy string) map[string]any {
+func (s Service) NetWorthHistory(ctx context.Context, f Filter, groupBy string) NetWorthHistoryReport {
 	q := s.open(ctx, f)
 	r := f.Range(s.now())
 	accts := q.accounts()
@@ -572,13 +568,13 @@ func (s Service) NetWorthHistory(ctx context.Context, f Filter, groupBy string) 
 		dates = append(dates, cur.Format("2006-01-02"))
 		values = append(values, q.totalOf(q.netWorthAt(accts, periodEnd(cur, r.End, groupBy))))
 	}
-	return map[string]any{"dates": dates, "values": values, "currency": q.code()}
+	return NetWorthHistoryReport{Dates: dates, Values: values, Currency: q.code()}
 }
 
 // monthlyBudget is the monthly budget the report scope is measured against, in
-// the base currency; null when there is none. The budget limits of several
+// the base currency; nil when there is none. The budget limits of several
 // currencies are converted at their rates and added before rounding.
-func (q report) monthlyBudget() any {
+func (q report) monthlyBudget() *money.Money {
 	f := q.f
 	scoped := len(f.CategoryIDs) > 0 || len(f.TagIDs) > 0
 	if !scoped && len(f.AccountIDs) > 0 {
@@ -592,7 +588,7 @@ func (q report) monthlyBudget() any {
 		repo := ledgerrepo.Repo{DB: q.DB}
 		if global := repo.GlobalMonthlyBudget(q.ctx); global != nil {
 			// A global budget stands for the whole scope, whatever its size.
-			return money.FromDecimal(budgetToBase(global.Amount, global.Rate, global.IsBase), q.unit)
+			return ptrTo(money.FromDecimal(budgetToBase(global.Amount, global.Rate, global.IsBase), q.unit))
 		}
 		rows, err := repo.MonthlyBudgets(q.ctx)
 		if err != nil {
@@ -609,7 +605,7 @@ func (q report) monthlyBudget() any {
 	if !total.IsPositive() {
 		return nil
 	}
-	return money.FromDecimal(total, q.unit)
+	return ptrTo(money.FromDecimal(total, q.unit))
 }
 
 // budgetToBase is a budget limit in base-currency major units, unrounded.
@@ -620,9 +616,9 @@ func budgetToBase(limit money.Money, rate decimal.Decimal, isBase bool) decimal.
 	return limit.Decimal().Mul(rate)
 }
 
-func nilOr(s string) any {
+func nilOr(s string) *string {
 	if s == "" {
 		return nil
 	}
-	return s
+	return &s
 }

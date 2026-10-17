@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"savvy-go/internal/auth"
+	"savvy-go/internal/auth/permissions"
 	authrepo "savvy-go/internal/db/repo/auth"
 	"savvy-go/internal/oauth"
 	"savvy-go/internal/store/sqlite"
@@ -183,7 +184,7 @@ func TestExchangeIssuesAReadOnlyShortLivedAPIToken(t *testing.T) {
 	if err != nil || tok == nil {
 		t.Fatalf("access token does not resolve: %v %v", tok, err)
 	}
-	if tok.Allows("transactions", auth.PermWrite) || !tok.Allows("transactions", auth.PermRead) || tok.Allows("transfers", auth.PermRead) || !tok.AllSpaces || tok.UserID != e.user.ID || tok.ExpiresAt == nil || !strings.Contains(tok.Name, "Claude") {
+	if tok.Allows("transactions", permissions.Write) || !tok.Allows("transactions", permissions.Read) || tok.Allows("transfers", permissions.Read) || !tok.AllSpaces || tok.UserID != e.user.ID || tok.ExpiresAt == nil || !strings.Contains(tok.Name, "Claude") {
 		t.Fatalf("token = %+v", tok)
 	}
 }
@@ -394,7 +395,7 @@ func TestChosenPermissionsReachTheTokenAndSurviveRefresh(t *testing.T) {
 		if err != nil || tok == nil {
 			t.Fatalf("token does not resolve: %v %v", tok, err)
 		}
-		if !tok.Allows("transactions", auth.PermRead) || !tok.Allows("accounts", auth.PermRead) || tok.Allows("budgets", auth.PermRead) {
+		if !tok.Allows("transactions", permissions.Read) || !tok.Allows("accounts", permissions.Read) || tok.Allows("budgets", permissions.Read) {
 			t.Fatalf("permissions = %v", tok.Permissions)
 		}
 	}

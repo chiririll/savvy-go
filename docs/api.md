@@ -5,6 +5,8 @@ Connect scripts and external apps with an API token.
 1. Open **Settings → User → API** and create a token: a name, the spaces it may reach, what it may do in them and an optional expiration. The token is shown once.
 2. Send it as a bearer token.
 
+Creating a token, or giving one more, asks for your password again (an authenticator or recovery code if you use 2FA). So does allowing an AI app to connect, adding or removing a passkey and turning on 2FA. This way someone who gets hold of a signed-in browser cannot add a way in that outlives it. Accounts that sign in only through single sign-on have nothing to confirm with and are not asked. Wrong answers count against the same limit as sign-in attempts.
+
 Finances belong to a space, so their endpoints are under `/api/spaces/{id}/…`. List your spaces to find the id:
 
 ```bash
@@ -58,4 +60,4 @@ From a script, the body is `{"name": "Budget bot", "preset": "editor", "space_id
 
 ## Reference
 
-Interactive reference (Swagger UI): `/api/docs`. Raw OpenAPI 3 spec: `/api/openapi.yaml`.
+Interactive reference (Swagger UI): `/api/docs`. Raw OpenAPI 3 spec: `/api/openapi.yaml`. Both are served by the API itself, so they work without the frontend. The spec is merged at startup from `internal/httpserver/ui/base.yaml` and the `openapi.yaml` that each handler package embeds next to its routes.

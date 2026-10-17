@@ -300,10 +300,14 @@ export default function SecuritySettingsPage() {
     const formatDate = (value: string) => new Date(value).toLocaleDateString(intlLocale())
 
     const handleEnable = async () => {
-        const data = await enableMutation.mutateAsync()
-        setQrData(data)
-        setSetupStep('qr')
-        setShowEnableDialog(true)
+        try {
+            const data = await enableMutation.mutateAsync()
+            setQrData(data)
+            setSetupStep('qr')
+            setShowEnableDialog(true)
+        } catch {
+            // toasted by the mutation, or the user cancelled the confirmation
+        }
     }
 
     const handleConfirm = async () => {
@@ -329,9 +333,13 @@ export default function SecuritySettingsPage() {
     }
 
     const handleAddPasskey = async () => {
-        await registerPasskey.mutateAsync(passkeyName.trim() || null)
-        setShowAddPasskeyDialog(false)
-        setPasskeyName('')
+        try {
+            await registerPasskey.mutateAsync(passkeyName.trim() || null)
+            setShowAddPasskeyDialog(false)
+            setPasskeyName('')
+        } catch {
+            // toasted by the mutation, or the user cancelled the confirmation
+        }
     }
 
     const copySecret = () => {

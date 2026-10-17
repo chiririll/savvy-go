@@ -4,7 +4,7 @@
 go run ./cmd/savvy-go       # serves :8080, data in ./savvy-data
 ```
 
-Nested files: `db/` (SQL, sqlc), `httpserver/` (routes, tokens, OAuth, MCP), `migrate/`, `legacy/` (Laravel).
+Nested files: `auth/` (user model, leaf subpackages), `db/` (SQL, sqlc), `httpserver/` (routes, tokens, OAuth, MCP), `migrate/`, `legacy/` (Laravel).
 
 ## Store boundary
 

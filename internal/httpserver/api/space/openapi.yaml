@@ -1,0 +1,94 @@
+paths:
+  /spaces:
+    get:
+      tags: [Spaces]
+      summary: List the caller's spaces
+      description: Each space with the caller's role in it (`admin`, `editor`, `viewer`).
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+    post:
+      tags: [Spaces]
+      summary: Create a space administered by the caller
+      description: >-
+        Session only. Guests cannot create spaces; `max_spaces_per_user` limits how many a user administers.
+        With only `name` the space is empty. Optional `baseCurrency` (required once anything else is
+        given), `currencies` (codes), `accounts` (`name`, `type`, `currency`, `initialBalance`, a JSON
+        number), `categories` (`name`, `type`, `icon`, `color`, `isDefault`) and `tags` (names) fill it in
+        the same request: the base currency first, then the others with rates from the server's rate
+        source, then the rest. The default `expense` and `income` categories are added when none is
+        given. Everything or nothing: if filling fails no space remains. A currency the server has no
+        rate for is refused with `422`.
+      security: [{cookieAuth: []}]
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses:
+        "201": {$ref: "#/components/responses/Data"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "422": {$ref: "#/components/responses/Validation"}
+
+  /spaces/{space}:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Spaces]
+      summary: Get a space with the caller's role, its size and quota
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "404": {$ref: "#/components/responses/NotFound"}
+    patch:
+      tags: [Spaces]
+      summary: Rename a space
+      description: Space admins only, session only.
+      security: [{cookieAuth: []}]
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+    delete:
+      tags: [Spaces]
+      summary: Delete a space
+      description: Space admins only, session only. A final backup is kept for the server administrators.
+      security: [{cookieAuth: []}]
+      responses:
+        "204": {description: Deleted}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+  /spaces/{space}/members:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Spaces]
+      summary: List the members of a space
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "404": {$ref: "#/components/responses/NotFound"}
+  /spaces/{space}/members/{user}:
+    parameters: [{$ref: "#/components/parameters/Space"}, {name: user, in: path, required: true, schema: {type: integer}}]
+    patch:
+      tags: [Spaces]
+      summary: Change a member's role
+      description: Space admins only, session only. A space keeps at least one admin; guests cannot be admins.
+      security: [{cookieAuth: []}]
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "422": {$ref: "#/components/responses/Validation"}
+    delete:
+      tags: [Spaces]
+      summary: Remove a member
+      description: Space admins only, session only.
+      security: [{cookieAuth: []}]
+      responses:
+        "204": {description: Removed}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "422": {$ref: "#/components/responses/Validation"}
+  /spaces/{space}/leave:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    post:
+      tags: [Spaces]
+      summary: Leave a space
+      description: Session only. The last admin of a space with other members cannot leave.
+      security: [{cookieAuth: []}]
+      responses:
+        "204": {description: Left}
+        "422": {$ref: "#/components/responses/Validation"}

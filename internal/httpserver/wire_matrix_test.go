@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -178,4 +179,40 @@ func TestConvertEndpointForEveryPair(t *testing.T) {
 			}
 		})
 	})
+}
+
+func rawBody(t *testing.T, res *http.Response) string {
+	t.Helper()
+	defer res.Body.Close()
+	b, err := io.ReadAll(res.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
+
+// An exchange rate is a JSON number, not a string, and keeps the digits it was given.
+func TestCurrencyRateIsAJSONNumber(t *testing.T) {
+	a := newTestApp(t)
+	sess := a.issue(a.createUser("rate@test.com", "secret1", roleEditor), false)
+	for _, c := range []struct {
+		code     string
+		decimals int
+		rate     json.Number
+		base     bool
+	}{{"USD", 2, "1", true}, {"JPY", 0, "0.01", false}, {"BTC", 8, "50000", false}} {
+		res := a.do("POST", "/api/currencies", map[string]any{
+			"code": c.code, "name": c.code, "symbol": c.code, "decimals": c.decimals, "is_base": c.base, "rate": c.rate,
+		}, sess.Token, sess.CSRF)
+		status(t, res, http.StatusCreated, c.code)
+	}
+	body := rawBody(t, a.do("GET", "/api/currencies", nil, sess.Token, ""))
+	for _, want := range []string{`"rate":0.01`, `"rate":50000`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("currencies response %s does not contain %s", body, want)
+		}
+	}
+	if strings.Contains(body, `"rate":"`) {
+		t.Errorf("rate must be a JSON number, got %s", body)
+	}
 }

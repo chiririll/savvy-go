@@ -102,7 +102,7 @@ func TestProbeSaysWhenRegistrationIsClosed(t *testing.T) {
 	}
 }
 
-func TestProbeCatchesAnIssuerThatIsNotTheAddressYouUse(t *testing.T) {
+func TestProbeCatchesIssuerNotMatchingAddress(t *testing.T) {
 	f := newFake(t)
 	p := newProbe(f, &bytes.Buffer{})
 	p.server = strings.Replace(f.URL, "127.0.0.1", "localhost", 1)

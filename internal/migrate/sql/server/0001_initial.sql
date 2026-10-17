@@ -21,6 +21,9 @@ CREATE TABLE IF NOT EXISTS users (
     two_factor_secret TEXT,
     two_factor_enabled INTEGER NOT NULL DEFAULT 0 CHECK (two_factor_enabled IN (0, 1)),
     two_factor_confirmed INTEGER NOT NULL DEFAULT 0 CHECK (two_factor_confirmed IN (0, 1)),
+    -- The 30 second step of the last authenticator code accepted. A code of that
+    -- step or an older one is refused, so a code works once.
+    two_factor_last_step INTEGER,
     -- Deleted users are kept anonymised, so ids recorded in space databases
     -- (created_by) still resolve.
     deleted_at TEXT,
@@ -72,19 +75,30 @@ CREATE TABLE IF NOT EXISTS two_factor_challenges (
     token_hash TEXT NOT NULL UNIQUE,
     expires_at TEXT NOT NULL,
     consumed_at TEXT,
+    -- Wrong codes sent against this challenge; it is used up at the limit.
+    attempts INTEGER NOT NULL DEFAULT 0,
     created_at TEXT,
     updated_at TEXT
+) STRICT;
+-- Wrong second-factor codes in a row, across challenges. Many of them lock
+-- new challenges until locked_until; a success deletes the row.
+CREATE TABLE IF NOT EXISTS two_factor_failures (
+    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    failures INTEGER NOT NULL,
+    locked_until TEXT
 ) STRICT;
 CREATE INDEX IF NOT EXISTS two_factor_challenges_user_idx ON two_factor_challenges (user_id);
 CREATE INDEX IF NOT EXISTS two_factor_challenges_expires_idx ON two_factor_challenges (expires_at);
 CREATE TABLE IF NOT EXISTS two_factor_recovery_codes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    -- SHA-256 of the user id and the code, never the code. A code has about 40 random bits
+    -- and is not chosen by a person, so a slow hash adds nothing and costs a guess 8 compares.
     code TEXT NOT NULL,
     used_at TEXT,
     created_at TEXT
 ) STRICT;
-CREATE INDEX IF NOT EXISTS two_factor_recovery_codes_user_idx ON two_factor_recovery_codes (user_id);
+CREATE INDEX IF NOT EXISTS two_factor_recovery_codes_code_idx ON two_factor_recovery_codes (user_id, code);
 CREATE TABLE IF NOT EXISTS webauthn_credentials (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

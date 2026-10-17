@@ -56,18 +56,18 @@ func TestReportTotalsFoldEveryCurrencyIntoEveryBase(t *testing.T) {
 		// Everything is folded unrounded and rounded once.
 		want := money.FromDecimal(exact, baseUnit)
 		got := reports.TxSummary(e.ctx, janRange, "expense")
-		if total := asMoney(t, got["total"]); !total.Equal(want) {
+		if total := got.Total; !total.Equal(want) {
 			t.Fatalf("report total = %s (%+v), want %s", total, total.Unit(), want)
 		}
 		sum := (ledger.Transactions{DB: e.db}).Summary(e.ctx, false)
 		if !sum.Expense.Equal(want) {
 			t.Fatalf("transaction summary = %s, want %s", sum.Expense, want)
 		}
-		if net := asMoney(t, reports.Overview(e.ctx, janRange)["netCashFlow"].(map[string]any)["value"]); !net.Equal(want.Neg()) {
+		if net := reports.Overview(e.ctx, janRange).NetCashFlow.Value; !net.Equal(want.Neg()) {
 			t.Fatalf("net cash flow = %s, want %s", net, want.Neg())
 		}
 		// Per-day and per-category views agree with the grand total.
-		if days := reports.Heatmap(e.ctx, janRange)["max"]; !asMoney(t, days).Equal(want) {
+		if days := reports.Heatmap(e.ctx, janRange).Max; !days.Equal(want) {
 			t.Fatalf("busiest day = %s, want %s", days, want)
 		}
 	})
@@ -95,7 +95,7 @@ func TestEachCurrencyAloneIsConvertedAndRoundedIntoTheBase(t *testing.T) {
 					if err != nil {
 						return // the base amount would be out of range: nothing sensible to compare
 					}
-					got := asMoney(t, (Service{DB: e.db}).TxSummary(e.ctx, janRange, "expense")["total"])
+					got := (Service{DB: e.db}).TxSummary(e.ctx, janRange, "expense").Total
 					if !got.Equal(want) {
 						t.Fatalf("%s %s is %s in the base, want %s", a.Name, a.Input, got, want)
 					}
@@ -117,7 +117,7 @@ func TestNetWorthAndAccountSummaryConvertEachBalance(t *testing.T) {
 			// Balances are converted and rounded one account at a time.
 			want = want.Add(money.FromDecimal(asBase(typical(c), c, base), baseUnit))
 		}
-		nw := asMoney(t, (Service{DB: e.db}).NetWorth(e.ctx, Filter{})["current"])
+		nw := (Service{DB: e.db}).NetWorth(e.ctx, Filter{}).Current
 		if !nw.Equal(want) {
 			t.Fatalf("net worth = %s, want %s", nw, want)
 		}

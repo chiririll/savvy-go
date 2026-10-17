@@ -174,12 +174,16 @@ func (g *Guard) Announce(url string) {
 	if !g.Active() {
 		return
 	}
-	slog.Info("FIRST RUN: there are no users yet.\n"+
-		"    Open "+url+" and create the admin account.\n"+
-		"    Bootstrap password: "+g.Password()+"\n"+
-		"    It is also in the file "+g.path+"\n"+
-		"    It stops working as soon as the first user exists.",
-		"file", g.path)
+	// The text log handler escapes newlines, so each line is its own record.
+	for _, line := range []string{
+		"FIRST RUN: there are no users yet.",
+		"Open " + url + " and create the admin account.",
+		"Bootstrap password: " + g.Password(),
+		"It is also in the file " + g.path,
+		"It stops working as soon as the first user exists.",
+	} {
+		slog.Info(line)
+	}
 }
 
 // generate returns 150 random bits as six dash-separated groups of five base32

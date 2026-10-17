@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { ApiTokenSummary, CreatedApiToken, CreateApiTokenInput, TokenCapabilities, UpdateApiTokenInput } from '@/types'
+import type { ApiTokenSummary, ConfirmFields, CreatedApiToken, CreateApiTokenInput, TokenCapabilities, UpdateApiTokenInput } from '@/types'
 
 export const apiTokensApi = {
     /** What each kind of token can be given. */
@@ -13,13 +13,13 @@ export const apiTokensApi = {
         return data.data
     },
 
-    create: async (input: CreateApiTokenInput): Promise<CreatedApiToken> => {
-        const { data } = await apiClient.post('/auth/api-tokens', input)
+    create: async (input: CreateApiTokenInput, confirm: ConfirmFields = {}): Promise<CreatedApiToken> => {
+        const { data } = await apiClient.post('/auth/api-tokens', { ...input, ...confirm })
         return data.data
     },
 
-    update: async (id: number, input: UpdateApiTokenInput): Promise<ApiTokenSummary> => {
-        const { data } = await apiClient.patch(`/auth/api-tokens/${id}`, input)
+    update: async (id: number, input: UpdateApiTokenInput, confirm: ConfirmFields = {}): Promise<ApiTokenSummary> => {
+        const { data } = await apiClient.patch(`/auth/api-tokens/${id}`, { ...input, ...confirm })
         return data.data
     },
 

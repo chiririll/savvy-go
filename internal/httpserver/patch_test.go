@@ -69,6 +69,19 @@ func TestPatchKeepsOmittedFieldsAndNullClears(t *testing.T) {
 			keep:     map[string]any{"name": "Loan to Ivan", "dueDate": "2027-01-01", "counterparty": "Ivan", "description": "Car"},
 			clearKey: "due_date", clearOut: "dueDate",
 		},
+		{
+			name: "recurring transaction",
+			create: func(accID, catID int64) (string, map[string]any) {
+				return "/api/recurring", map[string]any{
+					"type": "expense", "account_id": accID, "category_id": catID, "amount": 50,
+					"description": "Gym", "frequency": "monthly", "interval": 1, "day_of_month": 5,
+					"start_date": "2030-01-05", "end_date": "2031-01-05", "is_active": true,
+				}
+			},
+			change:   map[string]any{"is_active": false},
+			keep:     map[string]any{"description": "Gym", "endDate": "2031-01-05", "dayOfMonth": float64(5), "amount": float64(50), "isActive": false},
+			clearKey: "end_date", clearOut: "endDate",
+		},
 	}
 
 	for _, tc := range cases {

@@ -130,14 +130,14 @@ describe('automation', () => {
 
 describe('mail protocols', () => {
     it('are the ones the mailer accepts', () => {
-        const source = read('internal/mailer/mailer.go')
+        const source = read('internal/mail/smtp/mailer.go')
         const fromGo = [...source.matchAll(/^	[A-Za-z]+\s+= "([a-z]+)"\s+\/\//gm)].map((m) => m[1])
         expect(sorted(MAIL_PROTOCOLS)).toEqual(sorted(fromGo))
     })
 })
 
 describe('server checks', () => {
-    const source = () => read('internal/httpserver/checks.go')
+    const source = () => read('internal/httpserver/admin/checks/checks.go')
 
     it('are the ids the backend reports', () => {
         const fromGo = [...source().matchAll(/add\("([a-z_]+)"/g)].map((m) => m[1])
@@ -159,7 +159,7 @@ describe('server checks', () => {
 
 describe('backup status', () => {
     it('is one of the statuses the API can return', () => {
-        const body = goFunc('internal/httpserver/dto/dto.go', 'func NewBackup(')
+        const body = goFunc('internal/httpserver/httpx/dto/backups.go', 'func NewBackup(')
         const fromGo = [...body.matchAll(/status\s*:?=\s*"([a-z]+)"/g)].map((m) => m[1])
         expect(sorted(BACKUP_STATUSES)).toEqual(sorted(fromGo))
     })
@@ -191,10 +191,32 @@ describe('space audit log', () => {
     })
 })
 
+const SPACE_DATA_PACKAGES = [
+    'currencies',
+    'accounts',
+    'categories',
+    'tags',
+    'transactions',
+    'imports',
+    'debts',
+    'reports',
+    'recurring',
+    'budgets',
+    'automation',
+    'upload',
+]
+
 describe('API routes', () => {
     it('sends every space data route through /spaces/{id}', () => {
-        const body = goFunc('internal/httpserver/server.go', 'func dataRoutes(')
-        const roots = [...body.matchAll(/r\.(?:Get|Post|Put|Patch|Delete)\("\/([^/"{]+)/g)].map((m) => m[1])
+        // Each data domain is a package under internal/httpserver that mounts its own Routes.
+        const bodies = SPACE_DATA_PACKAGES.map((pkg) => {
+            const file = `internal/httpserver/api/${pkg}/routes.go`
+            const signature = read(file).includes('func Routes(') ? 'func Routes(' : ') Routes('
+            return goFunc(file, signature)
+        })
+        const roots = bodies.flatMap((body) =>
+            [...body.matchAll(/r\.(?:Get|Post|Put|Patch|Delete)\("\/([^/"{]+)/g)].map((m) => m[1]),
+        )
         expect(roots.length).toBeGreaterThan(50)
         expect(sorted(SPACE_ROOTS)).toEqual(sorted(roots))
     })

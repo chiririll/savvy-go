@@ -168,6 +168,25 @@ func (r Repo) SetTwoFactor(ctx context.Context, id int64, secret *string, enable
 	})
 }
 
+// AdvanceTwoFactorStep records step as the last authenticator step used and
+// reports whether it was newer than the one recorded. Of two calls with the
+// same step, one gets true.
+func (r Repo) AdvanceTwoFactorStep(ctx context.Context, id, step int64) (bool, error) {
+	res, err := r.q().AdvanceTwoFactorStep(ctx, sqlc.AdvanceTwoFactorStepParams{
+		TwoFactorLastStep: db.NullInt64(&step), ID: id, TwoFactorLastStep_2: db.NullInt64(&step),
+	})
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
+}
+
+// ClearTwoFactorStep forgets the last authenticator step, for a new secret.
+func (r Repo) ClearTwoFactorStep(ctx context.Context, id int64) error {
+	return r.q().ClearTwoFactorStep(ctx, id)
+}
+
 // Tombstone removes everything that identifies the user and everything that
 // grants access (credentials, tokens, passkeys, SSO links, memberships), and
 // keeps the row so ids stored in space databases still resolve.
@@ -408,6 +427,11 @@ func (r Repo) UpdateAPITokenGrant(ctx context.Context, userID, id int64, perms [
 	return true, nil
 }
 
+// DeleteAPITokens deletes every token of the user, with their space links and OAuth refresh tokens.
+func (r Repo) DeleteAPITokens(ctx context.Context, userID int64) error {
+	return r.q().DeleteUserAPITokens(ctx, userID)
+}
+
 // DeleteAPIToken reports whether the user had such a token.
 func (r Repo) DeleteAPIToken(ctx context.Context, userID, id int64) (bool, error) {
 	res, err := r.q().DeleteAPIToken(ctx, sqlc.DeleteAPITokenParams{ID: id, UserID: userID})
@@ -538,6 +562,45 @@ func (r Repo) ConsumeChallenge(ctx context.Context, hash string, now time.Time) 
 	return n == 1, nil
 }
 
+// FailChallenge counts a wrong code against an open challenge and uses the
+// challenge up once it has had max of them. It returns the owner and the wrong
+// codes so far; open is false when the challenge is not open.
+func (r Repo) FailChallenge(ctx context.Context, hash string, max int, now time.Time) (userID, attempts int64, open bool, err error) {
+	row, err := r.q().FailTwoFactorChallenge(ctx, sqlc.FailTwoFactorChallengeParams{
+		MaxAttempts: int64(max), ConsumedNow: db.TimeNS(now), UpdatedNow: db.TimeNS(now), TokenHash: hash, ValidAt: db.FormatTime(now),
+	})
+	if err == db.ErrNotFound {
+		return 0, 0, false, nil
+	}
+	return row.UserID, row.Attempts, err == nil, err
+}
+
+// TwoFactorLockedUntil is when the user may get a new second-factor challenge
+// again, or nil when no delay is running.
+func (r Repo) TwoFactorLockedUntil(ctx context.Context, userID int64) (*time.Time, error) {
+	raw, err := r.q().GetTwoFactorLock(ctx, userID)
+	if err != nil && err != db.ErrNotFound {
+		return nil, err
+	}
+	return optTime(raw), nil
+}
+
+// AddTwoFactorFailure counts a wrong code for the user across challenges and
+// returns the count.
+func (r Repo) AddTwoFactorFailure(ctx context.Context, userID int64) (int, error) {
+	n, err := r.q().AddTwoFactorFailure(ctx, userID)
+	return int(n), err
+}
+
+func (r Repo) LockTwoFactor(ctx context.Context, userID int64, until time.Time) error {
+	return r.q().LockTwoFactor(ctx, sqlc.LockTwoFactorParams{LockedUntil: db.TimeNS(until), UserID: userID})
+}
+
+// ResetTwoFactorFailures clears the user's count and any delay after a success.
+func (r Repo) ResetTwoFactorFailures(ctx context.Context, userID int64) error {
+	return r.q().ResetTwoFactorFailures(ctx, userID)
+}
+
 // AnyChallengeUserID is the owner of a challenge whether or not it is used.
 func (r Repo) AnyChallengeUserID(ctx context.Context, hash string) (int64, error) {
 	return r.q().GetChallengeUserID(ctx, hash)
@@ -550,31 +613,20 @@ func (r Repo) CountChallenges(ctx context.Context) (int, error) {
 
 // Recovery codes
 
-// RecoveryCode is an unused code, stored hashed.
-type RecoveryCode struct {
-	ID   int64
-	Hash string
-}
-
-func (r Repo) UnusedRecoveryCodes(ctx context.Context, userID int64) ([]RecoveryCode, error) {
-	rows, err := r.q().ListUnusedRecoveryCodes(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]RecoveryCode, len(rows))
-	for i, row := range rows {
-		out[i] = RecoveryCode{ID: row.ID, Hash: row.Code}
-	}
-	return out, nil
-}
-
 func (r Repo) CountUnusedRecoveryCodes(ctx context.Context, userID int64) (int, error) {
 	n, err := r.q().CountUnusedRecoveryCodes(ctx, userID)
 	return int(n), err
 }
 
-func (r Repo) MarkRecoveryCodeUsed(ctx context.Context, id int64, now time.Time) error {
-	return r.q().MarkRecoveryCodeUsed(ctx, sqlc.MarkRecoveryCodeUsedParams{UsedAt: db.TimeNS(now), ID: id})
+// UseRecoveryCode marks the unused code with this hash as used and reports whether there was
+// one. Finding and marking are one statement, so two requests cannot both use a code.
+func (r Repo) UseRecoveryCode(ctx context.Context, userID int64, hash string, now time.Time) (bool, error) {
+	res, err := r.q().UseRecoveryCode(ctx, sqlc.UseRecoveryCodeParams{UsedAt: db.TimeNS(now), UserID: userID, Code: hash})
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
 }
 
 func (r Repo) InvalidateUnusedRecoveryCodes(ctx context.Context, userID int64, now time.Time) error {
@@ -593,8 +645,9 @@ func (r Repo) DeleteRecoveryCodes(ctx context.Context, userID int64) error {
 
 // Passkey is a registered credential as the settings page lists it.
 type Passkey struct {
-	ID                                  int64
-	Name, AAGUID, LastUsedAt, CreatedAt *string
+	ID                    int64
+	Name, AAGUID          *string
+	LastUsedAt, CreatedAt *time.Time
 }
 
 func (r Repo) Passkeys(ctx context.Context, userID int64) ([]Passkey, error) {
@@ -605,7 +658,7 @@ func (r Repo) Passkeys(ctx context.Context, userID int64) ([]Passkey, error) {
 	out := make([]Passkey, len(rows))
 	for i, row := range rows {
 		out[i] = Passkey{ID: row.ID, Name: optString(row.Name), AAGUID: optString(row.Aaguid),
-			LastUsedAt: optString(row.LastUsedAt), CreatedAt: optString(row.CreatedAt)}
+			LastUsedAt: optTime(row.LastUsedAt), CreatedAt: optTime(row.CreatedAt)}
 	}
 	return out, nil
 }
@@ -659,9 +712,11 @@ func (r Repo) DeletePasskey(ctx context.Context, userID, id int64) (bool, error)
 	return n > 0, nil
 }
 
-func (r Repo) TouchPasskey(ctx context.Context, credentialID string, now time.Time) error {
-	return r.q().TouchWebAuthnCredential(ctx, sqlc.TouchWebAuthnCredentialParams{
-		LastUsedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now), CredentialID: credentialID,
+// UpdatePasskeyAfterLogin stores the credential record and sign count the
+// authenticator reported, and marks the passkey as used.
+func (r Repo) UpdatePasskeyAfterLogin(ctx context.Context, credentialID, record string, counter int64, now time.Time) error {
+	return r.q().UpdateWebAuthnCredentialAfterLogin(ctx, sqlc.UpdateWebAuthnCredentialAfterLoginParams{
+		Record: record, Counter: counter, LastUsedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now), CredentialID: credentialID,
 	})
 }
 
@@ -684,16 +739,18 @@ func (r Repo) InsertPasskeyChallenge(ctx context.Context, userID *int64, hash, t
 }
 
 // TakePasskeyChallenge returns an open challenge of the type and marks it
-// used. A challenge that is unknown, used or expired is nil.
+// used in one statement, so of two racing calls only one gets it. A challenge
+// that is unknown, used or expired is nil; a database error is returned.
 func (r Repo) TakePasskeyChallenge(ctx context.Context, hash, typ string, now time.Time) (*PasskeyChallenge, error) {
-	row, err := r.q().GetOpenWebAuthnChallenge(ctx, sqlc.GetOpenWebAuthnChallengeParams{
+	row, err := r.q().TakeWebAuthnChallenge(ctx, sqlc.TakeWebAuthnChallengeParams{
+		ConsumedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now),
 		TokenHash: hash, Type: typ, ExpiresAt: db.FormatTime(now),
 	})
 	if err != nil {
-		return nil, nil
+		if err == db.ErrNotFound {
+			return nil, nil
+		}
+		return nil, err
 	}
-	_ = r.q().ConsumeWebAuthnChallenge(ctx, sqlc.ConsumeWebAuthnChallengeParams{
-		ConsumedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now), TokenHash: hash,
-	})
 	return &PasskeyChallenge{UserID: row.UserID.Int64, Options: row.Options}, nil
 }

@@ -11,20 +11,10 @@ import (
 	"savvy-go/internal/db"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/migrate"
-	"savvy-go/internal/money"
 	"savvy-go/internal/money/moneytest"
 )
 
 func dec(s string) decimal.Decimal { return decimal.RequireFromString(s) }
-
-func asMoney(t *testing.T, v any) money.Money {
-	t.Helper()
-	m, ok := v.(money.Money)
-	if !ok {
-		t.Fatalf("%v (%T) is not money.Money", v, v)
-	}
-	return m
-}
 
 func openSpaceDB(t *testing.T) *sql.DB {
 	t.Helper()

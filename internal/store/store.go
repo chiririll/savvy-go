@@ -32,6 +32,10 @@ var (
 	ErrUnavailable = errors.New("space unavailable")
 	// ErrNotFound is returned for a space the store does not hold.
 	ErrNotFound = errors.New("space not found")
+	// ErrConstraint is returned when a write breaks a database constraint. Its
+	// message is safe to show; the driver text, which names the schema, is only
+	// reachable by unwrapping.
+	ErrConstraint = errors.New("the data is not allowed")
 )
 
 // Tx runs fn in a transaction on db. A handle that is already a transaction

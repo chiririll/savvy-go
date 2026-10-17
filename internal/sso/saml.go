@@ -10,10 +10,12 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/beevik/etree"
 )
 
 func (s Service) SamlMetadata(ctx context.Context, p IdentityProvider) string {
-	entity := s.AppURL() + "/api/auth/sso/" + p.Slug + "/metadata"
+	entity := s.samlEntityID(p)
 	acs := s.ACSURL(ctx, p)
 	return fmt.Sprintf(`<?xml version="1.0"?>
 <EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata" entityID="%s">
@@ -37,9 +39,14 @@ func (s Service) samlRedirect(ctx context.Context, p IdentityProvider, redirectA
 	if err != nil {
 		return "", err
 	}
-	entity := s.AppURL() + "/api/auth/sso/" + p.Slug + "/metadata"
+	entity := s.samlEntityID(p)
 	instant := time.Now().UTC().Format(time.RFC3339)
-	doc := fmt.Sprintf(`<samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="%s" Version="2.0" IssueInstant="%s" Destination="%s" AssertionConsumerServiceURL="%s" ProtocolBinding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"><saml:Issuer>%s</saml:Issuer></samlp:AuthnRequest>`,
+	doc := fmt.Sprintf(`<samlp:AuthnRequest`+
+		` xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"`+
+		` xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"`+
+		` ID="%s" Version="2.0" IssueInstant="%s" Destination="%s" AssertionConsumerServiceURL="%s"`+
+		` ProtocolBinding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST">`+
+		`<saml:Issuer>%s</saml:Issuer></samlp:AuthnRequest>`,
 		xmlEscape(reqID), xmlEscape(instant), xmlEscape(ssoURL), xmlEscape(s.ACSURL(ctx, p)), xmlEscape(entity))
 	encoded, err := deflateB64(doc)
 	if err != nil {
@@ -65,17 +72,118 @@ func (s Service) HandleACS(ctx context.Context, p IdentityProvider, samlResponse
 	if err != nil || len(raw) == 0 {
 		return NormalizedIdentity{}, ssoErr("saml_invalid", "The SAML response is invalid.", 401)
 	}
-	if err := VerifySAMLXML(raw, idpCerts(p)); err != nil {
+	signed, err := verifiedSAML(raw, idpCerts(p))
+	if err != nil {
 		return NormalizedIdentity{}, err
 	}
-	nameID, inResponseTo, attrs, ok := parseSAMLResponse(string(raw))
+	// Read only what the signature covers.
+	vouched := etree.NewDocument()
+	vouched.SetRoot(signed.Copy())
+	signedXML, err := vouched.WriteToString()
+	if err != nil {
+		return NormalizedIdentity{}, ssoErr("saml_invalid", "The SAML response is invalid.", 401)
+	}
+	nameID, inResponseTo, attrs, ok := parseSAMLResponse(signedXML)
 	if !ok {
 		return NormalizedIdentity{}, ssoErr("saml_invalid", "The SAML assertion is invalid.", 401)
 	}
-	if st.SAMLRequestID != "" && inResponseTo != "" && inResponseTo != st.SAMLRequestID {
+	// Only logins we started are accepted, so the signed assertion must answer exactly this request.
+	if st.SAMLRequestID == "" || inResponseTo != st.SAMLRequestID {
+		return NormalizedIdentity{}, ssoErr("saml_invalid", "The SAML assertion is invalid.", 401)
+	}
+	if !samlConditionsHold(signedXML, cfgString(p.Config, "idp_entity_id"), s.samlEntityID(p), time.Now()) {
 		return NormalizedIdentity{}, ssoErr("saml_invalid", "The SAML assertion is invalid.", 401)
 	}
 	return samlIdentity(p, nameID, attrs), nil
+}
+
+func (s Service) samlEntityID(p IdentityProvider) string {
+	return s.Cfg.AppURL() + "/api/auth/sso/" + p.Slug + "/metadata"
+}
+
+// samlClockSkew is how far the IdP's clock may differ from ours.
+const samlClockSkew = 2 * time.Minute
+
+// samlConditionsHold checks the signed assertion came from the configured IdP,
+// is meant for us, and is valid right now. Anything missing counts as failing.
+func samlConditionsHold(raw, idpEntity, audience string, now time.Time) bool {
+	if idpEntity == "" {
+		return false
+	}
+	within := func(notBefore, notOnOrAfter string, needEnd bool) bool {
+		if notBefore != "" {
+			t, err := time.Parse(time.RFC3339, notBefore)
+			if err != nil || now.Add(samlClockSkew).Before(t) {
+				return false
+			}
+		}
+		if notOnOrAfter == "" {
+			return !needEnd
+		}
+		t, err := time.Parse(time.RFC3339, notOnOrAfter)
+		return err == nil && now.Add(-samlClockSkew).Before(t)
+	}
+	attr := func(t xml.StartElement, name string) string {
+		for _, a := range t.Attr {
+			if local(a.Name.Local) == name {
+				return a.Value
+			}
+		}
+		return ""
+	}
+
+	dec := xml.NewDecoder(strings.NewReader(raw))
+	var restrictions [][]string
+	issuers := 0
+	conditions := false
+	for {
+		tok, err := dec.Token()
+		if err != nil {
+			break
+		}
+		t, ok := tok.(xml.StartElement)
+		if !ok {
+			continue
+		}
+		switch local(t.Name.Local) {
+		case "Issuer":
+			var v string
+			if dec.DecodeElement(&v, &t) != nil || strings.TrimSpace(v) != idpEntity {
+				return false
+			}
+			issuers++
+		case "Conditions":
+			conditions = true
+			if !within(attr(t, "NotBefore"), attr(t, "NotOnOrAfter"), true) {
+				return false
+			}
+		case "SubjectConfirmationData":
+			if !within(attr(t, "NotBefore"), attr(t, "NotOnOrAfter"), false) {
+				return false
+			}
+		case "AudienceRestriction":
+			restrictions = append(restrictions, nil)
+		case "Audience":
+			var v string
+			if dec.DecodeElement(&v, &t) != nil || len(restrictions) == 0 {
+				return false
+			}
+			restrictions[len(restrictions)-1] = append(restrictions[len(restrictions)-1], strings.TrimSpace(v))
+		}
+	}
+	if issuers == 0 || !conditions || len(restrictions) == 0 {
+		return false
+	}
+	for _, r := range restrictions {
+		found := false
+		for _, a := range r {
+			found = found || a == audience
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }
 
 func samlIdentity(p IdentityProvider, nameID string, attrs map[string][]string) NormalizedIdentity {
@@ -140,6 +248,12 @@ func parseSAMLResponse(raw string) (nameID, inResponseTo string, attrs map[strin
 			case "Response":
 				for _, a := range t.Attr {
 					if local(a.Name.Local) == "InResponseTo" {
+						inResponseTo = a.Value
+					}
+				}
+			case "SubjectConfirmationData":
+				for _, a := range t.Attr {
+					if local(a.Name.Local) == "InResponseTo" && inResponseTo == "" {
 						inResponseTo = a.Value
 					}
 				}

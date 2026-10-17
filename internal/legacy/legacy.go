@@ -70,6 +70,9 @@ func convert(ctx context.Context, db *sql.DB, appKey string) error {
 	if err := mapRoles(ctx, db); err != nil {
 		return fmt.Errorf("map roles: %w", err)
 	}
+	if err := mapPasswords(ctx, db); err != nil {
+		return fmt.Errorf("map passwords: %w", err)
+	}
 	dropLaravelOnly(ctx, db)
 	slog.Info("laravel database converted")
 	return nil

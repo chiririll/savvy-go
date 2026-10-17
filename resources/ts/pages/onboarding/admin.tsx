@@ -60,7 +60,7 @@ export default function AdminSetupPage() {
     const schema = useMemo(() => z.object({
         name: z.string().min(1, t('setup.validation.name')),
         email: z.string().email(t('setup.validation.email')),
-        password: z.string().min(6, t('setup.validation.passwordMin')),
+        password: z.string().min(8, t('setup.validation.passwordMin')),
         password_confirmation: z.string(),
     }).refine((data) => data.password === data.password_confirmation, {
         message: t('setup.validation.passwordMatch'),

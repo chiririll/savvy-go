@@ -11,6 +11,8 @@ import (
 	"testing"
 
 	"savvy-go/internal/auth"
+	"savvy-go/internal/auth/permissions"
+	"savvy-go/internal/httpserver/httpx/guard"
 )
 
 // Every data route must belong to a resource, or tokens are locked out of it
@@ -19,20 +21,20 @@ import (
 func TestEveryDataRouteMapsToAResource(t *testing.T) {
 	a := newTestApp(t)
 	for root := range dataRoots(a.s) {
-		res, ok := spaceResource("/api/spaces/1/" + root)
+		res, ok := guard.SpaceResource("/api/spaces/1/" + root)
 		if !ok {
 			t.Errorf("data route /%s has no API token resource: add it to spaceSegments", root)
-		} else if !slices.Contains(auth.APIResources, res) {
+		} else if !slices.Contains(permissions.APIResources, res) {
 			t.Errorf("/%s maps to %q, which is not an API resource", root, res)
 		}
 	}
 	for _, path := range []string{"/api/spaces/1", "/api/spaces/1/", "/api/spaces/1/members", "/api/spaces/1/transfers/abc/accept"} {
-		if _, ok := spaceResource(path); !ok {
+		if _, ok := guard.SpaceResource(path); !ok {
 			t.Errorf("%s has no resource", path)
 		}
 	}
 	for _, path := range []string{"/api/spaces/1/audit", "/api/spaces/1/backups", "/api/spaces/1/invitations", "/api/spaces/1/nope"} {
-		if res, ok := spaceResource(path); ok {
+		if res, ok := guard.SpaceResource(path); ok {
 			t.Errorf("%s maps to %q: tokens must not reach it", path, res)
 		}
 	}
@@ -71,7 +73,7 @@ func TestTokenPermissionsAreCheckedPerResource(t *testing.T) {
 	status(t, a.bearer("POST", "/api/accounts", map[string]any{"name": "X"}, viewerWrite), 403, "viewer role wins over the grant")
 
 	// Spaces' own administration stays out of reach whatever the grant.
-	all, _ := a.issueGrant(u, auth.Grant{Permissions: allPerms(auth.PermWrite), AllSpaces: true}, nil)
+	all, _ := a.issueGrant(u, auth.Grant{Permissions: allPerms(permissions.Write), AllSpaces: true}, nil)
 	for _, p := range []string{"/audit", "/backups", "/invitations"} {
 		status(t, a.bearer("GET", fmt.Sprintf("/api/spaces/%d%s", a.space.ID, p), nil, all), 403, "tokens cannot reach "+p)
 	}
@@ -80,7 +82,7 @@ func TestTokenPermissionsAreCheckedPerResource(t *testing.T) {
 func TestTokenReachesOnlyItsSpaces(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("two@a.com", "secret1", roleEditor)
-	other, err := a.s.spaces.Create(context.Background(), "Other", u)
+	other, err := a.svc.Spaces.Create(context.Background(), "Other", u)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,6 +121,7 @@ func TestCreateTokenKeepsTheChosenSpaces(t *testing.T) {
 
 	res := a.do("POST", "/api/auth/api-tokens", map[string]any{
 		"name": "ci", "permissions": []string{"transactions:write", "transactions:read", "accounts:read"}, "space_ids": []int64{a.space.ID},
+		"current_password": "secret1",
 	}, sess.Token, sess.CSRF)
 	if res.StatusCode != http.StatusCreated {
 		t.Fatalf("create %d", res.StatusCode)
@@ -139,7 +142,7 @@ func TestCreateTokenKeepsTheChosenSpaces(t *testing.T) {
 func TestOAuthConsentChoosesTheSpaces(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("oauth@a.com", "secret1", roleEditor)
-	other, err := a.s.spaces.Create(context.Background(), "Other", u)
+	other, err := a.svc.Spaces.Create(context.Background(), "Other", u)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,6 +157,7 @@ func TestOAuthConsentChoosesTheSpaces(t *testing.T) {
 	decide := func(body map[string]any) *http.Response {
 		body["client_id"], body["redirect_uri"], body["state"] = id, oauthRedirect, "st-1"
 		body["code_challenge"], body["code_challenge_method"], body["approve"] = oauthChallenge(), "S256", true
+		body["current_password"] = "secret1"
 		return a.do("POST", "/api/oauth/authorize", body, sess.Token, sess.CSRF)
 	}
 	status(t, decide(map[string]any{}), 422, "no choice")
@@ -202,7 +206,7 @@ func TestAPITokenGrantCanBeEditedInPlace(t *testing.T) {
 	sess := a.issue(u, false)
 	raw, tok := a.issueGrant(u, auth.Grant{Permissions: []string{"tags:write", "accounts:read"}, AllSpaces: true}, nil)
 	patch := func(body map[string]any) *http.Response {
-		return a.do("PATCH", "/api/auth/api-tokens/"+strconv.FormatInt(tok.ID, 10), body, sess.Token, sess.CSRF)
+		return a.do("PATCH", "/api/auth/api-tokens/"+strconv.FormatInt(tok.ID, 10), confirmed(body), sess.Token, sess.CSRF)
 	}
 
 	status(t, a.bearer("POST", "/api/tags", map[string]any{"name": "one"}, raw), http.StatusCreated, "before")
@@ -222,7 +226,7 @@ func TestAPITokenGrantCanBeEditedInPlace(t *testing.T) {
 	// Not another user's token, and not with a token.
 	other := a.createUser("other@a.com", "secret1", "admin")
 	os := a.issue(other, false)
-	status(t, a.do("PATCH", "/api/auth/api-tokens/"+strconv.FormatInt(tok.ID, 10), map[string]any{"permissions": []string{"tags:read"}, "all_spaces": true}, os.Token, os.CSRF), http.StatusNotFound, "someone else's token")
+	status(t, a.do("PATCH", "/api/auth/api-tokens/"+strconv.FormatInt(tok.ID, 10), map[string]any{"permissions": []string{"tags:read"}, "all_spaces": true, "current_password": "secret1"}, os.Token, os.CSRF), http.StatusNotFound, "someone else's token")
 	status(t, a.bearer("PATCH", "/api/auth/api-tokens/"+strconv.FormatInt(tok.ID, 10), map[string]any{"permissions": []string{"tags:delete"}, "all_spaces": true}, raw), http.StatusForbidden, "a token cannot edit tokens")
 }
 
@@ -240,7 +244,7 @@ func TestConnectedAppGrantCanBeEdited(t *testing.T) {
 	var tokenID int64
 	list := decodeJSON(t, a.do("GET", "/api/auth/api-tokens", nil, sess.Token, sess.CSRF))["data"].([]any)
 	for _, it := range list {
-		if m := it.(map[string]any); m["kind"] == auth.TokenMCP {
+		if m := it.(map[string]any); m["kind"] == permissions.KindMCP {
 			tokenID = int64(m["id"].(float64))
 		}
 	}
@@ -248,7 +252,7 @@ func TestConnectedAppGrantCanBeEdited(t *testing.T) {
 		t.Fatalf("no connection in %v", list)
 	}
 	patch := func(perms ...string) *http.Response {
-		return a.do("PATCH", "/api/auth/api-tokens/"+strconv.FormatInt(tokenID, 10), map[string]any{"permissions": perms, "all_spaces": true}, sess.Token, sess.CSRF)
+		return a.do("PATCH", "/api/auth/api-tokens/"+strconv.FormatInt(tokenID, 10), map[string]any{"permissions": perms, "all_spaces": true, "current_password": "secret1"}, sess.Token, sess.CSRF)
 	}
 
 	status(t, patch("transfers:write"), http.StatusUnprocessableEntity, "an app cannot get a part its tools do not use")
@@ -272,20 +276,21 @@ func TestTokenKindComesFromHowItWasMade(t *testing.T) {
 
 	res := a.do("POST", "/api/auth/api-tokens", map[string]any{
 		"name": "MCP: looks like an app", "permissions": []string{"transfers:read"}, "all_spaces": true, "kind": "mcp",
+		"current_password": "secret1",
 	}, sess.Token, sess.CSRF)
 	if res.StatusCode != http.StatusCreated {
 		t.Fatalf("create = %d", res.StatusCode)
 	}
 	data := decodeJSON(t, res)["data"].(map[string]any)
-	if data["kind"] != auth.TokenPersonal {
+	if data["kind"] != permissions.KindPersonal {
 		t.Fatalf("a token made in Settings is personal whatever it is called or asks for: %v", data["kind"])
 	}
 
 	// Only the OAuth flow makes a connection; Issue with that kind holds it to the tools' parts.
-	if _, _, err := a.s.apiTokens.Issue(context.Background(), u, "app", auth.Grant{Kind: auth.TokenMCP, Permissions: []string{"transfers:read"}, AllSpaces: true}, nil); err == nil {
+	if _, _, err := a.svc.APITokens.Issue(context.Background(), u, "app", auth.Grant{Kind: permissions.KindMCP, Permissions: []string{"transfers:read"}, AllSpaces: true}, nil); err == nil {
 		t.Fatal("a connection must not be given a part its tools do not use")
 	}
-	if _, _, err := a.s.apiTokens.Issue(context.Background(), u, "app", auth.Grant{Kind: auth.TokenMCP, Permissions: []string{"tags:write"}, AllSpaces: true}, nil); err != nil {
+	if _, _, err := a.svc.APITokens.Issue(context.Background(), u, "app", auth.Grant{Kind: permissions.KindMCP, Permissions: []string{"tags:write"}, AllSpaces: true}, nil); err != nil {
 		t.Fatalf("a connection with a part its tools use: %v", err)
 	}
 }

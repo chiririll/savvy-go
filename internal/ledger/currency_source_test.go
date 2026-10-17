@@ -82,11 +82,11 @@ func TestCatalogOffersOnlyCurrenciesTheSpaceLacks(t *testing.T) {
 		{Code: "EUR", Name: "Euro", Symbol: "€", Decimals: 2, Rate: dec("1.1")},
 	}}
 	list := (Currencies{DB: e.db, Source: src}).Catalog(e.ctx)
-	if len(list) != 1 || list[0]["code"] != "EUR" {
+	if len(list) != 1 || list[0].Code != "EUR" {
 		t.Fatalf("catalog = %v", list)
 	}
-	if rate, _ := list[0]["rate"].(decimal.Decimal); !rate.Equal(dec("1.1")) {
-		t.Fatalf("rate = %v", list[0]["rate"])
+	if !list[0].Rate.Equal(dec("1.1")) {
+		t.Fatalf("rate = %v", list[0].Rate)
 	}
 	if got := (Currencies{DB: e.db}).Catalog(e.ctx); len(got) != 0 {
 		t.Fatalf("without a source the catalog is empty, got %v", got)

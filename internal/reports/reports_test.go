@@ -17,14 +17,14 @@ func TestNetWorthConvertsEachAccountToBase(t *testing.T) {
 	e := newMoneyEnv(t)
 	got := (Service{DB: e.db}).NetWorth(e.ctx, Filter{})
 	// USD 100 + JPY 3000*0.01 + BTC 0.
-	if total := asMoney(t, got["current"]); !total.Equal(money.FromDecimal(dec("130"), e.usd.Unit())) {
+	if total := got.Current; !total.Equal(money.FromDecimal(dec("130"), e.usd.Unit())) {
 		t.Fatalf("current = %s (%+v), want 130 USD", total, total.Unit())
 	}
-	accounts := got["accounts"].([]map[string]any)
-	if len(accounts) != 3 || accounts[0]["name"] != "usd" || accounts[1]["name"] != "jpy" {
+	accounts := got.Accounts
+	if len(accounts) != 3 || accounts[0].Name != "usd" || accounts[1].Name != "jpy" {
 		t.Fatalf("accounts must be largest first: %v", accounts)
 	}
-	if pct := accounts[0]["percentage"].(float64); pct != 76.9 {
+	if pct := accounts[0].Percentage; pct != 76.9 {
 		t.Fatalf("usd share = %v, want 76.9", pct)
 	}
 }
@@ -34,13 +34,14 @@ func TestTxSummaryAveragesRoundToBaseScale(t *testing.T) {
 	e.tx(t, "expense", e.usdAcc.ID, "10.00")
 	got := (Service{DB: e.db}).TxSummary(e.ctx, janRange, "expense")
 	base := e.usd.Unit()
+	gotAmounts := map[string]money.Money{"total": got.Total, "avgPerDay": got.AvgPerDay, "avgPerWeek": got.AvgPerWeek}
 	for key, want := range map[string]string{"total": "10", "avgPerDay": "3.33", "avgPerWeek": "23.33"} {
-		if m := asMoney(t, got[key]); !m.Equal(money.FromDecimal(dec(want), base)) {
+		if m := gotAmounts[key]; !m.Equal(money.FromDecimal(dec(want), base)) {
 			t.Errorf("%s = %s, want %s", key, m, want)
 		}
 	}
-	if got["daysInPeriod"] != 3 {
-		t.Errorf("daysInPeriod = %v", got["daysInPeriod"])
+	if got.DaysInPeriod != 3 {
+		t.Errorf("daysInPeriod = %v", got.DaysInPeriod)
 	}
 }
 
@@ -82,15 +83,15 @@ func TestReportsFollowTheBaseCurrencyScale(t *testing.T) {
 	base := jpy.Unit()
 
 	got := reports.TxSummary(ctx, janRange, "expense")
-	if total := asMoney(t, got["total"]); !total.Equal(money.FromDecimal(dec("1150"), base)) {
+	if total := got.Total; !total.Equal(money.FromDecimal(dec("1150"), base)) {
 		t.Fatalf("total = %s (%+v), want 1150 JPY", total, total.Unit())
 	}
-	if avg := asMoney(t, got["avgPerDay"]); avg.Minor() != 383 { // 1150 / 3, whole yen
+	if avg := got.AvgPerDay; avg.Minor() != 383 { // 1150 / 3, whole yen
 		t.Fatalf("avgPerDay = %s, want 383", avg)
 	}
 
 	// Net worth: 5000 - 1000 JPY plus (10 - 1) USD at 150 = 1350 JPY.
-	if nw := asMoney(t, reports.NetWorth(ctx, Filter{})["current"]); nw.Minor() != 5350 {
+	if nw := reports.NetWorth(ctx, Filter{}).Current; nw.Minor() != 5350 {
 		t.Fatalf("net worth = %s, want 5350 JPY", nw)
 	}
 }
@@ -110,20 +111,20 @@ func TestMoneyFlowSplitsIncomeAcrossExpenses(t *testing.T) {
 		}
 	}
 	got := (Service{DB: e.db}).MoneyFlow(e.ctx, janRange)
-	totals := got["totals"].(map[string]any)
+	totals := map[string]money.Money{"income": got.Totals.Income, "expenses": got.Totals.Expenses, "savings": got.Totals.Savings}
 	base := e.usd.Unit()
 	for key, want := range map[string]string{"income": "100", "expenses": "25", "savings": "75"} {
-		if m := asMoney(t, totals[key]); !m.Equal(money.FromDecimal(dec(want), base)) {
+		if m := totals[key]; !m.Equal(money.FromDecimal(dec(want), base)) {
 			t.Errorf("%s = %s, want %s", key, m, want)
 		}
 	}
-	links := got["links"].([]map[string]any)
+	links := got.Links
 	if len(links) != 2 {
 		t.Fatalf("links = %v, want salary->food and salary->savings", links)
 	}
 	var sum money.Money = money.Zero(base)
 	for _, l := range links {
-		sum = sum.Add(asMoney(t, l["value"]))
+		sum = sum.Add(l.Value)
 	}
 	if !sum.Equal(money.FromDecimal(dec("100"), base)) {
 		t.Fatalf("links add up to %s, want the whole income", sum)
@@ -138,13 +139,13 @@ func TestExpensePaceBudgetIsConvertedToBase(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := (Service{DB: e.db}).ExpensePace(e.ctx, janRange)
-	months := got["months"].([]map[string]any)
+	months := got.Months
 	if len(months) == 0 {
 		t.Fatal("no months")
 	}
 	// 10000 JPY at 0.01 USD per JPY.
-	if b := asMoney(t, months[0]["budget"]); !b.Equal(money.FromDecimal(dec("100"), e.usd.Unit())) {
-		t.Fatalf("budget = %s (%+v), want 100 USD", b, b.Unit())
+	if b := months[0].Budget; b == nil || !b.Equal(money.FromDecimal(dec("100"), e.usd.Unit())) {
+		t.Fatalf("budget = %v, want 100 USD", b)
 	}
 }
 
@@ -158,11 +159,11 @@ func TestOverviewSavingsRate(t *testing.T) {
 	}
 	e.tx(t, "expense", e.usdAcc.ID, "50")
 	got := (Service{DB: e.db}).Overview(e.ctx, janRange)
-	rate := got["savingsRate"].(map[string]any)["value"].(float64)
+	rate := got.SavingsRate.Value
 	if rate != 75 {
 		t.Fatalf("savings rate = %v, want 75", rate)
 	}
-	net := asMoney(t, got["netCashFlow"].(map[string]any)["value"])
+	net := got.NetCashFlow.Value
 	if !net.Equal(money.FromDecimal(dec("150"), e.usd.Unit())) {
 		t.Fatalf("net = %s, want 150", net)
 	}

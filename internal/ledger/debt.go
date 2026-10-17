@@ -22,7 +22,25 @@ func (s Debts) All(ctx context.Context, includeCompleted bool) ([]Account, error
 	return s.Accounts.Debts(ctx, includeCompleted)
 }
 
-func (s Debts) Create(ctx context.Context, name, debtType string, currencyID, accountID int64, amount decimal.Decimal, date, origin string, due, counter, desc *string) (*Account, error) {
+// DebtInput describes a new debt. Origin "new" with an AccountID records the
+// issuance as a transaction on that account and takes its currency.
+type DebtInput struct {
+	Name         string
+	DebtType     string
+	CurrencyID   int64
+	AccountID    int64
+	Amount       decimal.Decimal
+	Date         string
+	Origin       string
+	DueDate      *string
+	Counterparty *string
+	Description  *string
+}
+
+func (s Debts) Create(ctx context.Context, in DebtInput) (*Account, error) {
+	name, debtType, currencyID, accountID := in.Name, in.DebtType, in.CurrencyID, in.AccountID
+	amount, date, origin := in.Amount, in.Date, in.Origin
+	due, counter, desc := in.DueDate, in.Counterparty, in.Description
 	if origin == "new" && accountID != 0 {
 		src, err := s.Accounts.ByID(ctx, accountID)
 		if err != nil || src == nil {
@@ -123,6 +141,9 @@ type DebtSummary struct {
 	Currency *Currency
 }
 
+// Net is what is owed to the user less what the user owes.
+func (s DebtSummary) Net() money.Money { return s.OwedToMe.Sub(s.IOwe) }
+
 func (s Debts) Summary(ctx context.Context) DebtSummary {
 	debts, _ := s.All(ctx, false)
 	base, _ := (Currencies{DB: s.Accounts.DB}).Base(ctx)
@@ -147,4 +168,26 @@ func (s Debts) Delete(ctx context.Context, id int64) error {
 		return fmt.Errorf("has history")
 	}
 	return s.repo().DeleteDebt(ctx, id)
+}
+
+// DebtTarget is the amount the debt was taken at, zero when none was set. It is
+// in the account's currency.
+func (a Account) DebtTarget() money.Money {
+	if a.TargetAmount != nil {
+		return *a.TargetAmount
+	}
+	return money.Zero(a.Balance.Unit())
+}
+
+// PaymentProgress is the share of the target already paid, as a percentage
+// rounded to one decimal and kept within 0..100: an overpaid debt is 100, a
+// debt that has grown beyond its target is 0.
+func (a Account) PaymentProgress() float64 {
+	target := a.DebtTarget()
+	if !target.IsPositive() {
+		return 0
+	}
+	paid := target.Sub(a.Balance)
+	pct := paid.Decimal().Div(target.Decimal()).Mul(decimal.NewFromInt(100)).Round(1)
+	return min(100, max(0, pct.InexactFloat64()))
 }

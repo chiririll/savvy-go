@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -15,12 +16,14 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"savvy-go/internal/appconfig"
 	"savvy-go/internal/auth"
 	"savvy-go/internal/bootstrap"
-	"savvy-go/internal/config"
 	"savvy-go/internal/currencydata"
+	"savvy-go/internal/httpserver/httpx/routing"
 	"savvy-go/internal/settings"
 	"savvy-go/internal/signing"
+	"savvy-go/internal/spacefill"
 	"savvy-go/internal/spaces"
 	"savvy-go/internal/store"
 	"savvy-go/internal/store/sqlite"
@@ -40,13 +43,14 @@ type testApp struct {
 	space  *spaces.Space // the space every createUser member belongs to
 	srv    *httptest.Server
 	s      *Server
+	svc    services
 	client *http.Client
 
 	bootstrap *bootstrap.Guard // the first-run password of the server
 }
 
 // openTestStore opens a store in cfg.DataDir with the embedded migrations.
-func openTestStore(t *testing.T, cfg config.Config) *sqlite.Store {
+func openTestStore(t *testing.T, cfg appconfig.Config) *sqlite.Store {
 	t.Helper()
 	st, err := sqlite.OpenApp(context.Background(), cfg.DataDir)
 	if err != nil {
@@ -57,7 +61,7 @@ func openTestStore(t *testing.T, cfg config.Config) *sqlite.Store {
 }
 
 // testKeys is a signing key in the test's data directory.
-func testKeys(t *testing.T, cfg config.Config) *signing.Holder {
+func testKeys(t *testing.T, cfg appconfig.Config) *signing.Holder {
 	t.Helper()
 	key, err := signing.Load(cfg.DataDir, false)
 	if err != nil {
@@ -66,19 +70,20 @@ func testKeys(t *testing.T, cfg config.Config) *signing.Holder {
 	return signing.NewHolder(key)
 }
 
-func newTestApp(t *testing.T) *testApp {
+func newTestApp(t *testing.T, opts ...Option) *testApp {
 	t.Helper()
 	cfg, _ := testConfig(t)
 	st := openTestStore(t, cfg)
 	guard := bootstrap.New(cfg.DataDir, bootstrap.Binary)
-	s := New(cfg, st, testKeys(t, cfg), WithRates(currencydata.NewOffline()), WithBootstrap(guard))
-	space, err := s.spaces.Create(context.Background(), "Test", nil)
+	opts = append([]Option{WithRates(currencydata.NewOffline()), WithBootstrap(guard)}, opts...)
+	s := newServer(cfg, st, testKeys(t, cfg), opts...)
+	space, err := servicesOf(s).Spaces.Create(context.Background(), "Test", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ts := httptest.NewServer(s.Handler())
 	t.Cleanup(ts.Close)
-	return &testApp{t: t, db: st.SQL(), store: st, space: space, srv: ts, s: s, client: ts.Client(), bootstrap: guard}
+	return &testApp{t: t, db: st.SQL(), store: st, space: space, srv: ts, s: s, svc: servicesOf(s), client: ts.Client(), bootstrap: guard}
 }
 
 // spaceDB is the database of the shared test space.
@@ -103,12 +108,12 @@ func (a *testApp) createUser(email, password, role string, opts ...func(*auth.Us
 	case roleEditor, roleViewer:
 		serverRole, spaceRole = auth.RoleUser, role
 	}
-	u, err := a.s.users.Create(context.Background(), "U", email, &password, serverRole)
+	u, err := a.svc.Users.Create(context.Background(), "U", email, &password, serverRole)
 	if err != nil {
 		a.t.Fatal(err)
 	}
 	if spaceRole != "" {
-		if err := a.s.spaces.SetMember(context.Background(), a.space.ID, u, spaceRole); err != nil {
+		if err := a.svc.Spaces.SetMember(context.Background(), a.space.ID, u, spaceRole); err != nil {
 			a.t.Fatal(err)
 		}
 	}
@@ -120,7 +125,7 @@ func (a *testApp) createUser(email, password, role string, opts ...func(*auth.Us
 
 func (a *testApp) issue(u *auth.User, remember bool) *auth.Issued {
 	a.t.Helper()
-	issued, err := a.s.sessions.Issue(context.Background(), u, "127.0.0.1", "test", remember)
+	issued, err := a.svc.Sessions.Issue(context.Background(), u, "127.0.0.1", "test", remember)
 	if err != nil {
 		a.t.Fatal(err)
 	}
@@ -130,7 +135,7 @@ func (a *testApp) issue(u *auth.User, remember bool) *auth.Issued {
 // dataRoots are the first path segments of the space data routes.
 func dataRoots(s *Server) map[string]bool {
 	r := chi.NewRouter()
-	dataRoutes(s, r)
+	routing.SpaceWriteRoutes(r, s.deps())
 	roots := map[string]bool{}
 	_ = chi.Walk(r, func(_, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
 		roots[strings.SplitN(strings.TrimPrefix(route, "/"), "/", 2)[0]] = true
@@ -207,6 +212,20 @@ func decodeJSON(t *testing.T, res *http.Response) map[string]any {
 	return out
 }
 
+// toString renders a decoded JSON value as text, for asserting that a response
+// mentions some phrase. JSON escaping applies, so keep phrases free of quotes,
+// angle brackets and ampersands.
+func toString(v any) string {
+	if s, ok := v.(string); ok {
+		return s
+	}
+	if v == nil {
+		return ""
+	}
+	b, _ := json.Marshal(v)
+	return string(b)
+}
+
 func cookieNamed(res *http.Response, name string) *http.Cookie {
 	for _, c := range res.Cookies() {
 		if c.Name == name {
@@ -269,12 +288,12 @@ func TestSessionSmokeRegisterMeLogout(t *testing.T) {
 func TestHostPrefixedCookieOverTLS(t *testing.T) {
 	cfg, _ := testConfig(t)
 	guard := bootstrap.New(cfg.DataDir, bootstrap.Binary)
-	s := New(cfg, openTestStore(t, cfg), testKeys(t, cfg), WithBootstrap(guard))
+	s := New(cfg.WithAppURL("https://savvy.test"), openTestStore(t, cfg), testKeys(t, cfg), WithBootstrap(guard))
 	ts := httptest.NewTLSServer(s.Handler())
 	t.Cleanup(ts.Close)
 	client := ts.Client()
 
-	raw, _ := json.Marshal(map[string]string{"name": "A", "email": "a@a.com", "password": "secret1", "bootstrap_password": guard.Password()})
+	raw, _ := json.Marshal(map[string]string{"name": "A", "email": "a@a.com", "password": "secret12", "bootstrap_password": guard.Password()})
 	req, _ := http.NewRequest("POST", ts.URL+"/api/auth/register", bytes.NewReader(raw))
 	req.Header.Set("Content-Type", "application/json")
 	res, err := client.Do(req)
@@ -329,7 +348,7 @@ func TestSessionIdleAbsoluteRevokeAndRefresh(t *testing.T) {
 	res.Body.Close()
 
 	issued = a.issue(u, false)
-	_ = a.s.sessions.Revoke(context.Background(), issued.Session)
+	_ = a.svc.Sessions.Revoke(context.Background(), issued.Session)
 	res = a.do("GET", "/api/auth/2fa/status", nil, issued.Token, "")
 	if res.StatusCode != 401 {
 		t.Fatalf("revoked %d", res.StatusCode)
@@ -450,7 +469,7 @@ func TestLoginSSOOnlyAnd2FAChallenge(t *testing.T) {
 	if cookieNamed(res, "svy_session") != nil {
 		t.Fatal("no session cookie during 2fa")
 	}
-	n, _ := a.s.challenges.Count(context.Background())
+	n, _ := a.svc.Challenges.Count(context.Background())
 	if n != 1 {
 		t.Fatalf("challenges %d", n)
 	}
@@ -459,237 +478,33 @@ func TestLoginSSOOnlyAnd2FAChallenge(t *testing.T) {
 func TestTwoFactorChallengePeekAndConsume(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("u@test.com", "secret1", roleEditor)
-	tok, err := a.s.challenges.Issue(context.Background(), u)
+	tok, err := a.svc.Challenges.Issue(context.Background(), u)
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := a.s.challenges.Resolve(context.Background(), tok)
+	got, err := a.svc.Challenges.Resolve(context.Background(), tok)
 	if err != nil || got == nil || got.ID != u.ID {
 		t.Fatalf("resolve %v %v", got, err)
 	}
-	got, _ = a.s.challenges.Resolve(context.Background(), tok)
+	got, _ = a.svc.Challenges.Resolve(context.Background(), tok)
 	if got == nil {
 		t.Fatal("peek should not consume")
 	}
-	got, _ = a.s.challenges.Consume(context.Background(), tok)
+	got, _ = a.svc.Challenges.Consume(context.Background(), tok)
 	if got == nil {
 		t.Fatal("first consume")
 	}
-	got, _ = a.s.challenges.Consume(context.Background(), tok)
+	got, _ = a.svc.Challenges.Consume(context.Background(), tok)
 	if got != nil {
 		t.Fatal("second consume")
 	}
 
-	tok, _ = a.s.challenges.Issue(context.Background(), u)
+	tok, _ = a.svc.Challenges.Issue(context.Background(), u)
 	_, _ = a.db.Exec(`UPDATE two_factor_challenges SET expires_at = ?`, time.Now().Add(-time.Minute).UTC().Format(time.RFC3339Nano))
-	got, _ = a.s.challenges.Resolve(context.Background(), tok)
+	got, _ = a.svc.Challenges.Resolve(context.Background(), tok)
 	if got != nil {
 		t.Fatal("expired challenge")
 	}
-}
-
-func TestChangePasswordAndLogoutOthers(t *testing.T) {
-	a := newTestApp(t)
-	u := a.createUser("u@test.com", "secret1", roleEditor)
-	current := a.issue(u, false)
-	other := a.issue(u, false)
-
-	res := a.do("PUT", "/api/auth/password", map[string]string{
-		"current_password": "secret1", "password": "newsecret1", "password_confirmation": "newsecret1",
-	}, current.Token, current.CSRF)
-	if res.StatusCode != 200 {
-		t.Fatalf("change %d %v", res.StatusCode, decodeJSON(t, res))
-	}
-	res.Body.Close()
-	ok := a.do("GET", "/api/auth/2fa/status", nil, current.Token, "")
-	if ok.StatusCode != 200 {
-		t.Fatalf("current %d", ok.StatusCode)
-	}
-	ok.Body.Close()
-	denied := a.do("GET", "/api/auth/2fa/status", nil, other.Token, "")
-	if denied.StatusCode != 401 {
-		t.Fatalf("other %d", denied.StatusCode)
-	}
-	denied.Body.Close()
-
-	u, _ = a.s.users.ByID(context.Background(), u.ID)
-	if !auth.CheckPassword(*u.Password, "newsecret1") {
-		t.Fatal("password not updated")
-	}
-
-	u = a.createUser("w@test.com", "secret1", roleEditor)
-	current = a.issue(u, false)
-	other = a.issue(u, false)
-	res = a.do("PUT", "/api/auth/password", map[string]string{
-		"current_password": "wrong-password", "password": "newsecret1", "password_confirmation": "newsecret1",
-	}, current.Token, current.CSRF)
-	if res.StatusCode != 422 {
-		t.Fatalf("wrong current %d", res.StatusCode)
-	}
-	res.Body.Close()
-	ok = a.do("GET", "/api/auth/2fa/status", nil, other.Token, "")
-	if ok.StatusCode != 200 {
-		t.Fatalf("other still valid %d", ok.StatusCode)
-	}
-	ok.Body.Close()
-
-	sso := a.createUser("sso2@test.com", "secret1", roleEditor)
-	_, _ = a.db.Exec(`UPDATE users SET is_sso_only = 1 WHERE id = ?`, sso.ID)
-	sso, _ = a.s.users.ByID(context.Background(), sso.ID)
-	iss := a.issue(sso, false)
-	res = a.do("PUT", "/api/auth/password", map[string]string{
-		"current_password": "secret1", "password": "newsecret1", "password_confirmation": "newsecret1",
-	}, iss.Token, iss.CSRF)
-	if res.StatusCode != 422 {
-		t.Fatalf("sso password change %d", res.StatusCode)
-	}
-	res.Body.Close()
-
-	u = a.createUser("lo@test.com", "secret1", roleEditor)
-	current = a.issue(u, false)
-	other = a.issue(u, false)
-	res = a.do("POST", "/api/auth/logout-others", map[string]any{}, current.Token, current.CSRF)
-	body := decodeJSON(t, res)
-	if res.StatusCode != 200 || body["revoked"].(float64) != 1 {
-		t.Fatalf("logout-others %d %v", res.StatusCode, body)
-	}
-	ok = a.do("GET", "/api/auth/2fa/status", nil, current.Token, "")
-	ok.Body.Close()
-	if ok.StatusCode != 200 {
-		t.Fatalf("keep current %d", ok.StatusCode)
-	}
-	denied = a.do("GET", "/api/auth/2fa/status", nil, other.Token, "")
-	denied.Body.Close()
-	if denied.StatusCode != 401 {
-		t.Fatalf("revoke other %d", denied.StatusCode)
-	}
-}
-
-func TestPasswordTokensAndUsers(t *testing.T) {
-	a := newTestApp(t)
-	admin, err := a.s.users.Create(context.Background(), "Admin", "admin@test.com", ptr("secret1"), auth.RoleAdmin)
-	if err != nil {
-		t.Fatal(err)
-	}
-	sess := a.issue(admin, false)
-
-	res := a.do("POST", "/api/users", map[string]any{
-		"name": "Active", "email": "active@test.com", "password": "password1", "role": "user",
-	}, sess.Token, sess.CSRF)
-	body := decodeJSON(t, res)
-	if res.StatusCode != 201 {
-		t.Fatalf("create %d %v", res.StatusCode, body)
-	}
-	data := body["data"].(map[string]any)
-	if data["email"] != "active@test.com" || data["isInactive"] != false || data["token"] != nil {
-		t.Fatalf("active user %v", data)
-	}
-
-	res = a.do("POST", "/api/users", map[string]any{
-		"name": "Invited", "email": "invited@test.com", "role": "user",
-	}, sess.Token, sess.CSRF)
-	body = decodeJSON(t, res)
-	if res.StatusCode != 201 {
-		t.Fatalf("invite %d %v", res.StatusCode, body)
-	}
-	data = body["data"].(map[string]any)
-	if data["isInactive"] != true || data["token"] == nil {
-		t.Fatalf("invite %v", data)
-	}
-	inviteTok := data["token"].(string)
-
-	rw, _ := a.s.users.Create(context.Background(), "RW", "rw@test.com", ptr("secret1"), auth.RoleUser)
-	rws := a.issue(rw, false)
-	res = a.do("POST", "/api/users", map[string]any{"name": "Nope", "email": "nope@test.com"}, rws.Token, rws.CSRF)
-	if res.StatusCode != 403 {
-		t.Fatalf("forbid %d", res.StatusCode)
-	}
-	res.Body.Close()
-
-	_, _ = a.s.users.Create(context.Background(), "Pending", "pending@test.com", nil, auth.RoleUser)
-	res = a.do("POST", "/api/auth/login", map[string]string{"email": "pending@test.com", "password": "anything1"}, "", "")
-	if res.StatusCode != 422 {
-		t.Fatalf("inactive login %d", res.StatusCode)
-	}
-	res.Body.Close()
-
-	res = a.do("GET", "/api/auth/password/"+inviteTok, nil, "", "")
-	prev := decodeJSON(t, res)
-	if res.StatusCode != 200 || prev["email"] != "invited@test.com" || prev["isInactive"] != true {
-		t.Fatalf("preview %d %v", res.StatusCode, prev)
-	}
-	res = a.do("GET", "/api/auth/password/not-a-real-token", nil, "", "")
-	if res.StatusCode != 404 {
-		t.Fatalf("bad token %d", res.StatusCode)
-	}
-	res.Body.Close()
-
-	res = a.do("POST", "/api/auth/password/"+inviteTok, map[string]string{
-		"password": "newpass12", "password_confirmation": "newpass12",
-	}, "", "")
-	acc := decodeJSON(t, res)
-	user := acc["user"].(map[string]any)
-	if res.StatusCode != 200 || user["email"] != "invited@test.com" {
-		t.Fatalf("accept %d %v", res.StatusCode, acc)
-	}
-	res = a.do("POST", "/api/auth/password/"+inviteTok, map[string]string{
-		"password": "otherpass", "password_confirmation": "otherpass",
-	}, "", "")
-	if res.StatusCode != 404 {
-		t.Fatalf("reuse %d", res.StatusCode)
-	}
-	res.Body.Close()
-	res = a.do("POST", "/api/auth/login", map[string]string{"email": "invited@test.com", "password": "newpass12"}, "", "")
-	if res.StatusCode != 200 {
-		t.Fatalf("login after accept %d", res.StatusCode)
-	}
-	res.Body.Close()
-
-	target, _ := a.s.users.Create(context.Background(), "Target", "target@test.com", ptr("oldpass12"), auth.RoleUser)
-	first, _, _ := a.s.tokens.Issue(context.Background(), target)
-	res = a.do("POST", "/api/users/"+itoa(target.ID)+"/password-token", map[string]any{}, sess.Token, sess.CSRF)
-	body = decodeJSON(t, res)
-	newTok := body["data"].(map[string]any)["token"].(string)
-	if newTok == first {
-		t.Fatal("token not rotated")
-	}
-	res = a.do("GET", "/api/auth/password/"+first, nil, "", "")
-	if res.StatusCode != 404 {
-		t.Fatalf("old token %d", res.StatusCode)
-	}
-	res.Body.Close()
-	res = a.do("GET", "/api/auth/password/"+newTok, nil, "", "")
-	prev = decodeJSON(t, res)
-	if prev["isInactive"] != false {
-		t.Fatalf("reset preview %v", prev)
-	}
-
-	res = a.do("POST", "/api/users/"+itoa(admin.ID)+"/password-token", map[string]any{}, sess.Token, sess.CSRF)
-	if res.StatusCode != 422 {
-		t.Fatalf("self reset %d", res.StatusCode)
-	}
-	res.Body.Close()
-
-	sso, _ := a.s.users.Create(context.Background(), "Sso", "sso@test.com", ptr("x"), auth.RoleUser)
-	_, _ = a.db.Exec(`UPDATE users SET is_sso_only = 1 WHERE id = ?`, sso.ID)
-	res = a.do("POST", "/api/users/"+itoa(sso.ID)+"/password-token", map[string]any{}, sess.Token, sess.CSRF)
-	if res.StatusCode != 422 {
-		t.Fatalf("sso reset %d", res.StatusCode)
-	}
-	res.Body.Close()
-
-	inv, _ := a.s.users.Create(context.Background(), "Inv2", "inv2@test.com", nil, auth.RoleUser)
-	issued, _, _ := a.s.tokens.Issue(context.Background(), inv)
-	res = a.do("PATCH", "/api/users/"+itoa(inv.ID), map[string]string{"password": "setbyadmin"}, sess.Token, sess.CSRF)
-	body = decodeJSON(t, res)
-	if res.StatusCode != 200 || body["data"].(map[string]any)["isInactive"] != false {
-		t.Fatalf("admin set password %d %v", res.StatusCode, body)
-	}
-	res = a.do("GET", "/api/auth/password/"+issued, nil, "", "")
-	if res.StatusCode != 404 {
-		t.Fatalf("revoked after admin set %d", res.StatusCode)
-	}
-	res.Body.Close()
 }
 
 func TestPasswordLoginToggle(t *testing.T) {
@@ -731,7 +546,7 @@ func TestPasswordLoginToggle(t *testing.T) {
 		t.Fatalf("status enabled %v", body)
 	}
 
-	admin, _ := a.s.users.Create(context.Background(), "Ad", "ad@test.com", ptr("secret1"), auth.RoleAdmin)
+	admin, _ := a.svc.Users.Create(context.Background(), "Ad", "ad@test.com", ptr("secret1"), auth.RoleAdmin)
 	iss := a.issue(admin, false)
 	_, _ = a.db.Exec(`DELETE FROM identity_providers`)
 	res = a.do("PATCH", "/api/settings", map[string]any{"password_login_enabled": false}, iss.Token, iss.CSRF)
@@ -752,22 +567,6 @@ func TestPasswordLoginToggle(t *testing.T) {
 	}
 }
 
-func TestCSRFOnLogout(t *testing.T) {
-	a := newTestApp(t)
-	u := a.createUser("u@test.com", "secret1", roleEditor)
-	issued := a.issue(u, false)
-	res := a.do("POST", "/api/auth/logout", map[string]any{}, issued.Token, "")
-	if res.StatusCode != 419 {
-		t.Fatalf("csrf %d", res.StatusCode)
-	}
-	res.Body.Close()
-	res = a.do("POST", "/api/auth/logout", map[string]any{}, issued.Token, issued.CSRF)
-	if res.StatusCode != 200 {
-		t.Fatalf("logout %d", res.StatusCode)
-	}
-	res.Body.Close()
-}
-
 func insertSSO(t *testing.T, sqlDB *sql.DB, enabled bool) {
 	t.Helper()
 	en := 0
@@ -785,3 +584,76 @@ func insertSSO(t *testing.T, sqlDB *sql.DB, enabled bool) {
 func ptr(s string) *string { return &s }
 
 func itoa(id int64) string { return strconv.FormatInt(id, 10) }
+
+// spaceCreator creates spaces with the server's own services, as the create-space route does.
+func (a *testApp) spaceCreator() spacefill.Creator {
+	return spacefill.Creator{Spaces: a.svc.Spaces, Store: a.svc.Store, Rates: a.svc.Rates}
+}
+
+// An unknown email, an SSO-only account and a wrong password must be
+// indistinguishable by status and body (the bcrypt work is covered in the
+// session package).
+func TestLoginAnswersTheSameForUnknownAndWrong(t *testing.T) {
+	a := newTestApp(t)
+	a.createUser("real@test.com", "secret1", roleEditor)
+	sso := a.createUser("sso@test.com", "secret1", roleEditor)
+	_, _ = a.db.Exec(`UPDATE users SET is_sso_only = 1 WHERE id = ?`, sso.ID)
+	var first map[string]any
+	for _, email := range []string{"real@test.com", "nobody@test.com", "sso@test.com"} {
+		res := a.do("POST", "/api/auth/login", map[string]string{"email": email, "password": "wrong-pass"}, "", "")
+		if res.StatusCode != 422 {
+			t.Fatalf("%s: %d", email, res.StatusCode)
+		}
+		body := decodeJSON(t, res)
+		if first == nil {
+			first = body
+		} else if fmt.Sprint(body) != fmt.Sprint(first) {
+			t.Errorf("%s: body %v differs from %v", email, body, first)
+		}
+	}
+}
+
+func TestPlainCookieDoesNotAuthenticateOverHTTPS(t *testing.T) {
+	cfg, _ := testConfig(t)
+	s := New(cfg.WithAppURL("https://savvy.test"), openTestStore(t, cfg), testKeys(t, cfg))
+	svc := servicesOf(s)
+	pw := "secret12"
+	u, err := svc.Users.Create(context.Background(), "U", "u@test.com", &pw, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	issued, err := svc.Sessions.Issue(context.Background(), u, "127.0.0.1:1", "test", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, want := range map[string]int{"svy_session": 401, "__Host-svy_session": 200} {
+		req := httptest.NewRequest("GET", "/api/auth/2fa/status", nil)
+		req.AddCookie(&http.Cookie{Name: name, Value: issued.Token})
+		rec := httptest.NewRecorder()
+		s.Handler().ServeHTTP(rec, req)
+		if rec.Code != want {
+			t.Errorf("%s: %d, want %d", name, rec.Code, want)
+		}
+	}
+}
+
+func TestForwardedProtoDoesNotMakeCookiesSecure(t *testing.T) {
+	a := newTestApp(t) // app_url is http://
+	a.createUser("u@test.com", "secret1", roleEditor)
+	raw, _ := json.Marshal(map[string]string{"email": "u@test.com", "password": "secret1"})
+	req := httptest.NewRequest("POST", "/api/auth/login", bytes.NewReader(raw))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Forwarded-Proto", "https")
+	rec := httptest.NewRecorder()
+	a.s.Handler().ServeHTTP(rec, req)
+	if rec.Code != 200 {
+		t.Fatalf("login %d", rec.Code)
+	}
+	res := rec.Result()
+	if c := cookieNamed(res, "svy_session"); c == nil || c.Secure {
+		t.Errorf("session cookie %+v, want plain and not Secure", c)
+	}
+	if cookieNamed(res, "__Host-svy_session") != nil {
+		t.Error("host-prefixed cookie set on an http:// instance")
+	}
+}

@@ -5,8 +5,16 @@
 ```bash
 go generate ./internal/db   # sqlc: internal/db/queries → internal/db/sqlc
 go test ./...
-go run ./cmd/savvy-go
+go run .
 ```
+
+### Code shape checks
+
+`internal/archtest` fails `go test ./...` on code that is clearly out of hand: a function over 500 lines, nesting deeper than 8, a name over 10 words, a line over 300 characters and similar. A justified exception goes in the doc comment: `//archtest:ignore funcLines <reason>`.
+
+`mage test:audit` (or `go test -tags audit ./internal/archtest -run Audit -v` and `npm run audit`) prints everything above the softer limits, worst first. It never fails; use it as a worklist when cleaning up.
+
+The frontend has the same two layers in `resources/ts/lib/code-shape` (`npm test` runs the hard one). Limits differ where the language does: a component may be 500 lines before it fails, and a test title is counted in words instead of an identifier. Opt out with `// archtest:ignore funcLines <reason>` above the declaration.
 
 Listens on `localhost:8080`. Data and the generated `config.toml` go to `./savvy-data`, see [Data and backups](data-and-backups.md) and [Configuration](deployment.md#configuration). A plain `go build` or `go run` serves the frontend from `public/` on disk; release builds have it built into the binary, see [Build tasks](#build-tasks).
 
@@ -26,6 +34,10 @@ In the seed config file, `date` (`YYYY-MM-DD`) places the data relative to that 
 ## Architecture
 
 One Go process serves the API, the React frontend, the scheduler and workers. Server data is in `server.sqlite`, each space has its own SQLite file. Business logic uses the storage interface in `internal/store` and asks the repositories in `internal/db/repo/<area>` for rows, so it holds no SQL; SQLite code stays in `internal/store/sqlite`, and operations spanning two spaces use `store.InSpaces`. Migrations run on startup.
+
+The HTTP layer in `internal/httpserver` is split by role: `api/<resource>` holds one thin handler package per resource (each with its own `routes.go` and `openapi.yaml`), `auth/` the sign-in, two-factor, OAuth and SSO flows, `admin/` what only server admins use (server backups, signing keys, spaces overview, users, mail, SSO providers, checks, monitoring) and `httpx/` what they share (JSON replies, request and scope helpers, `dto`, `guard`, `routing`). Handlers only adapt HTTP; the logic that scheduled jobs also need lives in the top-level `internal/` packages. A new handler package is linked in from `httpserver/modules.go`.
+
+`config.toml` is owned by `internal/config`, the only package that knows the file. The builder (`internal/app/builder.go`) calls `config.Init(path)`, asks for each section with `config.Of(section)`, then calls `config.Finish()`, which reports unknown keys and writes the file. A package declares its sections next to the code that uses them, and can have several. A section is a `config.Section[Table, Value]`: `Table` is the TOML struct and `Decode` turns it into the value the package works with (units, trimming, checks). When `Table` implements `Defaults()`, the defaults fill the keys the file lacks and the section is always written. Without them, it is written only when the file has it, and a table that only holds subsections is never written on its own. `config.OfOptional` is for one of several alternatives, such as `[mail.smtp]`. A `*config.Ref` gives the decoded value with `Get`. `Subscribe` is there for the rare package that must react to a change. Tests use `config.Fixed(value)`.
 
 ## Frontend
 
@@ -52,7 +64,7 @@ go tool mage generate        # sqlc
 go tool mage release         # everything a release ships, into dist/ (needs APP_VERSION and nfpm)
 ```
 
-`build:release` honors `APP_VERSION`, `APP_ENV` (default `production`), `TARGET_GOOS` and `TARGET_GOARCH`. The target falls back to `GOOS` and `GOARCH`, but those also change how Mage itself is compiled, so cross-building from Windows or macOS needs `TARGET_*`. It copies `public/` to `internal/webui/dist` (git-ignored) and builds with the `embed` tag; without the tag the Go build never touches the frontend, so `go test ./...` needs no frontend build.
+`build:release` honors `APP_VERSION`, `APP_ENV` (default `production`), `TARGET_GOOS` and `TARGET_GOARCH`. The target falls back to `GOOS` and `GOARCH`, but those also change how Mage itself is compiled, so cross-building from Windows or macOS needs `TARGET_*`. It copies `public/` to `internal/httpserver/ui/dist` (git-ignored) and builds with the `embed` tag; without the tag the Go build never touches the frontend, so `go test ./...` needs no frontend build.
 
 Logo and screenshot scripts: [Scripts](scripts.md).
 

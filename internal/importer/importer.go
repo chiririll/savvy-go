@@ -49,9 +49,45 @@ type Import struct {
 	CreatedCount  int
 	SkippedCount  int
 	ErrorCount    int
-	Errors        any
-	Meta          map[string]any
+	Errors        []RowError
+	Meta          Meta
 	Message       *string
+}
+
+// RowError is a row the import could not take, numbered from 1.
+type RowError struct {
+	Row     int    `json:"row"`
+	Message string `json:"message"`
+}
+
+// Formats are the CSV conventions found in the sample.
+type Formats struct {
+	DateFormat   string `json:"date_format"`
+	AmountFormat string `json:"amount_format"`
+	HasHeader    bool   `json:"has_header"`
+	Delimiter    string `json:"delimiter"`
+}
+
+// ParseMeta describes how the file was read.
+type ParseMeta struct {
+	Delimiter string `json:"delimiter"`
+	HasHeader bool   `json:"has_header"`
+	Encoding  string `json:"encoding"`
+}
+
+// Meta is what an import keeps next to its row counts, stored as JSON with
+// snake_case keys. The first group is set when the file is parsed, the second
+// when the import completes.
+type Meta struct {
+	Headers          []string       `json:"headers,omitempty"`
+	PreviewRows      [][]string     `json:"preview_rows,omitempty"`
+	DetectedFormats  Formats        `json:"detected_formats"`
+	SuggestedMapping map[string]int `json:"suggested_mapping,omitempty"`
+	ParseMeta        ParseMeta      `json:"parse_meta"`
+
+	CreatedCurrencies []string `json:"created_currencies"`
+	CreatedTags       []string `json:"created_tags"`
+	CreatedCategories []string `json:"created_categories"`
 }
 
 func (s Service) Create(ctx context.Context, userID int64, uploadID string) (*Import, error) {
@@ -79,15 +115,10 @@ func (s Service) ByID(ctx context.Context, id string) (*Import, error) {
 		_ = json.Unmarshal([]byte(*row.Options), &im.Options)
 	}
 	if row.Errors != nil && *row.Errors != "" {
-		var v any
-		_ = json.Unmarshal([]byte(*row.Errors), &v)
-		im.Errors = v
+		_ = json.Unmarshal([]byte(*row.Errors), &im.Errors)
 	}
 	if row.Meta != nil && *row.Meta != "" {
 		_ = json.Unmarshal([]byte(*row.Meta), &im.Meta)
-	}
-	if im.Meta == nil {
-		im.Meta = map[string]any{}
 	}
 	return &im, nil
 }
@@ -114,14 +145,12 @@ func (s Service) Parse(ctx context.Context, importID, uploadID string) error {
 	if len(preview) > 10 {
 		preview = preview[:10]
 	}
-	meta := map[string]any{
-		"headers": headers, "preview_rows": preview,
-		"detected_formats": map[string]any{
-			"date_format": detected.dateFormat, "amount_format": detected.amountFormat,
-			"has_header": true, "delimiter": string(detected.delimiter),
-		},
-		"suggested_mapping": detected.mapping,
-		"parse_meta":        map[string]any{"delimiter": string(detected.delimiter), "has_header": true, "encoding": "utf-8"},
+	delim := string(detected.delimiter)
+	meta := Meta{
+		Headers: headers, PreviewRows: preview,
+		DetectedFormats:  Formats{DateFormat: detected.dateFormat, AmountFormat: detected.amountFormat, HasHeader: true, Delimiter: delim},
+		SuggestedMapping: detected.mapping,
+		ParseMeta:        ParseMeta{Delimiter: delim, HasHeader: true, Encoding: "utf-8"},
 	}
 	rawMeta, _ := json.Marshal(meta)
 	return s.repo().MarkParsed(ctx, importID, len(rows), string(rawMeta), time.Now().UTC())
@@ -153,7 +182,7 @@ func (s Service) Execute(ctx context.Context, importID string, mapping, options 
 		return s.fail(ctx, importID, err.Error())
 	}
 	created, skipped := 0, 0
-	var errs []map[string]any
+	errs := []RowError{}
 	accountID, _ := asInt64(options["default_account_id"])
 	resolver, err := s.newCategoryResolver(ctx, collectImportCategories(rows, mapping, options), options)
 	if err != nil {
@@ -167,14 +196,14 @@ func (s Service) Execute(ctx context.Context, importID string, mapping, options 
 		res := processImportRow(row, mapping, options, i+1)
 		if res.err != "" {
 			if len(errs) < 200 {
-				errs = append(errs, map[string]any{"row": i + 1, "message": res.err})
+				errs = append(errs, RowError{Row: i + 1, Message: res.err})
 			}
 			continue
 		}
 		amount, err := money.FromInput(res.amount, unit)
 		if err != nil {
 			if len(errs) < 200 {
-				errs = append(errs, map[string]any{"row": i + 1, "message": err.Error()})
+				errs = append(errs, RowError{Row: i + 1, Message: err.Error()})
 			}
 			continue
 		}
@@ -184,7 +213,7 @@ func (s Service) Execute(ctx context.Context, importID string, mapping, options 
 			Description: res.desc, Date: res.date, Status: "confirmed", DedupHash: hash,
 		}, now)
 		if err != nil {
-			errs = append(errs, map[string]any{"row": i + 1, "message": err.Error()})
+			errs = append(errs, RowError{Row: i + 1, Message: err.Error()})
 			continue
 		}
 		if added {
@@ -195,12 +224,7 @@ func (s Service) Execute(ctx context.Context, importID string, mapping, options 
 	}
 	errJSON, _ := json.Marshal(errs)
 	meta := im.Meta
-	if meta == nil {
-		meta = map[string]any{}
-	}
-	meta["created_currencies"] = []any{}
-	meta["created_tags"] = []any{}
-	meta["created_categories"] = resolver.created
+	meta.CreatedCurrencies, meta.CreatedTags, meta.CreatedCategories = []string{}, []string{}, resolver.created
 	metaJSON, _ := json.Marshal(meta)
 	err = s.repo().MarkCompleted(ctx, importID, repo.Result{
 		Processed: created + skipped + len(errs), Created: created, Skipped: skipped, Errors: len(errs),
@@ -213,7 +237,7 @@ func (s Service) Execute(ctx context.Context, importID string, mapping, options 
 	return nil
 }
 
-func (s Service) Preview(ctx context.Context, im *Import, mapping, options map[string]any) (map[string]any, error) {
+func (s Service) Preview(ctx context.Context, im *Import, mapping, options map[string]any) (*PreviewResult, error) {
 	if im.UploadID == nil {
 		return nil, fmt.Errorf("file gone")
 	}
@@ -233,7 +257,7 @@ func (s Service) Preview(ctx context.Context, im *Import, mapping, options map[s
 	if err := s.matchImportCategories(ctx, cats); err != nil {
 		return nil, err
 	}
-	var preview []map[string]any
+	var preview []PreviewRow
 	willCreate, willSkip, hasErrors := 0, 0, 0
 	for i, row := range rows {
 		res := processImportRow(row, mapping, options, i+1)
@@ -245,31 +269,26 @@ func (s Service) Preview(ctx context.Context, im *Import, mapping, options map[s
 			willCreate++
 		}
 		if len(preview) < 200 {
-			preview = append(preview, map[string]any{
-				"row": i + 1, "date": res.date, "type": res.typ, "amount": res.amount,
-				"description": res.desc, "status": status, "error": nilOr(res.err),
-				"category": nilOr(res.category), "tags": []string{}, "duplicateOf": nil, "warnings": []string{},
+			preview = append(preview, PreviewRow{
+				Row: i + 1, Date: res.date, Type: res.typ, Amount: res.amount,
+				Description: res.desc, Status: status, Error: nilOr(res.err), Category: nilOr(res.category),
 			})
 		}
 	}
 	_ = willSkip
-	categories, categoriesToCreate := []map[string]any{}, []string{}
+	categories, categoriesToCreate := []PreviewCategory{}, []string{}
 	for _, c := range cats {
-		var matchID any
-		if c.MatchID != nil {
-			matchID = *c.MatchID
-		} else {
+		if c.MatchID == nil {
 			categoriesToCreate = append(categoriesToCreate, c.Name)
 		}
-		categories = append(categories, map[string]any{"name": c.Name, "type": c.Type, "count": c.Count, "matchId": matchID})
+		categories = append(categories, PreviewCategory{Name: c.Name, Type: c.Type, Count: c.Count, MatchID: c.MatchID})
 	}
-	return map[string]any{
-		"previewTransactions": preview,
-		"summary": map[string]any{
-			"willCreate": willCreate, "willSkip": willSkip, "hasErrors": hasErrors,
-			"totalRows": im.TotalRows, "sampled": willCreate + willSkip + hasErrors,
-			"currenciesToCreate": []any{}, "tagsToCreate": []any{},
-			"categoriesToCreate": categoriesToCreate, "categories": categories,
+	return &PreviewResult{
+		Transactions: preview,
+		Summary: PreviewSummary{
+			WillCreate: willCreate, WillSkip: willSkip, HasErrors: hasErrors,
+			TotalRows: im.TotalRows, Sampled: willCreate + willSkip + hasErrors,
+			CategoriesToCreate: categoriesToCreate, Categories: categories,
 		},
 	}, nil
 }
@@ -284,7 +303,7 @@ func parseCSV(raw []byte) ([]string, [][]string, error) {
 }
 
 func parseCSVWithDelimiter(raw []byte) (rune, []string, [][]string, error) {
-	raw = bytes.TrimPrefix(raw, []byte("ï»¿"))
+	raw = bytes.TrimPrefix(raw, []byte("\xef\xbb\xbf"))
 	delimiter := sniffDelimiter(raw)
 	r := csv.NewReader(bytes.NewReader(raw))
 	r.Comma = delimiter
@@ -407,9 +426,16 @@ func mappingIndex(mapping map[string]any, key string) (int, bool) {
 	return int(n), ok
 }
 
+// dedupHash identifies a row by its date, amount and description. The amount keeps
+// every decimal it has, at least two: cutting it to cents would make 0.0000015 and
+// 0.0000025 of an eight-decimal currency the same row.
 func dedupHash(date string, amount decimal.Decimal, desc string) string {
 	norm := strings.ToLower(strings.Join(strings.Fields(strings.TrimSpace(desc)), " "))
-	sum := md5.Sum([]byte(fmt.Sprintf("%s|%s|%s", date, amount.StringFixed(2), norm)))
+	places := 2
+	if _, frac, ok := strings.Cut(amount.String(), "."); ok { // String drops trailing zeros
+		places = max(places, len(frac))
+	}
+	sum := md5.Sum([]byte(fmt.Sprintf("%s|%s|%s", date, amount.StringFixed(int32(places)), norm)))
 	return hex.EncodeToString(sum[:])
 }
 
@@ -438,9 +464,9 @@ func asInt64(v any) (int64, bool) {
 	return 0, false
 }
 
-func nilOr(s string) any {
+func nilOr(s string) *string {
 	if s == "" {
 		return nil
 	}
-	return s
+	return &s
 }

@@ -1,0 +1,45 @@
+paths:
+  /spaces/{space}/sync-group:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Sync groups]
+      summary: Read the sync group of a space
+      description: >-
+        `data` is `null` when the space is in no group. `categories` and `tags` tell what the group
+        keeps identical; `members` are the group's spaces the caller belongs to, `hidden` counts the others.
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "404": {$ref: "#/components/responses/NotFound"}
+  /sync-groups/diff:
+    post:
+      tags: [Sync groups]
+      summary: Preview what a change of a sync group has to reconcile
+      description: >-
+        Session only. Body: `group_id` (0 starts a new group), `add_space_ids`, `remove_space_ids`,
+        `categories` and `tags` (what the group keeps identical afterwards). The caller must administer every space of the group and every
+        space added; a space the caller does not belong to answers `404`. The answer lists categories
+        and tags that are missing in some spaces or look different, and types whose default differs.
+      security: [{cookieAuth: []}]
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "422": {$ref: "#/components/responses/Validation"}
+  /sync-groups/apply:
+    post:
+      tags: [Sync groups]
+      summary: Reconcile the spaces and change a sync group
+      description: >-
+        Session only. The body of the preview plus `decisions` (`kind`, `type`, `name`, `keep`,
+        `from_space_id` for the space whose icon and color win, `successor` for the name of the category
+        that takes the transactions of a deleted one) and `defaults` (`type`, `name`). Refused with `422`
+        while a difference has no decision. A space may leave the group on the word of its own admin.
+        `data` is the group afterwards, `null` when it was dissolved.
+      security: [{cookieAuth: []}]
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "422": {$ref: "#/components/responses/Validation"}

@@ -2,40 +2,52 @@ package httpserver
 
 import (
 	"encoding/json"
-	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"savvy-go/internal/appconfig"
 	"savvy-go/internal/config"
+	"savvy-go/internal/signing"
 	"savvy-go/internal/store"
 )
 
-func testConfig(t *testing.T) (config.Config, string) {
+// testURL is the public URL of the test servers.
+const testURL = "http://localhost:8080"
+
+func testConfig(t *testing.T) (appconfig.Config, string) {
 	t.Helper()
 	dir := t.TempDir()
-	cfg := config.Config{
-		AppURL:        "http://localhost:8080",
-		DataDir:       dir,
-		UploadsDir:    filepath.Join(dir, "uploads"),
-		BackupsDir:    filepath.Join(dir, "backups"),
-		SessionTTL:    24 * time.Hour,
-		RememberTTL:   7 * 24 * time.Hour,
-		ChallengeTTL:  5 * time.Minute,
-		SessionCookie: "svy_session",
-		CSRFCookie:    "svy_csrf",
-		CSRFHeader:    "X-CSRF-Token",
+	cfg := appconfig.Config{
+		DataDir:    dir,
+		UploadsDir: filepath.Join(dir, "uploads"),
+		BackupsDir: filepath.Join(dir, "backups"),
+		TZ:         "UTC",
+		Location:   time.UTC,
 	}
 	return cfg, dir
 }
 
+// testFile is a config file with the given TOML.
+func testFile(toml string) *config.Config {
+	f, err := config.Parse(toml)
+	if err != nil {
+		panic(err)
+	}
+	return f
+}
+
+// newServer is New with the public URL set to testURL.
+func newServer(cfg appconfig.Config, st store.Store, keys *signing.Holder, opts ...Option) *Server {
+	return New(cfg.WithAppURL(testURL), st, keys, opts...)
+}
+
 func TestLivezPass(t *testing.T) {
 	cfg, _ := testConfig(t)
-	srv := httptest.NewServer(New(cfg, openTestStore(t, cfg), testKeys(t, cfg)).Handler())
+	srv := httptest.NewServer(newServer(cfg, openTestStore(t, cfg), testKeys(t, cfg)).Handler())
 	t.Cleanup(srv.Close)
 
 	res, err := http.Get(srv.URL + "/livez")
@@ -73,7 +85,7 @@ func (brokenSpaceStore) Status() store.Status {
 func readyz(t *testing.T, st store.Store) (int, map[string]any) {
 	t.Helper()
 	cfg, _ := testConfig(t)
-	srv := httptest.NewServer(New(cfg, st, testKeys(t, cfg)).Handler())
+	srv := httptest.NewServer(newServer(cfg, st, testKeys(t, cfg)).Handler())
 	t.Cleanup(srv.Close)
 	res, err := http.Get(srv.URL + "/readyz")
 	if err != nil {
@@ -127,8 +139,8 @@ func TestReadyzPassAfterOpen(t *testing.T) {
 	}
 }
 
-// P15: a space that failed to migrate is a warning, not a failed probe.
-func TestP15ReadyzWarnsAboutUnavailableSpace(t *testing.T) {
+// A space that failed to migrate is a warning, not a failed probe.
+func TestReadyzWarnsAboutUnavailableSpace(t *testing.T) {
 	cfg, _ := testConfig(t)
 	status, body := readyz(t, brokenSpaceStore{openTestStore(t, cfg)})
 	if status != http.StatusOK {
@@ -136,46 +148,5 @@ func TestP15ReadyzWarnsAboutUnavailableSpace(t *testing.T) {
 	}
 	if mig := migrationCheck(t, body); mig["status"] != "warn" || mig["observedValue"].(float64) != 1 {
 		t.Fatalf("migration check %v", mig)
-	}
-}
-
-func TestSPAServesIndexAndStatic(t *testing.T) {
-	cfg, _ := testConfig(t)
-	public := t.TempDir()
-	if err := os.WriteFile(filepath.Join(public, "favicon.svg"), []byte("<svg/>"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	index := `<html><head></head><body><div id="app"></div><i>{{.Version}}</i></body></html>`
-	if err := os.WriteFile(filepath.Join(public, "index.html"), []byte(index), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	s := New(cfg, openTestStore(t, cfg), testKeys(t, cfg))
-	s.assets = os.DirFS(public)
-	srv := httptest.NewServer(s.Handler())
-	t.Cleanup(srv.Close)
-
-	res, err := http.Get(srv.URL + "/favicon.svg")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		t.Fatalf("favicon %d", res.StatusCode)
-	}
-
-	htmlRes, err := http.Get(srv.URL + "/login")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer htmlRes.Body.Close()
-	raw, _ := io.ReadAll(htmlRes.Body)
-	if htmlRes.StatusCode != http.StatusOK {
-		t.Fatalf("spa %d", htmlRes.StatusCode)
-	}
-	if !strings.Contains(string(raw), `id="app"`) || strings.Contains(string(raw), "{{") {
-		t.Fatalf("spa html: %s", raw)
-	}
-	if !strings.Contains(htmlRes.Header.Get("Content-Type"), "text/html") {
-		t.Fatalf("content-type %q", htmlRes.Header.Get("Content-Type"))
 	}
 }

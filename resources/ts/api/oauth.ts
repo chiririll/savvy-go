@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { ApiPermission } from '@/types'
+import type { ApiPermission, ConfirmFields } from '@/types'
 
 export interface OAuthRequest {
     client_id: string
@@ -27,12 +27,14 @@ export const oauthApi = {
     },
 
     /** Records the decision; returns where to send the browser (the app's redirect URI).
-     * An approval names the spaces the app may reach and what it may do there. */
+     * An approval names the spaces the app may reach and what it may do there, and carries the
+     * password or code that confirms it. */
     decide: async (
         request: OAuthRequest,
         approve: boolean,
         spaces: { all: boolean; ids: number[] },
         permissions: ApiPermission[],
+        confirm: ConfirmFields = {},
     ): Promise<string> => {
         const { data } = await apiClient.post('/oauth/authorize', {
             ...request,
@@ -40,6 +42,7 @@ export const oauthApi = {
             all_spaces: spaces.all,
             space_ids: spaces.ids,
             permissions,
+            ...confirm,
         })
         return data.data.redirect_url
     },

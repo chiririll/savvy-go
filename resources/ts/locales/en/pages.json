@@ -87,7 +87,7 @@
         "resetPassword": "Reset password",
         "sendResetEmail": "Email a reset link",
         "inviteLinkTitle": "Set-password link",
-        "inviteLinkDescription": "Copy this link and send it to the user. It is shown only once and expires in 7 days.",
+        "inviteLinkDescription": "Copy this link and send it to the user. It is shown only once and works until {{date}}.",
         "columns": {
             "user": "User",
             "email": "Email",

@@ -1,0 +1,154 @@
+paths:
+  /spaces/{space}/reports/overview:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Reports]
+      summary: Overview
+      parameters:
+        - {name: period_type, in: query, schema: {type: string, default: last_30_days}}
+        - {name: period_value, in: query, schema: {type: string}}
+        - {name: start_date, in: query, schema: {type: string, format: date}}
+        - {name: end_date, in: query, schema: {type: string, format: date}}
+        - {name: compare_with, in: query, schema: {type: string, default: none}}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+  /spaces/{space}/reports/money-flow:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Reports]
+      summary: Money flow
+      parameters:
+        - {name: period_type, in: query, schema: {type: string, default: last_30_days}}
+        - {name: period_value, in: query, schema: {type: string}}
+        - {name: start_date, in: query, schema: {type: string, format: date}}
+        - {name: end_date, in: query, schema: {type: string, format: date}}
+        - {name: compare_with, in: query, schema: {type: string, default: none}}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+  /spaces/{space}/reports/expense-pace:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Reports]
+      summary: Expense pace
+      parameters:
+        - {name: period_type, in: query, schema: {type: string, default: last_30_days}}
+        - {name: period_value, in: query, schema: {type: string}}
+        - {name: start_date, in: query, schema: {type: string, format: date}}
+        - {name: end_date, in: query, schema: {type: string, format: date}}
+        - {name: compare_with, in: query, schema: {type: string, default: none}}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+  /spaces/{space}/reports/expenses-by-category:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Reports]
+      summary: Expenses by category
+      parameters:
+        - {name: period_type, in: query, schema: {type: string, default: last_30_days}}
+        - {name: period_value, in: query, schema: {type: string}}
+        - {name: start_date, in: query, schema: {type: string, format: date}}
+        - {name: end_date, in: query, schema: {type: string, format: date}}
+        - {name: compare_with, in: query, schema: {type: string, default: none}}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+  /spaces/{space}/reports/cash-flow-over-time:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Reports]
+      summary: Cash flow over time
+      parameters:
+        - {name: period_type, in: query, schema: {type: string, default: last_30_days}}
+        - {name: period_value, in: query, schema: {type: string}}
+        - {name: start_date, in: query, schema: {type: string, format: date}}
+        - {name: end_date, in: query, schema: {type: string, format: date}}
+        - {name: compare_with, in: query, schema: {type: string, default: none}}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+  /spaces/{space}/reports/activity-heatmap:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Reports]
+      summary: Activity heatmap
+      parameters:
+        - {name: period_type, in: query, schema: {type: string, default: last_30_days}}
+        - {name: period_value, in: query, schema: {type: string}}
+        - {name: start_date, in: query, schema: {type: string, format: date}}
+        - {name: end_date, in: query, schema: {type: string, format: date}}
+        - {name: compare_with, in: query, schema: {type: string, default: none}}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+  /spaces/{space}/reports/transactions/summary:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Reports]
+      summary: Transactions summary
+      parameters:
+        - {name: period_type, in: query, schema: {type: string, default: last_30_days}}
+        - {name: period_value, in: query, schema: {type: string}}
+        - {name: start_date, in: query, schema: {type: string, format: date}}
+        - {name: end_date, in: query, schema: {type: string, format: date}}
+        - {name: compare_with, in: query, schema: {type: string, default: none}}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+  /spaces/{space}/reports/transactions/by-category:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Reports]
+      summary: Transactions by category
+      parameters:
+        - {name: period_type, in: query, schema: {type: string, default: last_30_days}}
+        - {name: period_value, in: query, schema: {type: string}}
+        - {name: start_date, in: query, schema: {type: string, format: date}}
+        - {name: end_date, in: query, schema: {type: string, format: date}}
+        - {name: compare_with, in: query, schema: {type: string, default: none}}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+  /spaces/{space}/reports/transactions/dynamics:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Reports]
+      summary: Transactions dynamics
+      parameters:
+        - {name: period_type, in: query, schema: {type: string, default: last_30_days}}
+        - {name: period_value, in: query, schema: {type: string}}
+        - {name: start_date, in: query, schema: {type: string, format: date}}
+        - {name: end_date, in: query, schema: {type: string, format: date}}
+        - {name: compare_with, in: query, schema: {type: string, default: none}}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+  /spaces/{space}/reports/transactions/top:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Reports]
+      summary: Top transactions
+      parameters:
+        - {name: limit, in: query, schema: {type: integer}}
+        - {name: type, in: query, schema: {type: string, default: expense}}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+  /spaces/{space}/reports/net-worth:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Reports]
+      summary: Net worth
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+  /spaces/{space}/reports/net-worth-history:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Reports]
+      summary: Net worth history
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}

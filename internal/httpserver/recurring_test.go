@@ -3,24 +3,7 @@ package httpserver
 import (
 	"testing"
 	"time"
-
-	"savvy-go/internal/auth"
 )
-
-func seedMoney(t *testing.T, a *testApp, sess *auth.Issued) (accID, catID int64) {
-	t.Helper()
-	res := a.do("POST", "/api/currencies", map[string]any{
-		"code": "USD", "name": "US Dollar", "symbol": "$", "decimals": 2, "is_base": true, "rate": 1,
-	}, sess.Token, sess.CSRF)
-	usdID := int64(decodeJSON(t, res)["data"].(map[string]any)["id"].(float64))
-	res = a.do("POST", "/api/accounts", map[string]any{
-		"name": "Cash", "type": "cash", "currency_id": usdID, "initial_balance": 1000,
-	}, sess.Token, sess.CSRF)
-	accID = int64(decodeJSON(t, res)["data"].(map[string]any)["id"].(float64))
-	res = a.do("POST", "/api/categories", map[string]any{"name": "Food", "type": "expense"}, sess.Token, sess.CSRF)
-	catID = int64(decodeJSON(t, res)["data"].(map[string]any)["id"].(float64))
-	return accID, catID
-}
 
 func TestRecurringInactiveCreatesNoPending(t *testing.T) {
 	a := newTestApp(t)
@@ -134,53 +117,6 @@ func TestEstimatedAmountCarriesToPendingAndConfirmReplacesIt(t *testing.T) {
 	}
 }
 
-func TestEstimatedFlagOnlyKeptForPendingTransactions(t *testing.T) {
-	a := newTestApp(t)
-	u := a.createUser("est2@test.com", "secret1", roleEditor)
-	sess := a.issue(u, false)
-	accID, catID := seedMoney(t, a, sess)
-	today := time.Now().UTC().Format("2006-01-02")
-
-	res := a.do("POST", "/api/transactions", map[string]any{
-		"type": "expense", "account_id": accID, "category_id": catID, "amount": 10,
-		"date": today, "is_estimated": true,
-	}, sess.Token, sess.CSRF)
-	if got := decodeJSON(t, res)["data"].(map[string]any); got["status"] != "confirmed" || got["isEstimated"] != false {
-		t.Fatalf("confirmed transaction cannot be an estimate: %v", got)
-	}
-
-	res = a.do("POST", "/api/transactions", map[string]any{
-		"type": "expense", "account_id": accID, "category_id": catID, "amount": 10, "is_estimated": true,
-	}, sess.Token, sess.CSRF)
-	got := decodeJSON(t, res)["data"].(map[string]any)
-	if got["status"] != "pending" || got["isEstimated"] != true {
-		t.Fatalf("deferred transaction should be estimated: %v", got)
-	}
-	res = a.do("POST", "/api/transactions/"+itoa(int64(got["id"].(float64)))+"/confirm",
-		map[string]any{"date": today}, sess.Token, sess.CSRF)
-	if out := decodeJSON(t, res)["data"].(map[string]any); out["isEstimated"] != false || out["amount"].(float64) != 10 {
-		t.Fatalf("confirm without amount accepts the estimate: %v", out)
-	}
-
-	res = a.do("POST", "/api/transactions", map[string]any{
-		"type": "expense", "account_id": accID, "category_id": catID, "amount": 10,
-	}, sess.Token, sess.CSRF)
-	exact := decodeJSON(t, res)["data"].(map[string]any)
-	res = a.do("POST", "/api/transactions/"+itoa(int64(exact["id"].(float64)))+"/confirm",
-		map[string]any{"date": today, "amount": 12}, sess.Token, sess.CSRF)
-	if res.StatusCode != 422 {
-		t.Fatalf("only an estimate can be confirmed with another amount, got %d", res.StatusCode)
-	}
-
-	res = a.do("POST", "/api/transactions", map[string]any{
-		"type": "expense", "account_id": accID, "category_id": catID, "amount": 10, "is_estimated": true,
-		"items": []map[string]any{{"name": "Milk", "quantity": 2, "price_per_unit": 5}},
-	}, sess.Token, sess.CSRF)
-	if got := decodeJSON(t, res)["data"].(map[string]any); got["isEstimated"] != false {
-		t.Fatalf("items fix the amount, so it is not an estimate: %v", got)
-	}
-}
-
 func TestRecurringEndDateStopsNextPending(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("rw3@test.com", "secret1", roleEditor)
@@ -232,88 +168,6 @@ func TestRecurringSkipSpawnsNextWithoutBalanceChange(t *testing.T) {
 	}
 }
 
-func TestBudgetProgressCountsConfirmedExpenses(t *testing.T) {
-	a := newTestApp(t)
-	u := a.createUser("b@test.com", "secret1", roleEditor)
-	sess := a.issue(u, false)
-	accID, catID := seedMoney(t, a, sess)
-	today := time.Now().UTC().Format("2006-01-02")
-
-	res := a.do("POST", "/api/transactions", map[string]any{
-		"type": "expense", "account_id": accID, "category_id": catID, "amount": 40, "date": today,
-	}, sess.Token, sess.CSRF)
-	res.Body.Close()
-
-	res = a.do("POST", "/api/budgets", map[string]any{
-		"name": "Food", "amount": 100, "period": "monthly", "is_global": false,
-		"category_ids": []int64{catID}, "is_active": true,
-	}, sess.Token, sess.CSRF)
-	body := decodeJSON(t, res)
-	if res.StatusCode != 201 {
-		t.Fatalf("budget %d %v", res.StatusCode, body)
-	}
-	prog := body["data"].(map[string]any)["progress"].(map[string]any)
-	if prog["spent"].(float64) != 40 || prog["remaining"].(float64) != 60 {
-		t.Fatalf("progress %v", prog)
-	}
-}
-
-func TestAutomationSetsCategoryOnCreate(t *testing.T) {
-	a := newTestApp(t)
-	u := a.createUser("auto@test.com", "secret1", roleEditor)
-	sess := a.issue(u, false)
-	accID, catID := seedMoney(t, a, sess)
-	res := a.do("POST", "/api/categories", map[string]any{"name": "Auto", "type": "expense"}, sess.Token, sess.CSRF)
-	autoCat := int64(decodeJSON(t, res)["data"].(map[string]any)["id"].(float64))
-
-	res = a.do("POST", "/api/automation-rules", map[string]any{
-		"name": "Tag groceries", "trigger_type": "on_transaction_create", "priority": 10,
-		"conditions": map[string]any{
-			"match": "all",
-			"conditions": []map[string]any{
-				{"field": "type", "op": "equals", "value": "expense"},
-				{"field": "amount", "op": "gte", "value": 10},
-			},
-		},
-		"actions": []map[string]any{
-			{"type": "set_category", "category_id": autoCat},
-		},
-		"is_active": true,
-	}, sess.Token, sess.CSRF)
-	ruleBody := decodeJSON(t, res)
-	if res.StatusCode != 201 {
-		t.Fatalf("rule %d %v", res.StatusCode, ruleBody)
-	}
-
-	today := time.Now().UTC().Format("2006-01-02")
-	res = a.do("POST", "/api/transactions", map[string]any{
-		"type": "expense", "account_id": accID, "category_id": catID, "amount": 25, "date": today,
-	}, sess.Token, sess.CSRF)
-	tx := decodeJSON(t, res)
-	if res.StatusCode != 201 {
-		t.Fatalf("tx %d %v", res.StatusCode, tx)
-	}
-	cat := tx["data"].(map[string]any)["category"].(map[string]any)
-	if int64(cat["id"].(float64)) != autoCat {
-		t.Fatalf("category not rewritten %v", tx)
-	}
-
-	ruleID := int64(ruleBody["data"].(map[string]any)["id"].(float64))
-	res = a.do("GET", "/api/automation-rules/"+itoa(ruleID)+"/logs", nil, sess.Token, "")
-	logs := decodeJSON(t, res)
-	if res.StatusCode != 200 || len(logs["data"].([]any)) != 1 {
-		t.Fatalf("logs %d %v", res.StatusCode, logs)
-	}
-
-	res = a.do("POST", "/api/automation-rules/"+itoa(ruleID)+"/test", map[string]any{
-		"transaction_id": int64(tx["data"].(map[string]any)["id"].(float64)),
-	}, sess.Token, sess.CSRF)
-	testBody := decodeJSON(t, res)
-	if res.StatusCode != 200 || testBody["conditionsMatch"] != true {
-		t.Fatalf("test %d %v", res.StatusCode, testBody)
-	}
-}
-
 func findRecurringTx(list []any, templateID int64) map[string]any {
 	for _, item := range list {
 		m := item.(map[string]any)
@@ -322,39 +176,4 @@ func findRecurringTx(list []any, templateID int64) map[string]any {
 		}
 	}
 	return nil
-}
-
-// A PATCH changes only the fields it sends; an explicit null clears one.
-func TestRecurringPatchKeepsOmittedFields(t *testing.T) {
-	a := newTestApp(t)
-	u := a.createUser("patch@test.com", "secret1", roleEditor)
-	sess := a.issue(u, false)
-	accID, catID := seedMoney(t, a, sess)
-
-	res := a.do("POST", "/api/recurring", map[string]any{
-		"type": "expense", "account_id": accID, "category_id": catID, "amount": 50,
-		"description": "Gym", "frequency": "monthly", "interval": 1, "day_of_month": 5,
-		"start_date": "2030-01-05", "end_date": "2031-01-05", "is_active": true,
-	}, sess.Token, sess.CSRF)
-	body := decodeJSON(t, res)
-	if res.StatusCode != 201 {
-		t.Fatalf("create %d %v", res.StatusCode, body)
-	}
-	id := itoa(int64(body["data"].(map[string]any)["id"].(float64)))
-
-	res = a.do("PATCH", "/api/recurring/"+id, map[string]any{"is_active": false}, sess.Token, sess.CSRF)
-	got := decodeJSON(t, res)["data"].(map[string]any)
-	if res.StatusCode != 200 || got["isActive"] != false {
-		t.Fatalf("patch %d %v", res.StatusCode, got)
-	}
-	if got["description"] != "Gym" || got["category"] == nil || got["endDate"] != "2031-01-05" ||
-		got["dayOfMonth"] != float64(5) || got["amount"] != float64(50) {
-		t.Fatalf("omitted fields changed: %v", got)
-	}
-
-	res = a.do("PATCH", "/api/recurring/"+id, map[string]any{"end_date": nil}, sess.Token, sess.CSRF)
-	got = decodeJSON(t, res)["data"].(map[string]any)
-	if got["endDate"] != nil || got["description"] != "Gym" {
-		t.Fatalf("null should clear only end_date: %v", got)
-	}
 }

@@ -53,11 +53,11 @@ func newPair(t *testing.T) *pair {
 	a := newTestApp(t)
 	ctx := context.Background()
 	owner := a.createUser("owner@test.com", "secret1", auth.RoleUser)
-	A, err := a.s.spaces.Create(ctx, "Personal", owner)
+	A, err := a.svc.Spaces.Create(ctx, "Personal", owner)
 	if err != nil {
 		t.Fatal(err)
 	}
-	B, err := a.s.spaces.Create(ctx, "Family", owner)
+	B, err := a.svc.Spaces.Create(ctx, "Family", owner)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,9 +102,9 @@ func (p *pair) transfers(spaceID int64, sess *auth.Issued) map[string]map[string
 	return out
 }
 
-// P32: a transfer moves money out of one space's account and into the
+// A transfer moves money out of one space's account and into the
 // other's, each in its own currency, and is neither income nor expense.
-func TestP32TransferMovesMoneyBetweenSpaces(t *testing.T) {
+func TestTransferMovesMoneyBetweenSpaces(t *testing.T) {
 	p := newPair(t)
 	id := p.send("100", "108.50")
 	if b := p.balance(p.A.ID, p.accA); b != "-100" {
@@ -139,9 +139,9 @@ func domainSHA(path string) (string, error) {
 	return hex.EncodeToString(sum[:]), nil
 }
 
-// P31: the transaction of a transfer's side changes only through the
+// The transaction of a transfer's side changes only through the
 // transfer, and its account cannot be deleted.
-func TestP31TransferRowIsReadOnly(t *testing.T) {
+func TestTransferSidesAreReadOnly(t *testing.T) {
 	p := newPair(t)
 	p.send("10", "11")
 	list := decodeJSON(t, p.a.do("GET", spacePath(p.A.ID, "/transactions"), nil, p.sess.Token, ""))["data"].([]any)
@@ -161,13 +161,13 @@ func TestP31TransferRowIsReadOnly(t *testing.T) {
 	status(t, p.a.do("POST", spacePath(p.A.ID, "/transactions"), map[string]any{"type": "transfer_out", "account_id": p.accA, "amount": 1, "date": "2026-10-01"}, p.sess.Token, p.sess.CSRF), 422, "create a side by hand")
 }
 
-// P30: a member of only one space sees the other space's name and amount,
+// A member of only one space sees the other space's name and amount,
 // never its account.
-func TestP30OtherSideAccountIsPrivate(t *testing.T) {
+func TestOtherSideAccountIsPrivate(t *testing.T) {
 	p := newPair(t)
 	id := p.send("5", "5")
 	bob := p.a.createUser("bob@test.com", "secret1", auth.RoleUser)
-	_ = p.a.s.spaces.SetMember(context.Background(), p.B.ID, bob, spaces.RoleViewer)
+	_ = p.a.svc.Spaces.SetMember(context.Background(), p.B.ID, bob, spaces.RoleViewer)
 	bs := p.a.issue(bob, false)
 	seen := p.transfers(p.B.ID, bs)[id]
 	from := seen["from"].(map[string]any)
@@ -183,15 +183,15 @@ func TestP30OtherSideAccountIsPrivate(t *testing.T) {
 	status(t, p.a.do("POST", spacePath(p.B.ID, "/transfers"), map[string]any{}, bs.Token, bs.CSRF), 403, "viewer sends")
 }
 
-// P52: only who administers both spaces links them; a space the caller is
+// Only who administers both spaces links them; a space the caller is
 // not in is a 404; an admin of either side unlinks.
-func TestP52LinkRights(t *testing.T) {
+func TestLinkRights(t *testing.T) {
 	p := newPair(t)
 	ctx := context.Background()
 	other := p.a.createUser("other@test.com", "secret1", auth.RoleUser)
-	C, _ := p.a.s.spaces.Create(ctx, "Theirs", other)
+	C, _ := p.a.svc.Spaces.Create(ctx, "Theirs", other)
 	status(t, p.a.do("POST", spacePath(p.A.ID, "/links"), map[string]any{"target_space_id": C.ID}, p.sess.Token, p.sess.CSRF), 404, "not a member of the target")
-	_ = p.a.s.spaces.SetMember(ctx, C.ID, p.owner, spaces.RoleEditor)
+	_ = p.a.svc.Spaces.SetMember(ctx, C.ID, p.owner, spaces.RoleEditor)
 	status(t, p.a.do("POST", spacePath(p.A.ID, "/links"), map[string]any{"target_space_id": C.ID}, p.sess.Token, p.sess.CSRF), 403, "editor of the target")
 	status(t, p.a.do("POST", spacePath(p.A.ID, "/links"), map[string]any{"target_space_id": p.A.ID}, p.sess.Token, p.sess.CSRF), 422, "link to itself")
 
@@ -202,9 +202,9 @@ func TestP52LinkRights(t *testing.T) {
 	status(t, p.a.do("DELETE", spacePath(p.B.ID, "/links/"+strconv.FormatInt(p.A.ID, 10)), nil, p.sess.Token, p.sess.CSRF), 204, "unlink from B")
 }
 
-// P28: unlinking freezes the transfers in both spaces (they still count);
+// Unlinking freezes the transfers in both spaces (they still count);
 // linking again unfreezes them and merges what changed.
-func TestP28UnlinkFreezesRelinkSyncs(t *testing.T) {
+func TestUnlinkFreezesAndRelinkSyncs(t *testing.T) {
 	p := newPair(t)
 	id := p.send("20", "20")
 	status(t, p.a.do("DELETE", spacePath(p.A.ID, "/links/"+strconv.FormatInt(p.B.ID, 10)), nil, p.sess.Token, p.sess.CSRF), 204, "unlink")
@@ -229,11 +229,11 @@ func TestP28UnlinkFreezesRelinkSyncs(t *testing.T) {
 	}
 }
 
-// P29: when one space cannot take the write (quota), neither changes.
-func TestP29TransferBlockedByQuotaWritesNothing(t *testing.T) {
+// When one space cannot take the write (quota), neither changes.
+func TestTransferIntoFullSpaceWritesNothing(t *testing.T) {
 	p := newPair(t)
 	ctx := context.Background()
-	if err := p.a.s.spaces.SetQuota(ctx, p.owner, p.B.ID, 1); err != nil {
+	if err := p.a.svc.Spaces.SetQuota(ctx, p.owner, p.B.ID, 1); err != nil {
 		t.Fatal(err)
 	}
 	var code int
@@ -261,8 +261,8 @@ func TestP29TransferBlockedByQuotaWritesNothing(t *testing.T) {
 	}
 }
 
-// P40: transfers do not run automation rules.
-func TestP40TransfersSkipAutomation(t *testing.T) {
+// Transfers do not run automation rules.
+func TestTransfersSkipAutomation(t *testing.T) {
 	p := newPair(t)
 	p.post(p.B.ID, "/automation-rules", map[string]any{
 		"name": "Every incoming", "trigger_type": "on_transaction_create", "priority": 10,
@@ -294,10 +294,10 @@ func (p *pair) restoreA(name string) {
 	res.Body.Close()
 }
 
-// P24: after A is restored, every difference with B is pending in A and B
+// After A is restored, every difference with B is pending in A and B
 // does not change until someone decides; pending changes stay out of A's
 // balance, which matches the backup.
-func TestP24RestoreReviewsTransfers(t *testing.T) {
+func TestRestoreReviewsTransfers(t *testing.T) {
 	p := newPair(t)
 	kept := p.send("1", "1")
 	changed := p.send("2", "2")
@@ -331,7 +331,7 @@ func TestP24RestoreReviewsTransfers(t *testing.T) {
 
 	// A member without rights in B can only take B's version.
 	viewer := p.a.createUser("v@test.com", "secret1", auth.RoleUser)
-	_ = p.a.s.spaces.SetMember(context.Background(), p.A.ID, viewer, spaces.RoleEditor)
+	_ = p.a.svc.Spaces.SetMember(context.Background(), p.A.ID, viewer, spaces.RoleEditor)
 	vs := p.a.issue(viewer, false)
 	status(t, p.a.do("POST", spacePath(p.A.ID, "/transfers/"+changed+"/reject"), nil, vs.Token, vs.CSRF), 403, "reject without rights in B")
 
@@ -351,23 +351,23 @@ func TestP24RestoreReviewsTransfers(t *testing.T) {
 	}
 }
 
-// P24: a crash before the review merge finishes reviews again at startup
+// A crash before the review merge finishes reviews again at startup
 // instead of merging automatically.
-func TestP24ReviewMarkSurvivesCrash(t *testing.T) {
+func TestReviewMarkSurvivesCrash(t *testing.T) {
 	p := newPair(t)
 	backup := p.backupA()
 	created := p.send("8", "8")
 	ctx := context.Background()
-	space, _ := p.a.s.spaces.Get(ctx, p.A.ID)
+	space, _ := p.a.svc.Spaces.Get(ctx, p.A.ID)
 
 	// Restore without the review merge, as if the process died right after
 	// the swap: the mark is in the file.
-	b := p.a.s.backups
+	b := p.a.svc.Backups
 	b.Transfers = nil
 	if err := b.RestoreSpace(ctx, *space, backup, 0); err != nil {
 		t.Fatal(err)
 	}
-	if err := p.a.s.transfers.SyncAll(ctx); err != nil {
+	if err := p.a.svc.Transfers.SyncAll(ctx); err != nil {
 		t.Fatal(err)
 	}
 	if tr := p.transfers(p.A.ID, p.sess)[created]; tr == nil || tr["status"] != "pending" {
@@ -375,9 +375,9 @@ func TestP24ReviewMarkSurvivesCrash(t *testing.T) {
 	}
 }
 
-// P25: a transfer whose account is not in the restored space needs attention
+// A transfer whose account is not in the restored space needs attention
 // until another account is chosen.
-func TestP25MissingAccountNeedsAttention(t *testing.T) {
+func TestMissingAccountNeedsAttention(t *testing.T) {
 	p := newPair(t)
 	backup := p.backupA()
 	later := p.account(p.A.ID, "GBP")
@@ -439,15 +439,15 @@ func forgeBackup(t *testing.T, path string, statements ...string) []byte {
 	return buf.Bytes()
 }
 
-// P37, P38, P43, P51: a doctored backup cannot reach the other space: a
+// A doctored backup cannot reach the other space: a
 // made-up transfer and a raised version stay pending in A with no way to
 // push them, and a genuine record of other spaces is dropped.
-func TestP37ForgedBackupCannotReachOtherSpace(t *testing.T) {
+func TestForgedBackupCannotReachOtherSpace(t *testing.T) {
 	p := newPair(t)
 	real := p.send("5", "5")
 	backup := p.backupA()
 	uuidA, uuidB := p.A.UUID, p.B.UUID
-	forged := forgeBackup(t, p.a.s.backups.SpacePath(p.A.ID, backup),
+	forged := forgeBackup(t, p.a.svc.Backups.SpacePath(p.A.ID, backup),
 		`UPDATE space_transfers SET version = 99, from_amount = 1 WHERE uuid = '`+real+`'`,
 		`INSERT INTO space_transfers (uuid, from_space_uuid, from_account_id, from_amount, from_currency, from_decimals,
 			to_space_uuid, to_account_id, to_amount, to_currency, to_decimals, date, version, signer_kid, signature)
@@ -477,7 +477,7 @@ func TestP37ForgedBackupCannotReachOtherSpace(t *testing.T) {
 	}
 	status(t, p.a.do("POST", spacePath(p.A.ID, "/transfers/forged/reject"), nil, p.sess.Token, p.sess.CSRF), 422, "push forged")
 	status(t, p.a.do("POST", spacePath(p.A.ID, "/transfers/"+real+"/reject"), nil, p.sess.Token, p.sess.CSRF), 422, "push raised version")
-	if err := p.a.s.transfers.SyncAll(context.Background()); err != nil {
+	if err := p.a.svc.Transfers.SyncAll(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	if _, ok := p.transfers(p.B.ID, p.sess)["forged"]; ok || p.balance(p.B.ID, p.accB) != bBefore {
@@ -485,9 +485,9 @@ func TestP37ForgedBackupCannotReachOtherSpace(t *testing.T) {
 	}
 }
 
-// P33: restoring a server backup restores every space consistently; nothing
+// Restoring a server backup restores every space consistently; nothing
 // waits for review.
-func TestP33ServerRestoreNeedsNoReview(t *testing.T) {
+func TestServerRestoreNeedsNoReview(t *testing.T) {
 	p := newPair(t)
 	admin := p.a.issue(p.a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
 	id := p.send("3", "3")
@@ -505,9 +505,9 @@ func TestP33ServerRestoreNeedsNoReview(t *testing.T) {
 	}
 }
 
-// P54: restoring a space while transfers and a server snapshot run does not
+// Restoring a space while transfers and a server snapshot run does not
 // deadlock.
-func TestP54RestoreTransfersAndSnapshotConcurrently(t *testing.T) {
+func TestRestoreTransfersAndSnapshotConcurrentlyDoNotDeadlock(t *testing.T) {
 	p := newPair(t)
 	admin := p.a.issue(p.a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
 	backup := p.backupA()
@@ -544,17 +544,17 @@ func TestP54RestoreTransfersAndSnapshotConcurrently(t *testing.T) {
 	}
 }
 
-// P45: a server backup carries the signing key, so on a server that had
+// A server backup carries the signing key, so on a server that had
 // another key the restored transfers still verify and stay linked.
-func TestP45ServerMovesWithItsKey(t *testing.T) {
+func TestServerBackupCarriesItsKey(t *testing.T) {
 	p := newPair(t)
 	admin := p.a.issue(p.a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
 	id := p.send("6", "6")
 	b := createdBackup(t, p.a.do("POST", "/api/backups", map[string]any{}, admin.Token, admin.CSRF))
-	content, _ := os.ReadFile(p.a.s.backups.ServerPath(b["filename"].(string)))
+	content, _ := os.ReadFile(p.a.svc.Backups.ServerPath(b["filename"].(string)))
 
 	fresh := newTestApp(t)
-	if fresh.s.keys.Key().KID() == p.a.s.keys.Key().KID() {
+	if fresh.svc.Keys.Key().KID() == p.a.svc.Keys.Key().KID() {
 		t.Fatal("the test servers share a key")
 	}
 	fa := fresh.issue(fresh.createUser("admin@new.test", "secret1", auth.RoleAdmin), false)
@@ -564,20 +564,20 @@ func TestP45ServerMovesWithItsKey(t *testing.T) {
 		t.Fatalf("restore %d %v", res.StatusCode, decodeJSON(t, res))
 	}
 	res.Body.Close()
-	if fresh.s.keys.Key().KID() != p.a.s.keys.Key().KID() {
+	if fresh.svc.Keys.Key().KID() != p.a.svc.Keys.Key().KID() {
 		t.Fatal("the restored server does not use the backup's key")
 	}
-	list, err := fresh.s.transfers.List(context.Background(), p.A.ID)
+	list, err := fresh.svc.Transfers.List(context.Background(), p.A.ID)
 	if err != nil || len(list) != 1 || list[0].UUID != id || !list[0].Verified || list[0].Frozen {
 		t.Fatalf("transfers after the move %+v %v", list, err)
 	}
 }
 
-// P26: after A is restored, A's ids count up again, so a new transaction can
+// After A is restored, A's ids count up again, so a new transaction can
 // take the id the transfer's side had. The side is tied to the transfer by
 // uuid, never by id: the new transaction stays an ordinary one, and the
 // transfer comes back with a side of its own.
-func TestP26ReusedIDIsNotTheTransfer(t *testing.T) {
+func TestReusedIDIsNotTheTransfer(t *testing.T) {
 	p := newPair(t)
 	backup := p.backupA()
 	id := p.send("5", "5")
@@ -599,5 +599,20 @@ func TestP26ReusedIDIsNotTheTransfer(t *testing.T) {
 	}
 	if b := p.balance(p.A.ID, p.accA); b != "-7" {
 		t.Fatalf("A balance %s, want the expense (2) and the transfer (5)", b)
+	}
+}
+
+// A write that breaks a database constraint answers 422 without the schema.
+func TestConstraintErrorHidesSchema(t *testing.T) {
+	p := newPair(t)
+	res := p.a.do("POST", spacePath(p.A.ID, "/transactions"), map[string]any{"type": "bogus", "account_id": p.accA, "amount": 1, "date": "2026-10-01"}, p.sess.Token, p.sess.CSRF)
+	body := toString(decodeJSON(t, res))
+	if res.StatusCode != 422 {
+		t.Fatalf("status %d, want 422: %s", res.StatusCode, body)
+	}
+	for _, leak := range []string{"CHECK", "constraint", "IN (", "SQL"} {
+		if strings.Contains(body, leak) {
+			t.Errorf("response leaks %q: %s", leak, body)
+		}
 	}
 }
