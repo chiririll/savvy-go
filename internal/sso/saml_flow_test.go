@@ -31,12 +31,47 @@ const (
 // samlResponse is a Response around an Assertion for nameID, signed by key.
 func samlResponse(t *testing.T, key *rsa.PrivateKey, cert *x509.Certificate, nameID, inResponseTo string, attrs map[string][]string) *etree.Element {
 	t.Helper()
+	return samlResponseWith(t, key, cert, nameID, inResponseTo, attrs, validSAML())
+}
+
+// samlOpts are the parts of an assertion the service must hold the IdP to.
+type samlOpts struct {
+	issuer       string
+	audience     string // empty: no AudienceRestriction at all
+	notBefore    string // empty: omitted
+	notOnOrAfter string // empty: no Conditions window at all
+}
+
+func validSAML() samlOpts {
+	now := time.Now().UTC()
+	return samlOpts{
+		issuer:       "https://idp.example/saml",
+		audience:     "https://app.test/api/auth/sso/corp/metadata",
+		notBefore:    now.Add(-time.Minute).Format(time.RFC3339),
+		notOnOrAfter: now.Add(5 * time.Minute).Format(time.RFC3339),
+	}
+}
+
+func samlResponseWith(t *testing.T, key *rsa.PrivateKey, cert *x509.Certificate, nameID, inResponseTo string, attrs map[string][]string, o samlOpts) *etree.Element {
+	t.Helper()
 	assertion := etree.NewElement("Assertion")
 	assertion.CreateAttr("xmlns", "urn:oasis:names:tc:SAML:2.0:assertion")
 	assertion.CreateAttr("ID", "_assert1")
 	assertion.CreateAttr("Version", "2.0")
 	assertion.CreateAttr("IssueInstant", time.Now().UTC().Format(time.RFC3339))
-	assertion.CreateElement("Issuer").SetText("https://idp.example/saml")
+	assertion.CreateElement("Issuer").SetText(o.issuer)
+	if o.notOnOrAfter != "" || o.audience != "" {
+		cond := assertion.CreateElement("Conditions")
+		if o.notBefore != "" {
+			cond.CreateAttr("NotBefore", o.notBefore)
+		}
+		if o.notOnOrAfter != "" {
+			cond.CreateAttr("NotOnOrAfter", o.notOnOrAfter)
+		}
+		if o.audience != "" {
+			cond.CreateElement("AudienceRestriction").CreateElement("Audience").SetText(o.audience)
+		}
+	}
 	subject := assertion.CreateElement("Subject")
 	subject.CreateElement("NameID").SetText(nameID)
 	if inResponseTo != "" {
@@ -238,7 +273,7 @@ func TestSAMLCertificateRotation(t *testing.T) {
 	e := newSAMLEnv(t)
 	newKey, newCert, newPEM := selfSigned(t)
 	p := *e.p
-	p.Config = map[string]any{"idp_x509_cert": p.Config["idp_x509_cert"], "idp_x509_cert_standby": newPEM}
+	p.Config = map[string]any{"idp_entity_id": p.Config["idp_entity_id"], "idp_x509_cert": p.Config["idp_x509_cert"], "idp_x509_cert_standby": newPEM}
 	state, reqID := e.start(t)
 	if _, err := e.svc.HandleACS(e.ctx, p, encode(t, samlResponse(t, newKey, newCert, "ann@corp.test", reqID, nil)), state); err != nil {
 		t.Errorf("the standby certificate must verify during a rotation: %v", err)
@@ -283,6 +318,52 @@ func TestSAMLReplayWithARewrittenRequestIdIsRefused(t *testing.T) {
 	captured.CreateAttr("InResponseTo", newReq)
 	if _, err := e.svc.HandleACS(e.ctx, *e.p, encode(t, captured), state); ssoCode(err) != "saml_invalid" {
 		t.Errorf("a response to an old request was accepted for a new one: %q", ssoCode(err))
+	}
+}
+
+// Only logins we started are accepted, so a captured response that names no
+// request cannot be replayed against a fresh one.
+func TestSAMLResponseMustAnswerOurRequest(t *testing.T) {
+	e := newSAMLEnv(t)
+	state, _ := e.start(t)
+	if _, err := e.svc.HandleACS(e.ctx, *e.p, encode(t, samlResponse(t, e.key, e.cert, "ann@corp.test", "", nil)), state); ssoCode(err) != "saml_invalid" {
+		t.Errorf("a response without InResponseTo: %q", ssoCode(err))
+	}
+}
+
+func TestSAMLAssertionConditionsAreEnforced(t *testing.T) {
+	now := time.Now().UTC()
+	tests := []struct {
+		name   string
+		mutate func(*samlOpts)
+	}{
+		{"another issuer", func(o *samlOpts) { o.issuer = "https://evil.example/saml" }},
+		{"another audience", func(o *samlOpts) { o.audience = "https://other-app.test/metadata" }},
+		{"no audience", func(o *samlOpts) { o.audience = "" }},
+		{"expired", func(o *samlOpts) { o.notOnOrAfter = now.Add(-10 * time.Minute).Format(time.RFC3339) }},
+		{"not valid yet", func(o *samlOpts) { o.notBefore = now.Add(10 * time.Minute).Format(time.RFC3339) }},
+		{"no validity window", func(o *samlOpts) { o.notOnOrAfter = "" }},
+		{"unparsable time", func(o *samlOpts) { o.notOnOrAfter = "tomorrow" }},
+	}
+	for _, tc := range tests {
+		e := newSAMLEnv(t)
+		state, reqID := e.start(t)
+		o := validSAML()
+		tc.mutate(&o)
+		resp := samlResponseWith(t, e.key, e.cert, "ann@corp.test", reqID, nil, o)
+		if _, err := e.svc.HandleACS(e.ctx, *e.p, encode(t, resp), state); ssoCode(err) != "saml_invalid" {
+			t.Errorf("%s: %q, want saml_invalid", tc.name, ssoCode(err))
+		}
+	}
+}
+
+func TestSAMLClockSkewIsTolerated(t *testing.T) {
+	e := newSAMLEnv(t)
+	state, reqID := e.start(t)
+	o := validSAML()
+	o.notBefore = time.Now().UTC().Add(30 * time.Second).Format(time.RFC3339)
+	if _, err := e.svc.HandleACS(e.ctx, *e.p, encode(t, samlResponseWith(t, e.key, e.cert, "ann@corp.test", reqID, nil, o)), state); err != nil {
+		t.Errorf("a few seconds of clock drift between us and the IdP: %v", err)
 	}
 }
 

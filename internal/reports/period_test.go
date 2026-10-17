@@ -156,8 +156,11 @@ func TestNextPeriodAndPeriodEnd(t *testing.T) {
 	if got := nextPeriod(day("2024-01-31"), "day").Format("2006-01-02"); got != "2024-02-01" {
 		t.Errorf("next day %s", got)
 	}
-	if got := nextPeriod(day("2024-01-10"), "week").Weekday(); got != time.Monday {
-		t.Errorf("next week starts on %s", got)
+	if got := nextPeriod(day("2024-01-10"), "week").Weekday(); got != time.Sunday {
+		t.Errorf("next week starts on %s, like the weeks the other series group by", got)
+	}
+	if got := periodEnd(day("2024-01-10"), day("2024-03-01"), "week").Format("2006-01-02"); got != "2024-01-13" {
+		t.Errorf("a week ends on Saturday: %s", got)
 	}
 	max := day("2024-01-20")
 	if got := periodEnd(day("2024-01-10"), max, "month"); !got.Equal(max) {

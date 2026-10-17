@@ -11,8 +11,8 @@ import (
 	"syscall"
 	"time"
 
-	"savvy-go/internal/boot"
 	"savvy-go/internal/appconfig"
+	"savvy-go/internal/boot"
 	"savvy-go/internal/httpserver"
 )
 

@@ -170,7 +170,7 @@ func generatePeriods(start, end time.Time, groupBy string) []periodPoint {
 func nextPeriod(cur time.Time, groupBy string) time.Time {
 	switch groupBy {
 	case "week":
-		return calendar.StartOfWeek(cur.AddDate(0, 0, 7))
+		return startOfWeekSunday(cur.AddDate(0, 0, 7))
 	case "month":
 		return calendar.StartOfMonth(calendar.AddMonths(cur, 1))
 	default:
@@ -182,7 +182,7 @@ func periodEnd(cur, max time.Time, groupBy string) time.Time {
 	var end time.Time
 	switch groupBy {
 	case "week":
-		end = calendar.EndOfWeek(cur)
+		end = startOfWeekSunday(cur).AddDate(0, 0, 6)
 	case "month":
 		end = calendar.EndOfMonth(cur)
 	default:
