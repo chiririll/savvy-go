@@ -156,6 +156,8 @@ Set `app_url` to your public `https://` URL. The `X-Forwarded-For` header is hon
 
 HTTPS is detected from `app_url`, not from request headers: with an `https://` URL the session cookie is `Secure` and named `__Host-svy_session`, and only that cookie signs anyone in (a plain `svy_session` cookie is ignored). `X-Forwarded-Proto` is not trusted, because anyone who can reach the server directly could set it. Without `app_url`, a request counts as HTTPS only when the connection itself is TLS. So `app_url` must be `https://` behind a TLS-terminating proxy, or cookies stay plain and unprotected.
 
+Sign-in and the other public POSTs (login, 2FA, password links) refuse a browser request from another site: `Origin` must be the origin of `app_url` (the request's own host when it is unset), and the body must be `application/json`. A proxy that rewrites `Origin` breaks sign-in; scripts that send no `Origin` are unaffected.
+
 ### Traefik (HTTPS)
 
 ```yaml

@@ -105,7 +105,8 @@ func Build(r chi.Router, d *Deps) {
 
 	mount(root, r)
 	r.Route("/api", func(r chi.Router) {
-		mount(public, r)
+		// No session guards these, so RequireCSRF cannot: check origin and content type.
+		mount(public, r.With(g.PublicOrigin))
 
 		r.Group(func(r chi.Router) {
 			r.Use(g.RequireSession)
