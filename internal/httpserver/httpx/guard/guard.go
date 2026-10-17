@@ -71,6 +71,16 @@ func tooMany(w http.ResponseWriter, wait time.Duration) {
 	httpx.WriteMessage(w, http.StatusTooManyRequests, "Too many attempts. Try again later.")
 }
 
+// Secure reports whether r is served over HTTPS. The public URL decides; only without one is
+// the connection looked at. Request headers such as X-Forwarded-Proto are not trusted: whoever
+// can reach the server directly could choose the cookie name and flags.
+func (g *Guard) Secure(r *http.Request) bool {
+	if u := g.Cfg.AppURL(); u != "" {
+		return strings.HasPrefix(strings.ToLower(u), "https://")
+	}
+	return r.TLS != nil
+}
+
 // bearerToken returns the raw Authorization: Bearer value and whether the header was present.
 func bearerToken(r *http.Request) (string, bool) {
 	h := strings.TrimSpace(r.Header.Get("Authorization"))
@@ -97,7 +107,7 @@ func (g *Guard) RequireSession(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		}
-		token := g.Security.ReadToken(r)
+		token := g.Security.ReadToken(r, g.Secure(r))
 		sess, err := g.Sessions.Resolve(r.Context(), token)
 		if err != nil || sess == nil || sess.User == nil {
 			httpx.WriteMessage(w, http.StatusUnauthorized, "Unauthenticated.")

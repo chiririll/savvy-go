@@ -14,27 +14,18 @@ func (sec Security) SessionCookieName(secure bool) string {
 	return sec.SessionCookie
 }
 
-// ReadToken is the session token the request carries, or "".
-func (sec Security) ReadToken(r *http.Request) string {
-	if c, err := r.Cookie("__Host-" + sec.SessionCookie); err == nil && c.Value != "" {
-		return c.Value
-	}
-	if c, err := r.Cookie(sec.SessionCookie); err == nil {
+// ReadToken is the session token the request carries, or "". Over HTTPS only the __Host-
+// cookie counts, over HTTP only the plain one: a plain cookie planted by a sibling domain or
+// over HTTP never signs anyone in on an HTTPS instance.
+func (sec Security) ReadToken(r *http.Request, secure bool) string {
+	if c, err := r.Cookie(sec.SessionCookieName(secure)); err == nil {
 		return c.Value
 	}
 	return ""
 }
 
-func IsSecure(r *http.Request) bool {
-	if r.TLS != nil {
-		return true
-	}
-	return r.Header.Get("X-Forwarded-Proto") == "https"
-}
-
 // SetSessionCookies sends the session and CSRF cookies. remember makes them outlive the browser session.
-func (sec Security) SetSessionCookies(w http.ResponseWriter, r *http.Request, token, csrf string, remember bool) {
-	secure := IsSecure(r)
+func (sec Security) SetSessionCookies(w http.ResponseWriter, secure bool, token, csrf string, remember bool) {
 	var expires time.Time
 	maxAge := 0
 	if remember {
@@ -64,8 +55,7 @@ func (sec Security) SetSessionCookies(w http.ResponseWriter, r *http.Request, to
 }
 
 // ClearSessionCookies expires the session and CSRF cookies.
-func (sec Security) ClearSessionCookies(w http.ResponseWriter, r *http.Request) {
-	secure := IsSecure(r)
+func (sec Security) ClearSessionCookies(w http.ResponseWriter, secure bool) {
 	past := time.Unix(0, 0)
 	forget := func(name string, sec, httpOnly bool) {
 		http.SetCookie(w, &http.Cookie{

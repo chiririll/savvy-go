@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"savvy-go/internal/app/signin"
 	"savvy-go/internal/appconfig"
 	"savvy-go/internal/auth"
 	"savvy-go/internal/automation"
@@ -46,7 +47,7 @@ func (s *Server) newGuard() *guard.Guard {
 		Security:      locator.Get[auth.Security](s.loc),
 		Sessions:      locator.Get[auth.Sessions](s.loc),
 		APITokens:     locator.Get[auth.APITokens](s.loc),
-		EmailRequired: s.login.EmailRequired,
+		EmailRequired: locator.Get[signin.Policy](s.loc).EmailRequired,
 		Space: guard.SpaceDeps{
 			Spaces:   locator.Get[spaces.Service](s.loc),
 			Store:    locator.Get[store.Store](s.loc),

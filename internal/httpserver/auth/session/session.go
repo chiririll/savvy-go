@@ -133,6 +133,18 @@ func (h Handler) authRegister(w http.ResponseWriter, r *http.Request) {
 
 var errEmailTaken = errors.New("email taken")
 
+// credentialsOK runs exactly one password check whatever u is, so an unknown,
+// SSO-only or inactive account takes as long as a wrong password. check gets a
+// nil hash when there is none to compare with and must then report false.
+func credentialsOK(check func(hash *string, plain string) bool, u *auth.User, plain string) bool {
+	var hash *string
+	if u != nil && !u.IsSSOOnly && !u.IsInactive() {
+		hash = u.Password
+	}
+	ok := check(hash, plain)
+	return ok && hash != nil
+}
+
 func (h Handler) authLogin(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Email      string `json:"email"`
@@ -151,7 +163,10 @@ func (h Handler) authLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	u, err := h.Users.ByEmail(r.Context(), body.Email)
-	if err != nil || u == nil || u.IsSSOOnly || u.IsInactive() || u.Password == nil || !password.Check(*u.Password, body.Password) {
+	if err != nil {
+		u = nil
+	}
+	if !credentialsOK(password.CheckOrBurn, u, body.Password) {
 		httpx.WriteValidation(w, map[string][]string{"email": {"Invalid credentials."}})
 		return
 	}
@@ -169,7 +184,7 @@ func (h Handler) authLogin(w http.ResponseWriter, r *http.Request) {
 
 func (h Handler) authMe(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
-	token := h.Security.ReadToken(r)
+	token := h.Security.ReadToken(r, h.Guard.Secure(r))
 	sess, err := h.Sessions.Resolve(r.Context(), token)
 	if err != nil || sess == nil || sess.User == nil {
 		httpx.WriteJSON(w, http.StatusOK, dto.SessionPayload{})
@@ -181,7 +196,7 @@ func (h Handler) authMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if refreshed != nil {
-		h.Security.SetSessionCookies(w, r, refreshed.Token, refreshed.CSRF, true)
+		h.Security.SetSessionCookies(w, h.Guard.Secure(r), refreshed.Token, refreshed.CSRF, true)
 	}
 	h.Login.WritePayload(w, r, http.StatusOK, sess.User, sess)
 }
@@ -237,7 +252,7 @@ func (h Handler) authLogout(w http.ResponseWriter, r *http.Request) {
 	if sess := httpx.Session(r); sess != nil {
 		_ = h.Sessions.Revoke(r.Context(), sess)
 	}
-	h.Security.ClearSessionCookies(w, r)
+	h.Security.ClearSessionCookies(w, h.Guard.Secure(r))
 	httpx.WriteMessage(w, http.StatusOK, "Logged out.")
 }
 

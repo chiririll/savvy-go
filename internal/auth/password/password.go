@@ -3,6 +3,7 @@ package password
 
 import (
 	"fmt"
+	"sync"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -29,4 +30,31 @@ func Check(hash, plain string) bool {
 		return false
 	}
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(plain)) == nil
+}
+
+// dummyHash is a bcrypt hash at the same cost as real ones, made once on first
+// use, that no input is meant to match.
+var dummyHash = sync.OnceValue(func() string {
+	b, err := bcrypt.GenerateFromPassword([]byte("no account has this password"), bcryptCost)
+	if err != nil {
+		panic(err)
+	}
+	return string(b)
+})
+
+// Dummy spends the time of one real check and reports false. Sign-in calls it
+// when there is no password to check, so a missing account costs the same as a
+// wrong password.
+func Dummy() bool {
+	_ = bcrypt.CompareHashAndPassword([]byte(dummyHash()), []byte("x"))
+	return false
+}
+
+// CheckOrBurn is Check that always does one bcrypt compare: with no hash (nil
+// or empty) or an empty plain it runs Dummy instead of returning early.
+func CheckOrBurn(hash *string, plain string) bool {
+	if hash == nil || *hash == "" || plain == "" {
+		return Dummy()
+	}
+	return Check(*hash, plain)
 }

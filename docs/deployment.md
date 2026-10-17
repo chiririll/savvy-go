@@ -136,7 +136,9 @@ Passwords are at least 8 characters everywhere (first admin, change, reset, invi
 
 ## Behind a reverse proxy
 
-Set `app_url` to your public `https://` URL. The `X-Forwarded-Proto` and `X-Forwarded-For` headers are honored, no other setup needed.
+Set `app_url` to your public `https://` URL. The `X-Forwarded-For` header is honored, no other setup needed.
+
+HTTPS is detected from `app_url`, not from request headers: with an `https://` URL the session cookie is `Secure` and named `__Host-svy_session`, and only that cookie signs anyone in (a plain `svy_session` cookie is ignored). `X-Forwarded-Proto` is not trusted, because anyone who can reach the server directly could set it. Without `app_url`, a request counts as HTTPS only when the connection itself is TLS. So `app_url` must be `https://` behind a TLS-terminating proxy, or cookies stay plain and unprotected.
 
 ### Traefik (HTTPS)
 

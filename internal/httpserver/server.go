@@ -49,6 +49,7 @@ func FromLocator(l *locator.Locator) *Server {
 		},
 	}
 	s.guard = s.newGuard()
+	s.login.Guard = s.guard
 	s.mux = s.routes()
 	return s
 }

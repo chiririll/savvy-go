@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -287,7 +288,7 @@ func TestSessionSmokeRegisterMeLogout(t *testing.T) {
 func TestHostPrefixedCookieOverTLS(t *testing.T) {
 	cfg, _ := testConfig(t)
 	guard := bootstrap.New(cfg.DataDir, bootstrap.Binary)
-	s := newServer(cfg, openTestStore(t, cfg), testKeys(t, cfg), WithBootstrap(guard))
+	s := New(cfg.WithAppURL("https://savvy.test"), openTestStore(t, cfg), testKeys(t, cfg), WithBootstrap(guard))
 	ts := httptest.NewTLSServer(s.Handler())
 	t.Cleanup(ts.Close)
 	client := ts.Client()
@@ -587,4 +588,72 @@ func itoa(id int64) string { return strconv.FormatInt(id, 10) }
 // spaceCreator creates spaces with the server's own services, as the create-space route does.
 func (a *testApp) spaceCreator() spacefill.Creator {
 	return spacefill.Creator{Spaces: a.svc.Spaces, Store: a.svc.Store, Rates: a.svc.Rates}
+}
+
+// An unknown email, an SSO-only account and a wrong password must be
+// indistinguishable by status and body (the bcrypt work is covered in the
+// session package).
+func TestLoginAnswersTheSameForUnknownAndWrong(t *testing.T) {
+	a := newTestApp(t)
+	a.createUser("real@test.com", "secret1", roleEditor)
+	sso := a.createUser("sso@test.com", "secret1", roleEditor)
+	_, _ = a.db.Exec(`UPDATE users SET is_sso_only = 1 WHERE id = ?`, sso.ID)
+	var first map[string]any
+	for _, email := range []string{"real@test.com", "nobody@test.com", "sso@test.com"} {
+		res := a.do("POST", "/api/auth/login", map[string]string{"email": email, "password": "wrong-pass"}, "", "")
+		if res.StatusCode != 422 {
+			t.Fatalf("%s: %d", email, res.StatusCode)
+		}
+		body := decodeJSON(t, res)
+		if first == nil {
+			first = body
+		} else if fmt.Sprint(body) != fmt.Sprint(first) {
+			t.Errorf("%s: body %v differs from %v", email, body, first)
+		}
+	}
+}
+
+func TestPlainCookieDoesNotAuthenticateOverHTTPS(t *testing.T) {
+	cfg, _ := testConfig(t)
+	s := New(cfg.WithAppURL("https://savvy.test"), openTestStore(t, cfg), testKeys(t, cfg))
+	svc := servicesOf(s)
+	pw := "secret12"
+	u, err := svc.Users.Create(context.Background(), "U", "u@test.com", &pw, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	issued, err := svc.Sessions.Issue(context.Background(), u, "127.0.0.1:1", "test", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, want := range map[string]int{"svy_session": 401, "__Host-svy_session": 200} {
+		req := httptest.NewRequest("GET", "/api/auth/2fa/status", nil)
+		req.AddCookie(&http.Cookie{Name: name, Value: issued.Token})
+		rec := httptest.NewRecorder()
+		s.Handler().ServeHTTP(rec, req)
+		if rec.Code != want {
+			t.Errorf("%s: %d, want %d", name, rec.Code, want)
+		}
+	}
+}
+
+func TestForwardedProtoDoesNotMakeCookiesSecure(t *testing.T) {
+	a := newTestApp(t) // app_url is http://
+	a.createUser("u@test.com", "secret1", roleEditor)
+	raw, _ := json.Marshal(map[string]string{"email": "u@test.com", "password": "secret1"})
+	req := httptest.NewRequest("POST", "/api/auth/login", bytes.NewReader(raw))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Forwarded-Proto", "https")
+	rec := httptest.NewRecorder()
+	a.s.Handler().ServeHTTP(rec, req)
+	if rec.Code != 200 {
+		t.Fatalf("login %d", rec.Code)
+	}
+	res := rec.Result()
+	if c := cookieNamed(res, "svy_session"); c == nil || c.Secure {
+		t.Errorf("session cookie %+v, want plain and not Secure", c)
+	}
+	if cookieNamed(res, "__Host-svy_session") != nil {
+		t.Error("host-prefixed cookie set on an http:// instance")
+	}
 }

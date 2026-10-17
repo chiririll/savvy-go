@@ -10,6 +10,7 @@ import (
 	"savvy-go/internal/auth"
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/httpserver/httpx/dto"
+	"savvy-go/internal/httpserver/httpx/guard"
 )
 
 // Service starts sessions. It embeds the sign-in policy, so callers ask it the
@@ -18,6 +19,7 @@ type Service struct {
 	signin.Policy
 	Security auth.Security
 	Sessions auth.Sessions
+	Guard    *guard.Guard
 }
 
 // Issue starts a session for u and answers with it.
@@ -27,7 +29,7 @@ func (s Service) Issue(w http.ResponseWriter, r *http.Request, u *auth.User, sta
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	s.Security.SetSessionCookies(w, r, issued.Token, issued.CSRF, remember)
+	s.Security.SetSessionCookies(w, s.Guard.Secure(r), issued.Token, issued.CSRF, remember)
 	s.WritePayload(w, r, status, u, issued.Session)
 }
 
