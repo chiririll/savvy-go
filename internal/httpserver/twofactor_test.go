@@ -31,7 +31,8 @@ func TestTwoFactorEnableConfirmLoginAndRecovery(t *testing.T) {
 	}
 	bad.Body.Close()
 
-	code := totp.Now(secret)
+	// An authenticator code works once, so each step below takes a later one.
+	code := totp.At(secret, time.Now().Add(-30*time.Second))
 	ok := a.do("POST", "/api/auth/2fa/confirm", map[string]string{"code": code}, iss.Token, iss.CSRF)
 	if ok.StatusCode != 200 {
 		t.Fatalf("confirm %d %v", ok.StatusCode, decodeJSON(t, ok))
@@ -79,7 +80,7 @@ func TestTwoFactorEnableConfirmLoginAndRecovery(t *testing.T) {
 		t.Fatalf("remaining %v", stBody)
 	}
 
-	off := a.do("POST", "/api/auth/2fa/disable", map[string]string{"code": totp.Now(secret)}, iss.Token, iss.CSRF)
+	off := a.do("POST", "/api/auth/2fa/disable", map[string]string{"code": totp.At(secret, time.Now().Add(30*time.Second))}, iss.Token, iss.CSRF)
 	if off.StatusCode != 200 {
 		t.Fatalf("disable %d %v", off.StatusCode, decodeJSON(t, off))
 	}
@@ -203,4 +204,23 @@ func TestTwoFactorChallengeGivesOneSessionWhenRequestsRace(t *testing.T) {
 	if ok.Load() != 1 {
 		t.Fatalf("%d sessions for one challenge", ok.Load())
 	}
+}
+
+// A code seen once cannot sign in a second time, even on a fresh challenge.
+func TestTwoFactorRejectsAReplayedCode(t *testing.T) {
+	a := newTestApp(t)
+	secret, challenge := twoFactorUser(t, a)
+	code := totp.Now(secret)
+
+	res := verify2FA(a, challenge(), code)
+	if res.StatusCode != 200 {
+		t.Fatalf("first use: %d", res.StatusCode)
+	}
+	res.Body.Close()
+
+	res = verify2FA(a, challenge(), code)
+	if res.StatusCode != 422 || cookieNamed(res, "svy_session") != nil {
+		t.Fatalf("replayed code: %d", res.StatusCode)
+	}
+	res.Body.Close()
 }

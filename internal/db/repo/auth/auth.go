@@ -168,6 +168,25 @@ func (r Repo) SetTwoFactor(ctx context.Context, id int64, secret *string, enable
 	})
 }
 
+// AdvanceTwoFactorStep records step as the last authenticator step used and
+// reports whether it was newer than the one recorded. Of two calls with the
+// same step, one gets true.
+func (r Repo) AdvanceTwoFactorStep(ctx context.Context, id, step int64) (bool, error) {
+	res, err := r.q().AdvanceTwoFactorStep(ctx, sqlc.AdvanceTwoFactorStepParams{
+		TwoFactorLastStep: db.NullInt64(&step), ID: id, TwoFactorLastStep_2: db.NullInt64(&step),
+	})
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
+}
+
+// ClearTwoFactorStep forgets the last authenticator step, for a new secret.
+func (r Repo) ClearTwoFactorStep(ctx context.Context, id int64) error {
+	return r.q().ClearTwoFactorStep(ctx, id)
+}
+
 // Tombstone removes everything that identifies the user and everything that
 // grants access (credentials, tokens, passkeys, SSO links, memberships), and
 // keeps the row so ids stored in space databases still resolve.

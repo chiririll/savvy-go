@@ -33,7 +33,9 @@ func TestTwoFactorLifecycle(t *testing.T) {
 	if _, err := tf.Confirm(ctx, u, "000000"); err == nil {
 		t.Error("a wrong code confirmed")
 	}
-	codes, err := tf.Confirm(ctx, u, totp.Now(secret))
+	// Each authenticator code works once, so the steps below use the previous,
+	// the current and the next code, which the 90 second window accepts.
+	codes, err := tf.Confirm(ctx, u, totp.At(secret, time.Now().Add(-30*time.Second)))
 	if err != nil || len(codes) != 8 {
 		t.Fatalf("confirm: %v, %v", codes, err)
 	}
@@ -69,7 +71,7 @@ func TestTwoFactorLifecycle(t *testing.T) {
 	if _, err := tf.Regenerate(ctx, u, codes[1]); err == nil {
 		t.Error("a recovery code cannot mint more recovery codes")
 	}
-	fresh, err := tf.Regenerate(ctx, u, totp.Now(secret))
+	fresh, err := tf.Regenerate(ctx, u, totp.At(secret, time.Now().Add(30*time.Second)))
 	if err != nil || len(fresh) != 8 {
 		t.Fatalf("regenerate: %v, %v", fresh, err)
 	}
@@ -203,5 +205,71 @@ func TestChallengeConsumeSucceedsOnce(t *testing.T) {
 	wg.Wait()
 	if wins.Load() != 1 {
 		t.Fatalf("one challenge was consumed %d times", wins.Load())
+	}
+}
+
+func TestAuthenticatorCodeWorksOnce(t *testing.T) {
+	d := newDB(t)
+	ctx := context.Background()
+	users := Users{DB: d}
+	tf := TwoFactor{DB: d, Users: users}
+	u := newUser(t, d, "replay@test.com", RoleUser)
+	secret, _, err := tf.Enable(ctx, u)
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, _ = users.ByID(ctx, u.ID)
+	now := time.Now()
+	prev, cur, next := totp.At(secret, now.Add(-30*time.Second)), totp.At(secret, now), totp.At(secret, now.Add(30*time.Second))
+
+	if _, err := tf.Confirm(ctx, u, cur); err != nil {
+		t.Fatal(err)
+	}
+	u, _ = users.ByID(ctx, u.ID)
+	if tf.VerifyAny(ctx, u, cur) {
+		t.Error("the code that confirmed two-factor worked again")
+	}
+	if tf.VerifyAny(ctx, u, prev) {
+		t.Error("a code from an older step than the last accepted one worked")
+	}
+	if !tf.VerifyAny(ctx, u, next) {
+		t.Error("a code from a newer step did not work")
+	}
+	if tf.VerifyAny(ctx, u, next) {
+		t.Error("a code worked twice")
+	}
+}
+
+func TestAuthenticatorCodeWorksOnceWhenRequestsRace(t *testing.T) {
+	d := newDB(t)
+	ctx := context.Background()
+	users := Users{DB: d}
+	tf := TwoFactor{DB: d, Users: users}
+	u := newUser(t, d, "raceotp@test.com", RoleUser)
+	secret, _, err := tf.Enable(ctx, u)
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, _ = users.ByID(ctx, u.ID)
+	if _, err := tf.Confirm(ctx, u, totp.At(secret, time.Now().Add(-30*time.Second))); err != nil {
+		t.Fatal(err)
+	}
+	u, _ = users.ByID(ctx, u.ID)
+	code := totp.Now(secret)
+
+	var wins atomic.Int32
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if tf.VerifyAny(ctx, u, code) {
+				wins.Add(1)
+			}
+		}()
+	}
+	wg.Wait()
+	if wins.Load() != 1 {
+		t.Fatalf("one code was accepted %d times", wins.Load())
 	}
 }

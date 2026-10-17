@@ -115,6 +115,8 @@ A wrong two-factor code cannot be guessed at forever. After the password step, a
 
 Starting again does not give a fresh start. After **10 wrong codes in a row**, across sign-ins, the account gets no new two-factor sign-in for **1 minute**; every further wrong code doubles the wait, up to **1 hour**. During the wait, sign-in with the right password answers "Too many wrong verification codes" (`429`). A right code clears the count. The lockout is per account and cannot be changed in the settings.
 
+Each code works once. An authenticator code is accepted a single time, so one that was seen over a shoulder or in a log cannot sign in again, and the next code has to come from a later 30 second step. After a sign-in, wait for the app to show a new code before the next step that asks for one, such as turning two-factor off. A recovery code is likewise used up by its first success.
+
 ### Sign-in rate limits
 
 The routes where someone can guess a secret are throttled: sign-in, the second-factor step, passkey sign-in, first-run registration and its bootstrap password check, password reset links, invitation links and email confirmation links. Over the limit they answer `429` with a `Retry-After` header (seconds).

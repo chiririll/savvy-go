@@ -21,6 +21,9 @@ CREATE TABLE IF NOT EXISTS users (
     two_factor_secret TEXT,
     two_factor_enabled INTEGER NOT NULL DEFAULT 0 CHECK (two_factor_enabled IN (0, 1)),
     two_factor_confirmed INTEGER NOT NULL DEFAULT 0 CHECK (two_factor_confirmed IN (0, 1)),
+    -- The 30 second step of the last authenticator code accepted. A code of that
+    -- step or an older one is refused, so a code works once.
+    two_factor_last_step INTEGER,
     -- Deleted users are kept anonymised, so ids recorded in space databases
     -- (created_by) still resolve.
     deleted_at TEXT,

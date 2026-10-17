@@ -479,6 +479,7 @@ type User struct {
 	TwoFactorSecret    sql.NullString
 	TwoFactorEnabled   int64
 	TwoFactorConfirmed int64
+	TwoFactorLastStep  sql.NullInt64
 	DeletedAt          sql.NullString
 	CreatedAt          sql.NullString
 	UpdatedAt          sql.NullString

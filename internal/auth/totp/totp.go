@@ -5,6 +5,7 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha1"
+	"crypto/subtle"
 	"encoding/base32"
 	"encoding/binary"
 	"fmt"
@@ -33,25 +34,29 @@ func ProvisioningURI(email, secret string) string {
 	return u.String()
 }
 
-func Verify(secret, code string) bool {
+// VerifyStep reports whether code is right for secret at now, from one step
+// before to one step after, and which 30 second step it matched. A caller that
+// stores the step can refuse a code it has already accepted.
+func VerifyStep(secret, code string, now time.Time) (step int64, ok bool) {
 	code = strings.TrimSpace(code)
 	if len(code) != 6 {
-		return false
+		return 0, false
 	}
 	key, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(strings.ToUpper(secret))
 	if err != nil {
 		key, err = base32.StdEncoding.DecodeString(strings.ToUpper(secret))
 		if err != nil {
-			return false
+			return 0, false
 		}
 	}
-	now := time.Now().Unix() / 30
+	current := now.Unix() / 30
+	// Every step is compared, so the time taken does not tell which one matched.
 	for _, w := range []int64{-1, 0, 1} {
-		if totpCode(key, now+w) == code {
-			return true
+		if subtle.ConstantTimeCompare([]byte(totpCode(key, current+w)), []byte(code)) == 1 && !ok {
+			step, ok = current+w, true
 		}
 	}
-	return false
+	return step, ok
 }
 
 func totpCode(key []byte, counter int64) string {
@@ -65,11 +70,14 @@ func totpCode(key []byte, counter int64) string {
 	return fmt.Sprintf("%06d", n%1000000)
 }
 
-// Now is exported for tests.
-func Now(secret string) string {
+// At is the code an authenticator shows at t. Exported for tests.
+func At(secret string, t time.Time) string {
 	key, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(strings.ToUpper(secret))
 	if err != nil {
 		key, _ = base32.StdEncoding.DecodeString(strings.ToUpper(secret))
 	}
-	return totpCode(key, time.Now().Unix()/30)
+	return totpCode(key, t.Unix()/30)
 }
+
+// Now is the code shown right now. Exported for tests.
+func Now(secret string) string { return At(secret, time.Now()) }

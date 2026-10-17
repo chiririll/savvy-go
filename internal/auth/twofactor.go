@@ -22,11 +22,19 @@ type TwoFactor struct {
 
 func (t TwoFactor) repo() repo.Repo { return repo.Repo{DB: t.DB} }
 
-func (t TwoFactor) verifyTOTP(_ context.Context, u *User, code string) bool {
+// verifyTOTP accepts an authenticator code once: the step it matched must be
+// newer than the last one accepted, and recording it is atomic, so of two
+// requests with the same code only one passes.
+func (t TwoFactor) verifyTOTP(ctx context.Context, u *User, code string) bool {
 	if u == nil || u.TwoFactorSecret == nil {
 		return false
 	}
-	return totp.Verify(*u.TwoFactorSecret, code)
+	step, ok := totp.VerifyStep(*u.TwoFactorSecret, code, time.Now())
+	if !ok {
+		return false
+	}
+	fresh, err := t.repo().AdvanceTwoFactorStep(ctx, u.ID, step)
+	return err == nil && fresh
 }
 
 func (t TwoFactor) Enable(ctx context.Context, u *User) (secret, uri string, err error) {
@@ -40,6 +48,9 @@ func (t TwoFactor) Enable(ctx context.Context, u *User) (secret, uri string, err
 	if err := t.Users.SetTwoFactor(ctx, u.ID, &secret, true, false); err != nil {
 		return "", "", err
 	}
+	if err := t.repo().ClearTwoFactorStep(ctx, u.ID); err != nil {
+		return "", "", err
+	}
 	return secret, totp.ProvisioningURI(u.Email, secret), nil
 }
 
@@ -47,7 +58,7 @@ func (t TwoFactor) Confirm(ctx context.Context, u *User, code string) ([]string,
 	if !u.TwoFactorEnabled || u.TwoFactorConfirmed {
 		return nil, fmtErr("not pending")
 	}
-	if u.TwoFactorSecret == nil || !totp.Verify(*u.TwoFactorSecret, code) {
+	if !t.verifyTOTP(ctx, u, code) {
 		return nil, fmtErr("invalid code")
 	}
 	if err := t.Users.SetTwoFactor(ctx, u.ID, u.TwoFactorSecret, true, true); err != nil {
@@ -67,7 +78,7 @@ func (t TwoFactor) Disable(ctx context.Context, u *User, code string) error {
 		return err
 	}
 	_ = t.repo().DeleteRecoveryCodes(ctx, u.ID)
-	return nil
+	return t.repo().ClearTwoFactorStep(ctx, u.ID)
 }
 
 func (t TwoFactor) VerifyAny(ctx context.Context, u *User, code string) bool {
