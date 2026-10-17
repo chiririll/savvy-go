@@ -1,7 +1,9 @@
 package httpserver
 
 import (
+	"net/http"
 	"testing"
+	"time"
 
 	"savvy-go/internal/auth/totp"
 )
@@ -78,5 +80,98 @@ func TestTwoFactorEnableConfirmLoginAndRecovery(t *testing.T) {
 	off := a.do("POST", "/api/auth/2fa/disable", map[string]string{"code": totp.Now(secret)}, iss.Token, iss.CSRF)
 	if off.StatusCode != 200 {
 		t.Fatalf("disable %d %v", off.StatusCode, decodeJSON(t, off))
+	}
+}
+
+// twoFactorUser is a user with 2FA on, and a way to get a fresh challenge.
+func twoFactorUser(t *testing.T, a *testApp) (secret string, challenge func() string) {
+	t.Helper()
+	u := a.createUser("otp@test.com", "secret1", roleEditor)
+	secret = "JBSWY3DPEHPK3PXP"
+	if _, err := a.db.Exec(`UPDATE users SET two_factor_enabled = 1, two_factor_confirmed = 1, two_factor_secret = ? WHERE id = ?`, secret, u.ID); err != nil {
+		t.Fatal(err)
+	}
+	return secret, func() string {
+		res := a.do("POST", "/api/auth/login", map[string]string{"email": "otp@test.com", "password": "secret1"}, "", "")
+		tok, _ := decodeJSON(t, res)["two_factor_token"].(string)
+		if tok == "" {
+			t.Fatal("no challenge issued")
+		}
+		return tok
+	}
+}
+
+func verify2FA(a *testApp, tok, code string) *http.Response {
+	return a.do("POST", "/api/auth/2fa/verify", map[string]any{"two_factor_token": tok, "code": code}, "", "")
+}
+
+func TestTwoFactorChallengeAllowsFiveGuesses(t *testing.T) {
+	a := newTestApp(t)
+	secret, challenge := twoFactorUser(t, a)
+	tok := challenge()
+
+	for i := 1; i <= 4; i++ {
+		res := verify2FA(a, tok, "000000")
+		if res.StatusCode != 422 {
+			t.Fatalf("guess %d: %d", i, res.StatusCode)
+		}
+		res.Body.Close()
+	}
+	// The fifth wrong code uses the challenge up: the SPA goes back to login.
+	res := verify2FA(a, tok, "000000")
+	if res.StatusCode != 401 {
+		t.Fatalf("fifth guess: %d", res.StatusCode)
+	}
+	res.Body.Close()
+
+	res = verify2FA(a, tok, totp.Now(secret))
+	if res.StatusCode != 401 || cookieNamed(res, "svy_session") != nil {
+		t.Fatalf("right code on a dead challenge: %d", res.StatusCode)
+	}
+	res.Body.Close()
+}
+
+func TestTwoFactorRightCodeOnFourthTry(t *testing.T) {
+	a := newTestApp(t)
+	secret, challenge := twoFactorUser(t, a)
+	tok := challenge()
+	for range 3 {
+		verify2FA(a, tok, "000000").Body.Close()
+	}
+	res := verify2FA(a, tok, totp.Now(secret))
+	if res.StatusCode != 200 || cookieNamed(res, "svy_session") == nil {
+		t.Fatalf("fourth try: %d", res.StatusCode)
+	}
+	res.Body.Close()
+}
+
+func TestTwoFactorFailuresMakeTheAccountWait(t *testing.T) {
+	a := newTestApp(t)
+	secret, challenge := twoFactorUser(t, a)
+	for range 2 {
+		tok := challenge()
+		for range 5 {
+			verify2FA(a, tok, "000000").Body.Close()
+		}
+	}
+	res := a.do("POST", "/api/auth/login", map[string]string{"email": "otp@test.com", "password": "secret1"}, "", "")
+	body := decodeJSON(t, res)
+	if res.StatusCode != 429 || body["two_factor_token"] != nil {
+		t.Fatalf("login while locked: %d %v", res.StatusCode, body)
+	}
+
+	// After the delay a right code signs in, and that clears the count.
+	if _, err := a.db.Exec(`UPDATE two_factor_failures SET locked_until = ?`, time.Now().Add(-time.Second).UTC().Format(time.RFC3339Nano)); err != nil {
+		t.Fatal(err)
+	}
+	ok := verify2FA(a, challenge(), totp.Now(secret))
+	if ok.StatusCode != 200 {
+		t.Fatalf("after the delay: %d", ok.StatusCode)
+	}
+	ok.Body.Close()
+	var failures int
+	_ = a.db.QueryRow(`SELECT COUNT(*) FROM two_factor_failures`).Scan(&failures)
+	if failures != 0 {
+		t.Fatalf("failures after success: %d", failures)
 	}
 }

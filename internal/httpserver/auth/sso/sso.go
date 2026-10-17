@@ -96,7 +96,7 @@ func (h Handler) ssoExchange(w http.ResponseWriter, r *http.Request) {
 	if requires2FA {
 		tok, err := h.Challenges.Issue(r.Context(), u)
 		if err != nil {
-			httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
+			httpx.WriteChallengeError(w, err)
 			return
 		}
 		httpx.WriteJSON(w, http.StatusOK, dto.NewTwoFactorRequired(tok))

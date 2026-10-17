@@ -538,6 +538,45 @@ func (r Repo) ConsumeChallenge(ctx context.Context, hash string, now time.Time) 
 	return n == 1, nil
 }
 
+// FailChallenge counts a wrong code against an open challenge and uses the
+// challenge up once it has had max of them. It returns the owner and the wrong
+// codes so far; open is false when the challenge is not open.
+func (r Repo) FailChallenge(ctx context.Context, hash string, max int, now time.Time) (userID, attempts int64, open bool, err error) {
+	row, err := r.q().FailTwoFactorChallenge(ctx, sqlc.FailTwoFactorChallengeParams{
+		MaxAttempts: int64(max), ConsumedNow: db.TimeNS(now), UpdatedNow: db.TimeNS(now), TokenHash: hash, ValidAt: db.FormatTime(now),
+	})
+	if err == db.ErrNotFound {
+		return 0, 0, false, nil
+	}
+	return row.UserID, row.Attempts, err == nil, err
+}
+
+// TwoFactorLockedUntil is when the user may get a new second-factor challenge
+// again, or nil when no delay is running.
+func (r Repo) TwoFactorLockedUntil(ctx context.Context, userID int64) (*time.Time, error) {
+	raw, err := r.q().GetTwoFactorLock(ctx, userID)
+	if err != nil && err != db.ErrNotFound {
+		return nil, err
+	}
+	return optTime(raw), nil
+}
+
+// AddTwoFactorFailure counts a wrong code for the user across challenges and
+// returns the count.
+func (r Repo) AddTwoFactorFailure(ctx context.Context, userID int64) (int, error) {
+	n, err := r.q().AddTwoFactorFailure(ctx, userID)
+	return int(n), err
+}
+
+func (r Repo) LockTwoFactor(ctx context.Context, userID int64, until time.Time) error {
+	return r.q().LockTwoFactor(ctx, sqlc.LockTwoFactorParams{LockedUntil: db.TimeNS(until), UserID: userID})
+}
+
+// ResetTwoFactorFailures clears the user's count and any delay after a success.
+func (r Repo) ResetTwoFactorFailures(ctx context.Context, userID int64) error {
+	return r.q().ResetTwoFactorFailures(ctx, userID)
+}
+
 // AnyChallengeUserID is the owner of a challenge whether or not it is used.
 func (r Repo) AnyChallengeUserID(ctx context.Context, hash string) (int64, error) {
 	return r.q().GetChallengeUserID(ctx, hash)

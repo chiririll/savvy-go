@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"savvy-go/internal/auth"
 	"savvy-go/internal/spaces"
 )
 
@@ -36,4 +37,14 @@ func SpaceName(w http.ResponseWriter, raw string) (string, bool) {
 		return "", false
 	}
 	return name, true
+}
+
+// WriteChallengeError answers a failed second-factor challenge issue: 429 while
+// the account waits after too many wrong codes, 500 otherwise.
+func WriteChallengeError(w http.ResponseWriter, err error) {
+	if errors.Is(err, auth.ErrLocked) {
+		WriteMessage(w, http.StatusTooManyRequests, "Too many wrong verification codes. Try again later.")
+		return
+	}
+	WriteMessage(w, http.StatusInternalServerError, err.Error())
 }

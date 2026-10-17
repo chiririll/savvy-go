@@ -12,7 +12,7 @@ import (
 // setTables are tables each set must create.
 var setTables = map[Set][]string{
 	Server: {
-		"users", "auth_sessions", "password_tokens", "two_factor_challenges", "webauthn_credentials",
+		"users", "auth_sessions", "password_tokens", "two_factor_challenges", "two_factor_failures", "webauthn_credentials",
 		"api_tokens", "settings", "uploads", "identity_providers", "spaces", "space_members",
 		"space_invitations", "space_links", "sync_groups", "sync_group_spaces", "trusted_keys", "admin_audit",
 	},

@@ -155,7 +155,7 @@ func (h Handler) authLogin(w http.ResponseWriter, r *http.Request) {
 	if u.HasTwoFactor() {
 		tok, err := h.Challenges.Issue(r.Context(), u)
 		if err != nil {
-			httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
+			httpx.WriteChallengeError(w, err)
 			return
 		}
 		httpx.WriteJSON(w, http.StatusOK, dto.NewTwoFactorRequired(tok))
@@ -272,7 +272,7 @@ func (h Handler) passwordAccept(w http.ResponseWriter, r *http.Request) {
 	if u.HasTwoFactor() {
 		tok, err := h.Challenges.Issue(r.Context(), u)
 		if err != nil {
-			httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
+			httpx.WriteChallengeError(w, err)
 			return
 		}
 		httpx.WriteJSON(w, http.StatusOK, dto.NewTwoFactorRequired(tok))

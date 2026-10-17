@@ -109,6 +109,12 @@ The switch can only be turned on when mail and `app_url` are set up and your own
 
 Any space admin can make the server email an address by creating an invitation. To keep that from being used to flood a mailbox, an address cannot be invited again for one to two hours after an invitation to it was revoked or ran out, whichever space it was for. A server admin can end that wait early in **Administration → System → Invitation cooldown**, for one address or all.
 
+### Two-factor lockout
+
+A wrong two-factor code cannot be guessed at forever. After the password step, a sign-in has **5 tries**: the fifth wrong code (authenticator or recovery code) ends it, and the user has to enter the password again.
+
+Starting again does not give a fresh start. After **10 wrong codes in a row**, across sign-ins, the account gets no new two-factor sign-in for **1 minute**; every further wrong code doubles the wait, up to **1 hour**. During the wait, sign-in with the right password answers "Too many wrong verification codes" (`429`). A right code clears the count. The lockout is per account and cannot be changed in the settings.
+
 ## Behind a reverse proxy
 
 Set `app_url` to your public `https://` URL. The `X-Forwarded-Proto` and `X-Forwarded-For` headers are honored, no other setup needed.

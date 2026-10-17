@@ -145,6 +145,9 @@ func (h Handler) webauthnLoginVerify(w http.ResponseWriter, r *http.Request) {
 	if body.TwoFactorToken != nil && *body.TwoFactorToken != "" {
 		pending, err := h.Challenges.Resolve(r.Context(), *body.TwoFactorToken)
 		if err != nil || pending == nil || pending.ID != u.ID {
+			if pending != nil {
+				_, _ = h.Challenges.Fail(r.Context(), *body.TwoFactorToken)
+			}
 			httpx.WriteMessage(w, http.StatusUnauthorized, "Invalid or expired token.")
 			return
 		}

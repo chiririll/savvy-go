@@ -72,8 +72,17 @@ CREATE TABLE IF NOT EXISTS two_factor_challenges (
     token_hash TEXT NOT NULL UNIQUE,
     expires_at TEXT NOT NULL,
     consumed_at TEXT,
+    -- Wrong codes sent against this challenge; it is used up at the limit.
+    attempts INTEGER NOT NULL DEFAULT 0,
     created_at TEXT,
     updated_at TEXT
+) STRICT;
+-- Wrong second-factor codes in a row, across challenges. Many of them lock
+-- new challenges until locked_until; a success deletes the row.
+CREATE TABLE IF NOT EXISTS two_factor_failures (
+    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    failures INTEGER NOT NULL,
+    locked_until TEXT
 ) STRICT;
 CREATE INDEX IF NOT EXISTS two_factor_challenges_user_idx ON two_factor_challenges (user_id);
 CREATE INDEX IF NOT EXISTS two_factor_challenges_expires_idx ON two_factor_challenges (expires_at);

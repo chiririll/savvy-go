@@ -430,8 +430,15 @@ type TwoFactorChallenge struct {
 	TokenHash  string
 	ExpiresAt  string
 	ConsumedAt sql.NullString
+	Attempts   int64
 	CreatedAt  sql.NullString
 	UpdatedAt  sql.NullString
+}
+
+type TwoFactorFailure struct {
+	UserID      int64
+	Failures    int64
+	LockedUntil sql.NullString
 }
 
 type TwoFactorRecoveryCode struct {

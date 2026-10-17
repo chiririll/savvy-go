@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 )
@@ -115,5 +116,103 @@ func TestChallengesAreSingleUseAndExpire(t *testing.T) {
 	}
 	if got, _ := ch.Consume(ctx, expired); got != nil {
 		t.Error("an expired challenge was consumed")
+	}
+}
+
+func TestChallengeDiesAfterFiveWrongCodes(t *testing.T) {
+	d := newDB(t)
+	ctx := context.Background()
+	u := newUser(t, d, "a@test.com", RoleUser)
+	ch := Challenges{DB: d, TTL: time.Minute}
+	token, _ := ch.Issue(ctx, u)
+
+	for i := 1; i <= 5; i++ {
+		if got, _ := ch.Resolve(ctx, token); got == nil {
+			t.Fatalf("challenge died before failure %d", i)
+		}
+		left, err := ch.Fail(ctx, token)
+		if err != nil || left != 5-i {
+			t.Fatalf("failure %d: remaining %d, %v", i, left, err)
+		}
+	}
+	if got, _ := ch.Resolve(ctx, token); got != nil {
+		t.Error("a challenge with five wrong codes still resolves")
+	}
+	if got, _ := ch.Consume(ctx, token); got != nil {
+		t.Error("a used-up challenge was consumed")
+	}
+	if left, _ := ch.Fail(ctx, token); left != 0 {
+		t.Errorf("failing a dead challenge left %d", left)
+	}
+}
+
+func TestFailuresAcrossChallengesLockTheUser(t *testing.T) {
+	d := newDB(t)
+	ctx := context.Background()
+	u := newUser(t, d, "a@test.com", RoleUser)
+	ch := Challenges{DB: d, TTL: time.Minute}
+
+	var last string
+	for range 2 {
+		last, _ = ch.Issue(ctx, u)
+		for range 5 {
+			_, _ = ch.Fail(ctx, last)
+		}
+	}
+	if _, err := ch.Issue(ctx, u); !errors.Is(err, ErrLocked) {
+		t.Fatalf("issue after 10 failures: %v", err)
+	}
+
+	// Another user is not affected.
+	other := newUser(t, d, "b@test.com", RoleUser)
+	if _, err := ch.Issue(ctx, other); err != nil {
+		t.Fatalf("other user locked: %v", err)
+	}
+
+	// A challenge issued before the lock cannot be answered while it lasts.
+	open, _ := ch.Issue(ctx, other)
+	_, _ = d.ExecContext(ctx, `INSERT INTO two_factor_failures (user_id, failures, locked_until) VALUES (?, 10, ?)`,
+		other.ID, time.Now().Add(time.Minute).UTC().Format(time.RFC3339Nano))
+	if got, _ := ch.Resolve(ctx, open); got != nil {
+		t.Error("a locked user resolved a challenge")
+	}
+
+	// Once the delay is over, a challenge can be issued again.
+	_, _ = d.ExecContext(ctx, `UPDATE two_factor_failures SET locked_until = ?`, time.Now().Add(-time.Second).UTC().Format(time.RFC3339Nano))
+	token, err := ch.Issue(ctx, u)
+	if err != nil {
+		t.Fatalf("issue after the delay: %v", err)
+	}
+	// The count was kept, so the next wrong code locks again for longer.
+	_, _ = ch.Fail(ctx, token)
+	if _, err := ch.Issue(ctx, u); !errors.Is(err, ErrLocked) {
+		t.Fatalf("issue after another failure: %v", err)
+	}
+}
+
+func TestSuccessResetsTheFailureCount(t *testing.T) {
+	d := newDB(t)
+	ctx := context.Background()
+	u := newUser(t, d, "a@test.com", RoleUser)
+	ch := Challenges{DB: d, TTL: time.Minute}
+
+	token, _ := ch.Issue(ctx, u)
+	for range 4 {
+		_, _ = ch.Fail(ctx, token)
+	}
+	if got, _ := ch.Consume(ctx, token); got == nil {
+		t.Fatal("consume")
+	}
+	for range 2 {
+		tok, err := ch.Issue(ctx, u)
+		if err != nil {
+			t.Fatalf("issue: %v", err)
+		}
+		for range 4 {
+			_, _ = ch.Fail(ctx, tok)
+		}
+	}
+	if _, err := ch.Issue(ctx, u); err != nil {
+		t.Fatalf("8 failures after a success locked the user: %v", err)
 	}
 }

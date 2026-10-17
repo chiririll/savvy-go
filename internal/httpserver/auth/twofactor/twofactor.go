@@ -85,6 +85,16 @@ func (h Handler) twoFactorVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !h.TwoFactor.VerifyAny(r.Context(), u, body.Code) {
+		remaining, err := h.Challenges.Fail(r.Context(), body.Token)
+		if err != nil {
+			httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if remaining == 0 {
+			// Used up: the SPA goes back to the login form.
+			httpx.WriteMessage(w, http.StatusUnauthorized, "Invalid or expired token.")
+			return
+		}
 		httpx.WriteMessage(w, http.StatusUnprocessableEntity, "Invalid verification code.")
 		return
 	}
