@@ -4,6 +4,11 @@
 - New route: update the `openapi.yaml` next to the handler's `routes.go`. `auth/` routes deliberately have none.
 - Create-space needs `spaces` and `ledger` together, so lives in `internal/spacefill`. All or nothing.
 
+## Auth routes
+
+- Public route that takes a guess at a password or token: mount it `r.With(Guard.LimitAttempts)`. One shared per-IP count, so changing route or token gains nothing. Account-keyed limit: `Guard.AllowAccount`.
+- Password minimum: `password.MinLength`, never a literal.
+
 ## Mailer and bootstrap
 
 - Mailer: config.toml `[mailer]` only, never DB. Read via `mail.Service`. Bad section disables mail, does not stop startup.

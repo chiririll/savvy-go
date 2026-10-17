@@ -53,7 +53,7 @@ Keys, with their defaults, are listed in the generated file itself:
 |--------------|---------------------------------------------------------------------------------------------------|
 | `[server]`   | `listen` (`:80` in the image, `localhost:8080` otherwise), `app_url`, `timezone`                  |
 | `[paths]`    | `data`, `uploads`, `backups`                                                                      |
-| `[security]` | `session_ttl`, `remember_ttl`, `challenge_ttl`, `session_cookie`, `csrf_cookie`, `csrf_header` |
+| `[security]` | `session_ttl`, `remember_ttl`, `challenge_ttl`, `ip_rate_limit`, `account_rate_limit`, `session_cookie`, `csrf_cookie`, `csrf_header` |
 | `[mailer]`   | `enabled`, `host`, `port`, `protocol`, `user`, `password`, `from`, `skip_verify`, `timeout`       |
 
 A value the application cannot run with, such as a lifetime that is not a positive number or an empty cookie name under `[security]`, stops it at start with the section and key in the error. `[mailer]` is the exception: see [Email](#email).
@@ -114,6 +114,23 @@ Any space admin can make the server email an address by creating an invitation. 
 A wrong two-factor code cannot be guessed at forever. After the password step, a sign-in has **5 tries**: the fifth wrong code (authenticator or recovery code) ends it, and the user has to enter the password again.
 
 Starting again does not give a fresh start. After **10 wrong codes in a row**, across sign-ins, the account gets no new two-factor sign-in for **1 minute**; every further wrong code doubles the wait, up to **1 hour**. During the wait, sign-in with the right password answers "Too many wrong verification codes" (`429`). A right code clears the count. The lockout is per account and cannot be changed in the settings.
+
+### Sign-in rate limits
+
+The routes where someone can guess a secret are throttled: sign-in, the second-factor step, passkey sign-in, first-run registration and its bootstrap password check, password reset links, invitation links and email confirmation links. Over the limit they answer `429` with a `Retry-After` header (seconds).
+
+- `ip_rate_limit` (default `10`): attempts per minute from one client address, counted together over all these routes.
+- `account_rate_limit` (default `5`): sign-in attempts per minute against one email address, from any address. The address is compared without case or surrounding spaces. Attempts count whether or not the password was right.
+
+```toml
+[security]
+ip_rate_limit = 10
+account_rate_limit = 5
+```
+
+`0` turns a limit off; a negative number stops the server at start. The counters live in memory and start again after a restart. The client address is the one the reverse proxy reports in `X-Forwarded-For`: behind a proxy that does not set it, every user shares the proxy's address and the first limit. See [Behind a reverse proxy](#behind-a-reverse-proxy).
+
+Passwords are at least 8 characters everywhere (first admin, change, reset, invitation and admin-created users). Two-factor recovery codes are stored as SHA-256 hashes, so one wrong code costs the server a single lookup.
 
 ## Behind a reverse proxy
 

@@ -589,31 +589,21 @@ func (r Repo) CountChallenges(ctx context.Context) (int, error) {
 
 // Recovery codes
 
-// RecoveryCode is an unused code, stored hashed.
-type RecoveryCode struct {
-	ID   int64
-	Hash string
-}
-
-func (r Repo) UnusedRecoveryCodes(ctx context.Context, userID int64) ([]RecoveryCode, error) {
-	rows, err := r.q().ListUnusedRecoveryCodes(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]RecoveryCode, len(rows))
-	for i, row := range rows {
-		out[i] = RecoveryCode{ID: row.ID, Hash: row.Code}
-	}
-	return out, nil
-}
 
 func (r Repo) CountUnusedRecoveryCodes(ctx context.Context, userID int64) (int, error) {
 	n, err := r.q().CountUnusedRecoveryCodes(ctx, userID)
 	return int(n), err
 }
 
-func (r Repo) MarkRecoveryCodeUsed(ctx context.Context, id int64, now time.Time) error {
-	return r.q().MarkRecoveryCodeUsed(ctx, sqlc.MarkRecoveryCodeUsedParams{UsedAt: db.TimeNS(now), ID: id})
+// UseRecoveryCode marks the unused code with this hash as used and reports whether there was
+// one. Finding and marking are one statement, so two requests cannot both use a code.
+func (r Repo) UseRecoveryCode(ctx context.Context, userID int64, hash string, now time.Time) (bool, error) {
+	res, err := r.q().UseRecoveryCode(ctx, sqlc.UseRecoveryCodeParams{UsedAt: db.TimeNS(now), UserID: userID, Code: hash})
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
 }
 
 func (r Repo) InvalidateUnusedRecoveryCodes(ctx context.Context, userID int64, now time.Time) error {

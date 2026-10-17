@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"savvy-go/internal/auth/password"
 	"strconv"
 	"strings"
 
@@ -165,8 +166,8 @@ func (h Handler) invitationRegister(w http.ResponseWriter, r *http.Request) {
 	if !httpx.LooksLikeEmail(body.Email) {
 		errs["email"] = []string{"The email field must be a valid email address."}
 	}
-	if len(body.Password) < 8 {
-		errs["password"] = []string{"The password must be at least 8 characters."}
+	if password.TooShort(body.Password) {
+		errs["password"] = []string{password.TooShortMessage}
 	}
 	if len(errs) > 0 {
 		httpx.WriteValidation(w, errs)

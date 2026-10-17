@@ -89,8 +89,8 @@ func (h Handler) authRegister(w http.ResponseWriter, r *http.Request) {
 	if !httpx.LooksLikeEmail(body.Email) {
 		errs["email"] = []string{"The email field must be a valid email address."}
 	}
-	if len(body.Password) < 6 {
-		errs["password"] = []string{"The password must be at least 6 characters."}
+	if password.TooShort(body.Password) {
+		errs["password"] = []string{password.TooShortMessage}
 	}
 	if len(errs) > 0 {
 		httpx.WriteValidation(w, errs)
@@ -145,6 +145,9 @@ func (h Handler) authLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	if h.Login.PasswordLoginDisabled(r.Context()) {
 		httpx.WriteValidation(w, map[string][]string{"email": {"Password sign-in is disabled. Use single sign-on instead."}})
+		return
+	}
+	if !h.Guard.AllowAccount(w, body.Email) {
 		return
 	}
 	u, err := h.Users.ByEmail(r.Context(), body.Email)
@@ -202,8 +205,8 @@ func (h Handler) authChangePassword(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteValidation(w, map[string][]string{"current_password": {"Current password is incorrect."}})
 		return
 	}
-	if len(body.Password) < 8 {
-		httpx.WriteValidation(w, map[string][]string{"password": {"The password must be at least 8 characters."}})
+	if password.TooShort(body.Password) {
+		httpx.WriteValidation(w, map[string][]string{"password": {password.TooShortMessage}})
 		return
 	}
 	if body.Password != body.PasswordConfirmation {
@@ -254,8 +257,8 @@ func (h Handler) passwordAccept(w http.ResponseWriter, r *http.Request) {
 		Password             string `json:"password"`
 		PasswordConfirmation string `json:"password_confirmation"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || len(body.Password) < 8 || body.Password != body.PasswordConfirmation {
-		httpx.WriteValidation(w, map[string][]string{"password": {"The password must be at least 8 characters."}})
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || password.TooShort(body.Password) || body.Password != body.PasswordConfirmation {
+		httpx.WriteValidation(w, map[string][]string{"password": {password.TooShortMessage}})
 		return
 	}
 	row, err := h.Tokens.Consume(r.Context(), chi.URLParam(r, "token"))

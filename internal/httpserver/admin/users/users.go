@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"savvy-go/internal/auth/password"
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/httpserver/httpx/dto"
 	"savvy-go/internal/mail"
@@ -59,8 +60,8 @@ func (h Handler) validateNewUser(r *http.Request, body userStoreBody) (errs map[
 	if !httpx.LooksLikeEmail(body.Email) {
 		errs["email"] = []string{"The email field must be a valid email address."}
 	}
-	if body.hasPassword() && len(*body.Password) < 8 {
-		errs["password"] = []string{"The password must be at least 8 characters."}
+	if body.hasPassword() && password.TooShort(*body.Password) {
+		errs["password"] = []string{password.TooShortMessage}
 	}
 	if body.Role != "" && !validRole(body.Role) {
 		errs["role"] = []string{"The selected role is invalid."}

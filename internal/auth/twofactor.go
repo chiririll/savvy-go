@@ -3,13 +3,12 @@ package auth
 import (
 	"context"
 	"crypto/rand"
+	"strconv"
 	"strings"
 	"time"
 
 	repo "savvy-go/internal/db/repo/auth"
 	"savvy-go/internal/store"
-
-	"savvy-go/internal/auth/password"
 
 	"savvy-go/internal/auth/totp"
 )
@@ -79,18 +78,15 @@ func (t TwoFactor) VerifyAny(ctx context.Context, u *User, code string) bool {
 }
 
 func (t TwoFactor) ConsumeRecovery(ctx context.Context, userID int64, code string) bool {
-	code = strings.ToLower(strings.TrimSpace(code))
-	unused, err := t.repo().UnusedRecoveryCodes(ctx, userID)
-	if err != nil {
-		return false
-	}
-	for _, r := range unused {
-		if password.Check(r.Hash, code) {
-			_ = t.repo().MarkRecoveryCodeUsed(ctx, r.ID, time.Now().UTC())
-			return true
-		}
-	}
-	return false
+	ok, err := t.repo().UseRecoveryCode(ctx, userID, recoveryHash(userID, code), time.Now().UTC())
+	return err == nil && ok
+}
+
+// recoveryHash is what is stored for a code. A code has about 40 random bits and a person
+// never picks it, so SHA-256 is enough and lets the lookup be an index hit instead of a
+// bcrypt compare per row. The user id keeps equal codes of two users apart.
+func recoveryHash(userID int64, code string) string {
+	return HashToken(strconv.FormatInt(userID, 10) + ":" + strings.ToLower(strings.TrimSpace(code)))
 }
 
 func (t TwoFactor) Remaining(ctx context.Context, userID int64) int {
@@ -114,11 +110,7 @@ func (t TwoFactor) generateCodes(ctx context.Context, userID int64) ([]string, e
 	now := time.Now().UTC()
 	for i := 0; i < 8; i++ {
 		plain := recoveryCode()
-		h, err := password.Hash(plain)
-		if err != nil {
-			return nil, err
-		}
-		if err := t.repo().InsertRecoveryCode(ctx, userID, h, now); err != nil {
+		if err := t.repo().InsertRecoveryCode(ctx, userID, recoveryHash(userID, plain), now); err != nil {
 			return nil, err
 		}
 		codes = append(codes, plain)

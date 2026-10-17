@@ -4,12 +4,17 @@ package guard
 
 import (
 	"context"
+	"net"
 	"net/http"
+	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"savvy-go/internal/appconfig"
 	"savvy-go/internal/auth"
 	"savvy-go/internal/httpserver/httpx"
+	"savvy-go/internal/ratelimit"
 )
 
 // Guard is built once by the server from its own services.
@@ -21,6 +26,49 @@ type Guard struct {
 	Space     SpaceDeps
 	// EmailRequired reports whether the instance holds back unverified users.
 	EmailRequired func(context.Context) bool
+
+	limitsOnce sync.Once
+	byIP       *ratelimit.Limiter
+	byAccount  *ratelimit.Limiter
+}
+
+func (g *Guard) initLimiters() {
+	g.byIP = ratelimit.New(g.Security.IPRateLimit)
+	g.byAccount = ratelimit.New(g.Security.AccountRateLimit)
+}
+
+// LimitAttempts throttles a route that anyone can call to guess a secret, by client address.
+// All such routes share one count, so a guesser cannot get a fresh allowance by changing
+// route or token. RealIP has put the client address in RemoteAddr.
+func (g *Guard) LimitAttempts(next http.Handler) http.Handler {
+	g.limitsOnce.Do(g.initLimiters)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ip := r.RemoteAddr
+		if host, _, err := net.SplitHostPort(ip); err == nil {
+			ip = host
+		}
+		if ok, wait := g.byIP.Allow(ip); !ok {
+			tooMany(w, wait)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// AllowAccount counts a sign-in attempt against an account, whatever address it comes from,
+// and answers 429 itself when there are too many. The key is the normalised email.
+func (g *Guard) AllowAccount(w http.ResponseWriter, email string) bool {
+	g.limitsOnce.Do(g.initLimiters)
+	ok, wait := g.byAccount.Allow(strings.ToLower(strings.TrimSpace(email)))
+	if !ok {
+		tooMany(w, wait)
+	}
+	return ok
+}
+
+func tooMany(w http.ResponseWriter, wait time.Duration) {
+	w.Header().Set("Retry-After", strconv.Itoa(int(wait.Seconds())+1))
+	httpx.WriteMessage(w, http.StatusTooManyRequests, "Too many attempts. Try again later.")
 }
 
 // bearerToken returns the raw Authorization: Bearer value and whether the header was present.

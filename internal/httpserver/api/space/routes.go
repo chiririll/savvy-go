@@ -54,8 +54,9 @@ type Handler struct {
 }
 
 func (h Handler) PublicRoutes(r chi.Router) {
-	r.Get("/invitations/{token}", h.invitationPreview)
-	r.Post("/invitations/{token}/register", h.invitationRegister)
+	limited := r.With(h.Guard.LimitAttempts)
+	limited.Get("/invitations/{token}", h.invitationPreview)
+	limited.Post("/invitations/{token}/register", h.invitationRegister)
 }
 
 func (h Handler) ReadRoutes(r chi.Router) {

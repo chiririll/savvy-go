@@ -117,3 +117,29 @@ func TestRecoveryCodesLookRight(t *testing.T) {
 		t.Errorf("only %d distinct codes in 200", len(seen))
 	}
 }
+
+func TestRecoveryCodesAreStoredAsHashes(t *testing.T) {
+	d := newDB(t)
+	ctx := context.Background()
+	users := Users{DB: d}
+	tf := TwoFactor{DB: d, Users: users}
+	a := newUser(t, d, "a@test.com", RoleUser)
+	b := newUser(t, d, "b@test.com", RoleUser)
+	codes, err := tf.generateCodes(ctx, a.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stored string
+	if err := d.QueryRowContext(ctx, `SELECT code FROM two_factor_recovery_codes WHERE user_id = ? LIMIT 1`, a.ID).Scan(&stored); err != nil {
+		t.Fatal(err)
+	}
+	if stored == codes[0] || strings.Contains(stored, "-") || len(stored) != 64 {
+		t.Errorf("stored %q: want a SHA-256 hex digest, not the code", stored)
+	}
+	if tf.ConsumeRecovery(ctx, b.ID, codes[1]) {
+		t.Error("a code opened another user's account")
+	}
+	if !tf.ConsumeRecovery(ctx, a.ID, codes[1]) || tf.ConsumeRecovery(ctx, a.ID, codes[1]) {
+		t.Error("a code must verify once, then fail")
+	}
+}

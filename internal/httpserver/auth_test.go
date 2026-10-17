@@ -292,7 +292,7 @@ func TestHostPrefixedCookieOverTLS(t *testing.T) {
 	t.Cleanup(ts.Close)
 	client := ts.Client()
 
-	raw, _ := json.Marshal(map[string]string{"name": "A", "email": "a@a.com", "password": "secret1", "bootstrap_password": guard.Password()})
+	raw, _ := json.Marshal(map[string]string{"name": "A", "email": "a@a.com", "password": "secret12", "bootstrap_password": guard.Password()})
 	req, _ := http.NewRequest("POST", ts.URL+"/api/auth/register", bytes.NewReader(raw))
 	req.Header.Set("Content-Type", "application/json")
 	res, err := client.Do(req)

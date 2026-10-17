@@ -17,6 +17,9 @@ type Security struct {
 	SessionCookie string
 	CSRFCookie    string
 	CSRFHeader    string
+	// IPRateLimit and AccountRateLimit are the sign-in attempts a minute one address and one
+	// account may make. 0 is no limit.
+	IPRateLimit, AccountRateLimit int
 }
 
 // SecurityConfig is the [security] table of the config file.
@@ -27,6 +30,9 @@ type SecurityConfig struct {
 	Cookie       string `toml:"session_cookie" comment:"Cookie and header names."`
 	CSRFCookie   string `toml:"csrf_cookie"`
 	CSRFHeader   string `toml:"csrf_header"`
+
+	IPRateLimit      int `toml:"ip_rate_limit" comment:"Sign-in attempts per minute from one address and against one account. 0 is no limit."`
+	AccountRateLimit int `toml:"account_rate_limit"`
 }
 
 // Defaults are the values of the keys the file lacks.
@@ -38,6 +44,9 @@ func (SecurityConfig) Defaults() SecurityConfig {
 		Cookie:       "svy_session",
 		CSRFCookie:   "svy_csrf",
 		CSRFHeader:   "X-CSRF-Token",
+
+		IPRateLimit:      10,
+		AccountRateLimit: 5,
 	}
 }
 
@@ -59,6 +68,10 @@ func decodeSecurity(c SecurityConfig) (Security, error) {
 		return Security{}, errors.New("csrf_cookie is empty")
 	case strings.TrimSpace(c.CSRFHeader) == "":
 		return Security{}, errors.New("csrf_header is empty")
+	case c.IPRateLimit < 0:
+		return Security{}, errors.New("ip_rate_limit must be zero or a positive number of attempts a minute")
+	case c.AccountRateLimit < 0:
+		return Security{}, errors.New("account_rate_limit must be zero or a positive number of attempts a minute")
 	}
 	return Security{
 		SessionTTL:    time.Duration(c.SessionTTL) * time.Minute,
@@ -67,5 +80,8 @@ func decodeSecurity(c SecurityConfig) (Security, error) {
 		SessionCookie: strings.TrimSpace(c.Cookie),
 		CSRFCookie:    strings.TrimSpace(c.CSRFCookie),
 		CSRFHeader:    strings.TrimSpace(c.CSRFHeader),
+
+		IPRateLimit:      c.IPRateLimit,
+		AccountRateLimit: c.AccountRateLimit,
 	}, nil
 }

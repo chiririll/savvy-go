@@ -13,7 +13,7 @@ import (
 )
 
 func (a *testApp) register(password string, extra map[string]string) *http.Response {
-	body := map[string]string{"name": "A", "email": "a@a.com", "password": "secret1"}
+	body := map[string]string{"name": "A", "email": "a@a.com", "password": "secret12"}
 	if password != "" {
 		body["bootstrap_password"] = password
 	}

@@ -19,6 +19,14 @@ func TestDecodeSecurity(t *testing.T) {
 	if sec.SessionTTL != 24*time.Hour || sec.RememberTTL != 7*24*time.Hour || sec.ChallengeTTL != 5*time.Minute {
 		t.Errorf("lifetimes are minutes: %+v", sec)
 	}
+	if sec.IPRateLimit != 10 || sec.AccountRateLimit != 5 {
+		t.Errorf("default rate limits: %+v", sec)
+	}
+	off := good
+	off.IPRateLimit, off.AccountRateLimit = 0, 0
+	if _, err := decodeSecurity(off); err != nil {
+		t.Errorf("zero turns a limit off: %v", err)
+	}
 	padded := good
 	padded.Cookie, padded.CSRFHeader = "  sid ", " X-T "
 	if sec, _ := decodeSecurity(padded); sec.SessionCookie != "sid" || sec.CSRFHeader != "X-T" {
@@ -31,6 +39,8 @@ func TestDecodeSecurity(t *testing.T) {
 		"blank cookie":      func(c *SecurityConfig) { c.Cookie = " " },
 		"blank csrf cookie": func(c *SecurityConfig) { c.CSRFCookie = "" },
 		"blank csrf header": func(c *SecurityConfig) { c.CSRFHeader = "" },
+		"negative ip rate":  func(c *SecurityConfig) { c.IPRateLimit = -1 },
+		"negative account":  func(c *SecurityConfig) { c.AccountRateLimit = -1 },
 	} {
 		c := good
 		mutate(&c)

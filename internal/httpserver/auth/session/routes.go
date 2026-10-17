@@ -5,6 +5,7 @@ import (
 
 	"savvy-go/internal/auth"
 	"savvy-go/internal/bootstrap"
+	"savvy-go/internal/httpserver/httpx/guard"
 	"savvy-go/internal/httpserver/httpx/login"
 	"savvy-go/internal/httpserver/httpx/routing"
 	"savvy-go/internal/settings"
@@ -21,6 +22,7 @@ func init() {
 			Settings:   routing.Get[settings.Store](d),
 			Bootstrap:  routing.Get[*bootstrap.Guard](d),
 			Login:      d.Login,
+			Guard:      d.Guard,
 		}
 		return []routing.Mount{
 			routing.Public(h.PublicRoutes),
@@ -39,16 +41,20 @@ type Handler struct {
 	Settings   settings.Store
 	Bootstrap  *bootstrap.Guard
 	Login      login.Service
+	Guard      *guard.Guard
 }
 
 func (h Handler) PublicRoutes(r chi.Router) {
 	r.Get("/auth/status", h.authStatus)
 	r.Get("/auth/me", h.authMe)
-	r.Post("/auth/bootstrap/verify", h.bootstrapVerify)
-	r.Post("/auth/register", h.authRegister)
-	r.Post("/auth/login", h.authLogin)
-	r.Get("/auth/password/{token}", h.passwordPreview)
-	r.Post("/auth/password/{token}", h.passwordAccept)
+
+	// These take guesses at a password or a token, so they are throttled.
+	limited := r.With(h.Guard.LimitAttempts)
+	limited.Post("/auth/bootstrap/verify", h.bootstrapVerify)
+	limited.Post("/auth/register", h.authRegister)
+	limited.Post("/auth/login", h.authLogin)
+	limited.Get("/auth/password/{token}", h.passwordPreview)
+	limited.Post("/auth/password/{token}", h.passwordAccept)
 }
 
 func (h Handler) CredentialRoutes(r chi.Router) {

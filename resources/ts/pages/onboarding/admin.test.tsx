@@ -56,8 +56,8 @@ async function toAdminScreen(password = 'ABCDE') {
 function fillAdmin() {
     type('setup.name', 'Jane')
     type('email', 'jane@example.com')
-    type('password', 'secret1')
-    type('setup.confirmPassword', 'secret1')
+    type('password', 'secret12')
+    type('setup.confirmPassword', 'secret12')
     fireEvent.click(screen.getByRole('button', { name: 'setup.submit' }))
 }
 
@@ -223,7 +223,7 @@ describe('admin setup', () => {
             bootstrap_password: 'RIGHT',
             name: 'Jane',
             email: 'jane@example.com',
-            password: 'secret1',
+            password: 'secret12',
         })
         expect(invalidate).toHaveBeenCalledWith({ queryKey: ['auth', 'status'] })
     })

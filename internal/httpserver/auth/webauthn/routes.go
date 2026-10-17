@@ -28,8 +28,8 @@ type Handler struct {
 }
 
 func (h Handler) PublicRoutes(r chi.Router) {
-	r.With(h.Guard.NeedAppURL).Post("/auth/webauthn/login/options", h.webauthnLoginOptions)
-	r.With(h.Guard.NeedAppURL).Post("/auth/webauthn/login/verify", h.webauthnLoginVerify)
+	r.With(h.Guard.NeedAppURL, h.Guard.LimitAttempts).Post("/auth/webauthn/login/options", h.webauthnLoginOptions)
+	r.With(h.Guard.NeedAppURL, h.Guard.LimitAttempts).Post("/auth/webauthn/login/verify", h.webauthnLoginVerify)
 }
 
 func (h Handler) CredentialRoutes(r chi.Router) {

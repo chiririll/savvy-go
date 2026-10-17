@@ -89,11 +89,13 @@ CREATE INDEX IF NOT EXISTS two_factor_challenges_expires_idx ON two_factor_chall
 CREATE TABLE IF NOT EXISTS two_factor_recovery_codes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    -- SHA-256 of the user id and the code, never the code. A code has about 40 random bits
+    -- and is not chosen by a person, so a slow hash adds nothing and costs a guess 8 compares.
     code TEXT NOT NULL,
     used_at TEXT,
     created_at TEXT
 ) STRICT;
-CREATE INDEX IF NOT EXISTS two_factor_recovery_codes_user_idx ON two_factor_recovery_codes (user_id);
+CREATE INDEX IF NOT EXISTS two_factor_recovery_codes_code_idx ON two_factor_recovery_codes (user_id, code);
 CREATE TABLE IF NOT EXISTS webauthn_credentials (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

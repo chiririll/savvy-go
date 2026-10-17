@@ -146,7 +146,8 @@ func TestTwoFactorRightCodeOnFourthTry(t *testing.T) {
 }
 
 func TestTwoFactorFailuresMakeTheAccountWait(t *testing.T) {
-	a := newTestApp(t)
+	// Many sign-ins here: only the 2FA lockout is under test, so the sign-in limits are off.
+	a := newTestApp(t, WithConfig(testFile("[security]\nip_rate_limit = 0\naccount_rate_limit = 0\n")))
 	secret, challenge := twoFactorUser(t, a)
 	for range 2 {
 		tok := challenge()
