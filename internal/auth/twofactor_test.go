@@ -3,7 +3,10 @@ package auth
 import (
 	"context"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"savvy-go/internal/auth/totp"
 )
@@ -141,5 +144,64 @@ func TestRecoveryCodesAreStoredAsHashes(t *testing.T) {
 	}
 	if !tf.ConsumeRecovery(ctx, a.ID, codes[1]) || tf.ConsumeRecovery(ctx, a.ID, codes[1]) {
 		t.Error("a code must verify once, then fail")
+	}
+}
+
+func TestRecoveryCodeCanBeUsedOnceWhenRequestsRace(t *testing.T) {
+	d := newDB(t)
+	ctx := context.Background()
+	users := Users{DB: d}
+	tf := TwoFactor{DB: d, Users: users}
+	u := newUser(t, d, "race@test.com", RoleUser)
+	secret, _, err := tf.Enable(ctx, u)
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, _ = users.ByID(ctx, u.ID)
+	codes, err := tf.Confirm(ctx, u, totp.Now(secret))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var wins atomic.Int32
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if tf.ConsumeRecovery(ctx, u.ID, codes[0]) {
+				wins.Add(1)
+			}
+		}()
+	}
+	wg.Wait()
+	if wins.Load() != 1 {
+		t.Fatalf("one recovery code succeeded %d times", wins.Load())
+	}
+}
+
+func TestChallengeConsumeSucceedsOnce(t *testing.T) {
+	d := newDB(t)
+	ctx := context.Background()
+	u := newUser(t, d, "chal@test.com", RoleUser)
+	ch := Challenges{DB: d, TTL: time.Minute}
+	tok, err := ch.Issue(ctx, u)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var wins atomic.Int32
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if got, err := ch.Consume(ctx, tok); err == nil && got != nil {
+				wins.Add(1)
+			}
+		}()
+	}
+	wg.Wait()
+	if wins.Load() != 1 {
+		t.Fatalf("one challenge was consumed %d times", wins.Load())
 	}
 }

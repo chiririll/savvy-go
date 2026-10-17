@@ -2,6 +2,8 @@ package auth_test
 
 import (
 	"context"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -319,5 +321,29 @@ func TestEmailVerificationTokenIsOnePerUserAndSingleUse(t *testing.T) {
 	}
 	if ok, _ := r.ConsumeEmailVerificationToken(ctx, "second"); ok {
 		t.Fatal("a token was used twice")
+	}
+}
+
+func TestPasskeyChallengeIsTakenOnceWhenRequestsRace(t *testing.T) {
+	r, id := newRepo(t)
+	ctx := context.Background()
+	now := time.Now().UTC()
+	if err := r.InsertPasskeyChallenge(ctx, &id, "tok", "authentication", "{}", now.Add(time.Minute), now); err != nil {
+		t.Fatal(err)
+	}
+	var wins atomic.Int32
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if c, err := r.TakePasskeyChallenge(ctx, "tok", "authentication", now); err == nil && c != nil {
+				wins.Add(1)
+			}
+		}()
+	}
+	wg.Wait()
+	if wins.Load() != 1 {
+		t.Fatalf("one passkey challenge was taken %d times", wins.Load())
 	}
 }

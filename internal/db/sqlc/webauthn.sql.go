@@ -10,21 +10,6 @@ import (
 	"database/sql"
 )
 
-const consumeWebAuthnChallenge = `-- name: ConsumeWebAuthnChallenge :exec
-UPDATE webauthn_challenges SET consumed_at=?, updated_at=? WHERE token_hash=?
-`
-
-type ConsumeWebAuthnChallengeParams struct {
-	ConsumedAt sql.NullString
-	UpdatedAt  sql.NullString
-	TokenHash  string
-}
-
-func (q *Queries) ConsumeWebAuthnChallenge(ctx context.Context, arg ConsumeWebAuthnChallengeParams) error {
-	_, err := q.db.ExecContext(ctx, consumeWebAuthnChallenge, arg.ConsumedAt, arg.UpdatedAt, arg.TokenHash)
-	return err
-}
-
 const countWebAuthnCredentials = `-- name: CountWebAuthnCredentials :one
 SELECT COUNT(*) FROM webauthn_credentials WHERE user_id=?
 `
@@ -47,29 +32,6 @@ type DeleteWebAuthnCredentialParams struct {
 
 func (q *Queries) DeleteWebAuthnCredential(ctx context.Context, arg DeleteWebAuthnCredentialParams) (sql.Result, error) {
 	return q.db.ExecContext(ctx, deleteWebAuthnCredential, arg.ID, arg.UserID)
-}
-
-const getOpenWebAuthnChallenge = `-- name: GetOpenWebAuthnChallenge :one
-SELECT user_id, options FROM webauthn_challenges
-WHERE token_hash=? AND type=? AND consumed_at IS NULL AND expires_at > ?
-`
-
-type GetOpenWebAuthnChallengeParams struct {
-	TokenHash string
-	Type      string
-	ExpiresAt string
-}
-
-type GetOpenWebAuthnChallengeRow struct {
-	UserID  sql.NullInt64
-	Options string
-}
-
-func (q *Queries) GetOpenWebAuthnChallenge(ctx context.Context, arg GetOpenWebAuthnChallengeParams) (GetOpenWebAuthnChallengeRow, error) {
-	row := q.db.QueryRowContext(ctx, getOpenWebAuthnChallenge, arg.TokenHash, arg.Type, arg.ExpiresAt)
-	var i GetOpenWebAuthnChallengeRow
-	err := row.Scan(&i.UserID, &i.Options)
-	return i, err
 }
 
 const getWebAuthnUserIDByCredential = `-- name: GetWebAuthnUserIDByCredential :one
@@ -227,6 +189,38 @@ func (q *Queries) RenameWebAuthnCredential(ctx context.Context, arg RenameWebAut
 		arg.ID,
 		arg.UserID,
 	)
+}
+
+const takeWebAuthnChallenge = `-- name: TakeWebAuthnChallenge :one
+UPDATE webauthn_challenges SET consumed_at=?, updated_at=?
+WHERE token_hash=? AND type=? AND consumed_at IS NULL AND expires_at > ?
+RETURNING user_id, options
+`
+
+type TakeWebAuthnChallengeParams struct {
+	ConsumedAt sql.NullString
+	UpdatedAt  sql.NullString
+	TokenHash  string
+	Type       string
+	ExpiresAt  string
+}
+
+type TakeWebAuthnChallengeRow struct {
+	UserID  sql.NullInt64
+	Options string
+}
+
+func (q *Queries) TakeWebAuthnChallenge(ctx context.Context, arg TakeWebAuthnChallengeParams) (TakeWebAuthnChallengeRow, error) {
+	row := q.db.QueryRowContext(ctx, takeWebAuthnChallenge,
+		arg.ConsumedAt,
+		arg.UpdatedAt,
+		arg.TokenHash,
+		arg.Type,
+		arg.ExpiresAt,
+	)
+	var i TakeWebAuthnChallengeRow
+	err := row.Scan(&i.UserID, &i.Options)
+	return i, err
 }
 
 const updateWebAuthnCredentialAfterLogin = `-- name: UpdateWebAuthnCredentialAfterLogin :exec

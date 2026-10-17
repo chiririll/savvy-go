@@ -589,7 +589,6 @@ func (r Repo) CountChallenges(ctx context.Context) (int, error) {
 
 // Recovery codes
 
-
 func (r Repo) CountUnusedRecoveryCodes(ctx context.Context, userID int64) (int, error) {
 	n, err := r.q().CountUnusedRecoveryCodes(ctx, userID)
 	return int(n), err
@@ -716,16 +715,18 @@ func (r Repo) InsertPasskeyChallenge(ctx context.Context, userID *int64, hash, t
 }
 
 // TakePasskeyChallenge returns an open challenge of the type and marks it
-// used. A challenge that is unknown, used or expired is nil.
+// used in one statement, so of two racing calls only one gets it. A challenge
+// that is unknown, used or expired is nil; a database error is returned.
 func (r Repo) TakePasskeyChallenge(ctx context.Context, hash, typ string, now time.Time) (*PasskeyChallenge, error) {
-	row, err := r.q().GetOpenWebAuthnChallenge(ctx, sqlc.GetOpenWebAuthnChallengeParams{
+	row, err := r.q().TakeWebAuthnChallenge(ctx, sqlc.TakeWebAuthnChallengeParams{
+		ConsumedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now),
 		TokenHash: hash, Type: typ, ExpiresAt: db.FormatTime(now),
 	})
 	if err != nil {
-		return nil, nil
+		if err == db.ErrNotFound {
+			return nil, nil
+		}
+		return nil, err
 	}
-	_ = r.q().ConsumeWebAuthnChallenge(ctx, sqlc.ConsumeWebAuthnChallengeParams{
-		ConsumedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now), TokenHash: hash,
-	})
 	return &PasskeyChallenge{UserID: row.UserID.Int64, Options: row.Options}, nil
 }

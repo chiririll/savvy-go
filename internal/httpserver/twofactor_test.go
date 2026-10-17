@@ -2,6 +2,8 @@ package httpserver
 
 import (
 	"net/http"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -174,5 +176,31 @@ func TestTwoFactorFailuresMakeTheAccountWait(t *testing.T) {
 	_ = a.db.QueryRow(`SELECT COUNT(*) FROM two_factor_failures`).Scan(&failures)
 	if failures != 0 {
 		t.Fatalf("failures after success: %d", failures)
+	}
+}
+
+// Two requests that answer one challenge at the same moment get one session.
+func TestTwoFactorChallengeGivesOneSessionWhenRequestsRace(t *testing.T) {
+	a := newTestApp(t)
+	secret, challenge := twoFactorUser(t, a)
+	tok := challenge()
+	code := totp.Now(secret)
+
+	var ok atomic.Int32
+	var wg sync.WaitGroup
+	for range 6 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			res := verify2FA(a, tok, code)
+			defer res.Body.Close()
+			if res.StatusCode == 200 {
+				ok.Add(1)
+			}
+		}()
+	}
+	wg.Wait()
+	if ok.Load() != 1 {
+		t.Fatalf("%d sessions for one challenge", ok.Load())
 	}
 }

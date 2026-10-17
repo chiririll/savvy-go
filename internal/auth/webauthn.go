@@ -267,9 +267,9 @@ func (w WebAuthn) consumeChallenge(ctx context.Context, token, typ string, userI
 }
 
 func (w WebAuthn) consumeChallengeAny(ctx context.Context, token, typ string) (*webauthn.SessionData, int64, error) {
-	row, _ := w.repo().TakePasskeyChallenge(ctx, HashToken(token), typ, time.Now().UTC())
-	if row == nil {
-		return nil, 0, nil
+	row, err := w.repo().TakePasskeyChallenge(ctx, HashToken(token), typ, time.Now().UTC())
+	if err != nil || row == nil {
+		return nil, 0, err
 	}
 	var wrap struct {
 		Session webauthn.SessionData `json:"session"`

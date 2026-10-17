@@ -98,8 +98,14 @@ func (h Handler) twoFactorVerify(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusUnprocessableEntity, "Invalid verification code.")
 		return
 	}
-	if _, err := h.Challenges.Consume(r.Context(), body.Token); err != nil {
+	// Claiming the challenge is atomic: of two requests racing on one challenge, one wins.
+	claimed, err := h.Challenges.Consume(r.Context(), body.Token)
+	if err != nil {
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if claimed == nil {
+		httpx.WriteMessage(w, http.StatusUnauthorized, "Invalid or expired token.")
 		return
 	}
 	h.Login.Issue(w, r, u, http.StatusOK, body.RememberMe)
