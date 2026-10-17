@@ -79,7 +79,11 @@ func (p *probe) run(ctx context.Context, port int, wait time.Duration) error {
 		return fmt.Errorf("discovery: %w", err)
 	}
 	if meta.Issuer != p.server {
-		return fmt.Errorf("discovery: issuer is %q but you asked for %q; set app_url to the address you use", meta.Issuer, p.server)
+		return fmt.Errorf(
+			"discovery: issuer is %q but you asked for %q; set app_url to the address you use",
+			meta.Issuer,
+			p.server,
+		)
 	}
 	p.pass("discovery, issuer %s", meta.Issuer)
 	if meta.RegistrationEndpoint == "" {

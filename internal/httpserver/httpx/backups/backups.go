@@ -88,6 +88,9 @@ func RejectLaravel(w http.ResponseWriter, tmp, name string) bool {
 		return true
 	}
 	_ = os.Remove(tmp)
-	httpx.WriteValidation(w, map[string][]string{"file": {"A Laravel database is not a backup: upgrade it from the upload dialog."}})
+	httpx.WriteValidation(
+		w,
+		map[string][]string{"file": {"A Laravel database is not a backup: upgrade it from the upload dialog."}},
+	)
 	return false
 }

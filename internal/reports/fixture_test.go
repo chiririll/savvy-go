@@ -45,7 +45,10 @@ func newMoneyEnv(t *testing.T) *moneyEnv {
 	ctx := context.Background()
 	env := &moneyEnv{ctx: ctx, db: sqlDB, txs: ledger.Transactions{DB: sqlDB}}
 	mk := func(code string, decimals int, rate string) ledger.Currency {
-		c, err := (ledger.Currencies{DB: sqlDB}).Create(ctx, ledger.Currency{Code: code, Name: code, Symbol: code, Decimals: decimals, Rate: dec(rate)})
+		c, err := (ledger.Currencies{DB: sqlDB}).Create(
+			ctx,
+			ledger.Currency{Code: code, Name: code, Symbol: code, Decimals: decimals, Rate: dec(rate)},
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -55,7 +58,10 @@ func newMoneyEnv(t *testing.T) *moneyEnv {
 	env.jpy = mk("JPY", 0, "0.01")
 	env.btc = mk("BTC", 8, "50000")
 	acct := func(name string, cur ledger.Currency, initial string) ledger.Account {
-		a, err := (ledger.Accounts{DB: sqlDB}).Create(ctx, ledger.AccountInput{Name: name, Type: "cash", CurrencyID: cur.ID, InitialBalance: dec(initial), IsActive: true})
+		a, err := (ledger.Accounts{DB: sqlDB}).Create(
+			ctx,
+			ledger.AccountInput{Name: name, Type: "cash", CurrencyID: cur.ID, InitialBalance: dec(initial), IsActive: true},
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -91,7 +97,13 @@ func newMatrixEnv(t *testing.T, base moneytest.Currency) *matrixEnv {
 	t.Helper()
 	sqlDB := openSpaceDB(t)
 	ctx := context.Background()
-	e := &matrixEnv{ctx: ctx, db: sqlDB, curs: map[string]ledger.Currency{}, accts: map[string]ledger.Account{}, txs: ledger.Transactions{DB: sqlDB}}
+	e := &matrixEnv{
+		ctx:   ctx,
+		db:    sqlDB,
+		curs:  map[string]ledger.Currency{},
+		accts: map[string]ledger.Account{},
+		txs:   ledger.Transactions{DB: sqlDB},
+	}
 	add := func(c moneytest.Currency) {
 		created, err := (ledger.Currencies{DB: sqlDB}).Create(ctx, ledger.Currency{
 			Code: c.Code, Name: c.Code, Symbol: c.Code, Decimals: c.Decimals, Rate: c.RateIn(base),
@@ -100,7 +112,10 @@ func newMatrixEnv(t *testing.T, base moneytest.Currency) *matrixEnv {
 			t.Fatalf("create %v: %v", c, err)
 		}
 		e.curs[c.Code] = *created
-		acct, err := (ledger.Accounts{DB: sqlDB}).Create(ctx, ledger.AccountInput{Name: c.Code, Type: "cash", CurrencyID: created.ID, IsActive: true})
+		acct, err := (ledger.Accounts{DB: sqlDB}).Create(
+			ctx,
+			ledger.AccountInput{Name: c.Code, Type: "cash", CurrencyID: created.ID, IsActive: true},
+		)
 		if err != nil {
 			t.Fatalf("account %v: %v", c, err)
 		}
@@ -116,7 +131,12 @@ func newMatrixEnv(t *testing.T, base moneytest.Currency) *matrixEnv {
 }
 
 // tx records a confirmed transaction of the given type and amount on c's account.
-func (e *matrixEnv) tx(t *testing.T, typ string, c moneytest.Currency, amount decimal.Decimal) (*ledger.Transaction, error) {
+func (e *matrixEnv) tx(
+	t *testing.T,
+	typ string,
+	c moneytest.Currency,
+	amount decimal.Decimal,
+) (*ledger.Transaction, error) {
 	t.Helper()
 	date := "2024-01-15"
 	return e.txs.Create(e.ctx, ledger.TxInput{Type: typ, AccountID: e.accts[c.Code].ID, Amount: amount, Date: &date})

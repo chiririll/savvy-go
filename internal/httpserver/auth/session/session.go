@@ -272,7 +272,8 @@ func (h Handler) passwordAccept(w http.ResponseWriter, r *http.Request) {
 		Password             string `json:"password"`
 		PasswordConfirmation string `json:"password_confirmation"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || password.TooShort(body.Password) || body.Password != body.PasswordConfirmation {
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || password.TooShort(body.Password) ||
+		body.Password != body.PasswordConfirmation {
 		httpx.WriteValidation(w, map[string][]string{"password": {password.TooShortMessage}})
 		return
 	}

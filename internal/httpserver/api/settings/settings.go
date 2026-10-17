@@ -40,7 +40,12 @@ func (h Handler) settingsUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if v, ok := body["password_login_enabled"]; ok && !httpx.AsBool(v) && !h.SSO.AnyEnabled(r.Context()) {
-		httpx.WriteCoded(w, http.StatusUnprocessableEntity, "Enable at least one SSO provider before turning off password sign-in.", "sso_required")
+		httpx.WriteCoded(
+			w,
+			http.StatusUnprocessableEntity,
+			"Enable at least one SSO provider before turning off password sign-in.",
+			"sso_required",
+		)
 		return
 	}
 	if v, ok := body[signin.SettingRequireVerification]; ok && httpx.AsBool(v) && !h.canRequireVerification(w, r) {
@@ -78,7 +83,12 @@ func (h Handler) canRequireVerification(w http.ResponseWriter, r *http.Request) 
 	case err == nil:
 		return true
 	case errors.Is(err, mail.ErrOwnAddressUnverified):
-		httpx.WriteCoded(w, http.StatusUnprocessableEntity, "Confirm your own email address first, or you would lock yourself out.", "email_unverified")
+		httpx.WriteCoded(
+			w,
+			http.StatusUnprocessableEntity,
+			"Confirm your own email address first, or you would lock yourself out.",
+			"email_unverified",
+		)
 	default:
 		httpx.WriteCoded(w, http.StatusUnprocessableEntity, err.Error(), "mail_required")
 	}

@@ -77,7 +77,10 @@ func TestBudgetOfMaximumAmountHasNoOverflow(t *testing.T) {
 		e := newMatrixEnv(t, moneytest.Currencies[0])
 		cur := e.stored(c)
 		max := decimal.New(money.MaxMinor, -int32(c.Decimals))
-		budget, err := (Budgets{DB: e.db}).Create(e.ctx, BudgetInput{Name: "max", Amount: max, CurrencyID: &cur.ID, Period: "monthly", IsGlobal: ptrTo(true)})
+		budget, err := (Budgets{DB: e.db}).Create(
+			e.ctx,
+			BudgetInput{Name: "max", Amount: max, CurrencyID: &cur.ID, Period: "monthly", IsGlobal: ptrTo(true)},
+		)
 		if err != nil {
 			t.Fatal(err)
 		}

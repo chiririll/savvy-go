@@ -21,8 +21,16 @@ import (
 func Main(build appconfig.Build) {
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
 
-	configPath := flag.String("config", "", "path to config.toml (default: $CONFIG_FILE, else config.toml in the data directory; created if missing)")
-	seedConfig := flag.String("seed-config", "", "path to a TOML file (keys date, manifest, both optional); seeds the demo data on first boot when given")
+	configPath := flag.String(
+		"config",
+		"",
+		"path to config.toml (default: $CONFIG_FILE, else config.toml in the data directory; created if missing)",
+	)
+	seedConfig := flag.String(
+		"seed-config",
+		"",
+		"path to a TOML file (keys date, manifest, both optional); seeds the demo data on first boot when given",
+	)
 	flag.Parse()
 
 	if err := run(build, *configPath, *seedConfig); err != nil {

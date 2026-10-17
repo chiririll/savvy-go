@@ -110,7 +110,13 @@ type Service struct {
 }
 
 func New(db store.DB) *Service {
-	return &Service{DB: db, Tokens: auth.APITokens{DB: db}, Users: auth.Users{DB: db}, Now: func() time.Time { return time.Now().UTC() }, codes: map[string]codeEntry{}}
+	return &Service{
+		DB:     db,
+		Tokens: auth.APITokens{DB: db},
+		Users:  auth.Users{DB: db},
+		Now:    func() time.Time { return time.Now().UTC() },
+		codes:  map[string]codeEntry{},
+	}
 }
 
 func (s *Service) repo() repo.Repo { return repo.Repo{DB: s.DB} }
@@ -155,7 +161,11 @@ func (s *Service) Register(ctx context.Context, name string, redirectURIs []stri
 	if r := []rune(name); len(r) > maxNameLen {
 		name = string(r[:maxNameLen])
 	}
-	info = RequestInfo{IP: clip(info.IP, maxIPLen), UserAgent: clip(info.UserAgent, maxUALen), Origin: clip(info.Origin, maxOriginLen)}
+	info = RequestInfo{
+		IP:        clip(info.IP, maxIPLen),
+		UserAgent: clip(info.UserAgent, maxUALen),
+		Origin:    clip(info.Origin, maxOriginLen),
+	}
 	now := s.Now()
 	n, err := s.repo().CountClients(ctx)
 	if err != nil {
@@ -365,7 +375,12 @@ func (s *Service) Refresh(ctx context.Context, clientID, refreshToken string) (*
 	if prev == nil {
 		return nil, bad
 	}
-	access, tokenID, err := s.issueAccess(ctx, user, c, spaceGrant{all: prev.AllSpaces, ids: prev.SpaceIDs, perms: prev.Permissions})
+	access, tokenID, err := s.issueAccess(
+		ctx,
+		user,
+		c,
+		spaceGrant{all: prev.AllSpaces, ids: prev.SpaceIDs, perms: prev.Permissions},
+	)
 	if errors.Is(err, permissions.ErrBadGrant) {
 		// Every space the connection could reach is gone.
 		return nil, bad
@@ -419,7 +434,12 @@ func mcpPermissions(in []string) ([]string, error) {
 
 // issueAccess creates the API token an MCP client calls with: the read access
 // the user chose, in the spaces they chose, and nothing else.
-func (s *Service) issueAccess(ctx context.Context, user *auth.User, c *Client, spaces spaceGrant) (raw string, id int64, err error) {
+func (s *Service) issueAccess(
+	ctx context.Context,
+	user *auth.User,
+	c *Client,
+	spaces spaceGrant,
+) (raw string, id int64, err error) {
 	exp := s.Now().Add(AccessTTL)
 	grant := auth.Grant{Kind: permissions.KindMCP, Permissions: spaces.perms, AllSpaces: spaces.all, SpaceIDs: spaces.ids}
 	raw, tok, err := s.Tokens.Issue(ctx, user, "MCP: "+c.Name, grant, &exp)

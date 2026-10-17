@@ -29,7 +29,15 @@ func Serve(ctx context.Context, l *locator.Locator) error {
 	}
 	failed := make(chan error, 1)
 	go func() {
-		slog.Info("go savvy listening", "addr", listen, "data", cfg.DataDir, "version", locator.Get[appconfig.Build](l).Version)
+		slog.Info(
+			"go savvy listening",
+			"addr",
+			listen,
+			"data",
+			cfg.DataDir,
+			"version",
+			locator.Get[appconfig.Build](l).Version,
+		)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			failed <- fmt.Errorf("http server: %w", err)
 		}

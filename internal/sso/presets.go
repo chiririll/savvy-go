@@ -28,13 +28,26 @@ func clientFields() []Field {
 }
 
 func oidcClaims() map[string]any {
-	return map[string]any{"subject": "sub", "email": "email", "email_verified": "email_verified", "name": "name", "groups": "groups"}
+	return map[string]any{
+		"subject":        "sub",
+		"email":          "email",
+		"email_verified": "email_verified",
+		"name":           "name",
+		"groups":         "groups",
+	}
 }
 
 func PresetCatalog() []Preset {
 	return []Preset{
 		{Key: "entra", Label: "Microsoft Entra ID", Protocol: "oidc", Fields: append([]Field{
-			{Key: "tenant", Label: "Tenant", Type: "text", Required: true, Group: "config", Placeholder: "common / organizations / <tenant-guid>"},
+			{
+				Key:         "tenant",
+				Label:       "Tenant",
+				Type:        "text",
+				Required:    true,
+				Group:       "config",
+				Placeholder: "common / organizations / <tenant-guid>",
+			},
 		}, clientFields()...), DefaultClaims: map[string]any{
 			"subject": "sub", "email": []any{"email", "preferred_username", "upn"}, "email_verified": "xms_edov", "name": "name", "groups": "groups",
 		}},
@@ -46,23 +59,57 @@ func PresetCatalog() []Preset {
 		}},
 		{Key: "okta", Label: "Okta", Protocol: "oidc", Fields: append([]Field{
 			{Key: "domain", Label: "Domain", Type: "text", Required: true, Group: "config", Placeholder: "example.okta.com"},
-			{Key: "auth_server_id", Label: "Authorization server ID", Type: "text", Group: "config", Placeholder: "default (leave blank for the org server)"},
+			{
+				Key:         "auth_server_id",
+				Label:       "Authorization server ID",
+				Type:        "text",
+				Group:       "config",
+				Placeholder: "default (leave blank for the org server)",
+			},
 		}, clientFields()...), DefaultClaims: oidcClaims()},
 		{Key: "gitlab", Label: "GitLab", Protocol: "oidc", Fields: append([]Field{
-			{Key: "base_url", Label: "GitLab URL", Type: "url", Required: true, Group: "config", Placeholder: "https://gitlab.com"},
+			{
+				Key:         "base_url",
+				Label:       "GitLab URL",
+				Type:        "url",
+				Required:    true,
+				Group:       "config",
+				Placeholder: "https://gitlab.com",
+			},
 		}, clientFields()...), DefaultClaims: map[string]any{
 			"subject": "sub", "email": "email", "email_verified": "email_verified", "name": "name", "groups": "groups_direct",
 		}},
 		{Key: "keycloak", Label: "Keycloak", Protocol: "oidc", Fields: append([]Field{
-			{Key: "base_url", Label: "Keycloak URL", Type: "url", Required: true, Group: "config", Placeholder: "https://kc.example.com"},
+			{
+				Key:         "base_url",
+				Label:       "Keycloak URL",
+				Type:        "url",
+				Required:    true,
+				Group:       "config",
+				Placeholder: "https://kc.example.com",
+			},
 			{Key: "realm", Label: "Realm", Type: "text", Required: true, Group: "config"},
 		}, clientFields()...), DefaultClaims: oidcClaims()},
 		{Key: "authentik", Label: "Authentik", Protocol: "oidc", Fields: append([]Field{
-			{Key: "base_url", Label: "Authentik URL", Type: "url", Required: true, Group: "config", Placeholder: "https://auth.example.com"},
+			{
+				Key:         "base_url",
+				Label:       "Authentik URL",
+				Type:        "url",
+				Required:    true,
+				Group:       "config",
+				Placeholder: "https://auth.example.com",
+			},
 			{Key: "app_slug", Label: "Application slug", Type: "text", Required: true, Group: "config"},
 		}, clientFields()...), DefaultClaims: oidcClaims()},
 		{Key: "custom_oidc", Label: "OpenID Connect", Protocol: "oidc", Fields: append([]Field{
-			{Key: "discovery_url", Label: "Discovery URL", Type: "url", Required: true, Group: "config", Placeholder: "https://idp.example.com/.well-known/openid-configuration"},
+			{
+				Key:         "discovery_url",
+				Label:       "Discovery URL",
+				Type:        "url",
+				Required:    true,
+				Group:       "config",
+				Placeholder: "https://idp.example.com/.well-known/openid-configuration",
+			},
 			{Key: "scopes", Label: "Scopes", Type: "text", Group: "config", Placeholder: "openid profile email"},
 		}, clientFields()...), DefaultClaims: oidcClaims()},
 		{Key: "custom_saml", Label: "SAML 2.0", Protocol: "saml", Fields: []Field{
@@ -109,9 +156,21 @@ func PresetDiscoveryURL(p IdentityProvider) string {
 		}
 		return domain + "/.well-known/openid-configuration"
 	case "keycloak":
-		return strings.TrimRight(cfgString(p.Config, "base_url"), "/") + "/realms/" + cfgString(p.Config, "realm") + "/.well-known/openid-configuration"
+		return strings.TrimRight(
+			cfgString(p.Config, "base_url"),
+			"/",
+		) + "/realms/" + cfgString(
+			p.Config,
+			"realm",
+		) + "/.well-known/openid-configuration"
 	case "authentik":
-		return strings.TrimRight(cfgString(p.Config, "base_url"), "/") + "/application/o/" + cfgString(p.Config, "app_slug") + "/.well-known/openid-configuration"
+		return strings.TrimRight(
+			cfgString(p.Config, "base_url"),
+			"/",
+		) + "/application/o/" + cfgString(
+			p.Config,
+			"app_slug",
+		) + "/.well-known/openid-configuration"
 	case "gitlab":
 		return strings.TrimRight(cfgString(p.Config, "base_url"), "/") + "/.well-known/openid-configuration"
 	case "custom_oidc":

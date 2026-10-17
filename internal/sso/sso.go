@@ -320,7 +320,11 @@ func (s Service) Delete(ctx context.Context, id int64) error {
 	return s.repo().Delete(ctx, id)
 }
 
-func assembleFields(preset Preset, input map[string]any, existing *IdentityProvider) (cfg, sec map[string]any, err error) {
+func assembleFields(
+	preset Preset,
+	input map[string]any,
+	existing *IdentityProvider,
+) (cfg, sec map[string]any, err error) {
 	cfg, sec = map[string]any{}, map[string]any{}
 	if input == nil {
 		input = map[string]any{}

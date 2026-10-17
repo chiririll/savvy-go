@@ -63,7 +63,10 @@ func (s Service) Heal(ctx context.Context) error {
 func keepEverything(d Diff) Plan {
 	var p Plan
 	for _, c := range d.Categories {
-		p.Decisions = append(p.Decisions, Decision{Kind: Categories, Type: c.Type, Name: c.Name, Keep: true, From: c.Present[0].Space})
+		p.Decisions = append(
+			p.Decisions,
+			Decision{Kind: Categories, Type: c.Type, Name: c.Name, Keep: true, From: c.Present[0].Space},
+		)
 	}
 	for _, t := range d.Tags {
 		p.Decisions = append(p.Decisions, Decision{Kind: Tags, Name: t.Name, Keep: true})

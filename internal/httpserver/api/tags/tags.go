@@ -83,7 +83,8 @@ func (s Handler) tagsDestroy(w http.ResponseWriter, r *http.Request) {
 	}
 	// A failure on the plain path was never reported; one that comes from the
 	// sync group (rights, another space) is.
-	if err := s.Refsync.DeleteTag(r.Context(), httpx.User(r), httpx.Scope(r).ID, t.ID); err != nil && httpx.WriteSyncError(w, err) {
+	if err := s.Refsync.DeleteTag(r.Context(), httpx.User(r), httpx.Scope(r).ID, t.ID); err != nil &&
+		httpx.WriteSyncError(w, err) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

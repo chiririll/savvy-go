@@ -79,7 +79,9 @@ func TestTablesAreStrict(t *testing.T) {
 	for _, set := range []Set{Server, Space} {
 		t.Run(string(set), func(t *testing.T) {
 			sqlDB := migrated(t, set)
-			rows, err := sqlDB.Query(`SELECT name FROM pragma_table_list WHERE schema = 'main' AND type = 'table' AND strict = 0 AND name NOT LIKE 'sqlite_%'`)
+			rows, err := sqlDB.Query(
+				`SELECT name FROM pragma_table_list WHERE schema = 'main' AND type = 'table' AND strict = 0 AND name NOT LIKE 'sqlite_%'`,
+			)
 			if err != nil {
 				t.Fatal(err)
 			}

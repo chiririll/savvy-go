@@ -114,7 +114,12 @@ func (w WebAuthn) BeginRegistration(ctx context.Context, u *User) (token string,
 	return w.issueChallenge(ctx, &u.ID, WebAuthnRegister, creation.Response, session)
 }
 
-func (w WebAuthn) FinishRegistration(ctx context.Context, u *User, token, name string, response json.RawMessage) (*WebAuthnCred, error) {
+func (w WebAuthn) FinishRegistration(
+	ctx context.Context,
+	u *User,
+	token, name string,
+	response json.RawMessage,
+) (*WebAuthnCred, error) {
 	session, err := w.consumeChallenge(ctx, token, WebAuthnRegister, u.ID)
 	if err != nil || session == nil {
 		return nil, fmt.Errorf("challenge")
@@ -243,7 +248,13 @@ func (w WebAuthn) Delete(ctx context.Context, userID, id int64) error {
 	return nil
 }
 
-func (w WebAuthn) issueChallenge(ctx context.Context, userID *int64, typ string, options any, session *webauthn.SessionData) (string, any, error) {
+func (w WebAuthn) issueChallenge(
+	ctx context.Context,
+	userID *int64,
+	typ string,
+	options any,
+	session *webauthn.SessionData,
+) (string, any, error) {
 	token := RandomString(48)
 	now := time.Now().UTC()
 	raw, err := json.Marshal(map[string]any{"options": options, "session": session})
@@ -254,7 +265,11 @@ func (w WebAuthn) issueChallenge(ctx context.Context, userID *int64, typ string,
 	return token, options, err
 }
 
-func (w WebAuthn) consumeChallenge(ctx context.Context, token, typ string, userID int64) (*webauthn.SessionData, error) {
+func (w WebAuthn) consumeChallenge(
+	ctx context.Context,
+	token, typ string,
+	userID int64,
+) (*webauthn.SessionData, error) {
 	session, uid, err := w.consumeChallengeAny(ctx, token, typ)
 	if err != nil || session == nil {
 		return nil, err
@@ -334,7 +349,8 @@ func (w WebAuthn) recordLogin(ctx context.Context, u *User, cred *webauthn.Crede
 	if err != nil {
 		return err
 	}
-	return w.repo().UpdatePasskeyAfterLogin(ctx, b64(cred.ID), string(rec), int64(cred.Authenticator.SignCount), time.Now().UTC())
+	return w.repo().
+		UpdatePasskeyAfterLogin(ctx, b64(cred.ID), string(rec), int64(cred.Authenticator.SignCount), time.Now().UTC())
 }
 
 func descriptors(creds []webauthn.Credential) []protocol.CredentialDescriptor {

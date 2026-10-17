@@ -20,7 +20,12 @@ func TestChangePasswordKeepsThisSessionAndEndsTheOthers(t *testing.T) {
 	u := a.createUser("u@test.com", "secret1", roleEditor)
 	current, other := a.issue(u, false), a.issue(u, false)
 
-	status(t, a.do("PUT", "/api/auth/password", changePassword("secret1", "newsecret1"), current.Token, current.CSRF), 200, "change")
+	status(
+		t,
+		a.do("PUT", "/api/auth/password", changePassword("secret1", "newsecret1"), current.Token, current.CSRF),
+		200,
+		"change",
+	)
 	status(t, a.do("GET", "/api/auth/2fa/status", nil, current.Token, ""), 200, "this session")
 	status(t, a.do("GET", "/api/auth/2fa/status", nil, other.Token, ""), 401, "other session")
 
@@ -34,14 +39,24 @@ func TestChangePasswordRefusals(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("u@test.com", "secret1", roleEditor)
 	current, other := a.issue(u, false), a.issue(u, false)
-	status(t, a.do("PUT", "/api/auth/password", changePassword("wrong-password", "newsecret1"), current.Token, current.CSRF), 422, "wrong current password")
+	status(
+		t,
+		a.do("PUT", "/api/auth/password", changePassword("wrong-password", "newsecret1"), current.Token, current.CSRF),
+		422,
+		"wrong current password",
+	)
 	status(t, a.do("GET", "/api/auth/2fa/status", nil, other.Token, ""), 200, "a refused change ends no session")
 
 	sso := a.createUser("sso@test.com", "secret1", roleEditor)
 	_, _ = a.db.Exec(`UPDATE users SET is_sso_only = 1 WHERE id = ?`, sso.ID)
 	sso, _ = a.svc.Users.ByID(context.Background(), sso.ID)
 	iss := a.issue(sso, false)
-	status(t, a.do("PUT", "/api/auth/password", changePassword("secret1", "newsecret1"), iss.Token, iss.CSRF), 422, "SSO-only account")
+	status(
+		t,
+		a.do("PUT", "/api/auth/password", changePassword("secret1", "newsecret1"), iss.Token, iss.CSRF),
+		422,
+		"SSO-only account",
+	)
 }
 
 func TestLogoutOthersKeepsThisSession(t *testing.T) {
@@ -62,7 +77,13 @@ func TestAdminCreatesActiveAndInvitedUsers(t *testing.T) {
 	a := newTestApp(t)
 	sess := a.issue(a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
 
-	res := a.do("POST", "/api/users", map[string]any{"name": "Active", "email": "active@test.com", "password": "password1", "role": "user"}, sess.Token, sess.CSRF)
+	res := a.do(
+		"POST",
+		"/api/users",
+		map[string]any{"name": "Active", "email": "active@test.com", "password": "password1", "role": "user"},
+		sess.Token,
+		sess.CSRF,
+	)
 	body := decodeJSON(t, res)
 	data, _ := body["data"].(map[string]any)
 	if res.StatusCode != 201 || data["isInactive"] != false || data["token"] != nil {
@@ -70,7 +91,13 @@ func TestAdminCreatesActiveAndInvitedUsers(t *testing.T) {
 	}
 
 	// Without a password the account waits for its owner to choose one through a link.
-	res = a.do("POST", "/api/users", map[string]any{"name": "Invited", "email": "invited@test.com", "role": "user"}, sess.Token, sess.CSRF)
+	res = a.do(
+		"POST",
+		"/api/users",
+		map[string]any{"name": "Invited", "email": "invited@test.com", "role": "user"},
+		sess.Token,
+		sess.CSRF,
+	)
 	body = decodeJSON(t, res)
 	data, _ = body["data"].(map[string]any)
 	if res.StatusCode != 201 || data["isInactive"] != true || data["token"] == nil {
@@ -92,7 +119,8 @@ func TestSetPasswordLinkActivatesAnInvitedUser(t *testing.T) {
 	}
 
 	res := a.do("GET", "/api/auth/password/"+token, nil, "", "")
-	if preview := decodeJSON(t, res); res.StatusCode != 200 || preview["email"] != "invited@test.com" || preview["isInactive"] != true {
+	if preview := decodeJSON(t, res); res.StatusCode != 200 || preview["email"] != "invited@test.com" ||
+		preview["isInactive"] != true {
 		t.Fatalf("preview %d %v", res.StatusCode, preview)
 	}
 	status(t, a.do("GET", "/api/auth/password/not-a-real-token", nil, "", ""), 404, "unknown token")
@@ -103,7 +131,12 @@ func TestSetPasswordLinkActivatesAnInvitedUser(t *testing.T) {
 		t.Fatalf("accept %d %v", res.StatusCode, body)
 	}
 	status(t, a.do("POST", "/api/auth/password/"+token, set, "", ""), 404, "link used twice")
-	status(t, a.do("POST", "/api/auth/login", map[string]string{"email": "invited@test.com", "password": "newpass12"}, "", ""), 200, "sign in with the new password")
+	status(
+		t,
+		a.do("POST", "/api/auth/login", map[string]string{"email": "invited@test.com", "password": "newpass12"}, "", ""),
+		200,
+		"sign in with the new password",
+	)
 }
 
 func TestResettingAPasswordEndsEveryWayIn(t *testing.T) {
@@ -130,7 +163,12 @@ func TestChangingYourOwnPasswordKeepsYourAPITokens(t *testing.T) {
 	app, _ := a.issueToken(u, tokReadWrite, nil)
 	current := a.issue(u, false)
 
-	status(t, a.do("PUT", "/api/auth/password", changePassword("secret1", "newsecret1"), current.Token, current.CSRF), 200, "change")
+	status(
+		t,
+		a.do("PUT", "/api/auth/password", changePassword("secret1", "newsecret1"), current.Token, current.CSRF),
+		200,
+		"change",
+	)
 	status(t, a.bearer("GET", "/api/accounts", nil, app), 200, "token after a password change by its owner")
 }
 
@@ -180,8 +218,18 @@ func TestAdminResetLinkRefusals(t *testing.T) {
 	sso, _ := a.svc.Users.Create(context.Background(), "Sso", "sso@test.com", ptr("x"), auth.RoleUser)
 	_, _ = a.db.Exec(`UPDATE users SET is_sso_only = 1 WHERE id = ?`, sso.ID)
 
-	status(t, a.do("POST", "/api/users/"+itoa(admin.ID)+"/password-token", map[string]any{}, sess.Token, sess.CSRF), http.StatusUnprocessableEntity, "own account")
-	status(t, a.do("POST", "/api/users/"+itoa(sso.ID)+"/password-token", map[string]any{}, sess.Token, sess.CSRF), http.StatusUnprocessableEntity, "SSO-only account")
+	status(
+		t,
+		a.do("POST", "/api/users/"+itoa(admin.ID)+"/password-token", map[string]any{}, sess.Token, sess.CSRF),
+		http.StatusUnprocessableEntity,
+		"own account",
+	)
+	status(
+		t,
+		a.do("POST", "/api/users/"+itoa(sso.ID)+"/password-token", map[string]any{}, sess.Token, sess.CSRF),
+		http.StatusUnprocessableEntity,
+		"SSO-only account",
+	)
 }
 
 func TestAdminSettingAPasswordRevokesThePendingLink(t *testing.T) {
@@ -190,7 +238,13 @@ func TestAdminSettingAPasswordRevokesThePendingLink(t *testing.T) {
 	invited, _ := a.svc.Users.Create(context.Background(), "Inv", "inv@test.com", nil, auth.RoleUser)
 	token, _, _ := a.svc.PasswordTokens.Issue(context.Background(), invited)
 
-	res := a.do("PATCH", "/api/users/"+itoa(invited.ID), map[string]string{"password": "setbyadmin"}, sess.Token, sess.CSRF)
+	res := a.do(
+		"PATCH",
+		"/api/users/"+itoa(invited.ID),
+		map[string]string{"password": "setbyadmin"},
+		sess.Token,
+		sess.CSRF,
+	)
 	if body := decodeJSON(t, res); res.StatusCode != 200 || body["data"].(map[string]any)["isInactive"] != false {
 		t.Fatalf("admin sets a password %d %v", res.StatusCode, body)
 	}

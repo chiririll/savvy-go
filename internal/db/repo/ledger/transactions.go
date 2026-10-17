@@ -119,7 +119,14 @@ func (r Repo) DeleteTransaction(ctx context.Context, id int64) error {
 }
 
 // ConfirmTransaction settles a pending transaction with its real amounts.
-func (r Repo) ConfirmTransaction(ctx context.Context, id int64, amount money.Money, toAmount *money.Money, date string, now time.Time) error {
+func (r Repo) ConfirmTransaction(
+	ctx context.Context,
+	id int64,
+	amount money.Money,
+	toAmount *money.Money,
+	date string,
+	now time.Time,
+) error {
 	return r.q().ConfirmTransaction(ctx, sqlc.ConfirmTransactionParams{
 		Amount: amount.Minor(), ToAmount: db.NullMoney(toAmount), Date: db.NS(date), UpdatedAt: db.TimeNS(now), ID: id,
 	})
@@ -155,7 +162,14 @@ func (r Repo) ItemsOf(ctx context.Context, txIDs []int64) ([]TxItem, error) {
 	}
 	out := make([]TxItem, len(rows))
 	for i, x := range rows {
-		out[i] = TxItem{ID: x.ID, TransactionID: x.TransactionID, Name: x.Name, Quantity: x.Quantity, PricePerUnit: x.PricePerUnit, TotalPrice: x.TotalPrice}
+		out[i] = TxItem{
+			ID:            x.ID,
+			TransactionID: x.TransactionID,
+			Name:          x.Name,
+			Quantity:      x.Quantity,
+			PricePerUnit:  x.PricePerUnit,
+			TotalPrice:    x.TotalPrice,
+		}
 	}
 	return out, nil
 }
@@ -231,18 +245,26 @@ func (r Repo) SummaryRows(ctx context.Context, status string) ([]SummaryRow, err
 
 // BudgetSpent is what the transactions in [start, end] of the given
 // categories and tags spent, in unit, converted at targetRate.
-func (r Repo) BudgetSpent(ctx context.Context, start, end string, categoryIDs, tagIDs []int64, unit money.Unit, targetRate decimal.Decimal) (money.Money, error) {
+func (r Repo) BudgetSpent(
+	ctx context.Context,
+	start, end string,
+	categoryIDs, tagIDs []int64,
+	unit money.Unit,
+	targetRate decimal.Decimal,
+) (money.Money, error) {
 	return filter.BudgetSpent(ctx, r.DB, start, end, categoryIDs, tagIDs, unit, targetRate)
 }
 
 // SetTransactionCategory changes only a transaction's category.
 func (r Repo) SetTransactionCategory(ctx context.Context, id, categoryID int64, now time.Time) error {
-	return r.q().UpdateTransactionCategory(ctx, sqlc.UpdateTransactionCategoryParams{CategoryID: db.NI(categoryID), UpdatedAt: db.TimeNS(now), ID: id})
+	return r.q().
+		UpdateTransactionCategory(ctx, sqlc.UpdateTransactionCategoryParams{CategoryID: db.NI(categoryID), UpdatedAt: db.TimeNS(now), ID: id})
 }
 
 // SetTransactionDescription changes only a transaction's description.
 func (r Repo) SetTransactionDescription(ctx context.Context, id int64, description string, now time.Time) error {
-	return r.q().UpdateTransactionDescription(ctx, sqlc.UpdateTransactionDescriptionParams{Description: db.NS(description), UpdatedAt: db.TimeNS(now), ID: id})
+	return r.q().
+		UpdateTransactionDescription(ctx, sqlc.UpdateTransactionDescriptionParams{Description: db.NS(description), UpdatedAt: db.TimeNS(now), ID: id})
 }
 
 // CountTransactions counts every transaction of the space.

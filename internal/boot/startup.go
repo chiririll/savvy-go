@@ -56,7 +56,12 @@ func prepare(ctx context.Context, cfg appconfig.Config, st *sqlite.Store) (*sign
 // and prints it. It returns nil, which keeps registration closed, otherwise;
 // that includes a demo-seeded server. A password file left from an earlier run
 // is removed once users exist.
-func startBootstrap(ctx context.Context, cfg appconfig.Config, listen string, st *sqlite.Store) (*firstrun.Guard, error) {
+func startBootstrap(
+	ctx context.Context,
+	cfg appconfig.Config,
+	listen string,
+	st *sqlite.Store,
+) (*firstrun.Guard, error) {
 	n, err := (auth.Users{DB: st.Server()}).Count(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("count users: %w", err)

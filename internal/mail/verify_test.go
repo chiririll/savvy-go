@@ -55,7 +55,12 @@ func newVerifyEnv(t *testing.T, appURL string, mailOn bool) *verifyEnv {
 	}
 	return &verifyEnv{
 		ctx: context.Background(), rec: rec, users: users, user: u,
-		v: Verifier{Cfg: cfg, Mail: New(config.Empty(), cfg, sender), Verifications: auth.EmailVerifications{DB: d}, Users: users},
+		v: Verifier{
+			Cfg:           cfg,
+			Mail:          New(config.Empty(), cfg, sender),
+			Verifications: auth.EmailVerifications{DB: d},
+			Users:         users,
+		},
 	}
 }
 

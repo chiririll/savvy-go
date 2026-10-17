@@ -166,7 +166,11 @@ func decodeAutomation(w http.ResponseWriter, r *http.Request, base *automation.R
 	}
 	if base != nil {
 		body.Name, body.Description, body.TriggerType = base.Name, httpx.Clone(base.Description), base.TriggerType
-		body.Priority, body.IsActive, body.StopProcessing = base.Priority, httpx.Clone(&base.IsActive), httpx.Clone(&base.StopProcessing)
+		body.Priority, body.IsActive, body.StopProcessing = base.Priority, httpx.Clone(
+			&base.IsActive,
+		), httpx.Clone(
+			&base.StopProcessing,
+		)
 	}
 	err := json.NewDecoder(r.Body).Decode(&body)
 	// Decoding into a filled map would merge keys, so these are taken whole.

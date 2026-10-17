@@ -29,14 +29,20 @@ func newEnv(t *testing.T) *env {
 	d := dbtest.Space(t)
 	ctx := context.Background()
 	e := &env{ctx: ctx, svc: Service{DB: d, Txs: ledger.Transactions{DB: d}}}
-	cur, err := (ledger.Currencies{DB: d}).Create(ctx, ledger.Currency{Code: "USD", Name: "USD", Symbol: "$", Decimals: 2, Rate: dec("1")})
+	cur, err := (ledger.Currencies{DB: d}).Create(
+		ctx,
+		ledger.Currency{Code: "USD", Name: "USD", Symbol: "$", Decimals: 2, Rate: dec("1")},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	e.usd = *cur
 	accts := ledger.Accounts{DB: d}
 	acct := func(name string) ledger.Account {
-		a, err := accts.Create(ctx, ledger.AccountInput{Name: name, Type: "cash", CurrencyID: cur.ID, InitialBalance: dec("1000"), IsActive: true})
+		a, err := accts.Create(
+			ctx,
+			ledger.AccountInput{Name: name, Type: "cash", CurrencyID: cur.ID, InitialBalance: dec("1000"), IsActive: true},
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -67,7 +73,10 @@ func newEnv(t *testing.T) *env {
 func (e *env) expense(t *testing.T, amount, desc string) *ledger.Transaction {
 	t.Helper()
 	date := "2024-01-15"
-	tx, err := e.svc.Txs.Create(e.ctx, ledger.TxInput{Type: "expense", AccountID: e.wallet.ID, Amount: dec(amount), Description: &desc, Date: &date})
+	tx, err := e.svc.Txs.Create(
+		e.ctx,
+		ledger.TxInput{Type: "expense", AccountID: e.wallet.ID, Amount: dec(amount), Description: &desc, Date: &date},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +156,8 @@ func TestUpdateKeepsWhatIsNotSent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if upd.Name != "renamed" || upd.Priority != 7 || !upd.StopProcessing || !upd.IsActive || upd.TriggerType != r.TriggerType {
+	if upd.Name != "renamed" || upd.Priority != 7 || !upd.StopProcessing || !upd.IsActive ||
+		upd.TriggerType != r.TriggerType {
 		t.Errorf("updated %+v", upd)
 	}
 	if len(upd.Actions) != 1 || len(upd.Conditions["conditions"].([]any)) != 1 {
@@ -236,7 +246,10 @@ func TestProcessSkipsNonMatchingWrongTriggerInactiveAndUnconfirmed(t *testing.T)
 	e.rule(t, Input{Name: "on", Actions: setFood})
 	pending := "pending"
 	date := "2024-02-01"
-	plan, err := e.svc.Txs.Create(e.ctx, ledger.TxInput{Type: "expense", AccountID: e.wallet.ID, Amount: dec("4"), Date: &date, Status: &pending})
+	plan, err := e.svc.Txs.Create(
+		e.ctx,
+		ledger.TxInput{Type: "expense", AccountID: e.wallet.ID, Amount: dec("4"), Date: &date, Status: &pending},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -282,10 +295,23 @@ func TestProcessRunsRulesByPriorityAndStopsWhereAskedTo(t *testing.T) {
 
 func TestProcessLogsSuccessAndFailure(t *testing.T) {
 	e := newEnv(t)
-	good := e.rule(t, Input{Name: "good", Priority: 1, Actions: []map[string]any{{"type": "set_category", "category_id": float64(e.food.ID)}}})
+	good := e.rule(
+		t,
+		Input{
+			Name:     "good",
+			Priority: 1,
+			Actions:  []map[string]any{{"type": "set_category", "category_id": float64(e.food.ID)}},
+		},
+	)
 	// A category that does not exist: the write is refused.
-	bad := e.rule(t, Input{Name: "bad", Priority: 2, Actions: []map[string]any{{"type": "set_category", "category_id": float64(9999)}}})
-	after := e.rule(t, Input{Name: "after", Priority: 3, Actions: []map[string]any{{"type": "set_description", "value": "done"}}})
+	bad := e.rule(
+		t,
+		Input{Name: "bad", Priority: 2, Actions: []map[string]any{{"type": "set_category", "category_id": float64(9999)}}},
+	)
+	after := e.rule(
+		t,
+		Input{Name: "after", Priority: 3, Actions: []map[string]any{{"type": "set_description", "value": "done"}}},
+	)
 
 	tx := e.expense(t, "4", "x")
 	e.svc.Process(e.ctx, "on_transaction_create", tx)
@@ -297,7 +323,8 @@ func TestProcessLogsSuccessAndFailure(t *testing.T) {
 		}
 		return l
 	}
-	if l := logs(good.ID); len(l) != 1 || l[0].Status != "success" || l[0].TriggerEntityID == nil || *l[0].TriggerEntityID != tx.ID {
+	if l := logs(good.ID); len(l) != 1 || l[0].Status != "success" || l[0].TriggerEntityID == nil ||
+		*l[0].TriggerEntityID != tx.ID {
 		t.Errorf("good rule log %+v", l)
 	}
 	if l := logs(bad.ID); len(l) != 1 || l[0].Status != "error" || l[0].ErrorMessage == nil || *l[0].ErrorMessage == "" {
@@ -363,7 +390,14 @@ func TestCreateTransferActionMovesAFormulaOfTheAmount(t *testing.T) {
 
 func TestTestReportsTheMatchWithoutRunningAnything(t *testing.T) {
 	e := newEnv(t)
-	r := e.rule(t, Input{Name: "r", Conditions: when("description", "contains", "coffee"), Actions: []map[string]any{{"type": "set_category", "category_id": float64(e.food.ID)}}})
+	r := e.rule(
+		t,
+		Input{
+			Name:       "r",
+			Conditions: when("description", "contains", "coffee"),
+			Actions:    []map[string]any{{"type": "set_category", "category_id": float64(e.food.ID)}},
+		},
+	)
 	hit, miss := e.expense(t, "1", "coffee"), e.expense(t, "1", "tea")
 
 	got, err := e.svc.Test(e.ctx, r.ID, hit.ID)

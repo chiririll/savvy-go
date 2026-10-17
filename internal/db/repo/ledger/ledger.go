@@ -64,7 +64,15 @@ type Currency struct {
 func (c Currency) Unit() money.Unit { return money.Unit{ID: c.ID, Decimals: c.Decimals} }
 
 func currencyOf(id int64, code, name, symbol string, decimals, isBase int64, rate decimal.Decimal) Currency {
-	return Currency{ID: id, Code: code, Name: name, Symbol: symbol, Decimals: int(decimals), IsBase: isBase != 0, Rate: rate}
+	return Currency{
+		ID:       id,
+		Code:     code,
+		Name:     name,
+		Symbol:   symbol,
+		Decimals: int(decimals),
+		IsBase:   isBase != 0,
+		Rate:     rate,
+	}
 }
 
 func (r Repo) Currencies(ctx context.Context) ([]Currency, error) {
@@ -265,7 +273,9 @@ func (r Repo) InsertAccount(ctx context.Context, a AccountFields, now time.Time)
 	res, err := r.q().InsertAccount(ctx, sqlc.InsertAccountParams{
 		Name: a.Name, Type: a.Type, DebtType: db.NullString(a.DebtType), CurrencyID: a.CurrencyID,
 		InitialBalance: a.InitialBalance.Minor(), TargetAmount: db.NullMoney(a.TargetAmount), DueDate: db.NullString(a.DueDate),
-		IsPaidOff: db.BoolInt(a.IsPaidOff), Counterparty: db.NullString(a.Counterparty), DebtDescription: db.NullString(a.DebtDesc),
+		IsPaidOff: db.BoolInt(
+			a.IsPaidOff,
+		), Counterparty: db.NullString(a.Counterparty), DebtDescription: db.NullString(a.DebtDesc),
 		IsActive: db.BoolInt(a.IsActive), SortOrder: a.SortOrder, CreatedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now),
 	})
 	if err != nil {
@@ -371,7 +381,15 @@ type Category struct {
 }
 
 func categoryOf(id int64, name, typ string, icon, color db.NString, isDefault, count int64) Category {
-	return Category{ID: id, Name: name, Type: typ, Icon: optString(icon), Color: optString(color), IsDefault: isDefault != 0, TransactionsCount: int(count)}
+	return Category{
+		ID:                id,
+		Name:              name,
+		Type:              typ,
+		Icon:              optString(icon),
+		Color:             optString(color),
+		IsDefault:         isDefault != 0,
+		TransactionsCount: int(count),
+	}
 }
 
 // Categories lists categories, of one type when typ is not empty.
@@ -500,7 +518,8 @@ func (r Repo) Tag(ctx context.Context, id int64) (*Tag, error) {
 }
 
 func (r Repo) InsertTag(ctx context.Context, name string, now time.Time) (int64, error) {
-	res, err := r.q().InsertTag(ctx, sqlc.InsertTagParams{Name: name, CreatedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now)})
+	res, err := r.q().
+		InsertTag(ctx, sqlc.InsertTagParams{Name: name, CreatedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now)})
 	if err != nil {
 		return 0, err
 	}
@@ -542,7 +561,9 @@ func (r Repo) Budgets(ctx context.Context, id *int64) ([]Budget, error) {
 	for i, x := range rows {
 		out[i] = Budget{
 			ID: x.ID, Name: x.Name, Period: x.Period, Amount: money.New(x.Amount, money.Unit{ID: x.CurrencyID, Decimals: int(x.Decimals)}),
-			StartDate: optString(x.StartDate), EndDate: optString(x.EndDate), IsGlobal: x.IsGlobal != 0, IsActive: x.IsActive != 0,
+			StartDate: optString(
+				x.StartDate,
+			), EndDate: optString(x.EndDate), IsGlobal: x.IsGlobal != 0, IsActive: x.IsActive != 0,
 			NotifyAtPercent: optInt(x.NotifyAtPercent),
 		}
 	}
@@ -637,7 +658,11 @@ func (r Repo) GlobalMonthlyBudget(ctx context.Context) *MonthlyBudget {
 	if err != nil {
 		return nil
 	}
-	return &MonthlyBudget{Amount: money.New(x.Amount, money.Unit{ID: x.CurrencyID, Decimals: int(x.Decimals)}), Rate: x.Rate, IsBase: x.IsBase != 0}
+	return &MonthlyBudget{
+		Amount: money.New(x.Amount, money.Unit{ID: x.CurrencyID, Decimals: int(x.Decimals)}),
+		Rate:   x.Rate,
+		IsBase: x.IsBase != 0,
+	}
 }
 
 // MonthlyBudgets lists the active monthly budgets.
@@ -648,7 +673,11 @@ func (r Repo) MonthlyBudgets(ctx context.Context) ([]MonthlyBudget, error) {
 	}
 	out := make([]MonthlyBudget, len(rows))
 	for i, x := range rows {
-		out[i] = MonthlyBudget{Amount: money.New(x.Amount, money.Unit{ID: x.CurrencyID, Decimals: int(x.Decimals)}), Rate: x.Rate, IsBase: x.IsBase != 0}
+		out[i] = MonthlyBudget{
+			Amount: money.New(x.Amount, money.Unit{ID: x.CurrencyID, Decimals: int(x.Decimals)}),
+			Rate:   x.Rate,
+			IsBase: x.IsBase != 0,
+		}
 	}
 	return out, nil
 }

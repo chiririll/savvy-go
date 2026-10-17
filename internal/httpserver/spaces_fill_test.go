@@ -134,7 +134,8 @@ func TestCreateSpaceFilledBuildsEverything(t *testing.T) {
 	}
 	usd, _ := curs.ByCode(ctx, "USD")
 	gbp, _ := curs.ByCode(ctx, "GBP")
-	if usd == nil || !usd.Rate.Equal(decimal.RequireFromString("0.9")) || gbp == nil || !gbp.Rate.Equal(decimal.RequireFromString("1.2")) {
+	if usd == nil || !usd.Rate.Equal(decimal.RequireFromString("0.9")) || gbp == nil ||
+		!gbp.Rate.Equal(decimal.RequireFromString("1.2")) {
 		t.Fatalf("rates from the source: usd=%+v gbp=%+v", usd, gbp)
 	}
 
@@ -147,7 +148,8 @@ func TestCreateSpaceFilledBuildsEverything(t *testing.T) {
 		byName[acc.Name] = acc
 	}
 	card := byName["Card"]
-	if card.Type != "bank" || card.Currency.Code != "EUR" || !card.InitialBalance.Decimal().Equal(decimal.RequireFromString("120.5")) ||
+	if card.Type != "bank" || card.Currency.Code != "EUR" ||
+		!card.InitialBalance.Decimal().Equal(decimal.RequireFromString("120.5")) ||
 		!card.Balance.Decimal().Equal(decimal.RequireFromString("120.5")) {
 		t.Fatalf("card %+v", card)
 	}

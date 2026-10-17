@@ -125,11 +125,18 @@ func (r Repo) InsertUser(ctx context.Context, name, email, hash, role string, no
 }
 
 func (r Repo) SetPassword(ctx context.Context, id int64, hash string, now time.Time) error {
-	return r.q().UpdateUserPassword(ctx, sqlc.UpdateUserPasswordParams{Password: db.NS(hash), UpdatedAt: db.TimeNS(now), ID: id})
+	return r.q().
+		UpdateUserPassword(ctx, sqlc.UpdateUserPasswordParams{Password: db.NS(hash), UpdatedAt: db.TimeNS(now), ID: id})
 }
 
 // UpdateUser saves the profile; a non-empty hash replaces the password too.
-func (r Repo) UpdateUser(ctx context.Context, id int64, name, email, role, hash string, verified bool, now time.Time) error {
+func (r Repo) UpdateUser(
+	ctx context.Context,
+	id int64,
+	name, email, role, hash string,
+	verified bool,
+	now time.Time,
+) error {
 	if hash != "" {
 		return r.q().UpdateUserWithPassword(ctx, sqlc.UpdateUserWithPasswordParams{
 			Name: name, Email: email, Role: role, EmailVerified: db.BoolInt(verified),
@@ -161,7 +168,13 @@ func (r Repo) SetRole(ctx context.Context, id int64, role string, now time.Time)
 	return r.q().SetUserRole(ctx, sqlc.SetUserRoleParams{Role: role, UpdatedAt: db.TimeNS(now), ID: id})
 }
 
-func (r Repo) SetTwoFactor(ctx context.Context, id int64, secret *string, enabled, confirmed bool, now time.Time) error {
+func (r Repo) SetTwoFactor(
+	ctx context.Context,
+	id int64,
+	secret *string,
+	enabled, confirmed bool,
+	now time.Time,
+) error {
 	return r.q().SetUserTwoFactor(ctx, sqlc.SetUserTwoFactorParams{
 		TwoFactorSecret: db.NullString(secret), TwoFactorEnabled: db.BoolInt(enabled),
 		TwoFactorConfirmed: db.BoolInt(confirmed), UpdatedAt: db.TimeNS(now), ID: id,
@@ -257,7 +270,9 @@ func (r Repo) SessionByTokenHash(ctx context.Context, hash string) (*Session, er
 
 func (r Repo) TouchSession(ctx context.Context, id int64, lastUsed, idleExpires time.Time) error {
 	return r.q().TouchSession(ctx, sqlc.TouchSessionParams{
-		LastUsedAt: db.FormatTime(lastUsed), IdleExpiresAt: db.FormatTime(idleExpires), UpdatedAt: db.TimeNS(lastUsed), ID: id,
+		LastUsedAt: db.FormatTime(
+			lastUsed,
+		), IdleExpiresAt: db.FormatTime(idleExpires), UpdatedAt: db.TimeNS(lastUsed), ID: id,
 	})
 }
 
@@ -274,7 +289,8 @@ func (r Repo) RevokeSession(ctx context.Context, id int64, now time.Time) error 
 }
 
 func (r Repo) RevokeUserSessions(ctx context.Context, userID int64, now time.Time) error {
-	return r.q().RevokeUserSessions(ctx, sqlc.RevokeUserSessionsParams{RevokedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now), UserID: userID})
+	return r.q().
+		RevokeUserSessions(ctx, sqlc.RevokeUserSessionsParams{RevokedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now), UserID: userID})
 }
 
 // RevokeOtherSessions revokes every session of the user but keepID and
@@ -404,9 +420,19 @@ func (r Repo) TouchAPIToken(ctx context.Context, id int64, now time.Time) error 
 // UpdateAPITokenGrant replaces what the user's token may do and which spaces it
 // reaches, and reports whether they had such a token. Call it inside a
 // transaction: the spaces are rewritten too.
-func (r Repo) UpdateAPITokenGrant(ctx context.Context, userID, id int64, perms []string, allSpaces bool, spaceIDs []int64, now time.Time) (bool, error) {
+func (r Repo) UpdateAPITokenGrant(
+	ctx context.Context,
+	userID, id int64,
+	perms []string,
+	allSpaces bool,
+	spaceIDs []int64,
+	now time.Time,
+) (bool, error) {
 	res, err := r.q().UpdateAPITokenGrant(ctx, sqlc.UpdateAPITokenGrantParams{
-		Permissions: strings.Join(perms, ","), AllSpaces: boolInt(allSpaces), UpdatedAt: db.TimeNS(now), ID: id, UserID: userID,
+		Permissions: strings.Join(
+			perms,
+			",",
+		), AllSpaces: boolInt(allSpaces), UpdatedAt: db.TimeNS(now), ID: id, UserID: userID,
 	})
 	if err != nil {
 		return false, err
@@ -483,8 +509,13 @@ func (r Repo) RevokeActivePasswordTokens(ctx context.Context, userID int64, now 
 
 // ValidPasswordToken finds an unused token that has not expired at now.
 func (r Repo) ValidPasswordToken(ctx context.Context, hash string, now time.Time) (*OneTime, error) {
-	row, err := r.q().GetValidPasswordToken(ctx, sqlc.GetValidPasswordTokenParams{TokenHash: hash, ExpiresAt: db.FormatTime(now)})
-	return mapFound(row, err, func(row sqlc.GetValidPasswordTokenRow) OneTime { return oneTimeFrom(row.ID, row.UserID, row.ExpiresAt) })
+	row, err := r.q().
+		GetValidPasswordToken(ctx, sqlc.GetValidPasswordTokenParams{TokenHash: hash, ExpiresAt: db.FormatTime(now)})
+	return mapFound(
+		row,
+		err,
+		func(row sqlc.GetValidPasswordTokenRow) OneTime { return oneTimeFrom(row.ID, row.UserID, row.ExpiresAt) },
+	)
 }
 
 // PasswordTokenByHash finds a token whether or not it is used or expired.
@@ -504,7 +535,12 @@ type EmailVerification struct {
 
 // ReplaceEmailVerificationToken stores the user's confirmation link for an
 // address, ending any earlier one.
-func (r Repo) ReplaceEmailVerificationToken(ctx context.Context, userID int64, email, hash string, expires, now time.Time) error {
+func (r Repo) ReplaceEmailVerificationToken(
+	ctx context.Context,
+	userID int64,
+	email, hash string,
+	expires, now time.Time,
+) error {
 	return store.Tx(ctx, r.DB, func(tx store.DB) error {
 		q := db.Q(tx)
 		if err := q.DeleteUserEmailVerificationTokens(ctx, userID); err != nil {
@@ -546,7 +582,10 @@ func (r Repo) InsertChallenge(ctx context.Context, userID int64, hash string, ex
 // ChallengeUserID is the user a two-factor challenge was issued to, if it is
 // unused and has not expired at now.
 func (r Repo) ChallengeUserID(ctx context.Context, hash string, now time.Time) (*int64, error) {
-	return found(r.q().GetValidChallengeUserID(ctx, sqlc.GetValidChallengeUserIDParams{TokenHash: hash, ExpiresAt: db.FormatTime(now)}))
+	return found(
+		r.q().
+			GetValidChallengeUserID(ctx, sqlc.GetValidChallengeUserIDParams{TokenHash: hash, ExpiresAt: db.FormatTime(now)}),
+	)
 }
 
 // ConsumeChallenge marks an unexpired, unused challenge used and reports
@@ -565,9 +604,16 @@ func (r Repo) ConsumeChallenge(ctx context.Context, hash string, now time.Time) 
 // FailChallenge counts a wrong code against an open challenge and uses the
 // challenge up once it has had max of them. It returns the owner and the wrong
 // codes so far; open is false when the challenge is not open.
-func (r Repo) FailChallenge(ctx context.Context, hash string, max int, now time.Time) (userID, attempts int64, open bool, err error) {
+func (r Repo) FailChallenge(
+	ctx context.Context,
+	hash string,
+	max int,
+	now time.Time,
+) (userID, attempts int64, open bool, err error) {
 	row, err := r.q().FailTwoFactorChallenge(ctx, sqlc.FailTwoFactorChallengeParams{
-		MaxAttempts: int64(max), ConsumedNow: db.TimeNS(now), UpdatedNow: db.TimeNS(now), TokenHash: hash, ValidAt: db.FormatTime(now),
+		MaxAttempts: int64(
+			max,
+		), ConsumedNow: db.TimeNS(now), UpdatedNow: db.TimeNS(now), TokenHash: hash, ValidAt: db.FormatTime(now),
 	})
 	if err == db.ErrNotFound {
 		return 0, 0, false, nil
@@ -630,11 +676,13 @@ func (r Repo) UseRecoveryCode(ctx context.Context, userID int64, hash string, no
 }
 
 func (r Repo) InvalidateUnusedRecoveryCodes(ctx context.Context, userID int64, now time.Time) error {
-	return r.q().InvalidateUnusedRecoveryCodes(ctx, sqlc.InvalidateUnusedRecoveryCodesParams{UsedAt: db.TimeNS(now), UserID: userID})
+	return r.q().
+		InvalidateUnusedRecoveryCodes(ctx, sqlc.InvalidateUnusedRecoveryCodesParams{UsedAt: db.TimeNS(now), UserID: userID})
 }
 
 func (r Repo) InsertRecoveryCode(ctx context.Context, userID int64, hash string, now time.Time) error {
-	return r.q().InsertRecoveryCode(ctx, sqlc.InsertRecoveryCodeParams{UserID: userID, Code: hash, CreatedAt: db.TimeNS(now)})
+	return r.q().
+		InsertRecoveryCode(ctx, sqlc.InsertRecoveryCodeParams{UserID: userID, Code: hash, CreatedAt: db.TimeNS(now)})
 }
 
 func (r Repo) DeleteRecoveryCodes(ctx context.Context, userID int64) error {
@@ -714,7 +762,12 @@ func (r Repo) DeletePasskey(ctx context.Context, userID, id int64) (bool, error)
 
 // UpdatePasskeyAfterLogin stores the credential record and sign count the
 // authenticator reported, and marks the passkey as used.
-func (r Repo) UpdatePasskeyAfterLogin(ctx context.Context, credentialID, record string, counter int64, now time.Time) error {
+func (r Repo) UpdatePasskeyAfterLogin(
+	ctx context.Context,
+	credentialID, record string,
+	counter int64,
+	now time.Time,
+) error {
 	return r.q().UpdateWebAuthnCredentialAfterLogin(ctx, sqlc.UpdateWebAuthnCredentialAfterLoginParams{
 		Record: record, Counter: counter, LastUsedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now), CredentialID: credentialID,
 	})
@@ -731,7 +784,12 @@ type PasskeyChallenge struct {
 	Options string
 }
 
-func (r Repo) InsertPasskeyChallenge(ctx context.Context, userID *int64, hash, typ, options string, expires, now time.Time) error {
+func (r Repo) InsertPasskeyChallenge(
+	ctx context.Context,
+	userID *int64,
+	hash, typ, options string,
+	expires, now time.Time,
+) error {
 	return r.q().InsertWebAuthnChallenge(ctx, sqlc.InsertWebAuthnChallengeParams{
 		UserID: db.NullInt64(userID), TokenHash: hash, Type: typ, Options: options,
 		ExpiresAt: db.FormatTime(expires), CreatedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now),

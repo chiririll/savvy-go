@@ -121,7 +121,12 @@ func TestSyncGroupRefusesAnEditorWhoOnlyViewsAnotherSpace(t *testing.T) {
 	}
 	bobSess := p.a.issue(bob, false)
 
-	code, out := p.call(bobSess, "POST", spacePath(p.A.ID, "/categories"), map[string]any{"name": "Gifts", "type": "expense"})
+	code, out := p.call(
+		bobSess,
+		"POST",
+		spacePath(p.A.ID, "/categories"),
+		map[string]any{"name": "Gifts", "type": "expense"},
+	)
 	if code != http.StatusForbidden {
 		t.Fatalf("create %d %v", code, out)
 	}
@@ -221,7 +226,12 @@ func TestSyncGroupChangeNeedsATokenReachingEverySpace(t *testing.T) {
 	if slices.Contains(p.names(p.B.ID, "categories"), "Food") || slices.Contains(p.names(p.A.ID, "categories"), "Food") {
 		t.Fatal("the refused change reached a space")
 	}
-	status(t, p.a.bearer("GET", spacePath(p.A.ID, "/categories"), nil, grant(p.A.ID)), http.StatusOK, "reading needs no more than its own space")
+	status(
+		t,
+		p.a.bearer("GET", spacePath(p.A.ID, "/categories"), nil, grant(p.A.ID)),
+		http.StatusOK,
+		"reading needs no more than its own space",
+	)
 	status(t, create(grant(p.A.ID, p.B.ID), p.A.ID, "Food"), http.StatusCreated, "token reaching the whole group")
 	if !slices.Contains(p.names(p.B.ID, "categories"), "Food") {
 		t.Fatal("the change did not reach space B")

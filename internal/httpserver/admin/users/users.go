@@ -172,7 +172,11 @@ func (h Handler) usersUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 		// P9: whoever administers a space stays able to.
 		if err := h.Spaces.SetRoleAllowed(r.Context(), u, *body.Role); err != nil {
-			httpx.WriteMessage(w, http.StatusUnprocessableEntity, "This user administers a space; make someone else its admin first.")
+			httpx.WriteMessage(
+				w,
+				http.StatusUnprocessableEntity,
+				"This user administers a space; make someone else its admin first.",
+			)
 			return
 		}
 	}

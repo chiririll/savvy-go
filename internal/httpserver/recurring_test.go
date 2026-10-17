@@ -58,7 +58,13 @@ func TestRecurringCreatesPendingAndConfirmSpawnsNext(t *testing.T) {
 		t.Fatal("expected pending occurrence")
 	}
 
-	res = a.do("POST", "/api/transactions/"+itoa(int64(pending["id"].(float64)))+"/confirm", map[string]any{}, sess.Token, sess.CSRF)
+	res = a.do(
+		"POST",
+		"/api/transactions/"+itoa(int64(pending["id"].(float64)))+"/confirm",
+		map[string]any{},
+		sess.Token,
+		sess.CSRF,
+	)
 	if res.StatusCode != 200 {
 		t.Fatalf("confirm %d %v", res.StatusCode, decodeJSON(t, res))
 	} else {
@@ -131,7 +137,13 @@ func TestRecurringEndDateStopsNextPending(t *testing.T) {
 	templateID := int64(decodeJSON(t, res)["data"].(map[string]any)["id"].(float64))
 	res = a.do("GET", "/api/transactions?status=pending", nil, sess.Token, "")
 	pending := findRecurringTx(decodeJSON(t, res)["data"].([]any), templateID)
-	res = a.do("POST", "/api/transactions/"+itoa(int64(pending["id"].(float64)))+"/confirm", map[string]any{}, sess.Token, sess.CSRF)
+	res = a.do(
+		"POST",
+		"/api/transactions/"+itoa(int64(pending["id"].(float64)))+"/confirm",
+		map[string]any{},
+		sess.Token,
+		sess.CSRF,
+	)
 	res.Body.Close()
 	res = a.do("GET", "/api/transactions?status=pending", nil, sess.Token, "")
 	if findRecurringTx(decodeJSON(t, res)["data"].([]any), templateID) != nil {
@@ -153,7 +165,13 @@ func TestRecurringSkipSpawnsNextWithoutBalanceChange(t *testing.T) {
 	templateID := int64(decodeJSON(t, res)["data"].(map[string]any)["id"].(float64))
 	res = a.do("GET", "/api/transactions?status=pending", nil, sess.Token, "")
 	pending := findRecurringTx(decodeJSON(t, res)["data"].([]any), templateID)
-	res = a.do("POST", "/api/transactions/"+itoa(int64(pending["id"].(float64)))+"/skip", map[string]any{}, sess.Token, sess.CSRF)
+	res = a.do(
+		"POST",
+		"/api/transactions/"+itoa(int64(pending["id"].(float64)))+"/skip",
+		map[string]any{},
+		sess.Token,
+		sess.CSRF,
+	)
 	body := decodeJSON(t, res)
 	if res.StatusCode != 200 || body["data"].(map[string]any)["status"] != "skipped" {
 		t.Fatalf("skip %d %v", res.StatusCode, body)

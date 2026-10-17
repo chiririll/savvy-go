@@ -90,7 +90,13 @@ func TestAPITokenCreateListRevoke(t *testing.T) {
 	u := a.createUser("rw@a.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 
-	res := a.do("POST", "/api/auth/api-tokens", confirmed(map[string]any{"name": "Zapier", "permissions": allPerms(permissions.Write), "all_spaces": true}), sess.Token, sess.CSRF)
+	res := a.do(
+		"POST",
+		"/api/auth/api-tokens",
+		confirmed(map[string]any{"name": "Zapier", "permissions": allPerms(permissions.Write), "all_spaces": true}),
+		sess.Token,
+		sess.CSRF,
+	)
 	if res.StatusCode != http.StatusCreated {
 		t.Fatalf("create %d", res.StatusCode)
 	}
@@ -195,12 +201,32 @@ func TestAPITokenStoreValidation(t *testing.T) {
 	}{
 		{"empty name", map[string]any{"name": "  "}, "name"},
 		{"long name", map[string]any{"name": string(long)}, "name"},
-		{"unknown permission", map[string]any{"name": "x", "all_spaces": true, "permissions": []string{"admin:all"}}, "permissions"},
-		{"unknown resource", map[string]any{"name": "x", "all_spaces": true, "permissions": []string{"users:read"}}, "permissions"},
+		{
+			"unknown permission",
+			map[string]any{"name": "x", "all_spaces": true, "permissions": []string{"admin:all"}},
+			"permissions",
+		},
+		{
+			"unknown resource",
+			map[string]any{"name": "x", "all_spaces": true, "permissions": []string{"users:read"}},
+			"permissions",
+		},
 		{"no spaces", map[string]any{"name": "x", "permissions": []string{"accounts:read"}}, "space_ids"},
-		{"all and some spaces", map[string]any{"name": "x", "all_spaces": true, "space_ids": []int64{1}, "permissions": []string{"accounts:read"}}, "space_ids"},
-		{"foreign space", map[string]any{"name": "x", "space_ids": []int64{9999}, "permissions": []string{"accounts:read"}}, "space_ids"},
-		{"past expiry", map[string]any{"name": "x", "expires_at": time.Now().Add(-time.Hour).Format(time.RFC3339)}, "expires_at"},
+		{
+			"all and some spaces",
+			map[string]any{"name": "x", "all_spaces": true, "space_ids": []int64{1}, "permissions": []string{"accounts:read"}},
+			"space_ids",
+		},
+		{
+			"foreign space",
+			map[string]any{"name": "x", "space_ids": []int64{9999}, "permissions": []string{"accounts:read"}},
+			"space_ids",
+		},
+		{
+			"past expiry",
+			map[string]any{"name": "x", "expires_at": time.Now().Add(-time.Hour).Format(time.RFC3339)},
+			"expires_at",
+		},
 		{"bad expiry", map[string]any{"name": "x", "expires_at": "2030-01-01"}, "expires_at"},
 		{"malformed body", "not an object", "name"},
 	}
@@ -233,7 +259,20 @@ func TestAPITokenGrantAndFutureExpiry(t *testing.T) {
 	sess := a.issue(u, false)
 	exp := time.Now().Add(24 * time.Hour).Truncate(time.Second)
 
-	res := a.do("POST", "/api/auth/api-tokens", confirmed(map[string]any{"name": "ci", "all_spaces": true, "permissions": []string{"accounts:read"}, "expires_at": exp.Format(time.RFC3339)}), sess.Token, sess.CSRF)
+	res := a.do(
+		"POST",
+		"/api/auth/api-tokens",
+		confirmed(
+			map[string]any{
+				"name":        "ci",
+				"all_spaces":  true,
+				"permissions": []string{"accounts:read"},
+				"expires_at":  exp.Format(time.RFC3339),
+			},
+		),
+		sess.Token,
+		sess.CSRF,
+	)
 	if res.StatusCode != http.StatusCreated {
 		t.Fatalf("create %d", res.StatusCode)
 	}
@@ -255,7 +294,12 @@ func TestAPITokenLimit(t *testing.T) {
 	}
 	sess := a.issue(u, false)
 
-	status(t, a.do("POST", "/api/auth/api-tokens", confirmed(map[string]any{"name": "51st"}), sess.Token, sess.CSRF), 422, "over limit")
+	status(
+		t,
+		a.do("POST", "/api/auth/api-tokens", confirmed(map[string]any{"name": "51st"}), sess.Token, sess.CSRF),
+		422,
+		"over limit",
+	)
 	if _, _, err := a.svc.APITokens.Issue(context.Background(), u, "x", auth.Grant{Permissions: allPerms(permissions.Read), AllSpaces: true}, nil); err != auth.ErrTokenLimit {
 		t.Fatalf("issue over limit: %v", err)
 	}

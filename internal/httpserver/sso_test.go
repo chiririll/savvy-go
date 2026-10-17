@@ -216,7 +216,8 @@ func TestSSOSAMLMetadataRedirectAndRejectedResponse(t *testing.T) {
 	}
 	meta := a.do("GET", "/api/auth/sso/saml/metadata", nil, "", "")
 	b, _ := io.ReadAll(meta.Body)
-	if meta.StatusCode != 200 || !strings.Contains(string(b), "EntityDescriptor") || !strings.Contains(string(b), "AssertionConsumerService") {
+	if meta.StatusCode != 200 || !strings.Contains(string(b), "EntityDescriptor") ||
+		!strings.Contains(string(b), "AssertionConsumerService") {
 		t.Fatalf("metadata %d %s", meta.StatusCode, b)
 	}
 	if !strings.Contains(meta.Header.Get("Content-Type"), "xml") {

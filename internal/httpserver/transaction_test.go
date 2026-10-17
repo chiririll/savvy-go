@@ -112,8 +112,14 @@ func TestTransactionsListSortAndFilters(t *testing.T) {
 		}
 		return int64(body["data"].(map[string]any)["id"].(float64))
 	}
-	usd := mk("/api/currencies", map[string]any{"code": "USD", "name": "US Dollar", "symbol": "$", "decimals": 2, "is_base": true, "rate": 1})
-	eur := mk("/api/currencies", map[string]any{"code": "EUR", "name": "Euro", "symbol": "E", "decimals": 2, "is_base": false, "rate": 2})
+	usd := mk(
+		"/api/currencies",
+		map[string]any{"code": "USD", "name": "US Dollar", "symbol": "$", "decimals": 2, "is_base": true, "rate": 1},
+	)
+	eur := mk(
+		"/api/currencies",
+		map[string]any{"code": "EUR", "name": "Euro", "symbol": "E", "decimals": 2, "is_base": false, "rate": 2},
+	)
 	usdAcc := mk("/api/accounts", map[string]any{"name": "USD", "type": "cash", "currency_id": usd, "initial_balance": 0})
 	eurAcc := mk("/api/accounts", map[string]any{"name": "EUR", "type": "cash", "currency_id": eur, "initial_balance": 0})
 	food := mk("/api/categories", map[string]any{"name": "Food", "type": "expense"})
@@ -121,9 +127,25 @@ func TestTransactionsListSortAndFilters(t *testing.T) {
 	tag := mk("/api/tags", map[string]any{"name": "trip"})
 
 	// raw 100 USD = 100 base; raw 80 EUR = 160 base; raw 30 USD = 30 base; undated pending
-	big := mk("/api/transactions", map[string]any{"type": "expense", "account_id": usdAcc, "category_id": food, "amount": 100, "date": "2026-01-02"})
-	eurTx := mk("/api/transactions", map[string]any{"type": "expense", "account_id": eurAcc, "category_id": fun, "amount": 80, "date": "2026-01-03", "tag_ids": []int64{tag}})
-	small := mk("/api/transactions", map[string]any{"type": "expense", "account_id": usdAcc, "category_id": food, "amount": 30, "date": "2026-01-01"})
+	big := mk(
+		"/api/transactions",
+		map[string]any{"type": "expense", "account_id": usdAcc, "category_id": food, "amount": 100, "date": "2026-01-02"},
+	)
+	eurTx := mk(
+		"/api/transactions",
+		map[string]any{
+			"type":        "expense",
+			"account_id":  eurAcc,
+			"category_id": fun,
+			"amount":      80,
+			"date":        "2026-01-03",
+			"tag_ids":     []int64{tag},
+		},
+	)
+	small := mk(
+		"/api/transactions",
+		map[string]any{"type": "expense", "account_id": usdAcc, "category_id": food, "amount": 30, "date": "2026-01-01"},
+	)
 	undated := mk("/api/transactions", map[string]any{"type": "expense", "account_id": usdAcc, "amount": 5})
 
 	eq := func(name string, got, want []int64) {

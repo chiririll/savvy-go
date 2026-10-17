@@ -169,7 +169,12 @@ func audienceOK(claims jwt.MapClaims, want string) bool {
 	return false
 }
 
-func (s Service) verifyIDToken(ctx context.Context, disco *oidcDiscovery, p IdentityProvider, raw string) (map[string]any, error) {
+func (s Service) verifyIDToken(
+	ctx context.Context,
+	disco *oidcDiscovery,
+	p IdentityProvider,
+	raw string,
+) (map[string]any, error) {
 	keys, err := s.fetchJWKS(ctx, disco.JWKSURI)
 	if err != nil {
 		return nil, err

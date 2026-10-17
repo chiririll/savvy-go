@@ -27,12 +27,26 @@ func newFixture(t *testing.T) *fixture {
 	d := dbtest.Space(t)
 	l := ledgerrepo.Repo{DB: d}
 	now := time.Now().UTC()
-	cur, err := l.InsertCurrency(ctx, ledgerrepo.Currency{Code: "USD", Name: "Dollar", Symbol: "$", Decimals: 2, IsBase: true, Rate: decimal.NewFromInt(1)}, now)
+	cur, err := l.InsertCurrency(
+		ctx,
+		ledgerrepo.Currency{Code: "USD", Name: "Dollar", Symbol: "$", Decimals: 2, IsBase: true, Rate: decimal.NewFromInt(1)},
+		now,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	unit := money.Unit{ID: cur, Decimals: 2}
-	acct, _ := l.InsertAccount(ctx, ledgerrepo.AccountFields{Name: "Cash", Type: "cash", CurrencyID: cur, InitialBalance: money.New(0, unit), IsActive: true}, now)
+	acct, _ := l.InsertAccount(
+		ctx,
+		ledgerrepo.AccountFields{
+			Name:           "Cash",
+			Type:           "cash",
+			CurrencyID:     cur,
+			InitialBalance: money.New(0, unit),
+			IsActive:       true,
+		},
+		now,
+	)
 	tag, _ := l.InsertTag(ctx, "monthly", now)
 	return &fixture{repo: recurringrepo.Repo{DB: d}, usd: unit, acct: acct, tag: tag}
 }
@@ -59,7 +73,9 @@ func TestTemplateRoundTripKeepsOptionalFields(t *testing.T) {
 	r, _ := f.repo.ByID(ctx, id)
 	if r == nil || r.Amount != money.New(80000, f.usd) || r.ToAmount != nil || r.ToAccountID != nil || r.CategoryID != nil ||
 		!r.IsEstimated || !r.IsActive || r.DayOfMonth == nil || *r.DayOfMonth != 15 || r.DayOfWeek != nil ||
-		r.EndDate != nil || r.LastRunDate != nil || r.Description == nil || *r.Description != "Rent" {
+		r.EndDate != nil || r.LastRunDate != nil ||
+		r.Description == nil ||
+		*r.Description != "Rent" {
 		t.Fatalf("template = %+v", r)
 	}
 
@@ -101,7 +117,8 @@ func TestAdvanceTagsAndDelete(t *testing.T) {
 	if err := f.repo.Advance(ctx, id, "2026-01-15", "2026-02-15", time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
-	if r, _ := f.repo.ByID(ctx, id); r.NextRunDate != "2026-02-15" || r.LastRunDate == nil || *r.LastRunDate != "2026-01-15" {
+	if r, _ := f.repo.ByID(ctx, id); r.NextRunDate != "2026-02-15" || r.LastRunDate == nil ||
+		*r.LastRunDate != "2026-01-15" {
 		t.Fatalf("advanced = %+v", r)
 	}
 

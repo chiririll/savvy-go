@@ -135,7 +135,10 @@ func TestMCPRequiresABearerTokenAndPointsToTheMetadata(t *testing.T) {
 		if res.StatusCode != http.StatusUnauthorized {
 			t.Fatalf("%q: status %d", auth, res.StatusCode)
 		}
-		if h := res.Header.Get("WWW-Authenticate"); !strings.Contains(h, `resource_metadata="http://localhost:8080/.well-known/oauth-protected-resource"`) {
+		if h := res.Header.Get("WWW-Authenticate"); !strings.Contains(
+			h,
+			`resource_metadata="http://localhost:8080/.well-known/oauth-protected-resource"`,
+		) {
 			t.Fatalf("%q: WWW-Authenticate = %q", auth, h)
 		}
 	}
@@ -195,7 +198,13 @@ func TestMCPToolsReadTheCallersSpacesAndNothingElse(t *testing.T) {
 	a := newTestApp(t)
 	admin := a.createUser("admin@a.com", "secret1", "admin")
 	adminSess := a.issue(admin, false)
-	res := a.do("POST", "/api/accounts", map[string]any{"name": "Barclays", "type": "bank", "currency_code": "GBP", "initial_balance": 100}, adminSess.Token, adminSess.CSRF)
+	res := a.do(
+		"POST",
+		"/api/accounts",
+		map[string]any{"name": "Barclays", "type": "bank", "currency_code": "GBP", "initial_balance": 100},
+		adminSess.Token,
+		adminSess.CSRF,
+	)
 	status(t, res, http.StatusCreated, "seed account")
 
 	member := a.createUser("viewer@a.com", "secret1", roleViewer)
@@ -231,13 +240,31 @@ func TestMCPListTransactionsForwardsFiltersAndBoundsThePage(t *testing.T) {
 	sp := a.space.ID
 	s := a.mcpFull(u)
 
-	acc := idOf(t, a.call(s, "create_account", map[string]any{"space_id": sp, "name": "Wallet", "type": "cash", "currency_code": "EUR", "initial_balance": "0"}))
+	acc := idOf(
+		t,
+		a.call(
+			s,
+			"create_account",
+			map[string]any{"space_id": sp, "name": "Wallet", "type": "cash", "currency_code": "EUR", "initial_balance": "0"},
+		),
+	)
 	for _, tx := range []struct{ typ, desc, date string }{
 		{"expense", "coffee", "2026-02-01"},
 		{"income", "salary", "2026-02-02"},
 		{"expense", "old rent", "2025-12-31"},
 	} {
-		res := a.call(s, "create_transaction", map[string]any{"space_id": sp, "type": tx.typ, "account_id": acc, "amount": "5", "description": tx.desc, "date": tx.date})
+		res := a.call(
+			s,
+			"create_transaction",
+			map[string]any{
+				"space_id":    sp,
+				"type":        tx.typ,
+				"account_id":  acc,
+				"amount":      "5",
+				"description": tx.desc,
+				"date":        tx.date,
+			},
+		)
 		if res.IsError {
 			t.Fatalf("seed %s: %s", tx.desc, resultText(res))
 		}
@@ -382,10 +409,34 @@ func TestMCPWriteToolsRecordAndChangeMoney(t *testing.T) {
 		return accs[0].(map[string]any)["currentBalance"].(float64)
 	}
 
-	acc := idOf(t, a.call(s, "create_account", map[string]any{"space_id": sp, "name": "Wallet", "type": "cash", "currency_code": "EUR", "initial_balance": "100.00"}))
+	acc := idOf(
+		t,
+		a.call(
+			s,
+			"create_account",
+			map[string]any{
+				"space_id":        sp,
+				"name":            "Wallet",
+				"type":            "cash",
+				"currency_code":   "EUR",
+				"initial_balance": "100.00",
+			},
+		),
+	)
 
 	// Amounts travel as exact decimal strings and come back exact.
-	res := a.call(s, "create_transaction", map[string]any{"space_id": sp, "type": "expense", "account_id": acc, "amount": "12.34", "description": "lunch", "date": "2026-03-01"})
+	res := a.call(
+		s,
+		"create_transaction",
+		map[string]any{
+			"space_id":    sp,
+			"type":        "expense",
+			"account_id":  acc,
+			"amount":      "12.34",
+			"description": "lunch",
+			"date":        "2026-03-01",
+		},
+	)
 	if res.IsError {
 		t.Fatalf("create_transaction: %s", resultText(res))
 	}
@@ -401,7 +452,8 @@ func TestMCPWriteToolsRecordAndChangeMoney(t *testing.T) {
 	if res.IsError {
 		t.Fatalf("update_transaction: %s", resultText(res))
 	}
-	if item := toolData(t, res).(map[string]any); item["amount"] != float64(20) || item["description"] != "lunch" || item["date"] != "2026-03-01" {
+	if item := toolData(t, res).(map[string]any); item["amount"] != float64(20) || item["description"] != "lunch" ||
+		item["date"] != "2026-03-01" {
 		t.Fatalf("update_transaction must change only the amount: %v", item)
 	}
 	if got := balance(); got != 80 {
@@ -461,7 +513,11 @@ func TestMCPListsOnlyTheToolsTheTokenCanUse(t *testing.T) {
 	}
 
 	// A stale client may still call a tool it was not offered and gets the REST reason.
-	res := a.call(a.mcpGrant(u, "accounts:read"), "create_account", map[string]any{"space_id": a.space.ID, "name": "X", "type": "cash", "currency_code": "EUR"})
+	res := a.call(
+		a.mcpGrant(u, "accounts:read"),
+		"create_account",
+		map[string]any{"space_id": a.space.ID, "name": "X", "type": "cash", "currency_code": "EUR"},
+	)
 	if !res.IsError || !strings.Contains(resultText(res), "accounts:write") {
 		t.Errorf("unoffered tool = %v %s", res.IsError, resultText(res))
 	}
@@ -475,8 +531,11 @@ func TestMCPAutomationRules(t *testing.T) {
 
 	res := a.call(s, "create_automation_rule", map[string]any{
 		"space_id": sp, "name": "Coffee", "trigger_type": "on_transaction_create",
-		"conditions": map[string]any{"match": "all", "conditions": []any{map[string]any{"field": "description", "op": "contains", "value": "coffee"}}},
-		"actions":    []any{map[string]any{"type": "set_description", "value": "Coffee"}},
+		"conditions": map[string]any{
+			"match":      "all",
+			"conditions": []any{map[string]any{"field": "description", "op": "contains", "value": "coffee"}},
+		},
+		"actions": []any{map[string]any{"type": "set_description", "value": "Coffee"}},
 	})
 	if res.IsError {
 		t.Fatalf("create_automation_rule: %s", resultText(res))

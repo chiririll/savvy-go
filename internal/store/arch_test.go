@@ -90,7 +90,12 @@ func TestP57MigrationsKnowNothingOfLaravel(t *testing.T) {
 			t.Errorf("%s mentions %q: Laravel conversion belongs in internal/legacy", f, loc)
 		}
 	}
-	parsed, err := parser.ParseFile(token.NewFileSet(), filepath.Join("..", "migrate", "migrate.go"), nil, parser.ImportsOnly)
+	parsed, err := parser.ParseFile(
+		token.NewFileSet(),
+		filepath.Join("..", "migrate", "migrate.go"),
+		nil,
+		parser.ImportsOnly,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,9 +116,19 @@ var forbiddenImports = map[string][]string{
 		"savvy-go/internal/automation", "savvy-go/internal/transfers", "savvy-go/internal/uploads",
 		"savvy-go/internal/currencydata", "savvy-go/internal/spaces",
 	},
-	"spaces":            {"net/http", "savvy-go/internal/ledger", "savvy-go/internal/transfers", "savvy-go/internal/backup"},
-	"transfers":         {"net/http", "savvy-go/internal/ledger", "savvy-go/internal/backup"},
-	"refsync":           {"net/http", "savvy-go/internal/httpserver", "savvy-go/internal/backup", "savvy-go/internal/transfers"},
+	"spaces": {
+		"net/http",
+		"savvy-go/internal/ledger",
+		"savvy-go/internal/transfers",
+		"savvy-go/internal/backup",
+	},
+	"transfers": {"net/http", "savvy-go/internal/ledger", "savvy-go/internal/backup"},
+	"refsync": {
+		"net/http",
+		"savvy-go/internal/httpserver",
+		"savvy-go/internal/backup",
+		"savvy-go/internal/transfers",
+	},
 	"reports":           {"net/http", "savvy-go/internal/recurring", "savvy-go/internal/automation"},
 	"recurring":         {"net/http", "savvy-go/internal/reports", "savvy-go/internal/automation"},
 	"automation":        {"net/http", "savvy-go/internal/reports", "savvy-go/internal/recurring"},

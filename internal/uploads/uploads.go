@@ -66,7 +66,13 @@ func (s Service) UsageByBucket(ctx context.Context) ([]Usage, error) {
 	return s.repo().UsageByBucket(ctx)
 }
 
-func (s Service) Create(ctx context.Context, userID int64, bucket, filename string, size *int64, mime *string) (*Upload, error) {
+func (s Service) Create(
+	ctx context.Context,
+	userID int64,
+	bucket, filename string,
+	size *int64,
+	mime *string,
+) (*Upload, error) {
 	b, ok := uploadBucket(bucket)
 	if !ok {
 		return nil, fmt.Errorf("unknown bucket")

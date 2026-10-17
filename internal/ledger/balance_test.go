@@ -88,7 +88,11 @@ func TestSelfTransferNetsToItsAmountDifference(t *testing.T) {
 	e := newMoneyEnv(t)
 	self := e.usdAcc.ID
 	d := dec("7")
-	e.txOn(t, TxInput{Type: "transfer", AccountID: self, ToAccountID: &self, Amount: dec("10"), ToAmount: &d}, "2024-01-10")
+	e.txOn(
+		t,
+		TxInput{Type: "transfer", AccountID: self, ToAccountID: &self, Amount: dec("10"), ToAmount: &d},
+		"2024-01-10",
+	)
 	if got := e.balance(t, self); !got.Equal(dec("97")) { // 100 - 10 + 7
 		t.Errorf("balance = %s, want 97", got)
 	}
@@ -151,7 +155,10 @@ func TestDebtBalanceDoesNotDependOnTheDate(t *testing.T) {
 func TestNewAccountsGetIncreasingSortOrders(t *testing.T) {
 	e := newMoneyEnv(t)
 	accts := Accounts{DB: e.db}
-	a, err := accts.Create(e.ctx, AccountInput{Name: "first-after-seed", Type: "cash", CurrencyID: e.usd.ID, IsActive: true})
+	a, err := accts.Create(
+		e.ctx,
+		AccountInput{Name: "first-after-seed", Type: "cash", CurrencyID: e.usd.ID, IsActive: true},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

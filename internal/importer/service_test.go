@@ -39,7 +39,11 @@ func newEnv(t *testing.T) *env {
 	}
 	e := &env{
 		ctx: ctx, space: space, userID: uid,
-		svc: Service{DB: space, Uploads: uploads.Service{DB: server, Root: t.TempDir(), SignSecret: "s"}, Txs: ledger.Transactions{DB: space}},
+		svc: Service{
+			DB:      space,
+			Uploads: uploads.Service{DB: server, Root: t.TempDir(), SignSecret: "s"},
+			Txs:     ledger.Transactions{DB: space},
+		},
 	}
 	curs := ledger.Currencies{DB: space}
 	mk := func(code string, decimals int, rate string) ledger.Currency {
@@ -151,7 +155,8 @@ func TestParseReadsHeadersFormatsAndAPreview(t *testing.T) {
 		t.Errorf("the preview is the first ten rows: %d", len(im.Meta.PreviewRows))
 	}
 	m := im.Meta
-	if m.ParseMeta.Delimiter != ";" || m.DetectedFormats.DateFormat != "DD.MM.YYYY" || m.DetectedFormats.AmountFormat != "EU" {
+	if m.ParseMeta.Delimiter != ";" || m.DetectedFormats.DateFormat != "DD.MM.YYYY" ||
+		m.DetectedFormats.AmountFormat != "EU" {
 		t.Errorf("detected %+v", m)
 	}
 	if m.SuggestedMapping["date"] != 0 || m.SuggestedMapping["amount"] != 1 || m.SuggestedMapping["description"] != 2 {
@@ -188,7 +193,8 @@ func TestExecuteCreatesConfirmedTransactionsInTheAccountCurrency(t *testing.T) {
 	im := e.parsed(t, "Date,Amount,Description\n2024-01-01,-12.50,Coffee\n2024-01-02,2000,Salary\n2024-01-03,-0.99,Gum\n")
 	done := e.run(t, im, e.usdAcct.ID, nil)
 
-	if done.Status != "completed" || done.CreatedCount != 3 || done.SkippedCount != 0 || done.ErrorCount != 0 || done.ProcessedRows != 3 {
+	if done.Status != "completed" || done.CreatedCount != 3 || done.SkippedCount != 0 || done.ErrorCount != 0 ||
+		done.ProcessedRows != 3 {
 		t.Fatalf("import %+v", done)
 	}
 	byDesc := map[string]ledger.Transaction{}
@@ -196,7 +202,8 @@ func TestExecuteCreatesConfirmedTransactionsInTheAccountCurrency(t *testing.T) {
 		byDesc[*tx.Description] = tx
 	}
 	coffee, salary := byDesc["Coffee"], byDesc["Salary"]
-	if coffee.Type != "expense" || coffee.Amount.Decimal().String() != "12.5" || coffee.Status != "confirmed" || coffee.AccountID != e.usdAcct.ID {
+	if coffee.Type != "expense" || coffee.Amount.Decimal().String() != "12.5" || coffee.Status != "confirmed" ||
+		coffee.AccountID != e.usdAcct.ID {
 		t.Errorf("coffee %+v", coffee)
 	}
 	if salary.Type != "income" || salary.Amount.Decimal().String() != "2000" {

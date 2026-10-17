@@ -247,7 +247,11 @@ func decodeTx(w http.ResponseWriter, r *http.Request, base *ledger.Transaction) 
 			toAmount := base.ToAmount.Decimal()
 			body.ToAmount = &toAmount
 		}
-		body.IsEstimated, body.Description, body.Date = base.IsEstimated, httpx.Clone(base.Description), httpx.Clone(base.Date)
+		body.IsEstimated, body.Description, body.Date = base.IsEstimated, httpx.Clone(
+			base.Description,
+		), httpx.Clone(
+			base.Date,
+		)
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.AccountID == 0 {
 		httpx.WriteValidation(w, map[string][]string{"account_id": {"The account id field is required."}})

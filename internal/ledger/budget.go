@@ -197,7 +197,8 @@ func (s Budgets) spent(ctx context.Context, b *Budget, start, end time.Time) mon
 	for _, t := range b.Tags {
 		tagIDs = append(tagIDs, t.ID)
 	}
-	spent, err := s.repo().BudgetSpent(ctx, start.Format("2006-01-02"), end.Format("2006-01-02"), catIDs, tagIDs, unit, targetRate)
+	spent, err := s.repo().
+		BudgetSpent(ctx, start.Format("2006-01-02"), end.Format("2006-01-02"), catIDs, tagIDs, unit, targetRate)
 	if err != nil {
 		return money.Zero(unit)
 	}

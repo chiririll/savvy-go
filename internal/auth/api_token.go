@@ -103,7 +103,13 @@ func checkGrant(kind string, grant Grant) (perms []string, spaceIDs []int64, err
 // Issue creates a token and returns the raw value, which is never stored. The
 // grant must name at least one space unless it is for all of them; the caller
 // has checked that the owner belongs to each.
-func (s APITokens) Issue(ctx context.Context, user *User, name string, grant Grant, expiresAt *time.Time) (string, *APIToken, error) {
+func (s APITokens) Issue(
+	ctx context.Context,
+	user *User,
+	name string,
+	grant Grant,
+	expiresAt *time.Time,
+) (string, *APIToken, error) {
 	if grant.Kind == "" {
 		grant.Kind = permissions.KindPersonal
 	}

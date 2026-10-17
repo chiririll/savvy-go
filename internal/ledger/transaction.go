@@ -92,7 +92,9 @@ func (s Transactions) repo() repo.Repo { return repo.Repo{DB: s.DB} }
 
 // ErrTransferRow is returned for a change to one side of a transfer between
 // spaces: the transfer changes, not its rows.
-var ErrTransferRow = errors.New("this transaction is one side of a transfer between spaces; change the transfer instead")
+var ErrTransferRow = errors.New(
+	"this transaction is one side of a transfer between spaces; change the transfer instead",
+)
 
 // transferSideType reports the types reserved for a transfer between spaces;
 // they are written only by Transfers.
@@ -269,7 +271,12 @@ func (s Transactions) Delete(ctx context.Context, id int64) error {
 // Confirm settles a pending transaction on date. The amounts it was planned
 // with stand; only an estimate can be replaced by the real amounts, and a
 // transfer given only amount delivers it converted at the current rates.
-func (s Transactions) Confirm(ctx context.Context, id int64, date string, amount, toAmount *decimal.Decimal) (*Transaction, error) {
+func (s Transactions) Confirm(
+	ctx context.Context,
+	id int64,
+	date string,
+	amount, toAmount *decimal.Decimal,
+) (*Transaction, error) {
 	if err := s.guardTransfer(ctx, id); err != nil {
 		return nil, err
 	}
@@ -294,7 +301,13 @@ func (s Transactions) Confirm(ctx context.Context, id int64, date string, amount
 		if !cur.IsEstimated {
 			return nil, fmt.Errorf("not estimated")
 		}
-		in := TxInput{Type: cur.Type, AccountID: cur.AccountID, ToAccountID: cur.ToAccountID, Amount: cur.Amount.Decimal(), ToAmount: toAmount}
+		in := TxInput{
+			Type:        cur.Type,
+			AccountID:   cur.AccountID,
+			ToAccountID: cur.ToAccountID,
+			Amount:      cur.Amount.Decimal(),
+			ToAmount:    toAmount,
+		}
 		if amount != nil {
 			in.Amount = *amount
 		}

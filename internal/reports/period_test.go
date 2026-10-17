@@ -31,12 +31,24 @@ func TestRange(t *testing.T) {
 		{"a month out of range is this month", Filter{PeriodType: "month", PeriodValue: "2024-13"}, "2024-05-01..2024-05-31"},
 		{"a named quarter", Filter{PeriodType: "quarter", PeriodValue: "2023-Q4"}, "2023-10-01..2023-12-31"},
 		{"a quarter without a value is this quarter", Filter{PeriodType: "quarter"}, "2024-04-01..2024-06-30"},
-		{"a quarter past Q4 is this quarter", Filter{PeriodType: "quarter", PeriodValue: "2024-Q5"}, "2024-04-01..2024-06-30"},
+		{
+			"a quarter past Q4 is this quarter",
+			Filter{PeriodType: "quarter", PeriodValue: "2024-Q5"},
+			"2024-04-01..2024-06-30",
+		},
 		{"a named year", Filter{PeriodType: "year", PeriodValue: "2023"}, "2023-01-01..2023-12-31"},
 		{"a year without a value is this year", Filter{PeriodType: "year"}, "2024-01-01..2024-12-31"},
 		{"year to date ends today", Filter{PeriodType: "ytd"}, "2024-01-01..2024-05-15"},
-		{"a custom range", Filter{PeriodType: "custom", StartDate: "2024-01-13", EndDate: "2024-01-15"}, "2024-01-13..2024-01-15"},
-		{"a custom range with a bad date is the default", Filter{PeriodType: "custom", StartDate: "2024-01-13", EndDate: "tomorrow"}, "2024-04-16..2024-05-15"},
+		{
+			"a custom range",
+			Filter{PeriodType: "custom", StartDate: "2024-01-13", EndDate: "2024-01-15"},
+			"2024-01-13..2024-01-15",
+		},
+		{
+			"a custom range with a bad date is the default",
+			Filter{PeriodType: "custom", StartDate: "2024-01-13", EndDate: "tomorrow"},
+			"2024-04-16..2024-05-15",
+		},
 		{"no period is the last 30 days", Filter{}, "2024-04-16..2024-05-15"},
 		{"an unknown period is the last 30 days", Filter{PeriodType: "decade"}, "2024-04-16..2024-05-15"},
 	}
@@ -58,13 +70,37 @@ func TestComparison(t *testing.T) {
 		{"unset", Filter{PeriodType: "month"}, ""},
 		{"none", Filter{PeriodType: "month", CompareWith: "none"}, ""},
 		{"unknown", Filter{PeriodType: "month", CompareWith: "tomorrow"}, ""},
-		{"previous month", Filter{PeriodType: "month", PeriodValue: "2024-03", CompareWith: "previous_period"}, "2024-02-01..2024-02-29"},
-		{"previous month over a year end", Filter{PeriodType: "month", PeriodValue: "2024-01", CompareWith: "previous_period"}, "2023-12-01..2023-12-31"},
-		{"previous quarter", Filter{PeriodType: "quarter", PeriodValue: "2024-Q1", CompareWith: "previous_period"}, "2023-10-01..2023-12-31"},
-		{"previous year", Filter{PeriodType: "year", PeriodValue: "2024", CompareWith: "previous_period"}, "2023-01-01..2023-12-31"},
+		{
+			"previous month",
+			Filter{PeriodType: "month", PeriodValue: "2024-03", CompareWith: "previous_period"},
+			"2024-02-01..2024-02-29",
+		},
+		{
+			"previous month over a year end",
+			Filter{PeriodType: "month", PeriodValue: "2024-01", CompareWith: "previous_period"},
+			"2023-12-01..2023-12-31",
+		},
+		{
+			"previous quarter",
+			Filter{PeriodType: "quarter", PeriodValue: "2024-Q1", CompareWith: "previous_period"},
+			"2023-10-01..2023-12-31",
+		},
+		{
+			"previous year",
+			Filter{PeriodType: "year", PeriodValue: "2024", CompareWith: "previous_period"},
+			"2023-01-01..2023-12-31",
+		},
 		{"previous year to date", Filter{PeriodType: "ytd", CompareWith: "previous_period"}, "2023-01-01..2023-05-15"},
-		{"previous custom range is as long and adjacent", Filter{PeriodType: "custom", StartDate: "2024-01-11", EndDate: "2024-01-15", CompareWith: "previous_period"}, "2024-01-06..2024-01-10"},
-		{"same period last year", Filter{PeriodType: "month", PeriodValue: "2024-03", CompareWith: "same_period_last_year"}, "2023-03-01..2023-03-31"},
+		{
+			"previous custom range is as long and adjacent",
+			Filter{PeriodType: "custom", StartDate: "2024-01-11", EndDate: "2024-01-15", CompareWith: "previous_period"},
+			"2024-01-06..2024-01-10",
+		},
+		{
+			"same period last year",
+			Filter{PeriodType: "month", PeriodValue: "2024-03", CompareWith: "same_period_last_year"},
+			"2023-03-01..2023-03-31",
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -88,11 +124,31 @@ func TestSparkline(t *testing.T) {
 		f    Filter
 		want []string
 	}{
-		{"months", Filter{PeriodType: "month", PeriodValue: "2024-02"}, []string{"2023-12-01..2023-12-31", "2024-01-01..2024-01-31", "2024-02-01..2024-02-29"}},
-		{"quarters", Filter{PeriodType: "quarter", PeriodValue: "2024-Q1"}, []string{"2023-07-01..2023-09-30", "2023-10-01..2023-12-31", "2024-01-01..2024-03-31"}},
-		{"years", Filter{PeriodType: "year", PeriodValue: "2024"}, []string{"2022-01-01..2022-12-31", "2023-01-01..2023-12-31", "2024-01-01..2024-12-31"}},
-		{"year to date goes by month", Filter{PeriodType: "ytd"}, []string{"2024-03-01..2024-03-31", "2024-04-01..2024-04-30", "2024-05-01..2024-05-31"}},
-		{"custom ranges step back by their own length", Filter{PeriodType: "custom", StartDate: "2024-01-11", EndDate: "2024-01-15"}, []string{"2024-01-01..2024-01-05", "2024-01-06..2024-01-10", "2024-01-11..2024-01-15"}},
+		{
+			"months",
+			Filter{PeriodType: "month", PeriodValue: "2024-02"},
+			[]string{"2023-12-01..2023-12-31", "2024-01-01..2024-01-31", "2024-02-01..2024-02-29"},
+		},
+		{
+			"quarters",
+			Filter{PeriodType: "quarter", PeriodValue: "2024-Q1"},
+			[]string{"2023-07-01..2023-09-30", "2023-10-01..2023-12-31", "2024-01-01..2024-03-31"},
+		},
+		{
+			"years",
+			Filter{PeriodType: "year", PeriodValue: "2024"},
+			[]string{"2022-01-01..2022-12-31", "2023-01-01..2023-12-31", "2024-01-01..2024-12-31"},
+		},
+		{
+			"year to date goes by month",
+			Filter{PeriodType: "ytd"},
+			[]string{"2024-03-01..2024-03-31", "2024-04-01..2024-04-30", "2024-05-01..2024-05-31"},
+		},
+		{
+			"custom ranges step back by their own length",
+			Filter{PeriodType: "custom", StartDate: "2024-01-11", EndDate: "2024-01-15"},
+			[]string{"2024-01-01..2024-01-05", "2024-01-06..2024-01-10", "2024-01-11..2024-01-15"},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -128,8 +184,20 @@ func TestGeneratePeriods(t *testing.T) {
 		{"an unknown grouping is days", "2024-01-01", "2024-01-02", "decade", []string{"2024-01-01", "2024-01-02"}},
 		// Weeks start on Sunday here, as in the SQL that groups the totals (see filter.PeriodExpr).
 		{"weeks start on Sunday", "2024-01-03", "2024-01-17", "week", []string{"2023-12-31", "2024-01-07", "2024-01-14"}},
-		{"a range ending on a Sunday includes that week", "2024-01-03", "2024-01-07", "week", []string{"2023-12-31", "2024-01-07"}},
-		{"months start on the first", "2024-01-31", "2024-04-02", "month", []string{"2024-01-01", "2024-02-01", "2024-03-01", "2024-04-01"}},
+		{
+			"a range ending on a Sunday includes that week",
+			"2024-01-03",
+			"2024-01-07",
+			"week",
+			[]string{"2023-12-31", "2024-01-07"},
+		},
+		{
+			"months start on the first",
+			"2024-01-31",
+			"2024-04-02",
+			"month",
+			[]string{"2024-01-01", "2024-02-01", "2024-03-01", "2024-04-01"},
+		},
 		{"a single day", "2024-01-05", "2024-01-05", "day", []string{"2024-01-05"}},
 		{"an empty range", "2024-01-06", "2024-01-05", "day", nil},
 	}

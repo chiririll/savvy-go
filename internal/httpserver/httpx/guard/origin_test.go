@@ -29,9 +29,23 @@ func TestPublicOrigin(t *testing.T) {
 		{"same-site other origin", "POST", "/api/auth/login", j, map[string]string{"Sec-Fetch-Site": "same-site"}, 403},
 		{"same-origin fetch", "POST", "/api/auth/login", j, map[string]string{"Sec-Fetch-Site": "same-origin"}, 204},
 		{"GET untouched", "GET", "/api/auth/status", "", map[string]string{"Origin": "https://evil.example"}, 204},
-		{"SAML ACS cross-site form", "POST", "/api/auth/sso/okta/acs", "application/x-www-form-urlencoded", map[string]string{"Origin": "https://idp.example", "Sec-Fetch-Site": "cross-site"}, 204},
+		{
+			"SAML ACS cross-site form",
+			"POST",
+			"/api/auth/sso/okta/acs",
+			"application/x-www-form-urlencoded",
+			map[string]string{"Origin": "https://idp.example", "Sec-Fetch-Site": "cross-site"},
+			204,
+		},
 		{"restore multipart", "POST", "/api/onboarding/restore", "multipart/form-data; boundary=x", nil, 204},
-		{"restore multipart foreign", "POST", "/api/onboarding/restore", "multipart/form-data; boundary=x", map[string]string{"Origin": "https://evil.example"}, 403},
+		{
+			"restore multipart foreign",
+			"POST",
+			"/api/onboarding/restore",
+			"multipart/form-data; boundary=x",
+			map[string]string{"Origin": "https://evil.example"},
+			403,
+		},
 		{"upload part", "PUT", "/api/uploads/1/parts/1", "application/octet-stream", nil, 204},
 	}
 	for _, c := range cases {

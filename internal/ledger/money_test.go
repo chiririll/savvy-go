@@ -38,7 +38,10 @@ func newMoneyEnv(t *testing.T) *moneyEnv {
 	env := &moneyEnv{ctx: ctx, db: sqlDB, txs: Transactions{DB: sqlDB}}
 	curs := Currencies{DB: sqlDB}
 	mk := func(code string, decimals int, rate string) Currency {
-		c, err := curs.Create(ctx, Currency{Code: code, Name: code, Symbol: code, Decimals: decimals, Rate: decimal.RequireFromString(rate)})
+		c, err := curs.Create(
+			ctx,
+			Currency{Code: code, Name: code, Symbol: code, Decimals: decimals, Rate: decimal.RequireFromString(rate)},
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -49,7 +52,16 @@ func newMoneyEnv(t *testing.T) *moneyEnv {
 	env.btc = mk("BTC", 8, "50000")
 	accts := Accounts{DB: sqlDB}
 	acct := func(name string, cur Currency, initial string) Account {
-		a, err := accts.Create(ctx, AccountInput{Name: name, Type: "cash", CurrencyID: cur.ID, InitialBalance: decimal.RequireFromString(initial), IsActive: true})
+		a, err := accts.Create(
+			ctx,
+			AccountInput{
+				Name:           name,
+				Type:           "cash",
+				CurrencyID:     cur.ID,
+				InitialBalance: decimal.RequireFromString(initial),
+				IsActive:       true,
+			},
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -64,7 +76,10 @@ func newMoneyEnv(t *testing.T) *moneyEnv {
 func (e *moneyEnv) tx(t *testing.T, typ string, accountID int64, amount string) *Transaction {
 	t.Helper()
 	date := "2024-01-15"
-	tx, err := e.txs.Create(e.ctx, TxInput{Type: typ, AccountID: accountID, Amount: decimal.RequireFromString(amount), Date: &date})
+	tx, err := e.txs.Create(
+		e.ctx,
+		TxInput{Type: typ, AccountID: accountID, Amount: decimal.RequireFromString(amount), Date: &date},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +90,10 @@ func dec(s string) decimal.Decimal { return decimal.RequireFromString(s) }
 
 func TestBalanceIsExactForFloatUnfriendlySums(t *testing.T) {
 	e := newMoneyEnv(t)
-	acct, err := (Accounts{DB: e.db}).Create(e.ctx, AccountInput{Name: "cash2", Type: "cash", CurrencyID: e.usd.ID, IsActive: true})
+	acct, err := (Accounts{DB: e.db}).Create(
+		e.ctx,
+		AccountInput{Name: "cash2", Type: "cash", CurrencyID: e.usd.ID, IsActive: true},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,7 +153,8 @@ func TestCrossCurrencyReportSumsFoldToBase(t *testing.T) {
 		t.Fatalf("DailyTotals = %+v", days)
 	}
 	top := filter.TopTransactions(e.ctx, e.db, w, 2, base)
-	if len(top) != 2 || !top[0].Amount.Equal(money.FromDecimal(dec("10"), base)) || !top[1].Amount.Equal(money.FromDecimal(dec("5"), base)) {
+	if len(top) != 2 || !top[0].Amount.Equal(money.FromDecimal(dec("10"), base)) ||
+		!top[1].Amount.Equal(money.FromDecimal(dec("5"), base)) {
 		t.Fatalf("TopTransactions = %+v", top)
 	}
 }
@@ -144,11 +163,17 @@ func TestCrossCurrencyReportSumsFoldToBase(t *testing.T) {
 // USD each are worth 0.012 together (0.01), but 0 when rounded one by one.
 func TestReportSumRoundsOnceAfterFolding(t *testing.T) {
 	e := newMoneyEnv(t)
-	cheap, err := (Currencies{DB: e.db}).Create(e.ctx, Currency{Code: "XXX", Name: "XXX", Symbol: "X", Decimals: 3, Rate: dec("0.001")})
+	cheap, err := (Currencies{DB: e.db}).Create(
+		e.ctx,
+		Currency{Code: "XXX", Name: "XXX", Symbol: "X", Decimals: 3, Rate: dec("0.001")},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	acct, err := (Accounts{DB: e.db}).Create(e.ctx, AccountInput{Name: "x", Type: "cash", CurrencyID: cheap.ID, IsActive: true})
+	acct, err := (Accounts{DB: e.db}).Create(
+		e.ctx,
+		AccountInput{Name: "x", Type: "cash", CurrencyID: cheap.ID, IsActive: true},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -214,7 +239,8 @@ func TestItemTotalsAreExact(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(tx.Items) != 1 || !tx.Items[0].TotalPrice.Decimal().Equal(dec("0.30")) || !tx.Items[0].Quantity.Equal(dec("3")) {
+	if len(tx.Items) != 1 || !tx.Items[0].TotalPrice.Decimal().Equal(dec("0.30")) ||
+		!tx.Items[0].Quantity.Equal(dec("3")) {
 		t.Fatalf("items = %+v", tx.Items)
 	}
 }
@@ -274,7 +300,10 @@ func TestTransferWithoutDestinationAmountConverts(t *testing.T) {
 	e := newMoneyEnv(t)
 	date := "2024-01-15"
 	to := e.jpyAcc.ID
-	tx, err := e.txs.Create(e.ctx, TxInput{Type: "transfer", AccountID: e.usdAcc.ID, ToAccountID: &to, Amount: dec("15"), Date: &date})
+	tx, err := e.txs.Create(
+		e.ctx,
+		TxInput{Type: "transfer", AccountID: e.usdAcc.ID, ToAccountID: &to, Amount: dec("15"), Date: &date},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -299,11 +328,17 @@ func rawAmount(t *testing.T, e *moneyEnv, id int64) int64 {
 func TestAccountCurrencyIsImmutable(t *testing.T) {
 	e := newMoneyEnv(t)
 	accts := Accounts{DB: e.db}
-	eur, err := (Currencies{DB: e.db}).Create(e.ctx, Currency{Code: "EUR", Name: "EUR", Symbol: "E", Decimals: 2, Rate: dec("1.1")})
+	eur, err := (Currencies{DB: e.db}).Create(
+		e.ctx,
+		Currency{Code: "EUR", Name: "EUR", Symbol: "E", Decimals: 2, Rate: dec("1.1")},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, err := accts.Create(e.ctx, AccountInput{Name: "fixed", Type: "cash", CurrencyID: e.usd.ID, InitialBalance: dec("100"), IsActive: true})
+	a, err := accts.Create(
+		e.ctx,
+		AccountInput{Name: "fixed", Type: "cash", CurrencyID: e.usd.ID, InitialBalance: dec("100"), IsActive: true},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -359,7 +394,10 @@ func TestCurrencyUsedByBudgetCannotBeDeleted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	budget, err := (Budgets{DB: e.db}).Create(e.ctx, BudgetInput{Name: "b", Amount: dec("100"), CurrencyID: &eur.ID, Period: "monthly"})
+	budget, err := (Budgets{DB: e.db}).Create(
+		e.ctx,
+		BudgetInput{Name: "b", Amount: dec("100"), CurrencyID: &eur.ID, Period: "monthly"},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -376,11 +414,17 @@ func TestCurrencyUsedByBudgetCannotBeDeleted(t *testing.T) {
 
 func TestUnknownAccountOrCurrencyIsAnError(t *testing.T) {
 	e := newMoneyEnv(t)
-	if _, err := (Accounts{DB: e.db}).Create(e.ctx, AccountInput{Name: "ghost", Type: "cash", CurrencyID: 999, IsActive: true}); !errors.Is(err, ErrUnknownCurrency) {
+	if _, err := (Accounts{DB: e.db}).Create(e.ctx, AccountInput{Name: "ghost", Type: "cash", CurrencyID: 999, IsActive: true}); !errors.Is(
+		err,
+		ErrUnknownCurrency,
+	) {
 		t.Fatalf("create with unknown currency = %v, want ErrUnknownCurrency", err)
 	}
 	date := "2024-01-15"
-	if _, err := e.txs.Create(e.ctx, TxInput{Type: "expense", AccountID: 999, Amount: dec("1"), Date: &date}); !errors.Is(err, ErrUnknownAccount) {
+	if _, err := e.txs.Create(e.ctx, TxInput{Type: "expense", AccountID: 999, Amount: dec("1"), Date: &date}); !errors.Is(
+		err,
+		ErrUnknownAccount,
+	) {
 		t.Fatalf("transaction on unknown account = %v, want ErrUnknownAccount", err)
 	}
 }

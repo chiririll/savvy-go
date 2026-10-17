@@ -125,7 +125,11 @@ func (h Handler) apiTokenCapabilities(w http.ResponseWriter, r *http.Request) {
 		}
 		kinds[kind] = dto.TokenKindCapabilities{Resources: resources, Presets: presets}
 	}
-	httpx.WriteData(w, http.StatusOK, dto.TokenCapabilities{Levels: permissions.Levels, Presets: permissions.Presets, Kinds: kinds})
+	httpx.WriteData(
+		w,
+		http.StatusOK,
+		dto.TokenCapabilities{Levels: permissions.Levels, Presets: permissions.Presets, Kinds: kinds},
+	)
 }
 
 // tokenGrantBody is the part of a token request that says what it may do: a

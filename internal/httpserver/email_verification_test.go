@@ -135,7 +135,13 @@ func TestUnverifiedUserIsHeldBackOnAPITokensToo(t *testing.T) {
 	}
 	user := a.createUser("u@test.com", "secret1", roleEditor)
 	us := a.issue(user, false)
-	res := a.do("POST", "/api/auth/api-tokens", confirmed(map[string]any{"name": "t", "permissions": allPerms(permissions.Read), "all_spaces": true}), us.Token, us.CSRF)
+	res := a.do(
+		"POST",
+		"/api/auth/api-tokens",
+		confirmed(map[string]any{"name": "t", "permissions": allPerms(permissions.Read), "all_spaces": true}),
+		us.Token,
+		us.CSRF,
+	)
 	raw, _ := decodeJSON(t, res)["data"].(map[string]any)["token"].(string)
 	if res.StatusCode != 201 || raw == "" {
 		t.Fatalf("mint a token: %d", res.StatusCode)
@@ -275,7 +281,8 @@ func TestVerificationLinkExpires(t *testing.T) {
 	// The user asks again and the new link works.
 	a.do("POST", "/api/auth/verify-email/resend", nil, us.Token, us.CSRF).Body.Close()
 	fresh := strings.TrimPrefix(linkIn(t, rec.messages()[1]).Path, "/verify-email/")
-	if res := a.do("POST", "/api/auth/verify-email", map[string]any{"token": fresh}, "", ""); res.StatusCode != 200 || !a.verified(user.ID) {
+	if res := a.do("POST", "/api/auth/verify-email", map[string]any{"token": fresh}, "", ""); res.StatusCode != 200 ||
+		!a.verified(user.ID) {
 		t.Fatalf("the new link: %d", res.StatusCode)
 	}
 }
@@ -291,7 +298,13 @@ func TestResendNeedsMail(t *testing.T) {
 
 func TestAdminSetsVerifiedByHandAndAddressChangeClearsIt(t *testing.T) {
 	a, sess, _ := newMailApp(t, &recorder{on: true})
-	create := a.do("POST", "/api/users", map[string]any{"name": "N", "email": "n@test.com", "password": "secret12", "role": "user", "emailVerified": true}, sess.Token, sess.CSRF)
+	create := a.do(
+		"POST",
+		"/api/users",
+		map[string]any{"name": "N", "email": "n@test.com", "password": "secret12", "role": "user", "emailVerified": true},
+		sess.Token,
+		sess.CSRF,
+	)
 	data := decodeJSON(t, create)["data"].(map[string]any)
 	id := int64(data["id"].(float64))
 	if create.StatusCode != 201 || data["emailVerified"] != true {
@@ -317,7 +330,13 @@ func TestAdminSetsVerifiedByHandAndAddressChangeClearsIt(t *testing.T) {
 		t.Fatal("a new address stayed verified")
 	}
 	// Changing the address and marking it verified in one request is the admin's word.
-	a.do("PATCH", "/api/users/"+itoa(id), map[string]any{"email": "again@test.com", "emailVerified": true}, sess.Token, sess.CSRF)
+	a.do(
+		"PATCH",
+		"/api/users/"+itoa(id),
+		map[string]any{"email": "again@test.com", "emailVerified": true},
+		sess.Token,
+		sess.CSRF,
+	)
 	if !a.verified(id) {
 		t.Fatal("the admin's explicit mark was lost")
 	}

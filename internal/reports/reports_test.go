@@ -67,8 +67,14 @@ func TestReportsFollowTheBaseCurrencyScale(t *testing.T) {
 		t.Fatal(err)
 	}
 	accts := ledger.Accounts{DB: sqlDB}
-	yen, _ := accts.Create(ctx, ledger.AccountInput{Name: "yen", Type: "cash", CurrencyID: jpy.ID, InitialBalance: dec("5000"), IsActive: true})
-	dollars, _ := accts.Create(ctx, ledger.AccountInput{Name: "usd", Type: "cash", CurrencyID: usd.ID, InitialBalance: dec("10"), IsActive: true})
+	yen, _ := accts.Create(
+		ctx,
+		ledger.AccountInput{Name: "yen", Type: "cash", CurrencyID: jpy.ID, InitialBalance: dec("5000"), IsActive: true},
+	)
+	dollars, _ := accts.Create(
+		ctx,
+		ledger.AccountInput{Name: "usd", Type: "cash", CurrencyID: usd.ID, InitialBalance: dec("10"), IsActive: true},
+	)
 	date := "2024-01-15"
 	txs := ledger.Transactions{DB: sqlDB}
 	for _, in := range []ledger.TxInput{
@@ -111,7 +117,11 @@ func TestMoneyFlowSplitsIncomeAcrossExpenses(t *testing.T) {
 		}
 	}
 	got := (Service{DB: e.db}).MoneyFlow(e.ctx, janRange)
-	totals := map[string]money.Money{"income": got.Totals.Income, "expenses": got.Totals.Expenses, "savings": got.Totals.Savings}
+	totals := map[string]money.Money{
+		"income":   got.Totals.Income,
+		"expenses": got.Totals.Expenses,
+		"savings":  got.Totals.Savings,
+	}
 	base := e.usd.Unit()
 	for key, want := range map[string]string{"income": "100", "expenses": "25", "savings": "75"} {
 		if m := totals[key]; !m.Equal(money.FromDecimal(dec(want), base)) {

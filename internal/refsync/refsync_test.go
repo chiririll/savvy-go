@@ -121,7 +121,10 @@ func (e *env) category(t *testing.T, i int, typ, name string) *ledger.Category {
 func (e *env) spend(t *testing.T, i int, categoryID int64) {
 	t.Helper()
 	d := e.db(t, i)
-	cur, err := (ledger.Currencies{DB: d}).Create(ctx, ledger.Currency{Code: "EUR", Name: "EUR", Symbol: "EUR", Decimals: 2, IsBase: true, Rate: decimal.NewFromInt(1)})
+	cur, err := (ledger.Currencies{DB: d}).Create(
+		ctx,
+		ledger.Currency{Code: "EUR", Name: "EUR", Symbol: "EUR", Decimals: 2, IsBase: true, Rate: decimal.NewFromInt(1)},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -157,7 +160,12 @@ func TestOperationsAreMirroredToTheWholeGroup(t *testing.T) {
 	e.group(t, 0, 1, 2)
 	a := e.id(0)
 
-	created, err := e.svc.CreateCategory(ctx, e.owner, a, ledger.Category{Name: "Rent", Type: "expense", Color: ptr("#112233")})
+	created, err := e.svc.CreateCategory(
+		ctx,
+		e.owner,
+		a,
+		ledger.Category{Name: "Rent", Type: "expense", Color: ptr("#112233")},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -490,15 +498,20 @@ func TestMembershipRules(t *testing.T) {
 	// Only an admin of the space may take it out; removing needs no one else.
 	bob := e0(t, e.st, "Bob", "bob@test.com")
 	_ = e.svc.Spaces.SetMember(ctx, e.id(2), bob, spaces.RoleAdmin)
-	if _, err := e.svc.Apply(ctx, bob, Plan{Change: Change{GroupID: g.ID, Remove: []int64{e.id(0)}, Categories: true}}); !errors.Is(err, ErrNotAdmin) {
+	if _, err := e.svc.Apply(ctx, bob, Plan{Change: Change{GroupID: g.ID, Remove: []int64{e.id(0)}, Categories: true}}); !errors.Is(
+		err,
+		ErrNotAdmin,
+	) {
 		t.Fatalf("err = %v, want ErrNotAdmin", err)
 	}
-	if g, err = e.svc.Apply(ctx, bob, Plan{Change: Change{GroupID: g.ID, Remove: []int64{e.id(2)}, Categories: true}}); err != nil || len(g.Members) != 2 {
+	if g, err = e.svc.Apply(ctx, bob, Plan{Change: Change{GroupID: g.ID, Remove: []int64{e.id(2)}, Categories: true}}); err != nil ||
+		len(g.Members) != 2 {
 		t.Fatalf("group = %+v, %v", g, err)
 	}
 
 	// A group that falls below two spaces is dissolved.
-	if g, err = e.svc.Apply(ctx, e.owner, Plan{Change: Change{GroupID: g.ID, Remove: []int64{e.id(0)}, Categories: true}}); err != nil || g != nil {
+	if g, err = e.svc.Apply(ctx, e.owner, Plan{Change: Change{GroupID: g.ID, Remove: []int64{e.id(0)}, Categories: true}}); err != nil ||
+		g != nil {
 		t.Fatalf("group = %+v, %v", g, err)
 	}
 	if g, _ := e.svc.GroupOf(ctx, e.id(1)); g != nil {

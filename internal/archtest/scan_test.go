@@ -136,7 +136,13 @@ func analyzeFile(fset *token.FileSet, file *ast.File, rel string, src []byte) []
 		if i >= tf.LineCount() {
 			break
 		}
-		add(ruleLineWidth, tf.LineStart(i+1), fmt.Sprintf("line %d", i+1), utf8.RuneCountInString(strings.TrimRight(line, "\r")), nil)
+		add(
+			ruleLineWidth,
+			tf.LineStart(i+1),
+			fmt.Sprintf("line %d", i+1),
+			utf8.RuneCountInString(strings.TrimRight(line, "\r")),
+			nil,
+		)
 	}
 
 	for _, decl := range file.Decls {

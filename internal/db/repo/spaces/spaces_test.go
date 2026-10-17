@@ -262,7 +262,8 @@ func TestAuditLogIsNewestFirstAndActorIsOptional(t *testing.T) {
 		t.Fatalf("order = %s, %s", log[0].Action, log[1].Action)
 	}
 	if log[1].Actor != "Ann" || log[1].TargetUserID == nil || *log[1].TargetUserID != r.bob || log[1].Details != "bob@test.com" ||
-		log[1].CreatedAt == nil || !log[1].CreatedAt.Equal(t0) {
+		log[1].CreatedAt == nil ||
+		!log[1].CreatedAt.Equal(t0) {
 		t.Fatalf("entry = %+v", log[1])
 	}
 	if log[0].TargetUserID != nil {

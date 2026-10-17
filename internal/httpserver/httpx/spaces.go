@@ -20,9 +20,13 @@ func WriteSpaceError(w http.ResponseWriter, err error) {
 		WriteMessage(w, http.StatusForbidden, err.Error())
 	case errors.Is(err, spaces.ErrInvitationCooldown):
 		WriteMessage(w, http.StatusTooManyRequests, err.Error())
-	case errors.Is(err, spaces.ErrGuestCannotAdmin), errors.Is(err, spaces.ErrLastAdmin), errors.Is(err, spaces.ErrLastMember),
-		errors.Is(err, spaces.ErrSpaceLimit), errors.Is(err, spaces.ErrInvitationEmail),
-		errors.Is(err, spaces.ErrInvitationExists), errors.Is(err, spaces.ErrAlreadyMember):
+	case errors.Is(err, spaces.ErrGuestCannotAdmin),
+		errors.Is(err, spaces.ErrLastAdmin),
+		errors.Is(err, spaces.ErrLastMember),
+		errors.Is(err, spaces.ErrSpaceLimit),
+		errors.Is(err, spaces.ErrInvitationEmail),
+		errors.Is(err, spaces.ErrInvitationExists),
+		errors.Is(err, spaces.ErrAlreadyMember):
 		WriteMessage(w, http.StatusUnprocessableEntity, err.Error())
 	default:
 		WriteMessage(w, http.StatusInternalServerError, err.Error())

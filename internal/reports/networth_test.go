@@ -20,9 +20,18 @@ func (e *seriesEnv) budget(t *testing.T, in ledger.BudgetInput) {
 func TestPaceBudgetAddsEveryCurrencyAtItsRate(t *testing.T) {
 	e := newSeriesEnv(t)
 	e.budget(t, ledger.BudgetInput{Name: "usd", Amount: dec("50"), CurrencyID: &e.usd.ID})
-	e.budget(t, ledger.BudgetInput{Name: "yen", Amount: dec("10000"), CurrencyID: &e.jpy.ID})                       // 100 USD
-	e.budget(t, ledger.BudgetInput{Name: "weekly", Amount: dec("999"), CurrencyID: &e.usd.ID, Period: "weekly"})    // not monthly
-	e.budget(t, ledger.BudgetInput{Name: "off", Amount: dec("999"), CurrencyID: &e.usd.ID, IsActive: ptrTo(false)}) // not active
+	e.budget(
+		t,
+		ledger.BudgetInput{Name: "yen", Amount: dec("10000"), CurrencyID: &e.jpy.ID},
+	) // 100 USD
+	e.budget(
+		t,
+		ledger.BudgetInput{Name: "weekly", Amount: dec("999"), CurrencyID: &e.usd.ID, Period: "weekly"},
+	) // not monthly
+	e.budget(
+		t,
+		ledger.BudgetInput{Name: "off", Amount: dec("999"), CurrencyID: &e.usd.ID, IsActive: ptrTo(false)},
+	) // not active
 
 	got := (Service{DB: e.db}).ExpensePace(e.ctx, janRange)
 	if len(got.Months) != 1 || got.Months[0].Budget == nil {
@@ -46,8 +55,20 @@ func TestPaceBudgetFollowsTheReportScope(t *testing.T) {
 		t.Fatal(err)
 	}
 	e.budget(t, ledger.BudgetInput{Name: "all", Amount: dec("400"), CurrencyID: &e.usd.ID})
-	e.budget(t, ledger.BudgetInput{Name: "food", Amount: dec("30"), CurrencyID: &e.usd.ID, CategoryIDs: []int64{e.food.ID}, HasCategoryIDs: true})
-	e.budget(t, ledger.BudgetInput{Name: "trip", Amount: dec("7"), CurrencyID: &e.usd.ID, TagIDs: []int64{tag.ID}, HasTagIDs: true})
+	e.budget(
+		t,
+		ledger.BudgetInput{
+			Name:           "food",
+			Amount:         dec("30"),
+			CurrencyID:     &e.usd.ID,
+			CategoryIDs:    []int64{e.food.ID},
+			HasCategoryIDs: true,
+		},
+	)
+	e.budget(
+		t,
+		ledger.BudgetInput{Name: "trip", Amount: dec("7"), CurrencyID: &e.usd.ID, TagIDs: []int64{tag.ID}, HasTagIDs: true},
+	)
 	svc := Service{DB: e.db}
 
 	scoped := func(f Filter) *money.Money {
@@ -60,7 +81,8 @@ func TestPaceBudgetFollowsTheReportScope(t *testing.T) {
 	if b := scoped(Filter{TagIDs: []int64{tag.ID}}); b == nil || b.Decimal().String() != "7" {
 		t.Errorf("a tag sees the budgets tied to it: %v", b)
 	}
-	if b := scoped(Filter{CategoryIDs: []int64{e.food.ID}, TagIDs: []int64{tag.ID}}); b == nil || b.Decimal().String() != "37" {
+	if b := scoped(Filter{CategoryIDs: []int64{e.food.ID}, TagIDs: []int64{tag.ID}}); b == nil ||
+		b.Decimal().String() != "37" {
 		t.Errorf("both: %v", b)
 	}
 	if b := scoped(Filter{CategoryIDs: []int64{e.fun.ID}}); b != nil {
@@ -132,14 +154,19 @@ func TestNetWorthHistoryStepsByPeriod(t *testing.T) {
 	f := Filter{PeriodType: "custom", StartDate: "2024-01-15", EndDate: "2024-03-10"}
 
 	got := (Service{DB: e.db}).NetWorthHistory(e.ctx, f, "month")
-	if len(got.Dates) != 3 || got.Dates[0] != "2024-01-15" || got.Dates[1] != "2024-02-01" || got.Dates[2] != "2024-03-01" {
+	if len(got.Dates) != 3 || got.Dates[0] != "2024-01-15" || got.Dates[1] != "2024-02-01" ||
+		got.Dates[2] != "2024-03-01" {
 		t.Fatalf("dates %v", got.Dates)
 	}
 	for i, want := range []string{"110", "110", "160"} { // end of January, end of February, 10 March
 		wantMoney(t, got.Dates[i], got.Values[i], usd(e.moneyEnv, want))
 	}
 
-	days := (Service{DB: e.db}).NetWorthHistory(e.ctx, Filter{PeriodType: "custom", StartDate: "2024-01-19", EndDate: "2024-01-21"}, "day")
+	days := (Service{DB: e.db}).NetWorthHistory(
+		e.ctx,
+		Filter{PeriodType: "custom", StartDate: "2024-01-19", EndDate: "2024-01-21"},
+		"day",
+	)
 	for i, want := range []string{"130", "110", "110"} {
 		wantMoney(t, days.Dates[i], days.Values[i], usd(e.moneyEnv, want))
 	}

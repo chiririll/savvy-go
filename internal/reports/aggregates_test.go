@@ -87,7 +87,10 @@ func TestEachCurrencyAloneIsConvertedAndRoundedIntoTheBase(t *testing.T) {
 					stored := decimal.New(a.Minor, -int32(c.Decimals))
 					want, err := money.FromInput(asBase(stored, c, base), e.stored(base).Unit())
 					date := "2024-01-15"
-					created, terr := e.txs.Create(e.ctx, ledger.TxInput{Type: "expense", AccountID: e.accts[c.Code].ID, Amount: a.Input, Date: &date})
+					created, terr := e.txs.Create(
+						e.ctx,
+						ledger.TxInput{Type: "expense", AccountID: e.accts[c.Code].ID, Amount: a.Input, Date: &date},
+					)
 					if terr != nil {
 						t.Fatal(terr)
 					}

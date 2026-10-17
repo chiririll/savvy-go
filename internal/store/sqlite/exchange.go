@@ -104,7 +104,11 @@ func copyPlain(src, dst string) error {
 	return out.Close()
 }
 
-func (s *Store) PrepareSpace(ctx context.Context, src string, opts ...store.PrepareOption) (*store.PreparedSpace, error) {
+func (s *Store) PrepareSpace(
+	ctx context.Context,
+	src string,
+	opts ...store.PrepareOption,
+) (*store.PreparedSpace, error) {
 	o := store.ResolvePrepare(opts)
 	kind, err := inspect(ctx, src)
 	if err != nil {
@@ -172,7 +176,10 @@ func (s *Store) convertLaravel(ctx context.Context, src, staging, appKey string)
 			rows.Close()
 			return "", err
 		}
-		drops = append(drops, fmt.Sprintf("DROP %s IF EXISTS %s", map[string]string{"trigger": "TRIGGER", "view": "VIEW"}[typ], quoteIdent(name)))
+		drops = append(
+			drops,
+			fmt.Sprintf("DROP %s IF EXISTS %s", map[string]string{"trigger": "TRIGGER", "view": "VIEW"}[typ], quoteIdent(name)),
+		)
 	}
 	rows.Close()
 	for _, q := range drops {
@@ -189,7 +196,11 @@ func (s *Store) convertLaravel(ctx context.Context, src, staging, appKey string)
 	return dst, nil
 }
 
-func (s *Store) PrepareServer(ctx context.Context, src string, opts ...store.PrepareOption) (*store.PreparedServer, error) {
+func (s *Store) PrepareServer(
+	ctx context.Context,
+	src string,
+	opts ...store.PrepareOption,
+) (*store.PreparedServer, error) {
 	o := store.ResolvePrepare(opts)
 	if o.LegacyKey != "" {
 		if err := legacy.CheckKey(o.LegacyKey); err != nil {
@@ -276,7 +287,8 @@ func spaceIDs(dir string) ([]int64, error) {
 	var ids []int64
 	for _, e := range entries {
 		var id int64
-		if _, err := fmt.Sscanf(e.Name(), "%d"+spaceExt, &id); err == nil && id > 0 && e.Name() == strconv.FormatInt(id, 10)+spaceExt {
+		if _, err := fmt.Sscanf(e.Name(), "%d"+spaceExt, &id); err == nil && id > 0 &&
+			e.Name() == strconv.FormatInt(id, 10)+spaceExt {
 			ids = append(ids, id)
 		}
 	}

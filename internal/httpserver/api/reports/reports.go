@@ -66,12 +66,20 @@ func reportsExpensePace(w http.ResponseWriter, r *http.Request) {
 }
 
 func reportsByCategory(w http.ResponseWriter, r *http.Request) {
-	httpx.WriteJSON(w, http.StatusOK, dto.NewExpensesByCategory(httpx.Scope(r).Reports.ExpensesByCategory(r.Context(), reportFilter(r))))
+	httpx.WriteJSON(
+		w,
+		http.StatusOK,
+		dto.NewExpensesByCategory(httpx.Scope(r).Reports.ExpensesByCategory(r.Context(), reportFilter(r))),
+	)
 }
 
 func reportsCashFlow(w http.ResponseWriter, r *http.Request) {
 	group := firstQuery(r.URL.Query().Get("group_by"), "day")
-	httpx.WriteJSON(w, http.StatusOK, dto.NewCashFlow(httpx.Scope(r).Reports.CashFlowOverTime(r.Context(), reportFilter(r), group)))
+	httpx.WriteJSON(
+		w,
+		http.StatusOK,
+		dto.NewCashFlow(httpx.Scope(r).Reports.CashFlowOverTime(r.Context(), reportFilter(r), group)),
+	)
 }
 
 func reportsHeatmap(w http.ResponseWriter, r *http.Request) {
@@ -80,18 +88,30 @@ func reportsHeatmap(w http.ResponseWriter, r *http.Request) {
 
 func reportsTxSummary(w http.ResponseWriter, r *http.Request) {
 	typ := firstQuery(r.URL.Query().Get("type"), "expense")
-	httpx.WriteJSON(w, http.StatusOK, dto.NewTxSummary(httpx.Scope(r).Reports.TxSummary(r.Context(), reportFilter(r), typ)))
+	httpx.WriteJSON(
+		w,
+		http.StatusOK,
+		dto.NewTxSummary(httpx.Scope(r).Reports.TxSummary(r.Context(), reportFilter(r), typ)),
+	)
 }
 
 func reportsTxByCategory(w http.ResponseWriter, r *http.Request) {
 	typ := firstQuery(r.URL.Query().Get("type"), "expense")
-	httpx.WriteJSON(w, http.StatusOK, dto.NewTxByCategory(httpx.Scope(r).Reports.TxByCategory(r.Context(), reportFilter(r), typ)))
+	httpx.WriteJSON(
+		w,
+		http.StatusOK,
+		dto.NewTxByCategory(httpx.Scope(r).Reports.TxByCategory(r.Context(), reportFilter(r), typ)),
+	)
 }
 
 func reportsTxDynamics(w http.ResponseWriter, r *http.Request) {
 	typ := firstQuery(r.URL.Query().Get("type"), "expense")
 	group := firstQuery(r.URL.Query().Get("group_by"), "day")
-	httpx.WriteJSON(w, http.StatusOK, dto.NewTxDynamics(httpx.Scope(r).Reports.TxDynamics(r.Context(), reportFilter(r), typ, group)))
+	httpx.WriteJSON(
+		w,
+		http.StatusOK,
+		dto.NewTxDynamics(httpx.Scope(r).Reports.TxDynamics(r.Context(), reportFilter(r), typ, group)),
+	)
 }
 
 func reportsTxTop(w http.ResponseWriter, r *http.Request) {
@@ -106,5 +126,9 @@ func reportsNetWorth(w http.ResponseWriter, r *http.Request) {
 
 func reportsNetWorthHistory(w http.ResponseWriter, r *http.Request) {
 	group := firstQuery(r.URL.Query().Get("group_by"), "day")
-	httpx.WriteJSON(w, http.StatusOK, dto.NewNetWorthHistory(httpx.Scope(r).Reports.NetWorthHistory(r.Context(), reportFilter(r), group)))
+	httpx.WriteJSON(
+		w,
+		http.StatusOK,
+		dto.NewNetWorthHistory(httpx.Scope(r).Reports.NetWorthHistory(r.Context(), reportFilter(r), group)),
+	)
 }

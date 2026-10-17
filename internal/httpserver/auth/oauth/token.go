@@ -18,7 +18,10 @@ func (h Handler) oauthToken(w http.ResponseWriter, r *http.Request) {
 	f := r.PostForm
 	grant := f.Get("grant_type")
 	if grant != "authorization_code" && grant != "refresh_token" {
-		writeOAuthError(w, &oauth.Error{Code: "unsupported_grant_type", Description: "Use authorization_code or refresh_token."})
+		writeOAuthError(
+			w,
+			&oauth.Error{Code: "unsupported_grant_type", Description: "Use authorization_code or refresh_token."},
+		)
 		return
 	}
 	c, err := h.OAuth.Client(r.Context(), f.Get("client_id"))

@@ -15,7 +15,13 @@ type WebAuthnCred struct {
 }
 
 func NewWebAuthnCred(c auth.WebAuthnCred) WebAuthnCred {
-	return WebAuthnCred{ID: c.ID, Name: c.Name, AAGUID: c.AAGUID, LastUsedAt: utc(c.LastUsedAt), CreatedAt: utc(c.CreatedAt)}
+	return WebAuthnCred{
+		ID:         c.ID,
+		Name:       c.Name,
+		AAGUID:     c.AAGUID,
+		LastUsedAt: utc(c.LastUsedAt),
+		CreatedAt:  utc(c.CreatedAt),
+	}
 }
 
 // APIToken keeps snake_case keys, unlike the rest of the package: clients send

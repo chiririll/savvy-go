@@ -43,7 +43,10 @@ func (b syncBody) change() refsync.Change {
 func (b syncBody) plan() refsync.Plan {
 	p := refsync.Plan{Change: b.change()}
 	for _, d := range b.Decisions {
-		p.Decisions = append(p.Decisions, refsync.Decision{Kind: d.Kind, Type: d.Type, Name: d.Name, Keep: d.Keep, From: d.From, Successor: d.Successor})
+		p.Decisions = append(
+			p.Decisions,
+			refsync.Decision{Kind: d.Kind, Type: d.Type, Name: d.Name, Keep: d.Keep, From: d.From, Successor: d.Successor},
+		)
 	}
 	for _, d := range b.Defaults {
 		p.Defaults = append(p.Defaults, refsync.DefaultDecision{Type: d.Type, Name: d.Name})

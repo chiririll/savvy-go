@@ -45,7 +45,11 @@ func count(t *testing.T, d store.DB, q string, args ...any) int {
 // the second tag so the autoincrement counter is ahead of the rows.
 func seedSpace(t *testing.T, d store.DB) {
 	t.Helper()
-	exec(t, d, `INSERT INTO currencies (code, name, symbol, decimals, is_base, rate) VALUES ('EUR', 'Euro', '€', 2, 1, '1')`)
+	exec(
+		t,
+		d,
+		`INSERT INTO currencies (code, name, symbol, decimals, is_base, rate) VALUES ('EUR', 'Euro', '€', 2, 1, '1')`,
+	)
 	exec(t, d, `INSERT INTO accounts (name, type, currency_id) VALUES ('Cash', 'cash', 1)`)
 	exec(t, d, `INSERT INTO tags (name) VALUES ('keep'), ('gone')`)
 	exec(t, d, `DELETE FROM tags WHERE name = 'gone'`)

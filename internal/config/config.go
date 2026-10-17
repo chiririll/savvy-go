@@ -132,7 +132,13 @@ func (f *Config) finish() error {
 	f.writable = true
 	if err := writeFile(f.path, out); err != nil {
 		f.writable = false
-		slog.Warn("could not write the config file; the values in it cannot be changed from the application", "path", f.path, "err", err)
+		slog.Warn(
+			"could not write the config file; the values in it cannot be changed from the application",
+			"path",
+			f.path,
+			"err",
+			err,
+		)
 	}
 	return nil
 }

@@ -81,7 +81,9 @@ func newMailAppAt(t *testing.T, appURL string, rec *recorder, opts ...Option) (*
 	t.Helper()
 	cfg, _ := testConfig(t)
 	st := openTestStore(t, cfg)
-	opts = append([]Option{WithRates(currencydata.NewOffline()), WithConfig(mailFile(rec.on, "smtp.example.com")), WithMailer(rec)}, opts...)
+	opts = append(
+		[]Option{WithRates(currencydata.NewOffline()), WithConfig(mailFile(rec.on, "smtp.example.com")), WithMailer(rec)},
+		opts...)
 	s := New(cfg.WithAppURL(appURL), st, testKeys(t, cfg), opts...)
 	space, err := servicesOf(s).Spaces.Create(context.Background(), "Test", nil)
 	if err != nil {
@@ -192,7 +194,13 @@ func TestResetLinkIsEmailedWithoutRevealingTheToken(t *testing.T) {
 	a, sess, _ := newMailApp(t, rec)
 	target := a.createUser("target@test.com", "oldpass12", roleEditor)
 
-	res := a.do("POST", "/api/users/"+itoa(target.ID)+"/password-token", map[string]any{"send": true}, sess.Token, sess.CSRF)
+	res := a.do(
+		"POST",
+		"/api/users/"+itoa(target.ID)+"/password-token",
+		map[string]any{"send": true},
+		sess.Token,
+		sess.CSRF,
+	)
 	body := decodeJSON(t, res)
 	if res.StatusCode != 200 {
 		t.Fatalf("send %d %v", res.StatusCode, body)
@@ -257,11 +265,15 @@ func TestResetLinkIsNotSentWhenItCannotWork(t *testing.T) {
 			a, sess, _ := newMailApp(t, rec)
 			return a, sess, a.createUser("target@test.com", "oldpass12", roleEditor).ID
 		}, "connection refused"},
-		{"mail is off: asking to send is an error, not a silent fallback", func(t *testing.T, rec *recorder) (*testApp, *auth.Issued, int64) {
-			rec.on = false
-			a, sess, _ := newMailApp(t, rec)
-			return a, sess, a.createUser("target@test.com", "oldpass12", roleEditor).ID
-		}, ""},
+		{
+			"mail is off: asking to send is an error, not a silent fallback",
+			func(t *testing.T, rec *recorder) (*testApp, *auth.Issued, int64) {
+				rec.on = false
+				a, sess, _ := newMailApp(t, rec)
+				return a, sess, a.createUser("target@test.com", "oldpass12", roleEditor).ID
+			},
+			"",
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -299,7 +311,13 @@ func TestNewUserGetsTheSetPasswordLinkByEmail(t *testing.T) {
 	rec := &recorder{on: true}
 	a, sess, _ := newMailApp(t, rec)
 
-	res := a.do("POST", "/api/users", map[string]any{"name": "New", "email": "new@test.com", "role": "user", "send": true}, sess.Token, sess.CSRF)
+	res := a.do(
+		"POST",
+		"/api/users",
+		map[string]any{"name": "New", "email": "new@test.com", "role": "user", "send": true},
+		sess.Token,
+		sess.CSRF,
+	)
 	body := decodeJSON(t, res)
 	data, _ := body["data"].(map[string]any)
 	if res.StatusCode != 201 || data["emailSent"] != true {
@@ -361,11 +379,23 @@ func TestNewUserLinkIsRefusedWhenVerificationIsRequired(t *testing.T) {
 	_ = a.svc.Users.SetEmailVerified(context.Background(), admin.ID, true)
 	_ = settings.Store{DB: a.db}.Set(context.Background(), "require_email_verification", true)
 
-	res := a.do("POST", "/api/users", map[string]any{"name": "New", "email": "new@test.com", "role": "user"}, sess.Token, sess.CSRF)
+	res := a.do(
+		"POST",
+		"/api/users",
+		map[string]any{"name": "New", "email": "new@test.com", "role": "user"},
+		sess.Token,
+		sess.CSRF,
+	)
 	if res.StatusCode != 422 {
 		t.Errorf("link instead of email: %d", res.StatusCode)
 	}
-	res = a.do("POST", "/api/users", map[string]any{"name": "New", "email": "new@test.com", "role": "user", "send": true}, sess.Token, sess.CSRF)
+	res = a.do(
+		"POST",
+		"/api/users",
+		map[string]any{"name": "New", "email": "new@test.com", "role": "user", "send": true},
+		sess.Token,
+		sess.CSRF,
+	)
 	if res.StatusCode != 201 {
 		t.Errorf("emailed: %d", res.StatusCode)
 	}

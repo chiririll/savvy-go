@@ -125,7 +125,13 @@ func (f Filter) Sparkline(now time.Time, count int) []dateRange {
 			out = append(out, dateRange{start, calendar.EndOfMonth(start.AddDate(0, 2, 0))})
 		case "year":
 			a := cur.Start.AddDate(-i, 0, 0)
-			out = append(out, dateRange{time.Date(a.Year(), 1, 1, 0, 0, 0, 0, a.Location()), time.Date(a.Year(), 12, 31, 0, 0, 0, 0, a.Location())})
+			out = append(
+				out,
+				dateRange{
+					time.Date(a.Year(), 1, 1, 0, 0, 0, 0, a.Location()),
+					time.Date(a.Year(), 12, 31, 0, 0, 0, 0, a.Location()),
+				},
+			)
 		case "last_30_days", "custom":
 			out = append(out, dateRange{cur.Start.AddDate(0, 0, -days*i), cur.End.AddDate(0, 0, -days*i)})
 		case "ytd":

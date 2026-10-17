@@ -47,7 +47,12 @@ func sensitiveRequests() []sensitive {
 		return "/api/auth/api-tokens/" + strconv.FormatInt(tok.ID, 10)
 	}
 	return []sensitive{
-		{"register a passkey", "POST", fixed("/api/auth/webauthn/register/options"), func() map[string]any { return map[string]any{} }},
+		{
+			"register a passkey",
+			"POST",
+			fixed("/api/auth/webauthn/register/options"),
+			func() map[string]any { return map[string]any{} },
+		},
 		{"delete a passkey", "DELETE", passkey, func() map[string]any { return map[string]any{} }},
 		{"enable 2FA", "POST", fixed("/api/auth/2fa/enable"), func() map[string]any { return map[string]any{} }},
 		{"issue an API token", "POST", fixed("/api/auth/api-tokens"), grant},
@@ -78,7 +83,8 @@ func TestSensitiveChangesNeedThePassword(t *testing.T) {
 			}
 
 			res = a.do(tc.method, path, with(tc.body(), map[string]any{"current_password": "wrong-pass"}), sess.Token, sess.CSRF)
-			if body := decodeJSON(t, res); res.StatusCode != http.StatusUnprocessableEntity || body["error"] != "confirmation_invalid" {
+			if body := decodeJSON(t, res); res.StatusCode != http.StatusUnprocessableEntity ||
+				body["error"] != "confirmation_invalid" {
 				t.Fatalf("wrong password: %d %v", res.StatusCode, body)
 			}
 
@@ -113,7 +119,13 @@ func TestSensitiveChangesNeedTheCodeWhenTwoFactorIsOn(t *testing.T) {
 	if b := decodeJSON(t, res); res.StatusCode != http.StatusUnprocessableEntity || b["error"] != "confirmation_invalid" {
 		t.Fatalf("wrong code: %d %v", res.StatusCode, b)
 	}
-	res = a.do("POST", "/api/auth/api-tokens", body(map[string]any{"code": totp.At(secret, time.Now())}), sess.Token, sess.CSRF)
+	res = a.do(
+		"POST",
+		"/api/auth/api-tokens",
+		body(map[string]any{"code": totp.At(secret, time.Now())}),
+		sess.Token,
+		sess.CSRF,
+	)
 	res.Body.Close()
 	if res.StatusCode != http.StatusCreated {
 		t.Fatalf("right code: %d", res.StatusCode)
@@ -214,7 +226,8 @@ func TestOAuthConsentNeedsThePasswordToApprove(t *testing.T) {
 		t.Fatalf("no password: %d %v", res.StatusCode, body)
 	}
 	res = decide(true, map[string]any{"current_password": "wrong-pass"})
-	if body := decodeJSON(t, res); res.StatusCode != http.StatusUnprocessableEntity || body["error"] != "confirmation_invalid" {
+	if body := decodeJSON(t, res); res.StatusCode != http.StatusUnprocessableEntity ||
+		body["error"] != "confirmation_invalid" {
 		t.Fatalf("wrong password: %d %v", res.StatusCode, body)
 	}
 	status(t, decide(false, nil), http.StatusOK, "declining")

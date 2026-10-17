@@ -83,7 +83,17 @@ func newTestApp(t *testing.T, opts ...Option) *testApp {
 	}
 	ts := httptest.NewServer(s.Handler())
 	t.Cleanup(ts.Close)
-	return &testApp{t: t, db: st.SQL(), store: st, space: space, srv: ts, s: s, svc: servicesOf(s), client: ts.Client(), bootstrap: guard}
+	return &testApp{
+		t:         t,
+		db:        st.SQL(),
+		store:     st,
+		space:     space,
+		srv:       ts,
+		s:         s,
+		svc:       servicesOf(s),
+		client:    ts.Client(),
+		bootstrap: guard,
+	}
 }
 
 // spaceDB is the database of the shared test space.
@@ -293,7 +303,9 @@ func TestHostPrefixedCookieOverTLS(t *testing.T) {
 	t.Cleanup(ts.Close)
 	client := ts.Client()
 
-	raw, _ := json.Marshal(map[string]string{"name": "A", "email": "a@a.com", "password": "secret12", "bootstrap_password": guard.Password()})
+	raw, _ := json.Marshal(
+		map[string]string{"name": "A", "email": "a@a.com", "password": "secret12", "bootstrap_password": guard.Password()},
+	)
 	req, _ := http.NewRequest("POST", ts.URL+"/api/auth/register", bytes.NewReader(raw))
 	req.Header.Set("Content-Type", "application/json")
 	res, err := client.Do(req)
@@ -460,7 +472,10 @@ func TestLoginSSOOnlyAnd2FAChallenge(t *testing.T) {
 	res.Body.Close()
 
 	u2 := a.createUser("u@test.com", "secret1", roleEditor)
-	_, _ = a.db.Exec(`UPDATE users SET two_factor_enabled = 1, two_factor_confirmed = 1, two_factor_secret = 'SECRET' WHERE id = ?`, u2.ID)
+	_, _ = a.db.Exec(
+		`UPDATE users SET two_factor_enabled = 1, two_factor_confirmed = 1, two_factor_secret = 'SECRET' WHERE id = ?`,
+		u2.ID,
+	)
 	res = a.do("POST", "/api/auth/login", map[string]string{"email": "u@test.com", "password": "secret1"}, "", "")
 	body := decodeJSON(t, res)
 	if body["requires_2fa"] != true || body["two_factor_token"] == nil {
@@ -500,7 +515,10 @@ func TestTwoFactorChallengePeekAndConsume(t *testing.T) {
 	}
 
 	tok, _ = a.svc.Challenges.Issue(context.Background(), u)
-	_, _ = a.db.Exec(`UPDATE two_factor_challenges SET expires_at = ?`, time.Now().Add(-time.Minute).UTC().Format(time.RFC3339Nano))
+	_, _ = a.db.Exec(
+		`UPDATE two_factor_challenges SET expires_at = ?`,
+		time.Now().Add(-time.Minute).UTC().Format(time.RFC3339Nano),
+	)
 	got, _ = a.svc.Challenges.Resolve(context.Background(), tok)
 	if got != nil {
 		t.Fatal("expired challenge")

@@ -19,7 +19,11 @@ type TrustedKey struct {
 }
 
 func NewTrustedKey(k transfers.TrustedKey) TrustedKey {
-	return TrustedKey{SigningKey: SigningKey{KID: k.KID, PublicKey: k.PublicKey}, Name: k.Name, CreatedAt: utc(k.CreatedAt)}
+	return TrustedKey{
+		SigningKey: SigningKey{KID: k.KID, PublicKey: k.PublicKey},
+		Name:       k.Name,
+		CreatedAt:  utc(k.CreatedAt),
+	}
 }
 
 // Keys are this instance's own key and the keys of instances it trusts.

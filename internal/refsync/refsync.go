@@ -135,7 +135,13 @@ func (s Service) mirrorErr(ctx context.Context, id int64, err error) error {
 // mirror runs fn in the space and, if the space's group keeps kind identical,
 // in the rest of the group, the asked space first so its errors come out as
 // they are. A failure anywhere undoes everything.
-func (s Service) mirror(ctx context.Context, actor *auth.User, spaceID int64, kind Kind, fn func(id int64, d store.DB) error) error {
+func (s Service) mirror(
+	ctx context.Context,
+	actor *auth.User,
+	spaceID int64,
+	kind Kind,
+	fn func(id int64, d store.DB) error,
+) error {
 	ids := []int64{spaceID}
 	if g, err := s.GroupOf(ctx, spaceID); err != nil {
 		return err
@@ -152,7 +158,9 @@ func (s Service) mirror(ctx context.Context, actor *auth.User, spaceID int64, ki
 	if err := s.requireEditor(ctx, actor, ids); err != nil {
 		return err
 	}
-	order := append([]int64{spaceID}, slices.DeleteFunc(slices.Clone(ids), func(id int64) bool { return id == spaceID })...)
+	order := append(
+		[]int64{spaceID},
+		slices.DeleteFunc(slices.Clone(ids), func(id int64) bool { return id == spaceID })...)
 	return s.st().InSpaces(ctx, ids, func(dbs map[int64]store.DB) error {
 		for _, id := range order {
 			if err := fn(id, dbs[id]); err != nil {
@@ -213,7 +221,12 @@ func counterpart(ctx context.Context, d store.DB, c ledger.Category) (*ledger.Ca
 }
 
 // CreateCategory creates the category in the space and its group.
-func (s Service) CreateCategory(ctx context.Context, actor *auth.User, spaceID int64, c ledger.Category) (*ledger.Category, error) {
+func (s Service) CreateCategory(
+	ctx context.Context,
+	actor *auth.User,
+	spaceID int64,
+	c ledger.Category,
+) (*ledger.Category, error) {
 	var out *ledger.Category
 	err := s.mirror(ctx, actor, spaceID, Categories, func(id int64, d store.DB) error {
 		created, err := (ledger.Categories{DB: d}).Create(ctx, c)
@@ -227,7 +240,12 @@ func (s Service) CreateCategory(ctx context.Context, actor *auth.User, spaceID i
 
 // UpdateCategory changes the category, matched in the rest of the group by
 // the name and type it had before.
-func (s Service) UpdateCategory(ctx context.Context, actor *auth.User, spaceID, categoryID int64, c ledger.Category) (*ledger.Category, error) {
+func (s Service) UpdateCategory(
+	ctx context.Context,
+	actor *auth.User,
+	spaceID, categoryID int64,
+	c ledger.Category,
+) (*ledger.Category, error) {
 	var out, before *ledger.Category
 	err := s.mirror(ctx, actor, spaceID, Categories, func(id int64, d store.DB) error {
 		cats := ledger.Categories{DB: d}
@@ -258,7 +276,11 @@ func (s Service) UpdateCategory(ctx context.Context, actor *auth.User, spaceID, 
 }
 
 // SetDefaultCategory makes the category the default of its type everywhere.
-func (s Service) SetDefaultCategory(ctx context.Context, actor *auth.User, spaceID, categoryID int64) (*ledger.Category, error) {
+func (s Service) SetDefaultCategory(
+	ctx context.Context,
+	actor *auth.User,
+	spaceID, categoryID int64,
+) (*ledger.Category, error) {
 	var out, before *ledger.Category
 	err := s.mirror(ctx, actor, spaceID, Categories, func(id int64, d store.DB) error {
 		cats := ledger.Categories{DB: d}
@@ -291,7 +313,12 @@ func (s Service) SetDefaultCategory(ctx context.Context, actor *auth.User, space
 // DeleteCategory deletes the category everywhere. One successor, chosen in
 // the asked space, takes the transactions of the category in every space of
 // the group that has any.
-func (s Service) DeleteCategory(ctx context.Context, actor *auth.User, spaceID, categoryID int64, successorID *int64) error {
+func (s Service) DeleteCategory(
+	ctx context.Context,
+	actor *auth.User,
+	spaceID, categoryID int64,
+	successorID *int64,
+) error {
 	var before, successor *ledger.Category
 	err := s.mirror(ctx, actor, spaceID, Categories, func(id int64, d store.DB) error {
 		cats := ledger.Categories{DB: d}
@@ -343,7 +370,12 @@ func (s Service) CreateTag(ctx context.Context, actor *auth.User, spaceID int64,
 }
 
 // RenameTag renames the tag, matched in the rest of the group by its old name.
-func (s Service) RenameTag(ctx context.Context, actor *auth.User, spaceID, tagID int64, name string) (*ledger.Tag, error) {
+func (s Service) RenameTag(
+	ctx context.Context,
+	actor *auth.User,
+	spaceID, tagID int64,
+	name string,
+) (*ledger.Tag, error) {
 	var out, before *ledger.Tag
 	err := s.mirror(ctx, actor, spaceID, Tags, func(id int64, d store.DB) error {
 		tags := ledger.Tags{DB: d}

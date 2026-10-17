@@ -363,7 +363,11 @@ func diffSpaces(ctx context.Context, dbs map[int64]store.DB, members []int64, ki
 	return out, nil
 }
 
-func diffCategories(ctx context.Context, dbs map[int64]store.DB, members []int64) ([]CategoryConflict, []DefaultConflict, error) {
+func diffCategories(
+	ctx context.Context,
+	dbs map[int64]store.DB,
+	members []int64,
+) ([]CategoryConflict, []DefaultConflict, error) {
 	type key struct{ typ, name string }
 	states := map[key][]CategoryState{}
 	names := map[key]string{}
@@ -378,7 +382,10 @@ func diffCategories(ctx context.Context, dbs map[int64]store.DB, members []int64
 			if _, ok := names[k]; !ok {
 				names[k] = c.Name
 			}
-			states[k] = append(states[k], CategoryState{Space: id, Icon: c.Icon, Color: c.Color, IsDefault: c.IsDefault, Transactions: c.TransactionsCount})
+			states[k] = append(
+				states[k],
+				CategoryState{Space: id, Icon: c.Icon, Color: c.Color, IsDefault: c.IsDefault, Transactions: c.TransactionsCount},
+			)
 			if defaults[c.Type] == nil {
 				defaults[c.Type] = map[int64]string{}
 			}
@@ -590,7 +597,11 @@ func winningLook(c CategoryConflict, d Decision) (CategoryState, error) {
 	win := c.Present[0]
 	for _, s := range c.Present[1:] {
 		if !sameText(s.Icon, win.Icon) || !sameText(s.Color, win.Color) {
-			return CategoryState{}, fmt.Errorf("%w: category %q looks different in the spaces; say which one to keep", ErrUnresolved, c.Name)
+			return CategoryState{}, fmt.Errorf(
+				"%w: category %q looks different in the spaces; say which one to keep",
+				ErrUnresolved,
+				c.Name,
+			)
 		}
 	}
 	return win, nil

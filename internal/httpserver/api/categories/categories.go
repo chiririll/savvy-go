@@ -140,7 +140,14 @@ func (s Handler) categoriesStatistics(w http.ResponseWriter, r *http.Request) {
 	if c == nil {
 		return
 	}
-	stats, err := httpx.Scope(r).Categories.Statistics(r.Context(), c.ID, r.URL.Query().Get("start_date"), r.URL.Query().Get("end_date"))
+	stats, err := httpx.Scope(
+		r,
+	).Categories.Statistics(
+		r.Context(),
+		c.ID,
+		r.URL.Query().Get("start_date"),
+		r.URL.Query().Get("end_date"),
+	)
 	if err != nil || stats == nil {
 		httpx.WriteMessage(w, 422, "Could not compute category statistics.")
 		return
@@ -165,7 +172,11 @@ func (s Handler) categoriesSummary(w http.ResponseWriter, r *http.Request) {
 	if base != nil {
 		code = base.Code
 	}
-	httpx.WriteJSON(w, http.StatusOK, dto.CategorySummary{Data: dto.Map(list, dto.NewCategory), Total: total, Currency: code})
+	httpx.WriteJSON(
+		w,
+		http.StatusOK,
+		dto.CategorySummary{Data: dto.Map(list, dto.NewCategory), Total: total, Currency: code},
+	)
 }
 
 func (s Handler) categoryParam(w http.ResponseWriter, r *http.Request) *ledger.Category {

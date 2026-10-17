@@ -11,7 +11,11 @@ import (
 
 func init() {
 	routing.Register(func(d *routing.Deps) []routing.Mount {
-		h := Handler{DataDir: routing.Get[appconfig.Config](d).DataDir, Transfers: routing.Get[*transfers.Service](d), Keys: routing.Get[*signing.Holder](d)}
+		h := Handler{
+			DataDir:   routing.Get[appconfig.Config](d).DataDir,
+			Transfers: routing.Get[*transfers.Service](d),
+			Keys:      routing.Get[*signing.Holder](d),
+		}
 		return []routing.Mount{
 			routing.AdminSession(h.Routes),
 		}

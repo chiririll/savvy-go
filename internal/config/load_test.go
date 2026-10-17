@@ -234,7 +234,10 @@ func TestFinishRejectsWhatASectionCannotUse(t *testing.T) {
 // left out when the file is rewritten.
 func TestUnknownKeysAndTablesAreIgnored(t *testing.T) {
 	logs := captureLog(t)
-	path := write(t, "[server]\napp_url = \"https://a.example\"\nlisten_addr = \"x\"\n[old]\nkey = 1\n[mailer.nothing]\nx = 1\n")
+	path := write(
+		t,
+		"[server]\napp_url = \"https://a.example\"\nlisten_addr = \"x\"\n[old]\nkey = 1\n[mailer.nothing]\nx = 1\n",
+	)
 	h := start(t, path)
 	if h.server.Get().AppURL != "https://a.example" {
 		t.Error("known key lost")

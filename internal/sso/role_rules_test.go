@@ -41,7 +41,11 @@ func TestMatchRoleRule(t *testing.T) {
 		rule map[string]any
 		want string
 	}{
-		{"a group", map[string]any{"claim": "groups", "operator": "contains", "value": "finance", "role": "admin"}, auth.RoleAdmin},
+		{
+			"a group",
+			map[string]any{"claim": "groups", "operator": "contains", "value": "finance", "role": "admin"},
+			auth.RoleAdmin,
+		},
 		{"a plain claim, equals by default", map[string]any{"claim": "dept", "value": "eng", "role": "user"}, auth.RoleUser},
 		{"a numeric claim", map[string]any{"claim": "level", "value": "7", "role": "guest"}, auth.RoleGuest},
 		{"a retired role name", map[string]any{"claim": "dept", "value": "eng", "role": "read-write"}, auth.RoleUser},

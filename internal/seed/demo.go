@@ -24,12 +24,37 @@ const (
 )
 
 var merchants = map[string][]string{
-	"#GROCERIES":     {"Whole Foods Market", "Trader Joe's", "Costco Wholesale", "Walmart", "Kroger", "Aldi", "Target", "Safeway"},
-	"#TRANSPORT":     {"Shell", "BP", "Chevron", "Uber", "Lyft", "Metro Transit", "ParkMobile", "Jiffy Lube"},
-	"#DINING":        {"Starbucks", "Chipotle Mexican Grill", "McDonald's", "Olive Garden", "Subway", "Domino's Pizza", "Panera Bread", "Five Guys"},
+	"#GROCERIES": {
+		"Whole Foods Market",
+		"Trader Joe's",
+		"Costco Wholesale",
+		"Walmart",
+		"Kroger",
+		"Aldi",
+		"Target",
+		"Safeway",
+	},
+	"#TRANSPORT": {"Shell", "BP", "Chevron", "Uber", "Lyft", "Metro Transit", "ParkMobile", "Jiffy Lube"},
+	"#DINING": {
+		"Starbucks",
+		"Chipotle Mexican Grill",
+		"McDonald's",
+		"Olive Garden",
+		"Subway",
+		"Domino's Pizza",
+		"Panera Bread",
+		"Five Guys",
+	},
 	"#ENTERTAINMENT": {"AMC Theatres", "Steam", "PlayStation Store", "Ticketmaster", "Netflix", "Spotify"},
 	"#SHOPPING":      {"Amazon", "Best Buy", "IKEA", "Nike", "Apple Store", "Zara", "H&M", "Home Depot"},
-	"#HEALTH":        {"CVS Pharmacy", "Walgreens", "City Medical Clinic", "Planet Fitness", "LA Fitness", "Quest Diagnostics"},
+	"#HEALTH": {
+		"CVS Pharmacy",
+		"Walgreens",
+		"City Medical Clinic",
+		"Planet Fitness",
+		"LA Fitness",
+		"Quest Diagnostics",
+	},
 	"#PERSONAL_CARE": {"Supercuts", "Sephora", "Ulta Beauty", "The Barber Shop"},
 	"#GIFTS":         {"Etsy", "Amazon", "Tiffany & Co.", "Local Florist"},
 	"#TRAVEL":        {"Booking.com", "Airbnb", "Delta Air Lines", "Marriott", "Expedia", "Hertz"},
@@ -39,19 +64,95 @@ var merchants = map[string][]string{
 }
 
 var catalogs = map[string][]string{
-	"#GROCERIES":     {"Organic Bananas", "Whole Milk", "Sourdough Bread", "Free-range Eggs", "Chicken Breast", "Avocados", "Greek Yogurt", "Baby Spinach", "Ground Coffee", "Cheddar Cheese", "Pasta", "Olive Oil", "Roma Tomatoes", "Atlantic Salmon", "Brown Rice", "Butter", "Orange Juice", "Granola"},
-	"#DINING":        {"Latte", "Avocado Toast", "Caesar Salad", "Burger Combo", "Iced Americano", "Chicken Bowl", "Fries", "Cheesecake", "Iced Tea", "Soup of the Day", "Fish Tacos", "Espresso"},
-	"#TRANSPORT":     {"Regular Gasoline", "Premium Gasoline", "Airport Parking", "Car Wash", "Metro Day Pass", "Oil Change", "Tire Rotation", "Tolls"},
-	"#SHOPPING":      {"Cotton T-Shirt", "Wireless Earbuds", "Desk Lamp", "Running Shorts", "Phone Case", "Notebook Set", "Kitchen Towels", "HDMI Cable", "Sneakers", "Backpack"},
-	"#ENTERTAINMENT": {"Movie Ticket", "Popcorn Combo", "Game Download", "Arcade Tokens", "Concert Ticket", "Streaming Rental", "Base Plan"},
-	"#HEALTH":        {"Prescription Refill", "Vitamin D", "Ibuprofen", "Allergy Test", "Contact Lenses", "First Aid Kit", "Protein Powder"},
+	"#GROCERIES": {
+		"Organic Bananas",
+		"Whole Milk",
+		"Sourdough Bread",
+		"Free-range Eggs",
+		"Chicken Breast",
+		"Avocados",
+		"Greek Yogurt",
+		"Baby Spinach",
+		"Ground Coffee",
+		"Cheddar Cheese",
+		"Pasta",
+		"Olive Oil",
+		"Roma Tomatoes",
+		"Atlantic Salmon",
+		"Brown Rice",
+		"Butter",
+		"Orange Juice",
+		"Granola",
+	},
+	"#DINING": {
+		"Latte",
+		"Avocado Toast",
+		"Caesar Salad",
+		"Burger Combo",
+		"Iced Americano",
+		"Chicken Bowl",
+		"Fries",
+		"Cheesecake",
+		"Iced Tea",
+		"Soup of the Day",
+		"Fish Tacos",
+		"Espresso",
+	},
+	"#TRANSPORT": {
+		"Regular Gasoline",
+		"Premium Gasoline",
+		"Airport Parking",
+		"Car Wash",
+		"Metro Day Pass",
+		"Oil Change",
+		"Tire Rotation",
+		"Tolls",
+	},
+	"#SHOPPING": {
+		"Cotton T-Shirt",
+		"Wireless Earbuds",
+		"Desk Lamp",
+		"Running Shorts",
+		"Phone Case",
+		"Notebook Set",
+		"Kitchen Towels",
+		"HDMI Cable",
+		"Sneakers",
+		"Backpack",
+	},
+	"#ENTERTAINMENT": {
+		"Movie Ticket",
+		"Popcorn Combo",
+		"Game Download",
+		"Arcade Tokens",
+		"Concert Ticket",
+		"Streaming Rental",
+		"Base Plan",
+	},
+	"#HEALTH": {
+		"Prescription Refill",
+		"Vitamin D",
+		"Ibuprofen",
+		"Allergy Test",
+		"Contact Lenses",
+		"First Aid Kit",
+		"Protein Powder",
+	},
 	"#PERSONAL_CARE": {"Haircut", "Shampoo", "Face Moisturizer", "Toothpaste", "Sunscreen", "Nail Polish", "Beard Oil"},
-	"#TRAVEL":        {"Hotel Night", "Airport Transfer", "City Museum Pass", "Travel Adapter", "Bottled Water", "Snack Box", "Souvenir"},
-	"#GIFTS":         {"Greeting Card", "Gift Wrap", "Scented Candle", "Chocolate Box", "Bouquet", "Mug"},
-	"#UTILITIES":     {"Electricity Usage", "Delivery Charge", "Service Fee"},
-	"#HOUSING":       {"Shelf brackets", "Light bulbs", "Paint", "Towels"},
-	"#RENT":          {"Base Rent"},
-	"#OTHER":         {"Service Fee", "Convenience Charge", "Misc. Purchase", "Packaging"},
+	"#TRAVEL": {
+		"Hotel Night",
+		"Airport Transfer",
+		"City Museum Pass",
+		"Travel Adapter",
+		"Bottled Water",
+		"Snack Box",
+		"Souvenir",
+	},
+	"#GIFTS":     {"Greeting Card", "Gift Wrap", "Scented Candle", "Chocolate Box", "Bouquet", "Mug"},
+	"#UTILITIES": {"Electricity Usage", "Delivery Charge", "Service Fee"},
+	"#HOUSING":   {"Shelf brackets", "Light bulbs", "Paint", "Towels"},
+	"#RENT":      {"Base Rent"},
+	"#OTHER":     {"Service Fee", "Convenience Charge", "Misc. Purchase", "Packaging"},
 }
 
 type seeder struct {
@@ -165,10 +266,33 @@ func (s *seeder) createAccounts(usd *ledger.Currency, eur *ledger.Currency) (map
 	if eur != nil {
 		specs = append(specs, spec{"eur", "Revolut EUR", "bank", eur, 1850, "", nil, nil, "", ""})
 	}
-	specs = append(specs,
+	specs = append(
+		specs,
 		spec{"credit", "Amex Gold Card", "debt", usd, 0, iowe, &zero, nil, "American Express", "Credit card balance"},
-		spec{"mortgage", "Home Mortgage", "debt", usd, 0, iowe, &mortgageAmt, &mortgageDue, "Wells Fargo Home Mortgage", "30-year fixed mortgage"},
-		spec{"loan_out", "Loan to Michael", "debt", usd, 0, owed, &loanAmt, &loanDue, "Michael Chen", "Helped with moving costs"},
+		spec{
+			"mortgage",
+			"Home Mortgage",
+			"debt",
+			usd,
+			0,
+			iowe,
+			&mortgageAmt,
+			&mortgageDue,
+			"Wells Fargo Home Mortgage",
+			"30-year fixed mortgage",
+		},
+		spec{
+			"loan_out",
+			"Loan to Michael",
+			"debt",
+			usd,
+			0,
+			owed,
+			&loanAmt,
+			&loanDue,
+			"Michael Chen",
+			"Helped with moving costs",
+		},
 	)
 
 	for _, sp := range specs {
@@ -195,7 +319,11 @@ func (s *seeder) createAccounts(usd *ledger.Currency, eur *ledger.Currency) (map
 	return out, nil
 }
 
-func (s *seeder) createTransactions(accounts map[string]*ledger.Account, expenses, incomes []ledger.Category, tags []ledger.Tag) error {
+func (s *seeder) createTransactions(
+	accounts map[string]*ledger.Account,
+	expenses, incomes []ledger.Category,
+	tags []ledger.Tag,
+) error {
 	if err := s.seedIncome(accounts, incomes); err != nil {
 		return err
 	}
@@ -328,7 +456,11 @@ func (s *seeder) seedFixedExpenses(accounts map[string]*ledger.Account, expenses
 	return nil
 }
 
-func (s *seeder) seedVariableExpenses(accounts map[string]*ledger.Account, expenses []ledger.Category, tags []ledger.Tag) error {
+func (s *seeder) seedVariableExpenses(
+	accounts map[string]*ledger.Account,
+	expenses []ledger.Category,
+	tags []ledger.Tag,
+) error {
 	weights := []struct {
 		name string
 		w    int
@@ -564,7 +696,10 @@ func (s *seeder) randomItems(amount float64, category string) []ledger.TxItemInp
 				break
 			}
 			price := decimal.New(int64(remainingCents), -2)
-			items = append(items, ledger.TxItemInput{Name: name, Quantity: decimal.NewFromInt(1), PricePerUnit: price, TotalPrice: price})
+			items = append(
+				items,
+				ledger.TxItemInput{Name: name, Quantity: decimal.NewFromInt(1), PricePerUnit: price, TotalPrice: price},
+			)
 			break
 		}
 		maxShare := remainingCents - left
@@ -733,7 +868,17 @@ func (s *seeder) createAutomation(tags []ledger.Tag) error {
 	return nil
 }
 
-func (s *seeder) addTx(typ string, accountID int64, catID *int64, amount float64, desc string, date time.Time, toID *int64, toAmt *float64, tagIDs []int64) error {
+func (s *seeder) addTx(
+	typ string,
+	accountID int64,
+	catID *int64,
+	amount float64,
+	desc string,
+	date time.Time,
+	toID *int64,
+	toAmt *float64,
+	tagIDs []int64,
+) error {
 	if !s.inRange(date) {
 		return nil
 	}

@@ -43,8 +43,21 @@ func (p *pair) post(spaceID int64, path string, body any) map[string]any {
 
 func (p *pair) account(spaceID int64, code string) int64 {
 	p.a.t.Helper()
-	cur := p.post(spaceID, "/currencies", map[string]any{"code": code, "name": code, "symbol": code, "decimals": 2, "rate": 1})
-	acc := p.post(spaceID, "/accounts", map[string]any{"name": code + " cash", "type": "cash", "currency_id": cur["data"].(map[string]any)["id"], "initial_balance": 0})
+	cur := p.post(
+		spaceID,
+		"/currencies",
+		map[string]any{"code": code, "name": code, "symbol": code, "decimals": 2, "rate": 1},
+	)
+	acc := p.post(
+		spaceID,
+		"/accounts",
+		map[string]any{
+			"name":            code + " cash",
+			"type":            "cash",
+			"currency_id":     cur["data"].(map[string]any)["id"],
+			"initial_balance": 0,
+		},
+	)
 	return int64(acc["data"].(map[string]any)["id"].(float64))
 }
 
@@ -63,7 +76,12 @@ func newPair(t *testing.T) *pair {
 	}
 	p := &pair{a: a, owner: owner, sess: a.issue(owner, false), A: A, B: B}
 	p.accA, p.accB = p.account(A.ID, "EUR"), p.account(B.ID, "USD")
-	status(t, a.do("POST", spacePath(A.ID, "/links"), map[string]any{"target_space_id": B.ID}, p.sess.Token, p.sess.CSRF), 200, "link")
+	status(
+		t,
+		a.do("POST", spacePath(A.ID, "/links"), map[string]any{"target_space_id": B.ID}, p.sess.Token, p.sess.CSRF),
+		200,
+		"link",
+	)
 	return p
 }
 
@@ -154,11 +172,37 @@ func TestTransferSidesAreReadOnly(t *testing.T) {
 		}
 	}
 	id := strconv.FormatInt(int64(list[0].(map[string]any)["id"].(float64)), 10)
-	status(t, p.a.do("PATCH", spacePath(p.A.ID, "/transactions/"+id), map[string]any{"amount": 1}, p.sess.Token, p.sess.CSRF), 422, "edit")
+	status(
+		t,
+		p.a.do("PATCH", spacePath(p.A.ID, "/transactions/"+id), map[string]any{"amount": 1}, p.sess.Token, p.sess.CSRF),
+		422,
+		"edit",
+	)
 	status(t, p.a.do("DELETE", spacePath(p.A.ID, "/transactions/"+id), nil, p.sess.Token, p.sess.CSRF), 422, "delete")
-	status(t, p.a.do("POST", spacePath(p.A.ID, "/transactions/"+id+"/duplicate"), nil, p.sess.Token, p.sess.CSRF), 422, "duplicate")
-	status(t, p.a.do("DELETE", spacePath(p.A.ID, "/accounts/"+strconv.FormatInt(p.accA, 10)), nil, p.sess.Token, p.sess.CSRF), 422, "delete account")
-	status(t, p.a.do("POST", spacePath(p.A.ID, "/transactions"), map[string]any{"type": "transfer_out", "account_id": p.accA, "amount": 1, "date": "2026-10-01"}, p.sess.Token, p.sess.CSRF), 422, "create a side by hand")
+	status(
+		t,
+		p.a.do("POST", spacePath(p.A.ID, "/transactions/"+id+"/duplicate"), nil, p.sess.Token, p.sess.CSRF),
+		422,
+		"duplicate",
+	)
+	status(
+		t,
+		p.a.do("DELETE", spacePath(p.A.ID, "/accounts/"+strconv.FormatInt(p.accA, 10)), nil, p.sess.Token, p.sess.CSRF),
+		422,
+		"delete account",
+	)
+	status(
+		t,
+		p.a.do(
+			"POST",
+			spacePath(p.A.ID, "/transactions"),
+			map[string]any{"type": "transfer_out", "account_id": p.accA, "amount": 1, "date": "2026-10-01"},
+			p.sess.Token,
+			p.sess.CSRF,
+		),
+		422,
+		"create a side by hand",
+	)
 }
 
 // A member of only one space sees the other space's name and amount,
@@ -190,16 +234,36 @@ func TestLinkRights(t *testing.T) {
 	ctx := context.Background()
 	other := p.a.createUser("other@test.com", "secret1", auth.RoleUser)
 	C, _ := p.a.svc.Spaces.Create(ctx, "Theirs", other)
-	status(t, p.a.do("POST", spacePath(p.A.ID, "/links"), map[string]any{"target_space_id": C.ID}, p.sess.Token, p.sess.CSRF), 404, "not a member of the target")
+	status(
+		t,
+		p.a.do("POST", spacePath(p.A.ID, "/links"), map[string]any{"target_space_id": C.ID}, p.sess.Token, p.sess.CSRF),
+		404,
+		"not a member of the target",
+	)
 	_ = p.a.svc.Spaces.SetMember(ctx, C.ID, p.owner, spaces.RoleEditor)
-	status(t, p.a.do("POST", spacePath(p.A.ID, "/links"), map[string]any{"target_space_id": C.ID}, p.sess.Token, p.sess.CSRF), 403, "editor of the target")
-	status(t, p.a.do("POST", spacePath(p.A.ID, "/links"), map[string]any{"target_space_id": p.A.ID}, p.sess.Token, p.sess.CSRF), 422, "link to itself")
+	status(
+		t,
+		p.a.do("POST", spacePath(p.A.ID, "/links"), map[string]any{"target_space_id": C.ID}, p.sess.Token, p.sess.CSRF),
+		403,
+		"editor of the target",
+	)
+	status(
+		t,
+		p.a.do("POST", spacePath(p.A.ID, "/links"), map[string]any{"target_space_id": p.A.ID}, p.sess.Token, p.sess.CSRF),
+		422,
+		"link to itself",
+	)
 
 	links := decodeJSON(t, p.a.do("GET", spacePath(p.B.ID, "/links"), nil, p.sess.Token, ""))["data"].([]any)
 	if len(links) != 1 || links[0].(map[string]any)["name"] != "Personal" {
 		t.Fatalf("links of B %v", links)
 	}
-	status(t, p.a.do("DELETE", spacePath(p.B.ID, "/links/"+strconv.FormatInt(p.A.ID, 10)), nil, p.sess.Token, p.sess.CSRF), 204, "unlink from B")
+	status(
+		t,
+		p.a.do("DELETE", spacePath(p.B.ID, "/links/"+strconv.FormatInt(p.A.ID, 10)), nil, p.sess.Token, p.sess.CSRF),
+		204,
+		"unlink from B",
+	)
 }
 
 // Unlinking freezes the transfers in both spaces (they still count);
@@ -207,7 +271,12 @@ func TestLinkRights(t *testing.T) {
 func TestUnlinkFreezesAndRelinkSyncs(t *testing.T) {
 	p := newPair(t)
 	id := p.send("20", "20")
-	status(t, p.a.do("DELETE", spacePath(p.A.ID, "/links/"+strconv.FormatInt(p.B.ID, 10)), nil, p.sess.Token, p.sess.CSRF), 204, "unlink")
+	status(
+		t,
+		p.a.do("DELETE", spacePath(p.A.ID, "/links/"+strconv.FormatInt(p.B.ID, 10)), nil, p.sess.Token, p.sess.CSRF),
+		204,
+		"unlink",
+	)
 	for _, sp := range []int64{p.A.ID, p.B.ID} {
 		if tr := p.transfers(sp, p.sess)[id]; tr["frozen"] != true {
 			t.Fatalf("space %d not frozen: %v", sp, tr)
@@ -216,14 +285,53 @@ func TestUnlinkFreezesAndRelinkSyncs(t *testing.T) {
 	if b := p.balance(p.A.ID, p.accA); b != "-20" {
 		t.Fatalf("frozen transfer left the balance: %s", b)
 	}
-	status(t, p.a.do("PATCH", spacePath(p.A.ID, "/transfers/"+id), map[string]any{"from_amount": "1"}, p.sess.Token, p.sess.CSRF), 422, "edit frozen")
-	status(t, p.a.do("POST", spacePath(p.A.ID, "/transfers"), map[string]any{"to_space_id": p.B.ID, "from_account_id": p.accA, "to_account_id": p.accB, "from_amount": "1", "to_amount": "1", "date": "2026-10-01"}, p.sess.Token, p.sess.CSRF), 422, "send unlinked")
+	status(
+		t,
+		p.a.do("PATCH", spacePath(p.A.ID, "/transfers/"+id), map[string]any{"from_amount": "1"}, p.sess.Token, p.sess.CSRF),
+		422,
+		"edit frozen",
+	)
+	status(
+		t,
+		p.a.do(
+			"POST",
+			spacePath(p.A.ID, "/transfers"),
+			map[string]any{
+				"to_space_id":     p.B.ID,
+				"from_account_id": p.accA,
+				"to_account_id":   p.accB,
+				"from_amount":     "1",
+				"to_amount":       "1",
+				"date":            "2026-10-01",
+			},
+			p.sess.Token,
+			p.sess.CSRF,
+		),
+		422,
+		"send unlinked",
+	)
 
-	status(t, p.a.do("POST", spacePath(p.A.ID, "/links"), map[string]any{"target_space_id": p.B.ID}, p.sess.Token, p.sess.CSRF), 200, "relink")
+	status(
+		t,
+		p.a.do("POST", spacePath(p.A.ID, "/links"), map[string]any{"target_space_id": p.B.ID}, p.sess.Token, p.sess.CSRF),
+		200,
+		"relink",
+	)
 	if tr := p.transfers(p.B.ID, p.sess)[id]; tr["frozen"] != false {
 		t.Fatalf("not unfrozen %v", tr)
 	}
-	status(t, p.a.do("PATCH", spacePath(p.A.ID, "/transfers/"+id), map[string]any{"from_amount": "25", "to_amount": "26"}, p.sess.Token, p.sess.CSRF), 200, "edit after relink")
+	status(
+		t,
+		p.a.do(
+			"PATCH",
+			spacePath(p.A.ID, "/transfers/"+id),
+			map[string]any{"from_amount": "25", "to_amount": "26"},
+			p.sess.Token,
+			p.sess.CSRF,
+		),
+		200,
+		"edit after relink",
+	)
 	if b := p.balance(p.B.ID, p.accB); b != "26" {
 		t.Fatalf("B balance after edit %s", b)
 	}
@@ -238,7 +346,13 @@ func TestTransferIntoFullSpaceWritesNothing(t *testing.T) {
 	}
 	var code int
 	for i := 0; i < 200; i++ {
-		res := p.a.do("POST", spacePath(p.B.ID, "/tags"), map[string]any{"name": strings.Repeat("x", 900) + strconv.Itoa(i)}, p.sess.Token, p.sess.CSRF)
+		res := p.a.do(
+			"POST",
+			spacePath(p.B.ID, "/tags"),
+			map[string]any{"name": strings.Repeat("x", 900) + strconv.Itoa(i)},
+			p.sess.Token,
+			p.sess.CSRF,
+		)
 		code = res.StatusCode
 		res.Body.Close()
 		if code != 201 {
@@ -266,9 +380,12 @@ func TestTransfersSkipAutomation(t *testing.T) {
 	p := newPair(t)
 	p.post(p.B.ID, "/automation-rules", map[string]any{
 		"name": "Every incoming", "trigger_type": "on_transaction_create", "priority": 10,
-		"conditions": map[string]any{"match": "all", "conditions": []map[string]any{{"field": "amount", "op": "gte", "value": 0}}},
-		"actions":    []map[string]any{{"type": "set_description", "value": "touched"}},
-		"is_active":  true,
+		"conditions": map[string]any{
+			"match":      "all",
+			"conditions": []map[string]any{{"field": "amount", "op": "gte", "value": 0}},
+		},
+		"actions":   []map[string]any{{"type": "set_description", "value": "touched"}},
+		"is_active": true,
 	})
 	p.send("3", "3")
 	list := decodeJSON(t, p.a.do("GET", spacePath(p.B.ID, "/transactions"), nil, p.sess.Token, ""))["data"].([]any)
@@ -306,7 +423,18 @@ func TestRestoreReviewsTransfers(t *testing.T) {
 	balanceAtBackup := p.balance(p.A.ID, p.accA)
 
 	created := p.send("8", "8")
-	status(t, p.a.do("PATCH", spacePath(p.B.ID, "/transfers/"+changed), map[string]any{"from_amount": "20", "to_amount": "20"}, p.sess.Token, p.sess.CSRF), 200, "change")
+	status(
+		t,
+		p.a.do(
+			"PATCH",
+			spacePath(p.B.ID, "/transfers/"+changed),
+			map[string]any{"from_amount": "20", "to_amount": "20"},
+			p.sess.Token,
+			p.sess.CSRF,
+		),
+		200,
+		"change",
+	)
 	status(t, p.a.do("DELETE", spacePath(p.B.ID, "/transfers/"+deleted), nil, p.sess.Token, p.sess.CSRF), 204, "delete")
 	bBefore := p.transfers(p.B.ID, p.sess)
 	bBalance := p.balance(p.B.ID, p.accB)
@@ -333,11 +461,31 @@ func TestRestoreReviewsTransfers(t *testing.T) {
 	viewer := p.a.createUser("v@test.com", "secret1", auth.RoleUser)
 	_ = p.a.svc.Spaces.SetMember(context.Background(), p.A.ID, viewer, spaces.RoleEditor)
 	vs := p.a.issue(viewer, false)
-	status(t, p.a.do("POST", spacePath(p.A.ID, "/transfers/"+changed+"/reject"), nil, vs.Token, vs.CSRF), 403, "reject without rights in B")
+	status(
+		t,
+		p.a.do("POST", spacePath(p.A.ID, "/transfers/"+changed+"/reject"), nil, vs.Token, vs.CSRF),
+		403,
+		"reject without rights in B",
+	)
 
-	status(t, p.a.do("POST", spacePath(p.A.ID, "/transfers/"+created+"/accept"), nil, p.sess.Token, p.sess.CSRF), 200, "accept created")
-	status(t, p.a.do("POST", spacePath(p.A.ID, "/transfers/"+deleted+"/accept"), nil, p.sess.Token, p.sess.CSRF), 204, "accept deleted")
-	status(t, p.a.do("POST", spacePath(p.A.ID, "/transfers/"+changed+"/reject"), nil, p.sess.Token, p.sess.CSRF), 200, "reject changed")
+	status(
+		t,
+		p.a.do("POST", spacePath(p.A.ID, "/transfers/"+created+"/accept"), nil, p.sess.Token, p.sess.CSRF),
+		200,
+		"accept created",
+	)
+	status(
+		t,
+		p.a.do("POST", spacePath(p.A.ID, "/transfers/"+deleted+"/accept"), nil, p.sess.Token, p.sess.CSRF),
+		204,
+		"accept deleted",
+	)
+	status(
+		t,
+		p.a.do("POST", spacePath(p.A.ID, "/transfers/"+changed+"/reject"), nil, p.sess.Token, p.sess.CSRF),
+		200,
+		"reject changed",
+	)
 
 	inA = p.transfers(p.A.ID, p.sess)
 	if inA[created]["status"] != "ok" || inA[deleted] != nil || inA[changed]["status"] != "ok" {
@@ -390,7 +538,18 @@ func TestMissingAccountNeedsAttention(t *testing.T) {
 	if tr := p.transfers(p.A.ID, p.sess)[id]; tr["status"] != "needs_attention" {
 		t.Fatalf("status %v", tr)
 	}
-	status(t, p.a.do("PATCH", spacePath(p.A.ID, "/transfers/"+id), map[string]any{"from_account_id": p.accA}, p.sess.Token, p.sess.CSRF), 200, "choose account")
+	status(
+		t,
+		p.a.do(
+			"PATCH",
+			spacePath(p.A.ID, "/transfers/"+id),
+			map[string]any{"from_account_id": p.accA},
+			p.sess.Token,
+			p.sess.CSRF,
+		),
+		200,
+		"choose account",
+	)
 	if tr := p.transfers(p.A.ID, p.sess)[id]; tr["status"] != "ok" {
 		t.Fatalf("status after fix %v", tr)
 	}
@@ -434,7 +593,9 @@ func forgeBackup(t *testing.T, path string, statements ...string) []byte {
 	_, _ = w.Write(raw)
 	sum, _ := domainSHA(dbPath)
 	mw, _ := zw.Create("manifest.json")
-	_, _ = mw.Write([]byte(`{"format":1,"kind":"space","store":"sqlite","files":{"space.sqlite":"` + sum + `"},"space_uuid":"x"}`))
+	_, _ = mw.Write(
+		[]byte(`{"format":1,"kind":"space","store":"sqlite","files":{"space.sqlite":"` + sum + `"},"space_uuid":"x"}`),
+	)
 	_ = zw.Close()
 	return buf.Bytes()
 }
@@ -459,14 +620,21 @@ func TestForgedBackupCannotReachOtherSpace(t *testing.T) {
 	up := createdBackup(t, p.a.upload(spacePath(p.A.ID, "/backups/upload"), "forged.zip", forged, nil, p.sess))
 	// The manifest names another uuid: restore checks the database, not it.
 	bBefore := p.balance(p.B.ID, p.accB)
-	res := p.a.do("POST", spacePath(p.A.ID, "/backups/"+up["filename"].(string)+"/restore"), nil, p.sess.Token, p.sess.CSRF)
+	res := p.a.do(
+		"POST",
+		spacePath(p.A.ID, "/backups/"+up["filename"].(string)+"/restore"),
+		nil,
+		p.sess.Token,
+		p.sess.CSRF,
+	)
 	if res.StatusCode != 200 {
 		t.Fatalf("restore %d %v", res.StatusCode, decodeJSON(t, res))
 	}
 	res.Body.Close()
 
 	inA := p.transfers(p.A.ID, p.sess)
-	if tr := inA["forged"]; tr == nil || tr["status"] != "pending" || tr["review"] != "missing_remote" || tr["verified"] != false {
+	if tr := inA["forged"]; tr == nil || tr["status"] != "pending" || tr["review"] != "missing_remote" ||
+		tr["verified"] != false {
 		t.Fatalf("forged transfer in A: %v", tr)
 	}
 	if tr := inA[real]; tr["status"] != "pending" || tr["verified"] != false {
@@ -475,8 +643,18 @@ func TestForgedBackupCannotReachOtherSpace(t *testing.T) {
 	if _, ok := inA["foreign"]; ok {
 		t.Fatal("a record of other spaces survived the restore")
 	}
-	status(t, p.a.do("POST", spacePath(p.A.ID, "/transfers/forged/reject"), nil, p.sess.Token, p.sess.CSRF), 422, "push forged")
-	status(t, p.a.do("POST", spacePath(p.A.ID, "/transfers/"+real+"/reject"), nil, p.sess.Token, p.sess.CSRF), 422, "push raised version")
+	status(
+		t,
+		p.a.do("POST", spacePath(p.A.ID, "/transfers/forged/reject"), nil, p.sess.Token, p.sess.CSRF),
+		422,
+		"push forged",
+	)
+	status(
+		t,
+		p.a.do("POST", spacePath(p.A.ID, "/transfers/"+real+"/reject"), nil, p.sess.Token, p.sess.CSRF),
+		422,
+		"push raised version",
+	)
 	if err := p.a.svc.Transfers.SyncAll(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -492,7 +670,12 @@ func TestServerRestoreNeedsNoReview(t *testing.T) {
 	admin := p.a.issue(p.a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
 	id := p.send("3", "3")
 	b := createdBackup(t, p.a.do("POST", "/api/backups", map[string]any{}, admin.Token, admin.CSRF))
-	status(t, p.a.do("PATCH", spacePath(p.A.ID, "/transfers/"+id), map[string]any{"from_amount": "9"}, p.sess.Token, p.sess.CSRF), 200, "change")
+	status(
+		t,
+		p.a.do("PATCH", spacePath(p.A.ID, "/transfers/"+id), map[string]any{"from_amount": "9"}, p.sess.Token, p.sess.CSRF),
+		200,
+		"change",
+	)
 	res := p.a.do("POST", "/api/backups/"+b["filename"].(string)+"/restore", nil, admin.Token, admin.CSRF)
 	if res.StatusCode != 200 {
 		t.Fatalf("restore %d %v", res.StatusCode, decodeJSON(t, res))
@@ -583,17 +766,42 @@ func TestReusedIDIsNotTheTransfer(t *testing.T) {
 	id := p.send("5", "5")
 	sideID := decodeJSON(t, p.a.do("GET", spacePath(p.A.ID, "/transactions"), nil, p.sess.Token, ""))["data"].([]any)[0].(map[string]any)["id"]
 	// Unlinked, the restore has nothing to review and A forgets the transfer.
-	status(t, p.a.do("DELETE", spacePath(p.A.ID, "/links/"+strconv.FormatInt(p.B.ID, 10)), nil, p.sess.Token, p.sess.CSRF), 204, "unlink")
+	status(
+		t,
+		p.a.do("DELETE", spacePath(p.A.ID, "/links/"+strconv.FormatInt(p.B.ID, 10)), nil, p.sess.Token, p.sess.CSRF),
+		204,
+		"unlink",
+	)
 	p.restoreA(backup)
-	created := p.post(p.A.ID, "/transactions", map[string]any{"type": "expense", "account_id": p.accA, "amount": 1, "date": "2026-10-01"})
+	created := p.post(
+		p.A.ID,
+		"/transactions",
+		map[string]any{"type": "expense", "account_id": p.accA, "amount": 1, "date": "2026-10-01"},
+	)
 	newID := created["data"].(map[string]any)["id"]
 	if newID != sideID {
 		t.Fatalf("the scenario needs the id reused: side %v, new %v", sideID, newID)
 	}
-	status(t, p.a.do("POST", spacePath(p.A.ID, "/links"), map[string]any{"target_space_id": p.B.ID}, p.sess.Token, p.sess.CSRF), 200, "relink")
+	status(
+		t,
+		p.a.do("POST", spacePath(p.A.ID, "/links"), map[string]any{"target_space_id": p.B.ID}, p.sess.Token, p.sess.CSRF),
+		200,
+		"relink",
+	)
 
 	path := spacePath(p.A.ID, "/transactions/"+strconv.FormatFloat(newID.(float64), 'f', -1, 64))
-	status(t, p.a.do("PATCH", path, map[string]any{"type": "expense", "account_id": p.accA, "amount": 2, "date": "2026-10-01"}, p.sess.Token, p.sess.CSRF), 200, "the new transaction is ordinary")
+	status(
+		t,
+		p.a.do(
+			"PATCH",
+			path,
+			map[string]any{"type": "expense", "account_id": p.accA, "amount": 2, "date": "2026-10-01"},
+			p.sess.Token,
+			p.sess.CSRF,
+		),
+		200,
+		"the new transaction is ordinary",
+	)
 	if tr := p.transfers(p.A.ID, p.sess)[id]; tr == nil || tr["status"] != "ok" {
 		t.Fatalf("the transfer did not come back: %v", tr)
 	}
@@ -605,7 +813,13 @@ func TestReusedIDIsNotTheTransfer(t *testing.T) {
 // A write that breaks a database constraint answers 422 without the schema.
 func TestConstraintErrorHidesSchema(t *testing.T) {
 	p := newPair(t)
-	res := p.a.do("POST", spacePath(p.A.ID, "/transactions"), map[string]any{"type": "bogus", "account_id": p.accA, "amount": 1, "date": "2026-10-01"}, p.sess.Token, p.sess.CSRF)
+	res := p.a.do(
+		"POST",
+		spacePath(p.A.ID, "/transactions"),
+		map[string]any{"type": "bogus", "account_id": p.accA, "amount": 1, "date": "2026-10-01"},
+		p.sess.Token,
+		p.sess.CSRF,
+	)
 	body := toString(decodeJSON(t, res))
 	if res.StatusCode != 422 {
 		t.Fatalf("status %d, want 422: %s", res.StatusCode, body)

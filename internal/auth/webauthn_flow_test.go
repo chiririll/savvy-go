@@ -115,7 +115,12 @@ func (a *authenticator) assert(options any, userHandle []byte) json.RawMessage {
 	return a.assertWith(options, userHandle, waOrigin, a.key)
 }
 
-func (a *authenticator) assertWith(options any, userHandle []byte, origin string, key *ecdsa.PrivateKey) json.RawMessage {
+func (a *authenticator) assertWith(
+	options any,
+	userHandle []byte,
+	origin string,
+	key *ecdsa.PrivateKey,
+) json.RawMessage {
 	a.t.Helper()
 	a.counter++
 	cd := clientData(a.t, "webauthn.get", challengeOf(a.t, options), origin)
@@ -355,7 +360,10 @@ func TestPasskeyLoginRefusesWhatTheDeviceDidNotSign(t *testing.T) {
 		resp func(options any) json.RawMessage
 	}{
 		{"signed by another key", func(o any) json.RawMessage { return dev.assertWith(o, nil, waOrigin, stranger) }},
-		{"another site's origin", func(o any) json.RawMessage { return dev.assertWith(o, nil, "https://evil.test", dev.key) }},
+		{
+			"another site's origin",
+			func(o any) json.RawMessage { return dev.assertWith(o, nil, "https://evil.test", dev.key) },
+		},
 		{"not a response", func(any) json.RawMessage { return json.RawMessage(`{}`) }},
 	}
 	for _, tc := range tests {

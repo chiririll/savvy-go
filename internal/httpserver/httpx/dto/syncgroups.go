@@ -106,7 +106,10 @@ func NewSyncDiff(d refsync.Diff, name func(id int64) (string, bool)) SyncDiff {
 			})
 		}
 		note(c.Missing...)
-		out.Categories = append(out.Categories, SyncCategoryConflict{Type: c.Type, Name: c.Name, Present: present, Missing: orEmpty(c.Missing)})
+		out.Categories = append(
+			out.Categories,
+			SyncCategoryConflict{Type: c.Type, Name: c.Name, Present: present, Missing: orEmpty(c.Missing)},
+		)
 	}
 	for _, t := range d.Tags {
 		present := []SyncTagPresence{}

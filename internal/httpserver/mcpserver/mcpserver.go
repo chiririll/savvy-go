@@ -100,7 +100,10 @@ type mcpNeed struct{ resource, level string }
 // call to one anyway still reaches the REST route, which checks the grant and
 // names the missing permission.
 func (h Handler) mcpServer(perms []string) *mcp.Server {
-	srv := mcp.NewServer(&mcp.Implementation{Name: "go-savvy", Version: h.Version}, &mcp.ServerOptions{Instructions: mcpInstructions})
+	srv := mcp.NewServer(
+		&mcp.Implementation{Name: "go-savvy", Version: h.Version},
+		&mcp.ServerOptions{Instructions: mcpInstructions},
+	)
 	h.addSimpleReadTools(srv)
 	h.addQueryReadTools(srv)
 	h.hideUngrantedTools(srv, h.addMCPWriteTools(srv), perms)

@@ -65,7 +65,12 @@ func TestInvitationLifecycle(t *testing.T) {
 	open := a.invite(a.space.ID, admin, "", roleViewer)
 	list := decodeJSON(t, a.do("GET", spacePath(a.space.ID, "/invitations"), nil, admin.Token, ""))["data"].([]any)
 	id := int64(list[0].(map[string]any)["id"].(float64))
-	status(t, a.do("DELETE", spacePath(a.space.ID, "/invitations/"+strconv.FormatInt(id, 10)), nil, admin.Token, admin.CSRF), 204, "revoke")
+	status(
+		t,
+		a.do("DELETE", spacePath(a.space.ID, "/invitations/"+strconv.FormatInt(id, 10)), nil, admin.Token, admin.CSRF),
+		204,
+		"revoke",
+	)
 	status(t, a.do("POST", "/api/invitations/"+open+"/accept", nil, bs.Token, bs.CSRF), 404, "revoked")
 
 	expired := a.invite(a.space.ID, admin, "", roleViewer)
@@ -74,7 +79,12 @@ func TestInvitationLifecycle(t *testing.T) {
 	}
 	status(t, a.do("POST", "/api/invitations/"+expired+"/accept", nil, bs.Token, bs.CSRF), 404, "expired")
 
-	status(t, a.do("POST", spacePath(a.space.ID, "/invitations"), map[string]any{"role": roleViewer}, as.Token, as.CSRF), 403, "editor invites")
+	status(
+		t,
+		a.do("POST", spacePath(a.space.ID, "/invitations"), map[string]any{"role": roleViewer}, as.Token, as.CSRF),
+		403,
+		"editor invites",
+	)
 }
 
 // Registering through an invitation from a space admin makes a guest,
@@ -91,7 +101,13 @@ func TestRegisterThroughInvitation(t *testing.T) {
 	spaceAdmin := a.issue(owner, false)
 
 	register := func(token, email string) (int, map[string]any) {
-		res := a.do("POST", "/api/invitations/"+token+"/register", map[string]any{"name": "New", "email": email, "password": "password1"}, "", "")
+		res := a.do(
+			"POST",
+			"/api/invitations/"+token+"/register",
+			map[string]any{"name": "New", "email": email, "password": "password1"},
+			"",
+			"",
+		)
 		return res.StatusCode, decodeJSON(t, res)
 	}
 	if code, body := register(a.invite(a.space.ID, spaceAdmin, "", roleEditor), "guest@test.com"); code != http.StatusCreated {
@@ -132,11 +148,43 @@ func TestGuestNeverSpaceAdmin(t *testing.T) {
 	guest := a.createUser("guest@test.com", "secret1", auth.RoleGuest)
 	gs := a.issue(guest, false)
 
-	status(t, a.do("POST", "/api/invitations/"+a.invite(a.space.ID, as, "", spaces.RoleAdmin)+"/accept", nil, gs.Token, gs.CSRF), 422, "admin invitation")
-	status(t, a.do("POST", "/api/invitations/"+a.invite(a.space.ID, as, "", roleEditor)+"/accept", nil, gs.Token, gs.CSRF), 200, "editor invitation")
-	status(t, a.do("PATCH", spacePath(a.space.ID, "/members"+userPath(guest.ID)), map[string]any{"role": spaces.RoleAdmin}, as.Token, as.CSRF), 422, "promote")
+	status(
+		t,
+		a.do("POST", "/api/invitations/"+a.invite(a.space.ID, as, "", spaces.RoleAdmin)+"/accept", nil, gs.Token, gs.CSRF),
+		422,
+		"admin invitation",
+	)
+	status(
+		t,
+		a.do("POST", "/api/invitations/"+a.invite(a.space.ID, as, "", roleEditor)+"/accept", nil, gs.Token, gs.CSRF),
+		200,
+		"editor invitation",
+	)
+	status(
+		t,
+		a.do(
+			"PATCH",
+			spacePath(a.space.ID, "/members"+userPath(guest.ID)),
+			map[string]any{"role": spaces.RoleAdmin},
+			as.Token,
+			as.CSRF,
+		),
+		422,
+		"promote",
+	)
 	status(t, a.do("POST", "/api/spaces", map[string]any{"name": "Mine"}, gs.Token, gs.CSRF), 422, "create space")
-	status(t, a.do("POST", "/api/admin/spaces/"+strconv.FormatInt(a.space.ID, 10)+"/admins", map[string]any{"user_id": guest.ID}, as.Token, as.CSRF), 422, "assign admin")
+	status(
+		t,
+		a.do(
+			"POST",
+			"/api/admin/spaces/"+strconv.FormatInt(a.space.ID, 10)+"/admins",
+			map[string]any{"user_id": guest.ID},
+			as.Token,
+			as.CSRF,
+		),
+		422,
+		"assign admin",
+	)
 	// Registering through an admin invitation from a space admin would make
 	// a guest admin.
 	owner := a.createUser("owner@test.com", "secret1", auth.RoleUser)
@@ -157,9 +205,19 @@ func TestSpaceAdminCannotBeDemotedToGuest(t *testing.T) {
 	if _, err := a.svc.Spaces.Create(context.Background(), "Owned", owner); err != nil {
 		t.Fatal(err)
 	}
-	status(t, a.do("PATCH", "/api/users"+userPath(owner.ID), map[string]any{"role": auth.RoleGuest}, as.Token, as.CSRF), 422, "demote space admin")
+	status(
+		t,
+		a.do("PATCH", "/api/users"+userPath(owner.ID), map[string]any{"role": auth.RoleGuest}, as.Token, as.CSRF),
+		422,
+		"demote space admin",
+	)
 	plain := a.createUser("plain@test.com", "secret1", auth.RoleUser)
-	status(t, a.do("PATCH", "/api/users"+userPath(plain.ID), map[string]any{"role": auth.RoleGuest}, as.Token, as.CSRF), 200, "demote plain user")
+	status(
+		t,
+		a.do("PATCH", "/api/users"+userPath(plain.ID), map[string]any{"role": auth.RoleGuest}, as.Token, as.CSRF),
+		200,
+		"demote plain user",
+	)
 }
 
 // Max_spaces_per_user counts admin memberships: creating, accepting an
@@ -176,11 +234,48 @@ func TestSpaceLimit(t *testing.T) {
 
 	status(t, a.do("POST", "/api/spaces", map[string]any{"name": "First"}, us.Token, us.CSRF), 201, "first space")
 	status(t, a.do("POST", "/api/spaces", map[string]any{"name": "Second"}, us.Token, us.CSRF), 422, "second space")
-	status(t, a.do("POST", "/api/invitations/"+a.invite(a.space.ID, as, "", spaces.RoleAdmin)+"/accept", nil, us.Token, us.CSRF), 422, "admin invitation")
-	status(t, a.do("POST", "/api/invitations/"+a.invite(a.space.ID, as, "", roleEditor)+"/accept", nil, us.Token, us.CSRF), 200, "editor invitation")
-	status(t, a.do("PATCH", spacePath(a.space.ID, "/members"+userPath(user.ID)), map[string]any{"role": spaces.RoleAdmin}, as.Token, as.CSRF), 422, "promotion")
-	status(t, a.do("POST", "/api/admin/spaces/"+strconv.FormatInt(a.space.ID, 10)+"/admins", map[string]any{"user_id": user.ID}, as.Token, as.CSRF), 204, "server admin assigns")
-	status(t, a.do("POST", "/api/spaces", map[string]any{"name": "Admin's"}, as.Token, as.CSRF), 201, "server admin has no limit")
+	status(
+		t,
+		a.do("POST", "/api/invitations/"+a.invite(a.space.ID, as, "", spaces.RoleAdmin)+"/accept", nil, us.Token, us.CSRF),
+		422,
+		"admin invitation",
+	)
+	status(
+		t,
+		a.do("POST", "/api/invitations/"+a.invite(a.space.ID, as, "", roleEditor)+"/accept", nil, us.Token, us.CSRF),
+		200,
+		"editor invitation",
+	)
+	status(
+		t,
+		a.do(
+			"PATCH",
+			spacePath(a.space.ID, "/members"+userPath(user.ID)),
+			map[string]any{"role": spaces.RoleAdmin},
+			as.Token,
+			as.CSRF,
+		),
+		422,
+		"promotion",
+	)
+	status(
+		t,
+		a.do(
+			"POST",
+			"/api/admin/spaces/"+strconv.FormatInt(a.space.ID, 10)+"/admins",
+			map[string]any{"user_id": user.ID},
+			as.Token,
+			as.CSRF,
+		),
+		204,
+		"server admin assigns",
+	)
+	status(
+		t,
+		a.do("POST", "/api/spaces", map[string]any{"name": "Admin's"}, as.Token, as.CSRF),
+		201,
+		"server admin has no limit",
+	)
 
 	_ = a.svc.Settings.Set(ctx, "max_spaces_per_user", 0)
 	other := a.issue(a.createUser("other@test.com", "secret1", auth.RoleUser), false)
@@ -201,11 +296,33 @@ func TestSpaceKeepsItsLastAdmin(t *testing.T) {
 	_ = a.svc.Spaces.SetMember(ctx, space.ID, member, roleEditor)
 
 	status(t, a.do("POST", spacePath(space.ID, "/leave"), nil, os.Token, os.CSRF), 422, "last admin leaves")
-	status(t, a.do("PATCH", spacePath(space.ID, "/members"+userPath(owner.ID)), map[string]any{"role": roleEditor}, os.Token, os.CSRF), 422, "last admin demotes")
+	status(
+		t,
+		a.do(
+			"PATCH",
+			spacePath(space.ID, "/members"+userPath(owner.ID)),
+			map[string]any{"role": roleEditor},
+			os.Token,
+			os.CSRF,
+		),
+		422,
+		"last admin demotes",
+	)
 	admin := a.issue(a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
 	status(t, a.do("DELETE", "/api/users"+userPath(owner.ID), nil, admin.Token, admin.CSRF), 422, "delete last admin")
 
-	status(t, a.do("PATCH", spacePath(space.ID, "/members"+userPath(member.ID)), map[string]any{"role": spaces.RoleAdmin}, os.Token, os.CSRF), 200, "hand over")
+	status(
+		t,
+		a.do(
+			"PATCH",
+			spacePath(space.ID, "/members"+userPath(member.ID)),
+			map[string]any{"role": spaces.RoleAdmin},
+			os.Token,
+			os.CSRF,
+		),
+		200,
+		"hand over",
+	)
 	status(t, a.do("POST", spacePath(space.ID, "/leave"), nil, os.Token, os.CSRF), 204, "leave after hand-over")
 
 	ms := a.issue(member, false)
@@ -250,7 +367,8 @@ func TestDeleteUserAndTheirSpaces(t *testing.T) {
 		t.Fatalf("restore deleted %d %v", res.StatusCode, body)
 	}
 	restored := int64(body["data"].(map[string]any)["id"].(float64))
-	if names := tagNames(t, a.inSpace(restored, "GET", "/api/tags", nil, admin)); len(names) != 1 || names[0] != "keepsake" {
+	if names := tagNames(t, a.inSpace(restored, "GET", "/api/tags", nil, admin)); len(names) != 1 ||
+		names[0] != "keepsake" {
 		t.Fatalf("restored tags %v", names)
 	}
 }
@@ -296,8 +414,18 @@ func TestAdminActionsAreAudited(t *testing.T) {
 	os := a.issue(owner, false)
 
 	id := strconv.FormatInt(space.ID, 10)
-	status(t, a.do("POST", "/api/admin/spaces/"+id+"/admins", map[string]any{"user_id": admin.ID}, as.Token, as.CSRF), 204, "assign self")
-	status(t, a.do("PATCH", "/api/admin/spaces/"+id, map[string]any{"quota_bytes": 10 << 20}, as.Token, as.CSRF), 200, "quota")
+	status(
+		t,
+		a.do("POST", "/api/admin/spaces/"+id+"/admins", map[string]any{"user_id": admin.ID}, as.Token, as.CSRF),
+		204,
+		"assign self",
+	)
+	status(
+		t,
+		a.do("PATCH", "/api/admin/spaces/"+id, map[string]any{"quota_bytes": 10 << 20}, as.Token, as.CSRF),
+		200,
+		"quota",
+	)
 	log := decodeJSON(t, a.do("GET", spacePath(space.ID, "/audit"), nil, os.Token, ""))["data"].([]any)
 	actions := map[string]bool{}
 	for _, x := range log {
@@ -332,7 +460,12 @@ func TestSpaceRenameAndDelete(t *testing.T) {
 	_ = a.svc.Spaces.SetMember(ctx, space.ID, viewer, roleViewer)
 	vs := a.issue(viewer, false)
 
-	status(t, a.do("PATCH", spacePath(space.ID, ""), map[string]any{"name": "New"}, vs.Token, vs.CSRF), 403, "viewer renames")
+	status(
+		t,
+		a.do("PATCH", spacePath(space.ID, ""), map[string]any{"name": "New"}, vs.Token, vs.CSRF),
+		403,
+		"viewer renames",
+	)
 	res := a.do("PATCH", spacePath(space.ID, ""), map[string]any{"name": "New"}, os.Token, os.CSRF)
 	if body := decodeJSON(t, res); res.StatusCode != 200 || body["data"].(map[string]any)["name"] != "New" {
 		t.Fatalf("rename %d %v", res.StatusCode, body)
@@ -389,13 +522,24 @@ func TestReconcileRegistryAndFiles(t *testing.T) {
 func TestSpaceSettingsAreAdminEditable(t *testing.T) {
 	a := newTestApp(t)
 	admin := a.issue(a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
-	res := a.do("PATCH", "/api/settings", map[string]any{"max_spaces_per_user": 0, "space_invites_can_register": false}, admin.Token, admin.CSRF)
+	res := a.do(
+		"PATCH",
+		"/api/settings",
+		map[string]any{"max_spaces_per_user": 0, "space_invites_can_register": false},
+		admin.Token,
+		admin.CSRF,
+	)
 	body := decodeJSON(t, res)
 	if res.StatusCode != 200 || body["max_spaces_per_user"] != float64(0) || body["space_invites_can_register"] != false {
 		t.Fatalf("update %d %v", res.StatusCode, body)
 	}
 	user := a.issue(a.createUser("u@test.com", "secret1", auth.RoleUser), false)
-	status(t, a.do("POST", "/api/spaces", map[string]any{"name": "No"}, user.Token, user.CSRF), 422, "limit 0 through the API")
+	status(
+		t,
+		a.do("POST", "/api/spaces", map[string]any{"name": "No"}, user.Token, user.CSRF),
+		422,
+		"limit 0 through the API",
+	)
 	res = a.do("PATCH", "/api/settings", map[string]any{"max_spaces_per_user": nil}, admin.Token, admin.CSRF)
 	res.Body.Close()
 	status(t, a.do("POST", "/api/spaces", map[string]any{"name": "Yes"}, user.Token, user.CSRF), 201, "unlimited again")

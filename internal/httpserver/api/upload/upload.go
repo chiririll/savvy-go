@@ -118,7 +118,11 @@ func (s Handler) uploadComplete(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, 422, err.Error())
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, completedBody{Location: s.Uploads.Location(out), Key: out.ObjectKey, UploadID: out.ID})
+	httpx.WriteJSON(
+		w,
+		http.StatusOK,
+		completedBody{Location: s.Uploads.Location(out), Key: out.ObjectKey, UploadID: out.ID},
+	)
 }
 
 func (s Handler) uploadAbort(w http.ResponseWriter, r *http.Request) {

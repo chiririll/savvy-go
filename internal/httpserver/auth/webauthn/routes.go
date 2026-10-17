@@ -12,7 +12,13 @@ import (
 
 func init() {
 	routing.Register(func(d *routing.Deps) []routing.Mount {
-		h := Handler{WebAuthn: routing.Get[auth.WebAuthn](d), Challenges: routing.Get[auth.Challenges](d), Login: d.Login, Guard: d.Guard, Confirm: confirm.Confirmer{TwoFactor: routing.Get[auth.TwoFactor](d), Guard: d.Guard}}
+		h := Handler{
+			WebAuthn:   routing.Get[auth.WebAuthn](d),
+			Challenges: routing.Get[auth.Challenges](d),
+			Login:      d.Login,
+			Guard:      d.Guard,
+			Confirm:    confirm.Confirmer{TwoFactor: routing.Get[auth.TwoFactor](d), Guard: d.Guard},
+		}
 		return []routing.Mount{
 			routing.Public(h.PublicRoutes),
 			routing.Credential(h.CredentialRoutes),

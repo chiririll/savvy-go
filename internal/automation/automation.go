@@ -239,7 +239,14 @@ func (s Service) incrementRuns(ctx context.Context, id int64) {
 	_ = s.repo().CountRun(ctx, id, time.Now().UTC())
 }
 
-func (s Service) log(ctx context.Context, rule *Rule, tx *ledger.Transaction, status string, actions any, errMsg string) {
+func (s Service) log(
+	ctx context.Context,
+	rule *Rule,
+	tx *ledger.Transaction,
+	status string,
+	actions any,
+	errMsg string,
+) {
 	var actionsJSON string
 	if actions != nil {
 		raw, _ := json.Marshal(actions)
@@ -248,7 +255,11 @@ func (s Service) log(ctx context.Context, rule *Rule, tx *ledger.Transaction, st
 	_ = s.repo().AddLog(ctx, rule.ID, tx.ID, status, actionsJSON, errMsg, time.Now().UTC())
 }
 
-func (s Service) executeActions(ctx context.Context, actions []map[string]any, tx *ledger.Transaction) ([]map[string]any, error) {
+func (s Service) executeActions(
+	ctx context.Context,
+	actions []map[string]any,
+	tx *ledger.Transaction,
+) ([]map[string]any, error) {
 	var results []map[string]any
 	for _, action := range actions {
 		typ, _ := action["type"].(string)

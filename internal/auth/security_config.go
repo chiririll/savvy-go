@@ -31,7 +31,7 @@ type SecurityConfig struct {
 	RememberTTL  int    `toml:"remember_ttl"`
 	ChallengeTTL int    `toml:"challenge_ttl"`
 	ResetTTL     int    `toml:"reset_ttl"`
-	Cookie      string `toml:"session_cookie" comment:"Cookie and header names."`
+	Cookie       string `toml:"session_cookie" comment:"Cookie and header names."`
 	CSRFCookie   string `toml:"csrf_cookie"`
 	CSRFHeader   string `toml:"csrf_header"`
 
@@ -46,7 +46,7 @@ func (SecurityConfig) Defaults() SecurityConfig {
 		RememberTTL:  60 * 24 * 7,
 		ChallengeTTL: 5,
 		ResetTTL:     60,
-		Cookie:      "svy_session",
+		Cookie:       "svy_session",
 		CSRFCookie:   "svy_csrf",
 		CSRFHeader:   "X-CSRF-Token",
 

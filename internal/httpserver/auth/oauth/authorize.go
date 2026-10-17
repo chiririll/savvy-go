@@ -45,7 +45,12 @@ func (h Handler) oauthAuthorize(w http.ResponseWriter, r *http.Request) {
 	}
 	state := q.Get("state")
 	fail := func(code, desc string) {
-		http.Redirect(w, r, redirectWith(redirectURI, map[string]string{"error": code, "error_description": desc, "state": state}), http.StatusFound)
+		http.Redirect(
+			w,
+			r,
+			redirectWith(redirectURI, map[string]string{"error": code, "error_description": desc, "state": state}),
+			http.StatusFound,
+		)
 	}
 	if q.Get("response_type") != "code" {
 		fail("unsupported_response_type", "Only response_type=code is supported.")
@@ -98,7 +103,13 @@ func (h Handler) oauthConsent(w http.ResponseWriter, r *http.Request) {
 			writeOAuthAPIError(w, err)
 			return
 		}
-		httpx.WriteData(w, http.StatusOK, map[string]string{"redirect_url": redirectWith(body.RedirectURI, map[string]string{"error": "access_denied", "state": body.State})})
+		httpx.WriteData(
+			w,
+			http.StatusOK,
+			map[string]string{
+				"redirect_url": redirectWith(body.RedirectURI, map[string]string{"error": "access_denied", "state": body.State}),
+			},
+		)
 		return
 	}
 	// The app gets only the spaces the user picked, and only ones they belong to.
@@ -125,7 +136,13 @@ func (h Handler) oauthConsent(w http.ResponseWriter, r *http.Request) {
 		writeOAuthAPIError(w, err)
 		return
 	}
-	httpx.WriteData(w, http.StatusOK, map[string]string{"redirect_url": redirectWith(body.RedirectURI, map[string]string{"code": code, "state": body.State})})
+	httpx.WriteData(
+		w,
+		http.StatusOK,
+		map[string]string{
+			"redirect_url": redirectWith(body.RedirectURI, map[string]string{"code": code, "state": body.State}),
+		},
+	)
 }
 
 // consentBody is what the consent screen shows: the app and the spaces it may be given.

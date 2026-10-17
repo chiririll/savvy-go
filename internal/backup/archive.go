@@ -33,7 +33,9 @@ const (
 )
 
 // Archive entries a backup may hold. Anything else makes the archive invalid.
-var archiveEntry = regexp.MustCompile(`^(manifest\.json|manifest\.sig|space\.sqlite|server\.sqlite|keys/server\.ed25519|spaces/[1-9][0-9]*\.sqlite)$`)
+var archiveEntry = regexp.MustCompile(
+	`^(manifest\.json|manifest\.sig|space\.sqlite|server\.sqlite|keys/server\.ed25519|spaces/[1-9][0-9]*\.sqlite)$`,
+)
 
 // Manifest describes a backup.
 type Manifest struct {

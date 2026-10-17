@@ -32,7 +32,8 @@ func TestLoadWithoutPathsFallsBackToTheDetectedDataDir(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg := Load(f)
-	if cfg.DataDir == "" || cfg.UploadsDir != filepath.Join(cfg.DataDir, "uploads") || cfg.BackupsDir != filepath.Join(cfg.DataDir, "backups") {
+	if cfg.DataDir == "" || cfg.UploadsDir != filepath.Join(cfg.DataDir, "uploads") ||
+		cfg.BackupsDir != filepath.Join(cfg.DataDir, "backups") {
 		t.Errorf("defaults %+v", cfg)
 	}
 }

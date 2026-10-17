@@ -255,7 +255,10 @@ func TestFiltersNarrowEveryReport(t *testing.T) {
 	e.add(t, "expense", e.jpyAcc.ID, &e.food.ID, "1000", "2024-01-14") // 10 USD
 	e.add(t, "expense", e.usdAcc.ID, &e.fun.ID, "3", "2024-01-14")
 	date := "2024-01-14"
-	tagged, err := e.txs.Create(e.ctx, ledger.TxInput{Type: "expense", AccountID: e.usdAcc.ID, Amount: dec("4"), Date: &date, TagIDs: []int64{tag.ID}})
+	tagged, err := e.txs.Create(
+		e.ctx,
+		ledger.TxInput{Type: "expense", AccountID: e.usdAcc.ID, Amount: dec("4"), Date: &date, TagIDs: []int64{tag.ID}},
+	)
 	if err != nil || tagged == nil {
 		t.Fatal(err)
 	}
@@ -269,7 +272,12 @@ func TestFiltersNarrowEveryReport(t *testing.T) {
 	wantMoney(t, "one account", total(Filter{AccountIDs: []int64{e.jpyAcc.ID}}), usd(e.moneyEnv, "10"))
 	wantMoney(t, "one category", total(Filter{CategoryIDs: []int64{e.fun.ID}}), usd(e.moneyEnv, "3"))
 	wantMoney(t, "one tag", total(Filter{TagIDs: []int64{tag.ID}}), usd(e.moneyEnv, "4"))
-	wantMoney(t, "account and category", total(Filter{AccountIDs: []int64{e.usdAcc.ID}, CategoryIDs: []int64{e.food.ID}}), usd(e.moneyEnv, "10"))
+	wantMoney(
+		t,
+		"account and category",
+		total(Filter{AccountIDs: []int64{e.usdAcc.ID}, CategoryIDs: []int64{e.food.ID}}),
+		usd(e.moneyEnv, "10"),
+	)
 }
 
 func TestHeatmapCoversEveryDayAndFindsThePeak(t *testing.T) {

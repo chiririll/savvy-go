@@ -144,7 +144,14 @@ func TestIssueCodeChecksClientRedirectAndPKCE(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
 	id := e.client(t)
-	base := oauth.CodeRequest{ClientID: id, RedirectURI: redirect, CodeChallenge: challenge(vOK), CodeChallengeMethod: "S256", User: e.user, AllSpaces: true}
+	base := oauth.CodeRequest{
+		ClientID:            id,
+		RedirectURI:         redirect,
+		CodeChallenge:       challenge(vOK),
+		CodeChallengeMethod: "S256",
+		User:                e.user,
+		AllSpaces:           true,
+	}
 
 	bad := base
 	bad.ClientID = "nope"
@@ -184,7 +191,12 @@ func TestExchangeIssuesAReadOnlyShortLivedAPIToken(t *testing.T) {
 	if err != nil || tok == nil {
 		t.Fatalf("access token does not resolve: %v %v", tok, err)
 	}
-	if tok.Allows("transactions", permissions.Write) || !tok.Allows("transactions", permissions.Read) || tok.Allows("transfers", permissions.Read) || !tok.AllSpaces || tok.UserID != e.user.ID || tok.ExpiresAt == nil || !strings.Contains(tok.Name, "Claude") {
+	if tok.Allows("transactions", permissions.Write) || !tok.Allows("transactions", permissions.Read) ||
+		tok.Allows("transfers", permissions.Read) ||
+		!tok.AllSpaces ||
+		tok.UserID != e.user.ID ||
+		tok.ExpiresAt == nil ||
+		!strings.Contains(tok.Name, "Claude") {
 		t.Fatalf("token = %+v", tok)
 	}
 }
@@ -342,7 +354,12 @@ func TestRegisterKeepsAndBoundsTheRequestInfo(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
 	e.svc.OpenRegistration(oauth.RegistrationWindow)
-	c, err := e.svc.Register(ctx, "Claude", []string{redirect}, oauth.RequestInfo{IP: "203.0.113.7", UserAgent: strings.Repeat("u", 1000), Origin: "https://claude.ai"})
+	c, err := e.svc.Register(
+		ctx,
+		"Claude",
+		[]string{redirect},
+		oauth.RequestInfo{IP: "203.0.113.7", UserAgent: strings.Repeat("u", 1000), Origin: "https://claude.ai"},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -351,7 +368,8 @@ func TestRegisterKeepsAndBoundsTheRequestInfo(t *testing.T) {
 		t.Fatalf("clients = %+v, %v", list, err)
 	}
 	got := list[0]
-	if got.Request.IP != "203.0.113.7" || got.Request.Origin != "https://claude.ai" || len(got.Request.UserAgent) != 300 || got.CreatedAt.IsZero() {
+	if got.Request.IP != "203.0.113.7" || got.Request.Origin != "https://claude.ai" || len(got.Request.UserAgent) != 300 ||
+		got.CreatedAt.IsZero() {
 		t.Fatalf("client = %+v", got)
 	}
 }
@@ -395,7 +413,8 @@ func TestChosenPermissionsReachTheTokenAndSurviveRefresh(t *testing.T) {
 		if err != nil || tok == nil {
 			t.Fatalf("token does not resolve: %v %v", tok, err)
 		}
-		if !tok.Allows("transactions", permissions.Read) || !tok.Allows("accounts", permissions.Read) || tok.Allows("budgets", permissions.Read) {
+		if !tok.Allows("transactions", permissions.Read) || !tok.Allows("accounts", permissions.Read) ||
+			tok.Allows("budgets", permissions.Read) {
 			t.Fatalf("permissions = %v", tok.Permissions)
 		}
 	}

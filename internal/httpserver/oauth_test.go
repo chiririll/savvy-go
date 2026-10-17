@@ -104,7 +104,15 @@ func (a *testApp) connectWithRefresh(sess *auth.Issued) (clientID, access, refre
 	a.t.Helper()
 	id := a.registerClient()
 	code := codeFrom(a.t, a.approve(sess.Token, sess.CSRF, id, true))
-	status2, tok := a.token(url.Values{"grant_type": {"authorization_code"}, "client_id": {id}, "code": {code}, "code_verifier": {oauthVerifier}, "redirect_uri": {oauthRedirect}})
+	status2, tok := a.token(
+		url.Values{
+			"grant_type":    {"authorization_code"},
+			"client_id":     {id},
+			"code":          {code},
+			"code_verifier": {oauthVerifier},
+			"redirect_uri":  {oauthRedirect},
+		},
+	)
 	if status2 != 200 {
 		a.t.Fatalf("token = %d %v", status2, tok)
 	}
@@ -233,7 +241,13 @@ func TestOAuthConsentNeedsASessionNotAToken(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("oauth@a.com", "secret1", roleEditor)
 	id := a.registerClient()
-	body := map[string]any{"client_id": id, "redirect_uri": oauthRedirect, "code_challenge": oauthChallenge(), "code_challenge_method": "S256", "approve": true}
+	body := map[string]any{
+		"client_id":             id,
+		"redirect_uri":          oauthRedirect,
+		"code_challenge":        oauthChallenge(),
+		"code_challenge_method": "S256",
+		"approve":               true,
+	}
 
 	status(t, a.do("POST", "/api/oauth/authorize", body, "", ""), http.StatusUnauthorized, "anonymous")
 
@@ -241,7 +255,12 @@ func TestOAuthConsentNeedsASessionNotAToken(t *testing.T) {
 	status(t, a.do("POST", "/api/oauth/authorize", body, sess.Token, ""), 419, "no CSRF")
 
 	raw, _ := a.issueToken(u, "read-write", nil)
-	status(t, a.bearer("POST", "/api/oauth/authorize", body, raw), http.StatusForbidden, "an API token must not mint tokens")
+	status(
+		t,
+		a.bearer("POST", "/api/oauth/authorize", body, raw),
+		http.StatusForbidden,
+		"an API token must not mint tokens",
+	)
 }
 
 func TestOAuthConsentShowsTheClientName(t *testing.T) {
@@ -249,12 +268,24 @@ func TestOAuthConsentShowsTheClientName(t *testing.T) {
 	u := a.createUser("oauth@a.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 	id := a.registerClient()
-	res := a.do("GET", "/api/oauth/authorize?client_id="+id+"&redirect_uri="+url.QueryEscape(oauthRedirect), nil, sess.Token, sess.CSRF)
+	res := a.do(
+		"GET",
+		"/api/oauth/authorize?client_id="+id+"&redirect_uri="+url.QueryEscape(oauthRedirect),
+		nil,
+		sess.Token,
+		sess.CSRF,
+	)
 	data, _ := decodeJSON(t, res)["data"].(map[string]any)
 	if res.StatusCode != 200 || data["client_name"] != "Claude" {
 		t.Fatalf("consent info = %d %v", res.StatusCode, data)
 	}
-	res = a.do("GET", "/api/oauth/authorize?client_id="+id+"&redirect_uri="+url.QueryEscape("https://evil.example/cb"), nil, sess.Token, sess.CSRF)
+	res = a.do(
+		"GET",
+		"/api/oauth/authorize?client_id="+id+"&redirect_uri="+url.QueryEscape("https://evil.example/cb"),
+		nil,
+		sess.Token,
+		sess.CSRF,
+	)
 	status(t, res, http.StatusBadRequest, "unregistered redirect")
 }
 
@@ -265,7 +296,15 @@ func TestOAuthFullFlowGivesAReadOnlyToken(t *testing.T) {
 	id := a.registerClient()
 
 	code := codeFrom(t, a.approve(sess.Token, sess.CSRF, id, true))
-	code2, tok := a.token(url.Values{"grant_type": {"authorization_code"}, "client_id": {id}, "code": {code}, "code_verifier": {oauthVerifier}, "redirect_uri": {oauthRedirect}})
+	code2, tok := a.token(
+		url.Values{
+			"grant_type":    {"authorization_code"},
+			"client_id":     {id},
+			"code":          {code},
+			"code_verifier": {oauthVerifier},
+			"redirect_uri":  {oauthRedirect},
+		},
+	)
 	if code2 != 200 || tok["token_type"] != "Bearer" || tok["access_token"] == "" || tok["refresh_token"] == "" {
 		t.Fatalf("token = %d %v", code2, tok)
 	}
@@ -282,14 +321,18 @@ func TestOAuthFullFlowGivesAReadOnlyToken(t *testing.T) {
 	}
 
 	// Refresh rotates; the old pair stops working.
-	status2, next := a.token(url.Values{"grant_type": {"refresh_token"}, "client_id": {id}, "refresh_token": {tok["refresh_token"].(string)}})
+	status2, next := a.token(
+		url.Values{"grant_type": {"refresh_token"}, "client_id": {id}, "refresh_token": {tok["refresh_token"].(string)}},
+	)
 	if status2 != 200 || next["access_token"] == access {
 		t.Fatalf("refresh = %d %v", status2, next)
 	}
 	if res := a.bearer("GET", "/api/accounts", nil, access); res.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("old access token = %d, want 401", res.StatusCode)
 	}
-	status3, errBody := a.token(url.Values{"grant_type": {"refresh_token"}, "client_id": {id}, "refresh_token": {tok["refresh_token"].(string)}})
+	status3, errBody := a.token(
+		url.Values{"grant_type": {"refresh_token"}, "client_id": {id}, "refresh_token": {tok["refresh_token"].(string)}},
+	)
 	if status3 != http.StatusBadRequest || errBody["error"] != "invalid_grant" {
 		t.Fatalf("replayed refresh = %d %v", status3, errBody)
 	}
@@ -301,7 +344,8 @@ func TestOAuthDenyReturnsAccessDenied(t *testing.T) {
 	sess := a.issue(u, false)
 	id := a.registerClient()
 	u2, err := url.Parse(a.approve(sess.Token, sess.CSRF, id, false))
-	if err != nil || u2.Query().Get("error") != "access_denied" || u2.Query().Get("state") != "st-1" || u2.Query().Get("code") != "" {
+	if err != nil || u2.Query().Get("error") != "access_denied" || u2.Query().Get("state") != "st-1" ||
+		u2.Query().Get("code") != "" {
 		t.Fatalf("deny = %v %v", u2, err)
 	}
 }
@@ -311,7 +355,13 @@ func TestOAuthTokenErrors(t *testing.T) {
 	u := a.issue(a.createUser("oauth@a.com", "secret1", roleEditor), false)
 	id := a.registerClient()
 	exchange := func(code, verifier, redirect string) url.Values {
-		return url.Values{"grant_type": {"authorization_code"}, "client_id": {id}, "code": {code}, "code_verifier": {verifier}, "redirect_uri": {redirect}}
+		return url.Values{
+			"grant_type":    {"authorization_code"},
+			"client_id":     {id},
+			"code":          {code},
+			"code_verifier": {verifier},
+			"redirect_uri":  {redirect},
+		}
 	}
 	freshCode := func() string { return codeFrom(t, a.approve(u.Token, u.CSRF, id, true)) }
 
@@ -321,7 +371,11 @@ func TestOAuthTokenErrors(t *testing.T) {
 		want string
 	}{
 		{"unknown grant type", url.Values{"grant_type": {"password"}, "client_id": {id}}, "unsupported_grant_type"},
-		{"unknown client", url.Values{"grant_type": {"authorization_code"}, "client_id": {"unknown"}, "code": {"x"}}, "invalid_client"},
+		{
+			"unknown client",
+			url.Values{"grant_type": {"authorization_code"}, "client_id": {"unknown"}, "code": {"x"}},
+			"invalid_client",
+		},
 		{"unknown code", exchange("x", oauthVerifier, oauthRedirect), "invalid_grant"},
 		{"wrong PKCE verifier", exchange(freshCode(), strings.Repeat("w", 43), oauthRedirect), "invalid_grant"},
 		{"other redirect URI", exchange(freshCode(), oauthVerifier, "https://claude.ai/other"), "invalid_grant"},
@@ -396,7 +450,12 @@ func TestOnlyAdminSessionsControlRegistration(t *testing.T) {
 	a := newTestApp(t)
 	user := a.createUser("u@a.com", "secret1", roleEditor)
 	sess := a.issue(user, false)
-	status(t, a.do("POST", "/api/admin/oauth/registration", nil, sess.Token, sess.CSRF), http.StatusForbidden, "a normal user")
+	status(
+		t,
+		a.do("POST", "/api/admin/oauth/registration", nil, sess.Token, sess.CSRF),
+		http.StatusForbidden,
+		"a normal user",
+	)
 	status(t, a.do("POST", "/api/admin/oauth/registration", nil, "", ""), http.StatusUnauthorized, "anonymous")
 
 	admin := a.createUser("admin@a.com", "secret1", "admin")
@@ -429,7 +488,9 @@ func TestAdminSeesWhereTheRegistrationCameFrom(t *testing.T) {
 	}
 	c := list[0].(map[string]any)
 	if c["name"] != "Claude" || c["ip"] != "203.0.113.7" || c["user_agent"] != "Claude-MCP/9.9" || c["origin"] != "https://claude.ai" ||
-		c["approved_at"] != nil || c["registered_at"] == nil || c["redirect_uris"].([]any)[0] != oauthRedirect {
+		c["approved_at"] != nil ||
+		c["registered_at"] == nil ||
+		c["redirect_uris"].([]any)[0] != oauthRedirect {
 		t.Fatalf("client = %v", c)
 	}
 }
@@ -449,20 +510,40 @@ func TestRemovingAnAppCutsItOffAtOnce(t *testing.T) {
 	if _, body := a.token(url.Values{"grant_type": {"refresh_token"}, "client_id": {id}, "refresh_token": {refresh}}); body["error"] == nil {
 		t.Fatalf("a removed app refreshed its tokens: %v", body)
 	}
-	status(t, a.do("DELETE", "/api/admin/oauth/clients/"+id, nil, admin.Token, admin.CSRF), http.StatusNotFound, "remove twice")
+	status(
+		t,
+		a.do("DELETE", "/api/admin/oauth/clients/"+id, nil, admin.Token, admin.CSRF),
+		http.StatusNotFound,
+		"remove twice",
+	)
 }
 
 func TestOnlyAdminSessionsListAndRemoveApps(t *testing.T) {
 	a := newTestApp(t)
 	user := a.issue(a.createUser("u@a.com", "secret1", roleEditor), false)
 	id, access := a.connect(user)
-	status(t, a.do("GET", "/api/admin/oauth/clients", nil, user.Token, user.CSRF), http.StatusForbidden, "list as a normal user")
-	status(t, a.do("DELETE", "/api/admin/oauth/clients/"+id, nil, user.Token, user.CSRF), http.StatusForbidden, "remove as a normal user")
+	status(
+		t,
+		a.do("GET", "/api/admin/oauth/clients", nil, user.Token, user.CSRF),
+		http.StatusForbidden,
+		"list as a normal user",
+	)
+	status(
+		t,
+		a.do("DELETE", "/api/admin/oauth/clients/"+id, nil, user.Token, user.CSRF),
+		http.StatusForbidden,
+		"remove as a normal user",
+	)
 	// A token, even an admin's, cannot manage apps; neither can the app itself.
 	adminUser := a.createUser("admin@a.com", "secret1", "admin")
 	raw, _ := a.issueToken(adminUser, "read-write", nil)
 	status(t, a.bearer("GET", "/api/admin/oauth/clients", nil, raw), http.StatusForbidden, "list with a token")
-	status(t, a.bearer("DELETE", "/api/admin/oauth/clients/"+id, nil, access), http.StatusForbidden, "remove with its own token")
+	status(
+		t,
+		a.bearer("DELETE", "/api/admin/oauth/clients/"+id, nil, access),
+		http.StatusForbidden,
+		"remove with its own token",
+	)
 }
 
 func TestNoPageCanBeFramed(t *testing.T) {
@@ -499,19 +580,44 @@ func TestOAuthConsentCanGrantWriteToChosenResources(t *testing.T) {
 		t.Fatalf("approve = %d", res.StatusCode)
 	}
 	code := codeFrom(t, decodeJSON(t, res)["data"].(map[string]any)["redirect_url"].(string))
-	status2, tok := a.token(url.Values{"grant_type": {"authorization_code"}, "client_id": {id}, "code": {code}, "code_verifier": {oauthVerifier}, "redirect_uri": {oauthRedirect}})
+	status2, tok := a.token(
+		url.Values{
+			"grant_type":    {"authorization_code"},
+			"client_id":     {id},
+			"code":          {code},
+			"code_verifier": {oauthVerifier},
+			"redirect_uri":  {oauthRedirect},
+		},
+	)
 	if status2 != 200 {
 		t.Fatalf("token = %d %v", status2, tok)
 	}
 	access := tok["access_token"].(string)
 
-	status(t, a.bearer("POST", "/api/tags", map[string]any{"name": "t"}, access), http.StatusCreated, "write on a ticked resource")
-	status(t, a.bearer("POST", "/api/accounts", map[string]any{"name": "X"}, access), http.StatusForbidden, "write on a resource left at read")
+	status(
+		t,
+		a.bearer("POST", "/api/tags", map[string]any{"name": "t"}, access),
+		http.StatusCreated,
+		"write on a ticked resource",
+	)
+	status(
+		t,
+		a.bearer("POST", "/api/accounts", map[string]any{"name": "X"}, access),
+		http.StatusForbidden,
+		"write on a resource left at read",
+	)
 	status(t, a.bearer("GET", "/api/transactions", nil, access), http.StatusOK, "read")
 
 	// The grant survives a refresh.
-	_, next := a.token(url.Values{"grant_type": {"refresh_token"}, "client_id": {id}, "refresh_token": {tok["refresh_token"].(string)}})
-	status(t, a.bearer("POST", "/api/tags", map[string]any{"name": "t2"}, next["access_token"].(string)), http.StatusCreated, "write after refresh")
+	_, next := a.token(
+		url.Values{"grant_type": {"refresh_token"}, "client_id": {id}, "refresh_token": {tok["refresh_token"].(string)}},
+	)
+	status(
+		t,
+		a.bearer("POST", "/api/tags", map[string]any{"name": "t2"}, next["access_token"].(string)),
+		http.StatusCreated,
+		"write after refresh",
+	)
 }
 
 // Browser-based MCP clients ask before they call the discovery, token and MCP endpoints.

@@ -18,7 +18,11 @@ var spec []byte
 func init() {
 	ui.AddSpec(spec)
 	routing.Register(func(d *routing.Deps) []routing.Mount {
-		h := Handler{Tokens: routing.Get[auth.APITokens](d), Spaces: routing.Get[spaces.Service](d), Confirm: confirm.Confirmer{TwoFactor: routing.Get[auth.TwoFactor](d), Guard: d.Guard}}
+		h := Handler{
+			Tokens:  routing.Get[auth.APITokens](d),
+			Spaces:  routing.Get[spaces.Service](d),
+			Confirm: confirm.Confirmer{TwoFactor: routing.Get[auth.TwoFactor](d), Guard: d.Guard},
+		}
 		return []routing.Mount{
 			routing.Credential(h.Routes),
 		}

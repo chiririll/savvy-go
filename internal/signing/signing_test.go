@@ -81,7 +81,9 @@ func TestVerifyRefusesWrongKeysAndSignatures(t *testing.T) {
 	b, _ := Generate(t.TempDir())
 	msg := []byte("m")
 	sig := a.Sign(msg)
-	if !Verify(a.Public(), msg, sig) || Verify(b.Public(), msg, sig) || Verify(a.Public()[:5], msg, sig) || Verify(a.Public(), msg, sig[:10]) || Verify(nil, msg, sig) {
+	if !Verify(a.Public(), msg, sig) || Verify(b.Public(), msg, sig) || Verify(a.Public()[:5], msg, sig) ||
+		Verify(a.Public(), msg, sig[:10]) ||
+		Verify(nil, msg, sig) {
 		t.Error("Verify")
 	}
 }

@@ -54,14 +54,21 @@ func TestSpacesAreIsolated(t *testing.T) {
 	status(t, a.inSpace(aliceSpace.ID, "POST", "/api/tags", map[string]any{"name": "alice-only"}, as), 201, "alice tag")
 	status(t, a.inSpace(bobSpace.ID, "POST", "/api/tags", map[string]any{"name": "bob-only"}, bs), 201, "bob tag")
 
-	if names := tagNames(t, a.inSpace(aliceSpace.ID, "GET", "/api/tags", nil, as)); len(names) != 1 || names[0] != "alice-only" {
+	if names := tagNames(t, a.inSpace(aliceSpace.ID, "GET", "/api/tags", nil, as)); len(names) != 1 ||
+		names[0] != "alice-only" {
 		t.Fatalf("alice sees %v", names)
 	}
-	if names := tagNames(t, a.inSpace(bobSpace.ID, "GET", "/api/tags", nil, bs)); len(names) != 1 || names[0] != "bob-only" {
+	if names := tagNames(t, a.inSpace(bobSpace.ID, "GET", "/api/tags", nil, bs)); len(names) != 1 ||
+		names[0] != "bob-only" {
 		t.Fatalf("bob's space shows %v", names)
 	}
 	status(t, a.inSpace(aliceSpace.ID, "GET", "/api/tags", nil, bs), 404, "bob reads alice's space")
-	status(t, a.inSpace(aliceSpace.ID, "POST", "/api/tags", map[string]any{"name": "x"}, bs), 404, "bob writes alice's space")
+	status(
+		t,
+		a.inSpace(aliceSpace.ID, "POST", "/api/tags", map[string]any{"name": "x"}, bs),
+		404,
+		"bob writes alice's space",
+	)
 	status(t, a.inSpace(999, "GET", "/api/tags", nil, bs), 404, "missing space")
 
 	// Joining as a viewer makes the space readable but not writable.
@@ -82,8 +89,18 @@ func TestSettingsUpdateRoles(t *testing.T) {
 	admin := a.issue(a.createUser("a@test.com", "secret1", auth.RoleAdmin), false)
 	spaceSettings := spacePath(a.space.ID, "/settings")
 
-	status(t, a.do("PATCH", "/api/settings", map[string]any{"sso_allow_signup": false}, editor.Token, editor.CSRF), 403, "editor instance key")
-	status(t, a.do("PATCH", spaceSettings, map[string]any{"auto_update_currencies": false}, editor.Token, editor.CSRF), 403, "editor space key")
+	status(
+		t,
+		a.do("PATCH", "/api/settings", map[string]any{"sso_allow_signup": false}, editor.Token, editor.CSRF),
+		403,
+		"editor instance key",
+	)
+	status(
+		t,
+		a.do("PATCH", spaceSettings, map[string]any{"auto_update_currencies": false}, editor.Token, editor.CSRF),
+		403,
+		"editor space key",
+	)
 	status(t, a.do("GET", "/api/settings", nil, editor.Token, ""), 200, "instance settings are readable")
 
 	res := a.do("PATCH", "/api/settings", map[string]any{"sso_allow_signup": false}, admin.Token, admin.CSRF)
@@ -123,7 +140,13 @@ func TestNewAccountsHaveNoSpace(t *testing.T) {
 	t.Run("created by an admin", func(t *testing.T) {
 		a := newTestApp(t)
 		admin := a.issue(a.createUser("a@test.com", "secret1", auth.RoleAdmin), false)
-		res := a.do("POST", "/api/users", map[string]any{"name": "New", "email": "n@test.com", "password": "secret12", "role": auth.RoleUser}, admin.Token, admin.CSRF)
+		res := a.do(
+			"POST",
+			"/api/users",
+			map[string]any{"name": "New", "email": "n@test.com", "password": "secret12", "role": auth.RoleUser},
+			admin.Token,
+			admin.CSRF,
+		)
 		status(t, res, 201, "create user")
 		u, err := a.svc.Users.ByEmail(context.Background(), "n@test.com")
 		if err != nil || u == nil {

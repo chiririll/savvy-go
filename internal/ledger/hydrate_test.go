@@ -21,14 +21,30 @@ func TestPageHydrationKeepsItemsAndTagsWithTheirTransaction(t *testing.T) {
 	}
 	date := "2024-01-15"
 	mk := func(acct int64, amount string, items []TxItemInput, tagIDs []int64) int64 {
-		tx, err := e.txs.Create(e.ctx, TxInput{Type: "expense", AccountID: acct, Amount: dec(amount), Date: &date, Items: items, TagIDs: tagIDs})
+		tx, err := e.txs.Create(
+			e.ctx,
+			TxInput{Type: "expense", AccountID: acct, Amount: dec(amount), Date: &date, Items: items, TagIDs: tagIDs},
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
 		return tx.ID
 	}
-	usdTx := mk(e.usdAcc.ID, "3", []TxItemInput{{Name: "a", Quantity: dec("1"), PricePerUnit: dec("1")}, {Name: "b", Quantity: dec("2"), PricePerUnit: dec("1")}}, []int64{food.ID, trip.ID})
-	jpyTx := mk(e.jpyAcc.ID, "500", []TxItemInput{{Name: "c", Quantity: dec("1"), PricePerUnit: dec("500")}}, []int64{trip.ID})
+	usdTx := mk(
+		e.usdAcc.ID,
+		"3",
+		[]TxItemInput{
+			{Name: "a", Quantity: dec("1"), PricePerUnit: dec("1")},
+			{Name: "b", Quantity: dec("2"), PricePerUnit: dec("1")},
+		},
+		[]int64{food.ID, trip.ID},
+	)
+	jpyTx := mk(
+		e.jpyAcc.ID,
+		"500",
+		[]TxItemInput{{Name: "c", Quantity: dec("1"), PricePerUnit: dec("500")}},
+		[]int64{trip.ID},
+	)
 	bare := mk(e.usdAcc.ID, "1", nil, nil)
 
 	page, total, err := e.txs.Filtered(e.ctx, filter.TxFilter{}, 1, 25)
@@ -40,10 +56,12 @@ func TestPageHydrationKeepsItemsAndTagsWithTheirTransaction(t *testing.T) {
 		byID[tx.ID] = tx
 	}
 
-	if got := byID[usdTx]; len(got.Items) != 2 || got.Items[0].Name != "a" || got.Items[1].Name != "b" || len(got.Tags) != 2 {
+	if got := byID[usdTx]; len(got.Items) != 2 || got.Items[0].Name != "a" || got.Items[1].Name != "b" ||
+		len(got.Tags) != 2 {
 		t.Fatalf("usd tx items %+v tags %+v", got.Items, got.Tags)
 	}
-	if got := byID[jpyTx]; len(got.Items) != 1 || got.Items[0].Name != "c" || len(got.Tags) != 1 || got.Tags[0].ID != trip.ID {
+	if got := byID[jpyTx]; len(got.Items) != 1 || got.Items[0].Name != "c" || len(got.Tags) != 1 ||
+		got.Tags[0].ID != trip.ID {
 		t.Fatalf("jpy tx items %+v tags %+v", got.Items, got.Tags)
 	}
 	if got := byID[jpyTx].Items[0].TotalPrice; got.Unit() != e.jpy.Unit() || !got.Decimal().Equal(dec("500")) {

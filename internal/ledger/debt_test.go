@@ -72,7 +72,9 @@ func TestADebtCannotBeFundedFromADebt(t *testing.T) {
 
 func TestAnExistingDebtMovesNoMoney(t *testing.T) {
 	e := newMoneyEnv(t)
-	debt, err := newDebts(e).Create(e.ctx, DebtInput{Name: "old", DebtType: "i_owe", CurrencyID: e.usd.ID, AccountID: e.usdAcc.ID, Amount: dec("40"), Origin: "existing"})
+	debt, err := newDebts(
+		e,
+	).Create(e.ctx, DebtInput{Name: "old", DebtType: "i_owe", CurrencyID: e.usd.ID, AccountID: e.usdAcc.ID, Amount: dec("40"), Origin: "existing"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,7 +126,17 @@ func TestPaymentsPayTheDebtOffAndReopenBringsItBack(t *testing.T) {
 func TestCollectingPaysBackADebtOwedToMe(t *testing.T) {
 	e := newMoneyEnv(t)
 	debts := newDebts(e)
-	debt, err := debts.Create(e.ctx, DebtInput{Name: "Ann", DebtType: "owed_to_me", AccountID: e.usdAcc.ID, Amount: dec("60"), Date: "2024-01-10", Origin: "new"})
+	debt, err := debts.Create(
+		e.ctx,
+		DebtInput{
+			Name:      "Ann",
+			DebtType:  "owed_to_me",
+			AccountID: e.usdAcc.ID,
+			Amount:    dec("60"),
+			Date:      "2024-01-10",
+			Origin:    "new",
+		},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

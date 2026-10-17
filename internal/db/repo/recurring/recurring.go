@@ -85,7 +85,8 @@ func rowOf(x sqlc.ListRecurringRow) Row {
 // List lists templates, newest first by the query's order; activeOnly keeps
 // the active ones, limit caps the count.
 func (r Repo) List(ctx context.Context, activeOnly bool, limit int) ([]Row, error) {
-	rows, err := r.q().ListRecurring(ctx, sqlc.ListRecurringParams{ActiveOnly: db.Flag(activeOnly), Limit: int64(limit), Offset: 0})
+	rows, err := r.q().
+		ListRecurring(ctx, sqlc.ListRecurringParams{ActiveOnly: db.Flag(activeOnly), Limit: int64(limit), Offset: 0})
 	if err != nil {
 		return nil, err
 	}

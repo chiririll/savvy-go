@@ -27,7 +27,10 @@ func newRepos(t *testing.T) (repo.Repo, authrepo.Repo, int64) {
 
 func token(t *testing.T, a authrepo.Repo, uid int64, hash string) int64 {
 	t.Helper()
-	id, err := a.InsertAPIToken(context.Background(), authrepo.NewAPIToken{UserID: uid, Name: "t", Hash: hash, Prefix: "svy_", AllSpaces: true, Now: time.Now()})
+	id, err := a.InsertAPIToken(
+		context.Background(),
+		authrepo.NewAPIToken{UserID: uid, Name: "t", Hash: hash, Prefix: "svy_", AllSpaces: true, Now: time.Now()},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +116,17 @@ func TestRevokingTheAccessTokenRemovesTheRefreshToken(t *testing.T) {
 	ctx := context.Background()
 	_ = r.InsertClient(ctx, "c", "C", []string{"https://x/cb"}, repo.RequestInfo{}, time.Now())
 	tok := token(t, a, uid, "h1")
-	_ = r.InsertRefresh(ctx, repo.NewRefresh{Hash: "r1", ClientID: "c", UserID: uid, APITokenID: tok, ExpiresAt: time.Now().Add(time.Hour), Now: time.Now()})
+	_ = r.InsertRefresh(
+		ctx,
+		repo.NewRefresh{
+			Hash:       "r1",
+			ClientID:   "c",
+			UserID:     uid,
+			APITokenID: tok,
+			ExpiresAt:  time.Now().Add(time.Hour),
+			Now:        time.Now(),
+		},
+	)
 	if ok, _ := a.DeleteAPIToken(ctx, uid, tok); !ok {
 		t.Fatal("delete token")
 	}
@@ -127,7 +140,17 @@ func TestDeleteClientTakesItsAccessTokensAndSparesOthers(t *testing.T) {
 	ctx := context.Background()
 	_ = r.InsertClient(ctx, "c", "C", []string{"https://x/cb"}, repo.RequestInfo{}, time.Now())
 	oauthTok, plain := token(t, a, uid, "h1"), token(t, a, uid, "h2")
-	_ = r.InsertRefresh(ctx, repo.NewRefresh{Hash: "r1", ClientID: "c", UserID: uid, APITokenID: oauthTok, ExpiresAt: time.Now().Add(time.Hour), Now: time.Now()})
+	_ = r.InsertRefresh(
+		ctx,
+		repo.NewRefresh{
+			Hash:       "r1",
+			ClientID:   "c",
+			UserID:     uid,
+			APITokenID: oauthTok,
+			ExpiresAt:  time.Now().Add(time.Hour),
+			Now:        time.Now(),
+		},
+	)
 	if ok, err := r.DeleteClient(ctx, "c"); !ok || err != nil {
 		t.Fatalf("delete = %v, %v", ok, err)
 	}

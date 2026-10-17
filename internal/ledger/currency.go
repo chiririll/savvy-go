@@ -323,11 +323,27 @@ func (s Currencies) baseCode(ctx context.Context) string {
 }
 
 func currencyFrom(r repo.Currency) Currency {
-	return Currency{ID: r.ID, Code: r.Code, Name: r.Name, Symbol: r.Symbol, Decimals: r.Decimals, IsBase: r.IsBase, Rate: r.Rate}
+	return Currency{
+		ID:       r.ID,
+		Code:     r.Code,
+		Name:     r.Name,
+		Symbol:   r.Symbol,
+		Decimals: r.Decimals,
+		IsBase:   r.IsBase,
+		Rate:     r.Rate,
+	}
 }
 
 func currencyRow(c Currency) repo.Currency {
-	return repo.Currency{ID: c.ID, Code: c.Code, Name: c.Name, Symbol: c.Symbol, Decimals: c.Decimals, IsBase: c.IsBase, Rate: c.Rate}
+	return repo.Currency{
+		ID:       c.ID,
+		Code:     c.Code,
+		Name:     c.Name,
+		Symbol:   c.Symbol,
+		Decimals: c.Decimals,
+		IsBase:   c.IsBase,
+		Rate:     c.Rate,
+	}
 }
 
 // UpdateRates sets the rate of every non-base currency from the source.

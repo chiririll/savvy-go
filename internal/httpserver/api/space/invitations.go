@@ -63,7 +63,12 @@ func (h Handler) invitationsStore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len([]rune(strings.TrimSpace(body.Note))) > spaces.MaxInvitationNote {
-		httpx.WriteValidation(w, map[string][]string{"note": {fmt.Sprintf("The note may not be longer than %d characters.", spaces.MaxInvitationNote)}})
+		httpx.WriteValidation(
+			w,
+			map[string][]string{
+				"note": {fmt.Sprintf("The note may not be longer than %d characters.", spaces.MaxInvitationNote)},
+			},
+		)
 		return
 	}
 	if !spaces.ValidRole(body.Role) {
@@ -81,7 +86,10 @@ func (h Handler) invitationsStore(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteValidation(w, map[string][]string{"email": {"Invitations cannot be emailed. " + reason}})
 		return
 	case body.Email == "" && !byLink:
-		httpx.WriteValidation(w, map[string][]string{"email": {"This server requires invitations by email. Enter the address to invite."}})
+		httpx.WriteValidation(
+			w,
+			map[string][]string{"email": {"This server requires invitations by email. Enter the address to invite."}},
+		)
 		return
 	}
 	token, id, err := h.Spaces.Invite(r.Context(), httpx.Scope(r).ID, httpx.User(r), body.Email, body.Note, body.Role)
@@ -174,7 +182,10 @@ func (h Handler) invitationRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if existing, _ := h.Users.ByEmail(r.Context(), body.Email); existing != nil {
-		httpx.WriteValidation(w, map[string][]string{"email": {"Sign in with this email and open the invitation link again."}})
+		httpx.WriteValidation(
+			w,
+			map[string][]string{"email": {"Sign in with this email and open the invitation link again."}},
+		)
 		return
 	}
 	token := chi.URLParam(r, "token")

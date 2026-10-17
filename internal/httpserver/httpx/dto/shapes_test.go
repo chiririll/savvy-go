@@ -82,7 +82,14 @@ func TestBalanceHistoryShape(t *testing.T) {
 		Dates: []string{"2024-01-01"}, Currency: &code, Decimals: 2,
 		Series: []dto.BalanceSeries{
 			{Name: "Total", Type: "total", Data: []money.Money{money.New(100, usd)}, Currency: code},
-			{ID: &id, Name: "Cash", Type: "cash", Data: []money.Money{money.New(100, usd)}, NativeData: []money.Money{money.New(100, usd)}, Currency: code},
+			{
+				ID:         &id,
+				Name:       "Cash",
+				Type:       "cash",
+				Data:       []money.Money{money.New(100, usd)},
+				NativeData: []money.Money{money.New(100, usd)},
+				Currency:   code,
+			},
 		},
 	}
 	series := decode(t, h)["series"].([]any)
@@ -96,7 +103,10 @@ func TestBalanceHistoryShape(t *testing.T) {
 }
 
 func TestTransactionPage(t *testing.T) {
-	page := dto.TransactionPage{Data: []dto.Transaction{}, Meta: dto.PageMeta{CurrentPage: 1, LastPage: 3, PerPage: 25, Total: 60}}
+	page := dto.TransactionPage{
+		Data: []dto.Transaction{},
+		Meta: dto.PageMeta{CurrentPage: 1, LastPage: 3, PerPage: 25, Total: 60},
+	}
 	got := marshal(t, page)
 	if want := `{"data":[],"meta":{"current_page":1,"last_page":3,"per_page":25,"total":60}}`; got != want {
 		t.Fatalf("got %s, want %s", got, want)
@@ -123,7 +133,12 @@ func TestInvitationAndMember(t *testing.T) {
 }
 
 func TestCatalogCurrencyRateIsANumber(t *testing.T) {
-	got := marshal(t, dto.NewCatalogCurrency(ledger.Currency{Code: "EUR", Name: "Euro", Symbol: "€", Decimals: 2, Rate: decimal.RequireFromString("1.1")}))
+	got := marshal(
+		t,
+		dto.NewCatalogCurrency(
+			ledger.Currency{Code: "EUR", Name: "Euro", Symbol: "€", Decimals: 2, Rate: decimal.RequireFromString("1.1")},
+		),
+	)
 	if want := `{"code":"EUR","name":"Euro","symbol":"€","decimals":2,"rate":1.1}`; got != want {
 		t.Fatalf("got %s, want %s", got, want)
 	}

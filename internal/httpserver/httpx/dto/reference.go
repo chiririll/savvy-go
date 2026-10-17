@@ -18,7 +18,15 @@ type Currency struct {
 }
 
 func NewCurrency(c ledger.Currency) Currency {
-	return Currency{ID: c.ID, Code: c.Code, Name: c.Name, Symbol: c.Symbol, Decimals: c.Decimals, IsBase: c.IsBase, Rate: Number(c.Rate)}
+	return Currency{
+		ID:       c.ID,
+		Code:     c.Code,
+		Name:     c.Name,
+		Symbol:   c.Symbol,
+		Decimals: c.Decimals,
+		IsBase:   c.IsBase,
+		Rate:     Number(c.Rate),
+	}
 }
 
 type Tag struct {

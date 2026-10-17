@@ -58,7 +58,8 @@ func invalid(field, format string, args ...any) error {
 }
 
 func (f Fill) empty() bool {
-	return f.BaseCurrency == "" && len(f.Currencies) == 0 && len(f.Accounts) == 0 && len(f.Categories) == 0 && len(f.Tags) == 0
+	return f.BaseCurrency == "" && len(f.Currencies) == 0 && len(f.Accounts) == 0 && len(f.Categories) == 0 &&
+		len(f.Tags) == 0
 }
 
 func normalizeCode(raw string) string { return strings.ToUpper(strings.TrimSpace(raw)) }
@@ -67,7 +68,8 @@ func normalizeCode(raw string) string { return strings.ToUpper(strings.TrimSpace
 // with codes upper-cased and trimmed, and the two default categories added when
 // it names none. Currencies lists the base first, once each.
 func (f Fill) normalize() (Fill, error) {
-	if len(f.Currencies) > maxFillItems || len(f.Accounts) > maxFillItems || len(f.Categories) > maxFillItems || len(f.Tags) > maxFillItems {
+	if len(f.Currencies) > maxFillItems || len(f.Accounts) > maxFillItems || len(f.Categories) > maxFillItems ||
+		len(f.Tags) > maxFillItems {
 		return f, invalid("body", "Too many items.")
 	}
 	f.BaseCurrency = normalizeCode(f.BaseCurrency)
@@ -177,7 +179,11 @@ func (cr Creator) priceCurrencies(ctx context.Context, base string, codes []stri
 		case c.IsBase:
 			c.Rate = decimal.NewFromInt(1)
 		case !c.Rate.IsPositive():
-			return nil, invalid("currencies", "No exchange rate for %s is available right now. Try again later or leave it out.", code)
+			return nil, invalid(
+				"currencies",
+				"No exchange rate for %s is available right now. Try again later or leave it out.",
+				code,
+			)
 		}
 		out[i] = c
 	}

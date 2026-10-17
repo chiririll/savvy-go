@@ -105,7 +105,13 @@ func (h Handler) ssoExchange(w http.ResponseWriter, r *http.Request) {
 	h.Login.Issue(w, r, u, http.StatusOK, true)
 }
 
-func (h Handler) finishSSO(w http.ResponseWriter, r *http.Request, p *sso.IdentityProvider, id sso.NormalizedIdentity, err error) {
+func (h Handler) finishSSO(
+	w http.ResponseWriter,
+	r *http.Request,
+	p *sso.IdentityProvider,
+	id sso.NormalizedIdentity,
+	err error,
+) {
 	if err != nil {
 		h.redirectSPAError(w, r, ssoCode(err))
 		return

@@ -79,7 +79,8 @@ func TestCreatePlansTheParts(t *testing.T) {
 	if small.Status != uploadPending || small.ExpiresAt == nil || !small.ExpiresAt.After(time.Now()) {
 		t.Errorf("a new upload is pending with a deadline: %+v", small)
 	}
-	if !strings.HasPrefix(small.ObjectKey, "transaction-imports/") || !strings.HasSuffix(small.ObjectKey, "/"+small.ID+"/bank-export-2024.csv") {
+	if !strings.HasPrefix(small.ObjectKey, "transaction-imports/") ||
+		!strings.HasSuffix(small.ObjectKey, "/"+small.ID+"/bank-export-2024.csv") {
 		t.Errorf("object key %q", small.ObjectKey)
 	}
 

@@ -65,8 +65,13 @@ func TestPatchKeepsOmittedFieldsAndNullClears(t *testing.T) {
 					"date": "2026-09-01", "due_date": "2027-01-01", "counterparty": "Ivan", "description": "Car",
 				}
 			},
-			change:   map[string]any{"name": "Loan to Ivan"},
-			keep:     map[string]any{"name": "Loan to Ivan", "dueDate": "2027-01-01", "counterparty": "Ivan", "description": "Car"},
+			change: map[string]any{"name": "Loan to Ivan"},
+			keep: map[string]any{
+				"name":         "Loan to Ivan",
+				"dueDate":      "2027-01-01",
+				"counterparty": "Ivan",
+				"description":  "Car",
+			},
 			clearKey: "due_date", clearOut: "dueDate",
 		},
 		{
@@ -78,8 +83,14 @@ func TestPatchKeepsOmittedFieldsAndNullClears(t *testing.T) {
 					"start_date": "2030-01-05", "end_date": "2031-01-05", "is_active": true,
 				}
 			},
-			change:   map[string]any{"is_active": false},
-			keep:     map[string]any{"description": "Gym", "endDate": "2031-01-05", "dayOfMonth": float64(5), "amount": float64(50), "isActive": false},
+			change: map[string]any{"is_active": false},
+			keep: map[string]any{
+				"description": "Gym",
+				"endDate":     "2031-01-05",
+				"dayOfMonth":  float64(5),
+				"amount":      float64(50),
+				"isActive":    false,
+			},
 			clearKey: "end_date", clearOut: "endDate",
 		},
 	}

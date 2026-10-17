@@ -50,7 +50,8 @@ func TestBuildCreatesTheDataDirectoriesAndServices(t *testing.T) {
 		t.Error("the store is not registered")
 	}
 	// A server with no users starts with a first-run password.
-	if raw, err := os.ReadFile(filepath.Join(data, firstrun.FileName)); err != nil || strings.TrimSpace(string(raw)) == "" {
+	if raw, err := os.ReadFile(filepath.Join(data, firstrun.FileName)); err != nil ||
+		strings.TrimSpace(string(raw)) == "" {
 		t.Errorf("bootstrap password file: %q, %v", raw, err)
 	}
 }
@@ -111,10 +112,12 @@ func TestBuildReportsAnUnreadableConfigAndSeedFile(t *testing.T) {
 	if err := os.WriteFile(bad, []byte("[paths\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := NewBuilder(appconfig.Build{}).ConfigFile(bad).Build(ctx); err == nil || !strings.Contains(err.Error(), "load config") {
+	if _, err := NewBuilder(appconfig.Build{}).ConfigFile(bad).Build(ctx); err == nil ||
+		!strings.Contains(err.Error(), "load config") {
 		t.Errorf("broken config: %v", err)
 	}
-	if _, err := NewBuilder(appconfig.Build{}).ConfigFile(configIn(t, dir)).SeedFile(filepath.Join(dir, "missing.toml")).Build(ctx); err == nil || !strings.Contains(err.Error(), "seed") {
+	if _, err := NewBuilder(appconfig.Build{}).ConfigFile(configIn(t, dir)).SeedFile(filepath.Join(dir, "missing.toml")).Build(ctx); err == nil ||
+		!strings.Contains(err.Error(), "seed") {
 		t.Errorf("missing seed file: %v", err)
 	}
 }

@@ -47,7 +47,15 @@ func TestReportShapes(t *testing.T) {
 	// The comparison fields of a cash-flow point are left out, not null.
 	cash := decode(t, dto.NewCashFlow(reports.CashFlowReport{Items: []reports.CashFlowPoint{
 		{Date: "2024-01-01", Income: usd, Expenses: usd, Balance: usd},
-		{Date: "2024-01-02", Income: usd, Expenses: usd, Balance: usd, PrevIncome: &ten, PrevExpenses: &ten, PrevBalance: &ten},
+		{
+			Date:         "2024-01-02",
+			Income:       usd,
+			Expenses:     usd,
+			Balance:      usd,
+			PrevIncome:   &ten,
+			PrevExpenses: &ten,
+			PrevBalance:  &ten,
+		},
 	}}))
 	items := cash["items"].([]any)
 	if _, has := items[0].(map[string]any)["prevIncome"]; has {
@@ -71,7 +79,9 @@ func TestImportPreviewShape(t *testing.T) {
 	id := int64(3)
 	total := 40
 	got := decode(t, dto.NewImportPreview(importer.PreviewResult{
-		Transactions: []importer.PreviewRow{{Row: 1, Date: "2024-01-02", Type: "expense", Amount: decimal.RequireFromString("12.50"), Status: "new"}},
+		Transactions: []importer.PreviewRow{
+			{Row: 1, Date: "2024-01-02", Type: "expense", Amount: decimal.RequireFromString("12.50"), Status: "new"},
+		},
 		Summary: importer.PreviewSummary{
 			WillCreate: 1, TotalRows: &total, Sampled: 1,
 			Categories: []importer.PreviewCategory{{Name: "Food", Type: "expense", Count: 1, MatchID: &id}},

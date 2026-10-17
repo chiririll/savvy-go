@@ -34,7 +34,10 @@ func TestAmountsOutOfRangeAreRejectedAndStoreNothing(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		acct, err := (ledger.Accounts{DB: sqlDB}).Create(ctx, ledger.AccountInput{Name: "a", Type: "cash", CurrencyID: cur.ID, IsActive: true})
+		acct, err := (ledger.Accounts{DB: sqlDB}).Create(
+			ctx,
+			ledger.AccountInput{Name: "a", Type: "cash", CurrencyID: cur.ID, IsActive: true},
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -42,7 +45,10 @@ func TestAmountsOutOfRangeAreRejectedAndStoreNothing(t *testing.T) {
 
 		moneytest.ForEachAmount(t, moneytest.Invalid(c.Decimals), func(t *testing.T, a moneytest.Amount) {
 			for _, in := range []decimal.Decimal{a.Input, a.Input.Neg()} {
-				_, err := svc.Create(ctx, Input{Type: "expense", AccountID: acct.ID, Amount: in, Frequency: "monthly", StartDate: "2024-01-15"})
+				_, err := svc.Create(
+					ctx,
+					Input{Type: "expense", AccountID: acct.ID, Amount: in, Frequency: "monthly", StartDate: "2024-01-15"},
+				)
 				if !errors.Is(err, money.ErrOutOfRange) {
 					t.Errorf("amount %s: err = %v, want ErrOutOfRange", in, err)
 				}

@@ -21,7 +21,13 @@ func TestAddMonthsClampsToTheLastDay(t *testing.T) {
 		{day(2025, 5, 10), 0, day(2025, 5, 10)},
 	} {
 		if got := AddMonths(c.from, c.months); !got.Equal(c.want) {
-			t.Errorf("AddMonths(%s, %d) = %s, want %s", c.from.Format("2006-01-02"), c.months, got.Format("2006-01-02"), c.want.Format("2006-01-02"))
+			t.Errorf(
+				"AddMonths(%s, %d) = %s, want %s",
+				c.from.Format("2006-01-02"),
+				c.months,
+				got.Format("2006-01-02"),
+				c.want.Format("2006-01-02"),
+			)
 		}
 	}
 }

@@ -123,7 +123,13 @@ func (s Users) UpdatePassword(ctx context.Context, id int64, plain string) error
 }
 
 // A new address clears EmailVerified, unless verified says otherwise (an admin's word).
-func (s Users) Update(ctx context.Context, id int64, name, email, role *string, plain *string, verified *bool) (*User, error) {
+func (s Users) Update(
+	ctx context.Context,
+	id int64,
+	name, email, role *string,
+	plain *string,
+	verified *bool,
+) (*User, error) {
 	u, err := s.ByID(ctx, id)
 	if err != nil {
 		return nil, err

@@ -37,7 +37,14 @@ func newMatrixEnv(t *testing.T, base moneytest.Currency) *matrixEnv {
 	if err := migrate.Space.Up(ctx, sqlDB); err != nil {
 		t.Fatal(err)
 	}
-	e := &matrixEnv{ctx: ctx, db: sqlDB, base: base, curs: map[string]Currency{}, accts: map[string]Account{}, txs: Transactions{DB: sqlDB}}
+	e := &matrixEnv{
+		ctx:   ctx,
+		db:    sqlDB,
+		base:  base,
+		curs:  map[string]Currency{},
+		accts: map[string]Account{},
+		txs:   Transactions{DB: sqlDB},
+	}
 	add := func(c moneytest.Currency) {
 		created, err := (Currencies{DB: sqlDB}).Create(ctx, Currency{
 			Code: c.Code, Name: c.Code, Symbol: c.Code, Decimals: c.Decimals, Rate: c.RateIn(base),
@@ -46,7 +53,10 @@ func newMatrixEnv(t *testing.T, base moneytest.Currency) *matrixEnv {
 			t.Fatalf("create %v: %v", c, err)
 		}
 		e.curs[c.Code] = *created
-		acct, err := (Accounts{DB: sqlDB}).Create(ctx, AccountInput{Name: c.Code, Type: "cash", CurrencyID: created.ID, IsActive: true})
+		acct, err := (Accounts{DB: sqlDB}).Create(
+			ctx,
+			AccountInput{Name: c.Code, Type: "cash", CurrencyID: created.ID, IsActive: true},
+		)
 		if err != nil {
 			t.Fatalf("account %v: %v", c, err)
 		}
@@ -162,11 +172,20 @@ func TestAmountsOutOfRangeAreRejectedAndStoreNothing(t *testing.T) {
 				_, err = e.txs.Create(e.ctx, TxInput{Type: "income", AccountID: acct.ID, Amount: decimal.NewFromInt(1), Date: &date,
 					Items: []TxItemInput{{Name: "x", Quantity: decimal.NewFromInt(1), PricePerUnit: in}}})
 				check("item price", err)
-				_, err = (Accounts{DB: e.db}).Create(e.ctx, AccountInput{Name: "big", Type: "cash", CurrencyID: cur.ID, InitialBalance: in, IsActive: true})
+				_, err = (Accounts{DB: e.db}).Create(
+					e.ctx,
+					AccountInput{Name: "big", Type: "cash", CurrencyID: cur.ID, InitialBalance: in, IsActive: true},
+				)
 				check("account balance", err)
-				_, err = (Accounts{DB: e.db}).Create(e.ctx, AccountInput{Name: "debt", Type: "debt", CurrencyID: cur.ID, TargetAmount: &in, IsActive: true})
+				_, err = (Accounts{DB: e.db}).Create(
+					e.ctx,
+					AccountInput{Name: "debt", Type: "debt", CurrencyID: cur.ID, TargetAmount: &in, IsActive: true},
+				)
 				check("debt target", err)
-				_, err = (Budgets{DB: e.db}).Create(e.ctx, BudgetInput{Name: "b", Amount: in, CurrencyID: &cur.ID, Period: "monthly"})
+				_, err = (Budgets{DB: e.db}).Create(
+					e.ctx,
+					BudgetInput{Name: "b", Amount: in, CurrencyID: &cur.ID, Period: "monthly"},
+				)
 				check("budget", err)
 
 				if got := e.count(t, "transactions"); got != txs {
@@ -195,7 +214,11 @@ func TestUpdateRejectsOutOfRangeAndKeepsTheOldAmount(t *testing.T) {
 		}
 		for _, a := range moneytest.Invalid(c.Decimals) {
 			date := "2024-01-15"
-			_, err := e.txs.Update(e.ctx, orig.ID, TxInput{Type: "income", AccountID: orig.AccountID, Amount: a.Input, Date: &date})
+			_, err := e.txs.Update(
+				e.ctx,
+				orig.ID,
+				TxInput{Type: "income", AccountID: orig.AccountID, Amount: a.Input, Date: &date},
+			)
 			if !errors.Is(err, money.ErrOutOfRange) {
 				t.Errorf("%s: err = %v", a.Name, err)
 			}
@@ -283,7 +306,10 @@ func TestConvertRoundTripErrorIsBoundedByTheScales(t *testing.T) {
 			// which is worth rate_to/rate_from units of `from` on the way back.
 			unitFrom := decimal.New(1, -int32(from.Decimals))
 			unitTo := decimal.New(1, -int32(to.Decimals))
-			bound := half.Mul(unitFrom).Add(half.Mul(unitTo).Mul(to.Rate).DivRound(from.Rate, 40)).Add(unitFrom.Mul(half)) // + final rounding
+			bound := half.Mul(unitFrom).
+				Add(half.Mul(unitTo).Mul(to.Rate).DivRound(from.Rate, 40)).
+				Add(unitFrom.Mul(half))
+				// + final rounding
 			diff := back.Decimal().Sub(in.Decimal()).Abs()
 			if diff.GreaterThan(bound) {
 				t.Errorf("%s: %s -> %s -> %s drifted by %s, bound %s", a.Name, in, there, back, diff, bound)

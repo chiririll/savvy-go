@@ -109,7 +109,11 @@ func (g *Guard) RequireTokenGrant(next http.Handler) http.Handler {
 				return
 			}
 			if level != permissions.Read && !g.reachesSyncGroup(r, t, res) {
-				httpx.WriteMessage(w, http.StatusForbidden, "This space syncs its "+res+" with other spaces: the API token must reach all of them to change them.")
+				httpx.WriteMessage(
+					w,
+					http.StatusForbidden,
+					"This space syncs its "+res+" with other spaces: the API token must reach all of them to change them.",
+				)
 				return
 			}
 		}

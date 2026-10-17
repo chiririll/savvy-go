@@ -73,11 +73,17 @@ func newTransferEnv(t *testing.T) *transferEnv {
 func (e *transferEnv) account(t *testing.T, spaceID int64, code string) int64 {
 	t.Helper()
 	d, _ := e.st.Space(context.Background(), spaceID)
-	cur, err := (ledger.Currencies{DB: d}).Create(context.Background(), ledger.Currency{Code: code, Name: code, Symbol: code, Decimals: 2, IsBase: true, Rate: decimal.NewFromInt(1)})
+	cur, err := (ledger.Currencies{DB: d}).Create(
+		context.Background(),
+		ledger.Currency{Code: code, Name: code, Symbol: code, Decimals: 2, IsBase: true, Rate: decimal.NewFromInt(1)},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	acc, err := (ledger.Accounts{DB: d}).Create(context.Background(), ledger.AccountInput{Name: code, Type: "cash", CurrencyID: cur.ID})
+	acc, err := (ledger.Accounts{DB: d}).Create(
+		context.Background(),
+		ledger.AccountInput{Name: code, Type: "cash", CurrencyID: cur.ID},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -282,7 +288,10 @@ func TestP27P46MoveToAnotherServer(t *testing.T) {
 		t.Fatal(err)
 	}
 	// An update on the old server's record is refused until it is trusted.
-	if _, err := n.tr.Update(ctx, n.owner, a2.ID, tr.UUID, Update{Date: ptr("2026-10-02")}); !errors.Is(err, ErrUnverified) {
+	if _, err := n.tr.Update(ctx, n.owner, a2.ID, tr.UUID, Update{Date: ptr("2026-10-02")}); !errors.Is(
+		err,
+		ErrUnverified,
+	) {
 		t.Fatalf("update of an unverified record: %v", err)
 	}
 	pub := base64.StdEncoding.EncodeToString(e.holder.Key().Public())

@@ -106,7 +106,8 @@ func (r Repo) Update(ctx context.Context, id int64, f Fields, now time.Time) err
 func (r Repo) Delete(ctx context.Context, id int64) error { return r.q().DeleteAutomationRule(ctx, id) }
 
 func (r Repo) SetActive(ctx context.Context, id int64, active bool, now time.Time) error {
-	return r.q().ToggleAutomationRule(ctx, sqlc.ToggleAutomationRuleParams{IsActive: db.BoolInt(active), UpdatedAt: db.TimeNS(now), ID: id})
+	return r.q().
+		ToggleAutomationRule(ctx, sqlc.ToggleAutomationRuleParams{IsActive: db.BoolInt(active), UpdatedAt: db.TimeNS(now), ID: id})
 }
 
 func (r Repo) SetPriority(ctx context.Context, id int64, priority int) error {
@@ -115,7 +116,8 @@ func (r Repo) SetPriority(ctx context.Context, id int64, priority int) error {
 
 // CountRun records that a rule ran.
 func (r Repo) CountRun(ctx context.Context, id int64, now time.Time) error {
-	return r.q().IncrementAutomationRuns(ctx, sqlc.IncrementAutomationRunsParams{LastRunAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now), ID: id})
+	return r.q().
+		IncrementAutomationRuns(ctx, sqlc.IncrementAutomationRunsParams{LastRunAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now), ID: id})
 }
 
 // Log is one run of a rule.

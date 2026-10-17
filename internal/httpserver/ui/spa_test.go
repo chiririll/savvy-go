@@ -27,10 +27,14 @@ func TestResolveAssetsFallsBackToPublicDir(t *testing.T) {
 
 func TestSPAServesEmbeddedFrontend(t *testing.T) {
 	assets := fstest.MapFS{
-		"index.html":                {Data: []byte(`<html><body><div id="app"></div>{{range .JS}}<script src="{{.}}"></script>{{end}}</body></html>`)},
-		"favicon.svg":               {Data: []byte("<svg/>")},
-		"build/.vite/manifest.json": {Data: []byte(`{"resources/ts/main.tsx":{"file":"assets/main-abc.js","isEntry":true,"src":"resources/ts/main.tsx"}}`)},
-		"build/assets/main-abc.js":  {Data: []byte("console.log(1)")},
+		"index.html": {
+			Data: []byte(`<html><body><div id="app"></div>{{range .JS}}<script src="{{.}}"></script>{{end}}</body></html>`),
+		},
+		"favicon.svg": {Data: []byte("<svg/>")},
+		"build/.vite/manifest.json": {
+			Data: []byte(`{"resources/ts/main.tsx":{"file":"assets/main-abc.js","isEntry":true,"src":"resources/ts/main.tsx"}}`),
+		},
+		"build/assets/main-abc.js": {Data: []byte("console.log(1)")},
 	}
 	srv := httptest.NewServer(&SPA{Assets: assets})
 	t.Cleanup(srv.Close)
@@ -56,7 +60,8 @@ func TestSPAServesEmbeddedFrontend(t *testing.T) {
 	if !strings.Contains(res.Header.Get("Cache-Control"), "immutable") {
 		t.Fatalf("asset cache-control %q", res.Header.Get("Cache-Control"))
 	}
-	if res, body := get("/some/route"); res.StatusCode != http.StatusOK || !strings.Contains(body, `src="/build/assets/main-abc.js"`) {
+	if res, body := get("/some/route"); res.StatusCode != http.StatusOK ||
+		!strings.Contains(body, `src="/build/assets/main-abc.js"`) {
 		t.Fatalf("spa %d %q", res.StatusCode, body)
 	}
 	if res, _ := get("/build/assets/missing.js"); res.StatusCode != http.StatusNotFound {

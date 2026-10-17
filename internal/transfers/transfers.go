@@ -124,7 +124,9 @@ const currentSigV = 1
 func (t Transfer) payload(sigV int64) ([]byte, bool) {
 	switch sigV {
 	case 1:
-		b, err := json.Marshal(transferPayloadV1{t.UUID, t.From, t.To, t.Date, t.Description, t.CreatedBy, t.Version, t.DeletedAt})
+		b, err := json.Marshal(
+			transferPayloadV1{t.UUID, t.From, t.To, t.Date, t.Description, t.CreatedBy, t.Version, t.DeletedAt},
+		)
 		return b, err == nil
 	}
 	return nil, false
@@ -245,7 +247,15 @@ func (t Transfer) same(o Transfer) bool {
 // tombstone removes the transaction; an account missing here leaves the
 // record needing attention without a transaction. d must be the handle of
 // the transaction the caller runs in.
-func writeRecord(ctx context.Context, d store.DB, own string, t Transfer, localStatus string, review *string, remote *Transfer) error {
+func writeRecord(
+	ctx context.Context,
+	d store.DB,
+	own string,
+	t Transfer,
+	localStatus string,
+	review *string,
+	remote *Transfer,
+) error {
 	sp := repo.Space{DB: d}
 	side, sender, ok := t.side(own)
 	if !ok {
@@ -426,7 +436,13 @@ func sideFor(ctx context.Context, d store.DB, spaceUUID string, account int64, a
 	if m.Minor() <= 0 {
 		return Side{}, errors.New("the amounts must be positive")
 	}
-	return Side{SpaceUUID: spaceUUID, AccountID: account, Amount: m.Minor(), Currency: acc.Code, Decimals: acc.Decimals}, nil
+	return Side{
+		SpaceUUID: spaceUUID,
+		AccountID: account,
+		Amount:    m.Minor(),
+		Currency:  acc.Code,
+		Decimals:  acc.Decimals,
+	}, nil
 }
 
 // Create records a transfer in both spaces at once.
@@ -460,7 +476,15 @@ func (s Service) Create(ctx context.Context, actor *auth.User, in Input) (*Trans
 		if err != nil {
 			return err
 		}
-		t = Transfer{UUID: id7.String(), From: from, To: to, Date: in.Date, Description: in.Description, CreatedBy: &actor.ID, Version: 1}
+		t = Transfer{
+			UUID:        id7.String(),
+			From:        from,
+			To:          to,
+			Date:        in.Date,
+			Description: in.Description,
+			CreatedBy:   &actor.ID,
+			Version:     1,
+		}
 		signTransfer(s.Keys, &t)
 		for _, id := range []int64{in.FromSpace, in.ToSpace} {
 			if err := writeRecord(ctx, dbs[id], byID[id].UUID, t, "confirmed", nil, nil); err != nil {
@@ -513,7 +537,13 @@ func (s Service) counterpart(ctx context.Context, spaceID int64, t Transfer) (sp
 
 // change rewrites a transfer in both spaces with the next version; edit may
 // change it within the transaction (nil deletes it).
-func (s Service) change(ctx context.Context, actor *auth.User, spaceID int64, id string, edit func(map[int64]store.DB, spaces.Space, spaces.Space, *Transfer) error) (*Transfer, error) {
+func (s Service) change(
+	ctx context.Context,
+	actor *auth.User,
+	spaceID int64,
+	id string,
+	edit func(map[int64]store.DB, spaces.Space, spaces.Space, *Transfer) error,
+) (*Transfer, error) {
 	d, err := s.st().Space(ctx, spaceID)
 	if err != nil {
 		return nil, err
@@ -786,7 +816,13 @@ func (s Service) copyVerified(ctx context.Context, to syncSide, rec Transfer) er
 
 // reviewOne records, in a restored space, how its copy of a transfer differs
 // from the other space's. Nothing is written to the other space.
-func (s Service) reviewOne(ctx context.Context, own store.DB, ownUUID string, mine, theirs Transfer, haveMine, haveTheirs bool) error {
+func (s Service) reviewOne(
+	ctx context.Context,
+	own store.DB,
+	ownUUID string,
+	mine, theirs Transfer,
+	haveMine, haveTheirs bool,
+) error {
 	mark := func(t Transfer, kind string, remote *Transfer, local string) error {
 		k := kind
 		return writeRecord(ctx, own, ownUUID, t, local, &k, remote)

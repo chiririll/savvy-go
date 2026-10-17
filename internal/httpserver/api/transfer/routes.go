@@ -18,7 +18,11 @@ var spec []byte
 func init() {
 	ui.AddSpec(spec)
 	routing.Register(func(d *routing.Deps) []routing.Mount {
-		h := Handler{Spaces: routing.Get[spaces.Service](d), Transfers: routing.Get[*transfers.Service](d), Keys: routing.Get[*signing.Holder](d)}
+		h := Handler{
+			Spaces:    routing.Get[spaces.Service](d),
+			Transfers: routing.Get[*transfers.Service](d),
+			Keys:      routing.Get[*signing.Holder](d),
+		}
 		return []routing.Mount{
 			routing.SpaceRead(h.ReadRoutes),
 			routing.SpaceAdmin(h.AdminRoutes),

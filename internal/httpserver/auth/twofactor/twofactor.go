@@ -46,7 +46,11 @@ func (h Handler) twoFactorConfirm(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, dto.RecoveryCodes{Message: "Two-factor authentication has been enabled.", Codes: codes})
+	httpx.WriteJSON(
+		w,
+		http.StatusOK,
+		dto.RecoveryCodes{Message: "Two-factor authentication has been enabled.", Codes: codes},
+	)
 }
 
 func (h Handler) twoFactorDisable(w http.ResponseWriter, r *http.Request) {

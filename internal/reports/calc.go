@@ -86,7 +86,9 @@ func (q report) portion(total, part, whole money.Money) money.Money {
 // average is total spread over days, scaled to per days (1 for a day, 7 for a
 // week).
 func (q report) average(total money.Money, days, per int) money.Money {
-	d := total.Decimal().Mul(decimal.NewFromInt(int64(per))).DivRound(decimal.NewFromInt(int64(days)), money.RateDivPrecision)
+	d := total.Decimal().
+		Mul(decimal.NewFromInt(int64(per))).
+		DivRound(decimal.NewFromInt(int64(days)), money.RateDivPrecision)
 	return money.FromDecimal(d, q.unit)
 }
 
@@ -154,11 +156,27 @@ func (s Service) Overview(ctx context.Context, f Filter) OverviewReport {
 		savSpark = append(savSpark, m.SavingsRate)
 	}
 	return OverviewReport{
-		Income:      Metric[money.Money]{cur.Income, prevMetric(prev, func(m reportMetrics) money.Money { return m.Income }), incSpark},
-		Expenses:    Metric[money.Money]{cur.Expenses, prevMetric(prev, func(m reportMetrics) money.Money { return m.Expenses }), expSpark},
-		NetCashFlow: Metric[money.Money]{cur.Net, prevMetric(prev, func(m reportMetrics) money.Money { return m.Net }), netSpark},
-		SavingsRate: Metric[float64]{cur.SavingsRate, prevMetric(prev, func(m reportMetrics) float64 { return m.SavingsRate }), savSpark},
-		Currency:    q.code(),
+		Income: Metric[money.Money]{
+			cur.Income,
+			prevMetric(prev, func(m reportMetrics) money.Money { return m.Income }),
+			incSpark,
+		},
+		Expenses: Metric[money.Money]{
+			cur.Expenses,
+			prevMetric(prev, func(m reportMetrics) money.Money { return m.Expenses }),
+			expSpark,
+		},
+		NetCashFlow: Metric[money.Money]{
+			cur.Net,
+			prevMetric(prev, func(m reportMetrics) money.Money { return m.Net }),
+			netSpark,
+		},
+		SavingsRate: Metric[float64]{
+			cur.SavingsRate,
+			prevMetric(prev, func(m reportMetrics) float64 { return m.SavingsRate }),
+			savSpark,
+		},
+		Currency: q.code(),
 	}
 }
 

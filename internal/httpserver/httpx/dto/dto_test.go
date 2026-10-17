@@ -42,7 +42,14 @@ func TestDecimalMarshalingIsNotGlobal(t *testing.T) {
 	if got := marshal(t, dto.Number(decimal.RequireFromString("1.5"))); got != `1.5` {
 		t.Fatalf("Number = %s", got)
 	}
-	item := dto.NewTxItem(ledger.TxItem{Name: "x", Quantity: decimal.RequireFromString("2.50"), PricePerUnit: money.New(100, usd), TotalPrice: money.New(250, usd)})
+	item := dto.NewTxItem(
+		ledger.TxItem{
+			Name:         "x",
+			Quantity:     decimal.RequireFromString("2.50"),
+			PricePerUnit: money.New(100, usd),
+			TotalPrice:   money.New(250, usd),
+		},
+	)
 	m := decode(t, item)
 	if m["quantity"] != 2.5 || m["pricePerUnit"] != 1.0 || m["totalPrice"] != 2.5 {
 		t.Fatalf("item = %v", m)
@@ -78,14 +85,18 @@ func TestTransactionActionsFollowLedger(t *testing.T) {
 	} {
 		want := tx.Allowed()
 		got := dto.NewTransaction(tx).Actions
-		if got.Edit != want.Edit || got.Delete != want.Delete || got.Duplicate != want.Duplicate || got.Confirm != want.Confirm || got.Skip != want.Skip {
+		if got.Edit != want.Edit || got.Delete != want.Delete || got.Duplicate != want.Duplicate ||
+			got.Confirm != want.Confirm ||
+			got.Skip != want.Skip {
 			t.Errorf("%+v: actions %+v, ledger %+v", tx, got, want)
 		}
 	}
 }
 
 func TestSummaries(t *testing.T) {
-	s := dto.NewTransactionSummary(ledger.TransactionSummary{Income: money.New(5000, usd), Expense: money.New(1250, usd), Count: 2})
+	s := dto.NewTransactionSummary(
+		ledger.TransactionSummary{Income: money.New(5000, usd), Expense: money.New(1250, usd), Count: 2},
+	)
 	if s.Balance.Minor() != 3750 {
 		t.Errorf("balance = %d", s.Balance.Minor())
 	}
@@ -123,7 +134,8 @@ func TestNewImport(t *testing.T) {
 	}
 	m := decode(t, dto.NewImport(im))
 	parse := m["parse"].(map[string]any)
-	if f := parse["detectedFormats"].(map[string]any); f["delimiter"] != ";" || f["hasHeader"] != true || f["dateFormat"] != "ISO" {
+	if f := parse["detectedFormats"].(map[string]any); f["delimiter"] != ";" || f["hasHeader"] != true ||
+		f["dateFormat"] != "ISO" {
 		t.Errorf("formats = %v", f)
 	}
 	if len(parse["previewRows"].([]any)) != 0 {

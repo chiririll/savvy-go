@@ -16,7 +16,13 @@ type TxItem struct {
 }
 
 func NewTxItem(i ledger.TxItem) TxItem {
-	return TxItem{ID: i.ID, Name: i.Name, Quantity: Number(i.Quantity), PricePerUnit: i.PricePerUnit, TotalPrice: i.TotalPrice}
+	return TxItem{
+		ID:           i.ID,
+		Name:         i.Name,
+		Quantity:     Number(i.Quantity),
+		PricePerUnit: i.PricePerUnit,
+		TotalPrice:   i.TotalPrice,
+	}
 }
 
 type TxActions struct {

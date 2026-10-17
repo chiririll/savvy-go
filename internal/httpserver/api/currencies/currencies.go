@@ -158,7 +158,11 @@ func currenciesConvert(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteValidation(w, map[string][]string{"amount": {"The amount is out of range."}})
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, dto.CurrencyConversion{Amount: amount, From: dto.NewCurrency(*from), To: dto.NewCurrency(*to), Result: result})
+	httpx.WriteJSON(
+		w,
+		http.StatusOK,
+		dto.CurrencyConversion{Amount: amount, From: dto.NewCurrency(*from), To: dto.NewCurrency(*to), Result: result},
+	)
 }
 
 func currencyParam(w http.ResponseWriter, r *http.Request) *ledger.Currency {

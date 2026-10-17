@@ -31,12 +31,28 @@ func TestRun(t *testing.T) {
 		{"healthy server has no checks", func(*Input) {}, map[string]string{}},
 		{"no public url", func(in *Input) { in.AppURL = "" }, map[string]string{"app_url_missing": "warning"}},
 		{"mail off", func(in *Input) { in.MailEnabled = false }, map[string]string{"mail_off": "info"}},
-		{"mail section invalid", func(in *Input) { in.MailEnabled, in.MailProblem = false, "host is required" }, map[string]string{"mail_invalid": "error"}},
+		{
+			"mail section invalid",
+			func(in *Input) { in.MailEnabled, in.MailProblem = false, "host is required" },
+			map[string]string{"mail_invalid": "error"},
+		},
 		{"never backed up", func(in *Input) { in.LastBackup = nil }, map[string]string{"backup_missing": "info"}},
-		{"backup 29 days old is fine", func(in *Input) { in.LastBackup = addr(now.Add(-29 * 24 * time.Hour)) }, map[string]string{}},
-		{"backup 31 days old", func(in *Input) { in.LastBackup = addr(now.Add(-31 * 24 * time.Hour)) }, map[string]string{"backup_stale": "warning"}},
+		{
+			"backup 29 days old is fine",
+			func(in *Input) { in.LastBackup = addr(now.Add(-29 * 24 * time.Hour)) },
+			map[string]string{},
+		},
+		{
+			"backup 31 days old",
+			func(in *Input) { in.LastBackup = addr(now.Add(-31 * 24 * time.Hour)) },
+			map[string]string{"backup_stale": "warning"},
+		},
 		{"config read-only", func(in *Input) { in.Writable = false }, map[string]string{"config_read_only": "info"}},
-		{"disk 75% is filling", func(in *Input) { in.DiskPercent = addr(75.0) }, map[string]string{"disk_filling": "warning"}},
+		{
+			"disk 75% is filling",
+			func(in *Input) { in.DiskPercent = addr(75.0) },
+			map[string]string{"disk_filling": "warning"},
+		},
 		{"disk 90% is critical", func(in *Input) { in.DiskPercent = addr(90.0) }, map[string]string{"disk_filling": "error"}},
 		{"unknown disk is not a warning", func(in *Input) { in.DiskPercent = nil }, map[string]string{}},
 	}

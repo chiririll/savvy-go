@@ -29,7 +29,13 @@ const (
 )
 
 // samlResponse is a Response around an Assertion for nameID, signed by key.
-func samlResponse(t *testing.T, key *rsa.PrivateKey, cert *x509.Certificate, nameID, inResponseTo string, attrs map[string][]string) *etree.Element {
+func samlResponse(
+	t *testing.T,
+	key *rsa.PrivateKey,
+	cert *x509.Certificate,
+	nameID, inResponseTo string,
+	attrs map[string][]string,
+) *etree.Element {
 	t.Helper()
 	return samlResponseWith(t, key, cert, nameID, inResponseTo, attrs, validSAML())
 }
@@ -52,7 +58,14 @@ func validSAML() samlOpts {
 	}
 }
 
-func samlResponseWith(t *testing.T, key *rsa.PrivateKey, cert *x509.Certificate, nameID, inResponseTo string, attrs map[string][]string, o samlOpts) *etree.Element {
+func samlResponseWith(
+	t *testing.T,
+	key *rsa.PrivateKey,
+	cert *x509.Certificate,
+	nameID, inResponseTo string,
+	attrs map[string][]string,
+	o samlOpts,
+) *etree.Element {
 	t.Helper()
 	assertion := etree.NewElement("Assertion")
 	assertion.CreateAttr("xmlns", "urn:oasis:names:tc:SAML:2.0:assertion")
@@ -76,7 +89,9 @@ func samlResponseWith(t *testing.T, key *rsa.PrivateKey, cert *x509.Certificate,
 	subject.CreateElement("NameID").SetText(nameID)
 	if inResponseTo != "" {
 		// Where a real IdP says which request this answers: inside the signed part.
-		subject.CreateElement("SubjectConfirmation").CreateElement("SubjectConfirmationData").CreateAttr("InResponseTo", inResponseTo)
+		subject.CreateElement("SubjectConfirmation").
+			CreateElement("SubjectConfirmationData").
+			CreateAttr("InResponseTo", inResponseTo)
 	}
 	if len(attrs) > 0 {
 		stmt := assertion.CreateElement("AttributeStatement")
@@ -147,7 +162,11 @@ func newSAMLEnv(t *testing.T) *samlEnv {
 	ctx := context.Background()
 	p, err := svc.Create(ctx, IdPWrite{
 		Name: "Corp", Slug: "corp", Preset: "custom_saml", Enabled: ptr(true),
-		Fields: map[string]any{"idp_entity_id": "https://idp.example/saml", "idp_sso_url": "https://idp.example/sso?x=1", "idp_x509_cert": pemCert},
+		Fields: map[string]any{
+			"idp_entity_id": "https://idp.example/saml",
+			"idp_sso_url":   "https://idp.example/sso?x=1",
+			"idp_x509_cert": pemCert,
+		},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -228,7 +247,8 @@ func TestSAMLLoginReadsTheSignedAssertion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if id.Subject != "ann@corp.test" || id.Email != "ann@corp.test" || !id.EmailVerified || id.Name != "Ann" || len(id.Groups) != 2 {
+	if id.Subject != "ann@corp.test" || id.Email != "ann@corp.test" || !id.EmailVerified || id.Name != "Ann" ||
+		len(id.Groups) != 2 {
 		t.Errorf("identity %+v", id)
 	}
 	if _, err := e.svc.HandleACS(e.ctx, *e.p, encode(t, resp), state); ssoCode(err) != "invalid_state" {
@@ -264,7 +284,9 @@ func TestSAMLLoginRefusesForeignResponses(t *testing.T) {
 	state, reqID := e.start(t)
 	other := *e.p
 	other.ID += 50
-	if _, err := e.svc.HandleACS(e.ctx, other, encode(t, samlResponse(t, e.key, e.cert, "a", reqID, nil)), state); ssoCode(err) != "invalid_state" {
+	if _, err := e.svc.HandleACS(e.ctx, other, encode(t, samlResponse(t, e.key, e.cert, "a", reqID, nil)), state); ssoCode(
+		err,
+	) != "invalid_state" {
 		t.Errorf("another provider's state: %q", ssoCode(err))
 	}
 }
@@ -273,14 +295,20 @@ func TestSAMLCertificateRotation(t *testing.T) {
 	e := newSAMLEnv(t)
 	newKey, newCert, newPEM := selfSigned(t)
 	p := *e.p
-	p.Config = map[string]any{"idp_entity_id": p.Config["idp_entity_id"], "idp_x509_cert": p.Config["idp_x509_cert"], "idp_x509_cert_standby": newPEM}
+	p.Config = map[string]any{
+		"idp_entity_id":         p.Config["idp_entity_id"],
+		"idp_x509_cert":         p.Config["idp_x509_cert"],
+		"idp_x509_cert_standby": newPEM,
+	}
 	state, reqID := e.start(t)
 	if _, err := e.svc.HandleACS(e.ctx, p, encode(t, samlResponse(t, newKey, newCert, "ann@corp.test", reqID, nil)), state); err != nil {
 		t.Errorf("the standby certificate must verify during a rotation: %v", err)
 	}
 	p.Config = map[string]any{}
 	state, reqID = e.start(t)
-	if _, err := e.svc.HandleACS(e.ctx, p, encode(t, samlResponse(t, e.key, e.cert, "ann@corp.test", reqID, nil)), state); ssoCode(err) != "saml_invalid" {
+	if _, err := e.svc.HandleACS(e.ctx, p, encode(t, samlResponse(t, e.key, e.cert, "ann@corp.test", reqID, nil)), state); ssoCode(
+		err,
+	) != "saml_invalid" {
 		t.Errorf("without a certificate nothing verifies: %q", ssoCode(err))
 	}
 }
@@ -326,7 +354,9 @@ func TestSAMLReplayWithARewrittenRequestIdIsRefused(t *testing.T) {
 func TestSAMLResponseMustAnswerOurRequest(t *testing.T) {
 	e := newSAMLEnv(t)
 	state, _ := e.start(t)
-	if _, err := e.svc.HandleACS(e.ctx, *e.p, encode(t, samlResponse(t, e.key, e.cert, "ann@corp.test", "", nil)), state); ssoCode(err) != "saml_invalid" {
+	if _, err := e.svc.HandleACS(e.ctx, *e.p, encode(t, samlResponse(t, e.key, e.cert, "ann@corp.test", "", nil)), state); ssoCode(
+		err,
+	) != "saml_invalid" {
 		t.Errorf("a response without InResponseTo: %q", ssoCode(err))
 	}
 }
@@ -383,7 +413,11 @@ func TestSAMLIdentityMapping(t *testing.T) {
 	if bare.Subject != "only-name-id" || bare.Email != "" || bare.EmailVerified {
 		t.Errorf("a response without attributes %+v", bare)
 	}
-	mapped := samlIdentity(IdentityProvider{ClaimMappings: map[string]any{"subject": "uid", "email": "mail"}}, "nid", map[string][]string{"uid": {"u-7"}, "mail": {"m@x.y"}})
+	mapped := samlIdentity(
+		IdentityProvider{ClaimMappings: map[string]any{"subject": "uid", "email": "mail"}},
+		"nid",
+		map[string][]string{"uid": {"u-7"}, "mail": {"m@x.y"}},
+	)
 	if mapped.Subject != "u-7" || mapped.Email != "m@x.y" {
 		t.Errorf("mapped %+v", mapped)
 	}

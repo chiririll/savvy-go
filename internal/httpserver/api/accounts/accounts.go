@@ -202,7 +202,11 @@ func (s Handler) accountsBalanceHistory(w http.ResponseWriter, r *http.Request) 
 	if len(accts) > 1 {
 		series = append([]dto.BalanceSeries{{Name: "Total", Type: "total", Data: total, Currency: base.Code}}, series...)
 	}
-	httpx.WriteJSON(w, http.StatusOK, dto.BalanceHistory{Dates: dates, Series: series, Currency: &base.Code, Decimals: base.Decimals})
+	httpx.WriteJSON(
+		w,
+		http.StatusOK,
+		dto.BalanceHistory{Dates: dates, Series: series, Currency: &base.Code, Decimals: base.Decimals},
+	)
 }
 
 // queryPeriod resolves start_date/end_date from the query, falling back to the

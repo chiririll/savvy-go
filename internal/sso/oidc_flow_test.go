@@ -20,7 +20,8 @@ func TestAuthorizeURLCarriesPKCEAndAnUnguessableState(t *testing.T) {
 	if !strings.HasPrefix(loc, e.idp.srv.URL+"/authorize?") {
 		t.Fatalf("goes to the discovered endpoint: %s", loc)
 	}
-	if q.Get("client_id") != "cid" || q.Get("response_type") != "code" || q.Get("redirect_uri") != "https://app.test/api/auth/sso/test/callback" {
+	if q.Get("client_id") != "cid" || q.Get("response_type") != "code" ||
+		q.Get("redirect_uri") != "https://app.test/api/auth/sso/test/callback" {
 		t.Errorf("query %v", q)
 	}
 	if q.Get("scope") != "openid profile email" || q.Get("code_challenge_method") != "S256" || len(q.Get("state")) < 32 {
@@ -84,7 +85,8 @@ func TestCallbackReturnsTheVerifiedIdentity(t *testing.T) {
 	if id.Raw["email"] != "ann@test.com" || id.Raw["nickname"] != "annie" {
 		t.Errorf("claims %v", id.Raw)
 	}
-	if f := e.idp.lastForm; f.Get("code") != "abc" || f.Get("client_secret") != "shh" || f.Get("code_verifier") == "" || f.Get("grant_type") != "authorization_code" {
+	if f := e.idp.lastForm; f.Get("code") != "abc" || f.Get("client_secret") != "shh" || f.Get("code_verifier") == "" ||
+		f.Get("grant_type") != "authorization_code" {
 		t.Errorf("token request %v", f)
 	}
 }
@@ -104,7 +106,12 @@ func TestCallbackRefusesWhatIsNotAValidLogin(t *testing.T) {
 		}, "idp_error"},
 		{"no code", func() {}, func(s string) url.Values { return url.Values{"state": {s}} }, "invalid_request"},
 		{"no state", func() {}, func(string) url.Values { return url.Values{"code": {"abc"}} }, "invalid_request"},
-		{"an invented state", func() {}, func(string) url.Values { return url.Values{"code": {"abc"}, "state": {"forged"}} }, "invalid_state"},
+		{
+			"an invented state",
+			func() {},
+			func(string) url.Values { return url.Values{"code": {"abc"}, "state": {"forged"}} },
+			"invalid_state",
+		},
 		{"no ID token", func() { e.idp.tokenBody = map[string]any{"access_token": "at"} }, nil, "id_token_missing"},
 		{"a token for another application", func() {
 			c := good()
@@ -201,8 +208,16 @@ func TestScopes(t *testing.T) {
 	}{
 		{"defaults", IdentityProvider{}, "openid profile email"},
 		{"okta also asks for groups", IdentityProvider{Preset: "okta"}, "openid profile email groups"},
-		{"a string", IdentityProvider{Config: map[string]any{"scopes": "email  offline_access"}}, "openid email offline_access"},
-		{"a list, openid never twice", IdentityProvider{Config: map[string]any{"scopes": []any{"openid", "groups", " ", "groups"}}}, "openid groups"},
+		{
+			"a string",
+			IdentityProvider{Config: map[string]any{"scopes": "email  offline_access"}},
+			"openid email offline_access",
+		},
+		{
+			"a list, openid never twice",
+			IdentityProvider{Config: map[string]any{"scopes": []any{"openid", "groups", " ", "groups"}}},
+			"openid groups",
+		},
 	}
 	for _, tc := range tests {
 		if got := strings.Join(oidcScopes(tc.p), " "); got != tc.want {

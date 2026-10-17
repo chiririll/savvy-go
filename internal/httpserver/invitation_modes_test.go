@@ -98,7 +98,8 @@ func TestInvitationMethodFollowsTheServerSetup(t *testing.T) {
 		if status, _, raw := a.postInvite(sess, a.space.ID, ""); status != 422 {
 			t.Errorf("link invitation with verification required: %d %v", status, raw)
 		}
-		if status, data, raw := a.postInvite(sess, a.space.ID, "new@example.org"); status != 201 || data["emailSent"] != true {
+		if status, data, raw := a.postInvite(sess, a.space.ID, "new@example.org"); status != 201 ||
+			data["emailSent"] != true {
 			t.Errorf("email invitation: %d %v", status, raw)
 		}
 	})
@@ -236,7 +237,8 @@ func TestLinkInvitationRegistrationAsksEmailConfirmation(t *testing.T) {
 			t.Fatalf("a link nobody mailed proved an address: %+v", u)
 		}
 		msgs := rec.messages()
-		if len(msgs) != 1 || msgs[0].To != "carol@example.org" || !strings.HasPrefix(linkIn(t, msgs[0]).Path, "/verify-email/") {
+		if len(msgs) != 1 || msgs[0].To != "carol@example.org" ||
+			!strings.HasPrefix(linkIn(t, msgs[0]).Path, "/verify-email/") {
 			t.Fatalf("want one confirmation email to carol, got %+v", msgs)
 		}
 	})
@@ -397,7 +399,12 @@ func TestOnlyAServerAdminClearsInvitationCooldowns(t *testing.T) {
 	a, sess, _ := newMailApp(t, &recorder{on: true})
 	for _, email := range []string{"a@example.org", "b@example.org"} {
 		_, data, _ := a.postInvite(sess, a.space.ID, email)
-		status(t, a.do("DELETE", a.invitePath(a.space.ID)+"/"+itoa(int64(data["id"].(float64))), nil, sess.Token, sess.CSRF), 204, "revoke")
+		status(
+			t,
+			a.do("DELETE", a.invitePath(a.space.ID)+"/"+itoa(int64(data["id"].(float64))), nil, sess.Token, sess.CSRF),
+			204,
+			"revoke",
+		)
 	}
 	a.postInvite(sess, a.space.ID, "c@example.org")
 
@@ -430,7 +437,8 @@ func TestOnlyAServerAdminClearsInvitationCooldowns(t *testing.T) {
 	}
 
 	var audited int
-	if err := a.db.QueryRow(`SELECT COUNT(*) FROM admin_audit WHERE action = 'invitations.cleared'`).Scan(&audited); err != nil || audited != 2 {
+	if err := a.db.QueryRow(`SELECT COUNT(*) FROM admin_audit WHERE action = 'invitations.cleared'`).Scan(&audited); err != nil ||
+		audited != 2 {
 		t.Errorf("audit rows %d, %v; want one per clearing", audited, err)
 	}
 }

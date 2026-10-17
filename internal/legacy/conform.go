@@ -102,7 +102,8 @@ func targetTables(ctx context.Context) ([]tableDef, error) {
 
 func isStrict(ctx context.Context, db *sql.DB, table string) (strict, found bool, err error) {
 	var v int
-	err = db.QueryRowContext(ctx, `SELECT strict FROM pragma_table_list WHERE name = ? AND schema = 'main'`, table).Scan(&v)
+	err = db.QueryRowContext(ctx, `SELECT strict FROM pragma_table_list WHERE name = ? AND schema = 'main'`, table).
+		Scan(&v)
 	if err == sql.ErrNoRows {
 		return false, false, nil
 	}

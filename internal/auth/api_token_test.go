@@ -18,14 +18,24 @@ func TestAPITokenIssueAndResolve(t *testing.T) {
 	tokens := APITokens{DB: d}
 	sp := newSpaces(t, d, 3)
 
-	raw, tok, err := tokens.Issue(ctx, u, "ci", Grant{Permissions: []string{"transactions:write", "transactions:read", "reports:read"}, SpaceIDs: []int64{sp[2], sp[0], sp[2]}}, nil)
+	raw, tok, err := tokens.Issue(
+		ctx,
+		u,
+		"ci",
+		Grant{
+			Permissions: []string{"transactions:write", "transactions:read", "reports:read"},
+			SpaceIDs:    []int64{sp[2], sp[0], sp[2]},
+		},
+		nil,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.HasPrefix(raw, "svy_") || !strings.HasPrefix(raw, tok.Prefix) || len(tok.Prefix) != 8 {
 		t.Errorf("token %q prefix %q", raw, tok.Prefix)
 	}
-	if tok.Kind != permissions.KindPersonal || tok.AllSpaces || !slices.Equal(tok.SpaceIDs, []int64{sp[0], sp[2]}) || !slices.Equal(tok.Permissions, []string{"reports:read", "transactions:write"}) {
+	if tok.Kind != permissions.KindPersonal || tok.AllSpaces || !slices.Equal(tok.SpaceIDs, []int64{sp[0], sp[2]}) ||
+		!slices.Equal(tok.Permissions, []string{"reports:read", "transactions:write"}) {
 		t.Errorf("grant was not normalised: %+v", tok)
 	}
 
@@ -52,7 +62,15 @@ func TestExpiredAPITokenDoesNotResolve(t *testing.T) {
 	d := newDB(t)
 	ctx := context.Background()
 	u := newUser(t, d, "a@test.com", RoleUser)
-	raw, _, err := APITokens{DB: d}.Issue(ctx, u, "old", Grant{Permissions: []string{"reports:read"}, AllSpaces: true}, ptr(time.Now().Add(-time.Minute)))
+	raw, _, err := APITokens{
+		DB: d,
+	}.Issue(
+		ctx,
+		u,
+		"old",
+		Grant{Permissions: []string{"reports:read"}, AllSpaces: true},
+		ptr(time.Now().Add(-time.Minute)),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +78,8 @@ func TestExpiredAPITokenDoesNotResolve(t *testing.T) {
 		t.Error("an expired token resolved")
 	}
 	now := time.Now()
-	if !(&APIToken{ExpiresAt: &now}).Expired(now) || (&APIToken{}).Expired(now) || (&APIToken{ExpiresAt: ptr(now.Add(time.Second))}).Expired(now) {
+	if !(&APIToken{ExpiresAt: &now}).Expired(now) || (&APIToken{}).Expired(now) ||
+		(&APIToken{ExpiresAt: ptr(now.Add(time.Second))}).Expired(now) {
 		t.Error("Expired")
 	}
 }
@@ -111,7 +130,10 @@ func TestAPITokenGrantsAreChecked(t *testing.T) {
 		{"an unknown level", Grant{Permissions: []string{"reports:admin"}, AllSpaces: true}},
 		{"a typo that would grant less", Grant{Permissions: []string{"reports"}, AllSpaces: true}},
 		{"a connected app with nothing", Grant{Kind: permissions.KindMCP, AllSpaces: true}},
-		{"a connected app beyond its tools", Grant{Kind: permissions.KindMCP, Permissions: []string{"recurring:read"}, AllSpaces: true}},
+		{
+			"a connected app beyond its tools",
+			Grant{Kind: permissions.KindMCP, Permissions: []string{"recurring:read"}, AllSpaces: true},
+		},
 	}
 	for _, tc := range tests {
 		_, _, err := tokens.Issue(ctx, u, "x", tc.grant, nil)
@@ -147,12 +169,23 @@ func TestUpdateGrantKeepsTheTokenAndItsKind(t *testing.T) {
 	other := newUser(t, d, "b@test.com", RoleUser)
 	tokens := APITokens{DB: d}
 	sp := newSpaces(t, d, 1)
-	raw, tok, err := tokens.Issue(ctx, u, "app", Grant{Kind: permissions.KindMCP, Permissions: []string{"reports:read"}, SpaceIDs: sp}, nil)
+	raw, tok, err := tokens.Issue(
+		ctx,
+		u,
+		"app",
+		Grant{Kind: permissions.KindMCP, Permissions: []string{"reports:read"}, SpaceIDs: sp},
+		nil,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	upd, err := tokens.UpdateGrant(ctx, u.ID, tok.ID, Grant{Permissions: []string{"accounts:read", "reports:read"}, AllSpaces: true})
+	upd, err := tokens.UpdateGrant(
+		ctx,
+		u.ID,
+		tok.ID,
+		Grant{Permissions: []string{"accounts:read", "reports:read"}, AllSpaces: true},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,10 +195,16 @@ func TestUpdateGrantKeepsTheTokenAndItsKind(t *testing.T) {
 	if r, _ := tokens.Resolve(ctx, raw); r == nil || !r.Allows("accounts", permissions.Read) {
 		t.Error("the same token carries the new grant")
 	}
-	if _, err := tokens.UpdateGrant(ctx, u.ID, tok.ID, Grant{Permissions: []string{"recurring:read"}, AllSpaces: true}); !errors.Is(err, permissions.ErrBadGrant) {
+	if _, err := tokens.UpdateGrant(ctx, u.ID, tok.ID, Grant{Permissions: []string{"recurring:read"}, AllSpaces: true}); !errors.Is(
+		err,
+		permissions.ErrBadGrant,
+	) {
 		t.Errorf("a connected app cannot be widened beyond its tools: %v", err)
 	}
-	if _, err := tokens.UpdateGrant(ctx, other.ID, tok.ID, Grant{Permissions: []string{"reports:read"}, AllSpaces: true}); !errors.Is(err, ErrNotFound) {
+	if _, err := tokens.UpdateGrant(ctx, other.ID, tok.ID, Grant{Permissions: []string{"reports:read"}, AllSpaces: true}); !errors.Is(
+		err,
+		ErrNotFound,
+	) {
 		t.Errorf("another user's token: %v", err)
 	}
 	if _, err := tokens.Get(ctx, other.ID, tok.ID); !errors.Is(err, ErrNotFound) {

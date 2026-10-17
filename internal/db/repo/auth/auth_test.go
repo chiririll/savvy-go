@@ -262,7 +262,10 @@ func TestPasskeysBelongToTheirOwner(t *testing.T) {
 	r, id := newRepo(t)
 	ctx := context.Background()
 	other, _ := r.InsertUser(ctx, "Bob", "bob@test.com", "h", "user", time.Now())
-	pid, err := r.InsertPasskey(ctx, authrepo.NewPasskey{UserID: id, CredentialID: "cred", Name: "Laptop", AAGUID: "ab", Record: "{}", Now: time.Now()})
+	pid, err := r.InsertPasskey(
+		ctx,
+		authrepo.NewPasskey{UserID: id, CredentialID: "cred", Name: "Laptop", AAGUID: "ab", Record: "{}", Now: time.Now()},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -332,7 +335,8 @@ func TestEmailVerificationTokenIsOnePerUserAndSingleUse(t *testing.T) {
 		t.Fatalf("the replaced token is still valid: %+v", tok)
 	}
 	tok, err := r.EmailVerificationTokenByHash(ctx, "second")
-	if err != nil || tok == nil || tok.UserID != id || tok.Email != "ann@test.com" || !tok.ExpiresAt.Equal(now.Add(time.Hour)) {
+	if err != nil || tok == nil || tok.UserID != id || tok.Email != "ann@test.com" ||
+		!tok.ExpiresAt.Equal(now.Add(time.Hour)) {
 		t.Fatalf("token = %+v, %v", tok, err)
 	}
 	if ok, _ := r.ConsumeEmailVerificationToken(ctx, "second"); !ok {

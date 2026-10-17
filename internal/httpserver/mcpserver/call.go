@@ -28,7 +28,13 @@ func (h Handler) mcpGet(ctx context.Context, req *mcp.CallToolRequest, path stri
 }
 
 // mcpCall is mcpGet for any method. A body is sent as JSON.
-func (h Handler) mcpCall(ctx context.Context, req *mcp.CallToolRequest, method, path string, q url.Values, body []byte) *mcp.CallToolResult {
+func (h Handler) mcpCall(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	method, path string,
+	q url.Values,
+	body []byte,
+) *mcp.CallToolResult {
 	var authz string
 	if extra := req.GetExtra(); extra != nil {
 		authz = extra.Header.Get("Authorization")
@@ -63,7 +69,9 @@ func (h Handler) mcpCall(ctx context.Context, req *mcp.CallToolRequest, method, 
 		out = []byte(`{"ok":true}`)
 	}
 	if len(out) > mcpMaxResult {
-		return mcpFail("The result is too large. Narrow it with filters (dates, account, category) or ask for a smaller page.")
+		return mcpFail(
+			"The result is too large. Narrow it with filters (dates, account, category) or ask for a smaller page.",
+		)
 	}
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(out)}}}
 }

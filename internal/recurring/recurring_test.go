@@ -23,16 +23,48 @@ func TestNextRunDate(t *testing.T) {
 		{"daily", Recurring{Frequency: "daily", Interval: 1, NextRunDate: "2024-02-28"}, "2024-02-29"},
 		{"daily crosses a year end", Recurring{Frequency: "daily", Interval: 3, NextRunDate: "2023-12-30"}, "2024-01-02"},
 		{"weekly keeps the weekday", Recurring{Frequency: "weekly", Interval: 2, NextRunDate: "2024-01-01"}, "2024-01-15"},
-		{"weekly moves to the chosen weekday", Recurring{Frequency: "weekly", Interval: 1, DayOfWeek: ptr(5), NextRunDate: "2024-01-01"}, "2024-01-12"},
-		{"weekly on the same weekday", Recurring{Frequency: "weekly", Interval: 1, DayOfWeek: ptr(1), NextRunDate: "2024-01-01"}, "2024-01-08"},
+		{
+			"weekly moves to the chosen weekday",
+			Recurring{Frequency: "weekly", Interval: 1, DayOfWeek: ptr(5), NextRunDate: "2024-01-01"},
+			"2024-01-12",
+		},
+		{
+			"weekly on the same weekday",
+			Recurring{Frequency: "weekly", Interval: 1, DayOfWeek: ptr(1), NextRunDate: "2024-01-01"},
+			"2024-01-08",
+		},
 		{"monthly", Recurring{Frequency: "monthly", Interval: 1, NextRunDate: "2024-01-15"}, "2024-02-15"},
-		{"monthly clamps to a short month", Recurring{Frequency: "monthly", Interval: 1, DayOfMonth: ptr(31), NextRunDate: "2024-01-31"}, "2024-02-29"},
-		{"monthly returns to the day after a short month", Recurring{Frequency: "monthly", Interval: 1, DayOfMonth: ptr(31), NextRunDate: "2024-02-29"}, "2024-03-31"},
-		{"monthly interval over a year end", Recurring{Frequency: "monthly", Interval: 3, NextRunDate: "2024-11-10"}, "2025-02-10"},
+		{
+			"monthly clamps to a short month",
+			Recurring{Frequency: "monthly", Interval: 1, DayOfMonth: ptr(31), NextRunDate: "2024-01-31"},
+			"2024-02-29",
+		},
+		{
+			"monthly returns to the day after a short month",
+			Recurring{Frequency: "monthly", Interval: 1, DayOfMonth: ptr(31), NextRunDate: "2024-02-29"},
+			"2024-03-31",
+		},
+		{
+			"monthly interval over a year end",
+			Recurring{Frequency: "monthly", Interval: 3, NextRunDate: "2024-11-10"},
+			"2025-02-10",
+		},
 		{"yearly", Recurring{Frequency: "yearly", Interval: 1, NextRunDate: "2023-06-01"}, "2024-06-01"},
-		{"interval below one counts as one", Recurring{Frequency: "daily", Interval: 0, NextRunDate: "2024-01-01"}, "2024-01-02"},
-		{"unknown frequency steps by days", Recurring{Frequency: "fortnightly", Interval: 2, NextRunDate: "2024-01-01"}, "2024-01-03"},
-		{"a timestamp is cut to its date", Recurring{Frequency: "daily", Interval: 1, NextRunDate: "2024-01-01T10:00:00Z"}, "2024-01-02"},
+		{
+			"interval below one counts as one",
+			Recurring{Frequency: "daily", Interval: 0, NextRunDate: "2024-01-01"},
+			"2024-01-02",
+		},
+		{
+			"unknown frequency steps by days",
+			Recurring{Frequency: "fortnightly", Interval: 2, NextRunDate: "2024-01-01"},
+			"2024-01-03",
+		},
+		{
+			"a timestamp is cut to its date",
+			Recurring{Frequency: "daily", Interval: 1, NextRunDate: "2024-01-01T10:00:00Z"},
+			"2024-01-02",
+		},
 		{"an unreadable date is left alone", Recurring{Frequency: "daily", Interval: 1, NextRunDate: "soon"}, "soon"},
 	}
 	for _, tc := range tests {
@@ -110,7 +142,11 @@ func (e *env) create(t *testing.T, in Input) *Recurring {
 // pending lists the pending occurrences of a template.
 func (e *env) pending(t *testing.T, recurringID int64) []int64 {
 	t.Helper()
-	rows, err := e.svc.DB.QueryContext(e.ctx, `SELECT id FROM transactions WHERE recurring_transaction_id = ? AND status = 'pending' ORDER BY id`, recurringID)
+	rows, err := e.svc.DB.QueryContext(
+		e.ctx,
+		`SELECT id FROM transactions WHERE recurring_transaction_id = ? AND status = 'pending' ORDER BY id`,
+		recurringID,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,7 +173,17 @@ func (e *env) tx(t *testing.T, id int64) *ledger.Transaction {
 
 func TestCreateOpensOnePendingOccurrenceOnTheStartDate(t *testing.T) {
 	e := newEnv(t)
-	rec := e.create(t, Input{Type: "expense", AccountID: e.usdAcct.ID, Amount: dec("12.50"), Frequency: "monthly", StartDate: "2024-01-15", Description: ptr("rent")})
+	rec := e.create(
+		t,
+		Input{
+			Type:        "expense",
+			AccountID:   e.usdAcct.ID,
+			Amount:      dec("12.50"),
+			Frequency:   "monthly",
+			StartDate:   "2024-01-15",
+			Description: ptr("rent"),
+		},
+	)
 	if !rec.IsActive || rec.Interval != 1 || rec.NextRunDate != "2024-01-15" {
 		t.Errorf("defaults %+v", rec)
 	}
@@ -146,15 +192,36 @@ func TestCreateOpensOnePendingOccurrenceOnTheStartDate(t *testing.T) {
 		t.Fatalf("pending occurrences %v, want one", ids)
 	}
 	tx := e.tx(t, ids[0])
-	if tx.Amount.Decimal().String() != "12.5" || *tx.Date != "2024-01-15" || *tx.Description != "rent" || tx.Status != "pending" {
+	if tx.Amount.Decimal().String() != "12.5" || *tx.Date != "2024-01-15" || *tx.Description != "rent" ||
+		tx.Status != "pending" {
 		t.Errorf("occurrence %+v", tx)
 	}
 }
 
 func TestCreateInactiveOrPastItsEndOpensNothing(t *testing.T) {
 	e := newEnv(t)
-	inactive := e.create(t, Input{Type: "expense", AccountID: e.usdAcct.ID, Amount: dec("1"), Frequency: "daily", StartDate: "2024-01-15", IsActive: ptr(false)})
-	ended := e.create(t, Input{Type: "expense", AccountID: e.usdAcct.ID, Amount: dec("1"), Frequency: "daily", StartDate: "2024-01-15", EndDate: ptr("2024-01-01")})
+	inactive := e.create(
+		t,
+		Input{
+			Type:      "expense",
+			AccountID: e.usdAcct.ID,
+			Amount:    dec("1"),
+			Frequency: "daily",
+			StartDate: "2024-01-15",
+			IsActive:  ptr(false),
+		},
+	)
+	ended := e.create(
+		t,
+		Input{
+			Type:      "expense",
+			AccountID: e.usdAcct.ID,
+			Amount:    dec("1"),
+			Frequency: "daily",
+			StartDate: "2024-01-15",
+			EndDate:   ptr("2024-01-01"),
+		},
+	)
 	for _, rec := range []*Recurring{inactive, ended} {
 		if ids := e.pending(t, rec.ID); len(ids) != 0 {
 			t.Errorf("template %d opened %v", rec.ID, ids)
@@ -164,7 +231,17 @@ func TestCreateInactiveOrPastItsEndOpensNothing(t *testing.T) {
 
 func TestEstimatedFlagReachesTheOccurrence(t *testing.T) {
 	e := newEnv(t)
-	rec := e.create(t, Input{Type: "expense", AccountID: e.usdAcct.ID, Amount: dec("5"), Frequency: "monthly", StartDate: "2024-01-15", IsEstimated: ptr(true)})
+	rec := e.create(
+		t,
+		Input{
+			Type:        "expense",
+			AccountID:   e.usdAcct.ID,
+			Amount:      dec("5"),
+			Frequency:   "monthly",
+			StartDate:   "2024-01-15",
+			IsEstimated: ptr(true),
+		},
+	)
 	if !rec.IsEstimated || !e.tx(t, e.pending(t, rec.ID)[0]).IsEstimated {
 		t.Error("an estimated template must open estimated occurrences")
 	}
@@ -172,7 +249,17 @@ func TestEstimatedFlagReachesTheOccurrence(t *testing.T) {
 
 func TestAdvanceMovesTheScheduleAndOpensTheNextOccurrence(t *testing.T) {
 	e := newEnv(t)
-	rec := e.create(t, Input{Type: "expense", AccountID: e.usdAcct.ID, Amount: dec("10"), Frequency: "monthly", StartDate: "2024-01-31", DayOfMonth: ptr(31)})
+	rec := e.create(
+		t,
+		Input{
+			Type:       "expense",
+			AccountID:  e.usdAcct.ID,
+			Amount:     dec("10"),
+			Frequency:  "monthly",
+			StartDate:  "2024-01-31",
+			DayOfMonth: ptr(31),
+		},
+	)
 	first := e.pending(t, rec.ID)[0]
 
 	// The scheduler confirms the open occurrence, then asks the template to advance.
@@ -205,7 +292,17 @@ func TestAdvanceMovesTheScheduleAndOpensTheNextOccurrence(t *testing.T) {
 
 func TestAdvancePastTheEndDateStopsTheSeries(t *testing.T) {
 	e := newEnv(t)
-	rec := e.create(t, Input{Type: "expense", AccountID: e.usdAcct.ID, Amount: dec("10"), Frequency: "daily", StartDate: "2024-01-01", EndDate: ptr("2024-01-01")})
+	rec := e.create(
+		t,
+		Input{
+			Type:      "expense",
+			AccountID: e.usdAcct.ID,
+			Amount:    dec("10"),
+			Frequency: "daily",
+			StartDate: "2024-01-01",
+			EndDate:   ptr("2024-01-01"),
+		},
+	)
 	if _, err := e.svc.Txs.Confirm(e.ctx, e.pending(t, rec.ID)[0], "2024-01-01", nil, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -219,9 +316,25 @@ func TestAdvancePastTheEndDateStopsTheSeries(t *testing.T) {
 
 func TestEnsureUpcomingHealsOnlyTemplatesWithoutAnOpenOccurrence(t *testing.T) {
 	e := newEnv(t)
-	healthy := e.create(t, Input{Type: "expense", AccountID: e.usdAcct.ID, Amount: dec("1"), Frequency: "daily", StartDate: "2024-01-01"})
-	lost := e.create(t, Input{Type: "expense", AccountID: e.usdAcct.ID, Amount: dec("2"), Frequency: "daily", StartDate: "2024-01-01"})
-	off := e.create(t, Input{Type: "expense", AccountID: e.usdAcct.ID, Amount: dec("3"), Frequency: "daily", StartDate: "2024-01-01", IsActive: ptr(false)})
+	healthy := e.create(
+		t,
+		Input{Type: "expense", AccountID: e.usdAcct.ID, Amount: dec("1"), Frequency: "daily", StartDate: "2024-01-01"},
+	)
+	lost := e.create(
+		t,
+		Input{Type: "expense", AccountID: e.usdAcct.ID, Amount: dec("2"), Frequency: "daily", StartDate: "2024-01-01"},
+	)
+	off := e.create(
+		t,
+		Input{
+			Type:      "expense",
+			AccountID: e.usdAcct.ID,
+			Amount:    dec("3"),
+			Frequency: "daily",
+			StartDate: "2024-01-01",
+			IsActive:  ptr(false),
+		},
+	)
 	if _, err := e.svc.Txs.Skip(e.ctx, e.pending(t, lost.ID)[0]); err != nil {
 		t.Fatal(err)
 	}
@@ -245,7 +358,10 @@ func TestEnsureUpcomingHealsOnlyTemplatesWithoutAnOpenOccurrence(t *testing.T) {
 
 func TestUpdateReplansTheOpenOccurrence(t *testing.T) {
 	e := newEnv(t)
-	rec := e.create(t, Input{Type: "expense", AccountID: e.usdAcct.ID, Amount: dec("10"), Frequency: "monthly", StartDate: "2024-01-15"})
+	rec := e.create(
+		t,
+		Input{Type: "expense", AccountID: e.usdAcct.ID, Amount: dec("10"), Frequency: "monthly", StartDate: "2024-01-15"},
+	)
 	open := e.pending(t, rec.ID)[0]
 
 	upd, err := e.svc.Update(e.ctx, rec.ID, Input{Amount: dec("20"), Description: ptr("new")})
@@ -265,7 +381,10 @@ func TestUpdateReplansTheOpenOccurrence(t *testing.T) {
 
 func TestUpdateStartDateRestartsTheSchedule(t *testing.T) {
 	e := newEnv(t)
-	rec := e.create(t, Input{Type: "expense", AccountID: e.usdAcct.ID, Amount: dec("10"), Frequency: "monthly", StartDate: "2024-01-15"})
+	rec := e.create(
+		t,
+		Input{Type: "expense", AccountID: e.usdAcct.ID, Amount: dec("10"), Frequency: "monthly", StartDate: "2024-01-15"},
+	)
 	upd, err := e.svc.Update(e.ctx, rec.ID, Input{StartDate: "2024-03-01"})
 	if err != nil {
 		t.Fatal(err)
@@ -280,7 +399,10 @@ func TestUpdateStartDateRestartsTheSchedule(t *testing.T) {
 
 func TestDeactivatingStopsOccurrencesAndReactivatingOpensOne(t *testing.T) {
 	e := newEnv(t)
-	rec := e.create(t, Input{Type: "expense", AccountID: e.usdAcct.ID, Amount: dec("10"), Frequency: "daily", StartDate: "2024-01-01"})
+	rec := e.create(
+		t,
+		Input{Type: "expense", AccountID: e.usdAcct.ID, Amount: dec("10"), Frequency: "daily", StartDate: "2024-01-01"},
+	)
 	if _, err := e.svc.Txs.Skip(e.ctx, e.pending(t, rec.ID)[0]); err != nil {
 		t.Fatal(err)
 	}
@@ -312,7 +434,17 @@ func TestTagsFollowTheTemplateIntoItsOccurrences(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rec := e.create(t, Input{Type: "expense", AccountID: e.usdAcct.ID, Amount: dec("1"), Frequency: "daily", StartDate: "2024-01-01", TagIDs: []int64{tag.ID}})
+	rec := e.create(
+		t,
+		Input{
+			Type:      "expense",
+			AccountID: e.usdAcct.ID,
+			Amount:    dec("1"),
+			Frequency: "daily",
+			StartDate: "2024-01-01",
+			TagIDs:    []int64{tag.ID},
+		},
+	)
 	if len(rec.Tags) != 1 || rec.Tags[0].ID != tag.ID {
 		t.Fatalf("template tags %+v", rec.Tags)
 	}
@@ -334,9 +466,40 @@ func TestTagsFollowTheTemplateIntoItsOccurrences(t *testing.T) {
 // destination's scale, unless the template names the amount itself.
 func TestTransferDeliversTheConvertedOrTheStatedAmount(t *testing.T) {
 	e := newEnv(t)
-	converted := e.create(t, Input{Type: "transfer", AccountID: e.usdAcct.ID, ToAccountID: &e.eurAcct.ID, Amount: dec("10"), Frequency: "monthly", StartDate: "2024-01-15"})
-	stated := e.create(t, Input{Type: "transfer", AccountID: e.usdAcct.ID, ToAccountID: &e.eurAcct.ID, Amount: dec("10"), ToAmount: ptr(dec("4.99")), Frequency: "monthly", StartDate: "2024-01-15"})
-	same := e.create(t, Input{Type: "transfer", AccountID: e.usdAcct.ID, ToAccountID: &e.usdAcct2.ID, Amount: dec("10"), Frequency: "monthly", StartDate: "2024-01-15"})
+	converted := e.create(
+		t,
+		Input{
+			Type:        "transfer",
+			AccountID:   e.usdAcct.ID,
+			ToAccountID: &e.eurAcct.ID,
+			Amount:      dec("10"),
+			Frequency:   "monthly",
+			StartDate:   "2024-01-15",
+		},
+	)
+	stated := e.create(
+		t,
+		Input{
+			Type:        "transfer",
+			AccountID:   e.usdAcct.ID,
+			ToAccountID: &e.eurAcct.ID,
+			Amount:      dec("10"),
+			ToAmount:    ptr(dec("4.99")),
+			Frequency:   "monthly",
+			StartDate:   "2024-01-15",
+		},
+	)
+	same := e.create(
+		t,
+		Input{
+			Type:        "transfer",
+			AccountID:   e.usdAcct.ID,
+			ToAccountID: &e.usdAcct2.ID,
+			Amount:      dec("10"),
+			Frequency:   "monthly",
+			StartDate:   "2024-01-15",
+		},
+	)
 
 	want := map[int64]string{converted.ID: "5", stated.ID: "4.99", same.ID: "10"}
 	for id, w := range want {
@@ -356,9 +519,25 @@ func TestTransferDeliversTheConvertedOrTheStatedAmount(t *testing.T) {
 
 func TestAllUpcomingAndDelete(t *testing.T) {
 	e := newEnv(t)
-	a := e.create(t, Input{Type: "expense", AccountID: e.usdAcct.ID, Amount: dec("1"), Frequency: "daily", StartDate: "2024-01-01"})
-	b := e.create(t, Input{Type: "expense", AccountID: e.usdAcct.ID, Amount: dec("1"), Frequency: "daily", StartDate: "2024-01-02", IsActive: ptr(false)})
-	c := e.create(t, Input{Type: "expense", AccountID: e.usdAcct.ID, Amount: dec("1"), Frequency: "daily", StartDate: "2024-01-03"})
+	a := e.create(
+		t,
+		Input{Type: "expense", AccountID: e.usdAcct.ID, Amount: dec("1"), Frequency: "daily", StartDate: "2024-01-01"},
+	)
+	b := e.create(
+		t,
+		Input{
+			Type:      "expense",
+			AccountID: e.usdAcct.ID,
+			Amount:    dec("1"),
+			Frequency: "daily",
+			StartDate: "2024-01-02",
+			IsActive:  ptr(false),
+		},
+	)
+	c := e.create(
+		t,
+		Input{Type: "expense", AccountID: e.usdAcct.ID, Amount: dec("1"), Frequency: "daily", StartDate: "2024-01-03"},
+	)
 
 	all, err := e.svc.All(e.ctx)
 	if err != nil || len(all) != 3 {

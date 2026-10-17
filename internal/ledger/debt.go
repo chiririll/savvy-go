@@ -71,7 +71,15 @@ func (s Debts) Create(ctx context.Context, in DebtInput) (*Account, error) {
 	return debt, nil
 }
 
-func (s Debts) recordIssuance(ctx context.Context, debt Account, accountID int64, debtType string, amount decimal.Decimal, date string, desc *string) error {
+func (s Debts) recordIssuance(
+	ctx context.Context,
+	debt Account,
+	accountID int64,
+	debtType string,
+	amount decimal.Decimal,
+	date string,
+	desc *string,
+) error {
 	typ := "debt_lend"
 	amt := amount
 	toAmt := amount
@@ -85,7 +93,14 @@ func (s Debts) recordIssuance(ctx context.Context, debt Account, accountID int64
 	return err
 }
 
-func (s Debts) Payment(ctx context.Context, debtID, accountID int64, amount decimal.Decimal, date string, desc *string, collect bool) (*Transaction, error) {
+func (s Debts) Payment(
+	ctx context.Context,
+	debtID, accountID int64,
+	amount decimal.Decimal,
+	date string,
+	desc *string,
+	collect bool,
+) (*Transaction, error) {
 	debt, err := s.Accounts.ByID(ctx, debtID)
 	if err != nil || debt == nil || debt.Type != "debt" {
 		return nil, fmt.Errorf("not a debt")

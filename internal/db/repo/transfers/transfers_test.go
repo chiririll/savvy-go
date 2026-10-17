@@ -96,7 +96,9 @@ func TestRecordsRoundTripAndKeepTheirRemoteCopy(t *testing.T) {
 	}
 	got, _ := r.Record(ctx, "t1")
 	if got == nil || got.From != in.From || got.To != in.To || got.Version != 2 || got.Review == nil || *got.Review != review ||
-		got.Remote != `{"uuid":"t1"}` || got.Description == nil || *got.Description != "rent" || got.DeletedAt != nil {
+		got.Remote != `{"uuid":"t1"}` || got.Description == nil ||
+		*got.Description != "rent" ||
+		got.DeletedAt != nil {
 		t.Fatalf("record = %+v", got)
 	}
 
@@ -119,8 +121,22 @@ func TestDeletingARecordDeletesItsTransaction(t *testing.T) {
 	r := transfersrepo.Space{DB: d}
 	l := ledgerrepo.Repo{DB: d}
 	now := time.Now().UTC()
-	usd, _ := l.InsertCurrency(ctx, ledgerrepo.Currency{Code: "USD", Name: "Dollar", Symbol: "$", Decimals: 2, IsBase: true, Rate: decimal.NewFromInt(1)}, now)
-	acc, _ := l.InsertAccount(ctx, ledgerrepo.AccountFields{Name: "Cash", Type: "cash", CurrencyID: usd, InitialBalance: money.New(0, money.Unit{ID: usd, Decimals: 2}), IsActive: true}, now)
+	usd, _ := l.InsertCurrency(
+		ctx,
+		ledgerrepo.Currency{Code: "USD", Name: "Dollar", Symbol: "$", Decimals: 2, IsBase: true, Rate: decimal.NewFromInt(1)},
+		now,
+	)
+	acc, _ := l.InsertAccount(
+		ctx,
+		ledgerrepo.AccountFields{
+			Name:           "Cash",
+			Type:           "cash",
+			CurrencyID:     usd,
+			InitialBalance: money.New(0, money.Unit{ID: usd, Decimals: 2}),
+			IsActive:       true,
+		},
+		now,
+	)
 
 	if got, err := r.AccountCurrency(ctx, 999); got != nil || err != nil {
 		t.Fatalf("unknown account = %v, %v", got, err)
@@ -130,7 +146,14 @@ func TestDeletingARecordDeletesItsTransaction(t *testing.T) {
 	}
 
 	_ = r.Save(ctx, record("t1"), now)
-	tx := transfersrepo.Transaction{UUID: "t1", Type: "transfer_out", Date: "2026-03-04", Status: "confirmed", AccountID: acc, Amount: 1000}
+	tx := transfersrepo.Transaction{
+		UUID:      "t1",
+		Type:      "transfer_out",
+		Date:      "2026-03-04",
+		Status:    "confirmed",
+		AccountID: acc,
+		Amount:    1000,
+	}
 	if has, _ := r.HasTransaction(ctx, "t1"); has {
 		t.Fatal("transaction before insert")
 	}

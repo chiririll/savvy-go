@@ -37,7 +37,13 @@ func jwks(keys ...map[string]any) string {
 
 func claims(mut func(jwt.MapClaims)) jwt.MapClaims {
 	now := time.Now()
-	c := jwt.MapClaims{"iss": "https://idp.test", "sub": "u", "aud": "cid", "iat": now.Unix(), "exp": now.Add(time.Minute).Unix()}
+	c := jwt.MapClaims{
+		"iss": "https://idp.test",
+		"sub": "u",
+		"aud": "cid",
+		"iat": now.Unix(),
+		"exp": now.Add(time.Minute).Unix(),
+	}
 	if mut != nil {
 		mut(c)
 	}
@@ -84,8 +90,24 @@ func TestIDTokenVerification(t *testing.T) {
 	}{
 		{"an RSA token", signWith(t, jwt.SigningMethodRS256, rsaKey, "k1", claims(nil)), set, iss, aud, true, ""},
 		{"an EC token", signWith(t, jwt.SigningMethodES256, ecKey, "ec1", claims(nil)), set, iss, aud, true, ""},
-		{"a key that is not in the set", signWith(t, jwt.SigningMethodRS256, otherKey, "k1", claims(nil)), set, iss, aud, false, "id_token_invalid"},
-		{"a kid that is not in the set", signWith(t, jwt.SigningMethodRS256, rsaKey, "zzz", claims(nil)), set, iss, aud, false, "id_token_invalid"},
+		{
+			"a key that is not in the set",
+			signWith(t, jwt.SigningMethodRS256, otherKey, "k1", claims(nil)),
+			set,
+			iss,
+			aud,
+			false,
+			"id_token_invalid",
+		},
+		{
+			"a kid that is not in the set",
+			signWith(t, jwt.SigningMethodRS256, rsaKey, "zzz", claims(nil)),
+			set,
+			iss,
+			aud,
+			false,
+			"id_token_invalid",
+		},
 		{"a symmetric algorithm", confused, set, iss, aud, false, "id_token_invalid"},
 		{"an expired token", signWith(t, jwt.SigningMethodRS256, rsaKey, "k1", claims(func(c jwt.MapClaims) {
 			c["exp"] = time.Now().Add(-time.Hour).Unix()
@@ -93,14 +115,78 @@ func TestIDTokenVerification(t *testing.T) {
 		{"a token issued in the future", signWith(t, jwt.SigningMethodRS256, rsaKey, "k1", claims(func(c jwt.MapClaims) {
 			c["iat"] = time.Now().Add(time.Hour).Unix()
 		})), set, iss, aud, false, "id_token_invalid"},
-		{"another issuer", signWith(t, jwt.SigningMethodRS256, rsaKey, "k1", claims(func(c jwt.MapClaims) { c["iss"] = "https://evil" })), set, iss, aud, false, "issuer_mismatch"},
-		{"no issuer claim", signWith(t, jwt.SigningMethodRS256, rsaKey, "k1", claims(func(c jwt.MapClaims) { delete(c, "iss") })), set, iss, aud, false, "issuer_mismatch"},
-		{"another audience", signWith(t, jwt.SigningMethodRS256, rsaKey, "k1", claims(func(c jwt.MapClaims) { c["aud"] = "other" })), set, iss, aud, false, "audience_mismatch"},
-		{"no audience claim", signWith(t, jwt.SigningMethodRS256, rsaKey, "k1", claims(func(c jwt.MapClaims) { delete(c, "aud") })), set, iss, aud, false, "audience_mismatch"},
-		{"our audience among several", signWith(t, jwt.SigningMethodRS256, rsaKey, "k1", claims(func(c jwt.MapClaims) { c["aud"] = []string{"x", "cid"} })), set, iss, aud, true, ""},
-		{"a signature from a key with another declared algorithm", signWith(t, jwt.SigningMethodRS384, rsaKey, "k1", claims(nil)), set, iss, aud, false, "id_token_invalid"},
-		{"a set that is not JSON", signWith(t, jwt.SigningMethodRS256, rsaKey, "k1", claims(nil)), "not json", iss, aud, false, "jwks_failed"},
-		{"an empty set", signWith(t, jwt.SigningMethodRS256, rsaKey, "k1", claims(nil)), `{"keys":[]}`, iss, aud, false, "jwks_failed"},
+		{
+			"another issuer",
+			signWith(t, jwt.SigningMethodRS256, rsaKey, "k1", claims(func(c jwt.MapClaims) { c["iss"] = "https://evil" })),
+			set,
+			iss,
+			aud,
+			false,
+			"issuer_mismatch",
+		},
+		{
+			"no issuer claim",
+			signWith(t, jwt.SigningMethodRS256, rsaKey, "k1", claims(func(c jwt.MapClaims) { delete(c, "iss") })),
+			set,
+			iss,
+			aud,
+			false,
+			"issuer_mismatch",
+		},
+		{
+			"another audience",
+			signWith(t, jwt.SigningMethodRS256, rsaKey, "k1", claims(func(c jwt.MapClaims) { c["aud"] = "other" })),
+			set,
+			iss,
+			aud,
+			false,
+			"audience_mismatch",
+		},
+		{
+			"no audience claim",
+			signWith(t, jwt.SigningMethodRS256, rsaKey, "k1", claims(func(c jwt.MapClaims) { delete(c, "aud") })),
+			set,
+			iss,
+			aud,
+			false,
+			"audience_mismatch",
+		},
+		{
+			"our audience among several",
+			signWith(t, jwt.SigningMethodRS256, rsaKey, "k1", claims(func(c jwt.MapClaims) { c["aud"] = []string{"x", "cid"} })),
+			set,
+			iss,
+			aud,
+			true,
+			"",
+		},
+		{
+			"a signature from a key with another declared algorithm",
+			signWith(t, jwt.SigningMethodRS384, rsaKey, "k1", claims(nil)),
+			set,
+			iss,
+			aud,
+			false,
+			"id_token_invalid",
+		},
+		{
+			"a set that is not JSON",
+			signWith(t, jwt.SigningMethodRS256, rsaKey, "k1", claims(nil)),
+			"not json",
+			iss,
+			aud,
+			false,
+			"jwks_failed",
+		},
+		{
+			"an empty set",
+			signWith(t, jwt.SigningMethodRS256, rsaKey, "k1", claims(nil)),
+			`{"keys":[]}`,
+			iss,
+			aud,
+			false,
+			"jwks_failed",
+		},
 		{"a token that is not a JWT", "abc.def", set, iss, aud, false, "id_token_invalid"},
 	}
 	for _, tc := range tests {
@@ -189,33 +275,47 @@ func newAdminEnv(t *testing.T) (Service, context.Context) {
 }
 
 func oidcFields() map[string]any {
-	return map[string]any{"discovery_url": "https://idp.test/.well-known/openid-configuration", "client_id": "cid", "client_secret": "s3cret"}
+	return map[string]any{
+		"discovery_url": "https://idp.test/.well-known/openid-configuration",
+		"client_id":     "cid",
+		"client_secret": "s3cret",
+	}
 }
 
 func TestCreateValidatesTheProvider(t *testing.T) {
 	s, ctx := newAdminEnv(t)
-	if _, err := s.Create(ctx, IdPWrite{Slug: "a", Preset: "myspace", Fields: oidcFields()}); ssoCode(err) != "unknown_preset" {
+	if _, err := s.Create(ctx, IdPWrite{Slug: "a", Preset: "myspace", Fields: oidcFields()}); ssoCode(
+		err,
+	) != "unknown_preset" {
 		t.Errorf("unknown preset: %q", ssoCode(err))
 	}
 	for _, slug := range []string{"", "Has Space", "UPPER", "a_b", "../x"} {
-		if _, err := s.Create(ctx, IdPWrite{Slug: slug, Preset: "custom_oidc", Fields: oidcFields()}); ssoCode(err) != "invalid_slug" {
+		if _, err := s.Create(ctx, IdPWrite{Slug: slug, Preset: "custom_oidc", Fields: oidcFields()}); ssoCode(
+			err,
+		) != "invalid_slug" {
 			t.Errorf("slug %q: %q", slug, ssoCode(err))
 		}
 	}
 	fields := oidcFields()
 	delete(fields, "client_id")
-	if _, err := s.Create(ctx, IdPWrite{Slug: "a", Preset: "custom_oidc", Fields: fields}); ssoCode(err) != "missing_field" {
+	if _, err := s.Create(ctx, IdPWrite{Slug: "a", Preset: "custom_oidc", Fields: fields}); ssoCode(
+		err,
+	) != "missing_field" {
 		t.Errorf("missing client id: %q", ssoCode(err))
 	}
 	fields = oidcFields()
 	fields["client_secret"] = "  "
-	if _, err := s.Create(ctx, IdPWrite{Slug: "a", Preset: "custom_oidc", Fields: fields}); ssoCode(err) != "missing_field" {
+	if _, err := s.Create(ctx, IdPWrite{Slug: "a", Preset: "custom_oidc", Fields: fields}); ssoCode(
+		err,
+	) != "missing_field" {
 		t.Errorf("blank secret: %q", ssoCode(err))
 	}
 	if _, err := s.Create(ctx, IdPWrite{Name: "A", Slug: "a", Preset: "custom_oidc", Fields: oidcFields()}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Create(ctx, IdPWrite{Name: "B", Slug: "a", Preset: "custom_oidc", Fields: oidcFields()}); ssoCode(err) != "slug_taken" {
+	if _, err := s.Create(ctx, IdPWrite{Name: "B", Slug: "a", Preset: "custom_oidc", Fields: oidcFields()}); ssoCode(
+		err,
+	) != "slug_taken" {
 		t.Errorf("duplicate slug: %q", ssoCode(err))
 	}
 	if all, _ := s.All(ctx); len(all) != 1 {
@@ -225,7 +325,10 @@ func TestCreateValidatesTheProvider(t *testing.T) {
 
 func TestNewProviderStartsDisabledAndLinksByEmail(t *testing.T) {
 	s, ctx := newAdminEnv(t)
-	p, err := s.Create(ctx, IdPWrite{Name: "A", Slug: "a", Preset: "google", Fields: map[string]any{"client_id": "cid", "client_secret": "x"}})
+	p, err := s.Create(
+		ctx,
+		IdPWrite{Name: "A", Slug: "a", Preset: "google", Fields: map[string]any{"client_id": "cid", "client_secret": "x"}},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -268,7 +371,8 @@ func TestTheSecretNeverLeavesAndIsKeptWhenNotResent(t *testing.T) {
 		}
 	}
 	js := p.JSON("https://app.test/")
-	if js["hasClientSecret"] != true || js["callbackUrl"] != "https://app.test/api/auth/sso/a/callback" || js["acsUrl"] != "https://app.test/api/auth/sso/a/acs" {
+	if js["hasClientSecret"] != true || js["callbackUrl"] != "https://app.test/api/auth/sso/a/callback" ||
+		js["acsUrl"] != "https://app.test/api/auth/sso/a/acs" {
 		t.Errorf("json %v", js)
 	}
 	if _, ok := p.PublicJSON()["config"]; ok {
@@ -294,12 +398,25 @@ func TestTheSecretNeverLeavesAndIsKeptWhenNotResent(t *testing.T) {
 
 func TestUpdateKeepsWhatIsNotSent(t *testing.T) {
 	s, ctx := newAdminEnv(t)
-	p, _ := s.Create(ctx, IdPWrite{Name: "A", Slug: "a", Preset: "custom_oidc", Fields: oidcFields(), DefaultRole: "guest", SyncRoleOnLogin: ptr(true), SortOrder: ptr(3)})
+	p, _ := s.Create(
+		ctx,
+		IdPWrite{
+			Name:            "A",
+			Slug:            "a",
+			Preset:          "custom_oidc",
+			Fields:          oidcFields(),
+			DefaultRole:     "guest",
+			SyncRoleOnLogin: ptr(true),
+			SortOrder:       ptr(3),
+		},
+	)
 	upd, err := s.Update(ctx, p.ID, IdPWrite{Name: "Renamed"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if upd.Name != "Renamed" || upd.DefaultRole != "guest" || !upd.SyncRoleOnLogin || upd.SortOrder != 3 || upd.Config["client_id"] != "cid" || upd.Secrets["client_secret"] != "s3cret" {
+	if upd.Name != "Renamed" || upd.DefaultRole != "guest" || !upd.SyncRoleOnLogin || upd.SortOrder != 3 ||
+		upd.Config["client_id"] != "cid" ||
+		upd.Secrets["client_secret"] != "s3cret" {
 		t.Errorf("updated %+v", upd)
 	}
 	if got, err := s.Update(ctx, 999, IdPWrite{Name: "x"}); got != nil || err != nil {

@@ -80,7 +80,13 @@ func TestTwoFactorEnableConfirmLoginAndRecovery(t *testing.T) {
 		t.Fatalf("remaining %v", stBody)
 	}
 
-	off := a.do("POST", "/api/auth/2fa/disable", map[string]string{"code": totp.At(secret, time.Now().Add(30*time.Second))}, iss.Token, iss.CSRF)
+	off := a.do(
+		"POST",
+		"/api/auth/2fa/disable",
+		map[string]string{"code": totp.At(secret, time.Now().Add(30*time.Second))},
+		iss.Token,
+		iss.CSRF,
+	)
 	if off.StatusCode != 200 {
 		t.Fatalf("disable %d %v", off.StatusCode, decodeJSON(t, off))
 	}

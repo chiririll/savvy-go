@@ -257,7 +257,16 @@ func TestAuthenticatorCodeWorksOnce(t *testing.T) {
 	}
 	u, _ = users.ByID(ctx, u.ID)
 	now := time.Now()
-	prev, cur, next := totp.At(secret, now.Add(-30*time.Second)), totp.At(secret, now), totp.At(secret, now.Add(30*time.Second))
+	prev, cur, next := totp.At(
+		secret,
+		now.Add(-30*time.Second),
+	), totp.At(
+		secret,
+		now,
+	), totp.At(
+		secret,
+		now.Add(30*time.Second),
+	)
 
 	if _, err := tf.Confirm(ctx, u, cur); err != nil {
 		t.Fatal(err)

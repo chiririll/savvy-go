@@ -129,7 +129,10 @@ func TestAllListsOnlyKnownKeysOfItsKind(t *testing.T) {
 }
 
 func TestKeyKinds(t *testing.T) {
-	if !settings.IsServerKey("space_quota_mb") || settings.IsServerKey("auto_update_currencies") || !settings.IsSpaceKey("auto_update_currencies") || settings.IsSpaceKey("space_quota_mb") || settings.IsServerKey("nope") {
+	if !settings.IsServerKey("space_quota_mb") || settings.IsServerKey("auto_update_currencies") ||
+		!settings.IsSpaceKey("auto_update_currencies") ||
+		settings.IsSpaceKey("space_quota_mb") ||
+		settings.IsServerKey("nope") {
 		t.Error("a key belongs to the server or to a space, never both")
 	}
 }

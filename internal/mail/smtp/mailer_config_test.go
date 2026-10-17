@@ -10,7 +10,8 @@ func TestDecodeTrimsAndFillsTheTimeout(t *testing.T) {
 	if err != nil || got.Problem != "" {
 		t.Fatalf("%+v %v", got, err)
 	}
-	if c := got.Config; !c.Enabled || c.Host != "h" || c.Protocol != SMTPS || c.From != "a@b.example" || c.Timeout != DefaultTimeout {
+	if c := got.Config; !c.Enabled || c.Host != "h" || c.Protocol != SMTPS || c.From != "a@b.example" ||
+		c.Timeout != DefaultTimeout {
 		t.Errorf("config %+v", c)
 	}
 	got, _ = decode(MailerConfig{Timeout: 3})

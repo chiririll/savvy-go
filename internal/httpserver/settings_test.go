@@ -23,7 +23,12 @@ func TestServerSetupSettings(t *testing.T) {
 		t.Fatalf("server setup is pending on an existing server: %v (present %v)", v, ok)
 	}
 
-	status(t, a.do("PATCH", "/api/settings", map[string]any{"onboarding_server_done": true}, editor.Token, editor.CSRF), 403, "editor finishes server setup")
+	status(
+		t,
+		a.do("PATCH", "/api/settings", map[string]any{"onboarding_server_done": true}, editor.Token, editor.CSRF),
+		403,
+		"editor finishes server setup",
+	)
 	res := a.do("PATCH", "/api/settings", map[string]any{"onboarding_server_done": true}, admin.Token, admin.CSRF)
 	if body := decodeJSON(t, res); res.StatusCode != 200 || body["onboarding_server_done"] != true {
 		t.Fatalf("admin finish %d %v", res.StatusCode, body)

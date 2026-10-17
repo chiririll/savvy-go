@@ -135,7 +135,17 @@ func debtMove(w http.ResponseWriter, r *http.Request, collect bool) {
 		httpx.WriteValidation(w, map[string][]string{"amount": {"The given data was invalid."}})
 		return
 	}
-	tx, err := httpx.Scope(r).Debts.Payment(r.Context(), d.ID, body.AccountID, body.Amount, body.Date, body.Description, collect)
+	tx, err := httpx.Scope(
+		r,
+	).Debts.Payment(
+		r.Context(),
+		d.ID,
+		body.AccountID,
+		body.Amount,
+		body.Date,
+		body.Description,
+		collect,
+	)
 	if err != nil {
 		httpx.WriteMessage(w, 422, err.Error())
 		return

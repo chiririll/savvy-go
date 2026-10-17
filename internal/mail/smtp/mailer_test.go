@@ -246,7 +246,14 @@ func TestUnreachableServerFailsFast(t *testing.T) {
 	}
 	port := l.Addr().(*net.TCPAddr).Port
 	_ = l.Close() // nothing listens there now
-	c := Config{Enabled: true, Host: "127.0.0.1", Port: port, Protocol: Plain, From: "a@example.com", Timeout: 2 * time.Second}
+	c := Config{
+		Enabled:  true,
+		Host:     "127.0.0.1",
+		Port:     port,
+		Protocol: Plain,
+		From:     "a@example.com",
+		Timeout:  2 * time.Second,
+	}
 	start := time.Now()
 	if err := New(c).Send(context.Background(), msg()); err == nil {
 		t.Fatal("no error for an unreachable server")
@@ -270,7 +277,13 @@ func TestDisabled(t *testing.T) {
 }
 
 func TestValidate(t *testing.T) {
-	ok := Config{Enabled: true, Host: "smtp.example.com", Port: 587, Protocol: STARTTLS, From: "Go Savvy <savvy@example.com>"}
+	ok := Config{
+		Enabled:  true,
+		Host:     "smtp.example.com",
+		Port:     587,
+		Protocol: STARTTLS,
+		From:     "Go Savvy <savvy@example.com>",
+	}
 	if err := ok.Validate(); err != nil {
 		t.Fatalf("valid config: %v", err)
 	}

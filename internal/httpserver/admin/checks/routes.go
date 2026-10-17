@@ -11,7 +11,13 @@ import (
 
 func init() {
 	routing.Register(func(d *routing.Deps) []routing.Mount {
-		h := Handler{Cfg: routing.Get[appconfig.Config](d), Writable: d.ConfigWritable, UploadsDir: routing.Get[appconfig.Config](d).UploadsDir, Backups: routing.Get[backup.Service](d), Mail: routing.Get[*mail.Service](d).Status}
+		h := Handler{
+			Cfg:        routing.Get[appconfig.Config](d),
+			Writable:   d.ConfigWritable,
+			UploadsDir: routing.Get[appconfig.Config](d).UploadsDir,
+			Backups:    routing.Get[backup.Service](d),
+			Mail:       routing.Get[*mail.Service](d).Status,
+		}
 		return []routing.Mount{
 			routing.Admin(h.Routes),
 		}

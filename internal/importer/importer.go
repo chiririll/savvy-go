@@ -148,7 +148,12 @@ func (s Service) Parse(ctx context.Context, importID, uploadID string) error {
 	delim := string(detected.delimiter)
 	meta := Meta{
 		Headers: headers, PreviewRows: preview,
-		DetectedFormats:  Formats{DateFormat: detected.dateFormat, AmountFormat: detected.amountFormat, HasHeader: true, Delimiter: delim},
+		DetectedFormats: Formats{
+			DateFormat:   detected.dateFormat,
+			AmountFormat: detected.amountFormat,
+			HasHeader:    true,
+			Delimiter:    delim,
+		},
 		SuggestedMapping: detected.mapping,
 		ParseMeta:        ParseMeta{Delimiter: delim, HasHeader: true, Encoding: "utf-8"},
 	}

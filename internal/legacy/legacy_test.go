@@ -83,11 +83,13 @@ func TestUpgradeLeavesGoSchemaUsable(t *testing.T) {
 	sqlDB := upgradedFixture(t)
 
 	var typ string
-	if err := sqlDB.QueryRow(`SELECT type FROM pragma_table_info('transactions') WHERE name = 'amount'`).Scan(&typ); err != nil || typ != "INTEGER" {
+	if err := sqlDB.QueryRow(`SELECT type FROM pragma_table_info('transactions') WHERE name = 'amount'`).Scan(&typ); err != nil ||
+		typ != "INTEGER" {
 		t.Fatalf("transactions.amount type = %q, %v; want INTEGER", typ, err)
 	}
 	var idx int
-	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'transactions_account_type_date_amount_idx'`).Scan(&idx); err != nil || idx != 1 {
+	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'transactions_account_type_date_amount_idx'`).Scan(&idx); err != nil ||
+		idx != 1 {
 		t.Fatalf("amount index restored = %d, %v", idx, err)
 	}
 
@@ -161,10 +163,12 @@ func assertConverted(t *testing.T, dest *sql.DB) {
 	if err := dest.QueryRow(`SELECT code FROM currencies WHERE is_base = 1`).Scan(&code); err != nil || code != "EUR" {
 		t.Fatalf("base currency %q %v", code, err)
 	}
-	if err := dest.QueryRow(`SELECT description FROM transactions WHERE id = 1`).Scan(&desc); err != nil || desc != "Coffee" {
+	if err := dest.QueryRow(`SELECT description FROM transactions WHERE id = 1`).Scan(&desc); err != nil ||
+		desc != "Coffee" {
 		t.Fatalf("tx %q %v", desc, err)
 	}
-	if err := dest.QueryRow(`SELECT status FROM transactions WHERE id = 5`).Scan(&status); err != nil || status != "pending" {
+	if err := dest.QueryRow(`SELECT status FROM transactions WHERE id = 5`).Scan(&status); err != nil ||
+		status != "pending" {
 		t.Fatalf("pending tx status %q %v", status, err)
 	}
 }
@@ -174,7 +178,8 @@ func assertConverted(t *testing.T, dest *sql.DB) {
 func assertDateOnly(t *testing.T, sqlDB *sql.DB) {
 	t.Helper()
 	var date string
-	if err := sqlDB.QueryRow(`SELECT date FROM transactions WHERE id = 1`).Scan(&date); err != nil || date != "2026-01-03" {
+	if err := sqlDB.QueryRow(`SELECT date FROM transactions WHERE id = 1`).Scan(&date); err != nil ||
+		date != "2026-01-03" {
 		t.Fatalf("transactions.date %q %v", date, err)
 	}
 	for table, cols := range dateColumns {

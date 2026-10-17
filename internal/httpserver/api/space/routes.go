@@ -26,9 +26,15 @@ func init() {
 	ui.AddSpec(spec)
 	routing.Register(func(d *routing.Deps) []routing.Mount {
 		h := Handler{
-			Cfg: routing.Get[appconfig.Config](d), Store: routing.Get[store.Store](d), Spaces: routing.Get[spaces.Service](d), Users: routing.Get[auth.Users](d), Backups: routing.Get[backup.Service](d), Mail: routing.Get[*mail.Service](d),
+			Cfg: routing.Get[appconfig.Config](
+				d,
+			), Store: routing.Get[store.Store](d), Spaces: routing.Get[spaces.Service](d), Users: routing.Get[auth.Users](d), Backups: routing.Get[backup.Service](d), Mail: routing.Get[*mail.Service](d),
 			Login: d.Login, Verify: routing.Get[mail.Verifier](d), Guard: d.Guard,
-			Creator: spacefill.Creator{Spaces: routing.Get[spaces.Service](d), Store: routing.Get[store.Store](d), Rates: routing.Get[ledger.RateSource](d)},
+			Creator: spacefill.Creator{
+				Spaces: routing.Get[spaces.Service](d),
+				Store:  routing.Get[store.Store](d),
+				Rates:  routing.Get[ledger.RateSource](d),
+			},
 		}
 		return []routing.Mount{
 			routing.Public(h.PublicRoutes),

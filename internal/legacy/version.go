@@ -12,7 +12,9 @@ import (
 // than half-imported.
 const LatestMigration = "2026_09_09_180000_restore_fractional_transaction_item_quantity"
 
-var ErrUnsupportedVersion = errors.New("laravel database is older than the supported version; update the Laravel app to its latest version and create a new backup")
+var ErrUnsupportedVersion = errors.New(
+	"laravel database is older than the supported version; update the Laravel app to its latest version and create a new backup",
+)
 
 // ErrNotLaravel is returned for a file that is not a Laravel database.
 var ErrNotLaravel = errors.New("not a laravel database")

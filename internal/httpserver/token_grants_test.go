@@ -70,7 +70,12 @@ func TestTokenPermissionsAreCheckedPerResource(t *testing.T) {
 	// A grant is still held to the owner's role.
 	viewer := a.createUser("viewer@a.com", "secret1", roleViewer)
 	viewerWrite, _ := a.issueGrant(viewer, auth.Grant{Permissions: []string{"accounts:write"}, AllSpaces: true}, nil)
-	status(t, a.bearer("POST", "/api/accounts", map[string]any{"name": "X"}, viewerWrite), 403, "viewer role wins over the grant")
+	status(
+		t,
+		a.bearer("POST", "/api/accounts", map[string]any{"name": "X"}, viewerWrite),
+		403,
+		"viewer role wins over the grant",
+	)
 
 	// Spaces' own administration stays out of reach whatever the grant.
 	all, _ := a.issueGrant(u, auth.Grant{Permissions: allPerms(permissions.Write), AllSpaces: true}, nil)
@@ -91,8 +96,23 @@ func TestTokenReachesOnlyItsSpaces(t *testing.T) {
 
 	one, _ := a.issueGrant(u, auth.Grant{Permissions: []string{"accounts:write"}, SpaceIDs: []int64{other.ID}}, nil)
 	status(t, a.bearer("GET", inOther, nil, one), 200, "its space")
-	status(t, a.bearer("POST", inOther, map[string]any{"name": "X", "type": "bank", "currency_code": "GBP", "initial_balance": 0}, one), 201, "write in its space")
-	status(t, a.bearer("GET", inShared, nil, one), 404, "a space of the owner it was not given looks like it does not exist")
+	status(
+		t,
+		a.bearer(
+			"POST",
+			inOther,
+			map[string]any{"name": "X", "type": "bank", "currency_code": "GBP", "initial_balance": 0},
+			one,
+		),
+		201,
+		"write in its space",
+	)
+	status(
+		t,
+		a.bearer("GET", inShared, nil, one),
+		404,
+		"a space of the owner it was not given looks like it does not exist",
+	)
 	status(t, a.bearer("POST", inShared, map[string]any{"name": "X"}, one), 404, "no writing there either")
 
 	list := decodeJSON(t, a.bearer("GET", "/api/spaces", nil, one))["data"].([]any)
@@ -127,11 +147,13 @@ func TestCreateTokenKeepsTheChosenSpaces(t *testing.T) {
 		t.Fatalf("create %d", res.StatusCode)
 	}
 	data := decodeJSON(t, res)["data"].(map[string]any)
-	if fmt.Sprint(data["permissions"]) != "[accounts:read transactions:write]" || data["all_spaces"] != false || fmt.Sprint(data["space_ids"]) != fmt.Sprint([]any{float64(a.space.ID)}) {
+	if fmt.Sprint(data["permissions"]) != "[accounts:read transactions:write]" || data["all_spaces"] != false ||
+		fmt.Sprint(data["space_ids"]) != fmt.Sprint([]any{float64(a.space.ID)}) {
 		t.Fatalf("created = %v", data)
 	}
 	items := decodeJSON(t, a.do("GET", "/api/auth/api-tokens", nil, sess.Token, ""))["data"].([]any)
-	if got := items[0].(map[string]any); fmt.Sprint(got["space_ids"]) != fmt.Sprint(data["space_ids"]) || got["all_spaces"] != false {
+	if got := items[0].(map[string]any); fmt.Sprint(got["space_ids"]) != fmt.Sprint(data["space_ids"]) ||
+		got["all_spaces"] != false {
 		t.Fatalf("listed = %v", got)
 	}
 }
@@ -169,7 +191,13 @@ func TestOAuthConsentChoosesTheSpaces(t *testing.T) {
 		t.Fatalf("approve = %d", res.StatusCode)
 	}
 	code := codeFrom(t, decodeJSON(t, res)["data"].(map[string]any)["redirect_url"].(string))
-	form := url.Values{"grant_type": {"authorization_code"}, "client_id": {id}, "code": {code}, "code_verifier": {oauthVerifier}, "redirect_uri": {oauthRedirect}}
+	form := url.Values{
+		"grant_type":    {"authorization_code"},
+		"client_id":     {id},
+		"code":          {code},
+		"code_verifier": {oauthVerifier},
+		"redirect_uri":  {oauthRedirect},
+	}
 	st, tok := a.token(form)
 	if st != 200 {
 		t.Fatalf("token = %d %v", st, tok)
@@ -178,14 +206,36 @@ func TestOAuthConsentChoosesTheSpaces(t *testing.T) {
 	check := func(access string) {
 		t.Helper()
 		status(t, a.bearer("GET", fmt.Sprintf("/api/spaces/%d/accounts", other.ID), nil, access), 200, "chosen space")
-		status(t, a.bearer("GET", fmt.Sprintf("/api/spaces/%d/accounts", a.space.ID), nil, access), 404, "space that was not chosen")
-		status(t, a.bearer("GET", fmt.Sprintf("/api/spaces/%d/transfers", other.ID), nil, access), 403, "transfers are not for assistants")
-		status(t, a.bearer("GET", fmt.Sprintf("/api/spaces/%d/members", other.ID), nil, access), 403, "members are not for assistants")
-		status(t, a.bearer("POST", fmt.Sprintf("/api/spaces/%d/accounts", other.ID), map[string]any{"name": "X"}, access), 403, "read only")
+		status(
+			t,
+			a.bearer("GET", fmt.Sprintf("/api/spaces/%d/accounts", a.space.ID), nil, access),
+			404,
+			"space that was not chosen",
+		)
+		status(
+			t,
+			a.bearer("GET", fmt.Sprintf("/api/spaces/%d/transfers", other.ID), nil, access),
+			403,
+			"transfers are not for assistants",
+		)
+		status(
+			t,
+			a.bearer("GET", fmt.Sprintf("/api/spaces/%d/members", other.ID), nil, access),
+			403,
+			"members are not for assistants",
+		)
+		status(
+			t,
+			a.bearer("POST", fmt.Sprintf("/api/spaces/%d/accounts", other.ID), map[string]any{"name": "X"}, access),
+			403,
+			"read only",
+		)
 	}
 	check(tok["access_token"].(string))
 
-	st, next := a.token(url.Values{"grant_type": {"refresh_token"}, "client_id": {id}, "refresh_token": {tok["refresh_token"].(string)}})
+	st, next := a.token(
+		url.Values{"grant_type": {"refresh_token"}, "client_id": {id}, "refresh_token": {tok["refresh_token"].(string)}},
+	)
 	if st != 200 {
 		t.Fatalf("refresh = %d %v", st, next)
 	}
@@ -193,7 +243,8 @@ func TestOAuthConsentChoosesTheSpaces(t *testing.T) {
 
 	// The user can see what the connection holds in their token list.
 	items := decodeJSON(t, a.do("GET", "/api/auth/api-tokens", nil, sess.Token, ""))["data"].([]any)
-	if len(items) != 1 || strings.Contains(fmt.Sprint(items[0].(map[string]any)["permissions"]), "write") || items[0].(map[string]any)["all_spaces"] != false {
+	if len(items) != 1 || strings.Contains(fmt.Sprint(items[0].(map[string]any)["permissions"]), "write") ||
+		items[0].(map[string]any)["all_spaces"] != false {
 		t.Fatalf("connection token = %v", items)
 	}
 }
@@ -212,22 +263,63 @@ func TestAPITokenGrantCanBeEditedInPlace(t *testing.T) {
 	status(t, a.bearer("POST", "/api/tags", map[string]any{"name": "one"}, raw), http.StatusCreated, "before")
 
 	status(t, patch(map[string]any{"permissions": []string{"tags:read"}, "all_spaces": true}), http.StatusOK, "narrow")
-	status(t, a.bearer("POST", "/api/tags", map[string]any{"name": "two"}, raw), http.StatusForbidden, "write after narrowing")
+	status(
+		t,
+		a.bearer("POST", "/api/tags", map[string]any{"name": "two"}, raw),
+		http.StatusForbidden,
+		"write after narrowing",
+	)
 	status(t, a.bearer("GET", "/api/accounts", nil, raw), http.StatusForbidden, "a dropped resource")
 	status(t, a.bearer("GET", "/api/tags", nil, raw), http.StatusOK, "read after narrowing")
 
-	status(t, patch(map[string]any{"permissions": []string{"tags:write"}, "space_ids": []int64{a.space.ID}}), http.StatusOK, "expand")
-	status(t, a.bearer("POST", "/api/tags", map[string]any{"name": "three"}, raw), http.StatusCreated, "write after expanding")
+	status(
+		t,
+		patch(map[string]any{"permissions": []string{"tags:write"}, "space_ids": []int64{a.space.ID}}),
+		http.StatusOK,
+		"expand",
+	)
+	status(
+		t,
+		a.bearer("POST", "/api/tags", map[string]any{"name": "three"}, raw),
+		http.StatusCreated,
+		"write after expanding",
+	)
 
 	// The edit is checked like a new token.
-	status(t, patch(map[string]any{"permissions": []string{"nonsense"}, "all_spaces": true}), http.StatusUnprocessableEntity, "unknown permission")
+	status(
+		t,
+		patch(map[string]any{"permissions": []string{"nonsense"}, "all_spaces": true}),
+		http.StatusUnprocessableEntity,
+		"unknown permission",
+	)
 	status(t, patch(map[string]any{"permissions": []string{"tags:read"}}), http.StatusUnprocessableEntity, "no spaces")
 
 	// Not another user's token, and not with a token.
 	other := a.createUser("other@a.com", "secret1", "admin")
 	os := a.issue(other, false)
-	status(t, a.do("PATCH", "/api/auth/api-tokens/"+strconv.FormatInt(tok.ID, 10), map[string]any{"permissions": []string{"tags:read"}, "all_spaces": true, "current_password": "secret1"}, os.Token, os.CSRF), http.StatusNotFound, "someone else's token")
-	status(t, a.bearer("PATCH", "/api/auth/api-tokens/"+strconv.FormatInt(tok.ID, 10), map[string]any{"permissions": []string{"tags:delete"}, "all_spaces": true}, raw), http.StatusForbidden, "a token cannot edit tokens")
+	status(
+		t,
+		a.do(
+			"PATCH",
+			"/api/auth/api-tokens/"+strconv.FormatInt(tok.ID, 10),
+			map[string]any{"permissions": []string{"tags:read"}, "all_spaces": true, "current_password": "secret1"},
+			os.Token,
+			os.CSRF,
+		),
+		http.StatusNotFound,
+		"someone else's token",
+	)
+	status(
+		t,
+		a.bearer(
+			"PATCH",
+			"/api/auth/api-tokens/"+strconv.FormatInt(tok.ID, 10),
+			map[string]any{"permissions": []string{"tags:delete"}, "all_spaces": true},
+			raw,
+		),
+		http.StatusForbidden,
+		"a token cannot edit tokens",
+	)
 }
 
 // A connected app can be narrowed or widened too, but only over the parts of a
@@ -238,7 +330,15 @@ func TestConnectedAppGrantCanBeEdited(t *testing.T) {
 	sess := a.issue(u, false)
 	id := a.registerClient()
 	code := codeFrom(t, a.approve(sess.Token, sess.CSRF, id, true))
-	_, tok := a.token(url.Values{"grant_type": {"authorization_code"}, "client_id": {id}, "code": {code}, "code_verifier": {oauthVerifier}, "redirect_uri": {oauthRedirect}})
+	_, tok := a.token(
+		url.Values{
+			"grant_type":    {"authorization_code"},
+			"client_id":     {id},
+			"code":          {code},
+			"code_verifier": {oauthVerifier},
+			"redirect_uri":  {oauthRedirect},
+		},
+	)
 	access := tok["access_token"].(string)
 
 	var tokenID int64
@@ -252,18 +352,36 @@ func TestConnectedAppGrantCanBeEdited(t *testing.T) {
 		t.Fatalf("no connection in %v", list)
 	}
 	patch := func(perms ...string) *http.Response {
-		return a.do("PATCH", "/api/auth/api-tokens/"+strconv.FormatInt(tokenID, 10), map[string]any{"permissions": perms, "all_spaces": true, "current_password": "secret1"}, sess.Token, sess.CSRF)
+		return a.do(
+			"PATCH",
+			"/api/auth/api-tokens/"+strconv.FormatInt(tokenID, 10),
+			map[string]any{"permissions": perms, "all_spaces": true, "current_password": "secret1"},
+			sess.Token,
+			sess.CSRF,
+		)
 	}
 
 	status(t, patch("transfers:write"), http.StatusUnprocessableEntity, "an app cannot get a part its tools do not use")
 	status(t, patch(), http.StatusUnprocessableEntity, "an app needs at least one permission")
 	status(t, patch("tags:write", "accounts:read"), http.StatusOK, "widen")
-	status(t, a.bearer("POST", "/api/tags", map[string]any{"name": "t"}, access), http.StatusCreated, "write after widening")
+	status(
+		t,
+		a.bearer("POST", "/api/tags", map[string]any{"name": "t"}, access),
+		http.StatusCreated,
+		"write after widening",
+	)
 	status(t, a.bearer("GET", "/api/transactions", nil, access), http.StatusForbidden, "a dropped part")
 
-	_, next := a.token(url.Values{"grant_type": {"refresh_token"}, "client_id": {id}, "refresh_token": {tok["refresh_token"].(string)}})
+	_, next := a.token(
+		url.Values{"grant_type": {"refresh_token"}, "client_id": {id}, "refresh_token": {tok["refresh_token"].(string)}},
+	)
 	fresh := next["access_token"].(string)
-	status(t, a.bearer("POST", "/api/tags", map[string]any{"name": "t2"}, fresh), http.StatusCreated, "the edit survives a refresh")
+	status(
+		t,
+		a.bearer("POST", "/api/tags", map[string]any{"name": "t2"}, fresh),
+		http.StatusCreated,
+		"the edit survives a refresh",
+	)
 	status(t, a.bearer("GET", "/api/transactions", nil, fresh), http.StatusForbidden, "narrowing survives a refresh")
 }
 

@@ -82,10 +82,17 @@ func ro(title string) *mcp.ToolAnnotations {
 
 // addSimpleReadTools adds the read tools that take no filters.
 func (h Handler) addSimpleReadTools(srv *mcp.Server) {
-	mcp.AddTool(srv, &mcp.Tool{Name: "list_spaces", Description: "List the spaces (separate ledgers) you can read, with your role in each.", Annotations: ro("List spaces")},
+	mcp.AddTool(
+		srv,
+		&mcp.Tool{
+			Name:        "list_spaces",
+			Description: "List the spaces (separate ledgers) you can read, with your role in each.",
+			Annotations: ro("List spaces"),
+		},
 		func(ctx context.Context, req *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
 			return h.mcpGet(ctx, req, "/api/spaces", nil), nil, nil
-		})
+		},
+	)
 
 	spaceTool := func(name, title, desc, path string) {
 		mcp.AddTool(srv, &mcp.Tool{Name: name, Description: desc, Annotations: ro(title)},
@@ -95,20 +102,40 @@ func (h Handler) addSimpleReadTools(srv *mcp.Server) {
 	}
 	spaceTool("list_categories", "List categories", "List the space's categories (expense and income).", "/categories")
 	spaceTool("list_tags", "List tags", "List the space's tags.", "/tags")
-	spaceTool("list_currencies", "List currencies", "List the currencies the space uses, with decimals, exchange rates and which one is the base currency.", "/currencies")
+	spaceTool(
+		"list_currencies",
+		"List currencies",
+		"List the currencies the space uses, with decimals, exchange rates and which one is the base currency.",
+		"/currencies",
+	)
 	spaceTool("list_budgets", "List budgets", "List budgets with their progress.", "/budgets")
 	spaceTool("list_debts", "List debts", "List debts: what is owed and to whom, with payment progress.", "/debts")
 	spaceTool("get_debts_summary", "Debts summary", "Totals of the space's debts.", "/debts-summary")
-	spaceTool("get_transactions_summary", "Transactions summary", "Totals of the space's transactions.", "/transactions-summary")
+	spaceTool(
+		"get_transactions_summary",
+		"Transactions summary",
+		"Totals of the space's transactions.",
+		"/transactions-summary",
+	)
 
-	spaceTool("list_automation_rules", "List automation rules", "List the space's automation rules: what they match, what they do, whether they are active and how often they ran.", "/automation-rules")
+	spaceTool(
+		"list_automation_rules",
+		"List automation rules",
+		"List the space's automation rules: what they match, what they do, whether they are active and how often they ran.",
+		"/automation-rules",
+	)
 	for name, d := range map[string][3]string{
 		"get_automation_rule":      {"Get automation rule", "Get one automation rule with its conditions and actions.", ""},
 		"get_automation_rule_logs": {"Automation rule log", "What a rule did to which transactions, newest first.", "/logs"},
 	} {
 		mcp.AddTool(srv, &mcp.Tool{Name: name, Description: d[1], Annotations: ro(d[0])},
 			func(ctx context.Context, req *mcp.CallToolRequest, in idArgs) (*mcp.CallToolResult, any, error) {
-				return h.mcpGet(ctx, req, mcpSpacePath(in.SpaceID, "/automation-rules/"+strconv.FormatInt(in.ID, 10)+d[2]), nil), nil, nil
+				return h.mcpGet(
+					ctx,
+					req,
+					mcpSpacePath(in.SpaceID, "/automation-rules/"+strconv.FormatInt(in.ID, 10)+d[2]),
+					nil,
+				), nil, nil
 			})
 	}
 
@@ -116,16 +143,29 @@ func (h Handler) addSimpleReadTools(srv *mcp.Server) {
 
 // addQueryReadTools adds the read tools that turn their arguments into a query.
 func (h Handler) addQueryReadTools(srv *mcp.Server) {
-	mcp.AddTool(srv, &mcp.Tool{Name: "list_accounts", Description: "List the space's accounts with their currency and current balance.", Annotations: ro("List accounts")},
+	mcp.AddTool(
+		srv,
+		&mcp.Tool{
+			Name:        "list_accounts",
+			Description: "List the space's accounts with their currency and current balance.",
+			Annotations: ro("List accounts"),
+		},
 		func(ctx context.Context, req *mcp.CallToolRequest, in accountsArgs) (*mcp.CallToolResult, any, error) {
 			q := url.Values{}
 			if in.WithSummary {
 				q.Set("with_summary", "1")
 			}
 			return h.mcpGet(ctx, req, mcpSpacePath(in.SpaceID, "/accounts"), q), nil, nil
-		})
+		},
+	)
 
-	mcp.AddTool(srv, &mcp.Tool{Name: "list_transactions", Description: "List transactions, newest first, with optional filters. Each row has its own currency. Returns at most 100 rows per page; use page to continue.", Annotations: ro("List transactions")},
+	mcp.AddTool(
+		srv,
+		&mcp.Tool{
+			Name:        "list_transactions",
+			Description: "List transactions, newest first, with optional filters. Each row has its own currency. Returns at most 100 rows per page; use page to continue.",
+			Annotations: ro("List transactions"),
+		},
 		func(ctx context.Context, req *mcp.CallToolRequest, in transactionsArgs) (*mcp.CallToolResult, any, error) {
 			q := url.Values{}
 			if err := firstErr(
@@ -152,14 +192,28 @@ func (h Handler) addQueryReadTools(srv *mcp.Server) {
 				q.Set("with_summary", "1")
 			}
 			return h.mcpGet(ctx, req, mcpSpacePath(in.SpaceID, "/transactions"), q), nil, nil
-		})
+		},
+	)
 
-	mcp.AddTool(srv, &mcp.Tool{Name: "get_transaction", Description: "Get one transaction with its items, tags and category.", Annotations: ro("Get transaction")},
+	mcp.AddTool(
+		srv,
+		&mcp.Tool{
+			Name:        "get_transaction",
+			Description: "Get one transaction with its items, tags and category.",
+			Annotations: ro("Get transaction"),
+		},
 		func(ctx context.Context, req *mcp.CallToolRequest, in idArgs) (*mcp.CallToolResult, any, error) {
 			return h.mcpGet(ctx, req, mcpSpacePath(in.SpaceID, "/transactions/"+strconv.FormatInt(in.ID, 10)), nil), nil, nil
-		})
+		},
+	)
 
-	mcp.AddTool(srv, &mcp.Tool{Name: "get_report", Description: "Run one of the space's reports (spending by category, cash flow, net worth, ...) for a period. Totals are in the space's base currency unless the report says otherwise.", Annotations: ro("Get report")},
+	mcp.AddTool(
+		srv,
+		&mcp.Tool{
+			Name:        "get_report",
+			Description: "Run one of the space's reports (spending by category, cash flow, net worth, ...) for a period. Totals are in the space's base currency unless the report says otherwise.",
+			Annotations: ro("Get report"),
+		},
 		func(ctx context.Context, req *mcp.CallToolRequest, in reportArgs) (*mcp.CallToolResult, any, error) {
 			route, ok := mcpReports[in.Report]
 			if !ok {
@@ -180,5 +234,6 @@ func (h Handler) addQueryReadTools(srv *mcp.Server) {
 			setIDs(q, "category_ids", in.CategoryIDs)
 			setIDs(q, "tag_ids", in.TagIDs)
 			return h.mcpGet(ctx, req, mcpSpacePath(in.SpaceID, "/reports/"+route), q), nil, nil
-		})
+		},
+	)
 }

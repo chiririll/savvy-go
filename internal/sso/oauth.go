@@ -129,7 +129,12 @@ func (s Service) githubIdentity(ctx context.Context, p IdentityProvider, code st
 	form.Set("redirect_uri", s.CallbackURL(ctx, p))
 	form.Set("client_id", cfgString(p.Config, "client_id"))
 	form.Set("client_secret", secretString(p.Secrets, "client_secret"))
-	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, "https://github.com/login/oauth/access_token", strings.NewReader(form.Encode()))
+	req, _ := http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
+		"https://github.com/login/oauth/access_token",
+		strings.NewReader(form.Encode()),
+	)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 	res, err := s.client().Do(req)
@@ -175,7 +180,11 @@ func (s Service) githubEmail(ctx context.Context, token string) (string, bool) {
 	return "", false
 }
 
-func (s Service) oidcIdentity(ctx context.Context, p IdentityProvider, code, verifier string) (NormalizedIdentity, error) {
+func (s Service) oidcIdentity(
+	ctx context.Context,
+	p IdentityProvider,
+	code, verifier string,
+) (NormalizedIdentity, error) {
 	disco, err := s.discover(ctx, p)
 	if err != nil {
 		return NormalizedIdentity{}, err

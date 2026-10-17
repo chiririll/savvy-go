@@ -23,7 +23,13 @@ func apiID(t *testing.T, a *testApp, sess *auth.Issued, path string, body map[st
 func TestAccountCreatedFromACatalogCurrency(t *testing.T) {
 	a := newTestApp(t)
 	sess := a.issue(a.createUser("rw@test.com", "secret1", roleEditor), false)
-	apiID(t, a, sess, "/api/currencies", map[string]any{"code": "USD", "name": "US Dollar", "symbol": "$", "decimals": 2, "is_base": true, "rate": 1})
+	apiID(
+		t,
+		a,
+		sess,
+		"/api/currencies",
+		map[string]any{"code": "USD", "name": "US Dollar", "symbol": "$", "decimals": 2, "is_base": true, "rate": 1},
+	)
 
 	res := a.do("POST", "/api/accounts", map[string]any{
 		"name": "Barclays", "type": "bank", "currency_code": "GBP", "initial_balance": 100,
@@ -46,10 +52,34 @@ func TestAccountCreatedFromACatalogCurrency(t *testing.T) {
 func TestAccountSummaryConvertsToTheBaseCurrency(t *testing.T) {
 	a := newTestApp(t)
 	sess := a.issue(a.createUser("rw@test.com", "secret1", roleEditor), false)
-	usd := apiID(t, a, sess, "/api/currencies", map[string]any{"code": "USD", "name": "US Dollar", "symbol": "$", "decimals": 2, "is_base": true, "rate": 1})
-	eur := apiID(t, a, sess, "/api/currencies", map[string]any{"code": "EUR", "name": "Euro", "symbol": "€", "decimals": 2, "rate": 2})
-	apiID(t, a, sess, "/api/accounts", map[string]any{"name": "Cash", "type": "cash", "currency_id": usd, "initial_balance": 50})
-	apiID(t, a, sess, "/api/accounts", map[string]any{"name": "Euro cash", "type": "cash", "currency_id": eur, "initial_balance": 10})
+	usd := apiID(
+		t,
+		a,
+		sess,
+		"/api/currencies",
+		map[string]any{"code": "USD", "name": "US Dollar", "symbol": "$", "decimals": 2, "is_base": true, "rate": 1},
+	)
+	eur := apiID(
+		t,
+		a,
+		sess,
+		"/api/currencies",
+		map[string]any{"code": "EUR", "name": "Euro", "symbol": "€", "decimals": 2, "rate": 2},
+	)
+	apiID(
+		t,
+		a,
+		sess,
+		"/api/accounts",
+		map[string]any{"name": "Cash", "type": "cash", "currency_id": usd, "initial_balance": 50},
+	)
+	apiID(
+		t,
+		a,
+		sess,
+		"/api/accounts",
+		map[string]any{"name": "Euro cash", "type": "cash", "currency_id": eur, "initial_balance": 10},
+	)
 
 	body := decodeJSON(t, a.do("GET", "/api/accounts?with_summary=1", nil, sess.Token, ""))
 	summary, _ := body["summary"].(map[string]any)
@@ -62,8 +92,22 @@ func TestAccountSummaryConvertsToTheBaseCurrency(t *testing.T) {
 func TestDeletedAccountIsGone(t *testing.T) {
 	a := newTestApp(t)
 	sess := a.issue(a.createUser("rw@test.com", "secret1", roleEditor), false)
-	usd := apiID(t, a, sess, "/api/currencies", map[string]any{"code": "USD", "name": "US Dollar", "symbol": "$", "decimals": 2, "is_base": true, "rate": 1})
-	id := itoa(apiID(t, a, sess, "/api/accounts", map[string]any{"name": "Cash", "type": "cash", "currency_id": usd, "initial_balance": 0}))
+	usd := apiID(
+		t,
+		a,
+		sess,
+		"/api/currencies",
+		map[string]any{"code": "USD", "name": "US Dollar", "symbol": "$", "decimals": 2, "is_base": true, "rate": 1},
+	)
+	id := itoa(
+		apiID(
+			t,
+			a,
+			sess,
+			"/api/accounts",
+			map[string]any{"name": "Cash", "type": "cash", "currency_id": usd, "initial_balance": 0},
+		),
+	)
 
 	status(t, a.do("DELETE", "/api/accounts/"+id, nil, sess.Token, sess.CSRF), http.StatusNoContent, "delete")
 	status(t, a.do("GET", "/api/accounts/"+id, nil, sess.Token, ""), http.StatusNotFound, "get after delete")
@@ -73,8 +117,20 @@ func TestDeletedAccountIsGone(t *testing.T) {
 func TestInvalidValuesAreClientErrors(t *testing.T) {
 	a := newTestApp(t)
 	sess := a.issue(a.createUser("rw@test.com", "secret1", roleEditor), false)
-	usd := apiID(t, a, sess, "/api/currencies", map[string]any{"code": "USD", "name": "US Dollar", "symbol": "$", "decimals": 2, "is_base": true, "rate": 1})
-	acc := apiID(t, a, sess, "/api/accounts", map[string]any{"name": "Cash", "type": "cash", "currency_id": usd, "initial_balance": 0})
+	usd := apiID(
+		t,
+		a,
+		sess,
+		"/api/currencies",
+		map[string]any{"code": "USD", "name": "US Dollar", "symbol": "$", "decimals": 2, "is_base": true, "rate": 1},
+	)
+	acc := apiID(
+		t,
+		a,
+		sess,
+		"/api/accounts",
+		map[string]any{"name": "Cash", "type": "cash", "currency_id": usd, "initial_balance": 0},
+	)
 
 	for _, c := range []struct {
 		name, path string

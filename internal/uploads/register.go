@@ -16,7 +16,11 @@ func Register(l *locator.Locator) {
 		if err != nil {
 			return Service{}, err
 		}
-		return Service{DB: locator.Get[store.DB](l), Root: locator.Get[appconfig.Config](l).UploadsDir, SignSecret: secret}, nil
+		return Service{
+			DB:         locator.Get[store.DB](l),
+			Root:       locator.Get[appconfig.Config](l).UploadsDir,
+			SignSecret: secret,
+		}, nil
 	})
 }
 

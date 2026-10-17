@@ -136,7 +136,13 @@ func TestUploadSignForbiddenForOtherUser(t *testing.T) {
 		"bucket": "transaction-imports", "filename": "statement.csv", "size": 100,
 	}, s1.Token, s1.CSRF)
 	create := decodeJSON(t, res)
-	res = a.do("GET", "/api/s3/multipart/"+create["uploadId"].(string)+"/1?key="+url.QueryEscape(create["key"].(string)), nil, s2.Token, "")
+	res = a.do(
+		"GET",
+		"/api/s3/multipart/"+create["uploadId"].(string)+"/1?key="+url.QueryEscape(create["key"].(string)),
+		nil,
+		s2.Token,
+		"",
+	)
 	if res.StatusCode != 403 {
 		t.Fatalf("want 403 got %d %v", res.StatusCode, decodeJSON(t, res))
 	}

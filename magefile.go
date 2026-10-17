@@ -102,7 +102,13 @@ func (Test) All() {
 // first. Honors OAUTH_SERVER (default http://localhost:8080, spelled like the
 // server's app_url).
 func (Probe) Oauth() error {
-	return sh.RunV("go", "run", "./cmd/oauth-probe", "-server", firstNonEmpty(os.Getenv("OAUTH_SERVER"), "http://localhost:8080"))
+	return sh.RunV(
+		"go",
+		"run",
+		"./cmd/oauth-probe",
+		"-server",
+		firstNonEmpty(os.Getenv("OAUTH_SERVER"), "http://localhost:8080"),
+	)
 }
 
 // Clean removes build output.

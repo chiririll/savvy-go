@@ -18,7 +18,11 @@ func TestSplitSQL(t *testing.T) {
 		{"empty", "", nil},
 		{"only comments and blanks", "-- hello\n\n  -- again\n", nil},
 		{"one statement", "CREATE TABLE a (id INTEGER);\n", []string{"CREATE TABLE a (id INTEGER)"}},
-		{"a statement over several lines", "CREATE TABLE a (\n  id INTEGER,\n  n TEXT\n);\n", []string{"CREATE TABLE a (\n  id INTEGER,\n  n TEXT\n)"}},
+		{
+			"a statement over several lines",
+			"CREATE TABLE a (\n  id INTEGER,\n  n TEXT\n);\n",
+			[]string{"CREATE TABLE a (\n  id INTEGER,\n  n TEXT\n)"},
+		},
 		{"two statements with a comment between", "SELECT 1;\n-- next\nSELECT 2;\n", []string{"SELECT 1", "SELECT 2"}},
 		{"a last statement without a semicolon", "SELECT 1;\nSELECT 2", []string{"SELECT 1", "SELECT 2"}},
 		{"a lone semicolon is nothing", ";\nSELECT 1;\n", []string{"SELECT 1"}},
@@ -58,10 +62,12 @@ func TestBothSetsShareOneFileWithoutClashing(t *testing.T) {
 		t.Fatal(err)
 	}
 	var n int
-	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM schema_migrations WHERE version LIKE 'server/%'`).Scan(&n); err != nil || n == 0 {
+	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM schema_migrations WHERE version LIKE 'server/%'`).Scan(&n); err != nil ||
+		n == 0 {
 		t.Errorf("server versions: %d, %v", n, err)
 	}
-	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM schema_migrations WHERE version LIKE 'space/%'`).Scan(&n); err != nil || n == 0 {
+	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM schema_migrations WHERE version LIKE 'space/%'`).Scan(&n); err != nil ||
+		n == 0 {
 		t.Errorf("space versions: %d, %v", n, err)
 	}
 }
@@ -84,7 +90,8 @@ func TestEnsureIndexesRestoresADroppedIndex(t *testing.T) {
 	ctx := context.Background()
 	sqlDB := migrated(t, Space)
 	var name string
-	err := sqlDB.QueryRow(`SELECT name FROM sqlite_master WHERE type='index' AND name='transactions_account_dedup_unique'`).Scan(&name)
+	err := sqlDB.QueryRow(`SELECT name FROM sqlite_master WHERE type='index' AND name='transactions_account_dedup_unique'`).
+		Scan(&name)
 	if err != nil {
 		t.Fatalf("the dedup index must exist after migrating: %v", err)
 	}

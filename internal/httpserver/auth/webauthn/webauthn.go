@@ -60,7 +60,11 @@ func (h Handler) webauthnRegisterVerify(w http.ResponseWriter, r *http.Request) 
 		}
 		return
 	}
-	httpx.WriteJSON(w, http.StatusCreated, dto.PasskeyRegistered{Message: "Passkey registered.", Credential: dto.NewWebAuthnCred(*cred)})
+	httpx.WriteJSON(
+		w,
+		http.StatusCreated,
+		dto.PasskeyRegistered{Message: "Passkey registered.", Credential: dto.NewWebAuthnCred(*cred)},
+	)
 }
 
 func (h Handler) webauthnUpdate(w http.ResponseWriter, r *http.Request) {

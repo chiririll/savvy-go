@@ -82,14 +82,25 @@ func Demo(ctx context.Context, st store.Store, keys signing.KeyRing, opts Option
 	spaceSvc := spaces.Service{Store: st}
 	d := &demo{ctx: ctx, st: st, spaces: spaceSvc, people: people, now: now, manifest: &Manifest{Now: now}}
 	for _, u := range demoUsers {
-		d.manifest.Users = append(d.manifest.Users, ManifestUser{Key: u.key, Name: u.name, Email: u.email, Password: u.pass, Role: u.role})
+		d.manifest.Users = append(
+			d.manifest.Users,
+			ManifestUser{Key: u.key, Name: u.name, Email: u.email, Password: u.pass, Role: u.role},
+		)
 	}
 
-	d.demo, err = d.createSpace("Demo", userAlex, map[string]string{userJordan: spaces.RoleEditor, userDemo: spaces.RoleViewer})
+	d.demo, err = d.createSpace(
+		"Demo",
+		userAlex,
+		map[string]string{userJordan: spaces.RoleEditor, userDemo: spaces.RoleViewer},
+	)
 	if err != nil {
 		return nil, err
 	}
-	d.family, err = d.createSpace("Family Budget", userAlex, map[string]string{userJordan: spaces.RoleAdmin, userSam: spaces.RoleViewer})
+	d.family, err = d.createSpace(
+		"Family Budget",
+		userAlex,
+		map[string]string{userJordan: spaces.RoleAdmin, userSam: spaces.RoleViewer},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -98,9 +109,13 @@ func Demo(ctx context.Context, st store.Store, keys signing.KeyRing, opts Option
 		return nil, err
 	}
 
-	demoAccts, err := d.fill(d.demo, currencySet(usdCurrency, withRate(eurCurrency, "1.08")), func(db store.DB) (map[string]*ledger.Account, error) {
-		return seedWorkspace(ctx, db, now)
-	})
+	demoAccts, err := d.fill(
+		d.demo,
+		currencySet(usdCurrency, withRate(eurCurrency, "1.08")),
+		func(db store.DB) (map[string]*ledger.Account, error) {
+			return seedWorkspace(ctx, db, now)
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -110,9 +125,13 @@ func Demo(ctx context.Context, st store.Store, keys signing.KeyRing, opts Option
 	if err != nil {
 		return nil, err
 	}
-	studioAccts, err := d.fill(d.studio, currencySet(eurCurrency, withRate(usdCurrency, "0.9259")), func(db store.DB) (map[string]*ledger.Account, error) {
-		return seedMini(ctx, db, d.now, studioSpace)
-	})
+	studioAccts, err := d.fill(
+		d.studio,
+		currencySet(eurCurrency, withRate(usdCurrency, "0.9259")),
+		func(db store.DB) (map[string]*ledger.Account, error) {
+			return seedMini(ctx, db, d.now, studioSpace)
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +217,11 @@ func (d *demo) createSpace(name, owner string, members map[string]string) (*spac
 }
 
 // fill seeds a space's reference data and then its workspace.
-func (d *demo) fill(sp *spaces.Space, currencies []ledger.Currency, workspace func(store.DB) (map[string]*ledger.Account, error)) (map[string]*ledger.Account, error) {
+func (d *demo) fill(
+	sp *spaces.Space,
+	currencies []ledger.Currency,
+	workspace func(store.DB) (map[string]*ledger.Account, error),
+) (map[string]*ledger.Account, error) {
 	db, err := d.st.Space(d.ctx, sp.ID)
 	if err != nil {
 		return nil, err
@@ -215,7 +238,10 @@ func (d *demo) fill(sp *spaces.Space, currencies []ledger.Currency, workspace fu
 
 // linkAndTransfer links Demo with the other two spaces and moves money across
 // each link, including a transfer between currencies.
-func (d *demo) linkAndTransfer(tr transfers.Service, demoAccts, familyAccts, studioAccts map[string]*ledger.Account) error {
+func (d *demo) linkAndTransfer(
+	tr transfers.Service,
+	demoAccts, familyAccts, studioAccts map[string]*ledger.Account,
+) error {
 	alex := d.people[userAlex]
 	for _, other := range []*spaces.Space{d.family, d.studio} {
 		if err := tr.Link(d.ctx, alex, d.demo.ID, other.ID); err != nil {

@@ -23,7 +23,15 @@ func newSpaces(t *testing.T, d store.DB, n int) []int64 {
 	t.Helper()
 	var ids []int64
 	for i := range n {
-		id, err := spacesrepo.Repo{DB: d}.Insert(context.Background(), fmt.Sprintf("uuid-%d", i), fmt.Sprintf("space %d", i), nil, time.Now())
+		id, err := spacesrepo.Repo{
+			DB: d,
+		}.Insert(
+			context.Background(),
+			fmt.Sprintf("uuid-%d", i),
+			fmt.Sprintf("space %d", i),
+			nil,
+			time.Now(),
+		)
 		if err != nil {
 			t.Fatal(err)
 		}

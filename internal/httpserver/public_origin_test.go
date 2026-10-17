@@ -11,7 +11,11 @@ import (
 func TestPublicPostsRefuseCrossSiteForms(t *testing.T) {
 	a := newTestApp(t)
 	post := func(ctype, origin string) int {
-		req, err := http.NewRequest("POST", a.srv.URL+"/api/auth/login", strings.NewReader(`{"email":"a@b.c","password":"x"}`))
+		req, err := http.NewRequest(
+			"POST",
+			a.srv.URL+"/api/auth/login",
+			strings.NewReader(`{"email":"a@b.c","password":"x"}`),
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -44,7 +48,11 @@ func TestPublicPostsRefuseCrossSiteForms(t *testing.T) {
 // OAuth endpoints sit outside /api and take cross-origin form posts by design.
 func TestOAuthTokenStillAcceptsCrossOrigin(t *testing.T) {
 	a := newTestApp(t)
-	req, _ := http.NewRequest("POST", a.srv.URL+"/oauth/token", strings.NewReader(url.Values{"grant_type": {"authorization_code"}}.Encode()))
+	req, _ := http.NewRequest(
+		"POST",
+		a.srv.URL+"/oauth/token",
+		strings.NewReader(url.Values{"grant_type": {"authorization_code"}}.Encode()),
+	)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Origin", "https://claude.ai")
 	res, err := a.client.Do(req)

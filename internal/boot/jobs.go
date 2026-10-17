@@ -64,9 +64,13 @@ func (p *Process) Start(ctx context.Context) {
 				return err
 			})(ctx)
 		}},
-		jobs.Job{Name: "recurring:ensure-upcoming", Interval: time.Hour, Run: eachSpace(func(ctx context.Context, d store.DB) error {
-			return recurring.Service{DB: d, Txs: ledger.Transactions{DB: d}}.EnsureUpcoming(ctx)
-		})},
+		jobs.Job{
+			Name:     "recurring:ensure-upcoming",
+			Interval: time.Hour,
+			Run: eachSpace(func(ctx context.Context, d store.DB) error {
+				return recurring.Service{DB: d, Txs: ledger.Transactions{DB: d}}.EnsureUpcoming(ctx)
+			}),
+		},
 		jobs.Job{Name: "uploads:prune", Interval: time.Hour, Run: locator.Get[uploads.Service](l).PruneExpired},
 		// Expired invitations are kept an hour past their expiry: that is the
 		// cooldown on inviting the same address again.

@@ -137,7 +137,12 @@ func TestFirstRunRestoreLoadsTheBackupAndClosesSetup(t *testing.T) {
 		t.Fatalf("status after restore %v", body)
 	}
 	// The restored admin logs in with the password they had on the old server.
-	status(t, a.do("POST", "/api/auth/login", map[string]any{"email": "ada@source.com", "password": "secret1"}, "", ""), http.StatusOK, "login")
+	status(
+		t,
+		a.do("POST", "/api/auth/login", map[string]any{"email": "ada@source.com", "password": "secret1"}, "", ""),
+		http.StatusOK,
+		"login",
+	)
 	// And the endpoint is gone with the setup.
 	status(t, a.firstRunRestore(pass, "b.zip", serverBackupFile(t), nil), http.StatusForbidden, "second restore")
 }

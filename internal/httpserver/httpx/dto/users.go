@@ -17,7 +17,14 @@ type SessionUser struct {
 }
 
 func NewSessionUser(u auth.User) SessionUser {
-	return SessionUser{ID: u.ID, Name: u.Name, Email: u.Email, Role: u.Role, IsSSOOnly: u.IsSSOOnly, EmailVerified: u.EmailVerified}
+	return SessionUser{
+		ID:            u.ID,
+		Name:          u.Name,
+		Email:         u.Email,
+		Role:          u.Role,
+		IsSSOOnly:     u.IsSSOOnly,
+		EmailVerified: u.EmailVerified,
+	}
 }
 
 // User is a user as the server admin lists them.

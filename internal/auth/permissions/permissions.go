@@ -139,7 +139,9 @@ func CheckKind(kind string, permissions []string) error {
 	for _, p := range permissions {
 		resource, _, _ := strings.Cut(p, ":")
 		if !slices.Contains(allowed, resource) {
-			return grantError(fmt.Sprintf("A connected app can only be given access to %s, not %q", strings.Join(allowed, ", "), p))
+			return grantError(
+				fmt.Sprintf("A connected app can only be given access to %s, not %q", strings.Join(allowed, ", "), p),
+			)
 		}
 	}
 	return nil

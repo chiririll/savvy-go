@@ -216,7 +216,11 @@ func TestFailuresAcrossChallengesLockTheUser(t *testing.T) {
 	}
 
 	// Once the delay is over, a challenge can be issued again.
-	_, _ = d.ExecContext(ctx, `UPDATE two_factor_failures SET locked_until = ?`, time.Now().Add(-time.Second).UTC().Format(time.RFC3339Nano))
+	_, _ = d.ExecContext(
+		ctx,
+		`UPDATE two_factor_failures SET locked_until = ?`,
+		time.Now().Add(-time.Second).UTC().Format(time.RFC3339Nano),
+	)
 	token, err := ch.Issue(ctx, u)
 	if err != nil {
 		t.Fatalf("issue after the delay: %v", err)

@@ -63,7 +63,11 @@ func (s Service) samlRedirect(ctx context.Context, p IdentityProvider, redirectA
 	return u.String(), nil
 }
 
-func (s Service) HandleACS(ctx context.Context, p IdentityProvider, samlResponse, relayState string) (NormalizedIdentity, error) {
+func (s Service) HandleACS(
+	ctx context.Context,
+	p IdentityProvider,
+	samlResponse, relayState string,
+) (NormalizedIdentity, error) {
 	st, err := s.ConsumeState(ctx, relayState)
 	if err != nil || st == nil || st.ProviderID != p.ID {
 		return NormalizedIdentity{}, ssoErr("invalid_state", "The Service state is invalid or expired.", 401)

@@ -110,7 +110,10 @@ func TestAmountsOnTheWireInEveryCurrency(t *testing.T) {
 			}
 			balance += a.Minor
 			res = e.a.do("GET", "/api/accounts/"+itoa(e.acct[c.Code]), nil, e.sess.Token, "")
-			if body, want := rawBody(t, res), `"currentBalance":`+canonical(balance, c.Decimals)+`,`; !strings.Contains(body, want) {
+			if body, want := rawBody(t, res), `"currentBalance":`+canonical(balance, c.Decimals)+`,`; !strings.Contains(
+				body,
+				want,
+			) {
 				t.Fatalf("account %s does not contain %s", body, want)
 			}
 		})
@@ -174,7 +177,10 @@ func TestConvertEndpointForEveryPair(t *testing.T) {
 			if res.StatusCode != http.StatusOK {
 				t.Fatalf("status %d: %s", res.StatusCode, rawBody(t, res))
 			}
-			if body, wantJSON := rawBody(t, res), `"result":`+canonical(want.Minor(), to.Decimals); !strings.Contains(body, wantJSON) {
+			if body, wantJSON := rawBody(t, res), `"result":`+canonical(want.Minor(), to.Decimals); !strings.Contains(
+				body,
+				wantJSON,
+			) {
 				t.Fatalf("%s does not contain %s", body, wantJSON)
 			}
 		})

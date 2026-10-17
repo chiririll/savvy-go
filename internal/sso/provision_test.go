@@ -17,7 +17,13 @@ func (e *ssoEnv) admin(t *testing.T) *auth.User {
 }
 
 func ident(sub, email string, verified bool) NormalizedIdentity {
-	return NormalizedIdentity{Subject: sub, Email: email, EmailVerified: verified, Name: "Ann", Raw: map[string]any{"sub": sub}}
+	return NormalizedIdentity{
+		Subject:       sub,
+		Email:         email,
+		EmailVerified: verified,
+		Name:          "Ann",
+		Raw:           map[string]any{"sub": sub},
+	}
 }
 
 func TestProvisionNeedsASubjectAndAnAdminToExist(t *testing.T) {
@@ -64,7 +70,9 @@ func TestProvisionLinksByEmailOnlyWhenVerified(t *testing.T) {
 	e := newSSOEnv(t, nil)
 	victim := e.admin(t)
 
-	if _, _, err := e.svc.Provision(e.ctx, *e.p, ident("attacker", "root@test.com", false)); ssoCode(err) != "email_in_use" {
+	if _, _, err := e.svc.Provision(e.ctx, *e.p, ident("attacker", "root@test.com", false)); ssoCode(
+		err,
+	) != "email_in_use" {
 		t.Fatalf("an unverified claim to root@test.com: %q", ssoCode(err))
 	}
 

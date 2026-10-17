@@ -16,8 +16,20 @@ func reportFixture(t *testing.T) (*testApp, *auth.Issued) {
 	accID, expenseCat := seedMoney(t, a, sess)
 	incomeCat := apiID(t, a, sess, "/api/categories", map[string]any{"name": "Pay", "type": "income"})
 	today := time.Now().UTC().Format("2006-01-02")
-	apiID(t, a, sess, "/api/transactions", map[string]any{"type": "expense", "account_id": accID, "category_id": expenseCat, "amount": 25, "date": today})
-	apiID(t, a, sess, "/api/transactions", map[string]any{"type": "income", "account_id": accID, "category_id": incomeCat, "amount": 100, "date": today})
+	apiID(
+		t,
+		a,
+		sess,
+		"/api/transactions",
+		map[string]any{"type": "expense", "account_id": accID, "category_id": expenseCat, "amount": 25, "date": today},
+	)
+	apiID(
+		t,
+		a,
+		sess,
+		"/api/transactions",
+		map[string]any{"type": "income", "account_id": accID, "category_id": incomeCat, "amount": 100, "date": today},
+	)
 	return a, sess
 }
 

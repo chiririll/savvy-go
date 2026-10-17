@@ -46,7 +46,12 @@ func loadScales(ctx context.Context, q querier) (*scales, error) {
 		}
 	}
 	// is_base only exists on newer Laravel schemas; keep the lowest id otherwise.
-	_ = scanPairs(ctx, q, `SELECT id, is_base FROM currencies WHERE is_base = 1 ORDER BY id LIMIT 1`, func(id, _ int64) { s.base = id })
+	_ = scanPairs(
+		ctx,
+		q,
+		`SELECT id, is_base FROM currencies WHERE is_base = 1 ORDER BY id LIMIT 1`,
+		func(id, _ int64) { s.base = id },
+	)
 	return s, nil
 }
 
@@ -238,7 +243,11 @@ func planMoney(ctx context.Context, db *sql.DB) ([]moneyPlan, error) {
 		if err != nil {
 			return nil, err
 		}
-		p := moneyPlan{table: spec.table, read: intersect(spec.read, have), fill: spec.table == "budgets" && slices.Contains(have, "currency_id")}
+		p := moneyPlan{
+			table: spec.table,
+			read:  intersect(spec.read, have),
+			fill:  spec.table == "budgets" && slices.Contains(have, "currency_id"),
+		}
 		for _, c := range spec.write {
 			if slices.Contains(have, c.name) {
 				p.write = append(p.write, c)

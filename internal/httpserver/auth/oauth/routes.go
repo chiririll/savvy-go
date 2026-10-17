@@ -19,7 +19,12 @@ func init() {
 		h := Handler{
 			Cfg: routing.Get[appconfig.Config](d), OAuth: routing.Get[*oauth.Service](d), Spaces: routing.Get[spaces.Service](d),
 			Confirm: confirm.Confirmer{TwoFactor: routing.Get[auth.TwoFactor](d), Guard: d.Guard},
-			MCP:     mcpserver.Handler{Cfg: routing.Get[appconfig.Config](d), APITokens: routing.Get[auth.APITokens](d), Inner: d.Inner, Version: routing.Get[appconfig.Build](d).Version}.Endpoint(),
+			MCP: mcpserver.Handler{
+				Cfg:       routing.Get[appconfig.Config](d),
+				APITokens: routing.Get[auth.APITokens](d),
+				Inner:     d.Inner,
+				Version:   routing.Get[appconfig.Build](d).Version,
+			}.Endpoint(),
 		}
 		return []routing.Mount{
 			routing.Credential(h.CredentialRoutes),

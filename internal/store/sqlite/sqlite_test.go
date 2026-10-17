@@ -119,7 +119,10 @@ func TestP15FailedMigrationMarksOnlyThatSpaceUnavailable(t *testing.T) {
 	if countNotes(t, s, 1) != 0 {
 		t.Fatal("space 1 must keep working")
 	}
-	if err := s.InSpaces(ctx, []int64{1, 2}, func(map[int64]store.DB) error { return nil }); !errors.Is(err, store.ErrUnavailable) {
+	if err := s.InSpaces(ctx, []int64{1, 2}, func(map[int64]store.DB) error { return nil }); !errors.Is(
+		err,
+		store.ErrUnavailable,
+	) {
 		t.Fatalf("InSpaces with an unavailable space: %v", err)
 	}
 }

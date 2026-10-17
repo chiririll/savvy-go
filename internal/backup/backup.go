@@ -76,7 +76,8 @@ func (s Service) spaceDir(id int64) string {
 func (s Service) tmpDir() string { return filepath.Join(s.Dir, ".tmp") }
 func stamp(t time.Time) string   { return t.UTC().Format("20060102-150405") }
 func validName(name string) bool {
-	return name != "" && filepath.Base(name) == name && !strings.HasPrefix(name, ".") && strings.HasSuffix(name, archiveExt)
+	return name != "" && filepath.Base(name) == name && !strings.HasPrefix(name, ".") &&
+		strings.HasSuffix(name, archiveExt)
 }
 
 // --- listing ---------------------------------------------------------------
@@ -216,8 +217,11 @@ func (s Service) CreateSpace(ctx context.Context, sp spaces.Space, note *string)
 	if err := s.Store.ExportSpace(ctx, sp.ID, db); err != nil {
 		return nil, err
 	}
-	b, err := s.write(s.spaceDir(sp.ID), Manifest{Kind: kindSpace, Note: deref(note), SpaceUUID: sp.UUID, SpaceName: sp.Name},
-		map[string]string{"space.sqlite": db})
+	b, err := s.write(
+		s.spaceDir(sp.ID),
+		Manifest{Kind: kindSpace, Note: deref(note), SpaceUUID: sp.UUID, SpaceName: sp.Name},
+		map[string]string{"space.sqlite": db},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -367,7 +371,11 @@ func (s Service) DeletedPath(name string) (string, error) {
 
 // prepareSpaceFrom unpacks a space backup archive and has the store validate
 // it. maxBytes bounds the unpacked size.
-func (s Service) prepareSpaceFrom(ctx context.Context, path string, maxBytes int64) (*store.PreparedSpace, *Manifest, error) {
+func (s Service) prepareSpaceFrom(
+	ctx context.Context,
+	path string,
+	maxBytes int64,
+) (*store.PreparedSpace, *Manifest, error) {
 	arc, err := openArchive(path, s.tmpDir(), maxBytes, s.Keys)
 	if err != nil {
 		return nil, nil, err
@@ -420,7 +428,13 @@ func (s Service) Replace(ctx context.Context, sp spaces.Space, p *store.Prepared
 // owner. The space keeps the backup's uuid unless that uuid is taken on this
 // server (a copy next to its original), so spaces moved together between
 // servers still recognise each other.
-func (s Service) ImportSpace(ctx context.Context, spaces spaces.Service, path, name string, owner *auth.User, quota int64) (*spaces.Space, error) {
+func (s Service) ImportSpace(
+	ctx context.Context,
+	spaces spaces.Service,
+	path, name string,
+	owner *auth.User,
+	quota int64,
+) (*spaces.Space, error) {
 	p, m, err := s.prepareSpaceFrom(ctx, path, quota)
 	if err != nil {
 		return nil, err
