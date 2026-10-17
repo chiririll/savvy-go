@@ -1,8 +1,13 @@
 package auth
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
+
+	"savvy-go/internal/config"
 )
 
 func TestDecodeSecurity(t *testing.T) {
@@ -32,5 +37,38 @@ func TestDecodeSecurity(t *testing.T) {
 		if _, err := decodeSecurity(c); err == nil {
 			t.Errorf("%s was accepted", name)
 		}
+	}
+}
+
+// TestSecuritySectionFromFile covers what decodeSecurity cannot: the TOML keys
+// and the error naming the offending one.
+func TestSecuritySectionFromFile(t *testing.T) {
+	load := func(body string) (*config.Config, error) {
+		path := filepath.Join(t.TempDir(), "config.toml")
+		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return config.Open(path)
+	}
+
+	f, err := load("[security]\nsession_ttl = 30\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sec := config.Of(f, SecuritySection)
+	if err := f.Finish(); err != nil {
+		t.Fatal(err)
+	}
+	if got := sec.Get(); got.SessionTTL != 30*time.Minute || got.RememberTTL != 7*24*time.Hour {
+		t.Errorf("file value and default: %+v", got)
+	}
+
+	f, err = load("[security]\nremember_ttl = 0\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	config.Of(f, SecuritySection)
+	if err := f.Finish(); err == nil || !strings.Contains(err.Error(), "remember_ttl") {
+		t.Errorf("zero lifetime: %v", err)
 	}
 }
