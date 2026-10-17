@@ -3,15 +3,9 @@ package seed
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"time"
 
-	"github.com/shopspring/decimal"
-
 	"savvy-go/internal/auth"
-	automationrepo "savvy-go/internal/db/repo/automation"
-	ledgerrepo "savvy-go/internal/db/repo/ledger"
-	"savvy-go/internal/ledger"
 	"savvy-go/internal/settings"
 	"savvy-go/internal/signing"
 	"savvy-go/internal/spaces"
@@ -20,14 +14,6 @@ import (
 )
 
 const demoSeededKey = "demo_seeded"
-
-// Demo user keys, used to wire up spaces and memberships.
-const (
-	userAlex   = "alex"
-	userJordan = "jordan"
-	userSam    = "sam"
-	userDemo   = "demo"
-)
 
 // Options configures Demo.
 type Options struct {
@@ -42,7 +28,7 @@ type Options struct {
 // never been demo-seeded (no users yet). Later starts are no-ops so first-boot
 // matches Laravel's SEED_DEMO behavior.
 //
-// The spaces cover every feature of the spaces model:
+// The spaces (demoSpaces) cover every feature of the spaces model:
 //   - "Demo": the full workspace in USD with a EUR account; Alex administers it,
 //     Jordan edits it and the demo user only views it.
 //   - "Family Budget": Alex and Jordan administer it, the guest Sam views it.
@@ -72,8 +58,10 @@ func Demo(ctx context.Context, st store.Store, keys signing.KeyRing, opts Option
 	if err != nil {
 		return nil, err
 	}
-	spaceSvc := spaces.Service{Store: st}
-	d := &demo{ctx: ctx, st: st, spaces: spaceSvc, people: people, now: now, manifest: &Manifest{Now: now}}
+	d := &demo{
+		ctx: ctx, st: st, spaces: spaces.Service{Store: st}, people: people, now: now,
+		manifest: &Manifest{Now: now},
+	}
 	for _, u := range demoUsers {
 		d.manifest.Users = append(
 			d.manifest.Users,
@@ -81,23 +69,16 @@ func Demo(ctx context.Context, st store.Store, keys signing.KeyRing, opts Option
 		)
 	}
 
-	if err := d.createSpaces(); err != nil {
-		return nil, err
+	steps := []func() error{
+		d.createSpaces,
+		func() error { return d.linkTransfer(transfers.Service{Spaces: d.spaces, Keys: keys}) },
+		d.invite,
+		d.recordAutomations,
 	}
-	demoAccts, familyAccts, studioAccts, err := d.fillSpaces()
-	if err != nil {
-		return nil, err
-	}
-
-	transfers := transfers.Service{Spaces: spaceSvc, Keys: keys}
-	if err := d.linkTransfer(transfers, demoAccts, familyAccts, studioAccts); err != nil {
-		return nil, err
-	}
-	if err := d.invite(); err != nil {
-		return nil, err
-	}
-	if err := d.recordAutomations(); err != nil {
-		return nil, err
+	for _, step := range steps {
+		if err := step(); err != nil {
+			return nil, err
+		}
 	}
 	if err := server.Set(ctx, demoSeededKey, true); err != nil {
 		return nil, fmt.Errorf("mark demo seeded: %w", err)
@@ -119,220 +100,4 @@ func alreadySeeded(ctx context.Context, server settings.Store, users auth.Users)
 		return false, fmt.Errorf("count users: %w", err)
 	}
 	return n > 0, nil
-}
-
-func (d *demo) createSpaces() (err error) {
-	d.demo, err = d.createSpace(
-		"Demo",
-		userAlex,
-		map[string]string{userJordan: spaces.RoleEditor, userDemo: spaces.RoleViewer},
-	)
-	if err != nil {
-		return err
-	}
-	d.family, err = d.createSpace(
-		"Family Budget",
-		userAlex,
-		map[string]string{userJordan: spaces.RoleAdmin, userSam: spaces.RoleViewer},
-	)
-	if err != nil {
-		return err
-	}
-	d.studio, err = d.createSpace("Studio GmbH", userAlex, map[string]string{userJordan: spaces.RoleViewer})
-	return err
-}
-
-// fillSpaces seeds the three spaces and returns their accounts by key.
-func (d *demo) fillSpaces() (demoAccts, familyAccts, studioAccts map[string]*ledger.Account, err error) {
-	demoAccts, err = d.fill(
-		d.demo,
-		currencySet(usdCurrency, withRate(eurCurrency, "1.08")),
-		func(db store.DB) (map[string]*ledger.Account, error) {
-			return seedWorkspace(d.ctx, db, d.now)
-		},
-	)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	familyAccts, err = d.fill(d.family, currencySet(usdCurrency), func(db store.DB) (map[string]*ledger.Account, error) {
-		return seedMini(d.ctx, db, d.now, familySpace)
-	})
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	studioAccts, err = d.fill(
-		d.studio,
-		currencySet(eurCurrency, withRate(usdCurrency, "0.9259")),
-		func(db store.DB) (map[string]*ledger.Account, error) {
-			return seedMini(d.ctx, db, d.now, studioSpace)
-		},
-	)
-	return demoAccts, familyAccts, studioAccts, err
-}
-
-func (d *demo) logSeeded() error {
-	for _, sp := range []*spaces.Space{d.demo, d.family, d.studio} {
-		db, err := d.st.Space(d.ctx, sp.ID)
-		if err != nil {
-			return err
-		}
-		repo := ledgerrepo.Repo{DB: db}
-		txs, accts := repo.CountTransactions(d.ctx), repo.CountAccounts(d.ctx)
-		slog.Info("demo space seeded", "space", sp.Name, "transactions", txs, "accounts", accts)
-	}
-	return nil
-}
-
-// demoUsers are the seeded accounts; role is the server role.
-var demoUsers = []struct {
-	key, name, email, pass, role string
-}{
-	{userAlex, "Alex Morgan", "admin@savvy.app", "password", auth.RoleAdmin},
-	{userJordan, "Jordan Lee", "editor@savvy.app", "password", auth.RoleUser},
-	{userSam, "Sam Rivera", "guest@savvy.app", "password", auth.RoleGuest},
-	{userDemo, "Demo User", "demo@demo.com", "demo", auth.RoleUser},
-}
-
-func createDemoUsers(ctx context.Context, users auth.Users) (map[string]*auth.User, error) {
-	out := map[string]*auth.User{}
-	for _, u := range demoUsers {
-		pass := u.pass
-		created, err := users.Create(ctx, u.name, u.email, &pass, u.role)
-		if err != nil {
-			return nil, fmt.Errorf("user %s: %w", u.email, err)
-		}
-		out[u.key] = created
-	}
-	return out, nil
-}
-
-// demo carries what the steps of Demo share.
-type demo struct {
-	ctx    context.Context
-	st     store.Store
-	spaces spaces.Service
-	people map[string]*auth.User
-	now    time.Time
-
-	manifest             *Manifest
-	demo, family, studio *spaces.Space
-}
-
-// createSpace creates a space owned by owner and adds the other members.
-func (d *demo) createSpace(name, owner string, members map[string]string) (*spaces.Space, error) {
-	sp, err := d.spaces.Create(d.ctx, name, d.people[owner])
-	if err != nil {
-		return nil, fmt.Errorf("space %s: %w", name, err)
-	}
-	for key, role := range members {
-		if err := d.spaces.SetMember(d.ctx, sp.ID, d.people[key], role); err != nil {
-			return nil, fmt.Errorf("space %s member %s: %w", name, key, err)
-		}
-	}
-	roles := map[string]string{owner: spaces.RoleAdmin}
-	for key, role := range members {
-		roles[key] = role
-	}
-	d.manifest.Spaces = append(d.manifest.Spaces, ManifestSpace{ID: sp.ID, Name: name, Members: roles})
-	return sp, nil
-}
-
-// fill seeds a space's reference data and then its workspace.
-func (d *demo) fill(
-	sp *spaces.Space,
-	currencies []ledger.Currency,
-	workspace func(store.DB) (map[string]*ledger.Account, error),
-) (map[string]*ledger.Account, error) {
-	db, err := d.st.Space(d.ctx, sp.ID)
-	if err != nil {
-		return nil, err
-	}
-	if err := seedReference(d.ctx, db, currencies); err != nil {
-		return nil, fmt.Errorf("space %s: %w", sp.Name, err)
-	}
-	accts, err := workspace(db)
-	if err != nil {
-		return nil, fmt.Errorf("space %s: %w", sp.Name, err)
-	}
-	return accts, nil
-}
-
-// linkTransfer links Demo with the other two spaces and moves money across
-// each link, including a transfer between currencies.
-func (d *demo) linkTransfer(
-	tr transfers.Service,
-	demoAccts, familyAccts, studioAccts map[string]*ledger.Account,
-) error {
-	alex := d.people[userAlex]
-	for _, other := range []*spaces.Space{d.family, d.studio} {
-		if err := tr.Link(d.ctx, alex, d.demo.ID, other.ID); err != nil {
-			return fmt.Errorf("link %s: %w", other.Name, err)
-		}
-	}
-	for _, t := range []struct {
-		daysAgo              int
-		from, to             *spaces.Space
-		fromAcct, toAcct     *ledger.Account
-		fromAmount, toAmount string
-		description          string
-	}{
-		{40, d.demo, d.family, demoAccts["checking"], familyAccts["joint"], "900", "900",
-			"Monthly contribution to the family account"},
-		{12, d.demo, d.family, demoAccts["checking"], familyAccts["joint"], "900", "900",
-			"Monthly contribution to the family account"},
-		{25, d.family, d.demo, familyAccts["joint"], demoAccts["cash"], "150", "150", "Pocket money back"},
-		// Across currencies: each side keeps its own currency and amount.
-		{30, d.demo, d.studio, demoAccts["eur"], studioAccts["bank"], "1200", "1200", "Capital for the studio"},
-		{9, d.studio, d.demo, studioAccts["bank"], demoAccts["checking"], "2000", "2160", "Owner's draw"},
-	} {
-		date := d.now.AddDate(0, 0, -t.daysAgo).Format("2006-01-02")
-		desc := t.description
-		if _, err := tr.Create(d.ctx, alex, transfers.Input{
-			FromSpace: t.from.ID, FromAccount: t.fromAcct.ID, FromAmount: decimal.RequireFromString(t.fromAmount),
-			ToSpace: t.to.ID, ToAccount: t.toAcct.ID, ToAmount: decimal.RequireFromString(t.toAmount),
-			Date: date, Description: &desc,
-		}); err != nil {
-			return fmt.Errorf("transfer %q: %w", t.description, err)
-		}
-	}
-	return nil
-}
-
-// invite leaves two open invitations in Studio GmbH: one bound to an email and
-// one anyone with the link can use.
-func (d *demo) invite() error {
-	alex := d.people[userAlex]
-	for _, inv := range []struct{ email, role string }{
-		{"newhire@example.com", spaces.RoleEditor},
-		{"", spaces.RoleViewer},
-	} {
-		token, _, err := d.spaces.Invite(d.ctx, d.studio.ID, alex, inv.email, "", inv.role)
-		if err != nil {
-			return fmt.Errorf("invitation: %w", err)
-		}
-		d.manifest.Invitations = append(d.manifest.Invitations, ManifestInvitation{
-			SpaceID: d.studio.ID, Email: inv.email, Role: inv.role, Token: token,
-		})
-	}
-	return nil
-}
-
-// recordAutomations notes the automation rules of each space in the manifest,
-// for the pages that address a rule by id.
-func (d *demo) recordAutomations() error {
-	for i := range d.manifest.Spaces {
-		sp := &d.manifest.Spaces[i]
-		db, err := d.st.Space(d.ctx, sp.ID)
-		if err != nil {
-			return err
-		}
-		rules, err := automationrepo.Repo{DB: db}.List(d.ctx, automationrepo.Filter{})
-		if err != nil {
-			return fmt.Errorf("space %s automation rules: %w", sp.Name, err)
-		}
-		for _, r := range rules {
-			sp.Automations = append(sp.Automations, r.ID)
-		}
-	}
-	return nil
 }

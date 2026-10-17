@@ -38,15 +38,15 @@ const (
 )
 
 var rules = []rule{
-	{ruleFuncLines, 60, 500, "lines in a function"},
+	{ruleFuncLines, 60, 200, "lines in a function"},
 	{ruleNesting, 4, 8, "nested blocks in a function"},
 	{ruleComplexity, 15, 40, "branches in a function (cyclomatic complexity)"},
 	{ruleParams, 5, 10, "parameters of a function"},
-	{ruleFileLines, 600, 2000, "lines in a file"},
-	{ruleLineWidth, 120, 300, "characters in a line"},
+	{ruleFileLines, 600, 1500, "lines in a file"},
+	{ruleLineWidth, 120, 160, "characters in a line"},
 	// Many imports mean a file that knows too much about the rest of the code.
-	{ruleImports, 15, 40, "imports in a file"},
-	{ruleNameWords, 6, 10, "words in a name"},
+	{ruleImports, 15, 25, "imports in a file"},
+	{ruleNameWords, 6, 8, "words in a name"},
 	// A name that joins two ideas with And/Or usually does two jobs. Soft
 	// only: a hard limit would punish legitimate names like ValidateOrFail.
 	{ruleNameJoins, 0, 1 << 30, "And/Or in a name"},
