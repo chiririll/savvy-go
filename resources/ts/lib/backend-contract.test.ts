@@ -223,12 +223,12 @@ describe('API routes', () => {
 })
 
 describe('API token permissions', () => {
-    const source = read('internal/auth/permissions.go')
+    const source = read('internal/auth/permissions/permissions.go')
 
     // The parts of a space and the presets come from the server (api-token-capabilities);
     // only the order of the levels, which the grid ticks by, lives here.
     it('orders the levels the backend grants', () => {
-        const levels = [...source.matchAll(/Perm(?:Read|Write|Delete)\s*= "([a-z]+)"/g)].map((m) => m[1])
+        const levels = [...source.matchAll(/^\s*(?:Read|Write|Delete)\s*= "([a-z]+)"/gm)].map((m) => m[1])
         expect(sorted(API_PERMISSION_LEVELS)).toEqual(sorted(levels))
     })
 

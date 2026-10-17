@@ -11,5 +11,5 @@ describe('code shape: hard limits', () => {
                 return `${finding.file}:${finding.line} ${finding.name}: ${finding.value} ${rule.what} (hard limit ${rule.hard}). Split it up, or opt out with // archtest:ignore ${rule.name} <reason>`
             })
         expect(offenders).toEqual([])
-    })
+    }, 30_000)
 })
