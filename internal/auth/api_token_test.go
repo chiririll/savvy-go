@@ -65,6 +65,38 @@ func TestExpiredAPITokenDoesNotResolve(t *testing.T) {
 	}
 }
 
+func TestRevokeAllAPITokensOfOneUser(t *testing.T) {
+	d := newDB(t)
+	ctx := context.Background()
+	u := newUser(t, d, "a@test.com", RoleUser)
+	other := newUser(t, d, "b@test.com", RoleUser)
+	tokens := APITokens{DB: d}
+	sp := newSpaces(t, d, 1)
+	grant := Grant{Permissions: []string{"reports:read"}, SpaceIDs: sp}
+
+	first, _, _ := tokens.Issue(ctx, u, "one", grant, nil)
+	second, _, _ := tokens.Issue(ctx, u, "two", Grant{Permissions: []string{"reports:read"}, AllSpaces: true}, nil)
+	kept, _, _ := tokens.Issue(ctx, other, "kept", grant, nil)
+
+	if err := tokens.RevokeAll(ctx, u.ID); err != nil {
+		t.Fatal(err)
+	}
+	for _, raw := range []string{first, second} {
+		if r, _ := tokens.Resolve(ctx, raw); r != nil {
+			t.Error("a revoked token still resolves")
+		}
+	}
+	if list, _ := tokens.List(ctx, u.ID); len(list) != 0 {
+		t.Errorf("tokens left: %+v", list)
+	}
+	if r, _ := tokens.Resolve(ctx, kept); r == nil {
+		t.Error("RevokeAll reached another user")
+	}
+	if err := tokens.RevokeAll(ctx, u.ID); err != nil {
+		t.Errorf("revoking nothing is not an error: %v", err)
+	}
+}
+
 func TestAPITokenGrantsAreChecked(t *testing.T) {
 	d := newDB(t)
 	ctx := context.Background()

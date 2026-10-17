@@ -53,7 +53,7 @@ Keys, with their defaults, are listed in the generated file itself:
 |--------------|---------------------------------------------------------------------------------------------------|
 | `[server]`   | `listen` (`:80` in the image, `localhost:8080` otherwise), `app_url`, `timezone`                  |
 | `[paths]`    | `data`, `uploads`, `backups`                                                                      |
-| `[security]` | `session_ttl`, `remember_ttl`, `challenge_ttl`, `ip_rate_limit`, `account_rate_limit`, `session_cookie`, `csrf_cookie`, `csrf_header` |
+| `[security]` | `session_ttl`, `remember_ttl`, `challenge_ttl`, `reset_ttl`, `ip_rate_limit`, `account_rate_limit`, `session_cookie`, `csrf_cookie`, `csrf_header` |
 | `[mailer]`   | `enabled`, `host`, `port`, `protocol`, `user`, `password`, `from`, `skip_verify`, `timeout`       |
 
 A value the application cannot run with, such as a lifetime that is not a positive number or an empty cookie name under `[security]`, stops it at start with the section and key in the error. `[mailer]` is the exception: see [Email](#email).
@@ -90,8 +90,8 @@ from = "Go Savvy <savvy@example.com>"
 
 That page has a **Send test email** button, to try the saved settings. When mail works and `app_url` is set:
 
-- **Administration → Users → Email a reset link** sends a user a one-time password link (valid 7 days). It is not offered for yourself, for SSO-only users, or when password sign-in is off. **Reset password** still shows a link to copy.
-- **Administration → Users → New user** (without a password) can email the set-password link to the new user instead of showing it. With email verification switched on, emailing is the only option, since a link you hand over proves nothing about the mailbox.
+- **Administration → Users → Email a reset link** sends a user a one-time password link (valid 1 hour, see [Password links](#password-links)). It is not offered for yourself, for SSO-only users, or when password sign-in is off. **Reset password** still shows a link to copy.
+- **Administration → Users → New user** (without a password) can email the set-password link (valid 7 days) to the new user instead of showing it. With email verification switched on, emailing is the only option, since a link you hand over proves nothing about the mailbox.
 - Inviting someone by email from **Settings → Space** emails them the invitation link. The link is not shown to the inviter, so it can only be used by that mailbox. Which invitations a server allows is described under [Invitations](spaces.md#invitations).
 
 ### Email confirmation
@@ -116,6 +116,22 @@ A wrong two-factor code cannot be guessed at forever. After the password step, a
 Starting again does not give a fresh start. After **10 wrong codes in a row**, across sign-ins, the account gets no new two-factor sign-in for **1 minute**; every further wrong code doubles the wait, up to **1 hour**. During the wait, sign-in with the right password answers "Too many wrong verification codes" (`429`). A right code clears the count. The lockout is per account and cannot be changed in the settings.
 
 Each code works once. An authenticator code is accepted a single time, so one that was seen over a shoulder or in a log cannot sign in again, and the next code has to come from a later 30 second step. After a sign-in, wait for the app to show a new code before the next step that asks for one, such as turning two-factor off. A recovery code is likewise used up by its first success.
+
+### Password links
+
+A link that sets a password works once, and a newer link for the same user replaces the older one. How long it works depends on what it is for:
+
+- **Invitation**: the link of an account that has no password yet (**New user** without a password). It works for **7 days**, since its owner may not see it at once.
+- **Reset**: the link of an account that already has a password (**Reset password**, **Email a reset link**). It works for **1 hour**. Change that with `reset_ttl`, in minutes:
+
+```toml
+[security]
+reset_ttl = 60
+```
+
+Using a reset link signs the user out everywhere and **deletes all their API tokens**, including the ones of connected MCP apps, so nobody who had access before the reset keeps it. They have to create their tokens again. Changing your own password in **Settings** signs out your other sessions but keeps your API tokens.
+
+The token is part of the link's address. Pages send `Referrer-Policy: no-referrer`, so a browser does not pass the address on to other sites. A reverse proxy still logs the full address by default: leave `/set-password/` and `/api/auth/password/` out of its access log, or redact them, and keep the log private. A used or expired link is worthless, so this matters most for the hour after a reset link is sent.
 
 ### Sign-in rate limits
 

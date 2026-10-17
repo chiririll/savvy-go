@@ -17,6 +17,7 @@ func init() {
 			Security:   routing.Get[auth.Security](d),
 			Users:      routing.Get[auth.Users](d),
 			Sessions:   routing.Get[auth.Sessions](d),
+			APITokens:  routing.Get[auth.APITokens](d),
 			Tokens:     routing.Get[auth.PasswordTokens](d),
 			Challenges: routing.Get[auth.Challenges](d),
 			Settings:   routing.Get[settings.Store](d),
@@ -36,6 +37,7 @@ type Handler struct {
 	Security   auth.Security
 	Users      auth.Users
 	Sessions   auth.Sessions
+	APITokens  auth.APITokens
 	Tokens     auth.PasswordTokens
 	Challenges auth.Challenges
 	Settings   settings.Store

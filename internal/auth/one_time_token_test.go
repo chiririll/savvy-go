@@ -14,7 +14,7 @@ func TestPasswordTokensWorkOnceAndReplaceEachOther(t *testing.T) {
 	pt := PasswordTokens{DB: d}
 
 	first, expires, err := pt.Issue(ctx, u)
-	if err != nil || len(first) != 64 || !expires.After(time.Now().Add(6*24*time.Hour)) {
+	if err != nil || len(first) != 64 || !expires.After(time.Now().Add(50*time.Minute)) {
 		t.Fatalf("issue: %q %v %v", first, expires, err)
 	}
 	second, _, _ := pt.Issue(ctx, u)
@@ -45,6 +45,44 @@ func TestPasswordTokensWorkOnceAndReplaceEachOther(t *testing.T) {
 	}
 	if got, _ := pt.Preview(ctx, third); got != nil {
 		t.Error("a revoked link works")
+	}
+}
+
+func TestPasswordLinkLifetimeDependsOnItsPurpose(t *testing.T) {
+	d := newDB(t)
+	ctx := context.Background()
+	invited, err := Users{DB: d}.Create(ctx, "Invited", "invited@test.com", nil, RoleUser)
+	if err != nil {
+		t.Fatal(err)
+	}
+	active := newUser(t, d, "active@test.com", RoleUser)
+
+	near := func(got time.Time, want time.Duration) bool {
+		return got.After(time.Now().Add(want-time.Minute)) && got.Before(time.Now().Add(want+time.Minute))
+	}
+	pt := PasswordTokens{DB: d}
+	if _, expires, _ := pt.Issue(ctx, invited); !near(expires, 7*24*time.Hour) {
+		t.Errorf("an invitation to an inactive account lasts a week, expires %v", expires)
+	}
+	if _, expires, _ := pt.Issue(ctx, active); !near(expires, time.Hour) {
+		t.Errorf("a reset defaults to an hour, expires %v", expires)
+	}
+	pt.ResetTTL = 15 * time.Minute
+	if _, expires, _ := pt.Issue(ctx, active); !near(expires, 15*time.Minute) {
+		t.Errorf("a reset follows ResetTTL, expires %v", expires)
+	}
+	if _, expires, _ := pt.Issue(ctx, invited); !near(expires, 7*24*time.Hour) {
+		t.Errorf("ResetTTL must not shorten an invitation, expires %v", expires)
+	}
+
+	// A reset that has run out stops working.
+	pt.ResetTTL = -time.Second
+	token, _, _ := pt.Issue(ctx, active)
+	if got, _ := pt.Preview(ctx, token); got != nil {
+		t.Error("an expired reset link previewed")
+	}
+	if got, _ := pt.Consume(ctx, token); got != nil {
+		t.Error("an expired reset link was consumed")
 	}
 }
 

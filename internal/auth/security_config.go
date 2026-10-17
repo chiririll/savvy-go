@@ -13,7 +13,10 @@ type Security struct {
 	// SessionTTL and RememberTTL are how long a session lasts without and with "remember me".
 	SessionTTL, RememberTTL time.Duration
 	// ChallengeTTL is how long a second-factor or passkey challenge can be answered.
-	ChallengeTTL  time.Duration
+	ChallengeTTL time.Duration
+	// ResetTTL is how long a link to reset the password of an active account works. The link
+	// that sets the first password of an invited account is not bound by it.
+	ResetTTL      time.Duration
 	SessionCookie string
 	CSRFCookie    string
 	CSRFHeader    string
@@ -27,7 +30,8 @@ type SecurityConfig struct {
 	SessionTTL   int    `toml:"session_ttl" comment:"Lifetimes in minutes."`
 	RememberTTL  int    `toml:"remember_ttl"`
 	ChallengeTTL int    `toml:"challenge_ttl"`
-	Cookie       string `toml:"session_cookie" comment:"Cookie and header names."`
+	ResetTTL     int    `toml:"reset_ttl"`
+	Cookie      string `toml:"session_cookie" comment:"Cookie and header names."`
 	CSRFCookie   string `toml:"csrf_cookie"`
 	CSRFHeader   string `toml:"csrf_header"`
 
@@ -41,7 +45,8 @@ func (SecurityConfig) Defaults() SecurityConfig {
 		SessionTTL:   60 * 24,
 		RememberTTL:  60 * 24 * 7,
 		ChallengeTTL: 5,
-		Cookie:       "svy_session",
+		ResetTTL:     60,
+		Cookie:      "svy_session",
 		CSRFCookie:   "svy_csrf",
 		CSRFHeader:   "X-CSRF-Token",
 
@@ -62,6 +67,8 @@ func decodeSecurity(c SecurityConfig) (Security, error) {
 		return Security{}, errors.New("remember_ttl must be a positive number of minutes")
 	case c.ChallengeTTL <= 0:
 		return Security{}, errors.New("challenge_ttl must be a positive number of minutes")
+	case c.ResetTTL <= 0:
+		return Security{}, errors.New("reset_ttl must be a positive number of minutes")
 	case strings.TrimSpace(c.Cookie) == "":
 		return Security{}, errors.New("session_cookie is empty")
 	case strings.TrimSpace(c.CSRFCookie) == "":
@@ -77,6 +84,7 @@ func decodeSecurity(c SecurityConfig) (Security, error) {
 		SessionTTL:    time.Duration(c.SessionTTL) * time.Minute,
 		RememberTTL:   time.Duration(c.RememberTTL) * time.Minute,
 		ChallengeTTL:  time.Duration(c.ChallengeTTL) * time.Minute,
+		ResetTTL:      time.Duration(c.ResetTTL) * time.Minute,
 		SessionCookie: strings.TrimSpace(c.Cookie),
 		CSRFCookie:    strings.TrimSpace(c.CSRFCookie),
 		CSRFHeader:    strings.TrimSpace(c.CSRFHeader),

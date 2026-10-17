@@ -427,6 +427,11 @@ func (r Repo) UpdateAPITokenGrant(ctx context.Context, userID, id int64, perms [
 	return true, nil
 }
 
+// DeleteAPITokens deletes every token of the user, with their space links and OAuth refresh tokens.
+func (r Repo) DeleteAPITokens(ctx context.Context, userID int64) error {
+	return r.q().DeleteUserAPITokens(ctx, userID)
+}
+
 // DeleteAPIToken reports whether the user had such a token.
 func (r Repo) DeleteAPIToken(ctx context.Context, userID, id int64) (bool, error) {
 	res, err := r.q().DeleteAPIToken(ctx, sqlc.DeleteAPITokenParams{ID: id, UserID: userID})

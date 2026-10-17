@@ -22,6 +22,9 @@ func TestDecodeSecurity(t *testing.T) {
 	if sec.IPRateLimit != 10 || sec.AccountRateLimit != 5 {
 		t.Errorf("default rate limits: %+v", sec)
 	}
+	if sec.ResetTTL != time.Hour {
+		t.Errorf("default reset link lifetime: %+v", sec)
+	}
 	off := good
 	off.IPRateLimit, off.AccountRateLimit = 0, 0
 	if _, err := decodeSecurity(off); err != nil {
@@ -36,6 +39,7 @@ func TestDecodeSecurity(t *testing.T) {
 		"zero session":      func(c *SecurityConfig) { c.SessionTTL = 0 },
 		"negative remember": func(c *SecurityConfig) { c.RememberTTL = -1 },
 		"zero challenge":    func(c *SecurityConfig) { c.ChallengeTTL = 0 },
+		"zero reset":        func(c *SecurityConfig) { c.ResetTTL = 0 },
 		"blank cookie":      func(c *SecurityConfig) { c.Cookie = " " },
 		"blank csrf cookie": func(c *SecurityConfig) { c.CSRFCookie = "" },
 		"blank csrf header": func(c *SecurityConfig) { c.CSRFHeader = "" },

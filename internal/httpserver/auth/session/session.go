@@ -286,7 +286,16 @@ func (h Handler) passwordAccept(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	u, _ := h.Users.ByID(r.Context(), row.User.ID)
-	_ = h.Sessions.RevokeAll(r.Context(), u.ID)
+	// A reset is for taking an account back, so nothing from before it may stay: neither
+	// sessions nor API tokens. Failing here must not hand out a fresh session.
+	if err := h.Sessions.RevokeAll(r.Context(), u.ID); err != nil {
+		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if err := h.APITokens.RevokeAll(r.Context(), u.ID); err != nil {
+		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	if u.HasTwoFactor() {
 		tok, err := h.Challenges.Issue(r.Context(), u)
 		if err != nil {

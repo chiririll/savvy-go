@@ -35,17 +35,17 @@ export default function UsersPage() {
     // With verification on, a link the admin hands over proves nothing about the mailbox: only email will do.
     const mustEmail = !!settings?.require_email_verification
 
-    const [linkUrl, setLinkUrl] = useState<string | null>(null)
+    const [link, setLink] = useState<{ url: string; expiresAt?: string } | null>(null)
     const form = useResourceFormDialog<User, CreateUserFormData | UpdateUserFormData>({
         items: users ?? [],
         isLoading,
         syncSearchParams: false,
     })
 
-    const showLink = (token?: string) => {
+    const showLink = (token?: string, expiresAt?: string) => {
         if (!token) return
         form.setOpen(false)
-        setLinkUrl(setPasswordUrl(token))
+        setLink({ url: setPasswordUrl(token), expiresAt })
     }
 
     const handleSubmit = (data: CreateUserFormData | UpdateUserFormData) => {
@@ -71,7 +71,7 @@ export default function UsersPage() {
             {
                 onSuccess: (user) => {
                     if (user.token) {
-                        showLink(user.token)
+                        showLink(user.token, user.expiresAt)
                     } else if (user.emailError) {
                         form.setOpen(false)
                         toast.error(t('users.linkEmailFailed', { email: user.email }))
@@ -86,7 +86,7 @@ export default function UsersPage() {
 
     const handleReset = (user: User) => {
         issueToken.mutate({ id: user.id }, {
-            onSuccess: (result) => showLink(result.token),
+            onSuccess: (result) => showLink(result.token, result.expiresAt),
         })
     }
 
@@ -124,10 +124,11 @@ export default function UsersPage() {
             />
 
             <UserPasswordLinkDialog
-                url={linkUrl}
-                open={linkUrl !== null}
+                url={link?.url ?? null}
+                expiresAt={link?.expiresAt}
+                open={link !== null}
                 onOpenChange={(open) => {
-                    if (!open) setLinkUrl(null)
+                    if (!open) setLink(null)
                 }}
             />
         </>

@@ -64,6 +64,7 @@ func (s *Server) routes() *chi.Mux {
 	r.Use(locale)
 	r.Use(noStoreAPI)
 	r.Use(noFraming)
+	r.Use(noReferrer)
 
 	routing.Build(r, s.deps())
 

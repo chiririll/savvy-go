@@ -143,6 +143,25 @@ func TestTombstoneKeepsTheRowAndDropsAccess(t *testing.T) {
 	}
 }
 
+func TestDeleteAPITokensKeepsTheUser(t *testing.T) {
+	r, id := newRepo(t)
+	ctx := context.Background()
+	for _, hash := range []string{"h1", "h2"} {
+		if _, err := r.InsertAPIToken(ctx, authrepo.NewAPIToken{UserID: id, Name: hash, Hash: hash, Prefix: "svy_", AllSpaces: true, Now: time.Now()}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := r.DeleteAPITokens(ctx, id); err != nil {
+		t.Fatal(err)
+	}
+	if tokens, _ := r.APITokens(ctx, id); len(tokens) != 0 {
+		t.Fatalf("%d tokens survived", len(tokens))
+	}
+	if u, _ := r.UserByID(ctx, id); u == nil || u.Deleted {
+		t.Fatalf("user = %+v", u)
+	}
+}
+
 func TestSessionLifecycle(t *testing.T) {
 	r, id := newRepo(t)
 	ctx := context.Background()

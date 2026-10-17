@@ -106,6 +106,54 @@ func TestSetPasswordLinkActivatesAnInvitedUser(t *testing.T) {
 	status(t, a.do("POST", "/api/auth/login", map[string]string{"email": "invited@test.com", "password": "newpass12"}, "", ""), 200, "sign in with the new password")
 }
 
+func TestResettingAPasswordEndsEveryWayIn(t *testing.T) {
+	a := newTestApp(t)
+	target := a.createUser("target@test.com", "oldpass12", roleEditor)
+	bystander := a.createUser("by@test.com", "secret1", roleEditor)
+	app, _ := a.issueToken(target, tokReadWrite, nil)
+	bystanderApp, _ := a.issueToken(bystander, tokReadWrite, nil)
+	oldSession := a.issue(target, false)
+	status(t, a.bearer("GET", "/api/accounts", nil, app), 200, "token before the reset")
+
+	link, _, _ := a.svc.PasswordTokens.Issue(context.Background(), target)
+	set := map[string]string{"password": "newpass12", "password_confirmation": "newpass12"}
+	status(t, a.do("POST", "/api/auth/password/"+link, set, "", ""), 200, "reset")
+
+	status(t, a.bearer("GET", "/api/accounts", nil, app), 401, "API token after the reset")
+	status(t, a.do("GET", "/api/auth/2fa/status", nil, oldSession.Token, ""), 401, "session after the reset")
+	status(t, a.bearer("GET", "/api/accounts", nil, bystanderApp), 200, "another user's token")
+}
+
+func TestChangingYourOwnPasswordKeepsYourAPITokens(t *testing.T) {
+	a := newTestApp(t)
+	u := a.createUser("u@test.com", "secret1", roleEditor)
+	app, _ := a.issueToken(u, tokReadWrite, nil)
+	current := a.issue(u, false)
+
+	status(t, a.do("PUT", "/api/auth/password", changePassword("secret1", "newsecret1"), current.Token, current.CSRF), 200, "change")
+	status(t, a.bearer("GET", "/api/accounts", nil, app), 200, "token after a password change by its owner")
+}
+
+func TestPasswordLinkAnswersCarryNoReferrer(t *testing.T) {
+	a := newTestApp(t)
+	u, _ := a.svc.Users.Create(context.Background(), "Target", "target@test.com", ptr("oldpass12"), auth.RoleUser)
+	link, _, _ := a.svc.PasswordTokens.Issue(context.Background(), u)
+
+	for label, path := range map[string]string{"valid link": "/api/auth/password/" + link, "unknown link": "/api/auth/password/nope"} {
+		res := a.do("GET", path, nil, "", "")
+		res.Body.Close()
+		if got := res.Header.Get("Referrer-Policy"); got != "no-referrer" {
+			t.Errorf("%s: Referrer-Policy %q", label, got)
+		}
+	}
+	// The page that carries the token in its address is served by the SPA.
+	res := a.do("GET", "/set-password/"+link, nil, "", "")
+	res.Body.Close()
+	if got := res.Header.Get("Referrer-Policy"); got != "no-referrer" {
+		t.Errorf("set-password page: Referrer-Policy %q", got)
+	}
+}
+
 func TestAdminResetLinkReplacesTheOldOne(t *testing.T) {
 	a := newTestApp(t)
 	admin := a.createUser("admin@test.com", "secret1", auth.RoleAdmin)

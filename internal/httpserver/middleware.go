@@ -26,6 +26,16 @@ func noFraming(next http.Handler) http.Handler {
 	})
 }
 
+// noReferrer stops the browser sending our address to another site. The set-password
+// page and its API route carry a one-time token in the path, which a Referer header
+// would hand to anything the page loads or links to.
+func noReferrer(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Referrer-Policy", "no-referrer")
+		next.ServeHTTP(w, r)
+	})
+}
+
 func noStoreAPI(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/api/") || r.URL.Path == "/livez" || r.URL.Path == "/readyz" {

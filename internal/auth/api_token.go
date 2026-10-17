@@ -232,6 +232,11 @@ func (s APITokens) Revoke(ctx context.Context, userID, id int64) error {
 	return nil
 }
 
+// RevokeAll deletes every token the user has; none is not an error.
+func (s APITokens) RevokeAll(ctx context.Context, userID int64) error {
+	return s.repo().DeleteAPITokens(ctx, userID)
+}
+
 func toAPIToken(r repo.APIToken) APIToken {
 	return APIToken{
 		ID: r.ID, UserID: r.UserID, Name: r.Name, Prefix: r.Prefix, Kind: r.Kind,

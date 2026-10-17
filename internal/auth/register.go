@@ -20,7 +20,7 @@ func Register(l *locator.Locator) {
 		return APITokens{DB: locator.Get[store.DB](l)}, nil
 	})
 	locator.Provide(l, func(l *locator.Locator) (PasswordTokens, error) {
-		return PasswordTokens{DB: locator.Get[store.DB](l)}, nil
+		return PasswordTokens{DB: locator.Get[store.DB](l), ResetTTL: locator.Get[Security](l).ResetTTL}, nil
 	})
 	locator.Provide(l, func(l *locator.Locator) (TwoFactor, error) {
 		return TwoFactor{DB: locator.Get[store.DB](l), Users: locator.Get[Users](l)}, nil
