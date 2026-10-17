@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"savvy-go/internal/auth"
+	"savvy-go/internal/auth/permissions"
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/refsync"
 	"savvy-go/internal/spaces"
@@ -102,12 +103,12 @@ func (g *Guard) RequireTokenGrant(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if t := httpx.Token(r); t != nil {
 			res, known := SpaceResource(r.URL.Path)
-			level := auth.LevelFor(r.Method)
+			level := permissions.LevelFor(r.Method)
 			if !known || !t.Allows(res, level) {
-				httpx.WriteMessage(w, http.StatusForbidden, "This API token has no "+auth.Perm(res, level)+" permission.")
+				httpx.WriteMessage(w, http.StatusForbidden, "This API token has no "+permissions.New(res, level)+" permission.")
 				return
 			}
-			if level != auth.PermRead && !g.reachesSyncGroup(r, t, res) {
+			if level != permissions.Read && !g.reachesSyncGroup(r, t, res) {
 				httpx.WriteMessage(w, http.StatusForbidden, "This space syncs its "+res+" with other spaces: the API token must reach all of them to change them.")
 				return
 			}

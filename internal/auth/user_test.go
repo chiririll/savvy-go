@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	"savvy-go/internal/auth/password"
 )
 
 func TestUsersCreateAndFind(t *testing.T) {
@@ -17,7 +19,7 @@ func TestUsersCreateAndFind(t *testing.T) {
 	if u.Email != "ann@test.com" || u.Role != RoleUser || u.EmailVerified || u.IsInactive() {
 		t.Errorf("created %+v", u)
 	}
-	if u.Password == nil || !CheckPassword(*u.Password, "pw-12345") {
+	if u.Password == nil || !password.Check(*u.Password, "pw-12345") {
 		t.Error("the password is stored hashed")
 	}
 	byMail, err := users.ByEmail(ctx, "ANN@test.com")
@@ -76,17 +78,17 @@ func TestUpdateKeepsThePasswordUnlessGivenOne(t *testing.T) {
 	u := newUser(t, d, "a@test.com", RoleUser)
 
 	kept, _ := users.Update(ctx, u.ID, ptr("x"), nil, nil, ptr(""), nil)
-	if !CheckPassword(*kept.Password, "correct horse") {
+	if !password.Check(*kept.Password, "correct horse") {
 		t.Error("an empty password means no change")
 	}
 	changed, _ := users.Update(ctx, u.ID, nil, nil, ptr(RoleAdmin), ptr("brand new"), nil)
-	if !CheckPassword(*changed.Password, "brand new") || changed.Role != RoleAdmin {
+	if !password.Check(*changed.Password, "brand new") || changed.Role != RoleAdmin {
 		t.Errorf("changed %+v", changed)
 	}
 	if err := users.UpdatePassword(ctx, u.ID, "third"); err != nil {
 		t.Fatal(err)
 	}
-	if again, _ := users.ByID(ctx, u.ID); !CheckPassword(*again.Password, "third") {
+	if again, _ := users.ByID(ctx, u.ID); !password.Check(*again.Password, "third") {
 		t.Error("UpdatePassword")
 	}
 }

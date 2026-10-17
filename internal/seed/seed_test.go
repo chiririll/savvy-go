@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"savvy-go/internal/auth"
+	"savvy-go/internal/auth/password"
 	"savvy-go/internal/signing"
 	"savvy-go/internal/spaces"
 	"savvy-go/internal/store"
@@ -101,14 +102,14 @@ func TestDemoSeedsEmptyDatabase(t *testing.T) {
 	if err != nil || demo == nil || demo.Password == nil {
 		t.Fatalf("demo user: %v %v", demo, err)
 	}
-	if !auth.CheckPassword(*demo.Password, "demo") {
+	if !password.Check(*demo.Password, "demo") {
 		t.Fatal("demo password rejected")
 	}
 	admin, err := users.ByEmail(ctx, "admin@savvy.app")
 	if err != nil || admin == nil || admin.Password == nil {
 		t.Fatalf("admin user: %v %v", admin, err)
 	}
-	if !auth.CheckPassword(*admin.Password, "password") {
+	if !password.Check(*admin.Password, "password") {
 		t.Fatal("admin password rejected")
 	}
 	if demo.Role != auth.RoleUser || admin.Role != auth.RoleAdmin {

@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"savvy-go/internal/auth/permissions"
 )
 
 func TestAPITokenIssueAndResolve(t *testing.T) {
@@ -23,7 +25,7 @@ func TestAPITokenIssueAndResolve(t *testing.T) {
 	if !strings.HasPrefix(raw, "svy_") || !strings.HasPrefix(raw, tok.Prefix) || len(tok.Prefix) != 8 {
 		t.Errorf("token %q prefix %q", raw, tok.Prefix)
 	}
-	if tok.Kind != TokenPersonal || tok.AllSpaces || !slices.Equal(tok.SpaceIDs, []int64{sp[0], sp[2]}) || !slices.Equal(tok.Permissions, []string{"reports:read", "transactions:write"}) {
+	if tok.Kind != permissions.KindPersonal || tok.AllSpaces || !slices.Equal(tok.SpaceIDs, []int64{sp[0], sp[2]}) || !slices.Equal(tok.Permissions, []string{"reports:read", "transactions:write"}) {
 		t.Errorf("grant was not normalised: %+v", tok)
 	}
 
@@ -76,13 +78,13 @@ func TestAPITokenGrantsAreChecked(t *testing.T) {
 		{"an unknown resource", Grant{Permissions: []string{"payroll:read"}, AllSpaces: true}},
 		{"an unknown level", Grant{Permissions: []string{"reports:admin"}, AllSpaces: true}},
 		{"a typo that would grant less", Grant{Permissions: []string{"reports"}, AllSpaces: true}},
-		{"a connected app with nothing", Grant{Kind: TokenMCP, AllSpaces: true}},
-		{"a connected app beyond its tools", Grant{Kind: TokenMCP, Permissions: []string{"recurring:read"}, AllSpaces: true}},
+		{"a connected app with nothing", Grant{Kind: permissions.KindMCP, AllSpaces: true}},
+		{"a connected app beyond its tools", Grant{Kind: permissions.KindMCP, Permissions: []string{"recurring:read"}, AllSpaces: true}},
 	}
 	for _, tc := range tests {
 		_, _, err := tokens.Issue(ctx, u, "x", tc.grant, nil)
-		if !errors.Is(err, ErrBadGrant) {
-			t.Errorf("%s: err = %v, want ErrBadGrant", tc.name, err)
+		if !errors.Is(err, permissions.ErrBadGrant) {
+			t.Errorf("%s: err = %v, want permissions.ErrBadGrant", tc.name, err)
 		}
 	}
 	if list, _ := tokens.List(ctx, u.ID); len(list) != 0 {
@@ -113,7 +115,7 @@ func TestUpdateGrantKeepsTheTokenAndItsKind(t *testing.T) {
 	other := newUser(t, d, "b@test.com", RoleUser)
 	tokens := APITokens{DB: d}
 	sp := newSpaces(t, d, 1)
-	raw, tok, err := tokens.Issue(ctx, u, "app", Grant{Kind: TokenMCP, Permissions: []string{"reports:read"}, SpaceIDs: sp}, nil)
+	raw, tok, err := tokens.Issue(ctx, u, "app", Grant{Kind: permissions.KindMCP, Permissions: []string{"reports:read"}, SpaceIDs: sp}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,13 +124,13 @@ func TestUpdateGrantKeepsTheTokenAndItsKind(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if upd.Kind != TokenMCP || !upd.AllSpaces || len(upd.Permissions) != 2 {
+	if upd.Kind != permissions.KindMCP || !upd.AllSpaces || len(upd.Permissions) != 2 {
 		t.Errorf("updated %+v", upd)
 	}
-	if r, _ := tokens.Resolve(ctx, raw); r == nil || !r.Allows("accounts", PermRead) {
+	if r, _ := tokens.Resolve(ctx, raw); r == nil || !r.Allows("accounts", permissions.Read) {
 		t.Error("the same token carries the new grant")
 	}
-	if _, err := tokens.UpdateGrant(ctx, u.ID, tok.ID, Grant{Permissions: []string{"recurring:read"}, AllSpaces: true}); !errors.Is(err, ErrBadGrant) {
+	if _, err := tokens.UpdateGrant(ctx, u.ID, tok.ID, Grant{Permissions: []string{"recurring:read"}, AllSpaces: true}); !errors.Is(err, permissions.ErrBadGrant) {
 		t.Errorf("a connected app cannot be widened beyond its tools: %v", err)
 	}
 	if _, err := tokens.UpdateGrant(ctx, other.ID, tok.ID, Grant{Permissions: []string{"reports:read"}, AllSpaces: true}); !errors.Is(err, ErrNotFound) {
@@ -170,14 +172,14 @@ func TestAPITokenAllows(t *testing.T) {
 		resource, level string
 		want            bool
 	}{
-		{"reports", PermRead, true},
-		{"reports", PermWrite, false},
-		{"accounts", PermRead, true}, // write covers read
-		{"accounts", PermWrite, true},
-		{"accounts", PermDelete, false},
-		{"transactions", PermRead, true},
-		{"transactions", PermDelete, true},
-		{"budgets", PermRead, false},
+		{"reports", permissions.Read, true},
+		{"reports", permissions.Write, false},
+		{"accounts", permissions.Read, true}, // write covers read
+		{"accounts", permissions.Write, true},
+		{"accounts", permissions.Delete, false},
+		{"transactions", permissions.Read, true},
+		{"transactions", permissions.Delete, true},
+		{"budgets", permissions.Read, false},
 		{"reports", "", false},
 		{"reports", "root", false},
 	}
@@ -188,26 +190,5 @@ func TestAPITokenAllows(t *testing.T) {
 	}
 	if !tok.AllowsSpace(2) || tok.AllowsSpace(3) || !(&APIToken{AllSpaces: true}).AllowsSpace(99) {
 		t.Error("AllowsSpace")
-	}
-}
-
-func TestLevelForMethod(t *testing.T) {
-	for method, want := range map[string]string{"GET": PermRead, "HEAD": PermRead, "OPTIONS": PermRead, "POST": PermWrite, "PUT": PermWrite, "PATCH": PermWrite, "DELETE": PermDelete} {
-		if got := LevelFor(method); got != want {
-			t.Errorf("LevelFor(%s) = %s, want %s", method, got, want)
-		}
-	}
-}
-
-func TestNormalizePermissions(t *testing.T) {
-	got, err := NormalizePermissions([]string{"transactions:read", "transactions:delete", "accounts:read", "accounts:read"})
-	if err != nil || !slices.Equal(got, []string{"accounts:read", "transactions:delete"}) {
-		t.Errorf("got %v, %v", got, err)
-	}
-	if got, err := NormalizePermissions(nil); err != nil || len(got) != 0 {
-		t.Errorf("empty: %v, %v", got, err)
-	}
-	if _, err := PresetPermissions("superuser", false, APIResources); err == nil {
-		t.Error("an unknown preset")
 	}
 }

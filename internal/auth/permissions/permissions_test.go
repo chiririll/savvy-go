@@ -1,4 +1,4 @@
-package auth
+package permissions
 
 import (
 	"slices"
@@ -15,18 +15,18 @@ var presetMatrix = []struct {
 	deleter  string // editor with deleting switched on
 	admin    string
 }{
-	{"accounts", PermRead, PermWrite, PermWrite, PermDelete},
-	{"automation", PermRead, PermWrite, PermWrite, PermDelete},
-	{"budgets", PermRead, PermWrite, PermWrite, PermDelete},
-	{"categories", PermRead, PermRead, PermRead, PermDelete},
-	{"currencies", PermRead, PermRead, PermRead, PermDelete},
-	{"debts", PermRead, PermWrite, PermWrite, PermDelete},
-	{"recurring", PermRead, PermWrite, PermWrite, PermDelete},
-	{"reports", PermRead, PermRead, PermRead, PermDelete},
-	{"space", PermRead, PermRead, PermRead, PermDelete},
-	{"tags", PermRead, PermWrite, PermWrite, PermDelete},
-	{"transactions", PermRead, PermWrite, PermDelete, PermDelete},
-	{"transfers", PermRead, PermRead, PermRead, PermDelete},
+	{"accounts", Read, Write, Write, Delete},
+	{"automation", Read, Write, Write, Delete},
+	{"budgets", Read, Write, Write, Delete},
+	{"categories", Read, Read, Read, Delete},
+	{"currencies", Read, Read, Read, Delete},
+	{"debts", Read, Write, Write, Delete},
+	{"recurring", Read, Write, Write, Delete},
+	{"reports", Read, Read, Read, Delete},
+	{"space", Read, Read, Read, Delete},
+	{"tags", Read, Write, Write, Delete},
+	{"transactions", Read, Write, Delete, Delete},
+	{"transfers", Read, Read, Read, Delete},
 }
 
 func TestPresetMatrix(t *testing.T) {
@@ -43,12 +43,12 @@ func TestPresetMatrix(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got, err := PresetPermissions(c.preset, c.allowDelete, APIResources)
+			got, err := FromPreset(c.preset, c.allowDelete, APIResources)
 			if err != nil {
 				t.Fatal(err)
 			}
 			for i, row := range presetMatrix {
-				want := Perm(row.resource, c.want(i))
+				want := New(row.resource, c.want(i))
 				if !slices.Contains(got, want) {
 					t.Errorf("%s: want %s in %v", row.resource, want, got)
 				}
@@ -80,7 +80,7 @@ func TestPresetMatrixCoversResources(t *testing.T) {
 
 // A connected app is given a preset over only the parts its tools use.
 func TestPresetMatrixForConnectedApp(t *testing.T) {
-	got, err := PresetPermissions(PresetEditor, false, MCPResources)
+	got, err := FromPreset(PresetEditor, false, MCPResources)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,5 +92,26 @@ func TestPresetMatrixForConnectedApp(t *testing.T) {
 	}
 	if slices.Contains(got, "recurring:write") {
 		t.Errorf("recurring is not a connected-app resource, got %v", got)
+	}
+}
+
+func TestLevelForMethod(t *testing.T) {
+	for method, want := range map[string]string{"GET": Read, "HEAD": Read, "OPTIONS": Read, "POST": Write, "PUT": Write, "PATCH": Write, "DELETE": Delete} {
+		if got := LevelFor(method); got != want {
+			t.Errorf("LevelFor(%s) = %s, want %s", method, got, want)
+		}
+	}
+}
+
+func TestNormalizePermissions(t *testing.T) {
+	got, err := Normalize([]string{"transactions:read", "transactions:delete", "accounts:read", "accounts:read"})
+	if err != nil || !slices.Equal(got, []string{"accounts:read", "transactions:delete"}) {
+		t.Errorf("got %v, %v", got, err)
+	}
+	if got, err := Normalize(nil); err != nil || len(got) != 0 {
+		t.Errorf("empty: %v, %v", got, err)
+	}
+	if _, err := FromPreset("superuser", false, APIResources); err == nil {
+		t.Error("an unknown preset")
 	}
 }

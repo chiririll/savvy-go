@@ -254,3 +254,16 @@ func assertMinorUnits(t *testing.T, sqlDB *sql.DB) {
 		t.Errorf("fractional quantity = %v (%v), want 0.5", qty, err)
 	}
 }
+
+// Laravel writes $2y$ bcrypt hashes. The conversion rewrites them to the $2a$
+// form, so nothing outside this package ever sees a Laravel prefix.
+func TestUpgradeRewritesLaravelPasswordPrefix(t *testing.T) {
+	sqlDB := upgradedFixture(t)
+	var hash string
+	if err := sqlDB.QueryRow(`SELECT password FROM users WHERE id = 1`).Scan(&hash); err != nil {
+		t.Fatal(err)
+	}
+	if hash != "$2a$10$legacyhash" {
+		t.Errorf("password %q, want the $2a$ prefix", hash)
+	}
+}

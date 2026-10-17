@@ -3,7 +3,7 @@ package httpserver
 import (
 	"testing"
 
-	"savvy-go/internal/auth"
+	"savvy-go/internal/auth/totp"
 )
 
 func TestTwoFactorEnableConfirmLoginAndRecovery(t *testing.T) {
@@ -27,7 +27,7 @@ func TestTwoFactorEnableConfirmLoginAndRecovery(t *testing.T) {
 	}
 	bad.Body.Close()
 
-	code := auth.TOTPNow(secret)
+	code := totp.Now(secret)
 	ok := a.do("POST", "/api/auth/2fa/confirm", map[string]string{"code": code}, iss.Token, iss.CSRF)
 	if ok.StatusCode != 200 {
 		t.Fatalf("confirm %d %v", ok.StatusCode, decodeJSON(t, ok))
@@ -46,7 +46,7 @@ func TestTwoFactorEnableConfirmLoginAndRecovery(t *testing.T) {
 	}
 
 	verify := a.do("POST", "/api/auth/2fa/verify", map[string]any{
-		"two_factor_token": tok, "code": auth.TOTPNow(secret),
+		"two_factor_token": tok, "code": totp.Now(secret),
 	}, "", "")
 	if verify.StatusCode != 200 {
 		t.Fatalf("verify %d %v", verify.StatusCode, decodeJSON(t, verify))
@@ -75,7 +75,7 @@ func TestTwoFactorEnableConfirmLoginAndRecovery(t *testing.T) {
 		t.Fatalf("remaining %v", stBody)
 	}
 
-	off := a.do("POST", "/api/auth/2fa/disable", map[string]string{"code": auth.TOTPNow(secret)}, iss.Token, iss.CSRF)
+	off := a.do("POST", "/api/auth/2fa/disable", map[string]string{"code": totp.Now(secret)}, iss.Token, iss.CSRF)
 	if off.StatusCode != 200 {
 		t.Fatalf("disable %d %v", off.StatusCode, decodeJSON(t, off))
 	}

@@ -9,6 +9,8 @@ import (
 
 	repo "savvy-go/internal/db/repo/auth"
 	"savvy-go/internal/store"
+
+	"savvy-go/internal/auth/permissions"
 )
 
 const (
@@ -22,12 +24,9 @@ var ErrTokenLimit = errors.New("api token limit reached")
 // ErrNotFound is returned when the user has no token or passkey with that id.
 var ErrNotFound = errors.New("not found")
 
-// ErrBadGrant is returned for permissions or spaces a token cannot be given.
-var ErrBadGrant = errors.New("invalid token grant")
-
 // Grant is what a token may do: which resources, and in which spaces.
 type Grant struct {
-	// Kind is TokenPersonal (the default) or TokenMCP. Fixed at issue.
+	// Kind is permissions.KindPersonal (the default) or permissions.KindMCP. Fixed at issue.
 	Kind        string
 	Permissions []string
 	// AllSpaces reaches every space the owner belongs to, now and later.
@@ -53,12 +52,12 @@ type APIToken struct {
 }
 
 // Allows reports whether the token holds a grant for resource that covers
-// level (PermRead, PermWrite or PermDelete): a higher grant covers the lower.
+// level (permissions.Read, permissions.Write or permissions.Delete): a higher grant covers the lower.
 func (t *APIToken) Allows(resource, level string) bool {
-	need := permRank(level)
+	need := permissions.Rank(level)
 	for _, p := range t.Permissions {
 		res, lv, _ := strings.Cut(p, ":")
-		if res == resource && need > 0 && permRank(lv) >= need {
+		if res == resource && need > 0 && permissions.Rank(lv) >= need {
 			return true
 		}
 	}
@@ -83,15 +82,15 @@ func (s APITokens) repo() repo.Repo { return repo.Repo{DB: s.DB} }
 
 // checkGrant validates a grant for a token of this kind and returns the
 // normalized permissions and the sorted, distinct space ids (none for all
-// spaces). The error is an ErrBadGrant.
+// spaces). The error is an permissions.ErrBadGrant.
 func checkGrant(kind string, grant Grant) (perms []string, spaceIDs []int64, err error) {
-	if perms, err = NormalizePermissions(grant.Permissions); err != nil {
-		return nil, nil, ErrBadGrant
+	if perms, err = permissions.Normalize(grant.Permissions); err != nil {
+		return nil, nil, permissions.ErrBadGrant
 	}
 	if !grant.AllSpaces && len(grant.SpaceIDs) == 0 {
-		return nil, nil, ErrBadGrant
+		return nil, nil, permissions.ErrBadGrant
 	}
-	if err = CheckKindPermissions(kind, perms); err != nil {
+	if err = permissions.CheckKind(kind, perms); err != nil {
 		return nil, nil, err
 	}
 	spaceIDs = []int64{}
@@ -106,7 +105,7 @@ func checkGrant(kind string, grant Grant) (perms []string, spaceIDs []int64, err
 // has checked that the owner belongs to each.
 func (s APITokens) Issue(ctx context.Context, user *User, name string, grant Grant, expiresAt *time.Time) (string, *APIToken, error) {
 	if grant.Kind == "" {
-		grant.Kind = TokenPersonal
+		grant.Kind = permissions.KindPersonal
 	}
 	perms, spaceIDs, err := checkGrant(grant.Kind, grant)
 	if err != nil {

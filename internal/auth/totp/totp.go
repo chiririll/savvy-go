@@ -1,4 +1,5 @@
-package auth
+// Package totp makes and checks the one-time codes of authenticator apps (RFC 6238).
+package totp
 
 import (
 	"crypto/hmac"
@@ -12,7 +13,7 @@ import (
 	"time"
 )
 
-func NewTOTPSecret() (string, error) {
+func NewSecret() (string, error) {
 	b := make([]byte, 20)
 	if _, err := rand.Read(b); err != nil {
 		return "", err
@@ -20,7 +21,7 @@ func NewTOTPSecret() (string, error) {
 	return strings.TrimRight(base32.StdEncoding.EncodeToString(b), "="), nil
 }
 
-func TOTPProvisioningURI(email, secret string) string {
+func ProvisioningURI(email, secret string) string {
 	u := url.URL{Scheme: "otpauth", Host: "totp", Path: "/Savvy:" + email}
 	q := u.Query()
 	q.Set("secret", secret)
@@ -32,7 +33,7 @@ func TOTPProvisioningURI(email, secret string) string {
 	return u.String()
 }
 
-func VerifyTOTP(secret, code string) bool {
+func Verify(secret, code string) bool {
 	code = strings.TrimSpace(code)
 	if len(code) != 6 {
 		return false
@@ -64,8 +65,8 @@ func totpCode(key []byte, counter int64) string {
 	return fmt.Sprintf("%06d", n%1000000)
 }
 
-// TOTPNow is exported for tests.
-func TOTPNow(secret string) string {
+// Now is exported for tests.
+func Now(secret string) string {
 	key, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(strings.ToUpper(secret))
 	if err != nil {
 		key, _ = base32.StdEncoding.DecodeString(strings.ToUpper(secret))

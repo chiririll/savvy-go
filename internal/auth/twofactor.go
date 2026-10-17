@@ -8,6 +8,10 @@ import (
 
 	repo "savvy-go/internal/db/repo/auth"
 	"savvy-go/internal/store"
+
+	"savvy-go/internal/auth/password"
+
+	"savvy-go/internal/auth/totp"
 )
 
 const recoveryChars = "abcdefghjkmnpqrstuvwxyz23456789"
@@ -23,28 +27,28 @@ func (t TwoFactor) verifyTOTP(_ context.Context, u *User, code string) bool {
 	if u == nil || u.TwoFactorSecret == nil {
 		return false
 	}
-	return VerifyTOTP(*u.TwoFactorSecret, code)
+	return totp.Verify(*u.TwoFactorSecret, code)
 }
 
 func (t TwoFactor) Enable(ctx context.Context, u *User) (secret, uri string, err error) {
 	if u.HasTwoFactor() {
 		return "", "", fmtErr("already enabled")
 	}
-	secret, err = NewTOTPSecret()
+	secret, err = totp.NewSecret()
 	if err != nil {
 		return "", "", err
 	}
 	if err := t.Users.SetTwoFactor(ctx, u.ID, &secret, true, false); err != nil {
 		return "", "", err
 	}
-	return secret, TOTPProvisioningURI(u.Email, secret), nil
+	return secret, totp.ProvisioningURI(u.Email, secret), nil
 }
 
 func (t TwoFactor) Confirm(ctx context.Context, u *User, code string) ([]string, error) {
 	if !u.TwoFactorEnabled || u.TwoFactorConfirmed {
 		return nil, fmtErr("not pending")
 	}
-	if u.TwoFactorSecret == nil || !VerifyTOTP(*u.TwoFactorSecret, code) {
+	if u.TwoFactorSecret == nil || !totp.Verify(*u.TwoFactorSecret, code) {
 		return nil, fmtErr("invalid code")
 	}
 	if err := t.Users.SetTwoFactor(ctx, u.ID, u.TwoFactorSecret, true, true); err != nil {
@@ -81,7 +85,7 @@ func (t TwoFactor) ConsumeRecovery(ctx context.Context, userID int64, code strin
 		return false
 	}
 	for _, r := range unused {
-		if CheckPassword(r.Hash, code) {
+		if password.Check(r.Hash, code) {
 			_ = t.repo().MarkRecoveryCodeUsed(ctx, r.ID, time.Now().UTC())
 			return true
 		}
@@ -110,7 +114,7 @@ func (t TwoFactor) generateCodes(ctx context.Context, userID int64) ([]string, e
 	now := time.Now().UTC()
 	for i := 0; i < 8; i++ {
 		plain := recoveryCode()
-		h, err := HashPassword(plain)
+		h, err := password.Hash(plain)
 		if err != nil {
 			return nil, err
 		}

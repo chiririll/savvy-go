@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"savvy-go/internal/auth"
+	"savvy-go/internal/auth/permissions"
 	"savvy-go/internal/httpserver/httpx/guard"
 )
 
@@ -23,7 +24,7 @@ func TestEveryDataRouteMapsToAResource(t *testing.T) {
 		res, ok := guard.SpaceResource("/api/spaces/1/" + root)
 		if !ok {
 			t.Errorf("data route /%s has no API token resource: add it to spaceSegments", root)
-		} else if !slices.Contains(auth.APIResources, res) {
+		} else if !slices.Contains(permissions.APIResources, res) {
 			t.Errorf("/%s maps to %q, which is not an API resource", root, res)
 		}
 	}
@@ -72,7 +73,7 @@ func TestTokenPermissionsAreCheckedPerResource(t *testing.T) {
 	status(t, a.bearer("POST", "/api/accounts", map[string]any{"name": "X"}, viewerWrite), 403, "viewer role wins over the grant")
 
 	// Spaces' own administration stays out of reach whatever the grant.
-	all, _ := a.issueGrant(u, auth.Grant{Permissions: allPerms(auth.PermWrite), AllSpaces: true}, nil)
+	all, _ := a.issueGrant(u, auth.Grant{Permissions: allPerms(permissions.Write), AllSpaces: true}, nil)
 	for _, p := range []string{"/audit", "/backups", "/invitations"} {
 		status(t, a.bearer("GET", fmt.Sprintf("/api/spaces/%d%s", a.space.ID, p), nil, all), 403, "tokens cannot reach "+p)
 	}
@@ -241,7 +242,7 @@ func TestConnectedAppGrantCanBeEdited(t *testing.T) {
 	var tokenID int64
 	list := decodeJSON(t, a.do("GET", "/api/auth/api-tokens", nil, sess.Token, sess.CSRF))["data"].([]any)
 	for _, it := range list {
-		if m := it.(map[string]any); m["kind"] == auth.TokenMCP {
+		if m := it.(map[string]any); m["kind"] == permissions.KindMCP {
 			tokenID = int64(m["id"].(float64))
 		}
 	}
@@ -278,15 +279,15 @@ func TestTokenKindComesFromHowItWasMade(t *testing.T) {
 		t.Fatalf("create = %d", res.StatusCode)
 	}
 	data := decodeJSON(t, res)["data"].(map[string]any)
-	if data["kind"] != auth.TokenPersonal {
+	if data["kind"] != permissions.KindPersonal {
 		t.Fatalf("a token made in Settings is personal whatever it is called or asks for: %v", data["kind"])
 	}
 
 	// Only the OAuth flow makes a connection; Issue with that kind holds it to the tools' parts.
-	if _, _, err := a.svc.APITokens.Issue(context.Background(), u, "app", auth.Grant{Kind: auth.TokenMCP, Permissions: []string{"transfers:read"}, AllSpaces: true}, nil); err == nil {
+	if _, _, err := a.svc.APITokens.Issue(context.Background(), u, "app", auth.Grant{Kind: permissions.KindMCP, Permissions: []string{"transfers:read"}, AllSpaces: true}, nil); err == nil {
 		t.Fatal("a connection must not be given a part its tools do not use")
 	}
-	if _, _, err := a.svc.APITokens.Issue(context.Background(), u, "app", auth.Grant{Kind: auth.TokenMCP, Permissions: []string{"tags:write"}, AllSpaces: true}, nil); err != nil {
+	if _, _, err := a.svc.APITokens.Issue(context.Background(), u, "app", auth.Grant{Kind: permissions.KindMCP, Permissions: []string{"tags:write"}, AllSpaces: true}, nil); err != nil {
 		t.Fatalf("a connection with a part its tools use: %v", err)
 	}
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"savvy-go/internal/auth"
+	"savvy-go/internal/auth/permissions"
 )
 
 type bearerTransport struct{ token string }
@@ -51,7 +52,7 @@ func (a *testApp) mcpGrant(u *auth.User, perms ...string) *mcp.ClientSession {
 // preset of the consent screen does.
 func (a *testApp) mcpFull(u *auth.User) *mcp.ClientSession {
 	a.t.Helper()
-	perms, err := auth.PresetPermissions(auth.PresetAdmin, true, auth.MCPResources)
+	perms, err := permissions.FromPreset(permissions.PresetAdmin, true, permissions.MCPResources)
 	if err != nil {
 		a.t.Fatal(err)
 	}
@@ -286,7 +287,7 @@ func TestMCPAcceptsOAuthTokenButStaysReadOnly(t *testing.T) {
 	}
 }
 
-// What a connection is given (auth.MCPResources) must cover every read tool, or
+// What a connection is given (permissions.MCPResources) must cover every read tool, or
 // a tool would answer 403 for every connected assistant; a token with less than
 // that gets an error naming the missing permission.
 func TestMCPReadToolsNeedTheirPermissions(t *testing.T) {
@@ -294,7 +295,7 @@ func TestMCPReadToolsNeedTheirPermissions(t *testing.T) {
 	u := a.createUser("mcp@a.com", "secret1", "admin")
 	sp := a.space.ID
 
-	gs := a.mcpGrant(u, auth.ReadPerms(auth.MCPResources...)...)
+	gs := a.mcpGrant(u, permissions.ReadAll(permissions.MCPResources...)...)
 	calls := map[string]map[string]any{
 		"list_spaces":              nil,
 		"list_accounts":            {"space_id": sp},

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"savvy-go/internal/auth"
+	"savvy-go/internal/auth/permissions"
 	"savvy-go/internal/httpserver/httpx/dto"
 
 	"github.com/go-chi/chi/v5"
@@ -105,11 +106,11 @@ func (h Handler) apiTokensDestroy(w http.ResponseWriter, r *http.Request) {
 // the rest of token management.
 func (h Handler) apiTokenCapabilities(w http.ResponseWriter, r *http.Request) {
 	kinds := map[string]dto.TokenKindCapabilities{}
-	for _, kind := range []string{auth.TokenPersonal, auth.TokenMCP} {
-		resources := auth.ResourcesFor(kind)
+	for _, kind := range []string{permissions.KindPersonal, permissions.KindMCP} {
+		resources := permissions.ResourcesFor(kind)
 		presets := map[string][]string{}
-		for _, p := range auth.Presets {
-			perms, err := auth.PresetPermissions(p, false, resources)
+		for _, p := range permissions.Presets {
+			perms, err := permissions.FromPreset(p, false, resources)
 			if err != nil {
 				httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 				return
@@ -118,7 +119,7 @@ func (h Handler) apiTokenCapabilities(w http.ResponseWriter, r *http.Request) {
 		}
 		kinds[kind] = dto.TokenKindCapabilities{Resources: resources, Presets: presets}
 	}
-	httpx.WriteData(w, http.StatusOK, dto.TokenCapabilities{Levels: auth.Levels, Presets: auth.Presets, Kinds: kinds})
+	httpx.WriteData(w, http.StatusOK, dto.TokenCapabilities{Levels: permissions.Levels, Presets: permissions.Presets, Kinds: kinds})
 }
 
 // tokenGrantBody is the part of a token request that says what it may do: a
@@ -145,11 +146,11 @@ func (h Handler) grantFromBody(ctx context.Context, u *auth.User, b tokenGrantBo
 	case b.Preset != "" && len(b.Permissions) > 0:
 		errs["permissions"] = []string{"Give a preset or a list of permissions, not both."}
 	case b.Preset != "":
-		if perms, err = auth.PresetPermissions(b.Preset, b.AllowDelete, auth.APIResources); err != nil {
+		if perms, err = permissions.FromPreset(b.Preset, b.AllowDelete, permissions.APIResources); err != nil {
 			errs["preset"] = []string{"The preset must be viewer, editor or admin."}
 		}
 	default:
-		if perms, err = auth.NormalizePermissions(b.Permissions); err != nil {
+		if perms, err = permissions.Normalize(b.Permissions); err != nil {
 			errs["permissions"] = []string{err.Error() + "."}
 		}
 	}
@@ -200,10 +201,10 @@ func (h Handler) apiTokensUpdate(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case errors.Is(err, auth.ErrNotFound):
 		httpx.WriteMessage(w, http.StatusNotFound, "Not found.")
-	case errors.Is(err, auth.ErrBadGrant):
+	case errors.Is(err, permissions.ErrBadGrant):
 		// A connected app can be given only the parts of a space its tools use; the error says which.
 		msg := "The given data was invalid."
-		if err != auth.ErrBadGrant {
+		if err != permissions.ErrBadGrant {
 			msg = err.Error() + "."
 		}
 		httpx.WriteValidation(w, map[string][]string{"permissions": {msg}})

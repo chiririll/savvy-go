@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"savvy-go/internal/auth"
+	"savvy-go/internal/auth/password"
 	"savvy-go/internal/bootstrap"
 
 	"github.com/go-chi/chi/v5"
@@ -147,7 +148,7 @@ func (h Handler) authLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	u, err := h.Users.ByEmail(r.Context(), body.Email)
-	if err != nil || u == nil || u.IsSSOOnly || u.IsInactive() || u.Password == nil || !auth.CheckPassword(*u.Password, body.Password) {
+	if err != nil || u == nil || u.IsSSOOnly || u.IsInactive() || u.Password == nil || !password.Check(*u.Password, body.Password) {
 		httpx.WriteValidation(w, map[string][]string{"email": {"Invalid credentials."}})
 		return
 	}
@@ -197,7 +198,7 @@ func (h Handler) authChangePassword(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteValidation(w, map[string][]string{"password": {"The given data was invalid."}})
 		return
 	}
-	if !auth.CheckPassword(*u.Password, body.Current) {
+	if !password.Check(*u.Password, body.Current) {
 		httpx.WriteValidation(w, map[string][]string{"current_password": {"Current password is incorrect."}})
 		return
 	}

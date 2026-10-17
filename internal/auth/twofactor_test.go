@@ -4,6 +4,8 @@ import (
 	"context"
 	"strings"
 	"testing"
+
+	"savvy-go/internal/auth/totp"
 )
 
 func TestTwoFactorLifecycle(t *testing.T) {
@@ -28,7 +30,7 @@ func TestTwoFactorLifecycle(t *testing.T) {
 	if _, err := tf.Confirm(ctx, u, "000000"); err == nil {
 		t.Error("a wrong code confirmed")
 	}
-	codes, err := tf.Confirm(ctx, u, TOTPNow(secret))
+	codes, err := tf.Confirm(ctx, u, totp.Now(secret))
 	if err != nil || len(codes) != 8 {
 		t.Fatalf("confirm: %v, %v", codes, err)
 	}
@@ -56,7 +58,7 @@ func TestTwoFactorLifecycle(t *testing.T) {
 	if n := tf.Remaining(ctx, u.ID); n != 7 {
 		t.Errorf("remaining after one use: %d", n)
 	}
-	if !tf.VerifyAny(ctx, u, TOTPNow(secret)) {
+	if !tf.VerifyAny(ctx, u, totp.Now(secret)) {
 		t.Error("the authenticator code verifies too")
 	}
 
@@ -64,7 +66,7 @@ func TestTwoFactorLifecycle(t *testing.T) {
 	if _, err := tf.Regenerate(ctx, u, codes[1]); err == nil {
 		t.Error("a recovery code cannot mint more recovery codes")
 	}
-	fresh, err := tf.Regenerate(ctx, u, TOTPNow(secret))
+	fresh, err := tf.Regenerate(ctx, u, totp.Now(secret))
 	if err != nil || len(fresh) != 8 {
 		t.Fatalf("regenerate: %v, %v", fresh, err)
 	}
@@ -96,5 +98,22 @@ func TestTwoFactorLifecycle(t *testing.T) {
 	}
 	if err := tf.Disable(ctx, u, "123456"); err == nil {
 		t.Error("disabling what is not enabled")
+	}
+}
+
+func TestRecoveryCodesLookRight(t *testing.T) {
+	seen := map[string]bool{}
+	for range 200 {
+		c := recoveryCode()
+		if len(c) != 9 || c[4] != '-' {
+			t.Fatalf("code %q", c)
+		}
+		if strings.ContainsAny(c, "ilo01") {
+			t.Fatalf("%q has characters that are easy to misread", c)
+		}
+		seen[c] = true
+	}
+	if len(seen) < 190 {
+		t.Errorf("only %d distinct codes in 200", len(seen))
 	}
 }

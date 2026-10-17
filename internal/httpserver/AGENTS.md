@@ -30,7 +30,7 @@
 ## MCP server (`/mcp`)
 
 - Tools have no data access. Each calls app's own route in-process (`mcpCall`) with caller's bearer token, so roles, spaces, permissions, DTO/money shape are REST API's. Inner call needs fresh chi route context.
-- Tool's route must fall under `auth.MCPResources`. New read tool: add to `mcpReadNeeds`. Write tool: one arg struct plus `writeTool` line.
+- Tool's route must fall under `permissions.MCPResources`. New read tool: add to `mcpReadNeeds`. Write tool: one arg struct plus `writeTool` line.
 - Money args are strings. Delete tools carry `DestructiveHint`. Write tools leave `ReadOnlyHint` off.
 - `tools/list` filtered by middleware, not `RemoveTools`, so stale client's direct call still gets REST error naming missing permission.
 - Automation `conditions`/`actions` shape taught in tool schema text. Keep in step with `internal/automation`.

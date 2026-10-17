@@ -10,6 +10,7 @@ import (
 
 	"savvy-go/internal/appconfig"
 	savvyauth "savvy-go/internal/auth"
+	"savvy-go/internal/auth/permissions"
 	"savvy-go/internal/httpserver/httpx"
 
 	"github.com/modelcontextprotocol/go-sdk/auth"
@@ -109,7 +110,7 @@ func (h Handler) mcpServer(perms []string) *mcp.Server {
 // hideUngrantedTools leaves out of the tool list what the token has no grant for.
 func (h Handler) hideUngrantedTools(srv *mcp.Server, needs map[string]mcpNeed, perms []string) {
 	for name, resource := range mcpReadNeeds {
-		needs[name] = mcpNeed{resource, savvyauth.PermRead}
+		needs[name] = mcpNeed{resource, permissions.Read}
 	}
 	token := &savvyauth.APIToken{Permissions: perms}
 	srv.AddReceivingMiddleware(func(next mcp.MethodHandler) mcp.MethodHandler {

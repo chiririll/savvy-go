@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"savvy-go/internal/auth"
+	"savvy-go/internal/auth/totp"
 	"savvy-go/internal/db"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/legacy"
@@ -478,7 +479,7 @@ func laravelFileWithTOTP(t *testing.T) (content []byte, appKey, secret string) {
 		t.Fatal(err)
 	}
 	appKey = "base64:" + base64.StdEncoding.EncodeToString(key)
-	secret, err := auth.NewTOTPSecret()
+	secret, err := totp.NewSecret()
 	if err != nil {
 		t.Fatal(err)
 	}

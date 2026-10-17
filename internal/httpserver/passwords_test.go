@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"savvy-go/internal/auth"
+	"savvy-go/internal/auth/password"
 )
 
 type passwordChange map[string]string
@@ -24,7 +25,7 @@ func TestChangePasswordKeepsThisSessionAndEndsTheOthers(t *testing.T) {
 	status(t, a.do("GET", "/api/auth/2fa/status", nil, other.Token, ""), 401, "other session")
 
 	u, _ = a.svc.Users.ByID(context.Background(), u.ID)
-	if !auth.CheckPassword(*u.Password, "newsecret1") {
+	if !password.Check(*u.Password, "newsecret1") {
 		t.Fatal("password not updated")
 	}
 }

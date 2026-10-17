@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"savvy-go/internal/auth"
+	"savvy-go/internal/auth/permissions"
 )
 
 // bearer performs a request authenticated only by an API token.
@@ -42,18 +43,18 @@ const (
 )
 
 func allPerms(level string) []string {
-	out := make([]string, len(auth.APIResources))
-	for i, r := range auth.APIResources {
-		out[i] = auth.Perm(r, level)
+	out := make([]string, len(permissions.APIResources))
+	for i, r := range permissions.APIResources {
+		out[i] = permissions.New(r, level)
 	}
 	return out
 }
 
 func (a *testApp) issueToken(u *auth.User, scope string, exp *time.Time) (string, *auth.APIToken) {
 	a.t.Helper()
-	level := auth.PermRead
+	level := permissions.Read
 	if scope == tokReadWrite {
-		level = auth.PermDelete
+		level = permissions.Delete
 	}
 	return a.issueGrant(u, auth.Grant{Permissions: allPerms(level), AllSpaces: true}, exp)
 }
@@ -80,7 +81,7 @@ func TestAPITokenCreateListRevoke(t *testing.T) {
 	u := a.createUser("rw@a.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 
-	res := a.do("POST", "/api/auth/api-tokens", map[string]any{"name": "Zapier", "permissions": allPerms(auth.PermWrite), "all_spaces": true}, sess.Token, sess.CSRF)
+	res := a.do("POST", "/api/auth/api-tokens", map[string]any{"name": "Zapier", "permissions": allPerms(permissions.Write), "all_spaces": true}, sess.Token, sess.CSRF)
 	if res.StatusCode != http.StatusCreated {
 		t.Fatalf("create %d", res.StatusCode)
 	}
@@ -242,7 +243,7 @@ func TestAPITokenLimit(t *testing.T) {
 	sess := a.issue(u, false)
 
 	status(t, a.do("POST", "/api/auth/api-tokens", map[string]any{"name": "51st"}, sess.Token, sess.CSRF), 422, "over limit")
-	if _, _, err := a.svc.APITokens.Issue(context.Background(), u, "x", auth.Grant{Permissions: allPerms(auth.PermRead), AllSpaces: true}, nil); err != auth.ErrTokenLimit {
+	if _, _, err := a.svc.APITokens.Issue(context.Background(), u, "x", auth.Grant{Permissions: allPerms(permissions.Read), AllSpaces: true}, nil); err != auth.ErrTokenLimit {
 		t.Fatalf("issue over limit: %v", err)
 	}
 }

@@ -7,6 +7,8 @@ import (
 
 	repo "savvy-go/internal/db/repo/auth"
 	"savvy-go/internal/store"
+
+	"savvy-go/internal/auth/password"
 )
 
 // Server roles. What a user may do with the finances of a space is decided by
@@ -92,13 +94,13 @@ func (s Users) All(ctx context.Context) ([]User, error) {
 	return out, nil
 }
 
-func (s Users) Create(ctx context.Context, name, email string, password *string, role string) (*User, error) {
+func (s Users) Create(ctx context.Context, name, email string, plain *string, role string) (*User, error) {
 	if role == "" {
 		role = RoleUser
 	}
 	var hash string // empty: an account with no password (SSO only)
-	if password != nil && *password != "" {
-		h, err := HashPassword(*password)
+	if plain != nil && *plain != "" {
+		h, err := password.Hash(*plain)
 		if err != nil {
 			return nil, err
 		}
@@ -112,7 +114,7 @@ func (s Users) Create(ctx context.Context, name, email string, password *string,
 }
 
 func (s Users) UpdatePassword(ctx context.Context, id int64, plain string) error {
-	h, err := HashPassword(plain)
+	h, err := password.Hash(plain)
 	if err != nil {
 		return err
 	}
@@ -120,7 +122,7 @@ func (s Users) UpdatePassword(ctx context.Context, id int64, plain string) error
 }
 
 // A new address clears EmailVerified, unless verified says otherwise (an admin's word).
-func (s Users) Update(ctx context.Context, id int64, name, email, role *string, password *string, verified *bool) (*User, error) {
+func (s Users) Update(ctx context.Context, id int64, name, email, role *string, plain *string, verified *bool) (*User, error) {
 	u, err := s.ByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -142,8 +144,8 @@ func (s Users) Update(ctx context.Context, id int64, name, email, role *string, 
 		u.EmailVerified = *verified
 	}
 	var hash string // empty keeps the current password
-	if password != nil && *password != "" {
-		h, err := HashPassword(*password)
+	if plain != nil && *plain != "" {
+		h, err := password.Hash(*plain)
 		if err != nil {
 			return nil, err
 		}

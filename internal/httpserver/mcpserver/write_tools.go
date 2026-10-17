@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	savvyauth "savvy-go/internal/auth"
+	"savvy-go/internal/auth/permissions"
 	"savvy-go/internal/httpserver/httpx/guard"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -70,7 +70,7 @@ func (h Handler) addMCPWriteTools(srv *mcp.Server) map[string]mcpNeed {
 	w := func(name, title, desc, method, path string) writeTool {
 		// The resource is the one the REST route is guarded by.
 		resource, _ := guard.SpaceResource("/spaces/0/" + path)
-		needs[name] = mcpNeed{resource, savvyauth.LevelFor(method)}
+		needs[name] = mcpNeed{resource, permissions.LevelFor(method)}
 		return writeTool{name: name, title: title, desc: desc, method: method, path: sp + path, idempotent: method == http.MethodPatch}
 	}
 	del := func(name, title, desc, path string) writeTool {

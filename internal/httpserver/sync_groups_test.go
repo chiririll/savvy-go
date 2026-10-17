@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"savvy-go/internal/auth"
+	"savvy-go/internal/auth/permissions"
 	"savvy-go/internal/spaces"
 )
 
@@ -232,7 +233,7 @@ func TestSyncGroupChangeNeedsATokenReachingEverySpace(t *testing.T) {
 // granted, cannot form, change or preview one.
 func TestSyncGroupsAreManagedWithASessionOnly(t *testing.T) {
 	p := newSyncPair(t)
-	raw, _ := p.a.issueGrant(p.owner, auth.Grant{Permissions: allPerms(auth.PermWrite), AllSpaces: true}, nil)
+	raw, _ := p.a.issueGrant(p.owner, auth.Grant{Permissions: allPerms(permissions.Write), AllSpaces: true}, nil)
 	body := map[string]any{"add_space_ids": []int64{p.A.ID, p.B.ID}, "categories": true}
 	for _, path := range []string{"/api/sync-groups/diff", "/api/sync-groups/apply"} {
 		status(t, p.a.bearer("POST", path, body, raw), http.StatusForbidden, path)

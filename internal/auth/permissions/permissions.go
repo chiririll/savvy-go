@@ -1,6 +1,9 @@
-package auth
+// Package permissions is the vocabulary of API-token grants: levels, presets,
+// the resources a token kind can hold, and the checks that keep a grant valid.
+package permissions
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -13,27 +16,27 @@ import (
 // remove it. A token has no grant it was not given, so a new resource is
 // closed to every existing token.
 const (
-	PermRead   = "read"
-	PermWrite  = "write"
-	PermDelete = "delete"
+	Read   = "read"
+	Write  = "write"
+	Delete = "delete"
 )
 
 // Levels lists the permission levels, lowest first.
-var Levels = []string{PermRead, PermWrite, PermDelete}
+var Levels = []string{Read, Write, Delete}
 
-// permRank orders the levels (0 for an unknown one); a grant covers every level
+// Rank orders the levels (0 for an unknown one); a grant covers every level
 // up to its own.
-func permRank(level string) int { return slices.Index(Levels, level) + 1 }
+func Rank(level string) int { return slices.Index(Levels, level) + 1 }
 
 // LevelFor is the level a request method needs.
 func LevelFor(method string) string {
 	switch method {
 	case "GET", "HEAD", "OPTIONS":
-		return PermRead
+		return Read
 	case "DELETE":
-		return PermDelete
+		return Delete
 	}
-	return PermWrite
+	return Write
 }
 
 // Presets are ready-made sets of grants, named after space roles. They are
@@ -53,35 +56,35 @@ var Presets = []string{PresetViewer, PresetEditor, PresetAdmin}
 // read-only: they shape how everything else is counted or sent.
 var EditorResources = []string{"accounts", "automation", "budgets", "debts", "recurring", "tags", "transactions"}
 
-// PresetPermissions expands a preset over some parts of a space (those a kind
+// FromPreset expands a preset over some parts of a space (those a kind
 // of token can hold, see ResourcesFor). allowDelete lets an editor delete
 // transactions too; it means nothing for the other presets.
-func PresetPermissions(preset string, allowDelete bool, resources []string) ([]string, error) {
+func FromPreset(preset string, allowDelete bool, resources []string) ([]string, error) {
 	grant := func(level string, resources ...string) []string {
 		out := make([]string, len(resources))
 		for i, r := range resources {
-			out[i] = Perm(r, level)
+			out[i] = New(r, level)
 		}
 		return out
 	}
 	switch preset {
 	case PresetViewer:
-		return grant(PermRead, resources...), nil
+		return grant(Read, resources...), nil
 	case PresetEditor:
-		out := grant(PermRead, resources...)
+		out := grant(Read, resources...)
 		for _, r := range EditorResources {
 			if !slices.Contains(resources, r) {
 				continue
 			}
-			level := PermWrite
+			level := Write
 			if allowDelete && r == "transactions" {
-				level = PermDelete
+				level = Delete
 			}
-			out = append(out, Perm(r, level))
+			out = append(out, New(r, level))
 		}
-		return NormalizePermissions(out)
+		return Normalize(out)
 	case PresetAdmin:
-		return grant(PermDelete, resources...), nil
+		return grant(Delete, resources...), nil
 	}
 	return nil, fmt.Errorf("unknown preset %q", preset)
 }
@@ -104,17 +107,20 @@ var MCPResources = []string{
 // and only the parts its tools use. The kind is set when the token is issued
 // and never changes, so nothing has to guess it from the name.
 const (
-	TokenPersonal = "personal"
-	TokenMCP      = "mcp"
+	KindPersonal = "personal"
+	KindMCP      = "mcp"
 )
 
 // ResourcesFor are the parts of a space a token of this kind can be given.
 func ResourcesFor(kind string) []string {
-	if kind == TokenMCP {
+	if kind == KindMCP {
 		return MCPResources
 	}
 	return APIResources
 }
+
+// ErrBadGrant is returned for permissions or spaces a token cannot be given.
+var ErrBadGrant = errors.New("invalid token grant")
 
 // grantError is an ErrBadGrant that says what is wrong.
 type grantError string
@@ -122,11 +128,11 @@ type grantError string
 func (e grantError) Error() string      { return string(e) }
 func (grantError) Is(target error) bool { return target == ErrBadGrant }
 
-// CheckKindPermissions refuses a grant that reaches beyond what the kind of
+// CheckKind refuses a grant that reaches beyond what the kind of
 // token may hold. permissions are already normalized. The error is an
 // ErrBadGrant whose text can be shown to the user.
-func CheckKindPermissions(kind string, permissions []string) error {
-	if kind == TokenMCP && len(permissions) == 0 {
+func CheckKind(kind string, permissions []string) error {
+	if kind == KindMCP && len(permissions) == 0 {
 		return grantError("A connected app needs at least one permission")
 	}
 	allowed := ResourcesFor(kind)
@@ -139,36 +145,36 @@ func CheckKindPermissions(kind string, permissions []string) error {
 	return nil
 }
 
-// Perm is the grant string for a resource and level.
-func Perm(resource, level string) string { return resource + ":" + level }
+// New is the grant string for a resource and level.
+func New(resource, level string) string { return resource + ":" + level }
 
-// ReadPerms grants read on each resource.
-func ReadPerms(resources ...string) []string {
+// ReadAll grants read on each resource.
+func ReadAll(resources ...string) []string {
 	out := make([]string, len(resources))
 	for i, r := range resources {
-		out[i] = Perm(r, PermRead)
+		out[i] = New(r, Read)
 	}
 	return out
 }
 
-// NormalizePermissions checks a list of grants and returns it sorted, without
+// Normalize checks a list of grants and returns it sorted, without
 // duplicates, keeping only the highest level of each resource.
 // An unknown resource or level is an error: a typo must not become a token
 // that silently grants less (or, by a loose match, more) than asked.
-func NormalizePermissions(in []string) ([]string, error) {
+func Normalize(in []string) ([]string, error) {
 	level := map[string]string{}
 	for _, p := range in {
 		resource, lv, ok := strings.Cut(p, ":")
-		if !ok || !slices.Contains(APIResources, resource) || permRank(lv) == 0 {
+		if !ok || !slices.Contains(APIResources, resource) || Rank(lv) == 0 {
 			return nil, fmt.Errorf("unknown permission %q", p)
 		}
-		if permRank(lv) > permRank(level[resource]) {
+		if Rank(lv) > Rank(level[resource]) {
 			level[resource] = lv
 		}
 	}
 	out := make([]string, 0, len(level))
 	for resource, lv := range level {
-		out = append(out, Perm(resource, lv))
+		out = append(out, New(resource, lv))
 	}
 	slices.Sort(out)
 	return out, nil

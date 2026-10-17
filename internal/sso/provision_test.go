@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"savvy-go/internal/auth"
+	"savvy-go/internal/auth/totp"
 )
 
 func (e *ssoEnv) admin(t *testing.T) *auth.User {
@@ -231,7 +232,7 @@ func TestProvisionReportsTwoFactorForLinkedUsers(t *testing.T) {
 		t.Fatal(err)
 	}
 	root, _ = e.svc.Users.ByID(e.ctx, root.ID)
-	if _, err := tf.Confirm(e.ctx, root, auth.TOTPNow(secret)); err != nil {
+	if _, err := tf.Confirm(e.ctx, root, totp.Now(secret)); err != nil {
 		t.Fatal(err)
 	}
 	_, needs, err := e.svc.Provision(e.ctx, *e.p, ident("root-sub", "root@test.com", true))

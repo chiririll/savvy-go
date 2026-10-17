@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"savvy-go/internal/auth"
+	"savvy-go/internal/auth/permissions"
 	"savvy-go/internal/mail/smtp"
 	"savvy-go/internal/sso"
 )
@@ -134,7 +135,7 @@ func TestUnverifiedUserIsHeldBackOnAPITokensToo(t *testing.T) {
 	}
 	user := a.createUser("u@test.com", "secret1", roleEditor)
 	us := a.issue(user, false)
-	res := a.do("POST", "/api/auth/api-tokens", map[string]any{"name": "t", "permissions": allPerms(auth.PermRead), "all_spaces": true}, us.Token, us.CSRF)
+	res := a.do("POST", "/api/auth/api-tokens", map[string]any{"name": "t", "permissions": allPerms(permissions.Read), "all_spaces": true}, us.Token, us.CSRF)
 	raw, _ := decodeJSON(t, res)["data"].(map[string]any)["token"].(string)
 	if res.StatusCode != 201 || raw == "" {
 		t.Fatalf("mint a token: %d", res.StatusCode)
