@@ -104,16 +104,13 @@ func (h Handler) webauthnLoginOptions(w http.ResponseWriter, r *http.Request) {
 		TwoFactorToken *string `json:"two_factor_token"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
-	var userID *int64
 	if body.TwoFactorToken != nil && *body.TwoFactorToken != "" {
 		u, err := h.Challenges.Resolve(r.Context(), *body.TwoFactorToken)
 		if err != nil || u == nil {
 			httpx.WriteMessage(w, http.StatusUnauthorized, "Invalid or expired token.")
 			return
 		}
-		userID = &u.ID
-		u2 := u
-		token, options, err := h.WebAuthn.BeginLogin(r.Context(), u2)
+		token, options, err := h.WebAuthn.BeginLogin(r.Context(), u)
 		if err != nil {
 			httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 			return
@@ -121,7 +118,6 @@ func (h Handler) webauthnLoginOptions(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteJSON(w, http.StatusOK, dto.WebAuthnChallenge{Token: token, Options: options})
 		return
 	}
-	_ = userID
 	token, options, err := h.WebAuthn.BeginLogin(r.Context(), nil)
 	if err != nil {
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())

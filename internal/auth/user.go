@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -138,7 +139,11 @@ func (s Users) Update(ctx context.Context, id int64, name, email, role *string, 
 		}
 	}
 	if role != nil {
-		u.Role = *role
+		r := NormalizeRole(*role)
+		if !ValidRole(r) {
+			return nil, errors.New("invalid role")
+		}
+		u.Role = r
 	}
 	if verified != nil {
 		u.EmailVerified = *verified

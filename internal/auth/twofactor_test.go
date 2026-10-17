@@ -123,6 +123,43 @@ func TestRecoveryCodesLookRight(t *testing.T) {
 	}
 }
 
+func TestRandomCharactersAreUniform(t *testing.T) {
+	for _, alphabet := range []string{recoveryChars, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"} {
+		const n = 200000
+		counts := map[rune]int{}
+		for _, c := range randomFrom(alphabet, n) {
+			counts[c]++
+		}
+		want := float64(n) / float64(len(alphabet))
+		var chi float64
+		for _, c := range alphabet {
+			d := float64(counts[c]) - want
+			chi += d * d / want
+		}
+		// Degrees of freedom are len-1 (30 or 61); 120 is far above the 99.99th
+		// percentile for both, so a fair generator never trips it.
+		if len(counts) != len(alphabet) || chi > 120 {
+			t.Errorf("alphabet of %d: chi-square %.1f, %d distinct", len(alphabet), chi, len(counts))
+		}
+	}
+}
+
+func TestEnableDropsRecoveryCodesOfEarlierSetup(t *testing.T) {
+	d := newDB(t)
+	ctx := context.Background()
+	tf := TwoFactor{DB: d, Users: Users{DB: d}}
+	u := newUser(t, d, "a@test.com", RoleUser)
+	if _, err := generateCodes(ctx, tf.repo(), u.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := tf.Enable(ctx, u); err != nil {
+		t.Fatal(err)
+	}
+	if n := tf.Remaining(ctx, u.ID); n != 0 {
+		t.Errorf("%d stale recovery codes survive a new setup", n)
+	}
+}
+
 func TestRecoveryCodesAreStoredAsHashes(t *testing.T) {
 	d := newDB(t)
 	ctx := context.Background()
@@ -130,7 +167,7 @@ func TestRecoveryCodesAreStoredAsHashes(t *testing.T) {
 	tf := TwoFactor{DB: d, Users: users}
 	a := newUser(t, d, "a@test.com", RoleUser)
 	b := newUser(t, d, "b@test.com", RoleUser)
-	codes, err := tf.generateCodes(ctx, a.ID)
+	codes, err := generateCodes(ctx, tf.repo(), a.ID)
 	if err != nil {
 		t.Fatal(err)
 	}

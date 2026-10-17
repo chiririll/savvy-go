@@ -71,6 +71,22 @@ func TestUpdateReverifiesAChangedAddress(t *testing.T) {
 	}
 }
 
+func TestUpdateRefusesAnUnknownRole(t *testing.T) {
+	d := newDB(t)
+	ctx := context.Background()
+	users := Users{DB: d}
+	u := newUser(t, d, "a@test.com", RoleUser)
+	if _, err := users.Update(ctx, u.ID, nil, nil, ptr("root"), nil, nil); err == nil {
+		t.Error("role root was accepted")
+	}
+	if got, _ := users.ByID(ctx, u.ID); got.Role != RoleUser {
+		t.Errorf("role changed to %q", got.Role)
+	}
+	if got, err := users.Update(ctx, u.ID, nil, nil, ptr("read-only"), nil, nil); err != nil || got.Role != RoleUser {
+		t.Errorf("a retired role maps to user: %v %v", got, err)
+	}
+}
+
 func TestUpdateKeepsThePasswordUnlessGivenOne(t *testing.T) {
 	d := newDB(t)
 	ctx := context.Background()

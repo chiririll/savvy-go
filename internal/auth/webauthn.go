@@ -2,7 +2,6 @@ package auth
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -348,8 +347,4 @@ func descriptors(creds []webauthn.Credential) []protocol.CredentialDescriptor {
 
 func b64(b []byte) string {
 	return base64.RawURLEncoding.EncodeToString(b)
-}
-
-func init() {
-	_ = rand.Reader
 }

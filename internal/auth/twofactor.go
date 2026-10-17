@@ -2,7 +2,6 @@ package auth
 
 import (
 	"context"
-	"crypto/rand"
 	"strconv"
 	"strings"
 	"time"
@@ -45,10 +44,18 @@ func (t TwoFactor) Enable(ctx context.Context, u *User) (secret, uri string, err
 	if err != nil {
 		return "", "", err
 	}
-	if err := t.Users.SetTwoFactor(ctx, u.ID, &secret, true, false); err != nil {
-		return "", "", err
-	}
-	if err := t.repo().ClearTwoFactorStep(ctx, u.ID); err != nil {
+	err = store.Tx(ctx, t.DB, func(tx store.DB) error {
+		r := repo.Repo{DB: tx}
+		if err := r.SetTwoFactor(ctx, u.ID, &secret, true, false, time.Now().UTC()); err != nil {
+			return err
+		}
+		// A new secret starts clean: no codes from an earlier pending setup.
+		if err := r.DeleteRecoveryCodes(ctx, u.ID); err != nil {
+			return err
+		}
+		return r.ClearTwoFactorStep(ctx, u.ID)
+	})
+	if err != nil {
 		return "", "", err
 	}
 	return secret, totp.ProvisioningURI(u.Email, secret), nil
@@ -61,10 +68,23 @@ func (t TwoFactor) Confirm(ctx context.Context, u *User, code string) ([]string,
 	if !t.verifyTOTP(ctx, u, code) {
 		return nil, fmtErr("invalid code")
 	}
-	if err := t.Users.SetTwoFactor(ctx, u.ID, u.TwoFactorSecret, true, true); err != nil {
+	var codes []string
+	err := store.Tx(ctx, t.DB, func(tx store.DB) (err error) {
+		r := repo.Repo{DB: tx}
+		if err = r.SetTwoFactor(ctx, u.ID, u.TwoFactorSecret, true, true, time.Now().UTC()); err != nil {
+			return err
+		}
+		// Codes are made once, here: drop any left from an earlier attempt.
+		if err = r.DeleteRecoveryCodes(ctx, u.ID); err != nil {
+			return err
+		}
+		codes, err = generateCodes(ctx, r, u.ID)
+		return err
+	})
+	if err != nil {
 		return nil, err
 	}
-	return t.generateCodes(ctx, u.ID)
+	return codes, nil
 }
 
 func (t TwoFactor) Disable(ctx context.Context, u *User, code string) error {
@@ -74,11 +94,16 @@ func (t TwoFactor) Disable(ctx context.Context, u *User, code string) error {
 	if !t.VerifyAny(ctx, u, code) {
 		return fmtErr("invalid code")
 	}
-	if err := t.Users.SetTwoFactor(ctx, u.ID, nil, false, false); err != nil {
-		return err
-	}
-	_ = t.repo().DeleteRecoveryCodes(ctx, u.ID)
-	return t.repo().ClearTwoFactorStep(ctx, u.ID)
+	return store.Tx(ctx, t.DB, func(tx store.DB) error {
+		r := repo.Repo{DB: tx}
+		if err := r.SetTwoFactor(ctx, u.ID, nil, false, false, time.Now().UTC()); err != nil {
+			return err
+		}
+		if err := r.DeleteRecoveryCodes(ctx, u.ID); err != nil {
+			return err
+		}
+		return r.ClearTwoFactorStep(ctx, u.ID)
+	})
 }
 
 func (t TwoFactor) VerifyAny(ctx context.Context, u *User, code string) bool {
@@ -112,16 +137,29 @@ func (t TwoFactor) Regenerate(ctx context.Context, u *User, code string) ([]stri
 	if !t.verifyTOTP(ctx, u, code) {
 		return nil, fmtErr("invalid code")
 	}
-	_ = t.repo().InvalidateUnusedRecoveryCodes(ctx, u.ID, time.Now().UTC())
-	return t.generateCodes(ctx, u.ID)
+	var codes []string
+	err := store.Tx(ctx, t.DB, func(tx store.DB) (err error) {
+		r := repo.Repo{DB: tx}
+		if err = r.InvalidateUnusedRecoveryCodes(ctx, u.ID, time.Now().UTC()); err != nil {
+			return err
+		}
+		codes, err = generateCodes(ctx, r, u.ID)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return codes, nil
 }
 
-func (t TwoFactor) generateCodes(ctx context.Context, userID int64) ([]string, error) {
+// generateCodes stores 8 new codes through r, which must be a transaction so
+// a failure leaves none of them behind.
+func generateCodes(ctx context.Context, r repo.Repo, userID int64) ([]string, error) {
 	var codes []string
 	now := time.Now().UTC()
 	for i := 0; i < 8; i++ {
 		plain := recoveryCode()
-		if err := t.repo().InsertRecoveryCode(ctx, userID, recoveryHash(userID, plain), now); err != nil {
+		if err := r.InsertRecoveryCode(ctx, userID, recoveryHash(userID, plain), now); err != nil {
 			return nil, err
 		}
 		codes = append(codes, plain)
@@ -130,14 +168,8 @@ func (t TwoFactor) generateCodes(ctx context.Context, userID int64) ([]string, e
 }
 
 func recoveryCode() string {
-	b := make([]byte, 8)
-	_, _ = rand.Read(b)
-	var p1, p2 strings.Builder
-	for i := 0; i < 4; i++ {
-		p1.WriteByte(recoveryChars[int(b[i])%len(recoveryChars)])
-		p2.WriteByte(recoveryChars[int(b[i+4])%len(recoveryChars)])
-	}
-	return p1.String() + "-" + p2.String()
+	s := randomFrom(recoveryChars, 8)
+	return s[:4] + "-" + s[4:]
 }
 
 type tfErr string
