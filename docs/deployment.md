@@ -58,7 +58,7 @@ Keys, with their defaults, are listed in the generated file itself:
 
 A value the application cannot run with, such as a lifetime that is not a positive number or an empty cookie name under `[security]`, stops it at start with the section and key in the error. `[mailer]` is the exception: see [Email](#email).
 
-`app_url` is the public `https://` URL of your instance. SSO and passkeys stay disabled without it. The admin panel (System → Server) shows it but does not change it for now: edit the file and restart. Behind Docker, edit `/data/config.toml` once.
+`app_url` is the public `https://` URL of your instance. SSO and passkeys stay disabled without it. A passkey needs user verification (a PIN or biometric) both to register and to sign in, so a security key with no PIN set cannot be used. The admin panel (System → Server) shows it but does not change it for now: edit the file and restart. Behind Docker, edit `/data/config.toml` once.
 
 Limits such as spaces per user, space quotas and the number of kept backups are not in the file: server admins set them in **Administration → System**.
 

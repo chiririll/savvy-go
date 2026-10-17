@@ -689,9 +689,11 @@ func (r Repo) DeletePasskey(ctx context.Context, userID, id int64) (bool, error)
 	return n > 0, nil
 }
 
-func (r Repo) TouchPasskey(ctx context.Context, credentialID string, now time.Time) error {
-	return r.q().TouchWebAuthnCredential(ctx, sqlc.TouchWebAuthnCredentialParams{
-		LastUsedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now), CredentialID: credentialID,
+// UpdatePasskeyAfterLogin stores the credential record and sign count the
+// authenticator reported, and marks the passkey as used.
+func (r Repo) UpdatePasskeyAfterLogin(ctx context.Context, credentialID, record string, counter int64, now time.Time) error {
+	return r.q().UpdateWebAuthnCredentialAfterLogin(ctx, sqlc.UpdateWebAuthnCredentialAfterLoginParams{
+		Record: record, Counter: counter, LastUsedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now), CredentialID: credentialID,
 	})
 }
 

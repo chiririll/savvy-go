@@ -33,6 +33,8 @@ type authenticator struct {
 	key     *ecdsa.PrivateKey
 	credID  []byte
 	counter uint32
+	// noUV makes assertions without the user-verified flag: a key with no PIN.
+	noUV bool
 }
 
 func newAuthenticator(t *testing.T) *authenticator {
@@ -117,7 +119,11 @@ func (a *authenticator) assertWith(options any, userHandle []byte, origin string
 	a.t.Helper()
 	a.counter++
 	cd := clientData(a.t, "webauthn.get", challengeOf(a.t, options), origin)
-	data := a.authData(waRPID, flagUserPresent|flagUserVerified)
+	flags := byte(flagUserPresent | flagUserVerified)
+	if a.noUV {
+		flags = flagUserPresent
+	}
+	data := a.authData(waRPID, flags)
 	hash := sha256.Sum256(cd)
 	digest := sha256.Sum256(append(append([]byte{}, data...), hash[:]...))
 	sig, err := ecdsa.SignASN1(rand.Reader, key, digest[:])
@@ -200,6 +206,139 @@ func TestPasskeyDiscoverableLoginFindsTheUser(t *testing.T) {
 	got, err := w.FinishLogin(ctx, token, dev.assert(options, []byte(strconv.FormatInt(u.ID, 10))))
 	if err != nil || got == nil || got.ID != u.ID {
 		t.Fatalf("login = %+v, %v", got, err)
+	}
+}
+
+func TestPasskeyLoginNeedsUserVerification(t *testing.T) {
+	ctx := context.Background()
+	w, u, dev := newWebAuthn(t)
+	handle := []byte(strconv.FormatInt(u.ID, 10))
+
+	dev.noUV = true
+	token, options, _ := w.BeginLogin(ctx, u)
+	if got, err := w.FinishLogin(ctx, token, dev.assert(options, nil)); err == nil || got != nil {
+		t.Errorf("a tap without a PIN signed in (user-bound): %+v", got)
+	}
+	token, options, _ = w.BeginLogin(ctx, nil)
+	if got, err := w.FinishLogin(ctx, token, dev.assert(options, handle)); err == nil || got != nil {
+		t.Errorf("a tap without a PIN signed in (discoverable): %+v", got)
+	}
+
+	dev.noUV = false
+	token, options, _ = w.BeginLogin(ctx, u)
+	if got, err := w.FinishLogin(ctx, token, dev.assert(options, nil)); err != nil || got == nil {
+		t.Errorf("a verified assertion is refused (user-bound): %v", err)
+	}
+	token, options, _ = w.BeginLogin(ctx, nil)
+	if got, err := w.FinishLogin(ctx, token, dev.assert(options, handle)); err != nil || got == nil {
+		t.Errorf("a verified assertion is refused (discoverable): %v", err)
+	}
+}
+
+func TestPasskeyOptionsAskForUserVerification(t *testing.T) {
+	ctx := context.Background()
+	w, u, _ := newWebAuthn(t)
+
+	_, reg, err := w.BeginRegistration(ctx, u)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := json.Marshal(reg)
+	var r struct {
+		AuthenticatorSelection struct {
+			UserVerification string `json:"userVerification"`
+			ResidentKey      string `json:"residentKey"`
+		} `json:"authenticatorSelection"`
+	}
+	if err := json.Unmarshal(raw, &r); err != nil {
+		t.Fatal(err)
+	}
+	if r.AuthenticatorSelection.UserVerification != "required" || r.AuthenticatorSelection.ResidentKey != "required" {
+		t.Errorf("registration selection = %+v, want userVerification and residentKey required", r.AuthenticatorSelection)
+	}
+
+	for name, user := range map[string]*User{"user-bound": u, "discoverable": nil} {
+		_, opts, err := w.BeginLogin(ctx, user)
+		if err != nil {
+			t.Fatal(err)
+		}
+		raw, _ := json.Marshal(opts)
+		var l struct {
+			UserVerification string `json:"userVerification"`
+		}
+		_ = json.Unmarshal(raw, &l)
+		if l.UserVerification != "required" {
+			t.Errorf("%s login userVerification = %q, want required", name, l.UserVerification)
+		}
+	}
+}
+
+func storedSignCount(t *testing.T, w WebAuthn, userID int64) uint32 {
+	t.Helper()
+	creds, err := w.loadCreds(context.Background(), userID)
+	if err != nil || len(creds) != 1 {
+		t.Fatalf("credentials %d, %v", len(creds), err)
+	}
+	return creds[0].Authenticator.SignCount
+}
+
+func TestPasskeyLoginMovesTheSignCountForward(t *testing.T) {
+	ctx := context.Background()
+	w, u, dev := newWebAuthn(t)
+	handle := []byte(strconv.FormatInt(u.ID, 10))
+
+	token, options, _ := w.BeginLogin(ctx, u)
+	if _, err := w.FinishLogin(ctx, token, dev.assert(options, nil)); err != nil {
+		t.Fatal(err)
+	}
+	if got := storedSignCount(t, w, u.ID); got != dev.counter {
+		t.Errorf("stored count %d after a user-bound login, device at %d", got, dev.counter)
+	}
+
+	token, options, _ = w.BeginLogin(ctx, nil)
+	if _, err := w.FinishLogin(ctx, token, dev.assert(options, handle)); err != nil {
+		t.Fatal(err)
+	}
+	if got := storedSignCount(t, w, u.ID); got != dev.counter {
+		t.Errorf("stored count %d after a discoverable login, device at %d", got, dev.counter)
+	}
+}
+
+func TestPasskeyLoginRefusesAClonedAuthenticator(t *testing.T) {
+	ctx := context.Background()
+	w, u, dev := newWebAuthn(t)
+	handle := []byte(strconv.FormatInt(u.ID, 10))
+
+	token, options, _ := w.BeginLogin(ctx, u)
+	if _, err := w.FinishLogin(ctx, token, dev.assert(options, nil)); err != nil {
+		t.Fatal(err)
+	}
+	token, options, _ = w.BeginLogin(ctx, u)
+	if _, err := w.FinishLogin(ctx, token, dev.assert(options, nil)); err != nil {
+		t.Fatal(err)
+	}
+	stored := storedSignCount(t, w, u.ID)
+
+	// The clone's counter is behind what the real device already used.
+	dev.counter = 0
+	token, options, _ = w.BeginLogin(ctx, u)
+	if got, err := w.FinishLogin(ctx, token, dev.assert(options, nil)); err == nil || got != nil {
+		t.Errorf("a stale counter signed in (user-bound): %+v", got)
+	}
+	dev.counter = 0
+	token, options, _ = w.BeginLogin(ctx, nil)
+	if got, err := w.FinishLogin(ctx, token, dev.assert(options, handle)); err == nil || got != nil {
+		t.Errorf("a stale counter signed in (discoverable): %+v", got)
+	}
+	if got := storedSignCount(t, w, u.ID); got != stored {
+		t.Errorf("a refused login changed the stored count from %d to %d", stored, got)
+	}
+
+	// The real device, ahead of the stored count, still signs in.
+	dev.counter = stored
+	token, options, _ = w.BeginLogin(ctx, u)
+	if _, err := w.FinishLogin(ctx, token, dev.assert(options, nil)); err != nil {
+		t.Errorf("the real device is refused: %v", err)
 	}
 }
 

@@ -32,5 +32,5 @@ SELECT record FROM webauthn_credentials WHERE user_id=?;
 -- name: GetWebAuthnUserIDByCredential :one
 SELECT user_id FROM webauthn_credentials WHERE credential_id=?;
 
--- name: TouchWebAuthnCredential :exec
-UPDATE webauthn_credentials SET last_used_at=?, updated_at=? WHERE credential_id=?;
+-- name: UpdateWebAuthnCredentialAfterLogin :exec
+UPDATE webauthn_credentials SET record=?, counter=?, last_used_at=?, updated_at=? WHERE credential_id=?;

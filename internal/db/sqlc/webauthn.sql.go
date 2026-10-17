@@ -229,17 +229,25 @@ func (q *Queries) RenameWebAuthnCredential(ctx context.Context, arg RenameWebAut
 	)
 }
 
-const touchWebAuthnCredential = `-- name: TouchWebAuthnCredential :exec
-UPDATE webauthn_credentials SET last_used_at=?, updated_at=? WHERE credential_id=?
+const updateWebAuthnCredentialAfterLogin = `-- name: UpdateWebAuthnCredentialAfterLogin :exec
+UPDATE webauthn_credentials SET record=?, counter=?, last_used_at=?, updated_at=? WHERE credential_id=?
 `
 
-type TouchWebAuthnCredentialParams struct {
+type UpdateWebAuthnCredentialAfterLoginParams struct {
+	Record       string
+	Counter      int64
 	LastUsedAt   sql.NullString
 	UpdatedAt    sql.NullString
 	CredentialID string
 }
 
-func (q *Queries) TouchWebAuthnCredential(ctx context.Context, arg TouchWebAuthnCredentialParams) error {
-	_, err := q.db.ExecContext(ctx, touchWebAuthnCredential, arg.LastUsedAt, arg.UpdatedAt, arg.CredentialID)
+func (q *Queries) UpdateWebAuthnCredentialAfterLogin(ctx context.Context, arg UpdateWebAuthnCredentialAfterLoginParams) error {
+	_, err := q.db.ExecContext(ctx, updateWebAuthnCredentialAfterLogin,
+		arg.Record,
+		arg.Counter,
+		arg.LastUsedAt,
+		arg.UpdatedAt,
+		arg.CredentialID,
+	)
 	return err
 }
