@@ -4,7 +4,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"savvy-go/internal/auth"
-	"savvy-go/internal/bootstrap"
+	"savvy-go/internal/firstrun"
 	"savvy-go/internal/httpserver/httpx/guard"
 	"savvy-go/internal/httpserver/httpx/login"
 	"savvy-go/internal/httpserver/httpx/routing"
@@ -21,7 +21,7 @@ func init() {
 			Tokens:     routing.Get[auth.PasswordTokens](d),
 			Challenges: routing.Get[auth.Challenges](d),
 			Settings:   routing.Get[settings.Store](d),
-			Bootstrap:  routing.Get[*bootstrap.Guard](d),
+			Bootstrap:  routing.Get[*firstrun.Guard](d),
 			Login:      d.Login,
 			Guard:      d.Guard,
 		}
@@ -41,7 +41,7 @@ type Handler struct {
 	Tokens     auth.PasswordTokens
 	Challenges auth.Challenges
 	Settings   settings.Store
-	Bootstrap  *bootstrap.Guard
+	Bootstrap  *firstrun.Guard
 	Login      login.Service
 	Guard      *guard.Guard
 }

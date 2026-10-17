@@ -11,8 +11,8 @@ import (
 	"savvy-go/internal/config"
 	"savvy-go/internal/currencydata"
 	"savvy-go/internal/httpserver"
+	"savvy-go/internal/jobs"
 	"savvy-go/internal/locator"
-	"savvy-go/internal/runtime"
 	"savvy-go/internal/seed"
 	"savvy-go/internal/store/sqlite"
 )
@@ -90,7 +90,7 @@ func (b *Builder) Build(ctx context.Context) (*Process, error) {
 		return nil, err
 	}
 
-	queue := runtime.NewQueue(2)
+	queue := jobs.NewQueue(2)
 	rates := currencydata.New()
 	loc, err := app.New(cfg, st, keys,
 		app.WithConfig(file),

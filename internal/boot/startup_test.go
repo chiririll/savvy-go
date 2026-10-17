@@ -8,7 +8,7 @@ import (
 
 	"savvy-go/internal/appconfig"
 	"savvy-go/internal/auth"
-	"savvy-go/internal/bootstrap"
+	"savvy-go/internal/firstrun"
 	"savvy-go/internal/store/sqlite"
 )
 
@@ -29,7 +29,7 @@ func TestStartBootstrapOnAnEmptyServer(t *testing.T) {
 	if err != nil || !g.Active() {
 		t.Fatalf("guard %v, err %v", g, err)
 	}
-	if _, err := os.Stat(filepath.Join(cfg.DataDir, bootstrap.FileName)); err != nil {
+	if _, err := os.Stat(filepath.Join(cfg.DataDir, firstrun.FileName)); err != nil {
 		t.Fatal(err)
 	}
 	again, _ := startBootstrap(context.Background(), cfg, "localhost:8080", st)
@@ -44,7 +44,7 @@ func TestStartBootstrapSkipsAServerWithUsers(t *testing.T) {
 	if _, err := (auth.Users{DB: st.Server()}).Create(context.Background(), "A", "a@a.com", &pass, auth.RoleAdmin); err != nil {
 		t.Fatal(err)
 	}
-	stale := filepath.Join(cfg.DataDir, bootstrap.FileName)
+	stale := filepath.Join(cfg.DataDir, firstrun.FileName)
 	if err := os.WriteFile(stale, []byte("old\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}

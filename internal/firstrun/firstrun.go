@@ -1,8 +1,8 @@
-// Package bootstrap protects the first run. While the server has no users,
+// Package firstrun protects the first run. While the server has no users,
 // registration needs a one-time password that is printed in the log and kept in
 // a file in the data directory, so only someone with access to the machine can
 // claim the admin account.
-package bootstrap
+package firstrun
 
 import (
 	"crypto/rand"

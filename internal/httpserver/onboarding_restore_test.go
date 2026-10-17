@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"savvy-go/internal/auth"
-	"savvy-go/internal/bootstrap"
+	"savvy-go/internal/firstrun"
 )
 
 // firstRunRestore posts the restore form with no session, as the setup page does.
@@ -129,7 +129,7 @@ func TestFirstRunRestoreLoadsTheBackupAndClosesSetup(t *testing.T) {
 	if a.bootstrap.Active() {
 		t.Fatal("password still valid after the restore")
 	}
-	if _, err := os.Stat(filepath.Join(a.svc.Cfg.DataDir, bootstrap.FileName)); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(a.svc.Cfg.DataDir, firstrun.FileName)); !os.IsNotExist(err) {
 		t.Fatalf("password file still there: %v", err)
 	}
 	body := decodeJSON(t, a.do("GET", "/api/auth/status", nil, "", ""))

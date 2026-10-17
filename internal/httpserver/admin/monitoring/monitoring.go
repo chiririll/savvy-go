@@ -6,9 +6,9 @@ import (
 	"runtime"
 	"time"
 
+	"savvy-go/internal/httpserver/admin/sysinfo"
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/importer"
-	"savvy-go/internal/platform/sysinfo"
 )
 
 var processStarted = time.Now()

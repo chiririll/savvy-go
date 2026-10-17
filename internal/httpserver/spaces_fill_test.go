@@ -9,8 +9,8 @@ import (
 
 	"savvy-go/internal/auth"
 	"savvy-go/internal/ledger"
-	"savvy-go/internal/spacefill"
 	"savvy-go/internal/spaces"
+	"savvy-go/internal/spaces/spacefill"
 )
 
 // fixedRates is a rate source with exactly the currencies and rates it is given

@@ -12,7 +12,7 @@ import (
 
 	"savvy-go/internal/auth"
 	"savvy-go/internal/auth/password"
-	"savvy-go/internal/bootstrap"
+	"savvy-go/internal/firstrun"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -103,7 +103,7 @@ func (h Handler) authRegister(w http.ResponseWriter, r *http.Request) {
 		if n, err := h.Users.Count(r.Context()); err != nil {
 			return err
 		} else if n > 0 {
-			return bootstrap.ErrClosed
+			return firstrun.ErrClosed
 		}
 		pass := body.Password
 		var err error
@@ -113,9 +113,9 @@ func (h Handler) authRegister(w http.ResponseWriter, r *http.Request) {
 		return nil
 	})
 	switch {
-	case errors.Is(err, bootstrap.ErrWrongPassword):
+	case errors.Is(err, firstrun.ErrWrongPassword):
 		httpx.WriteValidation(w, map[string][]string{"bootstrap_password": {"The bootstrap password is missing or wrong."}})
-	case errors.Is(err, bootstrap.ErrClosed):
+	case errors.Is(err, firstrun.ErrClosed):
 		h.Bootstrap.Invalidate()
 		httpx.WriteMessage(w, http.StatusForbidden, "Registration is closed.")
 	case errors.Is(err, errEmailTaken):

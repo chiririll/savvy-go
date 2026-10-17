@@ -9,7 +9,7 @@ import (
 	backupx "savvy-go/internal/httpserver/httpx/backups"
 	"strings"
 
-	"savvy-go/internal/bootstrap"
+	"savvy-go/internal/firstrun"
 	"savvy-go/internal/legacy/restore"
 )
 
@@ -69,9 +69,9 @@ func (h Handler) onboardingRestore(w http.ResponseWriter, r *http.Request) {
 		_ = h.Backups.DeleteServer(saved)
 	}
 	switch {
-	case errors.Is(err, bootstrap.ErrWrongPassword):
+	case errors.Is(err, firstrun.ErrWrongPassword):
 		httpx.WriteValidation(w, map[string][]string{"bootstrap_password": {"The bootstrap password is missing or wrong."}})
-	case errors.Is(err, bootstrap.ErrClosed):
+	case errors.Is(err, firstrun.ErrClosed):
 		httpx.WriteMessage(w, http.StatusForbidden, "Restoring is closed.")
 	case errors.Is(err, errBackupWithoutUsers):
 		httpx.WriteValidation(w, map[string][]string{"file": {"The backup has no users."}})

@@ -10,10 +10,10 @@ import (
 	"log/slog"
 	"time"
 
+	"savvy-go/internal/jobs"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/locator"
 	"savvy-go/internal/recurring"
-	"savvy-go/internal/runtime"
 	"savvy-go/internal/settings"
 	"savvy-go/internal/spaces"
 	"savvy-go/internal/store"
@@ -45,8 +45,8 @@ func (p *Process) Start(ctx context.Context) {
 			return errors.Join(errs...)
 		}
 	}
-	runtime.NewScheduler(
-		runtime.Job{Name: "currencies:update", Interval: 24 * time.Hour, Run: func(ctx context.Context) error {
+	jobs.NewScheduler(
+		jobs.Job{Name: "currencies:update", Interval: 24 * time.Hour, Run: func(ctx context.Context) error {
 			// Rates are cached by base currency in the shared source, so spaces
 			// with the same base share one request. Expiring them here makes
 			// each base fetch once per run, and only if some space asks.
@@ -64,13 +64,13 @@ func (p *Process) Start(ctx context.Context) {
 				return err
 			})(ctx)
 		}},
-		runtime.Job{Name: "recurring:ensure-upcoming", Interval: time.Hour, Run: eachSpace(func(ctx context.Context, d store.DB) error {
+		jobs.Job{Name: "recurring:ensure-upcoming", Interval: time.Hour, Run: eachSpace(func(ctx context.Context, d store.DB) error {
 			return recurring.Service{DB: d, Txs: ledger.Transactions{DB: d}}.EnsureUpcoming(ctx)
 		})},
-		runtime.Job{Name: "uploads:prune", Interval: time.Hour, Run: locator.Get[uploads.Service](l).PruneExpired},
+		jobs.Job{Name: "uploads:prune", Interval: time.Hour, Run: locator.Get[uploads.Service](l).PruneExpired},
 		// Expired invitations are kept an hour past their expiry: that is the
 		// cooldown on inviting the same address again.
-		runtime.Job{Name: "invitations:prune", Interval: time.Hour, Run: func(ctx context.Context) error {
+		jobs.Job{Name: "invitations:prune", Interval: time.Hour, Run: func(ctx context.Context) error {
 			_, err := locator.Get[spaces.Service](l).PruneInvitations(ctx)
 			return err
 		}},

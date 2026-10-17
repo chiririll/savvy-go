@@ -18,13 +18,13 @@ import (
 
 	"savvy-go/internal/appconfig"
 	"savvy-go/internal/auth"
-	"savvy-go/internal/bootstrap"
 	"savvy-go/internal/currencydata"
+	"savvy-go/internal/firstrun"
 	"savvy-go/internal/httpserver/httpx/routing"
 	"savvy-go/internal/settings"
 	"savvy-go/internal/signing"
-	"savvy-go/internal/spacefill"
 	"savvy-go/internal/spaces"
+	"savvy-go/internal/spaces/spacefill"
 	"savvy-go/internal/store"
 	"savvy-go/internal/store/sqlite"
 )
@@ -46,7 +46,7 @@ type testApp struct {
 	svc    services
 	client *http.Client
 
-	bootstrap *bootstrap.Guard // the first-run password of the server
+	bootstrap *firstrun.Guard // the first-run password of the server
 }
 
 // openTestStore opens a store in cfg.DataDir with the embedded migrations.
@@ -74,7 +74,7 @@ func newTestApp(t *testing.T, opts ...Option) *testApp {
 	t.Helper()
 	cfg, _ := testConfig(t)
 	st := openTestStore(t, cfg)
-	guard := bootstrap.New(cfg.DataDir, bootstrap.Binary)
+	guard := firstrun.New(cfg.DataDir, firstrun.Binary)
 	opts = append([]Option{WithRates(currencydata.NewOffline()), WithBootstrap(guard)}, opts...)
 	s := newServer(cfg, st, testKeys(t, cfg), opts...)
 	space, err := servicesOf(s).Spaces.Create(context.Background(), "Test", nil)
@@ -287,7 +287,7 @@ func TestSessionSmokeRegisterMeLogout(t *testing.T) {
 
 func TestHostPrefixedCookieOverTLS(t *testing.T) {
 	cfg, _ := testConfig(t)
-	guard := bootstrap.New(cfg.DataDir, bootstrap.Binary)
+	guard := firstrun.New(cfg.DataDir, firstrun.Binary)
 	s := New(cfg.WithAppURL("https://savvy.test"), openTestStore(t, cfg), testKeys(t, cfg), WithBootstrap(guard))
 	ts := httptest.NewTLSServer(s.Handler())
 	t.Cleanup(ts.Close)

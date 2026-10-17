@@ -14,8 +14,8 @@ import (
 	"savvy-go/internal/httpserver/ui"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/mail"
-	"savvy-go/internal/spacefill"
 	"savvy-go/internal/spaces"
+	"savvy-go/internal/spaces/spacefill"
 	"savvy-go/internal/store"
 )
 

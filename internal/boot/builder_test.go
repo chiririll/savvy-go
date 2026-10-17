@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"savvy-go/internal/appconfig"
-	"savvy-go/internal/bootstrap"
+	"savvy-go/internal/firstrun"
 	"savvy-go/internal/locator"
 	"savvy-go/internal/signing"
 	"savvy-go/internal/store"
@@ -50,7 +50,7 @@ func TestBuildCreatesTheDataDirectoriesAndServices(t *testing.T) {
 		t.Error("the store is not registered")
 	}
 	// A server with no users starts with a first-run password.
-	if raw, err := os.ReadFile(filepath.Join(data, bootstrap.FileName)); err != nil || strings.TrimSpace(string(raw)) == "" {
+	if raw, err := os.ReadFile(filepath.Join(data, firstrun.FileName)); err != nil || strings.TrimSpace(string(raw)) == "" {
 		t.Errorf("bootstrap password file: %q, %v", raw, err)
 	}
 }
@@ -66,7 +66,7 @@ func TestRestartKeepsTheSigningKeyAndTheFirstRunPassword(t *testing.T) {
 		t.Fatal(err)
 	}
 	key1, _ := os.ReadFile(signing.Path(data))
-	pass1, _ := os.ReadFile(filepath.Join(data, bootstrap.FileName))
+	pass1, _ := os.ReadFile(filepath.Join(data, firstrun.FileName))
 	if err := first.Close(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +77,7 @@ func TestRestartKeepsTheSigningKeyAndTheFirstRunPassword(t *testing.T) {
 	}
 	defer second.Close(ctx)
 	key2, _ := os.ReadFile(signing.Path(data))
-	pass2, _ := os.ReadFile(filepath.Join(data, bootstrap.FileName))
+	pass2, _ := os.ReadFile(filepath.Join(data, firstrun.FileName))
 	if string(key1) != string(key2) {
 		t.Error("a restart replaced the signing key")
 	}

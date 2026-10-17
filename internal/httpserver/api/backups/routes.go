@@ -8,7 +8,7 @@ import (
 	"savvy-go/internal/appconfig"
 	"savvy-go/internal/auth"
 	"savvy-go/internal/backup"
-	"savvy-go/internal/bootstrap"
+	"savvy-go/internal/firstrun"
 	"savvy-go/internal/httpserver/httpx/guard"
 	"savvy-go/internal/httpserver/httpx/routing"
 	"savvy-go/internal/httpserver/ui"
@@ -30,7 +30,7 @@ func init() {
 			Spaces:     routing.Get[spaces.Service](d),
 			Settings:   routing.Get[settings.Store](d),
 			Users:      routing.Get[auth.Users](d),
-			Bootstrap:  routing.Get[*bootstrap.Guard](d),
+			Bootstrap:  routing.Get[*firstrun.Guard](d),
 			Guard:      d.Guard,
 		}
 		return []routing.Mount{
@@ -49,7 +49,7 @@ type Handler struct {
 	Spaces     spaces.Service
 	Settings   settings.Store
 	Users      auth.Users
-	Bootstrap  *bootstrap.Guard
+	Bootstrap  *firstrun.Guard
 	Guard      *guard.Guard
 }
 

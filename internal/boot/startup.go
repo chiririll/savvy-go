@@ -10,7 +10,7 @@ import (
 
 	"savvy-go/internal/appconfig"
 	"savvy-go/internal/auth"
-	"savvy-go/internal/bootstrap"
+	"savvy-go/internal/firstrun"
 	"savvy-go/internal/refsync"
 	"savvy-go/internal/settings"
 	"savvy-go/internal/signing"
@@ -56,18 +56,18 @@ func prepare(ctx context.Context, cfg appconfig.Config, st *sqlite.Store) (*sign
 // and prints it. It returns nil, which keeps registration closed, otherwise;
 // that includes a demo-seeded server. A password file left from an earlier run
 // is removed once users exist.
-func startBootstrap(ctx context.Context, cfg appconfig.Config, listen string, st *sqlite.Store) (*bootstrap.Guard, error) {
+func startBootstrap(ctx context.Context, cfg appconfig.Config, listen string, st *sqlite.Store) (*firstrun.Guard, error) {
 	n, err := (auth.Users{DB: st.Server()}).Count(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("count users: %w", err)
 	}
 	if n > 0 {
-		if err := os.Remove(filepath.Join(cfg.DataDir, bootstrap.FileName)); err != nil && !os.IsNotExist(err) {
+		if err := os.Remove(filepath.Join(cfg.DataDir, firstrun.FileName)); err != nil && !os.IsNotExist(err) {
 			slog.Warn("could not remove the stale bootstrap password file", "err", err)
 		}
 		return nil, nil
 	}
-	guard := bootstrap.New(cfg.DataDir, bootstrap.DetectEnv())
+	guard := firstrun.New(cfg.DataDir, firstrun.DetectEnv())
 	guard.Announce(openURL(listen, cfg.AppURL()))
 	return guard, nil
 }

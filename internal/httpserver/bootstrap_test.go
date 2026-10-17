@@ -8,8 +8,8 @@ import (
 	"sync"
 	"testing"
 
-	"savvy-go/internal/bootstrap"
 	"savvy-go/internal/currencydata"
+	"savvy-go/internal/firstrun"
 )
 
 func (a *testApp) register(password string, extra map[string]string) *http.Response {
@@ -49,7 +49,7 @@ func TestRegisterNeedsTheBootstrapPassword(t *testing.T) {
 
 // appWithGuard is a fresh server with the given bootstrap guard, or none when
 // g is nil. It has no shared test space.
-func appWithGuard(t *testing.T, g *bootstrap.Guard) *testApp {
+func appWithGuard(t *testing.T, g *firstrun.Guard) *testApp {
 	t.Helper()
 	cfg, _ := testConfig(t)
 	st := openTestStore(t, cfg)
@@ -76,7 +76,7 @@ func TestRegisterIsClosedOnceAUserExists(t *testing.T) {
 	if a.bootstrap.Active() {
 		t.Fatal("password still valid after the first user")
 	}
-	if _, err := os.Stat(filepath.Join(a.svc.Cfg.DataDir, bootstrap.FileName)); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(a.svc.Cfg.DataDir, firstrun.FileName)); !os.IsNotExist(err) {
 		t.Fatalf("password file still there: %v", err)
 	}
 }
@@ -131,7 +131,7 @@ func TestStatusCarriesTheBootstrapHint(t *testing.T) {
 	body := decodeJSON(t, a.do("GET", "/api/auth/status", nil, "", ""))
 	hint, _ := body["bootstrap_hint"].(map[string]any)
 	if body["needs_registration"] != true || hint["environment"] != "binary" ||
-		hint["file"] != filepath.Join(a.svc.Cfg.DataDir, bootstrap.FileName) {
+		hint["file"] != filepath.Join(a.svc.Cfg.DataDir, firstrun.FileName) {
 		t.Fatalf("status %v", body)
 	}
 	if _, leaked := hint["password"]; leaked || len(hint) != 2 {
@@ -146,9 +146,9 @@ func TestStatusCarriesTheBootstrapHint(t *testing.T) {
 }
 
 func TestStatusHintFollowsTheEnvironment(t *testing.T) {
-	for _, env := range []bootstrap.Env{bootstrap.Docker, bootstrap.Systemd} {
+	for _, env := range []firstrun.Env{firstrun.Docker, firstrun.Systemd} {
 		cfg, _ := testConfig(t)
-		a := appWithGuard(t, bootstrap.New(cfg.DataDir, env))
+		a := appWithGuard(t, firstrun.New(cfg.DataDir, env))
 		hint, _ := decodeJSON(t, a.do("GET", "/api/auth/status", nil, "", ""))["bootstrap_hint"].(map[string]any)
 		if hint["environment"] != string(env) {
 			t.Errorf("%s: hint %v", env, hint)

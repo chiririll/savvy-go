@@ -4,13 +4,13 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"savvy-go/internal/httpserver/httpx/routing"
-	"savvy-go/internal/runtime"
+	"savvy-go/internal/jobs"
 	"savvy-go/internal/uploads"
 )
 
 func init() {
 	routing.Register(func(d *routing.Deps) []routing.Mount {
-		h := Handler{Uploads: routing.Get[uploads.Service](d), Queue: routing.Get[*runtime.Queue](d)}
+		h := Handler{Uploads: routing.Get[uploads.Service](d), Queue: routing.Get[*jobs.Queue](d)}
 		return []routing.Mount{
 			routing.SpaceWrite(h.Routes),
 		}
@@ -20,7 +20,7 @@ func init() {
 // Handler serves the import routes. Jobs run on Queue, or at once when it is nil.
 type Handler struct {
 	Uploads uploads.Service
-	Queue   *runtime.Queue
+	Queue   *jobs.Queue
 }
 
 func (s Handler) Routes(r chi.Router) {

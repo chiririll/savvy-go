@@ -1,4 +1,4 @@
-package bootstrap
+package firstrun
 
 import (
 	"errors"

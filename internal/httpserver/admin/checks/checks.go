@@ -5,8 +5,8 @@ import (
 	"sort"
 	"time"
 
+	"savvy-go/internal/httpserver/admin/sysinfo"
 	"savvy-go/internal/httpserver/httpx"
-	"savvy-go/internal/platform/sysinfo"
 )
 
 // Server checks tell an admin what is misconfigured or running out. They are

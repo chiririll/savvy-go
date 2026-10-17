@@ -2,7 +2,7 @@
 
 - Domain types free of JSON/HTTP. `dto` converts: camelCase keys, optionals present as `null`, money as JSON number at stored scale.
 - New route: update the `openapi.yaml` next to the handler's `routes.go`. `auth/` routes deliberately have none.
-- Create-space needs `spaces` and `ledger` together, so lives in `internal/spacefill`. All or nothing.
+- Create-space needs `spaces` and `ledger` together, so lives in `internal/spaces/spacefill`. All or nothing.
 
 ## Auth routes
 

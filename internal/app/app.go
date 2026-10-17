@@ -9,16 +9,16 @@ import (
 	"savvy-go/internal/appconfig"
 	"savvy-go/internal/auth"
 	"savvy-go/internal/backup"
-	"savvy-go/internal/bootstrap"
 	"savvy-go/internal/config"
 	"savvy-go/internal/currencydata"
+	"savvy-go/internal/firstrun"
+	"savvy-go/internal/jobs"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/locator"
 	"savvy-go/internal/mail"
 	"savvy-go/internal/mail/smtp"
 	"savvy-go/internal/oauth"
 	"savvy-go/internal/refsync"
-	"savvy-go/internal/runtime"
 	"savvy-go/internal/settings"
 	"savvy-go/internal/signing"
 	"savvy-go/internal/spaces"
@@ -34,8 +34,8 @@ type inputs struct {
 	sender smtp.Mailer
 	rates  ledger.RateSource
 	build  appconfig.Build
-	guard  *bootstrap.Guard
-	queue  *runtime.Queue
+	guard  *firstrun.Guard
+	queue  *jobs.Queue
 }
 
 // Option configures New.
@@ -51,11 +51,11 @@ func WithBuild(b appconfig.Build) Option { return func(s *inputs) { s.build = b 
 
 // WithBootstrap sets the first-run password that registration needs while the server has
 // no users. Without it, registration is always closed.
-func WithBootstrap(g *bootstrap.Guard) Option { return func(s *inputs) { s.guard = g } }
+func WithBootstrap(g *firstrun.Guard) Option { return func(s *inputs) { s.guard = g } }
 
 // WithQueue sets the worker pool that background jobs (imports) run on. Without it they
 // run at once, inside the request.
-func WithQueue(q *runtime.Queue) Option { return func(s *inputs) { s.queue = q } }
+func WithQueue(q *jobs.Queue) Option { return func(s *inputs) { s.queue = q } }
 
 // WithConfig sets the config file the services pull their sections from. The default is an
 // empty one, so every section has its defaults.
