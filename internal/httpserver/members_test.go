@@ -110,14 +110,16 @@ func TestRegisterThroughInvitation(t *testing.T) {
 		)
 		return res.StatusCode, decodeJSON(t, res)
 	}
-	if code, body := register(a.invite(a.space.ID, spaceAdmin, "", roleEditor), "guest@test.com"); code != http.StatusCreated {
+	if code,
+		body := register(a.invite(a.space.ID, spaceAdmin, "", roleEditor), "guest@test.com"); code != http.StatusCreated {
 		t.Fatalf("register %d %v", code, body)
 	}
 	guest, _ := a.svc.Users.ByEmail(ctx, "guest@test.com")
 	if guest.Role != auth.RoleGuest || memberRole(t, a, a.space.ID, guest.ID) != roleEditor {
 		t.Fatalf("guest %+v", guest)
 	}
-	if code, _ := register(a.invite(a.space.ID, serverAdmin, "", roleViewer), "user@test.com"); code != http.StatusCreated {
+	if code,
+		_ := register(a.invite(a.space.ID, serverAdmin, "", roleViewer), "user@test.com"); code != http.StatusCreated {
 		t.Fatal("register through a server admin's invitation")
 	}
 	user, _ := a.svc.Users.ByEmail(ctx, "user@test.com")
@@ -129,12 +131,15 @@ func TestRegisterThroughInvitation(t *testing.T) {
 			t.Fatalf("%s is in %d spaces, want only the invited one", u.Email, len(mine))
 		}
 	}
-	if code, _ := register(a.invite(a.space.ID, spaceAdmin, "", roleViewer), "owner@test.com"); code != http.StatusUnprocessableEntity {
+	if code,
+		_ := register(a.invite(a.space.ID, spaceAdmin, "", roleViewer),
+		"owner@test.com"); code != http.StatusUnprocessableEntity {
 		t.Fatalf("register with a taken email: %d", code)
 	}
 
 	_ = a.svc.Settings.Set(ctx, "space_invites_can_register", false)
-	if code, _ := register(a.invite(a.space.ID, spaceAdmin, "", roleViewer), "late@test.com"); code != http.StatusForbidden {
+	if code,
+		_ := register(a.invite(a.space.ID, spaceAdmin, "", roleViewer), "late@test.com"); code != http.StatusForbidden {
 		t.Fatalf("registration closed: %d", code)
 	}
 }
@@ -198,7 +203,7 @@ func TestGuestNeverSpaceAdmin(t *testing.T) {
 }
 
 // A server admin cannot demote to guest someone who administers a space.
-func TestSpaceAdminCannotBeDemotedToGuest(t *testing.T) {
+func TestSpaceAdminCannotDemotedToGuest(t *testing.T) {
 	a := newTestApp(t)
 	as := a.issue(a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
 	owner := a.createUser("owner@test.com", "secret1", auth.RoleUser)
@@ -331,7 +336,7 @@ func TestSpaceKeepsItsLastAdmin(t *testing.T) {
 
 // Deleting a user tombstones them; spaces they were alone in go
 // with them, leaving a final backup only server admins see.
-func TestDeleteUserAndTheirSpaces(t *testing.T) {
+func TestDeleteUserTheirSpaces(t *testing.T) {
 	a := newTestApp(t)
 	ctx := context.Background()
 	admin := a.issue(a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
@@ -450,7 +455,7 @@ func TestUnavailableSpaceIsHiddenFromOutsiders(t *testing.T) {
 	status(t, a.do("GET", "/api/tags", nil, outsider.Token, ""), 404, "outsider")
 }
 
-func TestSpaceRenameAndDelete(t *testing.T) {
+func TestSpaceRenameDelete(t *testing.T) {
 	a := newTestApp(t)
 	ctx := context.Background()
 	owner := a.createUser("owner@test.com", "secret1", auth.RoleUser)
@@ -495,7 +500,7 @@ func (u unavailableStore) Space(ctx context.Context, id int64) (store.DB, error)
 
 // A registered space without a database and a database without a
 // registered space are both reported, never silently dropped.
-func TestReconcileRegistryAndFiles(t *testing.T) {
+func TestReconcileRegistryFiles(t *testing.T) {
 	a := newTestApp(t)
 	ctx := context.Background()
 	admin := a.issue(a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)

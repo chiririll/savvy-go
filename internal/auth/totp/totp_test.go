@@ -16,7 +16,7 @@ func TestTOTPMatchesTheRFCVector(t *testing.T) {
 	}
 }
 
-func TestVerifyStepAcceptsOneStepEitherWay(t *testing.T) {
+func TestVerifyStepAcceptsAdjacentSteps(t *testing.T) {
 	secret, err := NewSecret()
 	if err != nil {
 		t.Fatal(err)

@@ -45,7 +45,7 @@ func TestPreviewShortensLongStatements(t *testing.T) {
 	}
 }
 
-func TestBothSetsShareOneFileWithoutClashing(t *testing.T) {
+func TestBothSetsShareOneFile(t *testing.T) {
 	ctx := context.Background()
 	sqlDB, err := db.Open(filepath.Join(t.TempDir(), "both.sqlite"))
 	if err != nil {
@@ -62,7 +62,8 @@ func TestBothSetsShareOneFileWithoutClashing(t *testing.T) {
 		t.Fatal(err)
 	}
 	var n int
-	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM schema_migrations WHERE version LIKE 'server/%'`).Scan(&n); err != nil ||
+	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM schema_migrations ` +
+		`WHERE version LIKE 'server/%'`).Scan(&n); err != nil ||
 		n == 0 {
 		t.Errorf("server versions: %d, %v", n, err)
 	}
@@ -90,7 +91,8 @@ func TestEnsureIndexesRestoresADroppedIndex(t *testing.T) {
 	ctx := context.Background()
 	sqlDB := migrated(t, Space)
 	var name string
-	err := sqlDB.QueryRow(`SELECT name FROM sqlite_master WHERE type='index' AND name='transactions_account_dedup_unique'`).
+	err := sqlDB.QueryRow(`SELECT name FROM sqlite_master WHERE type='index' AND ` +
+		`name='transactions_account_dedup_unique'`).
 		Scan(&name)
 	if err != nil {
 		t.Fatalf("the dedup index must exist after migrating: %v", err)
@@ -103,7 +105,8 @@ func TestEnsureIndexesRestoresADroppedIndex(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := sqlDB.QueryRow(`SELECT name FROM sqlite_master WHERE type='index' AND name='transactions_account_dedup_unique'`).Scan(&name); err != nil {
+	if err := sqlDB.QueryRow(`SELECT name FROM sqlite_master WHERE type='index' AND ` +
+		`name='transactions_account_dedup_unique'`).Scan(&name); err != nil {
 		t.Errorf("the index was not restored: %v", err)
 	}
 }

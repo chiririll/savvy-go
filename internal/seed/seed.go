@@ -63,16 +63,9 @@ func Demo(ctx context.Context, st store.Store, keys signing.KeyRing, opts Option
 	}
 	now = now.In(loc)
 	server := settings.Store{DB: st.Server()}
-	if server.Bool(ctx, demoSeededKey, false) {
-		return nil, nil
-	}
 	users := auth.Users{DB: st.Server()}
-	n, err := users.Count(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("count users: %w", err)
-	}
-	if n > 0 {
-		return nil, nil
+	if skip, err := alreadySeeded(ctx, server, users); skip || err != nil {
+		return nil, err
 	}
 
 	people, err := createDemoUsers(ctx, users)
@@ -88,56 +81,16 @@ func Demo(ctx context.Context, st store.Store, keys signing.KeyRing, opts Option
 		)
 	}
 
-	d.demo, err = d.createSpace(
-		"Demo",
-		userAlex,
-		map[string]string{userJordan: spaces.RoleEditor, userDemo: spaces.RoleViewer},
-	)
-	if err != nil {
+	if err := d.createSpaces(); err != nil {
 		return nil, err
 	}
-	d.family, err = d.createSpace(
-		"Family Budget",
-		userAlex,
-		map[string]string{userJordan: spaces.RoleAdmin, userSam: spaces.RoleViewer},
-	)
-	if err != nil {
-		return nil, err
-	}
-	d.studio, err = d.createSpace("Studio GmbH", userAlex, map[string]string{userJordan: spaces.RoleViewer})
-	if err != nil {
-		return nil, err
-	}
-
-	demoAccts, err := d.fill(
-		d.demo,
-		currencySet(usdCurrency, withRate(eurCurrency, "1.08")),
-		func(db store.DB) (map[string]*ledger.Account, error) {
-			return seedWorkspace(ctx, db, now)
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-	familyAccts, err := d.fill(d.family, currencySet(usdCurrency), func(db store.DB) (map[string]*ledger.Account, error) {
-		return seedMini(ctx, db, d.now, familySpace)
-	})
-	if err != nil {
-		return nil, err
-	}
-	studioAccts, err := d.fill(
-		d.studio,
-		currencySet(eurCurrency, withRate(usdCurrency, "0.9259")),
-		func(db store.DB) (map[string]*ledger.Account, error) {
-			return seedMini(ctx, db, d.now, studioSpace)
-		},
-	)
+	demoAccts, familyAccts, studioAccts, err := d.fillSpaces()
 	if err != nil {
 		return nil, err
 	}
 
 	transfers := transfers.Service{Spaces: spaceSvc, Keys: keys}
-	if err := d.linkAndTransfer(transfers, demoAccts, familyAccts, studioAccts); err != nil {
+	if err := d.linkTransfer(transfers, demoAccts, familyAccts, studioAccts); err != nil {
 		return nil, err
 	}
 	if err := d.invite(); err != nil {
@@ -149,17 +102,85 @@ func Demo(ctx context.Context, st store.Store, keys signing.KeyRing, opts Option
 	if err := server.Set(ctx, demoSeededKey, true); err != nil {
 		return nil, fmt.Errorf("mark demo seeded: %w", err)
 	}
-
-	for _, sp := range []*spaces.Space{d.demo, d.family, d.studio} {
-		db, err := st.Space(ctx, sp.ID)
-		if err != nil {
-			return nil, err
-		}
-		repo := ledgerrepo.Repo{DB: db}
-		txs, accts := repo.CountTransactions(ctx), repo.CountAccounts(ctx)
-		slog.Info("demo space seeded", "space", sp.Name, "transactions", txs, "accounts", accts)
+	if err := d.logSeeded(); err != nil {
+		return nil, err
 	}
 	return d.manifest, nil
+}
+
+// alreadySeeded reports whether Demo has nothing to do: it ran before, or the
+// server already has users.
+func alreadySeeded(ctx context.Context, server settings.Store, users auth.Users) (bool, error) {
+	if server.Bool(ctx, demoSeededKey, false) {
+		return true, nil
+	}
+	n, err := users.Count(ctx)
+	if err != nil {
+		return false, fmt.Errorf("count users: %w", err)
+	}
+	return n > 0, nil
+}
+
+func (d *demo) createSpaces() (err error) {
+	d.demo, err = d.createSpace(
+		"Demo",
+		userAlex,
+		map[string]string{userJordan: spaces.RoleEditor, userDemo: spaces.RoleViewer},
+	)
+	if err != nil {
+		return err
+	}
+	d.family, err = d.createSpace(
+		"Family Budget",
+		userAlex,
+		map[string]string{userJordan: spaces.RoleAdmin, userSam: spaces.RoleViewer},
+	)
+	if err != nil {
+		return err
+	}
+	d.studio, err = d.createSpace("Studio GmbH", userAlex, map[string]string{userJordan: spaces.RoleViewer})
+	return err
+}
+
+// fillSpaces seeds the three spaces and returns their accounts by key.
+func (d *demo) fillSpaces() (demoAccts, familyAccts, studioAccts map[string]*ledger.Account, err error) {
+	demoAccts, err = d.fill(
+		d.demo,
+		currencySet(usdCurrency, withRate(eurCurrency, "1.08")),
+		func(db store.DB) (map[string]*ledger.Account, error) {
+			return seedWorkspace(d.ctx, db, d.now)
+		},
+	)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	familyAccts, err = d.fill(d.family, currencySet(usdCurrency), func(db store.DB) (map[string]*ledger.Account, error) {
+		return seedMini(d.ctx, db, d.now, familySpace)
+	})
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	studioAccts, err = d.fill(
+		d.studio,
+		currencySet(eurCurrency, withRate(usdCurrency, "0.9259")),
+		func(db store.DB) (map[string]*ledger.Account, error) {
+			return seedMini(d.ctx, db, d.now, studioSpace)
+		},
+	)
+	return demoAccts, familyAccts, studioAccts, err
+}
+
+func (d *demo) logSeeded() error {
+	for _, sp := range []*spaces.Space{d.demo, d.family, d.studio} {
+		db, err := d.st.Space(d.ctx, sp.ID)
+		if err != nil {
+			return err
+		}
+		repo := ledgerrepo.Repo{DB: db}
+		txs, accts := repo.CountTransactions(d.ctx), repo.CountAccounts(d.ctx)
+		slog.Info("demo space seeded", "space", sp.Name, "transactions", txs, "accounts", accts)
+	}
+	return nil
 }
 
 // demoUsers are the seeded accounts; role is the server role.
@@ -236,9 +257,9 @@ func (d *demo) fill(
 	return accts, nil
 }
 
-// linkAndTransfer links Demo with the other two spaces and moves money across
+// linkTransfer links Demo with the other two spaces and moves money across
 // each link, including a transfer between currencies.
-func (d *demo) linkAndTransfer(
+func (d *demo) linkTransfer(
 	tr transfers.Service,
 	demoAccts, familyAccts, studioAccts map[string]*ledger.Account,
 ) error {
@@ -255,8 +276,10 @@ func (d *demo) linkAndTransfer(
 		fromAmount, toAmount string
 		description          string
 	}{
-		{40, d.demo, d.family, demoAccts["checking"], familyAccts["joint"], "900", "900", "Monthly contribution to the family account"},
-		{12, d.demo, d.family, demoAccts["checking"], familyAccts["joint"], "900", "900", "Monthly contribution to the family account"},
+		{40, d.demo, d.family, demoAccts["checking"], familyAccts["joint"], "900", "900",
+			"Monthly contribution to the family account"},
+		{12, d.demo, d.family, demoAccts["checking"], familyAccts["joint"], "900", "900",
+			"Monthly contribution to the family account"},
 		{25, d.family, d.demo, familyAccts["joint"], demoAccts["cash"], "150", "150", "Pocket money back"},
 		// Across currencies: each side keeps its own currency and amount.
 		{30, d.demo, d.studio, demoAccts["eur"], studioAccts["bank"], "1200", "1200", "Capital for the studio"},

@@ -265,7 +265,7 @@ func (s Currencies) SetBase(ctx context.Context, id int64) (*Currency, error) {
 	return s.ByID(ctx, id)
 }
 
-func (s Currencies) FindOrCreateByCode(ctx context.Context, code string) (*Currency, error) {
+func (s Currencies) EnsureByCode(ctx context.Context, code string) (*Currency, error) {
 	if c, err := s.ByCode(ctx, code); err != nil || c != nil {
 		return c, err
 	}

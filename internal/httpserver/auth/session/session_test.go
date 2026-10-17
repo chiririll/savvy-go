@@ -7,7 +7,7 @@ import (
 	"savvy-go/internal/auth/password"
 )
 
-func TestCredentialsOKChecksOnceForEveryKindOfAccount(t *testing.T) {
+func TestCredentialsOKChecksOncePerKind(t *testing.T) {
 	hash, _ := password.Hash("secret12")
 	empty := ""
 	cases := map[string]struct {
@@ -31,7 +31,7 @@ func TestCredentialsOKChecksOnceForEveryKindOfAccount(t *testing.T) {
 			if (h == nil) != c.wantNil {
 				t.Errorf("%s: hash given = %v, want nil = %v", name, h != nil, c.wantNil)
 			}
-			return password.CheckOrBurn(h, plain)
+			return password.CheckConstantTime(h, plain)
 		}
 		if got := credentialsOK(check, c.user, c.plain); got != c.want {
 			t.Errorf("%s: got %v, want %v", name, got, c.want)
@@ -42,7 +42,7 @@ func TestCredentialsOKChecksOnceForEveryKindOfAccount(t *testing.T) {
 	}
 }
 
-func TestCredentialsOKRejectsEvenIfCheckerAccepts(t *testing.T) {
+func TestCredentialsOKRejectsDespiteChecker(t *testing.T) {
 	yes := func(*string, string) bool { return true }
 	if credentialsOK(yes, nil, "x") {
 		t.Error("an unknown account signed in")

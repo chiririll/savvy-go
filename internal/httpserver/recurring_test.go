@@ -30,7 +30,7 @@ func TestRecurringInactiveCreatesNoPending(t *testing.T) {
 	}
 }
 
-func TestRecurringCreatesPendingAndConfirmSpawnsNext(t *testing.T) {
+func TestRecurringCreatesPendingConfirmSpawnsNext(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("rw2@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
@@ -81,7 +81,7 @@ func TestRecurringCreatesPendingAndConfirmSpawnsNext(t *testing.T) {
 	}
 }
 
-func TestEstimatedAmountCarriesToPendingAndConfirmReplacesIt(t *testing.T) {
+func TestEstimatedAmountCarriesToPending(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("est@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
@@ -151,7 +151,7 @@ func TestRecurringEndDateStopsNextPending(t *testing.T) {
 	}
 }
 
-func TestRecurringSkipSpawnsNextWithoutBalanceChange(t *testing.T) {
+func TestRecurringSkipSpawnsNextOccurrence(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("rw4@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)

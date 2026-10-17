@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func TestWebauthnOptionsAndCredentialCRUD(t *testing.T) {
+func TestWebauthnOptionsCredentialCRUD(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("pk@test.com", "secret1", roleEditor)
 	iss := a.issue(u, false)

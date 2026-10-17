@@ -88,7 +88,7 @@ func (e *moneyEnv) tx(t *testing.T, typ string, accountID int64, amount string) 
 
 func dec(s string) decimal.Decimal { return decimal.RequireFromString(s) }
 
-func TestBalanceIsExactForFloatUnfriendlySums(t *testing.T) {
+func TestBalanceExactForFloatUnfriendlySums(t *testing.T) {
 	e := newMoneyEnv(t)
 	acct, err := (Accounts{DB: e.db}).Create(
 		e.ctx,
@@ -108,7 +108,7 @@ func TestBalanceIsExactForFloatUnfriendlySums(t *testing.T) {
 	}
 }
 
-func TestAmountsAreStoredAsMinorUnitsPerCurrency(t *testing.T) {
+func TestAmountsStoredMinorUnitsPerCurrency(t *testing.T) {
 	e := newMoneyEnv(t)
 	btcTx := e.tx(t, "income", e.btcAcc.ID, "0.00012345")
 	jpyTx := e.tx(t, "expense", e.jpyAcc.ID, "1500")
@@ -136,7 +136,7 @@ func TestAmountsAreStoredAsMinorUnitsPerCurrency(t *testing.T) {
 	}
 }
 
-func TestCrossCurrencyReportSumsFoldToBase(t *testing.T) {
+func TestCrossCurrencyReportSumsFoldBase(t *testing.T) {
 	e := newMoneyEnv(t)
 	e.tx(t, "expense", e.usdAcc.ID, "10.00")
 	e.tx(t, "expense", e.jpyAcc.ID, "500")
@@ -187,7 +187,7 @@ func TestReportSumRoundsOnceAfterFolding(t *testing.T) {
 	}
 }
 
-func TestBudgetSpentIsInTheBudgetCurrency(t *testing.T) {
+func TestBudgetSpentIsInBudgetCurrency(t *testing.T) {
 	e := newMoneyEnv(t)
 	e.tx(t, "expense", e.usdAcc.ID, "10.00") // 10 USD
 	e.tx(t, "expense", e.jpyAcc.ID, "500")   // 5 USD
@@ -213,7 +213,10 @@ func TestCategoryStatisticsFoldsCurrencies(t *testing.T) {
 		acct   int64
 		amount string
 	}{{e.usdAcc.ID, "10.00"}, {e.jpyAcc.ID, "500"}} {
-		if _, err := e.txs.Create(e.ctx, TxInput{Type: "expense", AccountID: in.acct, CategoryID: &cat.ID, Amount: dec(in.amount), Date: &date}); err != nil {
+		if _,
+			err := e.txs.Create(e.ctx,
+			TxInput{Type: "expense", AccountID: in.acct, CategoryID: &cat.ID, Amount: dec(in.amount),
+				Date: &date}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -264,7 +267,7 @@ func TestDebtIsPaidOffExactly(t *testing.T) {
 	}
 }
 
-func TestCurrencyConversionIsExactAndRounded(t *testing.T) {
+func TestCurrencyConversionIsExactRounded(t *testing.T) {
 	jpy := Currency{ID: 2, Decimals: 0, Rate: dec("0.01")}
 	usd := Currency{ID: 1, Decimals: 2, IsBase: true, Rate: dec("1")}
 	for _, c := range []struct {
@@ -275,7 +278,8 @@ func TestCurrencyConversionIsExactAndRounded(t *testing.T) {
 	}{
 		{"JPY->USD", money.FromDecimal(dec("1500"), jpy.Unit()), jpy, usd, "15"},
 		{"USD->JPY", money.FromDecimal(dec("15"), usd.Unit()), usd, jpy, "1500"},
-		{"result rounds to the target scale", money.FromDecimal(dec("1"), usd.Unit()), usd, Currency{ID: 2, Decimals: 0, Rate: dec("0.03")}, "33"},
+		{"result rounds to the target scale", money.FromDecimal(dec("1"), usd.Unit()), usd,
+			Currency{ID: 2, Decimals: 0, Rate: dec("0.03")}, "33"},
 		{"same currency is untouched", money.FromDecimal(dec("12.34"), usd.Unit()), usd, usd, "12.34"},
 	} {
 		got := Convert(c.in, c.from, c.to)
@@ -387,7 +391,7 @@ func TestCurrencyDecimalsAreImmutable(t *testing.T) {
 	}
 }
 
-func TestCurrencyUsedByBudgetCannotBeDeleted(t *testing.T) {
+func TestCurrencyUsedBudgetCannotBeDeleted(t *testing.T) {
 	e := newMoneyEnv(t)
 	curs := Currencies{DB: e.db}
 	eur, err := curs.Create(e.ctx, Currency{Code: "EUR", Name: "EUR", Symbol: "E", Decimals: 2, Rate: dec("1.1")})
@@ -412,9 +416,11 @@ func TestCurrencyUsedByBudgetCannotBeDeleted(t *testing.T) {
 	}
 }
 
-func TestUnknownAccountOrCurrencyIsAnError(t *testing.T) {
+func TestUnknownAccountCurrencyIsAnError(t *testing.T) {
 	e := newMoneyEnv(t)
-	if _, err := (Accounts{DB: e.db}).Create(e.ctx, AccountInput{Name: "ghost", Type: "cash", CurrencyID: 999, IsActive: true}); !errors.Is(
+	if _,
+		err := (Accounts{DB: e.db}).Create(e.ctx,
+		AccountInput{Name: "ghost", Type: "cash", CurrencyID: 999, IsActive: true}); !errors.Is(
 		err,
 		ErrUnknownCurrency,
 	) {

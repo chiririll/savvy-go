@@ -14,8 +14,8 @@ var DefaultListen = "localhost:8080"
 
 // serverTable is the [server] table. An empty value means "decide at run time".
 type serverTable struct {
-	Listen   string `toml:"listen" comment:"Address to listen on. Loopback only by default; use \":8080\" to listen on every interface."`
-	AppURL   string `toml:"app_url" comment:"Public URL of the instance, e.g. \"https://savvy.example.com\". SSO and passkeys stay disabled without it."`
+	Listen   string `toml:"listen" comment:"Address to listen on. Loopback by default; \":8080\" opens every interface."`
+	AppURL   string `toml:"app_url" comment:"Public URL, e.g. \"https://savvy.example.com\". SSO and passkeys need it."`
 	Timezone string `toml:"timezone" comment:"Time zone."`
 }
 

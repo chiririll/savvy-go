@@ -63,7 +63,8 @@ func TestPresetsViewerEditorAdmin(t *testing.T) {
 
 	// Viewer: reads everything, changes nothing.
 	viewer := presetToken(a, sess, tokenBody(map[string]any{"preset": "viewer"}))
-	for _, p := range []string{"/api/accounts", "/api/transactions", "/api/reports/overview", fmt.Sprintf("/api/spaces/%d/members", a.space.ID)} {
+	for _, p := range []string{"/api/accounts", "/api/transactions", "/api/reports/overview",
+		fmt.Sprintf("/api/spaces/%d/members", a.space.ID)} {
 		status(t, a.bearer("GET", p, nil, viewer), 200, "viewer reads "+p)
 	}
 	status(t, a.bearer("POST", "/api/transactions", tx, viewer), 403, "viewer cannot add")
@@ -176,7 +177,7 @@ func TestTokenNeverExceedsItsOwner(t *testing.T) {
 // A sync group mirrors categories and tags into the other spaces, so a token
 // that changes them in one space must reach all of them, and its owner must be
 // allowed to edit each (checked like for a session).
-func TestTokenChangingSyncedDataNeedsEverySpaceOfTheGroup(t *testing.T) {
+func TestTokenSyncedChangeNeedsEverySpace(t *testing.T) {
 	p := newSyncPair(t)
 	p.group(nil)
 	inA := spacePath(p.A.ID, "/categories")

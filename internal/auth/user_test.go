@@ -8,7 +8,7 @@ import (
 	"savvy-go/internal/auth/password"
 )
 
-func TestUsersCreateAndFind(t *testing.T) {
+func TestUsersCreateFind(t *testing.T) {
 	d := newDB(t)
 	ctx := context.Background()
 	users := Users{DB: d}
@@ -87,7 +87,7 @@ func TestUpdateRefusesAnUnknownRole(t *testing.T) {
 	}
 }
 
-func TestUpdateKeepsThePasswordUnlessGivenOne(t *testing.T) {
+func TestUpdateKeepsPasswordUnlessGivenOne(t *testing.T) {
 	d := newDB(t)
 	ctx := context.Background()
 	users := Users{DB: d}
@@ -109,7 +109,7 @@ func TestUpdateKeepsThePasswordUnlessGivenOne(t *testing.T) {
 	}
 }
 
-func TestAdminCountsAndRoles(t *testing.T) {
+func TestAdminCountsRoles(t *testing.T) {
 	d := newDB(t)
 	ctx := context.Background()
 	users := Users{DB: d}
@@ -171,12 +171,14 @@ func TestDeleteTombstonesTheUser(t *testing.T) {
 }
 
 func TestRoles(t *testing.T) {
-	for role, ok := range map[string]bool{RoleAdmin: true, RoleUser: true, RoleGuest: true, "read-only": false, "": false, "root": false} {
+	for role, ok := range map[string]bool{RoleAdmin: true, RoleUser: true, RoleGuest: true, "read-only": false, "": false,
+		"root": false} {
 		if ValidRole(role) != ok {
 			t.Errorf("ValidRole(%q) = %v", role, !ok)
 		}
 	}
-	for in, want := range map[string]string{"read-write": RoleUser, "read-only": RoleUser, RoleAdmin: RoleAdmin, RoleGuest: RoleGuest} {
+	for in, want := range map[string]string{"read-write": RoleUser, "read-only": RoleUser, RoleAdmin: RoleAdmin,
+		RoleGuest: RoleGuest} {
 		if got := NormalizeRole(in); got != want {
 			t.Errorf("NormalizeRole(%q) = %q", in, got)
 		}

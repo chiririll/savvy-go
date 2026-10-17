@@ -9,7 +9,7 @@ import (
 	"savvy-go/internal/appconfig"
 )
 
-func TestSecureComesFromAppURLNotHeaders(t *testing.T) {
+func TestSecureFollowsAppURLNotHeaders(t *testing.T) {
 	plain := httptest.NewRequest("GET", "/", nil)
 	forwarded := httptest.NewRequest("GET", "/", nil)
 	forwarded.Header.Set("X-Forwarded-Proto", "https")

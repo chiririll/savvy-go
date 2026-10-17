@@ -16,7 +16,7 @@ import (
 // scale, for every kind of amount.
 func dec(s string) decimal.Decimal { return decimal.RequireFromString(s) }
 
-func TestFixMoneyConvertsEveryCurrencyAndAmount(t *testing.T) {
+func TestFixMoneyConvertsEveryCurrencyAmount(t *testing.T) {
 	moneytest.ForEach(t, func(t *testing.T, c moneytest.Currency) {
 		sc := &scales{
 			currencyDec: map[int64]int{1: c.Decimals},
@@ -70,7 +70,7 @@ func TestFixMoneyConvertsEveryCurrencyAndAmount(t *testing.T) {
 
 // A transfer's destination amount is scaled by the destination account's
 // currency, not the source's.
-func TestFixMoneyScalesTransferByEachAccountsCurrency(t *testing.T) {
+func TestFixMoneyScalesTransferPerAccount(t *testing.T) {
 	moneytest.ForEachPair(t, func(t *testing.T, from, to moneytest.Currency) {
 		sc := &scales{
 			currencyDec: map[int64]int{1: from.Decimals, 2: to.Decimals},

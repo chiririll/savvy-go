@@ -1,20 +1,16 @@
 package sso
 
 import (
-	"bytes"
-	"compress/flate"
 	"context"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/base64"
-	"io"
 	"net/url"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/beevik/etree"
-	dsig "github.com/russellhaering/goxmldsig"
 
 	"savvy-go/internal/appconfig"
 	"savvy-go/internal/auth"
@@ -27,121 +23,6 @@ const (
 	nameClaim  = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"
 	groupClaim = "http://schemas.xmlsoap.org/claims/Group"
 )
-
-// samlResponse is a Response around an Assertion for nameID, signed by key.
-func samlResponse(
-	t *testing.T,
-	key *rsa.PrivateKey,
-	cert *x509.Certificate,
-	nameID, inResponseTo string,
-	attrs map[string][]string,
-) *etree.Element {
-	t.Helper()
-	return samlResponseWith(t, key, cert, nameID, inResponseTo, attrs, validSAML())
-}
-
-// samlOpts are the parts of an assertion the service must hold the IdP to.
-type samlOpts struct {
-	issuer       string
-	audience     string // empty: no AudienceRestriction at all
-	notBefore    string // empty: omitted
-	notOnOrAfter string // empty: no Conditions window at all
-}
-
-func validSAML() samlOpts {
-	now := time.Now().UTC()
-	return samlOpts{
-		issuer:       "https://idp.example/saml",
-		audience:     "https://app.test/api/auth/sso/corp/metadata",
-		notBefore:    now.Add(-time.Minute).Format(time.RFC3339),
-		notOnOrAfter: now.Add(5 * time.Minute).Format(time.RFC3339),
-	}
-}
-
-func samlResponseWith(
-	t *testing.T,
-	key *rsa.PrivateKey,
-	cert *x509.Certificate,
-	nameID, inResponseTo string,
-	attrs map[string][]string,
-	o samlOpts,
-) *etree.Element {
-	t.Helper()
-	assertion := etree.NewElement("Assertion")
-	assertion.CreateAttr("xmlns", "urn:oasis:names:tc:SAML:2.0:assertion")
-	assertion.CreateAttr("ID", "_assert1")
-	assertion.CreateAttr("Version", "2.0")
-	assertion.CreateAttr("IssueInstant", time.Now().UTC().Format(time.RFC3339))
-	assertion.CreateElement("Issuer").SetText(o.issuer)
-	if o.notOnOrAfter != "" || o.audience != "" {
-		cond := assertion.CreateElement("Conditions")
-		if o.notBefore != "" {
-			cond.CreateAttr("NotBefore", o.notBefore)
-		}
-		if o.notOnOrAfter != "" {
-			cond.CreateAttr("NotOnOrAfter", o.notOnOrAfter)
-		}
-		if o.audience != "" {
-			cond.CreateElement("AudienceRestriction").CreateElement("Audience").SetText(o.audience)
-		}
-	}
-	subject := assertion.CreateElement("Subject")
-	subject.CreateElement("NameID").SetText(nameID)
-	if inResponseTo != "" {
-		// Where a real IdP says which request this answers: inside the signed part.
-		subject.CreateElement("SubjectConfirmation").
-			CreateElement("SubjectConfirmationData").
-			CreateAttr("InResponseTo", inResponseTo)
-	}
-	if len(attrs) > 0 {
-		stmt := assertion.CreateElement("AttributeStatement")
-		for name, values := range attrs {
-			a := stmt.CreateElement("Attribute")
-			a.CreateAttr("Name", name)
-			for _, v := range values {
-				a.CreateElement("AttributeValue").SetText(v)
-			}
-		}
-	}
-	ctx, err := dsig.NewSigningContext(key, [][]byte{cert.Raw})
-	if err != nil {
-		t.Fatal(err)
-	}
-	signed, err := ctx.SignEnveloped(assertion)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resp := etree.NewElement("Response")
-	resp.CreateAttr("xmlns", "urn:oasis:names:tc:SAML:2.0:protocol")
-	resp.CreateAttr("ID", "_resp1")
-	if inResponseTo != "" {
-		resp.CreateAttr("InResponseTo", inResponseTo)
-	}
-	resp.AddChild(signed)
-	return resp
-}
-
-func encode(t *testing.T, resp *etree.Element) string {
-	t.Helper()
-	doc := etree.NewDocument()
-	doc.SetRoot(resp)
-	s, err := doc.WriteToString()
-	if err != nil {
-		t.Fatal(err)
-	}
-	return base64.StdEncoding.EncodeToString([]byte(s))
-}
-
-func inflate(b64 string) (string, error) {
-	raw, err := base64.StdEncoding.DecodeString(b64)
-	if err != nil {
-		return "", err
-	}
-	r := flate.NewReader(bytes.NewReader(raw))
-	defer r.Close()
-	out, err := io.ReadAll(r)
-	return string(out), err
-}
 
 type samlEnv struct {
 	ctx  context.Context
@@ -196,7 +77,7 @@ func (e *samlEnv) start(t *testing.T) (relayState, requestID string) {
 	return relayState, requestID
 }
 
-func TestSAMLRedirectAsksTheIdPForALogin(t *testing.T) {
+func TestSAMLRedirectAsksIdPLogin(t *testing.T) {
 	e := newSAMLEnv(t)
 	loc, err := e.svc.AuthorizeURL(e.ctx, *e.p, "//evil.example")
 	if err != nil {
@@ -301,12 +182,16 @@ func TestSAMLCertificateRotation(t *testing.T) {
 		"idp_x509_cert_standby": newPEM,
 	}
 	state, reqID := e.start(t)
-	if _, err := e.svc.HandleACS(e.ctx, p, encode(t, samlResponse(t, newKey, newCert, "ann@corp.test", reqID, nil)), state); err != nil {
+	if _,
+		err := e.svc.HandleACS(e.ctx, p, encode(t, samlResponse(t, newKey, newCert, "ann@corp.test", reqID, nil)),
+		state); err != nil {
 		t.Errorf("the standby certificate must verify during a rotation: %v", err)
 	}
 	p.Config = map[string]any{}
 	state, reqID = e.start(t)
-	if _, err := e.svc.HandleACS(e.ctx, p, encode(t, samlResponse(t, e.key, e.cert, "ann@corp.test", reqID, nil)), state); ssoCode(
+	if _,
+		err := e.svc.HandleACS(e.ctx, p, encode(t, samlResponse(t, e.key, e.cert, "ann@corp.test", reqID, nil)),
+		state); ssoCode(
 		err,
 	) != "saml_invalid" {
 		t.Errorf("without a certificate nothing verifies: %q", ssoCode(err))
@@ -315,7 +200,7 @@ func TestSAMLCertificateRotation(t *testing.T) {
 
 // The signature covers one assertion. Anything added next to it is not vouched for,
 // so it must never decide who logs in.
-func TestSAMLUnsignedAssertionBesideSignedOneIsIgnored(t *testing.T) {
+func TestSAMLUnsignedAssertionBesideSignedIgnored(t *testing.T) {
 	e := newSAMLEnv(t)
 	state, reqID := e.start(t)
 	resp := samlResponse(t, e.key, e.cert, "ann@corp.test", reqID, map[string][]string{emailClaim: {"ann@corp.test"}})
@@ -336,7 +221,7 @@ func TestSAMLUnsignedAssertionBesideSignedOneIsIgnored(t *testing.T) {
 
 // InResponseTo on the Response is outside the signature, so whoever replays a
 // captured response can rewrite it. Only the signed one counts.
-func TestSAMLReplayWithARewrittenRequestIdIsRefused(t *testing.T) {
+func TestSAMLReplayNewRequestIDRefused(t *testing.T) {
 	e := newSAMLEnv(t)
 	_, oldReq := e.start(t)
 	captured := samlResponse(t, e.key, e.cert, "ann@corp.test", oldReq, nil)
@@ -354,7 +239,9 @@ func TestSAMLReplayWithARewrittenRequestIdIsRefused(t *testing.T) {
 func TestSAMLResponseMustAnswerOurRequest(t *testing.T) {
 	e := newSAMLEnv(t)
 	state, _ := e.start(t)
-	if _, err := e.svc.HandleACS(e.ctx, *e.p, encode(t, samlResponse(t, e.key, e.cert, "ann@corp.test", "", nil)), state); ssoCode(
+	if _,
+		err := e.svc.HandleACS(e.ctx, *e.p, encode(t, samlResponse(t, e.key, e.cert, "ann@corp.test", "", nil)),
+		state); ssoCode(
 		err,
 	) != "saml_invalid" {
 		t.Errorf("a response without InResponseTo: %q", ssoCode(err))
@@ -392,7 +279,9 @@ func TestSAMLClockSkewIsTolerated(t *testing.T) {
 	state, reqID := e.start(t)
 	o := validSAML()
 	o.notBefore = time.Now().UTC().Add(30 * time.Second).Format(time.RFC3339)
-	if _, err := e.svc.HandleACS(e.ctx, *e.p, encode(t, samlResponseWith(t, e.key, e.cert, "ann@corp.test", reqID, nil, o)), state); err != nil {
+	if _,
+		err := e.svc.HandleACS(e.ctx, *e.p, encode(t, samlResponseWith(t, e.key, e.cert, "ann@corp.test", reqID, nil, o)),
+		state); err != nil {
 		t.Errorf("a few seconds of clock drift between us and the IdP: %v", err)
 	}
 }
@@ -423,9 +312,12 @@ func TestSAMLIdentityMapping(t *testing.T) {
 	}
 }
 
-func TestParseSAMLResponseHandlesPrefixesAndJunk(t *testing.T) {
-	xml := `<samlp:Response xmlns:samlp="p" xmlns:saml="a" InResponseTo="_r1"><saml:Assertion><saml:Subject><saml:NameID> bob </saml:NameID></saml:Subject>` +
-		`<saml:AttributeStatement><saml:Attribute Name="g"><saml:AttributeValue> a </saml:AttributeValue><saml:AttributeValue>b</saml:AttributeValue></saml:Attribute></saml:AttributeStatement></saml:Assertion></samlp:Response>`
+func TestParseSAMLResponseHandlesPrefixesJunk(t *testing.T) {
+	xml := `<samlp:Response xmlns:samlp="p" xmlns:saml="a" ` +
+		`InResponseTo="_r1"><saml:Assertion><saml:Subject><saml:NameID> bob </saml:NameID></saml:Subject>` +
+		`<saml:AttributeStatement><saml:Attribute Name="g"><saml:AttributeValue> a ` +
+		`</saml:AttributeValue><saml:AttributeValue>b</saml:AttributeValue></saml:Attribute>` +
+		`</saml:AttributeStatement></saml:Assertion></samlp:Response>`
 	nameID, irt, attrs, ok := parseSAMLResponse(xml)
 	if !ok || nameID != "bob" || irt != "_r1" || len(attrs["g"]) != 2 || attrs["g"][0] != "a" {
 		t.Errorf("parsed %q %q %v %v", nameID, irt, attrs, ok)

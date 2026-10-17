@@ -68,7 +68,7 @@ func (p *syncPair) names(spaceID int64, kind string) []string {
 	return names
 }
 
-func TestSyncGroupMirrorsCategoriesAndTagsOverHTTP(t *testing.T) {
+func TestSyncGroupMirrorsReferenceData(t *testing.T) {
 	p := newSyncPair(t)
 	p.group(nil)
 
@@ -79,7 +79,9 @@ func TestSyncGroupMirrorsCategoriesAndTagsOverHTTP(t *testing.T) {
 	}
 
 	for _, name := range []string{"Food", "Rent"} { // the last category of a type cannot go
-		if code, out := p.call(p.sess, "POST", spacePath(p.A.ID, "/categories"), map[string]any{"name": name, "type": "expense"}); code != 201 {
+		if code,
+			out := p.call(p.sess, "POST", spacePath(p.A.ID, "/categories"),
+			map[string]any{"name": name, "type": "expense"}); code != 201 {
 			t.Fatalf("create %d %v", code, out)
 		}
 	}
@@ -100,7 +102,9 @@ func TestSyncGroupMirrorsCategoriesAndTagsOverHTTP(t *testing.T) {
 			rent = c["id"].(float64)
 		}
 	}
-	if code, _ := p.call(p.sess, "DELETE", spacePath(p.A.ID, "/categories/"+strconv.Itoa(int(rent))), nil); code != http.StatusNoContent {
+	if code,
+		_ := p.call(p.sess, "DELETE", spacePath(p.A.ID, "/categories/"+strconv.Itoa(int(rent))),
+		nil); code != http.StatusNoContent {
 		t.Fatalf("delete %d", code)
 	}
 	if slices.Contains(p.names(p.B.ID, "categories"), "Rent") {
@@ -108,7 +112,7 @@ func TestSyncGroupMirrorsCategoriesAndTagsOverHTTP(t *testing.T) {
 	}
 }
 
-func TestSyncGroupRefusesAnEditorWhoOnlyViewsAnotherSpace(t *testing.T) {
+func TestSyncGroupRefusesEditorWithoutAccess(t *testing.T) {
 	p := newSyncPair(t)
 	p.group(nil)
 	bob := p.a.createUser("bob@test.com", "secret1", auth.RoleUser)
@@ -150,10 +154,14 @@ func TestSyncGroupRefusesAnEditorWhoOnlyViewsAnotherSpace(t *testing.T) {
 
 func TestSyncGroupDifferencesNeedDecisions(t *testing.T) {
 	p := newSyncPair(t)
-	if code, _ := p.call(p.sess, "POST", spacePath(p.A.ID, "/categories"), map[string]any{"name": "Rent", "type": "expense", "is_default": true}); code != 201 {
+	if code,
+		_ := p.call(p.sess, "POST", spacePath(p.A.ID, "/categories"),
+		map[string]any{"name": "Rent", "type": "expense", "is_default": true}); code != 201 {
 		t.Fatal("create A")
 	}
-	if code, _ := p.call(p.sess, "POST", spacePath(p.B.ID, "/categories"), map[string]any{"name": "Rent", "type": "expense", "is_default": true}); code != 201 {
+	if code,
+		_ := p.call(p.sess, "POST", spacePath(p.B.ID, "/categories"),
+		map[string]any{"name": "Rent", "type": "expense", "is_default": true}); code != 201 {
 		t.Fatal("create B")
 	}
 	if code, _ := p.call(p.sess, "POST", spacePath(p.B.ID, "/tags"), map[string]any{"name": "extra"}); code != 201 {
@@ -183,7 +191,7 @@ func TestSyncGroupDifferencesNeedDecisions(t *testing.T) {
 	}
 }
 
-func TestSyncGroupDoesNotLetSpacesBeProbed(t *testing.T) {
+func TestSyncGroupNotLetSpacesProbed(t *testing.T) {
 	p := newSyncPair(t)
 	stranger := p.a.createUser("stranger@test.com", "secret1", auth.RoleUser)
 	other, err := p.a.svc.Spaces.Create(context.Background(), "Private", stranger)
@@ -207,7 +215,7 @@ func TestSyncGroupDoesNotLetSpacesBeProbed(t *testing.T) {
 // A sync group mirrors a change into every space of the group, so a token may
 // make it only if it reaches them all. Without that, a token limited to one
 // space could rewrite its neighbours.
-func TestSyncGroupChangeNeedsATokenReachingEverySpace(t *testing.T) {
+func TestSyncGroupChangeNeedsFullToken(t *testing.T) {
 	p := newSyncPair(t)
 	p.group(nil)
 	solo, err := p.a.svc.Spaces.Create(context.Background(), "Solo", p.owner)
@@ -241,7 +249,7 @@ func TestSyncGroupChangeNeedsATokenReachingEverySpace(t *testing.T) {
 
 // Groups are managed from the settings screen only: a token, whatever it was
 // granted, cannot form, change or preview one.
-func TestSyncGroupsAreManagedWithASessionOnly(t *testing.T) {
+func TestSyncGroupsManagedWithSessionOnly(t *testing.T) {
 	p := newSyncPair(t)
 	raw, _ := p.a.issueGrant(p.owner, auth.Grant{Permissions: allPerms(permissions.Write), AllSpaces: true}, nil)
 	body := map[string]any{"add_space_ids": []int64{p.A.ID, p.B.ID}, "categories": true}
@@ -253,20 +261,24 @@ func TestSyncGroupsAreManagedWithASessionOnly(t *testing.T) {
 	}
 }
 
-func TestSyncGroupDiffFollowsTheRulesOfApply(t *testing.T) {
+func TestSyncGroupDiffFollowsRulesApply(t *testing.T) {
 	p := newSyncPair(t)
 	stranger := p.a.createUser("stranger@test.com", "secret1", auth.RoleUser)
 	other, err := p.a.svc.Spaces.Create(context.Background(), "Private", stranger)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if code, _ := p.call(p.sess, "POST", "/api/sync-groups/diff", map[string]any{"add_space_ids": []int64{p.A.ID, other.ID}, "categories": true}); code != http.StatusNotFound {
+	if code,
+		_ := p.call(p.sess, "POST", "/api/sync-groups/diff",
+		map[string]any{"add_space_ids": []int64{p.A.ID, other.ID}, "categories": true}); code != http.StatusNotFound {
 		t.Fatalf("diff with a space the caller is not in: %d", code)
 	}
 	bob := p.a.createUser("bob@test.com", "secret1", auth.RoleUser)
 	_ = p.a.svc.Spaces.SetMember(context.Background(), p.A.ID, bob, spaces.RoleEditor)
 	_ = p.a.svc.Spaces.SetMember(context.Background(), p.B.ID, bob, spaces.RoleEditor)
-	if code, _ := p.call(p.a.issue(bob, false), "POST", "/api/sync-groups/diff", map[string]any{"add_space_ids": []int64{p.A.ID, p.B.ID}, "categories": true}); code != http.StatusForbidden {
+	if code,
+		_ := p.call(p.a.issue(bob, false), "POST", "/api/sync-groups/diff",
+		map[string]any{"add_space_ids": []int64{p.A.ID, p.B.ID}, "categories": true}); code != http.StatusForbidden {
 		t.Fatalf("an editor previewed a group: %d", code)
 	}
 }

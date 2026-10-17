@@ -50,9 +50,9 @@ func Dummy() bool {
 	return false
 }
 
-// CheckOrBurn is Check that always does one bcrypt compare: with no hash (nil
+// CheckConstantTime is Check that always does one bcrypt compare: with no hash (nil
 // or empty) or an empty plain it runs Dummy instead of returning early.
-func CheckOrBurn(hash *string, plain string) bool {
+func CheckConstantTime(hash *string, plain string) bool {
 	if hash == nil || *hash == "" || plain == "" {
 		return Dummy()
 	}

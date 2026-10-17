@@ -7,7 +7,7 @@ import (
 
 func day(y int, m time.Month, d int) time.Time { return time.Date(y, m, d, 0, 0, 0, 0, time.UTC) }
 
-func TestAddMonthsClampsToTheLastDay(t *testing.T) {
+func TestAddMonthsClampsToLastDay(t *testing.T) {
 	for _, c := range []struct {
 		from   time.Time
 		months int
@@ -45,7 +45,7 @@ func TestDaysInMonth(t *testing.T) {
 	}
 }
 
-func TestMonthAndWeekBounds(t *testing.T) {
+func TestMonthWeekBounds(t *testing.T) {
 	wed := time.Date(2025, 2, 12, 15, 30, 0, 0, time.UTC) // a Wednesday
 	for name, c := range map[string]struct{ got, want time.Time }{
 		"start of month":             {StartOfMonth(wed), day(2025, 2, 1)},

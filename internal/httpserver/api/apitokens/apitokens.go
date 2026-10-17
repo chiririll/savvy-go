@@ -60,7 +60,8 @@ func (h Handler) apiTokensStore(w http.ResponseWriter, r *http.Request) {
 	// writes only where its owner may too: the request is limited by the
 	// token's permissions and the owner's role in the space.
 	grant, grantErrs := h.grantFromBody(r.Context(), u, tokenGrantBody{
-		Preset: body.Preset, AllowDelete: body.AllowDelete, Permissions: body.Permissions, AllSpaces: body.AllSpaces, SpaceIDs: body.SpaceIDs,
+		Preset: body.Preset, AllowDelete: body.AllowDelete, Permissions: body.Permissions, AllSpaces: body.AllSpaces,
+		SpaceIDs: body.SpaceIDs,
 	})
 	maps.Copy(errs, grantErrs)
 	var expires *time.Time
@@ -202,7 +203,8 @@ func (h Handler) apiTokensUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	grant, errs := h.grantFromBody(r.Context(), u, tokenGrantBody{
-		Preset: body.Preset, AllowDelete: body.AllowDelete, Permissions: body.Permissions, AllSpaces: body.AllSpaces, SpaceIDs: body.SpaceIDs,
+		Preset: body.Preset, AllowDelete: body.AllowDelete, Permissions: body.Permissions, AllSpaces: body.AllSpaces,
+		SpaceIDs: body.SpaceIDs,
 	})
 	if len(errs) > 0 {
 		httpx.WriteValidation(w, errs)

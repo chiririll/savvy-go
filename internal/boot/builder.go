@@ -53,16 +53,12 @@ func (b *Builder) Build(ctx context.Context) (*Process, error) {
 	server := config.Of(file, httpserver.ServerSection)
 	srv := server.Get()
 	cfg := appconfig.Load(file).WithServer(srv.TZ, srv.Location, func() string { return server.Get().AppURL })
-	var seedCfg seed.Config
-	if b.seedPath != "" {
-		if seedCfg, err = seed.LoadConfig(b.seedPath); err != nil {
-			return nil, fmt.Errorf("load seed config: %w", err)
-		}
+	seedCfg, err := b.loadSeed()
+	if err != nil {
+		return nil, err
 	}
-	for _, dir := range []string{cfg.DataDir, cfg.UploadsDir, cfg.BackupsDir} {
-		if err := os.MkdirAll(dir, 0o775); err != nil {
-			return nil, fmt.Errorf("create %s: %w", dir, err)
-		}
+	if err := makeDirs(cfg); err != nil {
+		return nil, err
 	}
 	st, err := sqlite.OpenApp(ctx, cfg.DataDir)
 	if err != nil {
@@ -107,6 +103,27 @@ func (b *Builder) Build(ctx context.Context) (*Process, error) {
 	}
 	built = true
 	return &Process{Loc: loc, rates: rates}, nil
+}
+
+// loadSeed reads the seed file; without one the demo data is not seeded.
+func (b *Builder) loadSeed() (seed.Config, error) {
+	if b.seedPath == "" {
+		return seed.Config{}, nil
+	}
+	cfg, err := seed.LoadConfig(b.seedPath)
+	if err != nil {
+		return seed.Config{}, fmt.Errorf("load seed config: %w", err)
+	}
+	return cfg, nil
+}
+
+func makeDirs(cfg appconfig.Config) error {
+	for _, dir := range []string{cfg.DataDir, cfg.UploadsDir, cfg.BackupsDir} {
+		if err := os.MkdirAll(dir, 0o775); err != nil {
+			return fmt.Errorf("create %s: %w", dir, err)
+		}
+	}
+	return nil
 }
 
 // Close releases what Build acquired: it drains the queue, then closes the store. Stop

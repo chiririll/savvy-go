@@ -5,27 +5,16 @@ package app
 import (
 	"os"
 
-	"savvy-go/internal/app/signin"
 	"savvy-go/internal/appconfig"
-	"savvy-go/internal/auth"
-	"savvy-go/internal/backup"
 	"savvy-go/internal/config"
 	"savvy-go/internal/currencydata"
 	"savvy-go/internal/firstrun"
 	"savvy-go/internal/jobs"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/locator"
-	"savvy-go/internal/mail"
 	"savvy-go/internal/mail/smtp"
-	"savvy-go/internal/oauth"
-	"savvy-go/internal/refsync"
-	"savvy-go/internal/settings"
 	"savvy-go/internal/signing"
-	"savvy-go/internal/spaces"
-	"savvy-go/internal/sso"
 	"savvy-go/internal/store"
-	"savvy-go/internal/transfers"
-	"savvy-go/internal/uploads"
 )
 
 // inputs are what the process makes before the services and hands to New.
@@ -99,12 +88,7 @@ func New(cfg appconfig.Config, st store.Store, keys *signing.Holder, opts ...Opt
 	if in.sender != nil {
 		locator.Set(l, in.sender)
 	}
-	for _, register := range []func(*locator.Locator){
-		auth.Register, settings.Register, spaces.Register, refsync.Register, transfers.Register,
-		backup.Register, uploads.Register, sso.Register, oauth.Register, mail.Register, signin.Register,
-	} {
-		register(l)
-	}
+	registerServices(l)
 	if err := l.Build(); err != nil {
 		return nil, err
 	}

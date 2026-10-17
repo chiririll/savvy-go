@@ -61,7 +61,8 @@ func TestUpCreatesTables(t *testing.T) {
 
 			for _, table := range tables {
 				var name string
-				if err := sqlDB.QueryRow(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`, table).Scan(&name); err != nil {
+				if err := sqlDB.QueryRow(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`,
+					table).Scan(&name); err != nil {
 					t.Errorf("missing table %s: %v", table, err)
 				}
 			}
@@ -80,7 +81,8 @@ func TestTablesAreStrict(t *testing.T) {
 		t.Run(string(set), func(t *testing.T) {
 			sqlDB := migrated(t, set)
 			rows, err := sqlDB.Query(
-				`SELECT name FROM pragma_table_list WHERE schema = 'main' AND type = 'table' AND strict = 0 AND name NOT LIKE 'sqlite_%'`,
+				`SELECT name FROM pragma_table_list WHERE schema = 'main' AND type = 'table' AND strict = 0 AND name NOT LIKE ` +
+					`'sqlite_%'`,
 			)
 			if err != nil {
 				t.Fatal(err)

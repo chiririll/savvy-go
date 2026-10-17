@@ -16,14 +16,16 @@ import (
 
 var ctx = context.Background()
 
-func TestLinksAndTrustedKeysOnTheServer(t *testing.T) {
+func TestLinksTrustedKeysOnTheServer(t *testing.T) {
 	d := dbtest.Server(t)
 	users := authrepo.Repo{DB: d}
 	now := time.Now().UTC()
 	ann, _ := users.InsertUser(ctx, "Ann", "ann@test.com", "h", "user", now)
 	// Two registered spaces to link.
 	for _, uuid := range []string{"a", "b"} {
-		if _, err := d.ExecContext(ctx, `INSERT INTO spaces (uuid, name, created_by) VALUES (?, ?, ?)`, uuid, uuid, ann); err != nil {
+		if _,
+			err := d.ExecContext(ctx, `INSERT INTO spaces (uuid, name, created_by) VALUES (?, ?, ?)`, uuid, uuid,
+			ann); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -82,7 +84,7 @@ func record(uuid string) transfersrepo.Record {
 	}
 }
 
-func TestRecordsRoundTripAndKeepTheirRemoteCopy(t *testing.T) {
+func TestRecordsRoundTripKeepRemoteCopy(t *testing.T) {
 	r := transfersrepo.Space{DB: dbtest.Space(t)}
 	now := time.Now().UTC()
 	if rec, err := r.Record(ctx, "nope"); rec != nil || err != nil {
@@ -95,7 +97,8 @@ func TestRecordsRoundTripAndKeepTheirRemoteCopy(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, _ := r.Record(ctx, "t1")
-	if got == nil || got.From != in.From || got.To != in.To || got.Version != 2 || got.Review == nil || *got.Review != review ||
+	if got == nil || got.From != in.From || got.To != in.To || got.Version != 2 || got.Review == nil ||
+		*got.Review != review ||
 		got.Remote != `{"uuid":"t1"}` || got.Description == nil ||
 		*got.Description != "rent" ||
 		got.DeletedAt != nil {

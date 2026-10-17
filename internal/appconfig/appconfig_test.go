@@ -9,7 +9,7 @@ import (
 	"savvy-go/internal/config"
 )
 
-func TestLoadDecidesThePathsFromTheFile(t *testing.T) {
+func TestLoadDecidesPathsFromTheFile(t *testing.T) {
 	f, err := config.Parse("[paths]\ndata = \"/srv/d\"\nbackups = \"/srv/b\"\n")
 	if err != nil {
 		t.Fatal(err)
@@ -26,7 +26,7 @@ func TestLoadDecidesThePathsFromTheFile(t *testing.T) {
 	}
 }
 
-func TestLoadWithoutPathsFallsBackToTheDetectedDataDir(t *testing.T) {
+func TestLoadWithoutPathsUsesDetectedDir(t *testing.T) {
 	f, err := config.Parse("")
 	if err != nil {
 		t.Fatal(err)
@@ -61,7 +61,7 @@ func TestWithAppURLTrimsTrailingSlashes(t *testing.T) {
 }
 
 // The URL is read on every call, so a change in the running process shows at once.
-func TestWithServerReadsTheURLEachTime(t *testing.T) {
+func TestWithServerReadsURLEachTime(t *testing.T) {
 	url := "https://a.example"
 	cfg := Config{}.WithServer("Europe/Paris", time.UTC, func() string { return url })
 	if cfg.TZ != "Europe/Paris" || cfg.Location != time.UTC {
@@ -73,7 +73,7 @@ func TestWithServerReadsTheURLEachTime(t *testing.T) {
 	}
 }
 
-func TestFilePathPrefersTheArgumentThenTheEnvironment(t *testing.T) {
+func TestFilePathPrefersArgumentThenEnvironment(t *testing.T) {
 	t.Setenv("CONFIG_FILE", " /env/config.toml ")
 	if got := FilePath("/arg/config.toml"); got != "/arg/config.toml" {
 		t.Errorf("an explicit path wins: %q", got)
@@ -87,7 +87,7 @@ func TestFilePathPrefersTheArgumentThenTheEnvironment(t *testing.T) {
 	}
 }
 
-func TestDetectDataDirIsAnExistingDirOrDefault(t *testing.T) {
+func TestDetectDataDirExistingDirDefault(t *testing.T) {
 	got := detectDataDir()
 	if got == "./savvy-data" {
 		return

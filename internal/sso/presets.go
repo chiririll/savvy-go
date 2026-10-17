@@ -49,7 +49,8 @@ func PresetCatalog() []Preset {
 				Placeholder: "common / organizations / <tenant-guid>",
 			},
 		}, clientFields()...), DefaultClaims: map[string]any{
-			"subject": "sub", "email": []any{"email", "preferred_username", "upn"}, "email_verified": "xms_edov", "name": "name", "groups": "groups",
+			"subject": "sub", "email": []any{"email", "preferred_username", "upn"}, "email_verified": "xms_edov", "name": "name",
+			"groups": "groups",
 		}},
 		{Key: "github", Label: "GitHub", Protocol: "oauth2", Fields: clientFields(), DefaultClaims: map[string]any{
 			"subject": "id", "email": "email", "name": "name", "groups": nil,

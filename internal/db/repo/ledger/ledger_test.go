@@ -119,7 +119,7 @@ func TestMissingRowsAreNil(t *testing.T) {
 	}
 }
 
-func TestAccountsCarryTheirCurrencyAndUnit(t *testing.T) {
+func TestAccountsCarryTheirCurrencyUnit(t *testing.T) {
 	f := newFixture(t)
 	a, _ := f.repo.Account(ctx, f.yen)
 	if a.Currency.Code != "JPY" || a.Currency.Decimals != 0 ||
@@ -157,7 +157,7 @@ func TestTransactionAmountsKeepTheirUnits(t *testing.T) {
 	}
 }
 
-func TestTagsOfTransactionsAndReplacement(t *testing.T) {
+func TestTagsOfTransactionsReplacement(t *testing.T) {
 	f := newFixture(t)
 	now := time.Now().UTC()
 	a, _ := f.repo.InsertTag(ctx, "a", now)
@@ -197,7 +197,7 @@ func TestReplacingACategoryMovesItsTransactions(t *testing.T) {
 	}
 }
 
-func TestBudgetsKeepTheirCurrencyAndScope(t *testing.T) {
+func TestBudgetsKeepTheirCurrencyScope(t *testing.T) {
 	f := newFixture(t)
 	now := time.Now().UTC()
 	pct := 80

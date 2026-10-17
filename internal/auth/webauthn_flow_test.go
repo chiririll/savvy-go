@@ -287,7 +287,7 @@ func storedSignCount(t *testing.T, w WebAuthn, userID int64) uint32 {
 	return creds[0].Authenticator.SignCount
 }
 
-func TestPasskeyLoginMovesTheSignCountForward(t *testing.T) {
+func TestPasskeyLoginMovesSignCountForward(t *testing.T) {
 	ctx := context.Background()
 	w, u, dev := newWebAuthn(t)
 	handle := []byte(strconv.FormatInt(u.ID, 10))
@@ -347,7 +347,7 @@ func TestPasskeyLoginRefusesAClonedAuthenticator(t *testing.T) {
 	}
 }
 
-func TestPasskeyLoginRefusesWhatTheDeviceDidNotSign(t *testing.T) {
+func TestPasskeyLoginRefusesUnsignedData(t *testing.T) {
 	ctx := context.Background()
 	w, u, dev := newWebAuthn(t)
 	stranger, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)

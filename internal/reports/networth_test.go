@@ -17,7 +17,7 @@ func (e *seriesEnv) budget(t *testing.T, in ledger.BudgetInput) {
 	}
 }
 
-func TestPaceBudgetAddsEveryCurrencyAtItsRate(t *testing.T) {
+func TestPaceBudgetAddsEveryCurrencyRate(t *testing.T) {
 	e := newSeriesEnv(t)
 	e.budget(t, ledger.BudgetInput{Name: "usd", Amount: dec("50"), CurrencyID: &e.usd.ID})
 	e.budget(
@@ -40,7 +40,7 @@ func TestPaceBudgetAddsEveryCurrencyAtItsRate(t *testing.T) {
 	wantMoney(t, "budget", *got.Months[0].Budget, usd(e.moneyEnv, "150"))
 }
 
-func TestPaceGlobalBudgetStandsForTheWholeScope(t *testing.T) {
+func TestPaceGlobalBudgetStandsWholeScope(t *testing.T) {
 	e := newSeriesEnv(t)
 	e.budget(t, ledger.BudgetInput{Name: "usd", Amount: dec("50"), CurrencyID: &e.usd.ID})
 	e.budget(t, ledger.BudgetInput{Name: "all", Amount: dec("400"), CurrencyID: &e.usd.ID, IsGlobal: ptrTo(true)})
@@ -119,7 +119,7 @@ func TestPaceAccumulatesSpendingDayByDay(t *testing.T) {
 	}
 }
 
-func TestNetWorthChangeAgainstThePreviousPeriod(t *testing.T) {
+func TestNetWorthChangeAgainstPreviousPeriod(t *testing.T) {
 	e := newSeriesEnv(t)
 	e.add(t, "expense", e.usdAcc.ID, &e.food.ID, "20", "2024-01-10")
 	e.add(t, "income", e.usdAcc.ID, &e.salary.ID, "55", "2024-02-10")

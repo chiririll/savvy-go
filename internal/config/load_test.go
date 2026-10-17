@@ -144,7 +144,7 @@ func read(t *testing.T, path string) string {
 	return string(raw)
 }
 
-func TestSectionsReadTheirTablesOverTheDefaults(t *testing.T) {
+func TestSectionsReadTheirTablesOverDefaults(t *testing.T) {
 	h := start(t, write(t, "[server]\napp_url = \"https://a.example\"\n[mailer.smtp]\nhost = \" h \"\n"))
 	if srv := h.server.Get(); srv.AppURL != "https://a.example" || srv.Listen != "localhost:8080" {
 		t.Errorf("server %+v: a key the file lacks must take its default", srv)
@@ -154,11 +154,13 @@ func TestSectionsReadTheirTablesOverTheDefaults(t *testing.T) {
 	}
 }
 
-func TestDefaultsAreWrittenAndTheFileIsStable(t *testing.T) {
+func TestDefaultsAreWrittenFileIsStable(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "sub", "config.toml")
 	start(t, path)
 	text := read(t, path)
-	for _, want := range []string{"# Go Savvy configuration", "[server]", "listen = 'localhost:8080'", "# Address to listen on.", "[mailer.smtp]", "port = 587"} {
+	for _, want := range []string{"# Go Savvy configuration", "[server]", "listen = 'localhost:8080'",
+		"# Address to listen on.",
+		"[mailer.smtp]", "port = 587"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("new file lacks %q:\n%s", want, text)
 		}
@@ -174,7 +176,7 @@ func TestDefaultsAreWrittenAndTheFileIsStable(t *testing.T) {
 	}
 }
 
-func TestSectionWithoutDefaultsIsKeptFromTheFile(t *testing.T) {
+func TestSectionWithoutDefaultsKeptFromFile(t *testing.T) {
 	path := write(t, "[mailer.sendgrid]\nkey = \"k\"\n")
 	h := start(t, path)
 	if g, ok := h.sendgrid.Get(); !ok || g.Key != "k" {
@@ -212,7 +214,7 @@ func TestBrokenSyntaxIsRejected(t *testing.T) {
 	}
 }
 
-func TestFinishRejectsWhatASectionCannotUse(t *testing.T) {
+func TestFinishRejectsWhatSectionCannotUse(t *testing.T) {
 	for name, body := range map[string]string{
 		"wrong type":   "[server]\nlisten = 5\n",
 		"decode error": "[mailer.smtp]\nport = 0\n",
@@ -232,7 +234,7 @@ func TestFinishRejectsWhatASectionCannotUse(t *testing.T) {
 
 // A key a version dropped (or a typo) must not stop the server: it is named in the log and
 // left out when the file is rewritten.
-func TestUnknownKeysAndTablesAreIgnored(t *testing.T) {
+func TestUnknownKeysTablesAreIgnored(t *testing.T) {
 	logs := captureLog(t)
 	path := write(
 		t,
@@ -257,7 +259,7 @@ func TestUnknownKeysAndTablesAreIgnored(t *testing.T) {
 
 // A section inside another one is not the parent's key: the parent neither reads it nor
 // complains about it, whatever order they are asked for in.
-func TestNestedSectionIsNotAKeyOfItsParent(t *testing.T) {
+func TestNestedSectionNotKeyItsParent(t *testing.T) {
 	logs := captureLog(t)
 	initAt(t, write(t, "[mailer]\n[mailer.smtp]\nhost = \"h\"\n"))
 	smtp := OfOptional(cur, smtpSection)
@@ -284,7 +286,7 @@ func TestOfGivesOneValue(t *testing.T) {
 	}
 }
 
-func TestUpdatePersistsAndKeepsTheRest(t *testing.T) {
+func TestUpdatePersistsKeepsTheRest(t *testing.T) {
 	path := write(t, "[server]\napp_url = \"https://a.example\"\n[mailer.sendgrid]\nkey = \"k\"\n")
 	h := start(t, path)
 	if err := serverSection.Update(cur, func(s *server) { s.AppURL = "https://b.example" }); err != nil {
@@ -302,7 +304,7 @@ func TestUpdatePersistsAndKeepsTheRest(t *testing.T) {
 	}
 }
 
-func TestUpdateIsDecodedAndRejected(t *testing.T) {
+func TestUpdateIsDecodedRejected(t *testing.T) {
 	path := write(t, "")
 	h := start(t, path)
 	before := read(t, path)
@@ -323,7 +325,7 @@ func TestUpdateIsDecodedAndRejected(t *testing.T) {
 	}
 }
 
-func TestOptionalUpdateAddsAndRemoveDrops(t *testing.T) {
+func TestOptionalUpdateAddsRemoveDrops(t *testing.T) {
 	path := write(t, "")
 	h := start(t, path)
 	if err := sendgridSection.Update(cur, func(s *sendgrid) { s.Key = "k" }); err != nil {
@@ -434,7 +436,7 @@ func TestMistakesInWiringPanic(t *testing.T) {
 	mustPanic(t, "no Decode between different types", func() { Of(cur, Section[server, conn]{Name: "x"}) })
 }
 
-func TestFixedAndNilHandles(t *testing.T) {
+func TestFixedNilHandles(t *testing.T) {
 	r := Fixed(server{AppURL: "u"})
 	if r.Get().AppURL != "u" {
 		t.Error("Fixed")
@@ -450,7 +452,7 @@ func TestFixedAndNilHandles(t *testing.T) {
 	}
 }
 
-func TestConcurrentReadsAndUpdates(t *testing.T) {
+func TestConcurrentReadsUpdates(t *testing.T) {
 	h := start(t, write(t, ""))
 	var wg sync.WaitGroup
 	for i := 0; i < 8; i++ {

@@ -29,8 +29,9 @@ type Recurring struct {
 
 func NewRecurring(r recurring.Recurring) Recurring {
 	return Recurring{
-		ID: r.ID, Type: r.Type, Amount: r.Amount, ToAmount: r.ToAmount, IsEstimated: r.IsEstimated, Description: r.Description,
-		Frequency: r.Frequency, Interval: r.Interval, DayOfWeek: r.DayOfWeek, DayOfMonth: r.DayOfMonth,
+		ID: r.ID, Type: r.Type, Amount: r.Amount, ToAmount: r.ToAmount, IsEstimated: r.IsEstimated,
+		Description: r.Description,
+		Frequency:   r.Frequency, Interval: r.Interval, DayOfWeek: r.DayOfWeek, DayOfMonth: r.DayOfMonth,
 		StartDate: r.StartDate, EndDate: r.EndDate, NextRunDate: r.NextRunDate, LastRunDate: r.LastRunDate,
 		IsActive:  r.IsActive,
 		Account:   ptr(r.Account, NewAccount),

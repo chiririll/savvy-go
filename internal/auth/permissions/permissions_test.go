@@ -96,7 +96,8 @@ func TestPresetMatrixForConnectedApp(t *testing.T) {
 }
 
 func TestLevelForMethod(t *testing.T) {
-	for method, want := range map[string]string{"GET": Read, "HEAD": Read, "OPTIONS": Read, "POST": Write, "PUT": Write, "PATCH": Write, "DELETE": Delete} {
+	for method, want := range map[string]string{"GET": Read, "HEAD": Read, "OPTIONS": Read, "POST": Write, "PUT": Write,
+		"PATCH": Write, "DELETE": Delete} {
 		if got := LevelFor(method); got != want {
 			t.Errorf("LevelFor(%s) = %s, want %s", method, got, want)
 		}

@@ -80,7 +80,8 @@ var spaceSegments = map[string]string{
 	"reports": "reports",
 	"tags":    "tags",
 	// Uploads exist for importing transactions.
-	"transactions": "transactions", "transactions-summary": "transactions", "transactions-pending-summary": "transactions", "s3": "transactions",
+	"transactions": "transactions", "transactions-summary": "transactions", "transactions-pending-summary": "transactions",
+	"s3":        "transactions",
 	"transfers": "transfers",
 }
 

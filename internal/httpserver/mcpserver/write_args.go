@@ -8,17 +8,17 @@ const (
 type txItemArgs struct {
 	Name         string `json:"name" jsonschema:"Name of the line item."`
 	Quantity     string `json:"quantity,omitempty" jsonschema:"Exact decimal as a string (default 1)."`
-	PricePerUnit string `json:"price_per_unit" jsonschema:"Price of one unit, in the transaction's currency. Exact decimal as a string."`
+	PricePerUnit string `json:"price_per_unit" jsonschema:"Price per unit in the transaction's currency, decimal string."`
 }
 
 type createTxArgs struct {
 	SpaceID     int64        `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
 	Type        string       `json:"type" jsonschema:"income, expense or transfer (between two accounts of this space)."`
-	AccountID   int64        `json:"account_id" jsonschema:"The account the money leaves (expense, transfer) or arrives in (income)."`
+	AccountID   int64        `json:"account_id" jsonschema:"Account money leaves (expense, transfer) or enters (income)."`
 	ToAccountID int64        `json:"to_account_id,omitempty" jsonschema:"Transfer only: the receiving account."`
 	CategoryID  int64        `json:"category_id,omitempty" jsonschema:"Category id, from list_categories."`
-	Amount      string       `json:"amount" jsonschema:"Amount in the currency of account_id. Exact decimal as a string, for example \"12.50\"."`
-	ToAmount    string       `json:"to_amount,omitempty" jsonschema:"Transfer between accounts in different currencies: the amount that arrives, in the receiving account's currency."`
+	Amount      string       `json:"amount" jsonschema:"Amount in account_id's currency, decimal string like \"12.50\"."`
+	ToAmount    string       `json:"to_amount,omitempty" jsonschema:"Amount that arrives, for a cross-currency transfer."`
 	IsEstimated bool         `json:"is_estimated,omitempty" jsonschema:"True when the amount is approximate."`
 	Description string       `json:"description,omitempty"`
 	Date        string       `json:"date,omitempty" jsonschema:"YYYY-MM-DD. Defaults to today."`
@@ -46,8 +46,8 @@ type createAccountArgs struct {
 	SpaceID        int64  `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
 	Name           string `json:"name"`
 	Type           string `json:"type,omitempty" jsonschema:"bank, cash or crypto (default cash)."`
-	CurrencyID     int64  `json:"currency_id,omitempty" jsonschema:"Currency id, from list_currencies. Give this or currency_code."`
-	CurrencyCode   string `json:"currency_code,omitempty" jsonschema:"Currency code such as EUR. Added to the space if it is not there yet."`
+	CurrencyID     int64  `json:"currency_id,omitempty" jsonschema:"Currency id (list_currencies) or currency_code."`
+	CurrencyCode   string `json:"currency_code,omitempty" jsonschema:"Currency code such as EUR, added if missing."`
 	InitialBalance string `json:"initial_balance,omitempty" jsonschema:"Exact decimal as a string."`
 	IsActive       *bool  `json:"is_active,omitempty"`
 }
@@ -96,7 +96,7 @@ type createCurrencyArgs struct {
 	Name     string `json:"name,omitempty"`
 	Symbol   string `json:"symbol,omitempty"`
 	Decimals *int   `json:"decimals,omitempty" jsonschema:"Digits after the decimal point (default 2, JPY 0)."`
-	Rate     string `json:"rate,omitempty" jsonschema:"Value of one unit in the space's base currency. Exact decimal as a string."`
+	Rate     string `json:"rate,omitempty" jsonschema:"Value of one unit in the base currency. Exact decimal string."`
 }
 
 type updateCurrencyArgs struct {
@@ -105,17 +105,17 @@ type updateCurrencyArgs struct {
 	Name     *string `json:"name,omitempty"`
 	Symbol   *string `json:"symbol,omitempty"`
 	Decimals *int    `json:"decimals,omitempty"`
-	Rate     string  `json:"rate,omitempty" jsonschema:"Value of one unit in the base currency. Exact decimal as a string."`
+	Rate     string  `json:"rate,omitempty" jsonschema:"Value of one unit in the base currency. Exact decimal string."`
 }
 
 type budgetFields struct {
 	Name            *string `json:"name,omitempty"`
-	Amount          string  `json:"amount,omitempty" jsonschema:"Limit per period, in currency_id. Exact decimal as a string."`
+	Amount          string  `json:"amount,omitempty" jsonschema:"Limit per period, in currency_id. Exact decimal string."`
 	CurrencyID      int64   `json:"currency_id,omitempty" jsonschema:"Currency id, from list_currencies."`
-	Period          string  `json:"period,omitempty" jsonschema:"weekly, monthly, yearly or custom (with start_date and end_date)."`
+	Period          string  `json:"period,omitempty" jsonschema:"weekly, monthly, yearly or custom (needs both dates)."`
 	StartDate       string  `json:"start_date,omitempty" jsonschema:"YYYY-MM-DD, custom period."`
 	EndDate         string  `json:"end_date,omitempty" jsonschema:"YYYY-MM-DD, custom period."`
-	IsGlobal        *bool   `json:"is_global,omitempty" jsonschema:"True to count all expenses instead of chosen categories and tags."`
+	IsGlobal        *bool   `json:"is_global,omitempty" jsonschema:"Count every expense, ignoring categories and tags."`
 	NotifyAtPercent *int    `json:"notify_at_percent,omitempty"`
 	IsActive        *bool   `json:"is_active,omitempty"`
 	CategoryIDs     []int64 `json:"category_ids,omitempty"`
@@ -139,7 +139,7 @@ type createDebtArgs struct {
 	DebtType     string `json:"debt_type" jsonschema:"i_owe (I borrowed) or owed_to_me (I lent)."`
 	CurrencyID   int64  `json:"currency_id" jsonschema:"Currency id, from list_currencies."`
 	Amount       string `json:"amount" jsonschema:"Total amount. Exact decimal as a string."`
-	Origin       string `json:"origin,omitempty" jsonschema:"new (money moves now, needs account_id) or existing (already happened; nothing is booked)."`
+	Origin       string `json:"origin,omitempty" jsonschema:"new (money moves now) or existing (already happened)."`
 	AccountID    int64  `json:"account_id,omitempty" jsonschema:"With origin new: the account the money went from or to."`
 	Date         string `json:"date,omitempty" jsonschema:"YYYY-MM-DD."`
 	DueDate      string `json:"due_date,omitempty" jsonschema:"YYYY-MM-DD."`
@@ -174,10 +174,10 @@ type createRuleArgs struct {
 	Description    string           `json:"description,omitempty"`
 	TriggerType    string           `json:"trigger_type" jsonschema:"on_transaction_create or on_transaction_update."`
 	Priority       int              `json:"priority,omitempty" jsonschema:"Lower runs first."`
-	Conditions     map[string]any   `json:"conditions" jsonschema:"When the rule applies: an object with match (all or any) and conditions, a list of {field, op, value}. See the tool description for fields and ops."`
-	Actions        []map[string]any `json:"actions" jsonschema:"What the rule does. Each is an object with a type: set_category (category_id), add_tags (tag_ids), remove_tags (tag_ids), set_description (value), or create_transfer (from_account_id, to_account_id, amount_formula)."`
+	Conditions     map[string]any   `json:"conditions" jsonschema:"When the rule applies (see the tool description)."`
+	Actions        []map[string]any `json:"actions" jsonschema:"What the rule does (see the tool description)."`
 	IsActive       *bool            `json:"is_active,omitempty"`
-	StopProcessing *bool            `json:"stop_processing,omitempty" jsonschema:"True to skip the rules after this one when it matches."`
+	StopProcessing *bool            `json:"stop_processing,omitempty" jsonschema:"Skip later rules after a match."`
 }
 
 type updateRuleArgs struct {
@@ -187,8 +187,8 @@ type updateRuleArgs struct {
 	Description    *string          `json:"description,omitempty"`
 	TriggerType    string           `json:"trigger_type,omitempty"`
 	Priority       *int             `json:"priority,omitempty"`
-	Conditions     map[string]any   `json:"conditions,omitempty" jsonschema:"Replaces the conditions as a whole: an object with match (all or any) and conditions, a list of {field, op, value}. See the create_automation_rule description for fields and ops."`
-	Actions        []map[string]any `json:"actions,omitempty" jsonschema:"Replaces the actions as a whole. Same shapes as create_automation_rule."`
+	Conditions     map[string]any   `json:"conditions,omitempty" jsonschema:"Replaces all conditions (see create rule)."`
+	Actions        []map[string]any `json:"actions,omitempty" jsonschema:"Replaces all actions (see create rule)."`
 	IsActive       *bool            `json:"is_active,omitempty"`
 	StopProcessing *bool            `json:"stop_processing,omitempty"`
 }

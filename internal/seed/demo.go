@@ -238,64 +238,50 @@ func seedWorkspace(ctx context.Context, db store.DB, now time.Time) (map[string]
 	return accounts, s.createAutomation(tags)
 }
 
-func (s *seeder) createAccounts(usd *ledger.Currency, eur *ledger.Currency) (map[string]*ledger.Account, error) {
-	out := map[string]*ledger.Account{}
-	type spec struct {
-		key, name, typ string
-		cur            *ledger.Currency
-		bal            float64
-		debtType       string
-		target         *float64
-		due            *string
-		counter, desc  string
-	}
-	iowe := "i_owe"
-	owed := "owed_to_me"
+// accountSpec describes one demo account; the debt fields are empty for the others.
+type accountSpec struct {
+	key, name, typ string
+	cur            *ledger.Currency
+	bal            float64
+	debtType       string
+	target         *float64
+	due            *string
+	counter, desc  string
+}
+
+func (s *seeder) accountSpecs(usd, eur *ledger.Currency) []accountSpec {
 	mortgageDue := s.now.AddDate(25, 0, 0).Format("2006-01-02")
 	loanDue := s.now.AddDate(0, 4, 0).Format("2006-01-02")
-	zero := 0.0
-	mortgageAmt := 285000.00
-	loanAmt := 1200.00
+	zero, mortgageAmt, loanAmt := 0.0, 285000.00, 1200.00
 
-	specs := []spec{
-		{"checking", "Chase Checking", "bank", usd, 8200, "", nil, nil, "", ""},
-		{"cash", "Cash Wallet", "cash", usd, 340, "", nil, nil, "", ""},
-		{"savings", "Ally Savings", "bank", usd, 24500, "", nil, nil, "", ""},
-		{"crypto", "Coinbase Portfolio", "crypto", usd, 6300, "", nil, nil, "", ""},
+	specs := []accountSpec{
+		{key: "checking", name: "Chase Checking", typ: "bank", cur: usd, bal: 8200},
+		{key: "cash", name: "Cash Wallet", typ: "cash", cur: usd, bal: 340},
+		{key: "savings", name: "Ally Savings", typ: "bank", cur: usd, bal: 24500},
+		{key: "crypto", name: "Coinbase Portfolio", typ: "crypto", cur: usd, bal: 6300},
 	}
 	if eur != nil {
-		specs = append(specs, spec{"eur", "Revolut EUR", "bank", eur, 1850, "", nil, nil, "", ""})
+		specs = append(specs, accountSpec{key: "eur", name: "Revolut EUR", typ: "bank", cur: eur, bal: 1850})
 	}
-	specs = append(
-		specs,
-		spec{"credit", "Amex Gold Card", "debt", usd, 0, iowe, &zero, nil, "American Express", "Credit card balance"},
-		spec{
-			"mortgage",
-			"Home Mortgage",
-			"debt",
-			usd,
-			0,
-			iowe,
-			&mortgageAmt,
-			&mortgageDue,
-			"Wells Fargo Home Mortgage",
-			"30-year fixed mortgage",
+	return append(specs,
+		accountSpec{
+			key: "credit", name: "Amex Gold Card", typ: "debt", cur: usd, debtType: "i_owe", target: &zero,
+			counter: "American Express", desc: "Credit card balance",
 		},
-		spec{
-			"loan_out",
-			"Loan to Michael",
-			"debt",
-			usd,
-			0,
-			owed,
-			&loanAmt,
-			&loanDue,
-			"Michael Chen",
-			"Helped with moving costs",
+		accountSpec{
+			key: "mortgage", name: "Home Mortgage", typ: "debt", cur: usd, debtType: "i_owe", target: &mortgageAmt,
+			due: &mortgageDue, counter: "Wells Fargo Home Mortgage", desc: "30-year fixed mortgage",
+		},
+		accountSpec{
+			key: "loan_out", name: "Loan to Michael", typ: "debt", cur: usd, debtType: "owed_to_me", target: &loanAmt,
+			due: &loanDue, counter: "Michael Chen", desc: "Helped with moving costs",
 		},
 	)
+}
 
-	for _, sp := range specs {
+func (s *seeder) createAccounts(usd *ledger.Currency, eur *ledger.Currency) (map[string]*ledger.Account, error) {
+	out := map[string]*ledger.Account{}
+	for _, sp := range s.accountSpecs(usd, eur) {
 		a := ledger.AccountInput{
 			Name: sp.name, Type: sp.typ, CurrencyID: sp.cur.ID,
 			InitialBalance: decimal.NewFromFloat(sp.bal), IsActive: true,
@@ -333,7 +319,7 @@ func (s *seeder) createTransactions(
 	if err := s.seedVariableExpenses(accounts, expenses, tags); err != nil {
 		return err
 	}
-	return s.seedTransfersAndDebt(accounts)
+	return s.seedTransfersDebt(accounts)
 }
 
 func (s *seeder) seedIncome(accounts map[string]*ledger.Account, incomes []ledger.Category) error {
@@ -341,47 +327,17 @@ func (s *seeder) seedIncome(accounts map[string]*ledger.Account, incomes []ledge
 	freelance := catByName(incomes, "#FREELANCE")
 	investments := catByName(incomes, "#INVESTMENTS")
 	other := catByName(incomes, "#OTHER_INCOME")
-	baseSalary := 6400.0
 
+	// The random draws of each month happen in this order; they are part of the demo data.
 	for cursor := s.start; !cursor.After(s.end); cursor = addMonthsNoOverflow(cursor, 1) {
-		for _, payDay := range []int{5, 20} {
-			payday := dateOn(cursor, minInt(payDay, daysInMonth(cursor)))
-			if salary != nil && s.inRange(payday) {
-				raise := 0.0
-				if monthsBetween(s.start, cursor) >= 7 {
-					raise = 600
-				}
-				if err := s.addTx("income", accounts["checking"].ID, &salary.ID,
-					baseSalary+raise+float64(s.mtRand(-40, 40)),
-					"Acme Corp — Payroll", payday, nil, nil, nil); err != nil {
-					return err
-				}
-			}
+		if err := s.seedSalary(accounts, salary, cursor); err != nil {
+			return err
 		}
-
-		if freelance != nil && s.mtRand(1, 100) <= 65 {
-			d := dateOn(cursor, s.mtRand(8, minInt(26, daysInMonth(cursor))))
-			if s.inRange(d) {
-				vendors := []string{"Upwork payout", "Fiverr withdrawal", fmt.Sprintf("Client invoice #%d", s.mtRand(1000, 9999))}
-				acct := accounts["checking"]
-				if accounts["eur"] != nil && s.mtRand(0, 1) == 1 {
-					acct = accounts["eur"]
-				}
-				if err := s.addTx("income", acct.ID, &freelance.ID, float64(s.mtRand(450, 1900)),
-					vendors[s.mtRand(0, 2)], d, nil, nil, nil); err != nil {
-					return err
-				}
-			}
+		if err := s.seedFreelance(accounts, freelance, cursor); err != nil {
+			return err
 		}
-
-		if investments != nil && int(cursor.Month())%3 == 1 {
-			d := dateOn(cursor, minInt(15, daysInMonth(cursor)))
-			if s.inRange(d) {
-				if err := s.addTx("income", accounts["crypto"].ID, &investments.ID,
-					float64(s.mtRand(80, 420)), "Quarterly dividend payout", d, nil, nil, nil); err != nil {
-					return err
-				}
-			}
+		if err := s.seedDividend(accounts, investments, cursor); err != nil {
+			return err
 		}
 	}
 
@@ -395,82 +351,172 @@ func (s *seeder) seedIncome(accounts map[string]*ledger.Account, incomes []ledge
 	return nil
 }
 
+// seedSalary adds the two paydays of the month of cursor.
+func (s *seeder) seedSalary(accounts map[string]*ledger.Account, salary *ledger.Category, cursor time.Time) error {
+	const baseSalary = 6400.0
+	for _, payDay := range []int{5, 20} {
+		payday := dateOn(cursor, minInt(payDay, daysInMonth(cursor)))
+		if salary == nil || !s.inRange(payday) {
+			continue
+		}
+		raise := 0.0
+		if monthsBetween(s.start, cursor) >= 7 {
+			raise = 600
+		}
+		if err := s.addTx("income", accounts["checking"].ID, &salary.ID,
+			baseSalary+raise+float64(s.mtRand(-40, 40)),
+			"Acme Corp — Payroll", payday, nil, nil, nil); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// seedFreelance adds a freelance payout to most months.
+func (s *seeder) seedFreelance(accounts map[string]*ledger.Account, freelance *ledger.Category,
+	cursor time.Time) error {
+	if freelance == nil || s.mtRand(1, 100) > 65 {
+		return nil
+	}
+	d := dateOn(cursor, s.mtRand(8, minInt(26, daysInMonth(cursor))))
+	if !s.inRange(d) {
+		return nil
+	}
+	vendors := []string{"Upwork payout", "Fiverr withdrawal", fmt.Sprintf("Client invoice #%d", s.mtRand(1000, 9999))}
+	acct := accounts["checking"]
+	if accounts["eur"] != nil && s.mtRand(0, 1) == 1 {
+		acct = accounts["eur"]
+	}
+	return s.addTx("income", acct.ID, &freelance.ID, float64(s.mtRand(450, 1900)),
+		vendors[s.mtRand(0, 2)], d, nil, nil, nil)
+}
+
+// seedDividend adds the quarterly dividend in the first month of each quarter.
+func (s *seeder) seedDividend(accounts map[string]*ledger.Account, investments *ledger.Category,
+	cursor time.Time) error {
+	if investments == nil || int(cursor.Month())%3 != 1 {
+		return nil
+	}
+	d := dateOn(cursor, minInt(15, daysInMonth(cursor)))
+	if !s.inRange(d) {
+		return nil
+	}
+	return s.addTx("income", accounts["crypto"].ID, &investments.ID,
+		float64(s.mtRand(80, 420)), "Quarterly dividend payout", d, nil, nil, nil)
+}
+
+// fixedSubs are the monthly subscriptions, charged to the credit card.
+var fixedSubs = []struct {
+	name  string
+	price float64
+}{
+	{"Netflix", 22.99}, {"Spotify", 11.99}, {"iCloud+", 9.99},
+	{"Adobe Creative Cloud", 59.99}, {"ChatGPT Plus", 20.00}, {"GitHub", 4.00},
+}
+
+// fixedUtilities are the monthly bills, with the range of their amounts.
+var fixedUtilities = []struct {
+	name   string
+	lo, hi int
+}{
+	{"ConEdison", 70, 180},
+	{"Xfinity Internet", 79, 79},
+	{"National Grid Gas", 40, 120},
+}
+
 func (s *seeder) seedFixedExpenses(accounts map[string]*ledger.Account, expenses []ledger.Category) error {
 	rent := catByName(expenses, "#RENT")
 	utilities := catByName(expenses, "#UTILITIES")
 	entertainment := catByName(expenses, "#ENTERTAINMENT")
-	subs := []struct {
-		name  string
-		price float64
-	}{
-		{"Netflix", 22.99}, {"Spotify", 11.99}, {"iCloud+", 9.99},
-		{"Adobe Creative Cloud", 59.99}, {"ChatGPT Plus", 20.00}, {"GitHub", 4.00},
-	}
-
 	for cursor := s.start; !cursor.After(s.end); cursor = addMonthsNoOverflow(cursor, 1) {
 		if rent != nil {
-			d := startOfMonth(cursor)
-			if s.inRange(d) {
-				if err := s.addTx("expense", accounts["checking"].ID, &rent.ID, 2150,
-					"Rent — Greystar Apartments", d, nil, nil, nil); err != nil {
-					return err
-				}
+			if err := s.seedRent(accounts, rent, cursor); err != nil {
+				return err
 			}
 		}
 		if utilities != nil {
-			for _, u := range []struct {
-				name   string
-				lo, hi int
-			}{
-				{"ConEdison", 70, 180},
-				{"Xfinity Internet", 79, 79},
-				{"National Grid Gas", 40, 120},
-			} {
-				d := dateOn(cursor, minInt(s.mtRand(12, 18), daysInMonth(cursor)))
-				if !s.inRange(d) {
-					continue
-				}
-				winter := 1.0
-				if m := int(cursor.Month()); m == 12 || m == 1 || m == 2 {
-					winter = 1.4
-				}
-				amt := round2(float64(s.mtRand(u.lo, u.hi)) * winter)
-				if err := s.addTx("expense", accounts["checking"].ID, &utilities.ID, amt, u.name, d, nil, nil, nil); err != nil {
-					return err
-				}
+			if err := s.seedUtilities(accounts, utilities, cursor); err != nil {
+				return err
 			}
 		}
 		if entertainment != nil {
-			for _, sub := range subs {
-				d := dateOn(cursor, minInt(s.mtRand(2, 9), daysInMonth(cursor)))
-				if !s.inRange(d) {
-					continue
-				}
-				if err := s.addTx("expense", accounts["credit"].ID, &entertainment.ID, sub.price,
-					sub.name+" subscription", d, nil, nil, nil); err != nil {
-					return err
-				}
+			if err := s.seedSubscriptions(accounts, entertainment, cursor); err != nil {
+				return err
 			}
 		}
 	}
 	return nil
 }
 
+func (s *seeder) seedRent(accounts map[string]*ledger.Account, rent *ledger.Category, month time.Time) error {
+	d := startOfMonth(month)
+	if !s.inRange(d) {
+		return nil
+	}
+	return s.addTx("expense", accounts["checking"].ID, &rent.ID, 2150,
+		"Rent — Greystar Apartments", d, nil, nil, nil)
+}
+
+func (s *seeder) seedUtilities(accounts map[string]*ledger.Account, cat *ledger.Category, month time.Time) error {
+	for _, u := range fixedUtilities {
+		d := dateOn(month, minInt(s.mtRand(12, 18), daysInMonth(month)))
+		if !s.inRange(d) {
+			continue
+		}
+		winter := 1.0
+		if m := int(month.Month()); m == 12 || m == 1 || m == 2 {
+			winter = 1.4
+		}
+		amt := round2(float64(s.mtRand(u.lo, u.hi)) * winter)
+		if err := s.addTx("expense", accounts["checking"].ID, &cat.ID, amt, u.name, d, nil, nil, nil); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *seeder) seedSubscriptions(accounts map[string]*ledger.Account, cat *ledger.Category, month time.Time) error {
+	for _, sub := range fixedSubs {
+		d := dateOn(month, minInt(s.mtRand(2, 9), daysInMonth(month)))
+		if !s.inRange(d) {
+			continue
+		}
+		if err := s.addTx("expense", accounts["credit"].ID, &cat.ID, sub.price,
+			sub.name+" subscription", d, nil, nil, nil); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// variableWeights is how often each variable expense category is drawn.
+var variableWeights = []struct {
+	name string
+	w    int
+}{
+	{"#GROCERIES", 22}, {"#DINING", 20}, {"#TRANSPORT", 16},
+	{"#SHOPPING", 12}, {"#ENTERTAINMENT", 9}, {"#HEALTH", 6}, {"#PERSONAL_CARE", 5},
+	{"#TRAVEL", 3}, {"#HOUSING", 2}, {"#GIFTS", 2}, {"#OTHER", 2},
+}
+
+// variableRanges is the whole-unit amount range per variable expense category.
+var variableRanges = map[string][2]int{
+	"#GROCERIES": {18, 145}, "#DINING": {9, 70}, "#TRANSPORT": {4, 65},
+	"#SHOPPING": {15, 240}, "#ENTERTAINMENT": {12, 95}, "#HEALTH": {10, 160},
+	"#PERSONAL_CARE": {15, 85}, "#TRAVEL": {120, 950}, "#HOUSING": {25, 180},
+	"#GIFTS": {20, 180}, "#OTHER": {10, 120},
+}
+
+// variableTags are the tags the variable expenses may carry.
+type variableTags struct{ vacation, essential, business *ledger.Tag }
+
 func (s *seeder) seedVariableExpenses(
 	accounts map[string]*ledger.Account,
 	expenses []ledger.Category,
 	tags []ledger.Tag,
 ) error {
-	weights := []struct {
-		name string
-		w    int
-	}{
-		{"#GROCERIES", 22}, {"#DINING", 20}, {"#TRANSPORT", 16},
-		{"#SHOPPING", 12}, {"#ENTERTAINMENT", 9}, {"#HEALTH", 6}, {"#PERSONAL_CARE", 5},
-		{"#TRAVEL", 3}, {"#HOUSING", 2}, {"#GIFTS", 2}, {"#OTHER", 2},
-	}
 	var pool []ledger.Category
-	for _, w := range weights {
+	for _, w := range variableWeights {
 		if c := catByName(expenses, w.name); c != nil {
 			for i := 0; i < w.w; i++ {
 				pool = append(pool, *c)
@@ -480,61 +526,18 @@ func (s *seeder) seedVariableExpenses(
 	if len(pool) == 0 {
 		return nil
 	}
-	ranges := map[string][2]int{
-		"#GROCERIES": {18, 145}, "#DINING": {9, 70}, "#TRANSPORT": {4, 65},
-		"#SHOPPING": {15, 240}, "#ENTERTAINMENT": {12, 95}, "#HEALTH": {10, 160},
-		"#PERSONAL_CARE": {15, 85}, "#TRAVEL": {120, 950}, "#HOUSING": {25, 180},
-		"#GIFTS": {20, 180}, "#OTHER": {10, 120},
-	}
-	vacation := tagByName(tags, "Vacation")
-	essential := tagByName(tags, "Essential")
-	business := tagByName(tags, "Business")
+	vt := variableTags{tagByName(tags, "Vacation"), tagByName(tags, "Essential"), tagByName(tags, "Business")}
 
 	for cursor := s.start; !cursor.After(s.end); cursor = cursor.AddDate(0, 0, 1) {
-		isWeekend := cursor.Weekday() == time.Saturday || cursor.Weekday() == time.Sunday
-		seasonal := 1.0
-		switch cursor.Month() {
-		case time.November, time.December:
-			seasonal = 1.5
-		case time.July:
-			seasonal = 1.25
-		}
+		seasonal := seasonalFactor(cursor.Month())
 		lo, hi := 1, 3
-		if isWeekend {
+		if cursor.Weekday() == time.Saturday || cursor.Weekday() == time.Sunday {
 			lo, hi = 2, 5
 		}
 		count := int(math.Round(float64(s.mtRand(lo, hi)) * seasonal))
 		for i := 0; i < count; i++ {
 			cat := pool[s.rng.Intn(len(pool))]
-			if cat.Name == "#TRAVEL" && s.mtRand(1, 100) > 12 {
-				continue
-			}
-			r := ranges[cat.Name]
-			if r[1] == 0 {
-				r = [2]int{10, 80}
-			}
-			amount := round2(float64(s.mtRand(r[0]*100, r[1]*100)) / 100 * seasonal)
-			merchant := s.merchantFor(cat.Name)
-			acct := accounts["checking"]
-			switch {
-			case cat.Name == "#TRAVEL" && accounts["eur"] != nil && s.mtRand(0, 1) == 1:
-				acct = accounts["eur"]
-			case inList(cat.Name, "#GROCERIES", "#SHOPPING", "#TRAVEL", "#HEALTH") && s.mtRand(1, 100) <= 60:
-				acct = accounts["credit"]
-			case amount < 25 && s.mtRand(1, 100) <= 35:
-				acct = accounts["cash"]
-			}
-			var tagIDs []int64
-			if cat.Name == "#TRAVEL" && vacation != nil {
-				tagIDs = append(tagIDs, vacation.ID)
-			}
-			if inList(cat.Name, "#GROCERIES", "#HEALTH") && essential != nil && s.mtRand(1, 100) <= 35 {
-				tagIDs = append(tagIDs, essential.ID)
-			}
-			if cat.Name == "#HOUSING" && business != nil && s.mtRand(1, 100) <= 20 {
-				tagIDs = append(tagIDs, business.ID)
-			}
-			if err := s.addTx("expense", acct.ID, &cat.ID, amount, merchant, cursor, nil, nil, tagIDs); err != nil {
+			if err := s.seedVariableExpense(accounts, vt, cat, cursor, seasonal); err != nil {
 				return err
 			}
 		}
@@ -542,7 +545,66 @@ func (s *seeder) seedVariableExpenses(
 	return nil
 }
 
-func (s *seeder) seedTransfersAndDebt(accounts map[string]*ledger.Account) error {
+func seasonalFactor(m time.Month) float64 {
+	switch m {
+	case time.November, time.December:
+		return 1.5
+	case time.July:
+		return 1.25
+	}
+	return 1.0
+}
+
+// seedVariableExpense adds one purchase in cat on day. The order of the random
+// draws is part of the demo data, so keep it.
+func (s *seeder) seedVariableExpense(
+	accounts map[string]*ledger.Account,
+	vt variableTags,
+	cat ledger.Category,
+	day time.Time,
+	seasonal float64,
+) error {
+	if cat.Name == "#TRAVEL" && s.mtRand(1, 100) > 12 {
+		return nil
+	}
+	r := variableRanges[cat.Name]
+	if r[1] == 0 {
+		r = [2]int{10, 80}
+	}
+	amount := round2(float64(s.mtRand(r[0]*100, r[1]*100)) / 100 * seasonal)
+	merchant := s.merchantFor(cat.Name)
+	acct := s.variableAccount(accounts, cat.Name, amount)
+	tagIDs := s.variableTagIDs(vt, cat.Name)
+	return s.addTx("expense", acct.ID, &cat.ID, amount, merchant, day, nil, nil, tagIDs)
+}
+
+func (s *seeder) variableAccount(accounts map[string]*ledger.Account, cat string, amount float64) *ledger.Account {
+	switch {
+	case cat == "#TRAVEL" && accounts["eur"] != nil && s.mtRand(0, 1) == 1:
+		return accounts["eur"]
+	case inList(cat, "#GROCERIES", "#SHOPPING", "#TRAVEL", "#HEALTH") && s.mtRand(1, 100) <= 60:
+		return accounts["credit"]
+	case amount < 25 && s.mtRand(1, 100) <= 35:
+		return accounts["cash"]
+	}
+	return accounts["checking"]
+}
+
+func (s *seeder) variableTagIDs(vt variableTags, cat string) []int64 {
+	var ids []int64
+	if cat == "#TRAVEL" && vt.vacation != nil {
+		ids = append(ids, vt.vacation.ID)
+	}
+	if inList(cat, "#GROCERIES", "#HEALTH") && vt.essential != nil && s.mtRand(1, 100) <= 35 {
+		ids = append(ids, vt.essential.ID)
+	}
+	if cat == "#HOUSING" && vt.business != nil && s.mtRand(1, 100) <= 20 {
+		ids = append(ids, vt.business.ID)
+	}
+	return ids
+}
+
+func (s *seeder) seedTransfersDebt(accounts map[string]*ledger.Account) error {
 	for cursor := s.start; !cursor.After(s.end); cursor = addMonthsNoOverflow(cursor, 1) {
 		d := dateOn(cursor, minInt(6, daysInMonth(cursor)))
 		if s.inRange(d) {

@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func TestAuthorizeURLCarriesPKCEAndAnUnguessableState(t *testing.T) {
+func TestAuthorizeURLCarriesPKCEUnguessableState(t *testing.T) {
 	e := newSSOEnv(t, nil)
 	loc, err := e.svc.AuthorizeURL(e.ctx, *e.p, "/spaces/3")
 	if err != nil {
@@ -47,7 +47,7 @@ func TestAuthorizeURLCarriesPKCEAndAnUnguessableState(t *testing.T) {
 	}
 }
 
-func TestRedirectAfterLoginStaysOnThisSite(t *testing.T) {
+func TestRedirectAfterLoginStaysThisSite(t *testing.T) {
 	for in, want := range map[string]string{
 		"/spaces/1":               "/spaces/1",
 		"  /spaces/1  ":           "/spaces/1",
@@ -91,7 +91,7 @@ func TestCallbackReturnsTheVerifiedIdentity(t *testing.T) {
 	}
 }
 
-func TestCallbackRefusesWhatIsNotAValidLogin(t *testing.T) {
+func TestCallbackRefusesWhatNotValidLogin(t *testing.T) {
 	e := newSSOEnv(t, nil)
 	good := func() map[string]any { return e.idp.idToken("sub-1", "ann@test.com", true) }
 
@@ -154,7 +154,7 @@ func TestCallbackRefusesWhatIsNotAValidLogin(t *testing.T) {
 	}
 }
 
-func TestAStateBelongsToTheProviderThatIssuedIt(t *testing.T) {
+func TestStateBelongsProviderThatIssuedIt(t *testing.T) {
 	e := newSSOEnv(t, nil)
 	e.idp.next = e.idp.idToken("sub-1", "ann@test.com", true)
 	loc, _ := e.svc.AuthorizeURL(e.ctx, *e.p, "")

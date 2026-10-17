@@ -31,7 +31,7 @@ func mustPanicWith(t *testing.T, want error, fn func()) {
 	fn()
 }
 
-func TestFromDecimalRoundsPerCurrencyAndAmount(t *testing.T) {
+func TestFromDecimalRoundsPerCurrencyAmount(t *testing.T) {
 	moneytest.ForEach(t, func(t *testing.T, c moneytest.Currency) {
 		unit := c.Unit(1)
 		moneytest.ForEachAmount(t, moneytest.Valid(c.Decimals), func(t *testing.T, a moneytest.Amount) {
@@ -53,7 +53,7 @@ func TestFromDecimalRoundsPerCurrencyAndAmount(t *testing.T) {
 	})
 }
 
-func TestFromInputRejectsAmountsOutOfRange(t *testing.T) {
+func TestFromInputRejectsAmountsOutRange(t *testing.T) {
 	moneytest.ForEach(t, func(t *testing.T, c moneytest.Currency) {
 		unit := c.Unit(1)
 		moneytest.ForEachAmount(t, moneytest.Amounts(c.Decimals), func(t *testing.T, a moneytest.Amount) {
@@ -109,7 +109,7 @@ func TestArithmeticOverflowPanics(t *testing.T) {
 	}
 }
 
-func TestSumOfManyMaximaStaysExactAndComparable(t *testing.T) {
+func TestSumManyMaximaStaysExactComparable(t *testing.T) {
 	moneytest.ForEach(t, func(t *testing.T, c moneytest.Currency) {
 		unit := c.Unit(1)
 		// A few thousand maximal rows is far beyond real data and still fits.
@@ -181,7 +181,7 @@ func TestMarshalJSONIsACanonicalNumber(t *testing.T) {
 	})
 }
 
-func TestMaximumIsAnExactIntegerForJavaScript(t *testing.T) {
+func TestMaximumExactIntegerForJavaScript(t *testing.T) {
 	if float64(money.MaxMinor) >= 1<<53 {
 		t.Fatalf("MaxMinor %d is not below 2^53", money.MaxMinor)
 	}

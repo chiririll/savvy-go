@@ -158,27 +158,8 @@ func (h Handler) usersUpdate(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteValidation(w, map[string][]string{"email": {"The given data was invalid."}})
 		return
 	}
-	if body.Role != nil && *body.Role != auth.RoleAdmin && u.IsAdmin() {
-		n, _ := h.Users.AdminCount(r.Context())
-		if n <= 1 {
-			httpx.WriteMessage(w, http.StatusUnprocessableEntity, "Cannot demote the last admin.")
-			return
-		}
-	}
-	if body.Role != nil {
-		if !validRole(*body.Role) {
-			httpx.WriteValidation(w, map[string][]string{"role": {"The selected role is invalid."}})
-			return
-		}
-		// P9: whoever administers a space stays able to.
-		if err := h.Spaces.SetRoleAllowed(r.Context(), u, *body.Role); err != nil {
-			httpx.WriteMessage(
-				w,
-				http.StatusUnprocessableEntity,
-				"This user administers a space; make someone else its admin first.",
-			)
-			return
-		}
+	if body.Role != nil && !h.roleChangeAllowed(w, r, u, *body.Role) {
+		return
 	}
 	if body.Password != nil && *body.Password != "" {
 		_ = h.Tokens.RevokeActive(r.Context(), u.ID)
@@ -192,6 +173,33 @@ func (h Handler) usersUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.WriteData(w, http.StatusOK, dto.NewUser(*updated))
+}
+
+// roleChangeAllowed checks that u may take role, and answers if not: the last
+// admin stays admin, the role must exist, and whoever administers a space stays
+// able to.
+func (h Handler) roleChangeAllowed(w http.ResponseWriter, r *http.Request, u *auth.User, role string) bool {
+	if role != auth.RoleAdmin && u.IsAdmin() {
+		n, _ := h.Users.AdminCount(r.Context())
+		if n <= 1 {
+			httpx.WriteMessage(w, http.StatusUnprocessableEntity, "Cannot demote the last admin.")
+			return false
+		}
+	}
+	if !validRole(role) {
+		httpx.WriteValidation(w, map[string][]string{"role": {"The selected role is invalid."}})
+		return false
+	}
+	// P9: whoever administers a space stays able to.
+	if err := h.Spaces.SetRoleAllowed(r.Context(), u, role); err != nil {
+		httpx.WriteMessage(
+			w,
+			http.StatusUnprocessableEntity,
+			"This user administers a space; make someone else its admin first.",
+		)
+		return false
+	}
+	return true
 }
 
 func (h Handler) usersDestroy(w http.ResponseWriter, r *http.Request) {
@@ -257,7 +265,8 @@ func (h Handler) usersIssueToken(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteData(w, http.StatusOK, payload)
 		return
 	}
-	if err := h.Mail.Send(r.Context(), smtp.PasswordReset(u.Email, u.Name, h.Cfg.AppURL()+"/set-password/"+tok, exp)); err != nil {
+	if err := h.Mail.Send(r.Context(),
+		smtp.PasswordReset(u.Email, u.Name, h.Cfg.AppURL()+"/set-password/"+tok, exp)); err != nil {
 		// The link was never seen by anyone: do not leave it valid.
 		_ = h.Tokens.RevokeActive(r.Context(), u.ID)
 		httpx.WriteMessage(w, http.StatusUnprocessableEntity, "Could not send the email: "+err.Error())

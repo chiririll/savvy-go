@@ -35,7 +35,7 @@ type SecurityConfig struct {
 	CSRFCookie   string `toml:"csrf_cookie"`
 	CSRFHeader   string `toml:"csrf_header"`
 
-	IPRateLimit      int `toml:"ip_rate_limit" comment:"Sign-in attempts per minute from one address and against one account. 0 is no limit."`
+	IPRateLimit      int `toml:"ip_rate_limit" comment:"Sign-in attempts a minute per address and account. 0 means none."`
 	AccountRateLimit int `toml:"account_rate_limit"`
 }
 

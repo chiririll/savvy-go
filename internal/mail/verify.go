@@ -57,7 +57,8 @@ func (s Verifier) Send(ctx context.Context, u *auth.User) string {
 	if err != nil {
 		return "Could not create the link: " + err.Error()
 	}
-	if err := s.Mail.Send(ctx, smtp.EmailVerification(u.Email, u.Name, s.Cfg.AppURL()+"/verify-email/"+token, exp)); err != nil {
+	if err := s.Mail.Send(ctx,
+		smtp.EmailVerification(u.Email, u.Name, s.Cfg.AppURL()+"/verify-email/"+token, exp)); err != nil {
 		return "Could not send the email: " + err.Error()
 	}
 	return ""

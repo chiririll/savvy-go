@@ -57,8 +57,10 @@ type Transfer struct {
 // other space: only then is the account on the other side shown.
 func NewTransfer(v transfers.View, seesOther bool) Transfer {
 	out := Transfer{
-		UUID: v.UUID, From: newTransferSide(v.From, v.Outgoing || seesOther), To: newTransferSide(v.To, !v.Outgoing || seesOther),
-		Outgoing: v.Outgoing, Date: v.Date, Description: v.Description, Version: v.Version, Status: v.Status, Review: v.Review,
+		UUID: v.UUID, From: newTransferSide(v.From, v.Outgoing || seesOther),
+		To:       newTransferSide(v.To, !v.Outgoing || seesOther),
+		Outgoing: v.Outgoing, Date: v.Date, Description: v.Description, Version: v.Version, Status: v.Status,
+		Review: v.Review,
 		Frozen: v.Frozen, Verified: v.Verified, Deleted: v.DeletedAt != nil,
 		OtherSpace: ptr(v.OtherSpace, NewSpaceName),
 	}

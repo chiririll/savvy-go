@@ -14,7 +14,7 @@ import (
 	"savvy-go/internal/sso"
 )
 
-func TestIdentityProviderCRUDAndPresets(t *testing.T) {
+func TestIdentityProviderCRUDPresets(t *testing.T) {
 	a := newTestApp(t)
 	admin := a.createUser("admin@test.com", "secret1", auth.RoleAdmin)
 	rw := a.createUser("rw@test.com", "secret1", roleEditor)
@@ -143,7 +143,7 @@ func TestSSOTicketExchange(t *testing.T) {
 	}
 }
 
-func TestSSOGithubSignInProvisionsTheUser(t *testing.T) {
+func TestSSOGithubSignInProvisionsUser(t *testing.T) {
 	a := newTestApp(t)
 	a.createUser("root@test.com", "secret1", auth.RoleAdmin)
 	_, err := a.svc.SSO.Create(context.Background(), sso.IdPWrite{
@@ -200,7 +200,7 @@ func TestSSOGithubSignInProvisionsTheUser(t *testing.T) {
 
 }
 
-func TestSSOSAMLMetadataRedirectAndRejectedResponse(t *testing.T) {
+func TestSSOSAMLMetadataRedirectRejectedResponse(t *testing.T) {
 	a := newTestApp(t)
 
 	_, err := a.svc.SSO.Create(context.Background(), sso.IdPWrite{
@@ -240,7 +240,7 @@ func TestSSOSAMLMetadataRedirectAndRejectedResponse(t *testing.T) {
 	}
 }
 
-func TestSSOProvisioningLinkAndJIT(t *testing.T) {
+func TestSSOProvisioningLinkJIT(t *testing.T) {
 	a := newTestApp(t)
 	a.createUser("root@test.com", "secret1", auth.RoleAdmin)
 	existing := a.createUser("jane@test.com", "secret1", roleEditor)

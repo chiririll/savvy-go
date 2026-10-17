@@ -81,13 +81,38 @@ var studioSpace = miniSpace{
 // seedMini fills a space with a miniSpace and returns its accounts by key. The
 // space's reference data (currencies, categories) must already exist.
 func seedMini(ctx context.Context, db store.DB, now time.Time, spec miniSpace) (map[string]*ledger.Account, error) {
+	out, err := seedMiniAccounts(ctx, db, spec.accounts)
+	if err != nil {
+		return nil, err
+	}
+	cats := ledger.Categories{DB: db}
+	var all []ledger.Category
+	for _, typ := range []string{"expense", "income"} {
+		list, err := cats.All(ctx, typ)
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, list...)
+	}
+	txs := ledger.Transactions{DB: db}
+	for _, t := range spec.txs {
+		if _, err := txs.Create(ctx, miniTxInput(t, out[t.account].ID, all, now)); err != nil {
+			return nil, fmt.Errorf("transaction %s: %w", t.desc, err)
+		}
+	}
+	if cat := catByName(all, spec.budget.category); cat != nil {
+		if err := seedMiniBudget(ctx, db, now, spec.budget, cat.ID); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
+func seedMiniAccounts(ctx context.Context, db store.DB, specs []miniAccount) (map[string]*ledger.Account, error) {
 	curs := ledger.Currencies{DB: db}
 	accts := ledger.Accounts{DB: db}
-	txs := ledger.Transactions{DB: db}
-	cats := ledger.Categories{DB: db}
-
 	out := map[string]*ledger.Account{}
-	for _, a := range spec.accounts {
+	for _, a := range specs {
 		cur, err := curs.ByCode(ctx, a.currency)
 		if err != nil || cur == nil {
 			return nil, fmt.Errorf("currency %s missing", a.currency)
@@ -101,47 +126,36 @@ func seedMini(ctx context.Context, db store.DB, now time.Time, spec miniSpace) (
 		}
 		out[a.key] = created
 	}
-
-	var all []ledger.Category
-	for _, typ := range []string{"expense", "income"} {
-		list, err := cats.All(ctx, typ)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, list...)
-	}
-	for _, t := range spec.txs {
-		in := ledger.TxInput{
-			Type: t.typ, AccountID: out[t.account].ID, Description: &t.desc,
-			Amount: decimal.NewFromFloat(t.amount), IsEstimated: t.estimated,
-		}
-		if c := catByName(all, t.category); c != nil {
-			in.CategoryID = &c.ID
-		}
-		date := now.AddDate(0, 0, -t.daysAgo).Format("2006-01-02")
-		status := "confirmed"
-		if t.pending {
-			status = "pending"
-		}
-		in.Date, in.Status = &date, &status
-		if _, err := txs.Create(ctx, in); err != nil {
-			return nil, fmt.Errorf("transaction %s: %w", t.desc, err)
-		}
-	}
-
-	if cat := catByName(all, spec.budget.category); cat != nil {
-		cur, err := curs.Base(ctx)
-		if err != nil {
-			return nil, err
-		}
-		start := startOfMonth(now).Format("2006-01-02")
-		notify := 80
-		if _, err := (ledger.Budgets{DB: db}).Create(ctx, ledger.BudgetInput{
-			Name: spec.budget.name, Amount: decimal.NewFromInt(spec.budget.amount), CurrencyID: &cur.ID,
-			Period: "monthly", StartDate: &start, NotifyAtPercent: &notify, CategoryIDs: []int64{cat.ID},
-		}); err != nil {
-			return nil, err
-		}
-	}
 	return out, nil
+}
+
+func miniTxInput(t miniTx, accountID int64, cats []ledger.Category, now time.Time) ledger.TxInput {
+	in := ledger.TxInput{
+		Type: t.typ, AccountID: accountID, Description: &t.desc,
+		Amount: decimal.NewFromFloat(t.amount), IsEstimated: t.estimated,
+	}
+	if c := catByName(cats, t.category); c != nil {
+		in.CategoryID = &c.ID
+	}
+	date := now.AddDate(0, 0, -t.daysAgo).Format("2006-01-02")
+	status := "confirmed"
+	if t.pending {
+		status = "pending"
+	}
+	in.Date, in.Status = &date, &status
+	return in
+}
+
+func seedMiniBudget(ctx context.Context, db store.DB, now time.Time, b miniBudget, categoryID int64) error {
+	cur, err := (ledger.Currencies{DB: db}).Base(ctx)
+	if err != nil {
+		return err
+	}
+	start := startOfMonth(now).Format("2006-01-02")
+	notify := 80
+	_, err = (ledger.Budgets{DB: db}).Create(ctx, ledger.BudgetInput{
+		Name: b.name, Amount: decimal.NewFromInt(b.amount), CurrencyID: &cur.ID,
+		Period: "monthly", StartDate: &start, NotifyAtPercent: &notify, CategoryIDs: []int64{categoryID},
+	})
+	return err
 }

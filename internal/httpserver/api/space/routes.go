@@ -28,7 +28,8 @@ func init() {
 		h := Handler{
 			Cfg: routing.Get[appconfig.Config](
 				d,
-			), Store: routing.Get[store.Store](d), Spaces: routing.Get[spaces.Service](d), Users: routing.Get[auth.Users](d), Backups: routing.Get[backup.Service](d), Mail: routing.Get[*mail.Service](d),
+			), Store: routing.Get[store.Store](d), Spaces: routing.Get[spaces.Service](d), Users: routing.Get[auth.Users](d),
+			Backups: routing.Get[backup.Service](d), Mail: routing.Get[*mail.Service](d),
 			Login: d.Login, Verify: routing.Get[mail.Verifier](d), Guard: d.Guard,
 			Creator: spacefill.Creator{
 				Spaces: routing.Get[spaces.Service](d),

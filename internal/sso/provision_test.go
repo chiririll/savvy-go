@@ -26,7 +26,7 @@ func ident(sub, email string, verified bool) NormalizedIdentity {
 	}
 }
 
-func TestProvisionNeedsASubjectAndAnAdminToExist(t *testing.T) {
+func TestProvisionNeedsSubjectAdminToExist(t *testing.T) {
 	e := newSSOEnv(t, nil)
 	if _, _, err := e.svc.Provision(e.ctx, *e.p, ident("", "a@test.com", true)); ssoCode(err) != "missing_subject" {
 		t.Errorf("no subject: %q", ssoCode(err))
@@ -36,7 +36,7 @@ func TestProvisionNeedsASubjectAndAnAdminToExist(t *testing.T) {
 	}
 }
 
-func TestProvisionCreatesAnSSOOnlyUserOnFirstLogin(t *testing.T) {
+func TestProvisionCreatesSSOUserFirstLogin(t *testing.T) {
 	e := newSSOEnv(t, nil)
 	e.admin(t)
 	u, needs2FA, err := e.svc.Provision(e.ctx, *e.p, ident("s1", "New@Test.com", true))
@@ -66,7 +66,7 @@ func TestProvisionLeavesAnUnverifiedAddressUnverified(t *testing.T) {
 }
 
 // An unverified address must never take over an existing account.
-func TestProvisionLinksByEmailOnlyWhenVerified(t *testing.T) {
+func TestProvisionLinksEmailOnlyWhenVerified(t *testing.T) {
 	e := newSSOEnv(t, nil)
 	victim := e.admin(t)
 
@@ -85,7 +85,7 @@ func TestProvisionLinksByEmailOnlyWhenVerified(t *testing.T) {
 	}
 }
 
-func TestProvisionWithoutLinkByEmailKeepsAccountsApart(t *testing.T) {
+func TestProvisionWithoutEmailLinkKeepsApart(t *testing.T) {
 	e := newSSOEnv(t, func(in *IdPWrite) { in.LinkByEmail = ptr(false) })
 	e.admin(t)
 	if _, _, err := e.svc.Provision(e.ctx, *e.p, ident("s", "root@test.com", true)); ssoCode(err) != "email_in_use" {
@@ -142,7 +142,7 @@ func TestProvisionSignupRules(t *testing.T) {
 	})
 }
 
-func TestProvisionGivesTheMappedOrDefaultRole(t *testing.T) {
+func TestProvisionGivesTheMappedDefaultRole(t *testing.T) {
 	mapping := []any{
 		map[string]any{"claim": "groups", "operator": "contains", "value": "admins", "role": "admin"},
 		map[string]any{"claim": "groups", "operator": "contains", "value": "guests", "role": "guest"},
@@ -170,7 +170,7 @@ func TestProvisionGivesTheMappedOrDefaultRole(t *testing.T) {
 	}
 }
 
-func TestProvisionSyncsRolesButKeepsLastAdmin(t *testing.T) {
+func TestProvisionSyncsRolesKeepsLastAdmin(t *testing.T) {
 	mapping := []any{map[string]any{"claim": "groups", "operator": "contains", "value": "admins", "role": "admin"}}
 	e := newSSOEnv(t, func(in *IdPWrite) {
 		in.RoleMapping, in.SyncRoleOnLogin, in.DefaultRole = mapping, ptr(true), "user"
@@ -231,7 +231,7 @@ func TestProvisionLeavesRolesAloneWithoutSync(t *testing.T) {
 	}
 }
 
-func TestProvisionReportsTwoFactorForLinkedUsers(t *testing.T) {
+func TestProvisionReportsTwoFactorLinkedUsers(t *testing.T) {
 	e := newSSOEnv(t, nil)
 	root := e.admin(t)
 	tf := auth.TwoFactor{DB: e.svc.DB, Users: e.svc.Users}

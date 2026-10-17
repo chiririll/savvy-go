@@ -64,7 +64,7 @@ func TestPublicOrigin(t *testing.T) {
 	}
 }
 
-func TestPublicOriginWithoutAppURLUsesHost(t *testing.T) {
+func TestPublicOriginFallsBackToHost(t *testing.T) {
 	g := &Guard{}
 	h := g.PublicOrigin(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(204) }))
 	for origin, want := range map[string]int{"http://example.com": 204, "http://evil.example": 403} {

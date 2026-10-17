@@ -217,7 +217,7 @@ func TestGeneratePeriods(t *testing.T) {
 	}
 }
 
-func TestNextPeriodAndPeriodEnd(t *testing.T) {
+func TestNextPeriodPeriodEnd(t *testing.T) {
 	if got := nextPeriod(day("2024-01-31"), "month").Format("2006-01-02"); got != "2024-02-01" {
 		t.Errorf("next month %s", got)
 	}
@@ -243,12 +243,16 @@ func TestNextPeriodAndPeriodEnd(t *testing.T) {
 }
 
 func TestParsePeriodValues(t *testing.T) {
-	for in, want := range map[string]bool{"2024-01": true, "2024-12": true, "2024-00": false, "2024-13": false, "24-01": false, "2024/01": false, "abcd-01": false, "": false} {
+	for in, want := range map[string]bool{"2024-01": true, "2024-12": true, "2024-00": false, "2024-13": false,
+		"24-01":   false,
+		"2024/01": false, "abcd-01": false, "": false} {
 		if _, _, ok := parseYearMonth(in); ok != want {
 			t.Errorf("parseYearMonth(%q) ok = %v, want %v", in, ok, want)
 		}
 	}
-	for in, want := range map[string]bool{"2024-Q1": true, "2024-Q4": true, "2024-Q0": false, "2024-Q5": false, "2024-q1": false, "2024-1": false, "": false} {
+	for in, want := range map[string]bool{"2024-Q1": true, "2024-Q4": true, "2024-Q0": false, "2024-Q5": false,
+		"2024-q1": false,
+		"2024-1":  false, "": false} {
 		if _, _, ok := parseYearQuarter(in); ok != want {
 			t.Errorf("parseYearQuarter(%q) ok = %v, want %v", in, ok, want)
 		}

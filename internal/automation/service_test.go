@@ -168,7 +168,7 @@ func TestUpdateKeepsWhatIsNotSent(t *testing.T) {
 	}
 }
 
-func TestToggleReorderAndDelete(t *testing.T) {
+func TestToggleReorderDelete(t *testing.T) {
 	e := newEnv(t)
 	a, b := e.rule(t, Input{Name: "a", Priority: 10}), e.rule(t, Input{Name: "b", Priority: 20})
 
@@ -230,7 +230,7 @@ func TestProcessAppliesEveryAction(t *testing.T) {
 	}
 }
 
-func TestProcessSkipsNonMatchingWrongTriggerInactiveAndUnconfirmed(t *testing.T) {
+func TestProcessSkipsInapplicableRules(t *testing.T) {
 	e := newEnv(t)
 	setFood := []map[string]any{{"type": "set_category", "category_id": float64(e.food.ID)}}
 	e.rule(t, Input{Name: "no match", Conditions: when("description", "contains", "tesla"), Actions: setFood})
@@ -260,7 +260,7 @@ func TestProcessSkipsNonMatchingWrongTriggerInactiveAndUnconfirmed(t *testing.T)
 	e.svc.Process(e.ctx, "on_transaction_create", nil) // must not panic
 }
 
-func TestProcessRunsRulesByPriorityAndStopsWhereAskedTo(t *testing.T) {
+func TestProcessRunsRulesPriorityStopsAsked(t *testing.T) {
 	e := newEnv(t)
 	set := func(id int64) []map[string]any {
 		return []map[string]any{{"type": "set_category", "category_id": float64(id)}}
@@ -293,7 +293,7 @@ func TestProcessRunsRulesByPriorityAndStopsWhereAskedTo(t *testing.T) {
 	}
 }
 
-func TestProcessLogsSuccessAndFailure(t *testing.T) {
+func TestProcessLogsSuccessFailure(t *testing.T) {
 	e := newEnv(t)
 	good := e.rule(
 		t,
@@ -341,7 +341,7 @@ func TestProcessLogsSuccessAndFailure(t *testing.T) {
 	}
 }
 
-func TestActionsThatNeedMoreInputDoNothing(t *testing.T) {
+func TestActionsNeedMoreInputDoNothing(t *testing.T) {
 	e := newEnv(t)
 	e.rule(t, Input{Name: "vague", Actions: []map[string]any{
 		{"type": "set_category"},
@@ -359,7 +359,7 @@ func TestActionsThatNeedMoreInputDoNothing(t *testing.T) {
 	}
 }
 
-func TestCreateTransferActionMovesAFormulaOfTheAmount(t *testing.T) {
+func TestCreateTransferActionMovesFormulaAmount(t *testing.T) {
 	e := newEnv(t)
 	e.rule(t, Input{
 		Name: "round up", Conditions: when("type", "equals", "expense"),
@@ -388,7 +388,7 @@ func TestCreateTransferActionMovesAFormulaOfTheAmount(t *testing.T) {
 	}
 }
 
-func TestTestReportsTheMatchWithoutRunningAnything(t *testing.T) {
+func TestTestReportsMatchWithoutRunningAnything(t *testing.T) {
 	e := newEnv(t)
 	r := e.rule(
 		t,

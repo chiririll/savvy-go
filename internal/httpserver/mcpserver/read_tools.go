@@ -55,12 +55,12 @@ type transactionsArgs struct {
 
 type reportArgs struct {
 	SpaceID     int64   `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
-	Report      string  `json:"report" jsonschema:"One of: overview, money_flow, expense_pace, expenses_by_category, cash_flow_over_time, transactions_summary, transactions_by_category, transactions_dynamics, transactions_top, net_worth, net_worth_history."`
-	PeriodType  string  `json:"period_type,omitempty" jsonschema:"last_30_days (default), month, quarter, year, ytd or custom."`
+	Report      string  `json:"report" jsonschema:"Report name, one of those in the tool description."`
+	PeriodType  string  `json:"period_type,omitempty" jsonschema:"Default last_30_days; month, quarter, year, ytd, custom"`
 	PeriodValue string  `json:"period_value,omitempty" jsonschema:"For month 2026-03, for quarter 2026-Q1, for year 2026."`
 	StartDate   string  `json:"start_date,omitempty" jsonschema:"With period_type custom: first day, YYYY-MM-DD."`
 	EndDate     string  `json:"end_date,omitempty" jsonschema:"With period_type custom: last day, YYYY-MM-DD."`
-	CompareWith string  `json:"compare_with,omitempty" jsonschema:"none (default), previous_period or same_period_last_year."`
+	CompareWith string  `json:"compare_with,omitempty" jsonschema:"none (default), previous_period, same_period_last_year"`
 	AccountIDs  []int64 `json:"account_ids,omitempty" jsonschema:"Only these accounts."`
 	CategoryIDs []int64 `json:"category_ids,omitempty" jsonschema:"Only these categories."`
 	TagIDs      []int64 `json:"tag_ids,omitempty" jsonschema:"Only these tags."`
@@ -162,39 +162,24 @@ func (h Handler) addQueryReadTools(srv *mcp.Server) {
 	mcp.AddTool(
 		srv,
 		&mcp.Tool{
-			Name:        "list_transactions",
-			Description: "List transactions, newest first, with optional filters. Each row has its own currency. Returns at most 100 rows per page; use page to continue.",
+			Name: "list_transactions",
+			Description: "List transactions, newest first, with optional filters. Each row has its own currency. Returns at " +
+				"most 100 rows per page; use page to continue.",
 			Annotations: ro("List transactions"),
 		},
 		func(ctx context.Context, req *mcp.CallToolRequest, in transactionsArgs) (*mcp.CallToolResult, any, error) {
-			q := url.Values{}
-			if err := firstErr(
-				setDate(q, "start_date", in.StartDate), setDate(q, "end_date", in.EndDate),
-				setEnum(q, "type", in.Type, "income", "expense", "transfer"),
-				setEnum(q, "status", in.Status, "completed", "pending", "skipped"),
-				setEnum(q, "sort_by", in.SortBy, "date", "amount", "created_at"),
-				setEnum(q, "sort_direction", in.SortDirection, "asc", "desc"),
-			); err != nil {
+			q, err := transactionsQuery(in)
+			if err != nil {
 				return mcpFail(err.Error()), nil, nil
-			}
-			setID(q, "account_id", in.AccountID)
-			setIDs(q, "category_ids", in.CategoryIDs)
-			setIDs(q, "tag_ids", in.TagIDs)
-			if in.Page > 0 {
-				q.Set("page", strconv.Itoa(in.Page))
-			}
-			per := in.PerPage
-			if per <= 0 {
-				per = 25
-			}
-			q.Set("per_page", strconv.Itoa(min(per, mcpMaxPerPage)))
-			if in.WithSummary {
-				q.Set("with_summary", "1")
 			}
 			return h.mcpGet(ctx, req, mcpSpacePath(in.SpaceID, "/transactions"), q), nil, nil
 		},
 	)
+	h.addLookupReadTools(srv)
+}
 
+// addLookupReadTools adds the read tools that fetch one transaction or report.
+func (h Handler) addLookupReadTools(srv *mcp.Server) {
 	mcp.AddTool(
 		srv,
 		&mcp.Tool{
@@ -210,8 +195,11 @@ func (h Handler) addQueryReadTools(srv *mcp.Server) {
 	mcp.AddTool(
 		srv,
 		&mcp.Tool{
-			Name:        "get_report",
-			Description: "Run one of the space's reports (spending by category, cash flow, net worth, ...) for a period. Totals are in the space's base currency unless the report says otherwise.",
+			Name: "get_report",
+			Description: "Run one of the space's reports (spending by category, cash flow, net worth, ...) for a period. " +
+				"Totals are in the space's base currency unless the report says otherwise. Reports: overview, " +
+				"money_flow, expense_pace, expenses_by_category, cash_flow_over_time, transactions_summary, " +
+				"transactions_by_category, transactions_dynamics, transactions_top, net_worth, net_worth_history.",
 			Annotations: ro("Get report"),
 		},
 		func(ctx context.Context, req *mcp.CallToolRequest, in reportArgs) (*mcp.CallToolResult, any, error) {
@@ -219,21 +207,59 @@ func (h Handler) addQueryReadTools(srv *mcp.Server) {
 			if !ok {
 				return mcpFail("Unknown report " + strconv.Quote(in.Report) + "."), nil, nil
 			}
-			q := url.Values{}
-			if err := firstErr(
-				setDate(q, "start_date", in.StartDate), setDate(q, "end_date", in.EndDate),
-				setEnum(q, "period_type", in.PeriodType, "last_30_days", "month", "quarter", "year", "ytd", "custom"),
-				setEnum(q, "compare_with", in.CompareWith, "none", "previous_period", "same_period_last_year"),
-			); err != nil {
+			q, err := reportQuery(in)
+			if err != nil {
 				return mcpFail(err.Error()), nil, nil
 			}
-			if in.PeriodValue != "" {
-				q.Set("period_value", in.PeriodValue)
-			}
-			setIDs(q, "account_ids", in.AccountIDs)
-			setIDs(q, "category_ids", in.CategoryIDs)
-			setIDs(q, "tag_ids", in.TagIDs)
 			return h.mcpGet(ctx, req, mcpSpacePath(in.SpaceID, "/reports/"+route), q), nil, nil
 		},
 	)
+}
+
+// transactionsQuery turns the arguments of list_transactions into a query.
+func transactionsQuery(in transactionsArgs) (url.Values, error) {
+	q := url.Values{}
+	if err := firstErr(
+		setDate(q, "start_date", in.StartDate), setDate(q, "end_date", in.EndDate),
+		setEnum(q, "type", in.Type, "income", "expense", "transfer"),
+		setEnum(q, "status", in.Status, "completed", "pending", "skipped"),
+		setEnum(q, "sort_by", in.SortBy, "date", "amount", "created_at"),
+		setEnum(q, "sort_direction", in.SortDirection, "asc", "desc"),
+	); err != nil {
+		return nil, err
+	}
+	setID(q, "account_id", in.AccountID)
+	setIDs(q, "category_ids", in.CategoryIDs)
+	setIDs(q, "tag_ids", in.TagIDs)
+	if in.Page > 0 {
+		q.Set("page", strconv.Itoa(in.Page))
+	}
+	per := in.PerPage
+	if per <= 0 {
+		per = 25
+	}
+	q.Set("per_page", strconv.Itoa(min(per, mcpMaxPerPage)))
+	if in.WithSummary {
+		q.Set("with_summary", "1")
+	}
+	return q, nil
+}
+
+// reportQuery turns the arguments of get_report into a query.
+func reportQuery(in reportArgs) (url.Values, error) {
+	q := url.Values{}
+	if err := firstErr(
+		setDate(q, "start_date", in.StartDate), setDate(q, "end_date", in.EndDate),
+		setEnum(q, "period_type", in.PeriodType, "last_30_days", "month", "quarter", "year", "ytd", "custom"),
+		setEnum(q, "compare_with", in.CompareWith, "none", "previous_period", "same_period_last_year"),
+	); err != nil {
+		return nil, err
+	}
+	if in.PeriodValue != "" {
+		q.Set("period_value", in.PeriodValue)
+	}
+	setIDs(q, "account_ids", in.AccountIDs)
+	setIDs(q, "category_ids", in.CategoryIDs)
+	setIDs(q, "tag_ids", in.TagIDs)
+	return q, nil
 }

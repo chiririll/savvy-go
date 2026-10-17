@@ -83,12 +83,14 @@ func TestUpgradeLeavesGoSchemaUsable(t *testing.T) {
 	sqlDB := upgradedFixture(t)
 
 	var typ string
-	if err := sqlDB.QueryRow(`SELECT type FROM pragma_table_info('transactions') WHERE name = 'amount'`).Scan(&typ); err != nil ||
+	if err := sqlDB.QueryRow(`SELECT type FROM pragma_table_info('transactions') ` +
+		`WHERE name = 'amount'`).Scan(&typ); err != nil ||
 		typ != "INTEGER" {
 		t.Fatalf("transactions.amount type = %q, %v; want INTEGER", typ, err)
 	}
 	var idx int
-	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'transactions_account_type_date_amount_idx'`).Scan(&idx); err != nil ||
+	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = ` +
+		`'transactions_account_type_date_amount_idx'`).Scan(&idx); err != nil ||
 		idx != 1 {
 		t.Fatalf("amount index restored = %d, %v", idx, err)
 	}

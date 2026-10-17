@@ -109,7 +109,7 @@ func (e *matrixEnv) rawAmount(t *testing.T, id int64) int64 {
 // stored it under; a case's Currency has no id of its own.
 func (e *matrixEnv) stored(c moneytest.Currency) Currency { return e.curs[c.Code] }
 
-func TestAmountsAreStoredAndSummedExactlyInEveryCurrency(t *testing.T) {
+func TestAmountsStoredSummedExactlyEveryCurrency(t *testing.T) {
 	moneytest.ForEach(t, func(t *testing.T, c moneytest.Currency) {
 		e := newMatrixEnv(t, moneytest.Currencies[0])
 		moneytest.ForEachAmount(t, moneytest.Valid(c.Decimals), func(t *testing.T, a moneytest.Amount) {
@@ -152,7 +152,7 @@ func TestManyMaximumAmountsSumExactly(t *testing.T) {
 	})
 }
 
-func TestAmountsOutOfRangeAreRejectedAndStoreNothing(t *testing.T) {
+func TestAmountsOutRangeRejectedStoreNothing(t *testing.T) {
 	moneytest.ForEach(t, func(t *testing.T, c moneytest.Currency) {
 		e := newMatrixEnv(t, moneytest.Currencies[0])
 		acct := e.accts[c.Code]
@@ -205,7 +205,7 @@ func TestAmountsOutOfRangeAreRejectedAndStoreNothing(t *testing.T) {
 	})
 }
 
-func TestUpdateRejectsOutOfRangeAndKeepsTheOldAmount(t *testing.T) {
+func TestUpdateRejectsRangeKeepsAmount(t *testing.T) {
 	moneytest.ForEach(t, func(t *testing.T, c moneytest.Currency) {
 		e := newMatrixEnv(t, moneytest.Currencies[0])
 		orig, err := e.tx(t, "income", c, decimal.New(12345, -int32(c.Decimals)))
@@ -229,7 +229,7 @@ func TestUpdateRejectsOutOfRangeAndKeepsTheOldAmount(t *testing.T) {
 	})
 }
 
-func TestConvertEveryPairAndAmount(t *testing.T) {
+func TestConvertEveryPairAmount(t *testing.T) {
 	// Rates against USD, so the base of this matrix is USD.
 	stored := map[string]Currency{}
 	for i, c := range moneytest.Currencies {
@@ -284,7 +284,7 @@ func mustPanic(t *testing.T, fn func()) {
 
 // A there-and-back conversion may lose at most what rounding to the two scales
 // can take, never more.
-func TestConvertRoundTripErrorIsBoundedByTheScales(t *testing.T) {
+func TestConvertRoundTripErrorBoundedScales(t *testing.T) {
 	stored := map[string]Currency{}
 	for i, c := range moneytest.Currencies {
 		stored[c.Code] = Currency{ID: int64(i + 1), Code: c.Code, Decimals: c.Decimals, Rate: c.Rate, IsBase: c.Code == "USD"}
@@ -356,7 +356,7 @@ func TestTransfersBetweenEveryPairOfCurrencies(t *testing.T) {
 	})
 }
 
-func TestExplicitTransferAmountIsRoundedIntoTheDestinationScale(t *testing.T) {
+func TestExplicitTransferAmountRoundsToDestination(t *testing.T) {
 	moneytest.ForEach(t, func(t *testing.T, to moneytest.Currency) {
 		e := newMatrixEnv(t, moneytest.Currencies[0])
 		from := moneytest.Currencies[0]

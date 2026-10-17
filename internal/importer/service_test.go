@@ -136,7 +136,7 @@ func (e *env) transactions(t *testing.T) []ledger.Transaction {
 	return list
 }
 
-func TestParseReadsHeadersFormatsAndAPreview(t *testing.T) {
+func TestParseReadsHeadersFormatsAPreview(t *testing.T) {
 	e := newEnv(t)
 	var b strings.Builder
 	b.WriteString("Дата;Сумма;Описание\n")
@@ -165,7 +165,7 @@ func TestParseReadsHeadersFormatsAndAPreview(t *testing.T) {
 }
 
 // Excel puts a byte order mark in front of the first header.
-func TestCSVWithByteOrderMarkMapsItsFirstColumn(t *testing.T) {
+func TestCSVBOMMapsFirstColumn(t *testing.T) {
 	e := newEnv(t)
 	im := e.parsed(t, "\xef\xbb\xbfDate,Amount,Description\n2024-01-01,-5.00,Tea\n")
 	if len(im.Meta.Headers) == 0 || im.Meta.Headers[0] != "Date" {
@@ -176,7 +176,7 @@ func TestCSVWithByteOrderMarkMapsItsFirstColumn(t *testing.T) {
 	}
 }
 
-func TestAFileWithOnlyHeadersHasNothingToImport(t *testing.T) {
+func TestFileWithOnlyHeadersNothingImport(t *testing.T) {
 	e := newEnv(t)
 	im := e.parsed(t, "Date,Amount,Description\n")
 	if im.Status != "parsed" || im.TotalRows == nil || *im.TotalRows != 0 {
@@ -188,7 +188,7 @@ func TestAFileWithOnlyHeadersHasNothingToImport(t *testing.T) {
 	}
 }
 
-func TestExecuteCreatesConfirmedTransactionsInTheAccountCurrency(t *testing.T) {
+func TestExecuteCreatesConfirmedTransactionsAccountCurrency(t *testing.T) {
 	e := newEnv(t)
 	im := e.parsed(t, "Date,Amount,Description\n2024-01-01,-12.50,Coffee\n2024-01-02,2000,Salary\n2024-01-03,-0.99,Gum\n")
 	done := e.run(t, im, e.usdAcct.ID, nil)
@@ -214,7 +214,7 @@ func TestExecuteCreatesConfirmedTransactionsInTheAccountCurrency(t *testing.T) {
 	}
 }
 
-func TestReimportingTheSameFileCreatesNothingNew(t *testing.T) {
+func TestReimportingSameFileCreatesNothingNew(t *testing.T) {
 	e := newEnv(t)
 	csv := "Date,Amount,Description\n2024-01-01,-12.50,Coffee\n2024-01-02,-3.00,  coffee  \n"
 	first := e.run(t, e.parsed(t, csv), e.usdAcct.ID, nil)
@@ -233,9 +233,10 @@ func TestReimportingTheSameFileCreatesNothingNew(t *testing.T) {
 }
 
 // Two small amounts of a currency with many decimals must not look like one.
-func TestDifferentAmountsBelowACentAreNotDuplicates(t *testing.T) {
+func TestDifferentAmountsBelowCentNotDuplicates(t *testing.T) {
 	e := newEnv(t)
-	csv := "Date,Amount,Description\n2024-01-01,0.00000150,Mining payout\n2024-01-01,0.00000250,Mining payout\n2024-01-01,1.001,Dust\n2024-01-01,1.004,Dust\n"
+	csv := "Date,Amount,Description\n2024-01-01,0.00000150,Mining payout\n2024-01-01,0.00000250,Mining payout\n" +
+		"2024-01-01,1.001,Dust\n2024-01-01,1.004,Dust\n"
 	done := e.run(t, e.parsed(t, csv), e.btcAcct.ID, nil)
 	if done.CreatedCount != 4 || done.SkippedCount != 0 {
 		t.Fatalf("rows with different amounts were taken for duplicates: %+v", done)
@@ -249,7 +250,7 @@ func TestDifferentAmountsBelowACentAreNotDuplicates(t *testing.T) {
 	}
 }
 
-func TestDedupHashIgnoresCaseAndSpacingButNotAmounts(t *testing.T) {
+func TestDedupHashIgnoresCaseSpacing(t *testing.T) {
 	base := dedupHash("2024-01-01", dec("12.5"), "Coffee Shop")
 	if dedupHash("2024-01-01", dec("12.50"), "  coffee   SHOP ") != base {
 		t.Error("the same row with other spacing and case is the same row")
@@ -268,7 +269,8 @@ func TestDedupHashIgnoresCaseAndSpacingButNotAmounts(t *testing.T) {
 
 func TestExecuteReportsRowsItCannotTake(t *testing.T) {
 	e := newEnv(t)
-	csv := "Date,Amount,Description\n2024-01-01,-5,ok\nnot a date,-5,bad date\n2024-01-02,lots,bad amount\n2999-01-01,-5,future\n2024-01-04\n"
+	csv := "Date,Amount,Description\n2024-01-01,-5,ok\nnot a date,-5,bad date\n2024-01-02,lots,bad amount\n" +
+		"2999-01-01,-5,future\n2024-01-04\n"
 	done := e.run(t, e.parsed(t, csv), e.usdAcct.ID, nil)
 
 	if done.CreatedCount != 1 || done.ErrorCount != 4 || done.ProcessedRows != 5 {
@@ -285,7 +287,7 @@ func TestExecuteReportsRowsItCannotTake(t *testing.T) {
 	}
 }
 
-func TestExecuteOptionsDefaultTypeAndExplicitTypeColumn(t *testing.T) {
+func TestExecuteOptionsDefaultColumnType(t *testing.T) {
 	e := newEnv(t)
 	csv := "Date,Amount,Description,Type\n2024-01-01,10,A,income\n2024-01-02,10,B,Expense\n2024-01-03,10,C,\n"
 	done := e.run(t, e.parsed(t, csv), e.usdAcct.ID, map[string]any{"default_type": "expense"})
@@ -304,7 +306,7 @@ func TestExecuteOptionsDefaultTypeAndExplicitTypeColumn(t *testing.T) {
 	}
 }
 
-func TestExecuteResolvesCategoriesByTheUsersChoices(t *testing.T) {
+func TestExecuteResolvesCategoriesByUsersChoices(t *testing.T) {
 	e := newEnv(t)
 	cats := ledger.Categories{DB: e.space}
 	food, _ := cats.Create(e.ctx, ledger.Category{Name: "Food", Type: "expense"})
@@ -381,7 +383,7 @@ func TestPreviewSaysWhatExecuteWouldDo(t *testing.T) {
 	}
 }
 
-func TestPreviewAndExecuteNeedTheFile(t *testing.T) {
+func TestPreviewExecuteNeedTheFile(t *testing.T) {
 	e := newEnv(t)
 	im := e.parsed(t, "Date,Amount\n2024-01-01,-1\n")
 	done := e.run(t, im, e.usdAcct.ID, nil)
@@ -421,8 +423,9 @@ func TestCountsByStatus(t *testing.T) {
 	}
 }
 
-func TestParseImportTypeAndMappingHelpers(t *testing.T) {
-	for in, want := range map[string]string{"income": "income", "Income": "income", " expense ": "expense", "": "", "transfer": ""} {
+func TestParseImportTypeMappingHelpers(t *testing.T) {
+	for in, want := range map[string]string{"income": "income", "Income": "income", " expense ": "expense", "": "",
+		"transfer": ""} {
 		if got := parseImportType(in); got != want {
 			t.Errorf("parseImportType(%q) = %q, want %q", in, got, want)
 		}
@@ -439,7 +442,7 @@ func TestParseImportTypeAndMappingHelpers(t *testing.T) {
 	if _, ok := mappingIndex(nil, "a"); ok {
 		t.Error("mappingIndex of nothing")
 	}
-	if nilOr("") != nil || *nilOr("x") != "x" {
-		t.Error("nilOr")
+	if ptrIfSet("") != nil || *ptrIfSet("x") != "x" {
+		t.Error("ptrIfSet")
 	}
 }

@@ -28,10 +28,13 @@ import (
 const (
 	mcpMaxResult    = 256 << 10
 	mcpMaxPerPage   = 100
-	mcpInstructions = "Go Savvy is a multi-currency expense tracker. Data lives in spaces: call list_spaces first and pass a space's id as space_id. " +
-		"Amounts are exact decimal numbers in the currency of the account or transaction they belong to; never add amounts of different currencies, " +
+	mcpInstructions = "Go Savvy is a multi-currency expense tracker. Data lives in spaces: call list_spaces first and " +
+		"pass a space's id as space_id. " +
+		"Amounts are exact decimal numbers in the currency of the account or transaction they belong to; never add amounts " +
+		"of different currencies, " +
 		"and always say which currency a figure is in. Dates are YYYY-MM-DD. " +
-		"Tools that create, change or delete data work only when the user granted write access; they act as the user, so do not use them unless the user asked for the change, " +
+		"Tools that create, change or delete data work only when the user granted write access; they act as the " +
+		"user, so do not use them unless the user asked for the change, " +
 		"and ask before deleting. Amounts are strings, for example \"12.50\"."
 )
 

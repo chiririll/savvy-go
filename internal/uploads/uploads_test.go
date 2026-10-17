@@ -39,7 +39,7 @@ func create(t *testing.T, s Service, uid int64, name string, size int64) *Upload
 	return u
 }
 
-func TestCreateRefusesWhatTheBucketDoesNotTake(t *testing.T) {
+func TestCreateRefusesWhatBucketNotTake(t *testing.T) {
 	s, uid := newService(t)
 	ctx := context.Background()
 	tests := []struct {
@@ -98,7 +98,7 @@ func TestCreatePlansTheParts(t *testing.T) {
 	}
 }
 
-func TestPartURLsAreSignedAndExpire(t *testing.T) {
+func TestPartURLsAreSignedExpire(t *testing.T) {
 	s, uid := newService(t)
 	u := create(t, s, uid, "a.csv", 10)
 
@@ -120,8 +120,9 @@ func TestPartURLsAreSignedAndExpire(t *testing.T) {
 		"another upload":   s.VerifyPart("other", 2, expires, sig),
 		"another deadline": s.VerifyPart(u.ID, 2, expires+1, sig),
 		"a blank":          s.VerifyPart(u.ID, 2, expires, ""),
-		"a past deadline":  s.VerifyPart(u.ID, 2, time.Now().Add(-time.Second).Unix(), s.sign(u.ID, 2, time.Now().Add(-time.Second).Unix())),
-		"another secret":   Service{SignSecret: "other"}.VerifyPart(u.ID, 2, expires, sig),
+		"a past deadline": s.VerifyPart(u.ID, 2, time.Now().Add(-time.Second).Unix(),
+			s.sign(u.ID, 2, time.Now().Add(-time.Second).Unix())),
+		"another secret": Service{SignSecret: "other"}.VerifyPart(u.ID, 2, expires, sig),
 	} {
 		if ok {
 			t.Errorf("%s verified", name)
@@ -140,7 +141,7 @@ func TestPartURLsAreSignedAndExpire(t *testing.T) {
 	}
 }
 
-func TestPartsAssembleIntoTheFileInOrder(t *testing.T) {
+func TestPartsAssembleIntoFileInOrder(t *testing.T) {
 	s, uid := newService(t)
 	ctx := context.Background()
 	u := create(t, s, uid, "a.csv", 11)
@@ -221,7 +222,7 @@ func TestReadFileOnlyOnceCompleted(t *testing.T) {
 	}
 }
 
-func TestAbortRemovesTheFilesAndMarksTheUpload(t *testing.T) {
+func TestAbortRemovesFilesMarksTheUpload(t *testing.T) {
 	s, uid := newService(t)
 	ctx := context.Background()
 	u := create(t, s, uid, "a.csv", 3)
@@ -267,7 +268,7 @@ func TestDiscardDeletesTheAssembledFile(t *testing.T) {
 	}
 }
 
-func TestPruneExpiredAbortsOnlyStalePendingUploads(t *testing.T) {
+func TestPruneExpiredAbortsStaleUploads(t *testing.T) {
 	s, uid := newService(t)
 	ctx := context.Background()
 	fresh := create(t, s, uid, "fresh.csv", 3)

@@ -31,12 +31,13 @@ func TestExtractIdentityFollowsTheClaimMappings(t *testing.T) {
 	if id.Email != "" || id.EmailVerified {
 		t.Errorf("overrides win over claims: %+v", id)
 	}
-	if id := extractIdentity(IdentityProvider{Preset: "google"}, map[string]any{"sub": "s", "email": "a@b.c"}, nil); id.EmailVerified {
+	if id := extractIdentity(IdentityProvider{Preset: "google"}, map[string]any{"sub": "s", "email": "a@b.c"},
+		nil); id.EmailVerified {
 		t.Error("an email the provider does not vouch for is unverified")
 	}
 }
 
-func TestClaimValueAndBooleans(t *testing.T) {
+func TestClaimValueBooleans(t *testing.T) {
 	claims := map[string]any{"a": "", "b": "x", "n": nil}
 	if claimValue(claims, nil) != nil || claimValue(claims, "b") != "x" ||
 		claimValue(claims, []any{"a", "n", "b"}) != "x" ||
@@ -44,7 +45,9 @@ func TestClaimValueAndBooleans(t *testing.T) {
 		claimValue(claims, 5) != nil {
 		t.Error("claimValue")
 	}
-	for in, want := range map[any]bool{true: true, false: false, float64(1): true, float64(0): false, "1": true, "TRUE": true, "yes": false, nil: false, "": false} {
+	for in, want := range map[any]bool{true: true, false: false, float64(1): true, float64(0): false, "1": true,
+		"TRUE": true,
+		"yes":  false, nil: false, "": false} {
 		if asBoolAny(in) != want {
 			t.Errorf("asBoolAny(%v) = %v", in, !want)
 		}

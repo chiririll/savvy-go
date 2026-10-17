@@ -13,7 +13,7 @@ import (
 	"testing"
 )
 
-func TestNewGeneratesGroupedPasswordAndWritesFile(t *testing.T) {
+func TestNewGeneratesGroupedPasswordWritesFile(t *testing.T) {
 	dir := t.TempDir()
 	g := New(dir, Binary)
 
@@ -124,7 +124,7 @@ func TestRegisterAcceptsTypingVariants(t *testing.T) {
 	}
 }
 
-func TestRegisterRefusesWrongOrMissing(t *testing.T) {
+func TestRegisterRefusesWrongMissing(t *testing.T) {
 	g := New(t.TempDir(), Binary)
 	called := false
 	create := func() error { called = true; return nil }
@@ -138,7 +138,7 @@ func TestRegisterRefusesWrongOrMissing(t *testing.T) {
 	}
 }
 
-func TestRegisterInvalidatesAndRemovesFile(t *testing.T) {
+func TestRegisterInvalidatesRemovesFile(t *testing.T) {
 	dir := t.TempDir()
 	g := New(dir, Binary)
 	pass := g.Password()

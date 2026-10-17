@@ -190,21 +190,46 @@ func (w WebAuthn) FinishLogin(ctx context.Context, token string, response json.R
 	if err != nil {
 		return nil, fmt.Errorf("verify")
 	}
+	var u *User
+	var cred *webauthn.Credential
 	if userID != 0 {
-		u, err := Users{DB: w.DB}.ByID(ctx, userID)
-		if err != nil || u == nil {
-			return nil, fmt.Errorf("verify")
-		}
-		creds, _ := w.loadCreds(ctx, u.ID)
-		cred, err := wa.ValidateLogin(waUser{user: u, credentials: creds}, *session, parsed)
-		if err != nil {
-			return nil, fmt.Errorf("verify")
-		}
-		if err := w.recordLogin(ctx, u, cred); err != nil {
-			return nil, err
-		}
-		return u, nil
+		u, cred, err = w.validateKnown(ctx, wa, userID, *session, parsed)
+	} else {
+		u, cred, err = w.validateDiscoverable(ctx, wa, *session, parsed)
 	}
+	if err != nil {
+		return nil, err
+	}
+	if err := w.recordLogin(ctx, u, cred); err != nil {
+		return nil, err
+	}
+	return u, nil
+}
+
+// validateKnown checks a login that started with a username: the challenge
+// names the user.
+func (w WebAuthn) validateKnown(
+	ctx context.Context, wa *webauthn.WebAuthn, userID int64,
+	session webauthn.SessionData, parsed *protocol.ParsedCredentialAssertionData,
+) (*User, *webauthn.Credential, error) {
+	u, err := Users{DB: w.DB}.ByID(ctx, userID)
+	if err != nil || u == nil {
+		return nil, nil, fmt.Errorf("verify")
+	}
+	creds, _ := w.loadCreds(ctx, u.ID)
+	cred, err := wa.ValidateLogin(waUser{user: u, credentials: creds}, session, parsed)
+	if err != nil {
+		return nil, nil, fmt.Errorf("verify")
+	}
+	return u, cred, nil
+}
+
+// validateDiscoverable checks a login with no username: the passkey names the
+// user.
+func (w WebAuthn) validateDiscoverable(
+	ctx context.Context, wa *webauthn.WebAuthn,
+	session webauthn.SessionData, parsed *protocol.ParsedCredentialAssertionData,
+) (*User, *webauthn.Credential, error) {
 	handler := func(rawID, userHandle []byte) (webauthn.User, error) {
 		u, creds, err := w.userForHandle(ctx, userHandle, rawID)
 		if err != nil || u == nil {
@@ -212,18 +237,15 @@ func (w WebAuthn) FinishLogin(ctx context.Context, token string, response json.R
 		}
 		return waUser{user: u, credentials: creds}, nil
 	}
-	cred, err := wa.ValidateDiscoverableLogin(handler, *session, parsed)
+	cred, err := wa.ValidateDiscoverableLogin(handler, session, parsed)
 	if err != nil {
-		return nil, fmt.Errorf("verify")
+		return nil, nil, fmt.Errorf("verify")
 	}
 	u, _, err := w.userForHandle(ctx, parsed.Response.UserHandle, cred.ID)
 	if err != nil || u == nil {
-		return nil, fmt.Errorf("verify")
+		return nil, nil, fmt.Errorf("verify")
 	}
-	if err := w.recordLogin(ctx, u, cred); err != nil {
-		return nil, err
-	}
-	return u, nil
+	return u, cred, nil
 }
 
 func (w WebAuthn) Rename(ctx context.Context, userID, id int64, name string) error {

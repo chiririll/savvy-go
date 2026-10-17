@@ -19,7 +19,7 @@ func balanceOf(t *testing.T, e *moneyEnv, id int64) money.Money {
 	return a.Balance
 }
 
-func TestLendingFromAnAccountRecordsTheIssuanceInThatCurrency(t *testing.T) {
+func TestLendingFromAccountRecordsIssuanceCurrency(t *testing.T) {
 	e := newMoneyEnv(t)
 	debts := newDebts(e)
 
@@ -55,17 +55,23 @@ func TestBorrowingBringsMoneyIn(t *testing.T) {
 	}
 }
 
-func TestADebtCannotBeFundedFromADebt(t *testing.T) {
+func TestDebtCannotBeFundedFromDebt(t *testing.T) {
 	e := newMoneyEnv(t)
 	debts := newDebts(e)
 	first, err := debts.Create(e.ctx, DebtInput{Name: "a", DebtType: "i_owe", CurrencyID: e.usd.ID, Amount: dec("10")})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := debts.Create(e.ctx, DebtInput{Name: "b", DebtType: "i_owe", AccountID: first.ID, Amount: dec("5"), Date: "2024-01-15", Origin: "new"}); err == nil {
+	if _,
+		err := debts.Create(e.ctx,
+		DebtInput{Name: "b", DebtType: "i_owe", AccountID: first.ID, Amount: dec("5"), Date: "2024-01-15",
+			Origin: "new"}); err == nil {
 		t.Error("a debt cannot be the source of another")
 	}
-	if _, err := debts.Create(e.ctx, DebtInput{Name: "c", DebtType: "i_owe", AccountID: 9999, Amount: dec("5"), Date: "2024-01-15", Origin: "new"}); err == nil {
+	if _,
+		err := debts.Create(e.ctx,
+		DebtInput{Name: "c", DebtType: "i_owe", AccountID: 9999, Amount: dec("5"), Date: "2024-01-15",
+			Origin: "new"}); err == nil {
 		t.Error("an unknown source account was accepted")
 	}
 }
@@ -74,7 +80,9 @@ func TestAnExistingDebtMovesNoMoney(t *testing.T) {
 	e := newMoneyEnv(t)
 	debt, err := newDebts(
 		e,
-	).Create(e.ctx, DebtInput{Name: "old", DebtType: "i_owe", CurrencyID: e.usd.ID, AccountID: e.usdAcc.ID, Amount: dec("40"), Origin: "existing"})
+	).Create(e.ctx,
+		DebtInput{Name: "old", DebtType: "i_owe", CurrencyID: e.usd.ID, AccountID: e.usdAcc.ID, Amount: dec("40"),
+			Origin: "existing"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +94,7 @@ func TestAnExistingDebtMovesNoMoney(t *testing.T) {
 	}
 }
 
-func TestPaymentsPayTheDebtOffAndReopenBringsItBack(t *testing.T) {
+func TestPaymentsSettleDebtReopenRestoresIt(t *testing.T) {
 	e := newMoneyEnv(t)
 	debts := newDebts(e)
 	accts := Accounts{DB: e.db}
@@ -123,7 +131,7 @@ func TestPaymentsPayTheDebtOffAndReopenBringsItBack(t *testing.T) {
 	}
 }
 
-func TestCollectingPaysBackADebtOwedToMe(t *testing.T) {
+func TestCollectingPaysBackDebtOwedMe(t *testing.T) {
 	e := newMoneyEnv(t)
 	debts := newDebts(e)
 	debt, err := debts.Create(
@@ -151,7 +159,7 @@ func TestCollectingPaysBackADebtOwedToMe(t *testing.T) {
 	}
 }
 
-func TestPaymentToSomethingThatIsNotADebtIsRefused(t *testing.T) {
+func TestPaymentSomethingNotDebtIsRefused(t *testing.T) {
 	e := newMoneyEnv(t)
 	if _, err := newDebts(e).Payment(e.ctx, e.usdAcc.ID, e.jpyAcc.ID, dec("1"), "2024-01-15", nil, false); err == nil {
 		t.Error("an ordinary account is not a debt")
@@ -161,7 +169,7 @@ func TestPaymentToSomethingThatIsNotADebtIsRefused(t *testing.T) {
 	}
 }
 
-func TestDebtSummaryFoldsEveryCurrencyIntoTheBase(t *testing.T) {
+func TestDebtSummaryFoldsIntoBase(t *testing.T) {
 	e := newMoneyEnv(t)
 	debts := newDebts(e)
 
@@ -226,7 +234,7 @@ func TestDeleteRefusesADebtWithHistory(t *testing.T) {
 	}
 }
 
-func TestReorderSetsTheOrderOfTheList(t *testing.T) {
+func TestReorderSetsOrderOfTheList(t *testing.T) {
 	e := newMoneyEnv(t)
 	accts := Accounts{DB: e.db}
 	if err := accts.Reorder(e.ctx, []int64{e.btcAcc.ID, e.usdAcc.ID, e.jpyAcc.ID}); err != nil {
@@ -245,7 +253,7 @@ func TestReorderSetsTheOrderOfTheList(t *testing.T) {
 	}
 }
 
-func TestTotalAtFoldsBalancesAsOfADate(t *testing.T) {
+func TestTotalFoldsBalancesAsOfDate(t *testing.T) {
 	e := newMoneyEnv(t)
 	date := func(s string) *string { return &s }
 	for _, in := range []TxInput{

@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestWebAuthnEngineUsesTheOriginOfThePublicURL(t *testing.T) {
+func TestWebAuthnEngineUsesPublicOrigin(t *testing.T) {
 	w := WebAuthn{Cfg: appconfig.Config{}.WithAppURL("https://savvy.example.com:8443/app")}
 	wa, err := w.engine()
 	if err != nil {
@@ -21,7 +21,7 @@ func TestWebAuthnEngineUsesTheOriginOfThePublicURL(t *testing.T) {
 	}
 }
 
-func TestWebAuthnEngineNeedsAPublicURL(t *testing.T) {
+func TestWebAuthnEngineNeedsPublicURL(t *testing.T) {
 	for _, url := range []string{"", "not a url", "/relative"} {
 		if _, err := (WebAuthn{Cfg: appconfig.Config{}.WithAppURL(url)}).engine(); !errors.Is(err, ErrNoPublicURL) {
 			t.Errorf("engine(%q) = %v, want ErrNoPublicURL", url, err)

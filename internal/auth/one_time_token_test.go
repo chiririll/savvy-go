@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func TestPasswordTokensWorkOnceAndReplaceEachOther(t *testing.T) {
+func TestPasswordTokensSingleUseReplaced(t *testing.T) {
 	d := newDB(t)
 	ctx := context.Background()
 	u := newUser(t, d, "a@test.com", RoleUser)
@@ -48,7 +48,7 @@ func TestPasswordTokensWorkOnceAndReplaceEachOther(t *testing.T) {
 	}
 }
 
-func TestPasswordLinkLifetimeDependsOnItsPurpose(t *testing.T) {
+func TestPasswordLinkLifetimeDependsItsPurpose(t *testing.T) {
 	d := newDB(t)
 	ctx := context.Background()
 	invited, err := Users{DB: d}.Create(ctx, "Invited", "invited@test.com", nil, RoleUser)
@@ -119,7 +119,7 @@ func TestEmailVerificationLinks(t *testing.T) {
 	}
 }
 
-func TestChallengesAreSingleUseAndExpire(t *testing.T) {
+func TestChallengesAreSingleUseExpire(t *testing.T) {
 	d := newDB(t)
 	ctx := context.Background()
 	u := newUser(t, d, "a@test.com", RoleUser)

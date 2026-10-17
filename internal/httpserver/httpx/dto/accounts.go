@@ -56,7 +56,8 @@ type AccountsSummary struct {
 
 func NewAccountsSummary(s ledger.AccountsSummary) AccountsSummary {
 	return AccountsSummary{
-		TotalBalance: s.Total, Currency: currencyCode(s.Currency), Decimals: currencyDecimals(s.Currency), AccountsCount: s.Count,
+		TotalBalance: s.Total, Currency: currencyCode(s.Currency), Decimals: currencyDecimals(s.Currency),
+		AccountsCount: s.Count,
 	}
 }
 

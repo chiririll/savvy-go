@@ -171,7 +171,7 @@ func (e *env) tx(t *testing.T, id int64) *ledger.Transaction {
 	return tx
 }
 
-func TestCreateOpensOnePendingOccurrenceOnTheStartDate(t *testing.T) {
+func TestCreateOpensPendingOccurrenceAtStart(t *testing.T) {
 	e := newEnv(t)
 	rec := e.create(
 		t,
@@ -198,7 +198,7 @@ func TestCreateOpensOnePendingOccurrenceOnTheStartDate(t *testing.T) {
 	}
 }
 
-func TestCreateInactiveOrPastItsEndOpensNothing(t *testing.T) {
+func TestCreateInactivePastEndOpensNothing(t *testing.T) {
 	e := newEnv(t)
 	inactive := e.create(
 		t,
@@ -247,7 +247,7 @@ func TestEstimatedFlagReachesTheOccurrence(t *testing.T) {
 	}
 }
 
-func TestAdvanceMovesTheScheduleAndOpensTheNextOccurrence(t *testing.T) {
+func TestAdvanceMovesScheduleOpensNextOccurrence(t *testing.T) {
 	e := newEnv(t)
 	rec := e.create(
 		t,
@@ -290,7 +290,7 @@ func TestAdvanceMovesTheScheduleAndOpensTheNextOccurrence(t *testing.T) {
 	}
 }
 
-func TestAdvancePastTheEndDateStopsTheSeries(t *testing.T) {
+func TestAdvancePastEndDateStopsSeries(t *testing.T) {
 	e := newEnv(t)
 	rec := e.create(
 		t,
@@ -314,7 +314,7 @@ func TestAdvancePastTheEndDateStopsTheSeries(t *testing.T) {
 	}
 }
 
-func TestEnsureUpcomingHealsOnlyTemplatesWithoutAnOpenOccurrence(t *testing.T) {
+func TestEnsureUpcomingHealsClosedTemplates(t *testing.T) {
 	e := newEnv(t)
 	healthy := e.create(
 		t,
@@ -397,7 +397,7 @@ func TestUpdateStartDateRestartsTheSchedule(t *testing.T) {
 	}
 }
 
-func TestDeactivatingStopsOccurrencesAndReactivatingOpensOne(t *testing.T) {
+func TestDeactivatingStopsOccurrencesReactivatingOpensOne(t *testing.T) {
 	e := newEnv(t)
 	rec := e.create(
 		t,
@@ -420,7 +420,7 @@ func TestDeactivatingStopsOccurrencesAndReactivatingOpensOne(t *testing.T) {
 	}
 }
 
-func TestUpdateOfAMissingTemplateIsNil(t *testing.T) {
+func TestUpdateOfMissingTemplateIsNil(t *testing.T) {
 	e := newEnv(t)
 	got, err := e.svc.Update(e.ctx, 999, Input{Amount: dec("1")})
 	if err != nil || got != nil {
@@ -428,7 +428,7 @@ func TestUpdateOfAMissingTemplateIsNil(t *testing.T) {
 	}
 }
 
-func TestTagsFollowTheTemplateIntoItsOccurrences(t *testing.T) {
+func TestTagsFollowTemplateIntoItsOccurrences(t *testing.T) {
 	e := newEnv(t)
 	tag, err := (ledger.Tags{DB: e.svc.DB}).Create(e.ctx, "weekly")
 	if err != nil {
@@ -464,7 +464,7 @@ func TestTagsFollowTheTemplateIntoItsOccurrences(t *testing.T) {
 
 // A transfer between currencies delivers the converted amount, rounded to the
 // destination's scale, unless the template names the amount itself.
-func TestTransferDeliversTheConvertedOrTheStatedAmount(t *testing.T) {
+func TestTransferDeliversConvertedTheStatedAmount(t *testing.T) {
 	e := newEnv(t)
 	converted := e.create(
 		t,
@@ -517,7 +517,7 @@ func TestTransferDeliversTheConvertedOrTheStatedAmount(t *testing.T) {
 	}
 }
 
-func TestAllUpcomingAndDelete(t *testing.T) {
+func TestAllUpcomingDelete(t *testing.T) {
 	e := newEnv(t)
 	a := e.create(
 		t,

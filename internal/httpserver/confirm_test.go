@@ -99,7 +99,7 @@ func TestSensitiveChangesNeedThePassword(t *testing.T) {
 
 // With 2FA on, the password is not enough: whoever has a stolen session and a
 // phished password still lacks the authenticator.
-func TestSensitiveChangesNeedTheCodeWhenTwoFactorIsOn(t *testing.T) {
+func TestSensitiveChangesNeedTwoFactorCode(t *testing.T) {
 	a := newTestApp(t)
 	secret, _ := twoFactorUser(t, a)
 	u, err := a.svc.Users.ByEmail(t.Context(), "otp@test.com")
@@ -133,7 +133,7 @@ func TestSensitiveChangesNeedTheCodeWhenTwoFactorIsOn(t *testing.T) {
 }
 
 // A code works once, here as everywhere: a second change needs a fresh one.
-func TestSensitiveChangeDoesNotAcceptAReplayedCode(t *testing.T) {
+func TestSensitiveChangeNotAcceptReplayedCode(t *testing.T) {
 	a := newTestApp(t)
 	secret, _ := twoFactorUser(t, a)
 	u, _ := a.svc.Users.ByEmail(t.Context(), "otp@test.com")
@@ -155,7 +155,7 @@ func TestSensitiveChangeDoesNotAcceptAReplayedCode(t *testing.T) {
 
 // An account that signs in with SSO and has neither a password nor 2FA has
 // nothing to confirm with, so it is not locked out of setting one up.
-func TestSensitiveChangesPassWithNothingToConfirm(t *testing.T) {
+func TestSensitiveChangesPassWithNothingConfirm(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("sso@test.com", "secret1", roleEditor)
 	if _, err := a.db.Exec(`UPDATE users SET password = NULL, is_sso_only = 1 WHERE id = ?`, u.ID); err != nil {
@@ -173,7 +173,7 @@ func TestSensitiveChangesPassWithNothingToConfirm(t *testing.T) {
 
 // Guessing the password through these routes counts against the same limit as
 // signing in, so a stolen session is no way round it.
-func TestWrongConfirmationsCountTowardTheAccountLimit(t *testing.T) {
+func TestWrongConfirmationsCountTowardAccountLimit(t *testing.T) {
 	a := newTestApp(t, WithConfig(testFile("[security]\nip_rate_limit = 0\naccount_rate_limit = 3\n")))
 	u := a.createUser("c@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
@@ -209,7 +209,7 @@ func TestHarmlessCredentialChangesAskForNothing(t *testing.T) {
 
 // Approving an app mints it a token, so it asks like issuing one does. Declining
 // gives nothing away and asks for nothing.
-func TestOAuthConsentNeedsThePasswordToApprove(t *testing.T) {
+func TestOAuthConsentNeedsPasswordApprove(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("oauth@a.com", "secret1", roleEditor)
 	sess := a.issue(u, false)

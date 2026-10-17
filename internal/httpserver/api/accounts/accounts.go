@@ -61,7 +61,7 @@ func (s Handler) accountsStore(w http.ResponseWriter, r *http.Request) {
 	if body.CurrencyID != nil {
 		currencyID = *body.CurrencyID
 	} else if body.CurrencyCode != "" {
-		c, err := httpx.Scope(r).Currencies.FindOrCreateByCode(r.Context(), body.CurrencyCode)
+		c, err := httpx.Scope(r).Currencies.EnsureByCode(r.Context(), body.CurrencyCode)
 		if err != nil || c == nil {
 			httpx.WriteValidation(w, map[string][]string{"currency_code": {"Unknown currency code."}})
 			return

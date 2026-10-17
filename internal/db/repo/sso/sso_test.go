@@ -29,7 +29,7 @@ func provider(slug string, enabled bool) ssorepo.Save {
 	}
 }
 
-func TestProvidersAreListedFilteredAndUpdated(t *testing.T) {
+func TestProvidersAreListedFilteredUpdated(t *testing.T) {
 	r, _ := newRepo(t)
 	now := time.Now().UTC()
 	a, err := r.Insert(ctx, provider("a", true), now)
@@ -94,7 +94,7 @@ func TestIdentityLinks(t *testing.T) {
 	}
 }
 
-func TestTicketsWorkOnceAndExpire(t *testing.T) {
+func TestTicketsWorkOnceExpire(t *testing.T) {
 	r, user := newRepo(t)
 	now := time.Now().UTC()
 	_ = r.InsertTicket(ctx, "live", user, true, now.Add(2*time.Minute), now)
@@ -115,7 +115,7 @@ func TestTicketsWorkOnceAndExpire(t *testing.T) {
 	}
 }
 
-func TestStateIsTakenOnceAndExpires(t *testing.T) {
+func TestStateIsTakenOnceExpires(t *testing.T) {
 	r, _ := newRepo(t)
 	now := time.Now().UTC()
 	p, _ := r.Insert(ctx, provider("a", true), now)
@@ -131,7 +131,8 @@ func TestStateIsTakenOnceAndExpires(t *testing.T) {
 	}
 	got, _ := r.TakeState(ctx, "live", now)
 	if got == nil ||
-		*got != (ssorepo.State{ProviderID: p, Nonce: "n", CodeVerifier: "v", SAMLRequestID: "req-1", RedirectAfter: "/home"}) {
+		*got != (ssorepo.State{ProviderID: p, Nonce: "n", CodeVerifier: "v", SAMLRequestID: "req-1",
+			RedirectAfter: "/home"}) {
 		t.Fatalf("state = %+v", got)
 	}
 	if again, _ := r.TakeState(ctx, "live", now); again != nil {

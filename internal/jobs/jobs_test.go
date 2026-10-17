@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func TestQueueRunsEveryJobBeforeShutdownReturns(t *testing.T) {
+func TestQueueRunsAllJobsBeforeShutdown(t *testing.T) {
 	q := NewQueue(3)
 	var done atomic.Int32
 	for range 50 {
@@ -43,7 +43,7 @@ func TestQueueWithoutWorkersStillGetsSome(t *testing.T) {
 	q.Shutdown(context.Background())
 }
 
-func TestShutdownGivesUpWhenTheContextEnds(t *testing.T) {
+func TestShutdownGivesUpWhenContextEnds(t *testing.T) {
 	q := NewQueue(1)
 	release := make(chan struct{})
 	q.Enqueue(func(context.Context) { <-release })
@@ -60,7 +60,7 @@ func TestShutdownGivesUpWhenTheContextEnds(t *testing.T) {
 	close(release)
 }
 
-func TestSchedulerRunsJobsOnTheirIntervalAndSurvivesFailures(t *testing.T) {
+func TestSchedulerRunsJobsIntervalSurvivesFailures(t *testing.T) {
 	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

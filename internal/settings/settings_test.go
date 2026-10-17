@@ -8,7 +8,7 @@ import (
 	"savvy-go/internal/settings"
 )
 
-func TestServerSettingsFallBackToTheirDefaults(t *testing.T) {
+func TestServerSettingsFallBackTheirDefaults(t *testing.T) {
 	ctx := context.Background()
 	s := settings.Store{DB: dbtest.Server(t)}
 
@@ -26,7 +26,7 @@ func TestServerSettingsFallBackToTheirDefaults(t *testing.T) {
 	}
 }
 
-func TestStoredValuesWinAndKeepTheirType(t *testing.T) {
+func TestStoredValuesWinKeepTheirType(t *testing.T) {
 	ctx := context.Background()
 	s := settings.Store{DB: dbtest.Server(t)}
 	for key, value := range map[string]any{"space_quota_mb": 25.5, "sso_allow_signup": false, "max_spaces_per_user": nil} {
@@ -48,13 +48,14 @@ func TestStoredValuesWinAndKeepTheirType(t *testing.T) {
 	}
 }
 
-func TestBoolReadsTheFormsASettingCanTake(t *testing.T) {
+func TestBoolReadsFormsSettingCanTake(t *testing.T) {
 	ctx := context.Background()
 	s := settings.Store{DB: dbtest.Server(t)}
 	for _, tc := range []struct {
 		stored any
 		want   bool
-	}{{true, true}, {false, false}, {float64(1), true}, {float64(0), false}, {"true", true}, {"false", false}, {"T", true}} {
+	}{{true, true}, {false, false}, {float64(1), true}, {float64(0), false}, {"true", true}, {"false", false},
+		{"T", true}} {
 		if err := s.Set(ctx, "flag", tc.stored); err != nil {
 			t.Fatal(err)
 		}
@@ -95,10 +96,11 @@ func TestInt(t *testing.T) {
 	}
 }
 
-func TestAllListsOnlyKnownKeysOfItsKind(t *testing.T) {
+func TestAllListsOnlyKnownKeysKind(t *testing.T) {
 	ctx := context.Background()
 	server, space := settings.Store{DB: dbtest.Server(t)}, settings.Store{DB: dbtest.Space(t), Space: true}
-	for _, kv := range [][2]any{{"space_quota_mb", 5}, {"legacy_marker", 1}, {"stray", 1}, {"auto_update_currencies", false}} {
+	for _, kv := range [][2]any{{"space_quota_mb", 5}, {"legacy_marker", 1}, {"stray", 1},
+		{"auto_update_currencies", false}} {
 		if err := server.Set(ctx, kv[0].(string), kv[1]); err != nil {
 			t.Fatal(err)
 		}

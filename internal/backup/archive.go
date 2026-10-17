@@ -192,18 +192,8 @@ func openArchive(p, tmpRoot string, maxBytes int64, keys signing.KeyRing) (*open
 		return nil, ErrBadArchive
 	}
 	defer zr.Close()
-	if len(zr.File) > maxEntries {
-		return nil, ErrBadArchive
-	}
-	var total uint64
-	for _, f := range zr.File {
-		if !archiveEntry.MatchString(f.Name) || path.Clean(f.Name) != f.Name || !f.Mode().IsRegular() {
-			return nil, fmt.Errorf("%w: unexpected entry %q", ErrBadArchive, f.Name)
-		}
-		total += f.UncompressedSize64
-	}
-	if maxBytes > 0 && total > uint64(maxBytes) {
-		return nil, fmt.Errorf("%w: it unpacks to more than the space may hold", ErrBadArchive)
+	if err := checkEntries(zr.File, maxBytes); err != nil {
+		return nil, err
 	}
 	if err := os.MkdirAll(tmpRoot, 0o700); err != nil {
 		return nil, err
@@ -212,38 +202,62 @@ func openArchive(p, tmpRoot string, maxBytes int64, keys signing.KeyRing) (*open
 	if err != nil {
 		return nil, err
 	}
-	fail := func(err error) (*openedArchive, error) {
+	if err := unpack(zr.File, m, dir, maxBytes); err != nil {
 		_ = os.RemoveAll(dir)
 		return nil, err
 	}
+	return &openedArchive{Dir: dir, Manifest: *m, Signature: sigState}, nil
+}
+
+// checkEntries rejects an archive with too many entries, an entry that is not
+// a plain file with a clean name, or a total size above maxBytes.
+func checkEntries(files []*zip.File, maxBytes int64) error {
+	if len(files) > maxEntries {
+		return ErrBadArchive
+	}
+	var total uint64
+	for _, f := range files {
+		if !archiveEntry.MatchString(f.Name) || path.Clean(f.Name) != f.Name || !f.Mode().IsRegular() {
+			return fmt.Errorf("%w: unexpected entry %q", ErrBadArchive, f.Name)
+		}
+		total += f.UncompressedSize64
+	}
+	if maxBytes > 0 && total > uint64(maxBytes) {
+		return fmt.Errorf("%w: it unpacks to more than the space may hold", ErrBadArchive)
+	}
+	return nil
+}
+
+// unpack writes every listed entry into dir and checks it against the manifest.
+func unpack(files []*zip.File, m *Manifest, dir string, maxBytes int64) error {
 	var written int64
-	for _, f := range zr.File {
+	for _, f := range files {
 		if f.Name == manifestName || f.Name == signatureName {
 			continue
 		}
 		want, listed := m.Files[f.Name]
 		if !listed {
-			return fail(fmt.Errorf("%w: %s is not in the manifest", ErrBadArchive, f.Name))
+			return fmt.Errorf("%w: %s is not in the manifest", ErrBadArchive, f.Name)
 		}
 		dst := filepath.Join(dir, filepath.FromSlash(f.Name))
 		if err := os.MkdirAll(filepath.Dir(dst), 0o700); err != nil {
-			return fail(err)
+			return err
 		}
 		n, sum, err := extract(f, dst, maxBytes-written, maxBytes > 0)
 		if err != nil {
-			return fail(err)
+			return err
 		}
 		written += n
 		if sum != want {
-			return fail(fmt.Errorf("%w: %s does not match the manifest", ErrBadArchive, f.Name))
+			return fmt.Errorf("%w: %s does not match the manifest", ErrBadArchive, f.Name)
 		}
 	}
 	for name := range m.Files {
 		if _, err := os.Stat(filepath.Join(dir, filepath.FromSlash(name))); errors.Is(err, fs.ErrNotExist) {
-			return fail(fmt.Errorf("%w: %s is missing", ErrBadArchive, name))
+			return fmt.Errorf("%w: %s is missing", ErrBadArchive, name)
 		}
 	}
-	return &openedArchive{Dir: dir, Manifest: *m, Signature: sigState}, nil
+	return nil
 }
 
 // extract writes one entry, never more than limit bytes when bounded (the

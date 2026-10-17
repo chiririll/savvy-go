@@ -18,7 +18,7 @@ import (
 // Every data route must belong to a resource, or tokens are locked out of it
 // (and a forgotten one would have silently opened to every token). A route
 // added to dataRoutes without a spaceSegments entry fails here.
-func TestEveryDataRouteMapsToAResource(t *testing.T) {
+func TestEveryDataRouteMapsToResource(t *testing.T) {
 	a := newTestApp(t)
 	for root := range dataRoots(a.s) {
 		res, ok := guard.SpaceResource("/api/spaces/1/" + root)
@@ -28,12 +28,14 @@ func TestEveryDataRouteMapsToAResource(t *testing.T) {
 			t.Errorf("/%s maps to %q, which is not an API resource", root, res)
 		}
 	}
-	for _, path := range []string{"/api/spaces/1", "/api/spaces/1/", "/api/spaces/1/members", "/api/spaces/1/transfers/abc/accept"} {
+	for _, path := range []string{"/api/spaces/1", "/api/spaces/1/", "/api/spaces/1/members",
+		"/api/spaces/1/transfers/abc/accept"} {
 		if _, ok := guard.SpaceResource(path); !ok {
 			t.Errorf("%s has no resource", path)
 		}
 	}
-	for _, path := range []string{"/api/spaces/1/audit", "/api/spaces/1/backups", "/api/spaces/1/invitations", "/api/spaces/1/nope"} {
+	for _, path := range []string{"/api/spaces/1/audit", "/api/spaces/1/backups", "/api/spaces/1/invitations",
+		"/api/spaces/1/nope"} {
 		if res, ok := guard.SpaceResource(path); ok {
 			t.Errorf("%s maps to %q: tokens must not reach it", path, res)
 		}
@@ -140,7 +142,8 @@ func TestCreateTokenKeepsTheChosenSpaces(t *testing.T) {
 	sess := a.issue(u, false)
 
 	res := a.do("POST", "/api/auth/api-tokens", map[string]any{
-		"name": "ci", "permissions": []string{"transactions:write", "transactions:read", "accounts:read"}, "space_ids": []int64{a.space.ID},
+		"name": "ci", "permissions": []string{"transactions:write", "transactions:read", "accounts:read"},
+		"space_ids":        []int64{a.space.ID},
 		"current_password": "secret1",
 	}, sess.Token, sess.CSRF)
 	if res.StatusCode != http.StatusCreated {
@@ -171,7 +174,9 @@ func TestOAuthConsentChoosesTheSpaces(t *testing.T) {
 	sess := a.issue(u, false)
 	id := a.registerClient()
 
-	info := decodeJSON(t, a.do("GET", "/api/oauth/authorize?client_id="+id+"&redirect_uri="+url.QueryEscape(oauthRedirect), nil, sess.Token, sess.CSRF))["data"].(map[string]any)
+	info := decodeJSON(t,
+		a.do("GET", "/api/oauth/authorize?client_id="+id+"&redirect_uri="+url.QueryEscape(oauthRedirect), nil, sess.Token,
+			sess.CSRF))["data"].(map[string]any)
 	if spaces, _ := info["spaces"].([]any); len(spaces) != 2 {
 		t.Fatalf("consent lists spaces %v", info["spaces"])
 	}
@@ -251,7 +256,7 @@ func TestOAuthConsentChoosesTheSpaces(t *testing.T) {
 
 // A token's rights can be changed later without issuing a new one: the app
 // that holds it keeps its secret and sees the change on its next request.
-func TestAPITokenGrantCanBeEditedInPlace(t *testing.T) {
+func TestAPITokenGrantCanEditedPlace(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("edit@a.com", "secret1", "admin")
 	sess := a.issue(u, false)
@@ -387,7 +392,7 @@ func TestConnectedAppGrantCanBeEdited(t *testing.T) {
 
 // The kind is set by how a token is made, not by its name, and a personal token
 // can never be turned into a connection (or the reverse) by editing.
-func TestTokenKindComesFromHowItWasMade(t *testing.T) {
+func TestTokenKindFollowsOrigin(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("kind@a.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
@@ -405,10 +410,14 @@ func TestTokenKindComesFromHowItWasMade(t *testing.T) {
 	}
 
 	// Only the OAuth flow makes a connection; Issue with that kind holds it to the tools' parts.
-	if _, _, err := a.svc.APITokens.Issue(context.Background(), u, "app", auth.Grant{Kind: permissions.KindMCP, Permissions: []string{"transfers:read"}, AllSpaces: true}, nil); err == nil {
+	if _, _,
+		err := a.svc.APITokens.Issue(context.Background(), u, "app",
+		auth.Grant{Kind: permissions.KindMCP, Permissions: []string{"transfers:read"}, AllSpaces: true}, nil); err == nil {
 		t.Fatal("a connection must not be given a part its tools do not use")
 	}
-	if _, _, err := a.svc.APITokens.Issue(context.Background(), u, "app", auth.Grant{Kind: permissions.KindMCP, Permissions: []string{"tags:write"}, AllSpaces: true}, nil); err != nil {
+	if _, _,
+		err := a.svc.APITokens.Issue(context.Background(), u, "app",
+		auth.Grant{Kind: permissions.KindMCP, Permissions: []string{"tags:write"}, AllSpaces: true}, nil); err != nil {
 		t.Fatalf("a connection with a part its tools use: %v", err)
 	}
 }

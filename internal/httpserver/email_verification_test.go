@@ -86,7 +86,7 @@ func TestRequiringVerificationNeedsMail(t *testing.T) {
 	}
 }
 
-func TestUnverifiedUserIsHeldBackOnlyWhileVerificationIsRequired(t *testing.T) {
+func TestUnverifiedUserHeldBackWhenRequired(t *testing.T) {
 	a, sess, admin := newMailApp(t, &recorder{on: true})
 	if err := a.svc.Users.SetEmailVerified(context.Background(), admin.ID, true); err != nil {
 		t.Fatal(err)
@@ -128,7 +128,7 @@ func TestUnverifiedUserIsHeldBackOnlyWhileVerificationIsRequired(t *testing.T) {
 	}
 }
 
-func TestUnverifiedUserIsHeldBackOnAPITokensToo(t *testing.T) {
+func TestUnverifiedUserHeldBackOnTokens(t *testing.T) {
 	a, _, admin := newMailApp(t, &recorder{on: true})
 	if err := a.svc.Users.SetEmailVerified(context.Background(), admin.ID, true); err != nil {
 		t.Fatal(err)
@@ -205,7 +205,7 @@ func TestVerifyEmailByLink(t *testing.T) {
 	}
 }
 
-func TestVerificationLinkIsOpaqueSingleUseAndReplaced(t *testing.T) {
+func TestVerificationLinkOpaqueSingleUseReplaced(t *testing.T) {
 	rec := &recorder{on: true}
 	a, _, _ := newMailApp(t, rec)
 	user := a.createUser("u@test.com", "secret1", roleEditor)
@@ -249,7 +249,8 @@ func TestVerificationLinkDiesWithTheAddress(t *testing.T) {
 	a.do("POST", "/api/auth/verify-email/resend", nil, us.Token, us.CSRF)
 	token := strings.TrimPrefix(linkIn(t, rec.messages()[0]).Path, "/verify-email/")
 
-	if res := a.do("PATCH", "/api/users/"+itoa(user.ID), map[string]any{"email": "new@test.com"}, admin.Token, admin.CSRF); res.StatusCode != 200 {
+	if res := a.do("PATCH", "/api/users/"+itoa(user.ID), map[string]any{"email": "new@test.com"}, admin.Token,
+		admin.CSRF); res.StatusCode != 200 {
 		t.Fatalf("change address: %d", res.StatusCode)
 	}
 	if res := a.do("POST", "/api/auth/verify-email", map[string]any{"token": token}, "", ""); res.StatusCode != 422 {
@@ -268,7 +269,9 @@ func TestVerificationLinkExpires(t *testing.T) {
 	a.do("POST", "/api/auth/verify-email/resend", nil, us.Token, us.CSRF).Body.Close()
 	token := strings.TrimPrefix(linkIn(t, rec.messages()[0]).Path, "/verify-email/")
 
-	if _, err := a.db.Exec(`UPDATE email_verification_tokens SET expires_at = ?`, time.Now().Add(-time.Minute).UTC()); err != nil {
+	if _,
+		err := a.db.Exec(`UPDATE email_verification_tokens SET expires_at = ?`,
+		time.Now().Add(-time.Minute).UTC()); err != nil {
 		t.Fatal(err)
 	}
 	if res := a.do("POST", "/api/auth/verify-email", map[string]any{"token": token}, "", ""); res.StatusCode != 422 {
@@ -296,7 +299,7 @@ func TestResendNeedsMail(t *testing.T) {
 	}
 }
 
-func TestAdminSetsVerifiedByHandAndAddressChangeClearsIt(t *testing.T) {
+func TestAdminVerifiesAddressChangeClears(t *testing.T) {
 	a, sess, _ := newMailApp(t, &recorder{on: true})
 	create := a.do(
 		"POST",
@@ -353,7 +356,7 @@ func TestFirstAdminStartsUnverified(t *testing.T) {
 	}
 }
 
-func TestSSOAddressVerifiedOnlyWhenProviderVouches(t *testing.T) {
+func TestSSOAddressVerifiedIfProviderVouches(t *testing.T) {
 	a := newTestApp(t)
 	a.createUser("root@test.com", "secret1", auth.RoleAdmin)
 	existing := a.createUser("jane@test.com", "secret1", roleEditor)

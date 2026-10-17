@@ -135,7 +135,8 @@ type Member struct {
 
 func (r Repo) UpsertMember(ctx context.Context, spaceID, userID int64, role string, now time.Time) error {
 	return r.q().
-		UpsertSpaceMember(ctx, sqlc.UpsertSpaceMemberParams{SpaceID: spaceID, UserID: userID, Role: role, CreatedAt: db.TimeNS(now)})
+		UpsertSpaceMember(ctx,
+			sqlc.UpsertSpaceMemberParams{SpaceID: spaceID, UserID: userID, Role: role, CreatedAt: db.TimeNS(now)})
 }
 
 func (r Repo) DeleteMember(ctx context.Context, spaceID, userID int64) error {
@@ -260,7 +261,8 @@ type NewInvitation struct {
 // InsertInvitation stores an invitation and returns its id.
 func (r Repo) InsertInvitation(ctx context.Context, n NewInvitation) (int64, error) {
 	return r.q().InsertInvitation(ctx, sqlc.InsertInvitationParams{
-		SpaceID: n.SpaceID, Email: db.NullStringVal(n.Email), Note: db.NullStringVal(n.Note), Role: n.Role, TokenHash: n.TokenHash,
+		SpaceID: n.SpaceID, Email: db.NullStringVal(n.Email), Note: db.NullStringVal(n.Note), Role: n.Role,
+		TokenHash: n.TokenHash,
 		InvitedBy: db.NI(n.InvitedBy), InvitedByServerAdmin: db.BoolInt(n.ByServerAdmin),
 		ExpiresAt: db.FormatTime(n.Expires), CreatedAt: db.TimeNS(n.Now),
 	})

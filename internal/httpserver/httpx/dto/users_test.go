@@ -40,7 +40,7 @@ func TestUserWithLink(t *testing.T) {
 	}
 }
 
-func TestTwoFactorStatusKeepsNullWhenOff(t *testing.T) {
+func TestTwoFactorStatusNullWhenOff(t *testing.T) {
 	got := marshal(t, dto.TwoFactorStatus{})
 	if want := `{"enabled":false,"pending_confirmation":false,"recovery_codes_remaining":null}`; got != want {
 		t.Fatalf("got %s, want %s", got, want)

@@ -15,7 +15,7 @@ type patchCase struct {
 	clearOut string         // response field that must become null
 }
 
-func TestPatchKeepsOmittedFieldsAndNullClears(t *testing.T) {
+func TestPatchKeepsOmittedFieldsNullClears(t *testing.T) {
 	cases := []patchCase{
 		{
 			name: "transaction",

@@ -41,7 +41,8 @@ func (r Server) Links(ctx context.Context, spaceID int64) ([]Link, error) {
 
 func (r Server) InsertLink(ctx context.Context, a, b, actor int64, now time.Time) error {
 	return r.q().
-		InsertSpaceLink(ctx, sqlc.InsertSpaceLinkParams{SpaceAID: a, SpaceBID: b, CreatedBy: db.NI(actor), CreatedAt: db.TimeNS(now)})
+		InsertSpaceLink(ctx,
+			sqlc.InsertSpaceLinkParams{SpaceAID: a, SpaceBID: b, CreatedBy: db.NI(actor), CreatedAt: db.TimeNS(now)})
 }
 
 // DeleteLink reports whether the spaces were linked.

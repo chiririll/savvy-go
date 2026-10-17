@@ -168,7 +168,8 @@ func (r Repo) SetTags(ctx context.Context, id int64, tagIDs []int64) error {
 		return err
 	}
 	for _, tagID := range tagIDs {
-		if err := r.q().InsertRecurringTag(ctx, sqlc.InsertRecurringTagParams{RecurringTransactionID: id, TagID: tagID}); err != nil {
+		if err := r.q().InsertRecurringTag(ctx,
+			sqlc.InsertRecurringTagParams{RecurringTransactionID: id, TagID: tagID}); err != nil {
 			return err
 		}
 	}

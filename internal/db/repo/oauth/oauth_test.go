@@ -48,7 +48,7 @@ func TestMissingRowsAreNil(t *testing.T) {
 	}
 }
 
-func TestClientRoundTripKeepsRedirectURIs(t *testing.T) {
+func TestClientRoundTripKeepsRedirectUR(t *testing.T) {
 	r, _, _ := newRepos(t)
 	ctx := context.Background()
 	uris := []string{"https://claude.ai/api/mcp/auth_callback", "http://localhost:6274/cb"}
@@ -64,7 +64,7 @@ func TestClientRoundTripKeepsRedirectURIs(t *testing.T) {
 	}
 }
 
-func TestPruneKeepsClientsThatHoldARefreshToken(t *testing.T) {
+func TestPruneKeepsClientsHoldRefreshToken(t *testing.T) {
 	r, a, uid := newRepos(t)
 	ctx := context.Background()
 	old := time.Now().Add(-48 * time.Hour)
@@ -72,7 +72,9 @@ func TestPruneKeepsClientsThatHoldARefreshToken(t *testing.T) {
 	_ = r.InsertClient(ctx, "used", "Used", []string{"https://x/cb"}, repo.RequestInfo{}, old)
 	_ = r.InsertClient(ctx, "fresh", "Fresh", []string{"https://x/cb"}, repo.RequestInfo{}, time.Now())
 	tok := token(t, a, uid, "h")
-	if err := r.InsertRefresh(ctx, repo.NewRefresh{Hash: "r1", ClientID: "used", UserID: uid, APITokenID: tok, ExpiresAt: time.Now().Add(time.Hour), Now: time.Now()}); err != nil {
+	if err := r.InsertRefresh(ctx,
+		repo.NewRefresh{Hash: "r1", ClientID: "used", UserID: uid, APITokenID: tok, ExpiresAt: time.Now().Add(time.Hour),
+			Now: time.Now()}); err != nil {
 		t.Fatal(err)
 	}
 	if err := r.PruneClients(ctx, time.Now().Add(-24*time.Hour)); err != nil {
@@ -91,7 +93,9 @@ func TestRotateNeedsTheCurrentHash(t *testing.T) {
 	_ = r.InsertClient(ctx, "c", "C", []string{"https://x/cb"}, repo.RequestInfo{}, time.Now())
 	tok := token(t, a, uid, "h1")
 	exp := time.Now().Add(time.Hour)
-	if err := r.InsertRefresh(ctx, repo.NewRefresh{Hash: "r1", ClientID: "c", UserID: uid, APITokenID: tok, ExpiresAt: exp, Now: time.Now()}); err != nil {
+	if err := r.InsertRefresh(ctx,
+		repo.NewRefresh{Hash: "r1", ClientID: "c", UserID: uid, APITokenID: tok, ExpiresAt: exp,
+			Now: time.Now()}); err != nil {
 		t.Fatal(err)
 	}
 	row, _ := r.RefreshByHash(ctx, "r1")
@@ -111,7 +115,7 @@ func TestRotateNeedsTheCurrentHash(t *testing.T) {
 	}
 }
 
-func TestRevokingTheAccessTokenRemovesTheRefreshToken(t *testing.T) {
+func TestRevokingAccessTokenRemovesRefreshToken(t *testing.T) {
 	r, a, uid := newRepos(t)
 	ctx := context.Background()
 	_ = r.InsertClient(ctx, "c", "C", []string{"https://x/cb"}, repo.RequestInfo{}, time.Now())
@@ -135,7 +139,7 @@ func TestRevokingTheAccessTokenRemovesTheRefreshToken(t *testing.T) {
 	}
 }
 
-func TestDeleteClientTakesItsAccessTokensAndSparesOthers(t *testing.T) {
+func TestDeleteClientRevokesOwnTokensOnly(t *testing.T) {
 	r, a, uid := newRepos(t)
 	ctx := context.Background()
 	_ = r.InsertClient(ctx, "c", "C", []string{"https://x/cb"}, repo.RequestInfo{}, time.Now())

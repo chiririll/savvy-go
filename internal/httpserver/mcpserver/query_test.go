@@ -7,7 +7,7 @@ import (
 
 // These helpers build the query of the REST call a tool makes, so what they let
 // through is what reaches the route.
-func TestQueryHelpersRefuseBadDatesAndValues(t *testing.T) {
+func TestQueryHelpersRefuseBadDatesValues(t *testing.T) {
 	q := url.Values{}
 	if err := setDate(q, "start_date", "2026-02-30x"); err == nil {
 		t.Error("a malformed date was accepted")
@@ -22,7 +22,8 @@ func TestQueryHelpersRefuseBadDatesAndValues(t *testing.T) {
 		t.Errorf("refused values reached the query: %v", q)
 	}
 
-	if err := firstErr(nil, setDate(q, "end_date", "2026-02-01"), setEnum(q, "type", "income", "expense", "income")); err != nil {
+	if err := firstErr(nil, setDate(q, "end_date", "2026-02-01"),
+		setEnum(q, "type", "income", "expense", "income")); err != nil {
 		t.Fatal(err)
 	}
 	if q.Get("end_date") != "2026-02-01" || q.Get("type") != "income" {

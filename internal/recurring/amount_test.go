@@ -17,7 +17,7 @@ import (
 
 // A recurring transaction template with an amount that does not fit the
 // currency is refused and stores nothing, in every currency scale.
-func TestAmountsOutOfRangeAreRejectedAndStoreNothing(t *testing.T) {
+func TestAmountsOutRangeRejectedStoreNothing(t *testing.T) {
 	moneytest.ForEach(t, func(t *testing.T, c moneytest.Currency) {
 		ctx := context.Background()
 		sqlDB, err := db.Open(filepath.Join(t.TempDir(), "database.sqlite"))

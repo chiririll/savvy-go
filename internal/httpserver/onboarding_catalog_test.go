@@ -34,7 +34,7 @@ func dataList(t *testing.T, body map[string]any) []any {
 	return list
 }
 
-func TestServerCurrencyCatalogMatchesTheSpaceCatalogWithoutFiltering(t *testing.T) {
+func TestServerCurrencyCatalogMatchesSpaceCatalog(t *testing.T) {
 	a := newTestApp(t)
 	user := a.issue(a.createUser("u@test.com", "secret1", roleEditor), false)
 
@@ -66,7 +66,8 @@ func TestServerCurrencyCatalogMatchesTheSpaceCatalogWithoutFiltering(t *testing.
 		t.Fatalf("create space %d", space.StatusCode)
 	}
 	id := int64(decodeJSON(t, space)["data"].(map[string]any)["id"].(float64))
-	if cur := a.inSpace(id, "POST", "/api/currencies", map[string]any{"code": "USD", "name": "US Dollar", "symbol": "$"}, sess); cur.StatusCode != 201 {
+	if cur := a.inSpace(id, "POST", "/api/currencies", map[string]any{"code": "USD", "name": "US Dollar", "symbol": "$"},
+		sess); cur.StatusCode != 201 {
 		t.Fatalf("add currency %d", cur.StatusCode)
 	}
 	own := dataList(t, decodeJSON(t, a.inSpace(id, "GET", "/api/currencies/catalog", nil, sess)))
@@ -75,7 +76,7 @@ func TestServerCurrencyCatalogMatchesTheSpaceCatalogWithoutFiltering(t *testing.
 	}
 }
 
-func TestServerCurrencyCatalogRejectsABadBase(t *testing.T) {
+func TestServerCurrencyCatalogRejectsBadBase(t *testing.T) {
 	a := newTestApp(t)
 	user := a.issue(a.createUser("u@test.com", "secret1", roleEditor), false)
 	res := a.serverGet("/api/currencies/catalog?base=../x", user.Token)
@@ -85,7 +86,7 @@ func TestServerCurrencyCatalogRejectsABadBase(t *testing.T) {
 	res.Body.Close()
 }
 
-func TestPresetsServeTheCategoriesAndTags(t *testing.T) {
+func TestPresetsServeTheCategoriesTags(t *testing.T) {
 	a := newTestApp(t)
 	user := a.issue(a.createUser("u@test.com", "secret1", roleViewer), false)
 
@@ -120,7 +121,7 @@ func TestPresetsServeTheCategoriesAndTags(t *testing.T) {
 }
 
 // The catalogs of the setup screens are for people who are signed in.
-func TestServerCatalogsNeedASignedInUser(t *testing.T) {
+func TestServerCatalogsNeedSignedInUser(t *testing.T) {
 	a := newTestApp(t)
 	for _, path := range []string{"/api/currencies/catalog", "/api/presets"} {
 		status(t, a.serverGet(path, ""), 401, path)

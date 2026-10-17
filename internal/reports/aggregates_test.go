@@ -40,7 +40,7 @@ func forEachBase(t *testing.T, fn func(t *testing.T, base moneytest.Currency)) {
 	moneytest.ForEach(t, fn)
 }
 
-func TestReportTotalsFoldEveryCurrencyIntoEveryBase(t *testing.T) {
+func TestReportTotalsFoldCurrenciesIntoBase(t *testing.T) {
 	forEachBase(t, func(t *testing.T, base moneytest.Currency) {
 		e := newMatrixEnv(t, base)
 		baseUnit := e.stored(base).Unit()
@@ -73,7 +73,7 @@ func TestReportTotalsFoldEveryCurrencyIntoEveryBase(t *testing.T) {
 	})
 }
 
-func TestEachCurrencyAloneIsConvertedAndRoundedIntoTheBase(t *testing.T) {
+func TestEachCurrencyConvertsRoundsToBase(t *testing.T) {
 	forEachBase(t, func(t *testing.T, base moneytest.Currency) {
 		for _, c := range moneytest.Currencies {
 			t.Run(c.Code, func(t *testing.T) {
@@ -108,7 +108,7 @@ func TestEachCurrencyAloneIsConvertedAndRoundedIntoTheBase(t *testing.T) {
 	})
 }
 
-func TestNetWorthAndAccountSummaryConvertEachBalance(t *testing.T) {
+func TestNetWorthSummaryConvertsEachBalance(t *testing.T) {
 	forEachBase(t, func(t *testing.T, base moneytest.Currency) {
 		e := newMatrixEnv(t, base)
 		baseUnit := e.stored(base).Unit()

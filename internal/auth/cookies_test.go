@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestReadTokenTrustsOnlyTheNameForTheTransport(t *testing.T) {
+func TestReadTokenTrustsOnlyNameTransport(t *testing.T) {
 	sec := Security{SessionCookie: "svy_session"}
 	req := func(names ...string) *http.Request {
 		r := httptest.NewRequest("GET", "/", nil)

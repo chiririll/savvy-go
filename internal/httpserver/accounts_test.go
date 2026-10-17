@@ -49,7 +49,7 @@ func TestAccountCreatedFromACatalogCurrency(t *testing.T) {
 }
 
 // The summary adds the balances of accounts in different currencies in the base currency.
-func TestAccountSummaryConvertsToTheBaseCurrency(t *testing.T) {
+func TestAccountSummaryConvertsToBaseCurrency(t *testing.T) {
 	a := newTestApp(t)
 	sess := a.issue(a.createUser("rw@test.com", "secret1", roleEditor), false)
 	usd := apiID(
@@ -136,9 +136,12 @@ func TestInvalidValuesAreClientErrors(t *testing.T) {
 		name, path string
 		body       map[string]any
 	}{
-		{"unknown account type", "/api/accounts", map[string]any{"name": "A", "type": "wallet", "currency_id": usd, "initial_balance": 0}},
-		{"negative transaction amount", "/api/transactions", map[string]any{"type": "income", "account_id": acc, "amount": -5, "date": "2024-01-15"}},
-		{"unknown transaction type", "/api/transactions", map[string]any{"type": "gift", "account_id": acc, "amount": 5, "date": "2024-01-15"}},
+		{"unknown account type", "/api/accounts",
+			map[string]any{"name": "A", "type": "wallet", "currency_id": usd, "initial_balance": 0}},
+		{"negative transaction amount", "/api/transactions",
+			map[string]any{"type": "income", "account_id": acc, "amount": -5, "date": "2024-01-15"}},
+		{"unknown transaction type", "/api/transactions",
+			map[string]any{"type": "gift", "account_id": acc, "amount": 5, "date": "2024-01-15"}},
 	} {
 		status(t, a.do("POST", c.path, c.body, sess.Token, sess.CSRF), http.StatusUnprocessableEntity, c.name)
 	}

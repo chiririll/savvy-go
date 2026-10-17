@@ -36,7 +36,7 @@ func (g *Guard) PublicOrigin(next http.Handler) http.Handler {
 			httpx.WriteMessage(w, http.StatusForbidden, "Cross-site request refused.")
 			return
 		}
-		if r.ContentLength != 0 && !jsonOrUpload(r) {
+		if r.ContentLength != 0 && !allowedBodyType(r) {
 			httpx.WriteMessage(w, http.StatusUnsupportedMediaType, "Content-Type must be application/json.")
 			return
 		}
@@ -49,7 +49,7 @@ func isSSOCallback(path string) bool {
 }
 
 // uploadPaths take a file, not JSON.
-func jsonOrUpload(r *http.Request) bool {
+func allowedBodyType(r *http.Request) bool {
 	p := r.URL.Path
 	if p == "/api/onboarding/restore" || strings.HasPrefix(p, "/api/uploads/") {
 		return true

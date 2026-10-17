@@ -357,20 +357,9 @@ func (s *Service) Refresh(ctx context.Context, clientID, refreshToken string) (*
 		_ = s.Tokens.Revoke(ctx, row.UserID, row.APITokenID)
 		return nil, bad
 	}
-	user, err := s.Users.ByID(ctx, row.UserID)
+	user, c, prev, err := s.refreshParties(ctx, row, clientID)
 	if err != nil {
-		return nil, fail("server_error", err.Error())
-	}
-	c, err := s.repo().Client(ctx, clientID)
-	if err != nil {
-		return nil, fail("server_error", err.Error())
-	}
-	if user == nil || c == nil {
-		return nil, bad
-	}
-	prev, err := s.accessToken(ctx, row.UserID, row.APITokenID)
-	if err != nil {
-		return nil, fail("server_error", err.Error())
+		return nil, err
 	}
 	if prev == nil {
 		return nil, bad
@@ -399,6 +388,29 @@ func (s *Service) Refresh(ctx context.Context, clientID, refreshToken string) (*
 	}
 	_ = s.Tokens.Revoke(ctx, user.ID, row.APITokenID)
 	return &TokenSet{AccessToken: access, RefreshToken: next, ExpiresIn: int(AccessTTL / time.Second)}, nil
+}
+
+// refreshParties loads who a refresh token belongs to: the user, the client and
+// the access token it replaces. Any of them nil means the grant is gone.
+func (s *Service) refreshParties(
+	ctx context.Context, row *repo.Refresh, clientID string,
+) (*auth.User, *repo.Client, *auth.APIToken, error) {
+	user, err := s.Users.ByID(ctx, row.UserID)
+	if err != nil {
+		return nil, nil, nil, fail("server_error", err.Error())
+	}
+	c, err := s.repo().Client(ctx, clientID)
+	if err != nil {
+		return nil, nil, nil, fail("server_error", err.Error())
+	}
+	if user == nil || c == nil {
+		return nil, nil, nil, fail("invalid_grant", "The refresh token is invalid or expired.")
+	}
+	prev, err := s.accessToken(ctx, row.UserID, row.APITokenID)
+	if err != nil {
+		return nil, nil, nil, fail("server_error", err.Error())
+	}
+	return user, c, prev, nil
 }
 
 // accessToken is the user's API token with that id, nil when it is gone.

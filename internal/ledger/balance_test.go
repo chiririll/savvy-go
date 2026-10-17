@@ -58,12 +58,14 @@ func TestBalanceFollowsEveryTransactionType(t *testing.T) {
 	}
 }
 
-func TestBalanceIgnoresPendingAndLaterTransactions(t *testing.T) {
+func TestBalanceIgnoresPendingLaterTransactions(t *testing.T) {
 	e := newMoneyEnv(t)
 	accts := Accounts{DB: e.db}
 	pending := "pending"
 	date := "2024-02-01"
-	if _, err := e.txs.Create(e.ctx, TxInput{Type: "expense", AccountID: e.usdAcc.ID, Amount: dec("30"), Date: &date, Status: &pending}); err != nil {
+	if _,
+		err := e.txs.Create(e.ctx,
+		TxInput{Type: "expense", AccountID: e.usdAcc.ID, Amount: dec("30"), Date: &date, Status: &pending}); err != nil {
 		t.Fatal(err)
 	}
 	e.txOn(t, TxInput{Type: "expense", AccountID: e.usdAcc.ID, Amount: dec("10")}, "2024-01-20")
@@ -84,7 +86,7 @@ func TestBalanceIgnoresPendingAndLaterTransactions(t *testing.T) {
 }
 
 // A transfer from an account to itself both takes and adds, as it always has.
-func TestSelfTransferNetsToItsAmountDifference(t *testing.T) {
+func TestSelfTransferNetsItsAmountDifference(t *testing.T) {
 	e := newMoneyEnv(t)
 	self := e.usdAcc.ID
 	d := dec("7")
@@ -100,7 +102,7 @@ func TestSelfTransferNetsToItsAmountDifference(t *testing.T) {
 
 // The series is the running total of the same ledger, so it must agree with
 // the balance computed date by date, in every currency.
-func TestBalanceSeriesMatchesBalanceOnEveryDay(t *testing.T) {
+func TestBalanceSeriesMatchesBalanceEveryDay(t *testing.T) {
 	e := newMoneyEnv(t)
 	accts := Accounts{DB: e.db}
 	days := []string{"2024-03-01", "2024-03-02", "2024-03-03", "2024-03-04", "2024-03-05"}
@@ -129,7 +131,7 @@ func TestBalanceSeriesMatchesBalanceOnEveryDay(t *testing.T) {
 	}
 }
 
-func TestDebtBalanceDoesNotDependOnTheDate(t *testing.T) {
+func TestDebtBalanceNotDependOnDate(t *testing.T) {
 	e := newMoneyEnv(t)
 	accts := Accounts{DB: e.db}
 	debts := Debts{Accounts: accts, Transactions: e.txs}

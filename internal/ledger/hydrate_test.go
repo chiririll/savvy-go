@@ -8,7 +8,7 @@ import (
 
 // A page loads the items and tags of all its transactions in one query each;
 // every line and tag must still land on its own transaction, in its currency.
-func TestPageHydrationKeepsItemsAndTagsWithTheirTransaction(t *testing.T) {
+func TestPageHydrationKeepsItemsTags(t *testing.T) {
 	e := newMoneyEnv(t)
 	tags := Tags{DB: e.db}
 	food, err := tags.Create(e.ctx, "food")

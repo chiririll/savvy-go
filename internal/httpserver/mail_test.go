@@ -96,7 +96,7 @@ func newMailAppAt(t *testing.T, appURL string, rec *recorder, opts ...Option) (*
 	return a, a.issue(admin, false), admin
 }
 
-func TestMailStatusIsAdminOnlyAndHidesThePassword(t *testing.T) {
+func TestMailStatusAdminOnlyHidesPassword(t *testing.T) {
 	a, sess, _ := newMailApp(t, &recorder{on: true})
 
 	res := a.do("GET", "/api/admin/mail", nil, sess.Token, sess.CSRF)
@@ -138,7 +138,7 @@ func TestMailStatusReportsAConfigProblem(t *testing.T) {
 	}
 }
 
-func TestMailTestSendsToTheAdminOrTheGivenAddress(t *testing.T) {
+func TestMailTestSendsAdminGivenAddress(t *testing.T) {
 	rec := &recorder{on: true}
 	a, sess, _ := newMailApp(t, rec)
 
@@ -189,7 +189,7 @@ func TestMailTestShowsWhyItFailed(t *testing.T) {
 	res.Body.Close()
 }
 
-func TestResetLinkIsEmailedWithoutRevealingTheToken(t *testing.T) {
+func TestResetLinkEmailedWithoutRevealingToken(t *testing.T) {
 	rec := &recorder{on: true}
 	a, sess, _ := newMailApp(t, rec)
 	target := a.createUser("target@test.com", "oldpass12", roleEditor)
@@ -236,7 +236,7 @@ func sendResetLink(t *testing.T, a *testApp, sess *auth.Issued, userID int64) (i
 	return res.StatusCode, decodeJSON(t, res)
 }
 
-func TestResetLinkIsNotSentWhenItCannotWork(t *testing.T) {
+func TestResetLinkNotSentIfUnusable(t *testing.T) {
 	cases := []struct {
 		name string
 		// setup prepares the app and returns the user to send to.
@@ -291,7 +291,7 @@ func TestResetLinkIsNotSentWhenItCannotWork(t *testing.T) {
 }
 
 // Without "send" the admin still gets the link to hand over, mail or not.
-func TestResetLinkStillReturnsTheTokenWhenNotSending(t *testing.T) {
+func TestResetLinkReturnsTokenUnsent(t *testing.T) {
 	for _, on := range []bool{true, false} {
 		rec := &recorder{on: on}
 		a, sess, _ := newMailApp(t, rec)
@@ -307,7 +307,7 @@ func TestResetLinkStillReturnsTheTokenWhenNotSending(t *testing.T) {
 	}
 }
 
-func TestNewUserGetsTheSetPasswordLinkByEmail(t *testing.T) {
+func TestNewUserGetsSetPasswordLink(t *testing.T) {
 	rec := &recorder{on: true}
 	a, sess, _ := newMailApp(t, rec)
 
@@ -332,7 +332,7 @@ func TestNewUserGetsTheSetPasswordLinkByEmail(t *testing.T) {
 	}
 }
 
-func TestNewUserEmailNeedsMailAndNoPassword(t *testing.T) {
+func TestNewUserEmailNeedsMail(t *testing.T) {
 	create := func(a *testApp, sess *auth.Issued, email string, extra map[string]any) (int, map[string]any) {
 		in := map[string]any{"name": "New", "email": email, "role": "user", "send": true}
 		for k, v := range extra {
@@ -373,7 +373,7 @@ func TestNewUserEmailNeedsMailAndNoPassword(t *testing.T) {
 
 // With verification required a link handed over by the admin proves nothing
 // about the mailbox, so a user without a password has to be emailed.
-func TestNewUserLinkIsRefusedWhenVerificationIsRequired(t *testing.T) {
+func TestNewUserLinkRefusedWhenVerifying(t *testing.T) {
 	rec := &recorder{on: true}
 	a, sess, admin := newMailApp(t, rec)
 	_ = a.svc.Users.SetEmailVerified(context.Background(), admin.ID, true)

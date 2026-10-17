@@ -68,7 +68,7 @@ func TestRegisterWithoutAGuardIsClosed(t *testing.T) {
 	status(t, a.register("anything", nil), http.StatusForbidden, "register with no guard")
 }
 
-func TestRegisterIsClosedOnceAUserExists(t *testing.T) {
+func TestRegisterIsClosedOnceUserExists(t *testing.T) {
 	a := newTestApp(t)
 	pass := a.bootstrap.Password()
 	status(t, a.register(pass, nil), http.StatusCreated, "first")
@@ -81,13 +81,13 @@ func TestRegisterIsClosedOnceAUserExists(t *testing.T) {
 	}
 }
 
-func TestRegisterClosedWhenUsersExistDespiteRightPassword(t *testing.T) {
+func TestRegisterClosedOnceUsersExist(t *testing.T) {
 	a := newTestApp(t)
 	a.createUser("someone@test.com", "secret1", "user")
 	status(t, a.register(a.bootstrap.Password(), nil), http.StatusForbidden, "users present")
 }
 
-func TestInvalidFieldsDoNotSpendThePassword(t *testing.T) {
+func TestInvalidFieldsDoNotSpendPassword(t *testing.T) {
 	a := newTestApp(t)
 	res := a.register(a.bootstrap.Password(), map[string]string{"email": "not-an-email"})
 	fieldErrors(t, res, "email")
@@ -174,7 +174,7 @@ func TestVerifyBootstrapPassword(t *testing.T) {
 	status(t, a.register(a.bootstrap.Password(), nil), http.StatusCreated, "register after verify")
 }
 
-func TestVerifyBootstrapIsClosedWhenUsersExist(t *testing.T) {
+func TestVerifyBootstrapClosedWhenUsersExist(t *testing.T) {
 	a := newTestApp(t)
 	pass := a.bootstrap.Password()
 	a.createUser("someone@test.com", "secret1", "user")

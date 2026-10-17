@@ -52,7 +52,7 @@ func TestFormulaArithmetic(t *testing.T) {
 	}
 }
 
-func TestFormulaTakesNumbersAndPlaceholders(t *testing.T) {
+func TestFormulaTakesNumbersPlaceholders(t *testing.T) {
 	dec := decimal.RequireFromString
 	tx := &ledger.Transaction{Amount: money.FromDecimal(dec("20"), money.Unit{ID: 1, Decimals: 2})}
 	for name, tc := range map[string]struct {
@@ -162,7 +162,7 @@ func TestCoercions(t *testing.T) {
 	}
 }
 
-func TestEqualityIsNumericForNumbersAndTextOtherwise(t *testing.T) {
+func TestEqualityNumericForNumbersTextOtherwise(t *testing.T) {
 	if !valuesEqual("12.50", float64(12.5)) || !valuesEqual(int64(3), "3") {
 		t.Error("numbers are compared by value")
 	}

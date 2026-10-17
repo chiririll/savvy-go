@@ -118,7 +118,7 @@ func TestInvitationMethodFollowsTheServerSetup(t *testing.T) {
 	})
 }
 
-func TestInvitationMethodsTellTheFrontendWhatApplies(t *testing.T) {
+func TestInvitationMethodsTellFrontendWhatApplies(t *testing.T) {
 	cases := []struct {
 		name         string
 		appURL       string
@@ -150,7 +150,7 @@ func TestInvitationMethodsTellTheFrontendWhatApplies(t *testing.T) {
 	}
 }
 
-func TestRegisteringThroughAnEmailedInvitationVerifiesTheAddress(t *testing.T) {
+func TestRegisteringThroughEmailedInvitationVerifiesAddress(t *testing.T) {
 	rec := &recorder{on: true}
 	a, sess, admin := newMailApp(t, rec)
 	a.requireVerification(admin)
@@ -179,7 +179,7 @@ func TestRegisteringThroughAnEmailedInvitationVerifiesTheAddress(t *testing.T) {
 	}
 }
 
-func TestLinkInvitationKeepsNoteEmailedDoesNot(t *testing.T) {
+func TestLinkInvitationKeepsNoteEmailedNot(t *testing.T) {
 	rec := &recorder{on: true}
 	a, sess, _ := newMailApp(t, rec)
 	post := func(body map[string]any) (int, map[string]any) {
@@ -190,7 +190,8 @@ func TestLinkInvitationKeepsNoteEmailedDoesNot(t *testing.T) {
 	if status, raw := post(map[string]any{"role": "editor", "note": "  Kim from work "}); status != 201 {
 		t.Fatalf("link with note: %d %v", status, raw)
 	}
-	if status, raw := post(map[string]any{"role": "editor", "email": "new@example.org", "note": "ignored"}); status != 201 {
+	if status,
+		raw := post(map[string]any{"role": "editor", "email": "new@example.org", "note": "ignored"}); status != 201 {
 		t.Fatalf("email with note: %d %v", status, raw)
 	}
 	if status, _ := post(map[string]any{"role": "editor", "note": strings.Repeat("x", 101)}); status != 422 {
@@ -255,7 +256,7 @@ func TestLinkInvitationRegistrationAsksEmailConfirmation(t *testing.T) {
 	})
 }
 
-func TestInvitationRegistrationIsClosedWhenPasswordSignInIsOff(t *testing.T) {
+func TestInvitationRegistrationClosedNoPassword(t *testing.T) {
 	a, sess, _ := newMailApp(t, &recorder{})
 	_, data, _ := a.postInvite(sess, a.space.ID, "")
 	insertSSO(t, a.db, true)
@@ -271,7 +272,7 @@ func TestInvitationRegistrationIsClosedWhenPasswordSignInIsOff(t *testing.T) {
 	}
 }
 
-func TestAFailedSendLeavesNoInvitationAndNoCooldown(t *testing.T) {
+func TestFailedSendLeavesNoInvitationCooldown(t *testing.T) {
 	rec := &recorder{on: true, sendErr: errors.New("connection refused")}
 	a, sess, _ := newMailApp(t, rec)
 
@@ -291,7 +292,7 @@ func TestAFailedSendLeavesNoInvitationAndNoCooldown(t *testing.T) {
 	}
 }
 
-func TestAnAddressCannotBeInvitedTwiceToTheSameSpace(t *testing.T) {
+func TestAddressCannotInvitedTwiceSameSpace(t *testing.T) {
 	a, sess, _ := newMailApp(t, &recorder{on: true})
 	if status, _, raw := a.postInvite(sess, a.space.ID, "new@example.org"); status != 201 {
 		t.Fatalf("first: %d %v", status, raw)
@@ -310,7 +311,7 @@ func TestAnAddressCannotBeInvitedTwiceToTheSameSpace(t *testing.T) {
 	}
 }
 
-func TestAMemberCannotBeInvitedByEmail(t *testing.T) {
+func TestMemberCannotBeInvitedByEmail(t *testing.T) {
 	a, sess, _ := newMailApp(t, &recorder{on: true})
 	a.createUser("member@test.com", "secret1", roleEditor)
 	status, _, raw := a.postInvite(sess, a.space.ID, "member@test.com")
@@ -319,7 +320,7 @@ func TestAMemberCannotBeInvitedByEmail(t *testing.T) {
 	}
 }
 
-func TestRevokingAnInvitationKillsTheLinkButNotTheCooldown(t *testing.T) {
+func TestRevokingInvitationKeepsCooldown(t *testing.T) {
 	rec := &recorder{on: true}
 	a, sess, _ := newMailApp(t, rec)
 	_, data, _ := a.postInvite(sess, a.space.ID, "new@example.org")
@@ -356,7 +357,7 @@ func TestRevokingAnInvitationKillsTheLinkButNotTheCooldown(t *testing.T) {
 	}
 }
 
-func TestPruningEndsTheCooldownOfOldRowsOnly(t *testing.T) {
+func TestPruningEndsCooldownOldRowsOnly(t *testing.T) {
 	a, sess, _ := newMailApp(t, &recorder{on: true})
 	ctx := context.Background()
 	now := time.Now().UTC()
@@ -395,7 +396,7 @@ func TestPruningEndsTheCooldownOfOldRowsOnly(t *testing.T) {
 	}
 }
 
-func TestOnlyAServerAdminClearsInvitationCooldowns(t *testing.T) {
+func TestOnlyServerAdminClearsInvitationCooldowns(t *testing.T) {
 	a, sess, _ := newMailApp(t, &recorder{on: true})
 	for _, email := range []string{"a@example.org", "b@example.org"} {
 		_, data, _ := a.postInvite(sess, a.space.ID, email)
@@ -437,13 +438,14 @@ func TestOnlyAServerAdminClearsInvitationCooldowns(t *testing.T) {
 	}
 
 	var audited int
-	if err := a.db.QueryRow(`SELECT COUNT(*) FROM admin_audit WHERE action = 'invitations.cleared'`).Scan(&audited); err != nil ||
+	if err := a.db.QueryRow(`SELECT COUNT(*) FROM admin_audit ` +
+		`WHERE action = 'invitations.cleared'`).Scan(&audited); err != nil ||
 		audited != 2 {
 		t.Errorf("audit rows %d, %v; want one per clearing", audited, err)
 	}
 }
 
-func TestAcceptedInvitationsCanStillBeRemovedFromTheList(t *testing.T) {
+func TestAcceptedInvitationsRemovableFromList(t *testing.T) {
 	a, sess, _ := newMailApp(t, &recorder{})
 	_, data, _ := a.postInvite(sess, a.space.ID, "")
 	token := data["token"].(string)

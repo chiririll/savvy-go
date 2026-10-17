@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestOpenCreatesTheDirectoryAndTheSafetyPragmas(t *testing.T) {
+func TestOpenCreatesDirectoryTheSafetyPragmas(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "nested", "deeper", "x.sqlite")
 	sqlDB, err := Open(path)
 	if err != nil {
@@ -72,7 +72,7 @@ func TestOpenAcceptsARelativePath(t *testing.T) {
 	}
 }
 
-func TestReadyAndCheckpoint(t *testing.T) {
+func TestReadyCheckpoint(t *testing.T) {
 	ctx := context.Background()
 	sqlDB, err := Open(filepath.Join(t.TempDir(), "x.sqlite"))
 	if err != nil {

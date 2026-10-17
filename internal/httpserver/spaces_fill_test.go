@@ -65,7 +65,7 @@ func spaceCount(t *testing.T, a *testApp) int {
 	return len(all)
 }
 
-func TestCreateSpaceWithNameOnlyIsEmpty(t *testing.T) {
+func TestCreateSpaceWithNameOnlyEmpty(t *testing.T) {
 	a := newTestApp(t)
 	ctx := context.Background()
 	owner := a.createUser("o@test.com", "secret1", auth.RoleUser)
@@ -86,7 +86,7 @@ func TestCreateSpaceWithNameOnlyIsEmpty(t *testing.T) {
 	}
 }
 
-func TestCreateSpaceWithNameOnlyOverHTTP(t *testing.T) {
+func TestCreateSpaceNameOnlyOverHTTP(t *testing.T) {
 	a := newTestApp(t)
 	sess := a.issue(a.createUser("o@test.com", "secret1", auth.RoleUser), false)
 	res := a.do("POST", "/api/spaces", map[string]any{"name": "Plain"}, sess.Token, sess.CSRF)
@@ -176,7 +176,7 @@ func TestCreateSpaceFilledBuildsEverything(t *testing.T) {
 	}
 }
 
-func TestCreateSpaceKeepsTheDefaultsTheRequestNames(t *testing.T) {
+func TestCreateSpaceKeepsDefaultsRequestNames(t *testing.T) {
 	a := newTestApp(t)
 	a.svc.Rates = fixedRates{"EUR": "1"}
 	ctx := context.Background()
@@ -203,7 +203,7 @@ func TestCreateSpaceKeepsTheDefaultsTheRequestNames(t *testing.T) {
 	}
 }
 
-func TestCreateSpaceRefusesBadInputBeforeCreatingAnything(t *testing.T) {
+func TestCreateSpaceRefusesBadInputEarly(t *testing.T) {
 	a := newTestApp(t)
 	a.svc.Rates = fixedRates{"USD": "1", "EUR": "1"}
 	owner := a.createUser("o@test.com", "secret1", auth.RoleUser)
@@ -231,7 +231,7 @@ func TestCreateSpaceRefusesBadInputBeforeCreatingAnything(t *testing.T) {
 	}
 }
 
-func TestCreateSpaceEnforcesGuestAndLimit(t *testing.T) {
+func TestCreateSpaceEnforcesGuestLimit(t *testing.T) {
 	a := newTestApp(t)
 	a.svc.Rates = fixedRates{"EUR": "1"}
 	ctx := context.Background()
@@ -256,7 +256,7 @@ func TestCreateSpaceEnforcesGuestAndLimit(t *testing.T) {
 	}
 }
 
-func TestCreateSpaceFailureInTheMiddleLeavesNoSpace(t *testing.T) {
+func TestCreateSpaceFailureLeavesNothing(t *testing.T) {
 	a := newTestApp(t)
 	// ZZZ is well formed but not in the catalog: it fails after the base exists.
 	a.svc.Rates = fixedRates{"USD": "1", "EUR": "1"}
@@ -291,7 +291,7 @@ func TestCreateSpaceFailureInTheMiddleLeavesNoSpace(t *testing.T) {
 	}
 }
 
-func TestCreateSpaceRefusesAForeignCurrencyWithoutARate(t *testing.T) {
+func TestCreateSpaceRefusesCurrencyWithoutRate(t *testing.T) {
 	a := newTestApp(t)
 	a.svc.Rates = fixedRates{"EUR": "1", "USD": "1.1", "JPY": "0"}
 	ctx := context.Background()
@@ -309,7 +309,9 @@ func TestCreateSpaceRefusesAForeignCurrencyWithoutARate(t *testing.T) {
 
 	// A base without a known rate is fine: its rate is 1 by definition.
 	a.svc.Rates = fixedRates{"JPY": "0", "EUR": "0.006"}
-	if _, err := a.spaceCreator().Create(ctx, "Yen base", owner, spacefill.Fill{BaseCurrency: "JPY", Currencies: []string{"EUR"}}); err != nil {
+	if _,
+		err := a.spaceCreator().Create(ctx, "Yen base", owner,
+		spacefill.Fill{BaseCurrency: "JPY", Currencies: []string{"EUR"}}); err != nil {
 		t.Fatal(err)
 	}
 }

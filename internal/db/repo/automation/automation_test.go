@@ -18,7 +18,7 @@ func rule(name, trigger string, priority int, active bool) automationrepo.Fields
 	}
 }
 
-func TestRulesAreListedByPriorityAndFiltered(t *testing.T) {
+func TestRulesAreListedByPriorityFiltered(t *testing.T) {
 	r := automationrepo.Repo{DB: dbtest.Space(t)}
 	now := time.Now().UTC()
 	late, err := r.Insert(ctx, rule("late", "on_transaction_create", 90, true), now)

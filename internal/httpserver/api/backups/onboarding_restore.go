@@ -21,13 +21,7 @@ var errBackupWithoutUsers = errors.New("restore: the backup has no users")
 // server, which also drops every session, so nobody is logged in afterwards.
 // A failed restore leaves the password valid.
 func (h Handler) onboardingRestore(w http.ResponseWriter, r *http.Request) {
-	n, err := h.Users.Count(r.Context())
-	if err != nil {
-		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if n > 0 || !h.Bootstrap.Active() {
-		httpx.WriteMessage(w, http.StatusForbidden, "Restoring is closed.")
+	if !h.restoreOpen(w, r) {
 		return
 	}
 	// The upload can be gigabytes: refuse a wrong password before reading it.
@@ -40,7 +34,7 @@ func (h Handler) onboardingRestore(w http.ResponseWriter, r *http.Request) {
 	defer r.MultipartForm.RemoveAll()
 	password := r.FormValue("bootstrap_password")
 	if h.Bootstrap.Verify(password) != nil {
-		httpx.WriteValidation(w, map[string][]string{"bootstrap_password": {"The bootstrap password is missing or wrong."}})
+		writeWrongPassword(w)
 		return
 	}
 	tmp, name, ok := backupx.ReceiveUpload(w, r, h.BackupsDir, backupx.MaxServerUpload)
@@ -51,26 +45,58 @@ func (h Handler) onboardingRestore(w http.ResponseWriter, r *http.Request) {
 
 	// A restore that fails has not spent the password; Register keeps it valid.
 	var saved string
-	err = h.Bootstrap.Register(password, func() error {
+	err := h.Bootstrap.Register(password, func() error {
 		var err error
-		if saved, err = h.restoreFirstRun(r, tmp, name); err != nil {
+		saved, err = h.restoreFirstRun(r, tmp, name)
+		if err != nil {
 			return err
 		}
-		// A backup without users would leave a server nobody can log in to.
-		if n, err := h.Users.Count(r.Context()); err != nil {
-			return err
-		} else if n == 0 {
-			return errBackupWithoutUsers
-		}
-		return nil
+		return h.requireUsers(r)
 	})
 	if err != nil && saved != "" {
 		// The backup was only needed for this restore.
 		_ = h.Backups.DeleteServer(saved)
 	}
+	writeRestoreResult(w, err)
+}
+
+// restoreOpen reports whether restoring is allowed, and answers if it is not.
+func (h Handler) restoreOpen(w http.ResponseWriter, r *http.Request) bool {
+	n, err := h.Users.Count(r.Context())
+	if err != nil {
+		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
+		return false
+	}
+	if n > 0 || !h.Bootstrap.Active() {
+		httpx.WriteMessage(w, http.StatusForbidden, "Restoring is closed.")
+		return false
+	}
+	return true
+}
+
+// requireUsers fails when the restored server has no users: nobody could log
+// in to it.
+func (h Handler) requireUsers(r *http.Request) error {
+	n, err := h.Users.Count(r.Context())
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return errBackupWithoutUsers
+	}
+	return nil
+}
+
+func writeWrongPassword(w http.ResponseWriter) {
+	httpx.WriteValidation(w, map[string][]string{
+		"bootstrap_password": {"The bootstrap password is missing or wrong."},
+	})
+}
+
+func writeRestoreResult(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, firstrun.ErrWrongPassword):
-		httpx.WriteValidation(w, map[string][]string{"bootstrap_password": {"The bootstrap password is missing or wrong."}})
+		writeWrongPassword(w)
 	case errors.Is(err, firstrun.ErrClosed):
 		httpx.WriteMessage(w, http.StatusForbidden, "Restoring is closed.")
 	case errors.Is(err, errBackupWithoutUsers):

@@ -25,7 +25,7 @@ func configIn(t *testing.T, dir string) string {
 	return path
 }
 
-func TestBuildCreatesTheDataDirectoriesAndServices(t *testing.T) {
+func TestBuildCreatesTheDataDirectoriesServices(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
 	p, err := NewBuilder(appconfig.Build{Version: "test"}).ConfigFile(configIn(t, dir)).Build(ctx)
@@ -56,7 +56,7 @@ func TestBuildCreatesTheDataDirectoriesAndServices(t *testing.T) {
 	}
 }
 
-func TestRestartKeepsTheSigningKeyAndTheFirstRunPassword(t *testing.T) {
+func TestRestartKeepsSigningKeyPassword(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
 	cfgPath := configIn(t, dir)
@@ -105,7 +105,7 @@ func TestRestartRefusesAMissingSigningKey(t *testing.T) {
 	}
 }
 
-func TestBuildReportsAnUnreadableConfigAndSeedFile(t *testing.T) {
+func TestBuildReportsUnreadableConfigSeedFile(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
 	bad := filepath.Join(dir, "bad.toml")
@@ -116,7 +116,9 @@ func TestBuildReportsAnUnreadableConfigAndSeedFile(t *testing.T) {
 		!strings.Contains(err.Error(), "load config") {
 		t.Errorf("broken config: %v", err)
 	}
-	if _, err := NewBuilder(appconfig.Build{}).ConfigFile(configIn(t, dir)).SeedFile(filepath.Join(dir, "missing.toml")).Build(ctx); err == nil ||
+	if _,
+		err := NewBuilder(appconfig.Build{}).ConfigFile(configIn(t, dir)).SeedFile(filepath.Join(dir,
+		"missing.toml")).Build(ctx); err == nil ||
 		!strings.Contains(err.Error(), "seed") {
 		t.Errorf("missing seed file: %v", err)
 	}

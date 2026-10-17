@@ -86,7 +86,8 @@ func TestProbeRunsTheWholeFlow(t *testing.T) {
 	if err := newProbe(f, &out).run(context.Background(), 0, 5*time.Second); err != nil {
 		t.Fatalf("run: %v\n%s", err, out.String())
 	}
-	for _, want := range []string{"registered client c1", "a spent code is refused", "returned 2 tools", "refreshed token works"} {
+	for _, want := range []string{"registered client c1", "a spent code is refused", "returned 2 tools",
+		"refreshed token works"} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("output lacks %q:\n%s", want, out.String())
 		}

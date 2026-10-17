@@ -10,7 +10,7 @@ import (
 	"savvy-go/internal/auth/totp"
 )
 
-func TestTwoFactorEnableConfirmLoginAndRecovery(t *testing.T) {
+func TestTwoFactorEnableConfirmLoginRecovery(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("otp@test.com", "secret1", roleEditor)
 	iss := a.issue(u, false)
@@ -97,7 +97,9 @@ func twoFactorUser(t *testing.T, a *testApp) (secret string, challenge func() st
 	t.Helper()
 	u := a.createUser("otp@test.com", "secret1", roleEditor)
 	secret = "JBSWY3DPEHPK3PXP"
-	if _, err := a.db.Exec(`UPDATE users SET two_factor_enabled = 1, two_factor_confirmed = 1, two_factor_secret = ? WHERE id = ?`, secret, u.ID); err != nil {
+	if _,
+		err := a.db.Exec(`UPDATE users SET two_factor_enabled = 1, two_factor_confirmed = 1, two_factor_secret = ? WHERE id `+
+		`= ?`, secret, u.ID); err != nil {
 		t.Fatal(err)
 	}
 	return secret, func() string {
@@ -140,7 +142,7 @@ func TestTwoFactorChallengeAllowsFiveGuesses(t *testing.T) {
 	res.Body.Close()
 }
 
-func TestTwoFactorRightCodeOnFourthTry(t *testing.T) {
+func TestTwoFactorRightCodeFourthTry(t *testing.T) {
 	a := newTestApp(t)
 	secret, challenge := twoFactorUser(t, a)
 	tok := challenge()
@@ -154,7 +156,7 @@ func TestTwoFactorRightCodeOnFourthTry(t *testing.T) {
 	res.Body.Close()
 }
 
-func TestTwoFactorFailuresMakeTheAccountWait(t *testing.T) {
+func TestTwoFactorFailuresMakeAccountWait(t *testing.T) {
 	// Many sign-ins here: only the 2FA lockout is under test, so the sign-in limits are off.
 	a := newTestApp(t, WithConfig(testFile("[security]\nip_rate_limit = 0\naccount_rate_limit = 0\n")))
 	secret, challenge := twoFactorUser(t, a)
@@ -171,7 +173,9 @@ func TestTwoFactorFailuresMakeTheAccountWait(t *testing.T) {
 	}
 
 	// After the delay a right code signs in, and that clears the count.
-	if _, err := a.db.Exec(`UPDATE two_factor_failures SET locked_until = ?`, time.Now().Add(-time.Second).UTC().Format(time.RFC3339Nano)); err != nil {
+	if _,
+		err := a.db.Exec(`UPDATE two_factor_failures SET locked_until = ?`,
+		time.Now().Add(-time.Second).UTC().Format(time.RFC3339Nano)); err != nil {
 		t.Fatal(err)
 	}
 	ok := verify2FA(a, challenge(), totp.Now(secret))
@@ -187,7 +191,7 @@ func TestTwoFactorFailuresMakeTheAccountWait(t *testing.T) {
 }
 
 // Two requests that answer one challenge at the same moment get one session.
-func TestTwoFactorChallengeGivesOneSessionWhenRequestsRace(t *testing.T) {
+func TestTwoFactorChallengeOneSessionRace(t *testing.T) {
 	a := newTestApp(t)
 	secret, challenge := twoFactorUser(t, a)
 	tok := challenge()

@@ -22,7 +22,7 @@ func (f *fakeSource) Rates(_ context.Context, base string) (map[string]decimal.D
 	return f.rates, f.err
 }
 
-func TestUpdateRatesSetsEveryNonBaseCurrency(t *testing.T) {
+func TestUpdateRatesSetsNonBaseCurrencies(t *testing.T) {
 	e := newMoneyEnv(t) // USD (base), JPY at 0.01, BTC at 50000
 	src := &fakeSource{rates: map[string]decimal.Decimal{
 		"USD": dec("1"), "JPY": dec("0.0066"), "BTC": dec("65000.5"), "EUR": dec("1.1"),
@@ -46,7 +46,7 @@ func TestUpdateRatesSetsEveryNonBaseCurrency(t *testing.T) {
 	}
 }
 
-func TestUpdateRatesSkipsCurrenciesWithoutAValidRate(t *testing.T) {
+func TestUpdateRatesSkipsInvalidRates(t *testing.T) {
 	e := newMoneyEnv(t)
 	src := &fakeSource{rates: map[string]decimal.Decimal{"JPY": dec("0.0066"), "BTC": decimal.Zero}}
 	curs := Currencies{DB: e.db, Source: src}
@@ -75,7 +75,7 @@ func TestUpdateRatesFailsWithoutLiveRates(t *testing.T) {
 	}
 }
 
-func TestCatalogOffersOnlyCurrenciesTheSpaceLacks(t *testing.T) {
+func TestCatalogOffersOnlyCurrenciesSpaceLacks(t *testing.T) {
 	e := newMoneyEnv(t)
 	src := &fakeSource{catalog: []Currency{
 		{Code: "USD", Name: "US Dollar", Symbol: "$", Decimals: 2, Rate: dec("1")},
@@ -93,19 +93,19 @@ func TestCatalogOffersOnlyCurrenciesTheSpaceLacks(t *testing.T) {
 	}
 }
 
-func TestFindOrCreateByCodeTakesTheCatalogRate(t *testing.T) {
+func TestFindCreateCodeTakesCatalogRate(t *testing.T) {
 	e := newMoneyEnv(t)
 	src := &fakeSource{catalog: []Currency{{Code: "EUR", Name: "Euro", Symbol: "€", Decimals: 2, Rate: dec("1.1")}}}
 	curs := Currencies{DB: e.db, Source: src}
-	got, err := curs.FindOrCreateByCode(e.ctx, "eur")
+	got, err := curs.EnsureByCode(e.ctx, "eur")
 	if err != nil || got.Code != "EUR" || !got.Rate.Equal(dec("1.1")) || got.IsBase {
 		t.Fatalf("created %+v, %v", got, err)
 	}
-	again, err := curs.FindOrCreateByCode(e.ctx, "EUR")
+	again, err := curs.EnsureByCode(e.ctx, "EUR")
 	if err != nil || again.ID != got.ID {
 		t.Fatalf("a second call must find it: %+v %v", again, err)
 	}
-	if _, err := curs.FindOrCreateByCode(e.ctx, "XXX"); err == nil {
+	if _, err := curs.EnsureByCode(e.ctx, "XXX"); err == nil {
 		t.Fatal("a code the catalog does not have must be refused")
 	}
 }

@@ -40,7 +40,7 @@ func forEachBase(t *testing.T, fn func(t *testing.T, base moneytest.Currency)) {
 	moneytest.ForEach(t, fn)
 }
 
-func TestBudgetSpentIsConvertedIntoTheBudgetCurrency(t *testing.T) {
+func TestBudgetSpentConvertedIntoBudgetCurrency(t *testing.T) {
 	forEachBase(t, func(t *testing.T, budgetCur moneytest.Currency) {
 		e := newMatrixEnv(t, moneytest.Currencies[0])
 		b := e.stored(budgetCur)
@@ -72,7 +72,7 @@ func TestBudgetSpentIsConvertedIntoTheBudgetCurrency(t *testing.T) {
 	})
 }
 
-func TestBudgetOfMaximumAmountHasNoOverflow(t *testing.T) {
+func TestBudgetMaximumAmountHasNoOverflow(t *testing.T) {
 	forEachBase(t, func(t *testing.T, c moneytest.Currency) {
 		e := newMatrixEnv(t, moneytest.Currencies[0])
 		cur := e.stored(c)
@@ -93,7 +93,7 @@ func TestBudgetOfMaximumAmountHasNoOverflow(t *testing.T) {
 	})
 }
 
-func TestCurrencyDecimalsAndRatesAreRangeChecked(t *testing.T) {
+func TestCurrencyDecimalsRatesAreRangeChecked(t *testing.T) {
 	e := newMatrixEnv(t, moneytest.Currencies[0])
 	curs := Currencies{DB: e.db}
 	mk := func(code string, decimals int, rate string) error {

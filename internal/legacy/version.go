@@ -13,7 +13,8 @@ import (
 const LatestMigration = "2026_09_09_180000_restore_fractional_transaction_item_quantity"
 
 var ErrUnsupportedVersion = errors.New(
-	"laravel database is older than the supported version; update the Laravel app to its latest version and create a new backup",
+	"laravel database is older than the supported version; update the Laravel app to its latest version and " +
+		"create a new backup",
 )
 
 // ErrNotLaravel is returned for a file that is not a Laravel database.
@@ -25,7 +26,8 @@ func checkVersion(ctx context.Context, db *sql.DB) error {
 		return ErrNotLaravel
 	}
 	var found int
-	if err := db.QueryRowContext(ctx, `SELECT 1 FROM migrations WHERE migration = ? LIMIT 1`, LatestMigration).Scan(&found); err != nil {
+	if err := db.QueryRowContext(ctx, `SELECT 1 FROM migrations WHERE migration = ? LIMIT 1`,
+		LatestMigration).Scan(&found); err != nil {
 		return ErrUnsupportedVersion
 	}
 	return nil

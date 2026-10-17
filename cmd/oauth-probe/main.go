@@ -12,7 +12,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -24,8 +23,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
-	"runtime"
 	"strings"
 	"time"
 )
@@ -74,39 +71,17 @@ type tokens struct {
 func (p *probe) pass(format string, a ...any) { fmt.Fprintf(p.out, "PASS  "+format+"\n", a...) }
 
 func (p *probe) run(ctx context.Context, port int, wait time.Duration) error {
-	var meta metadata
-	if err := p.getJSON(ctx, p.server+"/.well-known/oauth-authorization-server", &meta); err != nil {
-		return fmt.Errorf("discovery: %w", err)
+	meta, err := p.discover(ctx)
+	if err != nil {
+		return err
 	}
-	if meta.Issuer != p.server {
-		return fmt.Errorf(
-			"discovery: issuer is %q but you asked for %q; set app_url to the address you use",
-			meta.Issuer,
-			p.server,
-		)
-	}
-	p.pass("discovery, issuer %s", meta.Issuer)
-	if meta.RegistrationEndpoint == "" {
-		return errors.New("registration is closed: open it in Administration → Security, then run again")
-	}
-
 	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
 	if err != nil {
 		return err
 	}
 	redirect := "http://" + ln.Addr().String() + "/callback"
 	callbacks := make(chan url.Values, 1)
-	srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/callback" {
-			http.NotFound(w, r)
-			return
-		}
-		fmt.Fprintln(w, "You can close this tab and go back to the terminal.")
-		select {
-		case callbacks <- r.URL.Query():
-		default:
-		}
-	})}
+	srv := &http.Server{Handler: callbackHandler(callbacks)}
 	go srv.Serve(ln)
 	defer srv.Close()
 
@@ -121,9 +96,72 @@ func (p *probe) run(ctx context.Context, port int, wait time.Duration) error {
 	p.pass("registered client %s for %s", reg.ClientID, redirect)
 
 	verifier, state := randomString(32), randomString(16)
+	p.announce(meta, reg.ClientID, redirect, verifier, state)
+	code, err := awaitCode(ctx, callbacks, state, wait)
+	if err != nil {
+		return err
+	}
+	p.pass("redirect received with code and matching state")
+
+	codeForm := url.Values{
+		"grant_type": {"authorization_code"}, "client_id": {reg.ClientID}, "code": {code},
+		"code_verifier": {verifier}, "redirect_uri": {redirect},
+	}
+	var t tokens
+	err = p.postForm(ctx, meta.TokenEndpoint, codeForm, &t)
+	if err != nil || t.AccessToken == "" || t.RefreshToken == "" {
+		return fmt.Errorf("token exchange: %v", orMissing(err, "missing tokens"))
+	}
+	p.pass("code exchanged, access token expires in %ds, scope %q", t.ExpiresIn, t.Scope)
+
+	var again tokens
+	if err := p.postForm(ctx, meta.TokenEndpoint, codeForm, &again); err == nil {
+		return errors.New("the same code was accepted twice")
+	}
+	p.pass("a spent code is refused")
+	return p.verifyTokens(ctx, meta, reg.ClientID, t)
+}
+
+// discover fetches the server metadata and checks it is usable by the probe.
+func (p *probe) discover(ctx context.Context) (metadata, error) {
+	var meta metadata
+	if err := p.getJSON(ctx, p.server+"/.well-known/oauth-authorization-server", &meta); err != nil {
+		return meta, fmt.Errorf("discovery: %w", err)
+	}
+	if meta.Issuer != p.server {
+		return meta, fmt.Errorf(
+			"discovery: issuer is %q but you asked for %q; set app_url to the address you use",
+			meta.Issuer,
+			p.server,
+		)
+	}
+	p.pass("discovery, issuer %s", meta.Issuer)
+	if meta.RegistrationEndpoint == "" {
+		return meta, errors.New("registration is closed: open it in Administration → Security, then run again")
+	}
+	return meta, nil
+}
+
+// callbackHandler hands the query of the /callback redirect to callbacks.
+func callbackHandler(callbacks chan<- url.Values) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/callback" {
+			http.NotFound(w, r)
+			return
+		}
+		fmt.Fprintln(w, "You can close this tab and go back to the terminal.")
+		select {
+		case callbacks <- r.URL.Query():
+		default:
+		}
+	})
+}
+
+// announce prints the authorization address and opens it when it can.
+func (p *probe) announce(meta metadata, clientID, redirect, verifier, state string) {
 	sum := sha256.Sum256([]byte(verifier))
 	authURL := meta.AuthorizationEndpoint + "?" + url.Values{
-		"response_type": {"code"}, "client_id": {reg.ClientID}, "redirect_uri": {redirect},
+		"response_type": {"code"}, "client_id": {clientID}, "redirect_uri": {redirect},
 		"code_challenge": {base64.RawURLEncoding.EncodeToString(sum[:])}, "code_challenge_method": {"S256"},
 		"state": {state}, "resource": {p.server + "/mcp"},
 	}.Encode()
@@ -131,44 +169,33 @@ func (p *probe) run(ctx context.Context, port int, wait time.Duration) error {
 	if p.open != nil {
 		p.open(authURL)
 	}
+}
 
+// awaitCode waits for the redirect and returns its code once the state matches.
+func awaitCode(ctx context.Context, callbacks <-chan url.Values, state string, wait time.Duration) (string, error) {
 	var q url.Values
 	select {
 	case q = <-callbacks:
 	case <-time.After(wait):
-		return errors.New("no redirect arrived: did you press Allow access?")
+		return "", errors.New("no redirect arrived: did you press Allow access?")
 	case <-ctx.Done():
-		return ctx.Err()
+		return "", ctx.Err()
 	}
 	if e := q.Get("error"); e != "" {
-		return fmt.Errorf("authorization refused: %s %s", e, q.Get("error_description"))
+		return "", fmt.Errorf("authorization refused: %s %s", e, q.Get("error_description"))
 	}
 	if q.Get("state") != state {
-		return errors.New("redirect came back with a different state")
+		return "", errors.New("redirect came back with a different state")
 	}
 	if q.Get("code") == "" {
-		return errors.New("redirect carried no code")
+		return "", errors.New("redirect carried no code")
 	}
-	p.pass("redirect received with code and matching state")
+	return q.Get("code"), nil
+}
 
-	var t tokens
-	if err := p.postForm(ctx, meta.TokenEndpoint, url.Values{
-		"grant_type": {"authorization_code"}, "client_id": {reg.ClientID}, "code": {q.Get("code")},
-		"code_verifier": {verifier}, "redirect_uri": {redirect},
-	}, &t); err != nil || t.AccessToken == "" || t.RefreshToken == "" {
-		return fmt.Errorf("token exchange: %v", orMissing(err, "missing tokens"))
-	}
-	p.pass("code exchanged, access token expires in %ds, scope %q", t.ExpiresIn, t.Scope)
-
-	var again tokens
-	if err := p.postForm(ctx, meta.TokenEndpoint, url.Values{
-		"grant_type": {"authorization_code"}, "client_id": {reg.ClientID}, "code": {q.Get("code")},
-		"code_verifier": {verifier}, "redirect_uri": {redirect},
-	}, &again); err == nil {
-		return errors.New("the same code was accepted twice")
-	}
-	p.pass("a spent code is refused")
-
+// verifyTokens proves the access token works on /mcp, then does the same
+// for the token a refresh gives.
+func (p *probe) verifyTokens(ctx context.Context, meta metadata, clientID string, t tokens) error {
 	n, err := p.listTools(ctx, t.AccessToken)
 	if err != nil {
 		return fmt.Errorf("mcp: %w", err)
@@ -177,7 +204,7 @@ func (p *probe) run(ctx context.Context, port int, wait time.Duration) error {
 
 	var next tokens
 	if err := p.postForm(ctx, meta.TokenEndpoint, url.Values{
-		"grant_type": {"refresh_token"}, "client_id": {reg.ClientID}, "refresh_token": {t.RefreshToken},
+		"grant_type": {"refresh_token"}, "client_id": {clientID}, "refresh_token": {t.RefreshToken},
 	}, &next); err != nil || next.AccessToken == "" {
 		return fmt.Errorf("refresh: %v", orMissing(err, "missing tokens"))
 	}
@@ -222,63 +249,4 @@ func (p *probe) listTools(ctx context.Context, access string) (int, error) {
 		return 0, errors.New(out.Error.Message)
 	}
 	return len(out.Result.Tools), nil
-}
-
-func (p *probe) getJSON(ctx context.Context, u string, into any) error {
-	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
-	return p.do(req, into)
-}
-
-func (p *probe) postJSON(ctx context.Context, u string, body, into any) error {
-	b, _ := json.Marshal(body)
-	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewReader(b))
-	req.Header.Set("Content-Type", "application/json")
-	return p.do(req, into)
-}
-
-func (p *probe) postForm(ctx context.Context, u string, form url.Values, into any) error {
-	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, u, strings.NewReader(form.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	return p.do(req, into)
-}
-
-func (p *probe) do(req *http.Request, into any) error {
-	resp, err := p.http.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-	if resp.StatusCode/100 != 2 {
-		return fmt.Errorf("status %d: %s", resp.StatusCode, strings.TrimSpace(string(raw)))
-	}
-	return json.Unmarshal(raw, into)
-}
-
-func orMissing(err error, what string) error {
-	if err != nil {
-		return err
-	}
-	return errors.New(what)
-}
-
-func randomString(n int) string {
-	b := make([]byte, n)
-	if _, err := rand.Read(b); err != nil {
-		panic(err)
-	}
-	return base64.RawURLEncoding.EncodeToString(b)
-}
-
-func openBrowser(u string) {
-	var cmd *exec.Cmd
-	switch runtime.GOOS {
-	case "windows":
-		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", u)
-	case "darwin":
-		cmd = exec.Command("open", u)
-	default:
-		cmd = exec.Command("xdg-open", u)
-	}
-	_ = cmd.Start()
 }

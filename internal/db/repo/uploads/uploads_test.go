@@ -56,7 +56,7 @@ func TestUploadRoundTripKeepsOptionalFields(t *testing.T) {
 	}
 }
 
-func TestOnlyPendingUploadsPastTheirTimeExpire(t *testing.T) {
+func TestOnlyPendingUploadsPastTimeExpire(t *testing.T) {
 	ctx := context.Background()
 	r, user := newRepo(t)
 	now := time.Now().UTC()
@@ -71,7 +71,7 @@ func TestOnlyPendingUploadsPastTheirTimeExpire(t *testing.T) {
 	}
 }
 
-func TestUsageSumsBytesPerBucketAndStatus(t *testing.T) {
+func TestUsageSumsBytesPerBucketStatus(t *testing.T) {
 	ctx := context.Background()
 	r, user := newRepo(t)
 	now := time.Now().UTC().Add(time.Hour)

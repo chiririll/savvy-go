@@ -9,16 +9,16 @@ func TestDummyNeverVerifies(t *testing.T) {
 	h, _ := Hash("s3cret")
 	empty := ""
 	for name, got := range map[string]bool{
-		"no hash":     CheckOrBurn(nil, "s3cret"),
-		"empty hash":  CheckOrBurn(&empty, "s3cret"),
-		"empty plain": CheckOrBurn(&h, ""),
-		"wrong plain": CheckOrBurn(&h, "S3cret"),
+		"no hash":     CheckConstantTime(nil, "s3cret"),
+		"empty hash":  CheckConstantTime(&empty, "s3cret"),
+		"empty plain": CheckConstantTime(&h, ""),
+		"wrong plain": CheckConstantTime(&h, "S3cret"),
 	} {
 		if got {
 			t.Errorf("%s verified", name)
 		}
 	}
-	if !CheckOrBurn(&h, "s3cret") {
+	if !CheckConstantTime(&h, "s3cret") {
 		t.Error("the right password must still verify")
 	}
 }

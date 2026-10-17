@@ -168,7 +168,7 @@ func TestAPITokensDeletedWithUser(t *testing.T) {
 	}
 }
 
-func TestAPITokenRevokeAndListAreScopedToOwner(t *testing.T) {
+func TestAPITokenRevokeListScopedOwner(t *testing.T) {
 	a := newTestApp(t)
 	alice := a.createUser("alice@a.com", "secret1", roleEditor)
 	bob := a.createUser("bob@a.com", "secret1", roleEditor)
@@ -253,7 +253,7 @@ func TestAPITokenStoreValidation(t *testing.T) {
 	}
 }
 
-func TestAPITokenGrantAndFutureExpiry(t *testing.T) {
+func TestAPITokenGrantFutureExpiry(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("rw@a.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
@@ -300,7 +300,9 @@ func TestAPITokenLimit(t *testing.T) {
 		422,
 		"over limit",
 	)
-	if _, _, err := a.svc.APITokens.Issue(context.Background(), u, "x", auth.Grant{Permissions: allPerms(permissions.Read), AllSpaces: true}, nil); err != auth.ErrTokenLimit {
+	if _, _,
+		err := a.svc.APITokens.Issue(context.Background(), u, "x",
+		auth.Grant{Permissions: allPerms(permissions.Read), AllSpaces: true}, nil); err != auth.ErrTokenLimit {
 		t.Fatalf("issue over limit: %v", err)
 	}
 }
@@ -376,7 +378,7 @@ func TestUnusableBearerCredentialsAreRejected(t *testing.T) {
 
 // Managing credentials, backups and the server is for people in a session: an API token is
 // refused there, whoever it belongs to and however much it may do elsewhere.
-func TestAPITokensAreRefusedOnSessionOnlyRoutes(t *testing.T) {
+func TestAPITokensRefusedSessionOnlyRoutes(t *testing.T) {
 	a := newTestApp(t)
 	admin := a.createUser("admin@a.com", "secret1", auth.RoleAdmin)
 	raw, _ := a.issueToken(admin, tokReadWrite, nil)

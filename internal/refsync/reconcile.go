@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"slices"
-	"strings"
 	"time"
 
 	"savvy-go/internal/auth"
@@ -329,146 +328,7 @@ func (s Service) Apply(ctx context.Context, actor *auth.User, p Plan) (*Group, e
 
 // --- finding the differences -------------------------------------------------
 
-func lower(s string) string { return strings.ToLower(s) }
-
-func sameText(a, b *string) bool {
-	x, y := "", ""
-	if a != nil {
-		x = *a
-	}
-	if b != nil {
-		y = *b
-	}
-	return x == y
-}
-
-func diffSpaces(ctx context.Context, dbs map[int64]store.DB, members []int64, kinds []Kind) (Diff, error) {
-	var out Diff
-	for _, k := range kinds {
-		switch k {
-		case Categories:
-			conflicts, defaults, err := diffCategories(ctx, dbs, members)
-			if err != nil {
-				return Diff{}, err
-			}
-			out.Categories, out.Defaults = conflicts, defaults
-		case Tags:
-			conflicts, err := diffTags(ctx, dbs, members)
-			if err != nil {
-				return Diff{}, err
-			}
-			out.Tags = conflicts
-		}
-	}
-	return out, nil
-}
-
-func diffCategories(
-	ctx context.Context,
-	dbs map[int64]store.DB,
-	members []int64,
-) ([]CategoryConflict, []DefaultConflict, error) {
-	type key struct{ typ, name string }
-	states := map[key][]CategoryState{}
-	names := map[key]string{}
-	defaults := map[string]map[int64]string{} // type -> space -> default name
-	for _, id := range members {
-		list, err := (ledger.Categories{DB: dbs[id]}).All(ctx, "")
-		if err != nil {
-			return nil, nil, err
-		}
-		for _, c := range list {
-			k := key{c.Type, lower(c.Name)}
-			if _, ok := names[k]; !ok {
-				names[k] = c.Name
-			}
-			states[k] = append(
-				states[k],
-				CategoryState{Space: id, Icon: c.Icon, Color: c.Color, IsDefault: c.IsDefault, Transactions: c.TransactionsCount},
-			)
-			if defaults[c.Type] == nil {
-				defaults[c.Type] = map[int64]string{}
-			}
-			if c.IsDefault {
-				defaults[c.Type][id] = c.Name
-			}
-		}
-	}
-	var conflicts []CategoryConflict
-	for k, present := range states {
-		var missing []int64
-		for _, id := range members {
-			if !slices.ContainsFunc(present, func(s CategoryState) bool { return s.Space == id }) {
-				missing = append(missing, id)
-			}
-		}
-		differs := false
-		for _, s := range present[1:] {
-			if !sameText(s.Icon, present[0].Icon) || !sameText(s.Color, present[0].Color) {
-				differs = true
-			}
-		}
-		if len(missing) > 0 || differs {
-			conflicts = append(conflicts, CategoryConflict{Type: k.typ, Name: names[k], Present: present, Missing: missing})
-		}
-	}
-	slices.SortFunc(conflicts, func(a, b CategoryConflict) int {
-		return strings.Compare(a.Type+"\x00"+lower(a.Name), b.Type+"\x00"+lower(b.Name))
-	})
-
-	var conflictsOfDefault []DefaultConflict
-	for typ, bySpace := range defaults {
-		seen := map[string]bool{}
-		full := map[int64]string{}
-		for _, id := range members {
-			full[id] = bySpace[id]
-			seen[lower(bySpace[id])] = true
-		}
-		if len(seen) > 1 {
-			conflictsOfDefault = append(conflictsOfDefault, DefaultConflict{Type: typ, Defaults: full})
-		}
-	}
-	slices.SortFunc(conflictsOfDefault, func(a, b DefaultConflict) int { return strings.Compare(a.Type, b.Type) })
-	return conflicts, conflictsOfDefault, nil
-}
-
-func diffTags(ctx context.Context, dbs map[int64]store.DB, members []int64) ([]TagConflict, error) {
-	states := map[string][]TagState{}
-	names := map[string]string{}
-	for _, id := range members {
-		list, err := (ledger.Tags{DB: dbs[id]}).All(ctx)
-		if err != nil {
-			return nil, err
-		}
-		for _, t := range list {
-			k := lower(t.Name)
-			if _, ok := names[k]; !ok {
-				names[k] = t.Name
-			}
-			states[k] = append(states[k], TagState{Space: id, Transactions: t.TransactionsCount})
-		}
-	}
-	var out []TagConflict
-	for k, present := range states {
-		var missing []int64
-		for _, id := range members {
-			if !slices.ContainsFunc(present, func(s TagState) bool { return s.Space == id }) {
-				missing = append(missing, id)
-			}
-		}
-		if len(missing) > 0 {
-			out = append(out, TagConflict{Name: names[k], Present: present, Missing: missing})
-		}
-	}
-	slices.SortFunc(out, func(a, b TagConflict) int { return strings.Compare(lower(a.Name), lower(b.Name)) })
-	return out, nil
-}
-
 // --- carrying out the decisions ----------------------------------------------
-
-func decisionKey(kind Kind, typ, name string) string {
-	return string(kind) + "\x00" + typ + "\x00" + lower(name)
-}
 
 // reconciler carries what the phases of reconcileSpaces share.
 type reconciler struct {
@@ -554,7 +414,9 @@ func (r reconciler) createKept(ctx context.Context) error {
 			return err
 		}
 		for _, id := range c.Missing {
-			if _, err := r.cats(id).Create(ctx, ledger.Category{Name: c.Name, Type: c.Type, Icon: win.Icon, Color: win.Color}); err != nil {
+			if _,
+				err := r.cats(id).Create(ctx,
+				ledger.Category{Name: c.Name, Type: c.Type, Icon: win.Icon, Color: win.Color}); err != nil {
 				return err
 			}
 		}
@@ -566,7 +428,10 @@ func (r reconciler) createKept(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
-			if _, err := r.cats(s.Space).Update(ctx, cur.ID, ledger.Category{Name: cur.Name, Type: cur.Type, Icon: win.Icon, Color: win.Color, IsDefault: cur.IsDefault}); err != nil {
+			if _,
+				err := r.cats(s.Space).Update(ctx, cur.ID,
+				ledger.Category{Name: cur.Name, Type: cur.Type, Icon: win.Icon, Color: win.Color,
+					IsDefault: cur.IsDefault}); err != nil {
 				return err
 			}
 		}

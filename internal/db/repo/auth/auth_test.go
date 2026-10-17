@@ -46,7 +46,7 @@ func TestMissingRowsAreNilNotErrors(t *testing.T) {
 	}
 }
 
-func TestUserRoundTripAndPasswordOptional(t *testing.T) {
+func TestUserRoundTripPasswordOptional(t *testing.T) {
 	r, id := newRepo(t)
 	ctx := context.Background()
 	u, _ := r.UserByEmail(ctx, "ann@test.com")
@@ -119,10 +119,13 @@ func TestEmailVerifiedFlag(t *testing.T) {
 	}
 }
 
-func TestTombstoneKeepsTheRowAndDropsAccess(t *testing.T) {
+func TestTombstoneKeepsTheRowDropsAccess(t *testing.T) {
 	r, id := newRepo(t)
 	ctx := context.Background()
-	if _, err := r.InsertAPIToken(ctx, authrepo.NewAPIToken{UserID: id, Name: "t", Hash: "h", Prefix: "svy_", AllSpaces: true, Now: time.Now()}); err != nil {
+	if _,
+		err := r.InsertAPIToken(ctx,
+		authrepo.NewAPIToken{UserID: id, Name: "t", Hash: "h", Prefix: "svy_", AllSpaces: true,
+			Now: time.Now()}); err != nil {
 		t.Fatal(err)
 	}
 	if err := r.InsertRecoveryCode(ctx, id, "c", time.Now()); err != nil {
@@ -147,7 +150,10 @@ func TestDeleteAPITokensKeepsTheUser(t *testing.T) {
 	r, id := newRepo(t)
 	ctx := context.Background()
 	for _, hash := range []string{"h1", "h2"} {
-		if _, err := r.InsertAPIToken(ctx, authrepo.NewAPIToken{UserID: id, Name: hash, Hash: hash, Prefix: "svy_", AllSpaces: true, Now: time.Now()}); err != nil {
+		if _,
+			err := r.InsertAPIToken(ctx,
+			authrepo.NewAPIToken{UserID: id, Name: hash, Hash: hash, Prefix: "svy_", AllSpaces: true,
+				Now: time.Now()}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -204,7 +210,7 @@ func TestSessionLifecycle(t *testing.T) {
 	}
 }
 
-func TestOneTimeTokensWorkOnceAndExpire(t *testing.T) {
+func TestOneTimeTokensWorkOnceExpire(t *testing.T) {
 	r, id := newRepo(t)
 	ctx := context.Background()
 	now := time.Now().UTC()
@@ -293,11 +299,12 @@ func TestPasskeysBelongToTheirOwner(t *testing.T) {
 	}
 }
 
-func TestPasskeyChallengeIsTakenOnceAndPerType(t *testing.T) {
+func TestPasskeyChallengeTakenOncePerType(t *testing.T) {
 	r, id := newRepo(t)
 	ctx := context.Background()
 	now := time.Now().UTC()
-	if err := r.InsertPasskeyChallenge(ctx, &id, "tok", "registration", `{"x":1}`, now.Add(5*time.Minute), now); err != nil {
+	if err := r.InsertPasskeyChallenge(ctx, &id, "tok", "registration", `{"x":1}`, now.Add(5*time.Minute),
+		now); err != nil {
 		t.Fatal(err)
 	}
 	if c, _ := r.TakePasskeyChallenge(ctx, "tok", "authentication", now); c != nil {
@@ -320,7 +327,7 @@ func TestPasskeyChallengeIsTakenOnceAndPerType(t *testing.T) {
 	}
 }
 
-func TestEmailVerificationTokenIsOnePerUserAndSingleUse(t *testing.T) {
+func TestEmailVerifyTokenSingleUse(t *testing.T) {
 	r, id := newRepo(t)
 	now := time.Now().UTC().Truncate(time.Second)
 	ctx := context.Background()
@@ -347,7 +354,7 @@ func TestEmailVerificationTokenIsOnePerUserAndSingleUse(t *testing.T) {
 	}
 }
 
-func TestPasskeyChallengeIsTakenOnceWhenRequestsRace(t *testing.T) {
+func TestPasskeyChallengeSingleUseUnderRace(t *testing.T) {
 	r, id := newRepo(t)
 	ctx := context.Background()
 	now := time.Now().UTC()

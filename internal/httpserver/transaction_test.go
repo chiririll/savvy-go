@@ -7,7 +7,7 @@ import (
 	"savvy-go/internal/auth"
 )
 
-func TestPendingAndConfirmedTransactions(t *testing.T) {
+func TestPendingConfirmedTransactions(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("rw@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
@@ -49,7 +49,7 @@ func TestPendingAndConfirmedTransactions(t *testing.T) {
 	}
 }
 
-func TestDebtCreateLendAndBorrow(t *testing.T) {
+func TestDebtCreateLendBorrow(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("d@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
@@ -100,7 +100,7 @@ func listTxIDs(t *testing.T, a *testApp, sess *auth.Issued, query string) (ids [
 	return ids, body["meta"].(map[string]any)["total"].(float64)
 }
 
-func TestTransactionsListSortAndFilters(t *testing.T) {
+func TestTransactionsListSortFilters(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("sort@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
@@ -184,7 +184,7 @@ func TestTransactionsListSortAndFilters(t *testing.T) {
 	}
 }
 
-func TestEstimatedFlagOnlyKeptForPendingTransactions(t *testing.T) {
+func TestEstimatedFlagOnlyKeptPendingTransactions(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("est2@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)

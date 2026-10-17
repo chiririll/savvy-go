@@ -1,42 +1,8 @@
 package httpserver
 
 // Every package that serves routes registers them from its routes.go; linking it in is
-// what mounts them. Add a new handler package here.
+// what mounts them. Add a new handler package to the file for its kind.
 import (
-	_ "savvy-go/internal/httpserver/admin/backups"
-	_ "savvy-go/internal/httpserver/admin/checks"
-	_ "savvy-go/internal/httpserver/admin/keys"
-	_ "savvy-go/internal/httpserver/admin/mail"
-	_ "savvy-go/internal/httpserver/admin/monitoring"
-	_ "savvy-go/internal/httpserver/admin/oauth"
-	_ "savvy-go/internal/httpserver/admin/spaces"
-	_ "savvy-go/internal/httpserver/admin/sso"
-	_ "savvy-go/internal/httpserver/admin/users"
-	_ "savvy-go/internal/httpserver/api/accounts"
-	_ "savvy-go/internal/httpserver/api/apitokens"
-	_ "savvy-go/internal/httpserver/api/automation"
-	_ "savvy-go/internal/httpserver/api/backups"
-	_ "savvy-go/internal/httpserver/api/budgets"
-	_ "savvy-go/internal/httpserver/api/catalog"
-	_ "savvy-go/internal/httpserver/api/categories"
-	_ "savvy-go/internal/httpserver/api/currencies"
-	_ "savvy-go/internal/httpserver/api/debts"
-	_ "savvy-go/internal/httpserver/api/imports"
-	_ "savvy-go/internal/httpserver/api/recurring"
-	_ "savvy-go/internal/httpserver/api/reports"
-	_ "savvy-go/internal/httpserver/api/settings"
-	_ "savvy-go/internal/httpserver/api/space"
-	_ "savvy-go/internal/httpserver/api/syncgroups"
-	_ "savvy-go/internal/httpserver/api/tags"
-	_ "savvy-go/internal/httpserver/api/transactions"
-	_ "savvy-go/internal/httpserver/api/transfer"
-	_ "savvy-go/internal/httpserver/api/upload"
-	_ "savvy-go/internal/httpserver/auth/emailverify"
-	_ "savvy-go/internal/httpserver/auth/oauth"
-	_ "savvy-go/internal/httpserver/auth/session"
-	_ "savvy-go/internal/httpserver/auth/sso"
-	_ "savvy-go/internal/httpserver/auth/twofactor"
-	_ "savvy-go/internal/httpserver/auth/webauthn"
 	_ "savvy-go/internal/httpserver/health"
 	_ "savvy-go/internal/httpserver/ui"
 )

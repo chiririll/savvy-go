@@ -114,57 +114,76 @@ func (s *scales) fixMoney(table string, cols []string, vals []any) error {
 	for i, c := range cols {
 		idx[c] = i
 	}
-	get := func(name string) int64 {
-		i, ok := idx[name]
-		if !ok {
-			return 0
-		}
-		n, _ := asInt(vals[i])
-		return n
-	}
-	conv := func(name string, dec int) error {
-		i, ok := idx[name]
-		if !ok || vals[i] == nil {
-			return nil
-		}
-		d, err := toDecimal(vals[i])
-		if err != nil {
-			return fmt.Errorf("%s.%s: %w", table, name, err)
-		}
-		m, err := money.FromInput(d, money.Unit{Decimals: dec}) // only the scale matters here
-		if err != nil {
-			return fmt.Errorf("%s.%s = %s: %w", table, name, d, err)
-		}
-		vals[i] = m.Minor()
-		return nil
-	}
-	var errs [3]error
+	row := moneyRow{table: table, idx: idx, vals: vals}
 	switch table {
 	case "accounts":
-		dec := s.decimals(get("currency_id"))
-		errs[0], errs[1] = conv("initial_balance", dec), conv("target_amount", dec)
+		dec := s.decimals(row.get("currency_id"))
+		return row.convAll(dec, "initial_balance", "target_amount")
 	case "transactions", "recurring_transactions":
-		dec := s.accountDec(get("account_id"))
+		dec := s.accountDec(row.get("account_id"))
 		toDec := dec
-		if to := get("to_account_id"); to > 0 {
+		if to := row.get("to_account_id"); to > 0 {
 			toDec = s.accountDec(to)
 		}
-		errs[0], errs[1] = conv("amount", dec), conv("to_amount", toDec)
+		if err := row.conv("amount", dec); err != nil {
+			return err
+		}
+		return row.conv("to_amount", toDec)
 	case "transaction_items":
-		dec := s.accountDec(s.txAccount[get("transaction_id")])
-		errs[0], errs[1] = conv("price_per_unit", dec), conv("total_price", dec)
+		dec := s.accountDec(s.txAccount[row.get("transaction_id")])
+		return row.convAll(dec, "price_per_unit", "total_price")
 	case "budgets":
-		cid := get("currency_id")
+		cid := row.get("currency_id")
 		if cid == 0 {
 			cid = s.base
 		}
 		if i, ok := idx["currency_id"]; ok {
 			vals[i] = cid
 		}
-		errs[0] = conv("amount", s.decimals(cid))
+		return row.conv("amount", s.decimals(cid))
 	}
-	for _, err := range errs {
-		if err != nil {
+	return nil
+}
+
+// moneyRow is one row (columns by name in idx, values in vals) whose money
+// columns are converted in place.
+type moneyRow struct {
+	table string
+	idx   map[string]int
+	vals  []any
+}
+
+func (r moneyRow) get(name string) int64 {
+	i, ok := r.idx[name]
+	if !ok {
+		return 0
+	}
+	n, _ := asInt(r.vals[i])
+	return n
+}
+
+// conv turns one column from major to minor units; a missing or NULL column
+// is left alone.
+func (r moneyRow) conv(name string, dec int) error {
+	i, ok := r.idx[name]
+	if !ok || r.vals[i] == nil {
+		return nil
+	}
+	d, err := toDecimal(r.vals[i])
+	if err != nil {
+		return fmt.Errorf("%s.%s: %w", r.table, name, err)
+	}
+	m, err := money.FromInput(d, money.Unit{Decimals: dec}) // only the scale matters here
+	if err != nil {
+		return fmt.Errorf("%s.%s = %s: %w", r.table, name, d, err)
+	}
+	r.vals[i] = m.Minor()
+	return nil
+}
+
+func (r moneyRow) convAll(dec int, names ...string) error {
+	for _, name := range names {
+		if err := r.conv(name, dec); err != nil {
 			return err
 		}
 	}

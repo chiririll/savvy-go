@@ -68,7 +68,7 @@ func TestSessionIsActive(t *testing.T) {
 	}
 }
 
-func TestTouchSlidesIdleDeadlineButNotPastAbsolute(t *testing.T) {
+func TestTouchSlidesIdleDeadlineWithinAbsolute(t *testing.T) {
 	d := newDB(t)
 	ctx := context.Background()
 	u := newUser(t, d, "a@test.com", RoleUser)
@@ -85,7 +85,7 @@ func TestTouchSlidesIdleDeadlineButNotPastAbsolute(t *testing.T) {
 	}
 }
 
-func TestRememberMeSessionsRotateTheirTokenOnceADay(t *testing.T) {
+func TestRememberMeSessionsRotateTokenDaily(t *testing.T) {
 	d := newDB(t)
 	ctx := context.Background()
 	u := newUser(t, d, "a@test.com", RoleUser)
@@ -121,7 +121,7 @@ func TestRememberMeSessionsRotateTheirTokenOnceADay(t *testing.T) {
 	}
 }
 
-func TestRevokeAllAndOthers(t *testing.T) {
+func TestRevokeAllOthers(t *testing.T) {
 	d := newDB(t)
 	ctx := context.Background()
 	u := newUser(t, d, "a@test.com", RoleUser)

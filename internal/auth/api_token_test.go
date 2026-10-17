@@ -11,7 +11,7 @@ import (
 	"savvy-go/internal/auth/permissions"
 )
 
-func TestAPITokenIssueAndResolve(t *testing.T) {
+func TestAPITokenIssueResolve(t *testing.T) {
 	d := newDB(t)
 	ctx := context.Background()
 	u := newUser(t, d, "a@test.com", RoleUser)
@@ -84,7 +84,7 @@ func TestExpiredAPITokenDoesNotResolve(t *testing.T) {
 	}
 }
 
-func TestRevokeAllAPITokensOfOneUser(t *testing.T) {
+func TestRevokeAllAPITokensOneUser(t *testing.T) {
 	d := newDB(t)
 	ctx := context.Background()
 	u := newUser(t, d, "a@test.com", RoleUser)
@@ -162,7 +162,7 @@ func TestAPITokenLimit(t *testing.T) {
 	}
 }
 
-func TestUpdateGrantKeepsTheTokenAndItsKind(t *testing.T) {
+func TestUpdateGrantKeepsTokenItsKind(t *testing.T) {
 	d := newDB(t)
 	ctx := context.Background()
 	u := newUser(t, d, "a@test.com", RoleUser)
@@ -195,13 +195,17 @@ func TestUpdateGrantKeepsTheTokenAndItsKind(t *testing.T) {
 	if r, _ := tokens.Resolve(ctx, raw); r == nil || !r.Allows("accounts", permissions.Read) {
 		t.Error("the same token carries the new grant")
 	}
-	if _, err := tokens.UpdateGrant(ctx, u.ID, tok.ID, Grant{Permissions: []string{"recurring:read"}, AllSpaces: true}); !errors.Is(
+	if _,
+		err := tokens.UpdateGrant(ctx, u.ID, tok.ID,
+		Grant{Permissions: []string{"recurring:read"}, AllSpaces: true}); !errors.Is(
 		err,
 		permissions.ErrBadGrant,
 	) {
 		t.Errorf("a connected app cannot be widened beyond its tools: %v", err)
 	}
-	if _, err := tokens.UpdateGrant(ctx, other.ID, tok.ID, Grant{Permissions: []string{"reports:read"}, AllSpaces: true}); !errors.Is(
+	if _,
+		err := tokens.UpdateGrant(ctx, other.ID, tok.ID,
+		Grant{Permissions: []string{"reports:read"}, AllSpaces: true}); !errors.Is(
 		err,
 		ErrNotFound,
 	) {

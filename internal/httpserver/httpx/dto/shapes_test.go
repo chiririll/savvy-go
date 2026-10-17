@@ -113,7 +113,7 @@ func TestTransactionPage(t *testing.T) {
 	}
 }
 
-func TestInvitationAndMember(t *testing.T) {
+func TestInvitationMember(t *testing.T) {
 	at := time.Date(2030, 1, 2, 3, 4, 5, 0, time.UTC)
 	created := marshal(t, dto.InvitationCreated{ID: 3, EmailSent: true})
 	if created != `{"id":3,"emailSent":true}` {

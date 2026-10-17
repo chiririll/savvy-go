@@ -79,20 +79,23 @@ func (h Handler) oauthConsentInfo(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteData(w, http.StatusOK, consentBody{ClientName: c.Name, Spaces: dto.Map(mine, dto.NewSpace)})
 }
 
+// consentRequest is the user's decision on an app's access request.
+type consentRequest struct {
+	ClientID            string   `json:"client_id"`
+	RedirectURI         string   `json:"redirect_uri"`
+	State               string   `json:"state"`
+	CodeChallenge       string   `json:"code_challenge"`
+	CodeChallengeMethod string   `json:"code_challenge_method"`
+	Approve             bool     `json:"approve"`
+	AllSpaces           bool     `json:"all_spaces"`
+	SpaceIDs            []int64  `json:"space_ids"`
+	Permissions         []string `json:"permissions"`
+	confirm.Fields
+}
+
 // oauthConsent records the user's decision and says where to send the browser.
 func (h Handler) oauthConsent(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		ClientID            string   `json:"client_id"`
-		RedirectURI         string   `json:"redirect_uri"`
-		State               string   `json:"state"`
-		CodeChallenge       string   `json:"code_challenge"`
-		CodeChallengeMethod string   `json:"code_challenge_method"`
-		Approve             bool     `json:"approve"`
-		AllSpaces           bool     `json:"all_spaces"`
-		SpaceIDs            []int64  `json:"space_ids"`
-		Permissions         []string `json:"permissions"`
-		confirm.Fields
-	}
+	var body consentRequest
 	r.Body = http.MaxBytesReader(w, r.Body, oauthBodyLimit)
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		httpx.WriteMessage(w, http.StatusBadRequest, "The given data was invalid.")
@@ -103,25 +106,11 @@ func (h Handler) oauthConsent(w http.ResponseWriter, r *http.Request) {
 			writeOAuthAPIError(w, err)
 			return
 		}
-		httpx.WriteData(
-			w,
-			http.StatusOK,
-			map[string]string{
-				"redirect_url": redirectWith(body.RedirectURI, map[string]string{"error": "access_denied", "state": body.State}),
-			},
-		)
+		writeRedirect(w, body.RedirectURI, map[string]string{"error": "access_denied", "state": body.State})
 		return
 	}
-	// The app gets only the spaces the user picked, and only ones they belong to.
-	if body.AllSpaces == (len(body.SpaceIDs) > 0) {
-		httpx.WriteMessage(w, http.StatusUnprocessableEntity, "Choose all spaces, or at least one space.")
+	if !h.spacesAllowed(w, r, body) {
 		return
-	}
-	for _, id := range body.SpaceIDs {
-		if role, err := h.Spaces.Role(r.Context(), id, httpx.User(r).ID); err != nil || role == "" {
-			httpx.WriteMessage(w, http.StatusUnprocessableEntity, "You can only choose spaces you belong to.")
-			return
-		}
 	}
 	// Approving mints the app a token, so it is asked last, like issuing one: a bad form costs no attempt.
 	if !h.Confirm.Require(w, r, body.Fields) {
@@ -136,13 +125,27 @@ func (h Handler) oauthConsent(w http.ResponseWriter, r *http.Request) {
 		writeOAuthAPIError(w, err)
 		return
 	}
-	httpx.WriteData(
-		w,
-		http.StatusOK,
-		map[string]string{
-			"redirect_url": redirectWith(body.RedirectURI, map[string]string{"code": code, "state": body.State}),
-		},
-	)
+	writeRedirect(w, body.RedirectURI, map[string]string{"code": code, "state": body.State})
+}
+
+// spacesAllowed checks the spaces an approval names: the app gets only the
+// ones the user picked, and only ones they belong to. It answers when not.
+func (h Handler) spacesAllowed(w http.ResponseWriter, r *http.Request, body consentRequest) bool {
+	if body.AllSpaces == (len(body.SpaceIDs) > 0) {
+		httpx.WriteMessage(w, http.StatusUnprocessableEntity, "Choose all spaces, or at least one space.")
+		return false
+	}
+	for _, id := range body.SpaceIDs {
+		if role, err := h.Spaces.Role(r.Context(), id, httpx.User(r).ID); err != nil || role == "" {
+			httpx.WriteMessage(w, http.StatusUnprocessableEntity, "You can only choose spaces you belong to.")
+			return false
+		}
+	}
+	return true
+}
+
+func writeRedirect(w http.ResponseWriter, uri string, params map[string]string) {
+	httpx.WriteData(w, http.StatusOK, map[string]string{"redirect_url": redirectWith(uri, params)})
 }
 
 // consentBody is what the consent screen shows: the app and the spaces it may be given.

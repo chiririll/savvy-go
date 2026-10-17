@@ -71,7 +71,8 @@ func TestTemplateRoundTripKeepsOptionalFields(t *testing.T) {
 		t.Fatal(err)
 	}
 	r, _ := f.repo.ByID(ctx, id)
-	if r == nil || r.Amount != money.New(80000, f.usd) || r.ToAmount != nil || r.ToAccountID != nil || r.CategoryID != nil ||
+	if r == nil || r.Amount != money.New(80000,
+		f.usd) || r.ToAmount != nil || r.ToAccountID != nil || r.CategoryID != nil ||
 		!r.IsEstimated || !r.IsActive || r.DayOfMonth == nil || *r.DayOfMonth != 15 || r.DayOfWeek != nil ||
 		r.EndDate != nil || r.LastRunDate != nil ||
 		r.Description == nil ||
@@ -110,7 +111,7 @@ func TestListCanKeepOnlyActiveTemplates(t *testing.T) {
 	}
 }
 
-func TestAdvanceTagsAndDelete(t *testing.T) {
+func TestAdvanceTagsDelete(t *testing.T) {
 	f := newFixture(t)
 	id, _ := f.repo.Insert(ctx, f.fields(), time.Now().UTC())
 

@@ -103,32 +103,7 @@ func VerifyOIDCIDToken(rawToken, jwksJSON, issuer, audience, preset string) (map
 		jwt.WithLeeway(time.Minute),
 		jwt.WithIssuedAt(),
 	)
-	tok, err := parser.Parse(rawToken, func(t *jwt.Token) (any, error) {
-		alg, _ := t.Header["alg"].(string)
-		if strings.EqualFold(alg, "none") || alg == "" {
-			return nil, fmt.Errorf("rejected alg")
-		}
-		kid, _ := t.Header["kid"].(string)
-		var match *jwkKey
-		for i := range doc.Keys {
-			k := &doc.Keys[i]
-			if kid != "" && k.Kid != kid {
-				continue
-			}
-			if k.Alg != "" && alg != "" && k.Alg != alg {
-				continue
-			}
-			match = k
-			break
-		}
-		if match == nil && kid == "" && len(doc.Keys) == 1 {
-			match = &doc.Keys[0]
-		}
-		if match == nil {
-			return nil, fmt.Errorf("no matching jwk")
-		}
-		return jwkPublicKey(*match)
-	})
+	tok, err := parser.Parse(rawToken, func(t *jwt.Token) (any, error) { return doc.keyFor(t) })
 	if err != nil || tok == nil || !tok.Valid {
 		return nil, ssoErr("id_token_invalid", "The ID token signature is invalid.", 401)
 	}
@@ -139,16 +114,43 @@ func VerifyOIDCIDToken(rawToken, jwksJSON, issuer, audience, preset string) (map
 	if issuer != "" && !MatchesIssuer(preset, issuer, claims) {
 		return nil, ssoErr("issuer_mismatch", "The token issuer does not match the discovery document.", 401)
 	}
-	if audience != "" {
-		if !audienceOK(claims, audience) {
-			return nil, ssoErr("audience_mismatch", "The ID token audience does not match this application.", 401)
-		}
+	if audience != "" && !audienceOK(claims, audience) {
+		return nil, ssoErr("audience_mismatch", "The ID token audience does not match this application.", 401)
 	}
 	out := map[string]any{}
 	for k, v := range claims {
 		out[k] = v
 	}
 	return out, nil
+}
+
+// keyFor is the public key that signed t: the JWK its kid names, or the only
+// one when it names none.
+func (d jwksDoc) keyFor(t *jwt.Token) (any, error) {
+	alg, _ := t.Header["alg"].(string)
+	if strings.EqualFold(alg, "none") || alg == "" {
+		return nil, fmt.Errorf("rejected alg")
+	}
+	kid, _ := t.Header["kid"].(string)
+	var match *jwkKey
+	for i := range d.Keys {
+		k := &d.Keys[i]
+		if kid != "" && k.Kid != kid {
+			continue
+		}
+		if k.Alg != "" && k.Alg != alg {
+			continue
+		}
+		match = k
+		break
+	}
+	if match == nil && kid == "" && len(d.Keys) == 1 {
+		match = &d.Keys[0]
+	}
+	if match == nil {
+		return nil, fmt.Errorf("no matching jwk")
+	}
+	return jwkPublicKey(*match)
 }
 
 func audienceOK(claims jwt.MapClaims, want string) bool {

@@ -8,7 +8,7 @@ import (
 
 var expiry = time.Date(2026, 3, 4, 15, 30, 0, 0, time.UTC)
 
-func TestMessagesCarryTheirLinkAndRecipient(t *testing.T) {
+func TestMessagesCarryTheirLinkRecipient(t *testing.T) {
 	const link = "https://savvy.example/some/link"
 	cases := []struct {
 		name string
@@ -47,7 +47,7 @@ func TestMessagesCarryTheirLinkAndRecipient(t *testing.T) {
 	}
 }
 
-func TestNamesCannotBreakOutOfAHeaderLine(t *testing.T) {
+func TestNamesCannotBreakOutHeaderLine(t *testing.T) {
 	m := Invitation("bob@test.com", "Ann", "Home\r\nBcc: evil@example.org", "viewer", "https://savvy.example/x")
 	if strings.ContainsAny(m.Subject, "\r\n") {
 		t.Fatalf("subject %q spans lines", m.Subject)

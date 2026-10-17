@@ -84,6 +84,9 @@ func Register(build func(*Deps) []Mount) {
 	modules = append(modules, build)
 }
 
+// mounter mounts the routes registered for a tier on r.
+type mounter func(t Tier, r chi.Router)
+
 // Build mounts every registered package on r.
 func Build(r chi.Router, d *Deps) {
 	mu.Lock()
@@ -104,54 +107,7 @@ func Build(r chi.Router, d *Deps) {
 	g := d.Guard
 
 	mount(root, r)
-	r.Route("/api", func(r chi.Router) {
-		// No session guards these, so RequireCSRF cannot: check origin and content type.
-		mount(public, r.With(g.PublicOrigin))
-
-		r.Group(func(r chi.Router) {
-			r.Use(g.RequireSession)
-			r.Use(g.RequireCSRF)
-			r.Use(g.RequireVerifiedEmail)
-
-			// Credential management is limited to real sessions, never API tokens.
-			r.Group(func(r chi.Router) {
-				r.Use(g.SessionOnly)
-				mount(credential, r)
-			})
-
-			mount(account, r)
-
-			r.Route("/spaces/{space}", func(r chi.Router) {
-				r.Use(g.WithSpace)
-				r.Use(g.RequireTokenGrant)
-				mount(spaceRead, r)
-
-				// Administering the space: its admins, in a real session.
-				r.Group(func(r chi.Router) {
-					r.Use(g.RequireSpaceAdmin)
-					r.Use(g.SessionOnly)
-					mount(spaceAdmin, r)
-				})
-
-				r.Group(func(r chi.Router) {
-					r.Use(g.RequireWrite)
-					mount(spaceWrite, r)
-				})
-			})
-
-			// Users, instance settings, monitoring and the space overview are the
-			// server admins'.
-			r.Group(func(r chi.Router) {
-				r.Use(g.RequireAdmin)
-				mount(admin, r)
-			})
-			r.Group(func(r chi.Router) {
-				r.Use(g.RequireAdmin)
-				r.Use(g.SessionOnly)
-				mount(adminSession, r)
-			})
-		})
-	})
+	r.Route("/api", func(r chi.Router) { mountAPI(r, g, mount) })
 
 	// MCP clients (Claude web) discover and sign in through these; they need the public
 	// URL because it is their issuer.
@@ -161,6 +117,56 @@ func Build(r chi.Router, d *Deps) {
 	})
 
 	mount(fallback, r)
+}
+
+func mountAPI(r chi.Router, g *guard.Guard, mount mounter) {
+	// No session guards these, so RequireCSRF cannot: check origin and content type.
+	mount(public, r.With(g.PublicOrigin))
+
+	r.Group(func(r chi.Router) {
+		r.Use(g.RequireSession)
+		r.Use(g.RequireCSRF)
+		r.Use(g.RequireVerifiedEmail)
+
+		// Credential management is limited to real sessions, never API tokens.
+		r.Group(func(r chi.Router) {
+			r.Use(g.SessionOnly)
+			mount(credential, r)
+		})
+
+		mount(account, r)
+		r.Route("/spaces/{space}", func(r chi.Router) { mountSpace(r, g, mount) })
+
+		// Users, instance settings, monitoring and the space overview are the
+		// server admins'.
+		r.Group(func(r chi.Router) {
+			r.Use(g.RequireAdmin)
+			mount(admin, r)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(g.RequireAdmin)
+			r.Use(g.SessionOnly)
+			mount(adminSession, r)
+		})
+	})
+}
+
+func mountSpace(r chi.Router, g *guard.Guard, mount mounter) {
+	r.Use(g.WithSpace)
+	r.Use(g.RequireTokenGrant)
+	mount(spaceRead, r)
+
+	// Administering the space: its admins, in a real session.
+	r.Group(func(r chi.Router) {
+		r.Use(g.RequireSpaceAdmin)
+		r.Use(g.SessionOnly)
+		mount(spaceAdmin, r)
+	})
+
+	r.Group(func(r chi.Router) {
+		r.Use(g.RequireWrite)
+		mount(spaceWrite, r)
+	})
 }
 
 // SpaceWriteRoutes mounts only the finance routes of a space on r, with no middleware. The

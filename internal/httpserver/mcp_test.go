@@ -118,7 +118,7 @@ func idOf(t *testing.T, res *mcp.CallToolResult) int64 {
 	return int64(id)
 }
 
-func TestMCPRequiresABearerTokenAndPointsToTheMetadata(t *testing.T) {
+func TestMCPRequiresBearerTokenPointsMetadata(t *testing.T) {
 	a := newTestApp(t)
 	for _, auth := range []string{"", "Bearer nope", "Bearer svy_unknown"} {
 		req, _ := http.NewRequest("POST", a.srv.URL+"/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"ping"}`))
@@ -161,12 +161,13 @@ func TestMCPSessionCookieIsNotEnough(t *testing.T) {
 
 // A client decides what to run unasked from these hints. DestructiveHint is
 // true when absent, so every tool that is not a delete must say false.
-func TestMCPToolsAreMarkedByWhatTheyDo(t *testing.T) {
+func TestMCPToolsMarkedWhatTheyDo(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("mcp@a.com", "secret1", "admin")
 
 	tools := a.tools(a.mcpFull(u))
-	for _, name := range []string{"list_spaces", "list_accounts", "list_transactions", "get_report", "create_transaction", "update_transaction", "delete_transaction"} {
+	for _, name := range []string{"list_spaces", "list_accounts", "list_transactions", "get_report", "create_transaction",
+		"update_transaction", "delete_transaction"} {
 		if !slices.Contains(toolNames(tools), name) {
 			t.Errorf("missing tool %s", name)
 		}
@@ -194,7 +195,7 @@ func TestMCPToolsAreMarkedByWhatTheyDo(t *testing.T) {
 	}
 }
 
-func TestMCPToolsReadTheCallersSpacesAndNothingElse(t *testing.T) {
+func TestMCPToolsReadCallerSpacesOnly(t *testing.T) {
 	a := newTestApp(t)
 	admin := a.createUser("admin@a.com", "secret1", "admin")
 	adminSess := a.issue(admin, false)
@@ -234,7 +235,7 @@ func TestMCPToolsReadTheCallersSpacesAndNothingElse(t *testing.T) {
 	}
 }
 
-func TestMCPListTransactionsForwardsFiltersAndBoundsThePage(t *testing.T) {
+func TestMCPListTransactionsForwardsFilters(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("mcp@a.com", "secret1", "admin")
 	sp := a.space.ID
@@ -299,7 +300,7 @@ func TestMCPListTransactionsForwardsFiltersAndBoundsThePage(t *testing.T) {
 	}
 }
 
-func TestMCPAcceptsOAuthTokenButStaysReadOnly(t *testing.T) {
+func TestMCPOAuthTokenStaysReadOnly(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("mcp@a.com", "secret1", "admin")
 	_, access := a.connect(a.issue(u, false))
@@ -365,7 +366,7 @@ func TestMCPReadToolsNeedTheirPermissions(t *testing.T) {
 
 // The write tools are plain REST calls made with the caller's token, so a token
 // needs the grant of the route's level: write, and delete on top for deleting.
-func TestMCPWriteToolsNeedWriteAndDeleteGrants(t *testing.T) {
+func TestMCPWriteToolsNeedWriteGrants(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("mcp@a.com", "secret1", "admin")
 	sp := a.space.ID
@@ -398,7 +399,7 @@ func TestMCPWriteToolsNeedWriteAndDeleteGrants(t *testing.T) {
 	}
 }
 
-func TestMCPWriteToolsRecordAndChangeMoney(t *testing.T) {
+func TestMCPWriteToolsRecordChangeMoney(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("mcp@a.com", "secret1", "admin")
 	sp := a.space.ID
@@ -460,7 +461,8 @@ func TestMCPWriteToolsRecordAndChangeMoney(t *testing.T) {
 		t.Fatalf("balance = %v, want 80", got)
 	}
 
-	if bad := a.call(s, "create_transaction", map[string]any{"space_id": sp, "type": "expense", "account_id": 0, "amount": "1"}); !bad.IsError {
+	if bad := a.call(s, "create_transaction",
+		map[string]any{"space_id": sp, "type": "expense", "account_id": 0, "amount": "1"}); !bad.IsError {
 		t.Fatalf("a transaction without an account must be refused: %s", resultText(bad))
 	}
 	if got := balance(); got != 80 {
@@ -480,7 +482,7 @@ func TestMCPWriteToolsRecordAndChangeMoney(t *testing.T) {
 
 // An assistant is offered only the tools its token can use, so it does not try
 // what would fail. Calling one anyway still gets the REST error.
-func TestMCPListsOnlyTheToolsTheTokenCanUse(t *testing.T) {
+func TestMCPListsOnlyUsableTools(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("mcp@a.com", "secret1", "admin")
 	names := func(perms ...string) []string { return toolNames(a.tools(a.mcpGrant(u, perms...))) }
@@ -491,7 +493,8 @@ func TestMCPListsOnlyTheToolsTheTokenCanUse(t *testing.T) {
 			t.Errorf("a reader is missing %s: %v", want, viewer)
 		}
 	}
-	for _, hidden := range []string{"list_tags", "get_report", "create_transaction", "delete_transaction", "create_account"} {
+	for _, hidden := range []string{"list_tags", "get_report", "create_transaction", "delete_transaction",
+		"create_account"} {
 		if slices.Contains(viewer, hidden) {
 			t.Errorf("%s is offered to a token that cannot use it: %v", hidden, viewer)
 		}

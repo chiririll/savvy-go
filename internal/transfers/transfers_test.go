@@ -114,7 +114,7 @@ func (e *transferEnv) records(t *testing.T, spaceID int64) map[string]Transfer {
 
 // P22: a crash between the two commits leaves the transfer in A only; the
 // merge at startup finishes it in B.
-func TestP22CrashBetweenCommitsIsMerged(t *testing.T) {
+func TestP22CrashBetweenCommitsMerged(t *testing.T) {
 	e := newTransferEnv(t)
 	*e.crash = true
 	_, err := e.tr.Create(context.Background(), e.owner, Input{
@@ -198,7 +198,7 @@ func TestP23MergeRules(t *testing.T) {
 }
 
 // P43: the merge never copies a record whose signature does not verify.
-func TestP43UnsignedRecordIsNotMerged(t *testing.T) {
+func TestP43UnsignedRecordNotMerged(t *testing.T) {
 	e := newTransferEnv(t)
 	ctx := context.Background()
 	tr := e.send(t, "10")
@@ -253,7 +253,7 @@ func TestP47KeyRotation(t *testing.T) {
 // P27, P46: spaces moved together to a server with another key keep their
 // uuids; their transfers do not verify there until the old key is trusted
 // or the members re-sign them, and then they merge again.
-func TestP27P46MoveToAnotherServer(t *testing.T) {
+func TestP27P46MoveServer(t *testing.T) {
 	e := newTransferEnv(t)
 	ctx := context.Background()
 	tr := e.send(t, "4")
@@ -328,7 +328,7 @@ var _ store.Store = (*sqlite.Store)(nil)
 
 // An update keeps a description it does not set; HasDescription with nil
 // clears it on both sides.
-func TestTransferUpdateClearsDescriptionOnlyWhenAsked(t *testing.T) {
+func TestTransferUpdateClearsDescriptionOnRequest(t *testing.T) {
 	e := newTransferEnv(t)
 	ctx := context.Background()
 	tr, err := e.tr.Create(ctx, e.owner, Input{

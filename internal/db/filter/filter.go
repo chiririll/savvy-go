@@ -413,7 +413,8 @@ func TopTransactions(ctx context.Context, sqlDB store.DB, w ReportWhere, limit i
 		var x TopRow
 		var minor, decimals int64
 		var rate decimal.Decimal
-		if err := rows.Scan(&x.ID, &x.Description, &x.Date, &minor, &decimals, &rate, &x.CatID, &x.CatName, &x.Icon, &x.Color, &x.AccID, &x.AccName); err != nil {
+		if err := rows.Scan(&x.ID, &x.Description, &x.Date, &minor, &decimals, &rate, &x.CatID, &x.CatName, &x.Icon, &x.Color,
+			&x.AccID, &x.AccName); err != nil {
 			continue
 		}
 		x.Amount = money.FromDecimal(toBase(minor, decimals, rate), base)

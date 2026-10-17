@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-func TestDecodeTrimsAndFillsTheTimeout(t *testing.T) {
+func TestDecodeTrimsFillsTheTimeout(t *testing.T) {
 	got, err := decode(MailerConfig{Enabled: true, Host: " h ", Port: 465, Protocol: " SMTPS ", From: " a@b.example "})
 	if err != nil || got.Problem != "" {
 		t.Fatalf("%+v %v", got, err)
@@ -20,7 +20,7 @@ func TestDecodeTrimsAndFillsTheTimeout(t *testing.T) {
 	}
 }
 
-func TestDecodeSwitchesMailOffOnAMistake(t *testing.T) {
+func TestDecodeSwitchesMailOffOnMistake(t *testing.T) {
 	got, err := decode(MailerConfig{Enabled: true, Port: 587, Protocol: STARTTLS, From: "a@b.example"})
 	if err != nil {
 		t.Fatalf("a mistake must not stop the server: %v", err)

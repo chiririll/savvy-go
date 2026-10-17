@@ -132,7 +132,10 @@ func (e *env) spend(t *testing.T, i int, categoryID int64) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := d.ExecContext(ctx, `INSERT INTO transactions (type, account_id, category_id, amount, status, date) VALUES ('expense', ?, ?, 100, 'confirmed', '2026-01-01')`, acc.ID, categoryID); err != nil {
+	if _,
+		err := d.ExecContext(ctx,
+		`INSERT INTO transactions (type, account_id, category_id, amount, status, date) VALUES ('expense', ?, ?, 100, `+
+			`'confirmed', '2026-01-01')`, acc.ID, categoryID); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -155,7 +158,7 @@ func has(list []string, want string) bool {
 	return false
 }
 
-func TestOperationsAreMirroredToTheWholeGroup(t *testing.T) {
+func TestOperationsAreMirroredToWholeGroup(t *testing.T) {
 	e := newEnv(t)
 	e.group(t, 0, 1, 2)
 	a := e.id(0)
@@ -176,7 +179,9 @@ func TestOperationsAreMirroredToTheWholeGroup(t *testing.T) {
 	}
 
 	// A rename and an edit follow by the old name.
-	if _, err := e.svc.UpdateCategory(ctx, e.owner, a, created.ID, ledger.Category{Name: "Housing", Type: "expense", Color: ptr("#445566")}); err != nil {
+	if _,
+		err := e.svc.UpdateCategory(ctx, e.owner, a, created.ID,
+		ledger.Category{Name: "Housing", Type: "expense", Color: ptr("#445566")}); err != nil {
 		t.Fatal(err)
 	}
 	for i := 0; i < 3; i++ {
@@ -222,7 +227,7 @@ func TestOperationsAreMirroredToTheWholeGroup(t *testing.T) {
 	}
 }
 
-func TestDeletingMovesTransactionsOfEverySpaceToOneSuccessor(t *testing.T) {
+func TestDeletingMovesAllSpacesToSuccessor(t *testing.T) {
 	e := newEnv(t)
 	e.group(t, 0, 1, 2)
 	for _, name := range []string{"Taxi", "Transport"} {
@@ -262,7 +267,7 @@ func TestDeletingMovesTransactionsOfEverySpaceToOneSuccessor(t *testing.T) {
 	}
 }
 
-func TestDeleteUsedOnlyInAnotherSpaceNeedsSuccessor(t *testing.T) {
+func TestDeleteUsedElsewhereNeedsSuccessor(t *testing.T) {
 	e := newEnv(t)
 	e.group(t, 0, 1)
 	for _, name := range []string{"Taxi", "Transport"} {
@@ -343,12 +348,14 @@ func TestEnablingNeedsEveryDifferenceDecided(t *testing.T) {
 	e.seed(t, 0)
 	e.seed(t, 1)
 	// A has Rent (red) and Gym; B has Rent (blue) and Books; their defaults agree.
-	for _, c := range []ledger.Category{{Name: "Rent", Type: "expense", Color: ptr("red")}, {Name: "Gym", Type: "expense"}} {
+	for _, c := range []ledger.Category{{Name: "Rent", Type: "expense", Color: ptr("red")},
+		{Name: "Gym", Type: "expense"}} {
 		if _, err := e.cats(t, 0).Create(ctx, c); err != nil {
 			t.Fatal(err)
 		}
 	}
-	for _, c := range []ledger.Category{{Name: "Rent", Type: "expense", Color: ptr("blue")}, {Name: "Books", Type: "expense"}} {
+	for _, c := range []ledger.Category{{Name: "Rent", Type: "expense", Color: ptr("blue")},
+		{Name: "Books", Type: "expense"}} {
 		if _, err := e.cats(t, 1).Create(ctx, c); err != nil {
 			t.Fatal(err)
 		}
@@ -414,7 +421,9 @@ func TestDifferingDefaultsNeedADecision(t *testing.T) {
 	if _, err := e.svc.Apply(ctx, e.owner, Plan{Change: change}); !errors.Is(err, ErrUnresolved) {
 		t.Fatalf("err = %v", err)
 	}
-	if _, err := e.svc.Apply(ctx, e.owner, Plan{Change: change, Defaults: []DefaultDecision{{Type: "expense", Name: "Rent"}}}); err != nil {
+	if _,
+		err := e.svc.Apply(ctx, e.owner,
+		Plan{Change: change, Defaults: []DefaultDecision{{Type: "expense", Name: "Rent"}}}); err != nil {
 		t.Fatal(err)
 	}
 	for i := 0; i < 2; i++ {
@@ -424,7 +433,7 @@ func TestDifferingDefaultsNeedADecision(t *testing.T) {
 	}
 }
 
-func TestDroppingACategoryDuringEnablingMovesItsTransactions(t *testing.T) {
+func TestDroppingCategoryDuringEnablingMovesTransactions(t *testing.T) {
 	e := newEnv(t)
 	e.seed(t, 0)
 	e.seed(t, 1)
@@ -485,7 +494,8 @@ func TestMembershipRules(t *testing.T) {
 		t.Fatal(err)
 	}
 	// A space is in one group only.
-	if _, err := e.svc.Apply(ctx, e.owner, Plan{Change: Change{Add: []int64{e.id(1), e.id(2)}, Categories: true}}); err == nil {
+	if _,
+		err := e.svc.Apply(ctx, e.owner, Plan{Change: Change{Add: []int64{e.id(1), e.id(2)}, Categories: true}}); err == nil {
 		t.Fatal("a space joined a second group")
 	}
 
@@ -498,19 +508,25 @@ func TestMembershipRules(t *testing.T) {
 	// Only an admin of the space may take it out; removing needs no one else.
 	bob := e0(t, e.st, "Bob", "bob@test.com")
 	_ = e.svc.Spaces.SetMember(ctx, e.id(2), bob, spaces.RoleAdmin)
-	if _, err := e.svc.Apply(ctx, bob, Plan{Change: Change{GroupID: g.ID, Remove: []int64{e.id(0)}, Categories: true}}); !errors.Is(
+	if _,
+		err := e.svc.Apply(ctx, bob,
+		Plan{Change: Change{GroupID: g.ID, Remove: []int64{e.id(0)}, Categories: true}}); !errors.Is(
 		err,
 		ErrNotAdmin,
 	) {
 		t.Fatalf("err = %v, want ErrNotAdmin", err)
 	}
-	if g, err = e.svc.Apply(ctx, bob, Plan{Change: Change{GroupID: g.ID, Remove: []int64{e.id(2)}, Categories: true}}); err != nil ||
+	if g,
+		err = e.svc.Apply(ctx, bob,
+		Plan{Change: Change{GroupID: g.ID, Remove: []int64{e.id(2)}, Categories: true}}); err != nil ||
 		len(g.Members) != 2 {
 		t.Fatalf("group = %+v, %v", g, err)
 	}
 
 	// A group that falls below two spaces is dissolved.
-	if g, err = e.svc.Apply(ctx, e.owner, Plan{Change: Change{GroupID: g.ID, Remove: []int64{e.id(0)}, Categories: true}}); err != nil ||
+	if g,
+		err = e.svc.Apply(ctx, e.owner,
+		Plan{Change: Change{GroupID: g.ID, Remove: []int64{e.id(0)}, Categories: true}}); err != nil ||
 		g != nil {
 		t.Fatalf("group = %+v, %v", g, err)
 	}
@@ -519,108 +535,4 @@ func TestMembershipRules(t *testing.T) {
 	}
 }
 
-// drift is what makes the spaces with the indexes differ.
-func (e *env) drift(t *testing.T, idx ...int) Diff {
-	t.Helper()
-	var ids []int64
-	for _, i := range idx {
-		ids = append(ids, e.id(i))
-	}
-	var d Diff
-	err := e.st.InSpaces(ctx, ids, func(dbs map[int64]store.DB) error {
-		var err error
-		d, err = diffSpaces(ctx, dbs, ids, []Kind{Categories, Tags})
-		return err
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return d
-}
-
 func ptr(s string) *string { return &s }
-
-// A crash between the commits of two spaces, or a restore, leaves the group
-// apart. At startup it is brought together by adding, never by deleting.
-func TestHealAddsWhatIsMissingAndNeverDeletes(t *testing.T) {
-	e := newEnv(t)
-	e.group(t, 0, 1, 2)
-	// Drift, made behind the group's back: B has a category and a tag the
-	// others lack, C looks different and has another default, A lost nothing.
-	if _, err := e.cats(t, 1).Create(ctx, ledger.Category{Name: "Pets", Type: "expense", Color: ptr("green")}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := e.tags(t, 1).Create(ctx, "vet"); err != nil {
-		t.Fatal(err)
-	}
-	food := e.category(t, 0, "expense", "Food")
-	if _, err := e.cats(t, 0).Update(ctx, food.ID, ledger.Category{Name: "Food", Type: "expense", Color: ptr("red"), IsDefault: true}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := e.cats(t, 2).Create(ctx, ledger.Category{Name: "Gym", Type: "expense"}); err != nil {
-		t.Fatal(err)
-	}
-	gym := e.category(t, 2, "expense", "Gym")
-	if _, err := e.cats(t, 2).SetDefault(ctx, gym.ID); err != nil {
-		t.Fatal(err)
-	}
-	if e.drift(t, 0, 1, 2).Empty() {
-		t.Fatal("the fixture did not drift")
-	}
-
-	if err := e.svc.Heal(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if d := e.drift(t, 0, 1, 2); !d.Empty() {
-		t.Fatalf("still apart: %+v", d)
-	}
-	for i := 0; i < 3; i++ {
-		names := e.names(t, i, "expense")
-		if !has(names, "Pets") || !has(names, "Gym") || !has(names, "Food") {
-			t.Fatalf("space %d lost or lacks a category: %v", i, names)
-		}
-		if list, _ := e.tags(t, i).All(ctx); len(list) != 1 || list[0].Name != "vet" {
-			t.Fatalf("space %d: tags = %+v", i, list)
-		}
-		// The lowest space (A) wins: its look and its default.
-		if c := e.category(t, i, "expense", "Food"); c.Color == nil || *c.Color != "red" || !c.IsDefault {
-			t.Fatalf("space %d: Food = %+v", i, c)
-		}
-	}
-	// Nothing left to do the second time.
-	if err := e.svc.Heal(ctx); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestHealLeavesIdenticalAndUngroupedSpacesAlone(t *testing.T) {
-	e := newEnv(t)
-	e.group(t, 0, 1)
-	e.seed(t, 2) // not in the group
-	if _, err := e.cats(t, 2).Create(ctx, ledger.Category{Name: "Solo", Type: "expense"}); err != nil {
-		t.Fatal(err)
-	}
-	if err := e.svc.Heal(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if e.category(t, 0, "expense", "Solo") != nil || e.category(t, 1, "expense", "Solo") != nil {
-		t.Fatal("a space outside the group leaked into it")
-	}
-}
-
-func TestHealSkipsAKindThatIsSwitchedOff(t *testing.T) {
-	e := newEnv(t)
-	e.seed(t, 0)
-	e.seed(t, 1)
-	ids := []int64{e.id(0), e.id(1)}
-	if _, err := e.svc.Apply(ctx, e.owner, Plan{Change: Change{Add: ids, Categories: true}}); err != nil {
-		t.Fatal(err)
-	}
-	_, _ = e.tags(t, 0).Create(ctx, "solo")
-	if err := e.svc.Heal(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if list, _ := e.tags(t, 1).All(ctx); len(list) != 0 {
-		t.Fatalf("tags were healed with the flag off: %+v", list)
-	}
-}

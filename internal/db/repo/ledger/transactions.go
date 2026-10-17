@@ -213,7 +213,8 @@ func (r Repo) TagsOf(ctx context.Context, txIDs []int64) ([]TxTag, error) {
 func (r Repo) SetTags(ctx context.Context, txID int64, tagIDs []int64) error {
 	_ = r.q().DeleteTransactionTags(ctx, txID)
 	for _, id := range tagIDs {
-		if err := r.q().InsertTransactionTag(ctx, sqlc.InsertTransactionTagParams{TransactionID: txID, TagID: id}); err != nil {
+		if err := r.q().InsertTransactionTag(ctx,
+			sqlc.InsertTransactionTagParams{TransactionID: txID, TagID: id}); err != nil {
 			return err
 		}
 	}
@@ -258,13 +259,15 @@ func (r Repo) BudgetSpent(
 // SetTransactionCategory changes only a transaction's category.
 func (r Repo) SetTransactionCategory(ctx context.Context, id, categoryID int64, now time.Time) error {
 	return r.q().
-		UpdateTransactionCategory(ctx, sqlc.UpdateTransactionCategoryParams{CategoryID: db.NI(categoryID), UpdatedAt: db.TimeNS(now), ID: id})
+		UpdateTransactionCategory(ctx,
+			sqlc.UpdateTransactionCategoryParams{CategoryID: db.NI(categoryID), UpdatedAt: db.TimeNS(now), ID: id})
 }
 
 // SetTransactionDescription changes only a transaction's description.
 func (r Repo) SetTransactionDescription(ctx context.Context, id int64, description string, now time.Time) error {
 	return r.q().
-		UpdateTransactionDescription(ctx, sqlc.UpdateTransactionDescriptionParams{Description: db.NS(description), UpdatedAt: db.TimeNS(now), ID: id})
+		UpdateTransactionDescription(ctx,
+			sqlc.UpdateTransactionDescriptionParams{Description: db.NS(description), UpdatedAt: db.TimeNS(now), ID: id})
 }
 
 // CountTransactions counts every transaction of the space.

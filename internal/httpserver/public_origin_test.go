@@ -46,7 +46,7 @@ func TestPublicPostsRefuseCrossSiteForms(t *testing.T) {
 }
 
 // OAuth endpoints sit outside /api and take cross-origin form posts by design.
-func TestOAuthTokenStillAcceptsCrossOrigin(t *testing.T) {
+func TestOAuthTokenAcceptsCrossOrigin(t *testing.T) {
 	a := newTestApp(t)
 	req, _ := http.NewRequest(
 		"POST",

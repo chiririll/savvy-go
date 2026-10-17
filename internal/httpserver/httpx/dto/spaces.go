@@ -98,7 +98,8 @@ type AuditEntry struct {
 
 func NewAuditEntry(e spaces.AuditEntry) AuditEntry {
 	return AuditEntry{
-		ID: e.ID, Actor: e.Actor, Action: e.Action, TargetUserID: e.TargetUserID, Details: e.Details, CreatedAt: utc(e.CreatedAt),
+		ID: e.ID, Actor: e.Actor, Action: e.Action, TargetUserID: e.TargetUserID, Details: e.Details,
+		CreatedAt: utc(e.CreatedAt),
 	}
 }
 

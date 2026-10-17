@@ -144,7 +144,7 @@ func TestRandomCharactersAreUniform(t *testing.T) {
 	}
 }
 
-func TestEnableDropsRecoveryCodesOfEarlierSetup(t *testing.T) {
+func TestEnableDropsRecoveryCodesEarlierSetup(t *testing.T) {
 	d := newDB(t)
 	ctx := context.Background()
 	tf := TwoFactor{DB: d, Users: Users{DB: d}}
@@ -172,7 +172,8 @@ func TestRecoveryCodesAreStoredAsHashes(t *testing.T) {
 		t.Fatal(err)
 	}
 	var stored string
-	if err := d.QueryRowContext(ctx, `SELECT code FROM two_factor_recovery_codes WHERE user_id = ? LIMIT 1`, a.ID).Scan(&stored); err != nil {
+	if err := d.QueryRowContext(ctx, `SELECT code FROM two_factor_recovery_codes WHERE user_id = ? LIMIT 1`,
+		a.ID).Scan(&stored); err != nil {
 		t.Fatal(err)
 	}
 	if stored == codes[0] || strings.Contains(stored, "-") || len(stored) != 64 {
@@ -186,7 +187,7 @@ func TestRecoveryCodesAreStoredAsHashes(t *testing.T) {
 	}
 }
 
-func TestRecoveryCodeCanBeUsedOnceWhenRequestsRace(t *testing.T) {
+func TestRecoveryCodeSingleUseUnderRace(t *testing.T) {
 	d := newDB(t)
 	ctx := context.Background()
 	users := Users{DB: d}
@@ -286,7 +287,7 @@ func TestAuthenticatorCodeWorksOnce(t *testing.T) {
 	}
 }
 
-func TestAuthenticatorCodeWorksOnceWhenRequestsRace(t *testing.T) {
+func TestAuthenticatorCodeSingleUseUnderRace(t *testing.T) {
 	d := newDB(t)
 	ctx := context.Background()
 	users := Users{DB: d}

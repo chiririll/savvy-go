@@ -19,7 +19,7 @@ func TestResolveAssetsUsesEmbedded(t *testing.T) {
 	}
 }
 
-func TestResolveAssetsFallsBackToPublicDir(t *testing.T) {
+func TestResolveAssetsFallsBackPublicDir(t *testing.T) {
 	if got := Resolve(nil); got == nil {
 		t.Fatal("no FS without an embedded frontend")
 	}

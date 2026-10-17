@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -19,9 +20,11 @@ func (s Service) SamlMetadata(ctx context.Context, p IdentityProvider) string {
 	acs := s.ACSURL(ctx, p)
 	return fmt.Sprintf(`<?xml version="1.0"?>
 <EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata" entityID="%s">
-  <SPSSODescriptor AuthnRequestsSigned="false" WantAssertionsSigned="true" protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+  <SPSSODescriptor AuthnRequestsSigned="false" WantAssertionsSigned="true"
+      protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
     <NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress</NameIDFormat>
-    <AssertionConsumerService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="%s" index="0" isDefault="true"/>
+    <AssertionConsumerService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
+        Location="%s" index="0" isDefault="true"/>
   </SPSSODescriptor>
 </EntityDescriptor>
 `, xmlEscape(entity), xmlEscape(acs))
@@ -108,82 +111,102 @@ func (s Service) samlEntityID(p IdentityProvider) string {
 // samlClockSkew is how far the IdP's clock may differ from ours.
 const samlClockSkew = 2 * time.Minute
 
+// samlWithin reports whether now falls inside the NotBefore/NotOnOrAfter
+// window, allowing for clock skew. A missing end only passes if needEnd is false.
+func samlWithin(now time.Time, notBefore, notOnOrAfter string, needEnd bool) bool {
+	if notBefore != "" {
+		t, err := time.Parse(time.RFC3339, notBefore)
+		if err != nil || now.Add(samlClockSkew).Before(t) {
+			return false
+		}
+	}
+	if notOnOrAfter == "" {
+		return !needEnd
+	}
+	t, err := time.Parse(time.RFC3339, notOnOrAfter)
+	return err == nil && now.Add(-samlClockSkew).Before(t)
+}
+
+// samlAttrOK is the value of attribute name of t and whether t has it. Where
+// an attribute repeats, the last one wins.
+func samlAttrOK(t xml.StartElement, name string) (value string, found bool) {
+	for _, a := range t.Attr {
+		if local(a.Name.Local) == name {
+			value, found = a.Value, true
+		}
+	}
+	return value, found
+}
+
+// samlAttr is the first value of attribute name of t, or "". The conditions
+// check relies on the first one winning.
+func samlAttr(t xml.StartElement, name string) string {
+	for _, a := range t.Attr {
+		if local(a.Name.Local) == name {
+			return a.Value
+		}
+	}
+	return ""
+}
+
+// samlScan collects what samlConditionsHold needs while walking the assertion.
+type samlScan struct {
+	idpEntity    string
+	now          time.Time
+	restrictions [][]string
+	issuers      int
+	conditions   bool
+}
+
+// visit checks one start element. It returns false when the assertion must be rejected.
+func (sc *samlScan) visit(dec *xml.Decoder, t xml.StartElement) bool {
+	switch local(t.Name.Local) {
+	case "Issuer":
+		var v string
+		if dec.DecodeElement(&v, &t) != nil || strings.TrimSpace(v) != sc.idpEntity {
+			return false
+		}
+		sc.issuers++
+	case "Conditions":
+		sc.conditions = true
+		return samlWithin(sc.now, samlAttr(t, "NotBefore"), samlAttr(t, "NotOnOrAfter"), true)
+	case "SubjectConfirmationData":
+		return samlWithin(sc.now, samlAttr(t, "NotBefore"), samlAttr(t, "NotOnOrAfter"), false)
+	case "AudienceRestriction":
+		sc.restrictions = append(sc.restrictions, nil)
+	case "Audience":
+		var v string
+		if dec.DecodeElement(&v, &t) != nil || len(sc.restrictions) == 0 {
+			return false
+		}
+		last := len(sc.restrictions) - 1
+		sc.restrictions[last] = append(sc.restrictions[last], strings.TrimSpace(v))
+	}
+	return true
+}
+
 // samlConditionsHold checks the signed assertion came from the configured IdP,
 // is meant for us, and is valid right now. Anything missing counts as failing.
 func samlConditionsHold(raw, idpEntity, audience string, now time.Time) bool {
 	if idpEntity == "" {
 		return false
 	}
-	within := func(notBefore, notOnOrAfter string, needEnd bool) bool {
-		if notBefore != "" {
-			t, err := time.Parse(time.RFC3339, notBefore)
-			if err != nil || now.Add(samlClockSkew).Before(t) {
-				return false
-			}
-		}
-		if notOnOrAfter == "" {
-			return !needEnd
-		}
-		t, err := time.Parse(time.RFC3339, notOnOrAfter)
-		return err == nil && now.Add(-samlClockSkew).Before(t)
-	}
-	attr := func(t xml.StartElement, name string) string {
-		for _, a := range t.Attr {
-			if local(a.Name.Local) == name {
-				return a.Value
-			}
-		}
-		return ""
-	}
-
+	sc := &samlScan{idpEntity: idpEntity, now: now}
 	dec := xml.NewDecoder(strings.NewReader(raw))
-	var restrictions [][]string
-	issuers := 0
-	conditions := false
 	for {
 		tok, err := dec.Token()
 		if err != nil {
 			break
 		}
-		t, ok := tok.(xml.StartElement)
-		if !ok {
-			continue
-		}
-		switch local(t.Name.Local) {
-		case "Issuer":
-			var v string
-			if dec.DecodeElement(&v, &t) != nil || strings.TrimSpace(v) != idpEntity {
-				return false
-			}
-			issuers++
-		case "Conditions":
-			conditions = true
-			if !within(attr(t, "NotBefore"), attr(t, "NotOnOrAfter"), true) {
-				return false
-			}
-		case "SubjectConfirmationData":
-			if !within(attr(t, "NotBefore"), attr(t, "NotOnOrAfter"), false) {
-				return false
-			}
-		case "AudienceRestriction":
-			restrictions = append(restrictions, nil)
-		case "Audience":
-			var v string
-			if dec.DecodeElement(&v, &t) != nil || len(restrictions) == 0 {
-				return false
-			}
-			restrictions[len(restrictions)-1] = append(restrictions[len(restrictions)-1], strings.TrimSpace(v))
+		if t, ok := tok.(xml.StartElement); ok && !sc.visit(dec, t) {
+			return false
 		}
 	}
-	if issuers == 0 || !conditions || len(restrictions) == 0 {
+	if sc.issuers == 0 || !sc.conditions || len(sc.restrictions) == 0 {
 		return false
 	}
-	for _, r := range restrictions {
-		found := false
-		for _, a := range r {
-			found = found || a == audience
-		}
-		if !found {
+	for _, r := range sc.restrictions {
+		if !slices.Contains(r, audience) {
 			return false
 		}
 	}
@@ -234,57 +257,58 @@ func samlIdentity(p IdentityProvider, nameID string, attrs map[string][]string) 
 	return id
 }
 
+// samlParse collects the name ID, request ID and attributes of a response.
+type samlParse struct {
+	nameID, inResponseTo string
+	attrs                map[string][]string
+	attrName             string
+}
+
+// visit reads one start element.
+func (sp *samlParse) visit(dec *xml.Decoder, t xml.StartElement) {
+	switch local(t.Name.Local) {
+	case "Response":
+		if v, ok := samlAttrOK(t, "InResponseTo"); ok {
+			sp.inResponseTo = v
+		}
+	case "SubjectConfirmationData":
+		if v, ok := samlAttrOK(t, "InResponseTo"); ok && sp.inResponseTo == "" {
+			sp.inResponseTo = v
+		}
+	case "NameID":
+		var v string
+		if dec.DecodeElement(&v, &t) == nil {
+			sp.nameID = strings.TrimSpace(v)
+		}
+	case "Attribute":
+		sp.attrName, _ = samlAttrOK(t, "Name")
+	case "AttributeValue":
+		var v string
+		if dec.DecodeElement(&v, &t) == nil && sp.attrName != "" {
+			sp.attrs[sp.attrName] = append(sp.attrs[sp.attrName], strings.TrimSpace(v))
+		}
+	}
+}
+
 func parseSAMLResponse(raw string) (nameID, inResponseTo string, attrs map[string][]string, ok bool) {
 	if !strings.Contains(raw, "Assertion") && !strings.Contains(raw, "NameID") {
 		return "", "", nil, false
 	}
 	dec := xml.NewDecoder(strings.NewReader(raw))
-	attrs = map[string][]string{}
-	var attrName string
+	sp := &samlParse{attrs: map[string][]string{}}
 	for {
 		tok, err := dec.Token()
 		if err != nil {
 			break
 		}
-		switch t := tok.(type) {
-		case xml.StartElement:
-			switch local(t.Name.Local) {
-			case "Response":
-				for _, a := range t.Attr {
-					if local(a.Name.Local) == "InResponseTo" {
-						inResponseTo = a.Value
-					}
-				}
-			case "SubjectConfirmationData":
-				for _, a := range t.Attr {
-					if local(a.Name.Local) == "InResponseTo" && inResponseTo == "" {
-						inResponseTo = a.Value
-					}
-				}
-			case "NameID":
-				var v string
-				if dec.DecodeElement(&v, &t) == nil {
-					nameID = strings.TrimSpace(v)
-				}
-			case "Attribute":
-				attrName = ""
-				for _, a := range t.Attr {
-					if local(a.Name.Local) == "Name" {
-						attrName = a.Value
-					}
-				}
-			case "AttributeValue":
-				var v string
-				if dec.DecodeElement(&v, &t) == nil && attrName != "" {
-					attrs[attrName] = append(attrs[attrName], strings.TrimSpace(v))
-				}
-			}
+		if t, isStart := tok.(xml.StartElement); isStart {
+			sp.visit(dec, t)
 		}
 	}
-	if nameID == "" && len(attrs) == 0 {
+	if sp.nameID == "" && len(sp.attrs) == 0 {
 		return "", "", nil, false
 	}
-	return nameID, inResponseTo, attrs, true
+	return sp.nameID, sp.inResponseTo, sp.attrs, true
 }
 
 func local(n string) string {

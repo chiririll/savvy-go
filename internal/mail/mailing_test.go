@@ -43,7 +43,7 @@ func TestServiceReadsTheMailerSection(t *testing.T) {
 	}
 }
 
-func TestServiceUsesTheSenderItWasGiven(t *testing.T) {
+func TestServiceUsesSenderItWasGiven(t *testing.T) {
 	sender := smtp.Disabled{}
 	svc := New(config.Empty(), appconfig.Config{}, sender)
 	if svc.Mailer() != sender {

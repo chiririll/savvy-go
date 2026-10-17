@@ -32,7 +32,10 @@ func newSeriesEnv(t *testing.T) *seriesEnv {
 
 func (e *seriesEnv) add(t *testing.T, typ string, accountID int64, categoryID *int64, amount, date string) {
 	t.Helper()
-	if _, err := e.txs.Create(e.ctx, ledger.TxInput{Type: typ, AccountID: accountID, CategoryID: categoryID, Amount: dec(amount), Date: &date}); err != nil {
+	if _,
+		err := e.txs.Create(e.ctx,
+		ledger.TxInput{Type: typ, AccountID: accountID, CategoryID: categoryID, Amount: dec(amount),
+			Date: &date}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -46,7 +49,7 @@ func wantMoney(t *testing.T, what string, got, want money.Money) {
 	}
 }
 
-func TestCashFlowOverTimeAccumulatesTheBalancePerDay(t *testing.T) {
+func TestCashFlowOverTimeAccumulatesDaily(t *testing.T) {
 	e := newSeriesEnv(t)
 	e.add(t, "income", e.usdAcc.ID, &e.salary.ID, "100", "2024-01-13")
 	e.add(t, "expense", e.usdAcc.ID, &e.food.ID, "30", "2024-01-14")
@@ -54,7 +57,10 @@ func TestCashFlowOverTimeAccumulatesTheBalancePerDay(t *testing.T) {
 	// Pending transactions are plans, not money moved.
 	pending := "pending"
 	date := "2024-01-15"
-	if _, err := e.txs.Create(e.ctx, ledger.TxInput{Type: "expense", AccountID: e.usdAcc.ID, Amount: dec("999"), Date: &date, Status: &pending}); err != nil {
+	if _,
+		err := e.txs.Create(e.ctx,
+		ledger.TxInput{Type: "expense", AccountID: e.usdAcc.ID, Amount: dec("999"), Date: &date,
+			Status: &pending}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -79,7 +85,7 @@ func TestCashFlowOverTimeAccumulatesTheBalancePerDay(t *testing.T) {
 	}
 }
 
-func TestCashFlowPairsEachPointWithComparisonPeriod(t *testing.T) {
+func TestCashFlowPairsPointsWithComparison(t *testing.T) {
 	e := newSeriesEnv(t)
 	e.add(t, "expense", e.usdAcc.ID, &e.food.ID, "7", "2024-01-10")
 	e.add(t, "expense", e.usdAcc.ID, &e.food.ID, "20", "2024-01-14")
@@ -97,7 +103,7 @@ func TestCashFlowPairsEachPointWithComparisonPeriod(t *testing.T) {
 	wantMoney(t, "previous balance carries on", *got.Items[2].PrevBalance, usd(e.moneyEnv, "-7"))
 }
 
-func TestCashFlowByMonthHasOnePointPerMonth(t *testing.T) {
+func TestCashFlowMonthlyPointPerMonth(t *testing.T) {
 	e := newSeriesEnv(t)
 	e.add(t, "expense", e.usdAcc.ID, &e.food.ID, "5", "2024-01-31")
 	e.add(t, "expense", e.usdAcc.ID, &e.food.ID, "8", "2024-04-01")
@@ -112,7 +118,7 @@ func TestCashFlowByMonthHasOnePointPerMonth(t *testing.T) {
 	wantMoney(t, "final balance", got.Items[3].Balance, usd(e.moneyEnv, "-13"))
 }
 
-func TestExpensesByCategoryComparesWithTheEarlierPeriod(t *testing.T) {
+func TestExpensesCategoryComparesWithEarlierPeriod(t *testing.T) {
 	e := newSeriesEnv(t)
 	e.add(t, "expense", e.usdAcc.ID, &e.food.ID, "30", "2024-02-10")
 	e.add(t, "expense", e.usdAcc.ID, &e.food.ID, "20", "2024-01-10")
@@ -137,7 +143,7 @@ func TestExpensesByCategoryComparesWithTheEarlierPeriod(t *testing.T) {
 	}
 }
 
-func TestExpensesByCategoryWithoutComparisonHasZeroPrevious(t *testing.T) {
+func TestExpensesCategoryWithoutComparisonZeroPrevious(t *testing.T) {
 	e := newSeriesEnv(t)
 	e.add(t, "expense", e.usdAcc.ID, &e.food.ID, "30", "2024-02-10")
 	got := (Service{DB: e.db}).ExpensesByCategory(e.ctx, Filter{PeriodType: "month", PeriodValue: "2024-02"})
@@ -168,7 +174,7 @@ func TestCategorySummaryTotalsTheType(t *testing.T) {
 	wantMoney(t, "categories add up to the total", sum, total)
 }
 
-func TestTxByCategoryGivesSharesOfTheTotal(t *testing.T) {
+func TestTxCategoryGivesSharesOfTotal(t *testing.T) {
 	e := newSeriesEnv(t)
 	e.add(t, "expense", e.usdAcc.ID, &e.food.ID, "75", "2024-01-14")
 	e.add(t, "expense", e.usdAcc.ID, &e.fun.ID, "25", "2024-01-14")
@@ -189,7 +195,7 @@ func TestTxByCategoryGivesSharesOfTheTotal(t *testing.T) {
 	}
 }
 
-func TestTxDynamicsHasTotalAndLinePerCategory(t *testing.T) {
+func TestTxDynamicsTotalLinePerCategory(t *testing.T) {
 	e := newSeriesEnv(t)
 	e.add(t, "expense", e.usdAcc.ID, &e.food.ID, "10", "2024-01-13")
 	e.add(t, "expense", e.usdAcc.ID, &e.fun.ID, "4", "2024-01-15")
@@ -221,7 +227,7 @@ func TestTxDynamicsHasTotalAndLinePerCategory(t *testing.T) {
 	}
 }
 
-func TestTxTopListsTheLargestFirstInTheBaseCurrency(t *testing.T) {
+func TestTxTopLargestFirstInBase(t *testing.T) {
 	e := newSeriesEnv(t)
 	e.add(t, "expense", e.usdAcc.ID, &e.food.ID, "10", "2024-01-13")
 	e.add(t, "expense", e.jpyAcc.ID, nil, "5000", "2024-01-14") // 50 USD, no category
@@ -280,7 +286,7 @@ func TestFiltersNarrowEveryReport(t *testing.T) {
 	)
 }
 
-func TestHeatmapCoversEveryDayAndFindsThePeak(t *testing.T) {
+func TestHeatmapCoversEveryDayFindsPeak(t *testing.T) {
 	e := newSeriesEnv(t)
 	e.add(t, "expense", e.usdAcc.ID, &e.food.ID, "10", "2024-01-13")
 	e.add(t, "expense", e.usdAcc.ID, &e.food.ID, "5", "2024-01-15")
@@ -297,7 +303,7 @@ func TestHeatmapCoversEveryDayAndFindsThePeak(t *testing.T) {
 	wantMoney(t, "an empty day", got.Items[1].Value, usd(e.moneyEnv, "0"))
 }
 
-func TestReportsOnAnEmptySpaceAreEmptyNotBroken(t *testing.T) {
+func TestReportsEmptySpaceEmptyNotBroken(t *testing.T) {
 	svc := Service{DB: openSpaceDB(t)}
 	ctx := context.Background()
 	if got := svc.Overview(ctx, janRange); got.Currency != "" {

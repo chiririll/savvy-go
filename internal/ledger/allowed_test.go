@@ -74,7 +74,7 @@ func TestPaymentProgress(t *testing.T) {
 	}
 }
 
-func TestDebtTargetWithoutCurrencyDoesNotPanic(t *testing.T) {
+func TestDebtTargetWithoutCurrencyNotPanic(t *testing.T) {
 	a := Account{Balance: money.New(500, testUnit)} // Currency is nil
 	if got := a.DebtTarget(); !got.IsZero() || got.Unit() != testUnit {
 		t.Fatalf("DebtTarget() = %+v", got)

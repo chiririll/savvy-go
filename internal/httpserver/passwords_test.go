@@ -15,7 +15,7 @@ func changePassword(current, next string) passwordChange {
 	return passwordChange{"current_password": current, "password": next, "password_confirmation": next}
 }
 
-func TestChangePasswordKeepsThisSessionAndEndsTheOthers(t *testing.T) {
+func TestChangePasswordEndsOtherSessions(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("u@test.com", "secret1", roleEditor)
 	current, other := a.issue(u, false), a.issue(u, false)
@@ -73,7 +73,7 @@ func TestLogoutOthersKeepsThisSession(t *testing.T) {
 	status(t, a.do("GET", "/api/auth/2fa/status", nil, other.Token, ""), 401, "other session")
 }
 
-func TestAdminCreatesActiveAndInvitedUsers(t *testing.T) {
+func TestAdminCreatesActiveInvitedUsers(t *testing.T) {
 	a := newTestApp(t)
 	sess := a.issue(a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
 
@@ -107,7 +107,7 @@ func TestAdminCreatesActiveAndInvitedUsers(t *testing.T) {
 	status(t, res, 422, "inactive user signs in")
 }
 
-func TestSetPasswordLinkActivatesAnInvitedUser(t *testing.T) {
+func TestSetPasswordLinkActivatesInvitedUser(t *testing.T) {
 	a := newTestApp(t)
 	invited, err := a.svc.Users.Create(context.Background(), "Invited", "invited@test.com", nil, auth.RoleUser)
 	if err != nil {
@@ -139,7 +139,7 @@ func TestSetPasswordLinkActivatesAnInvitedUser(t *testing.T) {
 	)
 }
 
-func TestResettingAPasswordEndsEveryWayIn(t *testing.T) {
+func TestResettingPasswordEndsEveryWayIn(t *testing.T) {
 	a := newTestApp(t)
 	target := a.createUser("target@test.com", "oldpass12", roleEditor)
 	bystander := a.createUser("by@test.com", "secret1", roleEditor)
@@ -157,7 +157,7 @@ func TestResettingAPasswordEndsEveryWayIn(t *testing.T) {
 	status(t, a.bearer("GET", "/api/accounts", nil, bystanderApp), 200, "another user's token")
 }
 
-func TestChangingYourOwnPasswordKeepsYourAPITokens(t *testing.T) {
+func TestChangingPasswordKeepsAPITokens(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("u@test.com", "secret1", roleEditor)
 	app, _ := a.issueToken(u, tokReadWrite, nil)
@@ -177,7 +177,8 @@ func TestPasswordLinkAnswersCarryNoReferrer(t *testing.T) {
 	u, _ := a.svc.Users.Create(context.Background(), "Target", "target@test.com", ptr("oldpass12"), auth.RoleUser)
 	link, _, _ := a.svc.PasswordTokens.Issue(context.Background(), u)
 
-	for label, path := range map[string]string{"valid link": "/api/auth/password/" + link, "unknown link": "/api/auth/password/nope"} {
+	for label, path := range map[string]string{"valid link": "/api/auth/password/" + link,
+		"unknown link": "/api/auth/password/nope"} {
 		res := a.do("GET", path, nil, "", "")
 		res.Body.Close()
 		if got := res.Header.Get("Referrer-Policy"); got != "no-referrer" {
@@ -192,7 +193,7 @@ func TestPasswordLinkAnswersCarryNoReferrer(t *testing.T) {
 	}
 }
 
-func TestAdminResetLinkReplacesTheOldOne(t *testing.T) {
+func TestAdminResetLinkReplacesOldOne(t *testing.T) {
 	a := newTestApp(t)
 	admin := a.createUser("admin@test.com", "secret1", auth.RoleAdmin)
 	sess := a.issue(admin, false)
@@ -232,7 +233,7 @@ func TestAdminResetLinkRefusals(t *testing.T) {
 	)
 }
 
-func TestAdminSettingAPasswordRevokesThePendingLink(t *testing.T) {
+func TestAdminSettingPasswordRevokesPendingLink(t *testing.T) {
 	a := newTestApp(t)
 	sess := a.issue(a.createUser("admin@test.com", "secret1", auth.RoleAdmin), false)
 	invited, _ := a.svc.Users.Create(context.Background(), "Inv", "inv@test.com", nil, auth.RoleUser)

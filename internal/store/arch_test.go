@@ -36,7 +36,7 @@ var sqliteOnlyImports = []string{
 
 var sqliteOnlySQL = regexp.MustCompile(`(?i)\bPRAGMA\b|\bATTACH\s+DATABASE\b|\bsqlite_master\b|\bsqlite_sequence\b`)
 
-func TestP34BusinessLogicDoesNotKnowTheFiles(t *testing.T) {
+func TestP34BusinessLogicIgnoresFiles(t *testing.T) {
 	for _, pkg := range businessPackages {
 		dir := filepath.Join("..", pkg)
 		files, err := filepath.Glob(filepath.Join(dir, "*.go"))
@@ -72,7 +72,7 @@ func TestP34BusinessLogicDoesNotKnowTheFiles(t *testing.T) {
 
 // P57: Laravel is only ever converted by internal/legacy, and the migrations
 // know nothing about it: they create and update Go databases and no more.
-func TestP57MigrationsKnowNothingOfLaravel(t *testing.T) {
+func TestP57MigrationsKnowNothingLaravel(t *testing.T) {
 	files, err := filepath.Glob(filepath.Join("..", "migrate", "*.go"))
 	if err != nil {
 		t.Fatal(err)
@@ -198,7 +198,7 @@ func TestRepositoriesDoNotImportBusinessCode(t *testing.T) {
 // A business package reaches rows of another area through that area's
 // package, never through its repository. reports and seed read and write
 // ledger and automation rows directly by design.
-func TestBusinessCodeUsesOnlyItsOwnRepository(t *testing.T) {
+func TestBusinessCodeUsesOnlyOwnRepository(t *testing.T) {
 	allowed := map[string]bool{"reports": true, "seed": true}
 	const prefix = "savvy-go/internal/db/repo/"
 	for _, pkg := range businessPackages {

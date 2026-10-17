@@ -14,7 +14,7 @@ type (
 	mailer struct{ users *users }
 )
 
-func TestGetBuildsOnceAndResolvesDependencies(t *testing.T) {
+func TestGetBuildsOnceResolvesDependencies(t *testing.T) {
 	l := New()
 	var built atomic.Int32
 	Provide(l, func(*Locator) (*db, error) { built.Add(1); return &db{"main"}, nil })
@@ -41,7 +41,7 @@ func TestSetIsAReadyValue(t *testing.T) {
 	}
 }
 
-func TestSetReplacesAProviderBeforeItIsResolved(t *testing.T) {
+func TestSetReplacesProviderBeforeItResolved(t *testing.T) {
 	l := New()
 	Provide(l, func(*Locator) (*db, error) { return &db{"real"}, nil })
 	Set(l, &db{"fake"})
@@ -58,7 +58,7 @@ func TestMissingServiceNamesTheType(t *testing.T) {
 	}
 }
 
-func TestGetPanicsWhenTheServiceCannotBeBuilt(t *testing.T) {
+func TestGetPanicsWhenServiceCannotBuilt(t *testing.T) {
 	l := New()
 	defer func() {
 		if recover() == nil {
@@ -68,7 +68,7 @@ func TestGetPanicsWhenTheServiceCannotBeBuilt(t *testing.T) {
 	Get[*db](l)
 }
 
-func TestBuildErrorIsReportedWithThePathThatNeededIt(t *testing.T) {
+func TestBuildErrorNamesRequestingPath(t *testing.T) {
 	l := New()
 	boom := errors.New("boom")
 	Provide(l, func(*Locator) (*db, error) { return nil, boom })
@@ -86,7 +86,7 @@ func TestBuildErrorIsReportedWithThePathThatNeededIt(t *testing.T) {
 	}
 }
 
-func TestCycleIsAnErrorNotAHang(t *testing.T) {
+func TestCycleIsErrorNotAHang(t *testing.T) {
 	l := New()
 	Provide(l, func(l *Locator) (*users, error) { _, err := TryGet[*mailer](l); return nil, err })
 	Provide(l, func(l *Locator) (*mailer, error) { _, err := TryGet[*users](l); return nil, err })
@@ -95,7 +95,7 @@ func TestCycleIsAnErrorNotAHang(t *testing.T) {
 	}
 }
 
-func TestBuildResolvesEverythingAndReportsTheFirstFailure(t *testing.T) {
+func TestBuildResolvesEverythingReportsFirstFailure(t *testing.T) {
 	l := New()
 	var built atomic.Int32
 	Provide(l, func(*Locator) (*db, error) { built.Add(1); return &db{}, nil })
@@ -110,7 +110,7 @@ func TestBuildResolvesEverythingAndReportsTheFirstFailure(t *testing.T) {
 	}
 }
 
-func TestCloseRunsInReverseOrderOfConstruction(t *testing.T) {
+func TestCloseRunsReverseOrderOfConstruction(t *testing.T) {
 	l := New()
 	var order []string
 	Provide(l, func(l *Locator) (*db, error) {

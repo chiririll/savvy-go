@@ -38,10 +38,11 @@ func TestStartBootstrapOnAnEmptyServer(t *testing.T) {
 	}
 }
 
-func TestStartBootstrapSkipsAServerWithUsers(t *testing.T) {
+func TestStartBootstrapSkipsServerWithUsers(t *testing.T) {
 	st, cfg := openStore(t)
 	pass := "secret1"
-	if _, err := (auth.Users{DB: st.Server()}).Create(context.Background(), "A", "a@a.com", &pass, auth.RoleAdmin); err != nil {
+	if _,
+		err := (auth.Users{DB: st.Server()}).Create(context.Background(), "A", "a@a.com", &pass, auth.RoleAdmin); err != nil {
 		t.Fatal(err)
 	}
 	stale := filepath.Join(cfg.DataDir, firstrun.FileName)

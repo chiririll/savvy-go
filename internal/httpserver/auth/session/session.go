@@ -72,27 +72,12 @@ func (h Handler) authRegister(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusForbidden, "Registration is closed.")
 		return
 	}
-	var body struct {
-		Name              string `json:"name"`
-		Email             string `json:"email"`
-		Password          string `json:"password"`
-		BootstrapPassword string `json:"bootstrap_password"`
-	}
+	var body registerBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		httpx.WriteValidation(w, map[string][]string{"email": {"The given data was invalid."}})
 		return
 	}
-	errs := map[string][]string{}
-	if strings.TrimSpace(body.Name) == "" {
-		errs["name"] = []string{"The name field is required."}
-	}
-	if !httpx.LooksLikeEmail(body.Email) {
-		errs["email"] = []string{"The email field must be a valid email address."}
-	}
-	if password.TooShort(body.Password) {
-		errs["password"] = []string{password.TooShortMessage}
-	}
-	if len(errs) > 0 {
+	if errs := body.validate(); len(errs) > 0 {
 		httpx.WriteValidation(w, errs)
 		return
 	}
@@ -112,6 +97,32 @@ func (h Handler) authRegister(w http.ResponseWriter, r *http.Request) {
 		}
 		return nil
 	})
+	h.finishRegister(w, r, u, err)
+}
+
+type registerBody struct {
+	Name              string `json:"name"`
+	Email             string `json:"email"`
+	Password          string `json:"password"`
+	BootstrapPassword string `json:"bootstrap_password"`
+}
+
+func (b registerBody) validate() map[string][]string {
+	errs := map[string][]string{}
+	if strings.TrimSpace(b.Name) == "" {
+		errs["name"] = []string{"The name field is required."}
+	}
+	if !httpx.LooksLikeEmail(b.Email) {
+		errs["email"] = []string{"The email field must be a valid email address."}
+	}
+	if password.TooShort(b.Password) {
+		errs["password"] = []string{password.TooShortMessage}
+	}
+	return errs
+}
+
+// finishRegister answers a registration: the error Register gave, or a login of the new admin.
+func (h Handler) finishRegister(w http.ResponseWriter, r *http.Request, u *auth.User, err error) {
 	switch {
 	case errors.Is(err, firstrun.ErrWrongPassword):
 		httpx.WriteValidation(w, map[string][]string{"bootstrap_password": {"The bootstrap password is missing or wrong."}})
@@ -166,7 +177,7 @@ func (h Handler) authLogin(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		u = nil
 	}
-	if !credentialsOK(password.CheckOrBurn, u, body.Password) {
+	if !credentialsOK(password.CheckConstantTime, u, body.Password) {
 		httpx.WriteValidation(w, map[string][]string{"email": {"Invalid credentials."}})
 		return
 	}

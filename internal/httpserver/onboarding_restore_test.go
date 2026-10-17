@@ -63,7 +63,7 @@ func userCount(t *testing.T, a *testApp) int {
 	return n
 }
 
-func TestFirstRunRestoreNeedsTheBootstrapPassword(t *testing.T) {
+func TestFirstRunRestoreNeedsBootstrapPassword(t *testing.T) {
 	a := newTestApp(t)
 	content := serverBackupFile(t)
 
@@ -74,19 +74,19 @@ func TestFirstRunRestoreNeedsTheBootstrapPassword(t *testing.T) {
 	}
 }
 
-func TestFirstRunRestoreIsRefusedOnceAUserExists(t *testing.T) {
+func TestFirstRunRestoreRefusedWithUsers(t *testing.T) {
 	a := newTestApp(t)
 	pass := a.bootstrap.Password()
 	a.createUser("someone@test.com", "secret1", auth.RoleUser)
 	status(t, a.firstRunRestore(pass, "b.zip", serverBackupFile(t), nil), http.StatusForbidden, "users present")
 }
 
-func TestFirstRunRestoreWithoutAGuardIsClosed(t *testing.T) {
+func TestFirstRunRestoreWithoutGuardClosed(t *testing.T) {
 	a := appWithGuard(t, nil)
 	status(t, a.firstRunRestore("anything", "b.zip", serverBackupFile(t), nil), http.StatusForbidden, "no guard")
 }
 
-func TestFailedFirstRunRestoreKeepsThePasswordValid(t *testing.T) {
+func TestFailedFirstRunRestoreKeepsPassword(t *testing.T) {
 	a := newTestApp(t)
 	pass := a.bootstrap.Password()
 
@@ -113,7 +113,7 @@ func TestFailedFirstRunRestoreKeepsThePasswordValid(t *testing.T) {
 	}
 }
 
-func TestFirstRunRestoreLoadsTheBackupAndClosesSetup(t *testing.T) {
+func TestFirstRunRestoreClosesSetup(t *testing.T) {
 	a := newTestApp(t)
 	pass := a.bootstrap.Password()
 
@@ -147,7 +147,7 @@ func TestFirstRunRestoreLoadsTheBackupAndClosesSetup(t *testing.T) {
 	status(t, a.firstRunRestore(pass, "b.zip", serverBackupFile(t), nil), http.StatusForbidden, "second restore")
 }
 
-func TestFirstRunRestoreOfALaravelDatabase(t *testing.T) {
+func TestFirstRunRestoreOfLaravelDatabase(t *testing.T) {
 	a := newTestApp(t)
 	pass := a.bootstrap.Password()
 	laravel, _ := os.ReadFile(laravelFile(t, true))
@@ -165,7 +165,7 @@ func TestFirstRunRestoreOfALaravelDatabase(t *testing.T) {
 	}
 }
 
-func TestFirstRunRestoreWithoutUsersKeepsSetupOpen(t *testing.T) {
+func TestFirstRunRestoreEmptyKeepsOpen(t *testing.T) {
 	a := newTestApp(t)
 	pass := a.bootstrap.Password()
 	empty := newTestApp(t)

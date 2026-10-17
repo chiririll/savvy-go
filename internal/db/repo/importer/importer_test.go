@@ -68,7 +68,7 @@ func TestImportLifecycle(t *testing.T) {
 	}
 }
 
-func TestRowsWithTheSameHashAreInsertedOnce(t *testing.T) {
+func TestRowsWithSameHashInsertedOnce(t *testing.T) {
 	d := dbtest.Space(t)
 	l := ledgerrepo.Repo{DB: d}
 	now := time.Now().UTC()

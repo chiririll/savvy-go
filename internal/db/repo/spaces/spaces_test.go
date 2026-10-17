@@ -39,7 +39,7 @@ func newRegistry(t *testing.T) *registry {
 	return r
 }
 
-func TestSpacesAreFoundByIDAndUUID(t *testing.T) {
+func TestSpacesAreFoundByIDUUID(t *testing.T) {
 	r := newRegistry(t)
 	if sp, _ := r.repo.ByID(ctx, r.space); sp == nil || sp.UUID != "uuid-1" || sp.Name != "Home" {
 		t.Fatalf("space = %+v", sp)
@@ -58,7 +58,7 @@ func TestSpacesAreFoundByIDAndUUID(t *testing.T) {
 	}
 }
 
-func TestMembersAndRoles(t *testing.T) {
+func TestMembersRoles(t *testing.T) {
 	r := newRegistry(t)
 	now := time.Now().UTC()
 	if role, err := r.repo.MemberRole(ctx, r.space, r.ann); role != "" || err != nil {
@@ -113,7 +113,7 @@ func TestQuotaIsOptional(t *testing.T) {
 	}
 }
 
-func TestInvitationsAreUsedOnceAndRevokedByTheirSpace(t *testing.T) {
+func TestInvitationsUsedOnceRevokedTheirSpace(t *testing.T) {
 	r := newRegistry(t)
 	now := time.Now().UTC().Truncate(time.Second)
 	if _, err := r.repo.InsertInvitation(ctx, spacesrepo.NewInvitation{
@@ -165,7 +165,7 @@ func TestInvitationsAreUsedOnceAndRevokedByTheirSpace(t *testing.T) {
 	}
 }
 
-func TestExpiringAnInvitationKeepsTheRowForItsCooldown(t *testing.T) {
+func TestExpiringInvitationKeepsRowItsCooldown(t *testing.T) {
 	r := newRegistry(t)
 	now := time.Now().UTC().Truncate(time.Second)
 	id, err := r.repo.InsertInvitation(ctx, spacesrepo.NewInvitation{
@@ -200,7 +200,7 @@ func TestExpiringAnInvitationKeepsTheRowForItsCooldown(t *testing.T) {
 	}
 }
 
-func TestClearingExpiredInvitationsSparesPendingAndAccepted(t *testing.T) {
+func TestClearingExpiredInvitationsSparesPendingAccepted(t *testing.T) {
 	r := newRegistry(t)
 	now := time.Now().UTC().Truncate(time.Second)
 	add := func(email, hash string, expires time.Time) int64 {
@@ -248,7 +248,7 @@ func TestMemberByEmail(t *testing.T) {
 	}
 }
 
-func TestAuditLogIsNewestFirstAndActorIsOptional(t *testing.T) {
+func TestAuditLogNewestFirstActorOptional(t *testing.T) {
 	r := newRegistry(t)
 	t0 := time.Now().UTC().Truncate(time.Second)
 	_ = r.repo.InsertAudit(ctx, &r.ann, &r.space, &r.bob, "assign_admin", "bob@test.com", t0)
@@ -261,7 +261,8 @@ func TestAuditLogIsNewestFirstAndActorIsOptional(t *testing.T) {
 	if log[0].Action != "set_quota" || log[1].Action != "assign_admin" {
 		t.Fatalf("order = %s, %s", log[0].Action, log[1].Action)
 	}
-	if log[1].Actor != "Ann" || log[1].TargetUserID == nil || *log[1].TargetUserID != r.bob || log[1].Details != "bob@test.com" ||
+	if log[1].Actor != "Ann" || log[1].TargetUserID == nil || *log[1].TargetUserID != r.bob ||
+		log[1].Details != "bob@test.com" ||
 		log[1].CreatedAt == nil ||
 		!log[1].CreatedAt.Equal(t0) {
 		t.Fatalf("entry = %+v", log[1])
@@ -271,7 +272,7 @@ func TestAuditLogIsNewestFirstAndActorIsOptional(t *testing.T) {
 	}
 }
 
-func TestOverviewCountsMembersAndAdmins(t *testing.T) {
+func TestOverviewCountsMembersAdmins(t *testing.T) {
 	r := newRegistry(t)
 	now := time.Now().UTC()
 	_ = r.repo.UpsertMember(ctx, r.space, r.ann, "admin", now)

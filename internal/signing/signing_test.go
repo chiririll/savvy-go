@@ -9,7 +9,7 @@ import (
 )
 
 // P50: a key that was in use is never silently replaced when its file is gone.
-func TestP50MissingKeyIsNotRegenerated(t *testing.T) {
+func TestP50MissingKeyNotRegenerated(t *testing.T) {
 	dir := t.TempDir()
 	if _, err := Load(dir, true); !errors.Is(err, ErrKeyMissing) {
 		t.Fatalf("missing used key: %v", err)
@@ -28,7 +28,7 @@ func TestP50MissingKeyIsNotRegenerated(t *testing.T) {
 	}
 }
 
-func TestKeyFileRoundTripAndMalformedKeys(t *testing.T) {
+func TestKeyFileRoundTripMalformedKeys(t *testing.T) {
 	dir := t.TempDir()
 	key, err := Generate(dir)
 	if err != nil {
@@ -76,7 +76,7 @@ func TestKeyFileRoundTripAndMalformedKeys(t *testing.T) {
 	}
 }
 
-func TestVerifyRefusesWrongKeysAndSignatures(t *testing.T) {
+func TestVerifyRefusesWrongKeysSignatures(t *testing.T) {
 	a, _ := Generate(t.TempDir())
 	b, _ := Generate(t.TempDir())
 	msg := []byte("m")
@@ -131,7 +131,7 @@ func TestKeyRingSaysWhoSignedWhat(t *testing.T) {
 	}
 }
 
-func TestHolderSwapsTheKeyForEveryReader(t *testing.T) {
+func TestHolderSwapsKeyForEveryReader(t *testing.T) {
 	a, _ := Generate(t.TempDir())
 	b, _ := Generate(t.TempDir())
 	h := NewHolder(a)

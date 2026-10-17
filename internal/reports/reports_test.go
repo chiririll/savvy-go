@@ -13,7 +13,7 @@ import (
 
 var janRange = Filter{PeriodType: "custom", StartDate: "2024-01-13", EndDate: "2024-01-15"}
 
-func TestNetWorthConvertsEachAccountToBase(t *testing.T) {
+func TestNetWorthConvertsEachAccountBase(t *testing.T) {
 	e := newMoneyEnv(t)
 	got := (Service{DB: e.db}).NetWorth(e.ctx, Filter{})
 	// USD 100 + JPY 3000*0.01 + BTC 0.
@@ -29,7 +29,7 @@ func TestNetWorthConvertsEachAccountToBase(t *testing.T) {
 	}
 }
 
-func TestTxSummaryAveragesRoundToBaseScale(t *testing.T) {
+func TestTxSummaryAveragesRoundBaseScale(t *testing.T) {
 	e := newMoneyEnv(t)
 	e.tx(t, "expense", e.usdAcc.ID, "10.00")
 	got := (Service{DB: e.db}).TxSummary(e.ctx, janRange, "expense")
@@ -141,7 +141,7 @@ func TestMoneyFlowSplitsIncomeAcrossExpenses(t *testing.T) {
 	}
 }
 
-func TestExpensePaceBudgetIsConvertedToBase(t *testing.T) {
+func TestExpensePaceBudgetConvertedToBase(t *testing.T) {
 	e := newMoneyEnv(t)
 	if _, err := (ledger.Budgets{DB: e.db}).Create(e.ctx, ledger.BudgetInput{
 		Name: "yen budget", Amount: dec("10000"), CurrencyID: &e.jpy.ID, Period: "monthly", IsGlobal: ptrTo(true),
@@ -164,7 +164,10 @@ func TestOverviewSavingsRate(t *testing.T) {
 	cats := ledger.Categories{DB: e.db}
 	salary, _ := cats.Create(e.ctx, ledger.Category{Name: "Salary", Type: "income"})
 	date := "2024-01-15"
-	if _, err := e.txs.Create(e.ctx, ledger.TxInput{Type: "income", AccountID: e.usdAcc.ID, CategoryID: &salary.ID, Amount: dec("200"), Date: &date}); err != nil {
+	if _,
+		err := e.txs.Create(e.ctx,
+		ledger.TxInput{Type: "income", AccountID: e.usdAcc.ID, CategoryID: &salary.ID, Amount: dec("200"),
+			Date: &date}); err != nil {
 		t.Fatal(err)
 	}
 	e.tx(t, "expense", e.usdAcc.ID, "50")

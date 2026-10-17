@@ -64,7 +64,7 @@ func newVerifyEnv(t *testing.T, appURL string, mailOn bool) *verifyEnv {
 	}
 }
 
-func TestCanRequireNeedsMailAURLAndAVerifiedAdmin(t *testing.T) {
+func TestCanRequireNeedsMailURLAdmin(t *testing.T) {
 	t.Run("mail is off", func(t *testing.T) {
 		e := newVerifyEnv(t, "https://app.test", false)
 		var me MailRequiredError
@@ -94,7 +94,7 @@ func TestCanRequireNeedsMailAURLAndAVerifiedAdmin(t *testing.T) {
 	})
 }
 
-func TestSendEmailsALinkThatConfirmsTheAddress(t *testing.T) {
+func TestSendEmailsLinkThatConfirmsAddress(t *testing.T) {
 	e := newVerifyEnv(t, "https://app.test", true)
 	if why := e.v.Send(e.ctx, e.user); why != "" {
 		t.Fatalf("Send: %s", why)
@@ -138,7 +138,7 @@ func TestSendSaysWhyItCannot(t *testing.T) {
 	}
 }
 
-func TestOffReasonNamesTheMistakeInTheSection(t *testing.T) {
+func TestOffReasonNamesMistakeInSection(t *testing.T) {
 	f, err := config.Open(filepath.Join(t.TempDir(), "config.toml"))
 	if err != nil {
 		t.Fatal(err)
@@ -170,7 +170,7 @@ func TestOffReasonNamesTheMistakeInTheSection(t *testing.T) {
 	}
 }
 
-func TestSendGivesUpOnTheMailerErrorAndReturnsIt(t *testing.T) {
+func TestSendReturnsMailerError(t *testing.T) {
 	rec := &recorder{fail: errors.New("boom")}
 	svc := New(config.Empty(), appconfig.Config{}, rec)
 	if err := svc.Send(context.Background(), smtp.Message{To: "a@b.c"}); err == nil || err.Error() != "boom" {

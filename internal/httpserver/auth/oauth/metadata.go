@@ -12,7 +12,8 @@ func oauthPreflight(w http.ResponseWriter, r *http.Request) {
 	httpx.OpenCORS(w)
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
 	w.Header().
-		Set("Access-Control-Allow-Headers", "Authorization, Content-Type, Mcp-Session-Id, Mcp-Protocol-Version, Last-Event-ID")
+		Set("Access-Control-Allow-Headers",
+			"Authorization, Content-Type, Mcp-Session-Id, Mcp-Protocol-Version, Last-Event-ID")
 	w.WriteHeader(http.StatusNoContent)
 }
 

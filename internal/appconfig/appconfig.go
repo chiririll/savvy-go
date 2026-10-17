@@ -14,7 +14,7 @@ import (
 
 // pathsTable is the [paths] table.
 type pathsTable struct {
-	Data    string `toml:"data" comment:"Where the databases live. Empty: /data or /var/lib/savvy-go when they exist, otherwise ./savvy-data."`
+	Data    string `toml:"data" comment:"Database location. Empty: /data, /var/lib/savvy-go if there, else ./savvy-data."`
 	Uploads string `toml:"uploads" comment:"Empty: <data>/uploads."`
 	Backups string `toml:"backups" comment:"Empty: <data>/backups."`
 }
