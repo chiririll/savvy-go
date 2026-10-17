@@ -20,7 +20,7 @@ are what make the second factor actually hold.
 | 08 | [Trust only the `__Host-` cookie over HTTPS](08-host-cookie-only.md) | Medium |
 | 09 | [Absolute cap for remember-me sessions](09-remember-me-cap.md) | Low |
 | 10 | [Harden password links](10-password-links.md) | Low |
-| 11 | [Re-authenticate before credential changes](11-step-up-auth.md) | Low |
+| 11 | [Confirm before credential changes](11-step-up-auth.md) | Low |
 | 12 | [Origin check on public auth POSTs](12-public-post-origin.md) | Low |
 | 13 | [Small hardening items](13-small-hardening.md) | Low |
 

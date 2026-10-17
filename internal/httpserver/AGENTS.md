@@ -7,6 +7,7 @@
 ## Auth routes
 
 - Public route that takes a guess at a password or token: mount it `r.With(Guard.LimitAttempts)`. One shared per-IP count, so changing route or token gains nothing. Account-keyed limit: `Guard.AllowAccount`.
+- Session route that adds lasting access (passkey, 2FA, API token, OAuth approval): call `confirm.Confirmer.Require` after validation. Stolen session alone must not be enough; bad form costs no attempt.
 - Password minimum: `password.MinLength`, never a literal.
 
 ## Mailer and bootstrap

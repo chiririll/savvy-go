@@ -22,7 +22,12 @@ func (h Handler) webauthnIndex(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, dto.PasskeyList{Credentials: dto.Map(list, dto.NewWebAuthnCred)})
 }
 
+// webauthnRegisterOptions asks for confirmation here, at the start. The finish step
+// only completes a challenge that was issued to this user after that check.
 func (h Handler) webauthnRegisterOptions(w http.ResponseWriter, r *http.Request) {
+	if !h.Confirm.RequireBody(w, r) {
+		return
+	}
 	token, options, err := h.WebAuthn.BeginRegistration(r.Context(), httpx.User(r))
 	if err != nil {
 		if err.Error() == "limit" {
@@ -79,6 +84,9 @@ func (h Handler) webauthnUpdate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h Handler) webauthnDestroy(w http.ResponseWriter, r *http.Request) {
+	if !h.Confirm.RequireBody(w, r) {
+		return
+	}
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err := h.WebAuthn.Delete(r.Context(), httpx.User(r).ID, id); err != nil {
 		if err == auth.ErrNotFound {

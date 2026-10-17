@@ -15,7 +15,7 @@ func TestTwoFactorEnableConfirmLoginAndRecovery(t *testing.T) {
 	u := a.createUser("otp@test.com", "secret1", roleEditor)
 	iss := a.issue(u, false)
 
-	en := a.do("POST", "/api/auth/2fa/enable", map[string]any{}, iss.Token, iss.CSRF)
+	en := a.do("POST", "/api/auth/2fa/enable", map[string]any{"current_password": "secret1"}, iss.Token, iss.CSRF)
 	if en.StatusCode != 200 {
 		t.Fatalf("enable %d %v", en.StatusCode, decodeJSON(t, en))
 	}

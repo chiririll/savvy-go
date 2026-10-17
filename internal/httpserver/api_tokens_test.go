@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"strconv"
 	"testing"
@@ -68,6 +69,14 @@ func (a *testApp) issueGrant(u *auth.User, g auth.Grant, exp *time.Time) (string
 	return raw, tok
 }
 
+// confirmed adds the password every credential change asks for. createUser gives
+// its users the password "secret1".
+func confirmed(body map[string]any) map[string]any {
+	out := map[string]any{"current_password": "secret1"}
+	maps.Copy(out, body)
+	return out
+}
+
 func status(t *testing.T, res *http.Response, want int, label string) {
 	t.Helper()
 	res.Body.Close()
@@ -81,7 +90,7 @@ func TestAPITokenCreateListRevoke(t *testing.T) {
 	u := a.createUser("rw@a.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 
-	res := a.do("POST", "/api/auth/api-tokens", map[string]any{"name": "Zapier", "permissions": allPerms(permissions.Write), "all_spaces": true}, sess.Token, sess.CSRF)
+	res := a.do("POST", "/api/auth/api-tokens", confirmed(map[string]any{"name": "Zapier", "permissions": allPerms(permissions.Write), "all_spaces": true}), sess.Token, sess.CSRF)
 	if res.StatusCode != http.StatusCreated {
 		t.Fatalf("create %d", res.StatusCode)
 	}
@@ -196,7 +205,11 @@ func TestAPITokenStoreValidation(t *testing.T) {
 		{"malformed body", "not an object", "name"},
 	}
 	for _, c := range cases {
-		res := a.do("POST", "/api/auth/api-tokens", c.body, sess.Token, sess.CSRF)
+		body := c.body
+		if m, ok := body.(map[string]any); ok {
+			body = confirmed(m)
+		}
+		res := a.do("POST", "/api/auth/api-tokens", body, sess.Token, sess.CSRF)
 		if res.StatusCode != http.StatusUnprocessableEntity {
 			res.Body.Close()
 			t.Fatalf("%s: got %d want 422", c.label, res.StatusCode)
@@ -220,7 +233,7 @@ func TestAPITokenGrantAndFutureExpiry(t *testing.T) {
 	sess := a.issue(u, false)
 	exp := time.Now().Add(24 * time.Hour).Truncate(time.Second)
 
-	res := a.do("POST", "/api/auth/api-tokens", map[string]any{"name": "ci", "all_spaces": true, "permissions": []string{"accounts:read"}, "expires_at": exp.Format(time.RFC3339)}, sess.Token, sess.CSRF)
+	res := a.do("POST", "/api/auth/api-tokens", confirmed(map[string]any{"name": "ci", "all_spaces": true, "permissions": []string{"accounts:read"}, "expires_at": exp.Format(time.RFC3339)}), sess.Token, sess.CSRF)
 	if res.StatusCode != http.StatusCreated {
 		t.Fatalf("create %d", res.StatusCode)
 	}
@@ -242,7 +255,7 @@ func TestAPITokenLimit(t *testing.T) {
 	}
 	sess := a.issue(u, false)
 
-	status(t, a.do("POST", "/api/auth/api-tokens", map[string]any{"name": "51st"}, sess.Token, sess.CSRF), 422, "over limit")
+	status(t, a.do("POST", "/api/auth/api-tokens", confirmed(map[string]any{"name": "51st"}), sess.Token, sess.CSRF), 422, "over limit")
 	if _, _, err := a.svc.APITokens.Issue(context.Background(), u, "x", auth.Grant{Permissions: allPerms(permissions.Read), AllSpaces: true}, nil); err != auth.ErrTokenLimit {
 		t.Fatalf("issue over limit: %v", err)
 	}

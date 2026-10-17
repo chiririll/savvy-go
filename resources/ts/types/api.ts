@@ -14,6 +14,8 @@ export interface PaginatedResponse<T> {
 export interface ApiError {
     message: string
     code: string
+    /** The server's machine-readable error code, when it sent one (`confirmation_invalid`). */
+    reason?: string
     details?: Record<string, string[]>
 }
 

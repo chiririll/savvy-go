@@ -84,6 +84,7 @@ func (a *testApp) approve(sessToken, csrf, clientID string, approve bool) string
 	res := a.do("POST", "/api/oauth/authorize", map[string]any{
 		"client_id": clientID, "redirect_uri": oauthRedirect, "state": "st-1",
 		"code_challenge": oauthChallenge(), "code_challenge_method": "S256", "approve": approve, "all_spaces": true,
+		"current_password": "secret1",
 	}, sessToken, csrf)
 	if res.StatusCode != http.StatusOK {
 		a.t.Fatalf("approve: %d", res.StatusCode)
@@ -492,7 +493,7 @@ func TestOAuthConsentCanGrantWriteToChosenResources(t *testing.T) {
 	res := a.do("POST", "/api/oauth/authorize", map[string]any{
 		"client_id": id, "redirect_uri": oauthRedirect, "state": "st-1",
 		"code_challenge": oauthChallenge(), "code_challenge_method": "S256", "approve": true, "all_spaces": true,
-		"permissions": []string{"tags:write", "transactions:read"},
+		"permissions": []string{"tags:write", "transactions:read"}, "current_password": "secret1",
 	}, sess.Token, sess.CSRF)
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("approve = %d", res.StatusCode)

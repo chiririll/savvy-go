@@ -9,7 +9,7 @@ func TestWebauthnOptionsAndCredentialCRUD(t *testing.T) {
 	u := a.createUser("pk@test.com", "secret1", roleEditor)
 	iss := a.issue(u, false)
 
-	opts := a.do("POST", "/api/auth/webauthn/register/options", map[string]any{}, iss.Token, iss.CSRF)
+	opts := a.do("POST", "/api/auth/webauthn/register/options", map[string]any{"current_password": "secret1"}, iss.Token, iss.CSRF)
 	if opts.StatusCode != 200 {
 		t.Fatalf("register options %d %v", opts.StatusCode, decodeJSON(t, opts))
 	}
@@ -50,7 +50,7 @@ func TestWebauthnOptionsAndCredentialCRUD(t *testing.T) {
 		t.Fatalf("rename %d", ren.StatusCode)
 	}
 	ren.Body.Close()
-	del := a.do("DELETE", "/api/auth/webauthn/credentials/"+itoa(id), map[string]any{}, iss.Token, iss.CSRF)
+	del := a.do("DELETE", "/api/auth/webauthn/credentials/"+itoa(id), map[string]any{"current_password": "secret1"}, iss.Token, iss.CSRF)
 	if del.StatusCode != 200 {
 		t.Fatalf("delete %d", del.StatusCode)
 	}

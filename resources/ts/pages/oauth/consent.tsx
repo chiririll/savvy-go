@@ -24,6 +24,7 @@ import { PermissionPicker } from '@/components/features/api-tokens/PermissionPic
 import { kindOptions, permissionLevel, type ApiPermission, type ApiResource } from '@/types'
 import { apiResourceLabel } from '@/lib/labels'
 import { useUser } from '@/stores/auth'
+import { isConfirmCancelled, withConfirmation } from '@/stores/confirm'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { testId } from '@/lib/test-id'
 
@@ -86,11 +87,14 @@ export default function OAuthConsentPage() {
         setBusy(approve ? 'allow' : 'deny')
         setError(null)
         try {
-            const url = await oauthApi.decide(request, approve, spaceChoice, permissions)
+            // Allowing mints the app a token, so it asks for the password or code; denying asks for nothing.
+            const url = approve
+                ? await withConfirmation((fields) => oauthApi.decide(request, true, spaceChoice, permissions, fields))
+                : await oauthApi.decide(request, false, spaceChoice, permissions)
             setDone(true)
             window.location.assign(url)
         } catch (e) {
-            setError(getApiErrorMessage(e, t('oauth.failed')))
+            if (!isConfirmCancelled(e)) setError(getApiErrorMessage(e, t('oauth.failed')))
             setBusy(null)
         }
     }

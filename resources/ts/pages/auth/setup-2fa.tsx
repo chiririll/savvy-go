@@ -54,9 +54,13 @@ export default function Setup2FAPage() {
     }
 
     const handleEnable = async () => {
-        const data = await enableMutation.mutateAsync()
-        setQrData(data)
-        setStep('qr')
+        try {
+            const data = await enableMutation.mutateAsync()
+            setQrData(data)
+            setStep('qr')
+        } catch {
+            // toasted by the mutation, or the user cancelled the confirmation
+        }
     }
 
     const handleConfirm = async () => {

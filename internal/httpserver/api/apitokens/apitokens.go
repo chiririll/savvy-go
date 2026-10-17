@@ -15,6 +15,7 @@ import (
 
 	"savvy-go/internal/auth"
 	"savvy-go/internal/auth/permissions"
+	"savvy-go/internal/httpserver/httpx/confirm"
 	"savvy-go/internal/httpserver/httpx/dto"
 
 	"github.com/go-chi/chi/v5"
@@ -43,6 +44,7 @@ func (h Handler) apiTokensStore(w http.ResponseWriter, r *http.Request) {
 		AllSpaces   bool     `json:"all_spaces"`
 		SpaceIDs    []int64  `json:"space_ids"`
 		ExpiresAt   *string  `json:"expires_at"`
+		confirm.Fields
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		httpx.WriteValidation(w, map[string][]string{"name": {"The given data was invalid."}})
@@ -73,6 +75,10 @@ func (h Handler) apiTokensStore(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(errs) > 0 {
 		httpx.WriteValidation(w, errs)
+		return
+	}
+	// Asked last: a form that fails validation costs no attempt.
+	if !h.Confirm.Require(w, r, body.Fields) {
 		return
 	}
 	raw, tok, err := h.Tokens.Issue(r.Context(), u, name, grant, expires)
@@ -185,6 +191,7 @@ func (h Handler) apiTokensUpdate(w http.ResponseWriter, r *http.Request) {
 		Permissions []string `json:"permissions"`
 		AllSpaces   bool     `json:"all_spaces"`
 		SpaceIDs    []int64  `json:"space_ids"`
+		confirm.Fields
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		httpx.WriteValidation(w, map[string][]string{"permissions": {"The given data was invalid."}})
@@ -195,6 +202,9 @@ func (h Handler) apiTokensUpdate(w http.ResponseWriter, r *http.Request) {
 	})
 	if len(errs) > 0 {
 		httpx.WriteValidation(w, errs)
+		return
+	}
+	if !h.Confirm.Require(w, r, body.Fields) {
 		return
 	}
 	tok, err := h.Tokens.UpdateGrant(r.Context(), u.ID, id, grant)

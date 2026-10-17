@@ -57,7 +57,10 @@ paths:
     post:
       tags: [API tokens]
       summary: Create an API token
-      description: Session only. The raw `token` is shown once, in this response.
+      description: >-
+        Session only. The raw `token` is shown once, in this response. Asks you to confirm with your
+        password, or with a code when 2FA is on: without it the answer is `403` with error
+        `confirmation_required`, with a wrong one `422` with `confirmation_invalid`.
       security: [{cookieAuth: []}]
       requestBody:
         required: true
@@ -85,6 +88,8 @@ paths:
                   description: Spaces the token may reach; the owner must belong to each. Required unless `all_spaces` is true.
                   items: {type: integer}
                 expires_at: {type: string, format: date-time, nullable: true, description: Future RFC 3339 timestamp; omit for a token that never expires.}
+                current_password: {type: string, description: Your password. Required, unless you have 2FA on (send `code`) or sign in only through single sign-on.}
+                code: {type: string, description: An authenticator or recovery code. Required, instead of the password, when you have 2FA on.}
       responses:
         "201":
           description: Created
@@ -112,7 +117,7 @@ paths:
         Session only. Replaces the token's permissions and spaces; the secret and name stay, so the app
         that holds the token needs nothing new and sees the change on its next request. Send the whole
         grant, as when creating. A token of a connected AI app (MCP) may only hold the parts of a space
-        its tools use.
+        its tools use. Asks you to confirm like creating a token does (`current_password` or `code`).
       security: [{cookieAuth: []}]
       parameters: [{$ref: "#/components/parameters/Id"}]
       requestBody:
@@ -136,6 +141,8 @@ paths:
                   type: array
                   description: Spaces the token may reach; the owner must belong to each. Required unless `all_spaces` is true.
                   items: {type: integer}
+                current_password: {type: string, description: Your password. Required, unless you have 2FA on (send `code`) or sign in only through single sign-on.}
+                code: {type: string, description: An authenticator or recovery code. Required, instead of the password, when you have 2FA on.}
       responses:
         "200":
           description: Updated

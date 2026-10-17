@@ -7,6 +7,7 @@ import (
 
 	"savvy-go/internal/appconfig"
 	"savvy-go/internal/auth"
+	"savvy-go/internal/httpserver/httpx/confirm"
 	"savvy-go/internal/httpserver/httpx/routing"
 	"savvy-go/internal/httpserver/mcpserver"
 	"savvy-go/internal/oauth"
@@ -17,7 +18,8 @@ func init() {
 	routing.Register(func(d *routing.Deps) []routing.Mount {
 		h := Handler{
 			Cfg: routing.Get[appconfig.Config](d), OAuth: routing.Get[*oauth.Service](d), Spaces: routing.Get[spaces.Service](d),
-			MCP: mcpserver.Handler{Cfg: routing.Get[appconfig.Config](d), APITokens: routing.Get[auth.APITokens](d), Inner: d.Inner, Version: routing.Get[appconfig.Build](d).Version}.Endpoint(),
+			Confirm: confirm.Confirmer{TwoFactor: routing.Get[auth.TwoFactor](d), Guard: d.Guard},
+			MCP:     mcpserver.Handler{Cfg: routing.Get[appconfig.Config](d), APITokens: routing.Get[auth.APITokens](d), Inner: d.Inner, Version: routing.Get[appconfig.Build](d).Version}.Endpoint(),
 		}
 		return []routing.Mount{
 			routing.Credential(h.CredentialRoutes),
@@ -31,7 +33,9 @@ type Handler struct {
 	Cfg    appconfig.Config
 	OAuth  *oauth.Service
 	Spaces spaces.Service
-	MCP    http.Handler
+	// Confirm asks for the password or code before an app is approved.
+	Confirm confirm.Confirmer
+	MCP     http.Handler
 }
 
 // Routes mounts the OAuth endpoints and the MCP endpoint they protect.

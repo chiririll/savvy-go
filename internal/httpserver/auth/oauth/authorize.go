@@ -7,6 +7,7 @@ import (
 	"net/url"
 
 	"savvy-go/internal/httpserver/httpx"
+	"savvy-go/internal/httpserver/httpx/confirm"
 	"savvy-go/internal/httpserver/httpx/dto"
 	"savvy-go/internal/oauth"
 )
@@ -85,6 +86,7 @@ func (h Handler) oauthConsent(w http.ResponseWriter, r *http.Request) {
 		AllSpaces           bool     `json:"all_spaces"`
 		SpaceIDs            []int64  `json:"space_ids"`
 		Permissions         []string `json:"permissions"`
+		confirm.Fields
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, oauthBodyLimit)
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -109,6 +111,10 @@ func (h Handler) oauthConsent(w http.ResponseWriter, r *http.Request) {
 			httpx.WriteMessage(w, http.StatusUnprocessableEntity, "You can only choose spaces you belong to.")
 			return
 		}
+	}
+	// Approving mints the app a token, so it is asked last, like issuing one: a bad form costs no attempt.
+	if !h.Confirm.Require(w, r, body.Fields) {
+		return
 	}
 	code, err := h.OAuth.IssueCode(r.Context(), oauth.CodeRequest{
 		ClientID: body.ClientID, RedirectURI: body.RedirectURI, CodeChallenge: body.CodeChallenge,

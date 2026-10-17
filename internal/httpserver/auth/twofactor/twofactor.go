@@ -9,6 +9,9 @@ import (
 )
 
 func (h Handler) twoFactorEnable(w http.ResponseWriter, r *http.Request) {
+	if !h.Confirm.RequireBody(w, r) {
+		return
+	}
 	u := httpx.User(r)
 	secret, uri, err := h.TwoFactor.Enable(r.Context(), u)
 	if err != nil {

@@ -24,7 +24,7 @@ func presetToken(a *testApp, sess *auth.Issued, body map[string]any) string {
 }
 
 func tokenBody(extra map[string]any) map[string]any {
-	body := map[string]any{"name": "p", "all_spaces": true}
+	body := confirmed(map[string]any{"name": "p", "all_spaces": true})
 	for k, v := range extra {
 		body[k] = v
 	}

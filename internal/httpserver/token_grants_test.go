@@ -121,6 +121,7 @@ func TestCreateTokenKeepsTheChosenSpaces(t *testing.T) {
 
 	res := a.do("POST", "/api/auth/api-tokens", map[string]any{
 		"name": "ci", "permissions": []string{"transactions:write", "transactions:read", "accounts:read"}, "space_ids": []int64{a.space.ID},
+		"current_password": "secret1",
 	}, sess.Token, sess.CSRF)
 	if res.StatusCode != http.StatusCreated {
 		t.Fatalf("create %d", res.StatusCode)
@@ -156,6 +157,7 @@ func TestOAuthConsentChoosesTheSpaces(t *testing.T) {
 	decide := func(body map[string]any) *http.Response {
 		body["client_id"], body["redirect_uri"], body["state"] = id, oauthRedirect, "st-1"
 		body["code_challenge"], body["code_challenge_method"], body["approve"] = oauthChallenge(), "S256", true
+		body["current_password"] = "secret1"
 		return a.do("POST", "/api/oauth/authorize", body, sess.Token, sess.CSRF)
 	}
 	status(t, decide(map[string]any{}), 422, "no choice")
@@ -204,7 +206,7 @@ func TestAPITokenGrantCanBeEditedInPlace(t *testing.T) {
 	sess := a.issue(u, false)
 	raw, tok := a.issueGrant(u, auth.Grant{Permissions: []string{"tags:write", "accounts:read"}, AllSpaces: true}, nil)
 	patch := func(body map[string]any) *http.Response {
-		return a.do("PATCH", "/api/auth/api-tokens/"+strconv.FormatInt(tok.ID, 10), body, sess.Token, sess.CSRF)
+		return a.do("PATCH", "/api/auth/api-tokens/"+strconv.FormatInt(tok.ID, 10), confirmed(body), sess.Token, sess.CSRF)
 	}
 
 	status(t, a.bearer("POST", "/api/tags", map[string]any{"name": "one"}, raw), http.StatusCreated, "before")
@@ -224,7 +226,7 @@ func TestAPITokenGrantCanBeEditedInPlace(t *testing.T) {
 	// Not another user's token, and not with a token.
 	other := a.createUser("other@a.com", "secret1", "admin")
 	os := a.issue(other, false)
-	status(t, a.do("PATCH", "/api/auth/api-tokens/"+strconv.FormatInt(tok.ID, 10), map[string]any{"permissions": []string{"tags:read"}, "all_spaces": true}, os.Token, os.CSRF), http.StatusNotFound, "someone else's token")
+	status(t, a.do("PATCH", "/api/auth/api-tokens/"+strconv.FormatInt(tok.ID, 10), map[string]any{"permissions": []string{"tags:read"}, "all_spaces": true, "current_password": "secret1"}, os.Token, os.CSRF), http.StatusNotFound, "someone else's token")
 	status(t, a.bearer("PATCH", "/api/auth/api-tokens/"+strconv.FormatInt(tok.ID, 10), map[string]any{"permissions": []string{"tags:delete"}, "all_spaces": true}, raw), http.StatusForbidden, "a token cannot edit tokens")
 }
 
@@ -250,7 +252,7 @@ func TestConnectedAppGrantCanBeEdited(t *testing.T) {
 		t.Fatalf("no connection in %v", list)
 	}
 	patch := func(perms ...string) *http.Response {
-		return a.do("PATCH", "/api/auth/api-tokens/"+strconv.FormatInt(tokenID, 10), map[string]any{"permissions": perms, "all_spaces": true}, sess.Token, sess.CSRF)
+		return a.do("PATCH", "/api/auth/api-tokens/"+strconv.FormatInt(tokenID, 10), map[string]any{"permissions": perms, "all_spaces": true, "current_password": "secret1"}, sess.Token, sess.CSRF)
 	}
 
 	status(t, patch("transfers:write"), http.StatusUnprocessableEntity, "an app cannot get a part its tools do not use")
@@ -274,6 +276,7 @@ func TestTokenKindComesFromHowItWasMade(t *testing.T) {
 
 	res := a.do("POST", "/api/auth/api-tokens", map[string]any{
 		"name": "MCP: looks like an app", "permissions": []string{"transfers:read"}, "all_spaces": true, "kind": "mcp",
+		"current_password": "secret1",
 	}, sess.Token, sess.CSRF)
 	if res.StatusCode != http.StatusCreated {
 		t.Fatalf("create = %d", res.StatusCode)

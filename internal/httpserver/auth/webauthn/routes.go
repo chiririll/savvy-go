@@ -4,6 +4,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"savvy-go/internal/auth"
+	"savvy-go/internal/httpserver/httpx/confirm"
 	"savvy-go/internal/httpserver/httpx/guard"
 	"savvy-go/internal/httpserver/httpx/login"
 	"savvy-go/internal/httpserver/httpx/routing"
@@ -11,7 +12,7 @@ import (
 
 func init() {
 	routing.Register(func(d *routing.Deps) []routing.Mount {
-		h := Handler{WebAuthn: routing.Get[auth.WebAuthn](d), Challenges: routing.Get[auth.Challenges](d), Login: d.Login, Guard: d.Guard}
+		h := Handler{WebAuthn: routing.Get[auth.WebAuthn](d), Challenges: routing.Get[auth.Challenges](d), Login: d.Login, Guard: d.Guard, Confirm: confirm.Confirmer{TwoFactor: routing.Get[auth.TwoFactor](d), Guard: d.Guard}}
 		return []routing.Mount{
 			routing.Public(h.PublicRoutes),
 			routing.Credential(h.CredentialRoutes),
@@ -25,6 +26,7 @@ type Handler struct {
 	Challenges auth.Challenges
 	Login      login.Service
 	Guard      *guard.Guard
+	Confirm    confirm.Confirmer
 }
 
 func (h Handler) PublicRoutes(r chi.Router) {
