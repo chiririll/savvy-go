@@ -12,7 +12,7 @@ go run .
 
 ### Code shape checks
 
-`internal/archtest` fails `go test ./...` on code that is clearly out of hand: a function over 500 lines, nesting deeper than 8, a name over 10 words, a line over 300 characters and similar. A justified exception goes in the doc comment: `//archtest:ignore funcLines <reason>`.
+`internal/archtest` fails `go test ./...` on code that is clearly out of hand: a function over 200 lines, nesting deeper than 8, a name over 8 words, a line over 160 characters and similar. A justified exception goes in the doc comment: `//archtest:ignore funcLines <reason>`.
 
 `mage test:audit` (or `go test -tags audit ./internal/archtest -run Audit -v`, `npm run audit`) prints everything above the softer limits, worst first. It never fails; use it as a cleanup worklist.
 

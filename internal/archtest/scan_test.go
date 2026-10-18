@@ -42,7 +42,7 @@ var rules = []rule{
 	{ruleNesting, 4, 8, "nested blocks in a function"},
 	{ruleComplexity, 15, 40, "branches in a function (cyclomatic complexity)"},
 	{ruleParams, 5, 10, "parameters of a function"},
-	{ruleFileLines, 600, 1500, "lines in a file"},
+	{ruleFileLines, 600, 800, "lines in a file"},
 	{ruleLineWidth, 120, 160, "characters in a line"},
 	// Many imports mean a file that knows too much about the rest of the code.
 	{ruleImports, 15, 25, "imports in a file"},
