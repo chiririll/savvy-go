@@ -19,18 +19,18 @@ export interface Rule {
 
 export const RULES: Rule[] = [
     // Lines include nested functions, so a component counts its handlers and JSX.
-    { name: 'funcLines', soft: 150, hard: 500, what: 'lines in a function or component' },
+    { name: 'funcLines', soft: 150, hard: 200, what: 'lines in a function or component' },
     // Control flow only (if, loops, switch, try). A nested function is measured on its own.
-    { name: 'nesting', soft: 4, hard: 8, what: 'nested blocks in a function' },
-    { name: 'complexity', soft: 15, hard: 40, what: 'branches in a function (cyclomatic complexity)' },
-    { name: 'params', soft: 5, hard: 10, what: 'parameters of a function' },
-    { name: 'fileLines', soft: 500, hard: 1500, what: 'lines in a file' },
-    { name: 'lineWidth', soft: 120, hard: 300, what: 'characters in a line' },
+    { name: 'nesting', soft: 4, hard: 5, what: 'nested blocks in a function' },
+    { name: 'complexity', soft: 15, hard: 20, what: 'branches in a function (cyclomatic complexity)' },
+    { name: 'params', soft: 5, hard: 7, what: 'parameters of a function' },
+    { name: 'fileLines', soft: 500, hard: 600, what: 'lines in a file' },
+    { name: 'lineWidth', soft: 120, hard: 160, what: 'characters in a line' },
     // Many imports mean a file that knows too much about the rest of the code.
-    { name: 'imports', soft: 15, hard: 40, what: 'imports in a file' },
-    { name: 'importNames', soft: 30, hard: 80, what: 'names imported into a file' },
-    { name: 'nameWords', soft: 6, hard: 10, what: 'words in a name' },
-    { name: 'titleWords', soft: 12, hard: 18, what: 'words in a test title' },
+    { name: 'imports', soft: 15, hard: 20, what: 'imports in a file' },
+    { name: 'importNames', soft: 30, hard: 40, what: 'names imported into a file' },
+    { name: 'nameWords', soft: 6, hard: 8, what: 'words in a name' },
+    { name: 'titleWords', soft: 12, hard: 16, what: 'words in a test title' },
     // A name that joins two ideas with And/Or usually does two jobs. Soft only:
     // a hard limit would punish legitimate names like validateOrFail.
     { name: 'nameJoins', soft: 0, hard: Number.MAX_SAFE_INTEGER, what: 'And/Or in a name' },
