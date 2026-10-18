@@ -108,6 +108,7 @@ export default function UsersPage() {
         currentUserId: currentUser?.id,
         isReadOnly,
         onEmailReset: canEmail ? handleEmailReset : undefined,
+        showUnverified: !!mail?.enabled || mustEmail,
         onSetEmailVerified: (user, verified) => setEmailVerified.mutate({ id: user.id, verified }),
     })
 

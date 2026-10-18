@@ -296,7 +296,7 @@ func TestMailTestShowsWhyItFailed(t *testing.T) {
 	res.Body.Close()
 }
 
-func TestMailCheckTriesTheGivenSettingsWithoutSavingThem(t *testing.T) {
+func TestMailCheckLeavesSettingsUnsaved(t *testing.T) {
 	rec := &recorder{on: true}
 	a, sess, file := newWritableMailApp(t, rec)
 	before, _ := os.ReadFile(file.Path())

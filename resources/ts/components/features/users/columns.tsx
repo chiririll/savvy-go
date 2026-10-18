@@ -17,6 +17,8 @@ interface UserColumnsOptions {
     onEmailReset?: (user: User) => void
     /** An admin vouching for (true) or withdrawing (false) a user's address. */
     onSetEmailVerified?: (user: User, verified: boolean) => void
+    /** Whether confirming an address means anything here (mail works or confirmation is required): shows the badge and the menu item. */
+    showUnverified?: boolean
 }
 
 export const createUserColumns = ({
@@ -27,6 +29,7 @@ export const createUserColumns = ({
     isReadOnly,
     onEmailReset,
     onSetEmailVerified,
+    showUnverified,
 }: UserColumnsOptions): ColumnDef<User>[] => [
     {
         accessorKey: 'name',
@@ -38,7 +41,7 @@ export const createUserColumns = ({
                     <div className="flex items-center gap-2">
                         <p className="font-medium">{row.original.name}</p>
                         {row.original.isInactive && <Badge variant="secondary">{i18n.t('status.inactive')}</Badge>}
-                        {!row.original.emailVerified && (
+                        {showUnverified && !row.original.emailVerified && (
                             <Badge variant="outline">{i18n.t('pages:users.emailUnverified')}</Badge>
                         )}
                     </div>
@@ -80,7 +83,7 @@ export const createUserColumns = ({
                             {i18n.t('pages:users.sendResetEmail')}
                         </DropdownMenuItem>
                     )}
-                    {!isReadOnly && onSetEmailVerified && (
+                    {!isReadOnly && showUnverified && onSetEmailVerified && (
                         <DropdownMenuItem onClick={() => onSetEmailVerified(row.original, !row.original.emailVerified)}>
                             {row.original.emailVerified ? (
                                 <MailX className="mr-2 size-4" />
