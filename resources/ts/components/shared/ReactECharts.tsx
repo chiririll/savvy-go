@@ -36,5 +36,12 @@ const prefersReducedMotion = () =>
  * Charts draw without animation when the user asks for reduced motion.
  */
 export default function ReactECharts({ option, opts, ...props }: Omit<EChartsReactProps, 'echarts'>) {
-    return <ReactEChartsCore echarts={echarts} option={prefersReducedMotion() ? { ...option, animation: false } : option} opts={{ renderer: 'svg', ...opts }} {...props} />
+    return (
+        <ReactEChartsCore
+            echarts={echarts}
+            option={prefersReducedMotion() ? { ...option, animation: false } : option}
+            opts={{ renderer: 'svg', ...opts }}
+            {...props}
+        />
+    )
 }

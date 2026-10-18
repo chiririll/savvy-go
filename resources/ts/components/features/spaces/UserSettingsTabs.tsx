@@ -21,7 +21,8 @@ export function UserSettingsTabs() {
                     end
                     className={({ isActive }) =>
                         cn(
-                            'rounded-md px-3 py-1.5 font-medium text-muted-foreground transition-colors hover:text-foreground',
+                            'rounded-md px-3 py-1.5 font-medium text-muted-foreground transition-colors',
+                            'hover:text-foreground',
                             isActive && 'bg-background text-foreground shadow-sm',
                         )
                     }

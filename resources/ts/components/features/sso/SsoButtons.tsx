@@ -30,10 +30,14 @@ export function SsoButtons({ showDivider = true }: { showDivider?: boolean }) {
                             'hover:-translate-y-px hover:border-[color-mix(in_oklab,var(--brand)_55%,var(--border))]',
                             'hover:bg-[color-mix(in_oklab,var(--brand)_6%,var(--background))]',
                             'hover:shadow-[0_4px_16px_-6px_color-mix(in_oklab,var(--brand)_60%,transparent)]',
-                            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:translate-y-0',
+                            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                            'active:translate-y-0',
                         )}
                     >
-                        <BrandIcon preset={provider.preset} className="size-4 transition-transform group-hover:scale-110" />
+                        <BrandIcon
+                            preset={provider.preset}
+                            className="size-4 transition-transform group-hover:scale-110"
+                        />
                         {t('providers.continueWith', { name: provider.name })}
                     </button>
                 ))}
@@ -42,7 +46,12 @@ export function SsoButtons({ showDivider = true }: { showDivider?: boolean }) {
             {showDivider && (
                 <div className="relative">
                     <Separator />
-                    <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs text-muted-foreground">
+                    <span
+                        className={cn(
+                            'absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs',
+                            'text-muted-foreground',
+                        )}
+                    >
                         {t('providers.or')}
                     </span>
                 </div>

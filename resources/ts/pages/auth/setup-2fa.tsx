@@ -1,31 +1,23 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import {
-    InputOTP,
-    InputOTPGroup,
-    InputOTPSlot,
-    InputOTPSeparator,
-} from '@/components/ui/input-otp'
-import { useEnableTwoFactor, useConfirmTwoFactor, useTheme } from '@/hooks'
-import { ShieldCheck, Copy, Loader2, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
-import { QRCode } from 'react-qrcode-logo'
+import { Card } from '@/components/ui/card'
+import { useEnableTwoFactor, useConfirmTwoFactor } from '@/hooks'
 import { LanguageSwitcher } from '@/components/shared'
-import { testId } from '@/lib/test-id'
+import { IntroStep } from '@/components/features/security/setup2fa/IntroStep'
+import { QrStep, type TwoFactorSecret } from '@/components/features/security/setup2fa/QrStep'
+import { VerifyStep } from '@/components/features/security/setup2fa/VerifyStep'
+import { RecoveryStep } from '@/components/features/security/setup2fa/RecoveryStep'
 
 type SetupStep = 'intro' | 'qr' | 'verify' | 'recovery'
 
 export default function Setup2FAPage() {
     const { t } = useTranslation('auth')
-    const { t: tCommon } = useTranslation('common')
     const navigate = useNavigate()
-    const { theme } = useTheme()
 
     const [step, setStep] = useState<SetupStep>('intro')
-    const [qrData, setQrData] = useState<{ secret: string; qr_code_url: string } | null>(null)
+    const [qrData, setQrData] = useState<TwoFactorSecret | null>(null)
     const [recoveryCodes, setRecoveryCodes] = useState<string[]>([])
     const [otpValue, setOtpValue] = useState('')
 
@@ -70,203 +62,27 @@ export default function Setup2FAPage() {
         setOtpValue('')
     }
 
-    const copySecret = () => {
-        if (qrData?.secret) {
-            navigator.clipboard.writeText(qrData.secret)
-            toast.success(t('setup2fa.secretCopied'))
-        }
-    }
-
-    const copyRecoveryCodes = () => {
-        navigator.clipboard.writeText(recoveryCodes.join('\n'))
-        toast.success(t('setup2fa.codesCopied'))
-    }
-
     return (
         <div className="min-h-screen flex items-center justify-center bg-background p-4">
             <Card className="w-full max-w-md">
                 {step === 'intro' && (
-                    <>
-                        <CardHeader className="text-center">
-                            <div className="flex justify-center mb-4">
-                                <div className="flex size-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-                                    <ShieldCheck className="size-7" />
-                                </div>
-                            </div>
-                            <CardTitle className="text-2xl">{t('setup2fa.title')}</CardTitle>
-                            <CardDescription>
-                                {t('setup2fa.description')}
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="text-sm text-muted-foreground space-y-2">
-                                <p>{t('setup2fa.withEnabled')}</p>
-                                <ul className="list-disc list-inside space-y-1">
-                                    <li>{t('setup2fa.needPhone')}</li>
-                                    <li>{t('setup2fa.protected')}</li>
-                                    <li>{t('setup2fa.recoveryCodes')}</li>
-                                </ul>
-                            </div>
-                            <div className="flex flex-col gap-2">
-                                <Button
-                                    onClick={handleEnable}
-                                    disabled={enableMutation.isPending}
-                                    className="w-full"
-                                    {...testId('2fa-enable')}
-                                >
-                                    {enableMutation.isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
-                                    {t('setup2fa.enable')}
-                                </Button>
-                                <Button
-                                    variant="ghost"
-                                    onClick={handleSkip}
-                                    className="w-full"
-                                    {...testId('2fa-skip')}
-                                >
-                                    {t('setup2fa.skip')}
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </>
+                    <IntroStep enabling={enableMutation.isPending} onEnable={handleEnable} onSkip={handleSkip} />
                 )}
-
                 {step === 'qr' && qrData && (
-                    <>
-                        <CardHeader className="text-center">
-                            <CardTitle>{t('setup2fa.scanTitle')}</CardTitle>
-                            <CardDescription>
-                                {t('setup2fa.scanDescription')}
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex justify-center" {...testId('2fa-qr')}>
-                                <QRCode
-                                    value={qrData.qr_code_url}
-                                    size={240}
-                                    ecLevel="M"
-                                    bgColor="transparent"
-                                    fgColor={theme === 'dark' ? '#ffffff' : '#0f172a'}
-                                    qrStyle="dots"
-                                    eyeRadius={6}
-                                    quietZone={0}
-                                />
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground mb-2 text-center">
-                                    {t('setup2fa.manualCode')}
-                                </p>
-                                <div className="flex items-center gap-2 bg-muted p-2 rounded-md">
-                                    <code className="flex-1 text-sm font-mono break-all" {...testId('2fa-secret')}>
-                                        {qrData.secret}
-                                    </code>
-                                    <Button variant="ghost" size="sm" onClick={copySecret}>
-                                        <Copy className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            </div>
-                            <div className="flex gap-2">
-                                <Button
-                                    variant="outline"
-                                    onClick={() => setStep('intro')}
-                                    className="flex-1"
-                                >
-                                    <ArrowLeft className="mr-2 h-4 w-4" />
-                                    {tCommon('actions.back')}
-                                </Button>
-                                <Button
-                                    onClick={() => setStep('verify')}
-                                    className="flex-1"
-                                    {...testId('2fa-continue')}
-                                >
-                                    {tCommon('actions.continue')}
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </>
+                    <QrStep data={qrData} onBack={() => setStep('intro')} onContinue={() => setStep('verify')} />
                 )}
-
                 {step === 'verify' && (
-                    <>
-                        <CardHeader className="text-center">
-                            <CardTitle>{t('setup2fa.verifyTitle')}</CardTitle>
-                            <CardDescription>
-                                {t('setup2fa.verifyDescription')}
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            <div className="flex justify-center">
-                                <InputOTP
-                                    maxLength={6}
-                                    value={otpValue}
-                                    onChange={setOtpValue}
-                                >
-                                    <InputOTPGroup>
-                                        <InputOTPSlot index={0} />
-                                        <InputOTPSlot index={1} />
-                                        <InputOTPSlot index={2} />
-                                    </InputOTPGroup>
-                                    <InputOTPSeparator />
-                                    <InputOTPGroup>
-                                        <InputOTPSlot index={3} />
-                                        <InputOTPSlot index={4} />
-                                        <InputOTPSlot index={5} />
-                                    </InputOTPGroup>
-                                </InputOTP>
-                            </div>
-                            <div className="flex gap-2">
-                                <Button
-                                    variant="outline"
-                                    onClick={() => setStep('qr')}
-                                    className="flex-1"
-                                >
-                                    <ArrowLeft className="mr-2 h-4 w-4" />
-                                    {tCommon('actions.back')}
-                                </Button>
-                                <Button
-                                    onClick={handleConfirm}
-                                    disabled={otpValue.length !== 6 || confirmMutation.isPending}
-                                    className="flex-1"
-                                    {...testId('2fa-verify')}
-                                >
-                                    {confirmMutation.isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
-                                    {t('twoFactor.verify')}
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </>
+                    <VerifyStep
+                        code={otpValue}
+                        verifying={confirmMutation.isPending}
+                        onCodeChange={setOtpValue}
+                        onBack={() => setStep('qr')}
+                        onVerify={handleConfirm}
+                    />
                 )}
-
                 {step === 'recovery' && recoveryCodes.length > 0 && (
-                    <>
-                        <CardHeader className="text-center">
-                            <CardTitle>{t('setup2fa.recoveryTitle')}</CardTitle>
-                            <CardDescription>
-                                {t('setup2fa.recoveryDescription')}
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="bg-muted p-4 rounded-md font-mono text-sm grid grid-cols-2 gap-2" {...testId('2fa-recovery-codes')}>
-                                {recoveryCodes.map((code, index) => (
-                                    <div key={index} className="text-center">
-                                        {code}
-                                    </div>
-                                ))}
-                            </div>
-                            <Button
-                                variant="outline"
-                                className="w-full"
-                                onClick={copyRecoveryCodes}
-                            >
-                                <Copy className="h-4 w-4 mr-2" />
-                                {t('setup2fa.copyCodes')}
-                            </Button>
-                            <Button onClick={handleComplete} className="w-full" {...testId('2fa-done')}>
-                                {tCommon('actions.done')}
-                            </Button>
-                        </CardContent>
-                    </>
+                    <RecoveryStep codes={recoveryCodes} onDone={handleComplete} />
                 )}
-
             </Card>
             <LanguageSwitcher variant="auth" />
         </div>

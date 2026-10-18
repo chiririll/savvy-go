@@ -50,7 +50,12 @@ export function PermissionGrid({
                 {levels.map((level) => {
                     const Icon = icon[level]
                     return (
-                        <span key={level} className="flex justify-center" title={columnLabel[level]} aria-label={columnLabel[level]}>
+                        <span
+                            key={level}
+                            className="flex justify-center"
+                            title={columnLabel[level]}
+                            aria-label={columnLabel[level]}
+                        >
                             <Icon className="size-3.5" />
                         </span>
                     )

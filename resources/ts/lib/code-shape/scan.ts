@@ -68,7 +68,13 @@ export function splitWords(name: string): string[] {
 const TEST_FUNCTIONS = new Set(['it', 'test', 'describe'])
 
 export function analyzeSource(text: string, rel: string): Finding[] {
-    const source = ts.createSourceFile(rel, text, ts.ScriptTarget.Latest, true, rel.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
+    const source = ts.createSourceFile(
+        rel,
+        text,
+        ts.ScriptTarget.Latest,
+        true,
+        rel.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+    )
     const found: Finding[] = []
 
     const lineOf = (pos: number) => source.getLineAndCharacterOfPosition(pos).line + 1
@@ -87,11 +93,18 @@ export function analyzeSource(text: string, rel: string): Finding[] {
     add('fileLines', source, path.basename(rel), text.replace(/\n$/, '').split('\n').length, new Set())
     const imports = source.statements.filter(ts.isImportDeclaration)
     add('imports', source, path.basename(rel), imports.length, new Set())
-    add('importNames', source, path.basename(rel), imports.reduce((sum, declaration) => sum + importedNames(declaration), 0), new Set())
+    add(
+        'importNames',
+        source,
+        path.basename(rel),
+        imports.reduce((sum, declaration) => sum + importedNames(declaration), 0),
+        new Set(),
+    )
     const lineLimit = RULE_BY_NAME.get('lineWidth')!.soft
     text.split('\n').forEach((line, index) => {
         const width = [...line].length
-        if (width > lineLimit) found.push({ rule: 'lineWidth', file: rel, line: index + 1, name: `line ${index + 1}`, value: width })
+        if (width > lineLimit)
+            found.push({ rule: 'lineWidth', file: rel, line: index + 1, name: `line ${index + 1}`, value: width })
     })
 
     const visit = (node: ts.Node) => {
@@ -131,7 +144,12 @@ function importedNames(declaration: ts.ImportDeclaration): number {
 type FunctionLike = ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction | ts.FunctionExpression
 
 function isFunctionLike(node: ts.Node): node is FunctionLike {
-    return ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node) || ts.isArrowFunction(node) || ts.isFunctionExpression(node)
+    return (
+        ts.isFunctionDeclaration(node) ||
+        ts.isMethodDeclaration(node) ||
+        ts.isArrowFunction(node) ||
+        ts.isFunctionExpression(node)
+    )
 }
 
 /** The name a function is known by, or null for a callback nobody named. */
@@ -143,7 +161,8 @@ function functionName(node: FunctionLike): string | null {
     }
     // const Name = () => {}, also when wrapped: memo(() => {}), useCallback(() => {}, []).
     let parent: ts.Node = node.parent
-    while (ts.isParenthesizedExpression(parent) || ts.isCallExpression(parent) || ts.isAsExpression(parent)) parent = parent.parent
+    while (ts.isParenthesizedExpression(parent) || ts.isCallExpression(parent) || ts.isAsExpression(parent))
+        parent = parent.parent
     if (ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name)) return parent.name.text
     if (ts.isPropertyAssignment(parent) && ts.isIdentifier(parent.name)) return parent.name.text
     if (ts.isExportAssignment(parent)) return 'default'
@@ -186,7 +205,10 @@ const opensBlock = (node: ts.Node) =>
     ts.isTryStatement(node)
 
 /** The else-if of an if statement continues its chain and adds no level. */
-const elseIf = (node: ts.Node) => (ts.isIfStatement(node) && node.elseStatement && ts.isIfStatement(node.elseStatement) ? node.elseStatement : undefined)
+const elseIf = (node: ts.Node) =>
+    ts.isIfStatement(node) && node.elseStatement && ts.isIfStatement(node.elseStatement)
+        ? node.elseStatement
+        : undefined
 
 function addsBranch(node: ts.Node): boolean {
     if (
@@ -204,7 +226,11 @@ function addsBranch(node: ts.Node): boolean {
     }
     if (ts.isBinaryExpression(node)) {
         const kind = node.operatorToken.kind
-        return kind === ts.SyntaxKind.AmpersandAmpersandToken || kind === ts.SyntaxKind.BarBarToken || kind === ts.SyntaxKind.QuestionQuestionToken
+        return (
+            kind === ts.SyntaxKind.AmpersandAmpersandToken ||
+            kind === ts.SyntaxKind.BarBarToken ||
+            kind === ts.SyntaxKind.QuestionQuestionToken
+        )
     }
     return false
 }
@@ -217,7 +243,13 @@ function directives(node: ts.Node, source: ts.SourceFile, found: Finding[], rel:
     const ignored = new Set<string>()
     let owner: ts.Node = node
     // const Name = () => {} carries its comment on the statement, not the arrow.
-    while (owner.parent && !ts.isSourceFile(owner.parent) && !ts.isBlock(owner.parent) && !ts.isClassLike(owner.parent) && !ts.isModuleBlock(owner.parent)) {
+    while (
+        owner.parent &&
+        !ts.isSourceFile(owner.parent) &&
+        !ts.isBlock(owner.parent) &&
+        !ts.isClassLike(owner.parent) &&
+        !ts.isModuleBlock(owner.parent)
+    ) {
         owner = owner.parent
     }
     for (const range of ts.getLeadingCommentRanges(source.text, owner.getFullStart()) ?? []) {
@@ -226,7 +258,13 @@ function directives(node: ts.Node, source: ts.SourceFile, found: Finding[], rel:
         if (match[2]) {
             ignored.add(match[1])
         } else {
-            found.push({ rule: 'ignoreWithoutReason', file: rel, line: source.getLineAndCharacterOfPosition(range.pos).line + 1, name, value: 1 })
+            found.push({
+                rule: 'ignoreWithoutReason',
+                file: rel,
+                line: source.getLineAndCharacterOfPosition(range.pos).line + 1,
+                name,
+                value: 1,
+            })
         }
     }
     return ignored
@@ -235,7 +273,8 @@ function directives(node: ts.Node, source: ts.SourceFile, found: Finding[], rel:
 function sourceFiles(dir: string): string[] {
     return readdirSync(path.join(REPO, dir), { withFileTypes: true }).flatMap((entry) => {
         const rel = `${dir}/${entry.name}`
-        if (entry.isDirectory()) return SKIPPED_DIRS.some((skipped) => `${rel}/`.startsWith(skipped)) ? [] : sourceFiles(rel)
+        if (entry.isDirectory())
+            return SKIPPED_DIRS.some((skipped) => `${rel}/`.startsWith(skipped)) ? [] : sourceFiles(rel)
         return /\.tsx?$/.test(entry.name) && !entry.name.endsWith('.d.ts') ? [rel] : []
     })
 }

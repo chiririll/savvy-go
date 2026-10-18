@@ -7,7 +7,7 @@ import { toSpaceTransferInput } from './space-transfer-input'
 
 // The form pulls in zod, react-hook-form and most shared inputs; keep it out of the entry chunk.
 const TransactionFormDialog = lazy(() =>
-    import('./TransactionFormDialog').then((m) => ({ default: m.TransactionFormDialog }))
+    import('./TransactionFormDialog').then((m) => ({ default: m.TransactionFormDialog })),
 )
 
 export type CreateTransactionDefaults = Partial<TransactionFormValues>
@@ -50,10 +50,7 @@ export function CreateTransactionProvider({ children }: { children: React.ReactN
 
     const handleSubmit = (data: TransactionFormValues) => {
         if (transaction) {
-            updateTransaction.mutate(
-                { id: transaction.id, data },
-                { onSuccess: () => setOpen(false) }
-            )
+            updateTransaction.mutate({ id: transaction.id, data }, { onSuccess: () => setOpen(false) })
             return
         }
 
@@ -84,7 +81,9 @@ export function CreateTransactionProvider({ children }: { children: React.ReactN
                         open={open}
                         onOpenChange={setOpen}
                         onSubmit={handleSubmit}
-                        isSubmitting={createTransaction.isPending || updateTransaction.isPending || sendTransfer.isPending}
+                        isSubmitting={
+                            createTransaction.isPending || updateTransaction.isPending || sendTransfer.isPending
+                        }
                         defaultValues={defaults}
                     />
                 </Suspense>

@@ -22,7 +22,13 @@ import { cn, formatCurrency } from '@/lib/utils'
 type DebtTab = 'active' | 'completed'
 
 /** A summary figure: a row of one block on phones, a card from md up. */
-function SummaryItem({ icon: Icon, tone, label, value, valueClassName }: {
+function SummaryItem({
+    icon: Icon,
+    tone,
+    label,
+    value,
+    valueClassName,
+}: {
     icon: LucideIcon
     tone: string
     label: string
@@ -82,102 +88,103 @@ export default function DebtsPage() {
 
     const handlePaymentSubmit = (debtId: number, formData: DebtPaymentFormData) => {
         if (paymentMode === 'payment') {
-            debtPayment.mutate(
-                { debtId, data: formData },
-                { onSuccess: () => setPaymentDialogOpen(false) }
-            )
+            debtPayment.mutate({ debtId, data: formData }, { onSuccess: () => setPaymentDialogOpen(false) })
         } else {
-            debtCollection.mutate(
-                { debtId, data: formData },
-                { onSuccess: () => setPaymentDialogOpen(false) }
-            )
+            debtCollection.mutate({ debtId, data: formData }, { onSuccess: () => setPaymentDialogOpen(false) })
         }
     }
 
     return (
         <Page title={t('debts.title')}>
             <div className="space-y-6">
-            <PageHeader
-                title={t('debts.title')}
-                description={t('debts.description')}
-                onCreateClick={isReadOnly ? undefined : form.openCreate}
-                createLabel={t('debts.create')}
-            />
-
-            {summary && (
-                <div className="divide-y rounded-lg border bg-card md:grid md:grid-cols-3 md:gap-4 md:divide-y-0 md:border-0 md:bg-transparent">
-                    <SummaryItem
-                        icon={TrendingDown}
-                        tone="bg-red-100 text-red-600"
-                        label={t('debts.types.i_owe')}
-                        value={formatCurrency(summary.totalIOwe, summary.currency)}
-                        valueClassName="text-red-600"
-                    />
-                    <SummaryItem
-                        icon={TrendingUp}
-                        tone="bg-green-100 text-green-600"
-                        label={t('debts.types.owed_to_me')}
-                        value={formatCurrency(summary.totalOwedToMe, summary.currency)}
-                        valueClassName="text-green-600"
-                    />
-                    <SummaryItem
-                        icon={summary.netDebt >= 0 ? HandCoins : Banknote}
-                        tone={summary.netDebt >= 0 ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}
-                        label={t('debts.netPosition')}
-                        value={`${formatCurrency(Math.abs(summary.netDebt), summary.currency)} ${summary.netDebt >= 0 ? t('debts.inYourFavor') : t('debts.youOwe')}`}
-                        valueClassName={summary.netDebt >= 0 ? 'text-green-600' : 'text-red-600'}
-                    />
-                </div>
-            )}
-
-            <div className="mx-auto w-full max-w-[800px]">
-                <Tabs value={tab} onValueChange={(value) => setTab(value as DebtTab)} className="mb-4">
-                    <TabsList>
-                        <TabsTrigger value="active">{t('debts.tabs.active')}</TabsTrigger>
-                        <TabsTrigger value="completed">{t('debts.tabs.completed')}</TabsTrigger>
-                    </TabsList>
-                </Tabs>
-
-                <FeedList
-                    items={visibleDebts}
-                    isLoading={isLoading}
-                    emptyTitle={t('table.emptyTitle', { ns: 'common' })}
-                    emptyDescription={t('table.emptyDescription', { ns: 'common' })}
-                    onCreate={tab === 'active' ? form.openCreate : undefined}
+                <PageHeader
+                    title={t('debts.title')}
+                    description={t('debts.description')}
+                    onCreateClick={isReadOnly ? undefined : form.openCreate}
                     createLabel={t('debts.create')}
-                    isReadOnly={isReadOnly}
-                    getKey={(debt) => debt.id}
-                >
-                    {(debt) => (
-                        <DebtRow
-                            debt={debt}
-                            onEdit={form.openEdit}
-                            onDelete={(id) => deleteDebt.mutate(id)}
-                            onPayment={handlePayment}
-                            onCollect={handleCollect}
-                            onReopen={(id) => reopenDebt.mutate(id)}
-                            isReadOnly={isReadOnly}
+                />
+
+                {summary && (
+                    <div
+                        className={cn(
+                            'divide-y rounded-lg border bg-card md:grid md:grid-cols-3 md:gap-4 md:divide-y-0',
+                            'md:border-0 md:bg-transparent',
+                        )}
+                    >
+                        <SummaryItem
+                            icon={TrendingDown}
+                            tone="bg-red-100 text-red-600"
+                            label={t('debts.types.i_owe')}
+                            value={formatCurrency(summary.totalIOwe, summary.currency)}
+                            valueClassName="text-red-600"
                         />
-                    )}
-                </FeedList>
-            </div>
+                        <SummaryItem
+                            icon={TrendingUp}
+                            tone="bg-green-100 text-green-600"
+                            label={t('debts.types.owed_to_me')}
+                            value={formatCurrency(summary.totalOwedToMe, summary.currency)}
+                            valueClassName="text-green-600"
+                        />
+                        <SummaryItem
+                            icon={summary.netDebt >= 0 ? HandCoins : Banknote}
+                            tone={summary.netDebt >= 0 ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}
+                            label={t('debts.netPosition')}
+                            value={`${formatCurrency(Math.abs(summary.netDebt), summary.currency)} ${
+                                summary.netDebt >= 0 ? t('debts.inYourFavor') : t('debts.youOwe')
+                            }`}
+                            valueClassName={summary.netDebt >= 0 ? 'text-green-600' : 'text-red-600'}
+                        />
+                    </div>
+                )}
 
-            <DebtFormDialog
-                debt={form.entity}
-                open={form.open}
-                onOpenChange={form.setOpen}
-                onSubmit={form.submit}
-                isSubmitting={form.isSubmitting}
-            />
+                <div className="mx-auto w-full max-w-[800px]">
+                    <Tabs value={tab} onValueChange={(value) => setTab(value as DebtTab)} className="mb-4">
+                        <TabsList>
+                            <TabsTrigger value="active">{t('debts.tabs.active')}</TabsTrigger>
+                            <TabsTrigger value="completed">{t('debts.tabs.completed')}</TabsTrigger>
+                        </TabsList>
+                    </Tabs>
 
-            <DebtPaymentDialog
-                debt={selectedDebt}
-                open={paymentDialogOpen}
-                onOpenChange={setPaymentDialogOpen}
-                onSubmit={handlePaymentSubmit}
-                isSubmitting={debtPayment.isPending || debtCollection.isPending}
-                mode={paymentMode}
-            />
+                    <FeedList
+                        items={visibleDebts}
+                        isLoading={isLoading}
+                        emptyTitle={t('table.emptyTitle', { ns: 'common' })}
+                        emptyDescription={t('table.emptyDescription', { ns: 'common' })}
+                        onCreate={tab === 'active' ? form.openCreate : undefined}
+                        createLabel={t('debts.create')}
+                        isReadOnly={isReadOnly}
+                        getKey={(debt) => debt.id}
+                    >
+                        {(debt) => (
+                            <DebtRow
+                                debt={debt}
+                                onEdit={form.openEdit}
+                                onDelete={(id) => deleteDebt.mutate(id)}
+                                onPayment={handlePayment}
+                                onCollect={handleCollect}
+                                onReopen={(id) => reopenDebt.mutate(id)}
+                                isReadOnly={isReadOnly}
+                            />
+                        )}
+                    </FeedList>
+                </div>
+
+                <DebtFormDialog
+                    debt={form.entity}
+                    open={form.open}
+                    onOpenChange={form.setOpen}
+                    onSubmit={form.submit}
+                    isSubmitting={form.isSubmitting}
+                />
+
+                <DebtPaymentDialog
+                    debt={selectedDebt}
+                    open={paymentDialogOpen}
+                    onOpenChange={setPaymentDialogOpen}
+                    onSubmit={handlePaymentSubmit}
+                    isSubmitting={debtPayment.isPending || debtCollection.isPending}
+                    mode={paymentMode}
+                />
             </div>
         </Page>
     )

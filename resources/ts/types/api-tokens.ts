@@ -59,7 +59,10 @@ export interface KindOptions {
 
 export function kindOptions(caps: TokenCapabilities, kind: ApiTokenKind): KindOptions {
     const k = caps.kinds[kind]
-    return { resources: k.resources, presets: caps.presets.map((name) => ({ name, permissions: [...(k.presets[name] ?? [])].sort() })) }
+    return {
+        resources: k.resources,
+        presets: caps.presets.map((name) => ({ name, permissions: [...(k.presets[name] ?? [])].sort() })),
+    }
 }
 
 /** New rights for an existing token. The secret stays the same. */
@@ -82,7 +85,11 @@ export interface CreateApiTokenInput {
 }
 
 /** Whether two lists hold the same grant on every one of these resources. */
-export function samePermissions(a: readonly string[], b: readonly string[], resources: readonly ApiResource[]): boolean {
+export function samePermissions(
+    a: readonly string[],
+    b: readonly string[],
+    resources: readonly ApiResource[],
+): boolean {
     return resources.every((r) => permissionLevel(a, r) === permissionLevel(b, r))
 }
 

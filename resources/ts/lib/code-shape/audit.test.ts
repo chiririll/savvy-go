@@ -13,8 +13,11 @@ describe.runIf(import.meta.env.MODE === 'audit')('code shape: audit', () => {
         for (const rule of RULES) {
             const found = all.filter((finding) => finding.rule === rule.name).sort((a, b) => b.value - a.value)
             if (found.length === 0) continue
-            lines.push(`\n## ${rule.name}: ${rule.what} (soft ${rule.soft}, hard ${rule.hard}): ${found.length} found, ${found.filter(isHard).length} over hard`)
-            for (const finding of found) lines.push(`${String(finding.value).padStart(5)}  ${finding.file}:${finding.line}  ${finding.name}`)
+            const limits = `soft ${rule.soft}, hard ${rule.hard}`
+            const counts = `${found.length} found, ${found.filter(isHard).length} over hard`
+            lines.push(`\n## ${rule.name}: ${rule.what} (${limits}): ${counts}`)
+            for (const finding of found)
+                lines.push(`${String(finding.value).padStart(5)}  ${finding.file}:${finding.line}  ${finding.name}`)
         }
         console.log(lines.length ? lines.join('\n') : '\nNothing above the soft limits.')
     })

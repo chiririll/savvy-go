@@ -1,34 +1,13 @@
+import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
 import { useFormValuesChange } from '@/hooks'
-import { useForm } from 'react-hook-form'
+import { useForm, type UseFormReturn } from 'react-hook-form'
 import { schemaResolver } from '@/lib/form-resolver'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Checkbox } from '@/components/ui/checkbox'
-import {
-    Form,
-    FormField,
-    FormItem,
-    FormLabel,
-    FormControl,
-    FormMessage,
-    FormDescription,
-} from '@/components/ui/form'
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select'
-import {
-    createUserSchema,
-    updateUserSchema,
-    CreateUserFormData,
-    UpdateUserFormData,
-} from '@/schemas/users'
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from '@/components/ui/form'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { createUserSchema, updateUserSchema, CreateUserFormData, UpdateUserFormData } from '@/schemas/users'
 import { useUser } from '@/stores/auth'
-import { FormWrapper } from '@/components/shared/FormWrapper'
+import { FormCheckboxCard, FormInputField, FormSubmitButton, FormWrapper } from '@/components/shared'
 
 interface UserFormProps {
     defaultValues?: Partial<CreateUserFormData> & Partial<UpdateUserFormData> & { id?: number }
@@ -41,6 +20,41 @@ interface UserFormProps {
     hideSubmit?: boolean
     /** Whether the set-password link can be emailed, and whether it must be (verification is required). */
     mail?: { canEmail: boolean; mustEmail: boolean }
+}
+
+function UserRoleField({ form, disabled }: { form: UseFormReturn<CreateUserFormData>; disabled: boolean }) {
+    const { t } = useTranslation(['common', 'forms'])
+    return (
+        <FormField
+            control={form.control}
+            name="role"
+            render={({ field }) => (
+                <FormItem>
+                    <FormLabel>{t('fields.role')}</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange} disabled={disabled}>
+                        <FormControl>
+                            <SelectTrigger className="w-full">
+                                <SelectValue placeholder={t('forms:selectRole')} />
+                            </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                            <SelectItem value="admin">{t('roles.admin')}</SelectItem>
+                            <SelectItem value="user">{t('roles.user')}</SelectItem>
+                            <SelectItem value="guest">{t('roles.guest')}</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    {disabled && <FormDescription>{t('forms:users.cannotChangeOwnRole')}</FormDescription>}
+                    <FormMessage />
+                </FormItem>
+            )}
+        />
+    )
+}
+
+/** Why the set-password link may or may not be emailed. */
+const sendEmailHelp = (t: TFunction, mail: { canEmail: boolean; mustEmail: boolean }) => {
+    if (!mail.mustEmail) return t('forms:users.sendEmailHelp')
+    return mail.canEmail ? t('forms:users.sendEmailRequired') : t('forms:users.sendEmailUnavailable')
 }
 
 export function UserForm({
@@ -79,152 +93,59 @@ export function UserForm({
     return (
         <FormWrapper>
             <Form {...form}>
-                <form
-                    id={formId}
-                    onSubmit={form.handleSubmit(onSubmit)}
-                    className="space-y-4"
-                >
-                    <FormField
+                <form id={formId} onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <FormInputField
                         control={form.control}
                         name="name"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>{t('fields.name')}</FormLabel>
-                                <FormControl>
-                                    <Input placeholder={t('forms:users.namePlaceholder')} {...field} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
+                        label={t('fields.name')}
+                        inputProps={{ placeholder: t('forms:users.namePlaceholder') }}
                     />
 
-                    <FormField
+                    <FormInputField
                         control={form.control}
                         name="email"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>{t('fields.email')}</FormLabel>
-                                <FormControl>
-                                    <Input type="email" placeholder={t('forms:users.emailPlaceholder')} {...field} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
+                        label={t('fields.email')}
+                        inputProps={{ type: 'email', placeholder: t('forms:users.emailPlaceholder') }}
                     />
 
                     {!isEdit && (
-                        <FormField
+                        <FormCheckboxCard
                             control={form.control}
                             name="setPassword"
-                            render={({ field }) => (
-                                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                                    <FormControl>
-                                        <Checkbox
-                                            checked={Boolean(field.value)}
-                                            onCheckedChange={field.onChange}
-                                        />
-                                    </FormControl>
-                                    <div className="space-y-1 leading-none">
-                                        <FormLabel>{t('forms:users.setPassword')}</FormLabel>
-                                        <FormDescription>
-                                            {t('forms:users.setPasswordHelp')}
-                                        </FormDescription>
-                                    </div>
-                                </FormItem>
-                            )}
+                            label={t('forms:users.setPassword')}
+                            description={t('forms:users.setPasswordHelp')}
                         />
                     )}
 
                     {!isEdit && !setPassword && (mail.canEmail || mail.mustEmail) && (
-                        <FormField
+                        <FormCheckboxCard
                             control={form.control}
                             name="sendEmail"
-                            render={({ field }) => (
-                                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                                    <FormControl>
-                                        <Checkbox
-                                            checked={mail.mustEmail || Boolean(field.value)}
-                                            disabled={mail.mustEmail || !mail.canEmail}
-                                            onCheckedChange={field.onChange}
-                                        />
-                                    </FormControl>
-                                    <div className="space-y-1 leading-none">
-                                        <FormLabel>{t('forms:users.sendEmail')}</FormLabel>
-                                        <FormDescription>
-                                            {mail.mustEmail
-                                                ? mail.canEmail
-                                                    ? t('forms:users.sendEmailRequired')
-                                                    : t('forms:users.sendEmailUnavailable')
-                                                : t('forms:users.sendEmailHelp')}
-                                        </FormDescription>
-                                    </div>
-                                </FormItem>
-                            )}
+                            label={t('forms:users.sendEmail')}
+                            description={sendEmailHelp(t, mail)}
+                            forceChecked={mail.mustEmail}
+                            disabled={mail.mustEmail || !mail.canEmail}
                         />
                     )}
 
                     {showPassword && (
-                        <FormField
+                        <FormInputField
                             control={form.control}
                             name="password"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>{isEdit ? t('forms:users.newPassword') : t('fields.password')}</FormLabel>
-                                    <FormControl>
-                                        <Input
-                                            type="password"
-                                            placeholder={isEdit ? t('forms:users.passwordKeepPlaceholder') : t('forms:users.passwordPlaceholder')}
-                                            {...field}
-                                        />
-                                    </FormControl>
-                                    {isEdit && (
-                                        <FormDescription>
-                                            {t('forms:users.passwordKeepHelp')}
-                                        </FormDescription>
-                                    )}
-                                    <FormMessage />
-                                </FormItem>
-                            )}
+                            label={isEdit ? t('forms:users.newPassword') : t('fields.password')}
+                            description={isEdit ? t('forms:users.passwordKeepHelp') : undefined}
+                            inputProps={{
+                                type: 'password',
+                                placeholder: isEdit
+                                    ? t('forms:users.passwordKeepPlaceholder')
+                                    : t('forms:users.passwordPlaceholder'),
+                            }}
                         />
                     )}
 
-                    <FormField
-                        control={form.control}
-                        name="role"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>{t('fields.role')}</FormLabel>
-                                <Select
-                                    value={field.value}
-                                    onValueChange={field.onChange}
-                                    disabled={isEditingSelf}
-                                >
-                                    <FormControl>
-                                        <SelectTrigger className="w-full">
-                                            <SelectValue placeholder={t('forms:selectRole')} />
-                                        </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                        <SelectItem value="admin">{t('roles.admin')}</SelectItem>
-                                        <SelectItem value="user">{t('roles.user')}</SelectItem>
-                                        <SelectItem value="guest">{t('roles.guest')}</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                {isEditingSelf && (
-                                    <FormDescription>
-                                        {t('forms:users.cannotChangeOwnRole')}
-                                    </FormDescription>
-                                )}
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
+                    <UserRoleField form={form} disabled={isEditingSelf} />
 
-                    {!hideSubmit && (
-                        <Button type="submit" disabled={isSubmitting} className="w-full">
-                            {isSubmitting ? t('actions.saving') : (submitLabel ?? t('actions.save'))}
-                        </Button>
-                    )}
+                    <FormSubmitButton hidden={hideSubmit} isSubmitting={isSubmitting} label={submitLabel} />
                 </form>
             </Form>
         </FormWrapper>

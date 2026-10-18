@@ -24,7 +24,9 @@ export function MembersStep({ invitations, onChange }: Props) {
         const next = addInvitation(invitations, { email, note, role })
         if (next === invitations) {
             // addInvitation refuses an address that is not one or is listed already.
-            setProblem(invitations.some((i) => i.email?.toLowerCase() === email?.toLowerCase()) ? 'duplicate' : 'invalid')
+            setProblem(
+                invitations.some((i) => i.email?.toLowerCase() === email?.toLowerCase()) ? 'duplicate' : 'invalid',
+            )
             return false
         }
         setProblem(null)
@@ -47,7 +49,9 @@ export function MembersStep({ invitations, onChange }: Props) {
                                 type="button"
                                 variant="ghost"
                                 size="icon"
-                                aria-label={t('spaces.create.members.remove', { who: item.email ?? t('spaces.invitations.anyone') })}
+                                aria-label={t('spaces.create.members.remove', {
+                                    who: item.email ?? t('spaces.invitations.anyone'),
+                                })}
                                 onClick={() => onChange(removeInvitation(invitations, item.key))}
                             >
                                 <X className="size-4" />
@@ -60,11 +64,16 @@ export function MembersStep({ invitations, onChange }: Props) {
             )}
             <InviteFields
                 submitLabel={t('spaces.create.members.add')}
-                error={problem === 'invalid' ? t('spaces.create.members.invalid') : problem === 'duplicate' ? t('spaces.create.members.duplicate') : null}
+                error={
+                    problem === 'invalid'
+                        ? t('spaces.create.members.invalid')
+                        : problem === 'duplicate'
+                          ? t('spaces.create.members.duplicate')
+                          : null
+                }
                 onEdit={() => setProblem(null)}
                 onSubmit={add}
             />
-
         </div>
     )
 }

@@ -1,7 +1,7 @@
 import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Banknote, Check, HandCoins, SkipForward } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, cn } from '@/lib/utils'
 import { parseDateKey, pendingDateClassName } from '@/lib/dates'
 import { intlLocale } from '@/lib/i18n'
 import { displayTransactionDescription, transactionAmountAppearance } from '@/lib/transaction-description'
@@ -27,35 +27,35 @@ interface UpcomingPendingCardProps {
     onSkip: (id: number) => void
 }
 
-export function UpcomingPendingCard({
-    transaction,
-    isReadOnly,
-    onConfirm,
-    onSkip,
-}: UpcomingPendingCardProps) {
+export function UpcomingPendingCard({ transaction, isReadOnly, onConfirm, onSkip }: UpcomingPendingCardProps) {
     const { t } = useTranslation(['common', 'pages'])
     const Icon = TYPE_ICONS[transaction.type]
     const { sign, className } = transactionAmountAppearance(transaction.type)
     const dateLabel = transaction.date
         ? parseDateKey(transaction.date).toLocaleDateString(intlLocale(), {
-            month: 'short',
-            day: 'numeric',
-        })
+              month: 'short',
+              day: 'numeric',
+          })
         : t('pages:transactions.noDate')
 
     return (
-        <div className="grid w-72 shrink-0 lg:w-fullgrid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_auto_auto] gap-x-3 gap-y-2 rounded-lg border px-3 py-2.5">
+        <div
+            className={cn(
+                'grid w-72 shrink-0 lg:w-fullgrid-cols-[minmax(0,1fr)_auto]',
+                'grid-rows-[auto_auto_auto] gap-x-3 gap-y-2 rounded-lg border px-3 py-2.5',
+            )}
+        >
             <div className="flex min-w-0 items-center gap-1.5">
                 <Icon className={`size-3.5 shrink-0 ${className}`} />
-                <p className="font-medium text-sm truncate">
-                    {displayTransactionDescription(transaction)}
-                </p>
+                <p className="font-medium text-sm truncate">{displayTransactionDescription(transaction)}</p>
             </div>
             <p className={`justify-self-end self-center text-xs ${pendingDateClassName(transaction.date)}`}>
                 {dateLabel}
             </p>
             <p className={`row-span-2 self-start pt-0.5 font-mono text-base font-medium truncate ${className}`}>
-                {transaction.isEstimated && '≈ '}{sign}{formatCurrency(transaction.amount, transaction.account.currency)}
+                {transaction.isEstimated && '≈ '}
+                {sign}
+                {formatCurrency(transaction.amount, transaction.account.currency)}
             </p>
             {!isReadOnly && (
                 <div className="col-start-2 row-start-3 flex items-end justify-end gap-1">

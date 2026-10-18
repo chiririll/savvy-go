@@ -1,5 +1,12 @@
 import { apiClient } from './client'
-import type { ApiTokenSummary, ConfirmFields, CreatedApiToken, CreateApiTokenInput, TokenCapabilities, UpdateApiTokenInput } from '@/types'
+import type {
+    ApiTokenSummary,
+    ConfirmFields,
+    CreatedApiToken,
+    CreateApiTokenInput,
+    TokenCapabilities,
+    UpdateApiTokenInput,
+} from '@/types'
 
 export const apiTokensApi = {
     /** What each kind of token can be given. */

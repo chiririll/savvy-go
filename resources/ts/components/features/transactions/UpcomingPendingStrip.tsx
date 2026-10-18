@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { Transaction } from '@/types'
 import { isDateOverdue } from '@/lib/dates'
 import { UpcomingPendingCard } from './UpcomingPendingCard'
+import { cn } from '@/lib/utils'
 
 interface UpcomingPendingStripProps {
     transactions: Transaction[]
@@ -10,12 +11,7 @@ interface UpcomingPendingStripProps {
     onSkip: (id: number) => void
 }
 
-export function UpcomingPendingStrip({
-    transactions,
-    isReadOnly,
-    onConfirm,
-    onSkip,
-}: UpcomingPendingStripProps) {
+export function UpcomingPendingStrip({ transactions, isReadOnly, onConfirm, onSkip }: UpcomingPendingStripProps) {
     const { t } = useTranslation('pages')
 
     if (transactions.length === 0) {
@@ -49,7 +45,12 @@ export function UpcomingPendingStrip({
                 </div>
             </div>
 
-            <div className="hidden min-w-0 space-y-3 lg:sticky lg:top-24 lg:block lg:max-h-[calc(100vh-10rem)] lg:self-start lg:overflow-y-auto">
+            <div
+                className={cn(
+                    'hidden min-w-0 space-y-3 lg:sticky lg:top-24 lg:block',
+                    'lg:max-h-[calc(100vh-10rem)] lg:self-start lg:overflow-y-auto',
+                )}
+            >
                 {sections.map((section) => (
                     <div key={section.key} className="min-w-0">
                         <p className="text-sm font-medium mb-2">{section.title}</p>

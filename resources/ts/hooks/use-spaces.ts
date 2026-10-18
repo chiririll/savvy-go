@@ -3,7 +3,15 @@ import i18n from '@/lib/i18n'
 import { adminSpacesApi, invitationsApi, spacesApi, syncGroupsApi } from '@/api/spaces'
 import { useUser } from '@/stores/auth'
 import { useCurrentSpaceId, useSpaceStore } from '@/stores/space'
-import { CreateSpaceInput, LinkedSpace, SpaceRole, SpaceTransferInput, SyncChange, SyncKind, SyncPlan } from '@/types/spaces'
+import {
+    CreateSpaceInput,
+    LinkedSpace,
+    SpaceRole,
+    SpaceTransferInput,
+    SyncChange,
+    SyncKind,
+    SyncPlan,
+} from '@/types/spaces'
 import { useResourceMutation } from './use-crud'
 
 export const SPACES_KEY = ['spaces']
@@ -41,7 +49,9 @@ export function useSwitchSpace() {
     return async (id: number) => {
         await queryClient.refetchQueries({ queryKey: SPACES_KEY })
         setCurrentId(id)
-        await queryClient.resetQueries({ predicate: (q) => q.queryKey[0] !== SPACES_KEY[0] && q.queryKey[0] !== 'auth' })
+        await queryClient.resetQueries({
+            predicate: (q) => q.queryKey[0] !== SPACES_KEY[0] && q.queryKey[0] !== 'auth',
+        })
     }
 }
 
@@ -72,12 +82,21 @@ export function useSpacePresets(enabled = true) {
 }
 
 export function useServerCurrencyCatalog(enabled = true) {
-    return useQuery({ queryKey: ['currency-catalog'], queryFn: () => spacesApi.currencyCatalog(), enabled, staleTime: 10 * 60_000 })
+    return useQuery({
+        queryKey: ['currency-catalog'],
+        queryFn: () => spacesApi.currencyCatalog(),
+        enabled,
+        staleTime: 10 * 60_000,
+    })
 }
 
 /** What can be copied from another space; read only while `id` is set. */
 export function useSpaceContent(id: number | null) {
-    return useQuery({ queryKey: spaceKey(id, 'content'), queryFn: () => spacesApi.readContent(id!), enabled: id !== null })
+    return useQuery({
+        queryKey: spaceKey(id, 'content'),
+        queryFn: () => spacesApi.readContent(id!),
+        enabled: id !== null,
+    })
 }
 
 export function useImportSpace() {
@@ -146,7 +165,8 @@ export function useSpaceInvitations(id: number | null, enabled = true) {
 
 export function useInvite(id: number) {
     return useResourceMutation({
-        mutationFn: ({ role, email, note }: { role: SpaceRole; email?: string; note?: string }) => spacesApi.invite(id, role, email, note),
+        mutationFn: ({ role, email, note }: { role: SpaceRole; email?: string; note?: string }) =>
+            spacesApi.invite(id, role, email, note),
         invalidateKeys: [spaceKey(id, 'invitations')],
     })
 }
@@ -209,10 +229,17 @@ export function useUnlinkSpace(id: number) {
 }
 
 export function useSyncGroup(id: number | null) {
-    return useQuery({ queryKey: spaceKey(id, 'sync-group'), queryFn: () => spacesApi.syncGroup(id!), enabled: id !== null })
+    return useQuery({
+        queryKey: spaceKey(id, 'sync-group'),
+        queryFn: () => spacesApi.syncGroup(id!),
+        enabled: id !== null,
+    })
 }
 
-/** The sync group of each space, in order (undefined while loading or when it is in none). Shares the cache of useSyncGroup. */
+/**
+ * The sync group of each space, in order (undefined while loading or when it is in none).
+ * Shares the cache of useSyncGroup.
+ */
 export function useSyncGroups(ids: number[]) {
     return useQueries({
         queries: ids.map((id) => ({ queryKey: spaceKey(id, 'sync-group'), queryFn: () => spacesApi.syncGroup(id) })),
@@ -240,7 +267,11 @@ export function useApplySync() {
 }
 
 export function useSpaceTransfers(id: number | null) {
-    return useQuery({ queryKey: spaceKey(id, 'transfers'), queryFn: () => spacesApi.transfers(id!), enabled: id !== null })
+    return useQuery({
+        queryKey: spaceKey(id, 'transfers'),
+        queryFn: () => spacesApi.transfers(id!),
+        enabled: id !== null,
+    })
 }
 
 /** Sends money from the current space to a linked one. */
@@ -264,7 +295,8 @@ export function useResolveTransfer(id: number) {
 
 export function useUpdateTransfer(id: number) {
     return useResourceMutation({
-        mutationFn: ({ uuid, data }: { uuid: string; data: Partial<SpaceTransferInput> }) => spacesApi.updateTransfer(id, uuid, data),
+        mutationFn: ({ uuid, data }: { uuid: string; data: Partial<SpaceTransferInput> }) =>
+            spacesApi.updateTransfer(id, uuid, data),
         invalidateAll: true,
         successMessage: i18n.t('spaces.toasts.transferUpdated', { ns: 'settings' }),
     })
@@ -279,7 +311,11 @@ export function useDeleteTransfer(id: number) {
 }
 
 export function useSpaceAudit(id: number | null, enabled = true) {
-    return useQuery({ queryKey: spaceKey(id, 'audit'), queryFn: () => spacesApi.audit(id!), enabled: id !== null && enabled })
+    return useQuery({
+        queryKey: spaceKey(id, 'audit'),
+        queryFn: () => spacesApi.audit(id!),
+        enabled: id !== null && enabled,
+    })
 }
 
 export function useSpaceBackups(id: number | null) {
@@ -300,7 +336,8 @@ export function useDeletedSpaces() {
 
 export function useSetSpaceQuota() {
     return useResourceMutation({
-        mutationFn: ({ id, quotaBytes }: { id: number; quotaBytes: number | null }) => adminSpacesApi.setQuota(id, quotaBytes),
+        mutationFn: ({ id, quotaBytes }: { id: number; quotaBytes: number | null }) =>
+            adminSpacesApi.setQuota(id, quotaBytes),
         invalidateKeys: [ADMIN_SPACES],
         successMessage: i18n.t('admin.spaces.toasts.quota', { ns: 'settings' }),
     })
@@ -338,7 +375,8 @@ export function useSigningKeys() {
 
 export function useTrustKey() {
     return useResourceMutation({
-        mutationFn: ({ name, publicKey }: { name: string; publicKey: string }) => adminSpacesApi.trustKey(name, publicKey),
+        mutationFn: ({ name, publicKey }: { name: string; publicKey: string }) =>
+            adminSpacesApi.trustKey(name, publicKey),
         invalidateKeys: [KEYS],
         successMessage: i18n.t('admin.keys.toasts.trusted', { ns: 'settings' }),
     })

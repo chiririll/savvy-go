@@ -3,25 +3,10 @@ import { useTranslation } from 'react-i18next'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import i18n from '@/lib/i18n'
-import {
-    Form,
-    FormControl,
-    FormField,
-    FormItem,
-    FormLabel,
-    FormMessage,
-    FormDescription,
-} from '@/components/ui/form'
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select'
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
+import { ChoiceField, ColumnField } from './MappingFields'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import type { CsvParseResult, ColumnMapping, ImportOptions, DateFormat, AmountFormat } from '@/types/import'
-import { useEffect } from 'react'
 
 const mappingSchema = z.object({
     date: z.number({ error: i18n.t('import.dateRequired', { ns: 'forms' }) }),
@@ -45,7 +30,17 @@ interface MappingStepProps {
     isLoading: boolean
 }
 
-const NONE_VALUE = '__none__'
+const DATE_FORMATS = [
+    { value: 'ISO', label: 'ISO (YYYY-MM-DD)' },
+    { value: 'DD.MM.YYYY', label: 'DD.MM.YYYY' },
+    { value: 'DD/MM/YYYY', label: 'DD/MM/YYYY' },
+    { value: 'MM/DD/YYYY', label: 'MM/DD/YYYY' },
+]
+
+const AMOUNT_FORMATS = [
+    { value: 'US', label: 'US (1,234.56)' },
+    { value: 'EU', label: 'EU (1.234,56)' },
+]
 
 export function MappingStep({ parseResult, onSubmit, isLoading }: MappingStepProps) {
     const { t } = useTranslation('settings')
@@ -67,14 +62,6 @@ export function MappingStep({ parseResult, onSubmit, isLoading }: MappingStepPro
             defaultType: 'expense',
         },
     })
-
-    // Auto-submit when form is valid and user changes values
-    useEffect(() => {
-        const subscription = form.watch(() => {
-            // Don't auto-submit, just track changes
-        })
-        return () => subscription.unsubscribe()
-    }, [form])
 
     const handleSubmit = (values: MappingFormValues) => {
         const mapping: ColumnMapping = {
@@ -106,75 +93,24 @@ export function MappingStep({ parseResult, onSubmit, isLoading }: MappingStepPro
         label: `${index + 1}: ${header}`,
     }))
 
+    const { control } = form
+    const common = { control, disabled: isLoading }
+    const required = { ...common, options: columnOptions, placeholder: tForms('import.selectColumn') }
+    const optional = { ...required, noneLabel: tForms('import.none') }
+
     return (
         <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6" id="mapping-form">
-                {/* Required Mappings */}
                 <div className="space-y-4">
                     <h3 className="font-medium">{t('import.requiredFields')}</h3>
 
                     <div className="grid gap-4 sm:grid-cols-2">
-                        <FormField
-                            control={form.control}
-                            name="date"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>{tForms('import.dateColumn')}</FormLabel>
-                                    <Select
-                                        onValueChange={(val) => field.onChange(Number(val))}
-                                        value={field.value?.toString() ?? ''}
-                                        disabled={isLoading}
-                                    >
-                                        <FormControl>
-                                            <SelectTrigger className="w-full">
-                                                <SelectValue placeholder={tForms('import.selectColumn')} />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            {columnOptions.map((opt) => (
-                                                <SelectItem key={opt.value} value={opt.value}>
-                                                    {opt.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-                        <FormField
-                            control={form.control}
-                            name="amount"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>{tForms('import.amountColumn')}</FormLabel>
-                                    <Select
-                                        onValueChange={(val) => field.onChange(Number(val))}
-                                        value={field.value?.toString() ?? ''}
-                                        disabled={isLoading}
-                                    >
-                                        <FormControl>
-                                            <SelectTrigger className="w-full">
-                                                <SelectValue placeholder={tForms('import.selectColumn')} />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            {columnOptions.map((opt) => (
-                                                <SelectItem key={opt.value} value={opt.value}>
-                                                    {opt.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
+                        <ColumnField {...required} name="date" label={tForms('import.dateColumn')} />
+                        <ColumnField {...required} name="amount" label={tForms('import.amountColumn')} />
                     </div>
 
                     <FormField
-                        control={form.control}
+                        control={control}
                         name="defaultAccountId"
                         render={({ field }) => (
                             <FormItem>
@@ -186,237 +122,65 @@ export function MappingStep({ parseResult, onSubmit, isLoading }: MappingStepPro
                                     disabled={isLoading}
                                     allowCreate
                                 />
-                                <FormDescription>
-                                    {tForms('import.targetAccountHelp')}
-                                </FormDescription>
+                                <FormDescription>{tForms('import.targetAccountHelp')}</FormDescription>
                                 <FormMessage />
                             </FormItem>
                         )}
                     />
                 </div>
 
-                {/* Optional Mappings */}
                 <div className="space-y-4">
                     <h3 className="font-medium">{t('import.optionalFields')}</h3>
 
                     <div className="grid gap-4 sm:grid-cols-2">
-                        <FormField
-                            control={form.control}
-                            name="description"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>{tForms('import.descriptionColumn')}</FormLabel>
-                                    <Select
-                                        onValueChange={(val) => field.onChange(val === NONE_VALUE ? null : Number(val))}
-                                        value={field.value?.toString() ?? NONE_VALUE}
-                                        disabled={isLoading}
-                                    >
-                                        <FormControl>
-                                            <SelectTrigger className="w-full">
-                                                <SelectValue placeholder={tForms('import.selectColumn')} />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            <SelectItem value={NONE_VALUE}>{tForms('import.none')}</SelectItem>
-                                            {columnOptions.map((opt) => (
-                                                <SelectItem key={opt.value} value={opt.value}>
-                                                    {opt.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-                        <FormField
-                            control={form.control}
+                        <ColumnField {...optional} name="description" label={tForms('import.descriptionColumn')} />
+                        <ColumnField
+                            {...optional}
                             name="category"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>{tForms('import.categoryColumn')}</FormLabel>
-                                    <Select
-                                        onValueChange={(val) => field.onChange(val === NONE_VALUE ? null : Number(val))}
-                                        value={field.value?.toString() ?? NONE_VALUE}
-                                        disabled={isLoading}
-                                    >
-                                        <FormControl>
-                                            <SelectTrigger className="w-full">
-                                                <SelectValue placeholder={tForms('import.selectColumn')} />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            <SelectItem value={NONE_VALUE}>{tForms('import.none')}</SelectItem>
-                                            {columnOptions.map((opt) => (
-                                                <SelectItem key={opt.value} value={opt.value}>
-                                                    {opt.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <FormDescription>
-                                        {tForms('import.categoryHelp')}
-                                    </FormDescription>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
+                            label={tForms('import.categoryColumn')}
+                            help={tForms('import.categoryHelp')}
                         />
-
-                        <FormField
-                            control={form.control}
+                        <ColumnField
+                            {...optional}
                             name="tags"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>{tForms('import.tagsColumn')}</FormLabel>
-                                    <Select
-                                        onValueChange={(val) => field.onChange(val === NONE_VALUE ? null : Number(val))}
-                                        value={field.value?.toString() ?? NONE_VALUE}
-                                        disabled={isLoading}
-                                    >
-                                        <FormControl>
-                                            <SelectTrigger className="w-full">
-                                                <SelectValue placeholder={tForms('import.selectColumn')} />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            <SelectItem value={NONE_VALUE}>{tForms('import.none')}</SelectItem>
-                                            {columnOptions.map((opt) => (
-                                                <SelectItem key={opt.value} value={opt.value}>
-                                                    {opt.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <FormDescription>
-                                        {tForms('import.tagsHelp')}
-                                    </FormDescription>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
+                            label={tForms('import.tagsColumn')}
+                            help={tForms('import.tagsHelp')}
                         />
-
-                        <FormField
-                            control={form.control}
+                        <ColumnField
+                            {...optional}
                             name="type"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>{tForms('import.typeColumn')}</FormLabel>
-                                    <Select
-                                        onValueChange={(val) => field.onChange(val === NONE_VALUE ? null : Number(val))}
-                                        value={field.value?.toString() ?? NONE_VALUE}
-                                        disabled={isLoading}
-                                    >
-                                        <FormControl>
-                                            <SelectTrigger className="w-full">
-                                                <SelectValue placeholder={tForms('import.selectColumn')} />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            <SelectItem value={NONE_VALUE}>{tForms('import.autoDetect')}</SelectItem>
-                                            {columnOptions.map((opt) => (
-                                                <SelectItem key={opt.value} value={opt.value}>
-                                                    {opt.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <FormDescription>
-                                        {tForms('import.typeHelp')}
-                                    </FormDescription>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
+                            label={tForms('import.typeColumn')}
+                            help={tForms('import.typeHelp')}
+                            noneLabel={tForms('import.autoDetect')}
                         />
                     </div>
                 </div>
 
-                {/* Format Options */}
                 <div className="space-y-4">
                     <h3 className="font-medium">{t('import.formatSettings')}</h3>
 
                     <div className="grid gap-4 sm:grid-cols-3">
-                        <FormField
-                            control={form.control}
+                        <ChoiceField
+                            {...common}
                             name="dateFormat"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>{tForms('import.dateFormat')}</FormLabel>
-                                    <Select
-                                        onValueChange={field.onChange}
-                                        value={field.value}
-                                        disabled={isLoading}
-                                    >
-                                        <FormControl>
-                                            <SelectTrigger className="w-full">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            <SelectItem value="ISO">ISO (YYYY-MM-DD)</SelectItem>
-                                            <SelectItem value="DD.MM.YYYY">DD.MM.YYYY</SelectItem>
-                                            <SelectItem value="DD/MM/YYYY">DD/MM/YYYY</SelectItem>
-                                            <SelectItem value="MM/DD/YYYY">MM/DD/YYYY</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
+                            label={tForms('import.dateFormat')}
+                            choices={DATE_FORMATS}
                         />
-
-                        <FormField
-                            control={form.control}
+                        <ChoiceField
+                            {...common}
                             name="amountFormat"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>{tForms('import.amountFormat')}</FormLabel>
-                                    <Select
-                                        onValueChange={field.onChange}
-                                        value={field.value}
-                                        disabled={isLoading}
-                                    >
-                                        <FormControl>
-                                            <SelectTrigger className="w-full">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            <SelectItem value="US">US (1,234.56)</SelectItem>
-                                            <SelectItem value="EU">EU (1.234,56)</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
+                            label={tForms('import.amountFormat')}
+                            choices={AMOUNT_FORMATS}
                         />
-
-                        <FormField
-                            control={form.control}
+                        <ChoiceField
+                            {...common}
                             name="defaultType"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>{tForms('import.defaultType')}</FormLabel>
-                                    <Select
-                                        onValueChange={field.onChange}
-                                        value={field.value}
-                                        disabled={isLoading}
-                                    >
-                                        <FormControl>
-                                            <SelectTrigger className="w-full">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            <SelectItem value="expense">{tPages('transactions.types.expense')}</SelectItem>
-                                            <SelectItem value="income">{tPages('transactions.types.income')}</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <FormDescription>
-                                        {tForms('import.defaultTypeHelp')}
-                                    </FormDescription>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
+                            label={tForms('import.defaultType')}
+                            help={tForms('import.defaultTypeHelp')}
+                            choices={[
+                                { value: 'expense', label: tPages('transactions.types.expense') },
+                                { value: 'income', label: tPages('transactions.types.income') },
+                            ]}
                         />
                     </div>
                 </div>

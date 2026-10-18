@@ -2,146 +2,28 @@ import { testId } from '@/lib/test-id'
 import { UserSettingsTabs } from '@/components/features/spaces/UserSettingsTabs'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { toast } from 'sonner'
-import { Check, Copy, ExternalLink, KeyRound, Pencil, Plus, Trash2 } from 'lucide-react'
-import { Page, PageHeader, FormWrapper, ResponsiveDialog } from '@/components/shared'
+import { ExternalLink, KeyRound, Plus } from 'lucide-react'
+import { Page, PageHeader, FormWrapper } from '@/components/shared'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select'
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'
-import { useApiTokenCapabilities, useApiTokens, useCreateApiToken, useRevokeApiToken, useSpaces } from '@/hooks'
-import { SyncWarning } from '@/components/features/api-tokens/SyncWarning'
-import { PermissionPicker } from '@/components/features/api-tokens/PermissionPicker'
+import { useApiTokens, useRevokeApiToken, useSpaces } from '@/hooks'
 import { EditTokenDialog } from '@/components/features/api-tokens/EditTokenDialog'
-import { SpacePicker, hasSpaces, type SpaceChoice } from '@/components/features/api-tokens/SpacePicker'
-import { intlLocale } from '@/lib/i18n'
-import { kindOptions, permissionLevel, type ApiPermission, type ApiResource, type ApiTokenSummary } from '@/types'
-import { apiResourceLabel } from '@/lib/labels'
-
-type Expiry = 'never' | '30' | '90' | '365'
-
-/** What a token holds, as lists of resources by their highest level. */
-function grantedResources(token: ApiTokenSummary): { read: ApiResource[]; write: ApiResource[]; remove: ApiResource[] } {
-    const read: ApiResource[] = []
-    const write: ApiResource[] = []
-    const remove: ApiResource[] = []
-    const resources = new Set(token.permissions.map((p) => p.split(':')[0]))
-    for (const resource of resources) {
-        const level = permissionLevel(token.permissions, resource)
-        if (level === 'delete') remove.push(resource)
-        else if (level === 'write') write.push(resource)
-        else if (level === 'read') read.push(resource)
-    }
-    return { read, write, remove }
-}
-
-/** What a token may do, in words. */
-function TokenGrants({ token }: { token: ApiTokenSummary }) {
-    const { t } = useTranslation('settings')
-    const { read, write, remove } = grantedResources(token)
-    const list = (items: ApiResource[]) => items.map((r) => apiResourceLabel(t, r)).join(', ')
-    if (read.length === 0 && write.length === 0 && remove.length === 0) {
-        return <p className="text-xs text-muted-foreground">{t('api.tokens.noAccess')}</p>
-    }
-    return (
-        <div className="space-y-0.5 text-xs text-muted-foreground">
-            {read.length > 0 && <p>{t('api.tokens.canRead', { list: list(read) })}</p>}
-            {write.length > 0 && <p>{t('api.tokens.canWrite', { list: list(write) })}</p>}
-            {remove.length > 0 && <p>{t('api.tokens.canDelete', { list: list(remove) })}</p>}
-        </div>
-    )
-}
-
-function expiryToIso(expiry: Expiry): string | null {
-    if (expiry === 'never') return null
-    const date = new Date()
-    date.setDate(date.getDate() + Number(expiry))
-    return date.toISOString()
-}
+import { CreateTokenDialog } from '@/components/features/api-tokens/CreateTokenDialog'
+import { CreatedTokenDialog } from '@/components/features/api-tokens/CreatedTokenDialog'
+import { TokenRow } from '@/components/features/api-tokens/TokenRow'
+import type { ApiTokenSummary } from '@/types'
+import { cn } from '@/lib/utils'
 
 export default function ApiSettingsPage() {
     const { t } = useTranslation('settings')
-    const { t: tCommon } = useTranslation('common')
 
     const { data: tokens, isLoading } = useApiTokens()
-    const createToken = useCreateApiToken()
     const revokeToken = useRevokeApiToken()
     const { data: spaces = [] } = useSpaces()
 
     const [showCreate, setShowCreate] = useState(false)
-    const [name, setName] = useState('')
-    const { data: capabilities } = useApiTokenCapabilities()
-    const personal = capabilities ? kindOptions(capabilities, 'personal') : null
-    // Until the user changes it, a new token gets the lowest preset.
-    const [chosen, setChosen] = useState<ApiPermission[] | null>(null)
-    const permissions = chosen ?? personal?.presets[0]?.permissions ?? []
-    const [spaceChoice, setSpaceChoice] = useState<SpaceChoice>({ all: false, ids: [] })
-    const [expiry, setExpiry] = useState<Expiry>('never')
     const [createdToken, setCreatedToken] = useState<string | null>(null)
-    const [copied, setCopied] = useState(false)
     const [editing, setEditing] = useState<ApiTokenSummary | null>(null)
-
-    // Categories and tags are mirrored between spaces of a sync group, so only a
-    // token that can change them needs the warning.
-    const changesSynced = (['categories', 'tags'] as const).some((r) =>
-        ['write', 'delete'].includes(permissionLevel(permissions, r) ?? ''),
-    )
-
-    const formatDate = (value: string) => new Date(value).toLocaleDateString(intlLocale())
-
-    const resetForm = () => {
-        setName('')
-        setChosen(null)
-        setSpaceChoice({ all: false, ids: [] })
-        setExpiry('never')
-    }
-
-    const handleCreate = async () => {
-        try {
-            const created = await createToken.mutateAsync({
-                name: name.trim(),
-                permissions,
-                all_spaces: spaceChoice.all,
-                space_ids: spaceChoice.ids,
-                expires_at: expiryToIso(expiry),
-            })
-            setShowCreate(false)
-            resetForm()
-            setCreatedToken(created.token)
-            setCopied(false)
-        } catch {
-            // toasted by the mutation
-        }
-    }
-
-    const handleCopy = async () => {
-        if (!createdToken) return
-        try {
-            await navigator.clipboard.writeText(createdToken)
-            setCopied(true)
-        } catch {
-            toast.error(t('api.copyFailed'))
-        }
-    }
 
     return (
         <Page title={t('api.title')}>
@@ -152,7 +34,12 @@ export default function ApiSettingsPage() {
                 <section className="rounded-xl border bg-card shadow-sm">
                     <header className="flex flex-wrap items-start justify-between gap-3 border-b px-5 py-4">
                         <div className="flex items-start gap-3">
-                            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-muted/50 text-muted-foreground">
+                            <div
+                                className={cn(
+                                    'flex size-9 shrink-0 items-center justify-center rounded-lg border bg-muted/50',
+                                    'text-muted-foreground',
+                                )}
+                            >
                                 <KeyRound className="size-4" />
                             </div>
                             <div className="space-y-0.5">
@@ -180,70 +67,22 @@ export default function ApiSettingsPage() {
                         ) : tokens && tokens.length > 0 ? (
                             <div className="divide-y rounded-lg border">
                                 {tokens.map((token) => (
-                                    <div key={token.id} className="flex items-center justify-between gap-4 px-4 py-3.5">
-                                        <div className="min-w-0 space-y-1">
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                <span className="truncate text-sm font-medium">{token.name}</span>
-                                                <Badge variant="secondary">
-                                                    {token.all_spaces
-                                                        ? t('api.tokens.allSpaces')
-                                                        : t('api.tokens.spaceCount', { count: token.space_ids.length })}
-                                                </Badge>
-                                                <code className="text-xs text-muted-foreground">{token.prefix}…</code>
-                                            </div>
-                                            <TokenGrants token={token} />
-                                            <p className="text-xs text-muted-foreground">
-                                                {token.last_used_at
-                                                    ? t('api.tokens.lastUsed', { date: formatDate(token.last_used_at) })
-                                                    : t('api.tokens.neverUsed')}
-                                                {' · '}
-                                                {token.expires_at
-                                                    ? t('api.tokens.expires', { date: formatDate(token.expires_at) })
-                                                    : t('api.tokens.noExpiry')}
-                                            </p>
-                                        </div>
-                                        <div className="flex shrink-0 items-center">
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={() => setEditing(token)}
-                                                aria-label={t('api.tokens.editAria')}
-                                                {...testId(`edit-token-${token.id}`)}
-                                            >
-                                                <Pencil className="size-4" />
-                                            </Button>
-                                            <AlertDialog>
-                                                <AlertDialogTrigger asChild>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        disabled={revokeToken.isPending}
-                                                        aria-label={t('api.tokens.revokeAria')}
-                                                    >
-                                                        <Trash2 className="size-4" />
-                                                    </Button>
-                                                </AlertDialogTrigger>
-                                                <AlertDialogContent>
-                                                    <AlertDialogHeader>
-                                                        <AlertDialogTitle>{t('api.tokens.revokeTitle')}</AlertDialogTitle>
-                                                        <AlertDialogDescription>
-                                                            {t('api.tokens.revokeDescription', { name: token.name })}
-                                                        </AlertDialogDescription>
-                                                    </AlertDialogHeader>
-                                                    <AlertDialogFooter>
-                                                        <AlertDialogCancel>{tCommon('actions.cancel')}</AlertDialogCancel>
-                                                        <AlertDialogAction onClick={() => revokeToken.mutate(token.id)}>
-                                                            {t('api.tokens.revoke')}
-                                                        </AlertDialogAction>
-                                                    </AlertDialogFooter>
-                                                </AlertDialogContent>
-                                            </AlertDialog>
-                                        </div>
-                                    </div>
+                                    <TokenRow
+                                        key={token.id}
+                                        token={token}
+                                        revoking={revokeToken.isPending}
+                                        onEdit={() => setEditing(token)}
+                                        onRevoke={() => revokeToken.mutate(token.id)}
+                                    />
                                 ))}
                             </div>
                         ) : (
-                            <p className="rounded-lg border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
+                            <p
+                                className={cn(
+                                    'rounded-lg border border-dashed px-4 py-6 text-center text-sm',
+                                    'text-muted-foreground',
+                                )}
+                            >
                                 {t('api.tokens.empty')}
                             </p>
                         )}
@@ -251,89 +90,18 @@ export default function ApiSettingsPage() {
                 </section>
             </FormWrapper>
 
-            <ResponsiveDialog
+            <CreateTokenDialog
                 open={showCreate}
-                onOpenChange={(open) => {
-                    setShowCreate(open)
-                    if (!open) resetForm()
-                }}
-                title={t('api.create.title')}
-                description={t('api.create.description')}
-                footer={
-                    <>
-                        <Button variant="outline" onClick={() => setShowCreate(false)}>
-                            {tCommon('actions.cancel')}
-                        </Button>
-                        <Button
-                            onClick={handleCreate}
-                            disabled={!name.trim() || !hasSpaces(spaceChoice) || createToken.isPending}
-                        >
-                            {tCommon('actions.create')}
-                        </Button>
-                    </>
-                }
-            >
-                <div className="space-y-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="api-token-name">{t('api.create.name')}</Label>
-                        <Input
-                            id="api-token-name"
-                            placeholder={t('api.create.namePlaceholder')}
-                            value={name}
-                            maxLength={100}
-                            autoFocus
-                            onChange={(e) => setName(e.target.value)}
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <Label>{t('api.create.spaces')}</Label>
-                        <SpacePicker idPrefix="token-space" spaces={spaces} value={spaceChoice} onChange={setSpaceChoice} />
-                        <p className="text-xs text-muted-foreground">
-                            {hasSpaces(spaceChoice) ? t('api.create.spacesHint') : t('api.spaces.none')}
-                        </p>
-                    </div>
-                    {changesSynced && <SyncWarning spaces={spaces} choice={spaceChoice} />}
-                    <div className="space-y-2">
-                        <Label>{t('api.create.permissions')}</Label>
-                        {personal && <PermissionPicker value={permissions} onChange={setChosen} options={personal} />}
-                        <p className="text-xs text-muted-foreground">{t('api.create.permissionsHint')}</p>
-                    </div>
-                    <div className="space-y-2">
-                        <Label>{t('api.create.expiry')}</Label>
-                        <Select value={expiry} onValueChange={(v) => setExpiry(v as Expiry)}>
-                            <SelectTrigger className="w-full">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="never">{t('api.create.expiryNever')}</SelectItem>
-                                <SelectItem value="30">{t('api.create.expiryDays', { count: 30 })}</SelectItem>
-                                <SelectItem value="90">{t('api.create.expiryDays', { count: 90 })}</SelectItem>
-                                <SelectItem value="365">{t('api.create.expiryDays', { count: 365 })}</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                </div>
-            </ResponsiveDialog>
+                spaces={spaces}
+                onOpenChange={setShowCreate}
+                onCreated={setCreatedToken}
+            />
 
-            {editing && <EditTokenDialog key={editing.id} token={editing} spaces={spaces} onClose={() => setEditing(null)} />}
+            {editing && (
+                <EditTokenDialog key={editing.id} token={editing} spaces={spaces} onClose={() => setEditing(null)} />
+            )}
 
-            <ResponsiveDialog
-                open={createdToken !== null}
-                onOpenChange={(open) => !open && setCreatedToken(null)}
-                title={t('api.created.title')}
-                description={t('api.created.description')}
-                className="sm:max-w-lg"
-                footer={<Button onClick={() => setCreatedToken(null)}>{t('api.created.done')}</Button>}
-            >
-                <div className="flex items-center gap-2">
-                    <code className="min-w-0 flex-1 break-all rounded-md border bg-muted px-3 py-2 text-xs">
-                        {createdToken}
-                    </code>
-                    <Button variant="outline" size="icon" onClick={handleCopy} aria-label={t('api.created.copy')}>
-                        {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-                    </Button>
-                </div>
-            </ResponsiveDialog>
+            <CreatedTokenDialog token={createdToken} onClose={() => setCreatedToken(null)} />
         </Page>
     )
 }

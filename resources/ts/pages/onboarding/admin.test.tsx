@@ -172,7 +172,7 @@ describe('admin setup', () => {
         expect(screen.queryByLabelText('setup.name')).toBeNull()
     })
 
-    it('Enter on the first screen goes on and does not validate the admin fields', async () => {
+    it('Enter on the first screen goes on without validating the admin fields', async () => {
         renderPage()
         await screen.findByLabelText('setup.bootstrapPassword')
         type('setup.bootstrapPassword', 'RIGHT')
@@ -198,7 +198,7 @@ describe('admin setup', () => {
         expect(screen.queryByLabelText('setup.name')).toBeNull()
     })
 
-    it('shows the error of a wrong password, goes back to it and creates no user', async () => {
+    it('shows a wrong-password error on its screen and creates no user', async () => {
         register.mockRejectedValue({
             message: 'x',
             details: { bootstrap_password: ['The bootstrap password is missing or wrong.'] },
@@ -228,7 +228,7 @@ describe('admin setup', () => {
         expect(invalidate).toHaveBeenCalledWith({ queryKey: ['auth', 'status'] })
     })
 
-    it('does not bounce to the login page once the status says registration is over', async () => {
+    it('does not bounce to login once registration is over', async () => {
         // The first admin exists now: the refreshed status no longer asks for registration.
         register.mockImplementation(async () => {
             status.mockResolvedValue({ needs_registration: false, bootstrap_hint: null })

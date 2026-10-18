@@ -19,16 +19,19 @@ export function OnboardingLayout({ title, description, children, className }: On
             <Card className={cn('w-full max-w-md', className)}>
                 <CardHeader className="text-center px-4 sm:px-6">
                     <div className="flex justify-center mb-4">
-                        <div className="flex size-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+                        <div
+                            className={cn(
+                                'flex size-12 items-center justify-center rounded-xl bg-primary',
+                                'text-primary-foreground',
+                            )}
+                        >
                             <Logo className="size-7" />
                         </div>
                     </div>
                     <CardTitle className="text-2xl">{title}</CardTitle>
                     <CardDescription>{description}</CardDescription>
                 </CardHeader>
-                <CardContent className="px-4 sm:px-6">
-                    {children}
-                </CardContent>
+                <CardContent className="px-4 sm:px-6">{children}</CardContent>
             </Card>
             <LanguageSwitcher variant="auth" />
         </div>

@@ -4,9 +4,15 @@ import { useTranslation } from 'react-i18next'
 import { ListPage } from '@/components/shared'
 import { createUserColumns, UserFormDialog, UserPasswordLinkDialog } from '@/components/features/users'
 import {
-    useUsers, useDeleteUser, useCreateUser, useUpdateUser, useIssuePasswordToken, useResourceFormDialog,
+    useUsers,
+    useDeleteUser,
+    useCreateUser,
+    useUpdateUser,
+    useIssuePasswordToken,
+    useResourceFormDialog,
     useSetEmailVerified,
-    useMailStatus, useSettings,
+    useMailStatus,
+    useSettings,
 } from '@/hooks'
 import { useUser as useCurrentUser } from '@/stores/auth'
 import { useReadOnly } from '@/components/providers/ReadOnlyProvider'
@@ -85,22 +91,25 @@ export default function UsersPage() {
     }
 
     const handleReset = (user: User) => {
-        issueToken.mutate({ id: user.id }, {
-            onSuccess: (result) => showLink(result.token, result.expiresAt),
-        })
+        issueToken.mutate(
+            { id: user.id },
+            {
+                onSuccess: (result) => showLink(result.token, result.expiresAt),
+            },
+        )
     }
 
     const handleEmailReset = (user: User) => issueToken.mutate({ id: user.id, send: true })
 
-    const columns = createUserColumns(
-        (id) => deleteUser.mutate(id),
-        form.openEdit,
-        handleReset,
-        currentUser?.id,
+    const columns = createUserColumns({
+        onDelete: (id) => deleteUser.mutate(id),
+        onEdit: form.openEdit,
+        onResetPassword: handleReset,
+        currentUserId: currentUser?.id,
         isReadOnly,
-        canEmail ? handleEmailReset : undefined,
-        (user, verified) => setEmailVerified.mutate({ id: user.id, verified }),
-    )
+        onEmailReset: canEmail ? handleEmailReset : undefined,
+        onSetEmailVerified: (user, verified) => setEmailVerified.mutate({ id: user.id, verified }),
+    })
 
     return (
         <>

@@ -90,15 +90,17 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
  */
 export function addInvitation(
     list: DraftInvitation[],
-    input: { email: string | null; note?: string | null; role: SpaceRole }
+    input: { email: string | null; note?: string | null; role: SpaceRole },
 ): DraftInvitation[] {
     const email = input.email?.trim() || null
-    if (email !== null && (!EMAIL.test(email) || list.some((i) => i.email?.toLowerCase() === email.toLowerCase()))) return list
+    if (email !== null && (!EMAIL.test(email) || list.some((i) => i.email?.toLowerCase() === email.toLowerCase())))
+        return list
     const note = email === null ? input.note?.trim() || null : null
     return [...list, { key: newInvitationKey(), email, note, role: input.role }]
 }
 
-export const removeInvitation = (list: DraftInvitation[], key: string): DraftInvitation[] => list.filter((i) => i.key !== key)
+export const removeInvitation = (list: DraftInvitation[], key: string): DraftInvitation[] =>
+    list.filter((i) => i.key !== key)
 
 /** The steps in order; the copy step only exists when there is another space to copy from. */
 function stepsFor(otherSpaces: number): DraftStep[] {
@@ -108,6 +110,16 @@ function stepsFor(otherSpaces: number): DraftStep[] {
 export function nextStep(step: DraftStep, otherSpaces: number): DraftStep {
     const order = stepsFor(otherSpaces)
     return order[Math.min(order.indexOf(step) + 1, order.length - 1)]
+}
+
+/** A draft saved on the copy step can come back when there is nothing to copy from. */
+export function effectiveStep(step: DraftStep, otherSpaces: number): DraftStep {
+    return step === 'copy' && otherSpaces === 0 ? 'name' : step
+}
+
+/** The space to copy from; a source that is gone (or none picked) means the defaults. */
+export function effectiveSourceId(sourceId: number | null, spaceIds: number[]): number | null {
+    return sourceId !== null && spaceIds.includes(sourceId) ? sourceId : null
 }
 
 export function previousStep(step: DraftStep, otherSpaces: number): DraftStep {
@@ -163,9 +175,18 @@ export function buildContent(kinds: CopyKinds, source: CopySource | null, preset
         baseCurrency: currencies?.baseCurrency ?? null,
         currencies: currencies ? currencies.currencies.filter((code) => code !== currencies.baseCurrency) : [],
         accounts: accounts
-            ? accounts.accounts.map((a) => ({ key: newAccountKey(), name: a.name, type: a.type, currency: a.currency, initialBalance: '' }))
+            ? accounts.accounts.map((a) => ({
+                  key: newAccountKey(),
+                  name: a.name,
+                  type: a.type,
+                  currency: a.currency,
+                  initialBalance: '',
+              }))
             : [],
-        categories: withDefaults((categories ? categories.categories : presets.categories).map((c) => ({ ...c })), presets),
+        categories: withDefaults(
+            (categories ? categories.categories : presets.categories).map((c) => ({ ...c })),
+            presets,
+        ),
         tags: [...(tags ? tags.tags : presets.tags)],
     })
 }
@@ -183,7 +204,8 @@ export function draftProblems(draft: SpaceDraft): ('name' | 'baseCurrency' | 'ac
     if (!draft.name.trim()) problems.push('name')
     if (!draft.baseCurrency) problems.push('baseCurrency')
     if (draft.accounts.some((a) => !a.name.trim() || !a.currency)) problems.push('accounts')
-    if (draft.accounts.some((a) => a.initialBalance.trim() !== '' && !BALANCE.test(a.initialBalance.trim()))) problems.push('balances')
+    if (draft.accounts.some((a) => a.initialBalance.trim() !== '' && !BALANCE.test(a.initialBalance.trim())))
+        problems.push('balances')
     return problems
 }
 
@@ -205,7 +227,12 @@ export function toRequest(draft: SpaceDraft): CreateSpaceInput {
         currencies: content.currencies,
         accounts: content.accounts.map((a) => {
             const balance = a.initialBalance.trim().replace(',', '.')
-            return { name: a.name.trim(), type: a.type, currency: a.currency, ...(balance ? { initialBalance: balance } : {}) }
+            return {
+                name: a.name.trim(),
+                type: a.type,
+                currency: a.currency,
+                ...(balance ? { initialBalance: balance } : {}),
+            }
         }),
         categories: content.categories.map((c) => ({ ...c, name: c.name.trim() })).filter((c) => c.name),
         tags,
@@ -225,7 +252,13 @@ export function toCopySource(content: {
         accounts: content.accounts
             .filter((a) => a.currency !== null && a.type !== 'debt')
             .map((a) => ({ name: a.name, type: a.type, currency: a.currency!.code })),
-        categories: content.categories.map((c) => ({ name: c.name, type: c.type, icon: c.icon ?? '', color: c.color ?? '', isDefault: c.isDefault })),
+        categories: content.categories.map((c) => ({
+            name: c.name,
+            type: c.type,
+            icon: c.icon ?? '',
+            color: c.color ?? '',
+            isDefault: c.isDefault,
+        })),
         tags: content.tags.map((t) => t.name),
     }
 }

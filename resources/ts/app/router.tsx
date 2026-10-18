@@ -64,7 +64,9 @@ function AdminOnly({ children }: { children: React.ReactNode }) {
     return useUser()?.role === 'admin' ? <>{children}</> : <Navigate to="/" replace />
 }
 
-const admin = (Component: React.LazyExoticComponent<() => React.JSX.Element>) => <AdminOnly>{withSuspense(Component)}</AdminOnly>
+const admin = (Component: React.LazyExoticComponent<() => React.JSX.Element>) => (
+    <AdminOnly>{withSuspense(Component)}</AdminOnly>
+)
 
 function ProviderEditRedirect() {
     const { id } = useParams<{ id: string }>()
@@ -74,11 +76,13 @@ const NotFoundPage = lazy(() => import('@/pages/not-found'))
 
 const withSuspense = (Component: React.LazyExoticComponent<() => React.JSX.Element>) => (
     <ErrorBoundary>
-        <Suspense fallback={
-            <div className="flex items-center justify-center min-h-[200px]">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-            </div>
-        }>
+        <Suspense
+            fallback={
+                <div className="flex items-center justify-center min-h-[200px]">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+                </div>
+            }
+        >
             <Component />
         </Suspense>
     </ErrorBoundary>

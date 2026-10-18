@@ -24,12 +24,17 @@ export async function sendInvitations(
     spaceId: number,
     invitations: DraftInvitation[],
     invite: Invite = spacesApi.invite,
-    origin: string = window.location.origin
+    origin: string = window.location.origin,
 ): Promise<InvitationOutcome[]> {
     const out: InvitationOutcome[] = []
     for (const invitation of invitations) {
         try {
-            const { token, emailSent } = await invite(spaceId, invitation.role, invitation.email ?? undefined, invitation.note ?? undefined)
+            const { token, emailSent } = await invite(
+                spaceId,
+                invitation.role,
+                invitation.email ?? undefined,
+                invitation.note ?? undefined,
+            )
             out.push({ invitation, link: token ? `${origin}/invite/${token}` : null, emailed: emailSent, error: null })
         } catch (error) {
             out.push({ invitation, link: null, emailed: false, error: (error as ApiError).message })

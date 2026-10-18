@@ -63,7 +63,7 @@ export default function ServerSetupPage() {
     const fail = (error: unknown) => toast.error(getApiErrorMessage(error, t('serverSetup.failed')))
 
     // The URL is the one required step: save it if it changed, then show the optional ones.
-    const saveUrlAndContinue = async (url: string | null) => {
+    const submitUrl = async (url: string | null) => {
         if (url !== null) {
             try {
                 await update.mutateAsync({ app_url: url })
@@ -97,7 +97,7 @@ export default function ServerSetupPage() {
                             value={settings.app_url ?? ''}
                             writable={settings.config_writable !== false}
                             saving={update.isPending}
-                            onContinue={saveUrlAndContinue}
+                            onContinue={submitUrl}
                         />
                     </OnboardingLayout>
                 }
@@ -105,7 +105,10 @@ export default function ServerSetupPage() {
             <Route
                 path="more"
                 element={
-                    <OnboardingLayout title={t('serverSetup.optionsTitle')} description={t('serverSetup.optionsDescription')}>
+                    <OnboardingLayout
+                        title={t('serverSetup.optionsTitle')}
+                        description={t('serverSetup.optionsDescription')}
+                    >
                         <ServerOptions busy={update.isPending} onFinish={leave} />
                     </OnboardingLayout>
                 }
@@ -113,7 +116,11 @@ export default function ServerSetupPage() {
             <Route
                 path="mail"
                 element={
-                    <OnboardingLayout title={t('serverSetup.mail.title')} description={t('serverSetup.mail.description')} className="max-w-2xl">
+                    <OnboardingLayout
+                        title={t('serverSetup.mail.title')}
+                        description={t('serverSetup.mail.description')}
+                        className="max-w-2xl"
+                    >
                         <ServerMailStep />
                     </OnboardingLayout>
                 }
@@ -121,7 +128,11 @@ export default function ServerSetupPage() {
             <Route
                 path="sso"
                 element={
-                    <OnboardingLayout title={t('serverSetup.sso.title')} description={t('serverSetup.sso.description')} className="max-w-2xl">
+                    <OnboardingLayout
+                        title={t('serverSetup.sso.title')}
+                        description={t('serverSetup.sso.description')}
+                        className="max-w-2xl"
+                    >
                         <ServerSsoStep />
                     </OnboardingLayout>
                 }

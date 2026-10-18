@@ -1,15 +1,9 @@
-import { type CSSProperties, type ReactNode, useState } from 'react'
+import { type CSSProperties, type KeyboardEvent, type ReactNode, useState } from 'react'
 import { FileX, Plus } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import {
-    Empty,
-    EmptyDescription,
-    EmptyHeader,
-    EmptyMedia,
-    EmptyTitle,
-} from '@/components/ui/empty'
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { useIsMobile, useLongPress } from '@/hooks'
 import { cn } from '@/lib/utils'
 
@@ -40,18 +34,51 @@ interface FeedRowProps {
     actions?: (context: FeedRowActionsContext) => ReactNode
 }
 
-export function FeedStatusBadge({
-    children,
-    variant,
-}: {
-    children: ReactNode
-    variant?: 'secondary' | 'outline'
-}) {
+export function FeedStatusBadge({ children, variant }: { children: ReactNode; variant?: 'secondary' | 'outline' }) {
     return (
         <Badge variant={variant} className="h-5 shrink-0 px-1.5 text-[10px]">
             {children}
         </Badge>
     )
+}
+
+type FeedTextsProps = Pick<FeedRowProps, 'title' | 'titleClassName' | 'badge' | 'meta' | 'subtitle' | 'muted'>
+
+function FeedTexts({ title, titleClassName, badge, meta, subtitle, muted }: FeedTextsProps) {
+    return (
+        <div className={cn('min-w-0 flex-1', muted && 'opacity-60')}>
+            <div className="flex min-w-0 items-center gap-1.5">
+                <p className={cn('truncate font-semibold', titleClassName)}>{title}</p>
+                {badge}
+            </div>
+            {meta && <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1">{meta}</div>}
+            {subtitle && <div className="truncate text-xs text-muted-foreground">{subtitle}</div>}
+        </div>
+    )
+}
+
+type FeedAmountsProps = Pick<FeedRowProps, 'amount' | 'amountClassName' | 'extraAmount' | 'muted'>
+
+function FeedAmounts({ amount, amountClassName, extraAmount, muted }: FeedAmountsProps) {
+    if (amount == null && !extraAmount) return null
+    return (
+        <div className={cn('min-w-0 shrink-0 text-right', muted && 'opacity-60')}>
+            {amount != null && (
+                <p className={cn('font-mono font-semibold', muted ? 'text-muted-foreground' : amountClassName)}>
+                    {amount}
+                </p>
+            )}
+            {extraAmount && <p className="font-mono text-xs text-muted-foreground">{extraAmount}</p>}
+        </div>
+    )
+}
+
+/** Enter and Space open a row that acts as a button. */
+const openOnKey = (onOpen?: () => void) => (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault()
+        onOpen?.()
+    }
 }
 
 export function FeedRow({
@@ -102,12 +129,7 @@ export function FeedRow({
                     longPress.mark()
                     setMenuOpen(true)
                 }}
-                onKeyDown={interactive ? (event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault()
-                        onOpen?.()
-                    }
-                } : undefined}
+                onKeyDown={interactive ? openOnKey(onOpen) : undefined}
                 role={interactive ? 'button' : undefined}
                 tabIndex={interactive ? 0 : undefined}
             >
@@ -124,43 +146,24 @@ export function FeedRow({
                     {icon}
                 </div>
 
-                <div className={cn('min-w-0 flex-1', muted && 'opacity-60')}>
-                    <div className="flex min-w-0 items-center gap-1.5">
-                        <p className={cn('truncate font-semibold', titleClassName)}>{title}</p>
-                        {badge}
-                    </div>
-                    {meta && (
-                        <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1">
-                            {meta}
-                        </div>
-                    )}
-                    {subtitle && (
-                        <div className="truncate text-xs text-muted-foreground">
-                            {subtitle}
-                        </div>
-                    )}
-                </div>
+                <FeedTexts
+                    title={title}
+                    titleClassName={titleClassName}
+                    badge={badge}
+                    meta={meta}
+                    subtitle={subtitle}
+                    muted={muted}
+                />
 
-                {(amount != null || extraAmount) && (
-                    <div className={cn('min-w-0 shrink-0 text-right', muted && 'opacity-60')}>
-                        {amount != null && (
-                            <p className={cn('font-mono font-semibold', muted ? 'text-muted-foreground' : amountClassName)}>
-                                {amount}
-                            </p>
-                        )}
-                        {extraAmount && (
-                            <p className="font-mono text-xs text-muted-foreground">
-                                {extraAmount}
-                            </p>
-                        )}
-                    </div>
-                )}
+                <FeedAmounts
+                    amount={amount}
+                    amountClassName={amountClassName}
+                    extraAmount={extraAmount}
+                    muted={muted}
+                />
 
                 {hasActions && actions && (
-                    <div
-                        className={cn(!isMobile && '-mr-1 shrink-0')}
-                        onClick={(event) => event.stopPropagation()}
-                    >
+                    <div className={cn(!isMobile && '-mr-1 shrink-0')} onClick={(event) => event.stopPropagation()}>
                         {actions({ menuOpen, setMenuOpen, isMobile })}
                     </div>
                 )}
@@ -171,15 +174,7 @@ export function FeedRow({
 }
 
 /** A thin progress bar under a row; exceeded turns it red. */
-export function FeedProgress({
-    value,
-    exceeded,
-    muted,
-}: {
-    value: number
-    exceeded?: boolean
-    muted?: boolean
-}) {
+export function FeedProgress({ value, exceeded, muted }: { value: number; exceeded?: boolean; muted?: boolean }) {
     return (
         <div className="-mt-1 mb-1.5 h-1 overflow-hidden rounded-full bg-muted sm:mx-1.5" role="presentation">
             <div
@@ -302,9 +297,7 @@ export function FeedList<T>({
     return (
         <div className="divide-y divide-border/60">
             {items.map((item) => (
-                <div key={getKey(item)}>
-                    {children(item)}
-                </div>
+                <div key={getKey(item)}>{children(item)}</div>
             ))}
         </div>
     )
@@ -334,14 +327,13 @@ export function FeedEmpty({
                 <EmptyTitle>{title}</EmptyTitle>
                 <EmptyDescription>{description}</EmptyDescription>
             </EmptyHeader>
-            {action ?? (
-                onCreate && !isReadOnly ? (
+            {action ??
+                (onCreate && !isReadOnly ? (
                     <Button onClick={onCreate}>
                         <Plus className="size-4" />
                         {createLabel}
                     </Button>
-                ) : undefined
-            )}
+                ) : undefined)}
         </Empty>
     )
 }

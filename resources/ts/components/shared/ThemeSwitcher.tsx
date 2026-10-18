@@ -34,7 +34,8 @@ function AutoThemeIcon({
             <ThemeGlyph theme={theme} className="size-full" />
             <span
                 className={cn(
-                    'absolute -right-0.5 -bottom-0.5 flex items-center justify-center rounded-[2px] bg-background font-bold leading-none text-foreground ring-1 ring-border',
+                    'absolute -right-0.5 -bottom-0.5 flex items-center justify-center rounded-[2px]',
+                    'bg-background font-bold leading-none text-foreground ring-1 ring-border',
                     badgeClassName,
                 )}
             >
@@ -76,7 +77,9 @@ export function ThemeSwitcher({ variant = 'icon', className }: ThemeSwitcherProp
                     <Label htmlFor="interface-theme" className="text-sm font-medium">
                         {t('theme.label')}
                     </Label>
-                    <p className="text-sm leading-relaxed text-muted-foreground">{t('settings:user.theme.description')}</p>
+                    <p className="text-sm leading-relaxed text-muted-foreground">
+                        {t('settings:user.theme.description')}
+                    </p>
                 </div>
                 <Select value={preference} onValueChange={handleChange}>
                     <SelectTrigger id="interface-theme" className="w-40">

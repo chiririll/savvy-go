@@ -1,13 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { transactionTypeLabelLoose } from '@/lib/labels'
 import { Badge } from '@/components/ui/badge'
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useCategories } from '@/hooks'
 import { intlLocale } from '@/lib/i18n'
 import type { ImportCategoryCandidate, ImportCategoryChoice, ImportCategoryMap } from '@/types/import'
@@ -57,16 +51,18 @@ export function CategoryMapping({ candidates, value, onChange, disabled }: Categ
                         >
                             <div className="flex min-w-0 items-center gap-2">
                                 <span className="truncate font-medium">{candidate.name}</span>
-                                <Badge variant="secondary">
-                                    {transactionTypeLabelLoose(tPages, candidate.type)}
-                                </Badge>
+                                <Badge variant="secondary">{transactionTypeLabelLoose(tPages, candidate.type)}</Badge>
                                 <span className="shrink-0 text-xs text-muted-foreground">
-                                    {t('import.categoryMapping.rows', { count: candidate.count.toLocaleString(intlLocale()) })}
+                                    {t('import.categoryMapping.rows', {
+                                        count: candidate.count.toLocaleString(intlLocale()),
+                                    })}
                                 </span>
                             </div>
                             <Select
                                 value={toSelectValue(value[candidate.name])}
-                                onValueChange={(next) => onChange({ ...value, [candidate.name]: fromSelectValue(next) })}
+                                onValueChange={(next) =>
+                                    onChange({ ...value, [candidate.name]: fromSelectValue(next) })
+                                }
                                 disabled={disabled}
                             >
                                 <SelectTrigger className="w-full">

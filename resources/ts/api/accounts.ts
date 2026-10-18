@@ -44,27 +44,30 @@ const crud = createCrudApi<Account, AccountFormData>('/accounts')
 export const accountsApi = {
     ...crud,
 
-    getAll: (params?: { active?: boolean; exclude_debts?: boolean }) =>
-        crud.getAll(params),
+    getAll: (params?: { active?: boolean; exclude_debts?: boolean }) => crud.getAll(params),
 
     getAllWithSummary: async (params?: { active?: boolean; exclude_debts?: boolean }): Promise<AccountsResponse> => {
-        const response = await apiClient.get(`/accounts${toQueryString({
-            with_summary: true,
-            active: params?.active,
-            exclude_debts: params?.exclude_debts,
-        })}`)
+        const response = await apiClient.get(
+            `/accounts${toQueryString({
+                with_summary: true,
+                active: params?.active,
+                exclude_debts: params?.exclude_debts,
+            })}`,
+        )
         return response.data
     },
 
-    reorder: (ids: number[]) =>
-        api.post<{ success: boolean }, { ids: number[] }>('/accounts/reorder', { ids }),
+    reorder: (ids: number[]) => api.post<{ success: boolean }, { ids: number[] }>('/accounts/reorder', { ids }),
 
     getBalanceHistory: async (params?: { start_date?: string; end_date?: string }): Promise<BalanceHistoryResponse> => {
         const response = await apiClient.get(`/accounts-balance-history${toQueryString(params)}`)
         return response.data
     },
 
-    getBalanceComparison: async (params?: { start_date?: string; end_date?: string }): Promise<BalanceComparisonResponse> => {
+    getBalanceComparison: async (params?: {
+        start_date?: string
+        end_date?: string
+    }): Promise<BalanceComparisonResponse> => {
         const response = await apiClient.get(`/accounts-balance-comparison${toQueryString(params)}`)
         return response.data
     },

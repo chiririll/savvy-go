@@ -119,7 +119,7 @@ describe('server setup: who sees it', () => {
 })
 
 describe('step 1: the public URL', () => {
-    it('fills the field with the browser address when the URL is not set', () => {
+    it('fills the field with the browser address if no URL is set', () => {
         renderPage()
         expect(urlInput().value).toBe(window.location.origin)
     })
@@ -160,7 +160,7 @@ describe('step 1: the public URL', () => {
         expect((screen.getByRole('button', { name: 'serverSetup.continue' }) as HTMLButtonElement).disabled).toBe(true)
     })
 
-    it('shows a note and no input when the config file is read-only, and still goes on', async () => {
+    it('shows a note instead of an input when the config is read-only', async () => {
         settings = { ...settings, config_writable: false }
         renderPage()
         expect(screen.getByText('serverSetup.url.readOnly')).toBeTruthy()
@@ -174,8 +174,12 @@ describe('step 1: the public URL', () => {
 describe('step 2: the optional steps', () => {
     it('lists them as links to their own screens', () => {
         renderPage('/setup/server/more')
-        expect(screen.getByRole('link', { name: /serverSetup\.mail\.title/ }).getAttribute('href')).toBe('/setup/server/mail')
-        expect(screen.getByRole('link', { name: /serverSetup\.sso\.title/ }).getAttribute('href')).toBe('/setup/server/sso')
+        expect(screen.getByRole('link', { name: /serverSetup\.mail\.title/ }).getAttribute('href')).toBe(
+            '/setup/server/mail',
+        )
+        expect(screen.getByRole('link', { name: /serverSetup\.sso\.title/ }).getAttribute('href')).toBe(
+            '/setup/server/sso',
+        )
     })
 
     it('marks nothing as done at first and offers to skip', () => {
@@ -188,7 +192,9 @@ describe('step 2: the optional steps', () => {
         mail = { enabled: true }
         renderPage('/setup/server/more')
         expect(screen.getByRole('link', { name: /serverSetup\.mail\.title/ }).textContent).toContain('serverSetup.done')
-        expect(screen.getByRole('link', { name: /serverSetup\.sso\.title/ }).textContent).not.toContain('serverSetup.done')
+        expect(screen.getByRole('link', { name: /serverSetup\.sso\.title/ }).textContent).not.toContain(
+            'serverSetup.done',
+        )
         expect(screen.getByRole('button', { name: 'serverSetup.finish' })).toBeTruthy()
     })
 
@@ -198,7 +204,7 @@ describe('step 2: the optional steps', () => {
         expect(screen.getByRole('link', { name: /serverSetup\.sso\.title/ }).textContent).toContain('serverSetup.done')
     })
 
-    it('opens a step on its own screen and comes back to the list', async () => {
+    it('opens a step on its own screen and returns to the list', async () => {
         renderPage('/setup/server/more')
         fireEvent.click(screen.getByRole('link', { name: /serverSetup\.mail\.title/ }))
         await screen.findByText('mail-section')

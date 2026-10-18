@@ -2,18 +2,25 @@ import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-import { ACCOUNT_TYPES } from '@/types/accounts'
-import { API_PERMISSION_LEVELS } from '@/types/api-tokens'
-import { ACTION_TYPES, CONDITION_OPERATORS, TRIGGER_TYPES } from '@/types/automation'
-import { BACKUP_STATUSES } from '@/types/backup'
-import { BUDGET_PERIODS } from '@/types/budgets'
-import { CHECK_IDS, CHECK_SEVERITIES } from '@/types/checks'
-import { CATEGORY_TYPES } from '@/types/categories'
-import { DEBT_TYPE_VALUES } from '@/types/debts'
-import { MAIL_PROTOCOLS } from '@/types/mail'
-import { RECURRING_FREQUENCIES } from '@/types/recurring'
-import { SPACE_ROLES, TRANSFER_REVIEWS } from '@/types/spaces'
-import { ALL_TRANSACTION_TYPES, TRANSACTION_STATUSES } from '@/types/transactions'
+import {
+    ACCOUNT_TYPES,
+    API_PERMISSION_LEVELS,
+    ACTION_TYPES,
+    CONDITION_OPERATORS,
+    TRIGGER_TYPES,
+    BACKUP_STATUSES,
+    BUDGET_PERIODS,
+    CHECK_IDS,
+    CHECK_SEVERITIES,
+    CATEGORY_TYPES,
+    DEBT_TYPE_VALUES,
+    MAIL_PROTOCOLS,
+    RECURRING_FREQUENCIES,
+    SPACE_ROLES,
+    TRANSFER_REVIEWS,
+    ALL_TRANSACTION_TYPES,
+    TRANSACTION_STATUSES,
+} from '@/types'
 import { USER_ROLES } from '@/types/users'
 import { canWriteSpace } from '@/lib/ability'
 import { SSO_ERROR_CODES } from '@/lib/labels'
@@ -54,7 +61,9 @@ const quoted = (text: string) => [...text.matchAll(/"([a-z_]+)"/g)].map((m) => m
 /** The values of a `CHECK (column IN ('a', 'b'))` constraint, per `table.column`. */
 function sqlEnums(file: string): Map<string, string[]> {
     const enums = new Map<string, string[]>()
-    for (const table of read(file).split(/CREATE TABLE/i).slice(1)) {
+    for (const table of read(file)
+        .split(/CREATE TABLE/i)
+        .slice(1)) {
         const name = /^\s*(?:IF NOT EXISTS\s+)?(\w+)/.exec(table)![1]
         for (const m of table.matchAll(/(\w+)\s+TEXT[^\n]*?CHECK\s*\(\s*\1\s+IN\s*\(([^)]*)\)\s*\)/g)) {
             enums.set(`${name}.${m[1]}`, sorted(m[2].match(/'([^']*)'/g)!.map((v) => v.slice(1, -1))))
@@ -118,7 +127,7 @@ describe('frontend value lists', () => {
 
 describe('automation', () => {
     it('knows every condition operator the backend evaluates', () => {
-        const body = goFunc('internal/automation/automation.go', 'func evaluateCondition(')
+        const body = goFunc('internal/automation/conditions.go', 'func evaluateCondition(')
         expect(sorted(CONDITION_OPERATORS)).toEqual(sorted(quoted(body.match(/case [^\n]*:/g)!.join('\n'))))
     })
 
