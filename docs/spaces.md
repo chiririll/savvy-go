@@ -12,6 +12,14 @@ Use **Create a space** in the switcher, or the window shown to a user with no sp
 2. **Name**.
 3. **Copy from another space?** (only if you belong to one). Pick a source or the defaults, and tick what to copy: currencies, accounts (without balances), categories, tags. This is a one-time copy; for categories and tags that stay in step, see [shared categories and tags](#shared-categories-and-tags).
 4. **Base entities**, all editable: base currency (required) and other currencies from the server's list; accounts with optional opening balance; categories (the default of each type cannot be removed); tags.
+
+**Default categories and tags.** A new space starts with these presets, named in your language and each with a one-line hint:
+
+- Expense: Housing, Utilities, Subscriptions, Groceries, Eating out, Transport, Health, Fun, Clothes & personal care, Gifts & charity, Travel, Education, Family & kids, Other (the default).
+- Income: Salary, Side income, Investments, Gifts, Refunds, Other income (the default).
+- Tags: Essential, Subscription, Shared, Business, Vacation.
+
+Renaming a preset stores your own name. Spaces created before this list keep their old presets.
 5. **Create**: a summary, then the space is made in one step. The last screen has an optional **Invite members** button; people are invited when you press **Continue**. You can also invite later in the space settings.
 
 Progress is kept in your browser only, so you can close the window and return. Nothing reaches the server before the last step.

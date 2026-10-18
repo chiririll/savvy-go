@@ -20,7 +20,7 @@ var merchants = map[string][]string{
 		"Safeway",
 	},
 	"#TRANSPORT": {"Shell", "BP", "Chevron", "Uber", "Lyft", "Metro Transit", "ParkMobile", "Jiffy Lube"},
-	"#DINING": {
+	"#EATING_OUT": {
 		"Starbucks",
 		"Chipotle Mexican Grill",
 		"McDonald's",
@@ -30,8 +30,7 @@ var merchants = map[string][]string{
 		"Panera Bread",
 		"Five Guys",
 	},
-	"#ENTERTAINMENT": {"AMC Theatres", "Steam", "PlayStation Store", "Ticketmaster", "Netflix", "Spotify"},
-	"#SHOPPING":      {"Amazon", "Best Buy", "IKEA", "Nike", "Apple Store", "Zara", "H&M", "Home Depot"},
+	"#FUN": {"AMC Theatres", "Steam", "PlayStation Store", "Ticketmaster", "Netflix", "Spotify"},
 	"#HEALTH": {
 		"CVS Pharmacy",
 		"Walgreens",
@@ -40,12 +39,12 @@ var merchants = map[string][]string{
 		"LA Fitness",
 		"Quest Diagnostics",
 	},
-	"#PERSONAL_CARE": {"Supercuts", "Sephora", "Ulta Beauty", "The Barber Shop"},
-	"#GIFTS":         {"Etsy", "Amazon", "Tiffany & Co.", "Local Florist"},
-	"#TRAVEL":        {"Booking.com", "Airbnb", "Delta Air Lines", "Marriott", "Expedia", "Hertz"},
-	"#UTILITIES":     {"ConEdison", "AT&T", "Xfinity", "National Grid", "Verizon Wireless"},
-	"#HOUSING":       {"IKEA", "Home Depot", "Bed Bath & Beyond"},
-	"#OTHER":         {"PayPal", "Venmo", "Cash Withdrawal", "Square"},
+	"#CLOTHES_CARE": {"Nike", "Zara", "H&M", "Supercuts", "Sephora", "Ulta Beauty", "The Barber Shop"},
+	"#GIFTS":        {"Etsy", "Amazon", "Tiffany & Co.", "Local Florist"},
+	"#TRAVEL":       {"Booking.com", "Airbnb", "Delta Air Lines", "Marriott", "Expedia", "Hertz"},
+	"#UTILITIES":    {"ConEdison", "AT&T", "Xfinity", "National Grid", "Verizon Wireless"},
+	"#HOUSING":      {"IKEA", "Home Depot", "Bed Bath & Beyond"},
+	"#OTHER":        {"PayPal", "Venmo", "Cash Withdrawal", "Square"},
 }
 
 var catalogs = map[string][]string{
@@ -69,7 +68,7 @@ var catalogs = map[string][]string{
 		"Orange Juice",
 		"Granola",
 	},
-	"#DINING": {
+	"#EATING_OUT": {
 		"Latte",
 		"Avocado Toast",
 		"Caesar Salad",
@@ -93,19 +92,7 @@ var catalogs = map[string][]string{
 		"Tire Rotation",
 		"Tolls",
 	},
-	"#SHOPPING": {
-		"Cotton T-Shirt",
-		"Wireless Earbuds",
-		"Desk Lamp",
-		"Running Shorts",
-		"Phone Case",
-		"Notebook Set",
-		"Kitchen Towels",
-		"HDMI Cable",
-		"Sneakers",
-		"Backpack",
-	},
-	"#ENTERTAINMENT": {
+	"#FUN": {
 		"Movie Ticket",
 		"Popcorn Combo",
 		"Game Download",
@@ -123,7 +110,7 @@ var catalogs = map[string][]string{
 		"First Aid Kit",
 		"Protein Powder",
 	},
-	"#PERSONAL_CARE": {"Haircut", "Shampoo", "Face Moisturizer", "Toothpaste", "Sunscreen", "Nail Polish", "Beard Oil"},
+	"#CLOTHES_CARE": {"Cotton T-Shirt", "Running Shorts", "Sneakers", "Haircut", "Shampoo", "Face Moisturizer", "Sunscreen"},
 	"#TRAVEL": {
 		"Hotel Night",
 		"Airport Transfer",
@@ -135,7 +122,6 @@ var catalogs = map[string][]string{
 	},
 	"#GIFTS":     {"Greeting Card", "Gift Wrap", "Scented Candle", "Chocolate Box", "Bouquet", "Mug"},
 	"#UTILITIES": {"Electricity Usage", "Delivery Charge", "Service Fee"},
-	"#HOUSING":   {"Shelf brackets", "Light bulbs", "Paint", "Towels"},
-	"#RENT":      {"Base Rent"},
+	"#HOUSING":   {"Shelf brackets", "Light bulbs", "Paint", "Towels", "Base Rent"},
 	"#OTHER":     {"Service Fee", "Convenience Charge", "Misc. Purchase", "Packaging"},
 }

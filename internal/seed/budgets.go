@@ -16,8 +16,8 @@ func (s *seeder) createBudgets(usd *ledger.Currency, expenses []ledger.Category,
 	}
 	for _, b := range []named{
 		{"Groceries", 750, "#GROCERIES", 80},
-		{"Dining Out", 450, "#DINING", 90},
-		{"Fun Money", 300, "#ENTERTAINMENT", 100},
+		{"Dining Out", 450, "#EATING_OUT", 90},
+		{"Fun Money", 300, "#FUN", 100},
 	} {
 		cat := catByName(expenses, b.cat)
 		if cat == nil {
@@ -39,7 +39,7 @@ func (s *seeder) createBudgets(usd *ledger.Currency, expenses []ledger.Category,
 	}); err != nil {
 		return err
 	}
-	if vac := tagByName(tags, "Vacation"); vac != nil {
+	if vac := tagByName(tags, "#VACATION"); vac != nil {
 		from := s.now.AddDate(0, -1, 0).Format("2006-01-02")
 		to := s.now.AddDate(0, 4, 0).Format("2006-01-02")
 		n := 75

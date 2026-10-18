@@ -76,7 +76,7 @@ func (s *seeder) seedPending(accounts map[string]*ledger.Account, expenses []led
 		{1, "credit", "#GIFTS", 55, "Birthday gift — Etsy", false},
 		{3, "checking", "#UTILITIES", 115, "ConEdison — electricity bill (estimate)", true},
 		{5, "checking", "#TRANSPORT", 145, "Car insurance — GEICO", false},
-		{9, "checking", "#SHOPPING", 64.50, "Amazon — scheduled order", false},
+		{9, "checking", "#OTHER", 64.50, "Amazon — scheduled order", false},
 	} {
 		acct := accounts[p.acct]
 		if acct == nil {

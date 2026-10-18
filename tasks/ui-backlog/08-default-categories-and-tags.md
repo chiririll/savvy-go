@@ -54,6 +54,48 @@ many users. Tags ("Essential", "Optional", "Recurring", "One-time",
 - Tags are tokens and translated; the create-space modal shows translated
   names in `ru`.
 
-## Open question
+## Approved list (implemented)
 
-Which final list do you want? Draft it in this file before coding.
+Changed after review: "Bills & subscriptions" split into `#UTILITIES` (Utilities) and `#SUBSCRIPTIONS`; `#SUBSCRIPTION` tag kept; old category translations dropped. Expense count is 14, income 6, tags 5. The table below is the first draft; tokens now are in `internal/seed/presets.go`.
+
+Expense (13, `#OTHER` is the default):
+
+| Token | en | ru | Hint (en) | Icon |
+|---|---|---|---|---|
+| `#HOUSING` | Housing | Жильё | Rent, mortgage, repairs, furniture | 🏠 |
+| `#BILLS` | Bills & subscriptions | Счета и подписки | Electricity, water, internet, phone, streaming | ⚡ |
+| `#GROCERIES` | Groceries | Продукты | Supermarket, market, household goods | 🛒 |
+| `#EATING_OUT` | Eating out | Кафе и рестораны | Cafés, restaurants, delivery, coffee | 🍽️ |
+| `#TRANSPORT` | Transport | Транспорт | Fuel, public transport, taxi, car costs | 🚗 |
+| `#HEALTH` | Health | Здоровье | Doctor, pharmacy, insurance, sport | 🏥 |
+| `#FUN` | Fun | Развлечения | Cinema, games, hobbies, events | 🎮 |
+| `#CLOTHES_CARE` | Clothes & personal care | Одежда и уход | Clothes, shoes, hairdresser, cosmetics | 🛍️ |
+| `#GIFTS` | Gifts & charity | Подарки и благотворительность | Presents, donations | 🎁 |
+| `#TRAVEL` | Travel | Путешествия | Tickets, hotels, trips | ✈️ |
+| `#EDUCATION` | Education | Образование | Courses, books, tuition | 🎓 |
+| `#FAMILY` | Family & kids | Семья и дети | Childcare, school, toys, pets | 👨‍👩‍👧 |
+| `#OTHER` | Other | Прочее | Anything that fits nowhere else | 📌 |
+
+Income (6, `#OTHER_INCOME` is the default):
+
+| Token | en | ru | Hint (en) | Icon |
+|---|---|---|---|---|
+| `#SALARY` | Salary | Зарплата | Wages, bonuses | 💵 |
+| `#SIDE_INCOME` | Side income | Подработка | Freelance, one-off jobs, resale | 💻 |
+| `#INVESTMENTS` | Investments | Инвестиции | Interest, dividends, capital gains | 📈 |
+| `#GIFTS_RECEIVED` | Gifts | Подарки | Money received as a gift | 🎀 |
+| `#REFUNDS` | Refunds | Возвраты | Returned purchases, cashback, tax refunds | ↩️ |
+| `#OTHER_INCOME` | Other income | Прочий доход | Anything else | 💰 |
+
+Tags (5, tokens, translated): `#ESSENTIAL` Essential / Необходимое,
+`#SUBSCRIPTION` Subscription / Подписка, `#SHARED` Shared / Общее,
+`#BUSINESS` Business / Работа, `#VACATION` Vacation / Отпуск.
+Dropped: Optional, Recurring, One-time, Personal, Family, Emergency, Planned.
+
+Changes from today: `#RENT`+`#HOUSING` merged into `#HOUSING`, `#UTILITIES` →
+`#BILLS`, `#DINING` → `#EATING_OUT`, `#ENTERTAINMENT` → `#FUN`, `#SHOPPING` +
+`#PERSONAL_CARE` → `#CLOTHES_CARE`, `#FREELANCE` → `#SIDE_INCOME`; new
+`#EDUCATION`, `#FAMILY`.
+
+Open: `#SUBSCRIPTION` tag overlaps with the "Bills & subscriptions" category;
+keep it (a tag cuts across categories, e.g. a gym) or drop it?

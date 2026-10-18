@@ -86,7 +86,7 @@ export function TransactionFilterDetails({ list, categories, tags }: Transaction
                                     selected={params.tagIds.includes(tag.id)}
                                     onClick={() => toggleTag(tag.id)}
                                 >
-                                    #{tag.name}
+                                    #{localizeDefaultName(tag.name, 'tags')}
                                 </ToggleBadge>
                             ))}
                         </div>

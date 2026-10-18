@@ -21,7 +21,7 @@ import {
 
 const presets: SpacePresets = {
     categories: [
-        { name: '#RENT', type: 'expense', icon: 'home', color: '#111111', isDefault: false },
+        { name: '#HOUSING', type: 'expense', icon: 'home', color: '#111111', isDefault: false },
         { name: '#OTHER', type: 'expense', icon: 'tag', color: '#222222', isDefault: true },
         { name: '#SALARY', type: 'income', icon: 'wallet', color: '#333333', isDefault: false },
         { name: '#OTHER_INCOME', type: 'income', icon: 'tag', color: '#444444', isDefault: true },
@@ -102,7 +102,7 @@ describe('buildContent', () => {
         expect(content.baseCurrency).toBe('EUR')
         expect(content.currencies).toEqual(['USD'])
         expect(content.accounts).toEqual([])
-        expect(content.categories.map((c) => c.name)).toContain('#RENT')
+        expect(content.categories.map((c) => c.name)).toContain('#HOUSING')
     })
 
     it('copies accounts without balances', () => {
@@ -146,8 +146,8 @@ describe('categories', () => {
 
     it('removes any other category', () => {
         const categories = buildContent(noCopy(), null, presets).categories
-        const rent = categories.findIndex((c) => c.name === '#RENT')
-        expect(removeCategory(categories, rent).map((c) => c.name)).not.toContain('#RENT')
+        const rent = categories.findIndex((c) => c.name === '#HOUSING')
+        expect(removeCategory(categories, rent).map((c) => c.name)).not.toContain('#HOUSING')
     })
 })
 

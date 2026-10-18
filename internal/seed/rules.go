@@ -20,7 +20,7 @@ func (s *seeder) createRecurring(accounts map[string]*ledger.Account, expenses, 
 			return err
 		}
 	}
-	if rent := catByName(expenses, "#RENT"); rent != nil {
+	if rent := catByName(expenses, "#HOUSING"); rent != nil {
 		day := 1
 		next := startOfMonth(s.now.AddDate(0, 1, 0)).Format("2006-01-02")
 		if _, err := s.recur.Create(s.ctx, recurring.Input{
@@ -31,7 +31,7 @@ func (s *seeder) createRecurring(accounts map[string]*ledger.Account, expenses, 
 			return err
 		}
 	}
-	if subs := catByName(expenses, "#ENTERTAINMENT"); subs != nil {
+	if subs := catByName(expenses, "#SUBSCRIPTIONS"); subs != nil {
 		// Always due within the coming week so upcoming recurring is visible.
 		due := s.now.AddDate(0, 0, 2)
 		day := due.Day()
@@ -71,7 +71,7 @@ func (s *seeder) createRecurring(accounts map[string]*ledger.Account, expenses, 
 
 func (s *seeder) createAutomation(tags []ledger.Tag) error {
 	trigger := "on_transaction_create"
-	if essential := tagByName(tags, "Essential"); essential != nil {
+	if essential := tagByName(tags, "#ESSENTIAL"); essential != nil {
 		desc := "Tag any transaction above $500 as Essential"
 		if _, err := s.auto.Create(s.ctx, automation.Input{
 			Name: "Flag large transactions", Description: &desc, TriggerType: trigger, Priority: 1,
@@ -83,7 +83,7 @@ func (s *seeder) createAutomation(tags []ledger.Tag) error {
 			return err
 		}
 	}
-	if recurring := tagByName(tags, "Recurring"); recurring != nil {
+	if recurring := tagByName(tags, "#SUBSCRIPTION"); recurring != nil {
 		desc := `Tag transactions containing "subscription"`
 		if _, err := s.auto.Create(s.ctx, automation.Input{
 			Name: "Tag subscriptions", Description: &desc, TriggerType: trigger, Priority: 2,
@@ -95,7 +95,7 @@ func (s *seeder) createAutomation(tags []ledger.Tag) error {
 			return err
 		}
 	}
-	if business := tagByName(tags, "Business"); business != nil {
+	if business := tagByName(tags, "#BUSINESS"); business != nil {
 		desc := "Tag GitHub / Adobe / Udemy as Business"
 		if _, err := s.auto.Create(s.ctx, automation.Input{
 			Name: "Tag software tools", Description: &desc, TriggerType: trigger, Priority: 3,

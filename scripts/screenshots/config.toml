@@ -2,3 +2,13 @@
 [server]
 app_url = "http://savvy"
 timezone = "UTC"
+
+# Mail is on so the pages that depend on it show: the mail settings, the "unverified" badge
+# (the seeded guest has not verified the address) and the password reset. Nothing is sent
+# unless a scenario asks for it; the host does not exist.
+[mailer]
+enabled = true
+host = "mail.example.com"
+port = 587
+protocol = "starttls"
+from = "Go Savvy <savvy@example.com>"

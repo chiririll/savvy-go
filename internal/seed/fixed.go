@@ -26,9 +26,9 @@ var fixedUtilities = []struct {
 }
 
 func (s *seeder) seedFixedExpenses(accounts map[string]*ledger.Account, expenses []ledger.Category) error {
-	rent := catByName(expenses, "#RENT")
+	rent := catByName(expenses, "#HOUSING")
 	utilities := catByName(expenses, "#UTILITIES")
-	entertainment := catByName(expenses, "#ENTERTAINMENT")
+	entertainment := catByName(expenses, "#SUBSCRIPTIONS")
 	for cursor := s.start; !cursor.After(s.end); cursor = addMonthsNoOverflow(cursor, 1) {
 		if rent != nil {
 			if err := s.seedRent(accounts, rent, cursor); err != nil {

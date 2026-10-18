@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -172,7 +173,7 @@ func TestDemoSeedsExactlyTheExportedPresets(t *testing.T) {
 	st, _ := seedDemo(t)
 	space := spaceByName(t, st, "Demo")
 	cats, tags := DefaultCategories(), DefaultTags()
-	if len(cats) != 19 || len(tags) != 10 {
+	if len(cats) != 20 || len(tags) != 5 {
 		t.Fatalf("presets: %d categories, %d tags", len(cats), len(tags))
 	}
 	if n := countWhere(t, space, `SELECT COUNT(*) FROM categories`); n < len(cats) {
@@ -198,7 +199,7 @@ func TestDemoSeedsExactlyTheExportedPresets(t *testing.T) {
 func TestPresetsAreCopies(t *testing.T) {
 	DefaultCategories()[0].Name = "changed"
 	DefaultTags()[0] = "changed"
-	if DefaultCategories()[0].Name != "#RENT" || DefaultTags()[0] != "Essential" {
+	if DefaultCategories()[0].Name != "#HOUSING" || DefaultTags()[0] != "#ESSENTIAL" {
 		t.Fatal("a caller changed the shared presets")
 	}
 }
@@ -367,33 +368,39 @@ func TestLoadConfig(t *testing.T) {
 
 func TestDemoSpacesHaveLookAndAccount(t *testing.T) {
 	st, _ := seedDemo(t)
-	seen := map[string]bool{}
 	rows, err := st.Server().QueryContext(context.Background(), `SELECT name, emoji, color FROM spaces`)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer rows.Close()
-	n := 0
+	type look struct{ name, emoji, color string }
+	var looks []look
 	for rows.Next() {
-		var name string
+		var l look
 		var emoji, color *string
-		if err := rows.Scan(&name, &emoji, &color); err != nil {
+		if err := rows.Scan(&l.name, &emoji, &color); err != nil {
 			t.Fatal(err)
 		}
 		if emoji == nil || color == nil {
-			t.Fatalf("%s: emoji=%v color=%v", name, emoji, color)
+			t.Fatalf("%s: emoji=%v color=%v", l.name, emoji, color)
 		}
-		if seen[*emoji] || seen[*color] {
-			t.Fatalf("%s repeats the emoji or color of another space", name)
-		}
-		seen[*emoji], seen[*color] = true, true
-		if c := countWhere(t, spaceByName(t, st, name), `SELECT COUNT(*) FROM accounts`); c == 0 {
-			t.Fatalf("%s has no account", name)
-		}
-		n++
+		l.emoji, l.color = *emoji, *color
+		looks = append(looks, l)
 	}
-	if n != 3 {
-		t.Fatalf("spaces=%d", n)
+	if err := rows.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if len(looks) != 3 {
+		t.Fatalf("spaces=%d", len(looks))
+	}
+	seen := map[string]bool{}
+	for _, l := range looks {
+		if seen[l.emoji] || seen[l.color] {
+			t.Fatalf("%s repeats the emoji or color of another space", l.name)
+		}
+		seen[l.emoji], seen[l.color] = true, true
+		if c := countWhere(t, spaceByName(t, st, l.name), `SELECT COUNT(*) FROM accounts`); c == 0 {
+			t.Fatalf("%s has no account", l.name)
+		}
 	}
 }
 
@@ -448,5 +455,32 @@ func TestDemoSamIsUnverified(t *testing.T) {
 		if n := countWhere(t, st.Server(), `SELECT email_verified FROM users WHERE email = ?`, u.Email); n != want {
 			t.Fatalf("%s email_verified=%d", u.Key, n)
 		}
+	}
+}
+
+func TestPresetsAreUniqueTokensWithOneDefaultPerType(t *testing.T) {
+	seen := map[string]bool{}
+	defaults := map[string]int{}
+	for _, c := range DefaultCategories() {
+		if !strings.HasPrefix(c.Name, "#") {
+			t.Fatalf("category %q is not a token", c.Name)
+		}
+		if seen[c.Type+c.Name] {
+			t.Fatalf("category %s duplicated in %s", c.Name, c.Type)
+		}
+		seen[c.Type+c.Name] = true
+		if c.IsDefault {
+			defaults[c.Type]++
+		}
+	}
+	if defaults["expense"] != 1 || defaults["income"] != 1 {
+		t.Fatalf("defaults per type: %v", defaults)
+	}
+	tags := map[string]bool{}
+	for _, tag := range DefaultTags() {
+		if !strings.HasPrefix(tag, "#") || tags[tag] {
+			t.Fatalf("tag %q is not a unique token", tag)
+		}
+		tags[tag] = true
 	}
 }

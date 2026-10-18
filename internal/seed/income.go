@@ -9,7 +9,7 @@ import (
 
 func (s *seeder) seedIncome(accounts map[string]*ledger.Account, incomes []ledger.Category) error {
 	salary := catByName(incomes, "#SALARY")
-	freelance := catByName(incomes, "#FREELANCE")
+	freelance := catByName(incomes, "#SIDE_INCOME")
 	investments := catByName(incomes, "#INVESTMENTS")
 	other := catByName(incomes, "#OTHER_INCOME")
 

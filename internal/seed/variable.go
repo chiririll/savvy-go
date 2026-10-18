@@ -12,16 +12,16 @@ var variableWeights = []struct {
 	name string
 	w    int
 }{
-	{"#GROCERIES", 22}, {"#DINING", 20}, {"#TRANSPORT", 16},
-	{"#SHOPPING", 12}, {"#ENTERTAINMENT", 9}, {"#HEALTH", 6}, {"#PERSONAL_CARE", 5},
+	{"#GROCERIES", 22}, {"#EATING_OUT", 20}, {"#TRANSPORT", 16},
+	{"#CLOTHES_CARE", 17}, {"#FUN", 9}, {"#HEALTH", 6},
 	{"#TRAVEL", 3}, {"#HOUSING", 2}, {"#GIFTS", 2}, {"#OTHER", 2},
 }
 
 // variableRanges is the whole-unit amount range per variable expense category.
 var variableRanges = map[string][2]int{
-	"#GROCERIES": {18, 145}, "#DINING": {9, 70}, "#TRANSPORT": {4, 65},
-	"#SHOPPING": {15, 240}, "#ENTERTAINMENT": {12, 95}, "#HEALTH": {10, 160},
-	"#PERSONAL_CARE": {15, 85}, "#TRAVEL": {120, 950}, "#HOUSING": {25, 180},
+	"#GROCERIES": {18, 145}, "#EATING_OUT": {9, 70}, "#TRANSPORT": {4, 65},
+	"#FUN": {12, 95}, "#HEALTH": {10, 160},
+	"#CLOTHES_CARE": {15, 150}, "#TRAVEL": {120, 950}, "#HOUSING": {25, 180},
 	"#GIFTS": {20, 180}, "#OTHER": {10, 120},
 }
 
@@ -44,7 +44,7 @@ func (s *seeder) seedVariableExpenses(
 	if len(pool) == 0 {
 		return nil
 	}
-	vt := variableTags{tagByName(tags, "Vacation"), tagByName(tags, "Essential"), tagByName(tags, "Business")}
+	vt := variableTags{tagByName(tags, "#VACATION"), tagByName(tags, "#ESSENTIAL"), tagByName(tags, "#BUSINESS")}
 
 	for cursor := s.start; !cursor.After(s.end); cursor = cursor.AddDate(0, 0, 1) {
 		seasonal := seasonalFactor(cursor.Month())
@@ -100,7 +100,7 @@ func (s *seeder) variableAccount(accounts map[string]*ledger.Account, cat string
 	switch {
 	case cat == "#TRAVEL" && accounts["eur"] != nil && s.mtRand(0, 1) == 1:
 		return accounts["eur"]
-	case inList(cat, "#GROCERIES", "#SHOPPING", "#TRAVEL", "#HEALTH") && s.mtRand(1, 100) <= 60:
+	case inList(cat, "#GROCERIES", "#CLOTHES_CARE", "#TRAVEL", "#HEALTH") && s.mtRand(1, 100) <= 60:
 		return accounts["credit"]
 	case amount < 25 && s.mtRand(1, 100) <= 35:
 		return accounts["cash"]

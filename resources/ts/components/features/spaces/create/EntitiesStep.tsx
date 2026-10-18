@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { accountTypeLabel, categoryTypeLabel } from '@/lib/labels'
 import { testId } from '@/lib/test-id'
-import { localizeDefaultName, toStoredDefaultName } from '@/lib/localized-name'
+import { defaultNameHint, localizeDefaultName, toStoredDefaultName } from '@/lib/localized-name'
 import type { CurrencyCatalogItem } from '@/types'
 import type { AccountType } from '@/types/accounts'
 import { CATEGORY_TYPES, type CategoryType } from '@/types/categories'
@@ -246,12 +246,19 @@ function Categories({ content, onChange }: Pick<Props, 'content' | 'onChange'>) 
                         <span aria-hidden className="w-6 text-center">
                             {category.icon}
                         </span>
-                        <Input
-                            aria-label={t('spaces.create.categories.name')}
-                            value={localizeDefaultName(category.name)}
-                            maxLength={255}
-                            onChange={(e) => rename(index, e.target.value)}
-                        />
+                        <div className="min-w-0 flex-1">
+                            <Input
+                                aria-label={t('spaces.create.categories.name')}
+                                value={localizeDefaultName(category.name)}
+                                maxLength={255}
+                                onChange={(e) => rename(index, e.target.value)}
+                            />
+                            {defaultNameHint(category.name) && (
+                                <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                                    {defaultNameHint(category.name)}
+                                </p>
+                            )}
+                        </div>
                         <span className="w-20 shrink-0 text-xs text-muted-foreground">
                             {categoryTypeLabel(tc, category.type)}
                         </span>
@@ -321,10 +328,10 @@ function Tags({ content, onChange }: Pick<Props, 'content' | 'onChange'>) {
             <div className="flex flex-wrap gap-2">
                 {content.tags.map((tag) => (
                     <span key={tag} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-sm">
-                        {tag}
+                        {localizeDefaultName(tag, 'tags')}
                         <button
                             type="button"
-                            aria-label={t('spaces.create.tags.remove', { name: tag })}
+                            aria-label={t('spaces.create.tags.remove', { name: localizeDefaultName(tag, 'tags') })}
                             className="text-muted-foreground hover:text-foreground"
                             onClick={() => onChange({ tags: content.tags.filter((x) => x !== tag) })}
                         >

@@ -51,7 +51,7 @@ var familySpace = miniSpace{
 		{"income", "joint", "#SALARY", 2800, "Jordan — Payroll", 3, false, false},
 		{"expense", "joint", "#GROCERIES", 164.30, "Whole Foods Market", 28, false, false},
 		{"expense", "joint", "#GROCERIES", 128.75, "Trader Joe's", 14, false, false},
-		{"expense", "wallet", "#DINING", 42, "Pizza night", 6, false, false},
+		{"expense", "wallet", "#EATING_OUT", 42, "Pizza night", 6, false, false},
 		{"expense", "joint", "#HEALTH", 60, "Pediatrician copay", 18, false, false},
 		{"expense", "joint", "#UTILITIES", 96.10, "ConEdison", 20, false, false},
 		{"expense", "joint", "#UTILITIES", 105, "ConEdison — electricity bill (estimate)", -4, true, true},
@@ -66,16 +66,16 @@ var studioSpace = miniSpace{
 		{"usd", "Studio USD Account", "bank", "USD", 3100},
 	},
 	txs: []miniTx{
-		{"income", "bank", "#FREELANCE", 4800, "Client invoice — Nordlicht AG", 36, false, false},
-		{"income", "usd", "#FREELANCE", 2200, "Client invoice — Brightpath Inc.", 21, false, false},
-		{"income", "bank", "#FREELANCE", 3600, "Client invoice — Hafen Media", 5, false, false},
-		{"expense", "bank", "#RENT", 950, "Office rent — Kreuzberg", 27, false, false},
-		{"expense", "bank", "#RENT", 950, "Office rent — Kreuzberg", 1, false, false},
+		{"income", "bank", "#SIDE_INCOME", 4800, "Client invoice — Nordlicht AG", 36, false, false},
+		{"income", "usd", "#SIDE_INCOME", 2200, "Client invoice — Brightpath Inc.", 21, false, false},
+		{"income", "bank", "#SIDE_INCOME", 3600, "Client invoice — Hafen Media", 5, false, false},
+		{"expense", "bank", "#HOUSING", 950, "Office rent — Kreuzberg", 27, false, false},
+		{"expense", "bank", "#HOUSING", 950, "Office rent — Kreuzberg", 1, false, false},
 		{"expense", "bank", "#OTHER", 89, "Figma & Adobe subscriptions", 19, false, false},
 		{"expense", "bank", "#UTILITIES", 74.50, "Vattenfall", 10, false, false},
 		{"expense", "bank", "#OTHER", 2400, "VAT prepayment — Finanzamt", -6, true, true},
 	},
-	budget: miniBudget{"Office costs", "#RENT", 1000},
+	budget: miniBudget{"Office costs", "#HOUSING", 1000},
 }
 
 // seedMini fills a space with a miniSpace and returns its accounts by key. The

@@ -14,6 +14,7 @@ import {
     FormDescription,
 } from '@/components/ui/form'
 import { FormWrapper } from '@/components/shared/FormWrapper'
+import { localizeDefaultName, toStoredDefaultName } from '@/lib/localized-name'
 import { tagSchema, TagFormData } from '@/schemas'
 
 interface TagFormProps {
@@ -39,16 +40,19 @@ export function TagForm({
     const form = useForm<TagFormData>({
         resolver: zodResolver(tagSchema),
         defaultValues: {
-            name: defaultValues?.name ?? '',
+            name: defaultValues?.name ? localizeDefaultName(defaultValues.name, 'tags') : '',
         },
     })
 
     useFormValuesChange(form, onValuesChange)
 
+    const submit = (data: TagFormData) =>
+        onSubmit({ ...data, name: toStoredDefaultName(data.name, defaultValues?.name, 'tags') })
+
     return (
         <FormWrapper>
         <Form {...form}>
-            <form id={formId} onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <form id={formId} onSubmit={form.handleSubmit(submit)} className="space-y-4">
                 <FormField
                     control={form.control}
                     name="name"
