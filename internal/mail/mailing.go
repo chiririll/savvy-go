@@ -21,6 +21,7 @@ const DefaultTimeout = smtp.DefaultTimeout
 // time it is needed.
 type Service struct {
 	cfg     appconfig.Config
+	file    *config.Config
 	section *config.Ref[smtp.Setup]
 	sender  smtp.Mailer // given to New: used whatever the section says
 }
@@ -28,7 +29,39 @@ type Service struct {
 // New sends mail as the [mailer] section of f says. A non-nil sender replaces the SMTP one,
 // which is how tests record the mail.
 func New(f *config.Config, cfg appconfig.Config, sender smtp.Mailer) *Service {
-	return &Service{cfg: cfg, section: config.Of(f, smtp.Section), sender: sender}
+	return &Service{cfg: cfg, file: f, section: config.Of(f, smtp.Section), sender: sender}
+}
+
+// Settings is a full replacement of the [mailer] section, as an administrator sends it.
+type Settings struct {
+	Enabled    bool
+	Host       string
+	Port       int
+	Protocol   string
+	User       string
+	Password   *string // nil keeps the stored password; "" clears it
+	From       string
+	SkipVerify bool
+	Timeout    int // seconds
+}
+
+// Save writes the [mailer] section of the config file and applies it at once. An enabled
+// configuration that is not valid is refused with an smtp.InvalidError and nothing changes; a
+// disabled one may be half filled in. It fails with config.ErrReadOnly when the file cannot
+// be written.
+func (s *Service) Save(in Settings) error {
+	change := func(m *smtp.MailerConfig) {
+		password := m.Password
+		if in.Password != nil {
+			password = *in.Password
+		}
+		*m = smtp.MailerConfig{
+			Enabled: in.Enabled, Host: in.Host, Port: in.Port, Protocol: in.Protocol, User: in.User,
+			Password: password, From: in.From, SkipVerify: in.SkipVerify, Timeout: in.Timeout,
+		}
+	}
+	// The section turns a mistake into "mail is off", so it is refused by the check instead.
+	return smtp.Section.Edit(s.file, change, func(m smtp.MailerConfig) error { return m.Config().Validate() })
 }
 
 // Mailer is the current sender.

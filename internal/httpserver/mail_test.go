@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -126,6 +128,111 @@ func TestMailStatusAdminOnlyHidesPassword(t *testing.T) {
 	res = a.do("GET", "/api/admin/mail", nil, "", "")
 	if res.StatusCode != 401 {
 		t.Errorf("signed out: %d", res.StatusCode)
+	}
+	res.Body.Close()
+}
+
+// newWritableMailApp is newMailApp over a config file on disk that the application can save,
+// as in production once startup has finished.
+func newWritableMailApp(t *testing.T, rec *recorder) (*testApp, *auth.Issued, *config.Config) {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte(fmt.Sprintf(`[mailer]
+enabled = true
+host = "smtp.example.com"
+port = 587
+protocol = "starttls"
+user = "savvy"
+password = "s3cret-smtp-password"
+from = "Go Savvy <savvy@example.com>"
+timeout = 5
+`)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	file, err := config.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, sess, _ := newMailApp(t, rec, WithConfig(file))
+	if err := file.Finish(); err != nil {
+		t.Fatal(err)
+	}
+	return a, sess, file
+}
+
+func mailBody(over map[string]any) map[string]any {
+	body := map[string]any{
+		"enabled": true, "host": "mail.example.org", "port": 465, "protocol": "smtps",
+		"user": "savvy", "from": "savvy@example.org", "skipVerify": false, "timeout": 8,
+	}
+	for k, v := range over {
+		body[k] = v
+	}
+	return body
+}
+
+func TestMailSettingsAreSavedFromThePanel(t *testing.T) {
+	a, sess, file := newWritableMailApp(t, &recorder{on: true})
+
+	data := decodeJSON(t, a.do("GET", "/api/admin/mail", nil, sess.Token, sess.CSRF))["data"].(map[string]any)
+	if data["writable"] != true {
+		t.Fatalf("a config file that can be saved is reported read-only: %v", data)
+	}
+
+	res := a.do("PUT", "/api/admin/mail", mailBody(nil), sess.Token, sess.CSRF)
+	raw := decodeJSON(t, res)
+	if res.StatusCode != 200 {
+		t.Fatalf("save %d %v", res.StatusCode, raw)
+	}
+	data = raw["data"].(map[string]any)
+	if data["host"] != "mail.example.org" || data["port"] != float64(465) || data["protocol"] != "smtps" ||
+		data["from"] != "savvy@example.org" || data["timeout"] != float64(8) || data["passwordSet"] != true {
+		t.Errorf("response %v", data)
+	}
+	if strings.Contains(toString(raw), "s3cret-smtp-password") {
+		t.Error("the SMTP password is in the response")
+	}
+	if conf, _ := a.svc.Mail.Config(); conf.Host != "mail.example.org" || conf.Password != "s3cret-smtp-password" {
+		t.Errorf("not applied, or the stored password was lost: %+v", conf)
+	}
+	saved, err := os.ReadFile(file.Path())
+	if err != nil || !strings.Contains(string(saved), "mail.example.org") {
+		t.Errorf("not written to the config file: %v\n%s", err, saved)
+	}
+
+	res = a.do("PUT", "/api/admin/mail", mailBody(map[string]any{"user": "", "password": ""}), sess.Token, sess.CSRF)
+	res.Body.Close()
+	if conf, _ := a.svc.Mail.Config(); conf.Password != "" {
+		t.Errorf("an empty password did not clear it: %q", conf.Password)
+	}
+}
+
+func TestMailSettingsRejectedWhenInvalidOrNotAllowed(t *testing.T) {
+	a, sess, _ := newWritableMailApp(t, &recorder{on: true})
+
+	res := a.do("PUT", "/api/admin/mail", mailBody(map[string]any{"host": ""}), sess.Token, sess.CSRF)
+	body := decodeJSON(t, res)
+	if res.StatusCode != 422 || !strings.Contains(toString(body["errors"]), "host") {
+		t.Fatalf("empty host: %d %v", res.StatusCode, body)
+	}
+	if conf, _ := a.svc.Mail.Config(); conf.Host != "smtp.example.com" {
+		t.Errorf("a rejected save changed the mailer: %q", conf.Host)
+	}
+
+	user := a.createUser("plain@test.com", "secret1", roleEditor)
+	u := a.issue(user, false)
+	res = a.do("PUT", "/api/admin/mail", mailBody(nil), u.Token, u.CSRF)
+	if res.StatusCode != 403 {
+		t.Errorf("plain user: %d", res.StatusCode)
+	}
+	res.Body.Close()
+}
+
+func TestMailSettingsRefusedOnReadOnlyFile(t *testing.T) {
+	a, sess, _ := newMailApp(t, &recorder{on: true})
+	res := a.do("PUT", "/api/admin/mail", mailBody(nil), sess.Token, sess.CSRF)
+	if res.StatusCode != 409 {
+		t.Fatalf("read-only file: %d %v", res.StatusCode, decodeJSON(t, res))
 	}
 	res.Body.Close()
 }

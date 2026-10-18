@@ -4,6 +4,7 @@
 package appconfig
 
 import (
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -54,7 +55,8 @@ type Config struct {
 	TZ         string
 	Location   *time.Location
 
-	appURL func() string
+	appURL    func() string
+	setAppURL func(string) error
 }
 
 // Load is the Config of the [paths] section of f. The time zone and public URL come from
@@ -71,11 +73,49 @@ func (c Config) WithServer(tz string, loc *time.Location, appURL func() string) 
 	return c
 }
 
-// WithAppURL is c with a fixed public URL, for tests.
+// WithAppURLSetter sets how SetAppURL saves the public URL: the process writes it to the
+// config file, where AppURL then finds it.
+func (c Config) WithAppURLSetter(set func(string) error) Config {
+	c.setAppURL = set
+	return c
+}
+
+// WithAppURL is c with a fixed public URL, for tests. SetAppURL cannot change it; give it a
+// setter and a getter with WithServer and WithAppURLSetter to test a change.
 func (c Config) WithAppURL(url string) Config {
 	url = strings.TrimRight(url, "/")
 	c.appURL = func() string { return url }
 	return c
+}
+
+// SetAppURL saves a new public URL, which AppURL then reports. It is empty (unset) or an
+// absolute http(s) URL, kept without a trailing slash; anything else is a config.FieldError for
+// "app_url". The URL it already has is accepted without saving, so it also works when the
+// file cannot be written; otherwise it fails with config.ErrReadOnly when it cannot be saved.
+func (c Config) SetAppURL(raw string) error {
+	next, err := cleanAppURL(raw)
+	if err != nil {
+		return err
+	}
+	if next == c.AppURL() {
+		return nil
+	}
+	if c.setAppURL == nil {
+		return config.ErrReadOnly
+	}
+	return c.setAppURL(next)
+}
+
+func cleanAppURL(raw string) (string, error) {
+	raw = strings.TrimRight(strings.TrimSpace(raw), "/")
+	if raw == "" {
+		return "", nil
+	}
+	u, err := url.Parse(raw)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.RawQuery != "" || u.Fragment != "" {
+		return "", config.FieldError{Field: "app_url", Message: "Enter a full URL such as https://savvy.example.com."}
+	}
+	return raw, nil
 }
 
 // AppURL is the public URL of the instance without a trailing slash, empty when unset.

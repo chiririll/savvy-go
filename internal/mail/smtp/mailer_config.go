@@ -26,6 +26,26 @@ func (MailerConfig) Defaults() MailerConfig {
 	return MailerConfig{Port: 587, Protocol: STARTTLS, Timeout: int(DefaultTimeout / time.Second)}
 }
 
+// Config is the table as the mailer uses it: spaces trimmed, protocol lower-cased, a timeout
+// that is not positive replaced by DefaultTimeout. It is not checked; see Config.Validate.
+func (m MailerConfig) Config() Config {
+	timeout := DefaultTimeout
+	if m.Timeout > 0 {
+		timeout = time.Duration(m.Timeout) * time.Second
+	}
+	return Config{
+		Enabled:    m.Enabled,
+		Host:       strings.TrimSpace(m.Host),
+		Port:       m.Port,
+		Protocol:   strings.ToLower(strings.TrimSpace(m.Protocol)),
+		User:       m.User,
+		Password:   m.Password,
+		From:       strings.TrimSpace(m.From),
+		SkipVerify: m.SkipVerify,
+		Timeout:    timeout,
+	}
+}
+
 // Setup is the [mailer] section as the mailer uses it.
 type Setup struct {
 	Config Config
@@ -41,21 +61,7 @@ var Section = config.Section[MailerConfig, Setup]{Name: "mailer", Decode: decode
 // DefaultTimeout. A mistake does not stop the server: it switches mail off, and Problem
 // says why.
 func decode(m MailerConfig) (Setup, error) {
-	timeout := DefaultTimeout
-	if m.Timeout > 0 {
-		timeout = time.Duration(m.Timeout) * time.Second
-	}
-	conf := Config{
-		Enabled:    m.Enabled,
-		Host:       strings.TrimSpace(m.Host),
-		Port:       m.Port,
-		Protocol:   strings.ToLower(strings.TrimSpace(m.Protocol)),
-		User:       m.User,
-		Password:   m.Password,
-		From:       strings.TrimSpace(m.From),
-		SkipVerify: m.SkipVerify,
-		Timeout:    timeout,
-	}
+	conf := m.Config()
 	if err := conf.Validate(); err != nil {
 		conf.Enabled = false
 		slog.Warn("mail is disabled: invalid [mailer] section in the config file", "problem", err.Error())

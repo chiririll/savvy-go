@@ -1,6 +1,7 @@
 package appconfig
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -70,6 +71,75 @@ func TestWithServerReadsURLEachTime(t *testing.T) {
 	url = "https://b.example"
 	if got := cfg.AppURL(); got != "https://b.example" {
 		t.Errorf("AppURL after a change %q", got)
+	}
+}
+
+func TestSetAppURLUsesTheProcessSetter(t *testing.T) {
+	url := "https://a.example"
+	cfg := Config{}.
+		WithServer("UTC", time.UTC, func() string { return url }).
+		WithAppURLSetter(func(u string) error { url = u; return nil })
+	if err := cfg.SetAppURL("https://b.example"); err != nil {
+		t.Fatal(err)
+	}
+	if got := cfg.AppURL(); got != "https://b.example" {
+		t.Errorf("AppURL after SetAppURL %q", got)
+	}
+
+	failing := cfg.WithAppURLSetter(func(string) error { return config.ErrReadOnly })
+	if err := failing.SetAppURL("https://c.example"); !errors.Is(err, config.ErrReadOnly) {
+		t.Errorf("the setter's error is lost: %v", err)
+	}
+}
+
+func TestSetAppURLWithoutSetterIsReadOnly(t *testing.T) {
+	if err := (Config{}).SetAppURL("https://a.example"); !errors.Is(err, config.ErrReadOnly) {
+		t.Errorf("want ErrReadOnly, got %v", err)
+	}
+}
+
+// inMemory is a Config whose public URL starts as url and is saved to the returned variable.
+func inMemory(url string) (Config, *string) {
+	cur := url
+	cfg := Config{}.
+		WithServer("UTC", time.UTC, func() string { return cur }).
+		WithAppURLSetter(func(next string) error { cur = next; return nil })
+	return cfg, &cur
+}
+
+func TestSetAppURLCleansAndChecksTheURL(t *testing.T) {
+	ok := map[string]string{
+		"":                           "",
+		"  ":                         "",
+		"https://savvy.example.com/": "https://savvy.example.com",
+		"http://localhost:3000":      "http://localhost:3000",
+	}
+	for in, want := range ok {
+		cfg, _ := inMemory("https://old.example")
+		if err := cfg.SetAppURL(in); err != nil || cfg.AppURL() != want {
+			t.Errorf("SetAppURL(%q): %v, now %q; want %q", in, err, cfg.AppURL(), want)
+		}
+	}
+	for _, in := range []string{"savvy.example.com", "ftp://x", "https://", "https://x/?a=1", "https://x/#top"} {
+		cfg, _ := inMemory("https://old.example")
+		var field config.FieldError
+		if err := cfg.SetAppURL(in); !errors.As(err, &field) || field.Field != "app_url" {
+			t.Errorf("SetAppURL(%q) = %v; want a FieldError for app_url", in, err)
+		}
+		if cfg.AppURL() != "https://old.example" {
+			t.Errorf("SetAppURL(%q) changed the URL to %q", in, cfg.AppURL())
+		}
+	}
+}
+
+// Sending the URL the instance already has is not a change, so it needs no write access.
+func TestSetAppURLUnchangedNeedsNoWriteAccess(t *testing.T) {
+	cfg := Config{}.WithServer("UTC", time.UTC, func() string { return "https://a.example" })
+	if err := cfg.SetAppURL("https://a.example/"); err != nil {
+		t.Errorf("an unchanged URL on a read-only file: %v", err)
+	}
+	if err := cfg.SetAppURL("https://b.example"); !errors.Is(err, config.ErrReadOnly) {
+		t.Errorf("a changed URL on a read-only file: %v", err)
 	}
 }
 

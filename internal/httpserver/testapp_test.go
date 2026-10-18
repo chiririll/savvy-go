@@ -60,11 +60,22 @@ func testKeys(t *testing.T, cfg appconfig.Config) *signing.Holder {
 
 func newTestApp(t *testing.T, opts ...Option) *testApp {
 	t.Helper()
+	return newTestAppCfg(t, nil, opts...)
+}
+
+// newTestAppCfg is newTestApp with tune applied to the Config the server gets, to wire the
+// public URL to a config file as the process does.
+func newTestAppCfg(t *testing.T, tune func(appconfig.Config) appconfig.Config, opts ...Option) *testApp {
+	t.Helper()
 	cfg, _ := testConfig(t)
 	st := openTestStore(t, cfg)
 	guard := firstrun.New(cfg.DataDir, firstrun.Binary)
 	opts = append([]Option{WithRates(currencydata.NewOffline()), WithBootstrap(guard)}, opts...)
-	s := newServer(cfg, st, testKeys(t, cfg), opts...)
+	served := cfg.WithAppURL(testURL)
+	if tune != nil {
+		served = tune(served)
+	}
+	s := New(served, st, testKeys(t, cfg), opts...)
 	space, err := servicesOf(s).Spaces.Create(context.Background(), "Test", nil)
 	if err != nil {
 		t.Fatal(err)

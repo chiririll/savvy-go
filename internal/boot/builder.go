@@ -52,7 +52,9 @@ func (b *Builder) Build(ctx context.Context) (*Process, error) {
 	}
 	server := config.Of(file, httpserver.ServerSection)
 	srv := server.Get()
-	cfg := appconfig.Load(file).WithServer(srv.TZ, srv.Location, func() string { return server.Get().AppURL })
+	cfg := appconfig.Load(file).
+		WithServer(srv.TZ, srv.Location, func() string { return server.Get().AppURL }).
+		WithAppURLSetter(func(url string) error { return httpserver.SetAppURL(file, url) })
 	seedCfg, err := b.loadSeed()
 	if err != nil {
 		return nil, err

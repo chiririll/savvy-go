@@ -6,6 +6,7 @@ import (
 	"savvy-go/internal/backup"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/locator"
+	"savvy-go/internal/mail"
 	"savvy-go/internal/oauth"
 	"savvy-go/internal/settings"
 	"savvy-go/internal/signing"
@@ -33,6 +34,7 @@ type services struct {
 	Transfers      *transfers.Service
 	SSO            *sso.Service
 	OAuth          *oauth.Service
+	Mail           *mail.Service
 }
 
 func servicesOf(s *Server) services {
@@ -45,6 +47,6 @@ func servicesOf(s *Server) services {
 		Challenges: locator.Get[auth.Challenges](l), Settings: locator.Get[settings.Store](l),
 		Spaces: locator.Get[spaces.Service](l), Backups: locator.Get[backup.Service](l),
 		Transfers: locator.Get[*transfers.Service](l), SSO: locator.Get[*sso.Service](l),
-		OAuth: locator.Get[*oauth.Service](l),
+		OAuth: locator.Get[*oauth.Service](l), Mail: locator.Get[*mail.Service](l),
 	}
 }

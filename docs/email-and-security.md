@@ -6,7 +6,9 @@ Server settings live in `config.toml`, see [Deployment](deployment.md#configurat
 
 Without a mail server everything works: reset and invitation links are shown for you to copy and send. With one, Go Savvy can email them. Some things need it, see [how invitations are made](spaces.md#invitations).
 
-Set it up in `[mailer]` and restart. **Administration → System → Email** shows the configuration and has a **Send test email** button, but cannot save changes yet (the form is locked).
+Set it up in **Administration → System → Email**, or in `[mailer]` in `config.toml`. Saving in the panel writes the file and takes effect at once, no restart. A **Send test email** button checks the connection and sends a message to you. If the application cannot write `config.toml` (a read-only mount), the form is locked and you edit the file and restart.
+
+In the panel, leave the password field empty to keep the stored password; clear it on purpose to remove it. A configuration that cannot work (empty host, bad port, a `user` without a password) is refused with the field at fault, unless mail is switched off.
 
 ```toml
 [mailer]

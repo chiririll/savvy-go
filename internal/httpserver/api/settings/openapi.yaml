@@ -31,11 +31,16 @@ paths:
     patch:
       tags: [Other]
       summary: Update instance settings
-      description: Server administrators only, session only.
+      description: >-
+        Server administrators only, session only. `app_url` is saved to
+        config.toml and applies at once; `409` (`config_read_only`) when the file
+        cannot be written. Switching the URL between `http` and `https` signs
+        everyone out.
       security: [{cookieAuth: []}]
       requestBody: {$ref: "#/components/requestBodies/Object"}
       responses:
         "200": {$ref: "#/components/responses/Data"}
         "403": {$ref: "#/components/responses/Forbidden"}
+        "409": {description: The config file is read-only, so app_url cannot be changed}
         "422": {$ref: "#/components/responses/Validation"}
 

@@ -50,6 +50,13 @@ func decodeServer(t serverTable) (ServerConfig, error) {
 // ServerSection is the [server] table of the config file.
 var ServerSection = config.Section[serverTable, ServerConfig]{Name: "server", Decode: decodeServer}
 
+// SetAppURL writes the public URL to the [server] table of f, where AppURL reads it, without
+// touching the other keys. ServerSection must have been asked for with config.Of. It fails
+// with config.ErrReadOnly when the file cannot be written.
+func SetAppURL(f *config.Config, url string) error {
+	return ServerSection.Update(f, func(t *serverTable) { t.AppURL = strings.TrimRight(strings.TrimSpace(url), "/") })
+}
+
 func firstNonEmpty(values ...string) string {
 	for _, v := range values {
 		if strings.TrimSpace(v) != "" {

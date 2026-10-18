@@ -413,6 +413,47 @@ func TestUpdateBeforeFinishIsRefused(t *testing.T) {
 	}
 }
 
+func TestEditChecksTheNewTableBeforeWriting(t *testing.T) {
+	path := write(t, "[server]\napp_url = \"https://a.example\"\n")
+	h := start(t, path)
+	before, _ := os.ReadFile(path)
+
+	refuse := func(s server) error {
+		if s.AppURL == "bad" {
+			return FieldError{Field: "app_url", Message: "not a url"}
+		}
+		return nil
+	}
+	err := serverSection.Edit(cur, func(s *server) { s.AppURL = "bad" }, refuse)
+	var field FieldError
+	if !errors.As(err, &field) || field.Field != "app_url" || field.Error() != "not a url" {
+		t.Fatalf("want the check's FieldError, got %v", err)
+	}
+	if after, _ := os.ReadFile(path); string(after) != string(before) {
+		t.Errorf("a refused edit wrote the file:\n%s", after)
+	}
+	if got := h.server.Get().AppURL; got != "https://a.example" {
+		t.Errorf("a refused edit changed the value: %q", got)
+	}
+
+	if err := serverSection.Edit(cur, func(s *server) { s.AppURL = "https://b.example" }, refuse); err != nil {
+		t.Fatal(err)
+	}
+	if got := h.server.Get().AppURL; got != "https://b.example" {
+		t.Errorf("an accepted edit was not applied: %q", got)
+	}
+}
+
+func TestEditOnReadOnlyFileSkipsTheCheck(t *testing.T) {
+	initAt(t, write(t, ""))
+	Of(cur, serverSection)
+	called := false
+	err := serverSection.Edit(cur, func(s *server) { s.AppURL = "x" }, func(server) error { called = true; return nil })
+	if !errors.Is(err, ErrReadOnly) || called {
+		t.Errorf("want ErrReadOnly without a check, got %v (check ran %v)", err, called)
+	}
+}
+
 func mustPanic(t *testing.T, name string, fn func()) {
 	t.Helper()
 	defer func() {

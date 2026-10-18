@@ -103,6 +103,15 @@ func (s Section[T, V]) Update(c *Config, change func(*T)) error {
 	return lookup[T, V](c, s.Name, false).update(change)
 }
 
+// Edit is Update for a change that comes from a person: check judges the table the change
+// produced, and its error, usually a FieldError, ends the edit with nothing written or kept.
+// A decode that only switches a feature off (Decode returns no error) cannot refuse a mistake,
+// so check is where it is refused. It runs under the lock of the file, after the file is known
+// to be writable, so what it saw is what is written.
+func (s Section[T, V]) Edit(c *Config, change func(*T), check func(T) error) error {
+	return lookup[T, V](c, s.Name, false).edit(change, check)
+}
+
 // Update is Section.Update, adding the section when it is absent.
 func (s Optional[T, V]) Update(c *Config, change func(*T)) error {
 	return lookup[T, V](c, s.Name, true).update(change)
@@ -333,7 +342,9 @@ func (s *slot[T, V]) render(over any) ([]byte, error) {
 	return append([]byte("["+s.nameStr+"]\n"), body...), nil
 }
 
-func (s *slot[T, V]) update(change func(*T)) error {
+func (s *slot[T, V]) update(change func(*T)) error { return s.edit(change, nil) }
+
+func (s *slot[T, V]) edit(change func(*T), check func(T) error) error {
 	f := s.file
 	f.mu.Lock()
 	if !f.writable {
@@ -345,6 +356,12 @@ func (s *slot[T, V]) update(change func(*T)) error {
 		next = st.raw
 	}
 	change(&next)
+	if check != nil {
+		if err := check(next); err != nil {
+			f.mu.Unlock()
+			return err
+		}
+	}
 	val, err := s.decode(next)
 	if err != nil {
 		f.mu.Unlock()

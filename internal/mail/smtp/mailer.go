@@ -12,6 +12,8 @@ import (
 	"time"
 
 	gomail "github.com/wneessen/go-mail"
+
+	"savvy-go/internal/config"
 )
 
 // Protocols a server can be reached with.
@@ -42,15 +44,10 @@ const DefaultTimeout = 10 * time.Second
 
 // InvalidError is a mistake in an enabled configuration. Field is the config
 // key it is about ("host", "port", ...), so a form can show it by the field.
-type InvalidError struct {
-	Field string
-	msg   string
-}
-
-func (e InvalidError) Error() string { return e.msg }
+type InvalidError = config.FieldError
 
 func invalid(field, format string, args ...any) error {
-	return InvalidError{Field: field, msg: fmt.Sprintf(format, args...)}
+	return InvalidError{Field: field, Message: fmt.Sprintf(format, args...)}
 }
 
 // Validate reports what is wrong with an enabled configuration (an InvalidError).

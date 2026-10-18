@@ -6,14 +6,13 @@ import (
 	_ "embed"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"savvy-go/internal/app/signin"
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/mail"
 	"savvy-go/internal/settings"
-	"strings"
 	"time"
 )
 
@@ -52,14 +51,14 @@ func (h Handler) settingsUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if v, ok := body["app_url"]; ok {
-		clean, err := cleanAppURL(v)
-		if err != nil {
-			httpx.WriteValidation(w, map[string][]string{"app_url": {"Enter a full URL such as https://savvy.example.com."}})
-			return
+		// The URL lives in the config file. Saving it is the last check, so a refused
+		// setting never leaves another one half applied. Anything but a string is not a URL.
+		raw, isText := v.(string)
+		if !isText {
+			raw = fmt.Sprint(v)
 		}
-		// The application does not write the config file for now: edit it and restart.
-		if clean != h.Cfg.AppURL() {
-			httpx.WriteValidation(w, map[string][]string{"app_url": {"Set app_url in config.toml and restart."}})
+		if err := h.Cfg.SetAppURL(raw); err != nil {
+			httpx.WriteConfigError(w, err)
 			return
 		}
 	}
@@ -123,24 +122,6 @@ func (h Handler) spaceSettingsUpdate(w http.ResponseWriter, r *http.Request) {
 		}()
 	}
 	h.spaceSettingsIndex(w, r)
-}
-
-// cleanAppURL validates the app_url setting: empty (unset) or an
-// absolute http(s) URL, stored without a trailing slash.
-func cleanAppURL(v any) (string, error) {
-	raw, ok := v.(string)
-	if !ok {
-		return "", errors.New("not a string")
-	}
-	raw = strings.TrimRight(strings.TrimSpace(raw), "/")
-	if raw == "" {
-		return "", nil
-	}
-	u, err := url.Parse(raw)
-	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.RawQuery != "" || u.Fragment != "" {
-		return "", errors.New("invalid url")
-	}
-	return raw, nil
 }
 
 func (h Handler) spaceSettingsIndex(w http.ResponseWriter, r *http.Request) {

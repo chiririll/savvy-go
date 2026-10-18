@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"savvy-go/internal/httpserver/httpx"
+	"savvy-go/internal/mail"
 	"savvy-go/internal/mail/smtp"
 )
 
@@ -49,6 +50,38 @@ func (h Handler) index(w http.ResponseWriter, r *http.Request) {
 		SkipVerify: c.SkipVerify, Timeout: int(c.Timeout / time.Second), PasswordSet: c.Password != "",
 		AppURLSet: h.Mail.AppURL() != "", Writable: h.Writable(),
 	})
+}
+
+// inputBody is every mail setting, as the panel sends them. Without a password the stored one
+// is kept; an empty one clears it.
+type inputBody struct {
+	Enabled    bool    `json:"enabled"`
+	Host       string  `json:"host"`
+	Port       int     `json:"port"`
+	Protocol   string  `json:"protocol"`
+	User       string  `json:"user"`
+	Password   *string `json:"password"`
+	From       string  `json:"from"`
+	SkipVerify bool    `json:"skipVerify"`
+	Timeout    int     `json:"timeout"`
+}
+
+// update saves the mail settings to the config file and applies them at once. An enabled
+// configuration that cannot work is refused with the field at fault.
+func (h Handler) update(w http.ResponseWriter, r *http.Request) {
+	var body inputBody
+	if !httpx.DecodeBody(w, r, &body) {
+		return
+	}
+	err := h.Mail.Save(mail.Settings{
+		Enabled: body.Enabled, Host: body.Host, Port: body.Port, Protocol: body.Protocol, User: body.User,
+		Password: body.Password, From: body.From, SkipVerify: body.SkipVerify, Timeout: body.Timeout,
+	})
+	if err != nil {
+		httpx.WriteConfigError(w, err)
+		return
+	}
+	h.index(w, r)
 }
 
 // test checks the connection and sends a test message to the given address

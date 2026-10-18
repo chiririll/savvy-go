@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"savvy-go/internal/config"
 	"savvy-go/internal/httpserver/httpx/guard"
 	"savvy-go/internal/httpserver/httpx/login"
 	"savvy-go/internal/locator"
@@ -31,10 +32,9 @@ type Deps struct {
 // is a wiring bug and panics at start.
 func Get[T any](d *Deps) T { return locator.Get[T](d.Loc) }
 
-// ConfigWritable is whether the application changes the config file. It does not for now:
-// the file is edited by hand. Section.Update and config.Writable stay for when that is
-// switched back on.
-func (d *Deps) ConfigWritable() bool { return false }
+// ConfigWritable is whether the application can change the config file: false on a read-only
+// mount, where the settings it holds are shown but not edited.
+func (d *Deps) ConfigWritable() bool { return Get[*config.Config](d).Writable() }
 
 // Tier is who may reach a set of routes, and so which middleware wraps it.
 type Tier int

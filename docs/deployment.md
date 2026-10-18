@@ -45,7 +45,7 @@ Good to know:
 
 - A restart before the first user exists keeps the same password.
 - A server started with demo data has users already and needs none.
-- The URL step only explains how to set `app_url` while the application does not change `config.toml`.
+- The URL step saves `app_url` to `config.toml`. When the file is read-only it only explains how to set it by hand.
 
 **Moving from another server?** On the same page, restore a server backup instead of creating an admin. Enter the bootstrap password and upload the backup (for a Laravel database, also its `APP_KEY`). Users, spaces, settings and the signing key replace the empty server, and you sign in as the backup's admin. A failed restore changes nothing. See [Restoring on first run](data-and-backups.md#restoring-on-first-run).
 
@@ -56,7 +56,7 @@ Configuration is a TOML file; no environment variables are read.
 - `config.toml` is created with defaults on first start, in the data directory (`/data` in the image, `/var/lib/savvy-go` for the Debian package, `./savvy-data` otherwise).
 - `-config <path>` or `CONFIG_FILE` points elsewhere.
 - On every start the file is read and written back: new keys appear, comments are regenerated, your values are kept. A read-only file works, it is just not rewritten.
-- Edit it and restart.
+- Edit it and restart, or change `app_url` and the `[mailer]` section in **Administration → System**, which writes the file and applies at once. Everything else (`listen`, `timezone`, paths, security) is edited by hand and needs a restart.
 - Demo data is not configured here, see `--seed-config` in [Development](development.md).
 
 Keys and defaults are listed in the generated file.
@@ -70,7 +70,7 @@ Keys and defaults are listed in the generated file.
 
 An unusable value (a lifetime that is not a positive number, an empty cookie name) stops the server at start, naming the section and key. `[mailer]` is the exception, see [Email](email-and-security.md#email).
 
-**`app_url`** is the public `https://` URL of your instance. SSO and passkeys stay disabled without it. Passkeys need user verification (PIN or biometric) to register and sign in, so a security key without a PIN cannot be used. The admin panel (System → Server) shows `app_url` but cannot change it yet: edit the file and restart. In Docker, edit `/data/config.toml`.
+**`app_url`** is the public `https://` URL of your instance. SSO and passkeys stay disabled without it. Passkeys need user verification (PIN or biometric) to register and sign in, so a security key without a PIN cannot be used. Change it in the admin panel (System → Server) or in the file. The panel applies it at once, with no restart. Mind the scheme: the session cookie depends on it (see below), so switching between `http://` and `https://` signs everyone out, and if you reach the app over plain `http://` you cannot sign back in until you fix `app_url` in the file (in Docker, `/data/config.toml`) and restart.
 
 Limits such as spaces per user, space quotas and kept backups are not in the file. Server admins set them in **Administration → System**.
 
@@ -156,7 +156,7 @@ During maintenance `/livez` stays up and `/readyz` returns `503`. A space whose 
 | No server backup           | warning                      | no valid server backup exists |
 | Server backup is old       | warning                      | newest valid server backup is over 30 days old |
 | Data disk is filling       | warning at 75%, error at 90% | the volume that holds the uploads |
-| Config file is read-only   | info                         | `config.toml` is not changed by the application yet, so edit it by hand |
+| Config file is read-only   | info                         | `config.toml` cannot be written (read-only mount), so `app_url` and the mailer are edited by hand |
 
 ## Kubernetes
 

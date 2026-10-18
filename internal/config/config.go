@@ -28,6 +28,13 @@ comments and formatting are not.`
 // ErrReadOnly is returned by Update when the config file cannot be written.
 var ErrReadOnly = errors.New("the config file is read-only")
 
+// FieldError is a value a person cannot be allowed to save, named by the key it is about so a
+// form can show the message by the field. Edit passes the error of its check through, so a
+// caller can tell it from a failure to write the file.
+type FieldError struct{ Field, Message string }
+
+func (e FieldError) Error() string { return e.Message }
+
 // Open reads the TOML file at path. A missing file is an empty one; invalid TOML is an
 // error. Nothing is written until Finish. The program then asks for the sections it uses
 // with Of and calls Finish.
