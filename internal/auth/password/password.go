@@ -8,7 +8,12 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-const bcryptCost = 10
+// cost is the bcrypt work factor. Tests lower it with SetCost.
+var cost = bcrypt.DefaultCost
+
+// SetCost changes the bcrypt work factor for hashes made from now on. It is for test
+// packages, which hash many passwords; call it before any test runs.
+func SetCost(c int) { cost = c }
 
 // MinLength is the fewest characters any password path accepts: sign-up, change, reset,
 // invitation and the admin form.
@@ -21,7 +26,7 @@ func TooShort(plain string) bool { return len(plain) < MinLength }
 var TooShortMessage = fmt.Sprintf("The password must be at least %d characters.", MinLength)
 
 func Hash(plain string) (string, error) {
-	b, err := bcrypt.GenerateFromPassword([]byte(plain), bcryptCost)
+	b, err := bcrypt.GenerateFromPassword([]byte(plain), cost)
 	return string(b), err
 }
 
@@ -35,7 +40,7 @@ func Check(hash, plain string) bool {
 // dummyHash is a bcrypt hash at the same cost as real ones, made once on first
 // use, that no input is meant to match.
 var dummyHash = sync.OnceValue(func() string {
-	b, err := bcrypt.GenerateFromPassword([]byte("no account has this password"), bcryptCost)
+	b, err := bcrypt.GenerateFromPassword([]byte("no account has this password"), cost)
 	if err != nil {
 		panic(err)
 	}

@@ -175,6 +175,7 @@ func TestSensitiveChangesPassWithNothingConfirm(t *testing.T) {
 // signing in, so a stolen session is no way round it.
 func TestWrongConfirmationsCountTowardAccountLimit(t *testing.T) {
 	a := newTestApp(t, WithConfig(testFile("[security]\nip_rate_limit = 0\naccount_rate_limit = 3\n")))
+	freezeLimits(a)
 	u := a.createUser("c@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 

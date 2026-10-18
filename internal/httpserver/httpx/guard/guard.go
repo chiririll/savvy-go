@@ -37,6 +37,14 @@ func (g *Guard) initLimiters() {
 	g.byAccount = ratelimit.New(g.Security.AccountRateLimit)
 }
 
+// SetClock makes both attempt limiters read now. It is for tests, which stop time so a slow
+// run cannot refill a bucket.
+func (g *Guard) SetClock(now func() time.Time) {
+	g.limitsOnce.Do(g.initLimiters)
+	g.byIP.SetClock(now)
+	g.byAccount.SetClock(now)
+}
+
 // LimitAttempts throttles a route that anyone can call to guess a secret, by client address.
 // All such routes share one count, so a guesser cannot get a fresh allowance by changing
 // route or token. RealIP has put the client address in RemoteAddr.

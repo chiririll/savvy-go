@@ -3,7 +3,15 @@ package httpserver
 import (
 	"fmt"
 	"testing"
+	"time"
 )
+
+// freezeLimits stops the clock the attempt limiters read: a slow run must not refill a bucket
+// and let a request through that the test expects to be refused.
+func freezeLimits(a *testApp) {
+	now := time.Now()
+	a.s.guard.SetClock(func() time.Time { return now })
+}
 
 func tryLogin(a *testApp, email, pass string) int {
 	res := a.do("POST", "/api/auth/login", map[string]string{"email": email, "password": pass}, "", "")

@@ -31,6 +31,7 @@ func newSpaces(t *testing.T, d store.DB, n int) []int64 {
 			fmt.Sprintf("space %d", i),
 			nil,
 			time.Now(),
+			spacesrepo.Look{},
 		)
 		if err != nil {
 			t.Fatal(err)
