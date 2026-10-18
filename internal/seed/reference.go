@@ -56,8 +56,28 @@ func seedCurrencies(ctx context.Context, curs ledger.Currencies, list []ledger.C
 	return nil
 }
 
+// ownReference is what a space has besides the presets.
+type ownReference struct {
+	categories []Category
+	tags       []string
+}
+
+func seedOwn(ctx context.Context, db store.DB, own ownReference) error {
+	if err := createCategories(ctx, ledger.Categories{DB: db}, own.categories); err != nil {
+		return fmt.Errorf("categories: %w", err)
+	}
+	if err := createTags(ctx, ledger.Tags{DB: db}, own.tags); err != nil {
+		return fmt.Errorf("tags: %w", err)
+	}
+	return nil
+}
+
 func seedCategories(ctx context.Context, cats ledger.Categories) error {
-	for _, c := range DefaultCategories() {
+	return createCategories(ctx, cats, DefaultCategories())
+}
+
+func createCategories(ctx context.Context, cats ledger.Categories, list []Category) error {
+	for _, c := range list {
 		icon, color := c.Icon, c.Color
 		if _, err := cats.Create(ctx, ledger.Category{
 			Name: c.Name, Type: c.Type, Icon: &icon, Color: &color, IsDefault: c.IsDefault,
@@ -69,7 +89,11 @@ func seedCategories(ctx context.Context, cats ledger.Categories) error {
 }
 
 func seedTags(ctx context.Context, tags ledger.Tags) error {
-	for _, name := range DefaultTags() {
+	return createTags(ctx, tags, DefaultTags())
+}
+
+func createTags(ctx context.Context, tags ledger.Tags, names []string) error {
+	for _, name := range names {
 		if _, err := tags.Create(ctx, name); err != nil {
 			return err
 		}

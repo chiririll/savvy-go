@@ -25,14 +25,20 @@ type ManifestUser struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 	Role     string `json:"role"`
+	// Verified is whether the user proved the address; it only shows with mail on.
+	Verified bool `json:"verified"`
 }
 
 // ManifestSpace is a seeded space. Members maps a user key to the role in it.
 type ManifestSpace struct {
 	ID          int64             `json:"id"`
 	Name        string            `json:"name"`
+	Emoji       string            `json:"emoji,omitempty"`
+	Color       string            `json:"color,omitempty"`
 	Members     map[string]string `json:"members"`
 	Automations []int64           `json:"automations,omitempty"`
+	// SyncGroup is the id of the sync group the space is in, 0 for none.
+	SyncGroup int64 `json:"sync_group,omitempty"`
 }
 
 // ManifestInvitation is an open invitation; Token is the secret in its link.

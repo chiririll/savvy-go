@@ -29,9 +29,9 @@ With `--seed-config <file>` (any TOML file, even empty), the first boot creates 
 | `guest@savvy.app`  | `password` | guest       |
 | `demo@demo.com`    | `demo`     | user        |
 
-Roles differ per space, so each user sees a different view.
+Roles differ per space, so each user sees a different view. Every space has its own emoji and color. Family Budget and Studio GmbH are in one sync group, each with a category and a tag the other lacked, while Demo is outside it, so adding Demo to the group has differences to reconcile. All addresses are verified except the guest's, which shows as unverified once mail is set up.
 
-In the seed config file, `date` (`YYYY-MM-DD`) places the data relative to that day instead of today. `manifest` is a file the seed writes users, spaces and invitation tokens to; [Scripts](scripts.md) uses it.
+In the seed config file, `date` (`YYYY-MM-DD`) places the data relative to that day instead of today. `manifest` is a file the seed writes users (with whether their address is verified), spaces (emoji, color, sync group) and invitation tokens to; [Scripts](scripts.md) uses it.
 
 ## Architecture
 

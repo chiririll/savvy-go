@@ -364,3 +364,89 @@ func TestLoadConfig(t *testing.T) {
 		t.Error("accepted an unknown key")
 	}
 }
+
+func TestDemoSpacesHaveLookAndAccount(t *testing.T) {
+	st, _ := seedDemo(t)
+	seen := map[string]bool{}
+	rows, err := st.Server().QueryContext(context.Background(), `SELECT name, emoji, color FROM spaces`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	n := 0
+	for rows.Next() {
+		var name string
+		var emoji, color *string
+		if err := rows.Scan(&name, &emoji, &color); err != nil {
+			t.Fatal(err)
+		}
+		if emoji == nil || color == nil {
+			t.Fatalf("%s: emoji=%v color=%v", name, emoji, color)
+		}
+		if seen[*emoji] || seen[*color] {
+			t.Fatalf("%s repeats the emoji or color of another space", name)
+		}
+		seen[*emoji], seen[*color] = true, true
+		if c := countWhere(t, spaceByName(t, st, name), `SELECT COUNT(*) FROM accounts`); c == 0 {
+			t.Fatalf("%s has no account", name)
+		}
+		n++
+	}
+	if n != 3 {
+		t.Fatalf("spaces=%d", n)
+	}
+}
+
+func TestDemoSyncGroup(t *testing.T) {
+	st, keys := openStoreKeys(t)
+	m, err := Demo(context.Background(), st, keys, Options{Loc: time.UTC})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := countWhere(t, st.Server(), `SELECT COUNT(*) FROM sync_groups`); n != 1 {
+		t.Fatalf("sync groups=%d", n)
+	}
+	group := map[string]int64{}
+	for _, sp := range m.Spaces {
+		group[sp.Name] = sp.SyncGroup
+	}
+	if group["Family Budget"] == 0 || group["Family Budget"] != group["Studio GmbH"] || group["Demo"] != 0 {
+		t.Fatalf("manifest sync groups: %v", group)
+	}
+	for _, name := range []string{"Family Budget", "Studio GmbH"} {
+		d := spaceByName(t, st, name)
+		for _, cat := range []string{"School & kids", "Software & tools"} {
+			if countWhere(t, d, `SELECT COUNT(*) FROM categories WHERE name = ?`, cat) != 1 {
+				t.Fatalf("%s lacks the shared category %q", name, cat)
+			}
+		}
+		for _, tag := range []string{"Kids", "Client work"} {
+			if countWhere(t, d, `SELECT COUNT(*) FROM tags WHERE name = ?`, tag) != 1 {
+				t.Fatalf("%s lacks the shared tag %q", name, tag)
+			}
+		}
+	}
+	if countWhere(t, spaceByName(t, st, "Demo"), `SELECT COUNT(*) FROM categories WHERE name = 'School & kids'`) != 0 {
+		t.Fatal("Demo got a category of the group")
+	}
+}
+
+func TestDemoSamIsUnverified(t *testing.T) {
+	st, keys := openStoreKeys(t)
+	m, err := Demo(context.Background(), st, keys, Options{Loc: time.UTC})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, u := range m.Users {
+		if u.Verified == (u.Key == userSam) {
+			t.Fatalf("%s verified=%v", u.Key, u.Verified)
+		}
+		want := 1
+		if !u.Verified {
+			want = 0
+		}
+		if n := countWhere(t, st.Server(), `SELECT email_verified FROM users WHERE email = ?`, u.Email); n != want {
+			t.Fatalf("%s email_verified=%d", u.Key, n)
+		}
+	}
+}

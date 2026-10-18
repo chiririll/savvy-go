@@ -37,6 +37,10 @@ type Options struct {
 //     linked to Demo, so transfers between them cross currencies, and it is not
 //     linked to Family Budget. It has open invitations.
 //
+// Every space has an emoji and a color. Family Budget and Studio GmbH each have
+// a category and a tag of their own and share them in a sync group, so adding
+// Demo to the group has differences to reconcile. Sam's address is unverified.
+//
 // It returns what it created, or nil when it seeded nothing.
 func Demo(ctx context.Context, st store.Store, keys signing.KeyRing, opts Options) (*Manifest, error) {
 	loc := opts.Loc
@@ -65,12 +69,16 @@ func Demo(ctx context.Context, st store.Store, keys signing.KeyRing, opts Option
 	for _, u := range demoUsers {
 		d.manifest.Users = append(
 			d.manifest.Users,
-			ManifestUser{Key: u.key, Name: u.name, Email: u.email, Password: u.pass, Role: u.role},
+			ManifestUser{
+				Key: u.key, Name: u.name, Email: u.email, Password: u.pass, Role: u.role,
+				Verified: !u.unverified,
+			},
 		)
 	}
 
 	steps := []func() error{
 		d.createSpaces,
+		d.syncReference,
 		func() error { return d.linkTransfer(transfers.Service{Spaces: d.spaces, Keys: keys}) },
 		d.invite,
 		d.recordAutomations,

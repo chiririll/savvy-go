@@ -29,11 +29,17 @@ type workspaceFunc func(ctx context.Context, db store.DB, now time.Time) (map[st
 // what fills it. The owner is an admin of the space.
 type spaceSpec struct {
 	key, name  string
+	emoji      string
+	color      string // #rrggbb
 	owner      string
 	members    map[string]string // user key -> role
 	currencies []ledger.Currency
-	workspace  workspaceFunc
+	// own is the categories and tags only this space has, on top of the presets.
+	own       ownReference
+	workspace workspaceFunc
 }
+
+func (s spaceSpec) look() spaces.Look { return spaces.Look{Emoji: &s.emoji, Color: &s.color} }
 
 func miniWorkspace(spec miniSpace) workspaceFunc {
 	return func(ctx context.Context, db store.DB, now time.Time) (map[string]*ledger.Account, error) {
@@ -44,22 +50,30 @@ func miniWorkspace(spec miniSpace) workspaceFunc {
 // demoSpaces are the seeded spaces, in the order they are created.
 var demoSpaces = []spaceSpec{
 	{
-		key: spaceDemo, name: "Demo", owner: userAlex,
+		key: spaceDemo, name: "Demo", emoji: "🏠", color: "#3b82f6", owner: userAlex,
 		members:    map[string]string{userJordan: spaces.RoleEditor, userDemo: spaces.RoleViewer},
 		currencies: currencySet(usdCurrency, withRate(eurCurrency, "1.08")),
 		workspace:  seedWorkspace,
 	},
 	{
-		key: spaceFamily, name: "Family Budget", owner: userAlex,
+		key: spaceFamily, name: "Family Budget", emoji: "👨‍👩‍👧", color: "#22c55e", owner: userAlex,
 		members:    map[string]string{userJordan: spaces.RoleAdmin, userSam: spaces.RoleViewer},
 		currencies: currencySet(usdCurrency),
-		workspace:  miniWorkspace(familySpace),
+		own: ownReference{
+			categories: []Category{{"School & kids", "expense", "🎒", "#facc15", false}},
+			tags:       []string{"Kids"},
+		},
+		workspace: miniWorkspace(familySpace),
 	},
 	{
-		key: spaceStudio, name: "Studio GmbH", owner: userAlex,
+		key: spaceStudio, name: "Studio GmbH", emoji: "🎨", color: "#f97316", owner: userAlex,
 		members:    map[string]string{userJordan: spaces.RoleViewer},
 		currencies: currencySet(eurCurrency, withRate(usdCurrency, "0.9259")),
-		workspace:  miniWorkspace(studioSpace),
+		own: ownReference{
+			categories: []Category{{"Software & tools", "expense", "🧰", "#818cf8", false}},
+			tags:       []string{"Client work"},
+		},
+		workspace: miniWorkspace(studioSpace),
 	},
 }
 
@@ -107,7 +121,7 @@ func (d *demo) createSpaces() error {
 // createSpace creates a space owned by the spec's owner and adds the other
 // members.
 func (d *demo) createSpace(spec spaceSpec) (*spaces.Space, error) {
-	sp, err := d.spaces.Create(d.ctx, spec.name, d.people[spec.owner])
+	sp, err := d.spaces.CreateWith(d.ctx, spec.name, d.people[spec.owner], spec.look())
 	if err != nil {
 		return nil, fmt.Errorf("space %s: %w", spec.name, err)
 	}
@@ -118,7 +132,9 @@ func (d *demo) createSpace(spec spaceSpec) (*spaces.Space, error) {
 		}
 		roles[key] = role
 	}
-	d.manifest.Spaces = append(d.manifest.Spaces, ManifestSpace{ID: sp.ID, Name: spec.name, Members: roles})
+	d.manifest.Spaces = append(d.manifest.Spaces, ManifestSpace{
+		ID: sp.ID, Name: spec.name, Emoji: spec.emoji, Color: spec.color, Members: roles,
+	})
 	return sp, nil
 }
 
@@ -129,6 +145,9 @@ func (d *demo) fill(sp *spaces.Space, spec spaceSpec) (map[string]*ledger.Accoun
 		return nil, err
 	}
 	if err := seedReference(d.ctx, db, spec.currencies); err != nil {
+		return nil, fmt.Errorf("space %s: %w", sp.Name, err)
+	}
+	if err := seedOwn(d.ctx, db, spec.own); err != nil {
 		return nil, fmt.Errorf("space %s: %w", sp.Name, err)
 	}
 	accts, err := spec.workspace(d.ctx, db, d.now)
