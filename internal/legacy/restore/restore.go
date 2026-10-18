@@ -41,7 +41,13 @@ func Server(ctx context.Context, backups backup.Service, path, appKey string) (*
 
 // Space converts the finances of the Laravel database at path and keeps them
 // as a backup of sp, whose users and other server data are left out.
-func Space(ctx context.Context, backups backup.Service, sp spaces.Space, path string, quota int64) (*backup.Entry, error) {
+func Space(
+	ctx context.Context,
+	backups backup.Service,
+	sp spaces.Space,
+	path string,
+	quota int64,
+) (*backup.Entry, error) {
 	if exceeds(path, quota) {
 		return nil, backup.ErrTooLarge
 	}
@@ -58,7 +64,13 @@ func Space(ctx context.Context, backups backup.Service, sp spaces.Space, path st
 
 // ImportSpace creates a new space, owned by owner, from the finances of the
 // Laravel database at path. An empty name becomes "Imported".
-func ImportSpace(ctx context.Context, spaces spaces.Service, path, name string, owner *auth.User, quota int64) (*spaces.Space, error) {
+func ImportSpace(
+	ctx context.Context,
+	spaces spaces.Service,
+	path, name string,
+	owner *auth.User,
+	quota int64,
+) (*spaces.Space, error) {
 	if exceeds(path, quota) {
 		return nil, backup.ErrTooLarge
 	}

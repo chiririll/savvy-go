@@ -79,10 +79,7 @@ func DecryptLaravel(appKey, ciphertext string) (string, error) {
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return "", err
 	}
-	mac := hmac.New(sha256.New, key)
-	mac.Write([]byte(p.IV + p.Value))
-	expect := hex.EncodeToString(mac.Sum(nil))
-	if !hmac.Equal([]byte(expect), []byte(strings.ToLower(p.MAC))) && !hmac.Equal([]byte(expect), []byte(p.MAC)) {
+	if !p.macValid(key) {
 		return "", fmt.Errorf("invalid mac")
 	}
 	iv, err := base64.StdEncoding.DecodeString(p.IV)
@@ -99,31 +96,43 @@ func DecryptLaravel(appKey, ciphertext string) (string, error) {
 	}
 	var plain []byte
 	if strings.TrimSpace(p.Tag) != "" {
-		tag, err := base64.StdEncoding.DecodeString(p.Tag)
-		if err != nil {
-			return "", err
-		}
-		gcm, err := cipher.NewGCMWithNonceSize(block, len(iv))
-		if err != nil {
-			return "", err
-		}
-		plain, err = gcm.Open(nil, iv, append(val, tag...), nil)
-		if err != nil {
-			return "", err
-		}
+		plain, err = decryptGCM(block, iv, val, p.Tag)
 	} else {
-		if len(val)%aes.BlockSize != 0 || len(iv) != aes.BlockSize {
-			return "", fmt.Errorf("invalid ciphertext")
-		}
-		mode := cipher.NewCBCDecrypter(block, iv)
-		plain = make([]byte, len(val))
-		mode.CryptBlocks(plain, val)
-		plain, err = pkcs7unpad(plain)
-		if err != nil {
-			return "", err
-		}
+		plain, err = decryptCBC(block, iv, val)
+	}
+	if err != nil {
+		return "", err
 	}
 	return phpUnserializeString(string(plain)), nil
+}
+
+// macValid checks the payload's HMAC-SHA256 over iv and value.
+func (p laravelPayload) macValid(key []byte) bool {
+	mac := hmac.New(sha256.New, key)
+	mac.Write([]byte(p.IV + p.Value))
+	expect := hex.EncodeToString(mac.Sum(nil))
+	return hmac.Equal([]byte(expect), []byte(strings.ToLower(p.MAC))) || hmac.Equal([]byte(expect), []byte(p.MAC))
+}
+
+func decryptGCM(block cipher.Block, iv, val []byte, tagB64 string) ([]byte, error) {
+	tag, err := base64.StdEncoding.DecodeString(tagB64)
+	if err != nil {
+		return nil, err
+	}
+	gcm, err := cipher.NewGCMWithNonceSize(block, len(iv))
+	if err != nil {
+		return nil, err
+	}
+	return gcm.Open(nil, iv, append(val, tag...), nil)
+}
+
+func decryptCBC(block cipher.Block, iv, val []byte) ([]byte, error) {
+	if len(val)%aes.BlockSize != 0 || len(iv) != aes.BlockSize {
+		return nil, fmt.Errorf("invalid ciphertext")
+	}
+	plain := make([]byte, len(val))
+	cipher.NewCBCDecrypter(block, iv).CryptBlocks(plain, val)
+	return pkcs7unpad(plain)
 }
 
 // EncryptLaravel produces a Laravel-compatible AES-256-CBC payload (serialize=true).

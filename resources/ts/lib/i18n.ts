@@ -68,7 +68,10 @@ const lazyLocaleBackend: BackendModule = {
             callback(null, {})
             return
         }
-        loader().then((mod) => callback(null, mod.default), (err) => callback(err, false))
+        loader().then(
+            (mod) => callback(null, mod.default),
+            (err) => callback(err, false),
+        )
     },
 }
 
@@ -78,7 +81,15 @@ export const i18nReady = i18n
     .use(initReactI18next)
     .init({
         resources: {
-            en: { common: enCommon, nav: enNav, auth: enAuth, settings: enSettings, pages: enPages, forms: enForms, defaults: enDefaults },
+            en: {
+                common: enCommon,
+                nav: enNav,
+                auth: enAuth,
+                settings: enSettings,
+                pages: enPages,
+                forms: enForms,
+                defaults: enDefaults,
+            },
         },
         partialBundledLanguages: true,
         fallbackLng: 'en',

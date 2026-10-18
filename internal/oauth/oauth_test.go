@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"savvy-go/internal/auth"
+	"savvy-go/internal/auth/permissions"
 	authrepo "savvy-go/internal/db/repo/auth"
 	"savvy-go/internal/oauth"
 	"savvy-go/internal/store/sqlite"
@@ -73,7 +74,8 @@ func (e *env) client(t *testing.T) string {
 func (e *env) code(t *testing.T, clientID, verifier string) string {
 	t.Helper()
 	code, err := e.svc.IssueCode(context.Background(), oauth.CodeRequest{
-		ClientID: clientID, RedirectURI: redirect, CodeChallenge: challenge(verifier), CodeChallengeMethod: "S256", User: e.user, AllSpaces: true,
+		ClientID: clientID, RedirectURI: redirect, CodeChallenge: challenge(verifier), CodeChallengeMethod: "S256",
+		User: e.user, AllSpaces: true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -110,7 +112,7 @@ func TestRegisterValidatesRedirectURIs(t *testing.T) {
 	}
 }
 
-func TestRegisterDefaultsAndBoundsTheName(t *testing.T) {
+func TestRegisterDefaultsBoundsTheName(t *testing.T) {
 	e := newEnv(t)
 	c, err := e.reg(context.Background(), "  ", []string{redirect})
 	if err != nil || c.Name == "" {
@@ -139,11 +141,18 @@ func TestRegisterIsCapped(t *testing.T) {
 	}
 }
 
-func TestIssueCodeChecksClientRedirectAndPKCE(t *testing.T) {
+func TestIssueCodeChecksClientRedirectPKCE(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
 	id := e.client(t)
-	base := oauth.CodeRequest{ClientID: id, RedirectURI: redirect, CodeChallenge: challenge(vOK), CodeChallengeMethod: "S256", User: e.user, AllSpaces: true}
+	base := oauth.CodeRequest{
+		ClientID:            id,
+		RedirectURI:         redirect,
+		CodeChallenge:       challenge(vOK),
+		CodeChallengeMethod: "S256",
+		User:                e.user,
+		AllSpaces:           true,
+	}
 
 	bad := base
 	bad.ClientID = "nope"
@@ -166,7 +175,7 @@ func TestIssueCodeChecksClientRedirectAndPKCE(t *testing.T) {
 	wantCode(t, err, "invalid_request")
 }
 
-func TestExchangeIssuesAReadOnlyShortLivedAPIToken(t *testing.T) {
+func TestExchangeIssuesShortReadOnlyToken(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
 	id := e.client(t)
@@ -183,12 +192,17 @@ func TestExchangeIssuesAReadOnlyShortLivedAPIToken(t *testing.T) {
 	if err != nil || tok == nil {
 		t.Fatalf("access token does not resolve: %v %v", tok, err)
 	}
-	if tok.Allows("transactions", auth.PermWrite) || !tok.Allows("transactions", auth.PermRead) || tok.Allows("transfers", auth.PermRead) || !tok.AllSpaces || tok.UserID != e.user.ID || tok.ExpiresAt == nil || !strings.Contains(tok.Name, "Claude") {
+	if tok.Allows("transactions", permissions.Write) || !tok.Allows("transactions", permissions.Read) ||
+		tok.Allows("transfers", permissions.Read) ||
+		!tok.AllSpaces ||
+		tok.UserID != e.user.ID ||
+		tok.ExpiresAt == nil ||
+		!strings.Contains(tok.Name, "Claude") {
 		t.Fatalf("token = %+v", tok)
 	}
 }
 
-func TestCodeIsSingleUseEvenWhenTheFirstTryFails(t *testing.T) {
+func TestCodeSingleUseEvenAfterFailure(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
 	id := e.client(t)
@@ -199,7 +213,7 @@ func TestCodeIsSingleUseEvenWhenTheFirstTryFails(t *testing.T) {
 	wantCode(t, err, "invalid_grant")
 }
 
-func TestExchangeBindsCodeToClientAndRedirect(t *testing.T) {
+func TestExchangeBindsCodeToClientRedirect(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
 	id := e.client(t)
@@ -220,7 +234,7 @@ func TestCodeExpires(t *testing.T) {
 	wantCode(t, err, "invalid_grant")
 }
 
-func TestRefreshRotatesAndRetiresTheOldTokens(t *testing.T) {
+func TestRefreshRotatesRetiresTheOldTokens(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
 	id := e.client(t)
@@ -249,7 +263,7 @@ func TestRefreshRotatesAndRetiresTheOldTokens(t *testing.T) {
 	}
 }
 
-func TestRefreshRejectsOtherClientsExpiredAndRevoked(t *testing.T) {
+func TestRefreshRejectsOtherClientsExpiredRevoked(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
 	id := e.client(t)
@@ -276,7 +290,7 @@ func TestRefreshRejectsOtherClientsExpiredAndRevoked(t *testing.T) {
 	wantCode(t, err, "invalid_grant")
 }
 
-func TestRegistrationIsClosedUnlessAnAdminOpenedIt(t *testing.T) {
+func TestRegistrationClosedUnlessAdminOpenedIt(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
 	e.svc.CloseRegistration()
@@ -301,7 +315,7 @@ func TestRegistrationIsClosedUnlessAnAdminOpenedIt(t *testing.T) {
 	}
 }
 
-func TestRegisteredClientsKeepWorkingAfterTheWindowCloses(t *testing.T) {
+func TestRegisteredClientsSurviveWindowClose(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
 	id := e.client(t)
@@ -337,11 +351,16 @@ func TestTheFirstRegistrationClosesTheWindow(t *testing.T) {
 	wantCode(t, err, "access_denied")
 }
 
-func TestRegisterKeepsAndBoundsTheRequestInfo(t *testing.T) {
+func TestRegisterKeepsBoundsTheRequestInfo(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
 	e.svc.OpenRegistration(oauth.RegistrationWindow)
-	c, err := e.svc.Register(ctx, "Claude", []string{redirect}, oauth.RequestInfo{IP: "203.0.113.7", UserAgent: strings.Repeat("u", 1000), Origin: "https://claude.ai"})
+	c, err := e.svc.Register(
+		ctx,
+		"Claude",
+		[]string{redirect},
+		oauth.RequestInfo{IP: "203.0.113.7", UserAgent: strings.Repeat("u", 1000), Origin: "https://claude.ai"},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -350,7 +369,8 @@ func TestRegisterKeepsAndBoundsTheRequestInfo(t *testing.T) {
 		t.Fatalf("clients = %+v, %v", list, err)
 	}
 	got := list[0]
-	if got.Request.IP != "203.0.113.7" || got.Request.Origin != "https://claude.ai" || len(got.Request.UserAgent) != 300 || got.CreatedAt.IsZero() {
+	if got.Request.IP != "203.0.113.7" || got.Request.Origin != "https://claude.ai" || len(got.Request.UserAgent) != 300 ||
+		got.CreatedAt.IsZero() {
 		t.Fatalf("client = %+v", got)
 	}
 }
@@ -373,7 +393,7 @@ func TestRemoveRevokesTheAppsTokens(t *testing.T) {
 	}
 }
 
-func TestChosenPermissionsReachTheTokenAndSurviveRefresh(t *testing.T) {
+func TestChosenPermissionsReachTokenSurviveRefresh(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
 	id := e.client(t)
@@ -394,7 +414,8 @@ func TestChosenPermissionsReachTheTokenAndSurviveRefresh(t *testing.T) {
 		if err != nil || tok == nil {
 			t.Fatalf("token does not resolve: %v %v", tok, err)
 		}
-		if !tok.Allows("transactions", auth.PermRead) || !tok.Allows("accounts", auth.PermRead) || tok.Allows("budgets", auth.PermRead) {
+		if !tok.Allows("transactions", permissions.Read) || !tok.Allows("accounts", permissions.Read) ||
+			tok.Allows("budgets", permissions.Read) {
 			t.Fatalf("permissions = %v", tok.Permissions)
 		}
 	}
@@ -406,7 +427,7 @@ func TestChosenPermissionsReachTheTokenAndSurviveRefresh(t *testing.T) {
 	check(next.AccessToken)
 }
 
-func TestAppsOnlyGetResourcesTheToolsUse(t *testing.T) {
+func TestAppsOnlyGetResourcesToolsUse(t *testing.T) {
 	e := newEnv(t)
 	id := e.client(t)
 	for _, perms := range [][]string{{"transfers:read"}, {"transfers:write"}, {"space:delete"}, {"nonsense"}} {

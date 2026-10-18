@@ -33,7 +33,8 @@ func TestImportLifecycle(t *testing.T) {
 
 	_ = r.MarkParsed(ctx, "i1", 120, `{"headers":["a"]}`, now)
 	im, _ = r.ByID(ctx, "i1")
-	if im.Status != "parsed" || im.TotalRows == nil || *im.TotalRows != 120 || im.Meta == nil || *im.Meta != `{"headers":["a"]}` {
+	if im.Status != "parsed" || im.TotalRows == nil || *im.TotalRows != 120 || im.Meta == nil ||
+		*im.Meta != `{"headers":["a"]}` {
 		t.Fatalf("parsed = %+v", im)
 	}
 
@@ -43,9 +44,15 @@ func TestImportLifecycle(t *testing.T) {
 		t.Fatalf("importing = %+v", im)
 	}
 
-	_ = r.MarkCompleted(ctx, "i1", importerrepo.Result{Processed: 120, Created: 100, Skipped: 15, Errors: 5, ErrorsJSON: `[]`, MetaJSON: `{}`}, now)
+	_ = r.MarkCompleted(
+		ctx,
+		"i1",
+		importerrepo.Result{Processed: 120, Created: 100, Skipped: 15, Errors: 5, ErrorsJSON: `[]`, MetaJSON: `{}`},
+		now,
+	)
 	im, _ = r.ByID(ctx, "i1")
-	if im.Status != "completed" || im.ProcessedRows != 120 || im.CreatedCount != 100 || im.SkippedCount != 15 || im.ErrorCount != 5 {
+	if im.Status != "completed" || im.ProcessedRows != 120 || im.CreatedCount != 100 || im.SkippedCount != 15 ||
+		im.ErrorCount != 5 {
 		t.Fatalf("completed = %+v", im)
 	}
 
@@ -61,15 +68,37 @@ func TestImportLifecycle(t *testing.T) {
 	}
 }
 
-func TestRowsWithTheSameHashAreInsertedOnce(t *testing.T) {
+func TestRowsWithSameHashInsertedOnce(t *testing.T) {
 	d := dbtest.Space(t)
 	l := ledgerrepo.Repo{DB: d}
 	now := time.Now().UTC()
-	usd, _ := l.InsertCurrency(ctx, ledgerrepo.Currency{Code: "USD", Name: "Dollar", Symbol: "$", Decimals: 2, IsBase: true, Rate: decimal.NewFromInt(1)}, now)
-	acc, _ := l.InsertAccount(ctx, ledgerrepo.AccountFields{Name: "Cash", Type: "cash", CurrencyID: usd, InitialBalance: money.New(0, money.Unit{ID: usd, Decimals: 2}), IsActive: true}, now)
+	usd, _ := l.InsertCurrency(
+		ctx,
+		ledgerrepo.Currency{Code: "USD", Name: "Dollar", Symbol: "$", Decimals: 2, IsBase: true, Rate: decimal.NewFromInt(1)},
+		now,
+	)
+	acc, _ := l.InsertAccount(
+		ctx,
+		ledgerrepo.AccountFields{
+			Name:           "Cash",
+			Type:           "cash",
+			CurrencyID:     usd,
+			InitialBalance: money.New(0, money.Unit{ID: usd, Decimals: 2}),
+			IsActive:       true,
+		},
+		now,
+	)
 
 	r := importerrepo.Repo{DB: d}
-	row := importerrepo.Row{Type: "expense", AccountID: acc, Minor: 1250, Description: "Coffee", Date: "2026-02-01", Status: "confirmed", DedupHash: "h1"}
+	row := importerrepo.Row{
+		Type:        "expense",
+		AccountID:   acc,
+		Minor:       1250,
+		Description: "Coffee",
+		Date:        "2026-02-01",
+		Status:      "confirmed",
+		DedupHash:   "h1",
+	}
 	if added, err := r.InsertRow(ctx, row, now); !added || err != nil {
 		t.Fatalf("first insert = %v, %v", added, err)
 	}

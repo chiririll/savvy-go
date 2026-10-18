@@ -388,7 +388,11 @@ export const navLabel = (t: TFunction, key: NavKey): string => ({
 } satisfies Record<NavKey, string>)[key]
 
 /** Wording of a server check (`GET /admin/checks`); `value` fills the count in the title. */
-export const checkText = (t: TFunction, id: CheckId, value: number | null): { title: string; description: string; action: string } => {
+export const checkText = (
+    t: TFunction,
+    id: CheckId,
+    value: number | null,
+): { title: string; description: string; action: string } => {
     const count = Math.round(value ?? 0)
     return ({
         app_url_missing: {

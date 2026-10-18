@@ -1,7 +1,13 @@
 import { useTranslation } from 'react-i18next'
 import { FeedList, Page, PageHeader } from '@/components/shared'
 import { compareRecurring, recurringGroup, RecurringFormDialog, RecurringRow } from '@/components/features/recurring'
-import { useCreateRecurring, useDeleteRecurring, useRecurring, useUpdateRecurring, useResourceFormDialog } from '@/hooks'
+import {
+    useCreateRecurring,
+    useDeleteRecurring,
+    useRecurring,
+    useUpdateRecurring,
+    useResourceFormDialog,
+} from '@/hooks'
 import { useReadOnly } from '@/components/providers/ReadOnlyProvider'
 import { RecurringFormData } from '@/schemas'
 import { RecurringTransaction } from '@/types'

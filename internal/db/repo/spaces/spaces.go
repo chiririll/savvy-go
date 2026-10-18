@@ -100,7 +100,8 @@ func (r Repo) Quota(ctx context.Context, id int64) (*int64, error) {
 
 // SetQuota sets a space's own size limit; nil clears it.
 func (r Repo) SetQuota(ctx context.Context, id int64, bytes *int64, now time.Time) error {
-	return r.q().SetSpaceQuota(ctx, sqlc.SetSpaceQuotaParams{QuotaBytes: db.NullInt64(bytes), UpdatedAt: db.TimeNS(now), ID: id})
+	return r.q().
+		SetSpaceQuota(ctx, sqlc.SetSpaceQuotaParams{QuotaBytes: db.NullInt64(bytes), UpdatedAt: db.TimeNS(now), ID: id})
 }
 
 // Overview is one row of the admin overview: counts and metadata only.
@@ -133,7 +134,9 @@ type Member struct {
 }
 
 func (r Repo) UpsertMember(ctx context.Context, spaceID, userID int64, role string, now time.Time) error {
-	return r.q().UpsertSpaceMember(ctx, sqlc.UpsertSpaceMemberParams{SpaceID: spaceID, UserID: userID, Role: role, CreatedAt: db.TimeNS(now)})
+	return r.q().
+		UpsertSpaceMember(ctx,
+			sqlc.UpsertSpaceMemberParams{SpaceID: spaceID, UserID: userID, Role: role, CreatedAt: db.TimeNS(now)})
 }
 
 func (r Repo) DeleteMember(ctx context.Context, spaceID, userID int64) error {
@@ -156,7 +159,13 @@ func (r Repo) Members(ctx context.Context, spaceID int64) ([]Member, error) {
 	}
 	out := make([]Member, len(rows))
 	for i, row := range rows {
-		out[i] = Member{UserID: row.UserID, Name: row.Name, Email: row.Email, Role: row.Role, CreatedAt: optTime(row.CreatedAt)}
+		out[i] = Member{
+			UserID:    row.UserID,
+			Name:      row.Name,
+			Email:     row.Email,
+			Role:      row.Role,
+			CreatedAt: optTime(row.CreatedAt),
+		}
 	}
 	return out, nil
 }
@@ -202,7 +211,12 @@ type AuditEntry struct {
 }
 
 // InsertAudit records an admin action; actor, spaceID and target are optional.
-func (r Repo) InsertAudit(ctx context.Context, actor, spaceID, target *int64, action, details string, now time.Time) error {
+func (r Repo) InsertAudit(
+	ctx context.Context,
+	actor, spaceID, target *int64,
+	action, details string,
+	now time.Time,
+) error {
 	return r.q().InsertAudit(ctx, sqlc.InsertAuditParams{
 		ActorID: db.NullInt64(actor), Action: action, SpaceID: db.NullInt64(spaceID), TargetUserID: db.NullInt64(target),
 		Details: db.NullStringVal(details), CreatedAt: db.FormatTime(now),
@@ -217,7 +231,13 @@ func (r Repo) Audit(ctx context.Context, spaceID int64) ([]AuditEntry, error) {
 	}
 	out := make([]AuditEntry, len(rows))
 	for i, row := range rows {
-		e := AuditEntry{ID: row.ID, Actor: row.Actor, Action: row.Action, Details: row.Details.String, CreatedAt: timePtr(row.CreatedAt)}
+		e := AuditEntry{
+			ID:        row.ID,
+			Actor:     row.Actor,
+			Action:    row.Action,
+			Details:   row.Details.String,
+			CreatedAt: timePtr(row.CreatedAt),
+		}
 		if row.TargetUserID.Valid {
 			id := row.TargetUserID.Int64
 			e.TargetUserID = &id
@@ -241,7 +261,8 @@ type NewInvitation struct {
 // InsertInvitation stores an invitation and returns its id.
 func (r Repo) InsertInvitation(ctx context.Context, n NewInvitation) (int64, error) {
 	return r.q().InsertInvitation(ctx, sqlc.InsertInvitationParams{
-		SpaceID: n.SpaceID, Email: db.NullStringVal(n.Email), Note: db.NullStringVal(n.Note), Role: n.Role, TokenHash: n.TokenHash,
+		SpaceID: n.SpaceID, Email: db.NullStringVal(n.Email), Note: db.NullStringVal(n.Note), Role: n.Role,
+		TokenHash: n.TokenHash,
 		InvitedBy: db.NI(n.InvitedBy), InvitedByServerAdmin: db.BoolInt(n.ByServerAdmin),
 		ExpiresAt: db.FormatTime(n.Expires), CreatedAt: db.TimeNS(n.Now),
 	})
@@ -281,7 +302,8 @@ func (r Repo) Invitations(ctx context.Context, spaceID int64, now time.Time) ([]
 // whether it was pending. The row stays.
 func (r Repo) ExpireInvitation(ctx context.Context, spaceID, id int64, now time.Time) (bool, error) {
 	at := db.FormatTime(now)
-	res, err := r.q().ExpireInvitation(ctx, sqlc.ExpireInvitationParams{ExpiresAt: at, ID: id, SpaceID: spaceID, ExpiresAt_2: at})
+	res, err := r.q().
+		ExpireInvitation(ctx, sqlc.ExpireInvitationParams{ExpiresAt: at, ID: id, SpaceID: spaceID, ExpiresAt_2: at})
 	if err != nil {
 		return false, err
 	}
@@ -378,8 +400,15 @@ func (r Repo) InvitationByHash(ctx context.Context, hash string) (*InvitationByH
 	if err != nil {
 		return nil, err
 	}
-	inv := &InvitationByHash{ID: row.ID, SpaceID: row.SpaceID, Role: row.Role, ByServerAdmin: row.InvitedByServerAdmin == 1,
-		Used: row.AcceptedAt.Valid, SpaceName: row.SpaceName, Inviter: row.Inviter}
+	inv := &InvitationByHash{
+		ID:            row.ID,
+		SpaceID:       row.SpaceID,
+		Role:          row.Role,
+		ByServerAdmin: row.InvitedByServerAdmin == 1,
+		Used:          row.AcceptedAt.Valid,
+		SpaceName:     row.SpaceName,
+		Inviter:       row.Inviter,
+	}
 	if row.Email.Valid {
 		inv.Email = &row.Email.String
 	}
@@ -389,7 +418,8 @@ func (r Repo) InvitationByHash(ctx context.Context, hash string) (*InvitationByH
 
 // AcceptInvitation marks an unused invitation used and reports whether it did.
 func (r Repo) AcceptInvitation(ctx context.Context, id, userID int64, now time.Time) (bool, error) {
-	res, err := r.q().AcceptInvitation(ctx, sqlc.AcceptInvitationParams{AcceptedAt: db.TimeNS(now), AcceptedBy: db.NI(userID), ID: id})
+	res, err := r.q().
+		AcceptInvitation(ctx, sqlc.AcceptInvitationParams{AcceptedAt: db.TimeNS(now), AcceptedBy: db.NI(userID), ID: id})
 	if err != nil {
 		return false, err
 	}

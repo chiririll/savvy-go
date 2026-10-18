@@ -1,7 +1,7 @@
 /**
  * First path segments of the API that belong to a space; the backend serves
- * them under /spaces/{space}. Keep in sync with dataRoutes in
- * internal/httpserver/server.go.
+ * them under /spaces/{space}. Keep in sync with the Routes of the data
+ * packages mounted by dataRoutes in internal/httpserver/routes.go.
  */
 export const SPACE_ROOTS = new Set([
     'currencies',

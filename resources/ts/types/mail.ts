@@ -1,4 +1,4 @@
-/** How the SMTP connection is secured; mirrors the constants of internal/mailer. */
+/** How the SMTP connection is secured; mirrors the constants of internal/mail/smtp. */
 export const MAIL_PROTOCOLS = ['starttls', 'smtps', 'smtp'] as const
 export type MailProtocol = (typeof MAIL_PROTOCOLS)[number]
 
@@ -20,7 +20,7 @@ export interface MailStatus {
     passwordSet: boolean
     /** Links in emails need the public URL. */
     appUrlSet: boolean
-    /** False when config.toml is read-only: the settings can be shown but not changed. */
+    /** False when config.toml is read-only: the values can be shown but not changed. */
     writable: boolean
 }
 

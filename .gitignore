@@ -49,4 +49,4 @@ CLAUDE.md
 CLAUDE.local.md
 
 # Frontend copied in for the embed build (go tool mage build:release)
-/internal/webui/dist/
+/internal/httpserver/ui/dist/

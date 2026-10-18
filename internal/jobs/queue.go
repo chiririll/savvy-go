@@ -13,7 +13,7 @@ type Queue struct {
 	wg   sync.WaitGroup
 }
 
-func New(workers int) *Queue {
+func NewQueue(workers int) *Queue {
 	if workers < 1 {
 		workers = 2
 	}

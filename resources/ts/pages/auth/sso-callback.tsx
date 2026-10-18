@@ -38,7 +38,10 @@ export default function SsoCallbackPage() {
             .exchange(ticket)
             .then((res) => {
                 if ('requires_2fa' in res) {
-                    navigate('/login', { replace: true, state: { twoFactorToken: res.two_factor_token, rememberMe: true } })
+                    navigate('/login', {
+                        replace: true,
+                        state: { twoFactorToken: res.two_factor_token, rememberMe: true },
+                    })
                     return
                 }
 

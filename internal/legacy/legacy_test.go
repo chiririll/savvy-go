@@ -83,11 +83,15 @@ func TestUpgradeLeavesGoSchemaUsable(t *testing.T) {
 	sqlDB := upgradedFixture(t)
 
 	var typ string
-	if err := sqlDB.QueryRow(`SELECT type FROM pragma_table_info('transactions') WHERE name = 'amount'`).Scan(&typ); err != nil || typ != "INTEGER" {
+	if err := sqlDB.QueryRow(`SELECT type FROM pragma_table_info('transactions') ` +
+		`WHERE name = 'amount'`).Scan(&typ); err != nil ||
+		typ != "INTEGER" {
 		t.Fatalf("transactions.amount type = %q, %v; want INTEGER", typ, err)
 	}
 	var idx int
-	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'transactions_account_type_date_amount_idx'`).Scan(&idx); err != nil || idx != 1 {
+	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = ` +
+		`'transactions_account_type_date_amount_idx'`).Scan(&idx); err != nil ||
+		idx != 1 {
 		t.Fatalf("amount index restored = %d, %v", idx, err)
 	}
 
@@ -161,10 +165,12 @@ func assertConverted(t *testing.T, dest *sql.DB) {
 	if err := dest.QueryRow(`SELECT code FROM currencies WHERE is_base = 1`).Scan(&code); err != nil || code != "EUR" {
 		t.Fatalf("base currency %q %v", code, err)
 	}
-	if err := dest.QueryRow(`SELECT description FROM transactions WHERE id = 1`).Scan(&desc); err != nil || desc != "Coffee" {
+	if err := dest.QueryRow(`SELECT description FROM transactions WHERE id = 1`).Scan(&desc); err != nil ||
+		desc != "Coffee" {
 		t.Fatalf("tx %q %v", desc, err)
 	}
-	if err := dest.QueryRow(`SELECT status FROM transactions WHERE id = 5`).Scan(&status); err != nil || status != "pending" {
+	if err := dest.QueryRow(`SELECT status FROM transactions WHERE id = 5`).Scan(&status); err != nil ||
+		status != "pending" {
 		t.Fatalf("pending tx status %q %v", status, err)
 	}
 }
@@ -174,7 +180,8 @@ func assertConverted(t *testing.T, dest *sql.DB) {
 func assertDateOnly(t *testing.T, sqlDB *sql.DB) {
 	t.Helper()
 	var date string
-	if err := sqlDB.QueryRow(`SELECT date FROM transactions WHERE id = 1`).Scan(&date); err != nil || date != "2026-01-03" {
+	if err := sqlDB.QueryRow(`SELECT date FROM transactions WHERE id = 1`).Scan(&date); err != nil ||
+		date != "2026-01-03" {
 		t.Fatalf("transactions.date %q %v", date, err)
 	}
 	for table, cols := range dateColumns {
@@ -252,5 +259,18 @@ func assertMinorUnits(t *testing.T, sqlDB *sql.DB) {
 	var qty float64
 	if err := sqlDB.QueryRow(`SELECT quantity FROM transaction_items WHERE id = 2`).Scan(&qty); err != nil || qty != 0.5 {
 		t.Errorf("fractional quantity = %v (%v), want 0.5", qty, err)
+	}
+}
+
+// Laravel writes $2y$ bcrypt hashes. The conversion rewrites them to the $2a$
+// form, so nothing outside this package ever sees a Laravel prefix.
+func TestUpgradeRewritesLaravelPasswordPrefix(t *testing.T) {
+	sqlDB := upgradedFixture(t)
+	var hash string
+	if err := sqlDB.QueryRow(`SELECT password FROM users WHERE id = 1`).Scan(&hash); err != nil {
+		t.Fatal(err)
+	}
+	if hash != "$2a$10$legacyhash" {
+		t.Errorf("password %q, want the $2a$ prefix", hash)
 	}
 }

@@ -1,0 +1,243 @@
+openapi: 3.0.3
+info:
+  title: Savvy Go API
+  version: "1.0"
+  description: |
+    REST API of a self-hosted Savvy Go instance.
+
+    ## Authentication
+    Create an API token in **Settings → API** and send it on every request:
+
+    ```
+    Authorization: Bearer svy_xxxxxxxx
+    ```
+
+    A token acts as its owner, limited by what it was given:
+
+    * **Spaces** — the spaces it may reach: a chosen list, or all of the owner's spaces. Any other
+      space answers `404`, as if it did not exist, and `GET /spaces` lists only the token's own.
+    * **Permissions** — one grant per resource: `<resource>:read`, `:write` or `:delete`. Read allows
+      `GET`/`HEAD`; write allows `POST`/`PUT`/`PATCH`; delete allows `DELETE`. Each level includes the
+      ones before it, so a token can add data without being able to remove it. Resources:
+      `accounts`, `automation`, `budgets`, `categories`, `currencies`, `debts`, `recurring`,
+      `reports`, `space` (the space itself, members, settings, links), `tags`, `transactions`
+      (also imports and uploads) and `transfers`. A request outside the grants answers `403`.
+    * The owner's role in the space still applies on top, on every request: a token is never more
+      powerful than its owner (a viewer's token cannot write, and a demotion takes effect at once).
+    * Categories and tags of a space in a sync group are mirrored into the group's other spaces, so
+      changing them needs a token that reaches every space of the group.
+
+    ## Spaces
+    Finances live in spaces; a user may belong to several, as `admin`, `editor` or `viewer`.
+    Data endpoints live under `/spaces/{space}` (ids from `GET /spaces`). A space the caller
+    does not belong to answers `404`.
+
+    Tokens cannot call administrator endpoints (users, identity providers) or credential and
+    instance endpoints (passwords, 2FA, passkeys, API tokens, settings updates, backups).
+    Those answer `403`. A request with an invalid, expired or revoked token answers `401`
+    and never falls back to a session cookie.
+
+    Browser sessions (cookie + `X-CSRF-Token`) use the same endpoints; the SPA relies on them.
+
+    ## Conventions
+    * Successful bodies are wrapped as `{"data": ...}`; list endpoints may add `meta`.
+    * Errors: `{"message": "..."}`. Validation errors answer `422` with `{"message", "errors": {field: [..]}}`.
+    * Dates are `YYYY-MM-DD`, timestamps RFC 3339.
+    * Request bodies use `snake_case`; response resources use `camelCase`.
+servers:
+  - url: /api
+security:
+  - bearerAuth: []
+tags:
+  - name: API tokens
+  - name: Spaces
+  - name: Transfers between spaces
+  - name: Sync groups
+  - name: Currencies
+  - name: Accounts
+  - name: Categories
+  - name: Tags
+  - name: Transactions
+  - name: Debts
+  - name: Recurring
+  - name: Budgets
+  - name: Automation rules
+  - name: Reports
+  - name: Other
+paths: {}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: API token created in Settings → API (`svy_…`).
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: svy_session
+      description: Browser session. Non-GET requests also need the `X-CSRF-Token` header.
+  parameters:
+    Space:
+      name: space
+      in: path
+      required: true
+      description: Space id (see `GET /spaces`).
+      schema: {type: integer}
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: {type: integer}
+  requestBodies:
+    Object:
+      required: true
+      content:
+        application/json:
+          schema: {type: object, additionalProperties: true}
+    AutomationRule:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              name: {type: string}
+              description: {type: string, nullable: true}
+              trigger_type: {type: string}
+              priority: {type: integer}
+              conditions: {type: object, additionalProperties: true}
+              actions: {type: array, items: {type: object, additionalProperties: true}}
+              is_active: {type: boolean}
+              stop_processing: {type: boolean}
+  responses:
+    Data:
+      description: Success
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data: {}
+    Message:
+      description: Success
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Message"}
+    Unauthenticated:
+      description: Missing, invalid, expired or revoked credentials
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Message"}
+    Forbidden:
+      description: Read-only access, a permission the API token does not hold, or not available for API tokens
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Message"}
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Message"}
+    CsrfMismatch:
+      description: CSRF token mismatch (cookie sessions only)
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Message"}
+    Validation:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message: {type: string}
+              errors:
+                type: object
+                additionalProperties:
+                  type: array
+                  items: {type: string}
+  schemas:
+    Message:
+      type: object
+      properties:
+        message: {type: string}
+    ApiToken:
+      type: object
+      properties:
+        id: {type: integer}
+        name: {type: string}
+        prefix: {type: string, example: svy_AbC1}
+        kind: {type: string, enum: [personal, mcp], description: "`personal` is made in Settings; `mcp` is the token of a connected AI app. Fixed when issued."}
+        permissions: {type: array, items: {type: string, example: "transactions:read"}}
+        all_spaces: {type: boolean}
+        space_ids: {type: array, items: {type: integer}, description: Empty when `all_spaces` is true.}
+        expires_at: {type: string, format: date-time, nullable: true}
+        last_used_at: {type: string, format: date-time, nullable: true}
+        created_at: {type: string, format: date-time, nullable: true}
+    AccountInput:
+      type: object
+      properties:
+        name: {type: string}
+        type: {type: string}
+        currency_id: {type: integer, nullable: true}
+        currency_code: {type: string, description: Alternative to currency_id}
+        initial_balance: {type: number}
+        is_active: {type: boolean}
+    TransactionInput:
+      type: object
+      required: [type, account_id, amount]
+      properties:
+        type: {type: string, enum: [income, expense, transfer]}
+        account_id: {type: integer}
+        to_account_id: {type: integer, nullable: true, description: Transfers only}
+        category_id: {type: integer, nullable: true}
+        amount: {type: number}
+        to_amount: {type: number, nullable: true}
+        exchange_rate: {type: number, nullable: true}
+        description: {type: string, nullable: true}
+        date: {type: string, format: date}
+        tag_ids: {type: array, items: {type: integer}}
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              name: {type: string}
+              quantity: {type: number}
+              price_per_unit: {type: number}
+    Transaction:
+      type: object
+      properties:
+        id: {type: integer}
+        type: {type: string}
+        amount: {type: number}
+        toAmount: {type: number}
+        exchangeRate: {type: number}
+        description: {type: string, nullable: true}
+        date: {type: string}
+        status: {type: string}
+        recurringTransactionId: {type: integer, nullable: true}
+        account: {type: object, additionalProperties: true}
+        toAccount: {type: object, additionalProperties: true}
+        category: {type: object, additionalProperties: true}
+        tags: {type: array, items: {type: object, additionalProperties: true}}
+        items: {type: array, items: {type: object, additionalProperties: true}}
+        itemsCount: {type: integer}
+        actions:
+          type: object
+          additionalProperties: {type: boolean}
+        createdAt: {type: string, format: date-time}
+    BudgetInput:
+      type: object
+      properties:
+        name: {type: string}
+        amount: {type: number}
+        currency_id: {type: integer, nullable: true}
+        period: {type: string}
+        start_date: {type: string, format: date, nullable: true}
+        end_date: {type: string, format: date, nullable: true}
+        is_global: {type: boolean}
+        notify_at_percent: {type: integer}
+        is_active: {type: boolean}
+        category_ids: {type: array, items: {type: integer}}
+        tag_ids: {type: array, items: {type: integer}}

@@ -4,9 +4,7 @@ import { authApi, webauthnApi } from '@/api'
 import { setOnUnauthorized, setOnEmailUnverified } from '@/api/client'
 import { User, LoginCredentials, RegisterData, AuthResponse, TwoFactorAuthResponse, MeResponse } from '@/types'
 
-export type LoginResult =
-    | { success: true }
-    | { success: false; requires_2fa: true; two_factor_token: string }
+export type LoginResult = { success: true } | { success: false; requires_2fa: true; two_factor_token: string }
 
 interface AuthState {
     user: User | null
@@ -36,7 +34,9 @@ function isTwoFactorResponse(response: AuthResponse | TwoFactorAuthResponse): re
     return 'requires_2fa' in response && response.requires_2fa === true
 }
 
-function sessionTimes(response: Pick<MeResponse, 'expires_at' | 'refresh_at'>): Pick<AuthState, 'expiresAt' | 'refreshAt'> {
+function sessionTimes(
+    response: Pick<MeResponse, 'expires_at' | 'refresh_at'>,
+): Pick<AuthState, 'expiresAt' | 'refreshAt'> {
     return {
         expiresAt: response.expires_at ?? null,
         refreshAt: response.refresh_at ?? null,
@@ -137,19 +137,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
     },
 
-    applySession: (response) => set({
-        user: response.user,
-        isAuthenticated: true,
-        isLoading: false,
-        sessionExpired: false,
-        emailVerificationRequired: response.email_verification_required ?? false,
-        ...sessionTimes(response),
-    }),
+    applySession: (response) =>
+        set({
+            user: response.user,
+            isAuthenticated: true,
+            isLoading: false,
+            sessionExpired: false,
+            emailVerificationRequired: response.email_verification_required ?? false,
+            ...sessionTimes(response),
+        }),
 
-    holdBackForVerification: () => set((state) => ({
-        emailVerificationRequired: true,
-        user: state.user ? { ...state.user, emailVerified: false } : state.user,
-    })),
+    holdBackForVerification: () =>
+        set((state) => ({
+            emailVerificationRequired: true,
+            user: state.user ? { ...state.user, emailVerified: false } : state.user,
+        })),
 
     setUser: (user) => set({ user, isAuthenticated: true, isLoading: false, sessionExpired: false }),
 
@@ -160,15 +162,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ sessionExpired: true, isLoading: false })
     },
 
-    clear: () => set({
-        user: null,
-        isAuthenticated: false,
-        isLoading: false,
-        sessionExpired: false,
-        expiresAt: null,
-        refreshAt: null,
-        emailVerificationRequired: false,
-    }),
+    clear: () =>
+        set({
+            user: null,
+            isAuthenticated: false,
+            isLoading: false,
+            sessionExpired: false,
+            expiresAt: null,
+            refreshAt: null,
+            emailVerificationRequired: false,
+        }),
 }))
 
 setOnUnauthorized(() => {

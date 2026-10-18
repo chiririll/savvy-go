@@ -3,6 +3,7 @@ import type { LucideIcon } from 'lucide-react'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
+import { cn } from '@/lib/utils'
 
 /** A card on a settings page: an icon, a title, a short description. */
 export function SettingsSection({
@@ -10,12 +11,15 @@ export function SettingsSection({
     title,
     description,
     actions,
+    contentClassName,
     children,
 }: {
     icon: LucideIcon
     title: string
-    description: string
+    description?: string
     actions?: ReactNode
+    /** Classes of the body under the header. */
+    contentClassName?: string
     children: ReactNode
 }) {
     return (
@@ -23,17 +27,22 @@ export function SettingsSection({
             {/* On a phone the actions go under the text, so it is not squeezed into a narrow column. */}
             <header className="flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-start">
                 <div className="flex flex-1 items-start gap-3">
-                    <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-muted/50 text-muted-foreground">
+                    <div
+                        className={cn(
+                            'flex size-9 shrink-0 items-center justify-center rounded-lg border bg-muted/50',
+                            'text-muted-foreground',
+                        )}
+                    >
                         <Icon className="size-4" />
                     </div>
                     <div className="min-w-0 flex-1 space-y-0.5">
                         <h3 className="text-sm font-semibold leading-none">{title}</h3>
-                        <p className="text-xs text-muted-foreground">{description}</p>
+                        {description && <p className="text-xs text-muted-foreground">{description}</p>}
                     </div>
                 </div>
                 {actions && <div className="flex shrink-0 sm:self-start">{actions}</div>}
             </header>
-            <div className="p-5">{children}</div>
+            <div className={cn('p-5', contentClassName)}>{children}</div>
         </section>
     )
 }

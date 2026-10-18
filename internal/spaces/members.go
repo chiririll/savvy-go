@@ -358,7 +358,13 @@ type AuditEntry struct {
 }
 
 // Audit records a server admin action (P53).
-func (s Service) Audit(ctx context.Context, actor *auth.User, action string, spaceID, target *int64, details string) error {
+func (s Service) Audit(
+	ctx context.Context,
+	actor *auth.User,
+	action string,
+	spaceID, target *int64,
+	details string,
+) error {
 	return s.registry().InsertAudit(ctx, ownerID(actor), spaceID, target, action, details, time.Now().UTC())
 }
 

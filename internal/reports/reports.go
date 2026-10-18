@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"time"
 
-	"savvy-go/internal/calendar"
+	"savvy-go/internal/platform/calendar"
 	"savvy-go/internal/store"
 )
 
@@ -125,7 +125,13 @@ func (f Filter) Sparkline(now time.Time, count int) []dateRange {
 			out = append(out, dateRange{start, calendar.EndOfMonth(start.AddDate(0, 2, 0))})
 		case "year":
 			a := cur.Start.AddDate(-i, 0, 0)
-			out = append(out, dateRange{time.Date(a.Year(), 1, 1, 0, 0, 0, 0, a.Location()), time.Date(a.Year(), 12, 31, 0, 0, 0, 0, a.Location())})
+			out = append(
+				out,
+				dateRange{
+					time.Date(a.Year(), 1, 1, 0, 0, 0, 0, a.Location()),
+					time.Date(a.Year(), 12, 31, 0, 0, 0, 0, a.Location()),
+				},
+			)
 		case "last_30_days", "custom":
 			out = append(out, dateRange{cur.Start.AddDate(0, 0, -days*i), cur.End.AddDate(0, 0, -days*i)})
 		case "ytd":
@@ -141,21 +147,26 @@ func (f Filter) Sparkline(now time.Time, count int) []dateRange {
 
 type periodPoint struct{ Key string }
 
+// generatePeriods lists the buckets that hold the days from start to end, by the
+// first day of each. Stepping begins at the bucket that holds start, so a range
+// beginning on the 31st still reaches every month it touches.
 func generatePeriods(start, end time.Time, groupBy string) []periodPoint {
 	var out []periodPoint
 	cur := start
+	switch groupBy {
+	case "week":
+		cur = startOfWeekSunday(start)
+	case "month":
+		cur = calendar.StartOfMonth(start)
+	}
 	for !cur.After(end) {
+		out = append(out, periodPoint{Key: cur.Format("2006-01-02")})
 		switch groupBy {
 		case "week":
-			wk := startOfWeekSunday(cur)
-			out = append(out, periodPoint{Key: wk.Format("2006-01-02")})
 			cur = cur.AddDate(0, 0, 7)
 		case "month":
-			m := calendar.StartOfMonth(cur)
-			out = append(out, periodPoint{Key: m.Format("2006-01-02")})
 			cur = calendar.AddMonths(cur, 1)
 		default:
-			out = append(out, periodPoint{Key: cur.Format("2006-01-02")})
 			cur = cur.AddDate(0, 0, 1)
 		}
 	}
@@ -165,7 +176,7 @@ func generatePeriods(start, end time.Time, groupBy string) []periodPoint {
 func nextPeriod(cur time.Time, groupBy string) time.Time {
 	switch groupBy {
 	case "week":
-		return calendar.StartOfWeek(cur.AddDate(0, 0, 7))
+		return startOfWeekSunday(cur.AddDate(0, 0, 7))
 	case "month":
 		return calendar.StartOfMonth(calendar.AddMonths(cur, 1))
 	default:
@@ -177,7 +188,7 @@ func periodEnd(cur, max time.Time, groupBy string) time.Time {
 	var end time.Time
 	switch groupBy {
 	case "week":
-		end = calendar.EndOfWeek(cur)
+		end = startOfWeekSunday(cur).AddDate(0, 0, 6)
 	case "month":
 		end = calendar.EndOfMonth(cur)
 	default:

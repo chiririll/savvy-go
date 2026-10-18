@@ -2,15 +2,15 @@ package auth
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"time"
 
-	"savvy-go/internal/config"
+	"savvy-go/internal/appconfig"
 	repo "savvy-go/internal/db/repo/auth"
 	"savvy-go/internal/store"
 
@@ -25,8 +25,9 @@ const (
 )
 
 type WebAuthn struct {
-	DB  store.DB
-	Cfg config.Config
+	DB store.DB
+	// AppURL is the public URL of the instance, empty when unset.
+	Cfg appconfig.Config
 }
 
 func (w WebAuthn) repo() repo.Repo { return repo.Repo{DB: w.DB} }
@@ -47,8 +48,8 @@ type WebAuthnCred struct {
 	ID         int64
 	Name       *string
 	AAGUID     *string
-	LastUsedAt *string
-	CreatedAt  *string
+	LastUsedAt *time.Time
+	CreatedAt  *time.Time
 }
 
 // ErrNoPublicURL means passkeys cannot work: the relying party is the public
@@ -56,7 +57,7 @@ type WebAuthnCred struct {
 var ErrNoPublicURL = errors.New("the public URL is not set")
 
 func (w WebAuthn) engine() (*webauthn.WebAuthn, error) {
-	u, err := url.Parse(w.Cfg.URL())
+	u, err := url.Parse(w.Cfg.AppURL())
 	if err != nil || u.Host == "" || u.Hostname() == "" {
 		return nil, ErrNoPublicURL
 	}
@@ -101,7 +102,10 @@ func (w WebAuthn) BeginRegistration(ctx context.Context, u *User) (token string,
 		return "", nil, err
 	}
 	creation, session, err := wa.BeginRegistration(waUser{user: u, credentials: creds},
-		webauthn.WithResidentKeyRequirement(protocol.ResidentKeyRequirementRequired),
+		webauthn.WithAuthenticatorSelection(protocol.AuthenticatorSelection{
+			ResidentKey:      protocol.ResidentKeyRequirementRequired,
+			UserVerification: protocol.VerificationRequired,
+		}),
 		webauthn.WithExclusions(descriptors(creds)),
 	)
 	if err != nil {
@@ -110,7 +114,12 @@ func (w WebAuthn) BeginRegistration(ctx context.Context, u *User) (token string,
 	return w.issueChallenge(ctx, &u.ID, WebAuthnRegister, creation.Response, session)
 }
 
-func (w WebAuthn) FinishRegistration(ctx context.Context, u *User, token, name string, response json.RawMessage) (*WebAuthnCred, error) {
+func (w WebAuthn) FinishRegistration(
+	ctx context.Context,
+	u *User,
+	token, name string,
+	response json.RawMessage,
+) (*WebAuthnCred, error) {
 	session, err := w.consumeChallenge(ctx, token, WebAuthnRegister, u.ID)
 	if err != nil || session == nil {
 		return nil, fmt.Errorf("challenge")
@@ -141,8 +150,7 @@ func (w WebAuthn) FinishRegistration(ctx context.Context, u *User, token, name s
 	if err != nil {
 		return nil, err
 	}
-	created := now.Format(time.RFC3339)
-	return &WebAuthnCred{ID: id, Name: &name, AAGUID: &aaguid, CreatedAt: &created}, nil
+	return &WebAuthnCred{ID: id, Name: &name, AAGUID: &aaguid, CreatedAt: &now}, nil
 }
 
 func (w WebAuthn) BeginLogin(ctx context.Context, u *User) (token string, options any, err error) {
@@ -151,7 +159,7 @@ func (w WebAuthn) BeginLogin(ctx context.Context, u *User) (token string, option
 		return "", nil, err
 	}
 	if u == nil {
-		assertion, session, err := wa.BeginDiscoverableLogin()
+		assertion, session, err := wa.BeginDiscoverableLogin(webauthn.WithUserVerification(protocol.VerificationRequired))
 		if err != nil {
 			return "", nil, err
 		}
@@ -161,7 +169,8 @@ func (w WebAuthn) BeginLogin(ctx context.Context, u *User) (token string, option
 	if err != nil {
 		return "", nil, err
 	}
-	assertion, session, err := wa.BeginLogin(waUser{user: u, credentials: creds})
+	assertion, session, err := wa.BeginLogin(waUser{user: u, credentials: creds},
+		webauthn.WithUserVerification(protocol.VerificationRequired))
 	if err != nil {
 		return "", nil, err
 	}
@@ -181,18 +190,46 @@ func (w WebAuthn) FinishLogin(ctx context.Context, token string, response json.R
 	if err != nil {
 		return nil, fmt.Errorf("verify")
 	}
+	var u *User
+	var cred *webauthn.Credential
 	if userID != 0 {
-		u, err := Users{DB: w.DB}.ByID(ctx, userID)
-		if err != nil || u == nil {
-			return nil, fmt.Errorf("verify")
-		}
-		creds, _ := w.loadCreds(ctx, u.ID)
-		if _, err := wa.ValidateLogin(waUser{user: u, credentials: creds}, *session, parsed); err != nil {
-			return nil, fmt.Errorf("verify")
-		}
-		w.touchCred(ctx, parsed.RawID)
-		return u, nil
+		u, cred, err = w.validateKnown(ctx, wa, userID, *session, parsed)
+	} else {
+		u, cred, err = w.validateDiscoverable(ctx, wa, *session, parsed)
 	}
+	if err != nil {
+		return nil, err
+	}
+	if err := w.recordLogin(ctx, u, cred); err != nil {
+		return nil, err
+	}
+	return u, nil
+}
+
+// validateKnown checks a login that started with a username: the challenge
+// names the user.
+func (w WebAuthn) validateKnown(
+	ctx context.Context, wa *webauthn.WebAuthn, userID int64,
+	session webauthn.SessionData, parsed *protocol.ParsedCredentialAssertionData,
+) (*User, *webauthn.Credential, error) {
+	u, err := Users{DB: w.DB}.ByID(ctx, userID)
+	if err != nil || u == nil {
+		return nil, nil, fmt.Errorf("verify")
+	}
+	creds, _ := w.loadCreds(ctx, u.ID)
+	cred, err := wa.ValidateLogin(waUser{user: u, credentials: creds}, session, parsed)
+	if err != nil {
+		return nil, nil, fmt.Errorf("verify")
+	}
+	return u, cred, nil
+}
+
+// validateDiscoverable checks a login with no username: the passkey names the
+// user.
+func (w WebAuthn) validateDiscoverable(
+	ctx context.Context, wa *webauthn.WebAuthn,
+	session webauthn.SessionData, parsed *protocol.ParsedCredentialAssertionData,
+) (*User, *webauthn.Credential, error) {
 	handler := func(rawID, userHandle []byte) (webauthn.User, error) {
 		u, creds, err := w.userForHandle(ctx, userHandle, rawID)
 		if err != nil || u == nil {
@@ -200,16 +237,15 @@ func (w WebAuthn) FinishLogin(ctx context.Context, token string, response json.R
 		}
 		return waUser{user: u, credentials: creds}, nil
 	}
-	cred, err := wa.ValidateDiscoverableLogin(handler, *session, parsed)
+	cred, err := wa.ValidateDiscoverableLogin(handler, session, parsed)
 	if err != nil {
-		return nil, fmt.Errorf("verify")
+		return nil, nil, fmt.Errorf("verify")
 	}
 	u, _, err := w.userForHandle(ctx, parsed.Response.UserHandle, cred.ID)
 	if err != nil || u == nil {
-		return nil, fmt.Errorf("verify")
+		return nil, nil, fmt.Errorf("verify")
 	}
-	w.touchCred(ctx, parsed.RawID)
-	return u, nil
+	return u, cred, nil
 }
 
 func (w WebAuthn) Rename(ctx context.Context, userID, id int64, name string) error {
@@ -234,7 +270,13 @@ func (w WebAuthn) Delete(ctx context.Context, userID, id int64) error {
 	return nil
 }
 
-func (w WebAuthn) issueChallenge(ctx context.Context, userID *int64, typ string, options any, session *webauthn.SessionData) (string, any, error) {
+func (w WebAuthn) issueChallenge(
+	ctx context.Context,
+	userID *int64,
+	typ string,
+	options any,
+	session *webauthn.SessionData,
+) (string, any, error) {
 	token := RandomString(48)
 	now := time.Now().UTC()
 	raw, err := json.Marshal(map[string]any{"options": options, "session": session})
@@ -245,7 +287,11 @@ func (w WebAuthn) issueChallenge(ctx context.Context, userID *int64, typ string,
 	return token, options, err
 }
 
-func (w WebAuthn) consumeChallenge(ctx context.Context, token, typ string, userID int64) (*webauthn.SessionData, error) {
+func (w WebAuthn) consumeChallenge(
+	ctx context.Context,
+	token, typ string,
+	userID int64,
+) (*webauthn.SessionData, error) {
 	session, uid, err := w.consumeChallengeAny(ctx, token, typ)
 	if err != nil || session == nil {
 		return nil, err
@@ -257,9 +303,9 @@ func (w WebAuthn) consumeChallenge(ctx context.Context, token, typ string, userI
 }
 
 func (w WebAuthn) consumeChallengeAny(ctx context.Context, token, typ string) (*webauthn.SessionData, int64, error) {
-	row, _ := w.repo().TakePasskeyChallenge(ctx, HashToken(token), typ, time.Now().UTC())
-	if row == nil {
-		return nil, 0, nil
+	row, err := w.repo().TakePasskeyChallenge(ctx, HashToken(token), typ, time.Now().UTC())
+	if err != nil || row == nil {
+		return nil, 0, err
 	}
 	var wrap struct {
 		Session webauthn.SessionData `json:"session"`
@@ -312,8 +358,21 @@ func (w WebAuthn) userForHandle(ctx context.Context, handle, rawID []byte) (*Use
 	return u, creds, err
 }
 
-func (w WebAuthn) touchCred(ctx context.Context, rawID []byte) {
-	_ = w.repo().TouchPasskey(ctx, b64(rawID), time.Now().UTC())
+// recordLogin saves the credential the library returned from a valid
+// assertion, so the sign count moves forward. A count that did not advance
+// means a clone of the authenticator: the login is refused and nothing is saved.
+func (w WebAuthn) recordLogin(ctx context.Context, u *User, cred *webauthn.Credential) error {
+	if cred.Authenticator.CloneWarning {
+		slog.Warn("passkey sign count did not advance; possible cloned authenticator",
+			"user", u.ID, "credential", b64(cred.ID))
+		return fmt.Errorf("verify")
+	}
+	rec, err := json.Marshal(cred)
+	if err != nil {
+		return err
+	}
+	return w.repo().
+		UpdatePasskeyAfterLogin(ctx, b64(cred.ID), string(rec), int64(cred.Authenticator.SignCount), time.Now().UTC())
 }
 
 func descriptors(creds []webauthn.Credential) []protocol.CredentialDescriptor {
@@ -326,8 +385,4 @@ func descriptors(creds []webauthn.Credential) []protocol.CredentialDescriptor {
 
 func b64(b []byte) string {
 	return base64.RawURLEncoding.EncodeToString(b)
-}
-
-func init() {
-	_ = rand.Reader
 }

@@ -6,17 +6,17 @@ SELECT COUNT(*) FROM users WHERE role = ? AND deleted_at IS NULL;
 
 -- name: GetUser :one
 SELECT id, name, email, password, role, is_sso_only, email_verified,
-	two_factor_secret, two_factor_enabled, two_factor_confirmed, deleted_at, created_at, updated_at
+	two_factor_secret, two_factor_enabled, two_factor_confirmed, two_factor_last_step, deleted_at, created_at, updated_at
 FROM users WHERE id = ?;
 
 -- name: GetUserByEmail :one
 SELECT id, name, email, password, role, is_sso_only, email_verified,
-	two_factor_secret, two_factor_enabled, two_factor_confirmed, deleted_at, created_at, updated_at
+	two_factor_secret, two_factor_enabled, two_factor_confirmed, two_factor_last_step, deleted_at, created_at, updated_at
 FROM users WHERE lower(email) = ?;
 
 -- name: ListUsers :many
 SELECT id, name, email, password, role, is_sso_only, email_verified,
-	two_factor_secret, two_factor_enabled, two_factor_confirmed, deleted_at, created_at, updated_at
+	two_factor_secret, two_factor_enabled, two_factor_confirmed, two_factor_last_step, deleted_at, created_at, updated_at
 FROM users WHERE deleted_at IS NULL ORDER BY name;
 
 -- name: InsertUser :execresult
@@ -47,11 +47,18 @@ UPDATE users SET role=?, updated_at=? WHERE id=?;
 -- name: SetUserTwoFactor :exec
 UPDATE users SET two_factor_secret=?, two_factor_enabled=?, two_factor_confirmed=?, updated_at=? WHERE id=?;
 
+-- name: AdvanceTwoFactorStep :execresult
+UPDATE users SET two_factor_last_step = ?
+WHERE id = ? AND (two_factor_last_step IS NULL OR two_factor_last_step < ?);
+
+-- name: ClearTwoFactorStep :exec
+UPDATE users SET two_factor_last_step = NULL WHERE id = ?;
+
 -- name: TombstoneUser :exec
 -- A deleted user keeps their row (ids in space databases still resolve) but
 -- loses everything that identifies them or lets them sign in.
 UPDATE users SET name = 'Deleted user', email = 'deleted-' || id || '@invalid', password = NULL,
-	is_sso_only = 0, email_verified = 0, two_factor_secret = NULL, two_factor_enabled = 0, two_factor_confirmed = 0,
+	is_sso_only = 0, email_verified = 0, two_factor_secret = NULL, two_factor_enabled = 0, two_factor_confirmed = 0, two_factor_last_step = NULL,
 	deleted_at = sqlc.arg(now), updated_at = sqlc.arg(now)
 WHERE id = sqlc.arg(id);
 

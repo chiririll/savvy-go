@@ -9,7 +9,8 @@
         "logos": "npm --prefix scripts run logos",
         "screenshots": "npm --prefix scripts run screenshots --",
         "screenshots:diff": "npm --prefix scripts run screenshots:diff",
-        "test": "vitest run"
+        "test": "vitest run",
+        "audit": "vitest run --mode audit --silent=false --reporter=verbose resources/ts/lib/code-shape/audit.test.ts"
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.1.18",

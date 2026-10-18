@@ -11,7 +11,7 @@ describe('pages', () => {
         expect(missing, 'pages that router.tsx does not use').toEqual([])
     })
 
-    it('are the only routes with a path of their own, apart from redirects', () => {
+    it('are the only routes with their own path, besides redirects', () => {
         const literal = router
             .split('\n')
             .filter((line) => /\bpath: '/.test(line) && !/Navigate|Redirect|path: '\*'/.test(line))

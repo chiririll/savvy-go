@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	pkg      = "./cmd/savvy-go"
+	pkg      = "."
 	outDir   = "dist"
-	embedDir = "internal/webui/dist" // what the embed build tag compiles in
+	embedDir = "internal/httpserver/ui/dist" // what the embed build tag compiles in
 )
 
 // Build groups the build targets.
@@ -74,12 +74,22 @@ func (Test) Go() error {
 	if err := stageFrontend(); err != nil {
 		return err
 	}
-	return sh.RunV("go", "test", "-tags", "embed", "./internal/webui/...", "./internal/httpserver/...")
+	return sh.RunV("go", "test", "-tags", "embed", "./internal/httpserver/...")
 }
 
 // Frontend runs the frontend tests.
 func (Test) Frontend() error {
 	return sh.RunV(npm(), "test")
+}
+
+// Audit prints the Go and frontend code that is above the soft size and
+// naming limits (internal/archtest, resources/ts/lib/code-shape). It never
+// fails on what it finds.
+func (Test) Audit() error {
+	if err := sh.RunV("go", "test", "-tags", "audit", "./internal/archtest", "-run", "Audit", "-v", "-count=1"); err != nil {
+		return err
+	}
+	return sh.RunV(npm(), "run", "audit")
 }
 
 // All runs every test.
@@ -92,7 +102,13 @@ func (Test) All() {
 // first. Honors OAUTH_SERVER (default http://localhost:8080, spelled like the
 // server's app_url).
 func (Probe) Oauth() error {
-	return sh.RunV("go", "run", "./cmd/oauth-probe", "-server", firstNonEmpty(os.Getenv("OAUTH_SERVER"), "http://localhost:8080"))
+	return sh.RunV(
+		"go",
+		"run",
+		"./cmd/oauth-probe",
+		"-server",
+		firstNonEmpty(os.Getenv("OAUTH_SERVER"), "http://localhost:8080"),
+	)
 }
 
 // Clean removes build output.
@@ -137,9 +153,9 @@ func compile(o buildOpts) error {
 		}
 	}
 
-	ldflags := "-X savvy-go/internal/version.Value=" + firstNonEmpty(os.Getenv("APP_VERSION"), "dev")
+	ldflags := "-X main.Version=" + firstNonEmpty(os.Getenv("APP_VERSION"), "dev")
 	if o.env != "" {
-		ldflags += " -X savvy-go/internal/version.Env=" + o.env
+		ldflags += " -X main.Env=" + o.env
 	}
 	args := []string{"build"}
 	if o.embed {

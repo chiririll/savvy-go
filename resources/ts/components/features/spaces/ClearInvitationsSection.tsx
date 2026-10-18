@@ -17,7 +17,11 @@ export function ClearInvitationsSection() {
     const [email, setEmail] = useState('')
 
     return (
-        <SettingsSection icon={MailX} title={t('system.invitations.title')} description={t('system.invitations.description')}>
+        <SettingsSection
+            icon={MailX}
+            title={t('system.invitations.title')}
+            description={t('system.invitations.description')}
+        >
             <form
                 className="flex flex-col gap-2 sm:flex-row"
                 onSubmit={(e) => {

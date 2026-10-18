@@ -85,7 +85,7 @@ func (f *fakeService) source(clock *time.Time) *Source {
 	return s
 }
 
-func TestRatesAreWhatOneUnitIsWorthInTheBase(t *testing.T) {
+func TestRatesWhatOneUnitWorthBase(t *testing.T) {
 	clock := time.Now()
 	s := newFakeService(t).source(&clock)
 	rates, err := s.Rates(context.Background(), "usd")
@@ -135,7 +135,7 @@ func TestSignificant(t *testing.T) {
 }
 
 // Spaces with the same base share one request; each other base costs one.
-func TestSpacesWithTheSameBaseShareOneFetch(t *testing.T) {
+func TestSameBaseSharesOneFetch(t *testing.T) {
 	clock := time.Now()
 	f := newFakeService(t)
 	s := f.source(&clock)
@@ -149,7 +149,7 @@ func TestSpacesWithTheSameBaseShareOneFetch(t *testing.T) {
 	}
 }
 
-func TestExpireMakesEachBaseFetchOnceMore(t *testing.T) {
+func TestExpireRefetchesEachBase(t *testing.T) {
 	clock := time.Now()
 	f := newFakeService(t)
 	s := f.source(&clock)
@@ -185,7 +185,7 @@ func TestCacheExpiresAfterTTL(t *testing.T) {
 	}
 }
 
-func TestOldRatesServeWhileTheServiceIsDown(t *testing.T) {
+func TestOldRatesServeWhileServiceDown(t *testing.T) {
 	clock := time.Now()
 	f := newFakeService(t)
 	s := f.source(&clock)
@@ -235,7 +235,7 @@ func TestUnknownBaseIsAnError(t *testing.T) {
 	}
 }
 
-func TestCatalogCombinesNamesAndLiveRatesWithoutCaching(t *testing.T) {
+func TestCatalogCombinesNamesLiveRatesUncached(t *testing.T) {
 	clock := time.Now()
 	f := newFakeService(t)
 	s := f.source(&clock)
@@ -270,7 +270,7 @@ func TestCatalogCombinesNamesAndLiveRatesWithoutCaching(t *testing.T) {
 	}
 }
 
-func TestCatalogFallsBackToTheBuiltInList(t *testing.T) {
+func TestCatalogFallsBackBuiltInList(t *testing.T) {
 	list := NewOffline().Catalog(context.Background(), "eur")
 	if len(list) != len(fallback) {
 		t.Fatalf("%d currencies, want %d", len(list), len(fallback))

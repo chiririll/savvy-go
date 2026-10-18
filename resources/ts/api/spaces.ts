@@ -61,7 +61,11 @@ export const spacesApi = {
 
     invitations: (id: number) => api.get<SpaceInvitation[]>(`${base(id)}/invitations`),
     invite: (id: number, role: SpaceRole, email?: string, note?: string) =>
-        api.post<InviteResult, { role: SpaceRole; email?: string; note?: string }>(`${base(id)}/invitations`, { role, email, note }),
+        api.post<InviteResult, { role: SpaceRole; email?: string; note?: string }>(`${base(id)}/invitations`, {
+            role,
+            email,
+            note,
+        }),
     revokeInvitation: (id: number, invitationId: number) => api.delete<void>(`${base(id)}/invitations/${invitationId}`),
 
     links: (id: number) => api.get<LinkedSpace[]>(`${base(id)}/links`),
@@ -113,7 +117,9 @@ export const spacesApi = {
     backupDownloadUrl: (id: number, name: string) =>
         `${apiClient.defaults.baseURL}${base(id)}/backups/${encodeURIComponent(name)}/download`,
     restoreBackup: (id: number, name: string) =>
-        api.post<{ message: string }>(`${base(id)}/backups/${encodeURIComponent(name)}/restore`, undefined, { timeout: 0 }),
+        api.post<{ message: string }>(`${base(id)}/backups/${encodeURIComponent(name)}/restore`, undefined, {
+            timeout: 0,
+        }),
     deleteBackup: (id: number, name: string) => api.delete<void>(`${base(id)}/backups/${encodeURIComponent(name)}`),
 
     /** A space backup (or an older database file) becomes a new space owned by the caller. */

@@ -21,7 +21,12 @@ export function useSetOAuthRegistration() {
         mutationFn: (open: boolean) => (open ? oauthRegistrationApi.open() : oauthRegistrationApi.close()),
         onSuccess: (data: OAuthRegistration) => queryClient.setQueryData(QUERY_KEY, data),
         onError: (error: unknown, open: boolean) => {
-            toast.error(getApiErrorMessage(error, open ? i18n.t('settings:admin.mcp.openFailed') : i18n.t('settings:admin.mcp.closeFailed')))
+            toast.error(
+                getApiErrorMessage(
+                    error,
+                    open ? i18n.t('settings:admin.mcp.openFailed') : i18n.t('settings:admin.mcp.closeFailed'),
+                ),
+            )
         },
     })
 }
@@ -38,6 +43,7 @@ export function useRemoveOAuthClient() {
     return useMutation({
         mutationFn: oauthClientsApi.remove,
         onSuccess: () => queryClient.invalidateQueries({ queryKey: CLIENTS_KEY }),
-        onError: (error: unknown) => toast.error(getApiErrorMessage(error, i18n.t('settings:admin.mcp.apps.removeFailed'))),
+        onError: (error: unknown) =>
+            toast.error(getApiErrorMessage(error, i18n.t('settings:admin.mcp.apps.removeFailed'))),
     })
 }

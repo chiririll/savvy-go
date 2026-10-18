@@ -55,7 +55,7 @@ afterEach(() => {
 })
 
 describe('mail settings form', () => {
-    it('shows dots for a stored password, which go away when editing and return if left empty', () => {
+    it('shows dots for a stored password until edited, then again if empty', () => {
         render(<MailSection />)
         expect(field('mail-password').value).toBe('••••••')
         fireEvent.focus(field('mail-password'))

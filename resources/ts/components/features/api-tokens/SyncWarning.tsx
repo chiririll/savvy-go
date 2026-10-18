@@ -28,20 +28,27 @@ export function SyncWarning({
         const missing = others.filter((m) => !choice.all && !choice.ids.includes(m.id)).map((m) => m.name)
         const what = group.categories && group.tags ? 'both' : group.categories ? 'categories' : 'tags'
         const kind =
-            what === 'both'
-                ? t('api.sync.both')
-                : what === 'categories'
-                  ? t('api.sync.categories')
-                  : t('api.sync.tags')
+            what === 'both' ? t('api.sync.both') : what === 'categories' ? t('api.sync.categories') : t('api.sync.tags')
         const names = others.map((m) => m.name).join(', ')
         if (missing.length > 0 || group.hidden > 0) {
             notes.push({
                 key: `${space.id}-x`,
                 unreachable: true,
-                text: t('api.sync.unreachable', { space: space.name, kind, others: [...missing, ...(group.hidden > 0 ? [t('api.sync.hidden', { count: group.hidden })] : [])].join(', ') }),
+                text: t('api.sync.unreachable', {
+                    space: space.name,
+                    kind,
+                    others: [
+                        ...missing,
+                        ...(group.hidden > 0 ? [t('api.sync.hidden', { count: group.hidden })] : []),
+                    ].join(', '),
+                }),
             })
         } else {
-            notes.push({ key: `${space.id}-ok`, unreachable: false, text: t('api.sync.mirrored', { space: space.name, kind, others: names }) })
+            notes.push({
+                key: `${space.id}-ok`,
+                unreachable: false,
+                text: t('api.sync.mirrored', { space: space.name, kind, others: names }),
+            })
         }
     })
     if (notes.length === 0) return null

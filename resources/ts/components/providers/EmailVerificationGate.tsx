@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { authApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import type { ApiError } from '@/types'
+import { cn } from '@/lib/utils'
 
 /**
  * Closes the app to a user whose address is not confirmed while the instance
@@ -56,7 +57,12 @@ function UnverifiedEmailScreen({ email }: { email: string }) {
             <Card className="w-full max-w-md">
                 <CardHeader className="text-center">
                     <div className="mb-2 flex justify-center">
-                        <div className="flex size-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+                        <div
+                            className={cn(
+                                'flex size-12 items-center justify-center rounded-xl bg-primary',
+                                'text-primary-foreground',
+                            )}
+                        >
                             <MailCheck className="size-6" />
                         </div>
                     </div>

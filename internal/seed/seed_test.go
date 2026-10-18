@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"savvy-go/internal/auth"
+	"savvy-go/internal/auth/password"
 	"savvy-go/internal/signing"
 	"savvy-go/internal/spaces"
 	"savvy-go/internal/store"
@@ -51,7 +52,8 @@ func seedDemo(t *testing.T) (*sqlite.Store, signing.KeyRing) {
 func spaceByName(t *testing.T, st *sqlite.Store, name string) store.DB {
 	t.Helper()
 	var id int64
-	if err := st.Server().QueryRowContext(context.Background(), `SELECT id FROM spaces WHERE name = ?`, name).Scan(&id); err != nil {
+	if err := st.Server().QueryRowContext(context.Background(), `SELECT id FROM spaces WHERE name = ?`,
+		name).Scan(&id); err != nil {
 		t.Fatalf("space %q: %v", name, err)
 	}
 	d, err := st.Space(context.Background(), id)
@@ -101,14 +103,14 @@ func TestDemoSeedsEmptyDatabase(t *testing.T) {
 	if err != nil || demo == nil || demo.Password == nil {
 		t.Fatalf("demo user: %v %v", demo, err)
 	}
-	if !auth.CheckPassword(*demo.Password, "demo") {
+	if !password.Check(*demo.Password, "demo") {
 		t.Fatal("demo password rejected")
 	}
 	admin, err := users.ByEmail(ctx, "admin@savvy.app")
 	if err != nil || admin == nil || admin.Password == nil {
 		t.Fatalf("admin user: %v %v", admin, err)
 	}
-	if !auth.CheckPassword(*admin.Password, "password") {
+	if !password.Check(*admin.Password, "password") {
 		t.Fatal("admin password rejected")
 	}
 	if demo.Role != auth.RoleUser || admin.Role != auth.RoleAdmin {
@@ -126,7 +128,8 @@ func TestDemoSeedsEmptyDatabase(t *testing.T) {
 		role  string
 	}{
 		{"Demo", admin, spaces.RoleAdmin}, {"Demo", editor, spaces.RoleEditor}, {"Demo", demo, spaces.RoleViewer},
-		{"Family Budget", admin, spaces.RoleAdmin}, {"Family Budget", editor, spaces.RoleAdmin}, {"Family Budget", guest, spaces.RoleViewer},
+		{"Family Budget", admin, spaces.RoleAdmin}, {"Family Budget", editor, spaces.RoleAdmin},
+		{"Family Budget", guest, spaces.RoleViewer},
 		{"Studio GmbH", admin, spaces.RoleAdmin}, {"Studio GmbH", editor, spaces.RoleViewer},
 	} {
 		var id int64
@@ -176,7 +179,8 @@ func TestDemoSeedsExactlyTheExportedPresets(t *testing.T) {
 		t.Fatalf("categories=%d, want at least %d", n, len(cats))
 	}
 	for _, c := range cats {
-		q := `SELECT COUNT(*) FROM categories WHERE name = '` + c.Name + `' AND type = '` + c.Type + `' AND icon = '` + c.Icon + `' AND color = '` + c.Color + `'`
+		q := `SELECT COUNT(*) FROM categories WHERE name = '` + c.Name + `' AND type = '` + c.Type + `' AND icon = '` +
+			c.Icon + `' AND color = '` + c.Color + `'`
 		if n := countWhere(t, space, q); n != 1 {
 			t.Fatalf("category %s seeded %d times", c.Name, n)
 		}
@@ -199,7 +203,7 @@ func TestPresetsAreCopies(t *testing.T) {
 	}
 }
 
-func TestDemoSpacesAreLinkedAndTransfer(t *testing.T) {
+func TestDemoSpacesAreLinkedTransfer(t *testing.T) {
 	st, _ := seedDemo(t)
 	sqlDB := st.Server()
 	if n := countWhere(t, sqlDB, `SELECT COUNT(*) FROM spaces`); n != 3 {
@@ -273,7 +277,7 @@ func TestDemoSkipsWhenUsersExist(t *testing.T) {
 	}
 }
 
-func TestDemoPinnedDateIsReproducibleAndHasManifest(t *testing.T) {
+func TestDemoPinnedDateReproducibleHasManifest(t *testing.T) {
 	now, err := Config{Date: "2026-03-15"}.now(time.UTC)
 	if err != nil {
 		t.Fatal(err)
@@ -288,14 +292,16 @@ func TestDemoPinnedDateIsReproducibleAndHasManifest(t *testing.T) {
 		}
 		space := spaceByName(t, st, "Demo")
 		var last string
-		if err := space.QueryRowContext(context.Background(), `SELECT MAX(date) FROM transactions WHERE status = 'confirmed'`).Scan(&last); err != nil {
+		if err := space.QueryRowContext(context.Background(),
+			`SELECT MAX(date) FROM transactions WHERE status = 'confirmed'`).Scan(&last); err != nil {
 			t.Fatal(err)
 		}
 		if last > "2026-03-15" {
 			t.Fatalf("confirmed transaction after the pinned date: %s", last)
 		}
 		var sum string
-		if err := space.QueryRowContext(context.Background(), `SELECT COUNT(*) || ':' || SUM(amount) FROM transactions`).Scan(&sum); err != nil {
+		if err := space.QueryRowContext(context.Background(),
+			`SELECT COUNT(*) || ':' || SUM(amount) FROM transactions`).Scan(&sum); err != nil {
 			t.Fatal(err)
 		}
 		dumps[i] = sum

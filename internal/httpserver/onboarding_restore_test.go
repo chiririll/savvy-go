@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"savvy-go/internal/auth"
-	"savvy-go/internal/bootstrap"
+	"savvy-go/internal/firstrun"
 )
 
 // firstRunRestore posts the restore form with no session, as the setup page does.
@@ -43,11 +43,11 @@ func serverBackupFile(t *testing.T) []byte {
 	t.Helper()
 	src := newTestApp(t)
 	src.createUser("ada@source.com", "secret1", auth.RoleAdmin)
-	entry, err := src.s.backups.CreateServer(context.Background(), nil)
+	entry, err := src.svc.Backups.CreateServer(context.Background(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw, err := os.ReadFile(src.s.backups.ServerPath(entry.Filename))
+	raw, err := os.ReadFile(src.svc.Backups.ServerPath(entry.Filename))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +63,7 @@ func userCount(t *testing.T, a *testApp) int {
 	return n
 }
 
-func TestFirstRunRestoreNeedsTheBootstrapPassword(t *testing.T) {
+func TestFirstRunRestoreNeedsBootstrapPassword(t *testing.T) {
 	a := newTestApp(t)
 	content := serverBackupFile(t)
 
@@ -74,19 +74,19 @@ func TestFirstRunRestoreNeedsTheBootstrapPassword(t *testing.T) {
 	}
 }
 
-func TestFirstRunRestoreIsRefusedOnceAUserExists(t *testing.T) {
+func TestFirstRunRestoreRefusedWithUsers(t *testing.T) {
 	a := newTestApp(t)
 	pass := a.bootstrap.Password()
 	a.createUser("someone@test.com", "secret1", auth.RoleUser)
 	status(t, a.firstRunRestore(pass, "b.zip", serverBackupFile(t), nil), http.StatusForbidden, "users present")
 }
 
-func TestFirstRunRestoreWithoutAGuardIsClosed(t *testing.T) {
+func TestFirstRunRestoreWithoutGuardClosed(t *testing.T) {
 	a := appWithGuard(t, nil)
 	status(t, a.firstRunRestore("anything", "b.zip", serverBackupFile(t), nil), http.StatusForbidden, "no guard")
 }
 
-func TestFailedFirstRunRestoreKeepsThePasswordValid(t *testing.T) {
+func TestFailedFirstRunRestoreKeepsPassword(t *testing.T) {
 	a := newTestApp(t)
 	pass := a.bootstrap.Password()
 
@@ -108,12 +108,12 @@ func TestFailedFirstRunRestoreKeepsThePasswordValid(t *testing.T) {
 	if n := userCount(t, a); n != 0 {
 		t.Fatalf("%d users after failed restores", n)
 	}
-	if list, _ := a.s.backups.ServerBackups(); len(list) != 0 {
+	if list, _ := a.svc.Backups.ServerBackups(); len(list) != 0 {
 		t.Fatalf("failed restores left backups behind: %+v", list)
 	}
 }
 
-func TestFirstRunRestoreLoadsTheBackupAndClosesSetup(t *testing.T) {
+func TestFirstRunRestoreClosesSetup(t *testing.T) {
 	a := newTestApp(t)
 	pass := a.bootstrap.Password()
 
@@ -123,13 +123,13 @@ func TestFirstRunRestoreLoadsTheBackupAndClosesSetup(t *testing.T) {
 	}
 	res.Body.Close()
 
-	if u, _ := a.s.users.ByEmail(context.Background(), "ada@source.com"); u == nil || u.Role != auth.RoleAdmin {
+	if u, _ := a.svc.Users.ByEmail(context.Background(), "ada@source.com"); u == nil || u.Role != auth.RoleAdmin {
 		t.Fatalf("restored admin %+v", u)
 	}
 	if a.bootstrap.Active() {
 		t.Fatal("password still valid after the restore")
 	}
-	if _, err := os.Stat(filepath.Join(a.s.cfg.DataDir, bootstrap.FileName)); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(a.svc.Cfg.DataDir, firstrun.FileName)); !os.IsNotExist(err) {
 		t.Fatalf("password file still there: %v", err)
 	}
 	body := decodeJSON(t, a.do("GET", "/api/auth/status", nil, "", ""))
@@ -137,12 +137,17 @@ func TestFirstRunRestoreLoadsTheBackupAndClosesSetup(t *testing.T) {
 		t.Fatalf("status after restore %v", body)
 	}
 	// The restored admin logs in with the password they had on the old server.
-	status(t, a.do("POST", "/api/auth/login", map[string]any{"email": "ada@source.com", "password": "secret1"}, "", ""), http.StatusOK, "login")
+	status(
+		t,
+		a.do("POST", "/api/auth/login", map[string]any{"email": "ada@source.com", "password": "secret1"}, "", ""),
+		http.StatusOK,
+		"login",
+	)
 	// And the endpoint is gone with the setup.
 	status(t, a.firstRunRestore(pass, "b.zip", serverBackupFile(t), nil), http.StatusForbidden, "second restore")
 }
 
-func TestFirstRunRestoreOfALaravelDatabase(t *testing.T) {
+func TestFirstRunRestoreOfLaravelDatabase(t *testing.T) {
 	a := newTestApp(t)
 	pass := a.bootstrap.Password()
 	laravel, _ := os.ReadFile(laravelFile(t, true))
@@ -152,7 +157,7 @@ func TestFirstRunRestoreOfALaravelDatabase(t *testing.T) {
 		t.Fatalf("restore %d %v", res.StatusCode, decodeJSON(t, res))
 	}
 	res.Body.Close()
-	if u, _ := a.s.users.ByEmail(context.Background(), "ada@example.com"); u == nil || u.Role != auth.RoleAdmin {
+	if u, _ := a.svc.Users.ByEmail(context.Background(), "ada@example.com"); u == nil || u.Role != auth.RoleAdmin {
 		t.Fatalf("laravel admin %+v", u)
 	}
 	if a.bootstrap.Active() {
@@ -160,15 +165,15 @@ func TestFirstRunRestoreOfALaravelDatabase(t *testing.T) {
 	}
 }
 
-func TestFirstRunRestoreOfABackupWithoutUsersKeepsSetupOpen(t *testing.T) {
+func TestFirstRunRestoreEmptyKeepsOpen(t *testing.T) {
 	a := newTestApp(t)
 	pass := a.bootstrap.Password()
 	empty := newTestApp(t)
-	entry, err := empty.s.backups.CreateServer(context.Background(), nil)
+	entry, err := empty.svc.Backups.CreateServer(context.Background(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw, _ := os.ReadFile(empty.s.backups.ServerPath(entry.Filename))
+	raw, _ := os.ReadFile(empty.svc.Backups.ServerPath(entry.Filename))
 
 	status(t, a.firstRunRestore(pass, "b.zip", raw, nil), http.StatusUnprocessableEntity, "backup without users")
 	if !a.bootstrap.Active() {

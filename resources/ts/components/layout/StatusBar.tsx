@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Eye, TriangleAlert, X, type LucideIcon } from 'lucide-react'
 import { useReadOnly } from '@/components/providers/ReadOnlyProvider'
 import { isNonProductionApp } from '@/lib/app-env'
+import { cn } from '@/lib/utils'
 
 interface Status {
     id: string
@@ -60,12 +61,19 @@ export function StatusBar() {
     return (
         <div
             role="status"
-            className="relative flex w-full min-w-0 items-center justify-center bg-amber-500 px-9 py-1.5 text-center text-sm font-medium text-amber-950"
+            className={cn(
+                'relative flex w-full min-w-0 items-center justify-center bg-amber-500 px-9',
+                'py-1.5 text-center text-sm font-medium text-amber-950',
+            )}
         >
             <p className="min-w-0">
                 {statuses.map(({ id, icon: Icon, label }, index) => (
                     <Fragment key={id}>
-                        {index > 0 && <span aria-hidden className="mx-2">·</span>}
+                        {index > 0 && (
+                            <span aria-hidden className="mx-2">
+                                ·
+                            </span>
+                        )}
                         <Icon className="mr-1.5 inline size-4 -translate-y-px align-middle" />
                         {label}
                     </Fragment>

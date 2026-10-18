@@ -126,7 +126,9 @@ describe('locale files', () => {
             expect([...other.keys()].sort()).toEqual([...en.keys()].sort())
 
             for (const [ns, keys] of en) {
-                expect([...(other.get(ns)?.keys() ?? [])].sort(), `${locale}/${ns}.json`).toEqual([...keys.keys()].sort())
+                expect([...(other.get(ns)?.keys() ?? [])].sort(), `${locale}/${ns}.json`).toEqual(
+                    [...keys.keys()].sort(),
+                )
             }
         })
 
@@ -160,7 +162,10 @@ describe('locale files', () => {
             for (const [key, text] of texts) {
                 for (const m of text.matchAll(PLURAL_CALL)) {
                     found++
-                    const forms = m[1].split(';').map((part) => part.trim()).filter(Boolean)
+                    const forms = m[1]
+                        .split(';')
+                        .map((part) => part.trim())
+                        .filter(Boolean)
                     const parsed = forms.map((part) => /^(\w+):\s*(\S.*)$/.exec(part))
                     const where = `${ns}:${key}`
                     if (parsed.some((form) => !form)) {
@@ -170,10 +175,12 @@ describe('locale files', () => {
                     const names = parsed.map((form) => form![1])
                     if (!names.includes('other')) problems.push(`${where}: no "other" form`)
                     for (const name of names) {
-                        if (!categories.includes(name as never)) problems.push(`${where}: "${name}" is not a plural form of ${locale}`)
+                        if (!categories.includes(name as never))
+                            problems.push(`${where}: "${name}" is not a plural form of ${locale}`)
                     }
                     if (new Set(names).size !== names.length) problems.push(`${where}: a form is listed twice`)
-                    // The forms the language distinguishes should be written out; `other` alone is only fine for one form.
+                    // The forms the language distinguishes should be written out;
+                    // `other` alone is only fine for one form.
                     const missing = categories.filter((c) => c !== 'other' && !names.includes(c) && c !== 'many')
                     if (missing.length > 0) problems.push(`${where}: lacks ${missing.join(', ')}`)
                 }

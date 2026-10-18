@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { useIdentityProviders, useMailStatus } from '@/hooks'
 import { serverSetupPaths } from './server-setup-paths'
 import { testId } from '@/lib/test-id'
+import { cn } from '@/lib/utils'
 
 interface OptionProps {
     to: string
@@ -20,16 +21,30 @@ function Option({ to, icon: Icon, title, description, done }: OptionProps) {
     return (
         <Link
             to={to}
-            className="flex items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className={cn(
+                'flex items-center gap-3 rounded-lg border p-3 text-left transition-colors',
+                'hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2',
+                'focus-visible:ring-ring',
+            )}
         >
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-muted/50 text-muted-foreground">
+            <div
+                className={cn(
+                    'flex size-9 shrink-0 items-center justify-center rounded-lg border bg-muted/50',
+                    'text-muted-foreground',
+                )}
+            >
                 <Icon className="size-4" />
             </div>
             <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                     <span className="text-sm font-medium">{title}</span>
                     {done && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary">
+                        <span
+                            className={cn(
+                                'inline-flex items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5',
+                                'text-[11px] font-medium text-primary',
+                            )}
+                        >
                             <Check className="size-3" />
                             {t('serverSetup.done')}
                         </span>
@@ -74,7 +89,13 @@ export function ServerOptions({ busy, onFinish }: ServerOptionsProps) {
                 />
             </div>
             <div className="flex flex-col gap-2">
-                <Button type="button" className="w-full" disabled={busy} onClick={onFinish} {...testId('server-setup-finish')}>
+                <Button
+                    type="button"
+                    className="w-full"
+                    disabled={busy}
+                    onClick={onFinish}
+                    {...testId('server-setup-finish')}
+                >
                     {busy && <Loader2 className="mr-2 size-4 animate-spin" />}
                     {mailDone || ssoDone ? t('serverSetup.finish') : t('serverSetup.skip')}
                 </Button>

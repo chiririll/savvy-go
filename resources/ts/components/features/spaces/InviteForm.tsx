@@ -69,14 +69,26 @@ export function InviteForm({ spaceId }: { spaceId: number }) {
             {sent.length > 0 && (
                 <ul className="max-h-48 divide-y overflow-y-auto rounded-lg border">
                     {sent.map((item) => (
-                        <InvitationRow key={item.key} email={item.email} label={item.note} role={item.role} note={item.email ? t('spaces.invitations.sent') : undefined}>
+                        <InvitationRow
+                            key={item.key}
+                            email={item.email}
+                            label={item.note}
+                            role={item.role}
+                            note={item.email ? t('spaces.invitations.sent') : undefined}
+                        >
                             {item.link && (
                                 <Button type="button" variant="outline" size="sm" onClick={() => void copy(item)}>
                                     {copied === item.key ? <Check className="size-4" /> : <Copy className="size-4" />}
                                     {t('spaces.invitations.copy')}
                                 </Button>
                             )}
-                            <Button type="button" variant="ghost" size="icon" aria-label={t('spaces.invitations.cancel')} onClick={() => setCancelling(item)}>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                aria-label={t('spaces.invitations.cancel')}
+                                onClick={() => setCancelling(item)}
+                            >
                                 <X className="size-4" />
                             </Button>
                         </InvitationRow>
@@ -89,7 +101,9 @@ export function InviteForm({ spaceId }: { spaceId: number }) {
                     <AlertDialogHeader>
                         <AlertDialogTitle>{t('spaces.invitations.cancelTitle')}</AlertDialogTitle>
                         <AlertDialogDescription>
-                            {t('spaces.invitations.cancelText', { who: cancelling?.email ?? t('spaces.invitations.anyone') })}
+                            {t('spaces.invitations.cancelText', {
+                                who: cancelling?.email ?? t('spaces.invitations.anyone'),
+                            })}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -98,7 +112,9 @@ export function InviteForm({ spaceId }: { spaceId: number }) {
                             onClick={() => {
                                 const item = cancelling
                                 if (!item) return
-                                revoke.mutate(item.id, { onSuccess: () => setSent((list) => list.filter((i) => i.key !== item.key)) })
+                                revoke.mutate(item.id, {
+                                    onSuccess: () => setSent((list) => list.filter((i) => i.key !== item.key)),
+                                })
                             }}
                         >
                             {t('spaces.invitations.cancelConfirm')}

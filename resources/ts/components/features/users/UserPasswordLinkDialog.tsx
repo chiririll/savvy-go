@@ -4,15 +4,19 @@ import { Check, Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ResponsiveDialog } from '@/components/shared/ResponsiveDialog'
+import { formatDateTime } from '@/lib/format'
 
 interface UserPasswordLinkDialogProps {
     url: string | null
+    /** When the link stops working: an invitation lasts days, a reset an hour by default. */
+    expiresAt?: string | null
     open: boolean
     onOpenChange: (open: boolean) => void
 }
 
 export function UserPasswordLinkDialog({
     url,
+    expiresAt,
     open,
     onOpenChange,
 }: UserPasswordLinkDialogProps) {
@@ -35,7 +39,7 @@ export function UserPasswordLinkDialog({
             open={open}
             onOpenChange={onOpenChange}
             title={t('users.inviteLinkTitle')}
-            description={t('users.inviteLinkDescription')}
+            description={t('users.inviteLinkDescription', { date: expiresAt ? formatDateTime(expiresAt) : '' })}
             className="sm:max-w-lg"
             footer={
                 <Button type="button" onClick={() => onOpenChange(false)}>

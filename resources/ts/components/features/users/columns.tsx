@@ -7,17 +7,27 @@ import { User } from '@/types/users'
 import i18n from '@/lib/i18n'
 import { userRoleLabel } from '@/lib/labels'
 
-export const createUserColumns = (
-    onDelete: (id: number) => void,
-    onEdit: (user: User) => void,
-    onResetPassword: (user: User) => void,
-    currentUserId?: number,
-    isReadOnly?: boolean,
+interface UserColumnsOptions {
+    onDelete: (id: number) => void
+    onEdit: (user: User) => void
+    onResetPassword: (user: User) => void
+    currentUserId?: number
+    isReadOnly?: boolean
     /** Given when the server can send mail: adds "email a reset link". */
-    onEmailReset?: (user: User) => void,
+    onEmailReset?: (user: User) => void
     /** An admin vouching for (true) or withdrawing (false) a user's address. */
-    onSetEmailVerified?: (user: User, verified: boolean) => void,
-): ColumnDef<User>[] => [
+    onSetEmailVerified?: (user: User, verified: boolean) => void
+}
+
+export const createUserColumns = ({
+    onDelete,
+    onEdit,
+    onResetPassword,
+    currentUserId,
+    isReadOnly,
+    onEmailReset,
+    onSetEmailVerified,
+}: UserColumnsOptions): ColumnDef<User>[] => [
     {
         accessorKey: 'name',
         header: () => i18n.t('pages:users.columns.user'),
@@ -27,9 +37,7 @@ export const createUserColumns = (
                 <div>
                     <div className="flex items-center gap-2">
                         <p className="font-medium">{row.original.name}</p>
-                        {row.original.isInactive && (
-                            <Badge variant="secondary">{i18n.t('status.inactive')}</Badge>
-                        )}
+                        {row.original.isInactive && <Badge variant="secondary">{i18n.t('status.inactive')}</Badge>}
                         {!row.original.emailVerified && (
                             <Badge variant="outline">{i18n.t('pages:users.emailUnverified')}</Badge>
                         )}
@@ -42,16 +50,12 @@ export const createUserColumns = (
     {
         accessorKey: 'email',
         header: () => i18n.t('pages:users.columns.email'),
-        cell: ({ row }) => (
-            <span className="text-muted-foreground">{row.original.email}</span>
-        ),
+        cell: ({ row }) => <span className="text-muted-foreground">{row.original.email}</span>,
     },
     {
         accessorKey: 'role',
         header: () => i18n.t('pages:users.columns.role'),
-        cell: ({ row }) => (
-            <span>{userRoleLabel(i18n.t, row.original.role)}</span>
-        ),
+        cell: ({ row }) => <span>{userRoleLabel(i18n.t, row.original.role)}</span>,
     },
     {
         id: 'actions',
@@ -78,8 +82,14 @@ export const createUserColumns = (
                     )}
                     {!isReadOnly && onSetEmailVerified && (
                         <DropdownMenuItem onClick={() => onSetEmailVerified(row.original, !row.original.emailVerified)}>
-                            {row.original.emailVerified ? <MailX className="mr-2 size-4" /> : <MailCheck className="mr-2 size-4" />}
-                            {row.original.emailVerified ? i18n.t('pages:users.markUnverified') : i18n.t('pages:users.markVerified')}
+                            {row.original.emailVerified ? (
+                                <MailX className="mr-2 size-4" />
+                            ) : (
+                                <MailCheck className="mr-2 size-4" />
+                            )}
+                            {row.original.emailVerified
+                                ? i18n.t('pages:users.markUnverified')
+                                : i18n.t('pages:users.markVerified')}
                         </DropdownMenuItem>
                     )}
                     {canReset && (

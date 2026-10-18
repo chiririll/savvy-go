@@ -10,14 +10,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog'
-import {
-    Sheet,
-    SheetContent,
-    SheetDescription,
-    SheetFooter,
-    SheetHeader,
-    SheetTitle,
-} from '@/components/ui/sheet'
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { useReadOnly } from '@/components/providers/ReadOnlyProvider'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
@@ -72,11 +65,7 @@ function FormDialogActions({
             </Button>
             {!isReadOnly && (
                 <Button type="submit" form={formId} disabled={isSubmitting}>
-                    {isSubmitting
-                        ? t('actions.saving')
-                        : isEdit
-                            ? t('actions.save')
-                            : t('actions.create')}
+                    {isSubmitting ? t('actions.saving') : isEdit ? t('actions.save') : t('actions.create')}
                 </Button>
             )}
         </>
@@ -98,13 +87,12 @@ export function FormDialog({
     const isMobile = useIsMobile()
     const [footerStart, setFooterStart] = useState<HTMLDivElement | null>(null)
     const footerStartSlot = (
-        <div ref={setFooterStart} className="mr-auto flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 empty:hidden" />
+        <div
+            ref={setFooterStart}
+            className="mr-auto flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 empty:hidden"
+        />
     )
-    const body = (
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
-            {children}
-        </div>
-    )
+    const body = <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">{children}</div>
     const actions = (
         <FormDialogActions
             formId={formId}
@@ -127,13 +115,16 @@ export function FormDialog({
                         </div>
                         <SheetHeader className="shrink-0 space-y-1.5 border-b px-6 pb-4 pr-12 pt-3 text-left">
                             <SheetTitle>{title}</SheetTitle>
-                            {description && (
-                                <SheetDescription>{description}</SheetDescription>
-                            )}
+                            {description && <SheetDescription>{description}</SheetDescription>}
                             {headerExtra}
                         </SheetHeader>
                         {body}
-                        <SheetFooter className="shrink-0 flex-row flex-wrap items-center justify-end gap-2 border-t px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+                        <SheetFooter
+                            className={cn(
+                                'shrink-0 flex-row flex-wrap items-center justify-end gap-2 border-t px-6 py-4',
+                                'pb-[max(1rem,env(safe-area-inset-bottom))]',
+                            )}
+                        >
                             {footerStartSlot}
                             {actions}
                         </SheetFooter>
@@ -141,16 +132,18 @@ export function FormDialog({
                 </Sheet>
             ) : (
                 <Dialog open={open} onOpenChange={onOpenChange}>
-                    <DialogContent className={cn('flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg', className)}>
+                    <DialogContent
+                        className={cn('flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg', className)}
+                    >
                         <DialogHeader className="shrink-0 space-y-1.5 border-b px-6 pb-4 pr-12 pt-6">
                             <DialogTitle>{title}</DialogTitle>
-                            {description && (
-                                <DialogDescription>{description}</DialogDescription>
-                            )}
+                            {description && <DialogDescription>{description}</DialogDescription>}
                             {headerExtra}
                         </DialogHeader>
                         {body}
-                        <DialogFooter className="shrink-0 flex-row flex-wrap items-center border-t px-6 py-4 sm:justify-end">
+                        <DialogFooter
+                            className={cn('shrink-0 flex-row flex-wrap items-center border-t px-6 py-4 sm:justify-end')}
+                        >
                             {footerStartSlot}
                             {actions}
                         </DialogFooter>

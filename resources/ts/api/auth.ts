@@ -3,6 +3,7 @@ import type { PasswordTokenPreview } from '@/types/users'
 import {
     AuthResponse,
     AuthStatus,
+    ConfirmFields,
     LoginCredentials,
     RegisterData,
     User,
@@ -92,8 +93,8 @@ export const authApi = {
         return response.data
     },
 
-    twoFactorEnable: async (): Promise<TwoFactorEnableResponse> => {
-        const response = await apiClient.post('/auth/2fa/enable')
+    twoFactorEnable: async (confirm: ConfirmFields = {}): Promise<TwoFactorEnableResponse> => {
+        const response = await apiClient.post('/auth/2fa/enable', confirm)
         return response.data
     },
 

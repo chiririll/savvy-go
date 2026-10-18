@@ -6,6 +6,8 @@ import {
     buildContent,
     canRemoveCurrency,
     draftProblems,
+    effectiveSourceId,
+    effectiveStep,
     emptyDraft,
     nextStep,
     noCopy,
@@ -47,13 +49,13 @@ describe('steps', () => {
         expect(previousStep('entities', 0)).toBe('name')
     })
 
-    it('goes through the copy step when there is a space to copy from', () => {
+    it('goes through the copy step when there is a space to copy', () => {
         expect(nextStep('name', 2)).toBe('copy')
         expect(nextStep('copy', 2)).toBe('entities')
         expect(previousStep('entities', 2)).toBe('copy')
     })
 
-    it('goes from the entities straight to the summary: inviting is not a step', () => {
+    it('goes from entities straight to the summary, as inviting is no step', () => {
         expect(nextStep('entities', 0)).toBe('confirm')
         expect(previousStep('confirm', 0)).toBe('entities')
     })
@@ -61,6 +63,20 @@ describe('steps', () => {
     it('stays inside the first and last step', () => {
         expect(previousStep('name', 1)).toBe('name')
         expect(nextStep('confirm', 1)).toBe('confirm')
+    })
+})
+
+describe('effective step and source', () => {
+    it('returns to the name step when there is nothing to copy from', () => {
+        expect(effectiveStep('copy', 0)).toBe('name')
+        expect(effectiveStep('copy', 2)).toBe('copy')
+        expect(effectiveStep('entities', 0)).toBe('entities')
+    })
+
+    it('ignores a source space that is gone', () => {
+        expect(effectiveSourceId(3, [1, 3])).toBe(3)
+        expect(effectiveSourceId(3, [1, 2])).toBeNull()
+        expect(effectiveSourceId(null, [1, 2])).toBeNull()
     })
 })
 
@@ -110,8 +126,12 @@ describe('buildContent', () => {
 
     it('keeps a default category per type when copied categories lack one', () => {
         const content = buildContent({ ...noCopy(), categories: true }, source, presets)
-        expect(content.categories.filter((c) => c.type === 'expense' && c.isDefault).map((c) => c.name)).toEqual(['Misc'])
-        expect(content.categories.filter((c) => c.type === 'income' && c.isDefault).map((c) => c.name)).toEqual(['#OTHER_INCOME'])
+        expect(content.categories.filter((c) => c.type === 'expense' && c.isDefault).map((c) => c.name)).toEqual([
+            'Misc',
+        ])
+        expect(content.categories.filter((c) => c.type === 'income' && c.isDefault).map((c) => c.name)).toEqual([
+            '#OTHER_INCOME',
+        ])
     })
 })
 
@@ -169,7 +189,7 @@ describe('request', () => {
         expect(body.accounts?.[1]).not.toHaveProperty('initialBalance')
     })
 
-    it('adds the currency of an account to the list and drops duplicate tags', () => {
+    it('adds the account currency to the list and drops duplicate tags', () => {
         const draft = { ...ready(), currencies: [], tags: ['Family', ' family ', '', 'Work'] }
         const body = toRequest(draft)
         expect(body.currencies).toEqual(['GBP'])
@@ -220,7 +240,7 @@ describe('invitation list', () => {
         expect(list[0].key).not.toBe(list[1].key)
     })
 
-    it('keeps the note of a link invitation, trimmed, and drops an empty one', () => {
+    it('keeps the link invitation note, trimmed, and drops an empty one', () => {
         const list = addInvitation([], { email: null, note: '  Kim from work ', role: 'viewer' })
         expect(list[0].note).toBe('Kim from work')
         expect(addInvitation([], { email: null, note: '   ', role: 'viewer' })[0].note).toBeNull()
@@ -231,11 +251,14 @@ describe('invitation list', () => {
     })
 
     it('removes one entry by its key', () => {
-        const list = addInvitation(addInvitation([], { email: 'a@example.org', role: 'viewer' }), { email: 'b@example.org', role: 'viewer' })
+        const list = addInvitation(addInvitation([], { email: 'a@example.org', role: 'viewer' }), {
+            email: 'b@example.org',
+            role: 'viewer',
+        })
         expect(removeInvitation(list, list[0].key).map((i) => i.email)).toEqual(['b@example.org'])
     })
 
-    it('is not part of the draft or the request that creates the space', () => {
+    it('is not part of the draft or the create-space request', () => {
         expect(emptyDraft()).not.toHaveProperty('invitations')
         expect(toRequest({ ...emptyDraft(), name: 'Home', baseCurrency: 'EUR' })).not.toHaveProperty('invitations')
     })

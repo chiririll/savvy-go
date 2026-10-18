@@ -105,7 +105,12 @@ func (s Service) Discard(ctx context.Context, id int64) {
 
 // CreateFrom registers a space whose database is a prepared backup. It keeps
 // the backup's uuid unless another space here has it.
-func (s Service) CreateFrom(ctx context.Context, name string, owner *auth.User, p *store.PreparedSpace) (*Space, error) {
+func (s Service) CreateFrom(
+	ctx context.Context,
+	name string,
+	owner *auth.User,
+	p *store.PreparedSpace,
+) (*Space, error) {
 	if owner != nil && owner.IsGuest() {
 		s.Store.Discard(p.Artifact)
 		return nil, ErrGuestCannotAdmin

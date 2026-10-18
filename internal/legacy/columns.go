@@ -22,6 +22,7 @@ var extraColumns = map[string][]addColumn{
 		{"two_factor_secret", "TEXT"},
 		{"two_factor_enabled", "INTEGER NOT NULL DEFAULT 0"},
 		{"two_factor_confirmed", "INTEGER NOT NULL DEFAULT 0"},
+		{"two_factor_last_step", "INTEGER"},
 	},
 	"auth_sessions": {
 		{"remember_me", "INTEGER NOT NULL DEFAULT 0"},

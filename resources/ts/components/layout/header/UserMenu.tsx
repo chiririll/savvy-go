@@ -38,7 +38,9 @@ export function UserMenu() {
                     <UserAvatar user={user} className="size-8" />
                     <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium">{user.name}</p>
-                        <p className="truncate text-xs text-muted-foreground">{user.role ? userRoleLabel(t, user.role) : ''}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                            {user.role ? userRoleLabel(t, user.role) : ''}
+                        </p>
                     </div>
                 </div>
                 <DropdownMenuSeparator />

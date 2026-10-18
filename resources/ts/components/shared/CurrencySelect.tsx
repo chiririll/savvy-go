@@ -9,9 +9,7 @@ import { useCurrencies, useCurrencyCatalog } from '@/hooks'
 import { cn } from '@/lib/utils'
 import type { Currency, CurrencyCatalogItem } from '@/types'
 
-export type CurrencySelectValue =
-    | { source: 'existing'; id: number }
-    | { source: 'catalog'; code: string }
+export type CurrencySelectValue = { source: 'existing'; id: number } | { source: 'catalog'; code: string }
 
 interface CurrencySelectProps {
     value?: CurrencySelectValue | null
@@ -50,44 +48,39 @@ function CurrencyRow({
         <button
             type="button"
             className={cn(
-                'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground',
-                selected && 'bg-accent'
+                'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm',
+                'hover:bg-accent hover:text-accent-foreground',
+                selected && 'bg-accent',
             )}
             onClick={onSelect}
         >
             <Check className={cn('size-4 shrink-0', selected ? 'opacity-100' : 'opacity-0')} />
             <span className="min-w-0 flex-1 truncate">
                 <span className="font-mono font-medium">{code}</span>
-                <span className="text-muted-foreground"> · {symbol} · {name}</span>
+                <span className="text-muted-foreground">
+                    {' '}
+                    · {symbol} · {name}
+                </span>
             </span>
             {isNew && <Plus className="size-3.5 shrink-0 text-muted-foreground" />}
         </button>
     )
 }
 
-export function CurrencySelect({
-    value,
-    onChange,
-    allowCatalog = true,
-    disabled,
-    placeholder,
-}: CurrencySelectProps) {
+export function CurrencySelect({ value, onChange, allowCatalog = true, disabled, placeholder }: CurrencySelectProps) {
     const { t } = useTranslation('forms')
     const { data: currencies, isLoading } = useCurrencies()
     const { data: catalog = [] } = useCurrencyCatalog(allowCatalog)
     const [open, setOpen] = useState(false)
     const [query, setQuery] = useState('')
 
-    const selectedExisting = value?.source === 'existing'
-        ? currencies?.find((currency) => currency.id === value.id)
-        : undefined
-    const selectedCatalog = value?.source === 'catalog'
-        ? catalog.find((item) => item.code === value.code)
-        : undefined
+    const selectedExisting =
+        value?.source === 'existing' ? currencies?.find((currency) => currency.id === value.id) : undefined
+    const selectedCatalog = value?.source === 'catalog' ? catalog.find((item) => item.code === value.code) : undefined
 
     const existing = useMemo(
         () => (currencies ?? []).filter((currency) => matchesQuery(query, currency.code, currency.name)),
-        [currencies, query]
+        [currencies, query],
     )
 
     const catalogItems = useMemo(() => {
@@ -101,10 +94,10 @@ export function CurrencySelect({
     const label = selectedExisting
         ? formatCurrencyLabel(selectedExisting)
         : selectedCatalog
-            ? formatCurrencyLabel(selectedCatalog)
-            : value?.source === 'catalog'
-                ? value.code
-                : null
+          ? formatCurrencyLabel(selectedCatalog)
+          : value?.source === 'catalog'
+            ? value.code
+            : null
 
     const pick = (next: CurrencySelectValue) => {
         onChange(next)
@@ -131,10 +124,7 @@ export function CurrencySelect({
                         role="combobox"
                         aria-expanded={open}
                         disabled={disabled || isLoading}
-                        className={cn(
-                            'w-full justify-between font-normal',
-                            !label && 'text-muted-foreground'
-                        )}
+                        className={cn('w-full justify-between font-normal', !label && 'text-muted-foreground')}
                     >
                         <span className="truncate">{label ?? placeholder ?? t('selectCurrency')}</span>
                         <ChevronDown className="size-4 shrink-0 opacity-50" />
@@ -157,9 +147,7 @@ export function CurrencySelect({
                     {existing.length > 0 && (
                         <div>
                             {allowCatalog && (
-                                <p className="px-2 py-1.5 text-xs text-muted-foreground">
-                                    {t('currencyYour')}
-                                </p>
+                                <p className="px-2 py-1.5 text-xs text-muted-foreground">{t('currencyYour')}</p>
                             )}
                             {existing.map((currency) => (
                                 <CurrencyRow
@@ -175,9 +163,7 @@ export function CurrencySelect({
                     )}
                     {catalogItems.length > 0 && (
                         <div>
-                            <p className="px-2 py-1.5 text-xs text-muted-foreground">
-                                {t('currencyCatalog')}
-                            </p>
+                            <p className="px-2 py-1.5 text-xs text-muted-foreground">{t('currencyCatalog')}</p>
                             {catalogItems.map((item) => (
                                 <CurrencyRow
                                     key={item.code}
@@ -192,9 +178,7 @@ export function CurrencySelect({
                         </div>
                     )}
                     {existing.length === 0 && catalogItems.length === 0 && (
-                        <p className="px-2 py-6 text-center text-sm text-muted-foreground">
-                            {t('currencyEmpty')}
-                        </p>
+                        <p className="px-2 py-6 text-center text-sm text-muted-foreground">{t('currencyEmpty')}</p>
                     )}
                 </div>
             </PopoverContent>

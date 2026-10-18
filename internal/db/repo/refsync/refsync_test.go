@@ -17,7 +17,9 @@ func TestGroupsOnTheServer(t *testing.T) {
 	now := time.Now().UTC()
 	ann, _ := authrepo.Repo{DB: d}.InsertUser(ctx, "Ann", "ann@test.com", "h", "user", now)
 	for _, uuid := range []string{"a", "b", "c"} {
-		if _, err := d.ExecContext(ctx, `INSERT INTO spaces (uuid, name, created_by) VALUES (?, ?, ?)`, uuid, uuid, ann); err != nil {
+		if _,
+			err := d.ExecContext(ctx, `INSERT INTO spaces (uuid, name, created_by) VALUES (?, ?, ?)`, uuid, uuid,
+			ann); err != nil {
 			t.Fatal(err)
 		}
 	}

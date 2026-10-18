@@ -26,8 +26,12 @@ export function TransactionItemsRow({ transaction }: { transaction: Transaction 
                         <tr key={item.id ?? idx} className="border-t border-border/50">
                             <td className="py-1.5">{item.name}</td>
                             <td className="py-1.5 text-right font-mono">{item.quantity}</td>
-                            <td className="py-1.5 text-right font-mono">{formatCurrency(item.pricePerUnit, currency, { showSymbol: false })}</td>
-                            <td className="py-1.5 text-right font-mono font-medium">{formatCurrency(item.totalPrice, currency, { showSymbol: false })}</td>
+                            <td className="py-1.5 text-right font-mono">
+                                {formatCurrency(item.pricePerUnit, currency, { showSymbol: false })}
+                            </td>
+                            <td className="py-1.5 text-right font-mono font-medium">
+                                {formatCurrency(item.totalPrice, currency, { showSymbol: false })}
+                            </td>
                         </tr>
                     ))}
                 </tbody>

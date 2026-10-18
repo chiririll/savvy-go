@@ -4,6 +4,7 @@ import { webauthnApi } from '@/api'
 import { toast } from 'sonner'
 import i18n from '@/lib/i18n'
 import { resolveUserFacingText } from '@/lib/api-error'
+import { isConfirmCancelled, withConfirmation } from '@/stores/confirm'
 
 const QUERY_KEY = ['webauthn-credentials']
 
@@ -30,7 +31,7 @@ export function useRegisterPasskey() {
 
     return useMutation({
         mutationFn: async (name: string | null) => {
-            const { token, options } = await webauthnApi.registerOptions()
+            const { token, options } = await withConfirmation(webauthnApi.registerOptions)
             const attestation = await startRegistration({ optionsJSON: options })
             return webauthnApi.registerVerify(token, attestation, name)
         },
@@ -39,6 +40,7 @@ export function useRegisterPasskey() {
             toast.success(i18n.t('toasts.passkey.added'))
         },
         onError: (error: unknown) => {
+            if (isConfirmCancelled(error)) return
             toast.error(passkeyErrorMessage(error, i18n.t('toasts.passkey.addFailed')))
         },
     })
@@ -64,12 +66,13 @@ export function useDeletePasskey() {
     const queryClient = useQueryClient()
 
     return useMutation({
-        mutationFn: (id: number) => webauthnApi.deleteCredential(id),
+        mutationFn: (id: number) => withConfirmation((fields) => webauthnApi.deleteCredential(id, fields)),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: QUERY_KEY })
             toast.success(i18n.t('toasts.passkey.removed'))
         },
         onError: (error: Error) => {
+            if (isConfirmCancelled(error)) return
             toast.error(error.message || i18n.t('toasts.passkey.removeFailed'))
         },
     })

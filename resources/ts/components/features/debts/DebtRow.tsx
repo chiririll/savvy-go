@@ -23,33 +23,98 @@ interface DebtRowProps {
     isReadOnly?: boolean
 }
 
-export function DebtRow({ debt, onEdit, onDelete, onPayment, onCollect, onReopen, isReadOnly }: DebtRowProps) {
+interface DebtHandlers {
+    edit?: () => void
+    remove?: () => void
+    settle?: () => void
+    reopen?: () => void
+}
+
+/** Each action the row offers, or undefined when the debt, the role or the caller rules it out. */
+function debtHandlers(debt: Debt, { onEdit, onDelete, onPayment, onCollect, onReopen, isReadOnly }: DebtRowProps) {
+    const writable = !isReadOnly
+    const settle = debt.debtType === 'i_owe' ? onPayment : onCollect
+    return {
+        edit: writable && onEdit ? () => onEdit(debt) : undefined,
+        remove: writable && onDelete ? () => onDelete(debt.id) : undefined,
+        settle: writable && !debt.isPaidOff && settle ? () => settle(debt) : undefined,
+        reopen: writable && debt.isPaidOff && onReopen ? () => onReopen(debt.id) : undefined,
+    } satisfies DebtHandlers
+}
+
+function DebtSubtitle({ debt }: { debt: Debt }) {
     const { t } = useTranslation('pages')
     const relativeDay = useRelativeDay()
-    const canEdit = !!onEdit && !isReadOnly
-    const canDelete = !!onDelete && !isReadOnly
-    const { icon: Icon, tone } = DEBT_TYPE_CONFIG[debt.debtType]
-    const settle = debt.debtType === 'i_owe' ? onPayment : onCollect
-    const canSettle = !isReadOnly && !debt.isPaidOff && !!settle
-    const canReopen = !isReadOnly && debt.isPaidOff && !!onReopen
     const overdue = !debt.isPaidOff && isDateOverdue(debt.dueDate?.slice(0, 10))
+    if (!debt.dueDate && !debt.counterparty) return null
+    return (
+        <>
+            {debt.dueDate && (
+                <span className={cn(overdue && 'font-medium text-red-600')}>
+                    {t('debts.due', { date: relativeDay(debt.dueDate) })}
+                </span>
+            )}
+            {debt.dueDate && debt.counterparty && ' · '}
+            {debt.counterparty}
+        </>
+    )
+}
+
+interface DebtMenuProps {
+    debt: Debt
+    handlers: DebtHandlers
+    open: boolean
+    onOpenChange: (open: boolean) => void
+    showTrigger: boolean
+}
+
+function DebtMenu({ debt, handlers, open, onOpenChange, showTrigger }: DebtMenuProps) {
+    const { t } = useTranslation('pages')
+    const { icon: Icon } = DEBT_TYPE_CONFIG[debt.debtType]
+    return (
+        <RowActions
+            open={open}
+            onOpenChange={onOpenChange}
+            showTrigger={showTrigger}
+            onEdit={handlers.edit}
+            onDelete={handlers.remove}
+            deleteTitle={t('debts.deleteTitle')}
+            deleteDescription={t('debts.deleteDescription')}
+            leading={
+                (handlers.settle || handlers.reopen) && (
+                    <>
+                        {handlers.settle && (
+                            <DropdownMenuItem onClick={handlers.settle} {...testId('settle')}>
+                                <Icon className="mr-2 size-4" />
+                                {debt.debtType === 'i_owe' ? t('debts.makePayment') : t('debts.collectPayment')}
+                            </DropdownMenuItem>
+                        )}
+                        {handlers.reopen && (
+                            <DropdownMenuItem onClick={handlers.reopen}>
+                                <RotateCcw className="mr-2 size-4" />
+                                {t('debts.reopen')}
+                            </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
+                    </>
+                )
+            }
+        />
+    )
+}
+
+export function DebtRow(props: DebtRowProps) {
+    const { debt } = props
+    const { t } = useTranslation('pages')
+    const { icon: Icon, tone } = DEBT_TYPE_CONFIG[debt.debtType]
+    const handlers = debtHandlers(debt, props)
 
     return (
         <FeedRow
             icon={<Icon className="size-4" />}
             iconClassName={tone}
             title={debt.name}
-            subtitle={(debt.dueDate || debt.counterparty) && (
-                <>
-                    {debt.dueDate && (
-                        <span className={cn(overdue && 'font-medium text-red-600')}>
-                            {t('debts.due', { date: relativeDay(debt.dueDate) })}
-                        </span>
-                    )}
-                    {debt.dueDate && debt.counterparty && ' · '}
-                    {debt.counterparty}
-                </>
-            )}
+            subtitle={<DebtSubtitle debt={debt} />}
             {...progressAmounts({
                 remaining: debt.currentBalance,
                 total: debt.targetAmount,
@@ -57,34 +122,15 @@ export function DebtRow({ debt, onEdit, onDelete, onPayment, onCollect, onReopen
                 done: debt.isPaidOff ? t('debts.paidOff') : undefined,
             })}
             below={!debt.isPaidOff && debt.targetAmount > 0 && <FeedProgress value={debt.paymentProgress} />}
-            onOpen={canEdit ? () => onEdit(debt) : undefined}
-            hasActions={canEdit || canDelete || canSettle || canReopen}
+            onOpen={handlers.edit}
+            hasActions={Object.values(handlers).some(Boolean)}
             actions={({ menuOpen, setMenuOpen, isMobile }) => (
-                <RowActions
+                <DebtMenu
+                    debt={debt}
+                    handlers={handlers}
                     open={menuOpen}
                     onOpenChange={setMenuOpen}
                     showTrigger={!isMobile}
-                    onEdit={canEdit ? () => onEdit(debt) : undefined}
-                    onDelete={canDelete ? () => onDelete(debt.id) : undefined}
-                    deleteTitle={t('debts.deleteTitle')}
-                    deleteDescription={t('debts.deleteDescription')}
-                    leading={(canSettle || canReopen) && (
-                        <>
-                            {canSettle && (
-                                <DropdownMenuItem onClick={() => settle(debt)} {...testId('settle')}>
-                                    <Icon className="mr-2 size-4" />
-                                    {debt.debtType === 'i_owe' ? t('debts.makePayment') : t('debts.collectPayment')}
-                                </DropdownMenuItem>
-                            )}
-                            {canReopen && (
-                                <DropdownMenuItem onClick={() => onReopen(debt.id)}>
-                                    <RotateCcw className="mr-2 size-4" />
-                                    {t('debts.reopen')}
-                                </DropdownMenuItem>
-                            )}
-                            <DropdownMenuSeparator />
-                        </>
-                    )}
                 />
             )}
         />

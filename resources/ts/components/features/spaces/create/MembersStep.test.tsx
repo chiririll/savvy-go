@@ -29,7 +29,8 @@ function Harness({ onList }: { onList: (list: DraftInvitation[]) => void }) {
     )
 }
 
-const type = (value: string) => fireEvent.change(screen.getByPlaceholderText('spaces.invitations.emailPlaceholder'), { target: { value } })
+const type = (value: string) =>
+    fireEvent.change(screen.getByPlaceholderText('spaces.invitations.emailPlaceholder'), { target: { value } })
 const add = () => fireEvent.click(screen.getByRole('button', { name: 'spaces.create.members.add' }))
 
 afterEach(() => cleanup())

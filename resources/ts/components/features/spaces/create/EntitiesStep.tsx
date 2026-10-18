@@ -11,13 +11,7 @@ import { localizeDefaultName, toStoredDefaultName } from '@/lib/localized-name'
 import type { CurrencyCatalogItem } from '@/types'
 import type { AccountType } from '@/types/accounts'
 import { CATEGORY_TYPES, type CategoryType } from '@/types/categories'
-import {
-    canRemoveCurrency,
-    isProtectedCategory,
-    newAccountKey,
-    removeCategory,
-    type DraftContent,
-} from './draft'
+import { canRemoveCurrency, isProtectedCategory, newAccountKey, removeCategory, type DraftContent } from './draft'
 
 const ACCOUNT_TYPES: AccountType[] = ['bank', 'cash', 'crypto']
 
@@ -57,7 +51,8 @@ function Currencies({ content, catalog, catalogFailed, onRetryCatalog, onChange 
     const loading = catalog === undefined
     // While loading, the chosen base (e.g. from a draft) still has an item to show.
     const options: CurrencyCatalogItem[] =
-        catalog ?? (content.baseCurrency ? [{ code: content.baseCurrency, name: '', symbol: '', decimals: 2, rate: null }] : [])
+        catalog ??
+        (content.baseCurrency ? [{ code: content.baseCurrency, name: '', symbol: '', decimals: 2, rate: null }] : [])
     const free = (catalog ?? []).filter((c) => !taken.has(c.code))
 
     return (
@@ -85,11 +80,15 @@ function Currencies({ content, catalog, catalogFailed, onRetryCatalog, onChange 
                         ))}
                     </SelectContent>
                 </Select>
-                {loading && !catalogFailed && <p className="text-xs text-muted-foreground">{t('spaces.create.currencies.loading')}</p>}
+                {loading && !catalogFailed && (
+                    <p className="text-xs text-muted-foreground">{t('spaces.create.currencies.loading')}</p>
+                )}
                 {catalogFailed && (
                     <p className="text-xs text-destructive">
                         {t('spaces.create.currencies.failed')}{' '}
-                        <button type="button" className="underline" onClick={onRetryCatalog}>{t('actions.retry', { ns: 'common' })}</button>
+                        <button type="button" className="underline" onClick={onRetryCatalog}>
+                            {t('actions.retry', { ns: 'common' })}
+                        </button>
                     </p>
                 )}
             </div>
@@ -109,7 +108,11 @@ function Currencies({ content, catalog, catalogFailed, onRetryCatalog, onChange 
                     </span>
                 ))}
                 <Select value="" onValueChange={(code) => onChange({ currencies: [...content.currencies, code] })}>
-                    <SelectTrigger className="w-44" disabled={loading || !content.baseCurrency} {...testId('create-space-add-currency')}>
+                    <SelectTrigger
+                        className="w-44"
+                        disabled={loading || !content.baseCurrency}
+                        {...testId('create-space-add-currency')}
+                    >
                         <SelectValue placeholder={t('spaces.create.currencies.add')} />
                     </SelectTrigger>
                     <SelectContent>
@@ -136,7 +139,10 @@ function Accounts({ content, onChange }: Pick<Props, 'content' | 'onChange'>) {
         <Section title={t('spaces.create.accounts.title')} hint={t('spaces.create.accounts.hint')}>
             {content.accounts.map((account) => (
                 // Phone: name on top, type and currency side by side, balance and remove last.
-                <div key={account.key} className="grid grid-cols-2 gap-2 rounded-lg border p-2 sm:grid-cols-[2fr_1fr_1fr_1fr_auto]">
+                <div
+                    key={account.key}
+                    className="grid grid-cols-2 gap-2 rounded-lg border p-2 sm:grid-cols-[2fr_1fr_1fr_1fr_auto]"
+                >
                     <Input
                         className="col-span-2 sm:col-span-1"
                         {...testId('create-space-account-name')}
@@ -146,13 +152,18 @@ function Accounts({ content, onChange }: Pick<Props, 'content' | 'onChange'>) {
                         maxLength={255}
                         onChange={(e) => patch(account.key, { name: e.target.value })}
                     />
-                    <Select value={account.type} onValueChange={(type) => patch(account.key, { type: type as AccountType })}>
+                    <Select
+                        value={account.type}
+                        onValueChange={(type) => patch(account.key, { type: type as AccountType })}
+                    >
                         <SelectTrigger className="w-full">
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                             {ACCOUNT_TYPES.map((type) => (
-                                <SelectItem key={type} value={type}>{accountTypeLabel(tc, type)}</SelectItem>
+                                <SelectItem key={type} value={type}>
+                                    {accountTypeLabel(tc, type)}
+                                </SelectItem>
                             ))}
                         </SelectContent>
                     </Select>
@@ -162,7 +173,9 @@ function Accounts({ content, onChange }: Pick<Props, 'content' | 'onChange'>) {
                         </SelectTrigger>
                         <SelectContent>
                             {codes.map((code) => (
-                                <SelectItem key={code} value={code}>{code}</SelectItem>
+                                <SelectItem key={code} value={code}>
+                                    {code}
+                                </SelectItem>
                             ))}
                         </SelectContent>
                     </Select>
@@ -196,7 +209,13 @@ function Accounts({ content, onChange }: Pick<Props, 'content' | 'onChange'>) {
                     onChange({
                         accounts: [
                             ...content.accounts,
-                            { key: newAccountKey(), name: '', type: 'bank', currency: content.baseCurrency ?? '', initialBalance: '' },
+                            {
+                                key: newAccountKey(),
+                                name: '',
+                                type: 'bank',
+                                currency: content.baseCurrency ?? '',
+                                initialBalance: '',
+                            },
                         ],
                     })
                 }
@@ -214,7 +233,9 @@ function Categories({ content, onChange }: Pick<Props, 'content' | 'onChange'>) 
     const [type, setType] = useState<CategoryType>('expense')
     const rename = (index: number, input: string) =>
         onChange({
-            categories: content.categories.map((c, i) => (i === index ? { ...c, name: toStoredDefaultName(input, c.name) } : c)),
+            categories: content.categories.map((c, i) =>
+                i === index ? { ...c, name: toStoredDefaultName(input, c.name) } : c,
+            ),
         })
 
     return (
@@ -222,21 +243,27 @@ function Categories({ content, onChange }: Pick<Props, 'content' | 'onChange'>) 
             <ul className="space-y-1.5">
                 {content.categories.map((category, index) => (
                     <li key={index} className="flex items-center gap-2">
-                        <span aria-hidden className="w-6 text-center">{category.icon}</span>
+                        <span aria-hidden className="w-6 text-center">
+                            {category.icon}
+                        </span>
                         <Input
                             aria-label={t('spaces.create.categories.name')}
                             value={localizeDefaultName(category.name)}
                             maxLength={255}
                             onChange={(e) => rename(index, e.target.value)}
                         />
-                        <span className="w-20 shrink-0 text-xs text-muted-foreground">{categoryTypeLabel(tc, category.type)}</span>
+                        <span className="w-20 shrink-0 text-xs text-muted-foreground">
+                            {categoryTypeLabel(tc, category.type)}
+                        </span>
                         <Button
                             type="button"
                             variant="ghost"
                             size="icon"
                             disabled={isProtectedCategory(category)}
                             title={isProtectedCategory(category) ? t('spaces.create.categories.protected') : undefined}
-                            aria-label={t('spaces.create.categories.remove', { name: localizeDefaultName(category.name) })}
+                            aria-label={t('spaces.create.categories.remove', {
+                                name: localizeDefaultName(category.name),
+                            })}
                             onClick={() => onChange({ categories: removeCategory(content.categories, index) })}
                         >
                             <X className="size-4" />
@@ -250,7 +277,10 @@ function Categories({ content, onChange }: Pick<Props, 'content' | 'onChange'>) 
                     e.preventDefault()
                     if (!name.trim()) return
                     onChange({
-                        categories: [...content.categories, { name: name.trim(), type, icon: '🏷️', color: '#6b7280', isDefault: false }],
+                        categories: [
+                            ...content.categories,
+                            { name: name.trim(), type, icon: '🏷️', color: '#6b7280', isDefault: false },
+                        ],
                     })
                     setName('')
                 }}
@@ -268,7 +298,9 @@ function Categories({ content, onChange }: Pick<Props, 'content' | 'onChange'>) 
                     </SelectTrigger>
                     <SelectContent>
                         {CATEGORY_TYPES.map((v) => (
-                            <SelectItem key={v} value={v}>{categoryTypeLabel(tc, v)}</SelectItem>
+                            <SelectItem key={v} value={v}>
+                                {categoryTypeLabel(tc, v)}
+                            </SelectItem>
                         ))}
                     </SelectContent>
                 </Select>
@@ -306,7 +338,8 @@ function Tags({ content, onChange }: Pick<Props, 'content' | 'onChange'>) {
                 onSubmit={(e) => {
                     e.preventDefault()
                     const tag = name.trim()
-                    if (tag && !content.tags.some((x) => x.toLowerCase() === tag.toLowerCase())) onChange({ tags: [...content.tags, tag] })
+                    if (tag && !content.tags.some((x) => x.toLowerCase() === tag.toLowerCase()))
+                        onChange({ tags: [...content.tags, tag] })
                     setName('')
                 }}
             >

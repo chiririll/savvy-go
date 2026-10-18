@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { authApi } from '@/api'
 import { toast } from 'sonner'
 import i18n from '@/lib/i18n'
+import { isConfirmCancelled, withConfirmation } from '@/stores/confirm'
 
 const QUERY_KEY = ['two-factor-status']
 
@@ -14,8 +15,9 @@ export function useTwoFactorStatus() {
 
 export function useEnableTwoFactor() {
     return useMutation({
-        mutationFn: authApi.twoFactorEnable,
+        mutationFn: () => withConfirmation(authApi.twoFactorEnable),
         onError: (error: Error) => {
+            if (isConfirmCancelled(error)) return
             toast.error(error.message || i18n.t('toasts.twoFactor.enableFailed'))
         },
     })

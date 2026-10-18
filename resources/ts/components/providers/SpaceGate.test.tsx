@@ -12,7 +12,15 @@ vi.mock('react-i18next', async (importActual) => ({
     useTranslation: () => ({ t: (key: string) => key }),
 }))
 vi.mock('@/components/features/spaces/CreateSpaceModal', () => ({
-    CreateSpaceModal: ({ open, onOpenChange, dismissible = true }: { open: boolean; onOpenChange: (open: boolean) => void; dismissible?: boolean }) =>
+    CreateSpaceModal: ({
+        open,
+        onOpenChange,
+        dismissible = true,
+    }: {
+        open: boolean
+        onOpenChange: (open: boolean) => void
+        dismissible?: boolean
+    }) =>
         open ? (
             <div role="dialog" data-dismissible={String(dismissible)}>
                 <button onClick={() => onOpenChange(false)}>close</button>

@@ -1,20 +1,10 @@
 package importer
 
 import (
-	"bytes"
 	"context"
-	"crypto/md5"
-	"crypto/rand"
-	"encoding/csv"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"math"
-	"strconv"
-	"strings"
 	"time"
-
-	"github.com/shopspring/decimal"
 
 	repo "savvy-go/internal/db/repo/importer"
 	"savvy-go/internal/ledger"
@@ -49,9 +39,45 @@ type Import struct {
 	CreatedCount  int
 	SkippedCount  int
 	ErrorCount    int
-	Errors        any
-	Meta          map[string]any
+	Errors        []RowError
+	Meta          Meta
 	Message       *string
+}
+
+// RowError is a row the import could not take, numbered from 1.
+type RowError struct {
+	Row     int    `json:"row"`
+	Message string `json:"message"`
+}
+
+// Formats are the CSV conventions found in the sample.
+type Formats struct {
+	DateFormat   string `json:"date_format"`
+	AmountFormat string `json:"amount_format"`
+	HasHeader    bool   `json:"has_header"`
+	Delimiter    string `json:"delimiter"`
+}
+
+// ParseMeta describes how the file was read.
+type ParseMeta struct {
+	Delimiter string `json:"delimiter"`
+	HasHeader bool   `json:"has_header"`
+	Encoding  string `json:"encoding"`
+}
+
+// Meta is what an import keeps next to its row counts, stored as JSON with
+// snake_case keys. The first group is set when the file is parsed, the second
+// when the import completes.
+type Meta struct {
+	Headers          []string       `json:"headers,omitempty"`
+	PreviewRows      [][]string     `json:"preview_rows,omitempty"`
+	DetectedFormats  Formats        `json:"detected_formats"`
+	SuggestedMapping map[string]int `json:"suggested_mapping,omitempty"`
+	ParseMeta        ParseMeta      `json:"parse_meta"`
+
+	CreatedCurrencies []string `json:"created_currencies"`
+	CreatedTags       []string `json:"created_tags"`
+	CreatedCategories []string `json:"created_categories"`
 }
 
 func (s Service) Create(ctx context.Context, userID int64, uploadID string) (*Import, error) {
@@ -79,15 +105,10 @@ func (s Service) ByID(ctx context.Context, id string) (*Import, error) {
 		_ = json.Unmarshal([]byte(*row.Options), &im.Options)
 	}
 	if row.Errors != nil && *row.Errors != "" {
-		var v any
-		_ = json.Unmarshal([]byte(*row.Errors), &v)
-		im.Errors = v
+		_ = json.Unmarshal([]byte(*row.Errors), &im.Errors)
 	}
 	if row.Meta != nil && *row.Meta != "" {
 		_ = json.Unmarshal([]byte(*row.Meta), &im.Meta)
-	}
-	if im.Meta == nil {
-		im.Meta = map[string]any{}
 	}
 	return &im, nil
 }
@@ -114,14 +135,17 @@ func (s Service) Parse(ctx context.Context, importID, uploadID string) error {
 	if len(preview) > 10 {
 		preview = preview[:10]
 	}
-	meta := map[string]any{
-		"headers": headers, "preview_rows": preview,
-		"detected_formats": map[string]any{
-			"date_format": detected.dateFormat, "amount_format": detected.amountFormat,
-			"has_header": true, "delimiter": string(detected.delimiter),
+	delim := string(detected.delimiter)
+	meta := Meta{
+		Headers: headers, PreviewRows: preview,
+		DetectedFormats: Formats{
+			DateFormat:   detected.dateFormat,
+			AmountFormat: detected.amountFormat,
+			HasHeader:    true,
+			Delimiter:    delim,
 		},
-		"suggested_mapping": detected.mapping,
-		"parse_meta":        map[string]any{"delimiter": string(detected.delimiter), "has_header": true, "encoding": "utf-8"},
+		SuggestedMapping: detected.mapping,
+		ParseMeta:        ParseMeta{Delimiter: delim, HasHeader: true, Encoding: "utf-8"},
 	}
 	rawMeta, _ := json.Marshal(meta)
 	return s.repo().MarkParsed(ctx, importID, len(rows), string(rawMeta), time.Now().UTC())
@@ -152,8 +176,6 @@ func (s Service) Execute(ctx context.Context, importID string, mapping, options 
 	if err != nil {
 		return s.fail(ctx, importID, err.Error())
 	}
-	created, skipped := 0, 0
-	var errs []map[string]any
 	accountID, _ := asInt64(options["default_account_id"])
 	resolver, err := s.newCategoryResolver(ctx, collectImportCategories(rows, mapping, options), options)
 	if err != nil {
@@ -163,48 +185,17 @@ func (s Service) Execute(ctx context.Context, importID string, mapping, options 
 	if err != nil {
 		return s.fail(ctx, importID, err.Error())
 	}
+	run := importRun{s: s, accountID: accountID, unit: unit, resolver: resolver, now: now, errs: []RowError{}}
 	for i, row := range rows {
-		res := processImportRow(row, mapping, options, i+1)
-		if res.err != "" {
-			if len(errs) < 200 {
-				errs = append(errs, map[string]any{"row": i + 1, "message": res.err})
-			}
-			continue
-		}
-		amount, err := money.FromInput(res.amount, unit)
-		if err != nil {
-			if len(errs) < 200 {
-				errs = append(errs, map[string]any{"row": i + 1, "message": err.Error()})
-			}
-			continue
-		}
-		hash := dedupHash(res.date, res.amount, res.desc)
-		added, err := s.repo().InsertRow(ctx, repo.Row{
-			Type: res.typ, AccountID: accountID, CategoryID: resolver.resolve(res.category), Minor: amount.Minor(),
-			Description: res.desc, Date: res.date, Status: "confirmed", DedupHash: hash,
-		}, now)
-		if err != nil {
-			errs = append(errs, map[string]any{"row": i + 1, "message": err.Error()})
-			continue
-		}
-		if added {
-			created++
-		} else {
-			skipped++
-		}
+		run.row(ctx, row, mapping, options, i+1)
 	}
-	errJSON, _ := json.Marshal(errs)
+	errJSON, _ := json.Marshal(run.errs)
 	meta := im.Meta
-	if meta == nil {
-		meta = map[string]any{}
-	}
-	meta["created_currencies"] = []any{}
-	meta["created_tags"] = []any{}
-	meta["created_categories"] = resolver.created
+	meta.CreatedCurrencies, meta.CreatedTags, meta.CreatedCategories = []string{}, []string{}, resolver.created
 	metaJSON, _ := json.Marshal(meta)
 	err = s.repo().MarkCompleted(ctx, importID, repo.Result{
-		Processed: created + skipped + len(errs), Created: created, Skipped: skipped, Errors: len(errs),
-		ErrorsJSON: string(errJSON), MetaJSON: string(metaJSON),
+		Processed: run.created + run.skipped + len(run.errs), Created: run.created, Skipped: run.skipped,
+		Errors: len(run.errs), ErrorsJSON: string(errJSON), MetaJSON: string(metaJSON),
 	}, now)
 	if err != nil {
 		return err
@@ -213,7 +204,53 @@ func (s Service) Execute(ctx context.Context, importID string, mapping, options 
 	return nil
 }
 
-func (s Service) Preview(ctx context.Context, im *Import, mapping, options map[string]any) (map[string]any, error) {
+// maxRowErrors caps how many row errors an import report keeps.
+const maxRowErrors = 200
+
+// importRun tallies one Execute pass over the rows.
+type importRun struct {
+	s                Service
+	accountID        int64
+	unit             money.Unit
+	resolver         *categoryResolver
+	now              time.Time
+	created, skipped int
+	errs             []RowError
+}
+
+func (r *importRun) reject(n int, msg string) {
+	if len(r.errs) < maxRowErrors {
+		r.errs = append(r.errs, RowError{Row: n, Message: msg})
+	}
+}
+
+// row imports one CSV row; n is its 1-based position.
+func (r *importRun) row(ctx context.Context, row []string, mapping, options map[string]any, n int) {
+	res := processImportRow(row, mapping, options, n)
+	if res.err != "" {
+		r.reject(n, res.err)
+		return
+	}
+	amount, err := money.FromInput(res.amount, r.unit)
+	if err != nil {
+		r.reject(n, err.Error())
+		return
+	}
+	added, err := r.s.repo().InsertRow(ctx, repo.Row{
+		Type: res.typ, AccountID: r.accountID, CategoryID: r.resolver.resolve(res.category), Minor: amount.Minor(),
+		Description: res.desc, Date: res.date, Status: "confirmed", DedupHash: dedupHash(res.date, res.amount, res.desc),
+	}, r.now)
+	switch {
+	case err != nil:
+		r.errs = append(r.errs, RowError{Row: n, Message: err.Error()})
+	case added:
+		r.created++
+	default:
+		r.skipped++
+	}
+}
+
+func (s Service) Preview(ctx context.Context, im *Import, mapping, options map[string]any) (*PreviewResult, error) {
 	if im.UploadID == nil {
 		return nil, fmt.Errorf("file gone")
 	}
@@ -233,7 +270,7 @@ func (s Service) Preview(ctx context.Context, im *Import, mapping, options map[s
 	if err := s.matchImportCategories(ctx, cats); err != nil {
 		return nil, err
 	}
-	var preview []map[string]any
+	var preview []PreviewRow
 	willCreate, willSkip, hasErrors := 0, 0, 0
 	for i, row := range rows {
 		res := processImportRow(row, mapping, options, i+1)
@@ -245,202 +282,30 @@ func (s Service) Preview(ctx context.Context, im *Import, mapping, options map[s
 			willCreate++
 		}
 		if len(preview) < 200 {
-			preview = append(preview, map[string]any{
-				"row": i + 1, "date": res.date, "type": res.typ, "amount": res.amount,
-				"description": res.desc, "status": status, "error": nilOr(res.err),
-				"category": nilOr(res.category), "tags": []string{}, "duplicateOf": nil, "warnings": []string{},
+			preview = append(preview, PreviewRow{
+				Row: i + 1, Date: res.date, Type: res.typ, Amount: res.amount,
+				Description: res.desc, Status: status, Error: ptrIfSet(res.err), Category: ptrIfSet(res.category),
 			})
 		}
 	}
 	_ = willSkip
-	categories, categoriesToCreate := []map[string]any{}, []string{}
+	categories, categoriesToCreate := []PreviewCategory{}, []string{}
 	for _, c := range cats {
-		var matchID any
-		if c.MatchID != nil {
-			matchID = *c.MatchID
-		} else {
+		if c.MatchID == nil {
 			categoriesToCreate = append(categoriesToCreate, c.Name)
 		}
-		categories = append(categories, map[string]any{"name": c.Name, "type": c.Type, "count": c.Count, "matchId": matchID})
+		categories = append(categories, PreviewCategory{Name: c.Name, Type: c.Type, Count: c.Count, MatchID: c.MatchID})
 	}
-	return map[string]any{
-		"previewTransactions": preview,
-		"summary": map[string]any{
-			"willCreate": willCreate, "willSkip": willSkip, "hasErrors": hasErrors,
-			"totalRows": im.TotalRows, "sampled": willCreate + willSkip + hasErrors,
-			"currenciesToCreate": []any{}, "tagsToCreate": []any{},
-			"categoriesToCreate": categoriesToCreate, "categories": categories,
+	return &PreviewResult{
+		Transactions: preview,
+		Summary: PreviewSummary{
+			WillCreate: willCreate, WillSkip: willSkip, HasErrors: hasErrors,
+			TotalRows: im.TotalRows, Sampled: willCreate + willSkip + hasErrors,
+			CategoriesToCreate: categoriesToCreate, Categories: categories,
 		},
 	}, nil
 }
 
 func (s Service) fail(ctx context.Context, id, msg string) error {
 	return s.repo().Fail(ctx, id, msg, time.Now().UTC())
-}
-
-func parseCSV(raw []byte) ([]string, [][]string, error) {
-	_, headers, rows, err := parseCSVWithDelimiter(raw)
-	return headers, rows, err
-}
-
-func parseCSVWithDelimiter(raw []byte) (rune, []string, [][]string, error) {
-	raw = bytes.TrimPrefix(raw, []byte("ï»¿"))
-	delimiter := sniffDelimiter(raw)
-	r := csv.NewReader(bytes.NewReader(raw))
-	r.Comma = delimiter
-	r.FieldsPerRecord = -1
-	r.LazyQuotes = true
-	all, err := r.ReadAll()
-	if err != nil {
-		return 0, nil, nil, err
-	}
-	if len(all) == 0 {
-		return 0, nil, nil, fmt.Errorf("empty csv")
-	}
-	return delimiter, all[0], all[1:], nil
-}
-
-func suggestMapping(headers []string) map[string]int {
-	out := map[string]int{}
-	for i, h := range headers {
-		key := ""
-		switch strings.ToLower(strings.TrimSpace(h)) {
-		case "date", "дата":
-			key = "date"
-		case "amount", "sum", "сумма":
-			key = "amount"
-		case "description", "memo", "details", "описание", "назначение":
-			key = "description"
-		case "type", "тип":
-			key = "type"
-		case "category", "категория":
-			key = "category"
-		case "tags", "tag", "теги", "тег":
-			key = "tags"
-		case "currency", "валюта":
-			key = "currency"
-		}
-		if _, taken := out[key]; key != "" && !taken {
-			out[key] = i
-		}
-	}
-	return out
-}
-
-type importRow struct {
-	date, typ, desc, category, err string
-	amount                         decimal.Decimal
-}
-
-func processImportRow(row []string, mapping, options map[string]any, _ int) importRow {
-	out := importRow{typ: "expense"}
-	if v, _ := options["default_type"].(string); v != "" {
-		out.typ = v
-	}
-	di, ok := mappingIndex(mapping, "date")
-	if !ok {
-		out.err = "Date column is not mapped."
-		return out
-	}
-	if di >= len(row) {
-		out.err = "Row is too short."
-		return out
-	}
-	out.date = parseImportDate(row[di], optString(options, "date_format"))
-	if out.date == "" {
-		out.err = "Invalid date: " + row[di]
-		return out
-	}
-	if ledger.IsFuture(out.date) {
-		out.err = "Date is in the future."
-		return out
-	}
-	ai, ok := mappingIndex(mapping, "amount")
-	if !ok {
-		out.err = "Amount column is not mapped."
-		return out
-	}
-	if ai >= len(row) {
-		out.err = "Row is too short."
-		return out
-	}
-	amt, err := parseImportAmount(row[ai], optString(options, "amount_format"))
-	if err != nil {
-		out.err = "Invalid amount: " + row[ai]
-		return out
-	}
-	out.amount = amt
-	typeKnown := false
-	if ti, ok := mappingIndex(mapping, "type"); ok && ti < len(row) {
-		if t := parseImportType(row[ti]); t != "" {
-			out.typ, typeKnown = t, true
-		}
-	}
-	if !typeKnown {
-		if amt.Sign() < 0 {
-			out.typ = "expense"
-		} else if amt.Sign() > 0 {
-			out.typ = "income"
-		}
-	}
-	out.amount = out.amount.Abs()
-	if di, ok := mappingIndex(mapping, "description"); ok && di < len(row) {
-		out.desc = strings.TrimSpace(row[di])
-	}
-	if ci, ok := mappingIndex(mapping, "category"); ok && ci < len(row) {
-		out.category = strings.TrimSpace(row[ci])
-	}
-	return out
-}
-
-func optString(options map[string]any, key string) string {
-	v, _ := options[key].(string)
-	return v
-}
-
-func mappingIndex(mapping map[string]any, key string) (int, bool) {
-	v, ok := mapping[key]
-	if !ok {
-		return 0, false
-	}
-	n, ok := asInt64(v)
-	return int(n), ok
-}
-
-func dedupHash(date string, amount decimal.Decimal, desc string) string {
-	norm := strings.ToLower(strings.Join(strings.Fields(strings.TrimSpace(desc)), " "))
-	sum := md5.Sum([]byte(fmt.Sprintf("%s|%s|%s", date, amount.StringFixed(2), norm)))
-	return hex.EncodeToString(sum[:])
-}
-
-func newID() string {
-	b := make([]byte, 16)
-	_, _ = rand.Read(b)
-	return hex.EncodeToString(b)
-}
-
-// asInt64 reads a whole number from decoded JSON, a number or a numeric string.
-func asInt64(v any) (int64, bool) {
-	switch n := v.(type) {
-	case float64:
-		return int64(math.Round(n)), true
-	case int:
-		return int64(n), true
-	case int64:
-		return n, true
-	case json.Number:
-		i, err := n.Int64()
-		return i, err == nil
-	case string:
-		i, err := strconv.ParseInt(n, 10, 64)
-		return i, err == nil
-	}
-	return 0, false
-}
-
-func nilOr(s string) any {
-	if s == "" {
-		return nil
-	}
-	return s
 }

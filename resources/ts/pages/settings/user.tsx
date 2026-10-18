@@ -11,7 +11,11 @@ export default function UserSettingsPage() {
             <PageHeader title={t('user.title')} description={t('user.description')} />
             <UserSettingsTabs />
             <div className="grid items-start gap-6 lg:grid-cols-2">
-                <SettingsSection icon={Languages} title={t('system.language.title')} description={t('system.language.description')}>
+                <SettingsSection
+                    icon={Languages}
+                    title={t('system.language.title')}
+                    description={t('system.language.description')}
+                >
                     <div className="divide-y rounded-lg border">
                         <LanguageSwitcher variant="select" />
                         <ThemeSwitcher variant="select" />
