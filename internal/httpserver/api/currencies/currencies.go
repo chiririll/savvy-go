@@ -7,10 +7,8 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"strconv"
 	"strings"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/shopspring/decimal"
 
 	"savvy-go/internal/httpserver/httpx"
@@ -166,10 +164,5 @@ func currenciesConvert(w http.ResponseWriter, r *http.Request) {
 }
 
 func currencyParam(w http.ResponseWriter, r *http.Request) *ledger.Currency {
-	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	c, _ := httpx.Scope(r).Currencies.ByID(r.Context(), id)
-	if c == nil {
-		httpx.WriteMessage(w, http.StatusNotFound, "Not found.")
-	}
-	return c
+	return httpx.Lookup(w, r, httpx.Scope(r).Currencies.ByID)
 }

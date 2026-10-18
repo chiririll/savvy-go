@@ -2,16 +2,13 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Loader2 } from 'lucide-react'
-import { LanguageSwitcher } from '@/components/shared'
-import { Logo } from '@/components/shared/Logo'
+import { AuthCardShell } from '@/components/features/login/AuthCardShell'
 import { SetPasswordForm, type SetPasswordValues } from '@/components/features/login/SetPasswordForm'
 import { usePasswordTokenPreview } from '@/components/features/login/use-password-token-preview'
 import { authApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
 
 export default function SetPasswordPage() {
     const { t } = useTranslation('auth')
@@ -59,42 +56,26 @@ export default function SetPasswordPage() {
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-background p-4">
-            <Card className="w-full max-w-md">
-                <CardHeader className="text-center">
-                    <div className="flex justify-center mb-4">
-                        <div
-                            className={cn(
-                                'flex size-12 items-center justify-center rounded-xl bg-primary',
-                                'text-primary-foreground',
-                            )}
-                        >
-                            <Logo className="size-7" />
-                        </div>
-                    </div>
-                    <CardTitle className="text-2xl">
-                        {invalid
-                            ? t('setPassword.invalidTitle')
-                            : preview?.isInactive
-                              ? t('setPassword.inviteTitle')
-                              : t('setPassword.resetTitle')}
-                    </CardTitle>
-                    <CardDescription>
-                        {invalid
-                            ? t('setPassword.invalidDescription')
-                            : t('setPassword.description', { email: preview?.email ?? '' })}
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    {!invalid && <SetPasswordForm submitting={submitting} onSubmit={onSubmit} />}
-                    {invalid && (
-                        <Button className="w-full" onClick={() => navigate('/login', { replace: true })}>
-                            {t('setPassword.backToLogin')}
-                        </Button>
-                    )}
-                </CardContent>
-            </Card>
-            <LanguageSwitcher variant="auth" />
-        </div>
+        <AuthCardShell
+            title={
+                invalid
+                    ? t('setPassword.invalidTitle')
+                    : preview?.isInactive
+                      ? t('setPassword.inviteTitle')
+                      : t('setPassword.resetTitle')
+            }
+            description={
+                invalid
+                    ? t('setPassword.invalidDescription')
+                    : t('setPassword.description', { email: preview?.email ?? '' })
+            }
+        >
+            {!invalid && <SetPasswordForm submitting={submitting} onSubmit={onSubmit} />}
+            {invalid && (
+                <Button className="w-full" onClick={() => navigate('/login', { replace: true })}>
+                    {t('setPassword.backToLogin')}
+                </Button>
+            )}
+        </AuthCardShell>
     )
 }

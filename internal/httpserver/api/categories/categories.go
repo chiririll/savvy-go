@@ -8,8 +8,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
-
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/httpserver/httpx/dto"
 	"savvy-go/internal/ledger"
@@ -180,10 +178,5 @@ func (s Handler) categoriesSummary(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s Handler) categoryParam(w http.ResponseWriter, r *http.Request) *ledger.Category {
-	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	c, _ := httpx.Scope(r).Categories.ByID(r.Context(), id)
-	if c == nil {
-		httpx.WriteMessage(w, http.StatusNotFound, "Not found.")
-	}
-	return c
+	return httpx.Lookup(w, r, httpx.Scope(r).Categories.ByID)
 }

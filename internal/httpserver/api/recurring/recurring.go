@@ -3,19 +3,16 @@ package recurring
 
 import (
 	_ "embed"
-	"encoding/json"
 	"net/http"
 	"savvy-go/internal/httpserver/httpx"
-	"strconv"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/shopspring/decimal"
 
 	"savvy-go/internal/httpserver/httpx/dto"
 	"savvy-go/internal/recurring"
 )
 
-func recurringIndex(w http.ResponseWriter, r *http.Request) {
+func index(w http.ResponseWriter, r *http.Request) {
 	list, err := httpx.Scope(r).Recurring.All(r.Context())
 	if err != nil {
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
@@ -24,7 +21,7 @@ func recurringIndex(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteData(w, http.StatusOK, dto.Map(list, dto.NewRecurring))
 }
 
-func recurringUpcoming(w http.ResponseWriter, r *http.Request) {
+func upcoming(w http.ResponseWriter, r *http.Request) {
 	list, err := httpx.Scope(r).Recurring.Upcoming(r.Context(), 5)
 	if err != nil {
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
@@ -33,7 +30,7 @@ func recurringUpcoming(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteData(w, http.StatusOK, dto.Map(list, dto.NewRecurring))
 }
 
-func recurringStore(w http.ResponseWriter, r *http.Request) {
+func store(w http.ResponseWriter, r *http.Request) {
 	in, ok := decodeRecurring(w, r, nil)
 	if !ok {
 		return
@@ -46,16 +43,16 @@ func recurringStore(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteData(w, http.StatusCreated, dto.NewRecurring(*rec))
 }
 
-func recurringShow(w http.ResponseWriter, r *http.Request) {
-	rec := recurringParam(w, r)
+func show(w http.ResponseWriter, r *http.Request) {
+	rec := param(w, r)
 	if rec == nil {
 		return
 	}
 	httpx.WriteData(w, http.StatusOK, dto.NewRecurring(*rec))
 }
 
-func recurringUpdate(w http.ResponseWriter, r *http.Request) {
-	cur := recurringParam(w, r)
+func update(w http.ResponseWriter, r *http.Request) {
+	cur := param(w, r)
 	if cur == nil {
 		return
 	}
@@ -71,8 +68,8 @@ func recurringUpdate(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteData(w, http.StatusOK, dto.NewRecurring(*rec))
 }
 
-func recurringDestroy(w http.ResponseWriter, r *http.Request) {
-	rec := recurringParam(w, r)
+func destroy(w http.ResponseWriter, r *http.Request) {
+	rec := param(w, r)
 	if rec == nil {
 		return
 	}
@@ -83,24 +80,14 @@ func recurringDestroy(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func recurringParam(w http.ResponseWriter, r *http.Request) *recurring.Recurring {
-	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	rec, _ := httpx.Scope(r).Recurring.ByID(r.Context(), id)
-	if rec == nil {
-		httpx.WriteMessage(w, http.StatusNotFound, "Not found.")
-	}
-	return rec
+func param(w http.ResponseWriter, r *http.Request) *recurring.Recurring {
+	return httpx.Lookup(w, r, httpx.Scope(r).Recurring.ByID)
 }
 
 // decodeRecurring reads a recurring template from the body. On update, base
 // is the stored template: fields the body leaves out keep its values, and an
 // explicit null clears a nullable one.
 func decodeRecurring(w http.ResponseWriter, r *http.Request, base *recurring.Recurring) (recurring.Input, bool) {
-	var raw map[string]json.RawMessage
-	if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
-		httpx.WriteValidation(w, map[string][]string{"type": {"The type field is required."}})
-		return recurring.Input{}, false
-	}
 	var body struct {
 		Type        string           `json:"type"`
 		AccountID   int64            `json:"account_id"`
@@ -131,12 +118,11 @@ func decodeRecurring(w http.ResponseWriter, r *http.Request, base *recurring.Rec
 		body.DayOfWeek, body.DayOfMonth = httpx.Clone(base.DayOfWeek), httpx.Clone(base.DayOfMonth)
 		body.StartDate, body.EndDate, body.IsActive = base.StartDate, httpx.Clone(base.EndDate), httpx.Clone(&base.IsActive)
 	}
-	buf, _ := json.Marshal(raw)
-	if err := json.Unmarshal(buf, &body); err != nil {
-		httpx.WriteValidation(w, map[string][]string{"type": {"The given data was invalid."}})
+	sent, ok := httpx.DecodeSent(w, r, &body, "type")
+	if !ok {
 		return recurring.Input{}, false
 	}
-	_, hasTags := raw["tag_ids"]
+	_, hasTags := sent["tag_ids"]
 	return recurring.Input{
 		Type: body.Type, AccountID: body.AccountID, ToAccountID: body.ToAccountID,
 		CategoryID: body.CategoryID, Amount: body.Amount, ToAmount: body.ToAmount,

@@ -6,8 +6,8 @@ import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessa
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import type { IdentityProviderFormValues } from '@/schemas/sso'
+import { SettingsSection } from '@/components/shared'
 
-import { Section } from './form-parts'
 
 export function ProvisioningSection({ form }: { form: UseFormReturn<IdentityProviderFormValues> }) {
     const { t } = useTranslation(['common', 'forms'])
@@ -19,7 +19,7 @@ export function ProvisioningSection({ form }: { form: UseFormReturn<IdentityProv
     ] as const
 
     return (
-        <Section icon={UserCog} title={t('forms:sso.provisioning')} description={t('forms:sso.provisioningHelp')}>
+        <SettingsSection icon={UserCog} title={t('forms:sso.provisioning')} description={t('forms:sso.provisioningHelp')} contentClassName="space-y-5">
             <FormField
                 control={form.control}
                 name="default_role"
@@ -63,6 +63,6 @@ export function ProvisioningSection({ form }: { form: UseFormReturn<IdentityProv
                     />
                 ))}
             </div>
-        </Section>
+        </SettingsSection>
     )
 }

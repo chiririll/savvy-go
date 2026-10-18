@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Fingerprint, Plus, Trash2 } from 'lucide-react'
 import { testId } from '@/lib/test-id'
 import { intlLocale } from '@/lib/i18n'
-import { ResponsiveDialog } from '@/components/shared'
+import { ResponsiveDialog, SettingsSection } from '@/components/shared'
 import { useReadOnly } from '@/components/providers/ReadOnlyProvider'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,7 +19,7 @@ import {
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { isPasskeyDomainSupported, useDeletePasskey, useRegisterPasskey, useWebauthnCredentials } from '@/hooks'
-import { RowSkeleton, Section } from './SecurityLayout'
+import { RowSkeleton } from './SecurityLayout'
 import { cn } from '@/lib/utils'
 
 const formatDate = (value: string) => new Date(value).toLocaleDateString(intlLocale())
@@ -103,7 +103,7 @@ export function PasskeysSection() {
 
     return (
         <>
-            <Section
+            <SettingsSection
                 icon={Fingerprint}
                 title={t('security.passkeys.title')}
                 description={t('security.passkeys.description')}
@@ -146,7 +146,7 @@ export function PasskeysSection() {
                         {t('security.passkeys.add')}
                     </Button>
                 </div>
-            </Section>
+            </SettingsSection>
 
             <ResponsiveDialog
                 open={addOpen}

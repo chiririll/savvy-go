@@ -11,12 +11,15 @@ export function SettingsSection({
     title,
     description,
     actions,
+    contentClassName,
     children,
 }: {
     icon: LucideIcon
     title: string
-    description: string
+    description?: string
     actions?: ReactNode
+    /** Classes of the body under the header. */
+    contentClassName?: string
     children: ReactNode
 }) {
     return (
@@ -34,12 +37,12 @@ export function SettingsSection({
                     </div>
                     <div className="min-w-0 flex-1 space-y-0.5">
                         <h3 className="text-sm font-semibold leading-none">{title}</h3>
-                        <p className="text-xs text-muted-foreground">{description}</p>
+                        {description && <p className="text-xs text-muted-foreground">{description}</p>}
                     </div>
                 </div>
                 {actions && <div className="flex shrink-0 sm:self-start">{actions}</div>}
             </header>
-            <div className="p-5">{children}</div>
+            <div className={cn('p-5', contentClassName)}>{children}</div>
         </section>
     )
 }

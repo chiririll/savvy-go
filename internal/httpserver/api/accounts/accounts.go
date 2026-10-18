@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/shopspring/decimal"
 
 	"savvy-go/internal/httpserver/httpx"
@@ -240,12 +239,7 @@ func (s Handler) accountsBalanceComparison(w http.ResponseWriter, r *http.Reques
 }
 
 func (s Handler) accountParam(w http.ResponseWriter, r *http.Request) *ledger.Account {
-	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	a, _ := httpx.Scope(r).Accounts.ByID(r.Context(), id)
-	if a == nil {
-		httpx.WriteMessage(w, http.StatusNotFound, "Not found.")
-	}
-	return a
+	return httpx.Lookup(w, r, httpx.Scope(r).Accounts.ByID)
 }
 
 func dateRange(start, end string) []string {

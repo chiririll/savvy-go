@@ -22,15 +22,15 @@ func init() {
 }
 
 func Routes(r chi.Router) {
-	r.Get("/automation-rules/triggers", automationTriggers)
-	r.Post("/automation-rules/reorder", automationReorder)
-	r.Get("/automation-rules", automationIndex)
-	r.Post("/automation-rules", automationStore)
-	r.Get("/automation-rules/{id}", automationShow)
-	r.Put("/automation-rules/{id}", automationUpdate)
-	r.Patch("/automation-rules/{id}", automationUpdate)
-	r.Delete("/automation-rules/{id}", automationDestroy)
-	r.Post("/automation-rules/{id}/toggle", automationToggle)
-	r.Post("/automation-rules/{id}/test", automationTest)
-	r.Get("/automation-rules/{id}/logs", automationLogs)
+	r.Get("/automation-rules/triggers", triggers)
+	r.Post("/automation-rules/reorder", reorder)
+	r.Get("/automation-rules", index)
+	r.Post("/automation-rules", store)
+	r.Get("/automation-rules/{id}", show)
+	r.Put("/automation-rules/{id}", update)
+	r.Patch("/automation-rules/{id}", update)
+	r.Delete("/automation-rules/{id}", destroy)
+	r.Post("/automation-rules/{id}/toggle", toggle)
+	r.Post("/automation-rules/{id}/test", test)
+	r.Get("/automation-rules/{id}/logs", logs)
 }

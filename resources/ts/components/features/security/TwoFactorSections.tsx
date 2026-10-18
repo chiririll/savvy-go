@@ -4,8 +4,9 @@ import { testId } from '@/lib/test-id'
 import { useReadOnly } from '@/components/providers/ReadOnlyProvider'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
-import { ActionRow, RowSkeleton, Section } from './SecurityLayout'
+import { ActionRow, RowSkeleton } from './SecurityLayout'
 import type { TwoFactorSetup } from './useTwoFactorSetup'
+import { SettingsSection } from '@/components/shared'
 
 export function TwoFactorSection({ setup }: { setup: TwoFactorSetup }) {
     const { t } = useTranslation('settings')
@@ -13,7 +14,7 @@ export function TwoFactorSection({ setup }: { setup: TwoFactorSetup }) {
     const { status, isLoading, enableMutation, handleEnable, setShowDisableDialog } = setup
 
     return (
-        <Section
+        <SettingsSection
             icon={ShieldCheck}
             title={t('security.twoFactor.title')}
             description={t('security.twoFactor.description')}
@@ -36,7 +37,7 @@ export function TwoFactorSection({ setup }: { setup: TwoFactorSetup }) {
                     </ActionRow>
                 )}
             </div>
-        </Section>
+        </SettingsSection>
     )
 }
 
@@ -48,7 +49,7 @@ export function RecoverySection({ setup }: { setup: TwoFactorSetup }) {
     if (!status?.enabled) return null
 
     return (
-        <Section
+        <SettingsSection
             icon={Key}
             title={t('security.recovery.title')}
             description={t('security.recovery.description')}
@@ -69,6 +70,6 @@ export function RecoverySection({ setup }: { setup: TwoFactorSetup }) {
                     </Button>
                 </ActionRow>
             </div>
-        </Section>
+        </SettingsSection>
     )
 }

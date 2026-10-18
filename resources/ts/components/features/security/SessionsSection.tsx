@@ -2,10 +2,10 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { LogOut } from 'lucide-react'
 import { testId } from '@/lib/test-id'
-import { ResponsiveDialog } from '@/components/shared'
+import { ResponsiveDialog, SettingsSection } from '@/components/shared'
 import { Button } from '@/components/ui/button'
 import { useLogoutOthers } from '@/hooks'
-import { Section } from './SecurityLayout'
+
 
 export function SessionsSection() {
     const { t } = useTranslation('settings')
@@ -24,7 +24,7 @@ export function SessionsSection() {
 
     return (
         <>
-            <Section
+            <SettingsSection
                 icon={LogOut}
                 title={t('security.sessions.title')}
                 description={t('security.sessions.description')}
@@ -38,7 +38,7 @@ export function SessionsSection() {
                         {t('security.sessions.logoutOthers')}
                     </Button>
                 </div>
-            </Section>
+            </SettingsSection>
 
             <ResponsiveDialog
                 open={confirmOpen}

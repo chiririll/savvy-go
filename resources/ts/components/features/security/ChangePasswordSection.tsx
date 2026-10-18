@@ -9,7 +9,8 @@ import { Input } from '@/components/ui/input'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { useChangePassword } from '@/hooks'
 import { useUser } from '@/stores/auth'
-import { Section } from './SecurityLayout'
+import { SettingsSection } from '@/components/shared'
+
 
 type PasswordFormValues = {
     current_password: string
@@ -79,7 +80,7 @@ export function ChangePasswordSection() {
     }
 
     return (
-        <Section
+        <SettingsSection
             icon={Lock}
             title={t('security.password.title')}
             description={t('security.password.description')}
@@ -114,6 +115,6 @@ export function ChangePasswordSection() {
                     </form>
                 </Form>
             )}
-        </Section>
+        </SettingsSection>
     )
 }

@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { ArrowLeft, Fingerprint, Key, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator } from '@/components/ui/input-otp'
+import { OtpCodeInput } from '@/components/shared'
 import { useAuthStore } from '@/stores/auth'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { AuthCardShell } from './AuthCardShell'
@@ -16,34 +16,6 @@ interface Props {
     rememberMe: boolean
     afterLoginPath: string
     onBack: () => void
-}
-
-function OtpInput({
-    value,
-    onChange,
-    onComplete,
-}: {
-    value: string
-    onChange: (v: string) => void
-    onComplete: () => void
-}) {
-    return (
-        <div className="flex justify-center">
-            <InputOTP maxLength={6} value={value} onChange={onChange} onComplete={onComplete}>
-                <InputOTPGroup>
-                    <InputOTPSlot index={0} />
-                    <InputOTPSlot index={1} />
-                    <InputOTPSlot index={2} />
-                </InputOTPGroup>
-                <InputOTPSeparator />
-                <InputOTPGroup>
-                    <InputOTPSlot index={3} />
-                    <InputOTPSlot index={4} />
-                    <InputOTPSlot index={5} />
-                </InputOTPGroup>
-            </InputOTP>
-        </div>
-    )
 }
 
 export function TwoFactorStep({ token, rememberMe, afterLoginPath, onBack }: Props) {
@@ -101,7 +73,7 @@ export function TwoFactorStep({ token, rememberMe, afterLoginPath, onBack }: Pro
                     autoFocus
                 />
             ) : (
-                <OtpInput value={otpValue} onChange={setOtpValue} onComplete={onVerify} />
+                <OtpCodeInput value={otpValue} onChange={setOtpValue} onComplete={onVerify} />
             )}
 
             <div className="flex flex-col gap-2">

@@ -2,10 +2,9 @@ import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { QRCode } from 'react-qrcode-logo'
 import { Copy } from 'lucide-react'
-import { ResponsiveDialog } from '@/components/shared'
+import { OtpCodeInput, ResponsiveDialog } from '@/components/shared'
 import { Button } from '@/components/ui/button'
 import { useTheme } from '@/hooks'
-import { OtpField } from './SecurityLayout'
 import type { SetupStep, TwoFactorSetup } from './useTwoFactorSetup'
 
 function stepText(t: TFunction<'settings'>, step: SetupStep) {
@@ -115,7 +114,7 @@ function EnableDialog({ setup }: { setup: TwoFactorSetup }) {
             footer={footer}
         >
             {setupStep === 'qr' && <QrStep setup={setup} />}
-            {setupStep === 'verify' && <OtpField value={otpValue} onChange={setOtpValue} />}
+            {setupStep === 'verify' && <OtpCodeInput className="py-2" value={otpValue} onChange={setOtpValue} />}
             {setupStep === 'recovery' && <RecoveryStep setup={setup} />}
         </ResponsiveDialog>
     )
@@ -147,7 +146,7 @@ function DisableDialog({ setup }: { setup: TwoFactorSetup }) {
                 </>
             }
         >
-            <OtpField value={otpValue} onChange={setOtpValue} />
+            <OtpCodeInput className="py-2" value={otpValue} onChange={setOtpValue} />
         </ResponsiveDialog>
     )
 }
@@ -177,7 +176,7 @@ function RegenerateDialog({ setup }: { setup: TwoFactorSetup }) {
                 </>
             }
         >
-            <OtpField value={otpValue} onChange={setOtpValue} />
+            <OtpCodeInput className="py-2" value={otpValue} onChange={setOtpValue} />
         </ResponsiveDialog>
     )
 }

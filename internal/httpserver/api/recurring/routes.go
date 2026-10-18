@@ -22,11 +22,11 @@ func init() {
 }
 
 func Routes(r chi.Router) {
-	r.Get("/recurring", recurringIndex)
-	r.Get("/recurring-upcoming", recurringUpcoming)
-	r.Post("/recurring", recurringStore)
-	r.Get("/recurring/{id}", recurringShow)
-	r.Put("/recurring/{id}", recurringUpdate)
-	r.Patch("/recurring/{id}", recurringUpdate)
-	r.Delete("/recurring/{id}", recurringDestroy)
+	r.Get("/recurring", index)
+	r.Get("/recurring-upcoming", upcoming)
+	r.Post("/recurring", store)
+	r.Get("/recurring/{id}", show)
+	r.Put("/recurring/{id}", update)
+	r.Patch("/recurring/{id}", update)
+	r.Delete("/recurring/{id}", destroy)
 }

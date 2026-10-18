@@ -15,7 +15,6 @@ import (
 	"savvy-go/internal/httpserver/httpx/dto"
 	"savvy-go/internal/ledger"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/shopspring/decimal"
 )
 
@@ -212,16 +211,11 @@ func transactionsPendingSummary(w http.ResponseWriter, r *http.Request) {
 }
 
 func txParam(w http.ResponseWriter, r *http.Request) *ledger.Transaction {
-	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	tx, _ := httpx.Scope(r).Txs.ByID(r.Context(), id)
-	if tx == nil {
-		httpx.WriteMessage(w, http.StatusNotFound, "Not found.")
-	}
-	return tx
+	return httpx.Lookup(w, r, httpx.Scope(r).Txs.ByID)
 }
 
-// decodeTx reads a transaction from the body; on update, over base (see
-// patch.go). Items and tags left out are kept by the update itself.
+// decodeTx reads a transaction from the body; on update, over base: fields
+// the body leaves out keep their values. Items and tags left out are kept by the update itself.
 func decodeTx(w http.ResponseWriter, r *http.Request, base *ledger.Transaction) (ledger.TxInput, bool) {
 	var body struct {
 		Type        string           `json:"type"`

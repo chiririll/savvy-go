@@ -5,10 +5,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"net/http"
-	"strconv"
 	"strings"
-
-	"github.com/go-chi/chi/v5"
 
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/httpserver/httpx/dto"
@@ -91,10 +88,5 @@ func (s Handler) tagsDestroy(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s Handler) tagParam(w http.ResponseWriter, r *http.Request) *ledger.Tag {
-	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	t, _ := httpx.Scope(r).Tags.ByID(r.Context(), id)
-	if t == nil {
-		httpx.WriteMessage(w, http.StatusNotFound, "Not found.")
-	}
-	return t
+	return httpx.Lookup(w, r, httpx.Scope(r).Tags.ByID)
 }

@@ -7,16 +7,25 @@ import { cn } from '@/lib/utils'
 interface Props {
     title: string
     description: string
-    contentClassName: string
+    contentClassName?: string
+    /** Width of the card, for screens with more on them. */
+    className?: string
+    /** Tighter padding and top alignment on a phone, for long screens. */
+    compact?: boolean
     children: ReactNode
 }
 
-/** The centred card with the logo that the login screens share. */
-export function AuthCardShell({ title, description, contentClassName, children }: Props) {
+/** The centred card with the logo that the login and onboarding screens share. */
+export function AuthCardShell({ title, description, contentClassName, className, compact, children }: Props) {
     return (
-        <div className="min-h-screen flex items-center justify-center bg-background p-4">
-            <Card className="w-full max-w-md">
-                <CardHeader className="text-center">
+        <div
+            className={cn(
+                'min-h-screen flex justify-center bg-background',
+                compact ? 'items-start sm:items-center p-3 sm:p-4' : 'items-center p-4',
+            )}
+        >
+            <Card className={cn('w-full max-w-md', className)}>
+                <CardHeader className={cn('text-center', compact && 'px-4 sm:px-6')}>
                     <div className="flex justify-center mb-4">
                         <div
                             className={cn(
@@ -30,7 +39,7 @@ export function AuthCardShell({ title, description, contentClassName, children }
                     <CardTitle className="text-2xl">{title}</CardTitle>
                     <CardDescription>{description}</CardDescription>
                 </CardHeader>
-                <CardContent className={contentClassName}>{children}</CardContent>
+                <CardContent className={cn(compact && 'px-4 sm:px-6', contentClassName)}>{children}</CardContent>
             </Card>
             <LanguageSwitcher variant="auth" />
         </div>

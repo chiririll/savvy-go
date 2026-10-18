@@ -1,12 +1,9 @@
-import type { LucideIcon } from 'lucide-react'
 import { Copy } from 'lucide-react'
-import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { useSettings } from '@/hooks/use-settings'
-import { cn } from '@/lib/utils'
 
 function CopyableUrl({ label, value }: { label: string; value: string }) {
     const { t } = useTranslation('forms')
@@ -60,34 +57,5 @@ export function RedirectUrls({ slug, protocol }: { slug: string; protocol: strin
                 <CopyableUrl label={t('sso.redirectUrl')} value={`${base}/callback`} />
             )}
         </div>
-    )
-}
-
-interface SectionProps {
-    icon: LucideIcon
-    title: string
-    description?: string
-    children: ReactNode
-}
-
-export function Section({ icon: Icon, title, description, children }: SectionProps) {
-    return (
-        <section className="rounded-xl border bg-card shadow-sm">
-            <header className="flex items-start gap-3 border-b px-5 py-4">
-                <div
-                    className={cn(
-                        'flex size-9 shrink-0 items-center justify-center rounded-lg border bg-muted/50',
-                        'text-muted-foreground',
-                    )}
-                >
-                    <Icon className="size-4" />
-                </div>
-                <div className="space-y-0.5">
-                    <h3 className="text-sm font-semibold leading-none">{title}</h3>
-                    {description && <p className="text-xs text-muted-foreground">{description}</p>}
-                </div>
-            </header>
-            <div className="space-y-5 p-5">{children}</div>
-        </section>
     )
 }

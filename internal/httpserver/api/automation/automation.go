@@ -6,15 +6,12 @@ import (
 	"encoding/json"
 	"net/http"
 	"savvy-go/internal/httpserver/httpx"
-	"strconv"
-
-	"github.com/go-chi/chi/v5"
 
 	"savvy-go/internal/automation"
 	"savvy-go/internal/httpserver/httpx/dto"
 )
 
-func automationIndex(w http.ResponseWriter, r *http.Request) {
+func index(w http.ResponseWriter, r *http.Request) {
 	list, err := httpx.Scope(r).Automation.All(r.Context())
 	if err != nil {
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
@@ -23,12 +20,12 @@ func automationIndex(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteData(w, http.StatusOK, dto.Map(list, dto.NewAutomationRule))
 }
 
-// automationTriggers lists the trigger types; the SPA localizes them.
-func automationTriggers(w http.ResponseWriter, r *http.Request) {
+// triggers lists the trigger types; the SPA localizes them.
+func triggers(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, []string{"on_transaction_create", "on_transaction_update"})
 }
 
-func automationStore(w http.ResponseWriter, r *http.Request) {
+func store(w http.ResponseWriter, r *http.Request) {
 	in, ok := decodeAutomation(w, r, nil)
 	if !ok {
 		return
@@ -41,16 +38,16 @@ func automationStore(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteData(w, http.StatusCreated, dto.NewAutomationRule(*rule))
 }
 
-func automationShow(w http.ResponseWriter, r *http.Request) {
-	rule := automationParam(w, r)
+func show(w http.ResponseWriter, r *http.Request) {
+	rule := param(w, r)
 	if rule == nil {
 		return
 	}
 	httpx.WriteData(w, http.StatusOK, dto.NewAutomationRule(*rule))
 }
 
-func automationUpdate(w http.ResponseWriter, r *http.Request) {
-	cur := automationParam(w, r)
+func update(w http.ResponseWriter, r *http.Request) {
+	cur := param(w, r)
 	if cur == nil {
 		return
 	}
@@ -66,8 +63,8 @@ func automationUpdate(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteData(w, http.StatusOK, dto.NewAutomationRule(*rule))
 }
 
-func automationDestroy(w http.ResponseWriter, r *http.Request) {
-	rule := automationParam(w, r)
+func destroy(w http.ResponseWriter, r *http.Request) {
+	rule := param(w, r)
 	if rule == nil {
 		return
 	}
@@ -78,8 +75,8 @@ func automationDestroy(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func automationToggle(w http.ResponseWriter, r *http.Request) {
-	rule := automationParam(w, r)
+func toggle(w http.ResponseWriter, r *http.Request) {
+	rule := param(w, r)
 	if rule == nil {
 		return
 	}
@@ -91,7 +88,7 @@ func automationToggle(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteData(w, http.StatusOK, dto.NewAutomationRule(*out))
 }
 
-func automationReorder(w http.ResponseWriter, r *http.Request) {
+func reorder(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Rules []struct {
 			ID       int64 `json:"id"`
@@ -109,8 +106,8 @@ func automationReorder(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteSuccess(w)
 }
 
-func automationTest(w http.ResponseWriter, r *http.Request) {
-	rule := automationParam(w, r)
+func test(w http.ResponseWriter, r *http.Request) {
+	rule := param(w, r)
 	if rule == nil {
 		return
 	}
@@ -129,8 +126,8 @@ func automationTest(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, result)
 }
 
-func automationLogs(w http.ResponseWriter, r *http.Request) {
-	rule := automationParam(w, r)
+func logs(w http.ResponseWriter, r *http.Request) {
+	rule := param(w, r)
 	if rule == nil {
 		return
 	}
@@ -142,17 +139,12 @@ func automationLogs(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteData(w, http.StatusOK, dto.Map(logs, dto.NewAutomationLog))
 }
 
-func automationParam(w http.ResponseWriter, r *http.Request) *automation.Rule {
-	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	rule, _ := httpx.Scope(r).Automation.ByID(r.Context(), id)
-	if rule == nil {
-		httpx.WriteMessage(w, http.StatusNotFound, "Not found.")
-	}
-	return rule
+func param(w http.ResponseWriter, r *http.Request) *automation.Rule {
+	return httpx.Lookup(w, r, httpx.Scope(r).Automation.ByID)
 }
 
-// decodeAutomation reads a rule from the body; on update, over base (see
-// patch.go).
+// decodeAutomation reads a rule from the body; on update, over base: fields
+// the body leaves out keep their values.
 func decodeAutomation(w http.ResponseWriter, r *http.Request, base *automation.Rule) (automation.Input, bool) {
 	var body struct {
 		Name           string           `json:"name"`

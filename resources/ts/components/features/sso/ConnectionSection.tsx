@@ -10,8 +10,9 @@ import { useSsoPresets } from '@/hooks/use-sso'
 import type { IdentityProviderFormValues } from '@/schemas/sso'
 import type { PresetField } from '@/types/sso'
 
-import { RedirectUrls, Section } from './form-parts'
+import { RedirectUrls } from './form-parts'
 import { ssoFieldLabel, ssoFieldPlaceholder, ssoPresetLabel } from './presetMeta'
+import { SettingsSection } from '@/components/shared'
 
 type Form = UseFormReturn<IdentityProviderFormValues>
 
@@ -78,7 +79,7 @@ export function ConnectionSection({ form, isEdit, presetLocked }: ConnectionSect
     const slug = form.watch('slug')
 
     return (
-        <Section icon={Plug} title={t('forms:sso.connection')} description={t('forms:sso.connectionHelp')}>
+        <SettingsSection icon={Plug} title={t('forms:sso.connection')} description={t('forms:sso.connectionHelp')} contentClassName="space-y-5">
             <FormField
                 control={form.control}
                 name="name"
@@ -140,6 +141,6 @@ export function ConnectionSection({ form, isEdit, presetLocked }: ConnectionSect
             ))}
 
             {selectedPreset && slug && <RedirectUrls slug={slug} protocol={selectedPreset.protocol} />}
-        </Section>
+        </SettingsSection>
     )
 }

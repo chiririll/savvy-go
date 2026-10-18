@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import { CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { InputOTP, InputOTPGroup, InputOTPSeparator, InputOTPSlot } from '@/components/ui/input-otp'
+import { OtpCodeInput } from '@/components/shared'
 import { testId } from '@/lib/test-id'
 
 interface VerifyStepProps {
@@ -24,21 +24,7 @@ export function VerifyStep({ code, verifying, onCodeChange, onBack, onVerify }: 
                 <CardDescription>{t('setup2fa.verifyDescription')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-                <div className="flex justify-center">
-                    <InputOTP maxLength={6} value={code} onChange={onCodeChange}>
-                        <InputOTPGroup>
-                            <InputOTPSlot index={0} />
-                            <InputOTPSlot index={1} />
-                            <InputOTPSlot index={2} />
-                        </InputOTPGroup>
-                        <InputOTPSeparator />
-                        <InputOTPGroup>
-                            <InputOTPSlot index={3} />
-                            <InputOTPSlot index={4} />
-                            <InputOTPSlot index={5} />
-                        </InputOTPGroup>
-                    </InputOTP>
-                </div>
+                <OtpCodeInput value={code} onChange={onCodeChange} />
                 <div className="flex gap-2">
                     <Button variant="outline" onClick={onBack} className="flex-1">
                         <ArrowLeft className="mr-2 h-4 w-4" />

@@ -3,15 +3,12 @@ package budgets
 
 import (
 	_ "embed"
-	"encoding/json"
 	"net/http"
-	"strconv"
 
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/httpserver/httpx/dto"
 	"savvy-go/internal/ledger"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/shopspring/decimal"
 )
 
@@ -79,22 +76,13 @@ func destroy(w http.ResponseWriter, r *http.Request) {
 }
 
 func param(w http.ResponseWriter, r *http.Request) *ledger.Budget {
-	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	b, _ := httpx.Scope(r).Budgets.ByID(r.Context(), id)
-	if b == nil {
-		httpx.WriteMessage(w, http.StatusNotFound, "Not found.")
-	}
-	return b
+	return httpx.Lookup(w, r, httpx.Scope(r).Budgets.ByID)
 }
 
-// decodeBudget reads a budget from the body; on update, over base (see
-// patch.go).
+// decodeBudget reads a budget from the body; on update, over base: fields the
+// body leaves out keep their values, and category_ids / tag_ids are replaced
+// only when sent.
 func decodeBudget(w http.ResponseWriter, r *http.Request, base *ledger.Budget) (ledger.BudgetInput, bool) {
-	var raw map[string]json.RawMessage
-	if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
-		httpx.WriteValidation(w, map[string][]string{"name": {"The name field is required."}})
-		return ledger.BudgetInput{}, false
-	}
 	var body struct {
 		Name            string          `json:"name"`
 		Amount          decimal.Decimal `json:"amount"`
@@ -114,13 +102,12 @@ func decodeBudget(w http.ResponseWriter, r *http.Request, base *ledger.Budget) (
 		body.IsGlobal, body.NotifyAtPercent = httpx.Clone(&base.IsGlobal), httpx.Clone(base.NotifyAtPercent)
 		body.IsActive = httpx.Clone(&base.IsActive)
 	}
-	buf, _ := json.Marshal(raw)
-	if err := json.Unmarshal(buf, &body); err != nil {
-		httpx.WriteValidation(w, map[string][]string{"name": {"The given data was invalid."}})
+	sent, ok := httpx.DecodeSent(w, r, &body, "name")
+	if !ok {
 		return ledger.BudgetInput{}, false
 	}
-	_, hasCats := raw["category_ids"]
-	_, hasTags := raw["tag_ids"]
+	_, hasCats := sent["category_ids"]
+	_, hasTags := sent["tag_ids"]
 	return ledger.BudgetInput{
 		Name: body.Name, Amount: body.Amount, CurrencyID: body.CurrencyID, Period: body.Period,
 		StartDate: body.StartDate, EndDate: body.EndDate, IsGlobal: body.IsGlobal,

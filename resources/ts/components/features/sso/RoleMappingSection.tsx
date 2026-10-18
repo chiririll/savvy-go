@@ -7,8 +7,8 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { IdentityProviderFormValues } from '@/schemas/sso'
 
-import { Section } from './form-parts'
 import { cn } from '@/lib/utils'
+import { SettingsSection } from '@/components/shared'
 
 type Form = UseFormReturn<IdentityProviderFormValues>
 
@@ -81,7 +81,7 @@ export function RoleMappingSection({ form }: { form: Form }) {
     const { fields, append, remove } = useFieldArray({ control: form.control, name: 'role_mapping' })
 
     return (
-        <Section icon={Waypoints} title={t('forms:sso.roleMapping')} description={t('forms:sso.roleMappingHelp')}>
+        <SettingsSection icon={Waypoints} title={t('forms:sso.roleMapping')} description={t('forms:sso.roleMappingHelp')} contentClassName="space-y-5">
             {fields.length > 0 && (
                 <div className={`hidden ${GRID} gap-2 px-1 text-xs font-medium text-muted-foreground sm:grid`}>
                     <span>{t('forms:sso.claim')}</span>
@@ -112,6 +112,6 @@ export function RoleMappingSection({ form }: { form: Form }) {
                 <Plus className="mr-2 size-4" />
                 {t('forms:sso.addRule')}
             </Button>
-        </Section>
+        </SettingsSection>
     )
 }

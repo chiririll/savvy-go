@@ -72,7 +72,7 @@ func debtsUpdate(w http.ResponseWriter, r *http.Request) {
 	if cur == nil {
 		return
 	}
-	// Decoded over the stored debt (see patch.go).
+	// Decoded over the stored debt (fields the body leaves out keep their values).
 	in := cur.Input()
 	var body struct {
 		Name         string           `json:"name"`
