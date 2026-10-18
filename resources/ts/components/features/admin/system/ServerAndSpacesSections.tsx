@@ -25,6 +25,7 @@ export function ServerSection() {
                         }
                         readOnly={settings.config_writable === false}
                         placeholder={t('system.server.appUrlPlaceholder')}
+                        suggestion={window.location.origin}
                         value={settings.app_url ?? ''}
                         onSave={(v) => updateSettings.mutate({ app_url: v })}
                     />

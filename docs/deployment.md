@@ -38,7 +38,7 @@ A new server has no users. To stop others from claiming it first, creating the a
 | Standalone binary | the terminal, or `bootstrap-password` in the data directory                 |
 
 1. Open the app, enter the password and create the admin account.
-2. A short **server setup** follows. Step 1 (required) is the public URL, prefilled with the address you opened. Step 2 (optional) is [email](email-and-security.md#email) and single sign-on; each is marked **Done** once set. Skip or finish whenever you like: setup comes back after a reload or new sign-in until you do. The same settings stay in **Administration → System**.
+2. A short **server setup** follows. Step 1 (required) is the public URL. Click **Use <address>** to fill in the address you opened, then continue; **Administration → System** has the same button. Step 2 (optional) is [email](email-and-security.md#email) and single sign-on; each is marked **Done** once set. Skip or finish whenever you like: setup comes back after a reload or new sign-in until you do. The same settings stay in **Administration → System**.
 3. The admin starts with no space. Create the first one in the app, see [Spaces](spaces.md#creating-a-space).
 
 Good to know:

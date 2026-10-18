@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { UseBrowserUrlButton } from '@/components/features/settings/UseBrowserUrlButton'
 import { testId } from '@/lib/test-id'
 
 interface AppUrlStepProps {
@@ -18,9 +19,8 @@ interface AppUrlStepProps {
 /** Server setup, the required step: the public URL. The address the admin opened the app at is the usual answer. */
 export function AppUrlStep({ value, writable, saving, onContinue }: AppUrlStepProps) {
     const { t } = useTranslation('auth')
-    // Unset: offer the address the admin opened the app at.
     const browserUrl = window.location.origin
-    const [draft, setDraft] = useState(value || browserUrl)
+    const [draft, setDraft] = useState(value)
     const url = draft.trim()
 
     return (
@@ -29,16 +29,20 @@ export function AppUrlStep({ value, writable, saving, onContinue }: AppUrlStepPr
             {writable ? (
                 <div className="space-y-2">
                     <Label htmlFor="app-url">{t('serverSetup.url.label')}</Label>
-                    <Input
-                        id="app-url"
-                        type="url"
-                        inputMode="url"
-                        autoCapitalize="none"
-                        spellCheck={false}
-                        value={draft}
-                        placeholder={browserUrl}
-                        onChange={(e) => setDraft(e.target.value)}
-                    />
+                    <div className="relative">
+                        <Input
+                            id="app-url"
+                            type="url"
+                            inputMode="url"
+                            autoCapitalize="none"
+                            spellCheck={false}
+                            className="pr-10"
+                            value={draft}
+                            placeholder={browserUrl}
+                            onChange={(e) => setDraft(e.target.value)}
+                        />
+                        <UseBrowserUrlButton url={browserUrl} current={draft} onUse={setDraft} />
+                    </div>
                 </div>
             ) : (
                 <p className="rounded-md bg-muted p-3 text-sm">{t('serverSetup.url.readOnly')}</p>

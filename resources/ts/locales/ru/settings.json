@@ -39,6 +39,7 @@
             "appUrl": "Публичный адрес",
             "appUrlDescription": "Полный адрес, по которому пользователи открывают Savvy, например https://savvy.example.com. Нужен для SSO и passkeys; также можно задать как app_url в config.toml. Смена http на https (и наоборот) завершает все сессии, поэтому открывайте Savvy по новому адресу.",
             "appUrlPlaceholder": "https://savvy.example.com",
+            "useBrowserUrl": "Использовать {{url}}",
             "configReadOnly": "Savvy не может записывать config.toml, поэтому здесь это не изменить. Задайте app_url в файле и перезапустите."
         },
         "mail": {

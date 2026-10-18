@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { UseBrowserUrlButton } from '@/components/features/settings/UseBrowserUrlButton'
 import { numberDraft, numberToDraft } from './setting-drafts'
 
 /** A number field saved on demand; empty means null when nullable. */
@@ -62,6 +63,7 @@ export function TextRow({
     placeholder,
     value,
     readOnly,
+    suggestion,
     onSave,
 }: {
     id: string
@@ -70,6 +72,8 @@ export function TextRow({
     placeholder?: string
     value: string
     readOnly?: boolean
+    /** A URL offered as one-click input. Fills the draft only; Save stays explicit. */
+    suggestion?: string
     onSave: (value: string) => void
 }) {
     const { t } = useTranslation('settings')
@@ -86,15 +90,20 @@ export function TextRow({
                 <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
             </div>
             <div className="flex items-center gap-2">
-                <Input
-                    id={id}
-                    type="url"
-                    className="w-full sm:w-72"
-                    placeholder={placeholder}
-                    value={draft}
-                    readOnly={readOnly}
-                    onChange={(e) => setDraft(e.target.value)}
-                />
+                <div className="relative w-full sm:w-72">
+                    <Input
+                        id={id}
+                        type="url"
+                        className={suggestion && !readOnly ? 'pr-10' : undefined}
+                        placeholder={placeholder}
+                        value={draft}
+                        readOnly={readOnly}
+                        onChange={(e) => setDraft(e.target.value)}
+                    />
+                    {suggestion && !readOnly && (
+                        <UseBrowserUrlButton url={suggestion} current={draft} onUse={setDraft} />
+                    )}
+                </div>
                 {changed && !readOnly && (
                     <Button size="sm" onClick={() => onSave(draft.trim())}>
                         {t('actions.save', { ns: 'common' })}

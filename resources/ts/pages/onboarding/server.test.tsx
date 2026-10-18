@@ -119,9 +119,18 @@ describe('server setup: who sees it', () => {
 })
 
 describe('step 1: the public URL', () => {
-    it('fills the field with the browser address if no URL is set', () => {
+    it('leaves the field empty if no URL is set and offers the browser address', () => {
         renderPage()
+        expect(urlInput().value).toBe('')
+        click('system.server.useBrowserUrl')
         expect(urlInput().value).toBe(window.location.origin)
+        expect(update).not.toHaveBeenCalled()
+    })
+
+    it('does not offer the browser address when the URL is already that', () => {
+        settings = { ...settings, app_url: window.location.origin }
+        renderPage()
+        expect(screen.queryByRole('button', { name: 'system.server.useBrowserUrl' })).toBeNull()
     })
 
     it('keeps the URL that is already set', () => {
@@ -149,6 +158,7 @@ describe('step 1: the public URL', () => {
     it('stays on the step when saving fails', async () => {
         update.mockRejectedValue(new Error('no'))
         renderPage()
+        fireEvent.change(urlInput(), { target: { value: 'https://savvy.example.com' } })
         click('serverSetup.continue')
         await waitFor(() => expect(update).toHaveBeenCalled())
         expect(screen.queryByText('serverSetup.optionsTitle')).toBeNull()
