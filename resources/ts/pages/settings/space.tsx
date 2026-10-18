@@ -3,6 +3,7 @@ import { Page, PageHeader } from '@/components/shared'
 import { TransfersNeedingAttention } from '@/components/features/spaces/TransfersNeedingAttention'
 import { SyncGroupSection } from '@/components/features/spaces/SyncGroupSection'
 import { useCurrentSpace } from '@/hooks'
+import { SpaceBadge } from '@/components/features/spaces/SpaceBadge'
 import { spaceRoleLabel } from '@/lib/labels'
 import { General } from '@/components/features/spaces/settings/General'
 import { Members } from '@/components/features/spaces/settings/Members'
@@ -19,6 +20,7 @@ export default function SpaceSettingsPage() {
     return (
         <Page title={t('spaces.title')}>
             <PageHeader
+                leading={<SpaceBadge space={space} />}
                 title={space.name}
                 description={t('spaces.description', { role: spaceRoleLabel(t, space.role) })}
             />

@@ -263,3 +263,14 @@ describe('invitation list', () => {
         expect(toRequest({ ...emptyDraft(), name: 'Home', baseCurrency: 'EUR' })).not.toHaveProperty('invitations')
     })
 })
+
+describe('look in the request', () => {
+    it('sends the emoji and color only when picked', () => {
+        const draft = { ...emptyDraft(), name: ' Trip ', baseCurrency: 'EUR' }
+        expect(toRequest(draft)).not.toHaveProperty('emoji')
+        expect(toRequest(draft)).not.toHaveProperty('color')
+        const body = toRequest({ ...draft, emoji: '🏖️', color: '#ff8800' })
+        expect(body.emoji).toBe('🏖️')
+        expect(body.color).toBe('#ff8800')
+    })
+})

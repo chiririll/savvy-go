@@ -251,6 +251,8 @@ type Space struct {
 	ID         int64
 	Uuid       string
 	Name       string
+	Emoji      sql.NullString
+	Color      sql.NullString
 	QuotaBytes sql.NullInt64
 	CreatedBy  sql.NullInt64
 	CreatedAt  sql.NullString

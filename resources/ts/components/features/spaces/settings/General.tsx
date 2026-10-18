@@ -6,9 +6,10 @@ import { SettingsSection } from '@/components/shared'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useDeleteSpace, useLeaveSpace, useRenameSpace, useSpaceDetails } from '@/hooks'
+import { useDeleteSpace, useLeaveSpace, useUpdateSpace, useSpaceDetails } from '@/hooks'
 import { formatBytes } from '@/lib/format'
 import { Space } from '@/types/spaces'
+import { SpaceLookFields } from '@/components/features/spaces/SpaceLookFields'
 import { Confirm } from '@/components/features/spaces/settings/Confirm'
 
 export function General({ space, isAdmin }: { space: Space; isAdmin: boolean }) {
@@ -16,7 +17,10 @@ export function General({ space, isAdmin }: { space: Space; isAdmin: boolean }) 
     const navigate = useNavigate()
     const { data: details } = useSpaceDetails(space.id)
     const [name, setName] = useState(space.name)
-    const rename = useRenameSpace(space.id)
+    const [look, setLook] = useState({ emoji: space.emoji ?? '', color: space.color ?? '' })
+    const update = useUpdateSpace(space.id)
+    const changed =
+        name.trim() !== space.name || look.emoji !== (space.emoji ?? '') || look.color !== (space.color ?? '')
     const remove = useDeleteSpace(space.id)
     const leave = useLeaveSpace(space.id)
 
@@ -33,16 +37,17 @@ export function General({ space, isAdmin }: { space: Space; isAdmin: boolean }) 
                             maxLength={100}
                             onChange={(e) => setName(e.target.value)}
                         />
-                        {isAdmin && name.trim() !== space.name && (
-                            <Button
-                                disabled={!name.trim() || rename.isPending}
-                                onClick={() => rename.mutate(name.trim())}
-                            >
-                                {t('actions.save', { ns: 'common' })}
-                            </Button>
-                        )}
                     </div>
                 </div>
+                <SpaceLookFields {...look} onChange={setLook} disabled={!isAdmin} />
+                {isAdmin && changed && (
+                    <Button
+                        disabled={!name.trim() || update.isPending}
+                        onClick={() => update.mutate({ name: name.trim(), ...look })}
+                    >
+                        {t('actions.save', { ns: 'common' })}
+                    </Button>
+                )}
                 {details && (
                     <p className="text-sm text-muted-foreground">
                         {details.quota > 0

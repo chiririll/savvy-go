@@ -8,6 +8,7 @@ import {
     LinkedSpace,
     SpaceRole,
     SpaceTransferInput,
+    SpaceUpdate,
     SyncChange,
     SyncKind,
     SyncPlan,
@@ -111,11 +112,11 @@ export function useSpaceDetails(id: number | null) {
     return useQuery({ queryKey: spaceKey(id), queryFn: () => spacesApi.get(id!), enabled: id !== null })
 }
 
-export function useRenameSpace(id: number) {
+export function useUpdateSpace(id: number) {
     return useResourceMutation({
-        mutationFn: (name: string) => spacesApi.rename(id, name),
+        mutationFn: (input: SpaceUpdate) => spacesApi.update(id, input),
         invalidateKeys: [SPACES_KEY, spaceKey(id)],
-        successMessage: i18n.t('spaces.toasts.renamed', { ns: 'settings' }),
+        successMessage: i18n.t('spaces.toasts.updated', { ns: 'settings' }),
     })
 }
 

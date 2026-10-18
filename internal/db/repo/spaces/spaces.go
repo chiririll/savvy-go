@@ -39,6 +39,22 @@ func timePtr(raw string) *time.Time {
 type Space struct {
 	ID         int64
 	UUID, Name string
+	Look
+}
+
+// Look is how a space is drawn beside its name: an emoji and a #rrggbb color,
+// each optional.
+type Look struct{ Emoji, Color *string }
+
+func nullPtr(v sql.NullString) *string {
+	if !v.Valid {
+		return nil
+	}
+	return &v.String
+}
+
+func lookOf(emoji, color sql.NullString) Look {
+	return Look{Emoji: nullPtr(emoji), Color: nullPtr(color)}
 }
 
 // UserSpace is a space with the role of the user it was listed for.
@@ -48,9 +64,16 @@ type UserSpace struct {
 }
 
 // Insert registers a space and returns its id.
-func (r Repo) Insert(ctx context.Context, uuid, name string, createdBy *int64, now time.Time) (int64, error) {
+func (r Repo) Insert(
+	ctx context.Context,
+	uuid, name string,
+	createdBy *int64,
+	now time.Time,
+	look Look,
+) (int64, error) {
 	return r.q().InsertSpace(ctx, sqlc.InsertSpaceParams{
-		Uuid: uuid, Name: name, CreatedBy: db.NullInt64(createdBy), CreatedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now),
+		Uuid: uuid, Name: name, Emoji: db.NullString(look.Emoji), Color: db.NullString(look.Color),
+		CreatedBy: db.NullInt64(createdBy), CreatedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now),
 	})
 }
 
@@ -74,13 +97,16 @@ func (r Repo) ByID(ctx context.Context, id int64) (*Space, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Space{ID: row.ID, UUID: row.Uuid, Name: row.Name}, nil
+	return &Space{ID: row.ID, UUID: row.Uuid, Name: row.Name, Look: lookOf(row.Emoji, row.Color)}, nil
 }
 
 func (r Repo) IDs(ctx context.Context) ([]int64, error) { return r.q().ListSpaceIDs(ctx) }
 
-func (r Repo) Rename(ctx context.Context, id int64, name string, now time.Time) error {
-	return r.q().RenameSpace(ctx, sqlc.RenameSpaceParams{Name: name, UpdatedAt: db.TimeNS(now), ID: id})
+// Update sets a space's name and look; a nil emoji or color clears it.
+func (r Repo) Update(ctx context.Context, id int64, name string, look Look, now time.Time) error {
+	return r.q().UpdateSpace(ctx, sqlc.UpdateSpaceParams{
+		Name: name, Emoji: db.NullString(look.Emoji), Color: db.NullString(look.Color), UpdatedAt: db.TimeNS(now), ID: id,
+	})
 }
 
 // Quota is a space's own size limit in bytes; nil when it has none.
@@ -118,7 +144,7 @@ func (r Repo) Overview(ctx context.Context) ([]Overview, error) {
 	}
 	out := make([]Overview, len(rows))
 	for i, row := range rows {
-		out[i] = Overview{Space: Space{ID: row.ID, UUID: row.Uuid, Name: row.Name},
+		out[i] = Overview{Space: Space{ID: row.ID, UUID: row.Uuid, Name: row.Name, Look: lookOf(row.Emoji, row.Color)},
 			Members: row.Members, Admins: row.Admins, CreatedAt: optTime(row.CreatedAt)}
 	}
 	return out, nil
@@ -186,7 +212,7 @@ func (r Repo) ForUser(ctx context.Context, userID int64) ([]UserSpace, error) {
 	}
 	out := make([]UserSpace, len(rows))
 	for i, row := range rows {
-		out[i] = UserSpace{Space: Space{ID: row.ID, UUID: row.Uuid, Name: row.Name}, Role: row.Role}
+		out[i] = UserSpace{Space: Space{ID: row.ID, UUID: row.Uuid, Name: row.Name, Look: lookOf(row.Emoji, row.Color)}, Role: row.Role}
 	}
 	return out, nil
 }
@@ -435,7 +461,7 @@ func (r Repo) All(ctx context.Context) ([]Space, error) {
 	}
 	out := make([]Space, len(rows))
 	for i, row := range rows {
-		out[i] = Space{ID: row.ID, UUID: row.Uuid, Name: row.Name}
+		out[i] = Space{ID: row.ID, UUID: row.Uuid, Name: row.Name, Look: lookOf(row.Emoji, row.Color)}
 	}
 	return out, nil
 }

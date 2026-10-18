@@ -27,16 +27,23 @@ func New(perMinute int) *Limiter {
 	return &Limiter{perMinute: perMinute, now: time.Now, buckets: map[string]bucket{}}
 }
 
+// SetClock replaces the clock the limiter reads, so a test can stop time.
+func (l *Limiter) SetClock(now func() time.Time) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.now = now
+}
+
 // Allow takes a token for key. When none is left it returns false and how long until one is.
 func (l *Limiter) Allow(key string) (bool, time.Duration) {
 	if l == nil || l.perMinute <= 0 {
 		return true, 0
 	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	now := l.now()
 	rate := float64(l.perMinute) / float64(time.Minute) // tokens per nanosecond
 
-	l.mu.Lock()
-	defer l.mu.Unlock()
 	l.sweep(now)
 
 	b, ok := l.buckets[key]

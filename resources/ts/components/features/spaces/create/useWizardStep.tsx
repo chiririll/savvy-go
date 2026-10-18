@@ -53,7 +53,16 @@ export function useWizardStep({ open, onClose, dismissible, onCreated }: Options
     switch (step) {
         case 'name':
             return {
-                body: <NameStep name={draft.name} onNameChange={(name) => update({ name })} onSubmit={seed} />,
+                body: (
+                    <NameStep
+                        name={draft.name}
+                        onNameChange={(name) => update({ name })}
+                        emoji={draft.emoji}
+                        color={draft.color}
+                        onLookChange={update}
+                        onSubmit={seed}
+                    />
+                ),
                 footer: (
                     <>
                         {cancel}

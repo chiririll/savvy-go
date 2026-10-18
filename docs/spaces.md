@@ -16,7 +16,9 @@ Use **Create a space** in the switcher, or the window shown to a user with no sp
 
 Progress is kept in your browser only, so you can close the window and return. Nothing reaches the server before the last step.
 
-**Via the API.** `POST /api/spaces` with only a `name` makes an empty space. It can also fill the space in one request: `baseCurrency`, `currencies` (codes), `accounts` (`name`, `type`, `currency`, `initialBalance`), `categories`, `tags`. Rates come from the server's currency data; a currency without a known rate is refused, never stored with a made-up one. Default expense and income categories are always added. The request creates the whole space or nothing.
+**Emoji and color.** A space can have one emoji and a color (`#rrggbb`), picked when it is created and changed by a space admin in the space settings. They show in the space switcher, the settings header and the admin spaces table; without an emoji the first letter of the name is shown on the color. They are display only: they are not part of anything signed, so linked spaces and transfers do not carry them, and a space imported from a backup starts without them. Server backups keep them.
+
+**Via the API.** `POST /api/spaces` with only a `name` makes an empty space; `emoji` and `color` are optional. It can also fill the space in one request: `baseCurrency`, `currencies` (codes), `accounts` (`name`, `type`, `currency`, `initialBalance`), `categories`, `tags`. Rates come from the server's currency data; a currency without a known rate is refused, never stored with a made-up one. Default expense and income categories are always added. The request creates the whole space or nothing.
 
 ## Space roles
 

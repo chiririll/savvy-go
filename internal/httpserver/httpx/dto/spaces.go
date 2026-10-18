@@ -8,14 +8,16 @@ import (
 
 // Space is a space as the API lists it, with the caller's role in it.
 type Space struct {
-	ID   int64  `json:"id"`
-	UUID string `json:"uuid"`
-	Name string `json:"name"`
-	Role string `json:"role"`
+	ID    int64   `json:"id"`
+	UUID  string  `json:"uuid"`
+	Name  string  `json:"name"`
+	Emoji *string `json:"emoji"`
+	Color *string `json:"color"`
+	Role  string  `json:"role"`
 }
 
 func NewSpace(s spaces.Space) Space {
-	return Space{ID: s.ID, UUID: s.UUID, Name: s.Name, Role: s.Role}
+	return Space{ID: s.ID, UUID: s.UUID, Name: s.Name, Emoji: s.Emoji, Color: s.Color, Role: s.Role}
 }
 
 // SpaceDetail is the space the request works in, with its limits.
@@ -108,6 +110,8 @@ type SpaceOverview struct {
 	ID          int64      `json:"id"`
 	UUID        string     `json:"uuid"`
 	Name        string     `json:"name"`
+	Emoji       *string    `json:"emoji"`
+	Color       *string    `json:"color"`
 	Members     int64      `json:"members"`
 	Admins      int64      `json:"admins"`
 	Size        int64      `json:"size"`
@@ -118,7 +122,7 @@ type SpaceOverview struct {
 
 func NewSpaceOverview(o spaces.Overview) SpaceOverview {
 	return SpaceOverview{
-		ID: o.ID, UUID: o.UUID, Name: o.Name, Members: o.Members, Admins: o.Admins, Size: o.Size, Quota: o.Quota,
+		ID: o.ID, UUID: o.UUID, Name: o.Name, Emoji: o.Emoji, Color: o.Color, Members: o.Members, Admins: o.Admins, Size: o.Size, Quota: o.Quota,
 		Unavailable: o.Unavailable, CreatedAt: utc(o.CreatedAt),
 	}
 }

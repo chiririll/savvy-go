@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useAdminSpaces } from '@/hooks'
 import { formatBytes, formatDateTime } from '@/lib/format'
 import { QuotaCell, AssignAdmin } from '@/components/features/admin/spaces/SpaceCells'
+import { SpaceBadge } from '@/components/features/spaces/SpaceBadge'
 import { DeleteSpaceButton } from '@/components/features/admin/spaces/DeleteSpaceButton'
 import { DeletedSpacesSection } from '@/components/features/admin/spaces/DeletedSpacesSection'
 
@@ -33,7 +34,10 @@ export default function AdminSpacesPage() {
                             {spaces.map((s) => (
                                 <TableRow key={s.id}>
                                     <TableCell>
-                                        <div className="font-medium">{s.name}</div>
+                                        <div className="flex items-center gap-2 font-medium">
+                                            <SpaceBadge space={s} className="size-6 rounded-md text-xs" />
+                                            {s.name}
+                                        </div>
                                         <div className="text-xs text-muted-foreground">
                                             {formatDateTime(s.createdAt)}
                                         </div>

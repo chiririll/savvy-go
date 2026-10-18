@@ -32,7 +32,7 @@ func newRegistry(t *testing.T) *registry {
 	}
 	bob, _ := users.InsertUser(ctx, "Bob", "bob@test.com", "h", "user", now)
 	r := &registry{db: d, repo: spacesrepo.Repo{DB: d}, ann: ann, bob: bob}
-	r.space, err = r.repo.Insert(ctx, "uuid-1", "Home", &ann, now)
+	r.space, err = r.repo.Insert(ctx, "uuid-1", "Home", &ann, now, spacesrepo.Look{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -280,5 +280,63 @@ func TestOverviewCountsMembersAdmins(t *testing.T) {
 	rows, err := r.repo.Overview(ctx)
 	if err != nil || len(rows) != 1 || rows[0].Members != 2 || rows[0].Admins != 1 || rows[0].CreatedAt == nil {
 		t.Fatalf("overview = %+v, %v", rows, err)
+	}
+}
+
+func strp(s string) *string { return &s }
+
+func TestSpaceLookRoundTrips(t *testing.T) {
+	r := newRegistry(t)
+	now := time.Now().UTC()
+	if sp, _ := r.repo.ByID(ctx, r.space); sp.Emoji != nil || sp.Color != nil {
+		t.Fatalf("plain space has a look: %+v", sp)
+	}
+	id, err := r.repo.Insert(ctx, "uuid-2", "Trip", &r.ann, now, spacesrepo.Look{Emoji: strp("🏖️"), Color: strp("#ff8800")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sp, _ := r.repo.ByID(ctx, id)
+	if sp.Emoji == nil || *sp.Emoji != "🏖️" || sp.Color == nil || *sp.Color != "#ff8800" {
+		t.Fatalf("inserted look = %+v", sp)
+	}
+
+	if err := r.repo.Update(ctx, id, "Trip 2", spacesrepo.Look{Color: strp("#112233")}, now); err != nil {
+		t.Fatal(err)
+	}
+	sp, _ = r.repo.ByID(ctx, id)
+	if sp.Name != "Trip 2" || sp.Emoji != nil || *sp.Color != "#112233" {
+		t.Fatalf("updated = %+v", sp)
+	}
+
+	_ = r.repo.UpsertMember(ctx, id, r.ann, "admin", now)
+	mine, _ := r.repo.ForUser(ctx, r.ann)
+	var found bool
+	for _, s := range mine {
+		if s.ID == id {
+			found = *s.Color == "#112233"
+		}
+	}
+	if !found {
+		t.Fatalf("ForUser lost the look: %+v", mine)
+	}
+	ov, _ := r.repo.Overview(ctx)
+	for _, o := range ov {
+		if o.ID == id && *o.Color != "#112233" {
+			t.Fatalf("Overview lost the look: %+v", o)
+		}
+	}
+	all, _ := r.repo.All(ctx)
+	for _, s := range all {
+		if s.ID == id && *s.Color != "#112233" {
+			t.Fatalf("All lost the look: %+v", s)
+		}
+	}
+}
+
+func TestSpaceColorIsCheckedByTheSchema(t *testing.T) {
+	r := newRegistry(t)
+	_, err := r.repo.Insert(ctx, "uuid-3", "Bad", &r.ann, time.Now().UTC(), spacesrepo.Look{Color: strp("red")})
+	if err == nil {
+		t.Fatal("a color that is not #rrggbb was stored")
 	}
 }

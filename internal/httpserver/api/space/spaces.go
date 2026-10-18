@@ -6,6 +6,7 @@ import (
 
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/httpserver/httpx/dto"
+	"savvy-go/internal/spaces"
 	"savvy-go/internal/spaces/spacefill"
 )
 
@@ -25,6 +26,11 @@ func (h Handler) spacesStore(w http.ResponseWriter, r *http.Request) {
 	var fe *spacefill.Error
 	if errors.As(err, &fe) {
 		httpx.WriteValidation(w, map[string][]string{fe.Field: {fe.Msg}})
+		return
+	}
+	var le *spaces.LookError
+	if errors.As(err, &le) {
+		httpx.WriteValidation(w, map[string][]string{le.Field: {le.Msg}})
 		return
 	}
 	if err != nil {
@@ -48,7 +54,9 @@ func (h Handler) spaceShow(w http.ResponseWriter, r *http.Request) {
 
 func (h Handler) spaceUpdate(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Name string `json:"name"`
+		Name  string  `json:"name"`
+		Emoji *string `json:"emoji"`
+		Color *string `json:"color"`
 	}
 	if !httpx.DecodeBody(w, r, &body) {
 		return
@@ -57,7 +65,13 @@ func (h Handler) spaceUpdate(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if err := h.Spaces.Rename(r.Context(), httpx.Scope(r).ID, name); err != nil {
+	err := h.Spaces.Update(r.Context(), httpx.Scope(r).ID, name, spaces.Look{Emoji: body.Emoji, Color: body.Color})
+	var le *spaces.LookError
+	if errors.As(err, &le) {
+		httpx.WriteValidation(w, map[string][]string{le.Field: {le.Msg}})
+		return
+	}
+	if err != nil {
 		httpx.WriteSpaceError(w, err)
 		return
 	}

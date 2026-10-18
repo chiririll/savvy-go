@@ -1,15 +1,19 @@
 import { useTranslation } from 'react-i18next'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { SpaceLookFields } from '../SpaceLookFields'
 
 interface Props {
     name: string
     onNameChange: (name: string) => void
+    emoji: string
+    color: string
+    onLookChange: (look: { emoji: string; color: string }) => void
     /** Enter in the field; the caller decides whether the name is good enough to go on. */
     onSubmit: () => void
 }
 
-export function NameStep({ name, onNameChange, onSubmit }: Props) {
+export function NameStep({ name, onNameChange, emoji, color, onLookChange, onSubmit }: Props) {
     const { t } = useTranslation('settings')
 
     return (
@@ -31,6 +35,7 @@ export function NameStep({ name, onNameChange, onSubmit }: Props) {
                     onKeyDown={(e) => e.key === 'Enter' && name.trim() && onSubmit()}
                 />
             </div>
+            <SpaceLookFields emoji={emoji} color={color} onChange={onLookChange} />
         </div>
     )
 }

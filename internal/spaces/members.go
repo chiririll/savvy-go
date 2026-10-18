@@ -60,19 +60,23 @@ func (s Service) checkAdminLimit(ctx context.Context, u *auth.User) error {
 }
 
 // CreateOwned creates a space administered by owner, within their limit.
-func (s Service) CreateOwned(ctx context.Context, name string, owner *auth.User) (*Space, error) {
+func (s Service) CreateOwned(ctx context.Context, name string, owner *auth.User, look Look) (*Space, error) {
 	if owner.IsGuest() {
 		return nil, ErrGuestCannotAdmin
 	}
 	if err := s.checkAdminLimit(ctx, owner); err != nil {
 		return nil, err
 	}
-	return s.Create(ctx, name, owner)
+	return s.CreateWith(ctx, name, owner, look)
 }
 
-// Rename renames a space.
-func (s Service) Rename(ctx context.Context, id int64, name string) error {
-	return s.registry().Rename(ctx, id, name, time.Now().UTC())
+// Update sets a space's name and look. A bad look is a *LookError.
+func (s Service) Update(ctx context.Context, id int64, name string, look Look) error {
+	look, err := Normalize(look)
+	if err != nil {
+		return err
+	}
+	return s.registry().Update(ctx, id, name, look, time.Now().UTC())
 }
 
 // Members lists a space's members.
@@ -284,9 +288,10 @@ func (s Service) SetQuota(ctx context.Context, actor *auth.User, id, bytes int64
 
 // Overview is a space as the admin overview lists it: metadata only.
 type Overview struct {
-	ID          int64
-	UUID        string
-	Name        string
+	ID   int64
+	UUID string
+	Name string
+	Look
 	Members     int64
 	Admins      int64
 	Size        int64
@@ -304,7 +309,7 @@ func (s Service) Overview(ctx context.Context) ([]Overview, error) {
 	broken := s.Store.Status().Unavailable
 	out := make([]Overview, len(rows))
 	for i, r := range rows {
-		o := Overview{ID: r.ID, UUID: r.UUID, Name: r.Name, Members: r.Members, Admins: r.Admins,
+		o := Overview{ID: r.ID, UUID: r.UUID, Name: r.Name, Look: r.Look, Members: r.Members, Admins: r.Admins,
 			Unavailable: broken[r.ID], CreatedAt: r.CreatedAt}
 		o.Quota = s.Quota(ctx, r.ID)
 		var err error

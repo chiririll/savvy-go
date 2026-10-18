@@ -13,6 +13,8 @@ interface Props {
     onCreateClick?: () => void
     backLink?: string
     actions?: React.ReactNode
+    /** Shown before the title, e.g. a badge. */
+    leading?: React.ReactNode
 }
 
 export function PageHeader({
@@ -22,7 +24,8 @@ export function PageHeader({
                                createLabel,
                                onCreateClick,
                                backLink,
-                               actions
+                               actions,
+                               leading
                            }: Props) {
     const { t } = useTranslation()
     const label = createLabel ?? t('actions.create')
@@ -50,6 +53,7 @@ export function PageHeader({
                             </Link>
                         </Button>
                     )}
+                    {leading}
                     <div className="min-w-0">
                         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{title}</h1>
                         {description && (

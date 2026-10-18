@@ -258,6 +258,9 @@ CREATE TABLE IF NOT EXISTS spaces (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     uuid TEXT NOT NULL UNIQUE,
     name TEXT NOT NULL,
+    -- One emoji and a #rrggbb color shown beside the name; both optional.
+    emoji TEXT,
+    color TEXT CHECK (color IS NULL OR (length(color) = 7 AND color GLOB '#[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]')),
     -- Size limit in bytes set by a server admin; NULL uses space_quota_mb.
     quota_bytes INTEGER CHECK (quota_bytes > 0),
     created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,

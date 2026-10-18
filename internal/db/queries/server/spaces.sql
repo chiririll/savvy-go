@@ -1,16 +1,16 @@
 -- name: InsertSpace :one
-INSERT INTO spaces (uuid, name, created_by, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?)
+INSERT INTO spaces (uuid, name, emoji, color, created_by, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?)
 RETURNING id;
 
 -- name: DeleteSpaceRow :exec
 DELETE FROM spaces WHERE id = ?;
 
 -- name: GetSpace :one
-SELECT id, uuid, name, quota_bytes, created_by, created_at, updated_at FROM spaces WHERE id = ?;
+SELECT id, uuid, name, emoji, color, quota_bytes, created_by, created_at, updated_at FROM spaces WHERE id = ?;
 
--- name: RenameSpace :exec
-UPDATE spaces SET name = ?, updated_at = ? WHERE id = ?;
+-- name: UpdateSpace :exec
+UPDATE spaces SET name = ?, emoji = ?, color = ?, updated_at = ? WHERE id = ?;
 
 -- name: SetSpaceQuota :exec
 UPDATE spaces SET quota_bytes = ?, updated_at = ? WHERE id = ?;
@@ -19,7 +19,7 @@ UPDATE spaces SET quota_bytes = ?, updated_at = ? WHERE id = ?;
 SELECT quota_bytes FROM spaces WHERE id = ?;
 
 -- name: ListSpacesOverview :many
-SELECT s.id, s.uuid, s.name, s.quota_bytes, s.created_at,
+SELECT s.id, s.uuid, s.name, s.emoji, s.color, s.quota_bytes, s.created_at,
 	(SELECT COUNT(*) FROM space_members m WHERE m.space_id = s.id) AS members,
 	(SELECT COUNT(*) FROM space_members m WHERE m.space_id = s.id AND m.role = 'admin') AS admins
 FROM spaces s ORDER BY s.id;
@@ -28,7 +28,7 @@ FROM spaces s ORDER BY s.id;
 SELECT id FROM spaces ORDER BY id;
 
 -- name: ListUserSpaces :many
-SELECT s.id, s.uuid, s.name, m.role
+SELECT s.id, s.uuid, s.name, s.emoji, s.color, m.role
 FROM space_members m JOIN spaces s ON s.id = m.space_id
 WHERE m.user_id = ?
 ORDER BY s.id;
@@ -144,7 +144,7 @@ SELECT space_a_id, space_b_id FROM space_links WHERE space_a_id = sqlc.arg(id) O
 SELECT space_a_id, space_b_id FROM space_links ORDER BY space_a_id, space_b_id;
 
 -- name: ListSpaceUUIDs :many
-SELECT id, uuid, name FROM spaces;
+SELECT id, uuid, name, emoji, color FROM spaces;
 
 -- name: ListTrustedKeys :many
 SELECT kid, public_key, name, created_at FROM trusted_keys ORDER BY created_at;

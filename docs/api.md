@@ -7,7 +7,7 @@ Connect scripts and external apps with an API token.
 
 Creating a token, or giving one more, asks for your password again (an authenticator or recovery code if you use 2FA). So does allowing an AI app to connect, adding or removing a passkey and turning on 2FA. This way someone who gets hold of a signed-in browser cannot add a way in that outlives it. Accounts that sign in only through single sign-on have nothing to confirm with and are not asked. Wrong answers count against the same limit as sign-in attempts.
 
-Finances belong to a space, so their endpoints are under `/api/spaces/{id}/…`. List your spaces to find the id:
+Finances belong to a space, so their endpoints are under `/api/spaces/{id}/…`. List your spaces to find the id (each has a `name`, an `emoji` and a `color`, the last two `null` when not set):
 
 ```bash
 curl -H "Authorization: Bearer svy_xxxxxxxx" https://your-savvy.example/api/spaces

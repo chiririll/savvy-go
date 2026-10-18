@@ -510,7 +510,13 @@
         "title": "Space",
         "description": "Your role here: {{role}}.",
         "fields": {
-            "name": "Name"
+            "name": "Name",
+            "emoji": "Emoji",
+            "color": "Color"
+        },
+        "look": {
+            "clearEmoji": "Remove emoji",
+            "clearColor": "No color"
         },
         "roles": {
             "admin": "Admin",
@@ -608,7 +614,7 @@
         "toasts": {
             "created": "Space created",
             "imported": "Space imported",
-            "renamed": "Space renamed",
+            "updated": "Space updated",
             "deleted": "Space deleted",
             "left": "You left the space",
             "roleChanged": "Role changed",

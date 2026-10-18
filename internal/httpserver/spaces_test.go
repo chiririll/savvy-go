@@ -164,3 +164,54 @@ func TestNewAccountsHaveNoSpace(t *testing.T) {
 		status(t, a.do("GET", "/api/settings", nil, sess.Token, ""), 200, "instance settings")
 	})
 }
+
+func TestSpaceEmojiAndColor(t *testing.T) {
+	a := newTestApp(t)
+	u := a.createUser("look@test.com", "secret1", auth.RoleUser)
+	s := a.issue(u, false)
+
+	res := a.do("POST", "/api/spaces", map[string]any{"name": "Trip", "emoji": "🏖️", "color": "#FF8800"}, s.Token, s.CSRF)
+	body := decodeJSON(t, res)
+	if res.StatusCode != http.StatusCreated {
+		t.Fatalf("create %d %v", res.StatusCode, body)
+	}
+	data := body["data"].(map[string]any)
+	if data["emoji"] != "🏖️" || data["color"] != "#ff8800" {
+		t.Fatalf("created = %v", data)
+	}
+	id := int64(data["id"].(float64))
+
+	for field, payload := range map[string]map[string]any{
+		"emoji": {"name": "X", "emoji": "🏠🏠"},
+		"color": {"name": "X", "color": "red"},
+	} {
+		res := a.do("POST", "/api/spaces", payload, s.Token, s.CSRF)
+		b := decodeJSON(t, res)
+		if res.StatusCode != http.StatusUnprocessableEntity || b["errors"].(map[string]any)[field] == nil {
+			t.Fatalf("create with bad %s: %d %v", field, res.StatusCode, b)
+		}
+		res = a.do("PATCH", spacePath(id, ""), payload, s.Token, s.CSRF)
+		b = decodeJSON(t, res)
+		if res.StatusCode != http.StatusUnprocessableEntity || b["errors"].(map[string]any)[field] == nil {
+			t.Fatalf("update with bad %s: %d %v", field, res.StatusCode, b)
+		}
+	}
+
+	res = a.do("PATCH", spacePath(id, ""), map[string]any{"name": "Trip", "color": "#001122"}, s.Token, s.CSRF)
+	b := decodeJSON(t, res)
+	d := b["data"].(map[string]any)
+	if res.StatusCode != http.StatusOK || d["emoji"] != nil || d["color"] != "#001122" {
+		t.Fatalf("update %d %v", res.StatusCode, b)
+	}
+
+	list := decodeJSON(t, a.do("GET", "/api/spaces", nil, s.Token, s.CSRF))
+	var seen bool
+	for _, x := range list["data"].([]any) {
+		if m := x.(map[string]any); m["name"] == "Trip" {
+			seen = m["color"] == "#001122"
+		}
+	}
+	if !seen {
+		t.Fatalf("list lost the look: %v", list)
+	}
+}

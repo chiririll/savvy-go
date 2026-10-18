@@ -24,6 +24,8 @@ var currencyCodePattern = regexp.MustCompile(`^[A-Z0-9]{2,10}$`)
 
 // Fill is the optional content of POST /api/spaces beside the name.
 type Fill struct {
+	Emoji        *string    `json:"emoji"`
+	Color        *string    `json:"color"`
 	BaseCurrency string     `json:"baseCurrency"`
 	Currencies   []string   `json:"currencies"`
 	Accounts     []Account  `json:"accounts"`
@@ -196,14 +198,15 @@ func (cr Creator) priceCurrencies(ctx context.Context, base string, codes []stri
 // fails the space is discarded, so nothing of it remains. A fill problem is a
 // *Error.
 func (cr Creator) Create(ctx context.Context, name string, owner *auth.User, fill Fill) (*spaces.Space, error) {
+	look := spaces.Look{Emoji: fill.Emoji, Color: fill.Color}
 	if fill.empty() {
-		return cr.Spaces.CreateOwned(ctx, name, owner)
+		return cr.Spaces.CreateOwned(ctx, name, owner, look)
 	}
 	fill, err := fill.normalize()
 	if err != nil {
 		return nil, err
 	}
-	space, err := cr.Spaces.CreateOwned(ctx, name, owner)
+	space, err := cr.Spaces.CreateOwned(ctx, name, owner, look)
 	if err != nil {
 		return nil, err
 	}

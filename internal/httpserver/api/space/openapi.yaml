@@ -3,7 +3,9 @@ paths:
     get:
       tags: [Spaces]
       summary: List the caller's spaces
-      description: Each space with the caller's role in it (`admin`, `editor`, `viewer`).
+      description: >-
+        Each space with the caller's role in it (`admin`, `editor`, `viewer`), and its `emoji` and
+        `color` (`#rrggbb`), each `null` when not set.
       responses:
         "200": {$ref: "#/components/responses/Data"}
         "401": {$ref: "#/components/responses/Unauthenticated"}
@@ -12,7 +14,8 @@ paths:
       summary: Create a space administered by the caller
       description: >-
         Session only. Guests cannot create spaces; `max_spaces_per_user` limits how many a user administers.
-        With only `name` the space is empty. Optional `baseCurrency` (required once anything else is
+        With only `name` the space is empty. Optional `emoji` (one emoji) and `color` (`#rrggbb`) are shown
+        beside the name; a bad value is `422` on that field. Optional `baseCurrency` (required once anything else is
         given), `currencies` (codes), `accounts` (`name`, `type`, `currency`, `initialBalance`, a JSON
         number), `categories` (`name`, `type`, `icon`, `color`, `isDefault`) and `tags` (names) fill it in
         the same request: the base currency first, then the others with rates from the server's rate
@@ -36,8 +39,10 @@ paths:
         "404": {$ref: "#/components/responses/NotFound"}
     patch:
       tags: [Spaces]
-      summary: Rename a space
-      description: Space admins only, session only.
+      summary: Rename a space and change its emoji and color
+      description: >-
+        Space admins only, session only. `name` is required; `emoji` and `color` replace the stored ones,
+        and an empty or missing value clears it. A bad value is `422` on that field.
       security: [{cookieAuth: []}]
       requestBody: {$ref: "#/components/requestBodies/Object"}
       responses:

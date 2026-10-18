@@ -19,6 +19,7 @@ import {
     SpaceRole,
     SpaceTransfer,
     SpaceTransferInput,
+    SpaceUpdate,
     SyncChange,
     SyncDiff,
     SyncGroup,
@@ -46,7 +47,7 @@ export const spacesApi = {
         return { currencies, accounts, categories, tags }
     },
     get: (id: number) => api.get<SpaceDetails>(base(id)),
-    rename: (id: number, name: string) => api.patch<SpaceDetails, { name: string }>(base(id), { name }),
+    update: (id: number, input: SpaceUpdate) => api.patch<SpaceDetails, SpaceUpdate>(base(id), input),
     remove: (id: number) => api.delete<void>(base(id)),
     leave: (id: number) => api.post<void>(`${base(id)}/leave`),
 

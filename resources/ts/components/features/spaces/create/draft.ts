@@ -49,6 +49,9 @@ export interface DraftInvitation {
 export interface SpaceDraft extends DraftContent {
     step: DraftStep
     name: string
+    /** '' means none. */
+    emoji: string
+    color: string
     /** The space to copy from; null starts from the defaults. */
     sourceId: number | null
     copy: CopyKinds
@@ -68,6 +71,8 @@ export const noCopy = (): CopyKinds => ({ currencies: false, accounts: false, ca
 export const emptyDraft = (): SpaceDraft => ({
     step: 'name',
     name: '',
+    emoji: '',
+    color: '',
     sourceId: null,
     copy: noCopy(),
     baseCurrency: null,
@@ -223,6 +228,8 @@ export function toRequest(draft: SpaceDraft): CreateSpaceInput {
     }
     return {
         name: draft.name.trim(),
+        ...(draft.emoji ? { emoji: draft.emoji } : {}),
+        ...(draft.color ? { color: draft.color } : {}),
         baseCurrency: content.baseCurrency ?? undefined,
         currencies: content.currencies,
         accounts: content.accounts.map((a) => {

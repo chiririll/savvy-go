@@ -16,19 +16,9 @@ import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/c
 import { pathAfterSwitch, useCurrentSpace, useSpaces, useSwitchSpace } from '@/hooks/use-spaces'
 import { useUser } from '@/stores/auth'
 import { LazyCreateSpaceModal } from './LazyCreateSpaceModal'
+import { SpaceBadge } from './SpaceBadge'
 import { spaceRoleLabel } from '@/lib/labels'
 import { cn } from '@/lib/utils'
-
-function initials(name: string) {
-    return (
-        name
-            .split(/\s+/)
-            .filter(Boolean)
-            .slice(0, 2)
-            .map((part) => part[0]?.toUpperCase())
-            .join('') || '?'
-    )
-}
 
 /** The current space at the top of the sidebar, and the list to switch to. */
 export function SpaceSwitcher() {
@@ -65,14 +55,7 @@ export function SpaceSwitcher() {
                                     'data-[state=open]:text-sidebar-accent-foreground',
                                 )}
                             >
-                                <div
-                                    className={cn(
-                                        'flex aspect-square size-8 items-center justify-center rounded-lg bg-primary',
-                                        'text-sm font-semibold text-primary-foreground',
-                                    )}
-                                >
-                                    {initials(current?.name ?? '')}
-                                </div>
+                                {current && <SpaceBadge space={current} />}
                                 <div className="grid flex-1 text-left text-sm leading-tight">
                                     <span className="truncate font-semibold">{current?.name}</span>
                                     <span className="truncate text-xs text-muted-foreground">
@@ -93,14 +76,7 @@ export function SpaceSwitcher() {
                             </DropdownMenuLabel>
                             {spaces.map((space) => (
                                 <DropdownMenuItem key={space.id} onClick={() => choose(space.id)} className="gap-2 p-2">
-                                    <div
-                                        className={cn(
-                                            'flex size-6 items-center justify-center rounded-md border text-[10px]',
-                                            'font-semibold',
-                                        )}
-                                    >
-                                        {initials(space.name)}
-                                    </div>
+                                    <SpaceBadge space={space} className="size-6 rounded-md text-xs" />
                                     <div className="grid flex-1 leading-tight">
                                         <span className="truncate">{space.name}</span>
                                         <span className="truncate text-xs text-muted-foreground">
