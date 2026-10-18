@@ -22,9 +22,17 @@ vi.mock('@/hooks', () => ({
 vi.mock('@/components/shared', () => ({
     SettingsSection: ({ children }: { children: ReactNode }) => <section>{children}</section>,
     SettingsRowSkeleton: () => <div>loading</div>,
-    ToggleRow: ({ id, checked, disabled }: { id: string; checked: boolean; disabled?: boolean }) => (
-        <input id={id} type="checkbox" checked={checked} disabled={disabled} readOnly />
-    ),
+    ToggleRow: ({
+        id,
+        checked,
+        disabled,
+        onChange,
+    }: {
+        id: string
+        checked: boolean
+        disabled?: boolean
+        onChange: (checked: boolean) => void
+    }) => <input id={id} type="checkbox" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />,
 }))
 
 const base: MailStatus = {
@@ -127,5 +135,50 @@ describe('mail settings form', () => {
         mail = { ...base, enabled: false, problem: 'mailer.host is empty' }
         render(<MailSection />)
         expect(screen.getByText('system.mail.problem')).toBeTruthy()
+    })
+
+    it('shows only the status and the toggle while mail is off', () => {
+        mail = { ...base, enabled: false }
+        render(<MailSection />)
+        expect(field('mail-enabled')).toBeTruthy()
+        expect(screen.getByText('system.mail.off')).toBeTruthy()
+        expect(field('mail-host')).toBeNull()
+        expect(field('mail-timeout')).toBeNull()
+        expect(screen.queryByRole('button', { name: 'actions.save' })).toBeNull()
+    })
+
+    it('opens the fields with the toggle and keeps the draft across toggles', () => {
+        mail = { ...base, enabled: false }
+        render(<MailSection />)
+        fireEvent.click(field('mail-enabled'))
+        expect(field('mail-host').value).toBe('smtp.example.com')
+        fireEvent.change(field('mail-host'), { target: { value: 'smtp.draft.example' } })
+        fireEvent.click(field('mail-enabled'))
+        expect(field('mail-host')).toBeNull()
+        fireEvent.click(field('mail-enabled'))
+        expect(field('mail-host').value).toBe('smtp.draft.example')
+    })
+
+    it('keeps the fields open when the saved config has a problem', () => {
+        mail = { ...base, enabled: false, problem: 'mailer.host is empty' }
+        render(<MailSection />)
+        expect(field('mail-host')).toBeTruthy()
+    })
+
+    it('can still save after switching mail off, sending every setting and no password', () => {
+        render(<MailSection />)
+        fireEvent.click(field('mail-enabled'))
+        expect(field('mail-host')).toBeNull()
+        submit()
+        const input = save.mock.calls[0][0]
+        expect(input).toMatchObject({ enabled: false, host: 'smtp.example.com', port: 587, timeout: 10 })
+        expect('password' in input).toBe(false)
+    })
+
+    it('collapses a read-only form too when mail is not configured', () => {
+        mail = { ...base, enabled: false, writable: false }
+        render(<MailSection />)
+        expect(field('mail-host')).toBeNull()
+        expect(screen.getByText('system.mail.configReadOnly')).toBeTruthy()
     })
 })

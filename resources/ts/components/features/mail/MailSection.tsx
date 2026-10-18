@@ -90,14 +90,6 @@ function MailFields({ mail, draft, setDraft, locked, editingPassword, setEditing
 
     return (
         <>
-            <ToggleRow
-                id="mail-enabled"
-                label={t('system.mail.enabled')}
-                description={t('system.mail.enabledDescription')}
-                checked={draft.enabled}
-                disabled={locked}
-                onChange={(v) => set('enabled', v)}
-            />
             <Field id="mail-host" label={t('system.mail.host')}>
                 <Input
                     id="mail-host"
@@ -241,6 +233,8 @@ function MailForm({ mail }: { mail: MailStatus }) {
     const [editingPassword, setEditingPassword] = useState(false)
 
     const locked = !mail.writable
+    // The fields are noise on a server without mail; a broken saved config keeps them open to be fixed.
+    const open = draft.enabled || !!mail.problem
     const input = (): MailInput => ({
         enabled: draft.enabled,
         host: draft.host.trim(),
@@ -282,20 +276,30 @@ function MailForm({ mail }: { mail: MailStatus }) {
                     })
                 }}
             >
-                <MailFields
-                    mail={mail}
-                    draft={draft}
-                    setDraft={setDraft}
-                    locked={locked}
-                    editingPassword={editingPassword}
-                    setEditingPassword={setEditingPassword}
+                <ToggleRow
+                    id="mail-enabled"
+                    label={t('system.mail.enabled')}
+                    description={t('system.mail.enabledDescription')}
+                    checked={draft.enabled}
+                    disabled={locked}
+                    onChange={(enabled) => setDraft((d) => ({ ...d, enabled }))}
                 />
+                {open && (
+                    <MailFields
+                        mail={mail}
+                        draft={draft}
+                        setDraft={setDraft}
+                        locked={locked}
+                        editingPassword={editingPassword}
+                        setEditingPassword={setEditingPassword}
+                    />
+                )}
                 {locked && (
                     <p className="px-4 py-3 text-sm leading-relaxed text-muted-foreground">
                         {t('system.mail.configReadOnly')}
                     </p>
                 )}
-                {!locked && (
+                {!locked && (open || draft.enabled !== mail.enabled) && (
                     <div className="px-4 py-3.5">
                         <Button type="submit" disabled={update.isPending}>
                             {t('actions.save', { ns: 'common' })}
