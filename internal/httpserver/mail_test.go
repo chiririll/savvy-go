@@ -296,6 +296,55 @@ func TestMailTestShowsWhyItFailed(t *testing.T) {
 	res.Body.Close()
 }
 
+func TestMailCheckTriesTheGivenSettingsWithoutSavingThem(t *testing.T) {
+	rec := &recorder{on: true}
+	a, sess, file := newWritableMailApp(t, rec)
+	before, _ := os.ReadFile(file.Path())
+
+	res := a.do("POST", "/api/admin/mail/check", mailBody(nil), sess.Token, sess.CSRF)
+	if res.StatusCode != 200 {
+		t.Fatalf("check %d %v", res.StatusCode, decodeJSON(t, res))
+	}
+	res.Body.Close()
+	if conf, _ := a.svc.Mail.Config(); conf.Host != "smtp.example.com" {
+		t.Errorf("a check changed the mailer: %q", conf.Host)
+	}
+	if after, _ := os.ReadFile(file.Path()); string(after) != string(before) {
+		t.Error("a check wrote the config file")
+	}
+	if len(rec.messages()) != 0 {
+		t.Error("a check sent a message")
+	}
+}
+
+func TestMailCheckReportsWhyItFailed(t *testing.T) {
+	rec := &recorder{on: true, checkErr: errors.New("535 authentication failed")}
+	a, sess, _ := newWritableMailApp(t, rec)
+
+	res := a.do("POST", "/api/admin/mail/check", mailBody(nil), sess.Token, sess.CSRF)
+	body := decodeJSON(t, res)
+	if res.StatusCode != 422 || !strings.Contains(toString(body), "535 authentication failed") {
+		t.Fatalf("connect failure: %d %v", res.StatusCode, body)
+	}
+
+	res = a.do("POST", "/api/admin/mail/check", mailBody(map[string]any{"host": ""}), sess.Token, sess.CSRF)
+	body = decodeJSON(t, res)
+	if res.StatusCode != 422 || !strings.Contains(toString(body["errors"]), "host") {
+		t.Errorf("empty host: %d %v", res.StatusCode, body)
+	}
+}
+
+func TestMailCheckIsForAdminsOnly(t *testing.T) {
+	a, _, _ := newWritableMailApp(t, &recorder{on: true})
+	user := a.createUser("plain@test.com", "secret1", roleEditor)
+	u := a.issue(user, false)
+	res := a.do("POST", "/api/admin/mail/check", mailBody(nil), u.Token, u.CSRF)
+	if res.StatusCode != 403 {
+		t.Errorf("plain user: %d", res.StatusCode)
+	}
+	res.Body.Close()
+}
+
 func TestResetLinkEmailedWithoutRevealingToken(t *testing.T) {
 	rec := &recorder{on: true}
 	a, sess, _ := newMailApp(t, rec)

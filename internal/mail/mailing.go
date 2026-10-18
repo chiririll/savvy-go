@@ -50,18 +50,39 @@ type Settings struct {
 // disabled one may be half filled in. It fails with config.ErrReadOnly when the file cannot
 // be written.
 func (s *Service) Save(in Settings) error {
-	change := func(m *smtp.MailerConfig) {
-		password := m.Password
-		if in.Password != nil {
-			password = *in.Password
-		}
-		*m = smtp.MailerConfig{
-			Enabled: in.Enabled, Host: in.Host, Port: in.Port, Protocol: in.Protocol, User: in.User,
-			Password: password, From: in.From, SkipVerify: in.SkipVerify, Timeout: in.Timeout,
-		}
-	}
+	change := func(m *smtp.MailerConfig) { *m = in.mailerConfig(m.Password) }
 	// The section turns a mistake into "mail is off", so it is refused by the check instead.
 	return smtp.Section.Edit(s.file, change, func(m smtp.MailerConfig) error { return m.Config().Validate() })
+}
+
+// mailerConfig is the [mailer] table these settings make; stored is the password kept when none is given.
+func (in Settings) mailerConfig(stored string) smtp.MailerConfig {
+	password := stored
+	if in.Password != nil {
+		password = *in.Password
+	}
+	return smtp.MailerConfig{
+		Enabled: in.Enabled, Host: in.Host, Port: in.Port, Protocol: in.Protocol, User: in.User,
+		Password: password, From: in.From, SkipVerify: in.SkipVerify, Timeout: in.Timeout,
+	}
+}
+
+// Check connects and signs in to the server the settings describe, as if they were enabled, without
+// saving them or sending anything. A configuration that cannot work is refused with an smtp.InvalidError.
+func (s *Service) Check(ctx context.Context, in Settings) error {
+	stored, _ := s.Config()
+	in.Enabled = true
+	cfg := in.mailerConfig(stored.Password).Config()
+	if err := cfg.Validate(); err != nil {
+		return err
+	}
+	mailer := s.sender
+	if mailer == nil {
+		mailer = smtp.New(cfg)
+	}
+	ctx, cancel := context.WithTimeout(ctx, 3*cfg.Timeout)
+	defer cancel()
+	return mailer.Check(ctx)
 }
 
 // Mailer is the current sender.

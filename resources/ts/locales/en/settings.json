@@ -72,6 +72,8 @@
             "from": "Sender",
             "password": "Password",
             "noAppUrl": "The public URL is not set. Links in emails need it.",
+            "checkConnection": "Test connection",
+            "connectionOk": "Connected to the mail server",
             "testTitle": "Send a test email",
             "testPlaceholder": "Recipient (default: your email)",
             "testSend": "Send",

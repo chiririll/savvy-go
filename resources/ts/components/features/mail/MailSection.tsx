@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useMailStatus, useSendTestMail, useUpdateMail } from '@/hooks'
+import { useCheckMail, useMailStatus, useSendTestMail, useUpdateMail } from '@/hooks'
 import { mailProtocolLabel } from '@/lib/labels'
 import { MAIL_PROTOCOLS, type MailInput, type MailProtocol, type MailStatus } from '@/types/mail'
 import { cn } from '@/lib/utils'
@@ -228,6 +228,7 @@ function MailTestForm() {
 function MailForm({ mail }: { mail: MailStatus }) {
     const { t } = useTranslation('settings')
     const update = useUpdateMail()
+    const check = useCheckMail()
     const [draft, setDraft] = useState(() => draftOf(mail))
     // While false and a password is stored, the field shows dots instead of an (empty) draft.
     const [editingPassword, setEditingPassword] = useState(false)
@@ -247,6 +248,23 @@ function MailForm({ mail }: { mail: MailStatus }) {
         skipVerify: draft.skipVerify,
         timeout: Number(draft.timeout),
     })
+
+    // Settings that turn mail on are tried before they are kept; switching it off needs no server.
+    const save = async () => {
+        if (draft.enabled) {
+            try {
+                await check.mutateAsync(input())
+            } catch {
+                return // the API client has shown why
+            }
+        }
+        update.mutate(input(), {
+            onSuccess: (saved) => {
+                setDraft(draftOf(saved))
+                setEditingPassword(false)
+            },
+        })
+    }
 
     const status = mail.enabled
         ? t('system.mail.working')
@@ -268,12 +286,7 @@ function MailForm({ mail }: { mail: MailStatus }) {
                 className="divide-y"
                 onSubmit={(e) => {
                     e.preventDefault()
-                    update.mutate(input(), {
-                        onSuccess: (saved) => {
-                            setDraft(draftOf(saved))
-                            setEditingPassword(false)
-                        },
-                    })
+                    void save()
                 }}
             >
                 <ToggleRow
@@ -299,11 +312,21 @@ function MailForm({ mail }: { mail: MailStatus }) {
                         {t('system.mail.configReadOnly')}
                     </p>
                 )}
-                {!locked && (open || draft.enabled !== mail.enabled) && (
-                    <div className="px-4 py-3.5">
-                        <Button type="submit" disabled={update.isPending}>
+                {!locked && (
+                    <div className="flex flex-wrap gap-2 px-4 py-3.5">
+                        <Button type="submit" disabled={update.isPending || check.isPending}>
                             {t('actions.save', { ns: 'common' })}
                         </Button>
+                        {open && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                disabled={check.isPending}
+                                onClick={() => check.mutateAsync(input()).catch(() => {})}
+                            >
+                                {t('system.mail.checkConnection')}
+                            </Button>
+                        )}
                     </div>
                 )}
             </form>

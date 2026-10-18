@@ -23,6 +23,13 @@ export function useUpdateMail() {
     })
 }
 
+export function useCheckMail() {
+    return useResourceMutation({
+        mutationFn: (input: MailInput) => mailApi.check(input),
+        successMessage: i18n.t('system.mail.connectionOk', { ns: 'settings' }),
+    })
+}
+
 export function useSendTestMail() {
     return useResourceMutation({
         mutationFn: (to?: string) => mailApi.test(to),

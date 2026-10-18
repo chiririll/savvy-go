@@ -25,5 +25,6 @@ type Handler struct {
 func (h Handler) Routes(r chi.Router) {
 	r.Get("/admin/mail", h.index)
 	r.Put("/admin/mail", h.update)
+	r.Post("/admin/mail/check", h.check)
 	r.Post("/admin/mail/test", h.test)
 }

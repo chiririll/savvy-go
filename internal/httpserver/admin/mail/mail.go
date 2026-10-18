@@ -2,6 +2,7 @@ package mail
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -66,6 +67,32 @@ type inputBody struct {
 	Timeout    int     `json:"timeout"`
 }
 
+func (b inputBody) settings() mail.Settings {
+	return mail.Settings{
+		Enabled: b.Enabled, Host: b.Host, Port: b.Port, Protocol: b.Protocol, User: b.User,
+		Password: b.Password, From: b.From, SkipVerify: b.SkipVerify, Timeout: b.Timeout,
+	}
+}
+
+// check tries the settings in the body, saved or not, by connecting and signing in. Nothing is
+// saved or sent.
+func (h Handler) check(w http.ResponseWriter, r *http.Request) {
+	var body inputBody
+	if !httpx.DecodeBody(w, r, &body) {
+		return
+	}
+	err := h.Mail.Check(r.Context(), body.settings())
+	var invalid smtp.InvalidError
+	switch {
+	case err == nil:
+		httpx.WriteData(w, http.StatusOK, map[string]bool{"ok": true})
+	case errors.As(err, &invalid):
+		httpx.WriteConfigError(w, err)
+	default:
+		httpx.WriteMessage(w, http.StatusUnprocessableEntity, "Could not connect to the mail server: "+err.Error())
+	}
+}
+
 // update saves the mail settings to the config file and applies them at once. An enabled
 // configuration that cannot work is refused with the field at fault.
 func (h Handler) update(w http.ResponseWriter, r *http.Request) {
@@ -73,10 +100,7 @@ func (h Handler) update(w http.ResponseWriter, r *http.Request) {
 	if !httpx.DecodeBody(w, r, &body) {
 		return
 	}
-	err := h.Mail.Save(mail.Settings{
-		Enabled: body.Enabled, Host: body.Host, Port: body.Port, Protocol: body.Protocol, User: body.User,
-		Password: body.Password, From: body.From, SkipVerify: body.SkipVerify, Timeout: body.Timeout,
-	})
+	err := h.Mail.Save(body.settings())
 	if err != nil {
 		httpx.WriteConfigError(w, err)
 		return
