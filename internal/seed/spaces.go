@@ -53,7 +53,11 @@ var demoSpaces = []spaceSpec{
 		key: spaceDemo, name: "Demo", emoji: "🏠", color: "#3b82f6", owner: userAlex,
 		members:    map[string]string{userJordan: spaces.RoleEditor, userDemo: spaces.RoleViewer},
 		currencies: currencySet(usdCurrency, withRate(eurCurrency, "1.08")),
-		workspace:  seedWorkspace,
+		own: ownReference{
+			categories: []Category{{"Pets", "expense", "🐾", "#a3e635", false}},
+			tags:       []string{"Weekend"},
+		},
+		workspace: seedWorkspace,
 	},
 	{
 		key: spaceFamily, name: "Family Budget", emoji: "👨‍👩‍👧", color: "#22c55e", owner: userAlex,
@@ -69,10 +73,7 @@ var demoSpaces = []spaceSpec{
 		key: spaceStudio, name: "Studio GmbH", emoji: "🎨", color: "#f97316", owner: userAlex,
 		members:    map[string]string{userJordan: spaces.RoleViewer},
 		currencies: currencySet(eurCurrency, withRate(usdCurrency, "0.9259")),
-		own: ownReference{
-			categories: []Category{{"Software & tools", "expense", "🧰", "#818cf8", false}},
-			tags:       []string{"Client work"},
-		},
+		own:        studioReference,
 		workspace: miniWorkspace(studioSpace),
 	},
 }
@@ -144,7 +145,7 @@ func (d *demo) fill(sp *spaces.Space, spec spaceSpec) (map[string]*ledger.Accoun
 	if err != nil {
 		return nil, err
 	}
-	if err := seedReference(d.ctx, db, spec.currencies); err != nil {
+	if err := seedReference(d.ctx, db, spec.currencies, !spec.own.replacesPresets); err != nil {
 		return nil, fmt.Errorf("space %s: %w", sp.Name, err)
 	}
 	if err := seedOwn(d.ctx, db, spec.own); err != nil {

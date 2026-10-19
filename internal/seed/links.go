@@ -28,6 +28,16 @@ var demoTransfers = []transferSpec{
 	// Across currencies.
 	{30, spaceDemo, "eur", spaceStudio, "bank", "1200", "1200", "Capital for the studio"},
 	{9, spaceStudio, "bank", spaceDemo, "checking", "2000", "2160", "Owner's draw"},
+	{70, spaceDemo, "checking", spaceFamily, "joint", "900", "900", monthlyContribution},
+	{100, spaceDemo, "checking", spaceFamily, "joint", "900", "900", monthlyContribution},
+	{50, spaceStudio, "bank", spaceDemo, "eur", "600", "600", "Shared software licences"},
+	{21, spaceStudio, "usd", spaceDemo, "checking", "600", "600", "Contractor refund"},
+	{18, spaceDemo, "checking", spaceStudio, "usd", "1500", "1500", "Client prepayment"},
+	{7, spaceFamily, "wallet", spaceDemo, "cash", "40", "40", "Cash for the trip"},
+	// Recent, so the latest activity of the spaces shows them.
+	{5, spaceStudio, "bank", spaceDemo, "eur", "800", "800", "Shared software licences"},
+	{1, spaceDemo, "checking", spaceFamily, "joint", "450", "450", "Vacation fund top-up"},
+	{2, spaceDemo, "checking", spaceStudio, "bank", "540", "500", "Studio retainer"},
 }
 
 // linkTransfer links Demo with the other two spaces and moves money across

@@ -27,9 +27,14 @@ func withRate(c ledger.Currency, rate string) ledger.Currency {
 	return c
 }
 
-func seedReference(ctx context.Context, db store.DB, currencies []ledger.Currency) error {
+// seedReference seeds a space's currencies and, unless the space brings its own
+// (ownReference.replacesPresets), the preset categories and tags.
+func seedReference(ctx context.Context, db store.DB, currencies []ledger.Currency, presets bool) error {
 	if err := seedCurrencies(ctx, ledger.Currencies{DB: db}, currencies); err != nil {
 		return fmt.Errorf("currencies: %w", err)
+	}
+	if !presets {
+		return nil
 	}
 	if err := seedCategories(ctx, ledger.Categories{DB: db}); err != nil {
 		return fmt.Errorf("categories: %w", err)
@@ -56,10 +61,12 @@ func seedCurrencies(ctx context.Context, curs ledger.Currencies, list []ledger.C
 	return nil
 }
 
-// ownReference is what a space has besides the presets.
+// ownReference is what a space has besides the presets, or instead of them when
+// replacesPresets is set.
 type ownReference struct {
-	categories []Category
-	tags       []string
+	categories      []Category
+	tags            []string
+	replacesPresets bool
 }
 
 func seedOwn(ctx context.Context, db store.DB, own ownReference) error {
@@ -99,4 +106,25 @@ func createTags(ctx context.Context, tags ledger.Tags, names []string) error {
 		}
 	}
 	return nil
+}
+
+// studioReference is the categories and tags of Studio GmbH, a business with
+// nothing in common with the household presets.
+var studioReference = ownReference{
+	replacesPresets: true,
+	categories: []Category{
+		{"Rent & office", "expense", "🏢", "#a78bfa", false},
+		{"Software & tools", "expense", "🧰", "#818cf8", false},
+		{"Contractors", "expense", "🤝", "#60a5fa", false},
+		{"Marketing", "expense", "📣", "#f472b6", false},
+		{"Hardware", "expense", "🖥️", "#2dd4bf", false},
+		{"Taxes & VAT", "expense", "🧾", "#fbbf24", false},
+		{"Events & travel", "expense", "🚆", "#38bdf8", false},
+		{"Other costs", "expense", "📌", "#94a3b8", true},
+		{"Client projects", "income", "🎨", "#4ade80", false},
+		{"Retainers", "income", "🔁", "#34d399", false},
+		{"Licensing", "income", "📜", "#a3e635", false},
+		{"Other revenue", "income", "💰", "#94a3b8", true},
+	},
+	tags: []string{"Client work", "Billable", "Overhead", "Reimbursable", "Q4 deadline"},
 }

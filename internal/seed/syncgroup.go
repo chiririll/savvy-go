@@ -6,9 +6,9 @@ import (
 	"savvy-go/internal/refsync"
 )
 
-// syncedSpaces are the spaces of the demo sync group. Demo stays out, so
-// adding it has categories and tags to reconcile.
-var syncedSpaces = []string{spaceFamily, spaceStudio}
+// syncedSpaces are the spaces of the demo sync group. Studio stays out: its
+// categories and tags are a set of its own.
+var syncedSpaces = []string{spaceFamily, spaceDemo}
 
 // syncReference puts syncedSpaces in one sync group that keeps categories and
 // tags equal. Each of them has a category and a tag of its own, which the group

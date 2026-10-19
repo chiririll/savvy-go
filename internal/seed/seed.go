@@ -37,9 +37,10 @@ type Options struct {
 //     linked to Demo, so transfers between them cross currencies, and it is not
 //     linked to Family Budget. It has open invitations.
 //
-// Every space has an emoji and a color. Family Budget and Studio GmbH each have
-// a category and a tag of their own and share them in a sync group, so adding
-// Demo to the group has differences to reconcile. Sam's address is unverified.
+// Every space has an emoji and a color. Family Budget and Demo each have a
+// category and a tag of their own and share them in a sync group, with Studio
+// GmbH outside it: Studio has a business set of categories and tags instead of
+// the presets. Sam's address is unverified.
 //
 // It returns what it created, or nil when it seeded nothing.
 func Demo(ctx context.Context, st store.Store, keys signing.KeyRing, opts Options) (*Manifest, error) {

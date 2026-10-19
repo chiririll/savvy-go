@@ -236,6 +236,18 @@ func TestDemoHasRecentSpaceTransfer(t *testing.T) {
 	}
 }
 
+func TestDemoHasManySpaceTransfers(t *testing.T) {
+	st, _ := seedDemo(t)
+	d := spaceByName(t, st, "Demo")
+	if n := countWhere(t, d, `SELECT COUNT(*) FROM space_transfers`); n < 10 {
+		t.Fatalf("transfers between spaces=%d, want at least 10", n)
+	}
+	cutoff := time.Now().AddDate(0, 0, -7).Format("2006-01-02")
+	if n := countWhere(t, d, `SELECT COUNT(*) FROM space_transfers WHERE date >= ?`, cutoff); n < 3 {
+		t.Fatalf("transfers in the last week=%d, want at least 3", n)
+	}
+}
+
 func TestDemoHasEstimatedPending(t *testing.T) {
 	st, _ := seedDemo(t)
 	for _, name := range []string{"Demo", "Family Budget", "Studio GmbH"} {
@@ -426,24 +438,50 @@ func TestDemoSyncGroup(t *testing.T) {
 	for _, sp := range m.Spaces {
 		group[sp.Name] = sp.SyncGroup
 	}
-	if group["Family Budget"] == 0 || group["Family Budget"] != group["Studio GmbH"] || group["Demo"] != 0 {
+	if group["Family Budget"] == 0 || group["Family Budget"] != group["Demo"] || group["Studio GmbH"] != 0 {
 		t.Fatalf("manifest sync groups: %v", group)
 	}
-	for _, name := range []string{"Family Budget", "Studio GmbH"} {
+	for _, name := range []string{"Family Budget", "Demo"} {
 		d := spaceByName(t, st, name)
-		for _, cat := range []string{"School & kids", "Software & tools"} {
+		for _, cat := range []string{"School & kids", "Pets"} {
 			if countWhere(t, d, `SELECT COUNT(*) FROM categories WHERE name = ?`, cat) != 1 {
 				t.Fatalf("%s lacks the shared category %q", name, cat)
 			}
 		}
-		for _, tag := range []string{"Kids", "Client work"} {
+		for _, tag := range []string{"Kids", "Weekend"} {
 			if countWhere(t, d, `SELECT COUNT(*) FROM tags WHERE name = ?`, tag) != 1 {
 				t.Fatalf("%s lacks the shared tag %q", name, tag)
 			}
 		}
 	}
-	if countWhere(t, spaceByName(t, st, "Demo"), `SELECT COUNT(*) FROM categories WHERE name = 'School & kids'`) != 0 {
-		t.Fatal("Demo got a category of the group")
+}
+
+func TestDemoStudioHasItsOwnCategoriesAndTags(t *testing.T) {
+	st, _ := seedDemo(t)
+	studio := spaceByName(t, st, "Studio GmbH")
+	if n := countWhere(t, studio, `SELECT COUNT(*) FROM categories WHERE name LIKE '#%'`); n != 0 {
+		t.Fatalf("Studio has %d preset categories", n)
+	}
+	if n := countWhere(t, studio, `SELECT COUNT(*) FROM tags WHERE name LIKE '#%'`); n != 0 {
+		t.Fatalf("Studio has %d preset tags", n)
+	}
+	for _, typ := range []string{"expense", "income"} {
+		if n := countWhere(t, studio, `SELECT COUNT(*) FROM categories WHERE type = ? AND is_default = 1`, typ); n != 1 {
+			t.Fatalf("Studio has %d default %s categories", n, typ)
+		}
+	}
+	for _, other := range []string{"Demo", "Family Budget"} {
+		d := spaceByName(t, st, other)
+		if n := countWhere(t, d, `SELECT COUNT(*) FROM categories WHERE name = 'Client projects'`); n != 0 {
+			t.Fatalf("%s has a Studio category", other)
+		}
+	}
+	// Every Studio transaction and its budget use a category of the space.
+	if n := countWhere(t, studio, `SELECT COUNT(*) FROM transactions WHERE category_id IS NULL AND type IN ('income','expense')`); n != 0 {
+		t.Fatalf("%d Studio transactions have no category", n)
+	}
+	if n := countWhere(t, studio, `SELECT COUNT(*) FROM budgets`); n == 0 {
+		t.Fatal("Studio has no budget")
 	}
 }
 

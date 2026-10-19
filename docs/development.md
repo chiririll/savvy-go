@@ -29,7 +29,7 @@ With `--seed-config <file>` (any TOML file, even empty), the first boot creates 
 | `guest@savvy.app`  | `password` | guest       |
 | `demo@demo.com`    | `demo`     | user        |
 
-Roles differ per space, so each user sees a different view. Every space has its own emoji and color. Family Budget and Studio GmbH are in one sync group, each with a category and a tag the other lacked, while Demo is outside it, so adding Demo to the group has differences to reconcile. All addresses are verified except the guest's, which shows as unverified once mail is set up.
+Roles differ per space, so each user sees a different view. Every space has its own emoji and color. Family Budget and Demo are in one sync group, each with a category and a tag the other lacked. Studio GmbH is outside it and has a set of categories and tags of its own (clients, retainers, VAT) instead of the presets. About a dozen transfers cross the links between the spaces, some in the last few days and some between currencies. All addresses are verified except the guest's, which shows as unverified once mail is set up.
 
 Example `seed.toml`:
 

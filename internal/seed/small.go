@@ -66,16 +66,16 @@ var studioSpace = miniSpace{
 		{"usd", "Studio USD Account", "bank", "USD", 3100},
 	},
 	txs: []miniTx{
-		{"income", "bank", "#SIDE_INCOME", 4800, "Client invoice — Nordlicht AG", 36, false, false},
-		{"income", "usd", "#SIDE_INCOME", 2200, "Client invoice — Brightpath Inc.", 21, false, false},
-		{"income", "bank", "#SIDE_INCOME", 3600, "Client invoice — Hafen Media", 5, false, false},
-		{"expense", "bank", "#HOUSING", 950, "Office rent — Kreuzberg", 27, false, false},
-		{"expense", "bank", "#HOUSING", 950, "Office rent — Kreuzberg", 1, false, false},
-		{"expense", "bank", "#OTHER", 89, "Figma & Adobe subscriptions", 19, false, false},
-		{"expense", "bank", "#UTILITIES", 74.50, "Vattenfall", 10, false, false},
-		{"expense", "bank", "#OTHER", 2400, "VAT prepayment — Finanzamt", -6, true, true},
+		{"income", "bank", "Client projects", 4800, "Client invoice — Nordlicht AG", 36, false, false},
+		{"income", "usd", "Client projects", 2200, "Client invoice — Brightpath Inc.", 21, false, false},
+		{"income", "bank", "Retainers", 3600, "Client invoice — Hafen Media", 5, false, false},
+		{"expense", "bank", "Rent & office", 950, "Office rent — Kreuzberg", 27, false, false},
+		{"expense", "bank", "Rent & office", 950, "Office rent — Kreuzberg", 1, false, false},
+		{"expense", "bank", "Software & tools", 89, "Figma & Adobe subscriptions", 19, false, false},
+		{"expense", "bank", "Rent & office", 74.50, "Vattenfall", 10, false, false},
+		{"expense", "bank", "Taxes & VAT", 2400, "VAT prepayment — Finanzamt", -6, true, true},
 	},
-	budget: miniBudget{"Office costs", "#HOUSING", 1000},
+	budget: miniBudget{"Office costs", "Rent & office", 1000},
 }
 
 // seedMini fills a space with a miniSpace and returns its accounts by key. The
