@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { syncTypeLabel } from '@/lib/labels'
+import { testId } from '@/lib/test-id'
+import { localizeDefaultName } from '@/lib/localized-name'
 import type { SyncCategoryConflict, SyncTagConflict } from '@/types/spaces'
 import { differs, defaultOptions, type SyncDefaultConflict } from './sync-reconcile'
 
@@ -13,9 +15,9 @@ interface SpaceNames {
     names: (ids: number[]) => string
 }
 
-function Card({ testId, children }: { testId: string; children: ReactNode }) {
+function Card({ id, children }: { id: string; children: ReactNode }) {
     return (
-        <div className="space-y-2 rounded-lg border p-3 text-sm" data-testid={testId}>
+        <div className="space-y-2 rounded-lg border p-3 text-sm" {...testId(id)}>
             {children}
         </div>
     )
@@ -49,34 +51,26 @@ interface CategoryCardProps extends SpaceNames {
     conflict: SyncCategoryConflict
     kept: boolean
     look: number | undefined
-    successor: string | undefined
-    needsSuccessor: boolean
-    successors: string[]
     onKeep: (kept: boolean) => void
     onLook: (spaceId: number) => void
-    onSuccessor: (name: string) => void
 }
 
 export function SyncCategoryCard({
     conflict: c,
     kept,
     look,
-    successor,
-    needsSuccessor,
-    successors,
     spaceName,
     names,
     onKeep,
     onLook,
-    onSuccessor,
 }: CategoryCardProps) {
     const { t } = useTranslation(['settings', 'common'])
 
     return (
-        <Card testId="sync-category">
+        <Card id="sync-category">
             <div>
                 <p className="font-medium">
-                    {c.name} · {syncTypeLabel(t, c.type)}
+                    {localizeDefaultName(c.name)} · {syncTypeLabel(t, c.type)}
                 </p>
                 <p className="text-xs text-muted-foreground">
                     {t('spaces.sync.dialog.presentIn', { spaces: names(c.present.map((p) => p.spaceId)) })}
@@ -106,23 +100,6 @@ export function SyncCategoryCard({
                     </Select>
                 </div>
             )}
-            {needsSuccessor && (
-                <div className="space-y-1">
-                    <Label>{t('spaces.sync.dialog.successor')}</Label>
-                    <Select value={successor ?? ''} onValueChange={onSuccessor}>
-                        <SelectTrigger className={TRIGGER}>
-                            <SelectValue placeholder={t('spaces.sync.dialog.successorPlaceholder')} />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {successors.map((name) => (
-                                <SelectItem key={name} value={name}>
-                                    {name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-            )}
         </Card>
     )
 }
@@ -138,10 +115,10 @@ export function SyncDefaultCard({ conflict: d, value, spaceName, onChange }: Def
     const { t } = useTranslation(['settings', 'common'])
 
     return (
-        <Card testId="sync-default">
+        <Card id="sync-default">
             <p className="font-medium">{t('spaces.sync.dialog.defaultTitle', { type: syncTypeLabel(t, d.type) })}</p>
             <p className="text-xs text-muted-foreground">
-                {d.defaults.map((x) => `${spaceName(x.spaceId)}: ${x.name || '—'}`).join(' · ')}
+                {d.defaults.map((x) => `${spaceName(x.spaceId)}: ${localizeDefaultName(x.name) || '—'}`).join(' · ')}
             </p>
             <Select value={value} onValueChange={onChange}>
                 <SelectTrigger className={TRIGGER}>
@@ -150,11 +127,46 @@ export function SyncDefaultCard({ conflict: d, value, spaceName, onChange }: Def
                 <SelectContent>
                     {defaultOptions(d).map((name) => (
                         <SelectItem key={name} value={name}>
-                            {name}
+                            {localizeDefaultName(name)}
                         </SelectItem>
                     ))}
                 </SelectContent>
             </Select>
+        </Card>
+    )
+}
+
+interface SuccessorCardProps {
+    conflict: SyncCategoryConflict
+    value: string | undefined
+    options: string[]
+    onChange: (name: string) => void
+}
+
+/** Where the transactions of a category that is deleted everywhere go. */
+export function SyncSuccessorCard({ conflict: c, value, options, onChange }: SuccessorCardProps) {
+    const { t } = useTranslation(['settings', 'common'])
+
+    return (
+        <Card id="sync-successor">
+            <p className="font-medium">
+                {localizeDefaultName(c.name)} · {syncTypeLabel(t, c.type)}
+            </p>
+            <div className="space-y-1">
+                <Label>{t('spaces.sync.dialog.successor')}</Label>
+                <Select value={value ?? ''} onValueChange={onChange}>
+                    <SelectTrigger className={TRIGGER}>
+                        <SelectValue placeholder={t('spaces.sync.dialog.successorPlaceholder')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {options.map((name) => (
+                            <SelectItem key={name} value={name}>
+                                {localizeDefaultName(name)}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
         </Card>
     )
 }
@@ -169,9 +181,9 @@ export function SyncTagCard({ conflict: c, kept, names, onKeep }: TagCardProps) 
     const { t } = useTranslation(['settings', 'common'])
 
     return (
-        <Card testId="sync-tag">
+        <Card id="sync-tag">
             <div>
-                <p className="font-medium">#{c.name}</p>
+                <p className="font-medium">#{localizeDefaultName(c.name, 'tags')}</p>
                 <p className="text-xs text-muted-foreground">
                     {t('spaces.sync.dialog.presentIn', { spaces: names(c.present.map((p) => p.spaceId)) })}
                     {` · ${t('spaces.sync.dialog.missingIn', { spaces: names(c.missing) })}`}

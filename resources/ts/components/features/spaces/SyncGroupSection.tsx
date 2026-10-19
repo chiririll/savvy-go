@@ -5,6 +5,7 @@ import { SettingsSection } from '@/components/shared'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useApplySync, useSpaces, useSyncGroup } from '@/hooks'
+import { testId } from '@/lib/test-id'
 import { Space, SyncChange, SyncKind } from '@/types/spaces'
 import { SyncReconcileDialog } from './SyncReconcileDialog'
 import { SyncKindSwitches, SyncMemberList, SyncSetupForm } from './SyncGroupParts'
@@ -78,6 +79,7 @@ export function SyncGroupSection({ space, isAdmin }: { space: Space; isAdmin: bo
                                     </SelectContent>
                                 </Select>
                                 <Button
+                                    {...testId('sync-add')}
                                     disabled={!adding}
                                     onClick={() =>
                                         setChange({ group_id: group.id, add_space_ids: [Number(adding)], ...flags })

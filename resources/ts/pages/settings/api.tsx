@@ -1,5 +1,5 @@
 import { testId } from '@/lib/test-id'
-import { UserSettingsTabs } from '@/components/features/spaces/UserSettingsTabs'
+import { UserSettingsTabs } from '@/components/features/settings/UserSettingsTabs'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ExternalLink, KeyRound, Plus } from 'lucide-react'

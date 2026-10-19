@@ -29,7 +29,7 @@ export type PeriodType = 'last_30_days' | 'month' | 'quarter' | 'year' | 'ytd' |
 export type GroupBy = 'day' | 'week' | 'month'
 export type ReportTab = 'overview' | 'cashflow' | 'expenses' | 'income' | 'networth'
 export type SortOption = 'dateNewest' | 'dateOldest' | 'amountHigh' | 'amountLow'
-export type UserTab = 'preferences' | 'security' | 'api'
+export type UserTab = 'security' | 'passkeys' | 'api'
 export type AutomationLogStatus = 'success' | 'error' | 'skipped'
 export type SsoPresetKey = 'custom_oidc' | 'custom_saml'
 export type ConditionField = 'type' | 'amount' | 'description' | 'account_id' | 'category_id' | 'tags'
@@ -332,8 +332,8 @@ export const auditActionLabel = (t: TFunction, action: string): string =>
     }, action)
 
 export const userTabLabel = (t: TFunction, tab: UserTab): string => ({
-    preferences: t('settings:user.tabs.preferences'),
     security: t('settings:user.tabs.security'),
+    passkeys: t('settings:user.tabs.passkeys'),
     api: t('settings:user.tabs.api'),
 } satisfies Record<UserTab, string>)[tab]
 
@@ -358,7 +358,7 @@ export const transactionTypeLabel = (t: TFunction, type: TransactionType): strin
 
 export type NavKey =
     | 'dashboard' | 'transactions' | 'recurring' | 'budgets' | 'debts' | 'reports'
-    | 'accounts' | 'categories' | 'tags' | 'currencies' | 'automation' | 'space' | 'user' | 'import'
+    | 'accounts' | 'categories' | 'tags' | 'currencies' | 'automation' | 'space' | 'import'
     | 'backups' | 'system' | 'checks' | 'monitoring' | 'sso' | 'security' | 'systemBackups' | 'users' | 'spaces'
 
 export const navLabel = (t: TFunction, key: NavKey): string => ({
@@ -374,7 +374,6 @@ export const navLabel = (t: TFunction, key: NavKey): string => ({
     currencies: t('nav:currencies'),
     automation: t('nav:automation'),
     space: t('nav:space'),
-    user: t('nav:user'),
     import: t('nav:import'),
     backups: t('nav:backups'),
     system: t('nav:system'),

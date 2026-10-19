@@ -51,7 +51,7 @@ export const settingsItems: MenuItem[] = [
     { to: '/currencies', icon: Coins, labelKey: 'currencies' },
     { to: '/automation', icon: Zap, labelKey: 'automation' },
     { to: '/settings/space', icon: Boxes, labelKey: 'space' },
-    { to: '/settings/user', icon: UserRound, labelKey: 'user', also: ['/settings/security', '/settings/api'] },
+    { to: '/settings/security', icon: UserRound, labelKey: 'security', also: ['/settings/passkeys', '/settings/api'] },
     { to: '/settings/import', icon: Upload, labelKey: 'import' },
     { to: '/settings/backups', icon: Database, labelKey: 'backups' },
 ]

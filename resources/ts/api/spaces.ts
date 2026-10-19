@@ -1,7 +1,7 @@
 import { api, apiClient } from './client'
 import { toQueryString } from '@/lib/query-string'
 import { Backup } from '@/types/backup'
-import { Account, Category, Currency, CurrencyCatalogItem, Tag } from '@/types'
+import { Account, Category, Currency, CurrencyCatalog, CurrencyCatalogItem, Tag } from '@/types'
 import {
     AuditEntry,
     InvitationPreview,
@@ -35,7 +35,12 @@ export const spacesApi = {
     /** Categories and tags a new space can start with. */
     presets: () => api.get<SpacePresets>('/presets'),
     /** Every currency the server knows, priced in `base`; needs no space. */
-    currencyCatalog: (base?: string) => api.get<CurrencyCatalogItem[]>(`/currencies/catalog${toQueryString({ base })}`),
+    currencyCatalog: (base?: string) =>
+        apiClient
+            .get<{ data: CurrencyCatalogItem[]; meta?: { source?: string } }>(
+                `/currencies/catalog${toQueryString({ base })}`,
+            )
+            .then((res): CurrencyCatalog => ({ items: res.data.data, source: res.data.meta?.source ?? 'live' })),
     /** The currencies, accounts, categories and tags of a space, read with viewer rights. */
     readContent: async (id: number) => {
         const [currencies, accounts, categories, tags] = await Promise.all([

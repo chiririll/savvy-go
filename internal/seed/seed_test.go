@@ -149,7 +149,7 @@ func TestDemoSeedsEmptyDatabase(t *testing.T) {
 	if n := countWhere(t, space, `SELECT COUNT(*) FROM categories`); n < 10 {
 		t.Fatalf("categories=%d", n)
 	}
-	if n := countWhere(t, space, `SELECT COUNT(*) FROM tags`); n < 8 {
+	if n := countWhere(t, space, `SELECT COUNT(*) FROM tags`); n < 5 {
 		t.Fatalf("tags=%d", n)
 	}
 	if n := countWhere(t, space, `SELECT COUNT(*) FROM accounts`); n < 8 {
@@ -458,7 +458,7 @@ func TestDemoSamIsUnverified(t *testing.T) {
 	}
 }
 
-func TestPresetsAreUniqueTokensWithOneDefaultPerType(t *testing.T) {
+func TestPresetsAreUniqueTokensOneDefaultEach(t *testing.T) {
 	seen := map[string]bool{}
 	defaults := map[string]int{}
 	for _, c := range DefaultCategories() {

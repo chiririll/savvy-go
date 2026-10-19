@@ -182,10 +182,11 @@ func TestCreateSpaceKeepsDefaultsRequestNames(t *testing.T) {
 	ctx := context.Background()
 	owner := a.createUser("o@test.com", "secret1", auth.RoleUser)
 
-	fill := spacefill.Fill{BaseCurrency: "EUR", Categories: []spacefill.Category{
-		{Name: "Misc", Type: "expense", IsDefault: true},
-		{Name: "Pay", Type: "income"},
-	}}
+	fill := spacefill.Fill{BaseCurrency: "EUR", Accounts: []spacefill.Account{{Name: "Wallet", Currency: "EUR"}},
+		Categories: []spacefill.Category{
+			{Name: "Misc", Type: "expense", IsDefault: true},
+			{Name: "Pay", Type: "income"},
+		}}
 	space, err := a.spaceCreator().Create(ctx, "S", owner, fill)
 	if err != nil {
 		t.Fatal(err)
@@ -235,7 +236,7 @@ func TestCreateSpaceEnforcesGuestLimit(t *testing.T) {
 	a := newTestApp(t)
 	a.svc.Rates = fixedRates{"EUR": "1"}
 	ctx := context.Background()
-	fill := spacefill.Fill{BaseCurrency: "EUR"}
+	fill := spacefill.Fill{BaseCurrency: "EUR", Accounts: []spacefill.Account{{Name: "Wallet", Currency: "EUR"}}}
 
 	guest := a.createUser("g@test.com", "secret1", auth.RoleGuest)
 	if _, err := a.spaceCreator().Create(ctx, "G", guest, fill); !errors.Is(err, spaces.ErrGuestCannotAdmin) {
@@ -298,7 +299,8 @@ func TestCreateSpaceRefusesCurrencyWithoutRate(t *testing.T) {
 	owner := a.createUser("o@test.com", "secret1", auth.RoleUser)
 	before := spaceCount(t, a)
 
-	_, err := a.spaceCreator().Create(ctx, "Yen", owner, spacefill.Fill{BaseCurrency: "EUR", Currencies: []string{"JPY"}})
+	_, err := a.spaceCreator().Create(ctx, "Yen", owner, spacefill.Fill{BaseCurrency: "EUR", Currencies: []string{"JPY"},
+		Accounts: []spacefill.Account{{Name: "Wallet", Currency: "EUR"}}})
 	var fe *spacefill.Error
 	if !errors.As(err, &fe) || fe.Field != "currencies" {
 		t.Fatalf("got %v, want a spacefill.Error on currencies", err)
@@ -311,7 +313,29 @@ func TestCreateSpaceRefusesCurrencyWithoutRate(t *testing.T) {
 	a.svc.Rates = fixedRates{"JPY": "0", "EUR": "0.006"}
 	if _,
 		err := a.spaceCreator().Create(ctx, "Yen base", owner,
-		spacefill.Fill{BaseCurrency: "JPY", Currencies: []string{"EUR"}}); err != nil {
+		spacefill.Fill{BaseCurrency: "JPY", Currencies: []string{"EUR"},
+			Accounts: []spacefill.Account{{Name: "Wallet", Currency: "JPY"}}}); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestCreateSpaceNeedsAnAccount(t *testing.T) {
+	a := newTestApp(t)
+	a.svc.Rates = fixedRates{"EUR": "1"}
+	owner := a.createUser("o@test.com", "secret1", auth.RoleUser)
+	before := spaceCount(t, a)
+
+	var fe *spacefill.Error
+	_, err := a.spaceCreator().Create(context.Background(), "S", owner, spacefill.Fill{BaseCurrency: "EUR"})
+	if !errors.As(err, &fe) || fe.Field != "accounts" {
+		t.Fatalf("got %v, want a spacefill.Error on accounts", err)
+	}
+	if got := spaceCount(t, a); got != before {
+		t.Fatalf("spaces %d, was %d", got, before)
+	}
+
+	one := spacefill.Fill{BaseCurrency: "EUR", Accounts: []spacefill.Account{{Name: "Wallet", Currency: "EUR"}}}
+	if _, err := a.spaceCreator().Create(context.Background(), "S", owner, one); err != nil {
+		t.Fatalf("one account: %v", err)
 	}
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -11,6 +11,7 @@ import { defaultNameHint, localizeDefaultName, toStoredDefaultName } from '@/lib
 import type { CurrencyCatalogItem } from '@/types'
 import type { AccountType } from '@/types/accounts'
 import { CATEGORY_TYPES, type CategoryType } from '@/types/categories'
+import { CurrencyCombobox } from './CurrencyCombobox'
 import { canRemoveCurrency, isProtectedCategory, newAccountKey, removeCategory, type DraftContent } from './draft'
 
 const ACCOUNT_TYPES: AccountType[] = ['bank', 'cash', 'crypto']
@@ -20,6 +21,8 @@ interface Props {
     /** Undefined while the server is still loading it. */
     catalog: CurrencyCatalogItem[] | undefined
     catalogFailed?: boolean
+    /** The catalog is the short built-in list: a currency may be missing, and any code can be typed. */
+    catalogBuiltIn?: boolean
     onRetryCatalog?: () => void
     onChange: (patch: Partial<DraftContent>) => void
 }
@@ -36,56 +39,58 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
     )
 }
 
-function CurrencyOption({ item }: { item: CurrencyCatalogItem }) {
-    return (
-        <>
-            <span className="font-mono">{item.code}</span> <span className="text-muted-foreground">{item.name}</span>
-        </>
-    )
+/** The currencies listed first when nothing is typed: the big ones, and the one the interface language implies. */
+function popularCurrencies(language: string): string[] {
+    const own = language.startsWith('ru') ? ['RUB'] : []
+    return [...new Set(['USD', 'EUR', 'GBP', ...own])]
 }
 
 /** Base currency and the other currencies, from the server-wide catalog. */
-function Currencies({ content, catalog, catalogFailed, onRetryCatalog, onChange }: Props) {
-    const { t } = useTranslation('settings')
-    const taken = new Set([content.baseCurrency, ...content.currencies])
+function Currencies({ content, catalog, catalogFailed, catalogBuiltIn, onRetryCatalog, onChange }: Props) {
+    const { t, i18n } = useTranslation('settings')
+    const taken = useMemo(
+        () => new Set([content.baseCurrency, ...content.currencies].filter((c): c is string => !!c)),
+        [content],
+    )
+    const popular = useMemo(() => popularCurrencies(i18n.language), [i18n.language])
     const loading = catalog === undefined
-    // While loading, the chosen base (e.g. from a draft) still has an item to show.
-    const options: CurrencyCatalogItem[] =
-        catalog ??
-        (content.baseCurrency ? [{ code: content.baseCurrency, name: '', symbol: '', decimals: 2, rate: null }] : [])
-    const free = (catalog ?? []).filter((c) => !taken.has(c.code))
+    const list = catalog ?? []
 
     return (
         <Section title={t('spaces.create.currencies.title')} hint={t('spaces.create.currencies.hint')}>
             <div className="space-y-1.5">
                 <Label>{t('spaces.create.currencies.base')}</Label>
-                <Select
-                    value={content.baseCurrency ?? ''}
-                    onValueChange={(code) =>
+                <CurrencyCombobox
+                    className="w-full"
+                    catalog={list}
+                    value={content.baseCurrency}
+                    popular={popular}
+                    allowManual={catalogBuiltIn}
+                    disabled={loading}
+                    placeholder={t('spaces.create.currencies.basePlaceholder')}
+                    data-testid="create-space-base"
+                    onChange={(code) =>
                         onChange({
                             baseCurrency: code,
                             // A currency cannot be both the base and one of the others.
                             currencies: content.currencies.filter((c) => c !== code),
                         })
                     }
-                >
-                    <SelectTrigger className="w-full" disabled={loading} data-testid="create-space-base">
-                        <SelectValue placeholder={t('spaces.create.currencies.basePlaceholder')} />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {options.map((c) => (
-                            <SelectItem key={c.code} value={c.code}>
-                                <CurrencyOption item={c} />
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+                />
                 {loading && !catalogFailed && (
                     <p className="text-xs text-muted-foreground">{t('spaces.create.currencies.loading')}</p>
                 )}
                 {catalogFailed && (
                     <p className="text-xs text-destructive">
                         {t('spaces.create.currencies.failed')}{' '}
+                        <button type="button" className="underline" onClick={onRetryCatalog}>
+                            {t('actions.retry', { ns: 'common' })}
+                        </button>
+                    </p>
+                )}
+                {catalogBuiltIn && (
+                    <p className="text-xs text-muted-foreground" role="status">
+                        {t('spaces.create.currencies.builtIn')}{' '}
                         <button type="button" className="underline" onClick={onRetryCatalog}>
                             {t('actions.retry', { ns: 'common' })}
                         </button>
@@ -107,22 +112,17 @@ function Currencies({ content, catalog, catalogFailed, onRetryCatalog, onChange 
                         </button>
                     </span>
                 ))}
-                <Select value="" onValueChange={(code) => onChange({ currencies: [...content.currencies, code] })}>
-                    <SelectTrigger
-                        className="w-44"
-                        disabled={loading || !content.baseCurrency}
-                        {...testId('create-space-add-currency')}
-                    >
-                        <SelectValue placeholder={t('spaces.create.currencies.add')} />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {free.map((c) => (
-                            <SelectItem key={c.code} value={c.code}>
-                                <CurrencyOption item={c} />
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+                <CurrencyCombobox
+                    className="w-44"
+                    catalog={list}
+                    exclude={taken}
+                    popular={popular}
+                    allowManual={catalogBuiltIn}
+                    disabled={loading || !content.baseCurrency}
+                    placeholder={t('spaces.create.currencies.add')}
+                    data-testid="create-space-add-currency"
+                    onChange={(code) => onChange({ currencies: [...content.currencies, code] })}
+                />
             </div>
         </Section>
     )
@@ -137,6 +137,11 @@ function Accounts({ content, onChange }: Pick<Props, 'content' | 'onChange'>) {
 
     return (
         <Section title={t('spaces.create.accounts.title')} hint={t('spaces.create.accounts.hint')}>
+            {content.accounts.length === 0 && (
+                <p className="text-xs text-destructive" data-testid="create-space-no-account">
+                    {t('spaces.create.accounts.required')}
+                </p>
+            )}
             {content.accounts.map((account) => (
                 // Phone: name on top, type and currency side by side, balance and remove last.
                 <div

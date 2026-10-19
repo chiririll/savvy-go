@@ -559,11 +559,17 @@
                 "add": "Add a currency",
                 "remove": "Remove {{code}}",
                 "loading": "Loading currencies…",
-                "failed": "Could not load the currency list."
+                "failed": "Could not load the currency list.",
+                "search": "Search by code, name or symbol",
+                "none": "No currency found.",
+                "more": "{{count}} more: keep typing to narrow down",
+                "useCode": "use this code",
+                "builtIn": "Showing a short list: the currency service is unavailable. Type any currency code to use it."
             },
             "accounts": {
                 "title": "Accounts",
-                "hint": "Optional. Wallets and bank cards, each in one currency.",
+                "hint": "Wallets and bank cards, each in one currency.",
+                "required": "Add at least one account, such as your wallet or bank card.",
                 "name": "Name",
                 "currency": "Currency",
                 "balance": "Opening balance",
@@ -655,6 +661,7 @@
             "copied": "Link copied",
             "emailSent": "Invitation emailed to {{email}}",
             "anyone": "Anyone with the link",
+            "none": "No open invitations.",
             "expires": "Expires {{date}}",
             "revoke": "Revoke",
             "copy": "Copy link",
@@ -719,7 +726,19 @@
                 "successor": "Move its transactions to",
                 "successorPlaceholder": "Choose a category",
                 "defaultTitle": "Default {{type}} category",
-                "apply": "Apply"
+                "apply": "Apply",
+                "back": "Back",
+                "next": "Next",
+                "stepOf": "Step {{current}} of {{total}}: {{step}}",
+                "steps": {
+                    "categories": "Categories",
+                    "merge": "Move transactions",
+                    "tags": "Tags",
+                    "summary": "Defaults and summary"
+                },
+                "summaryCategories": "Categories: {{kept}} stay, {{dropped}} deleted everywhere.",
+                "summaryTags": "Tags: {{kept}} stay, {{dropped}} deleted everywhere.",
+                "summaryDefaults": "Only the default categories differ."
             }
         },
         "transfers": {
@@ -770,11 +789,9 @@
         }
     },
     "user": {
-        "title": "User",
-        "description": "Your own settings: they apply in every space.",
         "tabs": {
-            "preferences": "Preferences",
             "security": "Security",
+            "passkeys": "Passkeys",
             "api": "API"
         },
         "theme": {

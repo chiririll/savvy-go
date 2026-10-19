@@ -18,6 +18,7 @@ import {
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { spaceRoleLabel, syncKindLabel } from '@/lib/labels'
+import { testId } from '@/lib/test-id'
 import type { Space, SyncChange, SyncGroup, SyncKind } from '@/types/spaces'
 
 export const SYNC_KIND_LIST: SyncKind[] = ['categories', 'tags']
@@ -59,7 +60,7 @@ export function SyncMemberList({
     const { t } = useTranslation('settings')
 
     return (
-        <ul className="divide-y rounded-lg border">
+        <ul className="divide-y rounded-lg border" {...testId('sync-members')}>
             {members.map((m) => (
                 <li key={m.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
                     <span className="truncate">{m.name}</span>
@@ -132,6 +133,7 @@ export function SyncSetupForm({ space, candidates, onSetup }: SyncSetupFormProps
                 onChange={(kind, on) => setSetup({ ...setup, [kind]: on })}
             />
             <Button
+                {...testId('sync-setup')}
                 disabled={!picked.length || !(setup.categories || setup.tags)}
                 onClick={() => onSetup({ add_space_ids: [space.id, ...picked], ...setup })}
             >

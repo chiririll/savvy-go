@@ -1,6 +1,7 @@
 package catalog
 
 import (
+	"context"
 	_ "embed"
 	"net/http"
 	"regexp"
@@ -8,6 +9,7 @@ import (
 
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/httpserver/httpx/dto"
+	"savvy-go/internal/ledger"
 	"savvy-go/internal/seed"
 )
 
@@ -25,8 +27,27 @@ func (h Handler) currencies(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteValidation(w, map[string][]string{"base": {"The base must be a currency code."}})
 		return
 	}
-	list := h.Rates.Catalog(r.Context(), base)
-	httpx.WriteData(w, http.StatusOK, dto.Map(list, dto.NewCatalogCurrency))
+	list, builtIn := h.catalog(r, base)
+	source := "live"
+	if builtIn {
+		// The names could not be fetched: the list is short and a currency may be missing.
+		source = "fallback"
+	}
+	httpx.WriteJSON(w, http.StatusOK, httpx.Envelope{
+		Data: dto.Map(list, dto.NewCatalogCurrency),
+		Meta: map[string]string{"source": source},
+	})
+}
+
+// catalog asks the source for its list and whether that is the built-in one;
+// a source that cannot tell is taken to have the whole list.
+func (h Handler) catalog(r *http.Request, base string) (list []ledger.Currency, builtIn bool) {
+	if src, ok := h.Rates.(interface {
+		CatalogStatus(ctx context.Context, base string) ([]ledger.Currency, bool)
+	}); ok {
+		return src.CatalogStatus(r.Context(), base)
+	}
+	return h.Rates.Catalog(r.Context(), base), false
 }
 
 type presetCategory struct {

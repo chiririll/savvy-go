@@ -169,8 +169,17 @@ describe('request', () => {
     })
 
     it('reports what is missing', () => {
-        expect(draftProblems(emptyDraft())).toEqual(['name', 'baseCurrency'])
+        expect(draftProblems(emptyDraft())).toEqual(['name', 'baseCurrency', 'noAccounts'])
         expect(draftProblems(ready())).toEqual([])
+    })
+
+    it('needs at least one account, copied or added', () => {
+        const none = { ...ready(), accounts: [] }
+        expect(draftProblems(none)).toEqual(['noAccounts'])
+        const own = { ...none, accounts: [{ key: 'k', name: 'Wallet', type: 'cash' as const, currency: 'EUR', initialBalance: '' }] }
+        expect(draftProblems(own)).toEqual([])
+        // Accounts copied from another space are in the draft like any other.
+        expect(draftProblems(ready())).not.toContain('noAccounts')
     })
 
     it('rejects an unnamed account and a malformed balance', () => {

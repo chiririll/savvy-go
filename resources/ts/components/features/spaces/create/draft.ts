@@ -204,10 +204,14 @@ export function canRemoveCurrency(content: DraftContent, code: string): boolean 
 const BALANCE = /^-?\d+([.,]\d+)?$/
 
 /** Which parts of the draft stop it from being sent. */
-export function draftProblems(draft: SpaceDraft): ('name' | 'baseCurrency' | 'accounts' | 'balances')[] {
+export function draftProblems(
+    draft: SpaceDraft,
+): ('name' | 'baseCurrency' | 'noAccounts' | 'accounts' | 'balances')[] {
     const problems: ReturnType<typeof draftProblems> = []
     if (!draft.name.trim()) problems.push('name')
     if (!draft.baseCurrency) problems.push('baseCurrency')
+    // The draft's accounts are the final ones, copied accounts included: a space with none cannot hold a transaction.
+    if (draft.accounts.length === 0) problems.push('noAccounts')
     if (draft.accounts.some((a) => !a.name.trim() || !a.currency)) problems.push('accounts')
     if (draft.accounts.some((a) => a.initialBalance.trim() !== '' && !BALANCE.test(a.initialBalance.trim())))
         problems.push('balances')

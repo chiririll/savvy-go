@@ -11,6 +11,9 @@ import {
     isIdentical,
     needsSuccessor,
     successorNames,
+    summarize,
+    syncSteps,
+    tagKey,
 } from './sync-reconcile'
 
 const category = (extra: Partial<SyncCategoryConflict> = {}): SyncCategoryConflict =>
@@ -114,5 +117,36 @@ describe('sync reconcile defaults and successors', () => {
             { type: 'income', name: 'Pay' },
         ]
         expect(successorNames(mine, diff(), 'expense')).toEqual(['Meals'])
+    })
+})
+
+describe('sync reconcile steps', () => {
+    it('shows only the steps that have something to decide, summary last', () => {
+        expect(syncSteps(diff(), emptyChoices())).toEqual(['categories', 'tags', 'summary'])
+        expect(syncSteps(diff({ tags: [] }), emptyChoices())).toEqual(['categories', 'summary'])
+        expect(syncSteps(diff({ categories: [] }), emptyChoices())).toEqual(['tags', 'summary'])
+        expect(syncSteps(diff({ categories: [], tags: [] }), emptyChoices())).toEqual(['summary'])
+    })
+
+    it('adds the merge step only when a dropped category holds transactions', () => {
+        const choices = emptyChoices()
+        choices.keep[categoryKey(category())] = false
+        expect(syncSteps(diff(), choices)).toEqual(['categories', 'merge', 'tags', 'summary'])
+
+        const empty = category({
+            present: [{ spaceId: 1, icon: 'a', color: 'red', transactions: 0 }],
+        } as Partial<SyncCategoryConflict>)
+        const none = emptyChoices()
+        none.keep[categoryKey(empty)] = false
+        expect(syncSteps(diff({ categories: [empty] }), none)).not.toContain('merge')
+    })
+
+    it('counts what will be kept and deleted', () => {
+        const other = category({ name: 'Fun' })
+        const data = diff({ categories: [category(), other] })
+        const choices = emptyChoices()
+        choices.keep[categoryKey(other)] = false
+        choices.keep[tagKey({ name: 'Trip' })] = false
+        expect(summarize(data, choices)).toEqual({ categoriesKept: 1, categoriesDropped: 1, tagsKept: 0, tagsDropped: 1 })
     })
 })

@@ -1,13 +1,11 @@
 import { useTranslation } from 'react-i18next'
 import { Page, PageHeader, FormWrapper } from '@/components/shared'
-import { UserSettingsTabs } from '@/components/features/spaces/UserSettingsTabs'
+import { UserSettingsTabs } from '@/components/features/settings/UserSettingsTabs'
 import { ChangePasswordSection } from '@/components/features/security/ChangePasswordSection'
 import { SessionsSection } from '@/components/features/security/SessionsSection'
-import { PasskeysSection } from '@/components/features/security/PasskeysSection'
 import { TwoFactorSection, RecoverySection } from '@/components/features/security/TwoFactorSections'
 import { TwoFactorDialogs } from '@/components/features/security/TwoFactorDialogs'
 import { useTwoFactorSetup } from '@/components/features/security/useTwoFactorSetup'
-import { browserSupportsWebAuthn } from '@simplewebauthn/browser'
 
 export default function SecuritySettingsPage() {
     const { t } = useTranslation('settings')
@@ -23,7 +21,6 @@ export default function SecuritySettingsPage() {
                     <ChangePasswordSection />
                     <SessionsSection />
                     <TwoFactorSection setup={twoFactor} />
-                    {browserSupportsWebAuthn() && <PasskeysSection />}
                     <RecoverySection setup={twoFactor} />
                 </div>
             </FormWrapper>

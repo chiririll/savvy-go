@@ -42,8 +42,8 @@ function AutomationEditRedirect() {
 const ReportsPage = lazy(() => import('@/pages/reports'))
 // Settings: the current space and the user's own.
 const SpaceSettingsPage = lazy(() => import('@/pages/settings/space'))
-const UserSettingsPage = lazy(() => import('@/pages/settings/user'))
 const SecuritySettingsPage = lazy(() => import('@/pages/settings/security'))
+const PasskeySettingsPage = lazy(() => import('@/pages/settings/passkeys'))
 const ApiSettingsPage = lazy(() => import('@/pages/settings/api'))
 const ImportSettingsPage = lazy(() => import('@/pages/settings/import'))
 const SpaceBackupsPage = lazy(() => import('@/pages/settings/backups'))
@@ -154,8 +154,9 @@ export const router = createBrowserRouter([
                     { path: childPath(pages.automationLogs), element: withSuspense(AutomationLogsPage) },
                     { path: childPath(pages.reports), element: withSuspense(ReportsPage) },
                     { path: childPath(pages.spaceSettings), element: withSuspense(SpaceSettingsPage) },
-                    { path: childPath(pages.userSettings), element: withSuspense(UserSettingsPage) },
+                    { path: 'settings/user', element: <Navigate to={pages.securitySettings.path} replace /> },
                     { path: childPath(pages.securitySettings), element: withSuspense(SecuritySettingsPage) },
+                    { path: childPath(pages.passkeySettings), element: withSuspense(PasskeySettingsPage) },
                     { path: childPath(pages.apiSettings), element: withSuspense(ApiSettingsPage) },
                     { path: childPath(pages.importSettings), element: withSuspense(ImportSettingsPage) },
                     { path: childPath(pages.spaceBackups), element: withSuspense(SpaceBackupsPage) },

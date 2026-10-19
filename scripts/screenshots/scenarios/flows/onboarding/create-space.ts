@@ -14,7 +14,7 @@ export const createSpace = scenario(
     {
         name: 'onboarding/create-space',
         covers: [],
-        shots: ['name', 'entities', { name: 'entities-invalid', detail: true }, 'entities-filled', 'confirm', 'done', 'members'],
+        shots: ['name', 'entities', { name: 'entities-no-account', detail: true }, { name: 'entities-invalid', detail: true }, 'entities-filled', 'confirm', 'done', 'members'],
         leaves: 'a space "Family Budget" (USD, EUR, two accounts) is the current one; on its dashboard',
     },
     async ({ page, run, shot }) => {
@@ -29,8 +29,21 @@ export const createSpace = scenario(
         // The currency list comes from the server's data service: may take a while.
         const base = page.getByTestId('create-space-base')
         await expect(base).toBeEnabled({ timeout: 20_000 })
+        // The list searches by name, not only by code, and is capped.
+        await base.click()
+        await page.getByTestId('currency-search').fill('yen')
+        await expect(page.getByRole('option', { name: /^JPY/ })).toBeVisible()
+        await expect(page.getByRole('option')).toHaveCount(1)
+        await page.getByTestId('currency-search').fill('')
+        expect(await page.getByRole('option').count()).toBeLessThanOrEqual(50)
+        await page.keyboard.press('Escape')
         await choose(page, base, /^USD/)
         await shot('entities')
+
+        // A space needs an account: with none the way on stays shut, and the section says what to add.
+        await expect(page.getByTestId('create-space-no-account')).toBeVisible()
+        await expect(page.getByTestId('create-space-next')).toBeDisabled()
+        await shot('entities-no-account')
 
         // An account with no name cannot be created: the way on stays shut.
         await page.getByTestId('create-space-add-account').click()
@@ -66,6 +79,12 @@ export const createSpace = scenario(
         await expect(page.locator('[data-sidebar="trigger"]').first()).toBeAttached()
     },
 )
+
+/** Adds an account to the draft, as every space needs one. */
+async function addAccount(page: Page, name: string) {
+    await page.getByTestId('create-space-add-account').click()
+    await page.getByTestId('create-space-account-name').last().fill(name)
+}
 
 /** A second space: the modal now offers to copy from the first. */
 export const createSpaceCopy = scenario(
@@ -155,6 +174,7 @@ async function makeSpace(page: Page, viewport: string, name: string, currency: '
         if (!(await page.getByRole('listbox').isVisible())) await base.click()
         await page.getByRole('option', { name: new RegExp(`^${currency}`) }).click({ timeout: 3_000 })
     }).toPass({ timeout: 30_000 })
+    await addAccount(page, 'Wallet')
     await page.getByTestId('create-space-next').click()
     await page.getByTestId('create-space-submit').click()
     await expect(page.getByTestId('create-space-invite')).toBeVisible()
@@ -193,6 +213,7 @@ export const createSpaceMembers = scenario(
         const base = page.getByTestId('create-space-base')
         await expect(base).toBeEnabled({ timeout: 20_000 })
         await choose(page, base, /^USD/)
+        await addAccount(page, 'Wallet')
         await page.getByTestId('create-space-next').click()
         await expect(page.getByTestId('create-space-submit')).toBeVisible()
         await shot('confirm')

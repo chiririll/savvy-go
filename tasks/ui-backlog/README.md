@@ -19,6 +19,8 @@ problem, where it is in the code, the fix and the tests to write first.
 | 12 | [Demo data for the new features](12-demo-data-new-features.md) | M |
 | 13 | [Test against the wrong modal type](13-modal-type-test.md) | M |
 
+Status: all 13 are done in code and tests. Scenarios (`scripts/screenshots`) were written but not run here (they need the Docker or built app).
+
 Order: 01–04, 06, 07, 09 are independent. 08 and 10 need a decision first.
 13 before 11 makes the new dialog follow the rules. 12 goes last (needs 05, 08,
 10, 11).

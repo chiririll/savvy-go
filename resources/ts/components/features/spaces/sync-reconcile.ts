@@ -72,3 +72,31 @@ export const isComplete = (data: SyncDiff | undefined, choices: ReconcileChoices
 
 export const isIdentical = (data: SyncDiff | undefined) =>
     !!data && !data.categories.length && !data.tags.length && !data.defaults.length
+
+export type SyncStep = 'categories' | 'merge' | 'tags' | 'summary'
+
+/**
+ * The steps of the reconcile dialog, in order. A step with nothing to decide is left out; the merge
+ * step (where the transactions of a deleted category go) exists only while a choice needs it.
+ */
+export function syncSteps(data: SyncDiff | undefined, choices: ReconcileChoices): SyncStep[] {
+    const steps: SyncStep[] = []
+    if (data?.categories.length) steps.push('categories')
+    if (data?.categories.some((c) => needsSuccessor(c, choices))) steps.push('merge')
+    if (data?.tags.length) steps.push('tags')
+    return [...steps, 'summary']
+}
+
+/** What applying the choices does, for the last step. */
+export function summarize(data: SyncDiff | undefined, choices: ReconcileChoices) {
+    const categories = data?.categories ?? []
+    const tags = data?.tags ?? []
+    const kept = categories.filter((c) => isKept(choices, categoryKey(c))).length
+    const keptTags = tags.filter((c) => isKept(choices, tagKey(c))).length
+    return {
+        categoriesKept: kept,
+        categoriesDropped: categories.length - kept,
+        tagsKept: keptTags,
+        tagsDropped: tags.length - keptTags,
+    }
+}

@@ -11,7 +11,7 @@ Use **Create a space** in the switcher, or the window shown to a user with no sp
 1. **What a space is**: a short explanation.
 2. **Name**.
 3. **Copy from another space?** (only if you belong to one). Pick a source or the defaults, and tick what to copy: currencies, accounts (without balances), categories, tags. This is a one-time copy; for categories and tags that stay in step, see [shared categories and tags](#shared-categories-and-tags).
-4. **Base entities**, all editable: base currency (required) and other currencies from the server's list; accounts with optional opening balance; categories (the default of each type cannot be removed); tags.
+4. **Base entities**, all editable: base currency (required) and other currencies, picked from a searchable list (by code, name or symbol; the popular ones come first). If the server cannot reach its currency data, the list is a short built-in one, the modal says so, and any currency code can be typed; at least one account (copied accounts count), with optional opening balance; categories (the default of each type cannot be removed); tags.
 
 **Default categories and tags.** A new space starts with these presets, named in your language and each with a one-line hint:
 
@@ -26,7 +26,7 @@ Progress is kept in your browser only, so you can close the window and return. N
 
 **Emoji and color.** A space can have one emoji and a color (`#rrggbb`), picked when it is created and changed by a space admin in the space settings. They show in the space switcher, the settings header and the admin spaces table; without an emoji the first letter of the name is shown on the color. They are display only: they are not part of anything signed, so linked spaces and transfers do not carry them, and a space imported from a backup starts without them. Server backups keep them.
 
-**Via the API.** `POST /api/spaces` with only a `name` makes an empty space; `emoji` and `color` are optional. It can also fill the space in one request: `baseCurrency`, `currencies` (codes), `accounts` (`name`, `type`, `currency`, `initialBalance`), `categories`, `tags`. Rates come from the server's currency data; a currency without a known rate is refused, never stored with a made-up one. Default expense and income categories are always added. The request creates the whole space or nothing.
+**Via the API.** `POST /api/spaces` with only a `name` makes an empty space; `emoji` and `color` are optional. It can also fill the space in one request: `baseCurrency`, `currencies` (codes), `accounts` (`name`, `type`, `currency`, `initialBalance`; at least one when anything is filled in), `categories`, `tags`. Rates come from the server's currency data; a currency without a known rate is refused, never stored with a made-up one. Default expense and income categories are always added. The request creates the whole space or nothing.
 
 ## Space roles
 
@@ -46,7 +46,7 @@ A space always keeps one admin: the last admin cannot leave or be demoted while 
 
 ## Invitations
 
-Space admins invite people from **Settings → Space** or the last screen of space creation. An invitation has a role, is valid for 7 days and works once. Existing users join directly; new users can register through it if the server admin allows.
+Space admins invite people from **Settings → Space** or the last screen of space creation. An invitation has a role, is valid for 7 days and works once. The settings page shows one list of open invitations above the form. A link is shown for copying only right after it is made: the server keeps no copy, so after a reload revoke the invitation and make a new one. Existing users join directly; new users can register through it if the server admin allows.
 
 How it is sent depends on the server:
 
@@ -74,7 +74,7 @@ A transfer is stored in both spaces and signed by the server. If a space is rest
 
 ## Shared categories and tags
 
-Spaces that should use the same categories and tags can join a **sync group** in **Settings → Space → Shared categories and tags**. It needs no link or transfers and works between any spaces you administer. A space is in one group at most.
+Spaces that should use the same categories and tags can join a **sync group** in **Settings → Space → Shared categories and tags**. It needs no link or transfers and works between any spaces you administer. A space is in one group at most. Joining walks through the differences step by step (categories, where the transactions of a deleted category go, tags, then defaults and a summary); nothing changes until **Apply**, and **Back** keeps your choices. The dialog is a sheet on a phone.
 
 Categories and tags are switched on separately. While a kind is on, any add, edit, rename, default change or delete in one space is applied to all spaces of the group in one step: if it fails anywhere, it is done nowhere. Items match by name, ignoring case (categories also by type).
 

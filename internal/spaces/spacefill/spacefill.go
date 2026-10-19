@@ -92,6 +92,9 @@ func (f Fill) normalize() (Fill, error) {
 	}
 	f.Currencies = codes
 
+	if len(f.Accounts) == 0 {
+		return f, invalid("accounts", "At least one account is required.")
+	}
 	accounts := make([]Account, len(f.Accounts))
 	for i, a := range f.Accounts {
 		a.Name, a.Currency = strings.TrimSpace(a.Name), normalizeCode(a.Currency)

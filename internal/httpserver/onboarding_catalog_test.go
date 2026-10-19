@@ -127,3 +127,15 @@ func TestServerCatalogsNeedSignedInUser(t *testing.T) {
 		status(t, a.serverGet(path, ""), 401, path)
 	}
 }
+
+func TestServerCurrencyCatalogFlagsBuiltInList(t *testing.T) {
+	a := newTestApp(t) // its rate source is offline: only the built-in list is known
+	user := a.issue(a.createUser("u@test.com", "secret1", roleEditor), false)
+
+	res := a.serverGet("/api/currencies/catalog?base=USD", user.Token)
+	body := decodeJSON(t, res)
+	meta, _ := body["meta"].(map[string]any)
+	if meta["source"] != "fallback" {
+		t.Fatalf("meta %v, want source=fallback", body["meta"])
+	}
+}

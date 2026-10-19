@@ -93,7 +93,8 @@ export function useWizardStep({ open, onClose, dismissible, onCreated }: Options
                 body: (
                     <EntitiesStep
                         content={draft}
-                        catalog={catalog.data}
+                        catalog={catalog.data?.items}
+                        catalogBuiltIn={catalog.data?.source === 'fallback'}
                         catalogFailed={catalog.isError}
                         onRetryCatalog={() => void catalog.refetch()}
                         onChange={(patch) => update(patch)}
@@ -103,7 +104,10 @@ export function useWizardStep({ open, onClose, dismissible, onCreated }: Options
                     <>
                         {back}
                         {next(
-                            !draft.baseCurrency || problems.includes('accounts') || problems.includes('balances'),
+                            !draft.baseCurrency ||
+                                problems.includes('noAccounts') ||
+                                problems.includes('accounts') ||
+                                problems.includes('balances'),
                             () => goTo('confirm'),
                         )}
                     </>
