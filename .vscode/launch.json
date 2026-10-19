@@ -12,6 +12,9 @@
             "program": "${workspaceFolder}", 
             "cwd": "${workspaceFolder}",
             "envFile": "${workspaceFolder}/.env",
+            "args": [
+                "--seed-config", "seed.toml"
+            ],
             "buildFlags": [
                 "-ldflags=-s -w -X main.Version=dev -X main.Env=local"
             ],

@@ -227,6 +227,15 @@ func TestDemoSpacesAreLinkedTransfer(t *testing.T) {
 	}
 }
 
+func TestDemoHasRecentSpaceTransfer(t *testing.T) {
+	st, _ := seedDemo(t)
+	cutoff := time.Now().AddDate(0, 0, -3).Format("2006-01-02")
+	d := spaceByName(t, st, "Demo")
+	if n := countWhere(t, d, `SELECT COUNT(*) FROM space_transfers WHERE date >= ?`, cutoff); n == 0 {
+		t.Fatalf("no transfer between spaces since %s", cutoff)
+	}
+}
+
 func TestDemoHasEstimatedPending(t *testing.T) {
 	st, _ := seedDemo(t)
 	for _, name := range []string{"Demo", "Family Budget", "Studio GmbH"} {

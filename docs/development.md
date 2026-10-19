@@ -31,7 +31,26 @@ With `--seed-config <file>` (any TOML file, even empty), the first boot creates 
 
 Roles differ per space, so each user sees a different view. Every space has its own emoji and color. Family Budget and Studio GmbH are in one sync group, each with a category and a tag the other lacked, while Demo is outside it, so adding Demo to the group has differences to reconcile. All addresses are verified except the guest's, which shows as unverified once mail is set up.
 
-In the seed config file, `date` (`YYYY-MM-DD`) places the data relative to that day instead of today. `manifest` is a file the seed writes users (with whether their address is verified), spaces (emoji, color, sync group) and invitation tokens to; [Scripts](scripts.md) uses it.
+Example `seed.toml`:
+
+```toml
+# All keys are optional; an empty file seeds with the defaults.
+
+# Set to false to keep the file but skip seeding. Default: true.
+enabled = true
+
+# Place the data relative to this day (YYYY-MM-DD) instead of today.
+date = "2026-06-05"
+
+# Write the seeded users, spaces and invitation tokens to this file.
+manifest = "./savvy-data/manifest.json"
+```
+
+```bash
+go run . --seed-config seed.toml
+```
+
+`enabled` (default `true`) turns seeding off without removing the flag. `date` places the data relative to that day instead of today. `manifest` is a file the seed writes users (with whether their address is verified), spaces (emoji, color, sync group) and invitation tokens to; [Scripts](scripts.md) uses it. Unknown keys are an error. Seeding only happens on an empty database: if the server already has a user, or was seeded before, the flag does nothing, so start from a fresh data directory.
 
 ## Architecture
 

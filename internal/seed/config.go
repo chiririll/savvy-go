@@ -16,8 +16,9 @@ import (
 // Config says how to seed the demo data. It is read from the file named by
 // the --seed-config flag (TOML); every key is optional.
 type Config struct {
-	// Enabled seeds on first boot; it is set when a file is given.
-	Enabled bool `toml:"-"`
+	// Enabled seeds on first boot. True when a file is given, unless the file
+	// sets it to false.
+	Enabled bool `toml:"enabled"`
 	// Date (YYYY-MM-DD) is the day the data is placed relative to, the current
 	// day when empty. Pin it to seed the same data on any day.
 	Date string `toml:"date"`
