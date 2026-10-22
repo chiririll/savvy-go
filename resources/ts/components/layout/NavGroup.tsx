@@ -43,8 +43,8 @@ export function NavGroup({
         <SidebarGroup>
             <SidebarGroupContent>
                 <SidebarMenu>
-                    <Collapsible open={open} onOpenChange={onOpenChange} className="group/collapsible">
-                        <SidebarMenuItem>
+                    <SidebarMenuItem>
+                        <Collapsible open={open} onOpenChange={onOpenChange} className="group/collapsible">
                             <CollapsibleTrigger asChild>
                                 <SidebarMenuButton tooltip={label}>
                                     <GroupIcon />
@@ -93,8 +93,8 @@ export function NavGroup({
                                     ))}
                                 </SidebarMenuSub>
                             </CollapsibleContent>
-                        </SidebarMenuItem>
-                    </Collapsible>
+                        </Collapsible>
+                    </SidebarMenuItem>
                 </SidebarMenu>
             </SidebarGroupContent>
         </SidebarGroup>

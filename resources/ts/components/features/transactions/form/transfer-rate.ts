@@ -37,13 +37,15 @@ interface TransferRateOptions {
     toRate?: number | null
     /** The form (re)opens: start over. */
     open: boolean
+    /** The currency list is loaded: until it is, a rate cannot be told from a missing one. */
+    ratesReady?: boolean
 }
 
 /**
  * Keeps a transfer's exchange_rate and to_amount consistent while the user
  * edits the amounts, the rate or the accounts.
  */
-export function useTransferRate({ form, from, to, toRate, open }: TransferRateOptions) {
+export function useTransferRate({ form, from, to, toRate, open, ratesReady = true }: TransferRateOptions) {
     const [type, amount, toAmount, accountId, toSpaceId, toAccountId] = useWatch({
         control: form.control,
         name: ['type', 'amount', 'to_amount', 'account_id', 'to_space_id', 'to_account_id'],
@@ -109,7 +111,7 @@ export function useTransferRate({ form, from, to, toRate, open }: TransferRateOp
             return
         }
 
-        if (!from || !to) {
+        if (!from || !to || !ratesReady) {
             return
         }
 
@@ -174,7 +176,7 @@ export function useTransferRate({ form, from, to, toRate, open }: TransferRateOp
             }
             applyReceiveFromRate(rate)
         }
-    }, [isTransfer, sameCurrency, amount, toAmount, pairKey, from, to, fromRate, toRate, form, applyReceiveFromRate])
+    }, [isTransfer, sameCurrency, ratesReady, amount, toAmount, pairKey, from, to, fromRate, toRate, form, applyReceiveFromRate])
 
     return { sameCurrency, editable, commit, startEditing, keepNextPair }
 }

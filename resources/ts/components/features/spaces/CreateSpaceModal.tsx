@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ResponsiveDialog } from '@/components/shared/ResponsiveDialog'
+import { ResponsiveDialog } from '@/components/shared/dialogs/ResponsiveDialog'
 import { useSwitchSpace } from '@/hooks/use-spaces'
 import type { Space } from '@/types/spaces'
 import { DoneFooter, DoneStep } from './create/DoneStep'

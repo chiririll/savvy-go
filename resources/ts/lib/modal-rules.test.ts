@@ -60,7 +60,7 @@ const ALLOWED: Record<string, string> = {
     'components/features/spaces/settings/Invitations.tsx': 'AlertDialog confirmation: move to Confirm',
     'components/features/spaces/SyncGroupParts.tsx': 'AlertDialog confirmation: move to Confirm',
     'components/features/sso/ProviderGallery.tsx': 'raw Dialog for a picker: ResponsiveDialog',
-    'components/features/transactions/SkipTransactionAlert.tsx': 'AlertDialog confirmation: move to Confirm',
+    'components/features/transactions/deferred/SkipTransactionAlert.tsx': 'AlertDialog confirmation: move to Confirm',
     'pages/reports/components/FiltersBar.tsx': 'raw Sheet for filters: ResponsiveDialog',
 }
 
@@ -170,6 +170,6 @@ describe('modal rules', () => {
     it('lets the wrappers use the primitives', () => {
         const wrapper = `import { Dialog, DialogContent } from '@/components/ui/dialog'
                          export const A = () => <Dialog><DialogContent>{children}</DialogContent></Dialog>`
-        expect(checkSource(wrapper, 'components/shared/ResponsiveDialog.tsx')).toEqual([])
+        expect(checkSource(wrapper, 'components/shared/dialogs/ResponsiveDialog.tsx')).toEqual([])
     })
 })

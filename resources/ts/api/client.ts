@@ -78,10 +78,11 @@ const createApiClient = (baseURL: string): AxiosInstance => {
             const url = requestUrl(error.config)
             const status = error.response?.status
 
-            if (status === 401) {
-                if (!isAuthExempt(url)) {
-                    onUnauthorized?.()
-                }
+            // Sign-in screens show their own message, so an exempt 401 is not toasted here.
+            const quiet401 = status === 401 && isAuthExempt(url)
+
+            if (status === 401 && !quiet401) {
+                onUnauthorized?.()
                 return Promise.reject(error)
             }
 
@@ -107,7 +108,7 @@ const createApiClient = (baseURL: string): AxiosInstance => {
             apiError.message = getApiErrorMessage(apiError, i18n.t('errors.generic'))
 
             // Show toast for non-validation errors
-            if (status !== 422) {
+            if (status !== 422 && !quiet401) {
                 toast.error(apiError.message)
             }
 

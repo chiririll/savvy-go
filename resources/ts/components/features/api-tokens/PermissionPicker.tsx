@@ -65,11 +65,11 @@ export function PermissionPicker({
             <Tabs value={tab} onValueChange={pick}>
                 <TabsList className="w-full">
                     {presets.map(({ name }) => (
-                        <TabsTrigger key={name} value={name}>
+                        <TabsTrigger key={name} value={name} aria-controls={undefined}>
                             {apiPresetLabel(t, name)}
                         </TabsTrigger>
                     ))}
-                    <TabsTrigger value="custom">{apiPresetLabel(t, 'custom')}</TabsTrigger>
+                    <TabsTrigger value="custom" aria-controls={undefined}>{apiPresetLabel(t, 'custom')}</TabsTrigger>
                 </TabsList>
             </Tabs>
             <p className="text-xs text-muted-foreground">{apiPresetHint(t, tab)}</p>

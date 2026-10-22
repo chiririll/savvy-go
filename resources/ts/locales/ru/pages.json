@@ -164,6 +164,8 @@
         "clear": "Сбросить",
         "dateRange": "Период",
         "to": "—",
+        "dateFrom": "С",
+        "dateTo": "По",
         "categories": "Категории",
         "tags": "Теги",
         "sort": {
@@ -462,6 +464,7 @@
     },
     "dashboard": {
         "title": "Обзор",
+        "period": "Период",
         "welcome": "Сводка по вашим финансам",
         "totalBalance": "Общий баланс",
         "income": "Доходы",

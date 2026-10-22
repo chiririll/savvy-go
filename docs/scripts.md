@@ -14,7 +14,7 @@ Root `npm run <name>` commands are aliases for `npm --prefix scripts run <name>`
 npm run logos
 ```
 
-Regenerates every logo from the `Logo` component ([`Logo.tsx`](../resources/ts/components/shared/Logo.tsx)): favicons and app icons in `public/`, README logos in `docs/images/`. Edit the component, then run it. Needs the root `npm install` too.
+Regenerates every logo from the `Logo` component ([`Logo.tsx`](../resources/ts/components/shared/appearance/Logo.tsx)): favicons and app icons in `public/`, README logos in `docs/images/`. Edit the component, then run it. Needs the root `npm install` too.
 
 ## Screenshots
 

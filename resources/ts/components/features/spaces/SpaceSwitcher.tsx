@@ -49,6 +49,7 @@ export function SpaceSwitcher() {
                         <DropdownMenuTrigger asChild>
                             <SidebarMenuButton
                                 size="lg"
+                                aria-label={current ? undefined : t('spaces.switcher.label')}
                                 {...testIdMenu('layout-space')}
                                 className={cn(
                                     'data-[state=open]:bg-sidebar-accent',

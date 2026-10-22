@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import ReactECharts from '@/components/shared/ReactECharts'
+import ReactECharts from '@/components/shared/charts/ReactECharts'
 import { legendTextStyle, useChartTheme } from '@/lib/chart-theme'
 import { formatCurrency } from '@/lib/utils'
 import { localizeDefaultName } from '@/lib/localized-name'

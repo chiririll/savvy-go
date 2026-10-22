@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { Condition } from '@/types/automation'
 import { TRANSACTION_TYPES } from '@/constants'
-import { AccountSelect } from '@/components/shared/AccountSelect'
+import { AccountSelect } from '@/components/shared/pickers/AccountSelect'
 import { CategorySelect, TagSelect } from '@/components/shared'
 import { transactionTypeLabel } from '@/lib/labels'
 

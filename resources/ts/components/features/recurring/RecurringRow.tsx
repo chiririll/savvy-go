@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { FeedRow, RowActions, type FeedGroupKey } from '@/components/shared'
-import { transactionIconProps } from '@/components/features/transactions/transaction-icon'
+import { transactionIconProps } from '@/components/features/transactions/list/transaction-icon'
 import { useRelativeDay } from '@/hooks'
 import { pendingDateClassName } from '@/lib/dates'
 import i18n from '@/lib/i18n'

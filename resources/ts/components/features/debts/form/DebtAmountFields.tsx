@@ -1,7 +1,7 @@
 import type { Control } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { CurrencyIdField, FormInputField } from '@/components/shared'
-import { AccountSelect } from '@/components/shared/AccountSelect'
+import { AccountSelect } from '@/components/shared/pickers/AccountSelect'
 import { FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { formatCurrency } from '@/lib/utils'
 import type { DebtFormData } from '@/schemas'

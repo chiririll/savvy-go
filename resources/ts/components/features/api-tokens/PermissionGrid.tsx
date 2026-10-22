@@ -54,9 +54,9 @@ export function PermissionGrid({
                             key={level}
                             className="flex justify-center"
                             title={columnLabel[level]}
-                            aria-label={columnLabel[level]}
                         >
-                            <Icon className="size-3.5" />
+                            <Icon className="size-3.5" aria-hidden />
+                            <span className="sr-only">{columnLabel[level]}</span>
                         </span>
                     )
                 })}

@@ -164,6 +164,8 @@
         "clear": "Clear",
         "dateRange": "Date range",
         "to": "to",
+        "dateFrom": "From",
+        "dateTo": "To",
         "categories": "Categories",
         "tags": "Tags",
         "sort": {
@@ -462,6 +464,7 @@
     },
     "dashboard": {
         "title": "Dashboard",
+        "period": "Period",
         "welcome": "Welcome to your finance dashboard",
         "totalBalance": "Total balance",
         "income": "Income",

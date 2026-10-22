@@ -1,11 +1,12 @@
 import { LogOut } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { UserAvatar } from '@/components/shared/UserAvatar'
+import { UserAvatar } from '@/components/shared/appearance/UserAvatar'
 import { Button } from '@/components/ui/button'
 import {
     DropdownMenu,
     DropdownMenuContent,
+    DropdownMenuGroup,
     DropdownMenuItem,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
@@ -34,15 +35,20 @@ export function UserMenu() {
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-                <div className="flex items-center gap-2 px-2 py-1.5">
-                    <UserAvatar user={user} className="size-8" />
-                    <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">{user.name}</p>
-                        <p className="truncate text-xs text-muted-foreground">
-                            {user.role ? userRoleLabel(t, user.role) : ''}
-                        </p>
+                <DropdownMenuGroup>
+                    <div className="flex items-center gap-2 px-2 py-1.5">
+                        {/* The name beside it says who this is; a picture is not allowed inside a menu. */}
+                        <span aria-hidden="true">
+                            <UserAvatar user={user} className="size-8" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium">{user.name}</p>
+                            <p className="truncate text-xs text-muted-foreground">
+                                {user.role ? userRoleLabel(t, user.role) : ''}
+                            </p>
+                        </div>
                     </div>
-                </div>
+                </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout}>
                     <LogOut className="mr-2 size-4" />

@@ -20,7 +20,7 @@ import { TypeSelector } from './TypeSelector'
 import { IconPicker } from './IconPicker'
 import { ColorPicker } from './ColorPicker'
 import { CategoryPreview } from './CategoryPreview'
-import { FormWrapper } from '@/components/shared/FormWrapper'
+import { FormWrapper } from '@/components/shared/form/FormWrapper'
 
 interface CategoryFormProps {
     defaultValues?: Partial<CategoryFormData>

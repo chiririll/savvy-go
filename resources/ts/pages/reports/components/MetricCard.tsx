@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { Card, CardContent } from '@/components/ui/card'
-import { Sparkline } from '@/components/ui/sparkline'
+import { Sparkline } from '@/components/shared/charts/Sparkline'
 import { cn, formatCurrency } from '@/lib/utils'
 import { TrendingUp, TrendingDown } from 'lucide-react'
 import type { CompareType } from '../types'

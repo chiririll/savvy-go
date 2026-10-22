@@ -67,6 +67,7 @@ export function TwoFactorStep({ token, rememberMe, afterLoginPath, onBack }: Pro
                 <Input
                     type="text"
                     placeholder={t('twoFactor.recoveryPlaceholder')}
+                    aria-label={t('twoFactor.recoveryDescription')}
                     value={recoveryCode}
                     onChange={(e) => setRecoveryCode(e.target.value)}
                     className="text-center font-mono text-lg"

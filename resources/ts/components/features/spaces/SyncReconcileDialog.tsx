@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
-import { ResponsiveDialog } from '@/components/shared/ResponsiveDialog'
+import { ResponsiveDialog } from '@/components/shared/dialogs/ResponsiveDialog'
 import { useApplySync, useCategories, useSyncDiff } from '@/hooks'
 import { testId } from '@/lib/test-id'
 import { SyncChange, SyncDiff } from '@/types/spaces'

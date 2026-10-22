@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import ReactECharts from '@/components/shared/ReactECharts'
+import ReactECharts from '@/components/shared/charts/ReactECharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useTransactionReportDynamics } from '@/hooks'

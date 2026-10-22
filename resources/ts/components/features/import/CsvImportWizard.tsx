@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Stepper, Step } from '@/components/ui/stepper'
+import { Stepper, Step } from '@/components/shared/page/Stepper'
 import { AlertCircle } from 'lucide-react'
 import { UploadStep } from './steps/UploadStep'
 import { MappingStep } from './steps/MappingStep'
