@@ -67,7 +67,7 @@ export function SyncGroupSection({ space, isAdmin }: { space: Space; isAdmin: bo
                         {isAdmin && candidates.length > 0 && (
                             <div className="flex flex-wrap gap-2">
                                 <Select value={adding} onValueChange={setAdding}>
-                                    <SelectTrigger className="flex-1">
+                                    <SelectTrigger className="flex-1" aria-label={t('spaces.sync.choose')}>
                                         <SelectValue placeholder={t('spaces.sync.choose')} />
                                     </SelectTrigger>
                                     <SelectContent>

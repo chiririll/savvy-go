@@ -6,6 +6,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { NuqsTestingAdapter } from 'nuqs/adapters/testing'
 import { mswLoader } from 'msw-storybook-addon/csf3'
 import { Toaster } from 'sonner'
+import { configure } from 'storybook/test'
 
 import i18n, { i18nReady, LOCALE_LABELS, SUPPORTED_LOCALES, type AppLocale } from '@/lib/i18n'
 import { baseA11y } from '@/test/a11y'
@@ -14,6 +15,9 @@ import { AbilityProvider } from '@/components/providers/AbilityProvider'
 import { ReadOnlyProvider } from '@/components/providers/ReadOnlyProvider'
 import '@/index.css'
 import './preview.css'
+
+// With many stories loading at once a mocked request can take over a second, the default wait of a findBy query.
+configure({ asyncUtilTimeout: 5000 })
 
 const localeLoader: Loader = async ({ globals }) => {
     await i18nReady

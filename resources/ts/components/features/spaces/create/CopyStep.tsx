@@ -26,12 +26,12 @@ export function CopyStep({ spaces, sourceId, copy, onSourceChange, onCopyChange 
     return (
         <div className="space-y-4">
             <div className="space-y-1.5">
-                <Label>{t('spaces.create.copy.source')}</Label>
+                <Label htmlFor="create-space-source">{t('spaces.create.copy.source')}</Label>
                 <Select
                     value={sourceId === null ? 'defaults' : String(sourceId)}
                     onValueChange={(v) => onSourceChange(v === 'defaults' ? null : Number(v))}
                 >
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger id="create-space-source" className="w-full">
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>

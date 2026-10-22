@@ -17,7 +17,8 @@ export const identityProviderSchema = z.object({
         .regex(/^[a-z0-9-]+$/, i18n.t('validation.slugFormat')),
     preset: z.string().min(1, i18n.t('validation.pickProvider')),
     enabled: z.boolean().default(false),
-    fields: z.record(z.string(), z.string()).default({}),
+    // A preset field never touched in the form is undefined; it counts as empty.
+    fields: z.record(z.string(), z.string().optional().transform((value) => value ?? '')).default({}),
     role_mapping: z.array(roleMappingRuleSchema).default([]),
     default_role: z.enum(['user', 'guest']).default('user'),
     allow_jit: z.boolean().default(true),

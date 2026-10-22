@@ -24,11 +24,14 @@ function Card({ id, children }: { id: string; children: ReactNode }) {
 }
 
 function KeepSelect({
+    label,
     kept,
     keepLabel,
     dropLabel,
     onChange,
 }: {
+    /** What is kept or dropped, for a screen reader. */
+    label: string
     kept: boolean
     keepLabel: string
     dropLabel: string
@@ -36,7 +39,7 @@ function KeepSelect({
 }) {
     return (
         <Select value={kept ? 'keep' : 'drop'} onValueChange={(v) => onChange(v === 'keep')}>
-            <SelectTrigger className={TRIGGER}>
+            <SelectTrigger className={TRIGGER} aria-label={label}>
                 <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -78,6 +81,7 @@ export function SyncCategoryCard({
                 </p>
             </div>
             <KeepSelect
+                label={localizeDefaultName(c.name)}
                 kept={kept}
                 keepLabel={c.missing.length ? t('spaces.sync.dialog.keepAdd') : t('spaces.sync.dialog.keep')}
                 dropLabel={t('spaces.sync.dialog.drop')}
@@ -87,7 +91,7 @@ export function SyncCategoryCard({
                 <div className="space-y-1">
                     <Label>{t('spaces.sync.dialog.look')}</Label>
                     <Select value={String(look ?? c.present[0].spaceId)} onValueChange={(v) => onLook(Number(v))}>
-                        <SelectTrigger className={TRIGGER}>
+                        <SelectTrigger className={TRIGGER} aria-label={t('spaces.sync.dialog.look')}>
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -121,7 +125,10 @@ export function SyncDefaultCard({ conflict: d, value, spaceName, onChange }: Def
                 {d.defaults.map((x) => `${spaceName(x.spaceId)}: ${localizeDefaultName(x.name) || '—'}`).join(' · ')}
             </p>
             <Select value={value} onValueChange={onChange}>
-                <SelectTrigger className={TRIGGER}>
+                <SelectTrigger
+                    className={TRIGGER}
+                    aria-label={t('spaces.sync.dialog.defaultTitle', { type: syncTypeLabel(t, d.type) })}
+                >
                     <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -155,7 +162,7 @@ export function SyncSuccessorCard({ conflict: c, value, options, onChange }: Suc
             <div className="space-y-1">
                 <Label>{t('spaces.sync.dialog.successor')}</Label>
                 <Select value={value ?? ''} onValueChange={onChange}>
-                    <SelectTrigger className={TRIGGER}>
+                    <SelectTrigger className={TRIGGER} aria-label={t('spaces.sync.dialog.successor')}>
                         <SelectValue placeholder={t('spaces.sync.dialog.successorPlaceholder')} />
                     </SelectTrigger>
                     <SelectContent>
@@ -190,6 +197,7 @@ export function SyncTagCard({ conflict: c, kept, names, onKeep }: TagCardProps) 
                 </p>
             </div>
             <KeepSelect
+                label={`#${localizeDefaultName(c.name, 'tags')}`}
                 kept={kept}
                 keepLabel={t('spaces.sync.dialog.keepAdd')}
                 dropLabel={t('spaces.sync.dialog.dropTag')}

@@ -1,4 +1,4 @@
-import { CheckCircle2, XCircle, Tag, FolderOpen } from 'lucide-react'
+import { CheckCircle2, XCircle, Tag, FolderOpen, Coins } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -81,6 +81,19 @@ export function ResultStep({ result }: ResultStepProps) {
                                 </div>
                             </div>
                         )}
+                        {result.createdCurrencies.length > 0 && (
+                            <div className="flex items-start gap-2">
+                                <Coins className="size-4 text-muted-foreground mt-0.5" />
+                                <div>
+                                    <div className="text-sm font-medium">{t('import.currenciesLabel')}</div>
+                                    <div className="flex flex-wrap gap-1 mt-1">
+                                        {result.createdCurrencies.map((code) => (
+                                            <Badge key={code} variant="outline">{code}</Badge>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
@@ -91,7 +104,8 @@ export function ResultStep({ result }: ResultStepProps) {
                         <XCircle className="size-4 text-red-500" />
                         <span className="font-medium">{t('import.errorsCount', { count: result.errors.length })}</span>
                     </div>
-                    <div className="max-h-[200px] overflow-y-auto">
+                    {/* Scrolls when long, so it takes focus for keyboard scrolling. */}
+                    <div className="max-h-[200px] overflow-y-auto" tabIndex={0}>
                         <ul className="text-sm space-y-1">
                             {result.errors.map((err, i) => (
                                 <li key={i}>

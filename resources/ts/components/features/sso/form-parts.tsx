@@ -18,6 +18,7 @@ function CopyableUrl({ label, value }: { label: string; value: string }) {
                     variant="ghost"
                     size="icon"
                     className="size-7 shrink-0 text-muted-foreground"
+                    aria-label={t('common:actions.copy')}
                     onClick={() => {
                         navigator.clipboard?.writeText(value)
                         toast.success(t('sso.copied'))

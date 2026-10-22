@@ -49,7 +49,7 @@ export function Links({ space, isAdmin }: { space: Space; isAdmin: boolean }) {
                     (candidates.length ? (
                         <div className="flex gap-2">
                             <Select value={target} onValueChange={setTarget}>
-                                <SelectTrigger className="flex-1">
+                                <SelectTrigger className="flex-1" aria-label={t('spaces.links.choose')}>
                                     <SelectValue placeholder={t('spaces.links.choose')} />
                                 </SelectTrigger>
                                 <SelectContent>

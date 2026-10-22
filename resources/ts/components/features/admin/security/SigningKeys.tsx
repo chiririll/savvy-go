@@ -64,9 +64,14 @@ export function SigningKeys() {
         >
             <div className="space-y-5">
                 <div className="space-y-1.5">
-                    <Label>{t('admin.keys.own')}</Label>
+                    <Label htmlFor="own-public-key">{t('admin.keys.own')}</Label>
                     <div className="flex gap-2">
-                        <Input readOnly value={keys?.own.publicKey ?? ''} className="font-mono text-xs" />
+                        <Input
+                            id="own-public-key"
+                            readOnly
+                            value={keys?.own.publicKey ?? ''}
+                            className="font-mono text-xs"
+                        />
                         <Button
                             variant="outline"
                             size="icon"

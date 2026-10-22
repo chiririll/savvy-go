@@ -65,7 +65,7 @@ export function CategoryMapping({ candidates, value, onChange, disabled }: Categ
                                 }
                                 disabled={disabled}
                             >
-                                <SelectTrigger className="w-full">
+                                <SelectTrigger className="w-full" aria-label={candidate.name}>
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>

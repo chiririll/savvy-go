@@ -100,6 +100,7 @@ export function ProviderCard({ provider, index, onDelete, onTest }: ProviderCard
                         <Button
                             variant="ghost"
                             size="icon"
+                            aria-label={tCommon('actions.more')}
                             className={cn(
                                 'size-8 text-muted-foreground opacity-0 transition-opacity',
                                 'focus-visible:opacity-100 group-hover:opacity-100',

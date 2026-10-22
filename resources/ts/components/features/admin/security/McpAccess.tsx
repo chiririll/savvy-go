@@ -116,9 +116,9 @@ export function McpAccess() {
                     {open ? t('admin.mcp.open', { time: until }) : t('admin.mcp.closed')}
                 </p>
                 <div className="space-y-1.5">
-                    <Label>{t('admin.mcp.endpoint')}</Label>
+                    <Label htmlFor="mcp-endpoint">{t('admin.mcp.endpoint')}</Label>
                     <div className="flex gap-2">
-                        <Input readOnly value={endpoint} className="font-mono text-xs" />
+                        <Input id="mcp-endpoint" readOnly value={endpoint} className="font-mono text-xs" />
                         <Button
                             variant="outline"
                             size="icon"

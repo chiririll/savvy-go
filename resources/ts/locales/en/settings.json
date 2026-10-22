@@ -292,6 +292,7 @@
         "newEntitiesCreated": "New entities created",
         "categoriesLabel": "Categories",
         "tagsLabel": "Tags",
+        "currenciesLabel": "Currencies",
         "errorsCount": "Errors ({{count}})",
         "viewTransactions": "View transactions"
     },

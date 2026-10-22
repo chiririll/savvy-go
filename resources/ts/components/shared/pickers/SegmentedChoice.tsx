@@ -28,6 +28,7 @@ export function SegmentedChoice<T extends string>({ value, onChange, options, di
                     {...testIdTab(option, value === option)}
                     disabled={disabled}
                     onClick={() => onChange(option)}
+                    aria-pressed={value === option}
                     title={iconOnly ? label : undefined}
                     aria-label={iconOnly ? label : undefined}
                     className={cn(

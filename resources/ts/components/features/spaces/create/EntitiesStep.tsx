@@ -59,8 +59,9 @@ function Currencies({ content, catalog, catalogFailed, catalogBuiltIn, onRetryCa
     return (
         <Section title={t('spaces.create.currencies.title')} hint={t('spaces.create.currencies.hint')}>
             <div className="space-y-1.5">
-                <Label>{t('spaces.create.currencies.base')}</Label>
+                <Label htmlFor="create-space-base">{t('spaces.create.currencies.base')}</Label>
                 <CurrencyCombobox
+                    id="create-space-base"
                     className="w-full"
                     catalog={list}
                     value={content.baseCurrency}
@@ -161,7 +162,7 @@ function Accounts({ content, onChange }: Pick<Props, 'content' | 'onChange'>) {
                         value={account.type}
                         onValueChange={(type) => patch(account.key, { type: type as AccountType })}
                     >
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger className="w-full" aria-label={tc('fields.type')}>
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -173,7 +174,11 @@ function Accounts({ content, onChange }: Pick<Props, 'content' | 'onChange'>) {
                         </SelectContent>
                     </Select>
                     <Select value={account.currency} onValueChange={(currency) => patch(account.key, { currency })}>
-                        <SelectTrigger className="w-full" {...testId('create-space-account-currency')}>
+                        <SelectTrigger
+                            className="w-full"
+                            aria-label={t('spaces.create.accounts.currency')}
+                            {...testId('create-space-account-currency')}
+                        >
                             <SelectValue placeholder={t('spaces.create.accounts.currency')} />
                         </SelectTrigger>
                         <SelectContent>
@@ -305,7 +310,7 @@ function Categories({ content, onChange }: Pick<Props, 'content' | 'onChange'>) 
                     onChange={(e) => setName(e.target.value)}
                 />
                 <Select value={type} onValueChange={(v) => setType(v as CategoryType)}>
-                    <SelectTrigger className="w-32">
+                    <SelectTrigger className="w-32" aria-label={tc('fields.type')}>
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>

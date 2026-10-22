@@ -21,6 +21,8 @@ interface Props {
     allowManual?: boolean
     placeholder: string
     disabled?: boolean
+    /** For a label that names the picker; without one, the placeholder names it. */
+    id?: string
     className?: string
     'data-testid'?: string
 }
@@ -39,6 +41,7 @@ export function CurrencyCombobox({
     allowManual,
     placeholder,
     disabled,
+    id,
     className,
     ...rest
 }: Props) {
@@ -70,8 +73,10 @@ export function CurrencyCombobox({
             <PopoverTrigger asChild>
                 <Button
                     type="button"
+                    id={id}
                     variant="outline"
                     role="combobox"
+                    aria-label={id ? undefined : placeholder}
                     aria-expanded={open}
                     disabled={disabled}
                     className={cn('justify-between font-normal', !value && 'text-muted-foreground', className)}
@@ -92,6 +97,7 @@ export function CurrencyCombobox({
             </PopoverTrigger>
             <PopoverContent
                 align="start"
+                aria-label={placeholder}
                 className="w-[var(--radix-popover-trigger-width)] min-w-64 p-0"
             >
                 <div className="border-b p-2">
@@ -105,36 +111,40 @@ export function CurrencyCombobox({
                         onChange={(e) => setQuery(e.target.value)}
                     />
                 </div>
-                <div role="listbox" className="max-h-64 overflow-auto p-1">
-                    {manual && (
-                        <button
-                            type="button"
-                            role="option"
-                            aria-selected={false}
-                            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent"
-                            onClick={() => pick(manual)}
-                        >
-                            <span className="font-mono">{manual}</span>
-                            <span className="text-muted-foreground">{t('spaces.create.currencies.useCode')}</span>
-                        </button>
-                    )}
-                    {shown.map((c) => (
-                        <button
-                            key={c.code}
-                            type="button"
-                            role="option"
-                            aria-selected={c.code === value}
-                            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-                            onClick={() => pick(c.code)}
-                        >
-                            <Check className={cn('size-4 shrink-0', c.code === value ? 'opacity-100' : 'opacity-0')} />
-                            <span className="min-w-0 flex-1 truncate">
-                                <span className="font-mono">{c.code}</span>{' '}
-                                <span className="text-muted-foreground">{c.name}</span>
-                            </span>
-                            <span className="shrink-0 text-xs text-muted-foreground">{c.symbol}</span>
-                        </button>
-                    ))}
+                <div className="max-h-64 overflow-auto p-1">
+                    <div role="listbox" aria-label={placeholder}>
+                        {manual && (
+                            <button
+                                type="button"
+                                role="option"
+                                aria-selected={false}
+                                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent"
+                                onClick={() => pick(manual)}
+                            >
+                                <span className="font-mono">{manual}</span>
+                                <span className="text-muted-foreground">{t('spaces.create.currencies.useCode')}</span>
+                            </button>
+                        )}
+                        {shown.map((c) => (
+                            <button
+                                key={c.code}
+                                type="button"
+                                role="option"
+                                aria-selected={c.code === value}
+                                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                                onClick={() => pick(c.code)}
+                            >
+                                <Check
+                                    className={cn('size-4 shrink-0', c.code === value ? 'opacity-100' : 'opacity-0')}
+                                />
+                                <span className="min-w-0 flex-1 truncate">
+                                    <span className="font-mono">{c.code}</span>{' '}
+                                    <span className="text-muted-foreground">{c.name}</span>
+                                </span>
+                                <span className="shrink-0 text-xs text-muted-foreground">{c.symbol}</span>
+                            </button>
+                        ))}
+                    </div>
                     {shown.length === 0 && !manual && (
                         <p className="px-2 py-6 text-center text-sm text-muted-foreground">
                             {t('spaces.create.currencies.none')}
@@ -142,7 +152,9 @@ export function CurrencyCombobox({
                     )}
                     {total > shown.length && (
                         <p className="px-2 py-1.5 text-center text-xs text-muted-foreground">
-                            {t('spaces.create.currencies.more', { count: total - shown.length })}
+                            {t('spaces.create.currencies.more', {
+                                count: total - shown.length,
+                            })}
                         </p>
                     )}
                 </div>

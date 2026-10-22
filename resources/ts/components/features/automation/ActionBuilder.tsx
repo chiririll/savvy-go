@@ -106,7 +106,7 @@ export function ActionBuilder({ value, onChange }: ActionBuilderProps) {
                                 value={action.type}
                                 onValueChange={(type) => updateAction(index, { type: type as ActionType })}
                             >
-                                <SelectTrigger className="w-full">
+                                <SelectTrigger className="w-full" aria-label={t('automation.actionType')}>
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -123,6 +123,8 @@ export function ActionBuilder({ value, onChange }: ActionBuilderProps) {
                                 variant="ghost"
                                 size="icon"
                                 className="shrink-0"
+                                aria-label={t('automation.removeAction')}
+                                title={t('automation.removeAction')}
                                 onClick={() => removeAction(index)}
                             >
                                 <Trash2 className="size-4 text-muted-foreground hover:text-destructive" />

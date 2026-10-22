@@ -292,6 +292,7 @@
         "newEntitiesCreated": "Созданные сущности",
         "categoriesLabel": "Категории",
         "tagsLabel": "Теги",
+        "currenciesLabel": "Валюты",
         "errorsCount": "Ошибки ({{count}})",
         "viewTransactions": "К транзакциям"
     },

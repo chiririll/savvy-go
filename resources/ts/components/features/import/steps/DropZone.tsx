@@ -76,6 +76,7 @@ export function DropZone({ onFileSelect, disabled }: Props) {
                                 variant="ghost"
                                 size="icon"
                                 className="size-6"
+                                aria-label={t('common:actions.clear')}
                                 onClick={() => setSelectedFile(null)}
                             >
                                 <X className="size-4" />

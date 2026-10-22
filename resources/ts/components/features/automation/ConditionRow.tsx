@@ -30,7 +30,7 @@ export function ConditionRow({ condition, onChange, onRemove }: ConditionRowProp
                         })
                     }
                 >
-                    <SelectTrigger className="w-full min-w-0 flex-1">
+                    <SelectTrigger className="w-full min-w-0 flex-1" aria-label={t('automation.conditionField')}>
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -43,7 +43,7 @@ export function ConditionRow({ condition, onChange, onRemove }: ConditionRowProp
                 </Select>
 
                 <Select value={condition.op} onValueChange={(op) => onChange({ op: op as ConditionOperator })}>
-                    <SelectTrigger className="w-full min-w-0 flex-1">
+                    <SelectTrigger className="w-full min-w-0 flex-1" aria-label={t('automation.conditionOperator')}>
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -55,7 +55,15 @@ export function ConditionRow({ condition, onChange, onRemove }: ConditionRowProp
                     </SelectContent>
                 </Select>
 
-                <Button type="button" variant="ghost" size="icon" className="shrink-0" onClick={onRemove}>
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="shrink-0"
+                    aria-label={t('automation.removeCondition')}
+                    title={t('automation.removeCondition')}
+                    onClick={onRemove}
+                >
                     <Trash2 className="size-4 text-muted-foreground hover:text-destructive" />
                 </Button>
             </div>
