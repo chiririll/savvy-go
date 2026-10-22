@@ -22,6 +22,7 @@ export function FieldHelp({ children }: { children: React.ReactNode }) {
             </PopoverTrigger>
             <PopoverContent
                 side="top"
+                aria-label={t('actions.help')}
                 align="center"
                 collisionPadding={8}
                 onOpenAutoFocus={(event) => event.preventDefault()}

@@ -72,7 +72,11 @@ export function DataTable<T>({
                 <TableHeader>
                     {table.getHeaderGroups().map((headerGroup) => (
                         <TableRow key={headerGroup.id}>
-                            {isReorderable && <TableHead className="w-10" />}
+                            {isReorderable && (
+                                <TableHead className="w-10">
+                                    <span className="sr-only">{t('actions.reorder')}</span>
+                                </TableHead>
+                            )}
                             {headerGroup.headers.map((header) => (
                                 <TableHead key={header.id}>
                                     {header.isPlaceholder

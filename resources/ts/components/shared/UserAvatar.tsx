@@ -7,6 +7,16 @@ interface UserAvatarProps {
     className?: string
 }
 
+/** The avatar as drawn: the picture when there is one, otherwise the initial. */
+export function UserAvatarView({ user, src, className }: UserAvatarProps & { src?: string }) {
+    return (
+        <Avatar className={className}>
+            {src && <AvatarImage src={src} alt={user.name} />}
+            <AvatarFallback>{getUserInitials(user)}</AvatarFallback>
+        </Avatar>
+    )
+}
+
 export function UserAvatar({ user, className }: UserAvatarProps) {
     const [src, setSrc] = useState<string>()
 
@@ -22,10 +32,5 @@ export function UserAvatar({ user, className }: UserAvatarProps) {
         }
     }, [user.email])
 
-    return (
-        <Avatar className={className}>
-            {src && <AvatarImage src={src} alt={user.name} />}
-            <AvatarFallback>{getUserInitials(user)}</AvatarFallback>
-        </Avatar>
-    )
+    return <UserAvatarView user={user} src={src} className={className} />
 }

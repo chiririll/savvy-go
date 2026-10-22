@@ -3,6 +3,9 @@ import path from 'path'
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { storybookTest } from '@storybook/addon-vitest/vitest-plugin'
+import { playwright } from '@vitest/browser-playwright'
+import pkg from './package.json'
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, process.cwd(), '')
@@ -38,8 +41,35 @@ export default defineConfig(({ mode }) => {
             },
         },
         test: {
-            environment: 'node',
-            include: ['resources/ts/**/*.test.{ts,tsx}'],
+            projects: [
+                {
+                    extends: true,
+                    test: {
+                        name: 'unit',
+                        environment: 'node',
+                        include: ['resources/ts/**/*.test.{ts,tsx}'],
+                    },
+                },
+                // Every story is a test, in a real browser at a desktop and a phone size (`npm run test:stories`).
+                {
+                    extends: true,
+                    plugins: [storybookTest({ configDir: path.join(__dirname, '.storybook') })],
+                    // Name every dependency up front; one found mid-run makes Vite reload and fail the run.
+                    optimizeDeps: { include: Object.keys(pkg.dependencies).filter((name) => !name.startsWith('@vitejs/')) },
+                    test: {
+                        name: 'stories',
+                        browser: {
+                            enabled: true,
+                            headless: true,
+                            provider: playwright(),
+                            instances: [
+                                { browser: 'chromium', name: 'desktop', viewport: { width: 1280, height: 800 } },
+                                { browser: 'chromium', name: 'mobile', viewport: { width: 390, height: 844 } },
+                            ],
+                        },
+                    },
+                },
+            ],
         },
         server: {
             port: 5173,

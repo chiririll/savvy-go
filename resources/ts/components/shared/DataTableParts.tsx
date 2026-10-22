@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next'
 
 export function DataTableSkeleton({ columns }: { columns: number }) {
     return (
-        <div className="rounded-lg border">
+        <div className="rounded-lg border" aria-hidden="true">
             <Table>
                 <TableHeader>
                     <TableRow>
@@ -72,7 +72,7 @@ export function DataTablePagination<T>({ table }: { table: ReturnType<typeof use
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <span>{t('table.rowsPerPage')}</span>
                 <Select value={String(pageSize)} onValueChange={(value) => table.setPageSize(Number(value))}>
-                    <SelectTrigger className="h-8 w-16">
+                    <SelectTrigger className="h-8 w-16" aria-label={t('table.rowsPerPage')}>
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -95,6 +95,7 @@ export function DataTablePagination<T>({ table }: { table: ReturnType<typeof use
                         size="icon"
                         className="size-8"
                         onClick={() => table.setPageIndex(0)}
+                        aria-label={t('table.goFirst')}
                         disabled={!table.getCanPreviousPage()}
                     >
                         <ChevronsLeft className="size-4" />
@@ -104,6 +105,7 @@ export function DataTablePagination<T>({ table }: { table: ReturnType<typeof use
                         size="icon"
                         className="size-8"
                         onClick={() => table.previousPage()}
+                        aria-label={t('table.goPrevious')}
                         disabled={!table.getCanPreviousPage()}
                     >
                         <ChevronLeft className="size-4" />
@@ -113,6 +115,7 @@ export function DataTablePagination<T>({ table }: { table: ReturnType<typeof use
                         size="icon"
                         className="size-8"
                         onClick={() => table.nextPage()}
+                        aria-label={t('table.goNext')}
                         disabled={!table.getCanNextPage()}
                     >
                         <ChevronRight className="size-4" />
@@ -122,6 +125,7 @@ export function DataTablePagination<T>({ table }: { table: ReturnType<typeof use
                         size="icon"
                         className="size-8"
                         onClick={() => table.setPageIndex(pageCount - 1)}
+                        aria-label={t('table.goLast')}
                         disabled={!table.getCanNextPage()}
                     >
                         <ChevronsRight className="size-4" />

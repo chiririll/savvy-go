@@ -31,7 +31,8 @@
         "reorder": "Reorder",
         "help": "Help",
         "expand": "Expand",
-        "collapse": "Collapse"
+        "collapse": "Collapse",
+        "more": "More actions"
     },
     "negativeBalance": {
         "title": "Balance will go negative",
@@ -137,6 +138,8 @@
         "morePages": "More pages",
         "goPrevious": "Go to previous page",
         "goNext": "Go to next page",
+        "goFirst": "Go to first page",
+        "goLast": "Go to last page",
         "loadingMore": "Loading more…",
         "loadMoreError": "Couldn't load more",
         "endOfList": "You've reached the end"

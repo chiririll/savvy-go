@@ -48,7 +48,7 @@ export function PageHeader({
                 <div className="flex min-w-0 items-center gap-4">
                     {backLink && (
                         <Button variant="ghost" size="icon" asChild>
-                            <Link to={backLink}>
+                            <Link to={backLink} aria-label={t('actions.back')}>
                                 <ArrowLeft className="h-4 w-4" />
                             </Link>
                         </Button>

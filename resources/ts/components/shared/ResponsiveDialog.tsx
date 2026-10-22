@@ -36,7 +36,7 @@ export function ResponsiveDialog({
     children,
 }: ResponsiveDialogProps) {
     const isMobile = useIsMobile()
-    const body = children != null && <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">{children}</div>
+    const body = children != null && <div tabIndex={0} className="min-h-0 flex-1 overflow-y-auto px-6 py-4">{children}</div>
 
     if (isMobile) {
         return (

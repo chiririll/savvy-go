@@ -50,3 +50,6 @@ CLAUDE.local.md
 
 # Frontend copied in for the embed build (go tool mage build:release)
 /internal/httpserver/ui/dist/
+
+# Storybook
+/storybook-static/

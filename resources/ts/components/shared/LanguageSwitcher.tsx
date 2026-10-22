@@ -82,7 +82,7 @@ export function LanguageSwitcher({ variant = 'compact', className }: LanguageSwi
                         variant="ghost"
                         size={isAuth ? 'sm' : 'icon'}
                         className={isAuth ? 'gap-2' : className}
-                        aria-label={t('language.label')}
+                        aria-label={isAuth ? `${t('language.label')}: ${LOCALE_LABELS[locale]}` : t('language.label')}
                     >
                         <Languages className="h-5 w-5" />
                         {isAuth && <span className="text-sm">{LOCALE_LABELS[locale]}</span>}

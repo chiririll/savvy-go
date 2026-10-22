@@ -64,6 +64,21 @@ function generatePaginationItems(
     return items
 }
 
+/** The links have no href, so they are made buttons the keyboard can reach and Enter or Space press. */
+function pressable(onPress: () => void, disabled = false) {
+    return {
+        role: 'button',
+        tabIndex: disabled ? -1 : 0,
+        'aria-disabled': disabled || undefined,
+        onClick: () => !disabled && onPress(),
+        onKeyDown: (event: React.KeyboardEvent) => {
+            if (disabled || (event.key !== 'Enter' && event.key !== ' ')) return
+            event.preventDefault()
+            onPress()
+        },
+    } as const
+}
+
 export function ServerPagination({
     meta,
     onPageChange,
@@ -94,7 +109,7 @@ export function ServerPagination({
                 <PaginationContent>
                     <PaginationItem>
                         <PaginationPrevious
-                            onClick={() => canGoPrev && onPageChange(current_page - 1)}
+                            {...pressable(() => onPageChange(current_page - 1), !canGoPrev)}
                             className={!canGoPrev ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                         />
                     </PaginationItem>
@@ -106,7 +121,7 @@ export function ServerPagination({
                             ) : (
                                 <PaginationLink
                                     isActive={item === current_page}
-                                    onClick={() => onPageChange(item)}
+                                    {...pressable(() => onPageChange(item))}
                                     className="cursor-pointer"
                                 >
                                     {item}
@@ -117,7 +132,7 @@ export function ServerPagination({
 
                     <PaginationItem>
                         <PaginationNext
-                            onClick={() => canGoNext && onPageChange(current_page + 1)}
+                            {...pressable(() => onPageChange(current_page + 1), !canGoNext)}
                             className={!canGoNext ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                         />
                     </PaginationItem>

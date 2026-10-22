@@ -133,6 +133,7 @@ export function CurrencySelect({ value, onChange, allowCatalog = true, disabled,
             </PopoverTrigger>
             <PopoverContent
                 align="start"
+                aria-label={t('selectCurrency')}
                 className="w-[var(--radix-popover-trigger-width)] min-w-[var(--radix-popover-trigger-width)] p-0"
             >
                 <div className="border-b p-2">

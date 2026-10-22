@@ -70,6 +70,7 @@ export function RowActions({
                         triggerClassName,
                     )}
                     tabIndex={showTrigger ? undefined : -1}
+                    aria-label={t('actions.more')}
                     aria-hidden={!showTrigger}
                 >
                     <MoreHorizontal className="size-4" />

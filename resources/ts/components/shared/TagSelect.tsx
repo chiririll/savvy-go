@@ -37,20 +37,26 @@ export function TagSelect({
                 return (
                     <Badge
                         key={tag.id}
+                        asChild
                         variant={isSelected ? 'default' : 'outline'}
                         className={cn(
                             'cursor-pointer transition-colors',
                             isSelected ? 'hover:bg-primary/80' : 'hover:bg-muted'
                         )}
-                        onClick={() => {
-                            onChange(
-                                isSelected
-                                    ? value.filter((id) => id !== tag.id)
-                                    : [...value, tag.id]
-                            )
-                        }}
                     >
-                        #{localizeDefaultName(tag.name, 'tags')}
+                        <button
+                            type="button"
+                            aria-pressed={isSelected}
+                            onClick={() => {
+                                onChange(
+                                    isSelected
+                                        ? value.filter((id) => id !== tag.id)
+                                        : [...value, tag.id]
+                                )
+                            }}
+                        >
+                            #{localizeDefaultName(tag.name, 'tags')}
+                        </button>
                     </Badge>
                 )
             })}

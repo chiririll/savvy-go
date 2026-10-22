@@ -71,6 +71,25 @@ npx tsc --noEmit
 npm run build   # into public/build
 ```
 
+### Frontend tests
+
+```bash
+npm test                  # unit tests (Vitest, no browser)
+npm run test:stories      # every Storybook story, as a test in Chromium
+npm run storybook         # the stories in the browser, with a language and theme switch
+```
+
+Components are tested through Storybook (`*.stories.tsx` next to the component). A story is one state of a component: loading, empty, error, read-only, a currency with 0 or 3 decimals, Russian. `npm run test:stories` runs each story twice, at a desktop size (1280×800) and a phone size (390×844), so a responsive break fails the same way a logic bug does. A story with a `play` function also clicks and types, and asserts. Every story is checked for accessibility (axe) as well, and a violation fails it.
+
+The first run needs a browser: `npx playwright install chromium`.
+
+- **Data.** Components read the API through the real client; a story answers it with MSW (`resources/ts/test/api-mocks.ts`: `reply`, `fail`, `hang` for a request that never ends). A request a story did not mock fails the story. Sample data is in `resources/ts/test/fixtures.ts`.
+- **Forms.** Components built on the ShadCN form parts need a form around them: `decorators: [withForm({ label: 'Currency' })]` from `resources/ts/test/form-decorator.tsx`.
+- **Menus and selects.** Radix hides the page behind an open menu, which axe reports. Add `parameters: { a11y: overlayA11y }` from `resources/ts/test/a11y.ts`.
+- **Colour contrast is not checked yet** (`resources/ts/test/a11y.ts` has the reason and a TODO). The palette misses WCAG AA in a few places; the check goes back on once it passes.
+- **Language and theme.** `globals: { locale: 'ru' }` or `{ theme: 'dark' }` on a story.
+- **Animations are off**, so a check never sees an element half faded in.
+
 ## Build tasks
 
 [Mage](https://magefile.org) runs the builds from `magefile.go`, pinned in `go.mod` so nothing is installed globally. `go tool mage -l` lists the targets:
@@ -100,7 +119,7 @@ In `.github/workflows`. All of them can also be started manually.
 Run on PRs and pushes to `main`, only when relevant files change.
 
 - `ci-go`: backend tests.
-- `ci-frontend`: frontend type checking and tests.
+- `ci-frontend`: frontend type checking, unit tests and story tests.
 
 ### Package check
 
