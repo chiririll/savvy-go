@@ -60,7 +60,11 @@ export function useTransactionReportByCategory(filters: ReportFilters, type: Rep
     })
 }
 
-export function useTransactionReportDynamics(filters: ReportFilters, type: ReportTransactionType, groupBy: CashFlowGroupBy = 'day') {
+export function useTransactionReportDynamics(
+    filters: ReportFilters,
+    type: ReportTransactionType,
+    groupBy: CashFlowGroupBy = 'day',
+) {
     return useQuery({
         queryKey: ['reports', 'transaction-dynamics', filters, type, groupBy],
         queryFn: () => reportsApi.getTransactionDynamics(filters, type, groupBy),

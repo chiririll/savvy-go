@@ -12,8 +12,14 @@ const account = { name: 'Cash', currentBalance: 100 }
 
 describe('warningIfResultNegative', () => {
     it('warns when a spend takes the balance below zero', () => {
-        expect(warningIfResultNegative({ accountName: 'Cash', currentBalance: 100, resultingBalance: -20, currency: 'USD' }))
-            .toEqual({ accountName: 'Cash', currentBalance: 100, resultingBalance: -20, currency: 'USD' })
+        expect(
+            warningIfResultNegative({
+                accountName: 'Cash',
+                currentBalance: 100,
+                resultingBalance: -20,
+                currency: 'USD',
+            }),
+        ).toEqual({ accountName: 'Cash', currentBalance: 100, resultingBalance: -20, currency: 'USD' })
     })
 
     it('does not warn when the balance stays at or above zero', () => {
@@ -27,7 +33,9 @@ describe('warningIfResultNegative', () => {
     })
 
     it('warns again when an already negative balance gets worse', () => {
-        expect(warningIfResultNegative({ accountName: 'Cash', currentBalance: -50, resultingBalance: -60 })).not.toBeNull()
+        expect(
+            warningIfResultNegative({ accountName: 'Cash', currentBalance: -50, resultingBalance: -60 }),
+        ).not.toBeNull()
     })
 
     it('needs an account name', () => {

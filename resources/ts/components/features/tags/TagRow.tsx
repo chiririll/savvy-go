@@ -2,6 +2,7 @@ import { Hash } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { FeedRow, RowActions } from '@/components/shared'
 import { Tag } from '@/types'
+import { localizeDefaultName } from '@/lib/localized-name'
 
 interface TagRowProps {
     tag: Tag
@@ -20,7 +21,7 @@ export function TagRow({ tag, onEdit, onDelete, isReadOnly }: TagRowProps) {
         <FeedRow
             icon={<Hash className="size-4" />}
             iconClassName="bg-muted text-muted-foreground"
-            title={`#${tag.name}`}
+            title={`#${localizeDefaultName(tag.name, 'tags')}`}
             amount={count}
             amountClassName="text-muted-foreground"
             onOpen={canEdit ? () => onEdit(tag) : undefined}
@@ -33,7 +34,7 @@ export function TagRow({ tag, onEdit, onDelete, isReadOnly }: TagRowProps) {
                     onEdit={canEdit ? () => onEdit(tag) : undefined}
                     onDelete={canDelete ? () => onDelete(tag.id) : undefined}
                     deleteTitle={t('pages:tags.deleteTitle')}
-                    deleteDescription={t('pages:tags.deleteDescription', { name: tag.name })}
+                    deleteDescription={t('pages:tags.deleteDescription', { name: localizeDefaultName(tag.name, 'tags') })}
                 />
             )}
         />

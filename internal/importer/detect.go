@@ -56,7 +56,12 @@ func detectImport(headers []string, rows [][]string, delimiter rune) detectedImp
 
 	dateCol, ok := d.mapping["date"]
 	if !ok {
-		dateCol, ok = bestColumn(headers, sample, -1, func(col int) float64 { return bestDateScore(columnValues(sample, col)) })
+		dateCol, ok = bestColumn(
+			headers,
+			sample,
+			-1,
+			func(col int) float64 { return bestDateScore(columnValues(sample, col)) },
+		)
 		if ok {
 			d.mapping["date"] = dateCol
 		}
@@ -71,7 +76,12 @@ func detectImport(headers []string, rows [][]string, delimiter rune) detectedImp
 		if dc, has := d.mapping["date"]; has {
 			skip = dc
 		}
-		amountCol, ok = bestColumn(headers, sample, skip, func(col int) float64 { return numericScore(columnValues(sample, col)) })
+		amountCol, ok = bestColumn(
+			headers,
+			sample,
+			skip,
+			func(col int) float64 { return numericScore(columnValues(sample, col)) },
+		)
 		if ok {
 			d.mapping["amount"] = amountCol
 		}

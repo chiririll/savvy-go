@@ -11,10 +11,15 @@ describe('pages', () => {
         expect(missing, 'pages that router.tsx does not use').toEqual([])
     })
 
-    it('are the only routes with a path of their own, apart from redirects', () => {
+    it('are the only routes with their own path, besides redirects', () => {
         const literal = router
             .split('\n')
             .filter((line) => /\bpath: '/.test(line) && !/Navigate|Redirect|path: '\*'/.test(line))
         expect(literal, 'routes written out in router.tsx; add them to app/pages.ts').toEqual([])
+    })
+
+    it('redirect the old /settings/user to Security', () => {
+        expect(router).toMatch(/path: 'settings\/user', element: <Navigate to=\{pages\.securitySettings\.path\}/)
+        expect(Object.values(pages).map((p) => p.path)).not.toContain('/settings/user')
     })
 })

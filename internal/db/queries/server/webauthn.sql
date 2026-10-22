@@ -19,12 +19,10 @@ DELETE FROM webauthn_credentials WHERE id=? AND user_id=?;
 INSERT INTO webauthn_challenges (user_id, token_hash, type, options, expires_at, created_at, updated_at)
 VALUES (?,?,?,?,?,?,?);
 
--- name: GetOpenWebAuthnChallenge :one
-SELECT user_id, options FROM webauthn_challenges
-WHERE token_hash=? AND type=? AND consumed_at IS NULL AND expires_at > ?;
-
--- name: ConsumeWebAuthnChallenge :exec
-UPDATE webauthn_challenges SET consumed_at=?, updated_at=? WHERE token_hash=?;
+-- name: TakeWebAuthnChallenge :one
+UPDATE webauthn_challenges SET consumed_at=?, updated_at=?
+WHERE token_hash=? AND type=? AND consumed_at IS NULL AND expires_at > ?
+RETURNING user_id, options;
 
 -- name: ListWebAuthnRecords :many
 SELECT record FROM webauthn_credentials WHERE user_id=?;
@@ -32,5 +30,5 @@ SELECT record FROM webauthn_credentials WHERE user_id=?;
 -- name: GetWebAuthnUserIDByCredential :one
 SELECT user_id FROM webauthn_credentials WHERE credential_id=?;
 
--- name: TouchWebAuthnCredential :exec
-UPDATE webauthn_credentials SET last_used_at=?, updated_at=? WHERE credential_id=?;
+-- name: UpdateWebAuthnCredentialAfterLogin :exec
+UPDATE webauthn_credentials SET record=?, counter=?, last_used_at=?, updated_at=? WHERE credential_id=?;

@@ -59,7 +59,10 @@ type Source struct {
 	mu        sync.Mutex
 	meta      []ledger.Currency
 	metaUntil time.Time
-	rates     map[string]cachedRates // by upper-case base code; for updates only
+	// metaBuiltIn is set while meta is the short built-in list, because the
+	// names file has never been fetched.
+	metaBuiltIn bool
+	rates       map[string]cachedRates // by upper-case base code; for updates only
 }
 
 type cachedRates struct {
@@ -135,6 +138,14 @@ func (s *Source) Rates(ctx context.Context, base string) (map[string]decimal.Dec
 // rate is known). The rates are looked up live, not cached. When the service
 // is unreachable it falls back to a short built-in list.
 func (s *Source) Catalog(ctx context.Context, base string) []ledger.Currency {
+	list, _ := s.CatalogStatus(ctx, base)
+	return list
+}
+
+// CatalogStatus is Catalog, and says whether the list is the short built-in
+// one because the names could not be fetched, so the caller can tell the user
+// that a currency may be missing.
+func (s *Source) CatalogStatus(ctx context.Context, base string) (list []ledger.Currency, builtIn bool) {
 	base = strings.ToUpper(strings.TrimSpace(base))
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -148,7 +159,7 @@ func (s *Source) Catalog(ctx context.Context, base string) []ledger.Currency {
 		c.Rate = rates[c.Code]
 		out[i] = c
 	}
-	return out
+	return out, s.metaBuiltIn
 }
 
 // fetchRates loads base's file: its numbers say how many units of each
@@ -196,6 +207,7 @@ func (s *Source) metaList(ctx context.Context) []ledger.Currency {
 	if err := s.fetchJSON(ctx, s.MetaURL, &raw); err != nil || len(raw) == 0 {
 		if s.meta == nil {
 			s.meta = fallbackMeta()
+			s.metaBuiltIn = true
 		}
 		s.metaUntil = s.now().Add(s.Retry)
 		return s.meta
@@ -214,6 +226,7 @@ func (s *Source) metaList(ctx context.Context) []ledger.Currency {
 	}
 	sort.Slice(list, func(i, j int) bool { return list[i].Code < list[j].Code })
 	s.meta = list
+	s.metaBuiltIn = false
 	s.metaUntil = s.now().Add(s.TTL)
 	return list
 }

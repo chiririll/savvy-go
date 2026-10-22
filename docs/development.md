@@ -5,12 +5,22 @@
 ```bash
 go generate ./internal/db   # sqlc: internal/db/queries → internal/db/sqlc
 go test ./...
-go run ./cmd/savvy-go
+go run .
 ```
 
-Listens on `localhost:8080`. Data and the generated `config.toml` go to `./savvy-data`, see [Data and backups](data-and-backups.md) and [Configuration](deployment.md#configuration). A plain `go build` or `go run` serves the frontend from `public/` on disk; release builds have it built into the binary, see [Build tasks](#build-tasks).
+`go run .` listens on `localhost:8080`. Data and the generated `config.toml` go to `./savvy-data`, see [Data and backups](data-and-backups.md) and [Configuration](deployment.md#configuration). A plain `go build` or `go run` serves the frontend from `public/` on disk; release builds embed it, see [Build tasks](#build-tasks).
 
-With `--seed-config <file>` (any TOML file, even an empty one), the first boot creates demo users, three spaces with ~12 months of data, linked spaces and open invitations:
+### Code shape checks
+
+`internal/archtest` fails `go test ./...` on code that is clearly out of hand: a function over 200 lines, nesting deeper than 8, a name over 8 words, a line over 160 characters and similar. A justified exception goes in the doc comment: `//archtest:ignore funcLines <reason>`.
+
+`mage test:audit` (or `go test -tags audit ./internal/archtest -run Audit -v`, `npm run audit`) prints everything above the softer limits, worst first. It never fails; use it as a cleanup worklist.
+
+The frontend has the same two layers in `resources/ts/lib/code-shape` (`npm test` runs the hard one). Limits differ where the language does: a component may be 500 lines, and test titles count words. Opt out with `// archtest:ignore funcLines <reason>` above the declaration.
+
+### Demo data
+
+With `--seed-config <file>` (any TOML file, even empty), the first boot creates demo users, three spaces with ~12 months of data, linked spaces and open invitations:
 
 | Email              | Password   | Server role |
 |--------------------|------------|-------------|
@@ -19,13 +29,36 @@ With `--seed-config <file>` (any TOML file, even an empty one), the first boot c
 | `guest@savvy.app`  | `password` | guest       |
 | `demo@demo.com`    | `demo`     | user        |
 
-Roles differ per space, so each user sees a different view.
+Roles differ per space, so each user sees a different view. Every space has its own emoji and color. Family Budget and Demo are in one sync group, each with a category and a tag the other lacked. Studio GmbH is outside it and has a set of categories and tags of its own (clients, retainers, VAT) instead of the presets. About a dozen transfers cross the links between the spaces, some in the last few days and some between currencies. All addresses are verified except the guest's, which shows as unverified once mail is set up.
 
-In the seed config file, `date` (`YYYY-MM-DD`) places the data relative to that day instead of today. `manifest` is a file the seed writes users, spaces and invitation tokens to; [Scripts](scripts.md) uses it.
+Example `seed.toml`:
+
+```toml
+# All keys are optional; an empty file seeds with the defaults.
+
+# Set to false to keep the file but skip seeding. Default: true.
+enabled = true
+
+# Place the data relative to this day (YYYY-MM-DD) instead of today.
+date = "2026-06-05"
+
+# Write the seeded users, spaces and invitation tokens to this file.
+manifest = "./savvy-data/manifest.json"
+```
+
+```bash
+go run . --seed-config seed.toml
+```
+
+`enabled` (default `true`) turns seeding off without removing the flag. `date` places the data relative to that day instead of today. `manifest` is a file the seed writes users (with whether their address is verified), spaces (emoji, color, sync group) and invitation tokens to; [Scripts](scripts.md) uses it. Unknown keys are an error. Seeding only happens on an empty database: if the server already has a user, or was seeded before, the flag does nothing, so start from a fresh data directory.
 
 ## Architecture
 
 One Go process serves the API, the React frontend, the scheduler and workers. Server data is in `server.sqlite`, each space has its own SQLite file. Business logic uses the storage interface in `internal/store` and asks the repositories in `internal/db/repo/<area>` for rows, so it holds no SQL; SQLite code stays in `internal/store/sqlite`, and operations spanning two spaces use `store.InSpaces`. Migrations run on startup.
+
+The HTTP layer in `internal/httpserver` is split by role: `api/<resource>` holds one thin handler package per resource (each with its own `routes.go` and `openapi.yaml`), `auth/` the sign-in, two-factor, OAuth and SSO flows, `admin/` what only server admins use (server backups, signing keys, spaces overview, users, mail, SSO providers, checks, monitoring) and `httpx/` what they share (JSON replies, request and scope helpers, `dto`, `guard`, `routing`). Handlers only adapt HTTP; the logic that scheduled jobs also need lives in the top-level `internal/` packages. A new handler package is linked in from `httpserver/modules*.go`.
+
+`config.toml` is owned by `internal/config`, the only package that knows the file. The builder (`internal/app/builder.go`) calls `config.Init(path)`, asks for each section with `config.Of(section)`, then calls `config.Finish()`, which reports unknown keys and writes the file. A package declares its sections next to the code that uses them, and can have several. A section is a `config.Section[Table, Value]`: `Table` is the TOML struct and `Decode` turns it into the value the package works with (units, trimming, checks). When `Table` implements `Defaults()`, the defaults fill the keys the file lacks and the section is always written. Without them, it is written only when the file has it, and a table that only holds subsections is never written on its own. `config.OfOptional` is for one of several alternatives, such as `[mail.smtp]`. A `*config.Ref` gives the decoded value with `Get`. `Subscribe` is there for the rare package that must react to a change. Tests use `config.Fixed(value)`.
 
 ## Frontend
 
@@ -37,6 +70,25 @@ npm run dev     # Vite dev server
 npx tsc --noEmit
 npm run build   # into public/build
 ```
+
+### Frontend tests
+
+```bash
+npm test                  # unit tests (Vitest, no browser)
+npm run test:stories      # every Storybook story, as a test in Chromium
+npm run storybook         # the stories in the browser, with a language and theme switch
+```
+
+Components are tested through Storybook (`*.stories.tsx` next to the component). A story is one state of a component: loading, empty, error, read-only, a currency with 0 or 3 decimals, Russian. `npm run test:stories` runs each story twice, at a desktop size (1280×800) and a phone size (390×844), so a responsive break fails the same way a logic bug does. A story with a `play` function also clicks and types, and asserts. Every story is checked for accessibility (axe) as well, and a violation fails it.
+
+The first run needs a browser: `npx playwright install chromium`.
+
+- **Data.** Components read the API through the real client; a story answers it with MSW (`resources/ts/test/api-mocks.ts`: `reply`, `fail`, `hang` for a request that never ends). A request a story did not mock fails the story. Sample data is in `resources/ts/test/fixtures.ts`.
+- **Forms.** Components built on the ShadCN form parts need a form around them: `decorators: [withForm({ label: 'Currency' })]` from `resources/ts/test/form-decorator.tsx`.
+- **Menus and selects.** Radix hides the page behind an open menu, which axe reports. Add `parameters: { a11y: overlayA11y }` from `resources/ts/test/a11y.ts`.
+- **Colour contrast is not checked yet** (`resources/ts/test/a11y.ts` has the reason and a TODO). The palette misses WCAG AA in a few places; the check goes back on once it passes.
+- **Language and theme.** `globals: { locale: 'ru' }` or `{ theme: 'dark' }` on a story.
+- **Animations are off**, so a check never sees an element half faded in.
 
 ## Build tasks
 
@@ -52,7 +104,7 @@ go tool mage generate        # sqlc
 go tool mage release         # everything a release ships, into dist/ (needs APP_VERSION and nfpm)
 ```
 
-`build:release` honors `APP_VERSION`, `APP_ENV` (default `production`), `TARGET_GOOS` and `TARGET_GOARCH`. The target falls back to `GOOS` and `GOARCH`, but those also change how Mage itself is compiled, so cross-building from Windows or macOS needs `TARGET_*`. It copies `public/` to `internal/webui/dist` (git-ignored) and builds with the `embed` tag; without the tag the Go build never touches the frontend, so `go test ./...` needs no frontend build.
+`build:release` honors `APP_VERSION`, `APP_ENV` (default `production`), `TARGET_GOOS` and `TARGET_GOARCH`. The target falls back to `GOOS` and `GOARCH`, but those also change how Mage itself is compiled, so cross-building from Windows or macOS needs `TARGET_*`. It copies `public/` to `internal/httpserver/ui/dist` (git-ignored) and builds with the `embed` tag; without the tag the Go build never touches the frontend, so `go test ./...` needs no frontend build.
 
 Logo and screenshot scripts: [Scripts](scripts.md).
 
@@ -67,7 +119,7 @@ In `.github/workflows`. All of them can also be started manually.
 Run on PRs and pushes to `main`, only when relevant files change.
 
 - `ci-go`: backend tests.
-- `ci-frontend`: frontend type checking and tests.
+- `ci-frontend`: frontend type checking, unit tests and story tests.
 
 ### Package check
 

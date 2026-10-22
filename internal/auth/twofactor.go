@@ -2,12 +2,14 @@ package auth
 
 import (
 	"context"
-	"crypto/rand"
+	"strconv"
 	"strings"
 	"time"
 
 	repo "savvy-go/internal/db/repo/auth"
 	"savvy-go/internal/store"
+
+	"savvy-go/internal/auth/totp"
 )
 
 const recoveryChars = "abcdefghjkmnpqrstuvwxyz23456789"
@@ -19,38 +21,70 @@ type TwoFactor struct {
 
 func (t TwoFactor) repo() repo.Repo { return repo.Repo{DB: t.DB} }
 
-func (t TwoFactor) verifyTOTP(_ context.Context, u *User, code string) bool {
+// verifyTOTP accepts an authenticator code once: the step it matched must be
+// newer than the last one accepted, and recording it is atomic, so of two
+// requests with the same code only one passes.
+func (t TwoFactor) verifyTOTP(ctx context.Context, u *User, code string) bool {
 	if u == nil || u.TwoFactorSecret == nil {
 		return false
 	}
-	return VerifyTOTP(*u.TwoFactorSecret, code)
+	step, ok := totp.VerifyStep(*u.TwoFactorSecret, code, time.Now())
+	if !ok {
+		return false
+	}
+	fresh, err := t.repo().AdvanceTwoFactorStep(ctx, u.ID, step)
+	return err == nil && fresh
 }
 
 func (t TwoFactor) Enable(ctx context.Context, u *User) (secret, uri string, err error) {
 	if u.HasTwoFactor() {
 		return "", "", fmtErr("already enabled")
 	}
-	secret, err = NewTOTPSecret()
+	secret, err = totp.NewSecret()
 	if err != nil {
 		return "", "", err
 	}
-	if err := t.Users.SetTwoFactor(ctx, u.ID, &secret, true, false); err != nil {
+	err = store.Tx(ctx, t.DB, func(tx store.DB) error {
+		r := repo.Repo{DB: tx}
+		if err := r.SetTwoFactor(ctx, u.ID, &secret, true, false, time.Now().UTC()); err != nil {
+			return err
+		}
+		// A new secret starts clean: no codes from an earlier pending setup.
+		if err := r.DeleteRecoveryCodes(ctx, u.ID); err != nil {
+			return err
+		}
+		return r.ClearTwoFactorStep(ctx, u.ID)
+	})
+	if err != nil {
 		return "", "", err
 	}
-	return secret, TOTPProvisioningURI(u.Email, secret), nil
+	return secret, totp.ProvisioningURI(u.Email, secret), nil
 }
 
 func (t TwoFactor) Confirm(ctx context.Context, u *User, code string) ([]string, error) {
 	if !u.TwoFactorEnabled || u.TwoFactorConfirmed {
 		return nil, fmtErr("not pending")
 	}
-	if u.TwoFactorSecret == nil || !VerifyTOTP(*u.TwoFactorSecret, code) {
+	if !t.verifyTOTP(ctx, u, code) {
 		return nil, fmtErr("invalid code")
 	}
-	if err := t.Users.SetTwoFactor(ctx, u.ID, u.TwoFactorSecret, true, true); err != nil {
+	var codes []string
+	err := store.Tx(ctx, t.DB, func(tx store.DB) (err error) {
+		r := repo.Repo{DB: tx}
+		if err = r.SetTwoFactor(ctx, u.ID, u.TwoFactorSecret, true, true, time.Now().UTC()); err != nil {
+			return err
+		}
+		// Codes are made once, here: drop any left from an earlier attempt.
+		if err = r.DeleteRecoveryCodes(ctx, u.ID); err != nil {
+			return err
+		}
+		codes, err = generateCodes(ctx, r, u.ID)
+		return err
+	})
+	if err != nil {
 		return nil, err
 	}
-	return t.generateCodes(ctx, u.ID)
+	return codes, nil
 }
 
 func (t TwoFactor) Disable(ctx context.Context, u *User, code string) error {
@@ -60,11 +94,16 @@ func (t TwoFactor) Disable(ctx context.Context, u *User, code string) error {
 	if !t.VerifyAny(ctx, u, code) {
 		return fmtErr("invalid code")
 	}
-	if err := t.Users.SetTwoFactor(ctx, u.ID, nil, false, false); err != nil {
-		return err
-	}
-	_ = t.repo().DeleteRecoveryCodes(ctx, u.ID)
-	return nil
+	return store.Tx(ctx, t.DB, func(tx store.DB) error {
+		r := repo.Repo{DB: tx}
+		if err := r.SetTwoFactor(ctx, u.ID, nil, false, false, time.Now().UTC()); err != nil {
+			return err
+		}
+		if err := r.DeleteRecoveryCodes(ctx, u.ID); err != nil {
+			return err
+		}
+		return r.ClearTwoFactorStep(ctx, u.ID)
+	})
 }
 
 func (t TwoFactor) VerifyAny(ctx context.Context, u *User, code string) bool {
@@ -75,18 +114,15 @@ func (t TwoFactor) VerifyAny(ctx context.Context, u *User, code string) bool {
 }
 
 func (t TwoFactor) ConsumeRecovery(ctx context.Context, userID int64, code string) bool {
-	code = strings.ToLower(strings.TrimSpace(code))
-	unused, err := t.repo().UnusedRecoveryCodes(ctx, userID)
-	if err != nil {
-		return false
-	}
-	for _, r := range unused {
-		if CheckPassword(r.Hash, code) {
-			_ = t.repo().MarkRecoveryCodeUsed(ctx, r.ID, time.Now().UTC())
-			return true
-		}
-	}
-	return false
+	ok, err := t.repo().UseRecoveryCode(ctx, userID, recoveryHash(userID, code), time.Now().UTC())
+	return err == nil && ok
+}
+
+// recoveryHash is what is stored for a code. A code has about 40 random bits and a person
+// never picks it, so SHA-256 is enough and lets the lookup be an index hit instead of a
+// bcrypt compare per row. The user id keeps equal codes of two users apart.
+func recoveryHash(userID int64, code string) string {
+	return HashToken(strconv.FormatInt(userID, 10) + ":" + strings.ToLower(strings.TrimSpace(code)))
 }
 
 func (t TwoFactor) Remaining(ctx context.Context, userID int64) int {
@@ -101,20 +137,29 @@ func (t TwoFactor) Regenerate(ctx context.Context, u *User, code string) ([]stri
 	if !t.verifyTOTP(ctx, u, code) {
 		return nil, fmtErr("invalid code")
 	}
-	_ = t.repo().InvalidateUnusedRecoveryCodes(ctx, u.ID, time.Now().UTC())
-	return t.generateCodes(ctx, u.ID)
+	var codes []string
+	err := store.Tx(ctx, t.DB, func(tx store.DB) (err error) {
+		r := repo.Repo{DB: tx}
+		if err = r.InvalidateUnusedRecoveryCodes(ctx, u.ID, time.Now().UTC()); err != nil {
+			return err
+		}
+		codes, err = generateCodes(ctx, r, u.ID)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return codes, nil
 }
 
-func (t TwoFactor) generateCodes(ctx context.Context, userID int64) ([]string, error) {
+// generateCodes stores 8 new codes through r, which must be a transaction so
+// a failure leaves none of them behind.
+func generateCodes(ctx context.Context, r repo.Repo, userID int64) ([]string, error) {
 	var codes []string
 	now := time.Now().UTC()
 	for i := 0; i < 8; i++ {
 		plain := recoveryCode()
-		h, err := HashPassword(plain)
-		if err != nil {
-			return nil, err
-		}
-		if err := t.repo().InsertRecoveryCode(ctx, userID, h, now); err != nil {
+		if err := r.InsertRecoveryCode(ctx, userID, recoveryHash(userID, plain), now); err != nil {
 			return nil, err
 		}
 		codes = append(codes, plain)
@@ -123,14 +168,8 @@ func (t TwoFactor) generateCodes(ctx context.Context, userID int64) ([]string, e
 }
 
 func recoveryCode() string {
-	b := make([]byte, 8)
-	_, _ = rand.Read(b)
-	var p1, p2 strings.Builder
-	for i := 0; i < 4; i++ {
-		p1.WriteByte(recoveryChars[int(b[i])%len(recoveryChars)])
-		p2.WriteByte(recoveryChars[int(b[i+4])%len(recoveryChars)])
-	}
-	return p1.String() + "-" + p2.String()
+	s := randomFrom(recoveryChars, 8)
+	return s[:4] + "-" + s[4:]
 }
 
 type tfErr string

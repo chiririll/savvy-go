@@ -45,7 +45,11 @@ func count(t *testing.T, d store.DB, q string, args ...any) int {
 // the second tag so the autoincrement counter is ahead of the rows.
 func seedSpace(t *testing.T, d store.DB) {
 	t.Helper()
-	exec(t, d, `INSERT INTO currencies (code, name, symbol, decimals, is_base, rate) VALUES ('EUR', 'Euro', '€', 2, 1, '1')`)
+	exec(
+		t,
+		d,
+		`INSERT INTO currencies (code, name, symbol, decimals, is_base, rate) VALUES ('EUR', 'Euro', '€', 2, 1, '1')`,
+	)
 	exec(t, d, `INSERT INTO accounts (name, type, currency_id) VALUES ('Cash', 'cash', 1)`)
 	exec(t, d, `INSERT INTO tags (name) VALUES ('keep'), ('gone')`)
 	exec(t, d, `DELETE FROM tags WHERE name = 'gone'`)
@@ -54,7 +58,7 @@ func seedSpace(t *testing.T, d store.DB) {
 
 // P19, P26: a space backup comes back with the same ids, and ids freed before
 // the backup are not handed out again.
-func TestP19SpaceRoundTripKeepsIDs(t *testing.T) {
+func TestP19ExportKeepsIDs(t *testing.T) {
 	ctx := context.Background()
 	s := openApp(t)
 	_ = s.CreateSpace(ctx, 1)
@@ -90,7 +94,7 @@ func TestP19SpaceRoundTripKeepsIDs(t *testing.T) {
 
 // P18: nothing of a backup's schema runs, and only known tables and columns
 // are read.
-func TestP18UntrustedSpaceFileIsSanitized(t *testing.T) {
+func TestP18UntrustedSpaceFileSanitized(t *testing.T) {
 	ctx := context.Background()
 	s := openApp(t)
 	_ = s.CreateSpace(ctx, 1)
@@ -251,7 +255,7 @@ func TestP20ServerRoundTrip(t *testing.T) {
 	}
 }
 
-func TestServerBackupMustMatchItsSpaceFiles(t *testing.T) {
+func TestServerBackupMustMatchSpaceFiles(t *testing.T) {
 	ctx := context.Background()
 	s := openApp(t)
 	exec(t, s.Server(), `INSERT INTO spaces (id, uuid, name) VALUES (1, 'u', 'S'), (2, 'v', 'T')`)
@@ -308,7 +312,8 @@ func TestP21LaravelBackup(t *testing.T) {
 	}
 	for _, q := range []string{
 		`INSERT INTO migrations (migration, batch) VALUES ('` + legacy.LatestMigration + `', 2)`,
-		`INSERT INTO users (id, name, email, role) VALUES (2, 'Writer', 'w@x', 'read-write'), (3, 'Reader', 'r@x', 'read-only')`,
+		`INSERT INTO users (id, name, email, role) VALUES (2, 'Writer', 'w@x', 'read-write'), (3, 'Reader', 'r@x', ` +
+			`'read-only')`,
 		`CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT)`,
 		`INSERT INTO settings (key, value) VALUES ('auto_update_currencies', 'false')`,
 	} {
@@ -346,7 +351,8 @@ func TestP21LaravelBackup(t *testing.T) {
 		t.Fatalf("users with mapped roles %d", n)
 	}
 	for user, role := range map[int]string{1: "admin", 2: "editor", 3: "viewer"} {
-		if n := count(t, srv, `SELECT COUNT(*) FROM space_members WHERE space_id = 1 AND user_id = ? AND role = ?`, user, role); n != 1 {
+		if n := count(t, srv, `SELECT COUNT(*) FROM space_members WHERE space_id = 1 AND user_id = ? AND role = ?`, user,
+			role); n != 1 {
 			t.Fatalf("user %d is not %s of space 1", user, role)
 		}
 	}
@@ -354,7 +360,8 @@ func TestP21LaravelBackup(t *testing.T) {
 	if n := count(t, space, `SELECT COUNT(*) FROM accounts`); n != 4 {
 		t.Fatalf("accounts %d", n)
 	}
-	if n := count(t, space, `SELECT COUNT(*) FROM space_settings WHERE key = 'auto_update_currencies' AND value = 'false'`); n != 1 {
+	if n := count(t, space,
+		`SELECT COUNT(*) FROM space_settings WHERE key = 'auto_update_currencies' AND value = 'false'`); n != 1 {
 		t.Fatal("the space setting did not move into the space")
 	}
 	var uuid string

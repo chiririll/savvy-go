@@ -54,7 +54,7 @@ describe('EmailVerificationGate', () => {
         await waitFor(() => expect(resend).toHaveBeenCalledOnce())
     })
 
-    it('does not guess: a user without the flag (older server) is let in', () => {
+    it('does not guess: a user without the flag is let in', () => {
         setSession({ required: true, verified: undefined })
         render(<EmailVerificationGate>app</EmailVerificationGate>)
         expect(screen.getByText('app')).toBeTruthy()

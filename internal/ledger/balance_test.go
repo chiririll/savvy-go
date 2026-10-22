@@ -32,7 +32,7 @@ func TestBalanceFollowsEveryTransactionType(t *testing.T) {
 	e := newMoneyEnv(t)
 	usd, jpy := e.usdAcc.ID, e.jpyAcc.ID // start at 100 USD and 3000 JPY
 	debt, err := (Debts{Accounts: Accounts{DB: e.db}, Transactions: e.txs}).Create(
-		e.ctx, "loan", "owed_to_me", e.usd.ID, 0, dec("1"), "", "", nil, nil, nil)
+		e.ctx, DebtInput{Name: "loan", DebtType: "owed_to_me", CurrencyID: e.usd.ID, Amount: dec("1")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,12 +58,14 @@ func TestBalanceFollowsEveryTransactionType(t *testing.T) {
 	}
 }
 
-func TestBalanceIgnoresPendingAndLaterTransactions(t *testing.T) {
+func TestBalanceIgnoresPendingLaterTransactions(t *testing.T) {
 	e := newMoneyEnv(t)
 	accts := Accounts{DB: e.db}
 	pending := "pending"
 	date := "2024-02-01"
-	if _, err := e.txs.Create(e.ctx, TxInput{Type: "expense", AccountID: e.usdAcc.ID, Amount: dec("30"), Date: &date, Status: &pending}); err != nil {
+	if _,
+		err := e.txs.Create(e.ctx,
+		TxInput{Type: "expense", AccountID: e.usdAcc.ID, Amount: dec("30"), Date: &date, Status: &pending}); err != nil {
 		t.Fatal(err)
 	}
 	e.txOn(t, TxInput{Type: "expense", AccountID: e.usdAcc.ID, Amount: dec("10")}, "2024-01-20")
@@ -84,11 +86,15 @@ func TestBalanceIgnoresPendingAndLaterTransactions(t *testing.T) {
 }
 
 // A transfer from an account to itself both takes and adds, as it always has.
-func TestSelfTransferNetsToItsAmountDifference(t *testing.T) {
+func TestSelfTransferNetsItsAmountDifference(t *testing.T) {
 	e := newMoneyEnv(t)
 	self := e.usdAcc.ID
 	d := dec("7")
-	e.txOn(t, TxInput{Type: "transfer", AccountID: self, ToAccountID: &self, Amount: dec("10"), ToAmount: &d}, "2024-01-10")
+	e.txOn(
+		t,
+		TxInput{Type: "transfer", AccountID: self, ToAccountID: &self, Amount: dec("10"), ToAmount: &d},
+		"2024-01-10",
+	)
 	if got := e.balance(t, self); !got.Equal(dec("97")) { // 100 - 10 + 7
 		t.Errorf("balance = %s, want 97", got)
 	}
@@ -96,7 +102,7 @@ func TestSelfTransferNetsToItsAmountDifference(t *testing.T) {
 
 // The series is the running total of the same ledger, so it must agree with
 // the balance computed date by date, in every currency.
-func TestBalanceSeriesMatchesBalanceOnEveryDay(t *testing.T) {
+func TestBalanceSeriesMatchesBalanceEveryDay(t *testing.T) {
 	e := newMoneyEnv(t)
 	accts := Accounts{DB: e.db}
 	days := []string{"2024-03-01", "2024-03-02", "2024-03-03", "2024-03-04", "2024-03-05"}
@@ -125,11 +131,11 @@ func TestBalanceSeriesMatchesBalanceOnEveryDay(t *testing.T) {
 	}
 }
 
-func TestDebtBalanceDoesNotDependOnTheDate(t *testing.T) {
+func TestDebtBalanceNotDependOnDate(t *testing.T) {
 	e := newMoneyEnv(t)
 	accts := Accounts{DB: e.db}
 	debts := Debts{Accounts: accts, Transactions: e.txs}
-	debt, err := debts.Create(e.ctx, "loan", "i_owe", e.usd.ID, 0, dec("100"), "", "", nil, nil, nil)
+	debt, err := debts.Create(e.ctx, DebtInput{Name: "loan", DebtType: "i_owe", CurrencyID: e.usd.ID, Amount: dec("100")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,7 +157,10 @@ func TestDebtBalanceDoesNotDependOnTheDate(t *testing.T) {
 func TestNewAccountsGetIncreasingSortOrders(t *testing.T) {
 	e := newMoneyEnv(t)
 	accts := Accounts{DB: e.db}
-	a, err := accts.Create(e.ctx, AccountInput{Name: "first-after-seed", Type: "cash", CurrencyID: e.usd.ID, IsActive: true})
+	a, err := accts.Create(
+		e.ctx,
+		AccountInput{Name: "first-after-seed", Type: "cash", CurrencyID: e.usd.ID, IsActive: true},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -15,7 +15,7 @@ type patchCase struct {
 	clearOut string         // response field that must become null
 }
 
-func TestPatchKeepsOmittedFieldsAndNullClears(t *testing.T) {
+func TestPatchKeepsOmittedFieldsNullClears(t *testing.T) {
 	cases := []patchCase{
 		{
 			name: "transaction",
@@ -65,9 +65,33 @@ func TestPatchKeepsOmittedFieldsAndNullClears(t *testing.T) {
 					"date": "2026-09-01", "due_date": "2027-01-01", "counterparty": "Ivan", "description": "Car",
 				}
 			},
-			change:   map[string]any{"name": "Loan to Ivan"},
-			keep:     map[string]any{"name": "Loan to Ivan", "dueDate": "2027-01-01", "counterparty": "Ivan", "description": "Car"},
+			change: map[string]any{"name": "Loan to Ivan"},
+			keep: map[string]any{
+				"name":         "Loan to Ivan",
+				"dueDate":      "2027-01-01",
+				"counterparty": "Ivan",
+				"description":  "Car",
+			},
 			clearKey: "due_date", clearOut: "dueDate",
+		},
+		{
+			name: "recurring transaction",
+			create: func(accID, catID int64) (string, map[string]any) {
+				return "/api/recurring", map[string]any{
+					"type": "expense", "account_id": accID, "category_id": catID, "amount": 50,
+					"description": "Gym", "frequency": "monthly", "interval": 1, "day_of_month": 5,
+					"start_date": "2030-01-05", "end_date": "2031-01-05", "is_active": true,
+				}
+			},
+			change: map[string]any{"is_active": false},
+			keep: map[string]any{
+				"description": "Gym",
+				"endDate":     "2031-01-05",
+				"dayOfMonth":  float64(5),
+				"amount":      float64(50),
+				"isActive":    false,
+			},
+			clearKey: "end_date", clearOut: "endDate",
 		},
 	}
 
@@ -107,5 +131,77 @@ func TestPatchKeepsOmittedFieldsAndNullClears(t *testing.T) {
 				t.Errorf("%s = %v after null, want null", tc.clearOut, v)
 			}
 		})
+	}
+}
+
+// A PATCH replaces category_ids / tag_ids only when the body sends them.
+func TestPatchReplacesLinkListsOnlyWhenSent(t *testing.T) {
+	a := newTestApp(t)
+	u := a.createUser("patchlists@test.com", "secret1", roleEditor)
+	sess := a.issue(u, false)
+	accID, catID := seedMoney(t, a, sess)
+
+	res := a.do("POST", "/api/tags", map[string]any{"name": "Trip"}, sess.Token, sess.CSRF)
+	tagID := int64(decodeJSON(t, res)["data"].(map[string]any)["id"].(float64))
+
+	count := func(data map[string]any, key string) int { return len(data[key].([]any)) }
+	patch := func(path string, body map[string]any) map[string]any {
+		t.Helper()
+		res := a.do("PATCH", path, body, sess.Token, sess.CSRF)
+		got := decodeJSON(t, res)
+		if res.StatusCode != 200 {
+			t.Fatalf("patch %s %d %v", path, res.StatusCode, got)
+		}
+		return got["data"].(map[string]any)
+	}
+
+	res = a.do("POST", "/api/budgets", map[string]any{
+		"name": "Food", "amount": 100, "period": "monthly",
+		"category_ids": []int64{catID}, "tag_ids": []int64{tagID},
+	}, sess.Token, sess.CSRF)
+	created := decodeJSON(t, res)
+	if res.StatusCode != 201 {
+		t.Fatalf("create budget %d %v", res.StatusCode, created)
+	}
+	budget := "/api/budgets/" + itoa(int64(created["data"].(map[string]any)["id"].(float64)))
+
+	data := patch(budget, map[string]any{"name": "Groceries"})
+	if count(data, "categories") != 1 || count(data, "tags") != 1 {
+		t.Errorf("budget omitted lists changed: %v", data)
+	}
+	data = patch(budget, map[string]any{"tag_ids": []int64{}})
+	if count(data, "categories") != 1 || count(data, "tags") != 0 {
+		t.Errorf("budget tag_ids [] should clear tags only: %v", data)
+	}
+
+	res = a.do("POST", "/api/recurring", map[string]any{
+		"type": "expense", "account_id": accID, "category_id": catID, "amount": 50,
+		"frequency": "monthly", "interval": 1, "day_of_month": 5, "start_date": "2030-01-05",
+		"tag_ids": []int64{tagID},
+	}, sess.Token, sess.CSRF)
+	created = decodeJSON(t, res)
+	if res.StatusCode != 201 {
+		t.Fatalf("create recurring %d %v", res.StatusCode, created)
+	}
+	rec := "/api/recurring/" + itoa(int64(created["data"].(map[string]any)["id"].(float64)))
+
+	data = patch(rec, map[string]any{"amount": 60})
+	if count(data, "tags") != 1 {
+		t.Errorf("recurring omitted tag_ids changed: %v", data)
+	}
+	data = patch(rec, map[string]any{"tag_ids": []int64{}})
+	if count(data, "tags") != 0 {
+		t.Errorf("recurring tag_ids [] should clear tags: %v", data)
+	}
+}
+
+func TestResourceLookupUnknownIDIs404(t *testing.T) {
+	a := newTestApp(t)
+	u := a.createUser("lookup@test.com", "secret1", roleEditor)
+	sess := a.issue(u, false)
+	for _, path := range []string{"/api/budgets/999", "/api/recurring/999", "/api/automation-rules/999", "/api/tags/abc"} {
+		if res := a.do("GET", path, nil, sess.Token, sess.CSRF); res.StatusCode != 404 {
+			t.Errorf("GET %s = %d, want 404", path, res.StatusCode)
+		}
 	}
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -7,17 +7,12 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { accountTypeLabel, categoryTypeLabel } from '@/lib/labels'
 import { testId } from '@/lib/test-id'
-import { localizeDefaultName, toStoredDefaultName } from '@/lib/localized-name'
+import { defaultNameHint, localizeDefaultName, toStoredDefaultName } from '@/lib/localized-name'
 import type { CurrencyCatalogItem } from '@/types'
 import type { AccountType } from '@/types/accounts'
 import { CATEGORY_TYPES, type CategoryType } from '@/types/categories'
-import {
-    canRemoveCurrency,
-    isProtectedCategory,
-    newAccountKey,
-    removeCategory,
-    type DraftContent,
-} from './draft'
+import { CurrencyCombobox } from './CurrencyCombobox'
+import { canRemoveCurrency, isProtectedCategory, newAccountKey, removeCategory, type DraftContent } from './draft'
 
 const ACCOUNT_TYPES: AccountType[] = ['bank', 'cash', 'crypto']
 
@@ -26,6 +21,8 @@ interface Props {
     /** Undefined while the server is still loading it. */
     catalog: CurrencyCatalogItem[] | undefined
     catalogFailed?: boolean
+    /** The catalog is the short built-in list: a currency may be missing, and any code can be typed. */
+    catalogBuiltIn?: boolean
     onRetryCatalog?: () => void
     onChange: (patch: Partial<DraftContent>) => void
 }
@@ -42,54 +39,61 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
     )
 }
 
-function CurrencyOption({ item }: { item: CurrencyCatalogItem }) {
-    return (
-        <>
-            <span className="font-mono">{item.code}</span> <span className="text-muted-foreground">{item.name}</span>
-        </>
-    )
+/** The currencies listed first when nothing is typed: the big ones, and the one the interface language implies. */
+function popularCurrencies(language: string): string[] {
+    const own = language.startsWith('ru') ? ['RUB'] : []
+    return [...new Set(['USD', 'EUR', 'GBP', ...own])]
 }
 
 /** Base currency and the other currencies, from the server-wide catalog. */
-function Currencies({ content, catalog, catalogFailed, onRetryCatalog, onChange }: Props) {
-    const { t } = useTranslation('settings')
-    const taken = new Set([content.baseCurrency, ...content.currencies])
+function Currencies({ content, catalog, catalogFailed, catalogBuiltIn, onRetryCatalog, onChange }: Props) {
+    const { t, i18n } = useTranslation('settings')
+    const taken = useMemo(
+        () => new Set([content.baseCurrency, ...content.currencies].filter((c): c is string => !!c)),
+        [content],
+    )
+    const popular = useMemo(() => popularCurrencies(i18n.language), [i18n.language])
     const loading = catalog === undefined
-    // While loading, the chosen base (e.g. from a draft) still has an item to show.
-    const options: CurrencyCatalogItem[] =
-        catalog ?? (content.baseCurrency ? [{ code: content.baseCurrency, name: '', symbol: '', decimals: 2, rate: null }] : [])
-    const free = (catalog ?? []).filter((c) => !taken.has(c.code))
+    const list = catalog ?? []
 
     return (
         <Section title={t('spaces.create.currencies.title')} hint={t('spaces.create.currencies.hint')}>
             <div className="space-y-1.5">
                 <Label>{t('spaces.create.currencies.base')}</Label>
-                <Select
-                    value={content.baseCurrency ?? ''}
-                    onValueChange={(code) =>
+                <CurrencyCombobox
+                    className="w-full"
+                    catalog={list}
+                    value={content.baseCurrency}
+                    popular={popular}
+                    allowManual={catalogBuiltIn}
+                    disabled={loading}
+                    placeholder={t('spaces.create.currencies.basePlaceholder')}
+                    data-testid="create-space-base"
+                    onChange={(code) =>
                         onChange({
                             baseCurrency: code,
                             // A currency cannot be both the base and one of the others.
                             currencies: content.currencies.filter((c) => c !== code),
                         })
                     }
-                >
-                    <SelectTrigger className="w-full" disabled={loading} data-testid="create-space-base">
-                        <SelectValue placeholder={t('spaces.create.currencies.basePlaceholder')} />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {options.map((c) => (
-                            <SelectItem key={c.code} value={c.code}>
-                                <CurrencyOption item={c} />
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-                {loading && !catalogFailed && <p className="text-xs text-muted-foreground">{t('spaces.create.currencies.loading')}</p>}
+                />
+                {loading && !catalogFailed && (
+                    <p className="text-xs text-muted-foreground">{t('spaces.create.currencies.loading')}</p>
+                )}
                 {catalogFailed && (
                     <p className="text-xs text-destructive">
                         {t('spaces.create.currencies.failed')}{' '}
-                        <button type="button" className="underline" onClick={onRetryCatalog}>{t('actions.retry', { ns: 'common' })}</button>
+                        <button type="button" className="underline" onClick={onRetryCatalog}>
+                            {t('actions.retry', { ns: 'common' })}
+                        </button>
+                    </p>
+                )}
+                {catalogBuiltIn && (
+                    <p className="text-xs text-muted-foreground" role="status">
+                        {t('spaces.create.currencies.builtIn')}{' '}
+                        <button type="button" className="underline" onClick={onRetryCatalog}>
+                            {t('actions.retry', { ns: 'common' })}
+                        </button>
                     </p>
                 )}
             </div>
@@ -108,18 +112,17 @@ function Currencies({ content, catalog, catalogFailed, onRetryCatalog, onChange 
                         </button>
                     </span>
                 ))}
-                <Select value="" onValueChange={(code) => onChange({ currencies: [...content.currencies, code] })}>
-                    <SelectTrigger className="w-44" disabled={loading || !content.baseCurrency} {...testId('create-space-add-currency')}>
-                        <SelectValue placeholder={t('spaces.create.currencies.add')} />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {free.map((c) => (
-                            <SelectItem key={c.code} value={c.code}>
-                                <CurrencyOption item={c} />
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+                <CurrencyCombobox
+                    className="w-44"
+                    catalog={list}
+                    exclude={taken}
+                    popular={popular}
+                    allowManual={catalogBuiltIn}
+                    disabled={loading || !content.baseCurrency}
+                    placeholder={t('spaces.create.currencies.add')}
+                    data-testid="create-space-add-currency"
+                    onChange={(code) => onChange({ currencies: [...content.currencies, code] })}
+                />
             </div>
         </Section>
     )
@@ -134,9 +137,17 @@ function Accounts({ content, onChange }: Pick<Props, 'content' | 'onChange'>) {
 
     return (
         <Section title={t('spaces.create.accounts.title')} hint={t('spaces.create.accounts.hint')}>
+            {content.accounts.length === 0 && (
+                <p className="text-xs text-destructive" data-testid="create-space-no-account">
+                    {t('spaces.create.accounts.required')}
+                </p>
+            )}
             {content.accounts.map((account) => (
                 // Phone: name on top, type and currency side by side, balance and remove last.
-                <div key={account.key} className="grid grid-cols-2 gap-2 rounded-lg border p-2 sm:grid-cols-[2fr_1fr_1fr_1fr_auto]">
+                <div
+                    key={account.key}
+                    className="grid grid-cols-2 gap-2 rounded-lg border p-2 sm:grid-cols-[2fr_1fr_1fr_1fr_auto]"
+                >
                     <Input
                         className="col-span-2 sm:col-span-1"
                         {...testId('create-space-account-name')}
@@ -146,13 +157,18 @@ function Accounts({ content, onChange }: Pick<Props, 'content' | 'onChange'>) {
                         maxLength={255}
                         onChange={(e) => patch(account.key, { name: e.target.value })}
                     />
-                    <Select value={account.type} onValueChange={(type) => patch(account.key, { type: type as AccountType })}>
+                    <Select
+                        value={account.type}
+                        onValueChange={(type) => patch(account.key, { type: type as AccountType })}
+                    >
                         <SelectTrigger className="w-full">
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                             {ACCOUNT_TYPES.map((type) => (
-                                <SelectItem key={type} value={type}>{accountTypeLabel(tc, type)}</SelectItem>
+                                <SelectItem key={type} value={type}>
+                                    {accountTypeLabel(tc, type)}
+                                </SelectItem>
                             ))}
                         </SelectContent>
                     </Select>
@@ -162,7 +178,9 @@ function Accounts({ content, onChange }: Pick<Props, 'content' | 'onChange'>) {
                         </SelectTrigger>
                         <SelectContent>
                             {codes.map((code) => (
-                                <SelectItem key={code} value={code}>{code}</SelectItem>
+                                <SelectItem key={code} value={code}>
+                                    {code}
+                                </SelectItem>
                             ))}
                         </SelectContent>
                     </Select>
@@ -196,7 +214,13 @@ function Accounts({ content, onChange }: Pick<Props, 'content' | 'onChange'>) {
                     onChange({
                         accounts: [
                             ...content.accounts,
-                            { key: newAccountKey(), name: '', type: 'bank', currency: content.baseCurrency ?? '', initialBalance: '' },
+                            {
+                                key: newAccountKey(),
+                                name: '',
+                                type: 'bank',
+                                currency: content.baseCurrency ?? '',
+                                initialBalance: '',
+                            },
                         ],
                     })
                 }
@@ -214,7 +238,9 @@ function Categories({ content, onChange }: Pick<Props, 'content' | 'onChange'>) 
     const [type, setType] = useState<CategoryType>('expense')
     const rename = (index: number, input: string) =>
         onChange({
-            categories: content.categories.map((c, i) => (i === index ? { ...c, name: toStoredDefaultName(input, c.name) } : c)),
+            categories: content.categories.map((c, i) =>
+                i === index ? { ...c, name: toStoredDefaultName(input, c.name) } : c,
+            ),
         })
 
     return (
@@ -222,21 +248,34 @@ function Categories({ content, onChange }: Pick<Props, 'content' | 'onChange'>) 
             <ul className="space-y-1.5">
                 {content.categories.map((category, index) => (
                     <li key={index} className="flex items-center gap-2">
-                        <span aria-hidden className="w-6 text-center">{category.icon}</span>
-                        <Input
-                            aria-label={t('spaces.create.categories.name')}
-                            value={localizeDefaultName(category.name)}
-                            maxLength={255}
-                            onChange={(e) => rename(index, e.target.value)}
-                        />
-                        <span className="w-20 shrink-0 text-xs text-muted-foreground">{categoryTypeLabel(tc, category.type)}</span>
+                        <span aria-hidden className="w-6 text-center">
+                            {category.icon}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                            <Input
+                                aria-label={t('spaces.create.categories.name')}
+                                value={localizeDefaultName(category.name)}
+                                maxLength={255}
+                                onChange={(e) => rename(index, e.target.value)}
+                            />
+                            {defaultNameHint(category.name) && (
+                                <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                                    {defaultNameHint(category.name)}
+                                </p>
+                            )}
+                        </div>
+                        <span className="w-20 shrink-0 text-xs text-muted-foreground">
+                            {categoryTypeLabel(tc, category.type)}
+                        </span>
                         <Button
                             type="button"
                             variant="ghost"
                             size="icon"
                             disabled={isProtectedCategory(category)}
                             title={isProtectedCategory(category) ? t('spaces.create.categories.protected') : undefined}
-                            aria-label={t('spaces.create.categories.remove', { name: localizeDefaultName(category.name) })}
+                            aria-label={t('spaces.create.categories.remove', {
+                                name: localizeDefaultName(category.name),
+                            })}
                             onClick={() => onChange({ categories: removeCategory(content.categories, index) })}
                         >
                             <X className="size-4" />
@@ -250,7 +289,10 @@ function Categories({ content, onChange }: Pick<Props, 'content' | 'onChange'>) 
                     e.preventDefault()
                     if (!name.trim()) return
                     onChange({
-                        categories: [...content.categories, { name: name.trim(), type, icon: '🏷️', color: '#6b7280', isDefault: false }],
+                        categories: [
+                            ...content.categories,
+                            { name: name.trim(), type, icon: '🏷️', color: '#6b7280', isDefault: false },
+                        ],
                     })
                     setName('')
                 }}
@@ -268,7 +310,9 @@ function Categories({ content, onChange }: Pick<Props, 'content' | 'onChange'>) 
                     </SelectTrigger>
                     <SelectContent>
                         {CATEGORY_TYPES.map((v) => (
-                            <SelectItem key={v} value={v}>{categoryTypeLabel(tc, v)}</SelectItem>
+                            <SelectItem key={v} value={v}>
+                                {categoryTypeLabel(tc, v)}
+                            </SelectItem>
                         ))}
                     </SelectContent>
                 </Select>
@@ -289,10 +333,10 @@ function Tags({ content, onChange }: Pick<Props, 'content' | 'onChange'>) {
             <div className="flex flex-wrap gap-2">
                 {content.tags.map((tag) => (
                     <span key={tag} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-sm">
-                        {tag}
+                        {localizeDefaultName(tag, 'tags')}
                         <button
                             type="button"
-                            aria-label={t('spaces.create.tags.remove', { name: tag })}
+                            aria-label={t('spaces.create.tags.remove', { name: localizeDefaultName(tag, 'tags') })}
                             className="text-muted-foreground hover:text-foreground"
                             onClick={() => onChange({ tags: content.tags.filter((x) => x !== tag) })}
                         >
@@ -306,7 +350,8 @@ function Tags({ content, onChange }: Pick<Props, 'content' | 'onChange'>) {
                 onSubmit={(e) => {
                     e.preventDefault()
                     const tag = name.trim()
-                    if (tag && !content.tags.some((x) => x.toLowerCase() === tag.toLowerCase())) onChange({ tags: [...content.tags, tag] })
+                    if (tag && !content.tags.some((x) => x.toLowerCase() === tag.toLowerCase()))
+                        onChange({ tags: [...content.tags, tag] })
                     setName('')
                 }}
             >

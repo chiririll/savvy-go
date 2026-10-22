@@ -1,12 +1,12 @@
-// The settings of the signed-in user: profile, security and API tokens.
+// The settings of the signed-in user: security, passkeys and API tokens.
 import { pages } from '../../../../../resources/ts/app/pages.ts'
 import { scenario } from '../../types.ts'
 import { visit } from '../../visit.ts'
 import { createSpace } from '../onboarding/create-space.ts'
 
 const list = [
-    ['profile', pages.userSettings],
     ['security', pages.securitySettings],
+    ['passkeys', pages.passkeySettings],
     ['api', pages.apiSettings],
 ] as const
 

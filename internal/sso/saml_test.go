@@ -15,7 +15,7 @@ import (
 	dsig "github.com/russellhaering/goxmldsig"
 )
 
-func TestVerifySAMLXMLSignedAndTampered(t *testing.T) {
+func TestVerifySAMLXMLSignedTampered(t *testing.T) {
 	key, cert, pemCert := selfSigned(t)
 	xml := signedAssertion(t, key, cert, "jane@test.com")
 	certs := parseX509Certs(pemCert)
@@ -26,7 +26,8 @@ func TestVerifySAMLXMLSignedAndTampered(t *testing.T) {
 	if err := VerifySAMLXML([]byte(tampered), certs); err == nil {
 		t.Fatal("tampered assertion accepted")
 	}
-	unsigned := `<samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"><saml:Assertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"><saml:NameID>x</saml:NameID></saml:Assertion></samlp:Response>`
+	unsigned := `<samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"><saml:Assertion ` +
+		`xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"><saml:NameID>x</saml:NameID></saml:Assertion></samlp:Response>`
 	if err := VerifySAMLXML([]byte(unsigned), certs); err == nil {
 		t.Fatal("unsigned accepted")
 	}

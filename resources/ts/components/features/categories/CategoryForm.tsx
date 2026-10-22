@@ -15,12 +15,12 @@ import {
 } from '@/components/ui/form'
 import { COLOR_OPTIONS } from '@/constants'
 import { categorySchema, CategoryFormData } from '@/schemas'
-import { defaultNameKey, localizeDefaultName, toStoredDefaultName } from '@/lib/localized-name'
+import { defaultNameHint, defaultNameKey, localizeDefaultName, toStoredDefaultName } from '@/lib/localized-name'
 import { TypeSelector } from './TypeSelector'
 import { IconPicker } from './IconPicker'
 import { ColorPicker } from './ColorPicker'
 import { CategoryPreview } from './CategoryPreview'
-import { FormWrapper } from '@/components/shared/FormWrapper'
+import { FormWrapper } from '@/components/shared/form/FormWrapper'
 
 interface CategoryFormProps {
     defaultValues?: Partial<CategoryFormData>
@@ -81,6 +81,9 @@ export function CategoryForm({
                             <FormControl>
                                 <Input placeholder={t('forms:categories.namePlaceholder')} {...field} />
                             </FormControl>
+                            {defaultNameHint(storedName) && (
+                                <FormDescription>{defaultNameHint(storedName)}</FormDescription>
+                            )}
                             {isDefaultName && (
                                 <FormDescription>
                                     {t('forms:categories.defaultNameHelp')}

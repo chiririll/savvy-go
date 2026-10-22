@@ -23,16 +23,17 @@ ARG APP_ENV
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod go mod download
+COPY main.go ./
 COPY cmd ./cmd
 COPY internal ./internal
 # The frontend is embedded into the binary (build tag "embed").
-COPY public ./internal/webui/dist
-COPY --from=frontend /app/public/build ./internal/webui/dist/build
+COPY public ./internal/httpserver/ui/dist
+COPY --from=frontend /app/public/build ./internal/httpserver/ui/dist/build
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -tags embed -trimpath \
-    -ldflags="-s -w -X savvy-go/internal/config.DefaultListen=:80 -X savvy-go/internal/version.Value=${APP_VERSION} -X savvy-go/internal/version.Env=${APP_ENV}" \
-    -o /out/savvy-go ./cmd/savvy-go
+    -ldflags="-s -w -X savvy-go/internal/httpserver.DefaultListen=:80 -X main.Version=${APP_VERSION} -X main.Env=${APP_ENV}" \
+    -o /out/savvy-go .
 
 # Build the final image
 FROM alpine:3.22

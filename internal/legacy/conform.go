@@ -102,7 +102,8 @@ func targetTables(ctx context.Context) ([]tableDef, error) {
 
 func isStrict(ctx context.Context, db *sql.DB, table string) (strict, found bool, err error) {
 	var v int
-	err = db.QueryRowContext(ctx, `SELECT strict FROM pragma_table_list WHERE name = ? AND schema = 'main'`, table).Scan(&v)
+	err = db.QueryRowContext(ctx, `SELECT strict FROM pragma_table_list WHERE name = ? AND schema = 'main'`, table).
+		Scan(&v)
 	if err == sql.ErrNoRows {
 		return false, false, nil
 	}
@@ -157,7 +158,32 @@ func rebuildTable(ctx context.Context, tx *sql.Tx, t tableDef) error {
 	if _, err := tx.ExecContext(ctx, ddl); err != nil {
 		return err
 	}
-	oldCols, err := columns(ctx, tx, t.name)
+	if err := copyRows(ctx, tx, t.name, staging); err != nil {
+		return err
+	}
+
+	// AUTOINCREMENT remembers the highest id ever used, which can exceed the
+	// highest remaining id; carry it over so ids are never reused.
+	var seq sql.NullInt64
+	err := tx.QueryRowContext(ctx, `SELECT seq FROM sqlite_sequence WHERE name = ?`, t.name).Scan(&seq)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, fmt.Sprintf(`DROP TABLE "%s"`, t.name)); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, fmt.Sprintf(`ALTER TABLE "%s" RENAME TO "%s"`, staging, t.name)); err != nil {
+		return err
+	}
+	if !seq.Valid {
+		return nil
+	}
+	return restoreSequence(ctx, tx, t.name, seq.Int64)
+}
+
+// copyRows copies the columns both tables have from table into staging.
+func copyRows(ctx context.Context, tx *sql.Tx, table, staging string) error {
+	oldCols, err := columns(ctx, tx, table)
 	if err != nil {
 		return err
 	}
@@ -172,33 +198,18 @@ func rebuildTable(ctx context.Context, tx *sql.Tx, t tableDef) error {
 		}
 	}
 	list := strings.Join(common, ", ")
-	if _, err := tx.ExecContext(ctx, fmt.Sprintf(`INSERT INTO "%s" (%s) SELECT %s FROM "%s"`, staging, list, list, t.name)); err != nil {
-		return err
-	}
+	_, err = tx.ExecContext(ctx, fmt.Sprintf(`INSERT INTO "%s" (%s) SELECT %s FROM "%s"`, staging, list, list, table))
+	return err
+}
 
-	// AUTOINCREMENT remembers the highest id ever used, which can exceed the
-	// highest remaining id; carry it over so ids are never reused.
-	var seq sql.NullInt64
-	err = tx.QueryRowContext(ctx, `SELECT seq FROM sqlite_sequence WHERE name = ?`, t.name).Scan(&seq)
-	if err != nil && err != sql.ErrNoRows {
+// restoreSequence makes sure the table's AUTOINCREMENT counter is at least seq.
+func restoreSequence(ctx context.Context, tx *sql.Tx, table string, seq int64) error {
+	res, err := tx.ExecContext(ctx, `UPDATE sqlite_sequence SET seq = MAX(seq, ?) WHERE name = ?`, seq, table)
+	if err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, fmt.Sprintf(`DROP TABLE "%s"`, t.name)); err != nil {
-		return err
+	if n, _ := res.RowsAffected(); n == 0 {
+		_, err = tx.ExecContext(ctx, `INSERT INTO sqlite_sequence (name, seq) VALUES (?, ?)`, table, seq)
 	}
-	if _, err := tx.ExecContext(ctx, fmt.Sprintf(`ALTER TABLE "%s" RENAME TO "%s"`, staging, t.name)); err != nil {
-		return err
-	}
-	if seq.Valid {
-		res, err := tx.ExecContext(ctx, `UPDATE sqlite_sequence SET seq = MAX(seq, ?) WHERE name = ?`, seq.Int64, t.name)
-		if err != nil {
-			return err
-		}
-		if n, _ := res.RowsAffected(); n == 0 {
-			if _, err := tx.ExecContext(ctx, `INSERT INTO sqlite_sequence (name, seq) VALUES (?, ?)`, t.name, seq.Int64); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
+	return err
 }

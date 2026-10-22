@@ -35,6 +35,7 @@ type Space struct {
 	UUID string
 	Name string
 	Role string
+	Look
 }
 
 // ErrGuestCannotAdmin is returned when a guest would become a space admin.
@@ -65,6 +66,16 @@ func ownerID(owner *auth.User) *int64 {
 // Create registers a space, creates its database and, when owner is set,
 // makes them its admin.
 func (s Service) Create(ctx context.Context, name string, owner *auth.User) (*Space, error) {
+	return s.CreateWith(ctx, name, owner, Look{})
+}
+
+// CreateWith is Create with an emoji and color. A bad look is a *LookError and
+// nothing is created.
+func (s Service) CreateWith(ctx context.Context, name string, owner *auth.User, look Look) (*Space, error) {
+	look, err := Normalize(look)
+	if err != nil {
+		return nil, err
+	}
 	if owner != nil && owner.IsGuest() {
 		return nil, ErrGuestCannotAdmin
 	}
@@ -72,7 +83,7 @@ func (s Service) Create(ctx context.Context, name string, owner *auth.User) (*Sp
 	if err != nil {
 		return nil, err
 	}
-	id, err := s.registry().Insert(ctx, id7.String(), name, ownerID(owner), time.Now().UTC())
+	id, err := s.registry().Insert(ctx, id7.String(), name, ownerID(owner), time.Now().UTC(), look)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +95,7 @@ func (s Service) Create(ctx context.Context, name string, owner *auth.User) (*Sp
 		s.Discard(ctx, id)
 		return nil, err
 	}
-	sp := &Space{ID: id, UUID: id7.String(), Name: name}
+	sp := &Space{ID: id, UUID: id7.String(), Name: name, Look: look}
 	if owner != nil {
 		if err := s.SetMember(ctx, id, owner, RoleAdmin); err != nil {
 			return nil, err
@@ -105,7 +116,12 @@ func (s Service) Discard(ctx context.Context, id int64) {
 
 // CreateFrom registers a space whose database is a prepared backup. It keeps
 // the backup's uuid unless another space here has it.
-func (s Service) CreateFrom(ctx context.Context, name string, owner *auth.User, p *store.PreparedSpace) (*Space, error) {
+func (s Service) CreateFrom(
+	ctx context.Context,
+	name string,
+	owner *auth.User,
+	p *store.PreparedSpace,
+) (*Space, error) {
 	if owner != nil && owner.IsGuest() {
 		s.Store.Discard(p.Artifact)
 		return nil, ErrGuestCannotAdmin
@@ -120,7 +136,7 @@ func (s Service) CreateFrom(ctx context.Context, name string, owner *auth.User, 
 		}
 		id7 = fresh.String()
 	}
-	id, err := s.registry().Insert(ctx, id7, name, ownerID(owner), time.Now().UTC())
+	id, err := s.registry().Insert(ctx, id7, name, ownerID(owner), time.Now().UTC(), Look{})
 	if err != nil {
 		s.Store.Discard(p.Artifact)
 		return nil, err
@@ -150,7 +166,7 @@ func (s Service) Get(ctx context.Context, id int64) (*Space, error) {
 	if row == nil || err != nil {
 		return nil, err
 	}
-	return &Space{ID: row.ID, UUID: row.UUID, Name: row.Name}, nil
+	return &Space{ID: row.ID, UUID: row.UUID, Name: row.Name, Look: row.Look}, nil
 }
 
 // SetMember adds u to a space or changes their role.
@@ -177,7 +193,7 @@ func (s Service) ForUser(ctx context.Context, userID int64) ([]Space, error) {
 	}
 	out := make([]Space, len(rows))
 	for i, r := range rows {
-		out[i] = Space{ID: r.ID, UUID: r.UUID, Name: r.Name, Role: r.Role}
+		out[i] = Space{ID: r.ID, UUID: r.UUID, Name: r.Name, Role: r.Role, Look: r.Look}
 	}
 	return out, nil
 }
@@ -190,7 +206,7 @@ func (s Service) All(ctx context.Context) ([]Space, error) {
 	}
 	out := make([]Space, len(rows))
 	for i, r := range rows {
-		out[i] = Space{ID: r.ID, UUID: r.UUID, Name: r.Name}
+		out[i] = Space{ID: r.ID, UUID: r.UUID, Name: r.Name, Look: r.Look}
 	}
 	return out, nil
 }

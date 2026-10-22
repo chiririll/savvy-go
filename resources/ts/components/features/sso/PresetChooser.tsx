@@ -5,6 +5,7 @@ import { useSsoPresets } from '@/hooks/use-sso'
 import { isCustomPreset, ssoPresetLabel } from './presetMeta'
 import { BrandIcon, brandAccent } from './BrandIcon'
 import type { SsoPresetCatalogEntry } from '@/types/sso'
+import { cn } from '@/lib/utils'
 
 interface PresetChooserProps {
     onSelect: (preset: string) => void
@@ -21,7 +22,13 @@ function PresetCard({ preset, onSelect }: { preset: SsoPresetCatalogEntry; onSel
             type="button"
             onClick={() => onSelect(preset.key)}
             style={brand}
-            className="group relative flex items-center gap-4 rounded-xl border bg-card p-4 text-left transition-all hover:-translate-y-0.5 hover:border-[color-mix(in_oklab,var(--brand)_45%,var(--border))] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className={cn(
+                'group relative flex items-center gap-4 rounded-xl border bg-card p-4 text-left',
+                'transition-all hover:-translate-y-0.5',
+                'hover:border-[color-mix(in_oklab,var(--brand)_45%,var(--border))]',
+                'hover:shadow-md focus-visible:outline-none focus-visible:ring-2',
+                'focus-visible:ring-ring',
+            )}
         >
             <div
                 style={{
@@ -36,7 +43,12 @@ function PresetCard({ preset, onSelect }: { preset: SsoPresetCatalogEntry; onSel
                 <p className="truncate font-medium">{ssoPresetLabel(preset, t)}</p>
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">{preset.protocol}</p>
             </div>
-            <ChevronRight className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+            <ChevronRight
+                className={cn(
+                    'size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity',
+                    'group-hover:opacity-100',
+                )}
+            />
         </button>
     )
 }
@@ -61,11 +73,11 @@ export function PresetChooser({ onSelect }: PresetChooserProps) {
             <section className="space-y-3">
                 <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold">{t('providers.quickSetup')}</span>
-                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">{t('providers.recommended')}</span>
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                        {t('providers.recommended')}
+                    </span>
                 </div>
-                <p className="-mt-1 text-sm text-muted-foreground">
-                    {t('providers.quickSetupDescription')}
-                </p>
+                <p className="-mt-1 text-sm text-muted-foreground">{t('providers.quickSetupDescription')}</p>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     {builtIn.map((preset) => (
                         <PresetCard key={preset.key} preset={preset} onSelect={onSelect} />

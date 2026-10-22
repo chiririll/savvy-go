@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"savvy-go/internal/auth"
+	"savvy-go/internal/auth/password"
 	"savvy-go/internal/signing"
 	"savvy-go/internal/spaces"
 	"savvy-go/internal/store"
@@ -51,7 +53,8 @@ func seedDemo(t *testing.T) (*sqlite.Store, signing.KeyRing) {
 func spaceByName(t *testing.T, st *sqlite.Store, name string) store.DB {
 	t.Helper()
 	var id int64
-	if err := st.Server().QueryRowContext(context.Background(), `SELECT id FROM spaces WHERE name = ?`, name).Scan(&id); err != nil {
+	if err := st.Server().QueryRowContext(context.Background(), `SELECT id FROM spaces WHERE name = ?`,
+		name).Scan(&id); err != nil {
 		t.Fatalf("space %q: %v", name, err)
 	}
 	d, err := st.Space(context.Background(), id)
@@ -101,14 +104,14 @@ func TestDemoSeedsEmptyDatabase(t *testing.T) {
 	if err != nil || demo == nil || demo.Password == nil {
 		t.Fatalf("demo user: %v %v", demo, err)
 	}
-	if !auth.CheckPassword(*demo.Password, "demo") {
+	if !password.Check(*demo.Password, "demo") {
 		t.Fatal("demo password rejected")
 	}
 	admin, err := users.ByEmail(ctx, "admin@savvy.app")
 	if err != nil || admin == nil || admin.Password == nil {
 		t.Fatalf("admin user: %v %v", admin, err)
 	}
-	if !auth.CheckPassword(*admin.Password, "password") {
+	if !password.Check(*admin.Password, "password") {
 		t.Fatal("admin password rejected")
 	}
 	if demo.Role != auth.RoleUser || admin.Role != auth.RoleAdmin {
@@ -126,7 +129,8 @@ func TestDemoSeedsEmptyDatabase(t *testing.T) {
 		role  string
 	}{
 		{"Demo", admin, spaces.RoleAdmin}, {"Demo", editor, spaces.RoleEditor}, {"Demo", demo, spaces.RoleViewer},
-		{"Family Budget", admin, spaces.RoleAdmin}, {"Family Budget", editor, spaces.RoleAdmin}, {"Family Budget", guest, spaces.RoleViewer},
+		{"Family Budget", admin, spaces.RoleAdmin}, {"Family Budget", editor, spaces.RoleAdmin},
+		{"Family Budget", guest, spaces.RoleViewer},
 		{"Studio GmbH", admin, spaces.RoleAdmin}, {"Studio GmbH", editor, spaces.RoleViewer},
 	} {
 		var id int64
@@ -145,7 +149,7 @@ func TestDemoSeedsEmptyDatabase(t *testing.T) {
 	if n := countWhere(t, space, `SELECT COUNT(*) FROM categories`); n < 10 {
 		t.Fatalf("categories=%d", n)
 	}
-	if n := countWhere(t, space, `SELECT COUNT(*) FROM tags`); n < 8 {
+	if n := countWhere(t, space, `SELECT COUNT(*) FROM tags`); n < 5 {
 		t.Fatalf("tags=%d", n)
 	}
 	if n := countWhere(t, space, `SELECT COUNT(*) FROM accounts`); n < 8 {
@@ -169,14 +173,15 @@ func TestDemoSeedsExactlyTheExportedPresets(t *testing.T) {
 	st, _ := seedDemo(t)
 	space := spaceByName(t, st, "Demo")
 	cats, tags := DefaultCategories(), DefaultTags()
-	if len(cats) != 19 || len(tags) != 10 {
+	if len(cats) != 20 || len(tags) != 5 {
 		t.Fatalf("presets: %d categories, %d tags", len(cats), len(tags))
 	}
 	if n := countWhere(t, space, `SELECT COUNT(*) FROM categories`); n < len(cats) {
 		t.Fatalf("categories=%d, want at least %d", n, len(cats))
 	}
 	for _, c := range cats {
-		q := `SELECT COUNT(*) FROM categories WHERE name = '` + c.Name + `' AND type = '` + c.Type + `' AND icon = '` + c.Icon + `' AND color = '` + c.Color + `'`
+		q := `SELECT COUNT(*) FROM categories WHERE name = '` + c.Name + `' AND type = '` + c.Type + `' AND icon = '` +
+			c.Icon + `' AND color = '` + c.Color + `'`
 		if n := countWhere(t, space, q); n != 1 {
 			t.Fatalf("category %s seeded %d times", c.Name, n)
 		}
@@ -194,12 +199,12 @@ func TestDemoSeedsExactlyTheExportedPresets(t *testing.T) {
 func TestPresetsAreCopies(t *testing.T) {
 	DefaultCategories()[0].Name = "changed"
 	DefaultTags()[0] = "changed"
-	if DefaultCategories()[0].Name != "#RENT" || DefaultTags()[0] != "Essential" {
+	if DefaultCategories()[0].Name != "#HOUSING" || DefaultTags()[0] != "#ESSENTIAL" {
 		t.Fatal("a caller changed the shared presets")
 	}
 }
 
-func TestDemoSpacesAreLinkedAndTransfer(t *testing.T) {
+func TestDemoSpacesAreLinkedTransfer(t *testing.T) {
 	st, _ := seedDemo(t)
 	sqlDB := st.Server()
 	if n := countWhere(t, sqlDB, `SELECT COUNT(*) FROM spaces`); n != 3 {
@@ -219,6 +224,27 @@ func TestDemoSpacesAreLinkedAndTransfer(t *testing.T) {
 		if n := countWhere(t, d, `SELECT COUNT(*) FROM transactions WHERE type IN ('transfer_in','transfer_out')`); n == 0 {
 			t.Fatalf("%s has no transfer transactions", name)
 		}
+	}
+}
+
+func TestDemoHasRecentSpaceTransfer(t *testing.T) {
+	st, _ := seedDemo(t)
+	cutoff := time.Now().AddDate(0, 0, -3).Format("2006-01-02")
+	d := spaceByName(t, st, "Demo")
+	if n := countWhere(t, d, `SELECT COUNT(*) FROM space_transfers WHERE date >= ?`, cutoff); n == 0 {
+		t.Fatalf("no transfer between spaces since %s", cutoff)
+	}
+}
+
+func TestDemoHasManySpaceTransfers(t *testing.T) {
+	st, _ := seedDemo(t)
+	d := spaceByName(t, st, "Demo")
+	if n := countWhere(t, d, `SELECT COUNT(*) FROM space_transfers`); n < 10 {
+		t.Fatalf("transfers between spaces=%d, want at least 10", n)
+	}
+	cutoff := time.Now().AddDate(0, 0, -7).Format("2006-01-02")
+	if n := countWhere(t, d, `SELECT COUNT(*) FROM space_transfers WHERE date >= ?`, cutoff); n < 3 {
+		t.Fatalf("transfers in the last week=%d, want at least 3", n)
 	}
 }
 
@@ -273,7 +299,7 @@ func TestDemoSkipsWhenUsersExist(t *testing.T) {
 	}
 }
 
-func TestDemoPinnedDateIsReproducibleAndHasManifest(t *testing.T) {
+func TestDemoPinnedDateReproducibleHasManifest(t *testing.T) {
 	now, err := Config{Date: "2026-03-15"}.now(time.UTC)
 	if err != nil {
 		t.Fatal(err)
@@ -288,14 +314,16 @@ func TestDemoPinnedDateIsReproducibleAndHasManifest(t *testing.T) {
 		}
 		space := spaceByName(t, st, "Demo")
 		var last string
-		if err := space.QueryRowContext(context.Background(), `SELECT MAX(date) FROM transactions WHERE status = 'confirmed'`).Scan(&last); err != nil {
+		if err := space.QueryRowContext(context.Background(),
+			`SELECT MAX(date) FROM transactions WHERE status = 'confirmed'`).Scan(&last); err != nil {
 			t.Fatal(err)
 		}
 		if last > "2026-03-15" {
 			t.Fatalf("confirmed transaction after the pinned date: %s", last)
 		}
 		var sum string
-		if err := space.QueryRowContext(context.Background(), `SELECT COUNT(*) || ':' || SUM(amount) FROM transactions`).Scan(&sum); err != nil {
+		if err := space.QueryRowContext(context.Background(),
+			`SELECT COUNT(*) || ':' || SUM(amount) FROM transactions`).Scan(&sum); err != nil {
 			t.Fatal(err)
 		}
 		dumps[i] = sum
@@ -356,5 +384,150 @@ func TestLoadConfig(t *testing.T) {
 	}
 	if _, err := LoadConfig(bad); err == nil {
 		t.Error("accepted an unknown key")
+	}
+}
+
+func TestDemoSpacesHaveLookAndAccount(t *testing.T) {
+	st, _ := seedDemo(t)
+	rows, err := st.Server().QueryContext(context.Background(), `SELECT name, emoji, color FROM spaces`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	type look struct{ name, emoji, color string }
+	var looks []look
+	for rows.Next() {
+		var l look
+		var emoji, color *string
+		if err := rows.Scan(&l.name, &emoji, &color); err != nil {
+			t.Fatal(err)
+		}
+		if emoji == nil || color == nil {
+			t.Fatalf("%s: emoji=%v color=%v", l.name, emoji, color)
+		}
+		l.emoji, l.color = *emoji, *color
+		looks = append(looks, l)
+	}
+	if err := rows.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if len(looks) != 3 {
+		t.Fatalf("spaces=%d", len(looks))
+	}
+	seen := map[string]bool{}
+	for _, l := range looks {
+		if seen[l.emoji] || seen[l.color] {
+			t.Fatalf("%s repeats the emoji or color of another space", l.name)
+		}
+		seen[l.emoji], seen[l.color] = true, true
+		if c := countWhere(t, spaceByName(t, st, l.name), `SELECT COUNT(*) FROM accounts`); c == 0 {
+			t.Fatalf("%s has no account", l.name)
+		}
+	}
+}
+
+func TestDemoSyncGroup(t *testing.T) {
+	st, keys := openStoreKeys(t)
+	m, err := Demo(context.Background(), st, keys, Options{Loc: time.UTC})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := countWhere(t, st.Server(), `SELECT COUNT(*) FROM sync_groups`); n != 1 {
+		t.Fatalf("sync groups=%d", n)
+	}
+	group := map[string]int64{}
+	for _, sp := range m.Spaces {
+		group[sp.Name] = sp.SyncGroup
+	}
+	if group["Family Budget"] == 0 || group["Family Budget"] != group["Demo"] || group["Studio GmbH"] != 0 {
+		t.Fatalf("manifest sync groups: %v", group)
+	}
+	for _, name := range []string{"Family Budget", "Demo"} {
+		d := spaceByName(t, st, name)
+		for _, cat := range []string{"School & kids", "Pets"} {
+			if countWhere(t, d, `SELECT COUNT(*) FROM categories WHERE name = ?`, cat) != 1 {
+				t.Fatalf("%s lacks the shared category %q", name, cat)
+			}
+		}
+		for _, tag := range []string{"Kids", "Weekend"} {
+			if countWhere(t, d, `SELECT COUNT(*) FROM tags WHERE name = ?`, tag) != 1 {
+				t.Fatalf("%s lacks the shared tag %q", name, tag)
+			}
+		}
+	}
+}
+
+func TestDemoStudioHasItsOwnCategoriesAndTags(t *testing.T) {
+	st, _ := seedDemo(t)
+	studio := spaceByName(t, st, "Studio GmbH")
+	if n := countWhere(t, studio, `SELECT COUNT(*) FROM categories WHERE name LIKE '#%'`); n != 0 {
+		t.Fatalf("Studio has %d preset categories", n)
+	}
+	if n := countWhere(t, studio, `SELECT COUNT(*) FROM tags WHERE name LIKE '#%'`); n != 0 {
+		t.Fatalf("Studio has %d preset tags", n)
+	}
+	for _, typ := range []string{"expense", "income"} {
+		if n := countWhere(t, studio, `SELECT COUNT(*) FROM categories WHERE type = ? AND is_default = 1`, typ); n != 1 {
+			t.Fatalf("Studio has %d default %s categories", n, typ)
+		}
+	}
+	for _, other := range []string{"Demo", "Family Budget"} {
+		d := spaceByName(t, st, other)
+		if n := countWhere(t, d, `SELECT COUNT(*) FROM categories WHERE name = 'Client projects'`); n != 0 {
+			t.Fatalf("%s has a Studio category", other)
+		}
+	}
+	// Every Studio transaction and its budget use a category of the space.
+	if n := countWhere(t, studio, `SELECT COUNT(*) FROM transactions WHERE category_id IS NULL AND type IN ('income','expense')`); n != 0 {
+		t.Fatalf("%d Studio transactions have no category", n)
+	}
+	if n := countWhere(t, studio, `SELECT COUNT(*) FROM budgets`); n == 0 {
+		t.Fatal("Studio has no budget")
+	}
+}
+
+func TestDemoSamIsUnverified(t *testing.T) {
+	st, keys := openStoreKeys(t)
+	m, err := Demo(context.Background(), st, keys, Options{Loc: time.UTC})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, u := range m.Users {
+		if u.Verified == (u.Key == userSam) {
+			t.Fatalf("%s verified=%v", u.Key, u.Verified)
+		}
+		want := 1
+		if !u.Verified {
+			want = 0
+		}
+		if n := countWhere(t, st.Server(), `SELECT email_verified FROM users WHERE email = ?`, u.Email); n != want {
+			t.Fatalf("%s email_verified=%d", u.Key, n)
+		}
+	}
+}
+
+func TestPresetsAreUniqueTokensOneDefaultEach(t *testing.T) {
+	seen := map[string]bool{}
+	defaults := map[string]int{}
+	for _, c := range DefaultCategories() {
+		if !strings.HasPrefix(c.Name, "#") {
+			t.Fatalf("category %q is not a token", c.Name)
+		}
+		if seen[c.Type+c.Name] {
+			t.Fatalf("category %s duplicated in %s", c.Name, c.Type)
+		}
+		seen[c.Type+c.Name] = true
+		if c.IsDefault {
+			defaults[c.Type]++
+		}
+	}
+	if defaults["expense"] != 1 || defaults["income"] != 1 {
+		t.Fatalf("defaults per type: %v", defaults)
+	}
+	tags := map[string]bool{}
+	for _, tag := range DefaultTags() {
+		if !strings.HasPrefix(tag, "#") || tags[tag] {
+			t.Fatalf("tag %q is not a unique token", tag)
+		}
+		tags[tag] = true
 	}
 }

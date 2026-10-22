@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { Card, CardContent } from '@/components/ui/card'
-import { Sparkline } from '@/components/ui/sparkline'
+import { Sparkline } from '@/components/shared/charts/Sparkline'
 import { cn, formatCurrency } from '@/lib/utils'
 import { TrendingUp, TrendingDown } from 'lucide-react'
 import type { CompareType } from '../types'
@@ -16,12 +16,19 @@ interface MetricCardProps {
     currency?: string | null
 }
 
-export function MetricCard({ title, value, previousValue, sparklineData, type, compareWith, suffix, currency }: MetricCardProps) {
+export function MetricCard({
+    title,
+    value,
+    previousValue,
+    sparklineData,
+    type,
+    compareWith,
+    suffix,
+    currency,
+}: MetricCardProps) {
     const { t } = useTranslation('pages')
     const absoluteChange = previousValue != null ? value - previousValue : null
-    const percentChange = previousValue && previousValue !== 0
-        ? ((value - previousValue) / previousValue) * 100
-        : null
+    const percentChange = previousValue && previousValue !== 0 ? ((value - previousValue) / previousValue) * 100 : null
 
     const isPositiveChange = percentChange !== null && percentChange > 0
 
@@ -51,19 +58,24 @@ export function MetricCard({ title, value, previousValue, sparklineData, type, c
                 <div className="flex items-start justify-between gap-3">
                     <div className="space-y-1 min-w-0 flex-1">
                         <p className="text-sm text-muted-foreground truncate">{title}</p>
-                        <p className={cn(
-                            'text-xl sm:text-2xl font-bold tracking-tight break-words',
-                            type === 'income' && 'text-green-600',
-                            type === 'expense' && 'text-red-600',
-                        )}>
-                            {formatValue(value)}{suffix}
+                        <p
+                            className={cn(
+                                'text-xl sm:text-2xl font-bold tracking-tight break-words',
+                                type === 'income' && 'text-green-600',
+                                type === 'expense' && 'text-red-600',
+                            )}
+                        >
+                            {formatValue(value)}
+                            {suffix}
                         </p>
                         {compareWith !== 'none' && percentChange !== null && (
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
-                                <span className={cn(
-                                    'flex items-center gap-0.5',
-                                    isGoodChange ? 'text-green-600' : 'text-red-600'
-                                )}>
+                                <span
+                                    className={cn(
+                                        'flex items-center gap-0.5',
+                                        isGoodChange ? 'text-green-600' : 'text-red-600',
+                                    )}
+                                >
                                     {isPositiveChange ? (
                                         <TrendingUp className="size-3" />
                                     ) : (
@@ -72,9 +84,7 @@ export function MetricCard({ title, value, previousValue, sparklineData, type, c
                                     {Math.abs(percentChange).toFixed(1)}%
                                 </span>
                                 {absoluteChange !== null && (
-                                    <span className="text-muted-foreground">
-                                        ({formatChangeValue(absoluteChange)})
-                                    </span>
+                                    <span className="text-muted-foreground">({formatChangeValue(absoluteChange)})</span>
                                 )}
                             </div>
                         )}

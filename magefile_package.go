@@ -78,7 +78,16 @@ func pack(f format) error {
 		_ = os.Remove(p)
 	}
 
-	cmd := exec.Command("nfpm", "package", "--config", filepath.Join(stage, "nfpm.yaml"), "--packager", f.name, "--target", out)
+	cmd := exec.Command(
+		"nfpm",
+		"package",
+		"--config",
+		filepath.Join(stage, "nfpm.yaml"),
+		"--packager",
+		f.name,
+		"--target",
+		out,
+	)
 	cmd.Dir = filepath.Join("deploy", "nfpm") // the content sources in nfpm.yaml are relative to it
 	cmd.Env = append(os.Environ(), "APP_VERSION="+version)
 	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr

@@ -16,7 +16,7 @@ describe('bootstrapCommands', () => {
         ])
     })
 
-    it('gives a plain binary no command: the terminal and the file are enough', () => {
+    it('gives a plain binary no command, as the terminal and file suffice', () => {
         expect(bootstrapCommands({ environment: 'binary', file: './savvy-data/bootstrap-password' })).toEqual([])
     })
 })

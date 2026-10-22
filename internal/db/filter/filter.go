@@ -68,7 +68,9 @@ func txWhere(f TxFilter) (string, []any) {
 		}
 	}
 	if len(f.TagIDs) > 0 {
-		q += ` AND EXISTS (SELECT 1 FROM transaction_tag tt WHERE tt.transaction_id = t.id AND tt.tag_id IN (` + Placeholders(len(f.TagIDs)) + `))`
+		q += ` AND EXISTS (SELECT 1 FROM transaction_tag tt WHERE tt.transaction_id = t.id AND tt.tag_id IN (` + Placeholders(
+			len(f.TagIDs),
+		) + `))`
 		for _, id := range f.TagIDs {
 			args = append(args, id)
 		}
@@ -111,7 +113,12 @@ func CountTransactions(ctx context.Context, sqlDB store.DB, f TxFilter) (int64, 
 	return n, err
 }
 
-func ListTransactions(ctx context.Context, sqlDB store.DB, f TxFilter, limit, offset int) ([]sqlc.GetTransactionRow, error) {
+func ListTransactions(
+	ctx context.Context,
+	sqlDB store.DB,
+	f TxFilter,
+	limit, offset int,
+) ([]sqlc.GetTransactionRow, error) {
 	where, args := txWhere(f)
 	args = append(args, limit, offset)
 	rows, err := sqlDB.QueryContext(ctx, `
@@ -175,7 +182,9 @@ func Clause(w ReportWhere) (string, []any) {
 		}
 	}
 	if len(w.TagIDs) > 0 {
-		q += ` AND EXISTS (SELECT 1 FROM transaction_tag tt WHERE tt.transaction_id = t.id AND tt.tag_id IN (` + Placeholders(len(w.TagIDs)) + `))`
+		q += ` AND EXISTS (SELECT 1 FROM transaction_tag tt WHERE tt.transaction_id = t.id AND tt.tag_id IN (` + Placeholders(
+			len(w.TagIDs),
+		) + `))`
 		for _, id := range w.TagIDs {
 			args = append(args, id)
 		}
@@ -329,7 +338,13 @@ type PeriodTotal struct {
 
 // GroupedByPeriod is the total per period (see PeriodExpr) in the base
 // currency.
-func GroupedByPeriod(ctx context.Context, sqlDB store.DB, w ReportWhere, groupBy string, base money.Unit) []PeriodTotal {
+func GroupedByPeriod(
+	ctx context.Context,
+	sqlDB store.DB,
+	w ReportWhere,
+	groupBy string,
+	base money.Unit,
+) []PeriodTotal {
 	where, args := Clause(w)
 	rows, err := sqlDB.QueryContext(ctx, `
 		SELECT `+PeriodExpr(groupBy)+` as period_date, SUM(t.amount), c.decimals, c.rate
@@ -398,7 +413,8 @@ func TopTransactions(ctx context.Context, sqlDB store.DB, w ReportWhere, limit i
 		var x TopRow
 		var minor, decimals int64
 		var rate decimal.Decimal
-		if err := rows.Scan(&x.ID, &x.Description, &x.Date, &minor, &decimals, &rate, &x.CatID, &x.CatName, &x.Icon, &x.Color, &x.AccID, &x.AccName); err != nil {
+		if err := rows.Scan(&x.ID, &x.Description, &x.Date, &minor, &decimals, &rate, &x.CatID, &x.CatName, &x.Icon, &x.Color,
+			&x.AccID, &x.AccName); err != nil {
 			continue
 		}
 		x.Amount = money.FromDecimal(toBase(minor, decimals, rate), base)
@@ -422,13 +438,21 @@ func ScopedMonthlyBudgets(ctx context.Context, sqlDB store.DB, categoryIDs, tagI
 	var args []any
 	parts := []string{}
 	if len(categoryIDs) > 0 {
-		parts = append(parts, `EXISTS (SELECT 1 FROM budget_category bc WHERE bc.budget_id = b.id AND bc.category_id IN (`+Placeholders(len(categoryIDs))+`))`)
+		parts = append(
+			parts,
+			`EXISTS (SELECT 1 FROM budget_category bc WHERE bc.budget_id = b.id AND bc.category_id IN (`+Placeholders(
+				len(categoryIDs),
+			)+`))`,
+		)
 		for _, id := range categoryIDs {
 			args = append(args, id)
 		}
 	}
 	if len(tagIDs) > 0 {
-		parts = append(parts, `EXISTS (SELECT 1 FROM budget_tag bt WHERE bt.budget_id = b.id AND bt.tag_id IN (`+Placeholders(len(tagIDs))+`))`)
+		parts = append(
+			parts,
+			`EXISTS (SELECT 1 FROM budget_tag bt WHERE bt.budget_id = b.id AND bt.tag_id IN (`+Placeholders(len(tagIDs))+`))`,
+		)
 		for _, id := range tagIDs {
 			args = append(args, id)
 		}
@@ -460,7 +484,14 @@ func scanBudgetAmounts(ctx context.Context, sqlDB store.DB, q string, args []any
 // category/tag IN lists, expressed in the currency `in` whose rate to the base
 // currency is inRate (1 when it is the base). Variable-length IN cannot be a
 // single sqlc query.
-func BudgetSpent(ctx context.Context, sqlDB store.DB, start, end string, categoryIDs, tagIDs []int64, in money.Unit, inRate decimal.Decimal) (money.Money, error) {
+func BudgetSpent(
+	ctx context.Context,
+	sqlDB store.DB,
+	start, end string,
+	categoryIDs, tagIDs []int64,
+	in money.Unit,
+	inRate decimal.Decimal,
+) (money.Money, error) {
 	zero := money.Zero(in)
 	q := `
 		SELECT COALESCE(SUM(t.amount), 0), c.decimals, c.rate

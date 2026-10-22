@@ -3,7 +3,7 @@ import { AppSidebar } from './Sidebar'
 import { Header } from './Header'
 import { StatusBar } from './StatusBar'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
-import { CreateTransactionProvider } from '@/components/features/transactions/CreateTransactionProvider'
+import { CreateTransactionProvider } from '@/components/features/transactions/form/CreateTransactionProvider'
 import { useCurrencies } from '@/hooks/use-currencies'
 import { useUiStore } from '@/stores/ui'
 
@@ -21,9 +21,10 @@ export function AppLayout() {
                         <StatusBar />
                         <Header />
                     </div>
-                    <main className="min-w-0 flex-1 overflow-y-auto px-3 py-4 sm:p-6">
+                    {/* SidebarInset is the page's main landmark already. */}
+                    <div className="min-w-0 flex-1 overflow-y-auto px-3 py-4 sm:p-6">
                         <Outlet />
-                    </main>
+                    </div>
                 </CreateTransactionProvider>
             </SidebarInset>
         </SidebarProvider>

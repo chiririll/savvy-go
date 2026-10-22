@@ -35,10 +35,53 @@ func newFixture(t *testing.T) *fixture {
 		return id
 	}
 	f := &fixture{repo: r}
-	f.usd = must(r.InsertCurrency(ctx, ledgerrepo.Currency{Code: "USD", Name: "Dollar", Symbol: "$", Decimals: 2, IsBase: true, Rate: decimal.NewFromInt(1)}, now))
-	f.jpy = must(r.InsertCurrency(ctx, ledgerrepo.Currency{Code: "JPY", Name: "Yen", Symbol: "¥", Decimals: 0, Rate: decimal.RequireFromString("0.0066")}, now))
-	f.cash = must(r.InsertAccount(ctx, ledgerrepo.AccountFields{Name: "Cash", Type: "cash", CurrencyID: f.usd, InitialBalance: money.New(10000, money.Unit{ID: f.usd, Decimals: 2}), IsActive: true}, now))
-	f.yen = must(r.InsertAccount(ctx, ledgerrepo.AccountFields{Name: "Yen", Type: "cash", CurrencyID: f.jpy, InitialBalance: money.New(0, money.Unit{ID: f.jpy}), IsActive: true}, now))
+	f.usd = must(
+		r.InsertCurrency(
+			ctx,
+			ledgerrepo.Currency{
+				Code:     "USD",
+				Name:     "Dollar",
+				Symbol:   "$",
+				Decimals: 2,
+				IsBase:   true,
+				Rate:     decimal.NewFromInt(1),
+			},
+			now,
+		),
+	)
+	f.jpy = must(
+		r.InsertCurrency(
+			ctx,
+			ledgerrepo.Currency{Code: "JPY", Name: "Yen", Symbol: "¥", Decimals: 0, Rate: decimal.RequireFromString("0.0066")},
+			now,
+		),
+	)
+	f.cash = must(
+		r.InsertAccount(
+			ctx,
+			ledgerrepo.AccountFields{
+				Name:           "Cash",
+				Type:           "cash",
+				CurrencyID:     f.usd,
+				InitialBalance: money.New(10000, money.Unit{ID: f.usd, Decimals: 2}),
+				IsActive:       true,
+			},
+			now,
+		),
+	)
+	f.yen = must(
+		r.InsertAccount(
+			ctx,
+			ledgerrepo.AccountFields{
+				Name:           "Yen",
+				Type:           "cash",
+				CurrencyID:     f.jpy,
+				InitialBalance: money.New(0, money.Unit{ID: f.jpy}),
+				IsActive:       true,
+			},
+			now,
+		),
+	)
 	f.food = must(r.InsertCategory(ctx, ledgerrepo.Category{Name: "Food", Type: "expense"}, now))
 	return f
 }
@@ -76,10 +119,11 @@ func TestMissingRowsAreNil(t *testing.T) {
 	}
 }
 
-func TestAccountsCarryTheirCurrencyAndUnit(t *testing.T) {
+func TestAccountsCarryTheirCurrencyUnit(t *testing.T) {
 	f := newFixture(t)
 	a, _ := f.repo.Account(ctx, f.yen)
-	if a.Currency.Code != "JPY" || a.Currency.Decimals != 0 || a.InitialBalance.Unit() != (money.Unit{ID: f.jpy, Decimals: 0}) {
+	if a.Currency.Code != "JPY" || a.Currency.Decimals != 0 ||
+		a.InitialBalance.Unit() != (money.Unit{ID: f.jpy, Decimals: 0}) {
 		t.Fatalf("yen account = %+v", a)
 	}
 	if u, _ := f.repo.AccountUnit(ctx, f.cash); u == nil || *u != (money.Unit{ID: f.usd, Decimals: 2}) {
@@ -99,7 +143,8 @@ func TestTransactionAmountsKeepTheirUnits(t *testing.T) {
 	f := newFixture(t)
 	id := f.expense(t, f.yen, 1500, "2026-01-02")
 	tx, _ := f.repo.Transaction(ctx, id)
-	if tx.Amount.Minor() != 1500 || tx.Amount.Unit().Decimals != 0 || tx.ToAmount != nil || tx.Date == nil || *tx.Date != "2026-01-02" {
+	if tx.Amount.Minor() != 1500 || tx.Amount.Unit().Decimals != 0 || tx.ToAmount != nil || tx.Date == nil ||
+		*tx.Date != "2026-01-02" {
 		t.Fatalf("tx = %+v", tx)
 	}
 	changes, _ := f.repo.DailyChanges(ctx, f.yen, "")
@@ -112,7 +157,7 @@ func TestTransactionAmountsKeepTheirUnits(t *testing.T) {
 	}
 }
 
-func TestTagsOfTransactionsAndReplacement(t *testing.T) {
+func TestTagsOfTransactionsReplacement(t *testing.T) {
 	f := newFixture(t)
 	now := time.Now().UTC()
 	a, _ := f.repo.InsertTag(ctx, "a", now)
@@ -152,7 +197,7 @@ func TestReplacingACategoryMovesItsTransactions(t *testing.T) {
 	}
 }
 
-func TestBudgetsKeepTheirCurrencyAndScope(t *testing.T) {
+func TestBudgetsKeepTheirCurrencyScope(t *testing.T) {
 	f := newFixture(t)
 	now := time.Now().UTC()
 	pct := 80
@@ -167,7 +212,8 @@ func TestBudgetsKeepTheirCurrencyAndScope(t *testing.T) {
 		t.Fatal(err)
 	}
 	list, _ := f.repo.Budgets(ctx, &id)
-	if len(list) != 1 || list[0].Amount.Minor() != 50000 || list[0].NotifyAtPercent == nil || *list[0].NotifyAtPercent != 80 {
+	if len(list) != 1 || list[0].Amount.Minor() != 50000 || list[0].NotifyAtPercent == nil ||
+		*list[0].NotifyAtPercent != 80 {
 		t.Fatalf("budgets = %+v", list)
 	}
 	if cats, _ := f.repo.BudgetCategories(ctx, id); len(cats) != 1 || cats[0].ID != f.food {
@@ -183,7 +229,11 @@ func TestBudgetsKeepTheirCurrencyAndScope(t *testing.T) {
 	}
 	// USD is used by an account and the budget, JPY by an account; a currency
 	// nothing refers to is free to delete.
-	spare, _ := f.repo.InsertCurrency(ctx, ledgerrepo.Currency{Code: "EUR", Name: "Euro", Symbol: "E", Decimals: 2, Rate: decimal.NewFromInt(1)}, now)
+	spare, _ := f.repo.InsertCurrency(
+		ctx,
+		ledgerrepo.Currency{Code: "EUR", Name: "Euro", Symbol: "E", Decimals: 2, Rate: decimal.NewFromInt(1)},
+		now,
+	)
 	if !f.repo.CurrencyInUse(ctx, f.usd) || !f.repo.CurrencyInUse(ctx, f.jpy) || f.repo.CurrencyInUse(ctx, spare) {
 		t.Fatal("CurrencyInUse must be true for USD and JPY and false for a spare currency")
 	}

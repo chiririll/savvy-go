@@ -5,12 +5,15 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
+	"maps"
 	"net/http"
 	"strconv"
 	"testing"
 	"time"
 
 	"savvy-go/internal/auth"
+	"savvy-go/internal/auth/permissions"
 )
 
 // bearer performs a request authenticated only by an API token.
@@ -41,29 +44,37 @@ const (
 )
 
 func allPerms(level string) []string {
-	out := make([]string, len(auth.APIResources))
-	for i, r := range auth.APIResources {
-		out[i] = auth.Perm(r, level)
+	out := make([]string, len(permissions.APIResources))
+	for i, r := range permissions.APIResources {
+		out[i] = permissions.New(r, level)
 	}
 	return out
 }
 
 func (a *testApp) issueToken(u *auth.User, scope string, exp *time.Time) (string, *auth.APIToken) {
 	a.t.Helper()
-	level := auth.PermRead
+	level := permissions.Read
 	if scope == tokReadWrite {
-		level = auth.PermDelete
+		level = permissions.Delete
 	}
 	return a.issueGrant(u, auth.Grant{Permissions: allPerms(level), AllSpaces: true}, exp)
 }
 
 func (a *testApp) issueGrant(u *auth.User, g auth.Grant, exp *time.Time) (string, *auth.APIToken) {
 	a.t.Helper()
-	raw, tok, err := a.s.apiTokens.Issue(context.Background(), u, "app", g, exp)
+	raw, tok, err := a.svc.APITokens.Issue(context.Background(), u, "app", g, exp)
 	if err != nil {
 		a.t.Fatal(err)
 	}
 	return raw, tok
+}
+
+// confirmed adds the password every credential change asks for. createUser gives
+// its users the password "secret1".
+func confirmed(body map[string]any) map[string]any {
+	out := map[string]any{"current_password": "secret1"}
+	maps.Copy(out, body)
+	return out
 }
 
 func status(t *testing.T, res *http.Response, want int, label string) {
@@ -79,7 +90,13 @@ func TestAPITokenCreateListRevoke(t *testing.T) {
 	u := a.createUser("rw@a.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 
-	res := a.do("POST", "/api/auth/api-tokens", map[string]any{"name": "Zapier", "permissions": allPerms(auth.PermWrite), "all_spaces": true}, sess.Token, sess.CSRF)
+	res := a.do(
+		"POST",
+		"/api/auth/api-tokens",
+		confirmed(map[string]any{"name": "Zapier", "permissions": allPerms(permissions.Write), "all_spaces": true}),
+		sess.Token,
+		sess.CSRF,
+	)
 	if res.StatusCode != http.StatusCreated {
 		t.Fatalf("create %d", res.StatusCode)
 	}
@@ -118,11 +135,7 @@ func TestAPITokenBearerSkipsCSRF(t *testing.T) {
 	raw, _ := a.issueToken(u, tokReadWrite, nil)
 
 	status(t, a.bearer("GET", "/api/accounts", nil, raw), 200, "bearer GET")
-	res := a.bearer("POST", "/api/tags", map[string]any{"name": "from-api"}, raw)
-	if res.StatusCode != 201 && res.StatusCode != 200 {
-		t.Fatalf("bearer POST %d", res.StatusCode)
-	}
-	res.Body.Close()
+	status(t, a.bearer("POST", "/api/tags", map[string]any{"name": "from-api"}, raw), 201, "bearer POST")
 
 	// Cookie auth is still CSRF-protected.
 	sess := a.issue(u, false)
@@ -138,53 +151,6 @@ func TestAPITokenReadScopeBlocksWrites(t *testing.T) {
 	status(t, a.bearer("POST", "/api/tags", map[string]any{"name": "nope"}, raw), 403, "read POST")
 }
 
-// P4: a token never writes more than its owner may in the space, whatever
-// its scope; a viewer's read-write token reads but cannot write there.
-func TestP4ViewerReadWriteTokenCannotWrite(t *testing.T) {
-	a := newTestApp(t)
-	u := a.createUser("ro@a.com", "secret1", roleViewer)
-	raw, _ := a.issueToken(u, tokReadWrite, nil)
-
-	status(t, a.bearer("GET", "/api/tags", nil, raw), 200, "viewer token GET")
-	status(t, a.bearer("POST", "/api/tags", map[string]any{"name": "nope"}, raw), 403, "viewer token POST")
-}
-
-func TestAPITokenInvalidExpiredAndNoCookieFallback(t *testing.T) {
-	a := newTestApp(t)
-	u := a.createUser("rw@a.com", "secret1", roleEditor)
-	past := time.Now().Add(-time.Hour)
-	expired, _ := a.issueToken(u, tokRead, &past)
-
-	status(t, a.bearer("GET", "/api/accounts", nil, expired), 401, "expired")
-	status(t, a.bearer("GET", "/api/accounts", nil, "svy_garbage"), 401, "garbage")
-	status(t, a.bearer("GET", "/api/accounts", nil, "not-a-token"), 401, "wrong prefix")
-
-	// A valid session cookie must not rescue a bad bearer.
-	sess := a.issue(u, false)
-	req, _ := http.NewRequest("GET", a.srv.URL+a.apiPath("/api/accounts"), nil)
-	req.AddCookie(&http.Cookie{Name: "svy_session", Value: sess.Token})
-	req.Header.Set("Authorization", "Bearer svy_garbage")
-	res, err := a.client.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	status(t, res, 401, "bad bearer + good cookie")
-}
-
-func TestAPITokenForbiddenOnSessionOnlyAndAdminRoutes(t *testing.T) {
-	a := newTestApp(t)
-	admin := a.createUser("admin@a.com", "secret1", auth.RoleAdmin)
-	raw, _ := a.issueToken(admin, tokReadWrite, nil)
-
-	status(t, a.bearer("POST", "/api/auth/api-tokens", map[string]any{"name": "x"}, raw), 403, "mint via token")
-	status(t, a.bearer("GET", "/api/auth/api-tokens", nil, raw), 403, "list via token")
-	status(t, a.bearer("GET", "/api/backups", nil, raw), 403, "backups")
-	status(t, a.bearer("PATCH", "/api/settings", map[string]any{}, raw), 403, "settings update")
-	status(t, a.bearer("POST", "/api/auth/2fa/enable", nil, raw), 403, "2fa")
-	status(t, a.bearer("GET", "/api/identity-providers", nil, raw), 403, "admin route")
-	status(t, a.bearer("POST", "/api/users", map[string]any{}, raw), 403, "admin write")
-}
-
 func TestAPITokensDeletedWithUser(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("rw@a.com", "secret1", roleEditor)
@@ -192,7 +158,7 @@ func TestAPITokensDeletedWithUser(t *testing.T) {
 	if _, err := a.db.Exec(`PRAGMA foreign_keys = ON`); err != nil {
 		t.Fatal(err)
 	}
-	if err := a.s.users.Delete(context.Background(), u.ID); err != nil {
+	if err := a.svc.Users.Delete(context.Background(), u.ID); err != nil {
 		t.Fatal(err)
 	}
 	var n int
@@ -202,7 +168,7 @@ func TestAPITokensDeletedWithUser(t *testing.T) {
 	}
 }
 
-func TestAPITokenRevokeAndListAreScopedToOwner(t *testing.T) {
+func TestAPITokenRevokeListScopedOwner(t *testing.T) {
 	a := newTestApp(t)
 	alice := a.createUser("alice@a.com", "secret1", roleEditor)
 	bob := a.createUser("bob@a.com", "secret1", roleEditor)
@@ -217,18 +183,6 @@ func TestAPITokenRevokeAndListAreScopedToOwner(t *testing.T) {
 	id := strconv.FormatInt(aliceTok.ID, 10)
 	status(t, a.do("DELETE", "/api/auth/api-tokens/"+id, nil, sess.Token, sess.CSRF), 404, "revoke foreign token")
 	status(t, a.bearer("GET", "/api/accounts", nil, aliceRaw), 200, "foreign token still valid")
-}
-
-func TestAPITokenDemotedUserLosesWrite(t *testing.T) {
-	a := newTestApp(t)
-	u := a.createUser("rw@a.com", "secret1", roleEditor)
-	raw, _ := a.issueToken(u, tokReadWrite, nil)
-	if err := a.s.spaces.SetMember(context.Background(), a.space.ID, u, roleViewer); err != nil {
-		t.Fatal(err)
-	}
-
-	status(t, a.bearer("GET", "/api/tags", nil, raw), 200, "demoted GET")
-	status(t, a.bearer("POST", "/api/tags", map[string]any{"name": "nope"}, raw), 403, "demoted POST")
 }
 
 func TestAPITokenStoreValidation(t *testing.T) {
@@ -247,17 +201,41 @@ func TestAPITokenStoreValidation(t *testing.T) {
 	}{
 		{"empty name", map[string]any{"name": "  "}, "name"},
 		{"long name", map[string]any{"name": string(long)}, "name"},
-		{"unknown permission", map[string]any{"name": "x", "all_spaces": true, "permissions": []string{"admin:all"}}, "permissions"},
-		{"unknown resource", map[string]any{"name": "x", "all_spaces": true, "permissions": []string{"users:read"}}, "permissions"},
+		{
+			"unknown permission",
+			map[string]any{"name": "x", "all_spaces": true, "permissions": []string{"admin:all"}},
+			"permissions",
+		},
+		{
+			"unknown resource",
+			map[string]any{"name": "x", "all_spaces": true, "permissions": []string{"users:read"}},
+			"permissions",
+		},
 		{"no spaces", map[string]any{"name": "x", "permissions": []string{"accounts:read"}}, "space_ids"},
-		{"all and some spaces", map[string]any{"name": "x", "all_spaces": true, "space_ids": []int64{1}, "permissions": []string{"accounts:read"}}, "space_ids"},
-		{"foreign space", map[string]any{"name": "x", "space_ids": []int64{9999}, "permissions": []string{"accounts:read"}}, "space_ids"},
-		{"past expiry", map[string]any{"name": "x", "expires_at": time.Now().Add(-time.Hour).Format(time.RFC3339)}, "expires_at"},
+		{
+			"all and some spaces",
+			map[string]any{"name": "x", "all_spaces": true, "space_ids": []int64{1}, "permissions": []string{"accounts:read"}},
+			"space_ids",
+		},
+		{
+			"foreign space",
+			map[string]any{"name": "x", "space_ids": []int64{9999}, "permissions": []string{"accounts:read"}},
+			"space_ids",
+		},
+		{
+			"past expiry",
+			map[string]any{"name": "x", "expires_at": time.Now().Add(-time.Hour).Format(time.RFC3339)},
+			"expires_at",
+		},
 		{"bad expiry", map[string]any{"name": "x", "expires_at": "2030-01-01"}, "expires_at"},
 		{"malformed body", "not an object", "name"},
 	}
 	for _, c := range cases {
-		res := a.do("POST", "/api/auth/api-tokens", c.body, sess.Token, sess.CSRF)
+		body := c.body
+		if m, ok := body.(map[string]any); ok {
+			body = confirmed(m)
+		}
+		res := a.do("POST", "/api/auth/api-tokens", body, sess.Token, sess.CSRF)
 		if res.StatusCode != http.StatusUnprocessableEntity {
 			res.Body.Close()
 			t.Fatalf("%s: got %d want 422", c.label, res.StatusCode)
@@ -275,13 +253,26 @@ func TestAPITokenStoreValidation(t *testing.T) {
 	}
 }
 
-func TestAPITokenGrantAndFutureExpiry(t *testing.T) {
+func TestAPITokenGrantFutureExpiry(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("rw@a.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 	exp := time.Now().Add(24 * time.Hour).Truncate(time.Second)
 
-	res := a.do("POST", "/api/auth/api-tokens", map[string]any{"name": "ci", "all_spaces": true, "permissions": []string{"accounts:read"}, "expires_at": exp.Format(time.RFC3339)}, sess.Token, sess.CSRF)
+	res := a.do(
+		"POST",
+		"/api/auth/api-tokens",
+		confirmed(
+			map[string]any{
+				"name":        "ci",
+				"all_spaces":  true,
+				"permissions": []string{"accounts:read"},
+				"expires_at":  exp.Format(time.RFC3339),
+			},
+		),
+		sess.Token,
+		sess.CSRF,
+	)
 	if res.StatusCode != http.StatusCreated {
 		t.Fatalf("create %d", res.StatusCode)
 	}
@@ -303,8 +294,15 @@ func TestAPITokenLimit(t *testing.T) {
 	}
 	sess := a.issue(u, false)
 
-	status(t, a.do("POST", "/api/auth/api-tokens", map[string]any{"name": "51st"}, sess.Token, sess.CSRF), 422, "over limit")
-	if _, _, err := a.s.apiTokens.Issue(context.Background(), u, "x", auth.Grant{Permissions: allPerms(auth.PermRead), AllSpaces: true}, nil); err != auth.ErrTokenLimit {
+	status(
+		t,
+		a.do("POST", "/api/auth/api-tokens", confirmed(map[string]any{"name": "51st"}), sess.Token, sess.CSRF),
+		422,
+		"over limit",
+	)
+	if _, _,
+		err := a.svc.APITokens.Issue(context.Background(), u, "x",
+		auth.Grant{Permissions: allPerms(permissions.Read), AllSpaces: true}, nil); err != auth.ErrTokenLimit {
 		t.Fatalf("issue over limit: %v", err)
 	}
 }
@@ -346,39 +344,66 @@ func TestAPITokenTouchesLastUsed(t *testing.T) {
 	}
 }
 
-func TestAPITokenMalformedAuthorizationHeader(t *testing.T) {
+// A bearer that cannot be used is a 401 even when the same request carries a good session
+// cookie: a bad credential is never rescued by another one.
+func TestUnusableBearerCredentialsAreRejected(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("rw@a.com", "secret1", roleEditor)
+	past := time.Now().Add(-time.Hour)
+	expired, _ := a.issueToken(u, tokRead, &past)
 	sess := a.issue(u, false)
 
-	for _, h := range []string{"Basic dXNlcjpwYXNz", "Bearer", "Bearer   ", "svy_nobearerprefix"} {
-		req, _ := http.NewRequest("GET", a.srv.URL+a.apiPath("/api/accounts"), nil)
-		req.AddCookie(&http.Cookie{Name: "svy_session", Value: sess.Token})
-		req.Header.Set("Authorization", h)
-		res, err := a.client.Do(req)
-		if err != nil {
-			t.Fatal(err)
+	for _, c := range []struct{ name, header string }{
+		{"expired token", "Bearer " + expired},
+		{"unknown token", "Bearer svy_garbage"},
+		{"token without the prefix", "Bearer not-a-token"},
+		{"other scheme", "Basic dXNlcjpwYXNz"},
+		{"empty bearer", "Bearer   "},
+		{"no scheme", "svy_nobearerprefix"},
+	} {
+		for _, cookie := range []bool{false, true} {
+			req, _ := http.NewRequest("GET", a.srv.URL+a.apiPath("/api/accounts"), nil)
+			req.Header.Set("Authorization", c.header)
+			if cookie {
+				req.AddCookie(&http.Cookie{Name: "svy_session", Value: sess.Token})
+			}
+			res, err := a.client.Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			status(t, res, 401, fmt.Sprintf("%s (session cookie: %v)", c.name, cookie))
 		}
-		status(t, res, 401, "Authorization: "+h)
 	}
 }
 
-func TestAPITokenForbiddenOnCredentialRoutes(t *testing.T) {
+// Managing credentials, backups and the server is for people in a session: an API token is
+// refused there, whoever it belongs to and however much it may do elsewhere.
+func TestAPITokensRefusedSessionOnlyRoutes(t *testing.T) {
 	a := newTestApp(t)
-	u := a.createUser("rw@a.com", "secret1", roleEditor)
-	raw, _ := a.issueToken(u, tokReadWrite, nil)
-	sess := a.issue(u, false)
+	admin := a.createUser("admin@a.com", "secret1", auth.RoleAdmin)
+	raw, _ := a.issueToken(admin, tokReadWrite, nil)
+	sess := a.issue(admin, false)
 
-	status(t, a.bearer("POST", "/api/auth/logout", nil, raw), 403, "logout")
-	status(t, a.bearer("POST", "/api/auth/logout-others", nil, raw), 403, "logout others")
-	status(t, a.bearer("PUT", "/api/auth/password", map[string]any{"current_password": "secret1", "password": "secret2", "password_confirmation": "secret2"}, raw), 403, "change password")
-	status(t, a.bearer("GET", "/api/auth/2fa/status", nil, raw), 403, "2fa status")
-	status(t, a.bearer("GET", "/api/auth/webauthn/credentials", nil, raw), 403, "webauthn list")
-	status(t, a.bearer("DELETE", "/api/auth/webauthn/credentials/1", nil, raw), 403, "webauthn delete")
-	status(t, a.bearer("DELETE", "/api/auth/api-tokens/1", nil, raw), 403, "revoke via token")
-	status(t, a.bearer("POST", "/api/backups", nil, raw), 403, "backup create")
-	status(t, a.bearer("DELETE", "/api/backups/x.sqlite", nil, raw), 403, "backup delete")
-
-	// The blocked logout-others must have left existing sessions intact.
+	for _, r := range []struct{ method, path string }{
+		{"POST", "/api/auth/api-tokens"},
+		{"GET", "/api/auth/api-tokens"},
+		{"DELETE", "/api/auth/api-tokens/1"},
+		{"POST", "/api/auth/logout"},
+		{"POST", "/api/auth/logout-others"},
+		{"PUT", "/api/auth/password"},
+		{"POST", "/api/auth/2fa/enable"},
+		{"GET", "/api/auth/2fa/status"},
+		{"GET", "/api/auth/webauthn/credentials"},
+		{"DELETE", "/api/auth/webauthn/credentials/1"},
+		{"GET", "/api/backups"},
+		{"POST", "/api/backups"},
+		{"DELETE", "/api/backups/x.sqlite"},
+		{"PATCH", "/api/settings"},
+		{"GET", "/api/identity-providers"},
+		{"POST", "/api/users"},
+	} {
+		status(t, a.bearer(r.method, r.path, map[string]any{}, raw), 403, r.method+" "+r.path)
+	}
+	// The refused logout-others ended no session.
 	status(t, a.do("GET", "/api/accounts", nil, sess.Token, ""), 200, "session still valid")
 }

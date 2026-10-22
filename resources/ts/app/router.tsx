@@ -3,7 +3,7 @@ import { createBrowserRouter, Navigate, useParams } from 'react-router-dom'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { AuthProvider } from '@/components/providers/AuthProvider'
 import { useUser } from '@/stores/auth'
-import { ErrorBoundary } from '@/components/shared/ErrorBoundary'
+import { ErrorBoundary } from '@/components/shared/page/ErrorBoundary'
 import { childPath, pages } from './pages'
 
 // Auth pages
@@ -42,8 +42,8 @@ function AutomationEditRedirect() {
 const ReportsPage = lazy(() => import('@/pages/reports'))
 // Settings: the current space and the user's own.
 const SpaceSettingsPage = lazy(() => import('@/pages/settings/space'))
-const UserSettingsPage = lazy(() => import('@/pages/settings/user'))
 const SecuritySettingsPage = lazy(() => import('@/pages/settings/security'))
+const PasskeySettingsPage = lazy(() => import('@/pages/settings/passkeys'))
 const ApiSettingsPage = lazy(() => import('@/pages/settings/api'))
 const ImportSettingsPage = lazy(() => import('@/pages/settings/import'))
 const SpaceBackupsPage = lazy(() => import('@/pages/settings/backups'))
@@ -64,7 +64,9 @@ function AdminOnly({ children }: { children: React.ReactNode }) {
     return useUser()?.role === 'admin' ? <>{children}</> : <Navigate to="/" replace />
 }
 
-const admin = (Component: React.LazyExoticComponent<() => React.JSX.Element>) => <AdminOnly>{withSuspense(Component)}</AdminOnly>
+const admin = (Component: React.LazyExoticComponent<() => React.JSX.Element>) => (
+    <AdminOnly>{withSuspense(Component)}</AdminOnly>
+)
 
 function ProviderEditRedirect() {
     const { id } = useParams<{ id: string }>()
@@ -74,11 +76,13 @@ const NotFoundPage = lazy(() => import('@/pages/not-found'))
 
 const withSuspense = (Component: React.LazyExoticComponent<() => React.JSX.Element>) => (
     <ErrorBoundary>
-        <Suspense fallback={
-            <div className="flex items-center justify-center min-h-[200px]">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-            </div>
-        }>
+        <Suspense
+            fallback={
+                <div className="flex items-center justify-center min-h-[200px]">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+                </div>
+            }
+        >
             <Component />
         </Suspense>
     </ErrorBoundary>
@@ -150,8 +154,9 @@ export const router = createBrowserRouter([
                     { path: childPath(pages.automationLogs), element: withSuspense(AutomationLogsPage) },
                     { path: childPath(pages.reports), element: withSuspense(ReportsPage) },
                     { path: childPath(pages.spaceSettings), element: withSuspense(SpaceSettingsPage) },
-                    { path: childPath(pages.userSettings), element: withSuspense(UserSettingsPage) },
+                    { path: 'settings/user', element: <Navigate to={pages.securitySettings.path} replace /> },
                     { path: childPath(pages.securitySettings), element: withSuspense(SecuritySettingsPage) },
+                    { path: childPath(pages.passkeySettings), element: withSuspense(PasskeySettingsPage) },
                     { path: childPath(pages.apiSettings), element: withSuspense(ApiSettingsPage) },
                     { path: childPath(pages.importSettings), element: withSuspense(ImportSettingsPage) },
                     { path: childPath(pages.spaceBackups), element: withSuspense(SpaceBackupsPage) },

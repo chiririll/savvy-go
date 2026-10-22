@@ -13,7 +13,8 @@ import {
     FormMessage,
     FormDescription,
 } from '@/components/ui/form'
-import { FormWrapper } from '@/components/shared/FormWrapper'
+import { FormWrapper } from '@/components/shared/form/FormWrapper'
+import { localizeDefaultName, toStoredDefaultName } from '@/lib/localized-name'
 import { tagSchema, TagFormData } from '@/schemas'
 
 interface TagFormProps {
@@ -39,31 +40,34 @@ export function TagForm({
     const form = useForm<TagFormData>({
         resolver: zodResolver(tagSchema),
         defaultValues: {
-            name: defaultValues?.name ?? '',
+            name: defaultValues?.name ? localizeDefaultName(defaultValues.name, 'tags') : '',
         },
     })
 
     useFormValuesChange(form, onValuesChange)
 
+    const submit = (data: TagFormData) =>
+        onSubmit({ ...data, name: toStoredDefaultName(data.name, defaultValues?.name, 'tags') })
+
     return (
         <FormWrapper>
         <Form {...form}>
-            <form id={formId} onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <form id={formId} onSubmit={form.handleSubmit(submit)} className="space-y-4">
                 <FormField
                     control={form.control}
                     name="name"
                     render={({ field }) => (
                         <FormItem>
                             <FormLabel>{t('fields.name')}</FormLabel>
-                            <FormControl>
-                                <div className="flex items-center gap-2">
-                                    <span className="text-muted-foreground text-lg">#</span>
+                            <div className="flex items-center gap-2">
+                                <span className="text-muted-foreground text-lg" aria-hidden>#</span>
+                                <FormControl>
                                     <Input
                                         placeholder={t('forms:tags.namePlaceholder')}
                                         {...field}
                                     />
-                                </div>
-                            </FormControl>
+                                </FormControl>
+                            </div>
                             <FormDescription>
                                 {t('forms:tags.nameHelp')}
                             </FormDescription>

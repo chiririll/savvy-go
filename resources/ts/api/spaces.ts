@@ -1,7 +1,7 @@
 import { api, apiClient } from './client'
 import { toQueryString } from '@/lib/query-string'
 import { Backup } from '@/types/backup'
-import { Account, Category, Currency, CurrencyCatalogItem, Tag } from '@/types'
+import { Account, Category, Currency, CurrencyCatalog, CurrencyCatalogItem, Tag } from '@/types'
 import {
     AuditEntry,
     InvitationPreview,
@@ -19,6 +19,7 @@ import {
     SpaceRole,
     SpaceTransfer,
     SpaceTransferInput,
+    SpaceUpdate,
     SyncChange,
     SyncDiff,
     SyncGroup,
@@ -34,7 +35,12 @@ export const spacesApi = {
     /** Categories and tags a new space can start with. */
     presets: () => api.get<SpacePresets>('/presets'),
     /** Every currency the server knows, priced in `base`; needs no space. */
-    currencyCatalog: (base?: string) => api.get<CurrencyCatalogItem[]>(`/currencies/catalog${toQueryString({ base })}`),
+    currencyCatalog: (base?: string) =>
+        apiClient
+            .get<{ data: CurrencyCatalogItem[]; meta?: { source?: string } }>(
+                `/currencies/catalog${toQueryString({ base })}`,
+            )
+            .then((res): CurrencyCatalog => ({ items: res.data.data, source: res.data.meta?.source ?? 'live' })),
     /** The currencies, accounts, categories and tags of a space, read with viewer rights. */
     readContent: async (id: number) => {
         const [currencies, accounts, categories, tags] = await Promise.all([
@@ -46,7 +52,7 @@ export const spacesApi = {
         return { currencies, accounts, categories, tags }
     },
     get: (id: number) => api.get<SpaceDetails>(base(id)),
-    rename: (id: number, name: string) => api.patch<SpaceDetails, { name: string }>(base(id), { name }),
+    update: (id: number, input: SpaceUpdate) => api.patch<SpaceDetails, SpaceUpdate>(base(id), input),
     remove: (id: number) => api.delete<void>(base(id)),
     leave: (id: number) => api.post<void>(`${base(id)}/leave`),
 
@@ -61,7 +67,11 @@ export const spacesApi = {
 
     invitations: (id: number) => api.get<SpaceInvitation[]>(`${base(id)}/invitations`),
     invite: (id: number, role: SpaceRole, email?: string, note?: string) =>
-        api.post<InviteResult, { role: SpaceRole; email?: string; note?: string }>(`${base(id)}/invitations`, { role, email, note }),
+        api.post<InviteResult, { role: SpaceRole; email?: string; note?: string }>(`${base(id)}/invitations`, {
+            role,
+            email,
+            note,
+        }),
     revokeInvitation: (id: number, invitationId: number) => api.delete<void>(`${base(id)}/invitations/${invitationId}`),
 
     links: (id: number) => api.get<LinkedSpace[]>(`${base(id)}/links`),
@@ -113,7 +123,9 @@ export const spacesApi = {
     backupDownloadUrl: (id: number, name: string) =>
         `${apiClient.defaults.baseURL}${base(id)}/backups/${encodeURIComponent(name)}/download`,
     restoreBackup: (id: number, name: string) =>
-        api.post<{ message: string }>(`${base(id)}/backups/${encodeURIComponent(name)}/restore`, undefined, { timeout: 0 }),
+        api.post<{ message: string }>(`${base(id)}/backups/${encodeURIComponent(name)}/restore`, undefined, {
+            timeout: 0,
+        }),
     deleteBackup: (id: number, name: string) => api.delete<void>(`${base(id)}/backups/${encodeURIComponent(name)}`),
 
     /** A space backup (or an older database file) becomes a new space owned by the caller. */

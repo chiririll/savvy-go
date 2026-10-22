@@ -42,7 +42,10 @@ describe('draft store', () => {
     })
 
     it('is restored when the modal opens', async () => {
-        storage.setItem(key, JSON.stringify({ state: { draft: { ...empty(), name: 'Home', tags: ['a'] } }, version: 0 }))
+        storage.setItem(
+            key,
+            JSON.stringify({ state: { draft: { ...empty(), name: 'Home', tags: ['a'] } }, version: 0 }),
+        )
         await loadDraft()
         expect(draft()).toMatchObject({ name: 'Home', tags: ['a'] })
     })

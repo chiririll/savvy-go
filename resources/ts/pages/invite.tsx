@@ -31,7 +31,11 @@ export default function InvitePage() {
         void checkAuth()
     }, [checkAuth])
 
-    const { data: invitation, isPending, isError } = useQuery({
+    const {
+        data: invitation,
+        isPending,
+        isError,
+    } = useQuery({
         queryKey: ['invitation', token],
         queryFn: () => invitationsApi.preview(token),
         retry: false,
@@ -53,12 +57,13 @@ export default function InvitePage() {
         }
     }
 
-    const join = () => run(async () => {
-        const space = await invitationsApi.accept(token)
-        setCurrentId(space.id)
-        await queryClient.invalidateQueries({ queryKey: ['spaces'] })
-        navigate('/')
-    })
+    const join = () =>
+        run(async () => {
+            const space = await invitationsApi.accept(token)
+            setCurrentId(space.id)
+            await queryClient.invalidateQueries({ queryKey: ['spaces'] })
+            navigate('/')
+        })
 
     const register = (e: React.FormEvent) => {
         e.preventDefault()
@@ -105,24 +110,47 @@ export default function InvitePage() {
                                         <form onSubmit={register} className="space-y-3">
                                             <div className="space-y-1.5">
                                                 <Label htmlFor="name">{t('invite.name')}</Label>
-                                                <Input id="name" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                                                <Input
+                                                    id="name"
+                                                    required
+                                                    value={form.name}
+                                                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                                                />
                                             </div>
                                             <div className="space-y-1.5">
                                                 <Label htmlFor="email">{t('invite.email')}</Label>
-                                                <Input id="email" type="email" required readOnly={!!invitation.email} value={form.email}
-                                                    onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                                                <Input
+                                                    id="email"
+                                                    type="email"
+                                                    required
+                                                    readOnly={!!invitation.email}
+                                                    value={form.email}
+                                                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                                                />
                                             </div>
                                             <div className="space-y-1.5">
                                                 <Label htmlFor="password">{t('invite.password')}</Label>
-                                                <Input id="password" type="password" minLength={8} required value={form.password}
-                                                    onChange={(e) => setForm({ ...form, password: e.target.value })} />
+                                                <Input
+                                                    id="password"
+                                                    type="password"
+                                                    minLength={8}
+                                                    required
+                                                    value={form.password}
+                                                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+                                                />
                                             </div>
-                                            <Button type="submit" className="w-full" disabled={busy}>{t('invite.register')}</Button>
+                                            <Button type="submit" className="w-full" disabled={busy}>
+                                                {t('invite.register')}
+                                            </Button>
                                         </form>
                                     )}
                                     <p className="text-center text-sm text-muted-foreground">
                                         {t('invite.haveAccount')}{' '}
-                                        <Link to="/login" state={{ from: `/invite/${token}` }} className="font-medium text-foreground underline">
+                                        <Link
+                                            to="/login"
+                                            state={{ from: `/invite/${token}` }}
+                                            className="font-medium text-foreground underline"
+                                        >
                                             {t('invite.signIn')}
                                         </Link>
                                     </p>

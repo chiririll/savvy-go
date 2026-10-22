@@ -85,7 +85,7 @@ func (f *fakeService) source(clock *time.Time) *Source {
 	return s
 }
 
-func TestRatesAreWhatOneUnitIsWorthInTheBase(t *testing.T) {
+func TestRatesWhatOneUnitWorthBase(t *testing.T) {
 	clock := time.Now()
 	s := newFakeService(t).source(&clock)
 	rates, err := s.Rates(context.Background(), "usd")
@@ -135,7 +135,7 @@ func TestSignificant(t *testing.T) {
 }
 
 // Spaces with the same base share one request; each other base costs one.
-func TestSpacesWithTheSameBaseShareOneFetch(t *testing.T) {
+func TestSameBaseSharesOneFetch(t *testing.T) {
 	clock := time.Now()
 	f := newFakeService(t)
 	s := f.source(&clock)
@@ -149,7 +149,7 @@ func TestSpacesWithTheSameBaseShareOneFetch(t *testing.T) {
 	}
 }
 
-func TestExpireMakesEachBaseFetchOnceMore(t *testing.T) {
+func TestExpireRefetchesEachBase(t *testing.T) {
 	clock := time.Now()
 	f := newFakeService(t)
 	s := f.source(&clock)
@@ -185,7 +185,7 @@ func TestCacheExpiresAfterTTL(t *testing.T) {
 	}
 }
 
-func TestOldRatesServeWhileTheServiceIsDown(t *testing.T) {
+func TestOldRatesServeWhileServiceDown(t *testing.T) {
 	clock := time.Now()
 	f := newFakeService(t)
 	s := f.source(&clock)
@@ -235,7 +235,7 @@ func TestUnknownBaseIsAnError(t *testing.T) {
 	}
 }
 
-func TestCatalogCombinesNamesAndLiveRatesWithoutCaching(t *testing.T) {
+func TestCatalogCombinesNamesLiveRatesUncached(t *testing.T) {
 	clock := time.Now()
 	f := newFakeService(t)
 	s := f.source(&clock)
@@ -270,7 +270,7 @@ func TestCatalogCombinesNamesAndLiveRatesWithoutCaching(t *testing.T) {
 	}
 }
 
-func TestCatalogFallsBackToTheBuiltInList(t *testing.T) {
+func TestCatalogFallsBackBuiltInList(t *testing.T) {
 	list := NewOffline().Catalog(context.Background(), "eur")
 	if len(list) != len(fallback) {
 		t.Fatalf("%d currencies, want %d", len(list), len(fallback))
@@ -282,5 +282,36 @@ func TestCatalogFallsBackToTheBuiltInList(t *testing.T) {
 	// In euros: 1 EUR is 1, and 1 USD is worth 0.92 EUR.
 	if !rate["EUR"].Equal(dec("1")) || !rate["USD"].Equal(dec("0.92")) {
 		t.Fatalf("EUR=%s USD=%s", rate["EUR"], rate["USD"])
+	}
+}
+
+func TestCatalogStatusMarksFallbackList(t *testing.T) {
+	clock := time.Now()
+	f := newFakeService(t)
+	s := f.source(&clock)
+
+	if _, fallback := s.CatalogStatus(context.Background(), "usd"); fallback {
+		t.Fatal("the live list was reported as the built-in one")
+	}
+
+	// A server error on the names file: the short built-in list, and it says so.
+	broken := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "boom", http.StatusInternalServerError)
+	}))
+	t.Cleanup(broken.Close)
+	down := f.source(&clock)
+	down.MetaURL = broken.URL
+	list, fallback := down.CatalogStatus(context.Background(), "usd")
+	if !fallback || len(list) != len(fallbackMeta()) {
+		t.Fatalf("fallback=%v with %d currencies", fallback, len(list))
+	}
+	// Still the short list, and still said so, until the names can be fetched again.
+	if _, again := down.CatalogStatus(context.Background(), "usd"); !again {
+		t.Fatal("the flag was lost while the built-in list was in use")
+	}
+	down.MetaURL = f.srv.URL + "/meta.json"
+	clock = clock.Add(down.Retry + time.Second)
+	if _, recovered := down.CatalogStatus(context.Background(), "usd"); recovered {
+		t.Fatal("still reported as the built-in list after the service came back")
 	}
 }

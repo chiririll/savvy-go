@@ -58,7 +58,10 @@ export function EditTokenDialog({
                     <Button variant="outline" onClick={onClose}>
                         {tCommon('actions.cancel')}
                     </Button>
-                    <Button onClick={save} disabled={!hasSpaces(spaceChoice) || permissions.length === 0 || update.isPending}>
+                    <Button
+                        onClick={save}
+                        disabled={!hasSpaces(spaceChoice) || permissions.length === 0 || update.isPending}
+                    >
                         {tCommon('actions.save')}
                     </Button>
                 </>
@@ -67,7 +70,12 @@ export function EditTokenDialog({
             <div className="space-y-4">
                 <div className="space-y-2">
                     <Label>{t('api.create.spaces')}</Label>
-                    <SpacePicker idPrefix="edit-token-space" spaces={spaces} value={spaceChoice} onChange={setSpaceChoice} />
+                    <SpacePicker
+                        idPrefix="edit-token-space"
+                        spaces={spaces}
+                        value={spaceChoice}
+                        onChange={setSpaceChoice}
+                    />
                     {!hasSpaces(spaceChoice) && <p className="text-xs text-muted-foreground">{t('api.spaces.none')}</p>}
                 </div>
                 {changesSynced && <SyncWarning spaces={spaces} choice={spaceChoice} />}

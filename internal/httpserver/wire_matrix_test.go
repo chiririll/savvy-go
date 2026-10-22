@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -32,7 +33,8 @@ func newWireEnv(t *testing.T) *wireEnv {
 	e := &wireEnv{a: a, sess: a.issue(u, false), cur: map[string]int64{}, acct: map[string]int64{}}
 	for _, c := range moneytest.Currencies {
 		res := a.do("POST", "/api/currencies", map[string]any{
-			"code": c.Code, "name": c.Code, "symbol": c.Code, "decimals": c.Decimals, "rate": num(c.RateIn(moneytest.Currencies[0])),
+			"code": c.Code, "name": c.Code, "symbol": c.Code, "decimals": c.Decimals,
+			"rate": num(c.RateIn(moneytest.Currencies[0])),
 		}, e.sess.Token, e.sess.CSRF)
 		body := decodeJSON(t, res)
 		if res.StatusCode != http.StatusCreated {
@@ -55,7 +57,7 @@ func canonical(minor int64, decimals int) string {
 	return decimal.New(minor, -int32(decimals)).String()
 }
 
-func TestCurrencyAPIAcceptsEveryScaleAndRejectsOutOfRange(t *testing.T) {
+func TestCurrencyAPIChecksScaleRange(t *testing.T) {
 	e := newWireEnv(t) // creating every currency, zero and twelve decimals included, is the first check
 	post := func(body map[string]any) (int, map[string]any) {
 		res := e.a.do("POST", "/api/currencies", body, e.sess.Token, e.sess.CSRF)
@@ -67,10 +69,16 @@ func TestCurrencyAPIAcceptsEveryScaleAndRejectsOutOfRange(t *testing.T) {
 		body  map[string]any
 		field string // the validation error expected, "" for success
 	}{
-		{"decimals given as zero", map[string]any{"code": "KRW", "name": "Won", "symbol": "W", "decimals": 0, "rate": 0.00073}, ""},
-		{"decimals thirteen", map[string]any{"code": "TOO", "name": "x", "symbol": "x", "decimals": 13, "rate": 1}, "decimals"},
-		{"rate below the minimum", map[string]any{"code": "LOW", "name": "x", "symbol": "x", "decimals": 2, "rate": json.Number("0.0000000000000009")}, "rate"},
-		{"rate above the maximum", map[string]any{"code": "HIG", "name": "x", "symbol": "x", "decimals": 2, "rate": json.Number("1000000000000001")}, "rate"},
+		{"decimals given as zero",
+			map[string]any{"code": "KRW", "name": "Won", "symbol": "W", "decimals": 0, "rate": 0.00073}, ""},
+		{"decimals thirteen", map[string]any{"code": "TOO", "name": "x", "symbol": "x", "decimals": 13, "rate": 1},
+			"decimals"},
+		{"rate below the minimum",
+			map[string]any{"code": "LOW", "name": "x", "symbol": "x", "decimals": 2, "rate": json.Number("0.0000000000000009")},
+			"rate"},
+		{"rate above the maximum",
+			map[string]any{"code": "HIG", "name": "x", "symbol": "x", "decimals": 2, "rate": json.Number("1000000000000001")},
+			"rate"},
 		{"negative rate", map[string]any{"code": "NEG", "name": "x", "symbol": "x", "decimals": 2, "rate": -2}, "rate"},
 	} {
 		status, body := post(c.body)
@@ -92,7 +100,7 @@ func TestCurrencyAPIAcceptsEveryScaleAndRejectsOutOfRange(t *testing.T) {
 	}
 }
 
-func TestAmountsOnTheWireInEveryCurrency(t *testing.T) {
+func TestAmountsOnWireInEveryCurrency(t *testing.T) {
 	e := newWireEnv(t)
 	moneytest.ForEach(t, func(t *testing.T, c moneytest.Currency) {
 		balance := int64(0)
@@ -109,14 +117,17 @@ func TestAmountsOnTheWireInEveryCurrency(t *testing.T) {
 			}
 			balance += a.Minor
 			res = e.a.do("GET", "/api/accounts/"+itoa(e.acct[c.Code]), nil, e.sess.Token, "")
-			if body, want := rawBody(t, res), `"currentBalance":`+canonical(balance, c.Decimals)+`,`; !strings.Contains(body, want) {
+			if body, want := rawBody(t, res), `"currentBalance":`+canonical(balance, c.Decimals)+`,`; !strings.Contains(
+				body,
+				want,
+			) {
 				t.Fatalf("account %s does not contain %s", body, want)
 			}
 		})
 	})
 }
 
-func TestOutOfRangeAmountsAreRefusedOnTheWire(t *testing.T) {
+func TestOutRangeAmountsRefusedOnWire(t *testing.T) {
 	e := newWireEnv(t)
 	moneytest.ForEach(t, func(t *testing.T, c moneytest.Currency) {
 		moneytest.ForEachAmount(t, moneytest.Invalid(c.Decimals), func(t *testing.T, a moneytest.Amount) {
@@ -173,9 +184,48 @@ func TestConvertEndpointForEveryPair(t *testing.T) {
 			if res.StatusCode != http.StatusOK {
 				t.Fatalf("status %d: %s", res.StatusCode, rawBody(t, res))
 			}
-			if body, wantJSON := rawBody(t, res), `"result":`+canonical(want.Minor(), to.Decimals); !strings.Contains(body, wantJSON) {
+			if body, wantJSON := rawBody(t, res), `"result":`+canonical(want.Minor(), to.Decimals); !strings.Contains(
+				body,
+				wantJSON,
+			) {
 				t.Fatalf("%s does not contain %s", body, wantJSON)
 			}
 		})
 	})
+}
+
+func rawBody(t *testing.T, res *http.Response) string {
+	t.Helper()
+	defer res.Body.Close()
+	b, err := io.ReadAll(res.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
+
+// An exchange rate is a JSON number, not a string, and keeps the digits it was given.
+func TestCurrencyRateIsAJSONNumber(t *testing.T) {
+	a := newTestApp(t)
+	sess := a.issue(a.createUser("rate@test.com", "secret1", roleEditor), false)
+	for _, c := range []struct {
+		code     string
+		decimals int
+		rate     json.Number
+		base     bool
+	}{{"USD", 2, "1", true}, {"JPY", 0, "0.01", false}, {"BTC", 8, "50000", false}} {
+		res := a.do("POST", "/api/currencies", map[string]any{
+			"code": c.code, "name": c.code, "symbol": c.code, "decimals": c.decimals, "is_base": c.base, "rate": c.rate,
+		}, sess.Token, sess.CSRF)
+		status(t, res, http.StatusCreated, c.code)
+	}
+	body := rawBody(t, a.do("GET", "/api/currencies", nil, sess.Token, ""))
+	for _, want := range []string{`"rate":0.01`, `"rate":50000`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("currencies response %s does not contain %s", body, want)
+		}
+	}
+	if strings.Contains(body, `"rate":"`) {
+		t.Errorf("rate must be a JSON number, got %s", body)
+	}
 }

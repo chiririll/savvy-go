@@ -41,7 +41,13 @@ type Client struct {
 	CreatedAt    time.Time
 }
 
-func (r Repo) InsertClient(ctx context.Context, id, name string, redirectURIs []string, info RequestInfo, now time.Time) error {
+func (r Repo) InsertClient(
+	ctx context.Context,
+	id, name string,
+	redirectURIs []string,
+	info RequestInfo,
+	now time.Time,
+) error {
 	raw, err := json.Marshal(redirectURIs)
 	if err != nil {
 		return err
@@ -53,7 +59,11 @@ func (r Repo) InsertClient(ctx context.Context, id, name string, redirectURIs []
 }
 
 func toClient(row sqlc.OauthClient) (*Client, error) {
-	c := Client{ID: row.ClientID, Name: row.Name, Request: RequestInfo{IP: row.Ip, UserAgent: row.UserAgent, Origin: row.Origin}}
+	c := Client{
+		ID:      row.ClientID,
+		Name:    row.Name,
+		Request: RequestInfo{IP: row.Ip, UserAgent: row.UserAgent, Origin: row.Origin},
+	}
 	if err := json.Unmarshal([]byte(row.RedirectUris), &c.RedirectURIs); err != nil {
 		return nil, err
 	}
@@ -144,7 +154,13 @@ func (r Repo) RefreshByHash(ctx context.Context, hash string) (*Refresh, error) 
 // RotateRefresh swaps the token's hash and access token, but only while it
 // still holds oldHash, so a replayed token cannot rotate twice. It reports
 // whether it changed the row.
-func (r Repo) RotateRefresh(ctx context.Context, id int64, oldHash, newHash string, apiTokenID int64, expires time.Time) (bool, error) {
+func (r Repo) RotateRefresh(
+	ctx context.Context,
+	id int64,
+	oldHash, newHash string,
+	apiTokenID int64,
+	expires time.Time,
+) (bool, error) {
 	res, err := r.q().RotateOAuthRefresh(ctx, sqlc.RotateOAuthRefreshParams{
 		TokenHash: newHash, ApiTokenID: apiTokenID, ExpiresAt: db.FormatTime(expires), ID: id, TokenHash_2: oldHash,
 	})

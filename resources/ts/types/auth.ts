@@ -10,6 +10,12 @@ export interface User {
     emailVerified?: boolean
 }
 
+/** What a change to the account's credentials carries to prove it is the owner: the password, or with 2FA a code. */
+export interface ConfirmFields {
+    current_password?: string
+    code?: string
+}
+
 export interface LoginCredentials {
     email: string
     password: string

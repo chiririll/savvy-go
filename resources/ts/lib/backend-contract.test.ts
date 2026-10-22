@@ -2,18 +2,25 @@ import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-import { ACCOUNT_TYPES } from '@/types/accounts'
-import { API_PERMISSION_LEVELS } from '@/types/api-tokens'
-import { ACTION_TYPES, CONDITION_OPERATORS, TRIGGER_TYPES } from '@/types/automation'
-import { BACKUP_STATUSES } from '@/types/backup'
-import { BUDGET_PERIODS } from '@/types/budgets'
-import { CHECK_IDS, CHECK_SEVERITIES } from '@/types/checks'
-import { CATEGORY_TYPES } from '@/types/categories'
-import { DEBT_TYPE_VALUES } from '@/types/debts'
-import { MAIL_PROTOCOLS } from '@/types/mail'
-import { RECURRING_FREQUENCIES } from '@/types/recurring'
-import { SPACE_ROLES, TRANSFER_REVIEWS } from '@/types/spaces'
-import { ALL_TRANSACTION_TYPES, TRANSACTION_STATUSES } from '@/types/transactions'
+import {
+    ACCOUNT_TYPES,
+    API_PERMISSION_LEVELS,
+    ACTION_TYPES,
+    CONDITION_OPERATORS,
+    TRIGGER_TYPES,
+    BACKUP_STATUSES,
+    BUDGET_PERIODS,
+    CHECK_IDS,
+    CHECK_SEVERITIES,
+    CATEGORY_TYPES,
+    DEBT_TYPE_VALUES,
+    MAIL_PROTOCOLS,
+    RECURRING_FREQUENCIES,
+    SPACE_ROLES,
+    TRANSFER_REVIEWS,
+    ALL_TRANSACTION_TYPES,
+    TRANSACTION_STATUSES,
+} from '@/types'
 import { USER_ROLES } from '@/types/users'
 import { canWriteSpace } from '@/lib/ability'
 import { SSO_ERROR_CODES } from '@/lib/labels'
@@ -54,7 +61,9 @@ const quoted = (text: string) => [...text.matchAll(/"([a-z_]+)"/g)].map((m) => m
 /** The values of a `CHECK (column IN ('a', 'b'))` constraint, per `table.column`. */
 function sqlEnums(file: string): Map<string, string[]> {
     const enums = new Map<string, string[]>()
-    for (const table of read(file).split(/CREATE TABLE/i).slice(1)) {
+    for (const table of read(file)
+        .split(/CREATE TABLE/i)
+        .slice(1)) {
         const name = /^\s*(?:IF NOT EXISTS\s+)?(\w+)/.exec(table)![1]
         for (const m of table.matchAll(/(\w+)\s+TEXT[^\n]*?CHECK\s*\(\s*\1\s+IN\s*\(([^)]*)\)\s*\)/g)) {
             enums.set(`${name}.${m[1]}`, sorted(m[2].match(/'([^']*)'/g)!.map((v) => v.slice(1, -1))))
@@ -118,7 +127,7 @@ describe('frontend value lists', () => {
 
 describe('automation', () => {
     it('knows every condition operator the backend evaluates', () => {
-        const body = goFunc('internal/automation/automation.go', 'func evaluateCondition(')
+        const body = goFunc('internal/automation/conditions.go', 'func evaluateCondition(')
         expect(sorted(CONDITION_OPERATORS)).toEqual(sorted(quoted(body.match(/case [^\n]*:/g)!.join('\n'))))
     })
 
@@ -130,14 +139,14 @@ describe('automation', () => {
 
 describe('mail protocols', () => {
     it('are the ones the mailer accepts', () => {
-        const source = read('internal/mailer/mailer.go')
+        const source = read('internal/mail/smtp/mailer.go')
         const fromGo = [...source.matchAll(/^	[A-Za-z]+\s+= "([a-z]+)"\s+\/\//gm)].map((m) => m[1])
         expect(sorted(MAIL_PROTOCOLS)).toEqual(sorted(fromGo))
     })
 })
 
 describe('server checks', () => {
-    const source = () => read('internal/httpserver/checks.go')
+    const source = () => read('internal/httpserver/admin/checks/checks.go')
 
     it('are the ids the backend reports', () => {
         const fromGo = [...source().matchAll(/add\("([a-z_]+)"/g)].map((m) => m[1])
@@ -159,7 +168,7 @@ describe('server checks', () => {
 
 describe('backup status', () => {
     it('is one of the statuses the API can return', () => {
-        const body = goFunc('internal/httpserver/dto/dto.go', 'func NewBackup(')
+        const body = goFunc('internal/httpserver/httpx/dto/backups.go', 'func NewBackup(')
         const fromGo = [...body.matchAll(/status\s*:?=\s*"([a-z]+)"/g)].map((m) => m[1])
         expect(sorted(BACKUP_STATUSES)).toEqual(sorted(fromGo))
     })
@@ -191,22 +200,44 @@ describe('space audit log', () => {
     })
 })
 
+const SPACE_DATA_PACKAGES = [
+    'currencies',
+    'accounts',
+    'categories',
+    'tags',
+    'transactions',
+    'imports',
+    'debts',
+    'reports',
+    'recurring',
+    'budgets',
+    'automation',
+    'upload',
+]
+
 describe('API routes', () => {
     it('sends every space data route through /spaces/{id}', () => {
-        const body = goFunc('internal/httpserver/server.go', 'func dataRoutes(')
-        const roots = [...body.matchAll(/r\.(?:Get|Post|Put|Patch|Delete)\("\/([^/"{]+)/g)].map((m) => m[1])
+        // Each data domain is a package under internal/httpserver that mounts its own Routes.
+        const bodies = SPACE_DATA_PACKAGES.map((pkg) => {
+            const file = `internal/httpserver/api/${pkg}/routes.go`
+            const signature = read(file).includes('func Routes(') ? 'func Routes(' : ') Routes('
+            return goFunc(file, signature)
+        })
+        const roots = bodies.flatMap((body) =>
+            [...body.matchAll(/r\.(?:Get|Post|Put|Patch|Delete)\("\/([^/"{]+)/g)].map((m) => m[1]),
+        )
         expect(roots.length).toBeGreaterThan(50)
         expect(sorted(SPACE_ROOTS)).toEqual(sorted(roots))
     })
 })
 
 describe('API token permissions', () => {
-    const source = read('internal/auth/permissions.go')
+    const source = read('internal/auth/permissions/permissions.go')
 
     // The parts of a space and the presets come from the server (api-token-capabilities);
     // only the order of the levels, which the grid ticks by, lives here.
     it('orders the levels the backend grants', () => {
-        const levels = [...source.matchAll(/Perm(?:Read|Write|Delete)\s*= "([a-z]+)"/g)].map((m) => m[1])
+        const levels = [...source.matchAll(/^\s*(?:Read|Write|Delete)\s*= "([a-z]+)"/gm)].map((m) => m[1])
         expect(sorted(API_PERMISSION_LEVELS)).toEqual(sorted(levels))
     })
 

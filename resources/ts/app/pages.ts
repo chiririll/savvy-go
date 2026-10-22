@@ -43,8 +43,8 @@ export const pages = {
     importSettings: { path: '/settings/import', scope: 'space' },
     spaceBackups: { path: '/settings/backups', scope: 'space' },
 
-    userSettings: { path: '/settings/user', scope: 'user' },
     securitySettings: { path: '/settings/security', scope: 'user' },
+    passkeySettings: { path: '/settings/passkeys', scope: 'user' },
     apiSettings: { path: '/settings/api', scope: 'user' },
     oauthConsent: { path: '/oauth/consent', scope: 'user' },
 

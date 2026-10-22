@@ -7,10 +7,10 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	"savvy-go/internal/calendar"
 	repo "savvy-go/internal/db/repo/recurring"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/money"
+	"savvy-go/internal/platform/calendar"
 	"savvy-go/internal/store"
 )
 
@@ -130,11 +130,8 @@ func (s Service) Create(ctx context.Context, in Input) (*Recurring, error) {
 	return s.ByID(ctx, id)
 }
 
-func (s Service) Update(ctx context.Context, id int64, in Input) (*Recurring, error) {
-	cur, err := s.ByID(ctx, id)
-	if err != nil || cur == nil {
-		return cur, err
-	}
+// fillFromCurrent keeps the stored value for every required field in left empty.
+func fillFromCurrent(in *Input, cur *Recurring) {
 	if in.Type == "" {
 		in.Type = cur.Type
 	}
@@ -153,6 +150,14 @@ func (s Service) Update(ctx context.Context, id int64, in Input) (*Recurring, er
 	if in.StartDate == "" {
 		in.StartDate = cur.StartDate
 	}
+}
+
+func (s Service) Update(ctx context.Context, id int64, in Input) (*Recurring, error) {
+	cur, err := s.ByID(ctx, id)
+	if err != nil || cur == nil {
+		return cur, err
+	}
+	fillFromCurrent(&in, cur)
 	next := cur.NextRunDate
 	if in.StartDate != cur.StartDate {
 		next = in.StartDate

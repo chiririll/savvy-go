@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
+import en from '@/locales/en/defaults.json'
+import ru from '@/locales/ru/defaults.json'
 import { defaultNameKey, localizeDefaultName, toStoredDefaultName } from './localized-name'
 
 // Only SALARY and FOOD have a translation.
@@ -67,5 +69,16 @@ describe('toStoredDefaultName', () => {
 
     it('does not reuse the original when it was a custom name', () => {
         expect(toStoredDefaultName('Mine', 'Mine')).toBe('Mine')
+    })
+})
+
+describe('default name locales', () => {
+    const names = (file: object) => Object.keys(file).sort()
+
+    it('translate the same categories, hints and tags in both languages', () => {
+        for (const group of ['categories', 'categoryHints', 'tags']) {
+            expect(names(ru[group as keyof typeof ru])).toEqual(names(en[group as keyof typeof en]))
+        }
+        expect(names(en.categoryHints)).toEqual(names(en.categories))
     })
 })

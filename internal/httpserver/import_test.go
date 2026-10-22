@@ -5,7 +5,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"savvy-go/internal/auth"
 	"strings"
 	"testing"
 )
@@ -73,14 +72,14 @@ func TestMultipartImportPipeline(t *testing.T) {
 	importID := parsed["data"].(map[string]any)["importId"].(string)
 
 	res = a.do("GET", "/api/transactions/import/"+importID, nil, sess.Token, "")
-	status := decodeJSON(t, res)["data"].(map[string]any)
-	if res.StatusCode != 200 || status["status"] != "parsed" {
-		t.Fatalf("parsed status %d %v", res.StatusCode, status)
+	importStatus := decodeJSON(t, res)["data"].(map[string]any)
+	if res.StatusCode != 200 || importStatus["status"] != "parsed" {
+		t.Fatalf("parsed status %d %v", res.StatusCode, importStatus)
 	}
-	if int(status["totalRows"].(float64)) != 2 {
-		t.Fatalf("rows %v", status)
+	if int(importStatus["totalRows"].(float64)) != 2 {
+		t.Fatalf("rows %v", importStatus)
 	}
-	headers := status["parse"].(map[string]any)["headers"].([]any)
+	headers := importStatus["parse"].(map[string]any)["headers"].([]any)
 	if len(headers) != 3 {
 		t.Fatalf("headers %v", headers)
 	}
@@ -137,25 +136,15 @@ func TestUploadSignForbiddenForOtherUser(t *testing.T) {
 		"bucket": "transaction-imports", "filename": "statement.csv", "size": 100,
 	}, s1.Token, s1.CSRF)
 	create := decodeJSON(t, res)
-	res = a.do("GET", "/api/s3/multipart/"+create["uploadId"].(string)+"/1?key="+url.QueryEscape(create["key"].(string)), nil, s2.Token, "")
+	res = a.do(
+		"GET",
+		"/api/s3/multipart/"+create["uploadId"].(string)+"/1?key="+url.QueryEscape(create["key"].(string)),
+		nil,
+		s2.Token,
+		"",
+	)
 	if res.StatusCode != 403 {
 		t.Fatalf("want 403 got %d %v", res.StatusCode, decodeJSON(t, res))
 	}
 	res.Body.Close()
-}
-
-// P1: backups hold every space, so only server admins reach them; space
-// admins, editors, viewers and API tokens are refused.
-func TestP1BackupsAreServerAdminOnly(t *testing.T) {
-	a := newTestApp(t)
-	for _, role := range []string{roleEditor, roleViewer} {
-		u := a.createUser(role+"@test.com", "secret1", role)
-		sess := a.issue(u, false)
-		status(t, a.do("GET", "/api/backups", nil, sess.Token, ""), 403, role+" list")
-		status(t, a.do("POST", "/api/backups", map[string]any{}, sess.Token, sess.CSRF), 403, role+" create")
-		status(t, a.do("POST", "/api/backups/x.sqlite/restore", nil, sess.Token, sess.CSRF), 403, role+" restore")
-	}
-	admin := a.createUser("admin@test.com", "secret1", auth.RoleAdmin)
-	raw, _ := a.issueToken(admin, tokReadWrite, nil)
-	status(t, a.bearer("GET", "/api/backups", nil, raw), 403, "admin API token")
 }

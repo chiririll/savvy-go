@@ -48,7 +48,10 @@ func UpgradeLegacyTOTPSecrets(ctx context.Context, sqlDB *sql.DB, appKey string)
 			continue
 		}
 		if plain, ok := UnwrapSecret(appKey, r.TwoFactorSecret.String); ok {
-			err = q.UpdateUserTwoFactorSecret(ctx, sqlc.UpdateUserTwoFactorSecretParams{TwoFactorSecret: db.NS(plain), UpdatedAt: now, ID: r.ID})
+			err = q.UpdateUserTwoFactorSecret(
+				ctx,
+				sqlc.UpdateUserTwoFactorSecretParams{TwoFactorSecret: db.NS(plain), UpdatedAt: now, ID: r.ID},
+			)
 			unwrapped++
 		} else {
 			err = q.SetUserTwoFactor(ctx, sqlc.SetUserTwoFactorParams{UpdatedAt: now, ID: r.ID})

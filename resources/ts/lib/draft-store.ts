@@ -14,7 +14,10 @@ export function sameShape(empty: unknown, stored: unknown): boolean {
         if (typeof stored !== 'object' || stored === null || Array.isArray(stored)) return false
         const keys = Object.keys(empty)
         if (keys.length !== Object.keys(stored).length) return false
-        return keys.every((k) => k in stored && sameShape((empty as Record<string, unknown>)[k], (stored as Record<string, unknown>)[k]))
+        return keys.every(
+            (k) =>
+                k in stored && sameShape((empty as Record<string, unknown>)[k], (stored as Record<string, unknown>)[k]),
+        )
     }
     return typeof empty === typeof stored
 }
@@ -84,8 +87,8 @@ export function createDraftStore<T extends object>({ key, empty, accept }: Optio
                 storage: createJSONStorage(() => storage),
                 partialize: (state) => ({ draft: state.draft }),
                 skipHydration: true,
-            }
-        )
+            },
+        ),
     )
 
     /** Loads the draft of the signed-in user; call when the screen that edits it opens. */

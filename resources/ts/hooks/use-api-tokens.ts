@@ -1,9 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { apiTokensApi } from '@/api'
-import type { UpdateApiTokenInput } from '@/types'
+import type { CreateApiTokenInput, UpdateApiTokenInput } from '@/types'
 import i18n from '@/lib/i18n'
 import { getApiErrorMessage } from '@/lib/api-error'
+import { isConfirmCancelled, withConfirmation } from '@/stores/confirm'
 
 const QUERY_KEY = ['api-tokens']
 
@@ -27,12 +28,13 @@ export function useCreateApiToken() {
     const queryClient = useQueryClient()
 
     return useMutation({
-        mutationFn: apiTokensApi.create,
+        mutationFn: (input: CreateApiTokenInput) => withConfirmation((fields) => apiTokensApi.create(input, fields)),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: QUERY_KEY })
             toast.success(i18n.t('toasts.apiToken.created'))
         },
         onError: (error: unknown) => {
+            if (isConfirmCancelled(error)) return
             toast.error(getApiErrorMessage(error, i18n.t('toasts.apiToken.createFailed')))
         },
     })
@@ -42,12 +44,14 @@ export function useUpdateApiToken() {
     const queryClient = useQueryClient()
 
     return useMutation({
-        mutationFn: ({ id, input }: { id: number; input: UpdateApiTokenInput }) => apiTokensApi.update(id, input),
+        mutationFn: ({ id, input }: { id: number; input: UpdateApiTokenInput }) =>
+            withConfirmation((fields) => apiTokensApi.update(id, input, fields)),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: QUERY_KEY })
             toast.success(i18n.t('toasts.apiToken.updated'))
         },
         onError: (error: unknown) => {
+            if (isConfirmCancelled(error)) return
             toast.error(getApiErrorMessage(error, i18n.t('toasts.apiToken.updateFailed')))
         },
     })

@@ -85,7 +85,8 @@ func rowOf(x sqlc.ListRecurringRow) Row {
 // List lists templates, newest first by the query's order; activeOnly keeps
 // the active ones, limit caps the count.
 func (r Repo) List(ctx context.Context, activeOnly bool, limit int) ([]Row, error) {
-	rows, err := r.q().ListRecurring(ctx, sqlc.ListRecurringParams{ActiveOnly: db.Flag(activeOnly), Limit: int64(limit), Offset: 0})
+	rows, err := r.q().
+		ListRecurring(ctx, sqlc.ListRecurringParams{ActiveOnly: db.Flag(activeOnly), Limit: int64(limit), Offset: 0})
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +168,8 @@ func (r Repo) SetTags(ctx context.Context, id int64, tagIDs []int64) error {
 		return err
 	}
 	for _, tagID := range tagIDs {
-		if err := r.q().InsertRecurringTag(ctx, sqlc.InsertRecurringTagParams{RecurringTransactionID: id, TagID: tagID}); err != nil {
+		if err := r.q().InsertRecurringTag(ctx,
+			sqlc.InsertRecurringTagParams{RecurringTransactionID: id, TagID: tagID}); err != nil {
 			return err
 		}
 	}

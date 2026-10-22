@@ -7,26 +7,15 @@ import (
 	"savvy-go/internal/auth"
 )
 
-func TestPendingAndConfirmedTransactions(t *testing.T) {
+func TestPendingConfirmedTransactions(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("rw@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 
-	res := a.do("POST", "/api/currencies", map[string]any{
-		"code": "USD", "name": "US Dollar", "symbol": "$", "decimals": 2, "is_base": true, "rate": 1,
-	}, sess.Token, sess.CSRF)
-	usdID := int64(decodeJSON(t, res)["data"].(map[string]any)["id"].(float64))
-
-	res = a.do("POST", "/api/accounts", map[string]any{
-		"name": "Cash", "type": "cash", "currency_id": usdID, "initial_balance": 1000,
-	}, sess.Token, sess.CSRF)
-	accID := int64(decodeJSON(t, res)["data"].(map[string]any)["id"].(float64))
-
-	res = a.do("POST", "/api/categories", map[string]any{"name": "Food", "type": "expense"}, sess.Token, sess.CSRF)
-	catID := int64(decodeJSON(t, res)["data"].(map[string]any)["id"].(float64))
+	accID, catID := seedMoney(t, a, sess)
 
 	tomorrow := time.Now().UTC().AddDate(0, 0, 1).Format("2006-01-02")
-	res = a.do("POST", "/api/transactions", map[string]any{
+	res := a.do("POST", "/api/transactions", map[string]any{
 		"type": "expense", "account_id": accID, "category_id": catID, "amount": 50, "date": tomorrow,
 	}, sess.Token, sess.CSRF)
 	body := decodeJSON(t, res)
@@ -60,21 +49,14 @@ func TestPendingAndConfirmedTransactions(t *testing.T) {
 	}
 }
 
-func TestDebtCreateLendAndBorrow(t *testing.T) {
+func TestDebtCreateLendBorrow(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("d@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
 
-	res := a.do("POST", "/api/currencies", map[string]any{
-		"code": "USD", "name": "US Dollar", "symbol": "$", "decimals": 2, "is_base": true, "rate": 1,
-	}, sess.Token, sess.CSRF)
-	usdID := int64(decodeJSON(t, res)["data"].(map[string]any)["id"].(float64))
-	res = a.do("POST", "/api/accounts", map[string]any{
-		"name": "Cash", "type": "cash", "currency_id": usdID, "initial_balance": 1000,
-	}, sess.Token, sess.CSRF)
-	accID := int64(decodeJSON(t, res)["data"].(map[string]any)["id"].(float64))
+	accID, _ := seedMoney(t, a, sess)
 
-	res = a.do("POST", "/api/debts", map[string]any{
+	res := a.do("POST", "/api/debts", map[string]any{
 		"origin": "new", "name": "Loan to Ivan", "debt_type": "owed_to_me",
 		"account_id": accID, "amount": 200, "date": "2026-09-01",
 	}, sess.Token, sess.CSRF)
@@ -118,7 +100,7 @@ func listTxIDs(t *testing.T, a *testApp, sess *auth.Issued, query string) (ids [
 	return ids, body["meta"].(map[string]any)["total"].(float64)
 }
 
-func TestTransactionsListSortAndFilters(t *testing.T) {
+func TestTransactionsListSortFilters(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("sort@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
@@ -130,8 +112,14 @@ func TestTransactionsListSortAndFilters(t *testing.T) {
 		}
 		return int64(body["data"].(map[string]any)["id"].(float64))
 	}
-	usd := mk("/api/currencies", map[string]any{"code": "USD", "name": "US Dollar", "symbol": "$", "decimals": 2, "is_base": true, "rate": 1})
-	eur := mk("/api/currencies", map[string]any{"code": "EUR", "name": "Euro", "symbol": "E", "decimals": 2, "is_base": false, "rate": 2})
+	usd := mk(
+		"/api/currencies",
+		map[string]any{"code": "USD", "name": "US Dollar", "symbol": "$", "decimals": 2, "is_base": true, "rate": 1},
+	)
+	eur := mk(
+		"/api/currencies",
+		map[string]any{"code": "EUR", "name": "Euro", "symbol": "E", "decimals": 2, "is_base": false, "rate": 2},
+	)
 	usdAcc := mk("/api/accounts", map[string]any{"name": "USD", "type": "cash", "currency_id": usd, "initial_balance": 0})
 	eurAcc := mk("/api/accounts", map[string]any{"name": "EUR", "type": "cash", "currency_id": eur, "initial_balance": 0})
 	food := mk("/api/categories", map[string]any{"name": "Food", "type": "expense"})
@@ -139,9 +127,25 @@ func TestTransactionsListSortAndFilters(t *testing.T) {
 	tag := mk("/api/tags", map[string]any{"name": "trip"})
 
 	// raw 100 USD = 100 base; raw 80 EUR = 160 base; raw 30 USD = 30 base; undated pending
-	big := mk("/api/transactions", map[string]any{"type": "expense", "account_id": usdAcc, "category_id": food, "amount": 100, "date": "2026-01-02"})
-	eurTx := mk("/api/transactions", map[string]any{"type": "expense", "account_id": eurAcc, "category_id": fun, "amount": 80, "date": "2026-01-03", "tag_ids": []int64{tag}})
-	small := mk("/api/transactions", map[string]any{"type": "expense", "account_id": usdAcc, "category_id": food, "amount": 30, "date": "2026-01-01"})
+	big := mk(
+		"/api/transactions",
+		map[string]any{"type": "expense", "account_id": usdAcc, "category_id": food, "amount": 100, "date": "2026-01-02"},
+	)
+	eurTx := mk(
+		"/api/transactions",
+		map[string]any{
+			"type":        "expense",
+			"account_id":  eurAcc,
+			"category_id": fun,
+			"amount":      80,
+			"date":        "2026-01-03",
+			"tag_ids":     []int64{tag},
+		},
+	)
+	small := mk(
+		"/api/transactions",
+		map[string]any{"type": "expense", "account_id": usdAcc, "category_id": food, "amount": 30, "date": "2026-01-01"},
+	)
 	undated := mk("/api/transactions", map[string]any{"type": "expense", "account_id": usdAcc, "amount": 5})
 
 	eq := func(name string, got, want []int64) {
@@ -177,5 +181,52 @@ func TestTransactionsListSortAndFilters(t *testing.T) {
 	eq("tag_ids filter", got, []int64{eurTx})
 	if total != 1 {
 		t.Fatalf("tag total %v", total)
+	}
+}
+
+func TestEstimatedFlagOnlyKeptPendingTransactions(t *testing.T) {
+	a := newTestApp(t)
+	u := a.createUser("est2@test.com", "secret1", roleEditor)
+	sess := a.issue(u, false)
+	accID, catID := seedMoney(t, a, sess)
+	today := time.Now().UTC().Format("2006-01-02")
+
+	res := a.do("POST", "/api/transactions", map[string]any{
+		"type": "expense", "account_id": accID, "category_id": catID, "amount": 10,
+		"date": today, "is_estimated": true,
+	}, sess.Token, sess.CSRF)
+	if got := decodeJSON(t, res)["data"].(map[string]any); got["status"] != "confirmed" || got["isEstimated"] != false {
+		t.Fatalf("confirmed transaction cannot be an estimate: %v", got)
+	}
+
+	res = a.do("POST", "/api/transactions", map[string]any{
+		"type": "expense", "account_id": accID, "category_id": catID, "amount": 10, "is_estimated": true,
+	}, sess.Token, sess.CSRF)
+	got := decodeJSON(t, res)["data"].(map[string]any)
+	if got["status"] != "pending" || got["isEstimated"] != true {
+		t.Fatalf("deferred transaction should be estimated: %v", got)
+	}
+	res = a.do("POST", "/api/transactions/"+itoa(int64(got["id"].(float64)))+"/confirm",
+		map[string]any{"date": today}, sess.Token, sess.CSRF)
+	if out := decodeJSON(t, res)["data"].(map[string]any); out["isEstimated"] != false || out["amount"].(float64) != 10 {
+		t.Fatalf("confirm without amount accepts the estimate: %v", out)
+	}
+
+	res = a.do("POST", "/api/transactions", map[string]any{
+		"type": "expense", "account_id": accID, "category_id": catID, "amount": 10,
+	}, sess.Token, sess.CSRF)
+	exact := decodeJSON(t, res)["data"].(map[string]any)
+	res = a.do("POST", "/api/transactions/"+itoa(int64(exact["id"].(float64)))+"/confirm",
+		map[string]any{"date": today, "amount": 12}, sess.Token, sess.CSRF)
+	if res.StatusCode != 422 {
+		t.Fatalf("only an estimate can be confirmed with another amount, got %d", res.StatusCode)
+	}
+
+	res = a.do("POST", "/api/transactions", map[string]any{
+		"type": "expense", "account_id": accID, "category_id": catID, "amount": 10, "is_estimated": true,
+		"items": []map[string]any{{"name": "Milk", "quantity": 2, "price_per_unit": 5}},
+	}, sess.Token, sess.CSRF)
+	if got := decodeJSON(t, res)["data"].(map[string]any); got["isEstimated"] != false {
+		t.Fatalf("items fix the amount, so it is not an estimate: %v", got)
 	}
 }

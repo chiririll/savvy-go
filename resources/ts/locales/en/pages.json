@@ -87,7 +87,7 @@
         "resetPassword": "Reset password",
         "sendResetEmail": "Email a reset link",
         "inviteLinkTitle": "Set-password link",
-        "inviteLinkDescription": "Copy this link and send it to the user. It is shown only once and expires in 7 days.",
+        "inviteLinkDescription": "Copy this link and send it to the user. It is shown only once and works until {{date}}.",
         "columns": {
             "user": "User",
             "email": "Email",
@@ -164,6 +164,8 @@
         "clear": "Clear",
         "dateRange": "Date range",
         "to": "to",
+        "dateFrom": "From",
+        "dateTo": "To",
         "categories": "Categories",
         "tags": "Tags",
         "sort": {
@@ -462,6 +464,7 @@
     },
     "dashboard": {
         "title": "Dashboard",
+        "period": "Period",
         "welcome": "Welcome to your finance dashboard",
         "totalBalance": "Total balance",
         "income": "Income",

@@ -1,37 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useMutation } from '@tanstack/react-query'
-import { Check, Copy, Loader2 } from 'lucide-react'
-import { toast } from 'sonner'
-import { ResponsiveDialog } from '@/components/shared/ResponsiveDialog'
-import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { spacesApi } from '@/api/spaces'
-import { getApiErrorMessage } from '@/lib/api-error'
-import { useServerCurrencyCatalog, useSpaceContent, useSpacePresets, useSpaces, useSwitchSpace } from '@/hooks/use-spaces'
-import { loadSpaceDraft, useSpaceDraftStore } from '@/stores/space-draft'
+import { ResponsiveDialog } from '@/components/shared/dialogs/ResponsiveDialog'
+import { useSwitchSpace } from '@/hooks/use-spaces'
 import type { Space } from '@/types/spaces'
-import { testId } from '@/lib/test-id'
-import { InvitationRow } from './InvitationRow'
-import { EntitiesStep } from './create/EntitiesStep'
-import { MembersStep } from './create/MembersStep'
-import { sendInvitations, type InvitationOutcome } from './create/send-invitations'
-import {
-    buildContent,
-    COPY_KINDS,
-    draftProblems,
-    nextStep,
-    previousStep,
-    toCopySource,
-    toRequest,
-    type CopyKind,
-    type DraftInvitation,
-    type DraftContent,
-    type DraftStep,
-} from './create/draft'
+import { DoneFooter, DoneStep } from './create/DoneStep'
+import { useInviteAfterCreate } from './create/useInviteAfterCreate'
+import { useWizardStep } from './create/useWizardStep'
 
 interface Props {
     open: boolean
@@ -46,278 +20,48 @@ interface Props {
  */
 export function CreateSpaceModal({ open, onOpenChange, dismissible = true }: Props) {
     const { t } = useTranslation('settings')
-    const draft = useSpaceDraftStore((state) => state.draft)
-    const update = useSpaceDraftStore((state) => state.update)
-    const clear = useSpaceDraftStore((state) => state.clear)
     const switchSpace = useSwitchSpace()
-    const { data: spaces = [] } = useSpaces()
-    const presets = useSpacePresets(open)
-    const catalog = useServerCurrencyCatalog(open)
-    const [loaded, setLoaded] = useState(false)
     const [created, setCreated] = useState<Space | null>(null)
-    // Inviting is optional and comes after the space exists; the list is not part of the draft.
-    const [inviting, setInviting] = useState(false)
-    const [invitations, setInvitations] = useState<DraftInvitation[]>([])
-    // Set once the invitations went out and there is something to show (a link to copy, a refusal).
-    const [sent, setSent] = useState<InvitationOutcome[] | null>(null)
-    const [copied, setCopied] = useState<string | null>(null)
 
-    const otherSpaces = spaces.length
-    // Copying needs to read the other space; a source that is gone is ignored.
-    const sourceId = draft.sourceId !== null && spaces.some((s) => s.id === draft.sourceId) ? draft.sourceId : null
-    const source = useSpaceContent(open && draft.step === 'copy' ? sourceId : null)
-
-    useEffect(() => {
-        if (!open) return
-        let cancelled = false
-        setLoaded(false)
-        void loadSpaceDraft().then(() => !cancelled && setLoaded(true))
-        return () => {
-            cancelled = true
-        }
-    }, [open])
-
-    // A draft saved on the copy step can come back when there is nothing to copy from.
-    const step: DraftStep = draft.step === 'copy' && otherSpaces === 0 ? 'name' : draft.step
-    const problems = useMemo(() => draftProblems(draft), [draft])
-
-    const create = useMutation({
-        mutationFn: () => spacesApi.create(toRequest(draft)),
-        onSuccess: (space) => {
-            clear()
-            setCreated(space)
-        },
-        onError: (error) => toast.error(getApiErrorMessage(error, t('spaces.create.failed'))),
-    })
-
-    // The invitations go out when the done screen is left. Links and refusals need reading, so then it stays.
-    const invite = useMutation({
-        mutationFn: () => sendInvitations(created!.id, invitations),
-        onSuccess: (outcomes) => (outcomes.some((o) => o.link || o.error) ? setSent(outcomes) : void finish()),
-        onError: (error) => toast.error(getApiErrorMessage(error, t('spaces.create.failed'))),
-    })
+    const done = useInviteAfterCreate(created, () => void finish())
+    const wizard = useWizardStep({ open, onClose: () => onOpenChange(false), dismissible, onCreated: setCreated })
 
     const finish = async () => {
         const space = created
         setCreated(null)
-        setInviting(false)
-        setInvitations([])
-        setSent(null)
+        done.reset()
         onOpenChange(false)
         if (space) await switchSpace(space.id)
     }
 
-    const leaveDone = () => (invitations.length > 0 && !sent ? invite.mutate() : void finish())
-
     const requestClose = (next: boolean) => {
         if (next) return onOpenChange(true)
-        if (created) return leaveDone()
+        if (created) return done.leave()
         if (dismissible) onOpenChange(false)
     }
 
-    const content: DraftContent = draft
-    const kindLabels: Record<CopyKind, string> = {
-        currencies: t('spaces.create.copy.kinds.currencies'),
-        accounts: t('spaces.create.copy.kinds.accounts'),
-        categories: t('spaces.create.copy.kinds.categories'),
-        tags: t('spaces.create.copy.kinds.tags'),
-    }
-    const goTo = (to: DraftStep, patch: Partial<DraftContent> = {}) => update({ step: to, ...patch })
-    const seed = () => {
-        const target = nextStep(step, otherSpaces)
-        const fromCopy = step === 'copy'
-        const sourceContent = fromCopy && source.data ? toCopySource(source.data) : null
-        // Leaving the name step for the entities does not discard edits made earlier.
-        const seeded = draft.categories.length > 0 && !fromCopy
-        goTo(target, seeded ? {} : buildContent(draft.copy, sourceContent, presets.data!))
-    }
-
-    // Only the stored draft is needed to show a step. The presets are needed to leave the
-    // name/copy step, and the currency catalog (which may wait on the rate source) only by the currency selects.
-    const waiting = !loaded
-
-    let body: React.ReactNode
-    let footer: React.ReactNode
-    const back = step !== 'name' && (
-        <Button type="button" variant="outline" onClick={() => goTo(previousStep(step, otherSpaces))} {...testId('create-space-back')}>
-            {t('actions.back', { ns: 'common' })}
-        </Button>
+    const body = created ? (
+        <DoneStep
+            space={created}
+            inviting={done.inviting}
+            invitations={done.invitations}
+            onInvitationsChange={done.setInvitations}
+            sent={done.sent}
+        />
+    ) : (
+        wizard.body
     )
-    const cancel = dismissible && (
-        <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-            {t('actions.cancel', { ns: 'common' })}
-        </Button>
+    const footer = created ? (
+        <DoneFooter
+            inviting={done.inviting}
+            sent={done.sent}
+            isSending={done.isSending}
+            onInvite={() => done.setInviting(true)}
+            onLeave={done.leave}
+        />
+    ) : (
+        wizard.footer
     )
-
-    if (created) {
-        const copyLink = async (outcome: InvitationOutcome) => {
-            if (!outcome.link) return
-            await navigator.clipboard.writeText(outcome.link)
-            setCopied(outcome.invitation.key)
-            toast.success(t('spaces.invitations.copied'))
-        }
-        body = (
-            <div className="space-y-4">
-                <p className="text-sm">{t('spaces.create.done.text', { name: created.name })}</p>
-                {sent ? (
-                    <div className="space-y-2">
-                        <p className="text-sm font-medium">{t('spaces.create.done.invitations')}</p>
-                        <ul className="divide-y rounded-lg border">
-                            {sent.map((outcome) => (
-                                <InvitationRow
-                                    key={outcome.invitation.key}
-                                    email={outcome.invitation.email}
-                                    label={outcome.invitation.note}
-                                    role={outcome.invitation.role}
-                                    note={outcome.emailed ? t('spaces.invitations.sent') : undefined}
-                                    problem={outcome.error ? t('spaces.create.done.notSent', { error: outcome.error }) : undefined}
-                                >
-                                    {outcome.link && (
-                                        <Button type="button" variant="outline" size="sm" onClick={() => void copyLink(outcome)}>
-                                            {copied === outcome.invitation.key ? <Check className="size-4" /> : <Copy className="size-4" />}
-                                            {t('spaces.invitations.copy')}
-                                        </Button>
-                                    )}
-                                </InvitationRow>
-                            ))}
-                        </ul>
-                        {sent.some((o) => o.error) && <p className="text-xs text-muted-foreground">{t('spaces.create.done.retry')}</p>}
-                        {sent.some((o) => o.link) && <p className="text-xs text-muted-foreground">{t('spaces.invitations.linkReady')}</p>}
-                    </div>
-                ) : (
-                    inviting && <MembersStep invitations={invitations} onChange={setInvitations} />
-                )}
-            </div>
-        )
-        footer = (
-            <>
-                {!inviting && !sent && (
-                    <Button type="button" variant="outline" onClick={() => setInviting(true)} {...testId('create-space-invite')}>
-                        {t('spaces.create.done.invite')}
-                    </Button>
-                )}
-                <Button type="button" disabled={invite.isPending} onClick={leaveDone} {...testId('create-space-done')}>
-                    {invite.isPending && <Loader2 className="size-4 animate-spin" />}
-                    {sent ? t('actions.done', { ns: 'common' }) : t('actions.continue', { ns: 'common' })}
-                </Button>
-            </>
-        )
-    } else if (waiting) {
-        body = <Loader2 className="mx-auto size-6 animate-spin text-muted-foreground" />
-        footer = cancel
-    } else if (step === 'name') {
-        body = (
-            <div className="space-y-5">
-                <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
-                    <li>{t('spaces.create.intro.finances')}</li>
-                    <li>{t('spaces.create.intro.currency')}</li>
-                    <li>{t('spaces.create.intro.members')}</li>
-                    <li>{t('spaces.create.intro.separate')}</li>
-                </ul>
-                <div className="space-y-2">
-                    <Label htmlFor="space-name">{t('spaces.fields.name')}</Label>
-                    <Input
-                        id="space-name"
-                        value={draft.name}
-                        maxLength={100}
-                        autoFocus
-                        onChange={(e) => update({ name: e.target.value })}
-                        onKeyDown={(e) => e.key === 'Enter' && draft.name.trim() && seed()}
-                    />
-                </div>
-            </div>
-        )
-        footer = (
-            <>
-                {cancel}
-                <Button type="button" disabled={!draft.name.trim() || !presets.data} onClick={seed} {...testId('create-space-next')}>
-                    {t('actions.continue', { ns: 'common' })}
-                </Button>
-            </>
-        )
-    } else if (step === 'copy') {
-        body = (
-            <div className="space-y-4">
-                <div className="space-y-1.5">
-                    <Label>{t('spaces.create.copy.source')}</Label>
-                    <Select
-                        value={sourceId === null ? 'defaults' : String(sourceId)}
-                        onValueChange={(v) => update({ sourceId: v === 'defaults' ? null : Number(v) })}
-                    >
-                        <SelectTrigger className="w-full">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="defaults">{t('spaces.create.copy.defaults')}</SelectItem>
-                            {spaces.map((space) => (
-                                <SelectItem key={space.id} value={String(space.id)}>{space.name}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-                {sourceId !== null && (
-                    <fieldset className="space-y-2">
-                        <legend className="text-sm font-medium">{t('spaces.create.copy.what')}</legend>
-                        {COPY_KINDS.map((kind) => (
-                            <label key={kind} className="flex items-center gap-2 text-sm">
-                                <Checkbox
-                                    checked={draft.copy[kind]}
-                                    onCheckedChange={(checked) => update({ copy: { ...draft.copy, [kind]: checked === true } })}
-                                />
-                                {kindLabels[kind]}
-                            </label>
-                        ))}
-                        <p className="text-xs text-muted-foreground">{t('spaces.create.copy.hint')}</p>
-                    </fieldset>
-                )}
-            </div>
-        )
-        footer = (
-            <>
-                {back}
-                <Button type="button" disabled={!presets.data || (sourceId !== null && source.isPending)} onClick={seed} {...testId('create-space-next')}>
-                    {t('actions.continue', { ns: 'common' })}
-                </Button>
-            </>
-        )
-    } else if (step === 'entities') {
-        body = <EntitiesStep content={content} catalog={catalog.data} catalogFailed={catalog.isError} onRetryCatalog={() => void catalog.refetch()} onChange={(patch) => update(patch)} />
-        footer = (
-            <>
-                {back}
-                <Button type="button" disabled={!draft.baseCurrency || problems.includes('accounts') || problems.includes('balances')} onClick={() => goTo('confirm')} {...testId('create-space-next')}>
-                    {t('actions.continue', { ns: 'common' })}
-                </Button>
-            </>
-        )
-    } else {
-        const request = toRequest(draft)
-        body = (
-            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-                <dt className="text-muted-foreground">{t('spaces.fields.name')}</dt>
-                <dd>{request.name}</dd>
-                <dt className="text-muted-foreground">{t('spaces.create.summary.base')}</dt>
-                <dd>{request.baseCurrency}</dd>
-                <dt className="text-muted-foreground">{t('spaces.create.summary.currencies')}</dt>
-                <dd>{request.currencies?.length ? request.currencies.join(', ') : '—'}</dd>
-                <dt className="text-muted-foreground">{t('spaces.create.summary.accounts')}</dt>
-                <dd>{request.accounts?.length ?? 0}</dd>
-                <dt className="text-muted-foreground">{t('spaces.create.summary.categories')}</dt>
-                <dd>{request.categories?.length ?? 0}</dd>
-                <dt className="text-muted-foreground">{t('spaces.create.summary.tags')}</dt>
-                <dd>{request.tags?.length ?? 0}</dd>
-            </dl>
-        )
-        footer = (
-            <>
-                {back}
-                <Button type="button" disabled={problems.length > 0 || create.isPending} onClick={() => create.mutate()} {...testId('create-space-submit')}>
-                    {create.isPending && <Loader2 className="size-4 animate-spin" />}
-                    {t('spaces.create.submit')}
-                </Button>
-            </>
-        )
-    }
 
     return (
         <ResponsiveDialog

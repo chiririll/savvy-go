@@ -95,7 +95,7 @@ func TestReopenFindsSpaceFiles(t *testing.T) {
 }
 
 // P15: a space that fails to migrate is unavailable; the others work.
-func TestP15FailedMigrationMarksOnlyThatSpaceUnavailable(t *testing.T) {
+func TestP15FailedMigrationSpaceUnavailable(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
 	s := openTest(t, Options{Dir: dir})
@@ -119,7 +119,10 @@ func TestP15FailedMigrationMarksOnlyThatSpaceUnavailable(t *testing.T) {
 	if countNotes(t, s, 1) != 0 {
 		t.Fatal("space 1 must keep working")
 	}
-	if err := s.InSpaces(ctx, []int64{1, 2}, func(map[int64]store.DB) error { return nil }); !errors.Is(err, store.ErrUnavailable) {
+	if err := s.InSpaces(ctx, []int64{1, 2}, func(map[int64]store.DB) error { return nil }); !errors.Is(
+		err,
+		store.ErrUnavailable,
+	) {
 		t.Fatalf("InSpaces with an unavailable space: %v", err)
 	}
 }
@@ -164,7 +167,7 @@ func TestP14QuotaExceeded(t *testing.T) {
 }
 
 // P39: the quota is in the DSN, so a connection opened later enforces it too.
-func TestP39QuotaAppliesToEveryConnection(t *testing.T) {
+func TestP39QuotaAppliesEveryConnection(t *testing.T) {
 	ctx := context.Background()
 	s := openTest(t, Options{Quota: func(store.DB, int64) int64 { return 40960 }})
 	_ = s.CreateSpace(ctx, 1)
@@ -192,7 +195,7 @@ func TestP39QuotaAppliesToEveryConnection(t *testing.T) {
 }
 
 // P22: a failure inside fn on the second space rolls back both.
-func TestP22InSpacesRollsBackAll(t *testing.T) {
+func TestP22SpacesRollsBackAll(t *testing.T) {
 	ctx := context.Background()
 	s := openTest(t, Options{})
 	_ = s.CreateSpace(ctx, 1)
@@ -221,7 +224,7 @@ func TestP22InSpacesRollsBackAll(t *testing.T) {
 }
 
 // P22/P29: a quota failure on one side writes neither.
-func TestP29QuotaOnOneSideWritesNeither(t *testing.T) {
+func TestP29QuotaFailureWritesNeither(t *testing.T) {
 	ctx := context.Background()
 	s := openTest(t, Options{Quota: func(_ store.DB, id int64) int64 {
 		if id == 2 {

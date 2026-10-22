@@ -10,6 +10,7 @@ on:
       - 'package-lock.json'
       - 'tsconfig*.json'
       - 'vite.config.ts'
+      - '.storybook/**'
       - 'components.json'
       - '.github/workflows/ci-frontend.yaml'
   push:
@@ -21,6 +22,7 @@ on:
       - 'package-lock.json'
       - 'tsconfig*.json'
       - 'vite.config.ts'
+      - '.storybook/**'
       - 'components.json'
       - '.github/workflows/ci-frontend.yaml'
   workflow_dispatch:
@@ -46,3 +48,9 @@ jobs:
 
       - name: Test
         run: npm test
+
+      - name: Install browser for stories
+        run: npx playwright install --with-deps chromium
+
+      - name: Story tests
+        run: npm run test:stories

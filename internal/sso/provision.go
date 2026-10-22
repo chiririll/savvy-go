@@ -40,7 +40,11 @@ func (s Service) Provision(ctx context.Context, p IdentityProvider, id Normalize
 	return user, user.HasTwoFactor(), nil
 }
 
-func (s Service) loginExisting(ctx context.Context, p IdentityProvider, id NormalizedIdentity) (*auth.User, bool, error) {
+func (s Service) loginExisting(
+	ctx context.Context,
+	p IdentityProvider,
+	id NormalizedIdentity,
+) (*auth.User, bool, error) {
 	link, err := s.repo().LinkBySubject(ctx, p.ID, id.Subject)
 	if link == nil || err != nil {
 		return nil, false, nil

@@ -1,4 +1,4 @@
-// Renders resources/ts/components/shared/Logo.tsx into every static logo file:
+// Renders resources/ts/components/shared/appearance/Logo.tsx into every static logo file:
 // public/favicon.svg, the PNG/ICO icons in public/ and the README logos in docs/images/.
 // Usage: npm run logos
 import { writeFile } from 'node:fs/promises'
@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import sharp from 'sharp'
-import { Logo } from '../resources/ts/components/shared/Logo.tsx'
+import { Logo } from '../resources/ts/components/shared/appearance/Logo'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const out = (...parts: string[]) => path.join(root, ...parts)

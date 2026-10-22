@@ -5,6 +5,7 @@ import type {
 } from '@simplewebauthn/browser'
 import {
     AuthResponse,
+    ConfirmFields,
     WebauthnCredentialSummary,
     WebauthnRegisterOptions,
     WebauthnLoginOptions,
@@ -16,8 +17,8 @@ export const webauthnApi = {
         return data.credentials
     },
 
-    registerOptions: async (): Promise<WebauthnRegisterOptions> => {
-        const { data } = await apiClient.post('/auth/webauthn/register/options')
+    registerOptions: async (confirm: ConfirmFields = {}): Promise<WebauthnRegisterOptions> => {
+        const { data } = await apiClient.post('/auth/webauthn/register/options', confirm)
         return data
     },
 
@@ -38,8 +39,8 @@ export const webauthnApi = {
         await apiClient.patch(`/auth/webauthn/credentials/${id}`, { name })
     },
 
-    deleteCredential: async (id: number): Promise<void> => {
-        await apiClient.delete(`/auth/webauthn/credentials/${id}`)
+    deleteCredential: async (id: number, confirm: ConfirmFields = {}): Promise<void> => {
+        await apiClient.delete(`/auth/webauthn/credentials/${id}`, { data: confirm })
     },
 
     loginOptions: async (twoFactorToken?: string): Promise<WebauthnLoginOptions> => {

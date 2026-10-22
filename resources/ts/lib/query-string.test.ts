@@ -22,7 +22,9 @@ describe('toQueryString', () => {
     })
 
     it('repeats array params with a [] suffix', () => {
-        expect(toQueryString({ tags: [1, 2], ids: ['a'] })).toBe(`?${encodeURIComponent('tags[]')}=1&${encodeURIComponent('tags[]')}=2&${encodeURIComponent('ids[]')}=a`)
+        expect(toQueryString({ tags: [1, 2], ids: ['a'] })).toBe(
+            `?${encodeURIComponent('tags[]')}=1&${encodeURIComponent('tags[]')}=2&${encodeURIComponent('ids[]')}=a`,
+        )
     })
 
     it('sends no param for an empty array', () => {

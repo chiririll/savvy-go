@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"savvy-go/internal/appconfig"
 	"savvy-go/internal/auth"
 	repo "savvy-go/internal/db/repo/sso"
 	"savvy-go/internal/settings"
@@ -121,8 +122,8 @@ type Service struct {
 	Users    auth.Users
 	Settings settings.Store
 	// AppURL returns the public URL of the instance, empty when unset.
-	AppURL func() string
-	HTTP   *http.Client
+	Cfg  appconfig.Config
+	HTTP *http.Client
 }
 
 func (s Service) client() *http.Client {
@@ -196,29 +197,6 @@ func (s Service) Create(ctx context.Context, in IdPWrite) (*IdentityProvider, er
 	if err != nil {
 		return nil, err
 	}
-	enabled := false
-	if in.Enabled != nil {
-		enabled = *in.Enabled
-	}
-	sort := 0
-	if in.SortOrder != nil {
-		sort = *in.SortOrder
-	}
-	allowJIT, link := true, true
-	if in.AllowJIT != nil {
-		allowJIT = *in.AllowJIT
-	}
-	if in.LinkByEmail != nil {
-		link = *in.LinkByEmail
-	}
-	sync := false
-	if in.SyncRoleOnLogin != nil {
-		sync = *in.SyncRoleOnLogin
-	}
-	role := in.DefaultRole
-	if role == "" {
-		role = "read-only"
-	}
 	claims := in.ClaimMappings
 	if claims == nil {
 		claims = preset.DefaultClaims
@@ -231,16 +209,30 @@ func (s Service) Create(ctx context.Context, in IdPWrite) (*IdentityProvider, er
 	secJSON, _ := json.Marshal(sec)
 	claimJSON, _ := json.Marshal(claims)
 	roleJSON, _ := json.Marshal(roles)
+	role := in.DefaultRole
+	if role == "" {
+		role = "read-only"
+	}
 	id, err := s.repo().Insert(ctx, repo.Save{
 		Name: in.Name, Slug: in.Slug, Protocol: preset.Protocol, Preset: preset.Key,
-		Enabled: enabled, SortOrder: sort, Config: string(cfgJSON), Secrets: string(secJSON),
+		Enabled: ptrDefault(in.Enabled, false), SortOrder: ptrDefault(in.SortOrder, 0),
+		Config: string(cfgJSON), Secrets: string(secJSON),
 		ClaimMappings: string(claimJSON), RoleMapping: string(roleJSON),
-		DefaultRole: role, AllowJIT: allowJIT, SyncRoleOnLogin: sync, LinkByEmail: link,
+		DefaultRole: role, AllowJIT: ptrDefault(in.AllowJIT, true),
+		SyncRoleOnLogin: ptrDefault(in.SyncRoleOnLogin, false), LinkByEmail: ptrDefault(in.LinkByEmail, true),
 	}, time.Now().UTC())
 	if err != nil {
 		return nil, err
 	}
 	return s.ByID(ctx, id)
+}
+
+// ptrDefault is *p, or def when p is nil.
+func ptrDefault[T any](p *T, def T) T {
+	if p == nil {
+		return def
+	}
+	return *p
 }
 
 func (s Service) Update(ctx context.Context, id int64, in IdPWrite) (*IdentityProvider, error) {
@@ -252,18 +244,43 @@ func (s Service) Update(ctx context.Context, id int64, in IdPWrite) (*IdentityPr
 	if !ok {
 		return nil, ssoErr("unknown_preset", "Unknown Service preset: "+cur.Preset, 404)
 	}
+	if err := s.patchIdentity(ctx, cur, in); err != nil {
+		return nil, err
+	}
+	patchSettings(cur, in)
+	if in.Fields != nil {
+		cfg, sec, err := assembleFields(preset, in.Fields, cur)
+		if err != nil {
+			return nil, err
+		}
+		cur.Config, cur.Secrets = cfg, sec
+	}
+	if err := s.repo().Update(ctx, id, saveOf(cur), time.Now().UTC()); err != nil {
+		return nil, err
+	}
+	return s.ByID(ctx, id)
+}
+
+// patchIdentity applies the name and slug of in, checking the slug.
+func (s Service) patchIdentity(ctx context.Context, cur *IdentityProvider, in IdPWrite) error {
 	if in.Name != "" {
 		cur.Name = in.Name
 	}
-	if in.Slug != "" {
-		if !slugRE.MatchString(in.Slug) {
-			return nil, ssoErr("invalid_slug", "The slug format is invalid.", 422)
-		}
-		if other, _ := s.BySlug(ctx, in.Slug); other != nil && other.ID != id {
-			return nil, ssoErr("slug_taken", "The slug has already been taken.", 422)
-		}
-		cur.Slug = in.Slug
+	if in.Slug == "" {
+		return nil
 	}
+	if !slugRE.MatchString(in.Slug) {
+		return ssoErr("invalid_slug", "The slug format is invalid.", 422)
+	}
+	if other, _ := s.BySlug(ctx, in.Slug); other != nil && other.ID != cur.ID {
+		return ssoErr("slug_taken", "The slug has already been taken.", 422)
+	}
+	cur.Slug = in.Slug
+	return nil
+}
+
+// patchSettings applies every setting of in that was sent.
+func patchSettings(cur *IdentityProvider, in IdPWrite) {
 	if in.Enabled != nil {
 		cur.Enabled = *in.Enabled
 	}
@@ -288,27 +305,21 @@ func (s Service) Update(ctx context.Context, id int64, in IdPWrite) (*IdentityPr
 	if in.RoleMapping != nil {
 		cur.RoleMapping = in.RoleMapping
 	}
-	if in.Fields != nil {
-		cfg, sec, err := assembleFields(preset, in.Fields, cur)
-		if err != nil {
-			return nil, err
-		}
-		cur.Config, cur.Secrets = cfg, sec
-	}
-	cfgJSON, _ := json.Marshal(cur.Config)
-	secJSON, _ := json.Marshal(cur.Secrets)
-	claimJSON, _ := json.Marshal(cur.ClaimMappings)
-	roleJSON, _ := json.Marshal(cur.RoleMapping)
-	err = s.repo().Update(ctx, id, repo.Save{
-		Name: cur.Name, Slug: cur.Slug, Protocol: cur.Protocol, Preset: cur.Preset,
-		Enabled: cur.Enabled, SortOrder: cur.SortOrder, Config: string(cfgJSON), Secrets: string(secJSON),
+}
+
+// saveOf is the row to store for p.
+func saveOf(p *IdentityProvider) repo.Save {
+	cfgJSON, _ := json.Marshal(p.Config)
+	secJSON, _ := json.Marshal(p.Secrets)
+	claimJSON, _ := json.Marshal(p.ClaimMappings)
+	roleJSON, _ := json.Marshal(p.RoleMapping)
+	return repo.Save{
+		Name: p.Name, Slug: p.Slug, Protocol: p.Protocol, Preset: p.Preset,
+		Enabled: p.Enabled, SortOrder: p.SortOrder, Config: string(cfgJSON), Secrets: string(secJSON),
 		ClaimMappings: string(claimJSON), RoleMapping: string(roleJSON),
-		DefaultRole: cur.DefaultRole, AllowJIT: cur.AllowJIT, SyncRoleOnLogin: cur.SyncRoleOnLogin, LinkByEmail: cur.LinkByEmail,
-	}, time.Now().UTC())
-	if err != nil {
-		return nil, err
+		DefaultRole: p.DefaultRole, AllowJIT: p.AllowJIT, SyncRoleOnLogin: p.SyncRoleOnLogin,
+		LinkByEmail: p.LinkByEmail,
 	}
-	return s.ByID(ctx, id)
 }
 
 func (s Service) Delete(ctx context.Context, id int64) error {
@@ -319,7 +330,11 @@ func (s Service) Delete(ctx context.Context, id int64) error {
 	return s.repo().Delete(ctx, id)
 }
 
-func assembleFields(preset Preset, input map[string]any, existing *IdentityProvider) (cfg, sec map[string]any, err error) {
+func assembleFields(
+	preset Preset,
+	input map[string]any,
+	existing *IdentityProvider,
+) (cfg, sec map[string]any, err error) {
 	cfg, sec = map[string]any{}, map[string]any{}
 	if input == nil {
 		input = map[string]any{}
