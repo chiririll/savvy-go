@@ -3,7 +3,7 @@ import { createBrowserRouter, Navigate, useParams } from 'react-router-dom'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { AuthProvider } from '@/components/providers/AuthProvider'
 import { useUser } from '@/stores/auth'
-import { ErrorBoundary } from '@/components/shared/ErrorBoundary'
+import { ErrorBoundary } from '@/components/shared/page/ErrorBoundary'
 import { childPath, pages } from './pages'
 
 // Auth pages

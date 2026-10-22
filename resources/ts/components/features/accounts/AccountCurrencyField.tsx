@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form'
 import { AccountFormValues, encodeAccountCurrency } from '@/schemas'
-import { CurrencySelect } from '@/components/shared/CurrencySelect'
+import { CurrencySelect } from '@/components/shared/pickers/CurrencySelect'
 import type { UseFormReturn } from 'react-hook-form'
 import { toSelectValue } from './select-value'
 

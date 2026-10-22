@@ -4,7 +4,7 @@ import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ResponsiveDialog } from '@/components/shared/ResponsiveDialog'
+import { ResponsiveDialog } from '@/components/shared/dialogs/ResponsiveDialog'
 import { cancelConfirmation, submitConfirmation, useConfirmStore, type ConfirmMode } from '@/stores/confirm'
 
 function Ask({ mode }: { mode: ConfirmMode }) {

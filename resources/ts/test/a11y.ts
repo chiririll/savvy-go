@@ -12,3 +12,8 @@ export const baseA11y = { test: 'error', config: { rules: base } } as const
 export const overlayA11y = {
     config: { rules: [...base, { id: 'aria-hidden-focus', enabled: false }] },
 } as const
+
+/** For an open emoji picker: emoji-picker-react points aria-controls at an element it has not rendered yet. */
+export const emojiPickerA11y = {
+    config: { rules: [...base, { id: 'aria-valid-attr-value', enabled: false }] },
+} as const

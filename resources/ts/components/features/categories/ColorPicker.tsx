@@ -1,3 +1,5 @@
+import { useId } from 'react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import { COLOR_OPTIONS } from '@/constants/categories'
 
@@ -8,10 +10,13 @@ interface ColorPickerProps {
 }
 
 export function ColorPicker({ value, onChange, error }: ColorPickerProps) {
+    const { t } = useTranslation()
+    const labelId = useId()
+
     return (
         <div className="space-y-2">
-            <label className="text-sm font-medium">Color</label>
-            <div className="flex flex-wrap gap-2">
+            <p id={labelId} className="text-sm font-medium">{t('fields.color')}</p>
+            <div className="flex flex-wrap gap-2" role="group" aria-labelledby={labelId}>
                 {COLOR_OPTIONS.map((color) => (
                     <button
                         key={color}
@@ -24,7 +29,8 @@ export function ColorPicker({ value, onChange, error }: ColorPickerProps) {
                         )}
                         style={{ backgroundColor: color }}
                         onClick={() => onChange(color)}
-                        aria-label={`Select color ${color}`}
+                        aria-label={color}
+                        aria-pressed={value === color}
                     />
                 ))}
             </div>

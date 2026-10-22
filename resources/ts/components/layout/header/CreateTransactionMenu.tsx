@@ -8,7 +8,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { useCreateTransactionDialog } from '@/components/features/transactions/CreateTransactionProvider'
+import { useCreateTransactionDialog } from '@/components/features/transactions/form/CreateTransactionProvider'
 import { SPACE_TRANSFER_OPTION, TRANSACTION_TYPE_OPTIONS } from '@/constants'
 import { useTransferTargets } from '@/hooks'
 import { createMenuLabel } from '@/lib/labels'

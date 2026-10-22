@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { LanguageSwitcher } from '@/components/shared'
-import { Logo } from '@/components/shared/Logo'
+import { Logo } from '@/components/shared/appearance/Logo'
 import { cn } from '@/lib/utils'
 
 interface Props {

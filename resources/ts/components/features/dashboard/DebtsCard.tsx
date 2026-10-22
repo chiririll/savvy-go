@@ -74,7 +74,7 @@ function DebtTile({ debt }: { debt: Debt }) {
                 {iOwe ? <Banknote className="size-4 text-red-600" /> : <HandCoins className="size-4 text-green-600" />}
                 <p className="font-medium text-sm truncate">{debt.name}</p>
             </div>
-            <Progress value={debt.paymentProgress} className="h-1.5 mb-2" />
+            <Progress value={debt.paymentProgress} aria-label={debt.name} className="h-1.5 mb-2" />
             <div className="flex justify-between text-xs">
                 <span className="text-muted-foreground">
                     {t('dashboard.percentPaid', { percent: debt.paymentProgress.toFixed(0) })}

@@ -32,7 +32,8 @@
         "help": "Help",
         "expand": "Expand",
         "collapse": "Collapse",
-        "more": "More actions"
+        "more": "More actions",
+        "copy": "Copy"
     },
     "negativeBalance": {
         "title": "Balance will go negative",

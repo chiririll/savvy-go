@@ -10,7 +10,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Logo } from '@/components/shared/Logo'
+import { Logo } from '@/components/shared/appearance/Logo'
 import { apiResourceLabel } from '@/lib/labels'
 import { testId } from '@/lib/test-id'
 import type { ApiResource } from '@/types'

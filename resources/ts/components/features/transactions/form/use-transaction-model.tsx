@@ -81,6 +81,7 @@ export function useTransactionModel({
         // Rates are relative to this space's base currency, so look the destination up by code.
         toRate: currencies?.find((c) => c.code === selectedToAccount?.currency?.code)?.rate,
         open,
+        ratesReady: currencies !== undefined,
     })
 
     const posted = useMemo(

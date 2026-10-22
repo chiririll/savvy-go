@@ -1,13 +1,17 @@
+import './pin-locale'
 import { useEffect } from 'react'
 import type { Decorator, Loader, Preview } from '@storybook/react-vite'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
-import { http, HttpResponse } from 'msw'
+import { NuqsTestingAdapter } from 'nuqs/adapters/testing'
 import { mswLoader } from 'msw-storybook-addon/csf3'
 import { Toaster } from 'sonner'
 
 import i18n, { i18nReady, LOCALE_LABELS, SUPPORTED_LOCALES, type AppLocale } from '@/lib/i18n'
 import { baseA11y } from '@/test/a11y'
+import { setUpApp } from '@/test/app-state'
+import { AbilityProvider } from '@/components/providers/AbilityProvider'
+import { ReadOnlyProvider } from '@/components/providers/ReadOnlyProvider'
 import '@/index.css'
 import './preview.css'
 
@@ -34,9 +38,15 @@ const withApp: Decorator = (Story, { globals, parameters }) => {
         <QueryClientProvider client={client}>
             <ThemeClass theme={globals.theme} />
             <MemoryRouter initialEntries={[parameters.route ?? '/']}>
-                <div className="bg-background text-foreground min-h-8 p-4">
-                    <Story />
-                </div>
+                <NuqsTestingAdapter searchParams={(parameters.route ?? '/').split('?')[1] ?? ''} hasMemory>
+                    <AbilityProvider>
+                        <ReadOnlyProvider>
+                            <div className="bg-background text-foreground min-h-8 p-4">
+                                <Story />
+                            </div>
+                        </ReadOnlyProvider>
+                    </AbilityProvider>
+                </NuqsTestingAdapter>
             </MemoryRouter>
             <Toaster position="top-right" richColors />
         </QueryClientProvider>
@@ -46,9 +56,8 @@ const withApp: Decorator = (Story, { globals, parameters }) => {
 const preview: Preview = {
     decorators: [withApp],
     loaders: [localeLoader, mswLoader()],
-    // Any API call a story did not mock fails loudly instead of reaching a real server.
-    beforeEach({ msw }) {
-        msw.use(http.all('/api/*', ({ request }) => HttpResponse.json({ message: `Unmocked ${request.method} ${new URL(request.url).pathname}` }, { status: 599 })))
+    beforeEach({ msw, parameters }) {
+        return setUpApp(parameters.app, (...handlers) => msw.use(...handlers))
     },
     initialGlobals: { locale: 'en', theme: 'light' },
     globalTypes: {

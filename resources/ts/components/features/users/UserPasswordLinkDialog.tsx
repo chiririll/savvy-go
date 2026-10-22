@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Check, Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { ResponsiveDialog } from '@/components/shared/ResponsiveDialog'
+import { ResponsiveDialog } from '@/components/shared/dialogs/ResponsiveDialog'
 import { formatDateTime } from '@/lib/format'
 
 interface UserPasswordLinkDialogProps {
@@ -48,8 +48,8 @@ export function UserPasswordLinkDialog({
             }
         >
             <div className="flex gap-2">
-                <Input readOnly value={url ?? ''} className="font-mono text-sm" />
-                <Button type="button" variant="outline" onClick={handleCopy}>
+                <Input readOnly aria-label={t('users.inviteLinkTitle')} value={url ?? ''} className="font-mono text-sm" />
+                <Button type="button" variant="outline" onClick={handleCopy} aria-label={t('common:actions.copy')}>
                     {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
                 </Button>
             </div>

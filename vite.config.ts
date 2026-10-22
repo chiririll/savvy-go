@@ -55,9 +55,23 @@ export default defineConfig(({ mode }) => {
                     extends: true,
                     plugins: [storybookTest({ configDir: path.join(__dirname, '.storybook') })],
                     // Name every dependency up front; one found mid-run makes Vite reload and fail the run.
-                    optimizeDeps: { include: Object.keys(pkg.dependencies).filter((name) => !name.startsWith('@vitejs/')) },
+                    optimizeDeps: {
+                        include: [
+                            ...Object.keys(pkg.dependencies).filter((name) => !name.startsWith('@vitejs/')),
+                            // Deep imports are not found from the package name.
+                            'nuqs/adapters/testing',
+                            'echarts/core',
+                            'echarts/charts',
+                            'echarts/components',
+                            'echarts/renderers',
+                            'echarts-for-react/lib/core',
+                        ],
+                    },
                     test: {
                         name: 'stories',
+                        // Many stories load at once on a cold cache; the Russian ones wait for their language files.
+                        testTimeout: 30_000,
+                        hookTimeout: 30_000,
                         browser: {
                             enabled: true,
                             headless: true,

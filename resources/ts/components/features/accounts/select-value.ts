@@ -1,5 +1,5 @@
 import { decodeAccountCurrency } from '@/schemas'
-import { type CurrencySelectValue } from '@/components/shared/CurrencySelect'
+import { type CurrencySelectValue } from '@/components/shared/pickers/CurrencySelect'
 
 export function toSelectValue(currency: string): CurrencySelectValue | null {
     const decoded = decodeAccountCurrency(currency)

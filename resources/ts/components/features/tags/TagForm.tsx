@@ -13,7 +13,7 @@ import {
     FormMessage,
     FormDescription,
 } from '@/components/ui/form'
-import { FormWrapper } from '@/components/shared/FormWrapper'
+import { FormWrapper } from '@/components/shared/form/FormWrapper'
 import { localizeDefaultName, toStoredDefaultName } from '@/lib/localized-name'
 import { tagSchema, TagFormData } from '@/schemas'
 
@@ -59,15 +59,15 @@ export function TagForm({
                     render={({ field }) => (
                         <FormItem>
                             <FormLabel>{t('fields.name')}</FormLabel>
-                            <FormControl>
-                                <div className="flex items-center gap-2">
-                                    <span className="text-muted-foreground text-lg">#</span>
+                            <div className="flex items-center gap-2">
+                                <span className="text-muted-foreground text-lg" aria-hidden>#</span>
+                                <FormControl>
                                     <Input
                                         placeholder={t('forms:tags.namePlaceholder')}
                                         {...field}
                                     />
-                                </div>
-                            </FormControl>
+                                </FormControl>
+                            </div>
                             <FormDescription>
                                 {t('forms:tags.nameHelp')}
                             </FormDescription>

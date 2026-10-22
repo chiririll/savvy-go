@@ -34,6 +34,8 @@ export function HeaderBalance() {
 
     if (!balance) return null
 
+    const total = formatCurrency(balance.totalBalance ?? 0, balance.currency)
+
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -41,12 +43,10 @@ export function HeaderBalance() {
                     variant="ghost"
                     size="sm"
                     className="gap-2 font-normal"
-                    aria-label={t('header.accountBalances')}
+                    aria-label={`${t('header.accountBalances')}: ${total}`}
                 >
                     <Wallet className="size-4 text-muted-foreground" />
-                    <span className="font-mono font-medium">
-                        {formatCurrency(balance.totalBalance ?? 0, balance.currency)}
-                    </span>
+                    <span className="font-mono font-medium">{total}</span>
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent

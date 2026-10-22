@@ -51,7 +51,7 @@ function QrStep({ setup }: { setup: TwoFactorSetup }) {
                 <p className="text-sm text-muted-foreground mb-2 text-center">{t('security.dialogs.manualCode')}</p>
                 <div className="flex items-center gap-2 bg-muted p-2 rounded-md">
                     <code className="flex-1 text-sm font-mono break-all">{qrData.secret}</code>
-                    <Button variant="ghost" size="sm" onClick={copySecret}>
+                    <Button variant="ghost" size="sm" onClick={copySecret} aria-label={t('actions.copy', { ns: 'common' })}>
                         <Copy className="h-4 w-4" />
                     </Button>
                 </div>

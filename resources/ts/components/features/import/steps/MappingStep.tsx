@@ -5,7 +5,7 @@ import { z } from 'zod'
 import i18n from '@/lib/i18n'
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { ChoiceField, ColumnField } from './MappingFields'
-import { AccountSelect } from '@/components/shared/AccountSelect'
+import { AccountSelect } from '@/components/shared/pickers/AccountSelect'
 import type { CsvParseResult, ColumnMapping, ImportOptions, DateFormat, AmountFormat } from '@/types/import'
 
 const mappingSchema = z.object({

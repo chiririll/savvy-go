@@ -110,8 +110,8 @@ export function CurrencyForm({
                         render={({ field }) => (
                             <FormItem>
                                 <FormLabel>{t('forms:currencies.code')}</FormLabel>
-                                <FormControl>
-                                    <div className="relative">
+                                <div className="relative">
+                                    <FormControl>
                                         <Input
                                             placeholder="USD"
                                             autoComplete="off"
@@ -125,11 +125,11 @@ export function CurrencyForm({
                                                 setSuggestField((current) => (current === 'code' ? null : current))
                                             }
                                         />
-                                        {suggestField === 'code' && (
-                                            <Suggestions items={suggestions} onSelect={applyCatalogItem} />
-                                        )}
-                                    </div>
-                                </FormControl>
+                                    </FormControl>
+                                    {suggestField === 'code' && (
+                                        <Suggestions items={suggestions} onSelect={applyCatalogItem} />
+                                    )}
+                                </div>
                                 <FormDescription>{t('forms:currencies.codeHelp')}</FormDescription>
                                 <FormMessage />
                             </FormItem>
@@ -142,8 +142,8 @@ export function CurrencyForm({
                         render={({ field }) => (
                             <FormItem>
                                 <FormLabel>{t('fields.name')}</FormLabel>
-                                <FormControl>
-                                    <div className="relative">
+                                <div className="relative">
+                                    <FormControl>
                                         <Input
                                             placeholder={t('forms:currencies.namePlaceholder')}
                                             autoComplete="off"
@@ -157,11 +157,11 @@ export function CurrencyForm({
                                                 setSuggestField((current) => (current === 'name' ? null : current))
                                             }
                                         />
-                                        {suggestField === 'name' && (
-                                            <Suggestions items={suggestions} onSelect={applyCatalogItem} />
-                                        )}
-                                    </div>
-                                </FormControl>
+                                    </FormControl>
+                                    {suggestField === 'name' && (
+                                        <Suggestions items={suggestions} onSelect={applyCatalogItem} />
+                                    )}
+                                </div>
                                 <FormMessage />
                             </FormItem>
                         )}

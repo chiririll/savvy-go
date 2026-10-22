@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { EmojiPicker } from '@/components/ui/emoji-picker'
+import { EmojiPicker } from '@/components/shared/pickers/EmojiPicker'
 import { Label } from '@/components/ui/label'
 import { COLOR_OPTIONS } from '@/constants'
 import { cn } from '@/lib/utils'

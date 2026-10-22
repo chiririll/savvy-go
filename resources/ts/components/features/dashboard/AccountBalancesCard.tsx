@@ -29,11 +29,12 @@ function AccountIcon({ type }: { type: Account['type'] }) {
 
 function QuickAddMenu({ accountId, openCreate }: { accountId: Account['id']; openCreate: OpenCreate }) {
     const { t: tNav } = useTranslation('nav')
+    const { t: tCommon } = useTranslation('common')
 
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="size-8 shrink-0">
+                <Button variant="ghost" size="icon" className="size-8 shrink-0" aria-label={tCommon('actions.create')}>
                     <Plus className="size-4" />
                 </Button>
             </DropdownMenuTrigger>

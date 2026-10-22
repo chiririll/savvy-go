@@ -28,7 +28,7 @@ export function PeriodPicker({
             <div className="flex items-center gap-2">
                 <Calendar className="size-4 text-muted-foreground hidden sm:block" />
                 <Select value={period} onValueChange={onPeriodChange}>
-                    <SelectTrigger className="w-full sm:w-[200px] h-8">
+                    <SelectTrigger className="w-full sm:w-[200px] h-8" aria-label={t('dashboard.period')}>
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -46,6 +46,7 @@ export function PeriodPicker({
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                     <Input
                         type="date"
+                        aria-label={t('transactions.dateFrom')}
                         value={customStartDate}
                         onChange={(e) => onCustomStartChange(e.target.value)}
                         className="h-8 w-full sm:w-[140px]"
@@ -53,6 +54,7 @@ export function PeriodPicker({
                     <span className="text-muted-foreground text-center hidden sm:block">—</span>
                     <Input
                         type="date"
+                        aria-label={t('transactions.dateTo')}
                         value={customEndDate}
                         onChange={(e) => onCustomEndChange(e.target.value)}
                         className="h-8 w-full sm:w-[140px]"

@@ -25,7 +25,7 @@ vi.mock('@/hooks', () => ({
 vi.mock('@/lib/localized-name', () => ({
     localizeDefaultName: (name: string) => (name.startsWith('#') ? `Translated ${name.slice(1)}` : name),
 }))
-vi.mock('@/components/shared/ResponsiveDialog', () => ({
+vi.mock('@/components/shared/dialogs/ResponsiveDialog', () => ({
     ResponsiveDialog: ({ title, description, footer, children }: Record<string, ReactNode>) => (
         <div role="dialog">
             <h2>{title}</h2>

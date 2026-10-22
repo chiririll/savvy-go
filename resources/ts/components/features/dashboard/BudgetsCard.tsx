@@ -26,6 +26,7 @@ function BudgetTile({ budget }: { budget: Budget }) {
                 </span>
             </div>
             <Progress
+                aria-label={budget.name}
                 value={percent}
                 className={`h-2 mb-2 ${isExceeded ? '[&>div]:bg-red-500' : ''}`}
             />
