@@ -19,7 +19,7 @@ export default function ImportSettingsPage() {
                 <Card>
                     <CardContent className="flex flex-col items-center justify-center py-12 text-center">
                         <ShieldAlert className="size-12 text-muted-foreground mb-4" />
-                        <h3 className="text-lg font-medium mb-2">{t('import.readOnlyTitle')}</h3>
+                        <h2 className="text-lg font-medium mb-2">{t('import.readOnlyTitle')}</h2>
                         <p className="text-muted-foreground max-w-md">
                             {t('import.readOnlyDescription')}
                         </p>

@@ -43,7 +43,7 @@ export default function ApiSettingsPage() {
                                 <KeyRound className="size-4" />
                             </div>
                             <div className="space-y-0.5">
-                                <h3 className="text-sm font-semibold leading-none">{t('api.tokens.title')}</h3>
+                                <h2 className="text-sm font-semibold leading-none">{t('api.tokens.title')}</h2>
                                 <p className="text-xs text-muted-foreground">{t('api.tokens.description')}</p>
                             </div>
                         </div>

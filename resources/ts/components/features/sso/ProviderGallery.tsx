@@ -189,7 +189,7 @@ export function ProvidersEmptyState() {
                 })}
             </div>
 
-            <h3 className="text-lg font-semibold tracking-tight">{t('providers.emptyTitle')}</h3>
+            <h2 className="text-lg font-semibold tracking-tight">{t('providers.emptyTitle')}</h2>
             <p className="mt-2 max-w-md text-sm text-muted-foreground">{t('providers.emptyDescription')}</p>
 
             <Button asChild className="mt-6">

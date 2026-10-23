@@ -60,7 +60,7 @@ export const PresetPicked: Story = {
         await userEvent.click(await canvas.findByRole('combobox', { name: /provider type/i }))
         await userEvent.click(await screen.findByRole('option', { name: /keycloak/i }))
         await expect(await canvas.findByText('Usually master')).toBeVisible()
-        await expect(canvas.getByText('https://savvy.example.com/api/auth/sso/sso/callback')).toBeVisible()
+        await expect(await canvas.findByText('https://savvy.example.com/api/auth/sso/sso/callback')).toBeVisible()
     },
 }
 

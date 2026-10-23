@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect, waitFor } from 'storybook/test'
+import { expect, waitFor, within } from 'storybook/test'
 
 import ReactECharts from './ReactECharts'
 
@@ -27,6 +27,20 @@ export const Bars: Story = {
     play: async ({ canvasElement }) => {
         await waitFor(() => expect(canvasElement.querySelector('svg')).not.toBeNull())
         await expect(canvasElement.querySelector('canvas')).toBeNull()
+    },
+}
+
+export const WithAccessibleName: Story = {
+    args: {
+        ariaLabel: 'Sales by month',
+        option: {
+            xAxis: { type: 'category', data: months },
+            yAxis: { type: 'value' },
+            series: [{ type: 'bar', data: [120, 200, 150, 80] }],
+        },
+    },
+    play: async ({ canvasElement }) => {
+        await waitFor(() => expect(within(canvasElement).getByRole('img', { name: 'Sales by month' })).toBeVisible())
     },
 }
 

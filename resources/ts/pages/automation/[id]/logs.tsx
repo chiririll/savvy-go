@@ -28,7 +28,7 @@ export default function AutomationLogsPage() {
         <div className="space-y-6">
             <div className="flex items-center gap-4">
                 <Button variant="ghost" size="icon" asChild>
-                    <Link to="/automation">
+                    <Link to="/automation" aria-label={t('actions.back', { ns: 'common' })}>
                         <ArrowLeft className="size-4" />
                     </Link>
                 </Button>

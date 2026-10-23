@@ -837,6 +837,7 @@
             "defaultQuota": "Default",
             "chooseUser": "User",
             "assign": "Make admin",
+            "actions": "Actions",
             "members": "Members",
             "size": "Size",
             "quota": "Size limit",

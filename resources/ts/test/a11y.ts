@@ -17,3 +17,14 @@ export const overlayA11y = {
 export const emojiPickerA11y = {
     config: { rules: [...base, { id: 'aria-valid-attr-value', enabled: false }] },
 } as const
+
+/** For a page whose tabs show only the active panel: Radix leaves aria-controls of the other triggers pointing at
+ * panels it has not mounted, which axe reports as aria-valid-attr-value. */
+export const unmountedTabsA11y = {
+    config: { rules: [...base, { id: 'aria-valid-attr-value', enabled: false }] },
+} as const
+
+/** The tab pages above that also open a menu or select. */
+export const unmountedTabsOverlayA11y = {
+    config: { rules: [...base, { id: 'aria-valid-attr-value', enabled: false }, { id: 'aria-hidden-focus', enabled: false }] },
+} as const
