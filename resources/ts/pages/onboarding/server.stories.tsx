@@ -39,7 +39,6 @@ export const AppUrl: Story = {
         await expect(canvas.getByRole('button', { name: /continue/i })).toBeVisible()
     },
 }
-export const InRussian: Story = { tags: ['mobile-only'], globals: { locale: 'ru' } }
 export const Loading: Story = { beforeEach: ({ msw }) => msw.use(hang('get', '/settings')) }
 
 export const OptionalSteps: Story = {

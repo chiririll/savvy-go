@@ -45,4 +45,3 @@ export const Default: Story = {
         await expect(canvas.getByText('file is missing')).toBeVisible()
     },
 }
-export const InRussian: Story = { tags: ['mobile-only'], globals: { locale: 'ru' } }

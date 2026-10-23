@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next'
 export function DataTableSkeleton({ columns }: { columns: number }) {
     return (
         <div className="rounded-lg border" aria-hidden="true">
-            <Table>
+            <Table focusable={false}>
                 <TableHeader>
                     <TableRow>
                         {Array.from({ length: columns }).map((_, i) => (

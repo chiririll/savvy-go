@@ -36,5 +36,4 @@ export const Default: Story = {
         await expect(await within(canvasElement).findByText('Before the upgrade')).toBeVisible()
     },
 }
-export const InRussian: Story = { tags: ['mobile-only'], globals: { locale: 'ru' } }
 export const Empty: Story = { beforeEach: ({ msw }) => msw.use(reply('get', '/backups', [])) }

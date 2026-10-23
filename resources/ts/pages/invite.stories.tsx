@@ -47,7 +47,6 @@ export const SignedOut: Story = {
         await expect(canvas.getByRole('link', { name: /sign in/i })).toHaveAttribute('href', '/login')
     },
 }
-export const InRussian: Story = { tags: ['mobile-only'], globals: { locale: 'ru' } }
 export const Loading: Story = { beforeEach: ({ msw }) => msw.use(hang('get', '/invitations/tok')) }
 
 export const WithoutRegistration: Story = {

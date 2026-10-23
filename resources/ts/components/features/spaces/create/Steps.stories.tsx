@@ -109,5 +109,3 @@ export const ConfirmWithoutOtherCurrencies: Story = {
         await expect(within(canvasElement).getByText('—')).toBeVisible()
     },
 }
-
-export const ConfirmInRussian: Story = { ...Confirm, play: undefined, globals: { locale: 'ru' } }

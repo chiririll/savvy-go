@@ -50,8 +50,6 @@ export const Loaded: Story = {
     },
 }
 
-export const InRussian: Story = { tags: ['mobile-only'], globals: { locale: 'ru' } }
-
 export const InYen: Story = {
     args: { data: data('JPY') },
     play: async ({ canvasElement }) => {

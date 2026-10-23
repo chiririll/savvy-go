@@ -39,7 +39,6 @@ export const Default: Story = {
         await expect(canvas.getByText(/claude\.ai/)).toBeVisible()
     },
 }
-export const InRussian: Story = { tags: ['mobile-only'], globals: { locale: 'ru' } }
 export const Loading: Story = { beforeEach: ({ msw }) => msw.use(hang('get', '/oauth/authorize')) }
 
 export const UnknownClient: Story = {

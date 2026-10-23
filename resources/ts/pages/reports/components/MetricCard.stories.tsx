@@ -36,7 +36,6 @@ export const Income: Story = {
     },
 }
 
-export const InRussian: Story = { tags: ['mobile-only'], globals: { locale: 'ru' } }
 // A zero-decimal currency shows no fraction, in the figure and in the change.
 export const YenHasNoDecimals: Story = {
     args: { currency: 'JPY', value: 182_000, previousValue: 200_000 },

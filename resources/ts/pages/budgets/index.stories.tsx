@@ -35,7 +35,6 @@ export const Default: Story = {
         await expect(canvas.getByRole('button', { name: /new budget/i })).toBeVisible()
     },
 }
-export const InRussian: Story = { tags: ['mobile-only'], globals: { locale: 'ru' } }
 export const Loading: Story = { beforeEach: ({ msw }) => msw.use(hang('get', '/budgets')) }
 export const Empty: Story = {
     beforeEach: ({ msw }) => msw.use(reply('get', '/budgets', [])),
@@ -47,8 +46,8 @@ export const Empty: Story = {
 export const ReadOnly: Story = {
     parameters: { app: { role: 'viewer' } },
     play: async ({ canvasElement }) => {
-        await expect((await within(canvasElement).findAllByText('Groceries'))[0]).toBeVisible()
-        // The role comes from the space list, which can land after the rows.
+        // The role comes from the space list, which can land after the rows and re-render them; query again instead of holding an element.
+        await waitFor(() => expect(within(canvasElement).getAllByText('Groceries')[0]).toBeVisible())
         await waitFor(() => expect(within(canvasElement).queryByRole('button', { name: /new budget/i })).toBeNull())
     },
 }

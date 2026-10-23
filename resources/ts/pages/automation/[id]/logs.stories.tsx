@@ -53,7 +53,6 @@ export const Default: Story = {
         await expect(canvas.getByRole('link')).toHaveAttribute('href', '/automation')
     },
 }
-export const InRussian: Story = { tags: ['mobile-only'], globals: { locale: 'ru' } }
 export const Loading: Story = { beforeEach: ({ msw }) => msw.use(hang('get', '/automation-rules/1')) }
 
 export const Empty: Story = {

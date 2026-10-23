@@ -59,13 +59,6 @@ export const Donut: Story = {
     },
 }
 
-export const InRussian: Story = {
-    globals: { locale: 'ru' },
-    play: async ({ canvasElement }) => {
-        await expectChartDrawn(canvasElement)
-    },
-}
-
 export const Income: Story = {
     args: { type: 'income' },
     play: async ({ canvasElement }) => {

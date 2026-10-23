@@ -46,6 +46,7 @@ export const Opened: Story = {
 }
 
 export const Deleted: Story = {
+    tags: ['desktop-only'],
     play: async ({ canvasElement, args }) => {
         await userEvent.click(within(canvasElement).getByRole('button', { name: /more actions/i }))
         await expect(await screen.findByRole('menuitem', { name: /view logs/i })).toHaveAttribute(

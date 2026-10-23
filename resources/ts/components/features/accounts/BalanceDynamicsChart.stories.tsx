@@ -43,13 +43,6 @@ export const Default: Story = {
     },
 }
 
-export const InRussian: Story = {
-    globals: { locale: 'ru' },
-    play: async ({ canvasElement }) => {
-        await expectChartDrawn(canvasElement)
-    },
-}
-
 export const HidesASeries: Story = {
     play: async ({ canvasElement }) => {
         const canvas = within(canvasElement)

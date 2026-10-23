@@ -33,8 +33,6 @@ export const ColorsWithError: Story = {
     render: () => <ColorPicker value="" onChange={() => {}} error="Pick a colour" />,
 }
 
-export const ColorsInRussian: Story = { ...Colors, globals: { locale: 'ru' } }
-
 export const Icons: Story = {
     render: () => {
         const [icon, setIcon] = useState('🛒')

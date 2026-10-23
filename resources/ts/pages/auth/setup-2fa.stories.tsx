@@ -47,7 +47,6 @@ export const Intro: Story = {
         await expect(canvas.getByRole('button', { name: /skip/i })).toBeVisible()
     },
 }
-export const InRussian: Story = { tags: ['mobile-only'], globals: { locale: 'ru' } }
 
 export const SkipLeavesForTheDashboard: Story = {
     play: async ({ canvasElement }) => {

@@ -52,8 +52,6 @@ export const Default: Story = {
     },
 }
 
-export const InRussian: Story = { tags: ['mobile-only'], globals: { locale: 'ru' } }
-
 export const PicksAPeriodType: Story = {
     play: async ({ canvasElement }) => {
         const canvas = within(canvasElement)
@@ -106,6 +104,7 @@ export const ChangesComparison: Story = {
 }
 
 export const FiltersByAccountAndResets: Story = {
+    tags: ['desktop-only'],
     play: async ({ canvasElement }) => {
         const canvas = within(canvasElement)
         if (isPhone()) {

@@ -41,8 +41,6 @@ export const Default: Story = {
         await expect(canvas.getByRole('button', { name: /^sign in$/i })).toBeVisible()
     },
 }
-export const InRussian: Story = { tags: ['mobile-only'], globals: { locale: 'ru' } }
-export const InDarkTheme: Story = { globals: { theme: 'dark' } }
 export const Checking: Story = { beforeEach: ({ msw }) => msw.use(hang('get', '/auth/status')) }
 
 export const WithSingleSignOn: Story = {

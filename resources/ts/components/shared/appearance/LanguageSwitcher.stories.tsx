@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect, screen, userEvent, within } from 'storybook/test'
+import { expect, screen, userEvent, waitFor, within } from 'storybook/test'
 
 import i18n from '@/lib/i18n'
 import { overlayA11y } from '@/test/a11y'
@@ -22,7 +22,6 @@ type Story = StoryObj<typeof meta>
 export const Compact: Story = {}
 export const Select: Story = { args: { variant: 'select' } }
 export const Auth: Story = { args: { variant: 'auth' } }
-export const InRussian: Story = { globals: { locale: 'ru' } }
 
 export const CompactMenu: Story = {
     play: async ({ canvasElement }) => {
@@ -36,6 +35,7 @@ export const ChangesLanguage: Story = {
     play: async ({ canvasElement }) => {
         await userEvent.click(within(canvasElement).getByRole('button'))
         await userEvent.click(await screen.findByRole('menuitem', { name: /Русский/ }))
-        await expect(i18n.resolvedLanguage).toBe('ru')
+        // The Russian files load on demand.
+        await waitFor(() => expect(i18n.resolvedLanguage).toBe('ru'))
     },
 }

@@ -37,6 +37,7 @@ export const ReadOnly: Story = {
 }
 
 export const DeleteDisabled: Story = {
+    tags: ['desktop-only'],
     args: { deleteDisabled: true, deleteDisabledLabel: 'The last category cannot be deleted' },
     play: async ({ canvasElement }) => {
         await openMenu(canvasElement)
@@ -45,6 +46,7 @@ export const DeleteDisabled: Story = {
 }
 
 export const Deleted: Story = {
+    tags: ['desktop-only'],
     play: async ({ canvasElement, args }) => {
         await openMenu(canvasElement)
         await userEvent.click(await screen.findByRole('menuitem', { name: /delete/i }))
@@ -54,6 +56,7 @@ export const Deleted: Story = {
 }
 
 export const MadeDefault: Story = {
+    tags: ['desktop-only'],
     play: async ({ canvasElement, args }) => {
         await openMenu(canvasElement)
         await userEvent.click(await screen.findByRole('menuitem', { name: /default/i }))
@@ -62,6 +65,7 @@ export const MadeDefault: Story = {
 }
 
 export const DefaultCannotBeMadeDefault: Story = {
+    tags: ['desktop-only'],
     args: { category: category({ isDefault: true, transactionsCount: 0 }) },
     play: async ({ canvasElement }) => {
         await openMenu(canvasElement)
@@ -71,6 +75,7 @@ export const DefaultCannotBeMadeDefault: Story = {
 }
 
 export const SettingDefault: Story = {
+    tags: ['desktop-only'],
     args: { isSettingDefault: true },
     play: async ({ canvasElement }) => {
         await openMenu(canvasElement)
@@ -80,6 +85,7 @@ export const SettingDefault: Story = {
 
 // A category with transactions asks where they go before it is deleted.
 export const DeleteNeedsReplacement: Story = {
+    tags: ['desktop-only'],
     args: { category: category({ transactionsCount: 12 }) },
     play: async ({ canvasElement, args }) => {
         await openMenu(canvasElement)
@@ -97,6 +103,7 @@ export const DeleteNeedsReplacement: Story = {
 
 // In a space kept in step with others, even an unused category may be deleted with a replacement.
 export const SyncedUnused: Story = {
+    tags: ['desktop-only'],
     args: { synced: true },
     play: async ({ canvasElement, args }) => {
         await openMenu(canvasElement)

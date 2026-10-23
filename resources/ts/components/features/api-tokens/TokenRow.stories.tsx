@@ -31,7 +31,6 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 export const ReadOnlyToken: Story = {}
-export const InRussian: Story = { globals: { locale: 'ru' } }
 export const NeverUsed: Story = { args: { token: token({ last_used_at: null }) } }
 export const Expiring: Story = { args: { token: token({ expires_at: '2031-06-01T00:00:00Z' }) } }
 export const SomeSpaces: Story = { args: { token: token({ all_spaces: false, space_ids: [1, 2, 3] }) } }

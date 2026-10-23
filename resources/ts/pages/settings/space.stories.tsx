@@ -39,7 +39,6 @@ export const AsAdmin: Story = {
         await expect(await canvas.findByText('Alex')).toBeVisible()
     },
 }
-export const InRussian: Story = { tags: ['mobile-only'], globals: { locale: 'ru' } }
 
 // A member who is not an admin gets neither the invitations nor the audit log.
 export const AsViewer: Story = {

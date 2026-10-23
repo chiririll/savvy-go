@@ -54,7 +54,6 @@ export const Cards: Story = {
     },
 }
 
-export const CardsInRussian: Story = { ...Cards, play: undefined, globals: { locale: 'ru' } }
 export const LongName: Story = {
     render: () => grid({ name: 'A provider with a very long name for the whole company', slug: 'a-very-long-slug' }),
 }
@@ -91,5 +90,4 @@ export const Empty: Story = {
     },
 }
 
-export const EmptyInRussian: Story = { ...Empty, play: undefined, globals: { locale: 'ru' } }
 export const Loading: Story = { render: () => <ProviderGridSkeleton /> }

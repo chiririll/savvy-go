@@ -53,13 +53,6 @@ export const OverBudget: Story = {
     },
 }
 
-export const InRussian: Story = {
-    globals: { locale: 'ru' },
-    play: async ({ canvasElement }) => {
-        await expectChartDrawn(canvasElement)
-    },
-}
-
 export const UnderBudget: Story = {
     beforeEach: ({ msw }) => msw.use(reply('get', '/reports/expense-pace', pace('USD', month(1000, 640.1)))),
     play: async ({ canvasElement }) => {

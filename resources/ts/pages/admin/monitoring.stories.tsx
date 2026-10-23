@@ -21,7 +21,6 @@ export const Default: Story = {
         await expect(await within(canvasElement).findByText(/1.4.0/)).toBeVisible()
     },
 }
-export const InRussian: Story = { tags: ['mobile-only'], globals: { locale: 'ru' } }
 export const Loading: Story = {
     beforeEach: ({ msw }) => msw.use(hang('get', '/monitoring/resources'), hang('get', '/monitoring/storage')),
 }

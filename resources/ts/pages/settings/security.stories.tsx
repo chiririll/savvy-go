@@ -26,7 +26,6 @@ export const TwoFactorOff: Story = {
         await expect(canvas.getByRole('button', { name: /sign out other/i })).toBeVisible()
     },
 }
-export const InRussian: Story = { tags: ['mobile-only'], globals: { locale: 'ru' } }
 export const Loading: Story = { beforeEach: ({ msw }) => msw.use(hang('get', '/auth/2fa/status')) }
 
 export const TwoFactorOn: Story = {

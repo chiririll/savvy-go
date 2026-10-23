@@ -46,7 +46,6 @@ export const Current: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }
 export const Opened: Story = {
     play: async ({ canvasElement }) => {
         const menu = await open(canvasElement)

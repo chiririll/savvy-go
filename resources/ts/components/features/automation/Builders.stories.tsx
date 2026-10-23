@@ -85,7 +85,6 @@ export const EveryValueEditor: Story = {
     },
 }
 
-export const EveryValueEditorInRussian: Story = { ...EveryValueEditor, play: undefined, globals: { locale: 'ru' } }
 export const MatchAny: Story = {
     render: () => <Conditions initial={[{ field: 'type', op: 'equals', value: 'income' }]} />,
     play: async ({ canvasElement }) => {
@@ -175,8 +174,6 @@ export const EveryAction: Story = {
         await expect(canvas.getByDisplayValue('amount * 0.1')).toBeVisible()
     },
 }
-
-export const EveryActionInRussian: Story = { ...EveryAction, play: undefined, globals: { locale: 'ru' } }
 
 export const DescriptionTemplateTyped: Story = {
     render: () => <Actions initial={[{ type: 'set_description' }]} />,

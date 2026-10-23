@@ -3,7 +3,7 @@
 
 // TODO: re-enable color-contrast once the palette passes WCAG AA. Known misses: --destructive text is 4.49:1 on
 // white (4.0:1 on its tint), text-green-600 is 3.2:1, and the faded "muted" rows. Everything else is checked.
-const base = [{ id: 'color-contrast', enabled: false }]
+const base = [{ id: 'color-contrast', enabled: import.meta.env.STORYBOOK_CONTRAST === 'on' }]
 
 export const baseA11y = { test: 'error', config: { rules: base } } as const
 

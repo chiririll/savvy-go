@@ -50,4 +50,3 @@ export const VeryLargeAmounts: Story = {
 // The figures follow the precision of the currency they are in.
 export const InYen: Story = { args: { currency: 'JPY', totalBalance: 1500000, periodIncome: 320000, periodExpense: 184050 } }
 export const InDinars: Story = { args: { currency: 'KWD', totalBalance: 1234.567, periodIncome: 320.125, periodExpense: 84.005 } }
-export const InRussian: Story = { globals: { locale: 'ru' } }

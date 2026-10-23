@@ -64,7 +64,6 @@ export const Default: Story = {
         await expect(canvas.getByRole('button', { name: /new transaction/i })).toBeVisible()
     },
 }
-export const InRussian: Story = { tags: ['mobile-only'], globals: { locale: 'ru' } }
 export const Loading: Story = { beforeEach: ({ msw }) => msw.use(hang('get', '/transactions')) }
 
 export const Empty: Story = {

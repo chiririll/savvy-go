@@ -24,7 +24,6 @@ export const ChoosePreset: Story = {
         await expect(canvas.getByRole('link', { name: /back/i })).toHaveAttribute('href', '/admin/sso')
     },
 }
-export const InRussian: Story = { tags: ['mobile-only'], globals: { locale: 'ru' } }
 
 export const FillsTheForm: Story = {
     play: async ({ canvasElement }) => {

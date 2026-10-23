@@ -63,7 +63,7 @@ export function BudgetsCard({ budgets }: { budgets: Budget[] }) {
             </CardHeader>
             <CardContent className="min-w-0">
                 {budgets.length > 0 ? (
-                    <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                         {budgets.map((budget) => (
                             <BudgetTile key={budget.id} budget={budget} />
                         ))}

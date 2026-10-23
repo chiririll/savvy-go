@@ -34,5 +34,3 @@ export const FailedWithFallback: Story = {
         await expect(within(canvasElement).getByText('Custom fallback')).toBeVisible()
     },
 }
-
-export const FailedInRussian: Story = { ...Failed, globals: { locale: 'ru' } }

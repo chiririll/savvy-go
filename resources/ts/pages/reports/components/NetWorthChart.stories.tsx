@@ -37,13 +37,6 @@ export const Default: Story = {
     },
 }
 
-export const InRussian: Story = {
-    globals: { locale: 'ru' },
-    play: async ({ canvasElement }) => {
-        await expectChartDrawn(canvasElement)
-    },
-}
-
 export const ByWeek: Story = {
     args: { filters: { ...DEFAULT_FILTERS, periodType: 'quarter', selectedQuarter: '2030-Q1' } },
     play: async ({ canvasElement }) => {

@@ -23,7 +23,6 @@ export const Volume: Story = {
     },
 }
 
-export const VolumeInRussian: Story = { ...Volume, play: undefined, globals: { locale: 'ru' } }
 export const VolumeFillingUp: Story = {
     render: () => (
         <VolumePanel
@@ -69,8 +68,6 @@ export const Totals: Story = {
         await expect(canvas.getByText('4,300')).toBeVisible()
     },
 }
-
-export const TotalsInRussian: Story = { ...Totals, play: undefined, globals: { locale: 'ru' } }
 
 // Statuses the server did not report count as none.
 export const TotalsEmpty: Story = {

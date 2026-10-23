@@ -27,4 +27,3 @@ export const Default: Story = {
         await expect(await canvas.findByText('Last server backup is 12 days old')).toBeVisible()
     },
 }
-export const InRussian: Story = { tags: ['mobile-only'], globals: { locale: 'ru' } }

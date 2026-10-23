@@ -51,8 +51,6 @@ export const Default: Story = {
     },
 }
 
-export const InRussian: Story = { tags: ['mobile-only'], globals: { locale: 'ru' } }
-
 export const TooltipShowsTheAmount: Story = {
     play: async ({ canvasElement }) => {
         await hoverDay(canvasElement, 4)

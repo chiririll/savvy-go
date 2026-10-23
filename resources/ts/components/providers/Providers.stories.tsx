@@ -176,8 +176,6 @@ export const EmailNotConfirmed: Story = {
     },
 }
 
-export const EmailNotConfirmedInRussian: Story = { ...EmailNotConfirmed, globals: { locale: 'ru' } }
-
 export const EmailNotRequired: Story = {
     render: () => <EmailVerificationGate><Page /></EmailVerificationGate>,
     beforeEach: () => useAuthStore.setState({ user: { ...user, emailVerified: false }, emailVerificationRequired: false }),
@@ -287,8 +285,6 @@ export const NoSpaceForAViewer: Story = {
     parameters: { app: { role: 'viewer' } },
     beforeEach: ({ msw }) => msw.use(reply('get', '/spaces', [space('viewer')])),
 }
-
-export const NoSpaceInRussian: Story = { ...NoSpaceYet, globals: { locale: 'ru' } }
 
 // ---- the whole gate
 

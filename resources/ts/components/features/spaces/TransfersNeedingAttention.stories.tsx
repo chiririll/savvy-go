@@ -65,8 +65,6 @@ export const AfterARestore: Story = {
     },
 }
 
-export const InRussian: Story = { ...AfterARestore, play: undefined, globals: { locale: 'ru' } }
-
 // Nothing to decide, so nothing is shown.
 export const AllFine: Story = {
     beforeEach: ({ msw }) => msw.use(transfers([transfer()])),

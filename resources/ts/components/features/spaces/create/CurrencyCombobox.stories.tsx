@@ -48,7 +48,6 @@ const open = async (canvasElement: HTMLElement) => {
 
 export const Empty: Story = {}
 export const Chosen: Story = { args: { value: 'KWD' } }
-export const InRussian: Story = { globals: { locale: 'ru' } }
 export const Disabled: Story = { args: { disabled: true } }
 
 export const Opened: Story = {

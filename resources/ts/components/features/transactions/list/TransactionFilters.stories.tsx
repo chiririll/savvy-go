@@ -40,7 +40,6 @@ export const WithActiveFilters: Story = {
         await expect(within(canvasElement).getByRole('button', { name: /clear/i })).toBeVisible()
     },
 }
-export const InRussian: Story = { globals: { locale: 'ru' } }
 
 export const NoClearButtonWithoutFilters: Story = {
     play: async ({ canvasElement }) => {

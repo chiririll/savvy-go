@@ -32,7 +32,6 @@ export const Confirmed: Story = {
         await waitFor(() => expect(canvas.getByTestId('where')).toHaveTextContent(/^\/$/))
     },
 }
-export const InRussian: Story = { tags: ['mobile-only'], globals: { locale: 'ru' } }
 export const Working: Story = { beforeEach: ({ msw }) => msw.use(hang('post', '/auth/verify-email')) }
 
 export const InvalidLink: Story = {

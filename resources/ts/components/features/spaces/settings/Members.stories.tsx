@@ -38,7 +38,6 @@ export const AsAdmin: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }
 export const AsMember: Story = {
     args: { space: space('editor'), isAdmin: false },
     play: async ({ canvasElement }) => {

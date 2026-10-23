@@ -118,7 +118,7 @@ export function PreviewTable({ transactions }: { transactions: PreviewTransactio
 
     return (
         <div className="border rounded-lg overflow-hidden">
-            <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+            <div tabIndex={0} className="overflow-x-auto max-h-[400px] overflow-y-auto">
                 <table className="w-full text-sm">
                     <thead className="bg-muted sticky top-0">
                         <tr>

@@ -30,7 +30,6 @@ export const Default: Story = {
         await expect(canvas.getByRole('link', { name: /security/i })).toHaveAttribute('href', '/settings/security')
     },
 }
-export const InRussian: Story = { tags: ['mobile-only'], globals: { locale: 'ru' } }
 export const Empty: Story = {
     beforeEach: ({ msw }) => msw.use(raw('get', '/auth/webauthn/credentials', { credentials: [] })),
 }

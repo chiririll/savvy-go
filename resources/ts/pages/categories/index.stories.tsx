@@ -32,7 +32,6 @@ export const Expenses: Story = {
         await expect(canvas.getByRole('button', { name: /new category/i })).toBeVisible()
     },
 }
-export const InRussian: Story = { tags: ['mobile-only'], globals: { locale: 'ru' } }
 export const Loading: Story = { beforeEach: ({ msw }) => msw.use(hang('get', '/categories')) }
 
 export const IncomeTab: Story = {

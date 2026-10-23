@@ -31,5 +31,4 @@ export const Default: Story = {
         await expect(await within(canvasElement).findByDisplayValue('abc')).toBeVisible()
     },
 }
-export const InRussian: Story = { tags: ['mobile-only'], globals: { locale: 'ru' } }
 export const Loading: Story = { beforeEach: ({ msw }) => msw.use(hang('get', '/identity-providers/1')) }

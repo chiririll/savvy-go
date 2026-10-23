@@ -152,8 +152,6 @@ export const Deleted: Story = {
     },
 }
 
-export const DeletedInRussian: Story = { ...Deleted, play: undefined, globals: { locale: 'ru' } }
-
 export const DeletedRestored: Story = {
     render: () => <DeletedSpacesSection />,
     beforeEach: ({ msw }) => {
