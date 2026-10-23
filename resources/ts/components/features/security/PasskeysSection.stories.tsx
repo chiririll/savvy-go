@@ -68,7 +68,8 @@ export const ReadOnly: Story = {
     play: async ({ canvasElement }) => {
         const canvas = within(canvasElement)
         await canvas.findByText('MacBook Touch ID')
-        await expect(canvas.getByRole('button', { name: /add passkey/i })).toBeDisabled()
+        // The role of the space arrives after the list does.
+        await waitFor(() => expect(canvas.getByRole('button', { name: /add passkey/i })).toBeDisabled())
     },
 }
 
@@ -89,7 +90,9 @@ export const AddFailed: Story = {
         await userEvent.click(within(canvasElement).getByRole('button', { name: /add passkey/i }))
         await userEvent.type(await screen.findByPlaceholderText(/macbook touch id/i), 'YubiKey{Enter}')
         await userEvent.type(await screen.findByLabelText(/password/i), 'secret{Enter}')
-        await expect(await screen.findByText(/passkeys are off on this server/i)).toBeVisible()
+        // Both the API client and the mutation toast a refusal, so there can be two of them.
+        await waitFor(() => expect(screen.getAllByText(/passkeys are off on this server/i)[0]).toBeVisible())
+        await expect(screen.getByRole('dialog')).toBeVisible()
     },
 }
 

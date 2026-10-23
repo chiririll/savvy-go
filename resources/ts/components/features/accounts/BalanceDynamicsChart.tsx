@@ -79,6 +79,7 @@ export function BalanceDynamicsChart({ startDate, endDate, className }: BalanceD
                         <ReactECharts
                             key={periodKey}
                             option={chartOption}
+                            ariaLabel={t('dashboard.balanceDynamics')}
                             style={{ height: '250px', width: '100%' }}
                             className="min-w-0 max-w-full sm:[&]:!h-[300px]"
                             opts={{ renderer: 'svg' }}

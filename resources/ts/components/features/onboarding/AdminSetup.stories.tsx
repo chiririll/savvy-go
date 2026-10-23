@@ -114,7 +114,7 @@ export const AdminFields: Story = {
     render: () => <Admin />,
     play: async ({ canvasElement }) => {
         const canvas = within(canvasElement)
-        await userEvent.type(canvas.getByLabelText(/^name/i), 'Kirill')
+        await userEvent.type(canvas.getByLabelText(/your name/i), 'Kirill')
         await userEvent.type(canvas.getByLabelText(/^email/i), 'kirill@example.com')
         await expect(canvas.getByLabelText(/^email/i)).toHaveAttribute('autocomplete', 'email')
         await userEvent.click(canvas.getByRole('button', { name: /back/i }))
@@ -163,7 +163,7 @@ export const RestoreBackup: Story = {
         const canvas = within(canvasElement)
         await userEvent.upload(canvas.getByLabelText(/backup file/i), new File(['x'], 'server.zip'))
         // Only a Laravel database needs its old APP_KEY.
-        await expect(canvas.queryByLabelText(/app_key/i)).toBeNull()
+        await expect(canvas.queryByLabelText(/app key/i)).toBeNull()
         await userEvent.click(canvas.getByRole('button', { name: /restore/i }))
         await expect(onSubmit).toHaveBeenCalledWith('server.zip', '')
     },
@@ -174,7 +174,7 @@ export const RestoreLaravel: Story = {
     play: async ({ canvasElement }) => {
         const canvas = within(canvasElement)
         await userEvent.upload(canvas.getByLabelText(/backup file/i), new File(['x'], 'database.sqlite'))
-        await userEvent.type(await canvas.findByLabelText(/app_key/i), 'base64:abc')
+        await userEvent.type(await canvas.findByLabelText(/app key/i), 'base64:abc')
         await userEvent.click(canvas.getByRole('button', { name: /restore/i }))
         await expect(onSubmit).toHaveBeenCalledWith('database.sqlite', 'base64:abc')
     },

@@ -56,7 +56,13 @@ export function FiltersBar({ filters, onFilterChange, onToggleArrayFilter, onRes
 
                     <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
                         <SheetTrigger asChild>
-                            <Button variant="outline" size="sm" className="shrink-0" {...testId('filters')}>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="shrink-0"
+                                aria-label={t('reports.filters.title')}
+                                {...testId('filters')}
+                            >
                                 <SlidersHorizontal className="size-4" />
                                 {hasActiveFilters && (
                                     <Badge variant="secondary" className="ml-1 px-1.5">

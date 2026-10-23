@@ -108,7 +108,7 @@ export const FieldChanged: Story = {
         await expect(lastCall().conditions).toEqual([{ field: 'amount', op: 'equals', value: null }])
         // Only the operators of that field are offered.
         await userEvent.click(within(canvasElement).getByRole('combobox', { name: 'Condition' }))
-        await expect(await screen.findAllByRole('option')).toHaveLength(6)
+        await expect(await screen.findAllByRole('option')).toHaveLength(7)
     },
 }
 

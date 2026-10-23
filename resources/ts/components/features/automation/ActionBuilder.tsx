@@ -47,6 +47,7 @@ export function ActionBuilder({ value, onChange }: ActionBuilderProps) {
                 return (
                     <CategorySelect
                         plain
+                        ariaLabel={t('automation.actionTypes.set_category')}
                         value={action.category_id as number | undefined}
                         onChange={(categoryId) => updateAction(index, { category_id: categoryId })}
                     />
@@ -76,6 +77,7 @@ export function ActionBuilder({ value, onChange }: ActionBuilderProps) {
                     <div className="grid grid-cols-2 gap-2">
                         <AccountSelect
                             plain
+                            ariaLabel={t('automation.toAccount')}
                             excludeDebts={false}
                             activeOnly={false}
                             value={action.to_account_id as number | undefined}

@@ -64,6 +64,7 @@ export function ConditionValueInput({ condition, onChange }: ConditionValueInput
         return (
             <AccountSelect
                 plain
+                ariaLabel={t('automation.conditionValue')}
                 excludeDebts={false}
                 activeOnly={false}
                 value={condition.value as number | undefined}
@@ -73,7 +74,7 @@ export function ConditionValueInput({ condition, onChange }: ConditionValueInput
     }
 
     if (field === 'category_id') {
-        return <CategorySelect plain value={condition.value as number | undefined} onChange={setValue} />
+        return <CategorySelect plain ariaLabel={t('automation.conditionValue')} value={condition.value as number | undefined} onChange={setValue} />
     }
 
     if (field === 'tags') {
@@ -108,7 +109,7 @@ export function ConditionValueInput({ condition, onChange }: ConditionValueInput
                 type="number"
                 className="w-full min-w-0"
                 aria-label={t('automation.conditionValue')}
-                value={condition.value as number}
+                value={(condition.value as number | null) ?? ''}
                 onChange={(e) => setValue(Number(e.target.value))}
             />
         )

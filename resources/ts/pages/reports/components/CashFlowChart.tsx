@@ -70,7 +70,7 @@ export function CashFlowChart({ filters }: CashFlowChartProps) {
                 ) : (
                     <div ref={chartRef} style={{ height: CHART_HEIGHT }}>
                         {/* Mount once measured so the chart animates in a single pass */}
-                        {chartWidth > 0 && <ReactECharts option={chartOption} style={{ height: CHART_HEIGHT }} />}
+                        {chartWidth > 0 && <ReactECharts option={chartOption} ariaLabel={t('reports.cashFlowChart.title')} style={{ height: CHART_HEIGHT }} />}
                     </div>
                 )}
             </CardContent>

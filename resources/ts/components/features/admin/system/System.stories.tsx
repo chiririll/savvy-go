@@ -42,7 +42,8 @@ export const Authentication: Story = {
     play: async ({ canvasElement }) => {
         const canvas = within(canvasElement)
         await expect(await canvas.findByRole('switch', { name: /password sign-in/i })).toBeChecked()
-        await expect(canvas.getByRole('switch', { name: /require email confirmation/i })).toBeEnabled()
+        // The mail status arrives after the settings do.
+        await waitFor(() => expect(canvas.getByRole('switch', { name: /require email confirmation/i })).toBeEnabled())
     },
 }
 
@@ -67,7 +68,11 @@ export const PasswordLoginTurnedOff: Story = {
     render: () => <AuthenticationSection />,
     beforeEach: ({ msw }) => msw.use(saving({ password_login_enabled: false })),
     play: async ({ canvasElement }) => {
-        await userEvent.click(await within(canvasElement).findByRole('switch', { name: /password sign-in/i }))
+        const canvas = within(canvasElement)
+        const passwordLogin = await canvas.findByRole('switch', { name: /password sign-in/i })
+        // The switch stays locked until the single sign-on providers are known.
+        await waitFor(() => expect(passwordLogin).toBeEnabled())
+        await userEvent.click(passwordLogin)
         await waitFor(() => expect(sent.bodies).toEqual([{ password_login_enabled: false }]))
     },
 }

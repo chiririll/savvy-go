@@ -123,6 +123,7 @@ export function SankeyDiagram({ filters }: SankeyDiagramProps) {
                         {chartWidth > 0 && (
                             <ReactECharts
                                 option={sankeyOption}
+                                ariaLabel={t('reports.moneyFlow.title')}
                                 style={{ height: 400 }}
                                 onEvents={{
                                     click: handleSankeyClick,

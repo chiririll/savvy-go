@@ -104,7 +104,7 @@ export function ExpensePaceChart({ filters }: ExpensePaceChartProps) {
                                     value={String(selectedMonth)}
                                     onValueChange={(v) => setSelectedMonth(Number(v))}
                                 >
-                                    <SelectTrigger className="w-full sm:w-[180px]">
+                                    <SelectTrigger className="w-full sm:w-[180px]" aria-label={t('reports.filters.month')}>
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -120,7 +120,7 @@ export function ExpensePaceChart({ filters }: ExpensePaceChartProps) {
 
                         <div ref={chartRef} style={{ height: 300 }}>
                             {/* Mount once measured so the chart animates in a single pass */}
-                            {chartWidth > 0 && <ReactECharts option={chartOption} style={{ height: 300 }} />}
+                            {chartWidth > 0 && <ReactECharts option={chartOption} ariaLabel={t('reports.expensePace.title')} style={{ height: 300 }} />}
                         </div>
 
                         {currentMonthData && <ExpensePaceSummary month={currentMonthData} currency={currency} />}

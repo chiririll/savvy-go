@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect, fn, screen, userEvent, within } from 'storybook/test'
+import { expect, fn, screen, userEvent, waitFor, within } from 'storybook/test'
 
 import { overlayA11y } from '@/test/a11y'
 import { reply, settingsApi } from '@/test/api-mocks'
@@ -127,7 +127,7 @@ export const OptionsDone: Story = {
     beforeEach: ({ msw }) => msw.use(mail(true), providers(1)),
     play: async ({ canvasElement }) => {
         const canvas = within(canvasElement)
-        await expect(await canvas.findAllByText(/done/i)).toHaveLength(2)
+        await waitFor(() => expect(canvas.getAllByText(/done/i)).toHaveLength(2))
         await expect(canvas.getByRole('button', { name: /finish/i })).toBeVisible()
     },
 }

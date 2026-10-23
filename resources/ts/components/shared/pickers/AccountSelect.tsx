@@ -24,6 +24,8 @@ interface AccountSelectProps {
     placeholder?: string
     disabled?: boolean
     plain?: boolean
+    /** Accessible name of the trigger; set it when no visible label points at the select. */
+    ariaLabel?: string
     showBalance?: boolean
     allowCreate?: boolean
     /** Lists another space's accounts (null: no space chosen yet). */
@@ -41,6 +43,7 @@ export function AccountSelect({
     placeholder,
     disabled,
     plain,
+    ariaLabel,
     showBalance,
     allowCreate,
     spaceId,
@@ -62,7 +65,7 @@ export function AccountSelect({
     })
 
     const trigger = (
-        <SelectTrigger className="w-full">
+        <SelectTrigger className="w-full" aria-label={ariaLabel}>
             <SelectValue placeholder={placeholder ?? t('forms:selectAccount')} />
         </SelectTrigger>
     )

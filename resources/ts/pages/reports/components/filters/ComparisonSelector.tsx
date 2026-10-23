@@ -13,7 +13,7 @@ export function ComparisonSelector({ value, onChange }: ComparisonSelectorProps)
 
     return (
         <Select value={value} onValueChange={(val) => onChange(val as CompareType)}>
-            <SelectTrigger className="w-full md:w-[200px]" {...testIdSelect('global-compare')}>
+            <SelectTrigger aria-label={t('reports.filters.compareWith')} className="w-full md:w-[200px]" {...testIdSelect('global-compare')}>
                 <SelectValue placeholder={t('reports.filters.comparePlaceholder')} />
             </SelectTrigger>
             <SelectContent>

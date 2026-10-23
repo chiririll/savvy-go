@@ -83,6 +83,7 @@ export function ExpensesByCategoryCard({ summary, currency }: ExpensesByCategory
                     <div className="min-w-0 overflow-x-auto overscroll-x-contain">
                         <ReactECharts
                             option={option}
+                            ariaLabel={t('dashboard.expensesByCategory')}
                             style={{ height: '280px', width: '100%' }}
                             className="min-w-0 max-w-full"
                             opts={{ renderer: 'svg' }}

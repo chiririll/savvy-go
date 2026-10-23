@@ -14,9 +14,10 @@ interface OptionSelectProps {
 }
 
 function OptionSelect({ value, options, onChange, widthClass }: OptionSelectProps) {
+    const { t } = useTranslation('pages')
     return (
         <Select value={value} onValueChange={onChange}>
-            <SelectTrigger className={widthClass} {...testIdSelect('global-period-value')}>
+            <SelectTrigger aria-label={t('reports.filters.period')} className={widthClass} {...testIdSelect('global-period-value')}>
                 <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -37,7 +38,7 @@ interface PeriodSelectorProps {
 
 // The picker that goes with the chosen period type.
 export function PeriodSelector({ filters, onFilterChange }: PeriodSelectorProps) {
-    const { i18n } = useTranslation('pages')
+    const { t, i18n } = useTranslation('pages')
     const monthOptions = useMemo(() => getMonthOptions(), [i18n.language])
     const quarterOptions = useMemo(() => getQuarterOptions(), [i18n.language])
     const yearOptions = useMemo(() => getYearOptions(), [])
@@ -75,6 +76,7 @@ export function PeriodSelector({ filters, onFilterChange }: PeriodSelectorProps)
                 <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2">
                     <Input
                         type="date"
+                        aria-label={t('transactions.dateFrom')}
                         value={filters.customStartDate}
                         onChange={(e) => onFilterChange('customStartDate', e.target.value)}
                         className="w-full md:w-[140px]"
@@ -82,6 +84,7 @@ export function PeriodSelector({ filters, onFilterChange }: PeriodSelectorProps)
                     <span className="text-muted-foreground text-center hidden md:block">—</span>
                     <Input
                         type="date"
+                        aria-label={t('transactions.dateTo')}
                         value={filters.customEndDate}
                         onChange={(e) => onFilterChange('customEndDate', e.target.value)}
                         className="w-full md:w-[140px]"

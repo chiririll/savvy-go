@@ -100,6 +100,7 @@ export function NetWorthChart({ filters }: NetWorthChartProps) {
                         {chartWidth > 0 && (
                             <ReactECharts
                                 option={chartOption}
+                                ariaLabel={t('reports.netWorth.chartTitle')}
                                 style={{ height: 350 }}
                                 key={groupBy}
                             />

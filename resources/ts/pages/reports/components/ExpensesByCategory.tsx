@@ -66,10 +66,13 @@ export function ExpensesByCategory({ filters }: ExpensesByCategoryProps) {
                         const previousWidth = maxValue > 0 ? (category.previous / maxValue) * 100 : 0
 
                         return (
-                            <div
+                            <button
+                                type="button"
                                 key={category.id}
                                 className={cn(
-                                    'group cursor-pointer rounded-lg px-1 py-2 transition-colors hover:bg-muted/50',
+                                    'group block w-full cursor-pointer rounded-lg px-1 py-2 text-left transition-colors',
+                                    'hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2',
+                                    'focus-visible:ring-ring',
                                 )}
                                 onClick={() => handleCategoryClick(category.id)}
                             >
@@ -154,7 +157,7 @@ export function ExpensesByCategory({ filters }: ExpensesByCategoryProps) {
                                         </div>
                                     )}
                                 </div>
-                            </div>
+                            </button>
                         )
                     })
                 )}
