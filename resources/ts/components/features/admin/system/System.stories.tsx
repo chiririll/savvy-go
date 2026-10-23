@@ -47,7 +47,6 @@ export const Authentication: Story = {
     },
 }
 
-export const AuthenticationInRussian: Story = { render: () => <AuthenticationSection />, globals: { locale: 'ru' } }
 export const AuthenticationLoading: Story = {
     render: () => <AuthenticationSection />,
     beforeEach: ({ msw }) => msw.use(hang('get', '/settings')),
@@ -119,8 +118,6 @@ export const Server: Story = {
     },
 }
 
-export const ServerInRussian: Story = { render: () => <ServerSection />, globals: { locale: 'ru' } }
-
 export const ServerUrlSaved: Story = {
     render: () => <ServerSection />,
     beforeEach: ({ msw }) => msw.use(saving()),
@@ -153,8 +150,6 @@ export const SpacesLimits: Story = {
         await expect(canvas.getByLabelText(/default size limit/i)).toHaveValue(100)
     },
 }
-
-export const SpacesLimitsInRussian: Story = { render: () => <SpacesLimitsSection />, globals: { locale: 'ru' } }
 
 // Empty means no limit for spaces per user.
 export const NoSpacesLimit: Story = {

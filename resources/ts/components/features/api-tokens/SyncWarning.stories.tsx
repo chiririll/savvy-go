@@ -9,6 +9,7 @@ const spaces = [{ id: 1, name: 'Home' }, { id: 2, name: 'Trip' }]
 const group = { id: 1, categories: true, tags: true, members: spaces.map((s) => ({ ...s, role: 'admin' })), hidden: 0 }
 
 const meta = {
+    tags: ['desktop-only'],
     title: 'features/api-tokens/SyncWarning',
     component: SyncWarning,
     args: { spaces, choice: { all: true, ids: [] } },
@@ -23,8 +24,6 @@ export const Mirrored: Story = {
         await expect(await within(canvasElement).findAllByText(/trip/i)).not.toHaveLength(0)
     },
 }
-export const InRussian: Story = { globals: { locale: 'ru' } }
-
 export const OnlyCategories: Story = {
     beforeEach: ({ msw }) => msw.use(reply('get', '/sync-group', { ...group, tags: false })),
 }

@@ -8,6 +8,7 @@ import { InvitationRow } from './InvitationRow'
 
 // The rows sit in a list, as on every page that shows them.
 const meta = {
+    tags: ['desktop-only'],
     title: 'features/spaces/InvitationRow',
     component: InvitationRow,
     parameters: { layout: 'padded' },
@@ -29,8 +30,6 @@ export const ByEmail: Story = {
         await expect(within(canvasElement).getByText('Editor')).toBeVisible()
     },
 }
-
-export const InRussian: Story = { globals: { locale: 'ru' } }
 
 export const LinkForAnyone: Story = {
     args: { email: null, role: 'viewer' },

@@ -8,6 +8,7 @@ import { FormCheckboxCard } from './FormCheckboxCard'
 type Values = { active: boolean }
 
 const meta = {
+    tags: ['desktop-only'],
     title: 'shared/form/FormCheckboxCard',
     component: FormCheckboxCard<Values>,
     args: { control: undefined as never, name: 'active', label: 'Active' },

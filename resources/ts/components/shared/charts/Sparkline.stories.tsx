@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite'
 import { Sparkline } from './Sparkline'
 
 const meta = {
+    tags: ['desktop-only'],
     title: 'shared/charts/Sparkline',
     component: Sparkline,
     args: { data: [3, 5, 4, 8, 6, 9, 7] },

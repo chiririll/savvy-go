@@ -41,8 +41,6 @@ export const Suggested: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }
-
 // The account is not guessed: everything lands in it.
 export const AccountRequired: Story = {
     play: async ({ canvasElement, args }) => {

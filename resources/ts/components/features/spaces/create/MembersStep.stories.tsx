@@ -44,14 +44,14 @@ export const Listed: Story = {
     },
 }
 
-export const InRussian: Story = { render: () => <Harness initial={listed} />, globals: { locale: 'ru' } }
-
 // Nothing is sent from here: the list only grows.
 export const Added: Story = {
     render: () => <Harness />,
     play: async ({ canvasElement }) => {
         await userEvent.type(await emailField(canvasElement), 'sam@example.com{Enter}')
         await expect(await within(canvasElement).findByText('sam@example.com')).toBeVisible()
+        // A new address starts as an editor.
+        await expect(within(canvasElement).getByText(/editor · by email/i)).toBeVisible()
     },
 }
 

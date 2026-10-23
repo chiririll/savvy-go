@@ -61,8 +61,6 @@ export const SkippedAfterAsking: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }
-
 export const Strip: Story = {
     render: (args) => <UpcomingPendingStrip transactions={[overdue, soon]} onConfirm={args.onConfirm} onSkip={args.onSkip} />,
 }

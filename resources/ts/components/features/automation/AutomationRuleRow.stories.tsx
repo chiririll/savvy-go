@@ -24,8 +24,6 @@ export const Active: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }
-export const InDarkTheme: Story = { globals: { theme: 'dark' } }
 export const Inactive: Story = { args: { rule: rule({ isActive: false, runsCount: 0 }) } }
 export const LongName: Story = {
     args: { rule: rule({ name: 'A rule with a very long name that explains far too much about what it does' }) },

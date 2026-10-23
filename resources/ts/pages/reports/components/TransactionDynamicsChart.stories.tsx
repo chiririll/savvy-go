@@ -54,7 +54,7 @@ export const Income: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }
+export const InRussian: Story = { tags: ['mobile-only'], globals: { locale: 'ru' } }
 
 export const SwitchesToBars: Story = {
     play: async ({ canvasElement }) => {

@@ -22,8 +22,6 @@ export const Filled: Story = { args: { defaultValues: euro } }
 export const Editing: Story = { args: { isEditing: true, defaultValues: euro } }
 export const Submitting: Story = { args: { isSubmitting: true } }
 export const WithoutOwnSubmit: Story = { args: { hideSubmit: true } }
-export const InRussian: Story = { globals: { locale: 'ru' } }
-
 // The base currency is the unit of every other rate, so its own is fixed at 1.
 export const BaseCurrency: Story = {
     args: { isEditing: true, isBase: true, defaultValues: { ...euro, code: 'USD', rate: 1 } },

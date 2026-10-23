@@ -51,7 +51,7 @@ export const Default: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }
+export const InRussian: Story = { tags: ['mobile-only'], globals: { locale: 'ru' } }
 
 export const TooltipShowsTheAmount: Story = {
     play: async ({ canvasElement }) => {

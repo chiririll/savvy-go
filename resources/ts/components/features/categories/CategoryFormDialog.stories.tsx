@@ -24,7 +24,6 @@ export const Edit: Story = {
 }
 export const EditDefault: Story = { args: { category: category({ isDefault: true }) } }
 export const Submitting: Story = { args: { isSubmitting: true } }
-export const Closed: Story = { args: { open: false } }
 export const ReadOnly: Story = { parameters: { app: { role: 'viewer' } } }
 
 export const SubmittedFromTheFooter: Story = {

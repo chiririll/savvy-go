@@ -22,5 +22,4 @@ export const Default: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }
-export const InDarkTheme: Story = { globals: { theme: 'dark' } }
+export const InRussian: Story = { tags: ['mobile-only'], globals: { locale: 'ru' } }

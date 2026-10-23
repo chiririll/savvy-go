@@ -28,4 +28,4 @@ export const Default: Story = {
         await expect(canvas.getByRole('heading', { level: 1 })).toBeVisible()
     },
 }
-export const InRussian: Story = { globals: { locale: 'ru' } }
+export const InRussian: Story = { tags: ['mobile-only'], globals: { locale: 'ru' } }

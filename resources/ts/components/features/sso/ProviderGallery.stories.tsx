@@ -55,8 +55,6 @@ export const Cards: Story = {
 }
 
 export const CardsInRussian: Story = { ...Cards, play: undefined, globals: { locale: 'ru' } }
-export const CardsInDarkTheme: Story = { ...Cards, play: undefined, globals: { theme: 'dark' } }
-
 export const LongName: Story = {
     render: () => grid({ name: 'A provider with a very long name for the whole company', slug: 'a-very-long-slug' }),
 }

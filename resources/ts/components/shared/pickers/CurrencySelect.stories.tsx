@@ -102,7 +102,3 @@ export const Invalid: Story = {
     },
 }
 
-export const Russian: Story = {
-    globals: { locale: 'ru' },
-    args: { value: { source: 'existing', id: 2 } },
-}

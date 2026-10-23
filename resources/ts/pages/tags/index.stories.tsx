@@ -27,7 +27,7 @@ export const Default: Story = {
         await expect(canvas.getByRole('button', { name: /new tag/i })).toBeVisible()
     },
 }
-export const InRussian: Story = { globals: { locale: 'ru' } }
+export const InRussian: Story = { tags: ['mobile-only'], globals: { locale: 'ru' } }
 export const Loading: Story = { beforeEach: ({ msw }) => msw.use(hang('get', '/tags')) }
 export const Empty: Story = {
     beforeEach: ({ msw }) => msw.use(reply('get', '/tags', [])),

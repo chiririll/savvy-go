@@ -46,5 +46,4 @@ export const Edit: Story = {
 }
 
 export const Submitting: Story = { args: { isSubmitting: true } }
-export const Closed: Story = { args: { open: false } }
 export const ReadOnly: Story = { parameters: { app: { role: 'viewer' } }, args: { debt: debt() } }

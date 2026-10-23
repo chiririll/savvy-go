@@ -6,6 +6,39 @@ import tailwindcss from '@tailwindcss/vite'
 import { storybookTest } from '@storybook/addon-vitest/vitest-plugin'
 import { playwright } from '@vitest/browser-playwright'
 import pkg from './package.json'
+import { DESKTOP_ONLY, MOBILE_ONLY } from './.storybook/tags'
+
+// Every story is a test, in a real browser at one size (`npm run test:stories` runs both projects).
+// A story tagged for the other size is left out of this project; see .storybook/tags.ts.
+const storiesProject = (name: string, viewport: { width: number; height: number }, excludeTags: string[]) => ({
+    extends: true as const,
+    plugins: [storybookTest({ configDir: path.join(__dirname, '.storybook'), tags: { exclude: excludeTags } })],
+    // Name every dependency up front; one found mid-run makes Vite reload and fail the run.
+    optimizeDeps: {
+        include: [
+            ...Object.keys(pkg.dependencies).filter((dep) => !dep.startsWith('@vitejs/')),
+            // Deep imports are not found from the package name.
+            'nuqs/adapters/testing',
+            'echarts/core',
+            'echarts/charts',
+            'echarts/components',
+            'echarts/renderers',
+            'echarts-for-react/lib/core',
+        ],
+    },
+    test: {
+        name,
+        // Many stories load at once on a cold cache; the Russian ones wait for their language files.
+        testTimeout: 30_000,
+        hookTimeout: 30_000,
+        browser: {
+            enabled: true,
+            headless: true,
+            provider: playwright(),
+            instances: [{ browser: 'chromium' as const, viewport }],
+        },
+    },
+})
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, process.cwd(), '')
@@ -50,39 +83,8 @@ export default defineConfig(({ mode }) => {
                         include: ['resources/ts/**/*.test.{ts,tsx}'],
                     },
                 },
-                // Every story is a test, in a real browser at a desktop and a phone size (`npm run test:stories`).
-                {
-                    extends: true,
-                    plugins: [storybookTest({ configDir: path.join(__dirname, '.storybook') })],
-                    // Name every dependency up front; one found mid-run makes Vite reload and fail the run.
-                    optimizeDeps: {
-                        include: [
-                            ...Object.keys(pkg.dependencies).filter((name) => !name.startsWith('@vitejs/')),
-                            // Deep imports are not found from the package name.
-                            'nuqs/adapters/testing',
-                            'echarts/core',
-                            'echarts/charts',
-                            'echarts/components',
-                            'echarts/renderers',
-                            'echarts-for-react/lib/core',
-                        ],
-                    },
-                    test: {
-                        name: 'stories',
-                        // Many stories load at once on a cold cache; the Russian ones wait for their language files.
-                        testTimeout: 30_000,
-                        hookTimeout: 30_000,
-                        browser: {
-                            enabled: true,
-                            headless: true,
-                            provider: playwright(),
-                            instances: [
-                                { browser: 'chromium', name: 'desktop', viewport: { width: 1280, height: 800 } },
-                                { browser: 'chromium', name: 'mobile', viewport: { width: 390, height: 844 } },
-                            ],
-                        },
-                    },
-                },
+                storiesProject('stories-desktop', { width: 1280, height: 800 }, [MOBILE_ONLY]),
+                storiesProject('stories-mobile', { width: 390, height: 844 }, [DESKTOP_ONLY]),
             ],
         },
         server: {

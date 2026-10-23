@@ -16,8 +16,6 @@ export const Empty: Story = {}
 export const Income: Story = { args: { defaultValues: { name: 'Salary', type: 'income', icon: '💼', color: '#2563eb' } } }
 export const Submitting: Story = { args: { isSubmitting: true } }
 export const WithoutOwnSubmit: Story = { args: { hideSubmit: true } }
-export const InRussian: Story = { globals: { locale: 'ru' } }
-
 // The default category keeps its type.
 export const DefaultCategory: Story = {
     args: { isDefault: true, defaultValues: { name: 'Groceries', type: 'expense' } },

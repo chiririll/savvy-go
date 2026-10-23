@@ -65,7 +65,6 @@ export const WithBackups: Story = {
         await expect(await screen.findByText('Before the upgrade')).toBeVisible()
     },
 }
-export const InRussian: Story = { globals: { locale: 'ru' } }
 export const NoBackups: Story = { args: { source: source([]) } }
 export const WithExtraActions: Story = { args: { actions: <button type="button">Extra</button> } }
 

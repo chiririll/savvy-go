@@ -86,8 +86,6 @@ export const EveryValueEditor: Story = {
 }
 
 export const EveryValueEditorInRussian: Story = { ...EveryValueEditor, play: undefined, globals: { locale: 'ru' } }
-export const EveryValueEditorInDarkTheme: Story = { ...EveryValueEditor, play: undefined, globals: { theme: 'dark' } }
-
 export const MatchAny: Story = {
     render: () => <Conditions initial={[{ field: 'type', op: 'equals', value: 'income' }]} />,
     play: async ({ canvasElement }) => {

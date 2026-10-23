@@ -79,7 +79,7 @@ npm run test:stories      # every Storybook story, as a test in Chromium
 npm run storybook         # the stories in the browser, with a language and theme switch
 ```
 
-Components are tested through Storybook (`*.stories.tsx` next to the component). A story is one state of a component: loading, empty, error, read-only, a currency with 0 or 3 decimals, Russian. `npm run test:stories` runs each story twice, at a desktop size (1280×800) and a phone size (390×844), so a responsive break fails the same way a logic bug does. A story with a `play` function also clicks and types, and asserts. Every story is checked for accessibility (axe) as well, and a violation fails it.
+Components are tested through Storybook (`*.stories.tsx` next to the component). A story is one state of a component: loading, empty, error, read-only, a currency with 0 or 3 decimals, Russian. `npm run test:stories` runs each story twice, at a desktop size (1280×800, project `stories-desktop`) and a phone size (390×844, project `stories-mobile`), so a responsive break fails the same way a logic bug does. Story tags narrow that: `tags: ['mobile-only']` (e.g. a page's `InRussian`, the layout-overflow check) skips the desktop run, `tags: ['desktop-only']` (on `meta`, for a component with no responsive classes or `use-mobile` in its tree) skips the phone run. Untagged stories run at both sizes. Tag names and the projects live in `.storybook/tags.ts` and `vite.config.ts`. A story with a `play` function also clicks and types, and asserts. Every story is checked for accessibility (axe) as well, and a violation fails it.
 
 The first run needs a browser: `npx playwright install chromium`.
 

@@ -5,6 +5,7 @@ import { expect, fn, userEvent, within } from 'storybook/test'
 import { OtpCodeInput } from './OtpCodeInput'
 
 const meta = {
+    tags: ['desktop-only'],
     title: 'shared/form/OtpCodeInput',
     component: OtpCodeInput,
     args: { value: '', onChange: fn(), onComplete: fn() },

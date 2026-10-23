@@ -57,9 +57,6 @@ export const Preview: Story = {
     },
 }
 
-export const InRussian: Story = { render: () => <Harness />, globals: { locale: 'ru' } }
-export const InDarkTheme: Story = { render: () => <Harness />, globals: { theme: 'dark' } }
-
 export const CategoryLinked: Story = {
     render: () => <Harness />,
     play: async ({ canvasElement }) => {

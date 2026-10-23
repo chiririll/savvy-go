@@ -4,6 +4,7 @@ import { expect, within } from 'storybook/test'
 import { UserSettingsTabs } from './UserSettingsTabs'
 
 const meta = {
+    tags: ['desktop-only'],
     title: 'features/settings/UserSettingsTabs',
     component: UserSettingsTabs,
     parameters: { route: '/settings/security' },
@@ -25,4 +26,3 @@ export const Api: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }

@@ -24,8 +24,6 @@ export const Volume: Story = {
 }
 
 export const VolumeInRussian: Story = { ...Volume, play: undefined, globals: { locale: 'ru' } }
-export const VolumeInDarkTheme: Story = { ...Volume, play: undefined, globals: { theme: 'dark' } }
-
 export const VolumeFillingUp: Story = {
     render: () => (
         <VolumePanel

@@ -43,8 +43,6 @@ export const Entries: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }
-
 // An action this build does not know is shown as it came.
 export const UnknownAction: Story = {
     beforeEach: ({ msw }) => msw.use(reply('get', '/audit', [entry({ action: 'export_space', details: '' })])),

@@ -85,8 +85,6 @@ export const Start: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }
-
 export const Uploaded: Story = {
     play: async ({ canvasElement }) => {
         await upload(canvasElement)

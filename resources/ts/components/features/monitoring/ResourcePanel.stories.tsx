@@ -25,9 +25,6 @@ export const Healthy: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }
-export const InDarkTheme: Story = { globals: { theme: 'dark' } }
-
 // Over 90% turns red and says so under the uptime.
 export const UnderLoad: Story = {
     args: {

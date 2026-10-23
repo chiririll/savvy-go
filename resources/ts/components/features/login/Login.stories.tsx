@@ -55,8 +55,6 @@ export const ShellCompact: Story = {
     ),
 }
 
-export const ShellInRussian: Story = { ...Shell, globals: { locale: 'ru' } }
-
 // ---- the password form
 
 const loginPage = () => (
@@ -79,8 +77,6 @@ const fill = async (email: string, password: string) => {
 }
 
 export const LoginEmpty: Story = { render: () => loginPage() }
-export const LoginInRussian: Story = { render: () => loginPage(), globals: { locale: 'ru' } }
-
 export const LoginRemembersByDefault: Story = {
     render: () => loginPage(),
     play: async () => {
@@ -160,8 +156,6 @@ export const NewPasswordSubmitting: Story = {
         await expect(await screen.findByRole('button', { name: /save password/i })).toBeDisabled()
     },
 }
-export const NewPasswordInRussian: Story = { render: () => setPassword(), globals: { locale: 'ru' } }
-
 export const NewPasswordTooShort: Story = {
     render: () => setPassword(),
     play: async () => {
@@ -213,8 +207,6 @@ export const SecondFactor: Story = {
         await expect(within(canvasElement).getByRole('button', { name: /verify/i })).toBeDisabled()
     },
 }
-
-export const SecondFactorInRussian: Story = { render: () => twoFactor(), globals: { locale: 'ru' } }
 
 export const SecondFactorByRecoveryCode: Story = {
     render: () => twoFactor(),

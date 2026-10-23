@@ -4,6 +4,7 @@ import { expect, waitFor, within } from 'storybook/test'
 import ReactECharts from './ReactECharts'
 
 const meta = {
+    tags: ['desktop-only'],
     title: 'shared/charts/ReactECharts',
     component: ReactECharts,
     // The chart takes the height it is given.

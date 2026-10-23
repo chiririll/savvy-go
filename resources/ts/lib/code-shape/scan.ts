@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
 
 /*
@@ -50,7 +51,7 @@ export interface Finding {
 
 export const isHard = (finding: Finding) => finding.value > (RULE_BY_NAME.get(finding.rule)?.hard ?? Infinity)
 
-export const REPO = path.resolve(__dirname, '../../../..')
+export const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..')
 
 // Shadcn primitives are copied in, not written here.
 const SKIPPED_DIRS = ['resources/ts/components/ui/']

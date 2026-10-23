@@ -36,6 +36,7 @@ const List = ({ data, onReorder }: { data: Item[]; onReorder: (items: Item[]) =>
 }
 
 const meta = {
+    tags: ['desktop-only'],
     title: 'shared/table/SortableRows',
     component: List,
     args: { data: items, onReorder: fn() },
@@ -74,7 +75,5 @@ export const DroppedInPlaceChangesNothing: Story = {
         await expect(args.onReorder).not.toHaveBeenCalled()
     },
 }
-
-export const InRussian: Story = { globals: { locale: 'ru' } }
 
 export const SingleRow: Story = { args: { data: [items[0]] } }

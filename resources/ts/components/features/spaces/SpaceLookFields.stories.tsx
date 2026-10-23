@@ -7,6 +7,7 @@ import { COLOR_OPTIONS } from '@/constants'
 import { SpaceLookFields } from './SpaceLookFields'
 
 const meta = {
+    tags: ['desktop-only'],
     title: 'features/spaces/SpaceLookFields',
     component: SpaceLookFields,
     parameters: { layout: 'padded' },
@@ -30,9 +31,6 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 export const Chosen: Story = {}
-export const InRussian: Story = { globals: { locale: 'ru' } }
-export const InDarkTheme: Story = { globals: { theme: 'dark' } }
-
 export const NothingChosen: Story = {
     args: { emoji: '', color: '' },
     play: async ({ canvasElement }) => {

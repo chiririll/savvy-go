@@ -40,8 +40,6 @@ export const Selected: Story = { args: { value: 3 } }
 export const Disabled: Story = { args: { disabled: true, value: 1 } }
 export const CustomPlaceholder: Story = { args: { placeholder: 'From which account?' } }
 export const Loading: Story = { beforeEach: ({ msw }) => msw.use(hang('get', '/accounts')) }
-export const InRussian: Story = { globals: { locale: 'ru' } }
-
 // No space chosen yet: nothing to list, and the select stays shut.
 export const WaitingForSpace: Story = {
     args: { spaceId: null },

@@ -47,8 +47,6 @@ export const Current: Story = {
 }
 
 export const InRussian: Story = { globals: { locale: 'ru' } }
-export const InDarkTheme: Story = { globals: { theme: 'dark' } }
-
 export const Opened: Story = {
     play: async ({ canvasElement }) => {
         const menu = await open(canvasElement)

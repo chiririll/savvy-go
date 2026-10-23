@@ -45,13 +45,10 @@ export const EditPending: Story = {
     args: { transaction: transaction({ status: 'pending', date: '2099-06-01' }) },
 }
 export const Submitting: Story = { args: { isSubmitting: true } }
-export const Closed: Story = { args: { open: false } }
 export const ReadOnly: Story = {
     parameters: { app: { role: 'viewer' } },
     args: { transaction: transaction() },
 }
-export const InRussian: Story = { globals: { locale: 'ru' } }
-
 // The balance after the change sits in the dialog's header, out of the way of the form.
 export const BalancePreviewInHeader: Story = {
     args: { transaction: transaction({ status: 'confirmed', amount: 20 }) },

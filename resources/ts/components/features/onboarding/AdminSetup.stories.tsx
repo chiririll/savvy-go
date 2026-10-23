@@ -54,9 +54,6 @@ export const BootstrapInDocker: Story = {
     },
 }
 
-export const BootstrapInRussian: Story = { render: () => <Bootstrap environment="systemd" />, globals: { locale: 'ru' } }
-export const BootstrapInDarkTheme: Story = { render: () => <Bootstrap environment="docker" />, globals: { theme: 'dark' } }
-
 export const BootstrapUnderSystemd: Story = {
     render: () => <Bootstrap environment="systemd" />,
     play: async ({ canvasElement }) => {
@@ -122,8 +119,6 @@ export const AdminFields: Story = {
     },
 }
 
-export const AdminFieldsInRussian: Story = { render: () => <Admin />, globals: { locale: 'ru' } }
-
 export const AdminSaving: Story = {
     render: () => <Admin isLoading />,
     play: async ({ canvasElement }) => {
@@ -179,8 +174,6 @@ export const RestoreLaravel: Story = {
         await expect(onSubmit).toHaveBeenCalledWith('database.sqlite', 'base64:abc')
     },
 }
-
-export const RestoreInRussian: Story = { render: () => <Restore />, globals: { locale: 'ru' } }
 
 export const RestoreRefused: Story = {
     render: () => <Restore error="This is not a Savvy backup." />,

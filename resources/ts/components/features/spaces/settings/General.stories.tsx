@@ -34,8 +34,6 @@ export const AsAdmin: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }
-
 export const WithQuota: Story = {
     beforeEach: ({ msw }) => msw.use(details({ quota: 10_000_000 })),
     play: async ({ canvasElement }) => {

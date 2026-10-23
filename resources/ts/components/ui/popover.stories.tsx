@@ -18,8 +18,6 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-export const Closed: Story = {}
-
 export const Opened: Story = {
     play: async ({ canvasElement }) => {
         await userEvent.click(within(canvasElement).getByRole('button', { name: 'Details' }))

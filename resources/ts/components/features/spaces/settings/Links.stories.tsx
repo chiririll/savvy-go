@@ -36,8 +36,6 @@ export const AsAdmin: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }
-
 export const NoLinks: Story = {
     beforeEach: ({ msw }) => msw.use(reply('get', '/links', [])),
     play: async ({ canvasElement }) => {

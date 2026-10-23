@@ -38,8 +38,6 @@ export const OneTime: Story = {
 }
 export const Submitting: Story = { args: { isSubmitting: true } }
 export const WithoutOwnSubmit: Story = { args: { hideSubmit: true } }
-export const InRussian: Story = { globals: { locale: 'ru' } }
-
 export const ReadOnly: Story = {
     parameters: { app: { role: 'viewer' } },
     args: { defaultValues: filled },

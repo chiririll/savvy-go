@@ -17,6 +17,7 @@ const rows = (count: number): Row[] =>
     Array.from({ length: count }, (_, i) => ({ id: i + 1, name: `Item ${i + 1}`, amount: `${(i + 1) * 10}.00` }))
 
 const meta = {
+    tags: ['desktop-only'],
     title: 'shared/table/DataTable',
     component: DataTable<Row>,
     args: { data: rows(3), columns },

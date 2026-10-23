@@ -57,8 +57,6 @@ export const McpClosed: Story = {
     },
 }
 
-export const McpInRussian: Story = { render: () => <McpAccess />, globals: { locale: 'ru' } }
-
 export const McpOpened: Story = {
     render: () => <McpAccess />,
     beforeEach: ({ msw }) => {
@@ -123,8 +121,6 @@ export const Keys: Story = {
         await expect(canvas.getByText('Parents server')).toBeVisible()
     },
 }
-
-export const KeysInRussian: Story = { render: () => <SigningKeys />, globals: { locale: 'ru' } }
 
 export const KeysNoneTrusted: Story = {
     render: () => <SigningKeys />,

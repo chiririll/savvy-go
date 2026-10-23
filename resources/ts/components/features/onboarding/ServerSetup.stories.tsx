@@ -67,11 +67,6 @@ export const AppUrl: Story = {
     },
 }
 
-export const AppUrlInRussian: Story = {
-    render: () => card(<AppUrlStep value="" writable saving={false} onContinue={onContinue} />),
-    globals: { locale: 'ru' },
-}
-
 // The URL saved before is kept: continuing saves nothing.
 export const AppUrlUnchanged: Story = {
     render: () => card(<AppUrlStep value="https://savvy.example.com" writable saving={false} onContinue={onContinue} />),
@@ -115,11 +110,6 @@ export const Options: Story = {
         await userEvent.click(await canvas.findByRole('button', { name: /skip/i }))
         await expect(onFinish).toHaveBeenCalled()
     },
-}
-
-export const OptionsInRussian: Story = {
-    render: () => card(<ServerOptions busy={false} onFinish={onFinish} />),
-    globals: { locale: 'ru' },
 }
 
 export const OptionsDone: Story = {

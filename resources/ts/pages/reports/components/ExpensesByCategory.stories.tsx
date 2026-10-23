@@ -60,7 +60,7 @@ export const Default: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }
+export const InRussian: Story = { tags: ['mobile-only'], globals: { locale: 'ru' } }
 
 export const WithoutComparison: Story = {
     args: { filters: { ...DEFAULT_FILTERS, compareWith: 'none' } },

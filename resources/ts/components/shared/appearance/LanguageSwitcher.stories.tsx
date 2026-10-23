@@ -7,6 +7,7 @@ import { overlayA11y } from '@/test/a11y'
 import { LanguageSwitcher } from './LanguageSwitcher'
 
 const meta = {
+    tags: ['desktop-only'],
     title: 'shared/appearance/LanguageSwitcher',
     component: LanguageSwitcher,
     parameters: { a11y: overlayA11y },

@@ -17,8 +17,6 @@ export const Filled: Story = { args: { defaultValues: { name: 'holiday' } } }
 export const Submitting: Story = { args: { isSubmitting: true } }
 export const CustomSubmitLabel: Story = { args: { submitLabel: 'Add tag' } }
 export const WithoutOwnSubmit: Story = { args: { hideSubmit: true } }
-export const InRussian: Story = { globals: { locale: 'ru' } }
-
 export const ReadOnly: Story = {
     parameters: { app: { role: 'viewer' } },
     args: { defaultValues: { name: 'holiday' } },

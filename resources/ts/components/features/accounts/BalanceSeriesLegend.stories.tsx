@@ -19,6 +19,7 @@ const series: LabeledSeries[] = [
 ]
 
 const meta = {
+    tags: ['desktop-only'],
     title: 'features/accounts/BalanceSeriesLegend',
     component: BalanceSeriesLegend,
     beforeEach: () => useCurrenciesStore.getState().setAll(currencies),

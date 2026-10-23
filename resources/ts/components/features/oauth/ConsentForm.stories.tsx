@@ -44,6 +44,7 @@ function Stateful(args: Args) {
 }
 
 const meta = {
+    tags: ['desktop-only'],
     title: 'features/oauth/ConsentForm',
     component: Stateful,
     parameters: { layout: 'padded' },

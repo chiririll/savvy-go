@@ -32,8 +32,6 @@ export const BothMethods: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }
-
 // Nothing is shown until the server says how invitations may be made.
 export const WaitingForTheServer: Story = {
     beforeEach: ({ msw }) => msw.use(hang('get', '/invitation-methods')),

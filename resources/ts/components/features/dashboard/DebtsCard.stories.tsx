@@ -43,7 +43,6 @@ export const LongNames: Story = {
         debts: [debt({ name: 'A debt with a name far too long for its tile', counterparty: 'A counterparty with a very long name too' })],
     },
 }
-export const InRussian: Story = { globals: { locale: 'ru' } }
 export const InYen: Story = {
     args: {
         summary: { ...summary, totalIOwe: 450000, totalOwedToMe: 0, netDebt: -450000, currency: 'JPY', decimals: 0 },

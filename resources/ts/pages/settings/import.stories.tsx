@@ -26,7 +26,7 @@ export const Default: Story = {
         await expect(canvasElement.querySelector('input[type="file"]')).not.toBeNull()
     },
 }
-export const InRussian: Story = { globals: { locale: 'ru' } }
+export const InRussian: Story = { tags: ['mobile-only'], globals: { locale: 'ru' } }
 
 // A viewer cannot import, and is told so instead of being shown the wizard.
 export const ReadOnly: Story = {

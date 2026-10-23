@@ -8,6 +8,7 @@ import { FormInputField } from './FormInputField'
 type Values = { name: string; note: string | null; limit: number | null }
 
 const meta = {
+    tags: ['desktop-only'],
     title: 'shared/form/FormInputField',
     component: FormInputField<Values>,
     args: { control: undefined as never, name: 'name', label: 'Name' },

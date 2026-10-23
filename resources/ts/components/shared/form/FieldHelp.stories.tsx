@@ -4,6 +4,7 @@ import { expect, screen, userEvent, within } from 'storybook/test'
 import { FieldHelp } from './FieldHelp'
 
 const meta = {
+    tags: ['desktop-only'],
     title: 'shared/form/FieldHelp',
     component: FieldHelp,
     args: { children: 'The rate used to convert amounts into the base currency.' },

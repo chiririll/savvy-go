@@ -6,6 +6,7 @@ import { overlayA11y } from '@/test/a11y'
 import { ThemeSwitcher } from './ThemeSwitcher'
 
 const meta = {
+    tags: ['desktop-only'],
     title: 'shared/appearance/ThemeSwitcher',
     component: ThemeSwitcher,
     parameters: { a11y: overlayA11y },
@@ -37,4 +38,3 @@ export const ChoosesDark: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }

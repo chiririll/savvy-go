@@ -19,8 +19,6 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 export const Form: Story = {}
-export const InRussian: Story = { globals: { locale: 'ru' } }
-
 export const Emailed: Story = {
     beforeEach: ({ msw }) => {
         const invite = spy('post', '/invitations', { id: 5, emailSent: true })

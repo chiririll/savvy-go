@@ -47,7 +47,7 @@ export const Expenses: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }
+export const InRussian: Story = { tags: ['mobile-only'], globals: { locale: 'ru' } }
 
 export const Income: Story = {
     args: { type: 'income' },

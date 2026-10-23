@@ -31,5 +31,4 @@ export const EditWithAutoUpdate: Story = {
     beforeEach: ({ msw }) => msw.use(...currencyApi(), ...settingsApi({ auto_update_currencies: true })),
 }
 export const Submitting: Story = { args: { isSubmitting: true } }
-export const Closed: Story = { args: { open: false } }
 export const ReadOnly: Story = { parameters: { app: { role: 'viewer' } } }

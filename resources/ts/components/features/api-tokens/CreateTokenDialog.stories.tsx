@@ -45,8 +45,6 @@ export const Empty: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }
-
 export const NeedsASpace: Story = {
     play: async () => {
         const dialog = within(await screen.findByRole('dialog'))

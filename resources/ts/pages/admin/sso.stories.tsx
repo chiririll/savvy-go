@@ -26,7 +26,7 @@ export const Default: Story = {
         await expect(canvas.getByRole('link', { name: /add/i })).toHaveAttribute('href', '/admin/providers/create')
     },
 }
-export const InRussian: Story = { globals: { locale: 'ru' } }
+export const InRussian: Story = { tags: ['mobile-only'], globals: { locale: 'ru' } }
 export const Empty: Story = {
     beforeEach: ({ msw }) => msw.use(reply('get', '/identity-providers', [])),
     play: async ({ canvasElement }) => {

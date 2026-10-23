@@ -43,8 +43,6 @@ export const Open: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }
-
 // Accepted and expired ones are not open any more.
 export const OnlyOpenOnesListed: Story = {
     beforeEach: ({ msw }) =>

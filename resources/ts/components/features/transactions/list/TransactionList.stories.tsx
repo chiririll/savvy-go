@@ -54,4 +54,3 @@ export const PendingList: Story = {
     },
 }
 export const ReadOnly: Story = { args: { isReadOnly: true } }
-export const InRussian: Story = { globals: { locale: 'ru' } }

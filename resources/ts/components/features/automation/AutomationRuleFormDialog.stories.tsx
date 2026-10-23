@@ -28,9 +28,6 @@ export const Create: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }
-export const InDarkTheme: Story = { globals: { theme: 'dark' } }
-
 export const Edit: Story = {
     args: { rule: rule() },
     play: async () => {
@@ -84,4 +81,3 @@ export const TriggerAndStopChanged: Story = {
 }
 
 export const Submitting: Story = { args: { rule: rule(), isSubmitting: true } }
-export const Closed: Story = { args: { open: false } }

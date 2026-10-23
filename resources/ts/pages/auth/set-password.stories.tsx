@@ -44,7 +44,7 @@ export const Reset: Story = {
         await expect(canvas.getByText('Set a password for alex@example.com')).toBeVisible()
     },
 }
-export const InRussian: Story = { globals: { locale: 'ru' } }
+export const InRussian: Story = { tags: ['mobile-only'], globals: { locale: 'ru' } }
 
 export const Invite: Story = {
     beforeEach: ({ msw }) => msw.use(preview(true)),

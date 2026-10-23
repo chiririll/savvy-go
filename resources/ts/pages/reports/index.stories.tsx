@@ -106,7 +106,7 @@ export const Overview: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }
+export const InRussian: Story = { tags: ['mobile-only'], globals: { locale: 'ru' } }
 
 export const OverviewFailed: Story = {
     beforeEach: ({ msw }) => msw.use(fail('get', '/reports/overview')),

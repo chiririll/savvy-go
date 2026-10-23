@@ -56,7 +56,6 @@ export const Off: Story = {
         await expect(within(canvasElement).queryByText(/recovery/i, { selector: 'h2, h3' })).toBeNull()
     },
 }
-export const InRussian: Story = { globals: { locale: 'ru' } }
 export const Loading: Story = { beforeEach: ({ msw }) => msw.use(hang('get', '/auth/2fa/status')) }
 
 export const On: Story = {

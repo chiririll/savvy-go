@@ -23,8 +23,6 @@ const fill = async (canvas: ReturnType<typeof within>, current: string, next: st
 const sent: { bodies: unknown[] } = { bodies: [] }
 
 export const Form: Story = {}
-export const InRussian: Story = { globals: { locale: 'ru' } }
-
 export const SingleSignOnOnly: Story = {
     beforeEach: () => {
         const user = useAuthStore.getState().user

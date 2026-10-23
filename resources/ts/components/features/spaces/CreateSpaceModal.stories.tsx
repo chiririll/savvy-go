@@ -67,9 +67,6 @@ export const NameStep: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }
-export const InDarkTheme: Story = { globals: { theme: 'dark' } }
-
 // The presets are needed to leave the first step.
 export const WaitingForPresets: Story = {
     beforeEach: ({ msw }) => msw.use(hang('get', '/presets')),

@@ -68,9 +68,6 @@ export const Seeded: Story = {
     },
 }
 
-export const InRussian: Story = { render: () => <Harness initial={seeded} />, globals: { locale: 'ru' } }
-export const InDarkTheme: Story = { render: () => <Harness initial={seeded} />, globals: { theme: 'dark' } }
-
 export const Empty: Story = {
     render: () => <Harness initial={empty} />,
     play: async ({ canvasElement }) => {

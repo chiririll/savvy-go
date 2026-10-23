@@ -49,8 +49,6 @@ export const InYen: Story = {
     args: { budgets: [budget({ currency: currencies[2], amount: 100000, progress: progress(65000, 100000) })] },
 }
 export const LongName: Story = { args: { budgets: [budget({ name: 'A budget name much too long for its tile in the dashboard grid' })] } }
-export const InRussian: Story = { globals: { locale: 'ru' } }
-
 export const LinksToTheBudget: Story = {
     play: async ({ canvasElement }) => {
         await expect(within(canvasElement).getByRole('link', { name: /Groceries/ })).toHaveAttribute('href', '/budgets?edit=1')

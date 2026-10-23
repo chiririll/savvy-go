@@ -4,6 +4,7 @@ import { expect, within } from 'storybook/test'
 import { SpaceBadge } from './SpaceBadge'
 
 const meta = {
+    tags: ['desktop-only'],
     title: 'features/spaces/SpaceBadge',
     component: SpaceBadge,
     parameters: { layout: 'padded' },
@@ -24,8 +25,6 @@ export const FirstLetterWithoutEmoji: Story = {
 
 // No color falls back to the theme's primary color.
 export const WithoutColor: Story = { args: { space: { name: 'Work', emoji: null, color: null } } }
-export const WithoutColorInDarkTheme: Story = { ...WithoutColor, globals: { theme: 'dark' } }
-
 export const BlankName: Story = {
     args: { space: { name: ' ', emoji: null, color: null } },
     play: async ({ canvasElement }) => {

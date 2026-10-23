@@ -58,6 +58,14 @@ export const Create: Story = {
     },
 }
 
+// Every form dialog wraps this one, so the closed state is asserted here once.
+export const Closed: Story = {
+    args: { open: false },
+    play: async () => {
+        await expect(screen.queryByRole('dialog')).toBeNull()
+    },
+}
+
 export const CreateWithFallback: Story = {
     args: { fallbackValues: { name: 'Groceries' } },
     play: async () => {
@@ -89,8 +97,6 @@ export const Submitting: Story = {
         await expect(await screen.findByRole('button', { name: /saving/i })).toBeDisabled()
     },
 }
-
-export const InRussian: Story = { globals: { locale: 'ru' } }
 
 // A half-filled create form survives closing and opening the dialog again.
 export const DraftKeptWhenReopened: Story = {

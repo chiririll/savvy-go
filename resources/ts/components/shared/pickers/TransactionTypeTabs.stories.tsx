@@ -21,8 +21,6 @@ export const Expense: Story = {}
 export const Income: Story = { args: { value: 'income' } }
 export const Transfer: Story = { args: { value: 'transfer' } }
 export const WithSpaceTransfer: Story = { args: { withSpaceTransfer: true } }
-export const InRussian: Story = { globals: { locale: 'ru' } }
-
 export const SwitchToSpaceTransfer: Story = {
     args: { withSpaceTransfer: true },
     play: async ({ canvasElement }) => {

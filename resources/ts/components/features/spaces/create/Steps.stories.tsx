@@ -39,8 +39,6 @@ export const NameEmpty: Story = {
     },
 }
 
-export const NameInRussian: Story = { render: () => <Name initial="Семья" />, globals: { locale: 'ru' } }
-
 const Copy = ({ spaces = [space(), { ...space(), id: 2, name: 'Work' }], from = null as number | null }) => {
     const [sourceId, setSourceId] = useState(from)
     const [copy, setCopy] = useState<CopyKinds>(noCopy())
@@ -81,8 +79,6 @@ export const CopyFromASpace: Story = {
         await expect(canvas.getByText(/one-time copy/i)).toBeVisible()
     },
 }
-
-export const CopyInRussian: Story = { render: () => <Copy from={2} />, globals: { locale: 'ru' } }
 
 export const Confirm: Story = {
     render: () => (

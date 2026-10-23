@@ -25,8 +25,6 @@ export const Overdrawn: Story = { args: { accounts: [account({ currentBalance: -
 export const LongName: Story = {
     args: { accounts: [account({ name: 'An account with a name much too long for the line it has to fit on' })] },
 }
-export const InRussian: Story = { globals: { locale: 'ru' } }
-
 // Each balance is shown in its own currency's precision, without repeating the symbol in the number.
 export const Precisions: Story = {
     play: async ({ canvasElement }) => {

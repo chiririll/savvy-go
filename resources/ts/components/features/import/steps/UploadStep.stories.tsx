@@ -5,6 +5,7 @@ import { parsed } from '../fixtures'
 import { UploadStep } from './UploadStep'
 
 const meta = {
+    tags: ['desktop-only'],
     title: 'features/import/UploadStep',
     component: UploadStep,
     parameters: { layout: 'padded' },
@@ -29,9 +30,6 @@ export const Empty: Story = {
         await expect(within(canvasElement).getByText(/drop csv file here/i)).toBeVisible()
     },
 }
-
-export const InRussian: Story = { globals: { locale: 'ru' } }
-export const InDarkTheme: Story = { globals: { theme: 'dark' } }
 
 export const FileChosen: Story = {
     play: async ({ canvasElement, args }) => {

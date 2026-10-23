@@ -8,6 +8,7 @@ import { ServerChecks } from './ServerChecks'
 const checks = (list: unknown[]) => reply('get', '/admin/checks', list)
 
 const meta = {
+    tags: ['desktop-only'],
     title: 'features/admin/ServerChecks',
     component: ServerChecks,
     beforeEach: ({ msw }) =>
@@ -34,9 +35,6 @@ export const Problems: Story = {
         await expect(canvas.getByRole('link', { name: /set up email/i })).toHaveAttribute('href', '/admin/system')
     },
 }
-
-export const InRussian: Story = { globals: { locale: 'ru' } }
-export const InDarkTheme: Story = { globals: { theme: 'dark' } }
 
 export const OneDayOld: Story = {
     beforeEach: ({ msw }) => msw.use(checks([{ id: 'backup_stale', severity: 'warning', value: 1 }])),

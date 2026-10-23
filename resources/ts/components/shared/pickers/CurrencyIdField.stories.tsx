@@ -53,7 +53,6 @@ export const Selected: Story = {
         await waitFor(() => expect(within(canvasElement).getByRole('combobox')).toHaveTextContent('JPY'))
     },
 }
-export const InRussian: Story = { globals: { locale: 'ru' }, args: { value: 2 } }
 export const Disabled: Story = { args: { disabled: true } }
 
 // Only currencies the space already has: the catalog's ones need adding first.

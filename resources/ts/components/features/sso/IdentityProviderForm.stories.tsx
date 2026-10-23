@@ -29,9 +29,6 @@ export const Empty: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }
-export const InDarkTheme: Story = { globals: { theme: 'dark' } }
-
 export const Required: Story = {
     play: async ({ canvasElement, args }) => {
         await submit(canvasElement)

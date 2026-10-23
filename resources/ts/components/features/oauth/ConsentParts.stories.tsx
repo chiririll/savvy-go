@@ -29,8 +29,6 @@ export const Header: Story = {
     ),
 }
 
-export const HeaderInRussian: Story = { ...Header, globals: { locale: 'ru' } }
-
 const dialog = (props: Partial<React.ComponentProps<typeof ConsentConfirmDialog>> = {}) => (
     <ConsentConfirmDialog
         open
@@ -45,7 +43,6 @@ const dialog = (props: Partial<React.ComponentProps<typeof ConsentConfirmDialog>
 
 export const ConfirmChange: Story = { render: () => dialog() }
 export const ConfirmDelete: Story = { render: () => dialog({ deletes: ['transactions', 'accounts'] }) }
-export const ConfirmInRussian: Story = { render: () => dialog(), globals: { locale: 'ru' } }
 export const ConfirmClosed: Story = { render: () => dialog({ open: false }) }
 
 export const ConfirmAllowed: Story = {

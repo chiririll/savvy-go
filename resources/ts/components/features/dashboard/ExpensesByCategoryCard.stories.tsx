@@ -46,8 +46,6 @@ export const BuiltInNames: Story = {
         },
     },
 }
-export const InRussian: Story = { ...BuiltInNames, globals: { locale: 'ru' } }
-export const InDarkTheme: Story = { globals: { theme: 'dark' } }
 export const CurrencyFromTheSummary: Story = {
     args: { currency: undefined, summary: { ...summary, currency: 'JPY' } },
 }

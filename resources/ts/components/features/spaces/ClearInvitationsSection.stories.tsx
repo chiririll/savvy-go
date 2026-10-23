@@ -26,8 +26,6 @@ export const Section: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }
-
 export const ClearedForAll: Story = {
     play: async ({ canvasElement }) => {
         await userEvent.click(within(canvasElement).getByRole('button', { name: /clear for all/i }))

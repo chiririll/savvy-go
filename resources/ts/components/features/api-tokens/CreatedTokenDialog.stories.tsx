@@ -22,9 +22,6 @@ export const Shown: Story = {
         await expect(await screen.findByText(secret)).toBeVisible()
     },
 }
-export const InRussian: Story = { globals: { locale: 'ru' } }
-export const Closed: Story = { args: { token: null } }
-
 export const Done: Story = {
     play: async ({ args }) => {
         await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /done/i }))

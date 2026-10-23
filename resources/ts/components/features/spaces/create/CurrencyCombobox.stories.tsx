@@ -18,6 +18,7 @@ const items: CurrencyCatalogItem[] = [
 ]
 
 const meta = {
+    tags: ['desktop-only'],
     title: 'features/spaces/create/CurrencyCombobox',
     component: CurrencyCombobox,
     parameters: { layout: 'padded', a11y: overlayA11y },

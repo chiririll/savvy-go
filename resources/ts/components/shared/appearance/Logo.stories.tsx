@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite'
 import { Logo } from './Logo'
 
 const meta = {
+    tags: ['desktop-only'],
     title: 'shared/appearance/Logo',
     component: Logo,
     args: { className: 'size-16', role: 'img', 'aria-label': 'Savvy' },

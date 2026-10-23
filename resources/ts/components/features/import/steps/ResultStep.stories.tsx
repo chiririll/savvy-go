@@ -23,9 +23,6 @@ export const Imported: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }
-export const InDarkTheme: Story = { globals: { theme: 'dark' } }
-
 export const NothingImported: Story = {
     args: {
         result: result({ created: 0, skippedDuplicates: 5, errors: [], createdCurrencies: [], createdTags: [], createdCategories: [] }),

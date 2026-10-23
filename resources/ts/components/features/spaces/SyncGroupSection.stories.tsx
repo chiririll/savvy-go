@@ -57,9 +57,6 @@ export const InAGroup: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }
-export const InDarkTheme: Story = { globals: { theme: 'dark' } }
-
 export const WithSpacesYouAreNotIn: Story = {
     beforeEach: ({ msw }) => msw.use(reply('get', '/sync-group', group({ hidden: 2 }))),
     play: async ({ canvasElement }) => {

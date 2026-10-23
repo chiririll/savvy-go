@@ -61,7 +61,7 @@ export const Default: Story = {
         await expect(await canvas.findByText('Loan from Alex')).toBeVisible()
     },
 }
-export const InRussian: Story = { globals: { locale: 'ru' } }
+export const InRussian: Story = { tags: ['mobile-only'], globals: { locale: 'ru' } }
 export const InDarkTheme: Story = { globals: { theme: 'dark' } }
 
 export const Loading: Story = {

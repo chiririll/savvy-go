@@ -8,6 +8,7 @@ const Broken = () => {
 }
 
 const meta = {
+    tags: ['desktop-only'],
     title: 'shared/page/ErrorBoundary',
     component: ErrorBoundary,
 } satisfies Meta<typeof ErrorBoundary>

@@ -35,9 +35,6 @@ export const Buttons: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }
-export const InDarkTheme: Story = { globals: { theme: 'dark' } }
-
 export const WithoutDivider: Story = {
     args: { showDivider: false },
     play: async ({ canvasElement }) => {
@@ -84,4 +81,3 @@ export const Brands: Story = {
     ),
 }
 
-export const BrandsInDarkTheme: Story = { ...Brands, globals: { theme: 'dark' } }

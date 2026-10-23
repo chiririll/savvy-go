@@ -36,8 +36,6 @@ export const Selected: Story = { args: { value: 2 } }
 export const Disabled: Story = { args: { disabled: true, value: 1 } }
 export const CustomPlaceholder: Story = { args: { placeholder: 'Any category' } }
 export const Loading: Story = { beforeEach: ({ msw }) => msw.use(hang('get', '/categories')) }
-export const InRussian: Story = { globals: { locale: 'ru' } }
-
 export const Plain: Story = {
     args: { plain: true },
     decorators: [(Story) => <label>Category <Story /></label>],

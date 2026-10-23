@@ -27,7 +27,6 @@ export const Edit: Story = {
 }
 export const EditAllExpenses: Story = { args: { budget: budget({ isGlobal: true, categories: [] }) } }
 export const Submitting: Story = { args: { isSubmitting: true } }
-export const Closed: Story = { args: { open: false } }
 export const ReadOnly: Story = { parameters: { app: { role: 'viewer' } }, args: { budget: budget() } }
 
 export const SubmittedFromTheFooter: Story = {

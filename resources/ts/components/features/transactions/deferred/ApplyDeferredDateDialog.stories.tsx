@@ -41,10 +41,7 @@ export const DateInTheFuture: Story = {
 
 export const NoDate: Story = { args: { transaction: pendingTransaction({ date: null }) } }
 export const Submitting: Story = { args: { isSubmitting: true } }
-export const Closed: Story = { args: { open: false } }
 export const WithoutTransaction: Story = { args: { transaction: null } }
-export const InRussian: Story = { globals: { locale: 'ru' } }
-
 export const AppliedToday: Story = {
     play: async ({ args }) => {
         await confirm()

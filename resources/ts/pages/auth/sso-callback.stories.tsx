@@ -19,6 +19,7 @@ const Where = () => {
 }
 
 const meta = {
+    tags: ['desktop-only'],
     title: 'pages/auth/SsoCallback',
     component: SsoCallbackPage,
     parameters: { route: '/sso/callback?ticket=t1' },

@@ -82,9 +82,6 @@ export const Categories: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }
-export const InDarkTheme: Story = { globals: { theme: 'dark' } }
-
 export const Comparing: Story = {
     beforeEach: ({ msw }) => msw.use(hang('post', '/sync-groups/diff')),
     play: async () => {

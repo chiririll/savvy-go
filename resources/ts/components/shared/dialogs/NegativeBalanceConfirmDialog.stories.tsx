@@ -61,4 +61,3 @@ export const Cancelled: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }

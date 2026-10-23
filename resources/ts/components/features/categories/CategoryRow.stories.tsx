@@ -25,7 +25,6 @@ export const Expense: Story = {}
 export const Income: Story = { args: { category: category({ type: 'income', icon: '💼', color: '#2563eb', transactionsCount: 0 }) } }
 export const Default: Story = { args: { category: category({ isDefault: true, transactionsCount: 0 }) } }
 export const BuiltInName: Story = { args: { category: category({ name: '#GROCERIES', transactionsCount: 0 }) } }
-export const BuiltInNameInRussian: Story = { ...BuiltInName, globals: { locale: 'ru' } }
 export const NoColor: Story = { args: { category: category({ color: null, transactionsCount: 0 }) } }
 export const LongName: Story = {
     args: { category: category({ name: 'A category name far too long for the line it sits on', transactionsCount: 0 }) },

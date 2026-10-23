@@ -74,8 +74,6 @@ export const Created: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }
-
 export const Inviting: Story = {
     args: { inviting: true },
     play: async ({ canvasElement }) => {

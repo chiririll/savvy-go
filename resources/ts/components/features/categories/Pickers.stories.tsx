@@ -55,7 +55,6 @@ export const IconsWithError: Story = {
     render: () => <IconPicker value="" onChange={() => {}} error="Pick an icon" />,
 }
 
-export const IconsInDarkTheme: Story = { ...IconsOpened, globals: { theme: 'dark' } }
 
 export const Types: Story = {
     render: () => {

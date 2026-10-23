@@ -30,7 +30,6 @@ export const Edit: Story = {
 export const EditDebtAccount: Story = { args: { account: account({ type: 'debt' }) } }
 
 export const Submitting: Story = { args: { isSubmitting: true } }
-export const Closed: Story = { args: { open: false } }
 export const ReadOnly: Story = { parameters: { app: { role: 'viewer' } } }
 
 export const Cancelled: Story = {

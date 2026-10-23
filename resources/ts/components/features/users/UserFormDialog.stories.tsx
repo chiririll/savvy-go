@@ -31,7 +31,6 @@ export const Edit: Story = {
     },
 }
 export const Submitting: Story = { args: { isSubmitting: true } }
-export const Closed: Story = { args: { open: false } }
 export const WithMail: Story = { args: { mail: { canEmail: true, mustEmail: false } } }
 
 export const SubmittedFromTheFooter: Story = {

@@ -29,8 +29,6 @@ export const Presets: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }
-export const InDarkTheme: Story = { globals: { theme: 'dark' } }
 export const Loading: Story = { beforeEach: ({ msw }) => msw.use(hang('get', '/auth/sso/presets')) }
 
 export const CustomPicked: Story = {

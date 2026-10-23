@@ -8,6 +8,7 @@ const GREY_SQUARE =
 
 // The real UserAvatar fetches its picture from Gravatar; these stories draw the view alone, so they need no network.
 const meta = {
+    tags: ['desktop-only'],
     title: 'shared/appearance/UserAvatar',
     component: UserAvatarView,
     args: { user: { email: 'kirill@example.com', name: 'Kirill' }, className: 'size-12' },

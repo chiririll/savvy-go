@@ -35,7 +35,7 @@ export const Default: Story = {
         await expect(canvas.getByRole('button', { name: /new recurring/i })).toBeVisible()
     },
 }
-export const InRussian: Story = { globals: { locale: 'ru' } }
+export const InRussian: Story = { tags: ['mobile-only'], globals: { locale: 'ru' } }
 export const Loading: Story = { beforeEach: ({ msw }) => msw.use(hang('get', '/recurring')) }
 export const Empty: Story = {
     beforeEach: ({ msw }) => msw.use(reply('get', '/recurring', [])),
