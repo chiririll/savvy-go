@@ -151,7 +151,7 @@ export function TransactionRow(props: TransactionRowProps) {
                 </>
             }
             amount={`${transaction.isEstimated ? '≈ ' : ''}${sign}${amount}`}
-            amountClassName={cn(className, transaction.status === 'pending' && 'opacity-60')}
+            amountClassName={cn(className, transaction.status === 'pending' && 'italic')}
             extraAmount={received ? `${transaction.status === 'skipped' ? '' : '+'}${received}` : undefined}
             onOpen={handlers.edit}
             hasActions={showActions && Object.values(handlers).some(Boolean)}

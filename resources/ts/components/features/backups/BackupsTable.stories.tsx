@@ -20,6 +20,7 @@ const backup = (overrides: Partial<Backup> = {}): Backup => ({
 })
 
 const meta = {
+    tags: ['desktop-only'],
     title: 'features/backups/BackupsTable',
     component: BackupsTable,
     parameters: { a11y: overlayA11y },
@@ -40,7 +41,6 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 export const Filled: Story = {}
-export const InRussian: Story = { globals: { locale: 'ru' } }
 export const Loading: Story = { args: { isLoading: true } }
 export const Empty: Story = {
     args: { backups: [] },

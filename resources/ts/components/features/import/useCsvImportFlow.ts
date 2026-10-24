@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { getApiErrorMessage } from '@/lib/api-error'
 import { useMultipartUpload } from '@/hooks/use-upload'
 import { useExecuteImport, useParseImport, usePreviewImport } from '@/hooks/use-csv-import'
 import type {
@@ -16,7 +17,7 @@ export const STEP_IDS: ImportStep[] = ['upload', 'mapping', 'preview', 'result']
 
 const UPLOAD_BUCKET = 'transaction-imports'
 
-const errorMessage = (e: unknown, fallback: string) => (e instanceof Error ? e.message : fallback)
+const errorMessage = getApiErrorMessage
 
 /** The state of the import wizard and what moves it from one step to the next. */
 export function useCsvImportFlow() {

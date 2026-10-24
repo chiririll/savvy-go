@@ -47,7 +47,7 @@ export function CashFlowChart({ filters }: CashFlowChartProps) {
     if (error) {
         return (
             <Card>
-                <CardContent className="py-8 text-center text-red-500">{t('reports.errors.cashflowChart')}</CardContent>
+                <CardContent className="py-8 text-center text-destructive">{t('reports.errors.cashflowChart')}</CardContent>
             </Card>
         )
     }
@@ -70,7 +70,7 @@ export function CashFlowChart({ filters }: CashFlowChartProps) {
                 ) : (
                     <div ref={chartRef} style={{ height: CHART_HEIGHT }}>
                         {/* Mount once measured so the chart animates in a single pass */}
-                        {chartWidth > 0 && <ReactECharts option={chartOption} style={{ height: CHART_HEIGHT }} />}
+                        {chartWidth > 0 && <ReactECharts option={chartOption} ariaLabel={t('reports.cashFlowChart.title')} style={{ height: CHART_HEIGHT }} />}
                     </div>
                 )}
             </CardContent>

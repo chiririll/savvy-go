@@ -4,6 +4,7 @@ import { expect, fn, userEvent, within } from 'storybook/test'
 import { Step, Stepper } from './Stepper'
 
 const meta = {
+    tags: ['desktop-only'],
     title: 'shared/page/Stepper',
     component: Stepper,
     args: { activeStep: 1, onStepChange: fn(), children: null },

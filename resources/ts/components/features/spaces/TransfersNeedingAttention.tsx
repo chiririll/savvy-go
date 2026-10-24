@@ -108,7 +108,10 @@ export function TransfersNeedingAttention({ space }: { space: Space }) {
                                         value={choice[tr.uuid] ?? ''}
                                         onValueChange={(v) => setChoice({ ...choice, [tr.uuid]: v })}
                                     >
-                                        <SelectTrigger className="h-8 w-48">
+                                        <SelectTrigger
+                                            className="h-8 w-48"
+                                            aria-label={t('spaces.transfers.chooseAccount')}
+                                        >
                                             <SelectValue placeholder={t('spaces.transfers.chooseAccount')} />
                                         </SelectTrigger>
                                         <SelectContent>

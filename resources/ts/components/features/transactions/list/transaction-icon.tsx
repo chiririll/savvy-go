@@ -21,15 +21,15 @@ const TYPE_ICONS = {
 } as const
 
 const TYPE_ICON_TONES = {
-    income: 'bg-green-100 text-green-600 dark:bg-green-950/40',
-    expense: 'bg-red-100 text-red-600 dark:bg-red-950/40',
-    transfer: 'bg-blue-100 text-blue-600 dark:bg-blue-950/40',
-    debt_payment: 'bg-orange-100 text-orange-600 dark:bg-orange-950/40',
+    income: 'bg-success/15 text-success',
+    expense: 'bg-destructive/15 text-destructive',
+    transfer: 'bg-info/15 text-info',
+    debt_payment: 'bg-warning/15 text-warning',
     debt_collection: 'bg-purple-100 text-purple-600 dark:bg-purple-950/40',
-    debt_lend: 'bg-red-100 text-red-600 dark:bg-red-950/40',
-    debt_borrow: 'bg-green-100 text-green-600 dark:bg-green-950/40',
-    transfer_out: 'bg-blue-100 text-blue-600 dark:bg-blue-950/40',
-    transfer_in: 'bg-blue-100 text-blue-600 dark:bg-blue-950/40',
+    debt_lend: 'bg-destructive/15 text-destructive',
+    debt_borrow: 'bg-success/15 text-success',
+    transfer_out: 'bg-info/15 text-info',
+    transfer_in: 'bg-info/15 text-info',
 } as const
 
 /** FeedRow icon props of a transaction: its category's emoji, else its type. */

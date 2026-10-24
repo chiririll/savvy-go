@@ -29,7 +29,7 @@ export function progressAmounts({ remaining, total, currency, done }: {
                 {formatCurrency(hasTotal ? Math.abs(remaining) : remaining, currency)}
             </>
         ),
-        amountClassName: cn(done ? 'font-sans text-green-600' : over && 'text-red-600'),
+        amountClassName: cn(done ? 'font-sans text-success' : over && 'text-destructive'),
         extraAmount: hasTotal && i18n.t('progress.of', { amount: formatCurrency(total, currency) }),
     }
 }

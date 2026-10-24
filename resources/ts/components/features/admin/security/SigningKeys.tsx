@@ -1,23 +1,12 @@
-import { testId } from '@/lib/test-id'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Copy, KeyRound, RefreshCw, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { SettingsSection } from '@/components/shared'
+import { Confirm } from '@/components/shared/dialogs/Confirm'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'
 import { useRotateKey, useSigningKeys, useTrustKey, useUntrustKey } from '@/hooks/use-spaces'
 
 export function SigningKeys() {
@@ -40,33 +29,30 @@ export function SigningKeys() {
             title={t('admin.keys.title')}
             description={t('admin.keys.description')}
             actions={
-                <AlertDialog>
-                    <AlertDialogTrigger asChild {...testId('confirm')}>
+                <Confirm
+                    trigger={
                         <Button variant="outline" size="sm" disabled={rotate.isPending}>
                             <RefreshCw className="mr-2 size-4" />
                             {t('admin.keys.rotate')}
                         </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                        <AlertDialogHeader>
-                            <AlertDialogTitle>{t('admin.keys.rotateTitle')}</AlertDialogTitle>
-                            <AlertDialogDescription>{t('admin.keys.rotateDescription')}</AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                            <AlertDialogCancel>{t('actions.cancel', { ns: 'common' })}</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => rotate.mutate()}>
-                                {t('admin.keys.rotate')}
-                            </AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
+                    }
+                    title={t('admin.keys.rotateTitle')}
+                    description={t('admin.keys.rotateDescription')}
+                    action={t('admin.keys.rotate')}
+                    onConfirm={() => rotate.mutate()}
+                />
             }
         >
             <div className="space-y-5">
                 <div className="space-y-1.5">
-                    <Label>{t('admin.keys.own')}</Label>
+                    <Label htmlFor="own-public-key">{t('admin.keys.own')}</Label>
                     <div className="flex gap-2">
-                        <Input readOnly value={keys?.own.publicKey ?? ''} className="font-mono text-xs" />
+                        <Input
+                            id="own-public-key"
+                            readOnly
+                            value={keys?.own.publicKey ?? ''}
+                            className="font-mono text-xs"
+                        />
                         <Button
                             variant="outline"
                             size="icon"

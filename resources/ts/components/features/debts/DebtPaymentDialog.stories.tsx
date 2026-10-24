@@ -30,10 +30,7 @@ const pickAccount = async (dialog: HTMLElement, name: RegExp) => {
 export const MakePayment: Story = {}
 export const CollectPayment: Story = { args: { mode: 'collection', debt: debt({ debtType: 'owed_to_me' }) } }
 export const Submitting: Story = { args: { isSubmitting: true } }
-export const Closed: Story = { args: { open: false } }
 export const WithoutDebt: Story = { args: { debt: null } }
-export const InRussian: Story = { globals: { locale: 'ru' } }
-
 export const FullAmountButton: Story = {
     play: async () => {
         const dialog = await screen.findByRole('dialog')

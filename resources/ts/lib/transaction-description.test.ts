@@ -77,15 +77,15 @@ describe('transactionSubtitle', () => {
 
 describe('transactionAmountAppearance', () => {
     it.each(['income', 'debt_collection', 'debt_borrow', 'transfer_in'] as const)('%s is a green plus', (type) => {
-        expect(transactionAmountAppearance(type)).toEqual({ sign: '+', className: 'text-green-600' })
+        expect(transactionAmountAppearance(type)).toEqual({ sign: '+', className: 'text-success' })
     })
 
     it.each(['expense', 'debt_payment', 'debt_lend', 'transfer_out'] as const)('%s is a red minus', (type) => {
-        expect(transactionAmountAppearance(type)).toEqual({ sign: '-', className: 'text-red-600' })
+        expect(transactionAmountAppearance(type)).toEqual({ sign: '-', className: 'text-destructive' })
     })
 
     it('shows a transfer between own accounts without a sign', () => {
-        expect(transactionAmountAppearance('transfer')).toEqual({ sign: '', className: 'text-blue-600' })
+        expect(transactionAmountAppearance('transfer')).toEqual({ sign: '', className: 'text-info' })
     })
 
     it('mutes skipped transactions whatever the type', () => {

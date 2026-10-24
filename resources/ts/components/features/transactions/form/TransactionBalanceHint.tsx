@@ -14,7 +14,7 @@ function BalancePair({ preview, label }: { preview: BalancePreview; label: strin
                 'font-mono',
                 preview.insufficientFunds
                     ? 'text-destructive'
-                    : preview.newBalance > preview.currentBalance && 'text-green-600'
+                    : preview.newBalance > preview.currentBalance && 'text-success'
             )}>
                 {formatCurrency(preview.newBalance, preview.currency)}
             </span>

@@ -8,6 +8,7 @@ import { UseBrowserUrlButton } from './UseBrowserUrlButton'
 const url = 'https://savvy.example.com'
 
 const meta = {
+    tags: ['desktop-only'],
     title: 'features/settings/UseBrowserUrlButton',
     component: UseBrowserUrlButton,
     args: { url, current: '', onUse: fn() },
@@ -23,7 +24,6 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 export const Offered: Story = {}
-export const InRussian: Story = { globals: { locale: 'ru' } }
 export const OtherAddress: Story = { args: { current: 'http://localhost:8080' } }
 
 export const AlreadyThisAddress: Story = {

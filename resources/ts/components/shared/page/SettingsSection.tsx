@@ -36,7 +36,7 @@ export function SettingsSection({
                         <Icon className="size-4" />
                     </div>
                     <div className="min-w-0 flex-1 space-y-0.5">
-                        <h3 className="text-sm font-semibold leading-none">{title}</h3>
+                        <h2 className="text-sm font-semibold leading-none">{title}</h2>
                         {description && <p className="text-xs text-muted-foreground">{description}</p>}
                     </div>
                 </div>

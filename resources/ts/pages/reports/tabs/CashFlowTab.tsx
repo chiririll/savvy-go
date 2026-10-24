@@ -14,7 +14,7 @@ export function CashFlowTab({ filters }: CashFlowTabProps) {
 
     if (error) {
         return (
-            <div className="text-center py-8 text-red-500">
+            <div className="text-center py-8 text-destructive">
                 {t('reports.errors.cashflow')}
             </div>
         )

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useLinkSpace, useSpaceLinks, useSpaces, useUnlinkSpace } from '@/hooks'
 import { Space } from '@/types/spaces'
-import { Confirm } from '@/components/features/spaces/settings/Confirm'
+import { Confirm } from '@/components/shared/dialogs/Confirm'
 
 export function Links({ space, isAdmin }: { space: Space; isAdmin: boolean }) {
     const { t } = useTranslation('settings')
@@ -49,7 +49,7 @@ export function Links({ space, isAdmin }: { space: Space; isAdmin: boolean }) {
                     (candidates.length ? (
                         <div className="flex gap-2">
                             <Select value={target} onValueChange={setTarget}>
-                                <SelectTrigger className="flex-1">
+                                <SelectTrigger className="flex-1" aria-label={t('spaces.links.choose')}>
                                     <SelectValue placeholder={t('spaces.links.choose')} />
                                 </SelectTrigger>
                                 <SelectContent>

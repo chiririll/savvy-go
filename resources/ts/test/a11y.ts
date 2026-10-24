@@ -1,9 +1,8 @@
 // Axe rules for stories. A story's own a11y config replaces the global list instead of adding to it, so every list
 // here repeats the base rules.
 
-// TODO: re-enable color-contrast once the palette passes WCAG AA. Known misses: --destructive text is 4.49:1 on
-// white (4.0:1 on its tint), text-green-600 is 3.2:1, and the faded "muted" rows. Everything else is checked.
-const base = [{ id: 'color-contrast', enabled: false }]
+// Colour contrast is checked everywhere. STORYBOOK_CONTRAST=off (set before vitest) skips it while chasing another failure.
+const base = [{ id: 'color-contrast', enabled: import.meta.env.STORYBOOK_CONTRAST !== 'off' }]
 
 export const baseA11y = { test: 'error', config: { rules: base } } as const
 
@@ -16,4 +15,15 @@ export const overlayA11y = {
 /** For an open emoji picker: emoji-picker-react points aria-controls at an element it has not rendered yet. */
 export const emojiPickerA11y = {
     config: { rules: [...base, { id: 'aria-valid-attr-value', enabled: false }] },
+} as const
+
+/** For a page whose tabs show only the active panel: Radix leaves aria-controls of the other triggers pointing at
+ * panels it has not mounted, which axe reports as aria-valid-attr-value. */
+export const unmountedTabsA11y = {
+    config: { rules: [...base, { id: 'aria-valid-attr-value', enabled: false }] },
+} as const
+
+/** The tab pages above that also open a menu or select. */
+export const unmountedTabsOverlayA11y = {
+    config: { rules: [...base, { id: 'aria-valid-attr-value', enabled: false }, { id: 'aria-hidden-focus', enabled: false }] },
 } as const

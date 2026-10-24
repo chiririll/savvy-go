@@ -4,6 +4,7 @@ import { expect, fn, userEvent, within } from 'storybook/test'
 import { ServerPagination } from './ServerPagination'
 
 const meta = {
+    tags: ['desktop-only'],
     title: 'shared/table/ServerPagination',
     component: ServerPagination,
     args: {

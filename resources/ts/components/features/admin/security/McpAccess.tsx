@@ -3,20 +3,10 @@ import { useTranslation } from 'react-i18next'
 import { Bot, Copy, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { SettingsSection } from '@/components/shared'
+import { Confirm } from '@/components/shared/dialogs/Confirm'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'
 import {
     useOAuthClients,
     useOAuthRegistration,
@@ -46,28 +36,18 @@ export function McpApp({ app }: { app: OAuthClient }) {
                     <p className="truncate text-sm font-medium">{app.name}</p>
                 </div>
                 <div className="flex shrink-0 gap-2">
-                    <AlertDialog>
-                        <AlertDialogTrigger asChild>
+                    <Confirm
+                        trigger={
                             <Button variant="outline" size="sm" disabled={remove.isPending}>
                                 <Trash2 className="mr-2 size-4" />
                                 {t('admin.mcp.apps.disconnect')}
                             </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                            <AlertDialogHeader>
-                                <AlertDialogTitle>
-                                    {t('admin.mcp.apps.removeTitle', { name: app.name })}
-                                </AlertDialogTitle>
-                                <AlertDialogDescription>{t('admin.mcp.apps.removeDescription')}</AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                                <AlertDialogCancel>{t('actions.cancel', { ns: 'common' })}</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => remove.mutate(app.client_id)}>
-                                    {t('admin.mcp.apps.disconnect')}
-                                </AlertDialogAction>
-                            </AlertDialogFooter>
-                        </AlertDialogContent>
-                    </AlertDialog>
+                        }
+                        title={t('admin.mcp.apps.removeTitle', { name: app.name })}
+                        description={t('admin.mcp.apps.removeDescription')}
+                        action={t('admin.mcp.apps.disconnect')}
+                        onConfirm={() => remove.mutate(app.client_id)}
+                    />
                 </div>
             </div>
             <dl className="grid gap-x-3 gap-y-1 text-xs sm:grid-cols-[8rem_1fr]">
@@ -116,9 +96,9 @@ export function McpAccess() {
                     {open ? t('admin.mcp.open', { time: until }) : t('admin.mcp.closed')}
                 </p>
                 <div className="space-y-1.5">
-                    <Label>{t('admin.mcp.endpoint')}</Label>
+                    <Label htmlFor="mcp-endpoint">{t('admin.mcp.endpoint')}</Label>
                     <div className="flex gap-2">
-                        <Input readOnly value={endpoint} className="font-mono text-xs" />
+                        <Input id="mcp-endpoint" readOnly value={endpoint} className="font-mono text-xs" />
                         <Button
                             variant="outline"
                             size="icon"

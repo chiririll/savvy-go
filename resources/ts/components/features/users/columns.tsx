@@ -62,7 +62,7 @@ export const createUserColumns = ({
     },
     {
         id: 'actions',
-        header: '',
+        header: () => <span className="sr-only">{i18n.t('pages:users.columns.actions')}</span>,
         cell: ({ row }) => {
             const isCurrentUser = currentUserId === row.original.id
             const canReset = !isCurrentUser && !row.original.isSsoOnly && !isReadOnly

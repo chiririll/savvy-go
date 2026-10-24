@@ -8,13 +8,13 @@ export function severityFor(percent: number | null): Severity {
 }
 
 export const SEVERITY_STROKE: Record<Severity, string> = {
-    ok: 'text-emerald-500',
-    warn: 'text-amber-500',
-    crit: 'text-red-500',
+    ok: 'text-success',
+    warn: 'text-warning',
+    crit: 'text-destructive',
 }
 
 export const SEVERITY_FILL: Record<Severity, string> = {
-    ok: 'bg-emerald-500',
-    warn: 'bg-amber-500',
-    crit: 'bg-red-500',
+    ok: 'bg-success',
+    warn: 'bg-warning',
+    crit: 'bg-destructive',
 }

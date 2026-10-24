@@ -36,7 +36,6 @@ export const Custom: Story = {
         await expect(within(canvasElement).getAllByDisplayValue(/2026-01/)).toHaveLength(2)
     },
 }
-export const InRussian: Story = { globals: { locale: 'ru' } }
 
 export const DatesOnlyForCustom: Story = {
     play: async ({ canvasElement }) => {

@@ -34,6 +34,7 @@ type Story = StoryObj<typeof meta>
 const inSidebar = (node: React.ReactNode) => <SidebarProvider>{node}</SidebarProvider>
 
 export const SidebarMenu: Story = {
+    tags: ['desktop-only'],
     render: () => inSidebar(<AppSidebar />),
     play: async ({ canvasElement }) => {
         await expect(await within(canvasElement).findByRole('link', { name: /transactions/i })).toBeVisible()
@@ -41,6 +42,7 @@ export const SidebarMenu: Story = {
 }
 
 export const SidebarWithProblems: Story = {
+    tags: ['desktop-only'],
     render: () => inSidebar(<AppSidebar />),
     beforeEach: ({ msw }) => {
         msw.use(reply('get', '/admin/checks', [
@@ -65,6 +67,7 @@ export const SidebarWithoutAdministration: Story = {
 }
 
 export const SidebarInRussian: Story = {
+    tags: ['desktop-only'],
     render: () => inSidebar(<AppSidebar />),
     globals: { locale: 'ru' },
     play: async ({ canvasElement }) => {

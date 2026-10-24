@@ -139,9 +139,9 @@ function tooltipFormatter(
 
         let html = `<div class="font-medium mb-2">${params[0]?.axisValue || ''}</div>`
         html += `<div class="space-y-1">
-            ${dot('bg-green-500', names.income, valueOf(names.income))}
-            ${dot('bg-red-500', names.expenses, Math.abs(valueOf(names.expenses)))}
-            ${dot('bg-blue-500', names.balance, valueOf(names.balance))}
+            ${dot('bg-success', names.income, valueOf(names.income))}
+            ${dot('bg-destructive', names.expenses, Math.abs(valueOf(names.expenses)))}
+            ${dot('bg-info', names.balance, valueOf(names.balance))}
         </div>`
 
         if (showComparison) {

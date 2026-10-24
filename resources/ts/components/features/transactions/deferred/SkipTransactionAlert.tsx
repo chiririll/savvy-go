@@ -1,16 +1,6 @@
 import { ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'
+import { Confirm } from '@/components/shared/dialogs/Confirm'
 
 interface SkipTransactionAlertProps {
     onConfirm: () => void
@@ -22,22 +12,12 @@ export function SkipTransactionAlert({ onConfirm, trigger }: SkipTransactionAler
     const { t: tCommon } = useTranslation('common')
 
     return (
-        <AlertDialog>
-            <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>{t('transactions.skipTitle')}</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        {t('transactions.skipDescription')}
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel>{tCommon('actions.cancel')}</AlertDialogCancel>
-                    <AlertDialogAction onClick={onConfirm}>
-                        {tCommon('actions.skip')}
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
+        <Confirm
+            trigger={trigger}
+            title={t('transactions.skipTitle')}
+            description={t('transactions.skipDescription')}
+            action={tCommon('actions.skip')}
+            onConfirm={onConfirm}
+        />
     )
 }

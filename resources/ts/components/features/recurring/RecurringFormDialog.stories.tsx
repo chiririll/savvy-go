@@ -33,7 +33,6 @@ export const EditTransfer: Story = {
     args: { recurring: recurring({ type: 'transfer', category: null, toAccount: accounts[1], toAmount: 920 }) },
 }
 export const Submitting: Story = { args: { isSubmitting: true } }
-export const Closed: Story = { args: { open: false } }
 export const ReadOnly: Story = { parameters: { app: { role: 'viewer' } }, args: { recurring: recurring() } }
 
 export const SubmittedFromTheFooter: Story = {

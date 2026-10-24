@@ -41,8 +41,6 @@ export const Working: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }
-
 export const Loading: Story = { beforeEach: ({ msw }) => msw.use(hang('get', '/admin/mail')) }
 
 export const Off: Story = {

@@ -42,5 +42,3 @@ export const Cancelled: Story = {
         await expect(args.onConfirm).not.toHaveBeenCalled()
     },
 }
-
-export const InRussian: Story = { ...Asking, globals: { locale: 'ru' } }

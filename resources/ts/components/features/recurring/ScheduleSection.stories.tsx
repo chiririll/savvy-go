@@ -17,6 +17,7 @@ const base = {
 } as Partial<RecurringFormData>
 
 const meta = {
+    tags: ['desktop-only'],
     title: 'features/recurring/ScheduleSection',
     component: ScheduleSection,
     parameters: { a11y: overlayA11y },
@@ -54,8 +55,6 @@ export const Daily: Story = {
 }
 
 export const Yearly: Story = { args: { frequency: 'yearly' } }
-export const InRussian: Story = { globals: { locale: 'ru' } }
-
 export const EndDateIsOptional: Story = {
     play: async ({ canvasElement }) => {
         const end = within(canvasElement).getByLabelText(/end/i)

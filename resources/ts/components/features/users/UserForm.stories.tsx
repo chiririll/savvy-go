@@ -16,7 +16,6 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 export const Create: Story = {}
-export const CreateInRussian: Story = { globals: { locale: 'ru' } }
 export const Submitting: Story = { args: { isSubmitting: true } }
 
 export const Edit: Story = {

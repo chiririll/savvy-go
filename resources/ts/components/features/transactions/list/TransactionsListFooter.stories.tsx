@@ -4,6 +4,7 @@ import { expect, fn, userEvent, within } from 'storybook/test'
 import { TransactionsListFooter } from './TransactionsListFooter'
 
 const meta = {
+    tags: ['desktop-only'],
     title: 'features/transactions/list/TransactionsListFooter',
     component: TransactionsListFooter,
     args: {

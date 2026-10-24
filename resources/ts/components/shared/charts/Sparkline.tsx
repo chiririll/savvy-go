@@ -36,8 +36,8 @@ export function Sparkline({
 
     const strokeColor = {
         default: 'stroke-muted-foreground',
-        success: 'stroke-green-500',
-        danger: 'stroke-red-500',
+        success: 'stroke-success',
+        danger: 'stroke-destructive',
     }[color]
 
     if (data.length < 2) {

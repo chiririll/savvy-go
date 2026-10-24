@@ -43,6 +43,7 @@ export const ReadOnly: Story = {
 }
 
 export const DeleteDisabled: Story = {
+    tags: ['desktop-only'],
     args: { currency: usd, deleteDisabled: true, deleteDisabledLabel: 'The base currency cannot be deleted' },
     play: async ({ canvasElement }) => {
         await openMenu(canvasElement)
@@ -51,6 +52,7 @@ export const DeleteDisabled: Story = {
 }
 
 export const MadeBase: Story = {
+    tags: ['desktop-only'],
     play: async ({ canvasElement, args }) => {
         await openMenu(canvasElement)
         await userEvent.click(await screen.findByRole('menuitem', { name: /base/i }))
@@ -59,6 +61,7 @@ export const MadeBase: Story = {
 }
 
 export const BaseCannotBeMadeBase: Story = {
+    tags: ['desktop-only'],
     args: { currency: usd },
     play: async ({ canvasElement }) => {
         await openMenu(canvasElement)
@@ -68,6 +71,7 @@ export const BaseCannotBeMadeBase: Story = {
 }
 
 export const SettingBase: Story = {
+    tags: ['desktop-only'],
     args: { isSettingBase: true },
     play: async ({ canvasElement }) => {
         await openMenu(canvasElement)
@@ -76,6 +80,7 @@ export const SettingBase: Story = {
 }
 
 export const Deleted: Story = {
+    tags: ['desktop-only'],
     play: async ({ canvasElement, args }) => {
         await openMenu(canvasElement)
         await userEvent.click(await screen.findByRole('menuitem', { name: /delete/i }))
@@ -84,4 +89,3 @@ export const Deleted: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }

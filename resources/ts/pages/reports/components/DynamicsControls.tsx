@@ -31,14 +31,21 @@ export function ChartTypeBadges({ value, onChange }: ChartTypeBadgesProps) {
         <div className="flex gap-1" {...testIdControls('chart-type')}>
             {options.map(({ type, Icon, label }) => (
                 <Badge
+                    asChild
                     key={type}
-                    {...testIdControl(type, value === type)}
                     variant={value === type ? 'default' : 'outline'}
                     className="cursor-pointer gap-1.5"
-                    onClick={() => onChange(type)}
                 >
-                    <Icon className="size-3.5" />
-                    {label}
+                    {/* A real button, so the keyboard reaches it. */}
+                    <button
+                        type="button"
+                        aria-pressed={value === type}
+                        {...testIdControl(type, value === type)}
+                        onClick={() => onChange(type)}
+                    >
+                        <Icon className="size-3.5" />
+                        {label}
+                    </button>
                 </Badge>
             ))}
         </div>
@@ -65,7 +72,7 @@ export function SeriesPicker({ label, series, onToggle }: SeriesPickerProps) {
                     <ChevronDown className="size-3" />
                 </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-56 p-2" align="end">
+            <PopoverContent className="w-56 p-2" align="end" aria-label={label}>
                 <div className="space-y-1">
                     {series.map((item) => (
                         <div
@@ -73,7 +80,7 @@ export function SeriesPicker({ label, series, onToggle }: SeriesPickerProps) {
                             className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer"
                             onClick={() => onToggle(item.id)}
                         >
-                            <Checkbox checked={item.enabled} className="pointer-events-none" />
+                            <Checkbox checked={item.enabled} aria-label={item.name} className="pointer-events-none" />
                             <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
                             <Label className="text-sm cursor-pointer flex-1">{item.name}</Label>
                         </div>

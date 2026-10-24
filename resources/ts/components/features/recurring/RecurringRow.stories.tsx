@@ -60,6 +60,7 @@ export const Edited: Story = {
 }
 
 export const Deleted: Story = {
+    tags: ['desktop-only'],
     play: async ({ canvasElement, args }) => {
         await userEvent.click(within(canvasElement).getByRole('button', { name: /more actions/i }))
         await userEvent.click(await screen.findByRole('menuitem', { name: /delete/i }))
@@ -68,4 +69,3 @@ export const Deleted: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }

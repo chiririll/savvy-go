@@ -44,7 +44,7 @@ export function UploadStep({
                             </Button>
                         </div>
                     </div>
-                    <Progress value={uploadPercentage} />
+                    <Progress value={uploadPercentage} aria-label={t('import.uploading')} />
                 </div>
             )}
 

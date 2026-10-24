@@ -113,9 +113,9 @@ export function CreateTokenDialog({ open, spaces, onOpenChange, onCreated }: Cre
                     <p className="text-xs text-muted-foreground">{t('api.create.permissionsHint')}</p>
                 </div>
                 <div className="space-y-2">
-                    <Label>{t('api.create.expiry')}</Label>
+                    <Label htmlFor="api-token-expiry">{t('api.create.expiry')}</Label>
                     <Select value={expiry} onValueChange={(v) => setExpiry(v as Expiry)}>
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger id="api-token-expiry" className="w-full">
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>

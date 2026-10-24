@@ -7,6 +7,7 @@ import { useCurrenciesStore } from '@/stores/currencies'
 import { DebtPaymentSummary } from './DebtPaymentSummary'
 
 const meta = {
+    tags: ['desktop-only'],
     title: 'features/debts/DebtPaymentSummary',
     component: DebtPaymentSummary,
     beforeEach: () => useCurrenciesStore.getState().setAll(currencies),
@@ -38,4 +39,3 @@ export const WithoutCounterparty: Story = {
 }
 
 export const InYen: Story = { args: { debt: debt({ currency: currencies[2], currentBalance: 45000 }) } }
-export const InRussian: Story = { globals: { locale: 'ru' } }

@@ -20,6 +20,8 @@ interface CategorySelectProps {
     disabled?: boolean
     sortByPopularity?: boolean
     plain?: boolean
+    /** Accessible name of the trigger; set it when no visible label points at the select. */
+    ariaLabel?: string
 }
 
 export function CategorySelect({
@@ -31,6 +33,7 @@ export function CategorySelect({
     disabled,
     sortByPopularity = true,
     plain,
+    ariaLabel,
 }: CategorySelectProps) {
     const { t } = useTranslation('forms')
     const { data: categories } = useCategories()
@@ -49,7 +52,7 @@ export function CategorySelect({
     }, [categories, type, excludeIds, sortByPopularity])
 
     const trigger = (
-        <SelectTrigger className="w-full">
+        <SelectTrigger className="w-full" aria-label={ariaLabel}>
             <SelectValue placeholder={placeholder ?? t('selectCategory')} />
         </SelectTrigger>
     )

@@ -18,8 +18,6 @@ type Story = StoryObj<typeof meta>
 
 const openMenu = (canvasElement: HTMLElement) => userEvent.click(within(canvasElement).getByRole('button'))
 
-export const Closed: Story = {}
-
 export const Menu: Story = {
     play: async ({ canvasElement }) => {
         await openMenu(canvasElement)

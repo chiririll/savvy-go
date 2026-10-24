@@ -26,8 +26,6 @@ type Story = StoryObj<typeof meta>
 export const Filled: Story = {}
 export const Empty: Story = { args: { transactions: [] } }
 export const Loading: Story = { args: { transactions: undefined } }
-export const InRussian: Story = { globals: { locale: 'ru' } }
-
 // The rows here only open; they have no menu of their own.
 export const NoRowMenus: Story = {
     play: async ({ canvasElement }) => {

@@ -28,7 +28,7 @@ export function CreateTransactionMenu() {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button size="sm" className="gap-1" {...testIdMenu('layout-transaction')}>
+                <Button size="sm" className="gap-1" aria-label={t('newTransaction')} {...testIdMenu('layout-transaction')}>
                     <Plus className="size-4" />
                     <span className="hidden sm:inline">{t('newTransaction')}</span>
                 </Button>

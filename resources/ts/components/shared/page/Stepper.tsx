@@ -106,6 +106,7 @@ function Step({
                     isClickable && 'cursor-pointer',
                     disabled && 'opacity-50 cursor-not-allowed'
                 )}
+                aria-disabled={disabled || undefined}
                 onClick={() => isClickable && setActiveStep(index)}
             >
                 <StepIndicator
@@ -117,6 +118,7 @@ function Step({
                     <span
                         className={cn(
                             'text-sm font-medium whitespace-nowrap',
+                            !isActive && 'max-sm:sr-only',
                             isActive && 'text-foreground',
                             !isActive && !isCompleted && 'text-muted-foreground',
                             isCompleted && 'text-foreground'

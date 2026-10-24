@@ -47,7 +47,10 @@ export function Members({ space, isAdmin }: { space: Space; isAdmin: boolean }) 
                                             setRole.mutate({ userId: m.userId, role: role as SpaceRole })
                                         }
                                     >
-                                        <SelectTrigger className="h-8 w-32">
+                                        <SelectTrigger
+                                            className="h-8 w-32"
+                                            aria-label={`${t('common:fields.role')}: ${m.name}`}
+                                        >
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>

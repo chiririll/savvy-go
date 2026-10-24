@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { Route, Routes } from 'react-router-dom'
+import { delay, http, HttpResponse } from 'msw'
 import { expect, screen, userEvent, waitFor, within } from 'storybook/test'
 
 import { SidebarProvider } from '@/components/ui/sidebar'
@@ -76,7 +77,6 @@ export const ApplicationInRussian: Story = {
         await expect(await within(canvasElement).findByText(/13\D150,20/)).toBeVisible()
     },
 }
-export const ApplicationInDarkTheme: Story = { ...Application, globals: { theme: 'dark' } }
 
 // ---- the status bar above the header
 
@@ -178,6 +178,22 @@ export const BalanceAccounts: Story = {
         await userEvent.click(await within(canvasElement).findByRole('button', { name: /balances/i }))
         await expect(await screen.findByText('Yen wallet')).toBeVisible()
         await expect(screen.getByText(/15,000/)).toBeVisible()
+    },
+}
+
+export const BalanceAccountsLoading: Story = {
+    render: () => <HeaderBalance />,
+    // The total comes back; the list of accounts under it does not.
+    beforeEach: ({ msw }) =>
+        msw.use(
+            http.get(/\/api(\/spaces\/\d+)?\/accounts(\?.*)?$/, async ({ request }) => {
+                if (new URL(request.url).searchParams.has('exclude_debts')) await delay('infinite')
+                return HttpResponse.json({ data: [], summary })
+            }),
+        ),
+    play: async ({ canvasElement }) => {
+        await userEvent.click(await within(canvasElement).findByRole('button', { name: /balances/i }))
+        await expect(await screen.findByRole('menuitem', { name: /accounts/i })).toBeVisible()
     },
 }
 

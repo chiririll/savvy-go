@@ -3,21 +3,10 @@ import { useTranslation } from 'react-i18next'
 import { Fingerprint, Plus, Trash2 } from 'lucide-react'
 import { testId } from '@/lib/test-id'
 import { intlLocale } from '@/lib/i18n'
-import { ResponsiveDialog, SettingsSection } from '@/components/shared'
+import { Confirm, ResponsiveDialog, SettingsSection } from '@/components/shared'
 import { useReadOnly } from '@/components/providers/ReadOnlyProvider'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'
 import { isPasskeyDomainSupported, useDeletePasskey, useRegisterPasskey, useWebauthnCredentials } from '@/hooks'
 import { RowSkeleton } from './SecurityLayout'
 import { cn } from '@/lib/utils'
@@ -47,8 +36,8 @@ function PasskeyRow({ passkey, disabled, onDelete }: { passkey: Passkey; disable
                         : t('security.passkeys.neverUsed')}
                 </p>
             </div>
-            <AlertDialog>
-                <AlertDialogTrigger asChild>
+            <Confirm
+                trigger={
                     <Button
                         variant="ghost"
                         size="icon"
@@ -57,20 +46,13 @@ function PasskeyRow({ passkey, disabled, onDelete }: { passkey: Passkey; disable
                     >
                         <Trash2 className="size-4 text-destructive" />
                     </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>{t('security.passkeys.deleteTitle')}</AlertDialogTitle>
-                        <AlertDialogDescription>{t('security.passkeys.deleteDescription')}</AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>{tCommon('actions.cancel')}</AlertDialogCancel>
-                        <AlertDialogAction variant="destructive" onClick={onDelete}>
-                            {tCommon('actions.delete')}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                }
+                title={t('security.passkeys.deleteTitle')}
+                description={t('security.passkeys.deleteDescription')}
+                action={tCommon('actions.delete')}
+                destructive
+                onConfirm={onDelete}
+            />
         </div>
     )
 }

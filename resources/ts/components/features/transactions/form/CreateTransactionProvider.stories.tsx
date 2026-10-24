@@ -51,8 +51,6 @@ type Story = StoryObj<typeof meta>
 const open = (canvasElement: HTMLElement, name: string) =>
     userEvent.click(within(canvasElement).getByRole('button', { name }))
 
-export const Closed: Story = {}
-
 export const CreateOpened: Story = {
     play: async ({ canvasElement }) => {
         await open(canvasElement, 'New')

@@ -17,13 +17,20 @@ export function PeriodTypeBadges({ value, onChange, scroll = false }: PeriodType
 
     const badge = (type: PeriodType, label: string) => (
         <Badge
+            asChild
             key={type}
-            {...testIdControl(type, value === type)}
             variant={value === type ? 'default' : 'outline'}
             className="cursor-pointer"
-            onClick={() => onChange(type)}
         >
-            {label}
+            {/* A real button, so the keyboard reaches it. */}
+            <button
+                type="button"
+                aria-pressed={value === type}
+                {...testIdControl(type, value === type)}
+                onClick={() => onChange(type)}
+            >
+                {label}
+            </button>
         </Badge>
     )
 

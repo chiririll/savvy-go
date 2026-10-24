@@ -30,7 +30,7 @@ export function ExpensesByCategory({ filters }: ExpensesByCategoryProps) {
     if (error) {
         return (
             <Card>
-                <CardContent className="py-8 text-center text-red-500">
+                <CardContent className="py-8 text-center text-destructive">
                     {t('reports.errors.expensesByCategory')}
                 </CardContent>
             </Card>
@@ -66,10 +66,13 @@ export function ExpensesByCategory({ filters }: ExpensesByCategoryProps) {
                         const previousWidth = maxValue > 0 ? (category.previous / maxValue) * 100 : 0
 
                         return (
-                            <div
+                            <button
+                                type="button"
                                 key={category.id}
                                 className={cn(
-                                    'group cursor-pointer rounded-lg px-1 py-2 transition-colors hover:bg-muted/50',
+                                    'group block w-full cursor-pointer rounded-lg px-1 py-2 text-left transition-colors',
+                                    'hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2',
+                                    'focus-visible:ring-ring',
                                 )}
                                 onClick={() => handleCategoryClick(category.id)}
                             >
@@ -87,7 +90,7 @@ export function ExpensesByCategory({ filters }: ExpensesByCategoryProps) {
                                             {localizeDefaultName(category.name)}
                                         </span>
                                         {isAnomalous && filters.compareWith !== 'none' && (
-                                            <AlertTriangle className="size-4 shrink-0 text-amber-500" />
+                                            <AlertTriangle className="size-4 shrink-0 text-warning" />
                                         )}
                                     </div>
 
@@ -110,7 +113,7 @@ export function ExpensesByCategory({ filters }: ExpensesByCategoryProps) {
                                                 <span
                                                     className={cn(
                                                         'flex items-center gap-0.5 text-xs font-medium',
-                                                        isIncrease ? 'text-red-600' : 'text-green-600',
+                                                        isIncrease ? 'text-destructive' : 'text-success',
                                                     )}
                                                 >
                                                     {isIncrease ? (
@@ -154,7 +157,7 @@ export function ExpensesByCategory({ filters }: ExpensesByCategoryProps) {
                                         </div>
                                     )}
                                 </div>
-                            </div>
+                            </button>
                         )
                     })
                 )}

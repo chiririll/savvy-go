@@ -74,14 +74,21 @@ export function StructureChart({
                     <div className="flex flex-wrap gap-1" {...testIdControls('view')}>
                         {viewModes.map((mode) => (
                             <Badge
+                                asChild
                                 key={mode.value}
-                                {...testIdControl(mode.value, viewMode === mode.value)}
                                 variant={viewMode === mode.value ? 'default' : 'outline'}
                                 className="cursor-pointer gap-1.5"
-                                onClick={() => setViewMode(mode.value)}
                             >
-                                {mode.icon}
-                                {mode.label}
+                                {/* A real button, so the keyboard reaches it. */}
+                                <button
+                                    type="button"
+                                    aria-pressed={viewMode === mode.value}
+                                    {...testIdControl(mode.value, viewMode === mode.value)}
+                                    onClick={() => setViewMode(mode.value)}
+                                >
+                                    {mode.icon}
+                                    {mode.label}
+                                </button>
                             </Badge>
                         ))}
                     </div>
@@ -96,7 +103,7 @@ export function StructureChart({
                     <div ref={chartRef} style={{ height: chartHeight }}>
                         {/* Mount once measured so the chart animates in a single pass */}
                         {chartWidth > 0 && (
-                            <ReactECharts option={options[viewMode]()} style={{ height: chartHeight }} key={viewMode} />
+                            <ReactECharts option={options[viewMode]()} ariaLabel={title} style={{ height: chartHeight }} key={viewMode} />
                         )}
                     </div>
                 )}

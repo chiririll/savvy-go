@@ -1,18 +1,8 @@
 import { useTranslation } from 'react-i18next'
 import { CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+import { Confirm } from '@/components/shared/dialogs/Confirm'
 import { Logo } from '@/components/shared/appearance/Logo'
 import { apiResourceLabel } from '@/lib/labels'
-import { testId } from '@/lib/test-id'
 import type { ApiResource } from '@/types'
 
 export function ConsentHeader({ title, description }: { title: string; description: string }) {
@@ -52,29 +42,26 @@ export function ConsentConfirmDialog({
     const list = (rs: ApiResource[]) => rs.map((r) => apiResourceLabel(tSettings, r)).join(', ')
 
     return (
-        <AlertDialog open={open} onOpenChange={onOpenChange}>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>{t('oauth.confirmTitle', { client })}</AlertDialogTitle>
-                    <AlertDialogDescription asChild>
-                        <div className="space-y-2">
-                            <p>{t('oauth.confirmChange', { client, resources: list(changes) })}</p>
-                            {deletes.length > 0 && (
-                                <p className="font-medium text-destructive">
-                                    {t('oauth.confirmDelete', { resources: list(deletes) })}
-                                </p>
-                            )}
-                            <p>{t('oauth.confirmAsYou')}</p>
-                        </div>
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel {...testId('oauth-confirm-cancel')}>{t('oauth.confirmBack')}</AlertDialogCancel>
-                    <AlertDialogAction onClick={onAllow} {...testId('oauth-confirm-allow')}>
-                        {t('oauth.confirmAllow')}
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
+        <Confirm
+            open={open}
+            onOpenChange={onOpenChange}
+            title={t('oauth.confirmTitle', { client })}
+            description={
+                <>
+                    <p>{t('oauth.confirmChange', { client, resources: list(changes) })}</p>
+                    {deletes.length > 0 && (
+                        <p className="font-medium text-destructive">
+                            {t('oauth.confirmDelete', { resources: list(deletes) })}
+                        </p>
+                    )}
+                    <p>{t('oauth.confirmAsYou')}</p>
+                </>
+            }
+            action={t('oauth.confirmAllow')}
+            cancel={t('oauth.confirmBack')}
+            onConfirm={onAllow}
+            actionTestId="oauth-confirm-allow"
+            cancelTestId="oauth-confirm-cancel"
+        />
     )
 }

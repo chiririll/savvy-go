@@ -26,4 +26,3 @@ export const Hidden: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }

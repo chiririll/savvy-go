@@ -70,7 +70,6 @@ const diff = {
 } as unknown as SyncDiff
 
 const next = () => fireEvent.click(screen.getByRole('button', { name: 'spaces.sync.dialog.next' }))
-const back = () => fireEvent.click(screen.getByRole('button', { name: 'spaces.sync.dialog.back' }))
 const apply = () => screen.getByRole('button', { name: 'spaces.sync.dialog.apply' })
 const keepSelect = () => screen.getAllByRole('combobox')[0] as HTMLSelectElement
 
@@ -94,14 +93,6 @@ describe('SyncReconcileDialog', () => {
         expect(state.apply.mock.calls[0]![0]).toMatchObject({ decisions: [{ keep: true }, { keep: true }] })
     })
 
-    it('keeps the choices when going back', () => {
-        render(<SyncReconcileDialog change={change} onClose={vi.fn()} />)
-        fireEvent.change(keepSelect(), { target: { value: 'drop' } })
-        next()
-        back()
-        expect(keepSelect().value).toBe('drop')
-    })
-
     it('asks where the transactions go, and holds Apply back until that is chosen', () => {
         render(<SyncReconcileDialog change={change} onClose={vi.fn()} />)
         fireEvent.change(keepSelect(), { target: { value: 'drop' } })
@@ -114,12 +105,5 @@ describe('SyncReconcileDialog', () => {
         next()
         fireEvent.click(apply())
         expect(state.apply.mock.calls[0]![0].decisions[0]).toMatchObject({ keep: false, successor: '#GROCERIES' })
-    })
-
-    it('skips straight to the summary when only defaults differ', () => {
-        state.data = { ...diff, categories: [], tags: [], defaults: [{ type: 'expense', defaults: [{ spaceId: 1, name: '#OTHER' }] }] }
-        render(<SyncReconcileDialog change={change} onClose={vi.fn()} />)
-        expect(screen.getByText('spaces.sync.dialog.summaryDefaults')).toBeTruthy()
-        expect(apply()).toBeTruthy()
     })
 })

@@ -19,6 +19,7 @@ export function QuotaCell({ space }: { space: SpaceOverview }) {
         <div className="flex items-center gap-2">
             <Input
                 className="h-8 w-24"
+                aria-label={t('admin.spaces.quota')}
                 type="number"
                 min={0}
                 step="any"
@@ -48,7 +49,7 @@ export function AssignAdmin({ space }: { space: SpaceOverview }) {
     return (
         <div className="flex items-center gap-2">
             <Select value={userId} onValueChange={setUserId}>
-                <SelectTrigger className="h-8 w-44">
+                <SelectTrigger className="h-8 w-44" aria-label={t('admin.spaces.chooseUser')}>
                     <SelectValue placeholder={t('admin.spaces.chooseUser')} />
                 </SelectTrigger>
                 <SelectContent>

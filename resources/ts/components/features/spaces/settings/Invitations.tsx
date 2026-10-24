@@ -3,19 +3,10 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Check, Copy, Mail } from 'lucide-react'
 import { SettingsSection } from '@/components/shared'
+import { Confirm } from '@/components/shared/dialogs/Confirm'
 import { InvitationList } from '@/components/features/spaces/InvitationList'
 import { InvitationRow } from '@/components/features/spaces/InvitationRow'
 import { InviteForm } from '@/components/features/spaces/InviteForm'
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { useRevokeInvitation, useSpaceInvitations } from '@/hooks'
 import { formatDateTime } from '@/lib/format'
@@ -90,24 +81,17 @@ export function Invitations({ space }: { space: Space }) {
                     }}
                 />
             </div>
-            <AlertDialog open={cancelling !== null} onOpenChange={(isOpen) => !isOpen && setCancelling(null)}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>{t('spaces.invitations.cancelTitle')}</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            {t('spaces.invitations.cancelText', {
-                                who: cancelling?.email ?? t('spaces.invitations.anyone'),
-                            })}
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>{t('spaces.invitations.keep')}</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => cancelling && revoke.mutate(cancelling.id)}>
-                            {t('spaces.invitations.cancelConfirm')}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+            <Confirm
+                open={cancelling !== null}
+                onOpenChange={(isOpen) => !isOpen && setCancelling(null)}
+                title={t('spaces.invitations.cancelTitle')}
+                description={t('spaces.invitations.cancelText', {
+                    who: cancelling?.email ?? t('spaces.invitations.anyone'),
+                })}
+                action={t('spaces.invitations.cancelConfirm')}
+                cancel={t('spaces.invitations.keep')}
+                onConfirm={() => cancelling && revoke.mutate(cancelling.id)}
+            />
         </SettingsSection>
     )
 }

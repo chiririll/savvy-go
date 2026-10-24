@@ -44,6 +44,7 @@ function Stateful(args: Args) {
 }
 
 const meta = {
+    tags: ['desktop-only'],
     title: 'features/oauth/ConsentForm',
     component: Stateful,
     parameters: { layout: 'padded' },
@@ -54,7 +55,6 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 export const ReadOnly: Story = {}
-export const InRussian: Story = { globals: { locale: 'ru' } }
 export const NoHost: Story = { args: { host: null } }
 export const OptionsStillLoading: Story = { args: { options: null } }
 export const WithError: Story = { args: { error: 'The request has expired' } }

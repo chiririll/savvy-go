@@ -1,19 +1,9 @@
 import { useTranslation } from 'react-i18next'
 import { Pencil, Trash2 } from 'lucide-react'
 import { testId } from '@/lib/test-id'
+import { Confirm } from '@/components/shared/dialogs/Confirm'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'
 import { intlLocale } from '@/lib/i18n'
 import { apiResourceLabel } from '@/lib/labels'
 import type { ApiResource, ApiTokenSummary } from '@/types'
@@ -45,7 +35,6 @@ interface TokenRowProps {
 
 export function TokenRow({ token, revoking, onEdit, onRevoke }: TokenRowProps) {
     const { t } = useTranslation('settings')
-    const { t: tCommon } = useTranslation('common')
     const formatDate = (value: string) => new Date(value).toLocaleDateString(intlLocale())
 
     return (
@@ -81,25 +70,17 @@ export function TokenRow({ token, revoking, onEdit, onRevoke }: TokenRowProps) {
                 >
                     <Pencil className="size-4" />
                 </Button>
-                <AlertDialog>
-                    <AlertDialogTrigger asChild>
+                <Confirm
+                    trigger={
                         <Button variant="ghost" size="icon" disabled={revoking} aria-label={t('api.tokens.revokeAria')}>
                             <Trash2 className="size-4" />
                         </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                        <AlertDialogHeader>
-                            <AlertDialogTitle>{t('api.tokens.revokeTitle')}</AlertDialogTitle>
-                            <AlertDialogDescription>
-                                {t('api.tokens.revokeDescription', { name: token.name })}
-                            </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                            <AlertDialogCancel>{tCommon('actions.cancel')}</AlertDialogCancel>
-                            <AlertDialogAction onClick={onRevoke}>{t('api.tokens.revoke')}</AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
+                    }
+                    title={t('api.tokens.revokeTitle')}
+                    description={t('api.tokens.revokeDescription', { name: token.name })}
+                    action={t('api.tokens.revoke')}
+                    onConfirm={onRevoke}
+                />
             </div>
         </div>
     )

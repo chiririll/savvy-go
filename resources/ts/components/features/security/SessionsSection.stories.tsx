@@ -23,8 +23,6 @@ const open = async (canvasElement: HTMLElement) => {
 }
 
 export const Section: Story = {}
-export const InRussian: Story = { globals: { locale: 'ru' } }
-
 export const ConfirmAsked: Story = {
     play: async ({ canvasElement }) => {
         const dialog = await open(canvasElement)

@@ -13,24 +13,24 @@ function SummaryTiles({ summary }: { summary: DebtSummary }) {
 
     return (
         <div className="grid min-w-0 gap-4 sm:grid-cols-3">
-            <div className="flex items-center gap-3 p-3 rounded-lg bg-red-50 dark:bg-red-950/20">
-                <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30">
-                    <TrendingDown className="size-4 text-red-600" />
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-destructive/10">
+                <div className="p-2 rounded-lg bg-destructive/15">
+                    <TrendingDown className="size-4 text-destructive" />
                 </div>
                 <div>
                     <p className="text-xs text-muted-foreground">{t('debts.types.i_owe')}</p>
-                    <p className="font-mono font-semibold text-red-600 break-all">
+                    <p className="font-mono font-semibold text-destructive break-all">
                         {formatCurrency(summary.totalIOwe, summary.currency)}
                     </p>
                 </div>
             </div>
-            <div className="flex items-center gap-3 p-3 rounded-lg bg-green-50 dark:bg-green-950/20">
-                <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
-                    <TrendingUp className="size-4 text-green-600" />
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-success/10">
+                <div className="p-2 rounded-lg bg-success/15">
+                    <TrendingUp className="size-4 text-success" />
                 </div>
                 <div>
                     <p className="text-xs text-muted-foreground">{t('debts.types.owed_to_me')}</p>
-                    <p className="font-mono font-semibold text-green-600 break-all">
+                    <p className="font-mono font-semibold text-success break-all">
                         {formatCurrency(summary.totalOwedToMe, summary.currency)}
                     </p>
                 </div>
@@ -38,24 +38,24 @@ function SummaryTiles({ summary }: { summary: DebtSummary }) {
             <div
                 className={cn(
                     'flex items-center gap-3 p-3 rounded-lg',
-                    net ? 'bg-green-50 dark:bg-green-950/20' : 'bg-red-50 dark:bg-red-950/20',
+                    net ? 'bg-success/10' : 'bg-destructive/10',
                 )}
             >
                 <div
                     className={cn(
                         'p-2 rounded-lg',
-                        net ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30',
+                        net ? 'bg-success/15' : 'bg-destructive/15',
                     )}
                 >
                     {net ? (
-                        <HandCoins className="size-4 text-green-600" />
+                        <HandCoins className="size-4 text-success" />
                     ) : (
-                        <Banknote className="size-4 text-red-600" />
+                        <Banknote className="size-4 text-destructive" />
                     )}
                 </div>
                 <div>
                     <p className="text-xs text-muted-foreground">{t('debts.netPosition')}</p>
-                    <p className={`font-mono font-semibold break-all ${net ? 'text-green-600' : 'text-red-600'}`}>
+                    <p className={`font-mono font-semibold break-all ${net ? 'text-success' : 'text-destructive'}`}>
                         {formatCurrency(Math.abs(summary.netDebt), summary.currency)}
                     </p>
                 </div>
@@ -71,7 +71,7 @@ function DebtTile({ debt }: { debt: Debt }) {
     return (
         <Link to={`/debts?edit=${debt.id}`} className="block p-3 rounded-lg border hover:bg-muted/50 transition-colors">
             <div className="flex items-center gap-2 mb-2">
-                {iOwe ? <Banknote className="size-4 text-red-600" /> : <HandCoins className="size-4 text-green-600" />}
+                {iOwe ? <Banknote className="size-4 text-destructive" /> : <HandCoins className="size-4 text-success" />}
                 <p className="font-medium text-sm truncate">{debt.name}</p>
             </div>
             <Progress value={debt.paymentProgress} aria-label={debt.name} className="h-1.5 mb-2" />
@@ -79,7 +79,7 @@ function DebtTile({ debt }: { debt: Debt }) {
                 <span className="text-muted-foreground">
                     {t('dashboard.percentPaid', { percent: debt.paymentProgress.toFixed(0) })}
                 </span>
-                <span className={iOwe ? 'text-red-600' : 'text-green-600'}>
+                <span className={iOwe ? 'text-destructive' : 'text-success'}>
                     {formatCurrency(debt.currentBalance, debt.currency)}
                 </span>
             </div>

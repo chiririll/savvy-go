@@ -27,6 +27,7 @@ function RuleRow({ form, index, onRemove }: { form: Form; index: number; onRemov
         >
             <Input
                 placeholder={t('forms:sso.claimPlaceholder')}
+                aria-label={t('forms:sso.claim')}
                 className="font-mono text-sm"
                 {...form.register(`role_mapping.${index}.claim`)}
             />
@@ -36,7 +37,7 @@ function RuleRow({ form, index, onRemove }: { form: Form; index: number; onRemov
                     form.setValue(`role_mapping.${index}.operator`, v as 'equals' | 'contains' | 'one_of')
                 }
             >
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full" aria-label={t('forms:sso.condition')}>
                     <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -47,6 +48,7 @@ function RuleRow({ form, index, onRemove }: { form: Form; index: number; onRemov
             </Select>
             <Input
                 placeholder={t('forms:sso.valuePlaceholder')}
+                aria-label={t('forms:sso.value')}
                 className="font-mono text-sm"
                 {...form.register(`role_mapping.${index}.value`)}
             />
@@ -54,7 +56,7 @@ function RuleRow({ form, index, onRemove }: { form: Form; index: number; onRemov
                 value={form.watch(`role_mapping.${index}.role`)}
                 onValueChange={(v) => form.setValue(`role_mapping.${index}.role`, v as 'admin' | 'user' | 'guest')}
             >
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full" aria-label={t('fields.role')}>
                     <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -68,6 +70,8 @@ function RuleRow({ form, index, onRemove }: { form: Form; index: number; onRemov
                 variant="ghost"
                 size="icon"
                 className="justify-self-end text-muted-foreground hover:text-destructive"
+                aria-label={t('forms:sso.removeRule')}
+                title={t('forms:sso.removeRule')}
                 onClick={onRemove}
             >
                 <Trash2 className="size-4" />

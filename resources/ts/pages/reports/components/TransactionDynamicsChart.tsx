@@ -103,6 +103,7 @@ export function TransactionDynamicsChart({ filters, type }: TransactionDynamicsC
                         {chartWidth > 0 && (
                             <ReactECharts
                                 option={chartOption}
+                                ariaLabel={copy.title}
                                 style={{ height: 350 }}
                                 key={`${chartType}-${groupBy}`}
                             />

@@ -42,7 +42,10 @@ export function ImportProgress({ flow }: { flow: CsvImportFlow }) {
                     {total ? ` / ${total}` : ''}
                 </span>
             </div>
-            <Progress value={total ? Math.round((processed / total) * 100) : 0} />
+            <Progress
+                value={total ? Math.round((processed / total) * 100) : 0}
+                aria-label={t('import.importingProgress')}
+            />
         </div>
     )
 }

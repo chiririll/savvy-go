@@ -7,6 +7,7 @@ import { useCurrenciesStore } from '@/stores/currencies'
 import { TransactionItemsRow } from './TransactionItemsRow'
 
 const meta = {
+    tags: ['desktop-only'],
     title: 'features/transactions/list/TransactionItemsRow',
     component: TransactionItemsRow,
     beforeEach: () => useCurrenciesStore.getState().setAll(currencies),

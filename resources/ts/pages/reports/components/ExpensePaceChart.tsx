@@ -47,7 +47,7 @@ export function ExpensePaceChart({ filters }: ExpensePaceChartProps) {
     if (error) {
         return (
             <Card>
-                <CardContent className="py-8 text-center text-red-500">{t('reports.errors.expensePace')}</CardContent>
+                <CardContent className="py-8 text-center text-destructive">{t('reports.errors.expensePace')}</CardContent>
             </Card>
         )
     }
@@ -76,8 +76,8 @@ export function ExpensePaceChart({ filters }: ExpensePaceChartProps) {
                                     'text-xl sm:text-2xl font-bold break-words',
                                     currentMonthData.hasBudget
                                         ? currentMonthData.budgetRemaining >= 0
-                                            ? 'text-green-600'
-                                            : 'text-red-600'
+                                            ? 'text-success'
+                                            : 'text-destructive'
                                         : 'text-foreground',
                                 )}
                             >
@@ -104,7 +104,7 @@ export function ExpensePaceChart({ filters }: ExpensePaceChartProps) {
                                     value={String(selectedMonth)}
                                     onValueChange={(v) => setSelectedMonth(Number(v))}
                                 >
-                                    <SelectTrigger className="w-full sm:w-[180px]">
+                                    <SelectTrigger className="w-full sm:w-[180px]" aria-label={t('reports.filters.month')}>
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -120,7 +120,7 @@ export function ExpensePaceChart({ filters }: ExpensePaceChartProps) {
 
                         <div ref={chartRef} style={{ height: 300 }}>
                             {/* Mount once measured so the chart animates in a single pass */}
-                            {chartWidth > 0 && <ReactECharts option={chartOption} style={{ height: 300 }} />}
+                            {chartWidth > 0 && <ReactECharts option={chartOption} ariaLabel={t('reports.expensePace.title')} style={{ height: 300 }} />}
                         </div>
 
                         {currentMonthData && <ExpensePaceSummary month={currentMonthData} currency={currency} />}

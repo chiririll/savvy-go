@@ -5,15 +5,20 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { NuqsTestingAdapter } from 'nuqs/adapters/testing'
 import { mswLoader } from 'msw-storybook-addon/csf3'
-import { Toaster } from 'sonner'
+import { configure } from 'storybook/test'
 
 import i18n, { i18nReady, LOCALE_LABELS, SUPPORTED_LOCALES, type AppLocale } from '@/lib/i18n'
+import { AppToaster } from '@/components/providers/AppToaster'
 import { baseA11y } from '@/test/a11y'
 import { setUpApp } from '@/test/app-state'
+import { finishMatrixChecks, startMatrixChecks } from './matrix-checks'
 import { AbilityProvider } from '@/components/providers/AbilityProvider'
 import { ReadOnlyProvider } from '@/components/providers/ReadOnlyProvider'
 import '@/index.css'
 import './preview.css'
+
+// With many stories loading at once a mocked request can take over a second, the default wait of a findBy query.
+configure({ asyncUtilTimeout: 5000 })
 
 const localeLoader: Loader = async ({ globals }) => {
     await i18nReady
@@ -48,7 +53,7 @@ const withApp: Decorator = (Story, { globals, parameters }) => {
                     </AbilityProvider>
                 </NuqsTestingAdapter>
             </MemoryRouter>
-            <Toaster position="top-right" richColors />
+            <AppToaster />
         </QueryClientProvider>
     )
 }
@@ -56,10 +61,20 @@ const withApp: Decorator = (Story, { globals, parameters }) => {
 const preview: Preview = {
     decorators: [withApp],
     loaders: [localeLoader, mswLoader()],
-    beforeEach({ msw, parameters }) {
+    beforeEach(context) {
+        const { msw, parameters } = context
+        startMatrixChecks(context)
         return setUpApp(parameters.app, (...handlers) => msw.use(...handlers))
     },
-    initialGlobals: { locale: 'en', theme: 'light' },
+    afterEach({ globals }) {
+        finishMatrixChecks(globals)
+    },
+    // English and light, unless the vitest project asks for another pair (vite.config.ts; the language and theme matrix).
+    initialGlobals: {
+        locale: import.meta.env.STORYBOOK_LOCALE ?? 'en',
+        theme: import.meta.env.STORYBOOK_THEME ?? 'light',
+        viewport: import.meta.env.STORYBOOK_VIEWPORT ? { value: import.meta.env.STORYBOOK_VIEWPORT, isRotated: false } : undefined,
+    },
     globalTypes: {
         locale: {
             description: 'Interface language',
@@ -87,6 +102,7 @@ const preview: Preview = {
         a11y: baseA11y,
         viewport: {
             options: {
+                desktop: { name: 'Desktop', styles: { width: '1280px', height: '800px' }, type: 'desktop' },
                 mobile: { name: 'Mobile', styles: { width: '390px', height: '844px' }, type: 'mobile' },
                 tablet: { name: 'Tablet', styles: { width: '768px', height: '1024px' }, type: 'tablet' },
             },

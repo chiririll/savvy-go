@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { FormWrapper } from './FormWrapper'
 
 const meta = {
+    tags: ['desktop-only'],
     title: 'shared/form/FormWrapper',
     component: FormWrapper,
     args: {

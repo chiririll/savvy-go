@@ -38,8 +38,6 @@ export const Submitting: Story = {
 
 export const CustomSubmitLabel: Story = { args: { submitLabel: 'Add account' } }
 export const WithoutOwnSubmit: Story = { args: { hideSubmit: true } }
-export const InRussian: Story = { globals: { locale: 'ru' } }
-
 export const ReadOnly: Story = {
     parameters: { app: { role: 'viewer' } },
     args: { defaultValues: { name: 'Euro card', currency: 'id:2' } },

@@ -18,6 +18,7 @@ function Stateful({ initial = { all: false, ids: [1] }, spaces: list = spaces }:
 }
 
 const meta = {
+    tags: ['desktop-only'],
     title: 'features/api-tokens/SpacePicker',
     component: Stateful,
 } satisfies Meta<typeof Stateful>
@@ -32,7 +33,6 @@ export const SomeSpaces: Story = {
         await expect(picker.getByRole('checkbox', { name: 'Trip' })).not.toBeChecked()
     },
 }
-export const InRussian: Story = { globals: { locale: 'ru' } }
 export const NoneChosen: Story = { args: { initial: { all: false, ids: [] } } }
 export const NoSpaces: Story = { args: { spaces: [] } }
 export const ManySpaces: Story = {

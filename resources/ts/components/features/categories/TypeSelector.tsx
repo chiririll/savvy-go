@@ -25,7 +25,7 @@ export function TypeSelector({ value, onChange, error, disabled, disabledHelp }:
                 options={CATEGORY_TYPE_OPTIONS.map((option) => ({
                     value: option.value,
                     label: categoryTypeLabel(t, option.value),
-                    color: option.value === 'income' ? 'text-green-600' : 'text-red-600',
+                    color: option.value === 'income' ? 'text-success' : 'text-destructive',
                 }))}
             />
             {disabled && disabledHelp && (

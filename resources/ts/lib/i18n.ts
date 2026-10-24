@@ -57,13 +57,13 @@ function resolveDottedNamespaceKey(key: string): string {
 // English is bundled (fallback language); other locales are loaded on demand.
 // `en` is excluded: it is imported statically above, and a glob match would make Vite warn that
 // the dynamic import cannot split it out.
-const localeLoaders = import.meta.glob<{ default: Record<string, unknown> }>('@/locales/!(en)/*.json')
+const localeLoaders = import.meta.glob<{ default: Record<string, unknown> }>('../locales/!(en)/*.json')
 
 const lazyLocaleBackend: BackendModule = {
     type: 'backend',
     init() {},
     read(language, namespace, callback) {
-        const loader = localeLoaders[`/resources/ts/locales/${language}/${namespace}.json`]
+        const loader = localeLoaders[`../locales/${language}/${namespace}.json`]
         if (!loader) {
             callback(null, {})
             return

@@ -59,6 +59,7 @@ export const ReadOnly: Story = {
 }
 
 export const MakePayment: Story = {
+    tags: ['desktop-only'],
     play: async ({ canvasElement, args }) => {
         await openMenu(canvasElement)
         await userEvent.click(await screen.findByRole('menuitem', { name: /payment/i }))
@@ -68,6 +69,7 @@ export const MakePayment: Story = {
 }
 
 export const CollectPayment: Story = {
+    tags: ['desktop-only'],
     args: { debt: debt({ debtType: 'owed_to_me' }) },
     play: async ({ canvasElement, args }) => {
         await openMenu(canvasElement)
@@ -78,6 +80,7 @@ export const CollectPayment: Story = {
 }
 
 export const PaidOffCanBeReopened: Story = {
+    tags: ['desktop-only'],
     args: { debt: debt({ currentBalance: 0, isPaidOff: true }) },
     play: async ({ canvasElement, args }) => {
         await openMenu(canvasElement)
@@ -88,6 +91,7 @@ export const PaidOffCanBeReopened: Story = {
 }
 
 export const OpenDebtCannotBeReopened: Story = {
+    tags: ['desktop-only'],
     play: async ({ canvasElement }) => {
         await openMenu(canvasElement)
         await screen.findByRole('menuitem', { name: /edit/i })
@@ -103,6 +107,7 @@ export const Edited: Story = {
 }
 
 export const Deleted: Story = {
+    tags: ['desktop-only'],
     play: async ({ canvasElement, args }) => {
         await openMenu(canvasElement)
         await userEvent.click(await screen.findByRole('menuitem', { name: /delete/i }))
@@ -111,4 +116,3 @@ export const Deleted: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }

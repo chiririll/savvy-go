@@ -17,6 +17,7 @@ function Stateful({ targets, initial }: Props) {
 }
 
 const meta = {
+    tags: ['desktop-only'],
     title: 'features/backups/LaravelRestoreOptions',
     component: Stateful,
     args: { targets: ['server', 'new'] },
@@ -30,7 +31,6 @@ export const ForTheServer: Story = {
         await expect(within(canvasElement).getByLabelText(/app_key/i)).toBeVisible()
     },
 }
-export const InRussian: Story = { globals: { locale: 'ru' } }
 export const ForASpace: Story = {
     args: { targets: ['space', 'new'] },
     play: async ({ canvasElement }) => {

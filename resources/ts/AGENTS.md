@@ -19,6 +19,10 @@ npm run build                          # -> public/build; release builds embed i
 - Code reachable from entry (`components/layout`, `components/providers`, `app/`) imports concrete file, never `components/shared` or `features/*` barrels. Barrel pulls dnd-kit, zod, react-hook-form into entry chunk.
 - Heavy dialogs opened from layout use `lazy()`.
 
+## Dialogs
+
+- If possible, use dialogs from `components/shared/dialogs`. Screens never import dialogs from ui.
+
 ## Onboarding
 
 - `pages/onboarding/`: admin and server setup.

@@ -2,19 +2,9 @@ import { testId } from '@/lib/test-id'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Star, Trash2 } from 'lucide-react'
-import { FeedRow, RowActions, CategorySelect } from '@/components/shared'
+import { FeedRow, RowActions, CategorySelect, ResponsiveDialog } from '@/components/shared'
 import { DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'
+import { Button } from '@/components/ui/button'
 import { categoryIconStyle } from '@/lib/category-color'
 import { localizeDefaultName } from '@/lib/localized-name'
 import { Category } from '@/types'
@@ -62,7 +52,7 @@ export function CategoryRow({
             title={name}
             badge={category.isDefault ? (
                 <Star
-                    className="size-3.5 shrink-0 fill-amber-400 text-amber-500"
+                    className="size-3.5 shrink-0 fill-warning text-warning"
                     aria-label={t('pages:categories.columns.default')}
                 />
             ) : undefined}
@@ -119,30 +109,57 @@ function ReassignDeleteItem({ category, optional, synced, onConfirm }: ReassignD
     const { t } = useTranslation(['common', 'pages'])
     const name = localizeDefaultName(category.name)
     const count = category.transactionsCount ?? 0
+    const [open, setOpen] = useState(false)
     const [successorId, setSuccessorId] = useState<number | null>(null)
+    const close = () => {
+        setOpen(false)
+        setSuccessorId(null)
+    }
+    const description = [
+        synced && count === 0
+            ? t('pages:categories.syncedDeleteDescription', { name })
+            : t('pages:categories.reassignDescription', { name, count }),
+        synced && count > 0 && t('pages:categories.syncedDeleteNote'),
+    ]
+        .filter(Boolean)
+        .join(' ')
 
     return (
-        <AlertDialog onOpenChange={(open) => !open && setSuccessorId(null)}>
-            <AlertDialogTrigger asChild>
-                <DropdownMenuItem
-                    variant="destructive"
-                    {...testId('delete-reassign')}
-                    onSelect={(event) => event.preventDefault()}
-                >
-                    <Trash2 className="mr-2 size-4" />
-                    {t('actions.delete')}
-                </DropdownMenuItem>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>{t('pages:categories.reassignTitle')}</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        {synced && count === 0
-                            ? t('pages:categories.syncedDeleteDescription', { name })
-                            : t('pages:categories.reassignDescription', { name, count })}
-                        {synced && count > 0 && ` ${t('pages:categories.syncedDeleteNote')}`}
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
+        <>
+            <DropdownMenuItem
+                variant="destructive"
+                {...testId('delete-reassign')}
+                onSelect={(event) => {
+                    event.preventDefault()
+                    setOpen(true)
+                }}
+            >
+                <Trash2 className="mr-2 size-4" />
+                {t('actions.delete')}
+            </DropdownMenuItem>
+            <ResponsiveDialog
+                open={open}
+                onOpenChange={(next) => (next ? setOpen(true) : close())}
+                title={t('pages:categories.reassignTitle')}
+                description={description}
+                footer={
+                    <>
+                        <Button variant="outline" onClick={close}>
+                            {t('actions.cancel')}
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            disabled={!optional && !successorId}
+                            onClick={() => {
+                                onConfirm(successorId ?? undefined)
+                                close()
+                            }}
+                        >
+                            {successorId || !optional ? t('pages:categories.reassignAndDelete') : t('actions.delete')}
+                        </Button>
+                    </>
+                }
+            >
                 <CategorySelect
                     value={successorId}
                     onChange={setSuccessorId}
@@ -152,17 +169,7 @@ function ReassignDeleteItem({ category, optional, synced, onConfirm }: ReassignD
                     sortByPopularity
                     plain
                 />
-                <AlertDialogFooter>
-                    <AlertDialogCancel>{t('actions.cancel')}</AlertDialogCancel>
-                    <AlertDialogAction
-                        variant="destructive"
-                        disabled={!optional && !successorId}
-                        onClick={() => onConfirm(successorId ?? undefined)}
-                    >
-                        {successorId || !optional ? t('pages:categories.reassignAndDelete') : t('actions.delete')}
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
+            </ResponsiveDialog>
+        </>
     )
 }

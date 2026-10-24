@@ -91,4 +91,3 @@ export const FooterCheckboxes: Story = {
     },
 }
 
-export const InRussian: Story = { globals: { locale: 'ru' } }

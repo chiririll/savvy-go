@@ -29,6 +29,7 @@ function Stateful({ value: initial = options.presets[0].permissions, ...rest }: 
 }
 
 const meta = {
+    tags: ['desktop-only'],
     title: 'features/api-tokens/PermissionPicker',
     component: Stateful,
 } satisfies Meta<typeof Stateful>
@@ -41,7 +42,6 @@ export const Viewer: Story = {
         await expect(within(canvasElement).getByRole('tab', { name: /viewer/i })).toHaveAttribute('aria-selected', 'true')
     },
 }
-export const InRussian: Story = { globals: { locale: 'ru' } }
 export const Editor: Story = { args: { value: options.presets[1].permissions } }
 export const Custom: Story = {
     args: { value: ['transactions:read'] },

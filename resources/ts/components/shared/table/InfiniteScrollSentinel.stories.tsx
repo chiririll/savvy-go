@@ -4,6 +4,7 @@ import { expect, fn, waitFor } from 'storybook/test'
 import { InfiniteScrollSentinel } from './InfiniteScrollSentinel'
 
 const meta = {
+    tags: ['desktop-only'],
     title: 'shared/table/InfiniteScrollSentinel',
     component: InfiniteScrollSentinel,
     args: { enabled: true, onVisible: fn() },

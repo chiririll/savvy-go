@@ -58,13 +58,13 @@ export function transactionAmountAppearance(
         return { sign: '', className: 'text-muted-foreground' }
     }
     if (INCOMING_TYPES.includes(type)) {
-        return { sign: '+', className: 'text-green-600' }
+        return { sign: '+', className: 'text-success' }
     }
     if (type === 'transfer') {
-        return { sign: '', className: 'text-blue-600' }
+        return { sign: '', className: 'text-info' }
     }
     if (OUTGOING_TYPES.includes(type)) {
-        return { sign: '-', className: 'text-red-600' }
+        return { sign: '-', className: 'text-destructive' }
     }
     return { sign: '', className: 'text-foreground' }
 }

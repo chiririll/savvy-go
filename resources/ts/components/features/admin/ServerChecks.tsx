@@ -26,8 +26,8 @@ const ICONS: Record<CheckSeverity, LucideIcon> = {
 }
 
 const TONES: Record<CheckSeverity, string> = {
-    error: 'border-red-500/40 text-red-600 dark:text-red-400',
-    warning: 'border-amber-500/40 text-amber-600 dark:text-amber-400',
+    error: 'border-destructive/40 text-destructive',
+    warning: 'border-warning/40 text-warning',
     info: '',
 }
 

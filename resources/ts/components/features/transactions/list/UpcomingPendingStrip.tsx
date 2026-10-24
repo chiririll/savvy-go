@@ -40,7 +40,7 @@ export function UpcomingPendingStrip({ transactions, isReadOnly, onConfirm, onSk
         <>
             <div className="min-w-0 lg:hidden">
                 <p className="text-sm font-medium mb-2">{t('transactions.upcomingTitle')}</p>
-                <div className="overflow-x-auto overscroll-x-contain pb-3">
+                <div tabIndex={0} className="overflow-x-auto overscroll-x-contain pb-3">
                     <div className="flex w-max gap-2">{renderCards(transactions)}</div>
                 </div>
             </div>

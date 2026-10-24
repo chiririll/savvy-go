@@ -20,9 +20,6 @@ export const Link: Story = {
     },
 }
 export const WithoutExpiry: Story = { args: { expiresAt: null } }
-export const InRussian: Story = { globals: { locale: 'ru' } }
-export const Closed: Story = { args: { open: false } }
-
 export const Done: Story = {
     play: async ({ args }) => {
         await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /done/i }))

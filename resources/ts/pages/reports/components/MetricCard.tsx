@@ -61,8 +61,8 @@ export function MetricCard({
                         <p
                             className={cn(
                                 'text-xl sm:text-2xl font-bold tracking-tight break-words',
-                                type === 'income' && 'text-green-600',
-                                type === 'expense' && 'text-red-600',
+                                type === 'income' && 'text-success',
+                                type === 'expense' && 'text-destructive',
                             )}
                         >
                             {formatValue(value)}
@@ -73,7 +73,7 @@ export function MetricCard({
                                 <span
                                     className={cn(
                                         'flex items-center gap-0.5',
-                                        isGoodChange ? 'text-green-600' : 'text-red-600',
+                                        isGoodChange ? 'text-success' : 'text-destructive',
                                     )}
                                 >
                                     {isPositiveChange ? (

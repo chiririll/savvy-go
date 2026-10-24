@@ -57,7 +57,7 @@ export function BackupsView({ source, title, description, actions }: BackupsView
         <Page title={title}>
             <PageHeader title={title} description={description} />
 
-            <div className="flex gap-2 mb-6">
+            <div className="flex flex-wrap gap-2 mb-6">
                 <Button onClick={() => setCreateOpen(true)} {...testId('create')}>
                     <Plus className="size-4 mr-2" />
                     {t('backups.create')}

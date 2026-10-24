@@ -19,7 +19,6 @@ export const Used: Story = {}
 export const Unused: Story = { args: { tag: { id: 2, name: 'spare', transactionsCount: 0 } } }
 export const CountMissing: Story = { args: { tag: { id: 3, name: 'new' } } }
 export const BuiltInName: Story = { args: { tag: { id: 4, name: '#VACATION', transactionsCount: 2 } } }
-export const BuiltInNameInRussian: Story = { ...BuiltInName, globals: { locale: 'ru' } }
 export const LongName: Story = { args: { tag: { id: 5, name: 'a-tag-name-that-is-much-too-long-for-its-row', transactionsCount: 12 } } }
 export const ReadOnly: Story = {
     args: { isReadOnly: true },
@@ -36,6 +35,7 @@ export const Edited: Story = {
 }
 
 export const Deleted: Story = {
+    tags: ['desktop-only'],
     play: async ({ canvasElement, args }) => {
         await userEvent.click(within(canvasElement).getByRole('button', { name: /more actions/i }))
         await userEvent.click(await screen.findByRole('menuitem', { name: /delete/i }))

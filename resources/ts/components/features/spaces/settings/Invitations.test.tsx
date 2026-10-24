@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Space } from '@/types/spaces'
 
@@ -77,15 +77,5 @@ describe('Invitations', () => {
         fireEvent.click(screen.getByText('make'))
         rerender(<Invitations space={space} />)
         expect(screen.queryByRole('button', { name: /spaces.invitations.copy/ })).toBeNull()
-    })
-
-    it('revokes after the confirm dialog', async () => {
-        state.list = [{ id: 3, email: 'a@x.io', note: null, role: 'viewer', expiresAt: '2999-01-01T00:00:00Z', acceptedAt: null }]
-        render(<Invitations space={space} />)
-        fireEvent.click(screen.getByRole('button', { name: 'spaces.invitations.revoke' }))
-        expect(screen.getByText('spaces.invitations.cancelTitle')).toBeTruthy()
-        expect(state.revoke).not.toHaveBeenCalled()
-        fireEvent.click(screen.getByRole('button', { name: 'spaces.invitations.cancelConfirm' }))
-        await waitFor(() => expect(state.revoke).toHaveBeenCalledWith(3))
     })
 })

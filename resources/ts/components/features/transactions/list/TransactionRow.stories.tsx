@@ -94,6 +94,7 @@ export const SingleItemHasNoToggle: Story = {
 
 // A viewer may still open a transaction to look at it, but cannot confirm, skip, duplicate or delete it.
 export const ReadOnly: Story = {
+    tags: ['desktop-only'],
     args: { isReadOnly: true, transaction: pendingTransaction({ actions: { edit: true, duplicate: true, delete: true, confirm: true, skip: true } }) },
     play: async ({ canvasElement }) => {
         await openMenu(canvasElement)
@@ -127,6 +128,7 @@ export const Edited: Story = {
 }
 
 export const Duplicated: Story = {
+    tags: ['desktop-only'],
     play: async ({ canvasElement, args }) => {
         await openMenu(canvasElement)
         await userEvent.click(await screen.findByRole('menuitem', { name: /duplicate/i }))
@@ -135,6 +137,7 @@ export const Duplicated: Story = {
 }
 
 export const Deleted: Story = {
+    tags: ['desktop-only'],
     play: async ({ canvasElement, args }) => {
         await openMenu(canvasElement)
         await userEvent.click(await screen.findByRole('menuitem', { name: /delete/i }))
@@ -144,6 +147,7 @@ export const Deleted: Story = {
 }
 
 export const Confirmed: Story = {
+    tags: ['desktop-only'],
     args: { transaction: pendingTransaction() },
     play: async ({ canvasElement, args }) => {
         await openMenu(canvasElement)
@@ -154,6 +158,7 @@ export const Confirmed: Story = {
 
 // Skipping asks first, because it cannot be taken back.
 export const SkipAsksFirst: Story = {
+    tags: ['desktop-only'],
     args: { transaction: pendingTransaction() },
     play: async ({ canvasElement, args }) => {
         await openMenu(canvasElement)
@@ -166,6 +171,7 @@ export const SkipAsksFirst: Story = {
 }
 
 export const SkipCancelled: Story = {
+    tags: ['desktop-only'],
     args: { transaction: pendingTransaction() },
     play: async ({ canvasElement, args }) => {
         await openMenu(canvasElement)
@@ -174,5 +180,3 @@ export const SkipCancelled: Story = {
         await expect(args.onSkip).not.toHaveBeenCalled()
     },
 }
-
-export const InRussian: Story = { globals: { locale: 'ru' } }

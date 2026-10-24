@@ -94,6 +94,7 @@ export function InviteFields({ submitLabel, busy, error, onEdit, onSubmit }: Pro
                             className="col-span-2 sm:col-span-1"
                             type="email"
                             placeholder={t('spaces.invitations.emailPlaceholder')}
+                            aria-label={t('spaces.invitations.emailPlaceholder')}
                             value={email}
                             aria-invalid={!!error}
                             {...testId('invite-email')}
@@ -114,7 +115,7 @@ export function InviteFields({ submitLabel, busy, error, onEdit, onSubmit }: Pro
                         />
                     )}
                     <Select value={role} onValueChange={(r) => setRole(r as SpaceRole)}>
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger className="w-full" aria-label={t('common:fields.role')}>
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>

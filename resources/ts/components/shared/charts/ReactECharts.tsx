@@ -1,6 +1,7 @@
 import * as echarts from 'echarts/core'
 import { BarChart, LineChart, PieChart, SankeyChart, ScatterChart, TreemapChart } from 'echarts/charts'
 import {
+    AriaComponent,
     AxisPointerComponent,
     GraphicComponent,
     GridComponent,
@@ -19,6 +20,7 @@ echarts.use([
     SankeyChart,
     ScatterChart,
     TreemapChart,
+    AriaComponent,
     AxisPointerComponent,
     GraphicComponent,
     GridComponent,
@@ -34,12 +36,19 @@ const prefersReducedMotion = () =>
 /**
  * ECharts with only the charts/components this app uses registered (tree-shaken).
  * Charts draw without animation when the user asks for reduced motion.
+ * `ariaLabel` names the chart for screen readers (role="img" on the container).
  */
-export default function ReactECharts({ option, opts, ...props }: Omit<EChartsReactProps, 'echarts'>) {
+export default function ReactECharts({
+    option,
+    opts,
+    ariaLabel,
+    ...props
+}: Omit<EChartsReactProps, 'echarts'> & { ariaLabel?: string }) {
+    const named = ariaLabel ? { ...option, aria: { enabled: true, label: { description: ariaLabel } } } : option
     return (
         <ReactEChartsCore
             echarts={echarts}
-            option={prefersReducedMotion() ? { ...option, animation: false } : option}
+            option={prefersReducedMotion() ? { ...named, animation: false } : named}
             opts={{ renderer: 'svg', ...opts }}
             {...props}
         />

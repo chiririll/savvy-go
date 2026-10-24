@@ -29,8 +29,6 @@ export const Filled: Story = { args: { defaultValues: filled } }
 export const OwedToMe: Story = { args: { defaultValues: { ...filled, debt_type: 'owed_to_me' } } }
 export const Submitting: Story = { args: { isSubmitting: true } }
 export const WithoutOwnSubmit: Story = { args: { hideSubmit: true } }
-export const InRussian: Story = { globals: { locale: 'ru' } }
-
 // Editing has no account (no transaction is made) and shows the currency instead.
 export const Editing: Story = {
     args: { mode: 'edit', defaultValues: { ...filled, currency_id: 2 } },

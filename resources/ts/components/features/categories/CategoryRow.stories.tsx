@@ -25,7 +25,6 @@ export const Expense: Story = {}
 export const Income: Story = { args: { category: category({ type: 'income', icon: '💼', color: '#2563eb', transactionsCount: 0 }) } }
 export const Default: Story = { args: { category: category({ isDefault: true, transactionsCount: 0 }) } }
 export const BuiltInName: Story = { args: { category: category({ name: '#GROCERIES', transactionsCount: 0 }) } }
-export const BuiltInNameInRussian: Story = { ...BuiltInName, globals: { locale: 'ru' } }
 export const NoColor: Story = { args: { category: category({ color: null, transactionsCount: 0 }) } }
 export const LongName: Story = {
     args: { category: category({ name: 'A category name far too long for the line it sits on', transactionsCount: 0 }) },
@@ -38,6 +37,7 @@ export const ReadOnly: Story = {
 }
 
 export const DeleteDisabled: Story = {
+    tags: ['desktop-only'],
     args: { deleteDisabled: true, deleteDisabledLabel: 'The last category cannot be deleted' },
     play: async ({ canvasElement }) => {
         await openMenu(canvasElement)
@@ -46,6 +46,7 @@ export const DeleteDisabled: Story = {
 }
 
 export const Deleted: Story = {
+    tags: ['desktop-only'],
     play: async ({ canvasElement, args }) => {
         await openMenu(canvasElement)
         await userEvent.click(await screen.findByRole('menuitem', { name: /delete/i }))
@@ -55,6 +56,7 @@ export const Deleted: Story = {
 }
 
 export const MadeDefault: Story = {
+    tags: ['desktop-only'],
     play: async ({ canvasElement, args }) => {
         await openMenu(canvasElement)
         await userEvent.click(await screen.findByRole('menuitem', { name: /default/i }))
@@ -63,6 +65,7 @@ export const MadeDefault: Story = {
 }
 
 export const DefaultCannotBeMadeDefault: Story = {
+    tags: ['desktop-only'],
     args: { category: category({ isDefault: true, transactionsCount: 0 }) },
     play: async ({ canvasElement }) => {
         await openMenu(canvasElement)
@@ -72,6 +75,7 @@ export const DefaultCannotBeMadeDefault: Story = {
 }
 
 export const SettingDefault: Story = {
+    tags: ['desktop-only'],
     args: { isSettingDefault: true },
     play: async ({ canvasElement }) => {
         await openMenu(canvasElement)
@@ -81,11 +85,12 @@ export const SettingDefault: Story = {
 
 // A category with transactions asks where they go before it is deleted.
 export const DeleteNeedsReplacement: Story = {
+    tags: ['desktop-only'],
     args: { category: category({ transactionsCount: 12 }) },
     play: async ({ canvasElement, args }) => {
         await openMenu(canvasElement)
         await userEvent.click(await screen.findByRole('menuitem', { name: /delete/i }))
-        const dialog = await screen.findByRole('alertdialog')
+        const dialog = await screen.findByRole('dialog')
         const confirm = within(dialog).getByRole('button', { name: /delete/i })
         await expect(confirm).toBeDisabled()
         await userEvent.click(within(dialog).getByRole('combobox'))
@@ -98,11 +103,12 @@ export const DeleteNeedsReplacement: Story = {
 
 // In a space kept in step with others, even an unused category may be deleted with a replacement.
 export const SyncedUnused: Story = {
+    tags: ['desktop-only'],
     args: { synced: true },
     play: async ({ canvasElement, args }) => {
         await openMenu(canvasElement)
         await userEvent.click(await screen.findByRole('menuitem', { name: /delete/i }))
-        const dialog = await screen.findByRole('alertdialog')
+        const dialog = await screen.findByRole('dialog')
         await userEvent.click(within(dialog).getByRole('button', { name: /delete/i }))
         await expect(args.onDelete).toHaveBeenCalledWith(1, undefined)
     },

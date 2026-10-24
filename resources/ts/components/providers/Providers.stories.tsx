@@ -10,6 +10,7 @@ import { useAuthStore } from '@/stores/auth'
 import { ConfirmCancelled, useConfirmStore } from '@/stores/confirm'
 import { useSpaceStore } from '@/stores/space'
 
+import { AbilityProvider, Can } from './AbilityProvider'
 import { AuthProvider } from './AuthProvider'
 import ConfirmDialog from './ConfirmDialog'
 import { EmailVerificationGate } from './EmailVerificationGate'
@@ -175,8 +176,6 @@ export const EmailNotConfirmed: Story = {
     },
 }
 
-export const EmailNotConfirmedInRussian: Story = { ...EmailNotConfirmed, globals: { locale: 'ru' } }
-
 export const EmailNotRequired: Story = {
     render: () => <EmailVerificationGate><Page /></EmailVerificationGate>,
     beforeEach: () => useAuthStore.setState({ user: { ...user, emailVerified: false }, emailVerificationRequired: false }),
@@ -287,8 +286,6 @@ export const NoSpaceForAViewer: Story = {
     beforeEach: ({ msw }) => msw.use(reply('get', '/spaces', [space('viewer')])),
 }
 
-export const NoSpaceInRussian: Story = { ...NoSpaceYet, globals: { locale: 'ru' } }
-
 // ---- the whole gate
 
 export const SignedInAndReady: Story = {
@@ -336,5 +333,45 @@ export const FirstRunGoesToSetup: Story = {
     },
     play: async () => {
         await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/setup'), { timeout: 5000 })
+    },
+}
+
+// ---- what the server role may do
+
+const Abilities = () => (
+    <AbilityProvider>
+        <Can I="manage" a="User">
+            <p>Manages users</p>
+        </Can>
+        <Can I="read" a="User">
+            <p>Reads users</p>
+        </Can>
+        <Can I="read" a="all">
+            <p>Reads everything else</p>
+        </Can>
+    </AbilityProvider>
+)
+
+export const AdminManagesUsers: Story = {
+    render: () => <Abilities />,
+    play: async ({ canvasElement }) => {
+        await expect(await within(canvasElement).findByText('Manages users')).toBeVisible()
+    },
+}
+
+export const MemberOnlyReadsUsers: Story = {
+    parameters: { app: { serverRole: 'user' } },
+    render: () => <Abilities />,
+    play: async ({ canvasElement }) => {
+        await expect(await within(canvasElement).findByText('Reads users')).toBeVisible()
+        await expect(within(canvasElement).queryByText('Manages users')).toBeNull()
+    },
+}
+
+export const NobodyMayDoAnything: Story = {
+    parameters: { app: { signedOut: true } },
+    render: () => <Abilities />,
+    play: async ({ canvasElement }) => {
+        await waitFor(() => expect(within(canvasElement).queryByText('Reads everything else')).toBeNull())
     },
 }

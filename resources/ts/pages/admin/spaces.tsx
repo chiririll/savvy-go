@@ -27,7 +27,9 @@ export default function AdminSpacesPage() {
                                 <TableHead>{t('admin.spaces.size')}</TableHead>
                                 <TableHead>{t('admin.spaces.quota')}</TableHead>
                                 <TableHead>{t('admin.spaces.assign')}</TableHead>
-                                <TableHead />
+                                <TableHead>
+                                    <span className="sr-only">{t('admin.spaces.actions')}</span>
+                                </TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>

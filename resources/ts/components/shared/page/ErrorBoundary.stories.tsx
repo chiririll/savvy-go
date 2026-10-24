@@ -8,6 +8,7 @@ const Broken = () => {
 }
 
 const meta = {
+    tags: ['desktop-only'],
     title: 'shared/page/ErrorBoundary',
     component: ErrorBoundary,
 } satisfies Meta<typeof ErrorBoundary>
@@ -33,5 +34,3 @@ export const FailedWithFallback: Story = {
         await expect(within(canvasElement).getByText('Custom fallback')).toBeVisible()
     },
 }
-
-export const FailedInRussian: Story = { ...Failed, globals: { locale: 'ru' } }

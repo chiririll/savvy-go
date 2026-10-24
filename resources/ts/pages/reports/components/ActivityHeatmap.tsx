@@ -100,7 +100,7 @@ export function ActivityHeatmap({ filters }: ActivityHeatmapProps) {
     if (error) {
         return (
             <Card>
-                <CardContent className="py-8 text-center text-red-500">{t('reports.errors.heatmap')}</CardContent>
+                <CardContent className="py-8 text-center text-destructive">{t('reports.errors.heatmap')}</CardContent>
             </Card>
         )
     }
@@ -164,7 +164,7 @@ export function ActivityHeatmap({ filters }: ActivityHeatmapProps) {
                                             </p>
                                             {cell.value > 0 ? (
                                                 <>
-                                                    <p className="text-amber-300">
+                                                    <p className="font-semibold">
                                                         {formatCurrency(cell.value, heatmapData.currency)}
                                                     </p>
                                                     <p className="opacity-70">
