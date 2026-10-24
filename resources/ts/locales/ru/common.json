@@ -33,6 +33,7 @@
         "expand": "Развернуть",
         "collapse": "Свернуть",
         "more": "Действия",
+        "closeNotification": "Закрыть уведомление",
         "copy": "Копировать"
     },
     "negativeBalance": {

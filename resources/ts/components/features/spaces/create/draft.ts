@@ -2,8 +2,18 @@ import type { AccountType } from '@/types/accounts'
 import type { CategoryType } from '@/types/categories'
 import type { CreateSpaceInput, SpacePresets, SpaceRole } from '@/types/spaces'
 
-export const DRAFT_STEPS = ['name', 'copy', 'entities', 'confirm'] as const
+export const DRAFT_STEPS = ['name', 'copy', 'currencies', 'categories', 'tags', 'confirm'] as const
 export type DraftStep = (typeof DRAFT_STEPS)[number]
+
+/**
+ * A step name read from a stored draft. Drafts saved when currencies, categories
+ * and tags were one `entities` step come back on the first of the three; an
+ * unknown name gives null.
+ */
+export function migrateStep(step: string): DraftStep | null {
+    if (step === 'entities') return 'currencies'
+    return (DRAFT_STEPS as readonly string[]).includes(step) ? (step as DraftStep) : null
+}
 
 export const COPY_KINDS = ['currencies', 'accounts', 'categories', 'tags'] as const
 export type CopyKind = (typeof COPY_KINDS)[number]
@@ -216,6 +226,12 @@ export function draftProblems(
     if (draft.accounts.some((a) => a.initialBalance.trim() !== '' && !BALANCE.test(a.initialBalance.trim())))
         problems.push('balances')
     return problems
+}
+
+/** What keeps the user on a step: the currencies step needs a base currency and valid accounts; the others block nothing. */
+export function stepProblems(step: DraftStep, draft: SpaceDraft): ReturnType<typeof draftProblems> {
+    if (step !== 'currencies') return []
+    return draftProblems(draft).filter((p) => p !== 'name')
 }
 
 /** The body of POST /spaces. */

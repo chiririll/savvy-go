@@ -5,8 +5,8 @@ import { expect, fn, screen, userEvent, waitFor, within } from 'storybook/test'
 import { overlayA11y } from '@/test/a11y'
 import { catalog, catalogItem } from '@/test/fixtures'
 
+import { CurrenciesStep } from './CurrenciesStep'
 import type { DraftContent } from './draft'
-import { EntitiesStep } from './EntitiesStep'
 
 const items = [
     catalogItem({ code: 'USD', name: 'US Dollar', symbol: '$', rate: 1 }),
@@ -20,22 +20,18 @@ const seeded: DraftContent = {
     baseCurrency: 'EUR',
     currencies: ['JPY'],
     accounts: [{ key: 'a1', name: 'Yen wallet', type: 'cash', currency: 'JPY', initialBalance: '15000' }],
-    categories: [
-        { name: '#OTHER', type: 'expense', icon: '📦', color: '#6b7280', isDefault: true },
-        { name: 'Groceries', type: 'expense', icon: '🛒', color: '#16a34a', isDefault: false },
-        { name: '#OTHER_INCOME', type: 'income', icon: '💰', color: '#2563eb', isDefault: true },
-    ],
-    tags: ['holiday'],
+    categories: [],
+    tags: [],
 }
 
 const empty: DraftContent = { baseCurrency: null, currencies: [], accounts: [], categories: [], tags: [] }
 
 const changed = fn()
 
-const Harness = ({ initial, ...rest }: { initial: DraftContent } & Partial<Parameters<typeof EntitiesStep>[0]>) => {
+const Harness = ({ initial, ...rest }: { initial: DraftContent } & Partial<Parameters<typeof CurrenciesStep>[0]>) => {
     const [content, setContent] = useState(initial)
     return (
-        <EntitiesStep
+        <CurrenciesStep
             content={content}
             catalog={items}
             {...rest}
@@ -48,7 +44,7 @@ const Harness = ({ initial, ...rest }: { initial: DraftContent } & Partial<Param
 }
 
 const meta = {
-    title: 'features/spaces/create/EntitiesStep',
+    title: 'features/spaces/create/CurrenciesStep',
     parameters: { layout: 'padded', a11y: overlayA11y },
     beforeEach: () => changed.mockClear(),
 } satisfies Meta
@@ -63,19 +59,26 @@ export const Seeded: Story = {
         await expect(canvas.getByRole('combobox', { name: 'Base currency' })).toHaveTextContent('EUR Euro')
         // JPY cannot go while an account uses it.
         await expect(canvas.getByRole('button', { name: 'Remove JPY' })).toBeDisabled()
-        // The default category of each type stays.
-        await expect(canvas.getByRole('button', { name: /remove other$/i })).toBeDisabled()
     },
 }
 
+// First opened with no account: a hint, not yet an error.
 export const Empty: Story = {
     render: () => <Harness initial={empty} />,
     play: async ({ canvasElement }) => {
         const canvas = within(canvasElement)
         await expect(canvas.getByText(/add at least one account/i)).toBeVisible()
+        await expect(canvas.queryByRole('alert')).toBeNull()
         // Accounts need a currency, and other currencies need a base first.
         await expect(canvas.getByRole('button', { name: /add an account/i })).toBeDisabled()
         await expect(canvas.getByRole('combobox', { name: /add a currency/i })).toBeDisabled()
+    },
+}
+
+export const AccountRequiredAfterAttempt: Story = {
+    render: () => <Harness initial={{ ...empty, baseCurrency: 'EUR' }} accountsAttempted />,
+    play: async ({ canvasElement }) => {
+        await expect(within(canvasElement).getByRole('alert')).toHaveTextContent(/add at least one account/i)
     },
 }
 
@@ -132,6 +135,21 @@ export const CurrencyAdded: Story = {
     },
 }
 
+// On a phone the picker fills the row, so its list is as wide as the row.
+export const AddCurrencyOnAPhone: Story = {
+    tags: ['mobile-only'],
+    render: () => <Harness initial={seeded} />,
+    play: async ({ canvasElement }) => {
+        const trigger = within(canvasElement).getByRole('combobox', { name: /add a currency/i })
+        const row = trigger.parentElement!
+        await expect(trigger.getBoundingClientRect().width).toBeGreaterThan(row.getBoundingClientRect().width * 0.9)
+        await userEvent.click(trigger)
+        // The list opens, and the whole of it fits the screen.
+        const list = await screen.findByRole('listbox')
+        await expect(list.getBoundingClientRect().right).toBeLessThanOrEqual(window.innerWidth)
+    },
+}
+
 export const AccountAdded: Story = {
     render: () => <Harness initial={seeded} />,
     play: async ({ canvasElement }) => {
@@ -161,62 +179,20 @@ export const AccountAdded: Story = {
 export const AccountTypeChanged: Story = {
     render: () => <Harness initial={seeded} />,
     play: async ({ canvasElement }) => {
-        // The account's type comes first; the other "Type" is the new category's.
-        await userEvent.click(within(canvasElement).getAllByRole('combobox', { name: 'Type' })[0])
+        await userEvent.click(within(canvasElement).getByRole('combobox', { name: 'Type' }))
         await userEvent.click(await screen.findByRole('option', { name: /bank/i }))
         await expect(changed).toHaveBeenLastCalledWith({ accounts: [{ ...seeded.accounts[0], type: 'bank' }] })
     },
 }
 
+// Removing the last account turns the hint into an error, and frees the currency.
 export const AccountRemoved: Story = {
     render: () => <Harness initial={seeded} />,
     play: async ({ canvasElement }) => {
         const canvas = within(canvasElement)
+        await expect(canvas.queryByText(/add at least one account/i)).toBeNull()
         await userEvent.click(canvas.getByRole('button', { name: /remove the account/i }))
-        await expect(canvas.getByText(/add at least one account/i)).toBeVisible()
-        // With no account on it, JPY can go now.
+        await expect(canvas.getByRole('alert')).toHaveTextContent(/add at least one account/i)
         await expect(canvas.getByRole('button', { name: 'Remove JPY' })).toBeEnabled()
-    },
-}
-
-export const CategoryAddedAndRemoved: Story = {
-    render: () => <Harness initial={seeded} />,
-    play: async ({ canvasElement }) => {
-        const canvas = within(canvasElement)
-        await userEvent.click(canvas.getAllByRole('combobox', { name: 'Type' })[1])
-        await userEvent.click(await screen.findByRole('option', { name: /income/i }))
-        await userEvent.type(canvas.getByRole('textbox', { name: /new category/i }), ' Bonus {Enter}')
-        await expect(changed).toHaveBeenLastCalledWith({
-            categories: [
-                ...seeded.categories,
-                { name: 'Bonus', type: 'income', icon: '🏷️', color: '#6b7280', isDefault: false },
-            ],
-        })
-        await userEvent.click(canvas.getByRole('button', { name: 'Remove Groceries' }))
-        await expect(canvas.queryByDisplayValue('Groceries')).toBeNull()
-    },
-}
-
-export const BlankCategoryIsNotAdded: Story = {
-    render: () => <Harness initial={seeded} />,
-    play: async ({ canvasElement }) => {
-        await userEvent.type(within(canvasElement).getByRole('textbox', { name: /new category/i }), '   {Enter}')
-        await expect(changed).not.toHaveBeenCalled()
-    },
-}
-
-// A tag is added once, whatever its case.
-export const TagAdded: Story = {
-    render: () => <Harness initial={seeded} />,
-    play: async ({ canvasElement }) => {
-        const canvas = within(canvasElement)
-        const field = canvas.getByRole('textbox', { name: /new tag/i })
-        await userEvent.type(field, 'HOLIDAY{Enter}')
-        await expect(changed).not.toHaveBeenCalled()
-        await expect(field).toHaveValue('')
-        await userEvent.type(field, 'work{Enter}')
-        await expect(changed).toHaveBeenLastCalledWith({ tags: ['holiday', 'work'] })
-        await userEvent.click(canvas.getByRole('button', { name: /remove holiday/i }))
-        await expect(changed).toHaveBeenLastCalledWith({ tags: ['work'] })
     },
 }

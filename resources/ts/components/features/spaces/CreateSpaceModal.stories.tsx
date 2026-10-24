@@ -109,10 +109,18 @@ export const CreatedFromTheDefaults: Story = {
         d = await dialog()
         await userEvent.click(await d.findByRole('combobox', { name: 'Base currency' }))
         await userEvent.click(await screen.findByRole('option', { name: /EUR/ }))
-        await expect(d.getByRole('button', { name: /^continue$/i })).toBeDisabled()
+        // No account yet: the message is a hint until Continue is pressed, then it is an error and the step stays.
+        await expect(d.queryByRole('alert')).toBeNull()
+        await next()
+        await expect(await d.findByRole('alert')).toHaveTextContent(/add at least one account/i)
         await userEvent.click(d.getByRole('button', { name: /add an account/i }))
         await userEvent.type(d.getByRole('textbox', { name: 'Name' }), 'Cash')
         await userEvent.type(d.getByRole('textbox', { name: 'Opening balance' }), '10,50')
+        await next()
+        // Categories, then tags, then the summary.
+        await expect(await d.findByRole('textbox', { name: /new category/i })).toBeVisible()
+        await next()
+        await expect(await d.findByRole('textbox', { name: /new tag/i })).toBeVisible()
         await next()
         await expect(await d.findByText('Family')).toBeVisible()
         await expect(sent.bodies).toHaveLength(0)
@@ -134,7 +142,7 @@ export const CreatedFromTheDefaults: Story = {
 export const BadBalanceBlocksTheStep: Story = {
     beforeEach: () =>
         saveDraft({
-            step: 'entities',
+            step: 'currencies',
             name: 'Family',
             baseCurrency: 'EUR',
             accounts: [{ key: 'a1', name: 'Cash', type: 'cash', currency: 'EUR', initialBalance: '1.2.3' }],
@@ -144,6 +152,28 @@ export const BadBalanceBlocksTheStep: Story = {
         const d = await dialog()
         await expect(await d.findByDisplayValue('1.2.3')).toBeVisible()
         await expect(d.getByRole('button', { name: /^continue$/i })).toBeDisabled()
+    },
+}
+
+// A draft saved when currencies, categories and tags were one step resumes on the first of them, edits kept.
+export const ResumedOldEntitiesDraft: Story = {
+    beforeEach: () =>
+        saveDraft({
+            step: 'entities' as SpaceDraft['step'],
+            name: 'Family',
+            baseCurrency: 'EUR',
+            accounts: [{ key: 'a1', name: 'Cash', type: 'cash', currency: 'EUR', initialBalance: '' }],
+            categories: [presets.categories[0]],
+        }),
+    play: async () => {
+        const d = await dialog()
+        await expect(await d.findByDisplayValue('Cash')).toBeVisible()
+        await expect(d.getByRole('combobox', { name: 'Base currency' })).toHaveTextContent('EUR')
+        // Forward and back again keeps what was edited.
+        await next()
+        await expect(await d.findByRole('textbox', { name: /new category/i })).toBeVisible()
+        await userEvent.click(d.getByRole('button', { name: /^back$/i }))
+        await expect(await d.findByDisplayValue('Cash')).toBeVisible()
     },
 }
 

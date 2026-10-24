@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { useIsMobile, useLongPress } from '@/hooks'
 import { cn } from '@/lib/utils'
+import { ROW_ACTIONS_TRIGGER_SIZE } from '@/components/shared/table/RowActions'
 
 interface FeedRowActionsContext {
     menuOpen: boolean
@@ -174,6 +175,14 @@ export function FeedRow({
                     <div className={cn(!isMobile && '-mr-1 shrink-0')} onClick={(event) => event.stopPropagation()}>
                         {actions({ menuOpen, setMenuOpen, isMobile })}
                     </div>
+                )}
+                {/* No dots on this row, but its siblings have them: keep the amount in the same column. */}
+                {!hasActions && actions && !isMobile && (
+                    <div
+                        aria-hidden
+                        data-testid="feed-row-actions-spacer"
+                        className={cn('-mr-1 shrink-0', ROW_ACTIONS_TRIGGER_SIZE)}
+                    />
                 )}
             </div>
             {below}

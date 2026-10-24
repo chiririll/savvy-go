@@ -1,13 +1,15 @@
-import { type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Space } from '@/types/spaces'
 import { CreateSubmitButton } from './CreateSubmitButton'
 import { ConfirmStep } from './ConfirmStep'
 import { BackButton, CancelButton, NextButton } from './WizardButtons'
 import { CopyStep } from './CopyStep'
-import { EntitiesStep } from './EntitiesStep'
+import { CategoriesStep } from './CategoriesStep'
+import { CurrenciesStep } from './CurrenciesStep'
+import { TagsStep } from './TagsStep'
 import { NameStep } from './NameStep'
-import { previousStep, toRequest } from './draft'
+import { nextStep, previousStep, stepProblems, toRequest } from './draft'
 import { useWizardState } from './useWizardState'
 
 interface Options {
@@ -39,6 +41,9 @@ export function useWizardStep({ open, onClose, dismissible, onCreated }: Options
         goTo,
         seed,
     } = useWizardState({ open, onCreated })
+
+    // Set when Next is pressed on the currencies step without an account.
+    const [accountsTried, setAccountsTried] = useState(false)
 
     const back = <BackButton visible={step !== 'name'} onClick={() => goTo(previousStep(step, otherSpaces))} />
     const cancel = <CancelButton visible={dismissible} onClick={onClose} />
@@ -88,28 +93,49 @@ export function useWizardStep({ open, onClose, dismissible, onCreated }: Options
                     </>
                 ),
             }
-        case 'entities':
+        case 'currencies': {
+            const blocking = stepProblems('currencies', draft)
+            // A missing account does not shut the button: pressing it is what turns the hint into an error.
+            const shut = blocking.some((p) => p !== 'noAccounts')
             return {
                 body: (
-                    <EntitiesStep
+                    <CurrenciesStep
                         content={draft}
                         catalog={catalog.data?.items}
                         catalogBuiltIn={catalog.data?.source === 'fallback'}
                         catalogFailed={catalog.isError}
                         onRetryCatalog={() => void catalog.refetch()}
+                        accountsAttempted={accountsTried}
                         onChange={(patch) => update(patch)}
                     />
                 ),
                 footer: (
                     <>
                         {back}
-                        {next(
-                            !draft.baseCurrency ||
-                                problems.includes('noAccounts') ||
-                                problems.includes('accounts') ||
-                                problems.includes('balances'),
-                            () => goTo('confirm'),
+                        {next(shut, () =>
+                            blocking.includes('noAccounts') ? setAccountsTried(true) : goTo(nextStep(step, otherSpaces)),
                         )}
+                    </>
+                ),
+            }
+        }
+        case 'categories':
+            return {
+                body: <CategoriesStep content={draft} onChange={(patch) => update(patch)} />,
+                footer: (
+                    <>
+                        {back}
+                        {next(false, () => goTo(nextStep(step, otherSpaces)))}
+                    </>
+                ),
+            }
+        case 'tags':
+            return {
+                body: <TagsStep content={draft} onChange={(patch) => update(patch)} />,
+                footer: (
+                    <>
+                        {back}
+                        {next(false, () => goTo(nextStep(step, otherSpaces)))}
                     </>
                 ),
             }

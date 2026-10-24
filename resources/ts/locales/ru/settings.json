@@ -517,7 +517,8 @@
         },
         "look": {
             "clearEmoji": "Убрать эмодзи",
-            "clearColor": "Без цвета"
+            "clearColor": "Без цвета",
+            "preview": "Предпросмотр"
         },
         "roles": {
             "admin": "Администратор",

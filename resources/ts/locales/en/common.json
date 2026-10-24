@@ -33,6 +33,7 @@
         "expand": "Expand",
         "collapse": "Collapse",
         "more": "More actions",
+        "closeNotification": "Close notification",
         "copy": "Copy"
     },
     "negativeBalance": {

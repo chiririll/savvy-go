@@ -517,7 +517,8 @@
         },
         "look": {
             "clearEmoji": "Remove emoji",
-            "clearColor": "No color"
+            "clearColor": "No color",
+            "preview": "Preview"
         },
         "roles": {
             "admin": "Admin",

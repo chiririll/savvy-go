@@ -40,6 +40,19 @@ describe('Members', () => {
         expect(container.querySelectorAll('button[title]')).toHaveLength(2)
     })
 
+    it('stacks identity above the controls on narrow screens and goes single-line from sm', () => {
+        render(<Members space={space} isAdmin />)
+        for (const row of screen.getAllByRole('listitem')) {
+            expect(row.className).toContain('flex-col')
+            expect(row.className).toContain('sm:flex-row')
+            expect(row.className).not.toContain('flex-wrap')
+            // the select takes the free width of line 2 on mobile, fixed width from sm
+            const select = within(row).getByRole('combobox')
+            expect(select.className).toContain('w-full')
+            expect(select.className).toContain('sm:w-32')
+        }
+    })
+
     it('shows badges and no buttons to a non-admin', () => {
         render(<Members space={space} isAdmin={false} />)
         expect(screen.queryAllByRole('button')).toHaveLength(0)

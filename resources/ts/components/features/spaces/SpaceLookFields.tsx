@@ -3,6 +3,7 @@ import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { EmojiPicker } from '@/components/shared/pickers/EmojiPicker'
 import { Label } from '@/components/ui/label'
+import { SpaceBadge } from './SpaceBadge'
 import { COLOR_OPTIONS } from '@/constants'
 import { cn } from '@/lib/utils'
 
@@ -12,13 +13,22 @@ interface Props {
     color: string
     onChange: (look: { emoji: string; color: string }) => void
     disabled?: boolean
+    /** The space name, for the letter shown in the preview when there is no emoji. */
+    name?: string
 }
 
-/** Picks the emoji and color of a space; both may be left empty. */
-export function SpaceLookFields({ emoji, color, onChange, disabled }: Props) {
+/** Picks the emoji and color of a space, with a live preview; both may be left empty. */
+export function SpaceLookFields({ emoji, color, onChange, disabled, name = '' }: Props) {
     const { t } = useTranslation('settings')
     return (
         <div className="space-y-3">
+            <div className="flex items-center gap-3">
+                <SpaceBadge
+                    space={{ name, emoji: emoji || null, color: color || null }}
+                    className="size-12 text-xl"
+                />
+                <span className="text-sm text-muted-foreground">{t('spaces.look.preview')}</span>
+            </div>
             <div className="space-y-1.5">
                 <Label>{t('spaces.fields.emoji')}</Label>
                 <div className="flex items-center gap-2">

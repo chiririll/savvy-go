@@ -14,7 +14,7 @@ export const createSpace = scenario(
     {
         name: 'onboarding/create-space',
         covers: [],
-        shots: ['name', 'entities', { name: 'entities-no-account', detail: true }, { name: 'entities-invalid', detail: true }, 'entities-filled', 'confirm', 'done', 'members'],
+        shots: ['name', 'currencies', { name: 'currencies-no-account', detail: true }, { name: 'currencies-invalid', detail: true }, 'currencies-filled', 'categories', 'tags', 'confirm', 'done', 'members'],
         leaves: 'a space "Family Budget" (USD, EUR, two accounts) is the current one; on its dashboard',
     },
     async ({ page, run, shot }) => {
@@ -38,17 +38,21 @@ export const createSpace = scenario(
         expect(await page.getByRole('option').count()).toBeLessThanOrEqual(50)
         await page.keyboard.press('Escape')
         await choose(page, base, /^USD/)
-        await shot('entities')
+        await shot('currencies')
 
-        // A space needs an account: with none the way on stays shut, and the section says what to add.
+        // A space needs an account. Opened fresh, the section only says what to add; the red message
+        // comes once the user tries to go on, and the step stays.
+        await expect(page.getByTestId('create-space-account-hint')).toBeVisible()
+        await expect(page.getByTestId('create-space-no-account')).toHaveCount(0)
+        await page.getByTestId('create-space-next').click()
         await expect(page.getByTestId('create-space-no-account')).toBeVisible()
-        await expect(page.getByTestId('create-space-next')).toBeDisabled()
-        await shot('entities-no-account')
+        await expect(page.getByTestId('create-space-add-account')).toBeVisible()
+        await shot('currencies-no-account')
 
         // An account with no name cannot be created: the way on stays shut.
         await page.getByTestId('create-space-add-account').click()
         await expect(page.getByTestId('create-space-next')).toBeDisabled()
-        await shot('entities-invalid')
+        await shot('currencies-invalid')
 
         await page.getByTestId('create-space-account-name').fill('Wallet')
         await page.getByTestId('create-space-account-balance').fill('100')
@@ -58,8 +62,15 @@ export const createSpace = scenario(
         await choose(page, page.getByTestId('create-space-account-currency').last(), /^EUR/)
         await page.getByTestId('create-space-account-balance').last().fill('250')
         await expect(page.getByTestId('create-space-next')).toBeEnabled()
-        await shot('entities-filled')
+        await shot('currencies-filled')
 
+        // Categories and tags come next; neither blocks the way on.
+        await page.getByTestId('create-space-next').click()
+        await expect(page.getByRole('textbox', { name: /new category|новая категория/i })).toBeVisible()
+        await shot('categories')
+        await page.getByTestId('create-space-next').click()
+        await expect(page.getByRole('textbox', { name: /new tag|новый тег/i })).toBeVisible()
+        await shot('tags')
         await page.getByTestId('create-space-next').click()
         await expect(page.getByTestId('create-space-submit')).toBeVisible()
         await shot('confirm')
@@ -80,6 +91,11 @@ export const createSpace = scenario(
     },
 )
 
+/** From the currencies step through the categories and tags steps (nothing to change there) to the summary. */
+async function skipToSummary(page: Page) {
+    for (let i = 0; i < 3; i++) await page.getByTestId('create-space-next').click()
+}
+
 /** Adds an account to the draft, as every space needs one. */
 async function addAccount(page: Page, name: string) {
     await page.getByTestId('create-space-add-account').click()
@@ -91,7 +107,7 @@ export const createSpaceCopy = scenario(
     {
         name: 'onboarding/create-space-copy',
         covers: [],
-        shots: ['copy-source', 'copy-kinds', 'entities-copied', 'confirm'],
+        shots: ['copy-source', 'copy-kinds', 'currencies-copied', 'confirm'],
         leaves: 'two spaces; the second ("Holiday") is the current one',
     },
     async ({ page, viewport, run, shot }) => {
@@ -124,9 +140,9 @@ export const createSpaceCopy = scenario(
         await expect(page.getByTestId('create-space-account-name').first()).toHaveValue('Wallet', { timeout: 20_000 })
         await expect(page.getByTestId('create-space-account-balance').first()).toHaveValue('')
         await expect(page.getByTestId('create-space-account-name')).toHaveCount(2)
-        await shot('entities-copied')
+        await shot('currencies-copied')
 
-        await page.getByTestId('create-space-next').click()
+        await skipToSummary(page)
         await expect(page.getByTestId('create-space-submit')).toBeVisible()
         await shot('confirm')
         await page.getByTestId('create-space-submit').click()
@@ -175,7 +191,7 @@ async function makeSpace(page: Page, viewport: string, name: string, currency: '
         await page.getByRole('option', { name: new RegExp(`^${currency}`) }).click({ timeout: 3_000 })
     }).toPass({ timeout: 30_000 })
     await addAccount(page, 'Wallet')
-    await page.getByTestId('create-space-next').click()
+    await skipToSummary(page)
     await page.getByTestId('create-space-submit').click()
     await expect(page.getByTestId('create-space-invite')).toBeVisible()
 }
@@ -214,7 +230,7 @@ export const createSpaceMembers = scenario(
         await expect(base).toBeEnabled({ timeout: 20_000 })
         await choose(page, base, /^USD/)
         await addAccount(page, 'Wallet')
-        await page.getByTestId('create-space-next').click()
+        await skipToSummary(page)
         await expect(page.getByTestId('create-space-submit')).toBeVisible()
         await shot('confirm')
         await page.getByTestId('create-space-submit').click()
