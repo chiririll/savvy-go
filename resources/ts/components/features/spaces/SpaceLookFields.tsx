@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { X } from 'lucide-react'
+import { Ban, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { EmojiPicker } from '@/components/shared/pickers/EmojiPicker'
 import { Label } from '@/components/ui/label'
@@ -21,39 +21,53 @@ interface Props {
 export function SpaceLookFields({ emoji, color, onChange, disabled, name = '' }: Props) {
     const { t } = useTranslation('settings')
     return (
-        <div className="space-y-3">
-            <div className="flex items-center gap-3">
+        <div className="grid gap-4 sm:grid-cols-[auto_1fr] sm:gap-8">
+            <div className="flex items-end gap-3 sm:flex-col sm:items-start sm:gap-4">
                 <SpaceBadge
                     space={{ name, emoji: emoji || null, color: color || null }}
                     className="size-12 text-xl"
                 />
-                <span className="text-sm text-muted-foreground">{t('spaces.look.preview')}</span>
-            </div>
-            <div className="space-y-1.5">
-                <Label>{t('spaces.fields.emoji')}</Label>
-                <div className="flex items-center gap-2">
-                    <EmojiPicker value={emoji} onChange={(e) => onChange({ emoji: e, color })} disabled={disabled} />
-                    {emoji && !disabled && (
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            aria-label={t('spaces.look.clearEmoji')}
-                            onClick={() => onChange({ emoji: '', color })}
-                        >
-                            <X className="size-4" />
-                        </Button>
-                    )}
+                <span className="sr-only">{t('spaces.look.preview')}</span>
+                <div className="space-y-1.5">
+                    <Label>{t('spaces.fields.emoji')}</Label>
+                    <div className="flex items-center gap-2">
+                        <EmojiPicker value={emoji} onChange={(e) => onChange({ emoji: e, color })} disabled={disabled} />
+                        {emoji && !disabled && (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                aria-label={t('spaces.look.clearEmoji')}
+                                onClick={() => onChange({ emoji: '', color })}
+                            >
+                                <X className="size-4" />
+                            </Button>
+                        )}
+                    </div>
                 </div>
             </div>
             <div className="space-y-1.5">
                 <Label>{t('spaces.fields.color')}</Label>
                 <div className="flex flex-wrap items-center gap-2">
+                    <button
+                        type="button"
+                        disabled={disabled}
+                        aria-label={t('spaces.look.clearColor')}
+                        aria-pressed={!color}
+                        className={cn(
+                            'flex size-7 items-center justify-center rounded-full border-2 text-muted-foreground transition-transform',
+                            !color ? 'scale-110 border-foreground' : 'border-border',
+                        )}
+                        onClick={() => onChange({ emoji, color: '' })}
+                    >
+                        <Ban className="size-4" aria-hidden />
+                    </button>
                     {COLOR_OPTIONS.map((c) => (
                         <button
                             key={c}
                             type="button"
                             disabled={disabled}
+                            aria-pressed={color === c}
                             className={cn(
                                 'size-7 rounded-full border-2 transition-transform',
                                 color === c ? 'scale-110 border-foreground' : 'border-transparent',
@@ -63,11 +77,6 @@ export function SpaceLookFields({ emoji, color, onChange, disabled, name = '' }:
                             aria-label={c}
                         />
                     ))}
-                    {color && !disabled && (
-                        <Button type="button" variant="ghost" size="sm" onClick={() => onChange({ emoji, color: '' })}>
-                            {t('spaces.look.clearColor')}
-                        </Button>
-                    )}
                 </div>
             </div>
         </div>

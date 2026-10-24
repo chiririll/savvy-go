@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, X } from 'lucide-react'
+import { Loader2, Plus, X } from 'lucide-react'
+import { ACCOUNT_TYPE_CONFIG } from '@/constants/accounts'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -23,8 +24,8 @@ interface Props {
     /** The catalog is the short built-in list: a currency may be missing, and any code can be typed. */
     catalogBuiltIn?: boolean
     onRetryCatalog?: () => void
-    /** The user tried to go on without an account: the message about it turns into an error. */
-    accountsAttempted?: boolean
+    /** The catalog is being fetched right now (a retry included). */
+    catalogFetching?: boolean
     onChange: (patch: Partial<DraftContent>) => void
 }
 
@@ -34,8 +35,86 @@ function popularCurrencies(language: string): string[] {
     return [...new Set(['USD', 'EUR', 'GBP', ...own])]
 }
 
+/**
+ * The notice about a failed or built-in currency list, with a Retry that shows what happened:
+ * a spinner while the refetch runs, then whether the list was recovered.
+ */
+function CatalogNotice({
+    failed,
+    builtIn,
+    fetching,
+    onRetry,
+}: {
+    failed?: boolean
+    builtIn?: boolean
+    fetching?: boolean
+    onRetry?: () => void
+}) {
+    const { t } = useTranslation('settings')
+    // idle: Retry not used; waiting: pressed, the fetch not yet seen; running: seen; done: finished.
+    const [phase, setPhase] = useState<'idle' | 'waiting' | 'running' | 'done'>('idle')
+    useEffect(() => {
+        if (phase === 'waiting' && fetching) setPhase('running')
+        else if (phase === 'running' && !fetching) setPhase('done')
+    }, [phase, fetching])
+
+    const retry = (
+        <button
+            type="button"
+            className="underline disabled:no-underline disabled:opacity-50"
+            disabled={phase === 'waiting' || phase === 'running'}
+            onClick={() => {
+                setPhase('waiting')
+                onRetry?.()
+            }}
+        >
+            {t('actions.retry', { ns: 'common' })}
+        </button>
+    )
+
+    if (phase === 'waiting' || phase === 'running') {
+        return (
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground" role="status">
+                <Loader2 className="size-3 animate-spin" aria-hidden data-testid="create-space-catalog-spinner" />
+                {t('spaces.create.currencies.refreshing')} {retry}
+            </p>
+        )
+    }
+    if (builtIn) {
+        return (
+            <p className="text-xs text-muted-foreground" role="status">
+                {phase === 'done' ? t('spaces.create.currencies.stillBuiltIn') : t('spaces.create.currencies.builtIn')}{' '}
+                {retry}
+            </p>
+        )
+    }
+    if (failed) {
+        return (
+            <p className="text-xs text-destructive">
+                {t('spaces.create.currencies.failed')} {retry}
+            </p>
+        )
+    }
+    if (phase === 'done') {
+        return (
+            <p className="text-xs text-muted-foreground" role="status">
+                {t('spaces.create.currencies.recovered')}
+            </p>
+        )
+    }
+    return null
+}
+
 /** Base currency and the other currencies, from the server-wide catalog. */
-function Currencies({ content, catalog, catalogFailed, catalogBuiltIn, onRetryCatalog, onChange }: Props) {
+function Currencies({
+    content,
+    catalog,
+    catalogFailed,
+    catalogBuiltIn,
+    catalogFetching,
+    onRetryCatalog,
+    onChange,
+}: Props) {
     const { t, i18n } = useTranslation('settings')
     const taken = useMemo(
         () => new Set([content.baseCurrency, ...content.currencies].filter((c): c is string => !!c)),
@@ -70,23 +149,12 @@ function Currencies({ content, catalog, catalogFailed, catalogBuiltIn, onRetryCa
                 {loading && !catalogFailed && (
                     <p className="text-xs text-muted-foreground">{t('spaces.create.currencies.loading')}</p>
                 )}
-                {catalogFailed && (
-                    <p className="text-xs text-destructive">
-                        {t('spaces.create.currencies.failed')}{' '}
-                        <button type="button" className="underline" onClick={onRetryCatalog}>
-                            {t('actions.retry', { ns: 'common' })}
-                        </button>
-                    </p>
-                )}
-                {catalogBuiltIn && (
-                    <p className="text-xs text-muted-foreground" role="status">
-                        {t('spaces.create.currencies.builtIn')}{' '}
-                        <button type="button" className="underline" onClick={onRetryCatalog}>
-                            {t('actions.retry', { ns: 'common' })}
-                        </button>
-                    </p>
-                )}
-            </div>
+                <CatalogNotice
+                    failed={catalogFailed}
+                    builtIn={catalogBuiltIn}
+                    fetching={catalogFetching}
+                    onRetry={onRetryCatalog}
+                />            </div>
             <div className="flex flex-wrap items-center gap-2">
                 {content.currencies.map((code) => (
                     <span key={code} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-sm">
@@ -119,36 +187,16 @@ function Currencies({ content, catalog, catalogFailed, catalogBuiltIn, onRetryCa
     )
 }
 
-function Accounts({
-    content,
-    accountsAttempted,
-    onChange,
-}: Pick<Props, 'content' | 'accountsAttempted' | 'onChange'>) {
+function Accounts({ content, onChange }: Pick<Props, 'content' | 'onChange'>) {
     const { t } = useTranslation('settings')
     const { t: tc } = useTranslation()
-    // Taking the last account away is an attempt too: the message was seen, and now it matters.
-    const [removedLast, setRemovedLast] = useState(false)
     const codes = [content.baseCurrency, ...content.currencies].filter((c): c is string => !!c)
     const patch = (key: string, change: Partial<DraftContent['accounts'][number]>) =>
         onChange({ accounts: content.accounts.map((a) => (a.key === key ? { ...a, ...change } : a)) })
-    const remove = (key: string) => {
-        const accounts = content.accounts.filter((a) => a.key !== key)
-        if (accounts.length === 0) setRemovedLast(true)
-        onChange({ accounts })
-    }
+    const remove = (key: string) => onChange({ accounts: content.accounts.filter((a) => a.key !== key) })
 
     return (
         <StepSection title={t('spaces.create.accounts.title')} hint={t('spaces.create.accounts.hint')}>
-            {content.accounts.length === 0 &&
-                (accountsAttempted || removedLast ? (
-                    <p role="alert" className="text-xs text-destructive" data-testid="create-space-no-account">
-                        {t('spaces.create.accounts.required')}
-                    </p>
-                ) : (
-                    <p className="text-xs text-muted-foreground" data-testid="create-space-account-hint">
-                        {t('spaces.create.accounts.required')}
-                    </p>
-                ))}
             {content.accounts.map((account) => (
                 // Phone: name on top, type and currency side by side, balance and remove last.
                 <div
@@ -172,11 +220,15 @@ function Accounts({
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                            {ACCOUNT_TYPES.map((type) => (
-                                <SelectItem key={type} value={type}>
-                                    {accountTypeLabel(tc, type)}
-                                </SelectItem>
-                            ))}
+                            {ACCOUNT_TYPES.map((type) => {
+                                const Icon = ACCOUNT_TYPE_CONFIG[type].icon
+                                return (
+                                    <SelectItem key={type} value={type}>
+                                        <Icon aria-hidden />
+                                        {accountTypeLabel(tc, type)}
+                                    </SelectItem>
+                                )
+                            })}
                         </SelectContent>
                     </Select>
                     <Select value={account.currency} onValueChange={(currency) => patch(account.key, { currency })}>
@@ -247,7 +299,7 @@ export function CurrenciesStep(props: Props) {
     return (
         <div className="space-y-6">
             <Currencies {...props} />
-            <Accounts content={props.content} accountsAttempted={props.accountsAttempted} onChange={props.onChange} />
+            <Accounts content={props.content} onChange={props.onChange} />
         </div>
     )
 }

@@ -35,7 +35,7 @@ export function NameStep({ name, onNameChange, emoji, color, onLookChange, onSub
                     onKeyDown={(e) => e.key === 'Enter' && name.trim() && onSubmit()}
                 />
             </div>
-            <SpaceLookFields emoji={emoji} color={color} onChange={onLookChange} />
+            <SpaceLookFields name={name} emoji={emoji} color={color} onChange={onLookChange} />
         </div>
     )
 }

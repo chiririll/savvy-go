@@ -21,13 +21,12 @@ const withAccount: DraftContent = {
     accounts: [{ key: 'a1', name: 'Cash', type: 'cash', currency: 'USD', initialBalance: '' }],
 }
 
-function Harness({ initial, attempted = false }: { initial: DraftContent; attempted?: boolean }) {
+function Harness({ initial }: { initial: DraftContent }) {
     const [content, setContent] = useState(initial)
     return (
         <CurrenciesStep
             content={content}
             catalog={items}
-            accountsAttempted={attempted}
             onChange={(patch) => setContent((c) => ({ ...c, ...patch }))}
         />
     )
@@ -35,28 +34,81 @@ function Harness({ initial, attempted = false }: { initial: DraftContent; attemp
 
 afterEach(() => cleanup())
 
-describe('CurrenciesStep account message', () => {
-    it('is a plain hint when the step is first opened', () => {
+describe('CurrenciesStep without an account', () => {
+    it('says nothing about a missing account: the Continue button is what stays shut', () => {
         render(<Harness initial={empty} />)
-        expect(screen.getByText(REQUIRED)).toBeTruthy()
+        expect(screen.queryByText(REQUIRED)).toBeNull()
+        expect(screen.queryByRole('alert')).toBeNull()
+        expect(screen.queryByTestId('create-space-no-account')).toBeNull()
+        expect(screen.queryByTestId('create-space-account-hint')).toBeNull()
+    })
+
+    it('says nothing after the last account is removed either', () => {
+        render(<Harness initial={withAccount} />)
+        fireEvent.click(screen.getByRole('button', { name: 'spaces.create.accounts.remove' }))
+        expect(screen.queryByText(REQUIRED)).toBeNull()
         expect(screen.queryByRole('alert')).toBeNull()
     })
+})
 
-    it('turns into an error once Next was tried', () => {
-        render(<Harness initial={empty} attempted />)
-        expect(screen.getByRole('alert').textContent).toBe(REQUIRED)
+describe('CurrenciesStep catalog notice', () => {
+    const RETRY = 'actions.retry'
+
+    function Retrying({ builtIn, failed }: { builtIn?: boolean; failed?: boolean }) {
+        const [state, setState] = useState({ fetching: false, builtIn, failed })
+        return (
+            <>
+                <CurrenciesStep
+                    content={empty}
+                    catalog={items}
+                    catalogBuiltIn={state.builtIn}
+                    catalogFailed={state.failed}
+                    catalogFetching={state.fetching}
+                    onRetryCatalog={() => setState((s) => ({ ...s, fetching: true }))}
+                    onChange={() => {}}
+                />
+                {/* Stands for the refetch ending: with the list recovered, or still the built-in one. */}
+                <button onClick={() => setState({ fetching: false, builtIn: false, failed: false })}>recover</button>
+                <button onClick={() => setState((s) => ({ ...s, fetching: false }))}>stay</button>
+            </>
+        )
+    }
+
+    it('shows the built-in notice with a working Retry and no spinner', () => {
+        render(<Retrying builtIn />)
+        expect(screen.getByText(/spaces.create.currencies.builtIn/)).toBeTruthy()
+        expect((screen.getByRole('button', { name: RETRY }) as HTMLButtonElement).disabled).toBe(false)
+        expect(screen.queryByTestId('create-space-catalog-spinner')).toBeNull()
     })
 
-    it('turns into an error when the last account is removed', () => {
-        render(<Harness initial={withAccount} />)
-        expect(screen.queryByText(REQUIRED)).toBeNull()
-        fireEvent.click(screen.getByRole('button', { name: 'spaces.create.accounts.remove' }))
-        expect(screen.getByRole('alert').textContent).toBe(REQUIRED)
+    it('shows a spinner and disables Retry while the refetch runs', () => {
+        render(<Retrying builtIn />)
+        fireEvent.click(screen.getByRole('button', { name: RETRY }))
+        expect(screen.getByTestId('create-space-catalog-spinner')).toBeTruthy()
+        expect((screen.getByRole('button', { name: RETRY }) as HTMLButtonElement).disabled).toBe(true)
     })
 
-    it('shows nothing while an account exists, even after an attempt', () => {
-        render(<Harness initial={withAccount} attempted />)
-        expect(screen.queryByText(REQUIRED)).toBeNull()
+    it('says the currencies loaded when the refetch brings the real list', () => {
+        render(<Retrying builtIn />)
+        fireEvent.click(screen.getByRole('button', { name: RETRY }))
+        fireEvent.click(screen.getByText('recover'))
+        expect(screen.getByText('spaces.create.currencies.recovered')).toBeTruthy()
+        expect(screen.queryByTestId('create-space-catalog-spinner')).toBeNull()
+    })
+
+    it('says it is still the built-in list after a refetch, and Retry works again', () => {
+        render(<Retrying builtIn />)
+        fireEvent.click(screen.getByRole('button', { name: RETRY }))
+        fireEvent.click(screen.getByText('stay'))
+        expect(screen.getByText(/spaces.create.currencies.stillBuiltIn/)).toBeTruthy()
+        expect((screen.getByRole('button', { name: RETRY }) as HTMLButtonElement).disabled).toBe(false)
+    })
+
+    it('shows the failure again when the list could not be loaded', () => {
+        render(<Retrying failed />)
+        fireEvent.click(screen.getByRole('button', { name: RETRY }))
+        fireEvent.click(screen.getByText('stay'))
+        expect(screen.getByText(/spaces.create.currencies.failed/)).toBeTruthy()
     })
 })
 

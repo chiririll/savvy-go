@@ -1,4 +1,5 @@
-import { type CSSProperties, type ReactNode, useState } from 'react'
+import { type ReactNode, useState } from 'react'
+import { ColorIcon } from '@/components/shared/ColorIcon'
 import { FileX, Plus } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -16,8 +17,10 @@ interface FeedRowActionsContext {
 
 interface FeedRowProps {
     icon: ReactNode
+    /** Neutral background and text classes of the icon, used when there is no `iconColor`. */
     iconClassName?: string
-    iconStyle?: CSSProperties
+    /** Hex colour the icon is drawn on. */
+    iconColor?: string | null
     title: ReactNode
     titleClassName?: string
     badge?: ReactNode
@@ -33,6 +36,11 @@ interface FeedRowProps {
     onOpen?: () => void
     hasActions?: boolean
     actions?: (context: FeedRowActionsContext) => ReactNode
+    /**
+     * This row has no actions of its own, but others in its list do: keep the
+     * amount in their column. Desktop only; on mobile there are no dots.
+     */
+    reserveActions?: boolean
 }
 
 export function FeedStatusBadge({ children, variant }: { children: ReactNode; variant?: 'secondary' | 'outline' }) {
@@ -95,7 +103,7 @@ function FeedAmounts({ amount, amountClassName, extraAmount, muted }: FeedAmount
 export function FeedRow({
     icon,
     iconClassName,
-    iconStyle,
+    iconColor,
     title,
     titleClassName,
     badge,
@@ -110,6 +118,7 @@ export function FeedRow({
     onOpen,
     hasActions = false,
     actions,
+    reserveActions = false,
 }: FeedRowProps) {
     const isMobile = useIsMobile()
     const [menuOpen, setMenuOpen] = useState(false)
@@ -143,16 +152,14 @@ export function FeedRow({
             >
                 {leading}
 
-                <div
-                    className={cn(
-                        'flex size-10 shrink-0 items-center justify-center rounded-full text-base',
-                        muted && 'opacity-50 grayscale',
-                        iconClassName,
-                    )}
-                    style={iconStyle}
-                >
-                    {icon}
-                </div>
+                <ColorIcon
+                    icon={icon}
+                    color={iconColor}
+                    tone={iconClassName ?? ''}
+                    size="lg"
+                    shape="circle"
+                    className={cn(muted && 'opacity-50 grayscale')}
+                />
 
                 <FeedTexts
                     title={title}
@@ -176,8 +183,7 @@ export function FeedRow({
                         {actions({ menuOpen, setMenuOpen, isMobile })}
                     </div>
                 )}
-                {/* No dots on this row, but its siblings have them: keep the amount in the same column. */}
-                {!hasActions && actions && !isMobile && (
+                {!hasActions && reserveActions && !isMobile && (
                     <div
                         aria-hidden
                         data-testid="feed-row-actions-spacer"

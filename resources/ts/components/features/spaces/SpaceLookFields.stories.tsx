@@ -7,7 +7,6 @@ import { COLOR_OPTIONS } from '@/constants'
 import { SpaceLookFields } from './SpaceLookFields'
 
 const meta = {
-    tags: ['desktop-only'],
     title: 'features/spaces/SpaceLookFields',
     component: SpaceLookFields,
     parameters: { layout: 'padded' },
@@ -36,7 +35,7 @@ export const NothingChosen: Story = {
     play: async ({ canvasElement }) => {
         const canvas = within(canvasElement)
         await expect(canvas.queryByRole('button', { name: /remove emoji/i })).toBeNull()
-        await expect(canvas.queryByRole('button', { name: /no color/i })).toBeNull()
+        await expect(canvas.getByRole('button', { name: /no color/i })).toHaveAttribute('aria-pressed', 'true')
     },
 }
 
@@ -54,6 +53,14 @@ export const Cleared: Story = {
         await expect(args.onChange).toHaveBeenLastCalledWith({ emoji: '', color: COLOR_OPTIONS[0] })
         await userEvent.click(canvas.getByRole('button', { name: /no color/i }))
         await expect(args.onChange).toHaveBeenLastCalledWith({ emoji: '', color: '' })
+    },
+}
+
+// Without a name the preview shows the same letter the space will get.
+export const NamedNoEmoji: Story = {
+    args: { emoji: '', name: 'trip home' },
+    play: async ({ canvasElement }) => {
+        await expect(within(canvasElement).getByText('T')).toBeInTheDocument()
     },
 }
 

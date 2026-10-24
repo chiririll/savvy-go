@@ -39,7 +39,7 @@ export function General({ space, isAdmin }: { space: Space; isAdmin: boolean }) 
                         />
                     </div>
                 </div>
-                <SpaceLookFields {...look} name={name}onChange={setLook} disabled={!isAdmin} />
+                <SpaceLookFields {...look} name={name} onChange={setLook} disabled={!isAdmin} />
                 {isAdmin && changed && (
                     <Button
                         disabled={!name.trim() || update.isPending}

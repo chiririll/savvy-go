@@ -23,13 +23,14 @@ afterEach(() => {
 
 const actions = () => <RowActions onEdit={() => {}} />
 
-function row(props: { hasActions?: boolean; withActions?: boolean }) {
+function row(props: { hasActions?: boolean; reserveActions?: boolean; withActions?: boolean }) {
     return (
         <FeedRow
             icon="x"
             title="Row"
             amount="10.00"
             hasActions={props.hasActions}
+            reserveActions={props.reserveActions}
             actions={props.withActions === false ? undefined : actions}
         />
     )
@@ -44,8 +45,8 @@ function trailing(container: HTMLElement) {
 }
 
 describe('FeedRow actions column', () => {
-    it('reserves the dots width on a row without actions when actions are provided', () => {
-        const { container } = render(row({ hasActions: false }))
+    it('reserves the dots width on a row without actions when asked to', () => {
+        const { container } = render(row({ hasActions: false, reserveActions: true }))
         const [spacer, ...rest] = trailing(container)
         expect(rest).toHaveLength(0)
         expect(spacer!.getAttribute('data-testid')).toBe('feed-row-actions-spacer')
@@ -56,7 +57,7 @@ describe('FeedRow actions column', () => {
         const { container: withDots } = render(row({ hasActions: true }))
         const dots = trailing(withDots)
         const trigger = dots[0]!.querySelector('button')!
-        const { container: without } = render(row({ hasActions: false }))
+        const { container: without } = render(row({ hasActions: false, reserveActions: true }))
         const spacer = trailing(without)[0]!
 
         expect(dots).toHaveLength(1)
@@ -66,14 +67,26 @@ describe('FeedRow actions column', () => {
         expect(spacer.classList.contains('-mr-1')).toBe(dots[0]!.classList.contains('-mr-1'))
     })
 
+    it('adds no spacer by default, even when actions are provided', () => {
+        const { container } = render(row({ hasActions: false }))
+        expect(trailing(container)).toHaveLength(0)
+    })
+
     it('adds no spacer when the list passes no actions', () => {
         const { container } = render(row({ withActions: false }))
         expect(trailing(container)).toHaveLength(0)
     })
 
+    it('adds no spacer to a row that has actions of its own', () => {
+        const { container } = render(row({ hasActions: true, reserveActions: true }))
+        const items = trailing(container)
+        expect(items).toHaveLength(1)
+        expect(items[0]!.getAttribute('data-testid')).toBeNull()
+    })
+
     it('adds no spacer on mobile, where the menu opens by long press', () => {
         state.mobile = true
-        const { container } = render(row({ hasActions: false }))
+        const { container } = render(row({ hasActions: false, reserveActions: true }))
         expect(trailing(container)).toHaveLength(0)
     })
 })

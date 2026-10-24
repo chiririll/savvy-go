@@ -40,12 +40,8 @@ export const createSpace = scenario(
         await choose(page, base, /^USD/)
         await shot('currencies')
 
-        // A space needs an account. Opened fresh, the section only says what to add; the red message
-        // comes once the user tries to go on, and the step stays.
-        await expect(page.getByTestId('create-space-account-hint')).toBeVisible()
-        await expect(page.getByTestId('create-space-no-account')).toHaveCount(0)
-        await page.getByTestId('create-space-next').click()
-        await expect(page.getByTestId('create-space-no-account')).toBeVisible()
+        // A space needs an account: with none, the way on stays shut (there is no message about it).
+        await expect(page.getByTestId('create-space-next')).toBeDisabled()
         await expect(page.getByTestId('create-space-add-account')).toBeVisible()
         await shot('currencies-no-account')
 

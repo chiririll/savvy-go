@@ -109,10 +109,8 @@ export const CreatedFromTheDefaults: Story = {
         d = await dialog()
         await userEvent.click(await d.findByRole('combobox', { name: 'Base currency' }))
         await userEvent.click(await screen.findByRole('option', { name: /EUR/ }))
-        // No account yet: the message is a hint until Continue is pressed, then it is an error and the step stays.
-        await expect(d.queryByRole('alert')).toBeNull()
-        await next()
-        await expect(await d.findByRole('alert')).toHaveTextContent(/add at least one account/i)
+        // No account yet: Continue stays disabled until one exists.
+        await expect(d.getByRole('button', { name: /^continue$/i })).toBeDisabled()
         await userEvent.click(d.getByRole('button', { name: /add an account/i }))
         await userEvent.type(d.getByRole('textbox', { name: 'Name' }), 'Cash')
         await userEvent.type(d.getByRole('textbox', { name: 'Opening balance' }), '10,50')
@@ -191,7 +189,8 @@ export const ResumedDraft: Story = {
         const d = await dialog()
         await expect(await d.findByText('Trip')).toBeVisible()
         await expect(d.getByText('EUR')).toBeVisible()
-        await userEvent.click(d.getByRole('button', { name: /^back$/i }))
+        // Back from the summary: tags, categories, then the currencies and accounts.
+        for (let i = 0; i < 3; i++) await userEvent.click(d.getByRole('button', { name: /^back$/i }))
         await expect(await d.findByDisplayValue('Yen wallet')).toBeVisible()
     },
 }

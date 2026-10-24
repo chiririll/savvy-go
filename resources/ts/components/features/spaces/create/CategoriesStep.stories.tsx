@@ -51,6 +51,27 @@ export const Seeded: Story = {
     },
 }
 
+// Grouped by type, with the add form pinned below the list.
+export const Grouped: Story = {
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement)
+        await expect(canvas.getByRole('heading', { name: 'Expenses' })).toBeVisible()
+        await expect(canvas.getByRole('heading', { name: 'Incomes' })).toBeVisible()
+        await expect(canvas.getByTestId('create-space-category-form')).toBeVisible()
+    },
+}
+
+// On a phone the closed type select shows the icon only, the opened one icon and name.
+export const TypeSelectOnAPhone: Story = {
+    tags: ['mobile-only'],
+    play: async ({ canvasElement }) => {
+        const trigger = within(canvasElement).getByRole('combobox', { name: 'Type' })
+        await expect(trigger.querySelector('[data-type-name]')).not.toBeVisible()
+        await userEvent.click(trigger)
+        await expect(await screen.findByRole('option', { name: /income/i })).toBeVisible()
+    },
+}
+
 export const CategoryAddedAndRemoved: Story = {
     play: async ({ canvasElement }) => {
         const canvas = within(canvasElement)

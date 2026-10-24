@@ -33,6 +33,8 @@ export function EmojiPicker({ value, onChange, disabled, labelledBy }: EmojiPick
                     size="icon"
                     disabled={disabled}
                     aria-labelledby={labelledBy}
+                    // Without an emoji the button holds only an icon, so it needs a name of its own.
+                    aria-label={labelledBy ? undefined : t('fields.icon')}
                     className="size-10 text-xl"
                 >
                     {value || <SmilePlus data-testid="emoji-placeholder" aria-hidden className="size-5 text-muted-foreground" />}

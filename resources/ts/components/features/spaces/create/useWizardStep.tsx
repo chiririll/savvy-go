@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Space } from '@/types/spaces'
 import { CreateSubmitButton } from './CreateSubmitButton'
@@ -41,9 +41,6 @@ export function useWizardStep({ open, onClose, dismissible, onCreated }: Options
         goTo,
         seed,
     } = useWizardState({ open, onCreated })
-
-    // Set when Next is pressed on the currencies step without an account.
-    const [accountsTried, setAccountsTried] = useState(false)
 
     const back = <BackButton visible={step !== 'name'} onClick={() => goTo(previousStep(step, otherSpaces))} />
     const cancel = <CancelButton visible={dismissible} onClick={onClose} />
@@ -94,9 +91,8 @@ export function useWizardStep({ open, onClose, dismissible, onCreated }: Options
                 ),
             }
         case 'currencies': {
-            const blocking = stepProblems('currencies', draft)
-            // A missing account does not shut the button: pressing it is what turns the hint into an error.
-            const shut = blocking.some((p) => p !== 'noAccounts')
+            // Continue stays shut until the base currency and an account are there.
+            const shut = stepProblems('currencies', draft).length > 0
             return {
                 body: (
                     <CurrenciesStep
@@ -105,16 +101,14 @@ export function useWizardStep({ open, onClose, dismissible, onCreated }: Options
                         catalogBuiltIn={catalog.data?.source === 'fallback'}
                         catalogFailed={catalog.isError}
                         onRetryCatalog={() => void catalog.refetch()}
-                        accountsAttempted={accountsTried}
+                        catalogFetching={catalog.isFetching}
                         onChange={(patch) => update(patch)}
                     />
                 ),
                 footer: (
                     <>
                         {back}
-                        {next(shut, () =>
-                            blocking.includes('noAccounts') ? setAccountsTried(true) : goTo(nextStep(step, otherSpaces)),
-                        )}
+                        {next(shut, () => goTo(nextStep(step, otherSpaces)))}
                     </>
                 ),
             }

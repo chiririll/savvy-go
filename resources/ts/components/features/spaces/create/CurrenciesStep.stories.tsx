@@ -62,23 +62,16 @@ export const Seeded: Story = {
     },
 }
 
-// First opened with no account: a hint, not yet an error.
+// No account: no message about it (the Continue button of the modal stays shut instead).
 export const Empty: Story = {
     render: () => <Harness initial={empty} />,
     play: async ({ canvasElement }) => {
         const canvas = within(canvasElement)
-        await expect(canvas.getByText(/add at least one account/i)).toBeVisible()
+        await expect(canvas.queryByText(/add at least one account/i)).toBeNull()
         await expect(canvas.queryByRole('alert')).toBeNull()
         // Accounts need a currency, and other currencies need a base first.
         await expect(canvas.getByRole('button', { name: /add an account/i })).toBeDisabled()
         await expect(canvas.getByRole('combobox', { name: /add a currency/i })).toBeDisabled()
-    },
-}
-
-export const AccountRequiredAfterAttempt: Story = {
-    render: () => <Harness initial={{ ...empty, baseCurrency: 'EUR' }} accountsAttempted />,
-    play: async ({ canvasElement }) => {
-        await expect(within(canvasElement).getByRole('alert')).toHaveTextContent(/add at least one account/i)
     },
 }
 
@@ -108,6 +101,47 @@ export const BuiltInCatalog: Story = {
     render: () => <Harness initial={empty} catalogBuiltIn />,
     play: async ({ canvasElement }) => {
         await expect(within(canvasElement).getByRole('status')).toHaveTextContent(/currency service is unavailable/i)
+    },
+}
+
+// Retry: a spinner and a shut button while the refetch runs, then what came of it.
+const RetryHarness = () => {
+    const [fetching, setFetching] = useState(false)
+    const [builtIn, setBuiltIn] = useState(true)
+    return (
+        <Harness
+            initial={empty}
+            catalogBuiltIn={builtIn}
+            catalogFetching={fetching}
+            onRetryCatalog={() => {
+                setFetching(true)
+                setTimeout(() => {
+                    setBuiltIn(false)
+                    setFetching(false)
+                }, 300)
+            }}
+        />
+    )
+}
+
+export const RetryFeedback: Story = {
+    render: () => <RetryHarness />,
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement)
+        await userEvent.click(canvas.getByRole('button', { name: /try again/i }))
+        await expect(canvas.getByRole('button', { name: /try again/i })).toBeDisabled()
+        await expect(await canvas.findByText(/currencies loaded/i)).toBeVisible()
+    },
+}
+
+// The account type shows an icon beside its name, in the trigger and in the list.
+export const AccountTypeIcons: Story = {
+    render: () => <Harness initial={seeded} />,
+    play: async ({ canvasElement }) => {
+        const trigger = within(canvasElement).getByRole('combobox', { name: 'Type' })
+        await expect(trigger.querySelector('svg.lucide')).not.toBeNull()
+        await userEvent.click(trigger)
+        for (const option of await screen.findAllByRole('option')) await expect(option.querySelector('svg')).not.toBeNull()
     },
 }
 
@@ -185,14 +219,13 @@ export const AccountTypeChanged: Story = {
     },
 }
 
-// Removing the last account turns the hint into an error, and frees the currency.
+// Removing the last account frees the currency; no message appears.
 export const AccountRemoved: Story = {
     render: () => <Harness initial={seeded} />,
     play: async ({ canvasElement }) => {
         const canvas = within(canvasElement)
-        await expect(canvas.queryByText(/add at least one account/i)).toBeNull()
         await userEvent.click(canvas.getByRole('button', { name: /remove the account/i }))
-        await expect(canvas.getByRole('alert')).toHaveTextContent(/add at least one account/i)
+        await expect(canvas.queryByRole('alert')).toBeNull()
         await expect(canvas.getByRole('button', { name: 'Remove JPY' })).toBeEnabled()
     },
 }
