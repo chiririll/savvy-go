@@ -30,7 +30,7 @@ export const Complete: Story = {
         meta: <FeedStatusBadge variant="outline">Recurring</FeedStatusBadge>,
         badge: <FeedStatusBadge>New</FeedStatusBadge>,
         amount: formatCurrency(-42.5, usd),
-        amountClassName: 'text-red-600',
+        amountClassName: 'text-destructive',
         extraAmount: formatCurrency(-39.1, eur),
     },
 }

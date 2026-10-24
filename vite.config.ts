@@ -69,7 +69,7 @@ const storiesProject = (
             // below, so the preview picks the matching option (mobile and desktop in .storybook/preview.tsx).
             STORYBOOK_VIEWPORT: viewport.width < 600 ? 'mobile' : 'desktop',
             STORYBOOK_MATRIX_CHECKS: 'on',
-            STORYBOOK_CONTRAST: globals.theme === 'dark' ? (process.env.STORYBOOK_CONTRAST ?? '') : '',
+            STORYBOOK_CONTRAST: process.env.STORYBOOK_CONTRAST ?? '',
         },
         // Many stories load at once on a cold cache; the Russian ones wait for their language files.
         testTimeout: 30_000,

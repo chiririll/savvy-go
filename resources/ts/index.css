@@ -121,9 +121,10 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
-/* emoji-picker-react's default category label grey is 3.7:1 on white. */
-.EmojiPickerReact {
+/* emoji-picker-react's own category label colours miss WCAG AA, and its theme class sets them with the same weight as this rule. */
+.EmojiPickerReact.EmojiPickerReact {
   --epr-category-label-text-color: var(--muted-foreground);
+  --epr-category-label-bg-color: color-mix(in oklab, var(--popover) 95%, transparent);
 }
 
 @layer base {

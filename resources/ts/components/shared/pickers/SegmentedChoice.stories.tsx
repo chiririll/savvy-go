@@ -8,8 +8,8 @@ import { SegmentedChoice } from './SegmentedChoice'
 type Kind = 'income' | 'expense' | 'space'
 
 const options = [
-    { value: 'income', label: 'Income', icon: ArrowDownLeft, color: 'text-green-600' },
-    { value: 'expense', label: 'Expense', icon: ArrowUpRight, color: 'text-red-600' },
+    { value: 'income', label: 'Income', icon: ArrowDownLeft, color: 'text-success' },
+    { value: 'expense', label: 'Expense', icon: ArrowUpRight, color: 'text-destructive' },
 ] as const
 
 const meta = {
