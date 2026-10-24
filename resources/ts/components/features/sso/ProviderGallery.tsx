@@ -1,4 +1,3 @@
-import { testId } from '@/lib/test-id'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Trash2, MoreHorizontal, PlugZap, ArrowUpRight } from 'lucide-react'
@@ -12,17 +11,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'
+import { Confirm } from '@/components/shared/dialogs/Confirm'
 import { BrandTile, brandVars } from './BrandIcon'
 import type { IdentityProvider } from '@/types/sso'
 
@@ -114,28 +103,19 @@ export function ProviderCard({ provider, index, onDelete, onTest }: ProviderCard
                             {t('providers.testConnection')}
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild {...testId('confirm')}>
+                        <Confirm
+                            trigger={
                                 <DropdownMenuItem variant="destructive" onSelect={(e) => e.preventDefault()}>
                                     <Trash2 className="mr-2 size-4" />
                                     {tCommon('actions.delete')}
                                 </DropdownMenuItem>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                    <AlertDialogTitle>{t('providers.deleteTitle')}</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                        {t('providers.deleteDescription', { name: provider.name })}
-                                    </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel>{tCommon('actions.cancel')}</AlertDialogCancel>
-                                    <AlertDialogAction variant="destructive" onClick={() => onDelete(provider.id)}>
-                                        {tCommon('actions.delete')}
-                                    </AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
+                            }
+                            title={t('providers.deleteTitle')}
+                            description={t('providers.deleteDescription', { name: provider.name })}
+                            action={tCommon('actions.delete')}
+                            destructive
+                            onConfirm={() => onDelete(provider.id)}
+                        />
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>

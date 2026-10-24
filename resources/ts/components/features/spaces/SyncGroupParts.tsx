@@ -6,17 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'
+import { Confirm } from '@/components/shared/dialogs/Confirm'
 import { spaceRoleLabel, syncKindLabel } from '@/lib/labels'
 import { testId } from '@/lib/test-id'
 import type { Space, SyncChange, SyncGroup, SyncKind } from '@/types/spaces'
@@ -67,29 +57,17 @@ export function SyncMemberList({
                     <div className="flex items-center gap-2">
                         <Badge variant="secondary">{spaceRoleLabel(t, m.role)}</Badge>
                         {m.role === 'admin' && (
-                            <AlertDialog>
-                                <AlertDialogTrigger asChild>
+                            <Confirm
+                                trigger={
                                     <Button variant="ghost" size="icon" title={t('spaces.sync.remove')}>
                                         <Trash2 className="size-4" />
                                     </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                        <AlertDialogTitle>
-                                            {t('spaces.sync.removeTitle', { name: m.name })}
-                                        </AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                            {t('spaces.sync.removeDescription')}
-                                        </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                        <AlertDialogCancel>{t('actions.cancel', { ns: 'common' })}</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => onRemove(m.id)}>
-                                            {t('spaces.sync.remove')}
-                                        </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
+                                }
+                                title={t('spaces.sync.removeTitle', { name: m.name })}
+                                description={t('spaces.sync.removeDescription')}
+                                action={t('spaces.sync.remove')}
+                                onConfirm={() => onRemove(m.id)}
+                            />
                         )}
                     </div>
                 </li>

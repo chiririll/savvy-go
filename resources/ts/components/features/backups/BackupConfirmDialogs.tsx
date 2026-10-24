@@ -1,16 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { Loader2 } from 'lucide-react'
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import { Button } from '@/components/ui/button'
+import { Confirm } from '@/components/shared/dialogs/Confirm'
 import { useResourceMutation } from '@/hooks/use-crud'
 import i18n from '@/lib/i18n'
 import { formatDateTime } from '@/lib/format'
@@ -28,7 +17,6 @@ interface Props {
 
 export function RestoreBackupDialog({ source, backup, open, onClose }: Props) {
     const { t } = useTranslation('settings')
-    const { t: tCommon } = useTranslation('common')
     const restoreBackup = useResourceMutation({
         mutationFn: (filename: string) => source.restore(filename),
         invalidateAll: true,
@@ -41,37 +29,21 @@ export function RestoreBackupDialog({ source, backup, open, onClose }: Props) {
     }
 
     return (
-        <AlertDialog open={open} onOpenChange={(next) => !next && onClose()}>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>{t('backups.restoreTitle')}</AlertDialogTitle>
-                    <AlertDialogDescription asChild>
-                        <div className="space-y-2">
-                            <p>
-                                {t('backups.restoreDescription', {
-                                    date: backup ? formatDateTime(backup.createdAt) : '',
-                                })}
-                            </p>
-                            {backup && backup.status !== 'current' && <p>{backupStatusHelp(t, backup.status)}</p>}
-                        </div>
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel disabled={restoreBackup.isPending}>
-                        {tCommon('actions.cancel')}
-                    </AlertDialogCancel>
-                    <Button
-                        type="button"
-                        variant="destructive"
-                        disabled={restoreBackup.isPending}
-                        onClick={handleRestore}
-                    >
-                        {restoreBackup.isPending && <Loader2 className="size-4 mr-2 animate-spin" />}
-                        {t('backups.restore')}
-                    </Button>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
+        <Confirm
+            open={open}
+            onOpenChange={(next) => !next && onClose()}
+            title={t('backups.restoreTitle')}
+            description={
+                <>
+                    <p>{t('backups.restoreDescription', { date: backup ? formatDateTime(backup.createdAt) : '' })}</p>
+                    {backup && backup.status !== 'current' && <p>{backupStatusHelp(t, backup.status)}</p>}
+                </>
+            }
+            action={t('backups.restore')}
+            destructive
+            pending={restoreBackup.isPending}
+            onConfirm={handleRestore}
+        />
     )
 }
 
@@ -90,22 +62,15 @@ export function DeleteBackupDialog({ source, backup, open, onClose }: Props) {
     }
 
     return (
-        <AlertDialog open={open} onOpenChange={(next) => !next && onClose()}>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>{t('backups.deleteTitle')}</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        {t('backups.deleteDescription', { date: backup ? formatDateTime(backup.createdAt) : '' })}
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel>{tCommon('actions.cancel')}</AlertDialogCancel>
-                    <AlertDialogAction variant="destructive" onClick={handleDelete} disabled={deleteBackup.isPending}>
-                        {deleteBackup.isPending && <Loader2 className="size-4 mr-2 animate-spin" />}
-                        {tCommon('actions.delete')}
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
+        <Confirm
+            open={open}
+            onOpenChange={(next) => !next && onClose()}
+            title={t('backups.deleteTitle')}
+            description={t('backups.deleteDescription', { date: backup ? formatDateTime(backup.createdAt) : '' })}
+            action={tCommon('actions.delete')}
+            destructive
+            pending={deleteBackup.isPending}
+            onConfirm={handleDelete}
+        />
     )
 }

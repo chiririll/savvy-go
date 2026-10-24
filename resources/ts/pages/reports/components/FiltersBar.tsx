@@ -4,7 +4,7 @@ import { Calendar, Filter, RotateCcw, SlidersHorizontal } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { ResponsiveDialog } from '@/components/shared'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { testId } from '@/lib/test-id'
 import type { ReportFilters } from '../types'
@@ -54,66 +54,65 @@ export function FiltersBar({ filters, onFilterChange, onToggleArrayFilter, onRes
                         {periodBadges(true)}
                     </div>
 
-                    <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-                        <SheetTrigger asChild>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="shrink-0"
-                                aria-label={t('reports.filters.title')}
-                                {...testId('filters')}
-                            >
-                                <SlidersHorizontal className="size-4" />
-                                {hasActiveFilters && (
-                                    <Badge variant="secondary" className="ml-1 px-1.5">
-                                        {activeFiltersCount}
-                                    </Badge>
-                                )}
-                            </Button>
-                        </SheetTrigger>
-                        <SheetContent side="bottom" className="h-[85vh] rounded-t-xl">
-                            <SheetHeader>
-                                <SheetTitle>{t('reports.filters.title')}</SheetTitle>
-                            </SheetHeader>
-                            <div className="flex-1 overflow-y-auto px-4 pb-8 space-y-6">
-                                <div className="space-y-3">
-                                    <Label className="text-sm font-medium flex items-center gap-2">
-                                        <Calendar className="size-4" />
-                                        {t('reports.filters.period')}
-                                    </Label>
-                                    {periodBadges()}
-                                    {periodSelector}
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label className="text-sm font-medium">{t('reports.filters.compareWith')}</Label>
-                                    {comparison}
-                                </div>
-
-                                <div className="space-y-4">
-                                    <Label className="text-sm font-medium flex items-center gap-2">
-                                        <Filter className="size-4" />
-                                        {t('reports.filters.filterBy')}
-                                    </Label>
-                                    <EntityFilters filters={filters} onToggle={onToggleArrayFilter} inSheet />
-                                </div>
-
-                                {hasActiveFilters && (
-                                    <Button
-                                        variant="outline"
-                                        onClick={() => {
-                                            onReset()
-                                            setSheetOpen(false)
-                                        }}
-                                        className="w-full"
-                                    >
-                                        <RotateCcw className="size-4 mr-2" />
-                                        {t('reports.filters.resetFilters')}
-                                    </Button>
-                                )}
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="shrink-0"
+                        aria-label={t('reports.filters.title')}
+                        onClick={() => setSheetOpen(true)}
+                        {...testId('filters')}
+                    >
+                        <SlidersHorizontal className="size-4" />
+                        {hasActiveFilters && (
+                            <Badge variant="secondary" className="ml-1 px-1.5">
+                                {activeFiltersCount}
+                            </Badge>
+                        )}
+                    </Button>
+                    <ResponsiveDialog
+                        open={sheetOpen}
+                        onOpenChange={setSheetOpen}
+                        title={t('reports.filters.title')}
+                        footer={
+                            hasActiveFilters && (
+                                <Button
+                                    variant="outline"
+                                    onClick={() => {
+                                        onReset()
+                                        setSheetOpen(false)
+                                    }}
+                                    className="w-full"
+                                >
+                                    <RotateCcw className="size-4 mr-2" />
+                                    {t('reports.filters.resetFilters')}
+                                </Button>
+                            )
+                        }
+                    >
+                        <div className="space-y-6">
+                            <div className="space-y-3">
+                                <Label className="text-sm font-medium flex items-center gap-2">
+                                    <Calendar className="size-4" />
+                                    {t('reports.filters.period')}
+                                </Label>
+                                {periodBadges()}
+                                {periodSelector}
                             </div>
-                        </SheetContent>
-                    </Sheet>
+
+                            <div className="space-y-2">
+                                <Label className="text-sm font-medium">{t('reports.filters.compareWith')}</Label>
+                                {comparison}
+                            </div>
+
+                            <div className="space-y-4">
+                                <Label className="text-sm font-medium flex items-center gap-2">
+                                    <Filter className="size-4" />
+                                    {t('reports.filters.filterBy')}
+                                </Label>
+                                <EntityFilters filters={filters} onToggle={onToggleArrayFilter} inSheet />
+                            </div>
+                        </div>
+                    </ResponsiveDialog>
                 </div>
             </div>
         )

@@ -10,7 +10,7 @@ import { useDeleteSpace, useLeaveSpace, useUpdateSpace, useSpaceDetails } from '
 import { formatBytes } from '@/lib/format'
 import { Space } from '@/types/spaces'
 import { SpaceLookFields } from '@/components/features/spaces/SpaceLookFields'
-import { Confirm } from '@/components/features/spaces/settings/Confirm'
+import { Confirm } from '@/components/shared/dialogs/Confirm'
 
 export function General({ space, isAdmin }: { space: Space; isAdmin: boolean }) {
     const { t } = useTranslation('settings')

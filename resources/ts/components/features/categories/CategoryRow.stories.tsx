@@ -90,7 +90,7 @@ export const DeleteNeedsReplacement: Story = {
     play: async ({ canvasElement, args }) => {
         await openMenu(canvasElement)
         await userEvent.click(await screen.findByRole('menuitem', { name: /delete/i }))
-        const dialog = await screen.findByRole('alertdialog')
+        const dialog = await screen.findByRole('dialog')
         const confirm = within(dialog).getByRole('button', { name: /delete/i })
         await expect(confirm).toBeDisabled()
         await userEvent.click(within(dialog).getByRole('combobox'))
@@ -108,7 +108,7 @@ export const SyncedUnused: Story = {
     play: async ({ canvasElement, args }) => {
         await openMenu(canvasElement)
         await userEvent.click(await screen.findByRole('menuitem', { name: /delete/i }))
-        const dialog = await screen.findByRole('alertdialog')
+        const dialog = await screen.findByRole('dialog')
         await userEvent.click(within(dialog).getByRole('button', { name: /delete/i }))
         await expect(args.onDelete).toHaveBeenCalledWith(1, undefined)
     },

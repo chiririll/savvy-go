@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useLinkSpace, useSpaceLinks, useSpaces, useUnlinkSpace } from '@/hooks'
 import { Space } from '@/types/spaces'
-import { Confirm } from '@/components/features/spaces/settings/Confirm'
+import { Confirm } from '@/components/shared/dialogs/Confirm'
 
 export function Links({ space, isAdmin }: { space: Space; isAdmin: boolean }) {
     const { t } = useTranslation('settings')
