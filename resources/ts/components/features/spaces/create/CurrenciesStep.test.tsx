@@ -51,6 +51,18 @@ describe('CurrenciesStep without an account', () => {
     })
 })
 
+describe('CurrenciesStep account money', () => {
+    it('shows the symbol of the account currency inside the balance field', () => {
+        render(<Harness initial={withAccount} />)
+        expect(screen.getByTestId('create-space-account-balance-symbol').textContent).toBe('$')
+    })
+
+    it('shows no symbol where the catalog has none for the currency', () => {
+        render(<Harness initial={{ ...withAccount, accounts: [{ ...withAccount.accounts[0], currency: 'XYZ' }] }} />)
+        expect(screen.queryByTestId('create-space-account-balance-symbol')).toBeNull()
+    })
+})
+
 describe('CurrenciesStep catalog notice', () => {
     const RETRY = 'actions.retry'
 

@@ -187,10 +187,16 @@ function Currencies({
     )
 }
 
-function Accounts({ content, onChange }: Pick<Props, 'content' | 'onChange'>) {
+function Accounts({ content, catalog, onChange }: Pick<Props, 'content' | 'catalog' | 'onChange'>) {
     const { t } = useTranslation('settings')
     const { t: tc } = useTranslation()
     const codes = [content.baseCurrency, ...content.currencies].filter((c): c is string => !!c)
+    const symbols = useMemo(() => new Map((catalog ?? []).map((c) => [c.code, c.symbol])), [catalog])
+    // Nothing to add where the symbol is the code itself, or the catalog has no entry yet.
+    const symbolOf = (code: string): string | null => {
+        const symbol = symbols.get(code)?.trim()
+        return symbol && symbol !== code ? symbol : null
+    }
     const patch = (key: string, change: Partial<DraftContent['accounts'][number]>) =>
         onChange({ accounts: content.accounts.map((a) => (a.key === key ? { ...a, ...change } : a)) })
     const remove = (key: string) => onChange({ accounts: content.accounts.filter((a) => a.key !== key) })
@@ -221,10 +227,10 @@ function Accounts({ content, onChange }: Pick<Props, 'content' | 'onChange'>) {
                         </SelectTrigger>
                         <SelectContent>
                             {ACCOUNT_TYPES.map((type) => {
-                                const Icon = ACCOUNT_TYPE_CONFIG[type].icon
+                                const { icon: Icon, textColor } = ACCOUNT_TYPE_CONFIG[type]
                                 return (
                                     <SelectItem key={type} value={type}>
-                                        <Icon aria-hidden />
+                                        <Icon aria-hidden className={textColor} />
                                         {accountTypeLabel(tc, type)}
                                     </SelectItem>
                                 )
@@ -242,19 +248,32 @@ function Accounts({ content, onChange }: Pick<Props, 'content' | 'onChange'>) {
                         <SelectContent>
                             {codes.map((code) => (
                                 <SelectItem key={code} value={code}>
-                                    {code}
+                                    <span className="font-mono">{code}</span>
+                                    {symbolOf(code) && <span className="text-muted-foreground">{symbolOf(code)}</span>}
                                 </SelectItem>
                             ))}
                         </SelectContent>
                     </Select>
-                    <Input
-                        inputMode="decimal"
-                        {...testId('create-space-account-balance')}
-                        aria-label={t('spaces.create.accounts.balance')}
-                        placeholder={t('spaces.create.accounts.balance')}
-                        value={account.initialBalance}
-                        onChange={(e) => patch(account.key, { initialBalance: e.target.value })}
-                    />
+                    <div className="relative">
+                        <Input
+                            inputMode="decimal"
+                            className={symbolOf(account.currency) ? 'pr-10' : undefined}
+                            {...testId('create-space-account-balance')}
+                            aria-label={t('spaces.create.accounts.balance')}
+                            placeholder={t('spaces.create.accounts.balance')}
+                            value={account.initialBalance}
+                            onChange={(e) => patch(account.key, { initialBalance: e.target.value })}
+                        />
+                        {symbolOf(account.currency) && (
+                            <span
+                                aria-hidden
+                                data-testid="create-space-account-balance-symbol"
+                                className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-muted-foreground"
+                            >
+                                {symbolOf(account.currency)}
+                            </span>
+                        )}
+                    </div>
                     <Button
                         type="button"
                         variant="ghost"
@@ -299,7 +318,7 @@ export function CurrenciesStep(props: Props) {
     return (
         <div className="space-y-6">
             <Currencies {...props} />
-            <Accounts content={props.content} onChange={props.onChange} />
+            <Accounts content={props.content} catalog={props.catalog} onChange={props.onChange} />
         </div>
     )
 }

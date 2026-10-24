@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowDownLeft, ArrowUpRight, Plus, X } from 'lucide-react'
+import { ArrowDownLeft, ArrowUpRight, Info, Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { categoryTypeLabel } from '@/lib/labels'
 import { defaultNameHint, localizeDefaultName, toStoredDefaultName } from '@/lib/localized-name'
 import { CATEGORY_TYPES, type CategoryType } from '@/types/categories'
@@ -20,6 +21,52 @@ const TYPE_ICONS = {
     expense: { Icon: ArrowUpRight, tone: 'text-destructive' },
     income: { Icon: ArrowDownLeft, tone: 'text-success' },
 } satisfies Record<CategoryType, { Icon: typeof ArrowUpRight; tone: string }>
+
+/** The name field; a preset category with a description gets an info button inside the field. */
+function CategoryNameInput({
+    label,
+    aboutLabel,
+    value,
+    description,
+    onChange,
+}: {
+    label: string
+    aboutLabel: string
+    value: string
+    description: string | null
+    onChange: (value: string) => void
+}) {
+    // Controlled, so a tap opens it too: a touch screen has no hover.
+    const [open, setOpen] = useState(false)
+    return (
+        <div className="relative">
+            <Input
+                aria-label={label}
+                className={description ? 'pr-9' : undefined}
+                value={value}
+                maxLength={255}
+                onChange={(e) => onChange(e.target.value)}
+            />
+            {description && (
+                <Tooltip open={open} onOpenChange={setOpen}>
+                    <TooltipTrigger asChild>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-0.5 top-0.5 size-8 text-muted-foreground"
+                            aria-label={aboutLabel}
+                            onClick={() => setOpen((v) => !v)}
+                        >
+                            <Info className="size-4" />
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-64">{description}</TooltipContent>
+                </Tooltip>
+            )}
+        </div>
+    )
+}
 
 /** Step: the categories of the space, in a group per type, and a form to add one that stays in view. */
 export function CategoriesStep({ content, onChange }: Props) {
@@ -52,23 +99,18 @@ export function CategoriesStep({ content, onChange }: Props) {
                         <h4 className="pt-1 text-xs font-medium text-muted-foreground">{group.title}</h4>
                         <ul className="space-y-1.5">
                             {rows.map(({ category, index }) => (
-                                // Top-aligned: the emoji and the button line up with the input, whatever the hint below it adds.
                                 <li key={index} className="flex items-start gap-2">
                                     <span aria-hidden className="flex h-9 w-6 shrink-0 items-center justify-center">
                                         {category.icon}
                                     </span>
                                     <div className="min-w-0 flex-1">
-                                        <Input
-                                            aria-label={t('spaces.create.categories.name')}
+                                        <CategoryNameInput
+                                            label={t('spaces.create.categories.name')}
+                                            aboutLabel={t('spaces.create.categories.about')}
                                             value={localizeDefaultName(category.name)}
-                                            maxLength={255}
-                                            onChange={(e) => rename(index, e.target.value)}
+                                            description={defaultNameHint(category.name)}
+                                            onChange={(input) => rename(index, input)}
                                         />
-                                        {defaultNameHint(category.name) && (
-                                            <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                                                {defaultNameHint(category.name)}
-                                            </p>
-                                        )}
                                     </div>
                                     <Button
                                         type="button"
@@ -97,10 +139,12 @@ export function CategoriesStep({ content, onChange }: Props) {
                 )
             })}
             {/* Sticks to the bottom of the modal's scroll area, so it is there however long the list is.
-                The negative margins stretch it over the area's padding; it is a form, so the keyboard
-                of a phone shrinks the sheet (dvh) and this stays above it. */}
+                data-sticky-bottom drops the area's bottom padding (ResponsiveDialog), so no list shows
+                through below it. The negative side margins stretch it over the side padding. It is a
+                form, so the keyboard of a phone shrinks the sheet (dvh) and this stays above it. */}
             <form
-                className="sticky bottom-0 z-10 -mx-6 -mb-4 flex gap-2 border-t bg-background px-6 py-3"
+                className="sticky bottom-0 z-10 -mx-6 flex gap-2 border-t bg-background px-6 py-3"
+                data-sticky-bottom
                 data-testid="create-space-category-form"
                 onSubmit={(e) => {
                     e.preventDefault()

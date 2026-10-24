@@ -79,12 +79,38 @@ describe('CategoriesStep rows', () => {
     })
 })
 
+describe('CategoriesStep descriptions', () => {
+    const preset: DraftContent = {
+        ...content,
+        categories: [
+            { name: '#UTILITIES', type: 'expense', icon: '💡', color: '#16a34a', isDefault: false },
+            { name: 'Groceries', type: 'expense', icon: '🛒', color: '#16a34a', isDefault: false },
+        ],
+    }
+
+    it('keeps the description out of the list, and gives only a preset category the info button', () => {
+        render(<Harness initial={preset} />)
+        expect(screen.getAllByRole('button', { name: 'spaces.create.categories.about' })).toHaveLength(1)
+        const [presetRow, plainRow] = screen.getAllByRole('listitem')
+        expect(within(presetRow).getByRole('button', { name: 'spaces.create.categories.about' })).toBeTruthy()
+        expect(within(plainRow).queryByRole('button', { name: 'spaces.create.categories.about' })).toBeNull()
+        expect(presetRow.querySelector('p')).toBeNull()
+    })
+})
+
 describe('CategoriesStep add form', () => {
     it('sticks to the bottom of the scroll area', () => {
         render(<Harness />)
         const form = screen.getByTestId('create-space-category-form')
         expect(form.className).toContain('sticky')
         expect(form.className).toContain('bottom-0')
+    })
+
+    it('has no bottom margin, and tells the dialog to drop its bottom padding, so no gap shows under it', () => {
+        render(<Harness />)
+        const form = screen.getByTestId('create-space-category-form')
+        expect(form.className).not.toMatch(/-mb-/)
+        expect(form.hasAttribute('data-sticky-bottom')).toBe(true)
     })
 
     it('adds a category of the chosen type (default: expense) and clears the field', () => {

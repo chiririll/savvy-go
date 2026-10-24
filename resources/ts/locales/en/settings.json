@@ -589,7 +589,8 @@
                 "groupIncome": "Incomes",
                 "add": "Add the category",
                 "remove": "Remove {{name}}",
-                "protected": "The default category of its type cannot be removed"
+                "protected": "The default category of its type cannot be removed",
+                "about": "About this category"
             },
             "tags": {
                 "title": "Tags",

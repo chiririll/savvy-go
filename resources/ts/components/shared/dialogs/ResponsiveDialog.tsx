@@ -36,7 +36,12 @@ export function ResponsiveDialog({
     children,
 }: ResponsiveDialogProps) {
     const isMobile = useIsMobile()
-    const body = children != null && <div tabIndex={0} className="min-h-0 flex-1 overflow-y-auto px-6 py-4">{children}</div>
+    // A child marked data-sticky-bottom pins itself to the bottom edge, so the padding there would leave a gap under it.
+    const body = children != null && (
+        <div tabIndex={0} className="min-h-0 flex-1 overflow-y-auto px-6 py-4 has-[[data-sticky-bottom]]:pb-0">
+            {children}
+        </div>
+    )
 
     if (isMobile) {
         return (
