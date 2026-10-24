@@ -1,12 +1,14 @@
 // scripts/package.json "screenshots" (npm run screenshots in the root): runs
 // docker-compose.screenshots.yml and removes what it created afterwards, whether or not
-// the run worked. Needs only Node and Docker.
+// the run worked. Needs only Node and Docker; the daemon may be remote (docker context): nothing is
+// bind-mounted, the files are copied out of the container.
 //
 //   npm run screenshots              the default config: everything, in English and the light theme
 //   npm run screenshots -- <name>    the config configs/<name>.json
 //   npm run screenshots -- <name> --languages=en,ru --detail=key    settings on top of it
+//   npm run screenshots -- --concurrency=8    browser contexts at a time (default: the CPUs of the Docker host)
 import { spawn, type ChildProcess } from 'node:child_process'
-import { existsSync, readdirSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -23,6 +25,13 @@ for (const arg of args.filter((a) => a.startsWith('--'))) {
     const [key, ...rest] = arg.slice(2).split('=')
     overrides[key] = rest.length ? rest.join('=') : 'true'
 }
+// Not a setting of the run's config: the runner reads it from the environment.
+const concurrency = overrides.concurrency ?? ''
+delete overrides.concurrency
+if (concurrency && !/^[1-9]\d*$/.test(concurrency)) {
+    console.error(`--concurrency must be a whole number above 0, not "${concurrency}".`)
+    process.exit(2)
+}
 const config = (args.find((a) => !a.startsWith('--')) ?? '').replace(/\.json$/, '')
 if (config && !names.includes(config)) {
     console.error(`No config "${config}"; there are ${names.join(', ') || 'none'} in scripts/screenshots/configs.`)
@@ -36,13 +45,17 @@ const now = new Date()
 const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`
 const runName = process.env.RUN_NAME || (config ? `${stamp}_${config}` : stamp)
 
+// The app's config files go to the container as variables: a mount would name a path on the daemon's host.
+const appConfig = readFileSync(path.join(here, 'config.toml'), 'utf8')
+const appSeed = readFileSync(path.join(here, 'seed.toml'), 'utf8')
+
 let current: ChildProcess | null = null
 const compose = (...args: string[]) =>
     new Promise<number>((resolve) => {
         const child = spawn('docker', ['compose', '-f', 'docker-compose.screenshots.yml', ...args], {
             cwd: root,
             stdio: 'inherit',
-            env: { ...process.env, RUN_NAME: runName, CONFIG: config, CONFIG_OVERRIDES: JSON.stringify(overrides) },
+            env: { ...process.env, APP_CONFIG: appConfig, APP_SEED: appSeed, RUN_NAME: runName, CONFIG: config, CONCURRENCY: concurrency, CONFIG_OVERRIDES: JSON.stringify(overrides) },
         })
         current = child
         child.on('error', (e) => {
@@ -67,6 +80,10 @@ ${signal}: stopping and removing the containers...`)
 }
 
 const code = await compose('up', '--build', '--abort-on-container-exit', '--exit-code-from', 'shots')
+// Before `down`, which removes the container: it is stopped by now, but cp still reads it. Also after a
+// failed run, which leaves FAILED.png.
+mkdirSync(path.join(root, 'screenshots'), { recursive: true })
+if ((await compose('cp', `shots:/out/${runName}`, 'screenshots')) !== 0) console.error('Could not copy the screenshots out of the container.')
 await compose('down', '-v', '--remove-orphans')
 if (interrupted) {
     console.log('Interrupted.')

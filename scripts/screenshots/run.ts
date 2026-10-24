@@ -9,9 +9,10 @@
 // Run it with docker compose (docker-compose.screenshots.yml).
 // Env:   BASE_URL (http://localhost:8080), MANIFEST (<repo>/screenshots/manifest.json),
 //        OUT (<repo>/screenshots), RUN_NAME (the start time; the files go to OUT/RUN_NAME),
-//        CONFIG (the name of a file of configs/; none: the defaults), CONCURRENCY (4), TZ (UTC),
+//        CONFIG (the name of a file of configs/; none: the defaults), CONCURRENCY (the CPUs), TZ (UTC),
 //        SAVVY_BIN (the app's binary that scenarios start; see scenarios/server.ts)
 import { mkdir, readFile } from 'node:fs/promises'
+import { availableParallelism } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium, type Browser } from 'playwright'
@@ -37,7 +38,8 @@ const stamp = new Date().toISOString().slice(0, 19).replace('T', '_').replace(/:
 const runName = env('RUN_NAME', configName ? `${stamp}_${configName}` : stamp)
 const outDir = path.join(outRoot, runName)
 const manifestPath = path.resolve(env('MANIFEST', path.join(outRoot, 'manifest.json')))
-const concurrency = Number(env('CONCURRENCY', '4'))
+// Browser contexts at a time, shared by the pages and the scenarios, which run together.
+const concurrency = Math.max(1, Math.floor(Number(env('CONCURRENCY', String(availableParallelism())))) || 1)
 
 async function main() {
     const manifest = await readManifest()
@@ -48,14 +50,21 @@ async function main() {
     if (state.config.capture && !manifest) throw new Error(`no manifest at ${manifestPath}: seed the app with --seed-config, or set "capture": false`)
     const browser = await chromium.launch()
 
-    if (state.config.capture && manifest) await capturePages(browser, manifest)
-    if (state.config.scenarios) {
-        const failures = await runScenarios(browser, {
-            config: state.config, outDir, concurrency, binary: env('SAVVY_BIN', ''),
-        })
-        state.saved += shotsTaken.shots
-        state.failures.push(...failures.map((f) => `scenario ${f}`))
-    }
+    // Pages are shot on the seeded app, scenarios on servers of their own: they do not meet, so they
+    // go together and split the contexts (all of them to whichever runs alone).
+    const pages = state.config.capture && manifest
+    const scenarios = state.config.scenarios
+    const forPages = pages && scenarios ? Math.ceil(concurrency / 2) : concurrency
+    const forScenarios = pages && scenarios ? Math.max(1, concurrency - forPages) : concurrency
+    await Promise.all([
+        pages ? capturePages(browser, manifest, forPages) : undefined,
+        scenarios
+            ? runScenarios(browser, { config: state.config, outDir, concurrency: forScenarios, binary: env('SAVVY_BIN', '') }).then((failures) => {
+                  state.saved += shotsTaken.shots
+                  state.failures.push(...failures.map((f) => `scenario ${f}`))
+              })
+            : undefined,
+    ])
     await browser.close()
 
     console.log(`${state.saved} screenshots in ${outDir}`)
@@ -77,7 +86,7 @@ async function readManifest(): Promise<Manifest | undefined> {
     }
 }
 
-async function capturePages(browser: Browser, manifest: Manifest) {
+async function capturePages(browser: Browser, manifest: Manifest, concurrency: number) {
     // The app works out some periods ("last 30 days") from the server's own clock,
     // so data seeded for another day only looks right if the server runs on that
     // day. The browser's clock is moved to the seeded day, but the server's is not.
