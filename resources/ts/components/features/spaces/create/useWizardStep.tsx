@@ -1,13 +1,15 @@
-import { type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Space } from '@/types/spaces'
 import { CreateSubmitButton } from './CreateSubmitButton'
 import { ConfirmStep } from './ConfirmStep'
 import { BackButton, CancelButton, NextButton } from './WizardButtons'
 import { CopyStep } from './CopyStep'
-import { EntitiesStep } from './EntitiesStep'
+import { CategoriesStep } from './CategoriesStep'
+import { CurrenciesStep } from './CurrenciesStep'
+import { TagsStep } from './TagsStep'
 import { NameStep } from './NameStep'
-import { previousStep, toRequest } from './draft'
+import { nextStep, previousStep, stepProblems, toRequest } from './draft'
 import { useWizardState } from './useWizardState'
 
 interface Options {
@@ -88,28 +90,46 @@ export function useWizardStep({ open, onClose, dismissible, onCreated }: Options
                     </>
                 ),
             }
-        case 'entities':
+        case 'currencies': {
+            // Continue stays shut until the base currency and an account are there.
+            const shut = stepProblems('currencies', draft).length > 0
             return {
                 body: (
-                    <EntitiesStep
+                    <CurrenciesStep
                         content={draft}
                         catalog={catalog.data?.items}
                         catalogBuiltIn={catalog.data?.source === 'fallback'}
                         catalogFailed={catalog.isError}
                         onRetryCatalog={() => void catalog.refetch()}
+                        catalogFetching={catalog.isFetching}
                         onChange={(patch) => update(patch)}
                     />
                 ),
                 footer: (
                     <>
                         {back}
-                        {next(
-                            !draft.baseCurrency ||
-                                problems.includes('noAccounts') ||
-                                problems.includes('accounts') ||
-                                problems.includes('balances'),
-                            () => goTo('confirm'),
-                        )}
+                        {next(shut, () => goTo(nextStep(step, otherSpaces)))}
+                    </>
+                ),
+            }
+        }
+        case 'categories':
+            return {
+                body: <CategoriesStep content={draft} onChange={(patch) => update(patch)} />,
+                footer: (
+                    <>
+                        {back}
+                        {next(false, () => goTo(nextStep(step, otherSpaces)))}
+                    </>
+                ),
+            }
+        case 'tags':
+            return {
+                body: <TagsStep content={draft} onChange={(patch) => update(patch)} />,
+                footer: (
+                    <>
+                        {back}
+                        {next(false, () => goTo(nextStep(step, otherSpaces)))}
                     </>
                 ),
             }

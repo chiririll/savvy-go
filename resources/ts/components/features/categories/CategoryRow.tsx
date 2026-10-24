@@ -5,7 +5,6 @@ import { Star, Trash2 } from 'lucide-react'
 import { FeedRow, RowActions, CategorySelect, ResponsiveDialog } from '@/components/shared'
 import { DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import { Button } from '@/components/ui/button'
-import { categoryIconStyle } from '@/lib/category-color'
 import { localizeDefaultName } from '@/lib/localized-name'
 import { Category } from '@/types'
 import { categoryTypeLabel } from '@/lib/labels'
@@ -47,8 +46,8 @@ export function CategoryRow({
 
     return (
         <FeedRow
-            icon={<span aria-hidden>{category.icon}</span>}
-            iconStyle={categoryIconStyle(category.color)}
+            icon={category.icon}
+            iconColor={category.color}
             title={name}
             badge={category.isDefault ? (
                 <Star

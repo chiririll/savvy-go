@@ -15,8 +15,11 @@ export const serverSetup = scenario(
         await run(adminSetup)
         await expect(page).toHaveURL(/\/setup\/server$/)
 
-        // The address the admin opened the app at is offered; keeping it saves it.
+        // The address the admin opened the app at is offered by a button; using it fills the field, continuing saves it.
         const url = page.locator('#app-url')
+        await expect(url).toHaveValue('')
+        // The button sits right after the field; it has no text to rely on across languages and no mark, which would make the dialog capture click it.
+        await page.locator('#app-url + button').click()
         await expect(url).toHaveValue(server.url)
         await shot('url')
         await page.getByTestId('server-setup-continue').click()

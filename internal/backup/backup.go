@@ -139,6 +139,24 @@ func (s Service) describe(dir string, info os.FileInfo) Entry {
 	return b
 }
 
+// ServerBackupWithNote finds a valid server backup with exactly this note that
+// was written after since, or nil.
+func (s Service) ServerBackupWithNote(note string, since time.Time) *Entry {
+	list, err := s.ServerBackups()
+	if err != nil {
+		return nil
+	}
+	for _, b := range list {
+		if !b.Valid || b.Note == nil || *b.Note != note {
+			continue
+		}
+		if info, err := os.Stat(s.ServerPath(b.Filename)); err == nil && info.ModTime().After(since) {
+			return &b
+		}
+	}
+	return nil
+}
+
 // ServerBackup / SpaceBackup find one backup by name.
 func (s Service) ServerBackup(name string) (*Entry, error) { return s.find(s.serverDir(), name) }
 func (s Service) SpaceBackup(spaceID int64, name string) (*Entry, error) {

@@ -1,0 +1,194 @@
+import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { ArrowDownLeft, ArrowUpRight, Info, Plus, X } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { DialogPinned } from '@/components/shared/dialogs/DialogPinned'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { categoryTypeLabel } from '@/lib/labels'
+import { defaultNameHint, localizeDefaultName, toStoredDefaultName } from '@/lib/localized-name'
+import { CATEGORY_TYPES, type CategoryType } from '@/types/categories'
+import { isProtectedCategory, removeCategory, type DraftContent } from './draft'
+import { StepSection } from './StepSection'
+
+interface Props {
+    content: DraftContent
+    onChange: (patch: Partial<DraftContent>) => void
+}
+
+/** The same arrows as the transaction list uses for the two kinds of money flow. */
+const TYPE_ICONS = {
+    expense: { Icon: ArrowUpRight, tone: 'text-destructive' },
+    income: { Icon: ArrowDownLeft, tone: 'text-success' },
+} satisfies Record<CategoryType, { Icon: typeof ArrowUpRight; tone: string }>
+
+/** The name field; a preset category with a description gets an info button inside the field. */
+function CategoryNameInput({
+    label,
+    aboutLabel,
+    value,
+    description,
+    onChange,
+}: {
+    label: string
+    aboutLabel: string
+    value: string
+    description: string | null
+    onChange: (value: string) => void
+}) {
+    // Controlled, so a tap opens it too: a touch screen has no hover.
+    const [open, setOpen] = useState(false)
+    return (
+        <div className="relative">
+            <Input
+                aria-label={label}
+                className={description ? 'pr-9' : undefined}
+                value={value}
+                maxLength={255}
+                onChange={(e) => onChange(e.target.value)}
+            />
+            {description && (
+                <Tooltip open={open} onOpenChange={setOpen}>
+                    <TooltipTrigger asChild>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-0.5 top-0.5 size-8 text-muted-foreground"
+                            aria-label={aboutLabel}
+                            onClick={() => setOpen((v) => !v)}
+                        >
+                            <Info className="size-4" />
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-64">{description}</TooltipContent>
+                </Tooltip>
+            )}
+        </div>
+    )
+}
+
+/** Step: the categories of the space, in a group per type, and a form to add one that stays in view. */
+export function CategoriesStep({ content, onChange }: Props) {
+    const { t } = useTranslation('settings')
+    const { t: tc } = useTranslation()
+    const [name, setName] = useState('')
+    const [type, setType] = useState<CategoryType>('expense')
+    const rename = (index: number, input: string) =>
+        onChange({
+            categories: content.categories.map((c, i) =>
+                i === index ? { ...c, name: toStoredDefaultName(input, c.name) } : c,
+            ),
+        })
+
+    const groups: { type: CategoryType; title: string }[] = [
+        { type: 'expense', title: t('spaces.create.categories.groupExpense') },
+        { type: 'income', title: t('spaces.create.categories.groupIncome') },
+    ]
+
+    return (
+        <StepSection title={t('spaces.create.categories.title')} hint={t('spaces.create.categories.hint')}>
+            {groups.map((group) => {
+                // Indexes stay those of the whole list: renaming and removing address it by position.
+                const rows = content.categories
+                    .map((category, index) => ({ category, index }))
+                    .filter(({ category }) => category.type === group.type)
+                if (rows.length === 0) return null
+                return (
+                    <div key={group.type} className="space-y-1.5" data-testid={`create-space-categories-${group.type}`}>
+                        <h4 className="pt-1 text-xs font-medium text-muted-foreground">{group.title}</h4>
+                        <ul className="space-y-1.5">
+                            {rows.map(({ category, index }) => (
+                                <li key={index} className="flex items-start gap-2">
+                                    <span aria-hidden className="flex h-9 w-6 shrink-0 items-center justify-center">
+                                        {category.icon}
+                                    </span>
+                                    <div className="min-w-0 flex-1">
+                                        <CategoryNameInput
+                                            label={t('spaces.create.categories.name')}
+                                            aboutLabel={t('spaces.create.categories.about')}
+                                            value={localizeDefaultName(category.name)}
+                                            description={defaultNameHint(category.name)}
+                                            onChange={(input) => rename(index, input)}
+                                        />
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="shrink-0"
+                                        disabled={isProtectedCategory(category)}
+                                        title={
+                                            isProtectedCategory(category)
+                                                ? t('spaces.create.categories.protected')
+                                                : undefined
+                                        }
+                                        aria-label={t('spaces.create.categories.remove', {
+                                            name: localizeDefaultName(category.name),
+                                        })}
+                                        onClick={() =>
+                                            onChange({ categories: removeCategory(content.categories, index) })
+                                        }
+                                    >
+                                        <X className="size-4" />
+                                    </Button>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )
+            })}
+            {/* Pinned above the footer, so it is there however long the list is. It is a form, so the
+                keyboard of a phone shrinks the sheet (dvh) and this stays above it. */}
+            <DialogPinned>
+            <form
+                className="flex gap-2"
+                data-testid="create-space-category-form"
+                onSubmit={(e) => {
+                    e.preventDefault()
+                    if (!name.trim()) return
+                    onChange({
+                        categories: [
+                            ...content.categories,
+                            { name: name.trim(), type, icon: '🏷️', color: '#6b7280', isDefault: false },
+                        ],
+                    })
+                    setName('')
+                }}
+            >
+                <Input
+                    aria-label={t('spaces.create.categories.new')}
+                    placeholder={t('spaces.create.categories.new')}
+                    value={name}
+                    maxLength={255}
+                    onChange={(e) => setName(e.target.value)}
+                />
+                <Select value={type} onValueChange={(v) => setType(v as CategoryType)}>
+                    {/* Phone: the closed select shows the icon only; the opened list has icon and name. */}
+                    <SelectTrigger
+                        className="w-16 shrink-0 sm:w-36 max-sm:[&_[data-type-name]]:hidden"
+                        aria-label={tc('fields.type')}
+                    >
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {CATEGORY_TYPES.map((v) => {
+                            const { Icon, tone } = TYPE_ICONS[v]
+                            return (
+                                <SelectItem key={v} value={v}>
+                                    <Icon aria-hidden className={tone} />
+                                    <span data-type-name>{categoryTypeLabel(tc, v)}</span>
+                                </SelectItem>
+                            )
+                        })}
+                    </SelectContent>
+                </Select>
+                <Button type="submit" variant="outline" size="icon" className="shrink-0" aria-label={t('spaces.create.categories.add')}>
+                    <Plus className="size-4" />
+                </Button>
+            </form>
+            </DialogPinned>
+        </StepSection>
+    )
+}

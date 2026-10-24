@@ -23,6 +23,9 @@ import {
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 
+/** Size of the three-dots trigger. Feed rows without actions reserve the same width so amounts line up. */
+export const ROW_ACTIONS_TRIGGER_SIZE = 'size-8'
+
 interface RowActionsProps {
     onEdit?: () => void
     onDelete?: () => void
@@ -65,7 +68,7 @@ export function RowActions({
                     size="icon"
                     {...testIdMenu('row')}
                     className={cn(
-                        'size-8',
+                        ROW_ACTIONS_TRIGGER_SIZE,
                         !showTrigger && 'pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 opacity-0',
                         triggerClassName,
                     )}

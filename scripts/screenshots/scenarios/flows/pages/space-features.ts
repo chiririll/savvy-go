@@ -1,5 +1,5 @@
 // What a space's settings page does, beyond showing it: one list of invitations, the steps of a sync
-// group, and the old address of the user settings.
+// group.
 import { expect } from 'playwright/test'
 import { pages } from '../../../../../resources/ts/app/pages.ts'
 import { api } from '../../api.ts'
@@ -74,20 +74,5 @@ export const syncGroupSteps = scenario(
         await expect(page.getByTestId('sync-apply')).toBeHidden()
         await expect(page.getByTestId('sync-members')).toBeVisible()
         await shot('joined')
-    },
-)
-
-export const oldUserSettingsAddress = scenario(
-    {
-        name: 'pages/user-redirect',
-        covers: [],
-        shots: [],
-        leaves: 'the admin in the space "Family Budget", on the security settings',
-    },
-    async ({ page, run }) => {
-        await run(createSpace)
-        // The page called "User" is gone; bookmarks to it land on Security.
-        await page.goto('/settings/user')
-        await expect(page).toHaveURL(new RegExp(`${pages.securitySettings.path}$`))
     },
 )

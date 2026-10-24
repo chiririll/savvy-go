@@ -49,6 +49,14 @@ export const LongTitle: Story = {
 export const ZeroDecimals: Story = { args: { amount: formatCurrency(1500, jpy) } }
 export const ThreeDecimals: Story = { args: { amount: formatCurrency(12.345, kwd) } }
 
+export const ReservedActions: Story = {
+    tags: ['desktop-only'],
+    args: { amount: formatCurrency(10, usd), reserveActions: true },
+    play: async ({ canvasElement }) => {
+        await expect(within(canvasElement).getByTestId('feed-row-actions-spacer')).toBeInTheDocument()
+    },
+}
+
 export const Opened: Story = {
     args: { onOpen: fn() },
     play: async ({ canvasElement, args }) => {

@@ -517,7 +517,8 @@
         },
         "look": {
             "clearEmoji": "Remove emoji",
-            "clearColor": "No color"
+            "clearColor": "No color",
+            "preview": "Preview"
         },
         "roles": {
             "admin": "Admin",
@@ -565,12 +566,14 @@
                 "none": "No currency found.",
                 "more": "{{count}} more: keep typing to narrow down",
                 "useCode": "use this code",
-                "builtIn": "Showing a short list: the currency service is unavailable. Type any currency code to use it."
+                "builtIn": "Showing a short list: the currency service is unavailable. Type any currency code to use it.",
+                "refreshing": "Checking the currency service…",
+                "recovered": "Currencies loaded.",
+                "stillBuiltIn": "Still the built-in list: the currency service did not answer."
             },
             "accounts": {
                 "title": "Accounts",
                 "hint": "Wallets and bank cards, each in one currency.",
-                "required": "Add at least one account, such as your wallet or bank card.",
                 "name": "Name",
                 "currency": "Currency",
                 "balance": "Opening balance",
@@ -582,9 +585,12 @@
                 "hint": "Rename, remove or add. The default category of each type stays.",
                 "name": "Category name",
                 "new": "New category",
+                "groupExpense": "Expenses",
+                "groupIncome": "Incomes",
                 "add": "Add the category",
                 "remove": "Remove {{name}}",
-                "protected": "The default category of its type cannot be removed"
+                "protected": "The default category of its type cannot be removed",
+                "about": "About this category"
             },
             "tags": {
                 "title": "Tags",

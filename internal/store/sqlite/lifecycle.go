@@ -2,8 +2,14 @@ package sqlite
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+	"time"
 
 	"savvy-go/internal/db"
 	"savvy-go/internal/migrate"
@@ -112,10 +118,10 @@ func (s *Store) ApplyQuota(ctx context.Context, id int64) error {
 	return nil
 }
 
-// OpenApp opens the store of the application in dir with the embedded server
-// and space migrations.
-func OpenApp(ctx context.Context, dir string) (*Store, error) {
-	return Open(ctx, Options{
+// AppOptions are the options of the application's store in dir: the embedded
+// server and space migrations; tests replace them with fakes.
+func AppOptions(ctx context.Context, dir string) Options {
+	return Options{
 		Dir: dir, MigrateServer: migrate.Server.Up, MigrateSpace: migrate.Space.Up,
 		Quota: func(server store.DB, id int64) int64 {
 			if q, err := db.Q(server).GetSpaceQuota(ctx, id); err == nil && q.Valid {
@@ -123,5 +129,67 @@ func OpenApp(ctx context.Context, dir string) (*Store, error) {
 			}
 			return settings.SpaceQuota(ctx, server)
 		},
-	})
+	}
+}
+
+// OpenApp opens the store of the application in dir with the embedded server
+// and space migrations.
+func OpenApp(ctx context.Context, dir string) (*Store, error) {
+	return Open(ctx, AppOptions(ctx, dir))
+}
+
+// LastWrite is the newest modification time among the server file and the
+// space files. Write-ahead logs are left out: opening a store touches them, and
+// what they hold lands in the database file when the store closes.
+func (s *Store) LastWrite() time.Time {
+	s.layout.RLock()
+	defer s.layout.RUnlock()
+	paths := []string{filepath.Join(s.opts.Dir, serverFile)}
+	if ids, err := s.spaceFiles(); err == nil {
+		for _, id := range ids {
+			paths = append(paths, s.spacePath(id))
+		}
+	}
+	var newest time.Time
+	for _, p := range paths {
+		if info, err := os.Stat(p); err == nil && info.ModTime().After(newest) {
+			newest = info.ModTime()
+		}
+	}
+	return newest
+}
+
+// Pending describes the migrations existing data has to apply: the server
+// file's and every space file's that are behind, as a stable key that is the
+// same for the same set of pending migrations ("" when there are none). A file
+// that was never migrated (a new install) holds nothing to lose and does not
+// count.
+func (s *Store) Pending(ctx context.Context) (string, error) {
+	s.layout.RLock()
+	defer s.layout.RUnlock()
+	pending, err := migrate.Server.PendingVersions(ctx, s.server)
+	if err != nil {
+		return "", fmt.Errorf("list pending server migrations: %w", err)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ids := make([]int64, 0, len(s.spaces))
+	for id := range s.spaces {
+		ids = append(ids, id)
+	}
+	slices.Sort(ids)
+	for _, id := range ids {
+		versions, err := migrate.Space.PendingVersions(ctx, s.spaces[id].db)
+		if err != nil {
+			return "", fmt.Errorf("list pending migrations of space %d: %w", id, err)
+		}
+		for _, v := range versions {
+			pending = append(pending, fmt.Sprintf("%s@%d", v, id))
+		}
+	}
+	if len(pending) == 0 {
+		return "", nil
+	}
+	sum := sha256.Sum256([]byte(strings.Join(pending, "\n")))
+	return hex.EncodeToString(sum[:6]), nil
 }

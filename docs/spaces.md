@@ -11,7 +11,9 @@ Use **Create a space** in the switcher, or the window shown to a user with no sp
 1. **What a space is**: a short explanation.
 2. **Name**.
 3. **Copy from another space?** (only if you belong to one). Pick a source or the defaults, and tick what to copy: currencies, accounts (without balances), categories, tags. This is a one-time copy; for categories and tags that stay in step, see [shared categories and tags](#shared-categories-and-tags).
-4. **Base entities**, all editable: base currency (required) and other currencies, picked from a searchable list (by code, name or symbol; the popular ones come first). If the server cannot reach its currency data, the list is a short built-in one, the modal says so, and any currency code can be typed; at least one account (copied accounts count), with optional opening balance; categories (the default of each type cannot be removed); tags.
+4. **Currencies and accounts**: base currency (required) and other currencies, picked from a searchable list (by code, name or symbol; the popular ones come first; on a phone the picker and its list use the full width). If the server cannot reach its currency data, the list is a short built-in one, the modal says so, and any currency code can be typed. The server waits 5 minutes after a failed download before trying again; the notice's Retry button skips that wait (`GET /api/currencies/catalog?refresh=1`), at most once per 10 seconds, so repeated clicks do not hammer the data service. Data that was fetched fine is not thrown away by a retry, and old data stays in use if the retry fails. Below, at least one account (copied accounts count), with optional opening balance. While Retry runs the notice shows a spinner and the button is disabled; afterwards it says whether the currencies loaded or it is still the built-in list. **Continue** stays disabled until a base currency and at least one account exist. Account types show an icon (bank, cash, crypto).
+5. **Categories**, editable (the default of each type cannot be removed), listed in two groups, expenses and incomes. The form to add one stays pinned at the bottom while the list scrolls.
+6. **Tags**, optional.
 
 **Default categories and tags.** A new space starts with these presets, named in your language and each with a one-line hint:
 
@@ -20,11 +22,11 @@ Use **Create a space** in the switcher, or the window shown to a user with no sp
 - Tags: Essential, Subscription, Shared, Business, Vacation.
 
 Renaming a preset stores your own name. Spaces created before this list keep their old presets.
-5. **Create**: a summary, then the space is made in one step. The last screen has an optional **Invite members** button; people are invited when you press **Continue**. You can also invite later in the space settings.
+7. **Create**: a summary, then the space is made in one step. The last screen has an optional **Invite members** button; people are invited when you press **Continue**. You can also invite later in the space settings.
 
-Progress is kept in your browser only, so you can close the window and return. Nothing reaches the server before the last step.
+Progress is kept in your browser only, so you can close the window and return (a draft saved on the old single "base entities" step resumes on **Currencies and accounts**). Going back never loses what you edited. Nothing reaches the server before the last step.
 
-**Emoji and color.** A space can have one emoji and a color (`#rrggbb`), picked when it is created and changed by a space admin in the space settings. They show in the space switcher, the settings header and the admin spaces table; without an emoji the first letter of the name is shown on the color. They are display only: they are not part of anything signed, so linked spaces and transfers do not carry them, and a space imported from a backup starts without them. Server backups keep them.
+**Emoji and color.** A space can have one emoji and a color (`#rrggbb`), picked when it is created and changed by a space admin in the space settings. They show in the space switcher, the settings header and the admin spaces table; without an emoji the first letter of the name is shown instead. The color is drawn as a soft tint behind the emoji, the same way category icons are, and the space settings and the create dialog show a live preview. They are display only: they are not part of anything signed, so linked spaces and transfers do not carry them, and a space imported from a backup starts without them. Server backups keep them.
 
 **Via the API.** `POST /api/spaces` with only a `name` makes an empty space; `emoji` and `color` are optional. It can also fill the space in one request: `baseCurrency`, `currencies` (codes), `accounts` (`name`, `type`, `currency`, `initialBalance`; at least one when anything is filled in), `categories`, `tags`. Rates come from the server's currency data; a currency without a known rate is refused, never stored with a made-up one. Default expense and income categories are always added. The request creates the whole space or nothing.
 

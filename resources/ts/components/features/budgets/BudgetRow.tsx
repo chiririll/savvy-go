@@ -1,7 +1,6 @@
 import { PiggyBank } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { FeedProgress, FeedRow, progressAmounts, RowActions, type FeedGroupKey } from '@/components/shared'
-import { categoryIconStyle } from '@/lib/category-color'
 import i18n from '@/lib/i18n'
 import { localizeDefaultName } from '@/lib/localized-name'
 import { Budget, BudgetPeriod } from '@/types'
@@ -30,10 +29,10 @@ function BudgetIcon({ budget }: { budget: Budget }) {
         return <PiggyBank className="size-4" />
     }
     if (icons.length === 1) {
-        return <span aria-hidden>{icons[0]}</span>
+        return <>{icons[0]}</>
     }
     return (
-        <span aria-hidden className="relative block size-full text-sm">
+        <span className="relative block size-full text-sm">
             <span className="absolute left-1 top-1">{icons[0]}</span>
             <span className="absolute bottom-1 right-1">{icons[1]}</span>
         </span>
@@ -61,7 +60,7 @@ export function BudgetRow({ budget, onEdit, onDelete, isReadOnly }: BudgetRowPro
         <FeedRow
             icon={<BudgetIcon budget={budget} />}
             iconClassName={color ? undefined : 'bg-muted text-muted-foreground'}
-            iconStyle={categoryIconStyle(color)}
+            iconColor={color}
             title={budget.name}
             subtitle={scope || undefined}
             {...(progress && progressAmounts({

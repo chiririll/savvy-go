@@ -36,6 +36,16 @@ When restoring:
 
 A database of the Laravel version is upgraded and only the upgraded version is kept as a backup, see [Upgrading from the Laravel version](#upgrading-from-the-laravel-version). A deleted space leaves a final backup in **Administration → Spaces**.
 
+### Backup before an upgrade
+
+When you start a newer version that has database migrations to apply, Savvy first makes a server backup of the data as it is, and migrates only after that. It appears in **Administration → System backups** like any other server backup (signed, with the signing key), with the note *Before migration*. The file is in `backups/server/`, and the manifest records the app version that made it, which is the *new* version, so the backup holds the data of the version before.
+
+- A new install, or data that is already up to date, makes no backup.
+- If the migration itself fails and Savvy is restarted again and again (a service manager does this), it does not make a backup each time. The note names the pending migrations (*Before migration bb19a7f7f41c*), and a start that finds that backup again reuses it, as long as no database file was written since. If you ran an older version in between and added data, the next attempt makes a new backup.
+- If the backup cannot be written, Savvy refuses to start with `backup failed, the data is not migrated` and changes nothing. Free space or fix the permissions of `backups/` and start again.
+
+To roll back, stop Savvy, unpack the zip into the data directory (`server.sqlite`, `spaces/*.sqlite`, `keys/server.ed25519`), delete the old `*.sqlite-wal` and `*.sqlite-shm` files next to them, and start the previous version. Anything written after the upgrade is lost. If the new version still runs, you can instead restore the backup in **Administration → System backups**, but then the newer version migrates it again.
+
 ### Restoring on first run
 
 A new server with no users can be filled from a server backup instead of creating an admin: this is how you move to another server. On the first-run page (see [Deployment](deployment.md#first-run)) enter the bootstrap password, upload the backup and, for a database of the Laravel version, its `APP_KEY`. Everything in the backup replaces the empty server (users, spaces, settings and the signing key), all sessions are dropped, and you sign in as usual. If the restore fails, nothing changes and the password stays valid. Once the server has a user, this option is gone; use **Administration → System backups**.

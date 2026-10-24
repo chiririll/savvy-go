@@ -27,6 +27,12 @@ func (h Handler) currencies(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteValidation(w, map[string][]string{"base": {"The base must be a currency code."}})
 		return
 	}
+	if refresh := r.URL.Query().Get("refresh"); refresh == "1" || refresh == "true" {
+		// The user asked to try the data service again; the source throttles this.
+		if src, ok := h.Rates.(interface{ Refresh() bool }); ok {
+			src.Refresh()
+		}
+	}
 	list, builtIn := h.catalog(r, base)
 	source := "live"
 	if builtIn {

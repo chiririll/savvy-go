@@ -155,6 +155,7 @@ export function TransactionRow(props: TransactionRowProps) {
             extraAmount={received ? `${transaction.status === 'skipped' ? '' : '+'}${received}` : undefined}
             onOpen={handlers.edit}
             hasActions={showActions && Object.values(handlers).some(Boolean)}
+            reserveActions={showActions && !props.isReadOnly}
             actions={({ menuOpen, setMenuOpen, isMobile }) => (
                 <TransactionMenu
                     handlers={handlers}

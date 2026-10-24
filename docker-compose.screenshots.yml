@@ -3,7 +3,10 @@
 #   docker compose -f docker-compose.screenshots.yml up --build --abort-on-container-exit --exit-code-from shots
 #   docker compose -f docker-compose.screenshots.yml down -v
 #
-# The files appear in ./screenshots. `down -v` removes the app's data with its volume.
+# The files are copied to ./screenshots by `npm run screenshots` (docker compose cp), which also sets
+# APP_CONFIG and APP_SEED to the contents of scripts/screenshots/config.toml and seed.toml. Nothing is
+# bind-mounted from the host, so this works with a remote Docker context too. `down -v` removes the
+# app's data with its volume.
 services:
   # Not called "app": Chromium treats http://app as the .app top-level domain, which is HTTPS-only.
   savvy:
@@ -14,12 +17,16 @@ services:
         # Marks what opens a dialog in the interface, so the runner finds it.
         APP_ENV: screenshots
     environment:
-      CONFIG_FILE: /config/config.toml
+      CONFIG_FILE: /tmp/config/config.toml
+      APP_CONFIG: ${APP_CONFIG:?set by npm run screenshots}
+      APP_SEED: ${APP_SEED:?set by npm run screenshots}
     volumes:
       - test-data:/data
-      - ./scripts/screenshots/config.toml:/config/config.toml:ro
-      - ./scripts/screenshots/seed.toml:/config/seed.toml:ro
-    command: ["--seed-config", "/config/seed.toml"]
+    # The config files are written from the environment, not mounted (a mount path is the daemon's).
+    entrypoint:
+      - /bin/sh
+      - -c
+      - mkdir -p /tmp/config && printf '%s' "$$APP_CONFIG" > /tmp/config/config.toml && printf '%s' "$$APP_SEED" > /tmp/config/seed.toml && exec savvy-go --seed-config /tmp/config/seed.toml
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/livez"]
       interval: 3s
@@ -47,12 +54,13 @@ services:
       CONFIG: ${CONFIG:-}
       # Settings from the command line (--languages=en,ru), a JSON object of strings.
       CONFIG_OVERRIDES: ${CONFIG_OVERRIDES:-}
+      # Browser contexts at a time; the container's CPUs when empty.
+      CONCURRENCY: ${CONCURRENCY:-}
       TZ: UTC
     # Chromium recommends sharing the host's IPC namespace in Docker.
     ipc: host
     volumes:
       - test-data:/data:ro
-      - ./screenshots:/out
 
 volumes:
   test-data:

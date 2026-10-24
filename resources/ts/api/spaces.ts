@@ -34,11 +34,15 @@ export const spacesApi = {
 
     /** Categories and tags a new space can start with. */
     presets: () => api.get<SpacePresets>('/presets'),
-    /** Every currency the server knows, priced in `base`; needs no space. */
-    currencyCatalog: (base?: string) =>
+    /**
+     * Every currency the server knows, priced in `base`; needs no space. `refresh`
+     * asks the server to try its data service again now instead of answering from
+     * the cache it keeps after a failure.
+     */
+    currencyCatalog: (base?: string, opts?: { refresh?: boolean }) =>
         apiClient
             .get<{ data: CurrencyCatalogItem[]; meta?: { source?: string } }>(
-                `/currencies/catalog${toQueryString({ base })}`,
+                `/currencies/catalog${toQueryString({ base, refresh: opts?.refresh ? 1 : undefined })}`,
             )
             .then((res): CurrencyCatalog => ({ items: res.data.data, source: res.data.meta?.source ?? 'live' })),
     /** The currencies, accounts, categories and tags of a space, read with viewer rights. */

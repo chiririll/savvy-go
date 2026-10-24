@@ -22,24 +22,29 @@ export function Members({ space, isAdmin }: { space: Space; isAdmin: boolean }) 
         <SettingsSection icon={Users} title={t('spaces.members.title')} description={t('spaces.members.description')}>
             <ul className="divide-y rounded-lg border">
                 {members.map((m) => (
-                    <li key={m.userId} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2">
-                        <div
-                            aria-hidden
-                            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"
-                        >
-                            <UserRound className="size-4" />
+                    <li
+                        key={m.userId}
+                        className="flex flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:gap-3"
+                    >
+                        <div className="flex min-w-0 flex-1 items-center gap-3">
+                            <div
+                                aria-hidden
+                                className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"
+                            >
+                                <UserRound className="size-4" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-medium">
+                                    {m.name}{' '}
+                                    {m.userId === me?.id && (
+                                        <span className="text-muted-foreground">({t('spaces.members.you')})</span>
+                                    )}
+                                </p>
+                                <p className="truncate text-xs text-muted-foreground">{m.email}</p>
+                            </div>
                         </div>
-                        <div className="min-w-0 flex-1 basis-40">
-                            <p className="truncate text-sm font-medium">
-                                {m.name}{' '}
-                                {m.userId === me?.id && (
-                                    <span className="text-muted-foreground">({t('spaces.members.you')})</span>
-                                )}
-                            </p>
-                            <p className="truncate text-xs text-muted-foreground">{m.email}</p>
-                        </div>
-                        <div className="ml-auto flex items-center gap-2">
-                            <div className="flex w-32 justify-end">
+                        <div className="flex items-center gap-2 sm:ml-auto">
+                            <div className="flex flex-1 justify-start sm:w-32 sm:flex-none sm:justify-end">
                                 {isAdmin ? (
                                     <Select
                                         value={m.role}
@@ -48,7 +53,7 @@ export function Members({ space, isAdmin }: { space: Space; isAdmin: boolean }) 
                                         }
                                     >
                                         <SelectTrigger
-                                            className="h-8 w-32"
+                                            className="h-8 w-full sm:w-32"
                                             aria-label={`${t('common:fields.role')}: ${m.name}`}
                                         >
                                             <SelectValue />

@@ -315,3 +315,139 @@ func TestCatalogStatusMarksFallbackList(t *testing.T) {
 		t.Fatal("still reported as the built-in list after the service came back")
 	}
 }
+
+// countingNames serves a names file and counts the requests that reach it.
+func countingNames(t *testing.T, fail *bool) (url string, hits *int) {
+	t.Helper()
+	var mu sync.Mutex
+	n := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		mu.Lock()
+		n++
+		down := *fail
+		mu.Unlock()
+		if down {
+			http.Error(w, "boom", http.StatusInternalServerError)
+			return
+		}
+		_, _ = w.Write([]byte(`{"USD": {"code": "USD", "name": "US Dollar", "symbol": "$", "symbol_native": "$", "decimal_digits": 2}}`))
+	}))
+	t.Cleanup(srv.Close)
+	return srv.URL, &n
+}
+
+func TestRefreshRetriesFailedNamesOnce(t *testing.T) {
+	clock := time.Now()
+	f := newFakeService(t)
+	down := true
+	url, hits := countingNames(t, &down)
+	s := f.source(&clock)
+	s.MetaURL = url
+	ctx := context.Background()
+
+	if _, builtIn := s.CatalogStatus(ctx, "usd"); !builtIn || *hits != 1 {
+		t.Fatalf("builtIn=%v hits=%d, want the built-in list after one try", builtIn, *hits)
+	}
+	// Inside the retry window a normal call answers from the cache.
+	s.CatalogStatus(ctx, "usd")
+	if *hits != 1 {
+		t.Fatalf("hits=%d, a normal call must not touch the network in the window", *hits)
+	}
+	// The service recovers; Refresh makes the next call hit the network once.
+	down = false
+	if !s.Refresh() {
+		t.Fatal("first Refresh was refused")
+	}
+	if _, builtIn := s.CatalogStatus(ctx, "usd"); builtIn || *hits != 2 {
+		t.Fatalf("builtIn=%v hits=%d, want recovered after one more request", builtIn, *hits)
+	}
+}
+
+func TestRefreshIsThrottled(t *testing.T) {
+	clock := time.Now()
+	f := newFakeService(t)
+	down := true
+	url, hits := countingNames(t, &down)
+	s := f.source(&clock)
+	s.MetaURL = url
+	ctx := context.Background()
+	s.CatalogStatus(ctx, "usd") // hits=1, fails
+
+	if !s.Refresh() {
+		t.Fatal("first Refresh refused")
+	}
+	s.CatalogStatus(ctx, "usd") // hits=2, fails again
+	if s.Refresh() {
+		t.Fatal("second Refresh inside the throttle was accepted")
+	}
+	s.CatalogStatus(ctx, "usd")
+	if *hits != 2 {
+		t.Fatalf("hits=%d, a throttled Refresh must not reach the network", *hits)
+	}
+	clock = clock.Add(s.RefreshEvery + time.Second)
+	if !s.Refresh() {
+		t.Fatal("Refresh refused after the throttle passed")
+	}
+	s.CatalogStatus(ctx, "usd")
+	if *hits != 3 {
+		t.Fatalf("hits=%d, want 3", *hits)
+	}
+}
+
+func TestRefreshKeepsGoodData(t *testing.T) {
+	clock := time.Now()
+	f := newFakeService(t)
+	s := f.source(&clock)
+	ctx := context.Background()
+	if _, err := s.Rates(ctx, "usd"); err != nil {
+		t.Fatal(err)
+	}
+	s.CatalogStatus(ctx, "usd")
+	before := f.requests("usd")
+
+	s.Refresh()
+	if _, err := s.Rates(ctx, "usd"); err != nil {
+		t.Fatal(err)
+	}
+	if f.requests("usd") != before {
+		t.Fatal("Refresh threw away rates that were fetched fine")
+	}
+}
+
+func TestRefreshRetriesFailedRatesKeepingOld(t *testing.T) {
+	clock := time.Now()
+	f := newFakeService(t)
+	s := f.source(&clock)
+	ctx := context.Background()
+	if _, err := s.Rates(ctx, "jpy"); err != nil {
+		t.Fatal(err)
+	}
+	// Expire, then the service goes down: the old rates serve and a retry window starts.
+	s.Expire()
+	f.set(func() { f.down = true })
+	if _, err := s.Rates(ctx, "jpy"); err != nil {
+		t.Fatal(err)
+	}
+	failedAt := f.requests("jpy")
+	s.Rates(ctx, "jpy")
+	if f.requests("jpy") != failedAt {
+		t.Fatal("a call inside the retry window reached the network")
+	}
+
+	// Refresh while still down: one more attempt, and the old data stays in use.
+	s.Refresh()
+	rates, err := s.Rates(ctx, "jpy")
+	if err != nil || !rates["USD"].Equal(dec("160")) {
+		t.Fatalf("old rates lost: %v %v", rates, err)
+	}
+	if f.requests("jpy") != failedAt+1 {
+		t.Fatalf("requests=%d, want one forced attempt", f.requests("jpy")-failedAt)
+	}
+	// Recovered after the throttle.
+	clock = clock.Add(s.RefreshEvery + time.Second)
+	f.set(func() { f.down = false })
+	s.Refresh()
+	if _, err := s.Rates(ctx, "jpy"); err != nil || f.requests("jpy") != failedAt+2 {
+		t.Fatalf("err=%v requests=%d", err, f.requests("jpy"))
+	}
+}

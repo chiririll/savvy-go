@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { SmilePlus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import EmojiPickerReact, { EmojiClickData, EmojiStyle, Theme } from 'emoji-picker-react'
 import { Popover, PopoverContent, PopoverTrigger } from '../../ui/popover'
@@ -32,9 +33,11 @@ export function EmojiPicker({ value, onChange, disabled, labelledBy }: EmojiPick
                     size="icon"
                     disabled={disabled}
                     aria-labelledby={labelledBy}
+                    // Without an emoji the button holds only an icon, so it needs a name of its own.
+                    aria-label={labelledBy ? undefined : t('fields.icon')}
                     className="size-10 text-xl"
                 >
-                    {value || '😀'}
+                    {value || <SmilePlus data-testid="emoji-placeholder" aria-hidden className="size-5 text-muted-foreground" />}
                 </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start" aria-label={t('fields.icon')}>

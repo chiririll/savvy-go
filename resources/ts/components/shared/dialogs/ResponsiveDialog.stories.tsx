@@ -3,6 +3,7 @@ import { expect, fn, screen, userEvent } from 'storybook/test'
 
 import { Button } from '@/components/ui/button'
 
+import { DialogPinned } from './DialogPinned'
 import { ResponsiveDialog } from './ResponsiveDialog'
 
 // A dialog on a wide screen and a bottom sheet on a narrow one; the story tests run at both sizes.
@@ -38,6 +39,30 @@ export const LongBody: Story = {
     play: async () => {
         // The footer must stay on screen while the body scrolls.
         await expect(await screen.findByRole('button', { name: 'Send' })).toBeVisible()
+    },
+}
+
+export const PinnedBelowLongBody: Story = {
+    args: {
+        children: (
+            <>
+                {Array.from({ length: 40 }, (_, i) => (
+                    <p key={i}>Line {i + 1}</p>
+                ))}
+                <DialogPinned>
+                    <input aria-label="New item" />
+                </DialogPinned>
+            </>
+        ),
+    },
+    play: async () => {
+        const input = await screen.findByRole('textbox', { name: 'New item' })
+        const send = screen.getByRole('button', { name: 'Send' })
+        // Not part of the scrolling body, so scrolling the body never moves it away.
+        await expect(input.closest('[tabindex="0"]')).toBeNull()
+        await expect(input).toBeVisible()
+        // Drawn above the footer buttons.
+        await expect(input.getBoundingClientRect().bottom).toBeLessThanOrEqual(send.getBoundingClientRect().top)
     },
 }
 

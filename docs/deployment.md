@@ -218,4 +218,6 @@ docker compose up -d
 
 Data stays in the volume and migrations run on start. With the Debian or RPM package, install the newer package.
 
+When a newer version changes the database layout, Savvy first saves a server backup, then migrates. If the backup cannot be written (disk full, backups directory not writable), Savvy refuses to start and the data stays as it was. See [Backup before an upgrade](data-and-backups.md#backup-before-an-upgrade).
+
 Coming from Laravel: see [Upgrading from the Laravel version](data-and-backups.md#upgrading-from-the-laravel-version).

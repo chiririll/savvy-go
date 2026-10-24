@@ -21,11 +21,16 @@ Regenerates every logo from the `Logo` component ([`Logo.tsx`](../resources/ts/c
 ```bash
 npm run screenshots              # defaults: English, light theme
 npm run screenshots -- full      # use configs/full.json
+npm run screenshots -- --concurrency=8   # browser contexts at a time
 ```
 
 Screenshots every page for each demo user, space and viewport (desktop and mobile). Only Docker is needed.
 
 [`docker-compose.screenshots.yml`](../docker-compose.screenshots.yml) builds the app, seeds demo data into an empty volume and runs Playwright against it. When the run ends (even on failure or Ctrl+C) containers and volume are removed, so every run starts fresh.
+
+The Docker daemon may be remote (`docker context use ...` or `DOCKER_HOST`): config files are passed as environment variables, the source goes up as the build context and the result is copied back with `docker compose cp`, so no host paths are mounted. Expect the repo upload on every run.
+
+Pages and scenarios run at the same time and share the browser contexts (half each; all to whichever runs alone). The number is the CPU count of the Docker host unless `--concurrency=N` is given. Pages all hit one seeded app, so a very high number can slow it down instead of the run.
 
 Output goes to `screenshots/<start time>[_<config>]/` (git-ignored). Set `RUN_NAME` to name a run, e.g. `RUN_NAME=before-redesign`.
 

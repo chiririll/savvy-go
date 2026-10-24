@@ -8,12 +8,15 @@ import (
 
 	"savvy-go/internal/app"
 	"savvy-go/internal/appconfig"
+	"savvy-go/internal/backup"
 	"savvy-go/internal/config"
 	"savvy-go/internal/currencydata"
 	"savvy-go/internal/httpserver"
 	"savvy-go/internal/jobs"
 	"savvy-go/internal/locator"
 	"savvy-go/internal/seed"
+	"savvy-go/internal/settings"
+	"savvy-go/internal/signing"
 	"savvy-go/internal/store/sqlite"
 )
 
@@ -62,9 +65,9 @@ func (b *Builder) Build(ctx context.Context) (*Process, error) {
 	if err := makeDirs(cfg); err != nil {
 		return nil, err
 	}
-	st, err := sqlite.OpenApp(ctx, cfg.DataDir)
+	st, err := openMigrated(ctx, cfg, b.build, sqlite.AppOptions(ctx, cfg.DataDir))
 	if err != nil {
-		return nil, fmt.Errorf("open store: %w", err)
+		return nil, err
 	}
 	built := false
 	defer func() {
@@ -105,6 +108,81 @@ func (b *Builder) Build(ctx context.Context) (*Process, error) {
 	}
 	built = true
 	return &Process{Loc: loc, rates: rates}, nil
+}
+
+// openMigrated opens the databases and migrates them. If existing data has
+// migrations pending, a normal server backup is taken first.
+//
+// The backup needs the signing key from the data dir and an open store, so
+// the files are first opened without migrators (the schema stays as on disk),
+// backed up, closed, and opened again with the real migrators.
+//
+// A failed backup stops the start: migrating without the promised backup
+// could lose data with no way back, so the schema is left untouched.
+func openMigrated(
+	ctx context.Context,
+	cfg appconfig.Config,
+	build appconfig.Build,
+	opts sqlite.Options,
+) (*sqlite.Store, error) {
+	probe := opts
+	probe.MigrateServer, probe.MigrateSpace = nil, nil
+	st, err := sqlite.Open(ctx, probe)
+	if err != nil {
+		return nil, fmt.Errorf("open store: %w", err)
+	}
+	pending, err := st.Pending(ctx)
+	if err == nil && pending != "" {
+		err = backupBeforeMigration(ctx, cfg, build, st, pending)
+	}
+	if cerr := st.Close(); err == nil && cerr != nil {
+		err = cerr
+	}
+	if err != nil {
+		return nil, fmt.Errorf("before migrating: %w", err)
+	}
+	st, err = sqlite.Open(ctx, opts)
+	if err != nil {
+		return nil, fmt.Errorf("open store: %w", err)
+	}
+	return st, nil
+}
+
+// backupBeforeMigration takes the server backup for the migrations named by
+// pending. The note carries pending, so a start that finds its backup again
+// (the migration failed and the process is restarted in a loop) reuses it
+// instead of filling the disk.
+func backupBeforeMigration(
+	ctx context.Context,
+	cfg appconfig.Config,
+	build appconfig.Build,
+	st *sqlite.Store,
+	pending string,
+) error {
+	note := "Before migration " + pending
+	// The settings may be of an older schema; an unreadable one counts as no key used yet.
+	kid, _ := (settings.Store{DB: st.Server()}).Get(ctx, signingKeyUsedKey, "").(string)
+	key, err := signing.Load(cfg.DataDir, kid != "")
+	if err != nil {
+		return fmt.Errorf("signing key: %w", err)
+	}
+	svc := backup.Service{
+		Store: st, Keys: signing.KeyRing{Holder: signing.NewHolder(key)},
+		Dir: cfg.BackupsDir, DataDir: cfg.DataDir, AppVersion: build.Version,
+	}
+	// The migration failed before and the process was restarted: the backup of
+	// that attempt still holds all the data unless a file was written since.
+	if prev := svc.ServerBackupWithNote(note, st.LastWrite()); prev != nil {
+		slog.Info("migrations pending; reusing the backup from an earlier attempt", "file", prev.Filename)
+		return nil
+	}
+	slog.Info("migrations pending; backing up the server first")
+	entry, err := svc.CreateServer(ctx, &note)
+	if err != nil {
+		return fmt.Errorf("backup failed, the data is not migrated: %w", err)
+	}
+	slog.Info("backup before migration written", "file", entry.Filename)
+	return nil
 }
 
 // loadSeed reads the seed file; without one the demo data is not seeded.

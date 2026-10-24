@@ -1,3 +1,4 @@
+import { useCallback, useRef } from 'react'
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import i18n from '@/lib/i18n'
 import { adminSpacesApi, invitationsApi, spacesApi, syncGroupsApi } from '@/api/spaces'
@@ -82,13 +83,32 @@ export function useSpacePresets(enabled = true) {
     return useQuery({ queryKey: ['presets'], queryFn: spacesApi.presets, enabled, staleTime: Infinity })
 }
 
+/**
+ * The server's currency list. The first load and any automatic refetch use the
+ * server's cache; a manual `refetch()` (the Retry button) sends `refresh=1`, so the
+ * server tries its data service again instead of repeating a failed answer.
+ */
 export function useServerCurrencyCatalog(enabled = true) {
-    return useQuery({
+    const forceRefresh = useRef(false)
+    const query = useQuery({
         queryKey: ['currency-catalog'],
-        queryFn: () => spacesApi.currencyCatalog(),
+        queryFn: () => spacesApi.currencyCatalog(undefined, { refresh: forceRefresh.current }),
         enabled,
         staleTime: 10 * 60_000,
     })
+    const { refetch: plainRefetch } = query
+    const refetch = useCallback<typeof plainRefetch>(
+        async (options) => {
+            forceRefresh.current = true
+            try {
+                return await plainRefetch(options)
+            } finally {
+                forceRefresh.current = false
+            }
+        },
+        [plainRefetch],
+    )
+    return { ...query, refetch }
 }
 
 /** What can be copied from another space; read only while `id` is set. */

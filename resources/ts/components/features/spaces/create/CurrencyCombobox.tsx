@@ -98,7 +98,7 @@ export function CurrencyCombobox({
             <PopoverContent
                 align="start"
                 aria-label={placeholder}
-                className="w-[var(--radix-popover-trigger-width)] min-w-64 p-0"
+                className="w-[var(--radix-popover-trigger-width)] min-w-64 max-w-[calc(100vw-2rem)] p-0"
             >
                 <div className="border-b p-2">
                     <Input

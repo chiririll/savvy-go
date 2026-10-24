@@ -120,6 +120,26 @@ export const NothingAllowed: Story = {
     },
 }
 
+// A row without actions keeps its amount in the column of the rows that have the dots.
+export const NothingAllowedKeepsDotsColumn: Story = {
+    tags: ['desktop-only'],
+    args: {
+        transaction: transaction({ actions: { edit: false, duplicate: false, delete: false, confirm: false, skip: false } }),
+    },
+    play: async ({ canvasElement }) => {
+        await expect(within(canvasElement).getByTestId('feed-row-actions-spacer')).toBeInTheDocument()
+    },
+}
+
+// A viewer has no dots on any row, so there is no column to keep.
+export const ReadOnlyHasNoDotsColumn: Story = {
+    tags: ['desktop-only'],
+    args: { isReadOnly: true },
+    play: async ({ canvasElement }) => {
+        await expect(within(canvasElement).queryByTestId('feed-row-actions-spacer')).toBeNull()
+    },
+}
+
 export const Edited: Story = {
     play: async ({ canvasElement, args }) => {
         await userEvent.click(within(canvasElement).getByText('Weekly shop'))
