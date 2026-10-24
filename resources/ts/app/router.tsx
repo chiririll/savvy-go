@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { createBrowserRouter, Navigate, useParams } from 'react-router-dom'
+import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { AuthProvider } from '@/components/providers/AuthProvider'
 import { useUser } from '@/stores/auth'
@@ -30,15 +30,6 @@ const RecurringPage = lazy(() => import('@/pages/recurring'))
 const AutomationPage = lazy(() => import('@/pages/automation'))
 const AutomationLogsPage = lazy(() => import('@/pages/automation/[id]/logs'))
 
-function AutomationCreateRedirect() {
-    return <Navigate to="/automation?create=1" replace />
-}
-
-function AutomationEditRedirect() {
-    const { id } = useParams<{ id: string }>()
-    return <Navigate to={id ? `/automation?edit=${id}` : '/automation'} replace />
-}
-
 const ReportsPage = lazy(() => import('@/pages/reports'))
 // Settings: the current space and the user's own.
 const SpaceSettingsPage = lazy(() => import('@/pages/settings/space'))
@@ -68,10 +59,6 @@ const admin = (Component: React.LazyExoticComponent<() => React.JSX.Element>) =>
     <AdminOnly>{withSuspense(Component)}</AdminOnly>
 )
 
-function ProviderEditRedirect() {
-    const { id } = useParams<{ id: string }>()
-    return <Navigate to={`/admin/providers/${id}/edit`} replace />
-}
 const NotFoundPage = lazy(() => import('@/pages/not-found'))
 
 const withSuspense = (Component: React.LazyExoticComponent<() => React.JSX.Element>) => (
@@ -149,12 +136,9 @@ export const router = createBrowserRouter([
                     { path: childPath(pages.debts), element: withSuspense(DebtsPage) },
                     { path: childPath(pages.recurring), element: withSuspense(RecurringPage) },
                     { path: childPath(pages.automation), element: withSuspense(AutomationPage) },
-                    { path: 'automation/create', element: <AutomationCreateRedirect /> },
-                    { path: 'automation/:id/edit', element: <AutomationEditRedirect /> },
                     { path: childPath(pages.automationLogs), element: withSuspense(AutomationLogsPage) },
                     { path: childPath(pages.reports), element: withSuspense(ReportsPage) },
                     { path: childPath(pages.spaceSettings), element: withSuspense(SpaceSettingsPage) },
-                    { path: 'settings/user', element: <Navigate to={pages.securitySettings.path} replace /> },
                     { path: childPath(pages.securitySettings), element: withSuspense(SecuritySettingsPage) },
                     { path: childPath(pages.passkeySettings), element: withSuspense(PasskeySettingsPage) },
                     { path: childPath(pages.apiSettings), element: withSuspense(ApiSettingsPage) },
@@ -170,13 +154,6 @@ export const router = createBrowserRouter([
                     { path: childPath(pages.adminBackups), element: admin(SystemBackupsPage) },
                     { path: childPath(pages.adminUsers), element: admin(AdminUsersPage) },
                     { path: childPath(pages.adminSpaces), element: admin(AdminSpacesPage) },
-                    // Old addresses.
-                    { path: 'users', element: <Navigate to="/admin/users" replace /> },
-                    { path: 'settings/system', element: <Navigate to="/admin/system" replace /> },
-                    { path: 'settings/monitoring', element: <Navigate to="/admin/monitoring" replace /> },
-                    { path: 'settings/providers', element: <Navigate to="/admin/sso" replace /> },
-                    { path: 'settings/providers/create', element: <Navigate to="/admin/providers/create" replace /> },
-                    { path: 'settings/providers/:id/edit', element: <ProviderEditRedirect /> },
                 ],
             },
         ],
