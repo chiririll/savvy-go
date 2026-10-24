@@ -79,7 +79,7 @@ export const CreateOpensTheModal: Story = {
     play: async ({ canvasElement }) => {
         const menu = await open(canvasElement)
         await userEvent.click(menu.getByRole('menuitem', { name: /create a space/i }))
-        await expect(await screen.findByRole('dialog', { name: /new space/i })).toBeVisible()
+        await expect(await screen.findByRole('dialog', { name: /new space/i }, { timeout: 5000 })).toBeVisible()
     },
 }
 

@@ -1,9 +1,8 @@
 // Axe rules for stories. A story's own a11y config replaces the global list instead of adding to it, so every list
 // here repeats the base rules.
 
-// TODO: re-enable color-contrast once the palette passes WCAG AA. Known misses: --destructive text is 4.49:1 on
-// white (4.0:1 on its tint), text-green-600 is 3.2:1, and the faded "muted" rows. Everything else is checked.
-const base = [{ id: 'color-contrast', enabled: import.meta.env.STORYBOOK_CONTRAST === 'on' }]
+// Colour contrast is checked everywhere. STORYBOOK_CONTRAST=off (set before vitest) skips it while chasing another failure.
+const base = [{ id: 'color-contrast', enabled: import.meta.env.STORYBOOK_CONTRAST !== 'off' }]
 
 export const baseA11y = { test: 'error', config: { rules: base } } as const
 

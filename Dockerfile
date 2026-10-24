@@ -12,6 +12,8 @@ COPY package.json package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci
 COPY resources ./resources
 COPY vite.config.ts ./
+# vite.config.ts imports the story tags
+COPY .storybook/tags.ts ./.storybook/tags.ts
 RUN npm run build
 
 # Build the backend
