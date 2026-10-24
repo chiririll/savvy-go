@@ -4,6 +4,7 @@ import { ArrowDownLeft, ArrowUpRight, Info, Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { DialogPinned } from '@/components/shared/dialogs/DialogPinned'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { categoryTypeLabel } from '@/lib/labels'
 import { defaultNameHint, localizeDefaultName, toStoredDefaultName } from '@/lib/localized-name'
@@ -138,13 +139,11 @@ export function CategoriesStep({ content, onChange }: Props) {
                     </div>
                 )
             })}
-            {/* Sticks to the bottom of the modal's scroll area, so it is there however long the list is.
-                data-sticky-bottom drops the area's bottom padding (ResponsiveDialog), so no list shows
-                through below it. The negative side margins stretch it over the side padding. It is a
-                form, so the keyboard of a phone shrinks the sheet (dvh) and this stays above it. */}
+            {/* Pinned above the footer, so it is there however long the list is. It is a form, so the
+                keyboard of a phone shrinks the sheet (dvh) and this stays above it. */}
+            <DialogPinned>
             <form
-                className="sticky bottom-0 z-10 -mx-6 flex gap-2 border-t bg-background px-6 py-3"
-                data-sticky-bottom
+                className="flex gap-2"
                 data-testid="create-space-category-form"
                 onSubmit={(e) => {
                     e.preventDefault()
@@ -189,6 +188,7 @@ export function CategoriesStep({ content, onChange }: Props) {
                     <Plus className="size-4" />
                 </Button>
             </form>
+            </DialogPinned>
         </StepSection>
     )
 }

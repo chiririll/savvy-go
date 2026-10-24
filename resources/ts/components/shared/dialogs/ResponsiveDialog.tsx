@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
+import { PinnedSlotContext } from './DialogPinned'
 import {
     Dialog,
     DialogContent,
@@ -36,15 +37,16 @@ export function ResponsiveDialog({
     children,
 }: ResponsiveDialogProps) {
     const isMobile = useIsMobile()
-    // A child marked data-sticky-bottom pins itself to the bottom edge, so the padding there would leave a gap under it.
+    const [pinnedSlot, setPinnedSlot] = useState<HTMLElement | null>(null)
     const body = children != null && (
-        <div tabIndex={0} className="min-h-0 flex-1 overflow-y-auto px-6 py-4 has-[[data-sticky-bottom]]:pb-0">
-            {children}
-        </div>
+        <div tabIndex={0} className="min-h-0 flex-1 overflow-y-auto px-6 py-4">{children}</div>
     )
+    // Filled by DialogPinned; hidden while empty, so a dialog that pins nothing shows no strip.
+    const pinned = <div ref={setPinnedSlot} className="shrink-0 border-t bg-background px-6 py-3 empty:hidden" />
 
     if (isMobile) {
         return (
+            <PinnedSlotContext.Provider value={pinnedSlot}>
             <Sheet open={open} onOpenChange={onOpenChange}>
                 <SheetContent
                     side="bottom"
@@ -63,6 +65,7 @@ export function ResponsiveDialog({
                         {description && <SheetDescription>{description}</SheetDescription>}
                     </SheetHeader>
                     {body}
+                    {pinned}
                     {footer && (
                         <SheetFooter
                             className={cn(
@@ -75,10 +78,12 @@ export function ResponsiveDialog({
                     )}
                 </SheetContent>
             </Sheet>
+            </PinnedSlotContext.Provider>
         )
     }
 
     return (
+        <PinnedSlotContext.Provider value={pinnedSlot}>
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent
                 className={cn('flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-md', className)}
@@ -90,6 +95,7 @@ export function ResponsiveDialog({
                     {description && <DialogDescription>{description}</DialogDescription>}
                 </DialogHeader>
                 {body}
+                {pinned}
                 {footer && (
                     <DialogFooter
                         className={cn('shrink-0 flex-row flex-wrap items-center border-t px-6 py-4 sm:justify-end')}
@@ -99,5 +105,6 @@ export function ResponsiveDialog({
                 )}
             </DialogContent>
         </Dialog>
+        </PinnedSlotContext.Provider>
     )
 }

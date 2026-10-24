@@ -99,20 +99,6 @@ describe('CategoriesStep descriptions', () => {
 })
 
 describe('CategoriesStep add form', () => {
-    it('sticks to the bottom of the scroll area', () => {
-        render(<Harness />)
-        const form = screen.getByTestId('create-space-category-form')
-        expect(form.className).toContain('sticky')
-        expect(form.className).toContain('bottom-0')
-    })
-
-    it('has no bottom margin, and tells the dialog to drop its bottom padding, so no gap shows under it', () => {
-        render(<Harness />)
-        const form = screen.getByTestId('create-space-category-form')
-        expect(form.className).not.toMatch(/-mb-/)
-        expect(form.hasAttribute('data-sticky-bottom')).toBe(true)
-    })
-
     it('adds a category of the chosen type (default: expense) and clears the field', () => {
         render(<Harness />)
         const input = screen.getByRole('textbox', { name: 'spaces.create.categories.new' })

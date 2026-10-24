@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DialogPinned } from '@/components/shared/dialogs/DialogPinned'
 import { localizeDefaultName } from '@/lib/localized-name'
 import type { DraftContent } from './draft'
 import { StepSection } from './StepSection'
@@ -34,8 +35,10 @@ export function TagsStep({ content, onChange }: Props) {
                     </span>
                 ))}
             </div>
+            <DialogPinned>
             <form
                 className="flex gap-2"
+                data-testid="create-space-tag-form"
                 onSubmit={(e) => {
                     e.preventDefault()
                     const tag = name.trim()
@@ -55,6 +58,7 @@ export function TagsStep({ content, onChange }: Props) {
                     <Plus className="size-4" />
                 </Button>
             </form>
+            </DialogPinned>
         </StepSection>
     )
 }
