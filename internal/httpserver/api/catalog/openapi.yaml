@@ -6,6 +6,7 @@ paths:
       description: Every known currency with its rate in `base`, for any signed-in user. A space's own catalog hides what it already has; this one does not.
       parameters:
         - {name: base, in: query, schema: {type: string, default: USD}, description: Currency code the rates are priced in}
+        - {name: refresh, in: query, schema: {type: string, enum: ["1", "true"]}, description: "Try the currency data service again now instead of using the answer cached after a failure. The server allows one such retry per 10 seconds; inside that window the current state is returned. `meta.source` says `fallback` while the list is still the short built-in one."}
       responses:
         "200": {$ref: "#/components/responses/Data"}
         "401": {$ref: "#/components/responses/Unauthenticated"}
