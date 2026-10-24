@@ -37,7 +37,9 @@ type Migrate func(context.Context, *sql.DB) error
 
 type Options struct {
 	// Dir holds server.sqlite and the spaces directory.
-	Dir           string
+	Dir string
+	// MigrateServer and MigrateSpace may be nil: the files are then opened as
+	// they are, without touching the schema.
 	MigrateServer Migrate
 	MigrateSpace  Migrate
 	// Quota is the size limit of a space in bytes; 0 means unlimited. It may

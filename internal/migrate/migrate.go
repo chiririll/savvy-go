@@ -35,6 +35,31 @@ func (s Set) PendingCount(ctx context.Context, db *sql.DB) (int, error) {
 	return pendingCount(ctx, db, s)
 }
 
+// PendingVersions lists this set's migrations not yet applied, as recorded
+// ("<set>/<file>"). A file that was never migrated has none: it holds nothing
+// to lose.
+func (s Set) PendingVersions(ctx context.Context, db *sql.DB) ([]string, error) {
+	n, err := pendingCount(ctx, db, s)
+	if err != nil || n == -1 {
+		return nil, err
+	}
+	applied, err := appliedVersions(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	names, err := migrationFiles(s)
+	if err != nil {
+		return nil, err
+	}
+	var out []string
+	for _, name := range names {
+		if v := strings.TrimSuffix(name, ".sql"); !applied[v] {
+			out = append(out, v)
+		}
+	}
+	return out, nil
+}
+
 const tableSQL = `CREATE TABLE IF NOT EXISTS schema_migrations (
     version TEXT PRIMARY KEY,
     applied_at TEXT NOT NULL
