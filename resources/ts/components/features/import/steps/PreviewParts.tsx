@@ -15,9 +15,9 @@ const nf = (n: number) => n.toLocaleString(intlLocale())
 
 function Tile({ tone, value, label }: { tone: 'green' | 'yellow' | 'red'; value: string; label: string }) {
     const classes = {
-        green: ['bg-green-500/10', 'text-green-600'],
-        yellow: ['bg-yellow-500/10', 'text-yellow-600'],
-        red: ['bg-red-500/10', 'text-red-600'],
+        green: ['bg-success/10', 'text-success'],
+        yellow: ['bg-warning/10', 'text-warning'],
+        red: ['bg-destructive/10', 'text-destructive'],
     }[tone]
 
     return (
@@ -87,9 +87,9 @@ export function NewEntities({ summary }: { summary: Summary }) {
     }
 
     return (
-        <div className="p-4 border rounded-lg bg-blue-500/10">
+        <div className="p-4 border rounded-lg bg-info/10">
             <div className="flex items-center gap-2 mb-2">
-                <AlertTriangle className="size-4 text-blue-500" />
+                <AlertTriangle className="size-4 text-info" />
                 <span className="font-medium">{t('import.newEntities')}</span>
             </div>
             <div className="space-y-2 text-sm">
@@ -106,14 +106,14 @@ export function PreviewTable({ transactions }: { transactions: PreviewTransactio
     const { t: tPages } = useTranslation('pages')
 
     const statusConfig = {
-        new: { icon: CheckCircle2, color: 'text-green-500', bgColor: 'bg-green-500/10', label: t('import.statusNew') },
+        new: { icon: CheckCircle2, color: 'text-success', bgColor: 'bg-success/10', label: t('import.statusNew') },
         duplicate: {
             icon: Copy,
-            color: 'text-yellow-500',
-            bgColor: 'bg-yellow-500/10',
+            color: 'text-warning',
+            bgColor: 'bg-warning/10',
             label: t('import.statusDuplicate'),
         },
-        error: { icon: XCircle, color: 'text-red-500', bgColor: 'bg-red-500/10', label: t('import.statusError') },
+        error: { icon: XCircle, color: 'text-destructive', bgColor: 'bg-destructive/10', label: t('import.statusError') },
     }
 
     return (
@@ -181,7 +181,7 @@ function IssueList({ tone, icon, title, issues }: IssueListProps) {
     if (issues.length === 0) return null
 
     return (
-        <div className={cn('p-4 border rounded-lg', tone === 'yellow' ? 'bg-yellow-500/10' : 'bg-red-500/10')}>
+        <div className={cn('p-4 border rounded-lg', tone === 'yellow' ? 'bg-warning/10' : 'bg-destructive/10')}>
             <div className="flex items-center gap-2 mb-2">
                 {icon}
                 <span className="font-medium">{title}</span>
@@ -202,7 +202,7 @@ export function PreviewIssues({ transactions }: { transactions: PreviewTransacti
         <>
             <IssueList
                 tone="yellow"
-                icon={<AlertTriangle className="size-4 text-yellow-500" />}
+                icon={<AlertTriangle className="size-4 text-warning" />}
                 title={t('import.warnings')}
                 issues={transactions
                     .filter((tx) => tx.warnings.length > 0)
@@ -210,7 +210,7 @@ export function PreviewIssues({ transactions }: { transactions: PreviewTransacti
             />
             <IssueList
                 tone="red"
-                icon={<XCircle className="size-4 text-red-500" />}
+                icon={<XCircle className="size-4 text-destructive" />}
                 title={t('import.errorsSkipped')}
                 issues={transactions
                     .filter((tx) => tx.error)

@@ -47,7 +47,7 @@ export function ExpensePaceChart({ filters }: ExpensePaceChartProps) {
     if (error) {
         return (
             <Card>
-                <CardContent className="py-8 text-center text-red-500">{t('reports.errors.expensePace')}</CardContent>
+                <CardContent className="py-8 text-center text-destructive">{t('reports.errors.expensePace')}</CardContent>
             </Card>
         )
     }
@@ -76,8 +76,8 @@ export function ExpensePaceChart({ filters }: ExpensePaceChartProps) {
                                     'text-xl sm:text-2xl font-bold break-words',
                                     currentMonthData.hasBudget
                                         ? currentMonthData.budgetRemaining >= 0
-                                            ? 'text-green-600'
-                                            : 'text-red-600'
+                                            ? 'text-success'
+                                            : 'text-destructive'
                                         : 'text-foreground',
                                 )}
                             >

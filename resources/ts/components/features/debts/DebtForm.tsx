@@ -33,12 +33,12 @@ const DEBT_TYPES = [
     {
         value: 'i_owe',
         icon: Banknote,
-        color: 'text-red-600',
+        color: 'text-destructive',
     },
     {
         value: 'owed_to_me',
         icon: HandCoins,
-        color: 'text-green-600',
+        color: 'text-success',
     },
 ] as const
 

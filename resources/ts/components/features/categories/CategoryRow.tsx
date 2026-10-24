@@ -62,7 +62,7 @@ export function CategoryRow({
             title={name}
             badge={category.isDefault ? (
                 <Star
-                    className="size-3.5 shrink-0 fill-amber-400 text-amber-500"
+                    className="size-3.5 shrink-0 fill-warning text-warning"
                     aria-label={t('pages:categories.columns.default')}
                 />
             ) : undefined}

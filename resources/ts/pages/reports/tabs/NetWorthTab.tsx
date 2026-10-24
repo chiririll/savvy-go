@@ -57,7 +57,7 @@ export function NetWorthTab({ filters }: NetWorthTabProps) {
                             <p
                                 className={cn(
                                     'max-w-full font-bold tracking-tight mb-4 whitespace-nowrap',
-                                    data.current >= 0 ? 'text-blue-600' : 'text-red-600',
+                                    data.current >= 0 ? 'text-info' : 'text-destructive',
                                 )}
                                 style={{ fontSize: netWorthFontSize(netWorthText) }}
                             >
@@ -72,8 +72,8 @@ export function NetWorthTab({ filters }: NetWorthTabProps) {
                                         className={cn(
                                             'flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium',
                                             isPositive
-                                                ? 'bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300'
-                                                : 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300',
+                                                ? 'bg-success/15 text-success'
+                                                : 'bg-destructive/15 text-destructive',
                                         )}
                                     >
                                         {isPositive ? (
@@ -90,8 +90,8 @@ export function NetWorthTab({ filters }: NetWorthTabProps) {
                                         className={cn(
                                             'flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium',
                                             isPositive
-                                                ? 'bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300'
-                                                : 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300',
+                                                ? 'bg-success/15 text-success'
+                                                : 'bg-destructive/15 text-destructive',
                                         )}
                                     >
                                         {isPositive ? '+' : ''}

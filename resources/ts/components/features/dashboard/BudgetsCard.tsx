@@ -21,14 +21,14 @@ function BudgetTile({ budget }: { budget: Budget }) {
         >
             <div className="flex items-center justify-between mb-2">
                 <p className="font-medium text-sm truncate">{budget.name}</p>
-                <span className={`text-xs font-medium ${isExceeded ? 'text-red-600' : 'text-muted-foreground'}`}>
+                <span className={`text-xs font-medium ${isExceeded ? 'text-destructive' : 'text-muted-foreground'}`}>
                     {progress?.percent.toFixed(0)}%
                 </span>
             </div>
             <Progress
                 aria-label={budget.name}
                 value={percent}
-                className={`h-2 mb-2 ${isExceeded ? '[&>div]:bg-red-500' : ''}`}
+                className={`h-2 mb-2 ${isExceeded ? '[&>div]:bg-destructive' : ''}`}
             />
             <div className="flex justify-between text-xs text-muted-foreground">
                 <span>{formatCurrency(progress?.spent ?? 0, budget.currency)}</span>

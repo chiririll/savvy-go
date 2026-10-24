@@ -113,26 +113,26 @@ export default function DebtsPage() {
                     >
                         <SummaryItem
                             icon={TrendingDown}
-                            tone="bg-red-100 text-red-600"
+                            tone="bg-destructive/15 text-destructive"
                             label={t('debts.types.i_owe')}
                             value={formatCurrency(summary.totalIOwe, summary.currency)}
-                            valueClassName="text-red-600"
+                            valueClassName="text-destructive"
                         />
                         <SummaryItem
                             icon={TrendingUp}
-                            tone="bg-green-100 text-green-600"
+                            tone="bg-success/15 text-success"
                             label={t('debts.types.owed_to_me')}
                             value={formatCurrency(summary.totalOwedToMe, summary.currency)}
-                            valueClassName="text-green-600"
+                            valueClassName="text-success"
                         />
                         <SummaryItem
                             icon={summary.netDebt >= 0 ? HandCoins : Banknote}
-                            tone={summary.netDebt >= 0 ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}
+                            tone={summary.netDebt >= 0 ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}
                             label={t('debts.netPosition')}
                             value={`${formatCurrency(Math.abs(summary.netDebt), summary.currency)} ${
                                 summary.netDebt >= 0 ? t('debts.inYourFavor') : t('debts.youOwe')
                             }`}
-                            valueClassName={summary.netDebt >= 0 ? 'text-green-600' : 'text-red-600'}
+                            valueClassName={summary.netDebt >= 0 ? 'text-success' : 'text-destructive'}
                         />
                     </div>
                 )}

@@ -14,7 +14,7 @@ export function PreviewStep({ previewResult, categoryMap, onCategoryMapChange, i
     const { previewTransactions, summary } = previewResult
 
     return (
-        <div className={cn('space-y-6', isLoading && 'opacity-50 pointer-events-none')}>
+        <div className={cn('space-y-6', isLoading && 'pointer-events-none')} aria-busy={isLoading}>
             <PreviewSummary summary={summary} />
 
             <CategoryMapping

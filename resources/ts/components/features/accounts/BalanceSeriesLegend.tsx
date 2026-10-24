@@ -21,10 +21,10 @@ export function BalanceSeriesLegend({ series, hiddenKeys, onToggle }: BalanceSer
                         className={cn(
                             'inline-flex max-w-full min-w-0 items-center gap-1.5 overflow-hidden rounded-md',
                             'px-1.5 py-0.5 text-xs transition-opacity hover:bg-muted',
-                            hidden && 'opacity-40 line-through',
+                            hidden && 'text-muted-foreground line-through',
                         )}
                     >
-                        <span className="size-2 shrink-0 rounded-sm" style={{ backgroundColor: item.color }} />
+                        <span className={cn('size-2 shrink-0 rounded-sm', hidden && 'opacity-40')} style={{ backgroundColor: item.color }} />
                         <span className="min-w-0 truncate">{item.label}</span>
                         <span className="shrink-0 font-mono text-muted-foreground">
                             {formatCurrency(lastAmount(item), item.currency)}

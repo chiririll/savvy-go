@@ -47,7 +47,7 @@ export function CashFlowChart({ filters }: CashFlowChartProps) {
     if (error) {
         return (
             <Card>
-                <CardContent className="py-8 text-center text-red-500">{t('reports.errors.cashflowChart')}</CardContent>
+                <CardContent className="py-8 text-center text-destructive">{t('reports.errors.cashflowChart')}</CardContent>
             </Card>
         )
     }

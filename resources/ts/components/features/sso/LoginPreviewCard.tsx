@@ -36,7 +36,7 @@ export function LoginPreviewCard({ preset, name, enabled }: LoginPreviewCardProp
                 </div>
                 <div className="flex items-center gap-2 text-xs">
                     <span
-                        className={`size-1.5 rounded-full ${enabled ? 'bg-emerald-500' : 'bg-muted-foreground/40'}`}
+                        className={`size-1.5 rounded-full ${enabled ? 'bg-success' : 'bg-muted-foreground/40'}`}
                     />
                     <span className="text-muted-foreground">
                         {enabled ? t('sso.visibleOnLogin') : t('sso.hiddenOnLogin')}

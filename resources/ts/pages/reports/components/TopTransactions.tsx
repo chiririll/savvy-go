@@ -46,7 +46,7 @@ export function TopTransactions({ filters, type, limit = 10 }: TopTransactionsPr
                   noData: t('reports.topExpenses.noData'),
               }
     const currency = data?.currency
-    const amountClass = type === 'income' ? 'text-green-600' : 'text-red-600'
+    const amountClass = type === 'income' ? 'text-success' : 'text-destructive'
     const amountPrefix = type === 'income' ? '+' : '-'
 
     const totalTop = useMemo(() => {

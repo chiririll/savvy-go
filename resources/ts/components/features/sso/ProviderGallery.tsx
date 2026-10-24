@@ -32,18 +32,17 @@ function StatusPill({ enabled }: { enabled: boolean }) {
         return (
             <span
                 className={cn(
-                    'inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600',
-                    'dark:text-emerald-400',
+                    'inline-flex items-center gap-1.5 text-xs font-medium text-success',
                 )}
             >
                 <span className="relative flex size-2">
                     <span
                         className={cn(
-                            'absolute inline-flex size-full animate-ping rounded-full bg-emerald-500',
+                            'absolute inline-flex size-full animate-ping rounded-full bg-success',
                             'opacity-60',
                         )}
                     />
-                    <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+                    <span className="relative inline-flex size-2 rounded-full bg-success" />
                 </span>
                 {t('providers.active')}
             </span>

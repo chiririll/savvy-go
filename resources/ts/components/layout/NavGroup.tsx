@@ -55,7 +55,7 @@ export function NavGroup({
                                             aria-label={t('needsAttention')}
                                             className={cn(
                                                 'ml-auto size-2 rounded-full',
-                                                alert === 'error' ? 'bg-red-500' : 'bg-amber-500',
+                                                alert === 'error' ? 'bg-destructive' : 'bg-warning',
                                             )}
                                         />
                                     )}
@@ -79,9 +79,9 @@ export function NavGroup({
                                                     {!!counts?.[to] && (
                                                         <span
                                                             className={cn(
-                                                                'ml-auto rounded-full bg-amber-500/15 px-1.5 text-xs',
+                                                                'ml-auto rounded-full bg-warning/15 px-1.5 text-xs',
                                                                 'font-medium tabular-nums',
-                                                                'text-amber-600 dark:text-amber-400',
+                                                                'text-warning',
                                                             )}
                                                         >
                                                             {counts[to]}

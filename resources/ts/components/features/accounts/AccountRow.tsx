@@ -7,9 +7,9 @@ import { Account } from '@/types'
 import { accountTypeLabel } from '@/lib/labels'
 
 const TYPE_ICON_TONES = {
-    bank: 'bg-blue-100 text-blue-600 dark:bg-blue-950/40',
-    cash: 'bg-green-100 text-green-600 dark:bg-green-950/40',
-    crypto: 'bg-orange-100 text-orange-600 dark:bg-orange-950/40',
+    bank: 'bg-info/15 text-info',
+    cash: 'bg-success/15 text-success',
+    crypto: 'bg-warning/15 text-warning',
     debt: 'bg-purple-100 text-purple-600 dark:bg-purple-950/40',
 } as const
 
@@ -46,7 +46,7 @@ export function AccountRow({
             titleClassName={account.isActive ? undefined : 'text-muted-foreground'}
             subtitle={`${currency} · ${typeLabel}`}
             amount={formatCurrency(account.currentBalance, account.currency)}
-            amountClassName={account.currentBalance >= 0 ? 'text-green-600' : 'text-red-600'}
+            amountClassName={account.currentBalance >= 0 ? 'text-success' : 'text-destructive'}
             extraAmount={showInitial
                 ? t('pages:accounts.initial', {
                     amount: formatCurrency(account.initialBalance, account.currency),

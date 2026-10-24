@@ -5,13 +5,13 @@ import { FeedRow, FeedStatusBadge, RowActions } from '@/components/shared'
 import { Currency } from '@/types'
 
 const ICON_TONES = [
-    'bg-green-100 text-green-600 dark:bg-green-950/40',
-    'bg-blue-100 text-blue-600 dark:bg-blue-950/40',
-    'bg-orange-100 text-orange-600 dark:bg-orange-950/40',
+    'bg-success/15 text-success',
+    'bg-info/15 text-info',
+    'bg-warning/15 text-warning',
     'bg-purple-100 text-purple-600 dark:bg-purple-950/40',
-    'bg-red-100 text-red-600 dark:bg-red-950/40',
+    'bg-destructive/15 text-destructive',
     'bg-sky-100 text-sky-600 dark:bg-sky-950/40',
-    'bg-amber-100 text-amber-600 dark:bg-amber-950/40',
+    'bg-warning/15 text-warning',
     'bg-teal-100 text-teal-600 dark:bg-teal-950/40',
     'bg-rose-100 text-rose-600 dark:bg-rose-950/40',
     'bg-indigo-100 text-indigo-600 dark:bg-indigo-950/40',
@@ -90,7 +90,7 @@ export function CurrencyRow({
             title={currency.name}
             badge={currency.isBase ? (
                 <Star
-                    className="size-3.5 shrink-0 fill-amber-400 text-amber-500"
+                    className="size-3.5 shrink-0 fill-warning text-warning"
                     aria-label={t('pages:currencies.columns.base')}
                 />
             ) : undefined}

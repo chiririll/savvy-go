@@ -5,10 +5,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { NuqsTestingAdapter } from 'nuqs/adapters/testing'
 import { mswLoader } from 'msw-storybook-addon/csf3'
-import { Toaster } from 'sonner'
 import { configure } from 'storybook/test'
 
 import i18n, { i18nReady, LOCALE_LABELS, SUPPORTED_LOCALES, type AppLocale } from '@/lib/i18n'
+import { AppToaster } from '@/components/providers/AppToaster'
 import { baseA11y } from '@/test/a11y'
 import { setUpApp } from '@/test/app-state'
 import { finishMatrixChecks, startMatrixChecks } from './matrix-checks'
@@ -53,7 +53,7 @@ const withApp: Decorator = (Story, { globals, parameters }) => {
                     </AbilityProvider>
                 </NuqsTestingAdapter>
             </MemoryRouter>
-            <Toaster position="top-right" richColors />
+            <AppToaster />
         </QueryClientProvider>
     )
 }

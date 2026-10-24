@@ -9,8 +9,8 @@ import { cn } from '@/lib/utils'
 import { Debt } from '@/types'
 
 const DEBT_TYPE_CONFIG = {
-    i_owe: { icon: Banknote, tone: 'bg-red-100 text-red-600 dark:bg-red-950/40' },
-    owed_to_me: { icon: HandCoins, tone: 'bg-green-100 text-green-600 dark:bg-green-950/40' },
+    i_owe: { icon: Banknote, tone: 'bg-destructive/15 text-destructive' },
+    owed_to_me: { icon: HandCoins, tone: 'bg-success/15 text-success' },
 } as const
 
 interface DebtRowProps {
@@ -50,7 +50,7 @@ function DebtSubtitle({ debt }: { debt: Debt }) {
     return (
         <>
             {debt.dueDate && (
-                <span className={cn(overdue && 'font-medium text-red-600')}>
+                <span className={cn(overdue && 'font-medium text-destructive')}>
                     {t('debts.due', { date: relativeDay(debt.dueDate) })}
                 </span>
             )}

@@ -17,7 +17,7 @@ export function OverviewTab({ filters }: OverviewTabProps) {
 
     if (error) {
         return (
-            <div className="text-center py-8 text-red-500">
+            <div className="text-center py-8 text-destructive">
                 {t('reports.errors.overview')}
             </div>
         )

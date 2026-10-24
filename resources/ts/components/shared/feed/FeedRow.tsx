@@ -51,7 +51,7 @@ function FeedTexts({ title, titleClassName, badge, meta, subtitle, muted, onOpen
     const titleClasses = cn('truncate font-semibold', titleClassName)
 
     return (
-        <div className={cn('min-w-0 flex-1', muted && 'opacity-60')}>
+        <div className={cn('min-w-0 flex-1', muted && 'text-muted-foreground')}>
             <div className="flex min-w-0 items-center gap-1.5">
                 {onOpen ? (
                     <button
@@ -80,7 +80,7 @@ type FeedAmountsProps = Pick<FeedRowProps, 'amount' | 'amountClassName' | 'extra
 function FeedAmounts({ amount, amountClassName, extraAmount, muted }: FeedAmountsProps) {
     if (amount == null && !extraAmount) return null
     return (
-        <div className={cn('min-w-0 shrink-0 text-right', muted && 'opacity-60')}>
+        <div className="min-w-0 shrink-0 text-right">
             {amount != null && (
                 <p className={cn('font-mono font-semibold', muted ? 'text-muted-foreground' : amountClassName)}>
                     {amount}
@@ -188,7 +188,7 @@ export function FeedProgress({ value, exceeded, muted }: { value: number; exceed
             <div
                 className={cn(
                     'h-full rounded-full transition-[width]',
-                    exceeded ? 'bg-red-500' : 'bg-green-500',
+                    exceeded ? 'bg-destructive' : 'bg-success',
                     muted && 'bg-muted-foreground/40',
                 )}
                 style={{ width: `${Math.max(0, Math.min(value, 100))}%` }}

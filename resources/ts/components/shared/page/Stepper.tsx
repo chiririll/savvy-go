@@ -106,6 +106,7 @@ function Step({
                     isClickable && 'cursor-pointer',
                     disabled && 'opacity-50 cursor-not-allowed'
                 )}
+                aria-disabled={disabled || undefined}
                 onClick={() => isClickable && setActiveStep(index)}
             >
                 <StepIndicator

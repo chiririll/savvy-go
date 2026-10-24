@@ -99,7 +99,7 @@ export function SankeyDiagram({ filters }: SankeyDiagramProps) {
     if (error) {
         return (
             <Card>
-                <CardContent className="py-8 text-center text-red-500">{t('reports.errors.moneyFlow')}</CardContent>
+                <CardContent className="py-8 text-center text-destructive">{t('reports.errors.moneyFlow')}</CardContent>
             </Card>
         )
     }

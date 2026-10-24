@@ -17,8 +17,8 @@ function BudgetVerdict({ month, currency }: ExpensePaceSummaryProps) {
             className={cn(
                 'flex min-w-0 items-start gap-2 px-3 py-2 rounded-lg',
                 month.isOverBudget
-                    ? 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300'
-                    : 'bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-300',
+                    ? 'bg-destructive/10 text-destructive'
+                    : 'bg-success/10 text-success',
             )}
         >
             {month.isOverBudget ? (
@@ -41,7 +41,7 @@ export function ExpensePaceSummary({ month, currency }: ExpensePaceSummaryProps)
     return (
         <div className="mt-4 pt-4 border-t">
             {!month.hasBudget && (
-                <div className="flex items-center gap-2 text-sm text-amber-600 mb-3">
+                <div className="flex items-center gap-2 text-sm text-warning mb-3">
                     <AlertCircle className="size-4" />
                     <span>{t('reports.expensePace.noBudgetHint')}</span>
                 </div>

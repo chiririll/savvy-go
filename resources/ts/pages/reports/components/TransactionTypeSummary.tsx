@@ -9,18 +9,18 @@ import type { ReportTransactionType } from '@/api/reports'
 
 const TONE = {
     income: {
-        total: 'text-green-600',
-        day: 'bg-green-100 text-green-600 dark:bg-green-950/50 dark:text-green-400',
-        week: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400',
-        up: 'text-green-600',
-        down: 'text-red-600',
+        total: 'text-success',
+        day: 'bg-success/15 text-success',
+        week: 'bg-success/15 text-success',
+        up: 'text-success',
+        down: 'text-destructive',
     },
     expense: {
-        total: 'text-red-600',
-        day: 'bg-orange-100 text-orange-600 dark:bg-orange-950/50 dark:text-orange-400',
+        total: 'text-destructive',
+        day: 'bg-warning/15 text-warning',
         week: 'bg-purple-100 text-purple-600 dark:bg-purple-950/50 dark:text-purple-400',
-        up: 'text-red-600',
-        down: 'text-green-600',
+        up: 'text-destructive',
+        down: 'text-success',
     },
 } as const
 

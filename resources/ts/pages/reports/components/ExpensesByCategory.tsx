@@ -30,7 +30,7 @@ export function ExpensesByCategory({ filters }: ExpensesByCategoryProps) {
     if (error) {
         return (
             <Card>
-                <CardContent className="py-8 text-center text-red-500">
+                <CardContent className="py-8 text-center text-destructive">
                     {t('reports.errors.expensesByCategory')}
                 </CardContent>
             </Card>
@@ -90,7 +90,7 @@ export function ExpensesByCategory({ filters }: ExpensesByCategoryProps) {
                                             {localizeDefaultName(category.name)}
                                         </span>
                                         {isAnomalous && filters.compareWith !== 'none' && (
-                                            <AlertTriangle className="size-4 shrink-0 text-amber-500" />
+                                            <AlertTriangle className="size-4 shrink-0 text-warning" />
                                         )}
                                     </div>
 
@@ -113,7 +113,7 @@ export function ExpensesByCategory({ filters }: ExpensesByCategoryProps) {
                                                 <span
                                                     className={cn(
                                                         'flex items-center gap-0.5 text-xs font-medium',
-                                                        isIncrease ? 'text-red-600' : 'text-green-600',
+                                                        isIncrease ? 'text-destructive' : 'text-success',
                                                     )}
                                                 >
                                                     {isIncrease ? (

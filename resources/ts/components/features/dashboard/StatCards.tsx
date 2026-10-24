@@ -27,7 +27,7 @@ function ChangeBadge({ change, lowerIsBetter = false }: { change: number | null;
     const good = lowerIsBetter ? change <= 0 : change >= 0
 
     return (
-        <div className={cn('flex items-center gap-1 text-xs mt-1', good ? 'text-green-600' : 'text-red-600')}>
+        <div className={cn('flex items-center gap-1 text-xs mt-1', good ? 'text-success' : 'text-destructive')}>
             {change >= 0 ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
             <span>{Math.abs(change).toFixed(1)}%</span>
         </div>
@@ -66,15 +66,15 @@ export function DashboardStats({
                 <ChangeBadge change={balanceChange} />
             </StatCard>
 
-            <StatCard title={t('dashboard.income')} icon={<ArrowDownLeft className="size-4 text-green-600" />}>
-                <div className="text-2xl font-bold font-mono text-green-600 break-all">
+            <StatCard title={t('dashboard.income')} icon={<ArrowDownLeft className="size-4 text-success" />}>
+                <div className="text-2xl font-bold font-mono text-success break-all">
                     +{formatCurrency(periodIncome, currency)}
                 </div>
                 <ChangeBadge change={incomeChange} />
             </StatCard>
 
-            <StatCard title={t('dashboard.expenses')} icon={<ArrowUpRight className="size-4 text-red-600" />}>
-                <div className="text-2xl font-bold font-mono text-red-600 break-all">
+            <StatCard title={t('dashboard.expenses')} icon={<ArrowUpRight className="size-4 text-destructive" />}>
+                <div className="text-2xl font-bold font-mono text-destructive break-all">
                     -{formatCurrency(periodExpense, currency)}
                 </div>
                 <ChangeBadge change={expenseChange} lowerIsBetter />
@@ -85,8 +85,8 @@ export function DashboardStats({
                     <div
                         className={cn(
                             'text-2xl font-bold font-mono break-all',
-                            pendingBalance > 0 && 'text-green-600',
-                            pendingBalance < 0 && 'text-red-600',
+                            pendingBalance > 0 && 'text-success',
+                            pendingBalance < 0 && 'text-destructive',
                         )}
                     >
                         {formatCurrency(pendingBalance, pendingSummary?.currency ?? currency)}

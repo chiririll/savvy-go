@@ -40,15 +40,15 @@ function QuickAddMenu({ accountId, openCreate }: { accountId: Account['id']; ope
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => openCreate({ type: 'income', account_id: accountId })}>
-                    <ArrowDownLeft className="size-4 mr-2 text-green-600" />
+                    <ArrowDownLeft className="size-4 mr-2 text-success" />
                     {tNav('income')}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => openCreate({ type: 'expense', account_id: accountId })}>
-                    <ArrowUpRight className="size-4 mr-2 text-red-600" />
+                    <ArrowUpRight className="size-4 mr-2 text-destructive" />
                     {tNav('expense')}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => openCreate({ type: 'transfer', account_id: accountId })}>
-                    <ArrowLeftRight className="size-4 mr-2 text-blue-600" />
+                    <ArrowLeftRight className="size-4 mr-2 text-info" />
                     {tNav('transfer')}
                 </DropdownMenuItem>
             </DropdownMenuContent>

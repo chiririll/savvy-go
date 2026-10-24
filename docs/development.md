@@ -112,6 +112,7 @@ Coverage of the stories: `npx vitest run --project stories-desktop --project sto
 - **Forms.** Components built on the ShadCN form parts need a form around them: `decorators: [withForm({ label: 'Currency' })]` from `resources/ts/test/form-decorator.tsx`.
 - **Menus and selects.** Radix hides the page behind an open menu, which axe reports. Add `parameters: { a11y: overlayA11y }` from `resources/ts/test/a11y.ts`.
 - **Colour contrast is not checked yet** (`resources/ts/test/a11y.ts` has the reason and a TODO). The palette misses WCAG AA in a few places; the check goes back on once it passes. To see the misses in the dark theme: `STORYBOOK_CONTRAST=on npx vitest run --project stories-desktop-dark`.
+- **Status colours are tokens.** Use `text-destructive`, `text-success`, `text-warning`, `text-info` and tints like `bg-success/10` (defined per theme in `resources/ts/index.css`, checked against WCAG AA), not `text-red-600` plus a `dark:` variant. Do not dim text with `opacity-*`: use `text-muted-foreground`, or `aria-disabled` for a disabled control.
 - **Language and theme.** See "Language and theme matrix" above.
 - **Animations are off**, so a check never sees an element half faded in.
 

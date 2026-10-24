@@ -17,8 +17,8 @@ function SeverityBadge({ severity }: { severity: Exclude<Severity, 'ok'> }) {
                 'ml-auto inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px]',
                 'font-semibold uppercase tracking-wide',
                 severity === 'crit'
-                    ? 'bg-red-500/10 text-red-600 dark:text-red-400'
-                    : 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+                    ? 'bg-destructive/10 text-destructive'
+                    : 'bg-warning/10 text-warning',
             )}
         >
             <AlertTriangle className="size-3" />

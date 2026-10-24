@@ -121,9 +121,9 @@ describe('groupByDateKey', () => {
 
 describe('pendingDateClassName', () => {
     it('colours by how close the date is', () => {
-        expect(pendingDateClassName('2026-03-14')).toBe('text-red-600')
-        expect(pendingDateClassName('2026-03-15')).toBe('text-yellow-600')
-        expect(pendingDateClassName('2026-03-18')).toBe('text-yellow-600')
+        expect(pendingDateClassName('2026-03-14')).toBe('text-destructive')
+        expect(pendingDateClassName('2026-03-15')).toBe('text-warning')
+        expect(pendingDateClassName('2026-03-18')).toBe('text-warning')
         expect(pendingDateClassName('2026-03-19')).toBe('text-muted-foreground')
         expect(pendingDateClassName(null)).toBe('text-muted-foreground')
     })

@@ -32,8 +32,8 @@ function LiveIndicator({ time }: { time: string }) {
     return (
         <span className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex">
             <span className="relative flex size-2">
-                <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-500 opacity-60" />
-                <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+                <span className="absolute inline-flex size-full animate-ping rounded-full bg-success opacity-60" />
+                <span className="relative inline-flex size-2 rounded-full bg-success" />
             </span>
             {t('monitoring.updated', { time })}
         </span>
