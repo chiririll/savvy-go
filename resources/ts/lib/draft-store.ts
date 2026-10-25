@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware'
+import { getInstanceId } from '@/lib/instance-id'
 import { useAuthStore } from '@/stores/auth'
 
 /**
@@ -40,7 +41,9 @@ export interface DraftState<T extends object> {
 /**
  * A draft that lives in this browser only: saved on every change, one per user,
  * and checked against the code when it is loaded (a draft of another shape is
- * dropped). It works without storage, just without resume. Nothing goes to the server.
+ * dropped) and against the server install (a draft saved under another instance
+ * id is dropped). It works without storage, just without resume. Nothing goes to
+ * the server.
  */
 export function createDraftStore<T extends object>({ key, empty, accept }: Options<T>) {
     const keyFor = () => `${key}:${useAuthStore.getState().user?.id ?? 'anonymous'}`
@@ -85,7 +88,7 @@ export function createDraftStore<T extends object>({ key, empty, accept }: Optio
             {
                 name: key,
                 storage: createJSONStorage(() => storage),
-                partialize: (state) => ({ draft: state.draft }),
+                partialize: (state) => ({ draft: state.draft, instance: getInstanceId() }),
                 skipHydration: true,
             },
         ),
@@ -96,8 +99,12 @@ export function createDraftStore<T extends object>({ key, empty, accept }: Optio
         try {
             const raw = read(key)
             // Setting only a draft that fits keeps the previous user's state from showing through.
-            const stored = raw === null ? null : (JSON.parse(raw) as { state?: { draft?: unknown } }).state?.draft
-            if (raw !== null && sameShape(empty(), stored) && (accept?.(stored as T) ?? true)) {
+            const state =
+                raw === null ? null : (JSON.parse(raw) as { state?: { draft?: unknown; instance?: unknown } }).state
+            const stored = state?.draft
+            // A draft from another install of the server may point at what does not exist here.
+            const sameRun = state?.instance === getInstanceId()
+            if (raw !== null && sameRun && sameShape(empty(), stored) && (accept?.(stored as T) ?? true)) {
                 useStore.setState({ draft: stored as T })
                 return
             }

@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+
+	"savvy-go/internal/appconfig"
 )
 
 func TestResolveAssetsUsesEmbedded(t *testing.T) {
@@ -22,6 +24,22 @@ func TestResolveAssetsUsesEmbedded(t *testing.T) {
 func TestResolveAssetsFallsBackPublicDir(t *testing.T) {
 	if got := Resolve(nil); got == nil {
 		t.Fatal("no FS without an embedded frontend")
+	}
+}
+
+func TestSPAShellCarriesInstanceID(t *testing.T) {
+	assets := fstest.MapFS{"index.html": {Data: []byte(`<meta name="instance-id" content="{{.InstanceID}}">`)}}
+	body := func(h *SPA) string {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+		return rec.Body.String()
+	}
+
+	id := "6f1b5c1e-2d1c-4c58-9a4c-0d3f6a1f9b11"
+	spa := NewSPA(appconfig.Build{Version: "1", Env: "production", InstanceID: id})
+	spa.Assets = assets
+	if got := body(spa); got != `<meta name="instance-id" content="`+id+`">` {
+		t.Fatalf("shell %q", got)
 	}
 }
 

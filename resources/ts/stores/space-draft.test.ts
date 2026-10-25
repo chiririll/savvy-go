@@ -14,7 +14,7 @@ const store = (initial: Record<string, string> = {}) => {
         removeItem: (k: string) => void delete data[k],
     })
 }
-const saved = (draft: object) => ({ [`${spaceDraft.key}:anonymous`]: JSON.stringify({ state: { draft } }) })
+const saved = (draft: object) => ({ [`${spaceDraft.key}:anonymous`]: JSON.stringify({ state: { draft, instance: '' } }) })
 
 describe('space draft saved with the old entities step', () => {
     it('resumes on the currencies step with its content kept', async () => {

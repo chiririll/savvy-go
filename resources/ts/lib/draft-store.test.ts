@@ -16,6 +16,9 @@ const storage = vi.hoisted(() => {
 const auth = vi.hoisted(() => ({ user: { id: 7 } as { id: number } | null }))
 vi.mock('@/stores/auth', () => ({ useAuthStore: { getState: () => auth } }))
 
+const instance = vi.hoisted(() => ({ id: 'run-1' }))
+vi.mock('@/lib/instance-id', () => ({ getInstanceId: () => instance.id }))
+
 import { createDraftStore, sameShape } from './draft-store'
 
 interface Fake {
@@ -27,10 +30,12 @@ const store = createDraftStore({ key: 'test-draft', empty })
 const key = `${store.key}:7`
 const draft = () => store.useStore.getState().draft
 const loadDraft = store.load
+const stored = (d: unknown, id = instance.id) => JSON.stringify({ state: { draft: d, instance: id }, version: 0 })
 
 beforeEach(() => {
     storage.clear()
     auth.user = { id: 7 }
+    instance.id = 'run-1'
     store.useStore.setState({ draft: empty() })
 })
 
@@ -42,10 +47,7 @@ describe('draft store', () => {
     })
 
     it('is restored when the modal opens', async () => {
-        storage.setItem(
-            key,
-            JSON.stringify({ state: { draft: { ...empty(), name: 'Home', tags: ['a'] } }, version: 0 }),
-        )
+        storage.setItem(key, stored({ ...empty(), name: 'Home', tags: ['a'] }))
         await loadDraft()
         expect(draft()).toMatchObject({ name: 'Home', tags: ['a'] })
     })
@@ -57,6 +59,25 @@ describe('draft store', () => {
         expect(draft().name).toBe('')
     })
 
+    it('is saved with the id of the instance that wrote it', () => {
+        store.useStore.getState().update({ name: 'Home' })
+        expect(JSON.parse(storage.getItem(key)!).state.instance).toBe('run-1')
+    })
+
+    it('drops a draft of another instance', async () => {
+        storage.setItem(key, stored({ ...empty(), name: 'Home' }, 'run-0'))
+        await loadDraft()
+        expect(draft()).toEqual(empty())
+        const saved = JSON.parse(storage.getItem(key)!).state
+        expect(saved).toEqual({ draft: empty(), instance: 'run-1' })
+    })
+
+    it('drops a draft saved before instances had an id', async () => {
+        storage.setItem(key, JSON.stringify({ state: { draft: { ...empty(), name: 'Home' } }, version: 0 }))
+        await loadDraft()
+        expect(draft()).toEqual(empty())
+    })
+
     it('is cleared after a successful create', () => {
         store.useStore.getState().update({ name: 'Home' })
         store.useStore.getState().clear()
@@ -65,21 +86,21 @@ describe('draft store', () => {
     })
 
     it('drops a draft with other fields', async () => {
-        storage.setItem(key, JSON.stringify({ state: { draft: { name: 'Old', tags: [], removed: 1 } }, version: 0 }))
+        storage.setItem(key, stored({ name: 'Old', tags: [], removed: 1 }))
         await loadDraft()
         expect(draft()).toEqual(empty())
         expect(JSON.parse(storage.getItem(key)!).state.draft).toEqual(empty())
     })
 
     it('drops a draft whose field is of another kind', async () => {
-        storage.setItem(key, JSON.stringify({ state: { draft: { name: 'Old', tags: 'a' } }, version: 0 }))
+        storage.setItem(key, stored({ name: 'Old', tags: 'a' }))
         await loadDraft()
         expect(draft()).toEqual(empty())
     })
 
     it('drops a draft that the caller does not accept', async () => {
         const picky = createDraftStore({ key: 'test-draft', empty, accept: (d) => d.name !== 'Old' })
-        storage.setItem(key, JSON.stringify({ state: { draft: { name: 'Old', tags: [] } }, version: 0 }))
+        storage.setItem(key, stored({ name: 'Old', tags: [] }))
         await picky.load()
         expect(picky.useStore.getState().draft).toEqual(empty())
     })
