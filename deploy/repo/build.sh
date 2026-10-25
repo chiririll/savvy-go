@@ -25,8 +25,9 @@ pool="$OUT/apt/pool/main"
 dist="$OUT/apt/dists/stable"
 mkdir -p "$pool" "$dist/main/binary-amd64" "$OUT/rpm"
 
-tags=$(gh release list --repo "$GITHUB_REPOSITORY" --exclude-drafts --exclude-pre-releases --limit "$KEEP" \
-  --json tagName --jq '.[].tagName')
+# Stable tags are plain vX.Y.Z; anything with a suffix (v1.2.0-rc1) is a pre-release.
+tags=$(gh release list --repo "$GITHUB_REPOSITORY" --exclude-drafts --limit 50 --json tagName --jq '.[].tagName' \
+  | grep -E '^v[0-9]+(\.[0-9]+)*$' | head -n "$KEEP" || true)
 [ -n "$tags" ] || { echo "no stable releases found" >&2; exit 1; }
 
 for tag in $tags; do
