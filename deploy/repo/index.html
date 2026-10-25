@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Go Savvy packages</title>
+<style>
+  :root {
+    --bg: #f6f8f7; --card: #fff; --text: #17211d; --muted: #5d6b65; --border: #dbe3df;
+    --accent: #0f8a5f; --code-bg: #101815; --code-text: #d7efe4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e1412; --card: #151d1a; --text: #e6efeb; --muted: #93a39b; --border: #25312c;
+      --accent: #3ccf93; --code-bg: #0a0f0d; --code-text: #d7efe4;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 860px; margin: 0 auto; padding: 56px 16px 72px; }
+  header { margin-bottom: 40px; }
+  h1 { margin: 0 0 8px; font-size: 2.2rem; letter-spacing: -0.02em; }
+  h1 span { color: var(--accent); }
+  .lead { margin: 0; color: var(--muted); font-size: 1.1rem; }
+  .grid { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; min-width: 0; }
+  h2 { margin: 0 0 4px; font-size: 1.25rem; }
+  .for { margin: 0 0 16px; color: var(--muted); font-size: 0.9rem; }
+  .code { position: relative; margin: 0 0 12px; }
+  pre {
+    margin: 0; padding: 14px 16px; overflow-x: auto; border-radius: 8px;
+    background: var(--code-bg); color: var(--code-text); font: 0.85rem/1.5 ui-monospace, "SF Mono", Consolas, monospace;
+  }
+  button {
+    position: absolute; top: 8px; right: 8px; padding: 3px 9px; border: 1px solid #ffffff33; border-radius: 6px;
+    background: #ffffff14; color: var(--code-text); font: 0.75rem system-ui, sans-serif; cursor: pointer;
+  }
+  button:hover { background: #ffffff2b; }
+  .step { margin: 16px 0 6px; font-weight: 600; font-size: 0.9rem; }
+  .note { margin: 40px 0 0; color: var(--muted); font-size: 0.9rem; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Go <span>Savvy</span> packages</h1>
+    <p class="lead">Install Go Savvy from a signed apt or dnf repository, and get new versions with your regular system updates.</p>
+  </header>
+
+  <div class="grid">
+    <section class="card">
+      <h2>Debian &amp; Ubuntu</h2>
+      <p class="for">apt, amd64. Debian 13 or later.</p>
+      <p class="step">1. Add the repository</p>
+      <div class="code"><pre>sudo install -d -m 0755 /etc/apt/keyrings
+sudo curl -fsSLo /etc/apt/keyrings/savvy-go.asc @SITE_URL@/savvy-go.asc
+echo "deb [signed-by=/etc/apt/keyrings/savvy-go.asc] @SITE_URL@/apt stable main" \
+  | sudo tee /etc/apt/sources.list.d/savvy-go.list</pre></div>
+      <p class="step">2. Install</p>
+      <div class="code"><pre>sudo apt update
+sudo apt install savvy-go</pre></div>
+      <p class="step">Update</p>
+      <div class="code"><pre>sudo apt update &amp;&amp; sudo apt upgrade savvy-go</pre></div>
+    </section>
+
+    <section class="card">
+      <h2>Fedora, RHEL &amp; openSUSE</h2>
+      <p class="for">dnf, x86_64.</p>
+      <p class="step">1. Add the repository</p>
+      <div class="code"><pre>sudo curl -fsSLo /etc/yum.repos.d/savvy-go.repo @SITE_URL@/savvy-go.repo</pre></div>
+      <p class="step">2. Install</p>
+      <div class="code"><pre>sudo dnf install savvy-go</pre></div>
+      <p class="step">Update</p>
+      <div class="code"><pre>sudo dnf upgrade savvy-go</pre></div>
+    </section>
+  </div>
+
+  <p class="note">
+    After installing, Go Savvy runs as the <code>savvy-go</code> service on <code>127.0.0.1:8080</code>.
+    The repository metadata is signed with <a href="savvy-go.asc">this key</a>. It keeps the last stable releases;
+    older ones and the standalone binaries are on <a href="https://github.com/@REPO@/releases">GitHub Releases</a>.
+    More in the <a href="https://github.com/@REPO@/blob/main/docs/deployment.md">deployment docs</a>.
+  </p>
+</main>
+<script>
+  document.querySelectorAll(".code").forEach(function (box) {
+    var btn = document.createElement("button");
+    btn.textContent = "Copy";
+    btn.addEventListener("click", function () {
+      navigator.clipboard.writeText(box.querySelector("pre").textContent).then(function () {
+        btn.textContent = "Copied";
+        setTimeout(function () { btn.textContent = "Copy"; }, 1500);
+      });
+    });
+    box.appendChild(btn);
+  });
+</script>
+</body>
+</html>

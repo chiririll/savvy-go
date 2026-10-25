@@ -96,7 +96,7 @@ The language and the theme are Storybook globals (`locale`, `theme`; the toolbar
 | `npm run test:stories` (local, job `frontend` in `ci-frontend.yaml`) | `stories-desktop`, `stories-mobile` | English, light | desktop, phone |
 | `npm run test:stories:full` (`ci-frontend-stories.yaml`, manual only: "Run workflow" on the Actions tab) | the two above, plus `stories-mobile-<locale>` for every other language and `stories-desktop-dark` | each project sets its own | phone for a language (longest text, narrowest screen), desktop for dark |
 
-`test:stories:full` (`scripts/test-stories-full.mjs`) runs the projects one after another, because starting a browser for every project at once hung on a CI-sized host. Extra arguments go to every vitest run, e.g. `npm run test:stories:full -- --reporter=dot`. The workflow does not use this loop: it takes the project list from `node scripts/test-stories-full.mjs --list` and runs each project on its own runner, in parallel.
+`test:stories:full` (`scripts/test-stories-full.mts`) runs the projects one after another, because starting a browser for every project at once hung on a CI-sized host. Extra arguments go to every vitest run, e.g. `npm run test:stories:full -- --reporter=dot`. The workflow does not use this loop: it takes the project list from `node scripts/test-stories-full.mts --list` and runs each project on its own runner, in parallel.
 
 A project picks its globals from environment variables set in `vite.config.ts` (`STORYBOOK_LOCALE`, `STORYBOOK_THEME`), which `initialGlobals` in `.storybook/preview.tsx` reads. A story can still set `globals: { locale: 'ru' }` itself, for a check that is about Russian (number format, a Russian label), like `ApplicationInRussian` in `Layout.stories.tsx`.
 
@@ -171,6 +171,18 @@ Usually run on a `v*` tag push.
 #### dist
 
 Runs `mage release`: builds the Linux packages (`.deb`, `.rpm`), the standalone Linux and Windows binaries and `SHA256SUMS`, and publishes a GitHub release. The frontend is built once and shared by all of them. To run it locally, install [nfpm](https://nfpm.goreleaser.com) and set `APP_VERSION`.
+
+#### pages
+
+Separate workflow (`pages.yaml`), run when `dist` succeeds for a stable tag, or by hand. `dist` marks tags with a `-` (like `v1.2.0-rc1`) as pre-releases and the repository skips them. `deploy/repo/build.sh` downloads the packages of the last 5 stable releases, builds a signed apt and dnf repository and publishes it to GitHub Pages, replacing the whole site each time. A release deleted on GitHub therefore disappears from the repository on the next run. Packages are not kept anywhere else, so the releases are the source of truth. Like every `workflow_run` workflow, it runs from the default branch.
+
+One-time setup:
+
+1. Settings → Pages → Source: **GitHub Actions**.
+2. Make a signing key without a passphrase: `gpg --quick-generate-key "Go Savvy <you@example.com>" ed25519 sign 3y`.
+3. Add its private key (`gpg --armor --export-secret-keys <id>`) as the secret `PACKAGES_GPG_PRIVATE_KEY`.
+
+Rotating the key means changing the secret and asking users to fetch the new public key, so set an expiry and note the date. The script needs `gh`, `gpg`, `apt-ftparchive` and `createrepo_c`, and signs with the default secret key of the keyring.
 
 #### docker
 

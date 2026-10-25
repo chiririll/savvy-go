@@ -1,0 +1,51 @@
+name: Package repository
+
+# Rebuilds the whole apt/dnf site from the last stable releases and replaces the Pages site.
+# Releases made with GITHUB_TOKEN do not fire `release` events, hence workflow_run.
+on:
+  workflow_run:
+    workflows: ['Build deb and rpm']
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  repo:
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && !contains(github.event.workflow_run.head_branch, '-')) }}
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y apt-utils createrepo-c gnupg
+
+      # The key must have no passphrase.
+      - name: Import signing key
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.PACKAGES_GPG_PRIVATE_KEY }}
+
+      - name: Build repositories
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+        run: bash deploy/repo/build.sh site
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4

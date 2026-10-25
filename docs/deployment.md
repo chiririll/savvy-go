@@ -177,12 +177,17 @@ Use a single-replica `Deployment` with a `PersistentVolumeClaim` at `/data` and 
 
 ## Debian package
 
-For Debian 13 (Trixie) or later:
+For Debian 13 (Trixie) or later. Add the repository once and `apt upgrade` delivers new versions:
 
 ```bash
-curl -fsSLO https://github.com/chiririll/savvy-go/releases/latest/download/savvy-go.deb
-sudo apt install ./savvy-go.deb
+sudo install -d -m 0755 /etc/apt/keyrings
+sudo curl -fsSLo /etc/apt/keyrings/savvy-go.asc https://chiririll.github.io/savvy-go/savvy-go.asc
+echo "deb [signed-by=/etc/apt/keyrings/savvy-go.asc] https://chiririll.github.io/savvy-go/apt stable main" | sudo tee /etc/apt/sources.list.d/savvy-go.list
+sudo apt update
+sudo apt install savvy-go
 ```
+
+Without the repository, download the package from the release instead: `curl -fsSLO https://github.com/chiririll/savvy-go/releases/latest/download/savvy-go.deb && sudo apt install ./savvy-go.deb`. The repository keeps the last 5 stable releases.
 
 - Runs as the `savvy-go` systemd service (`/usr/bin/savvy-go`).
 - Data: `/var/lib/savvy-go`. Config: `/etc/savvy-go/config.toml`, created and maintained by the service (restart after editing).
@@ -194,9 +199,11 @@ sudo apt install ./savvy-go.deb
 For Fedora, RHEL (and derivatives) or openSUSE:
 
 ```bash
-curl -fsSLO https://github.com/chiririll/savvy-go/releases/latest/download/savvy-go.rpm
-sudo dnf install ./savvy-go.rpm
+sudo curl -fsSLo /etc/yum.repos.d/savvy-go.repo https://chiririll.github.io/savvy-go/savvy-go.repo
+sudo dnf install savvy-go
 ```
+
+The repository metadata is signed (`repo_gpgcheck`); the packages are not. Or download one package from the release: `sudo dnf install https://github.com/chiririll/savvy-go/releases/latest/download/savvy-go.rpm`.
 
 Same as the Debian package, but runs as its own `savvy-go` system user. Removing the package keeps `/var/lib/savvy-go` and `/etc/savvy-go`; delete them to wipe the data.
 
@@ -216,7 +223,7 @@ docker compose pull
 docker compose up -d
 ```
 
-Data stays in the volume and migrations run on start. With the Debian or RPM package, install the newer package.
+Data stays in the volume and migrations run on start. With the Debian or RPM package, use `sudo apt update && sudo apt upgrade savvy-go` or `sudo dnf upgrade savvy-go` (if you installed from the repository), or install the newer package file.
 
 When a newer version changes the database layout, Savvy first saves a server backup, then migrates. If the backup cannot be written (disk full, backups directory not writable), Savvy refuses to start and the data stays as it was. See [Backup before an upgrade](data-and-backups.md#backup-before-an-upgrade).
 
