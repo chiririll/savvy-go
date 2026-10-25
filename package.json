@@ -69,7 +69,7 @@
         "@tanstack/react-table": "^8.21.3",
         "@uppy/aws-s3": "^5.1.0",
         "@uppy/core": "^5.2.0",
-        "@vitejs/plugin-react": "^5.2.0",
+        "@vitejs/plugin-react": "^6.0.0",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "date-fns": "^3.6.0",
