@@ -1,0 +1,28 @@
+name: Stories Matrix
+
+# Every story again in the other languages (phone size) and in the dark theme. CI Frontend runs English and light only.
+# Manual only: start it with "Run workflow" on the Actions tab.
+on:
+  workflow_dispatch:
+
+jobs:
+  stories-matrix:
+    name: Story language and theme matrix
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install browser for stories
+        run: npx playwright install --with-deps chromium
+
+      - name: Story tests, every language and theme
+        run: npm run test:stories:full

@@ -3,7 +3,7 @@ name: CI Go
 on:
   pull_request:
     branches: [main]
-    paths:
+    paths: &backend-paths
       - '**/*.go'
       - 'go.mod'
       - 'go.sum'
@@ -13,14 +13,7 @@ on:
       - '.github/workflows/ci-go.yaml'
   push:
     branches: [main]
-    paths:
-      - '**/*.go'
-      - 'go.mod'
-      - 'go.sum'
-      - 'sqlc.yaml'
-      - 'testdata/**'
-      - 'internal/**'
-      - '.github/workflows/ci-go.yaml'
+    paths: *backend-paths
   workflow_dispatch:
 
 jobs:

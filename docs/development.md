@@ -91,7 +91,7 @@ The language and the theme are Storybook globals (`locale`, `theme`; the toolbar
 | Run | Projects | Language, theme | Size |
 | --- | --- | --- | --- |
 | `npm run test:stories` (local, job `frontend` in `ci-frontend.yaml`) | `stories-desktop`, `stories-mobile` | English, light | desktop, phone |
-| `npm run test:stories:full` (`ci-frontend.yaml`, job `stories-matrix`) | the two above, plus `stories-mobile-<locale>` for every other language and `stories-desktop-dark` | each project sets its own | phone for a language (longest text, narrowest screen), desktop for dark |
+| `npm run test:stories:full` (`ci-frontend-stories.yaml`, manual only: "Run workflow" on the Actions tab) | the two above, plus `stories-mobile-<locale>` for every other language and `stories-desktop-dark` | each project sets its own | phone for a language (longest text, narrowest screen), desktop for dark |
 
 `test:stories:full` (`scripts/test-stories-full.mjs`) runs the projects one after another, because starting a browser for every project at once hung on a CI-sized host. Extra arguments go to every vitest run, e.g. `npm run test:stories:full -- --reporter=dot`.
 
