@@ -41,7 +41,9 @@ export interface DraftState<T extends object> {
 /**
  * A draft that lives in this browser only: saved on every change, one per user,
  * and checked against the code when it is loaded (a draft of another shape is
- * dropped) and against the server install (a draft saved under another instance id is dropped). It works without storage, just without resume. Nothing goes to the server.
+ * dropped) and against the server install (a draft saved under another instance
+ * id is dropped). It works without storage, just without resume. Nothing goes to
+ * the server.
  */
 export function createDraftStore<T extends object>({ key, empty, accept }: Options<T>) {
     const keyFor = () => `${key}:${useAuthStore.getState().user?.id ?? 'anonymous'}`
