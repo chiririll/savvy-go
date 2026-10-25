@@ -1,21 +1,15 @@
-import { createContext, useContext, useMemo } from 'react'
-import { createContextualCan } from '@casl/react'
+import { useMemo } from 'react'
+import { AbilityProvider as CaslAbilityProvider, Can as CaslCan, useAbility as useCaslAbility, type CanProps } from '@casl/react'
 import { defineAbilityFor, AppAbility } from '@/lib/ability'
 import { useUser } from '@/stores/auth'
 
-const AbilityContext = createContext<AppAbility>(defineAbilityFor(null))
-
-export const Can = createContextualCan(AbilityContext.Consumer)
+export const Can: (props: CanProps<AppAbility>) => React.ReactNode = CaslCan
 
 export function AbilityProvider({ children }: { children: React.ReactNode }) {
     const user = useUser()
     const ability = useMemo(() => defineAbilityFor(user?.role ?? null), [user?.role])
 
-    return (
-        <AbilityContext.Provider value={ability}>
-            {children}
-        </AbilityContext.Provider>
-    )
+    return <CaslAbilityProvider value={ability}>{children}</CaslAbilityProvider>
 }
 
-export const useAbility = () => useContext(AbilityContext)
+export const useAbility = () => useCaslAbility<AppAbility>()

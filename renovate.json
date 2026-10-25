@@ -5,5 +5,13 @@
   ],
   "extends": [
     "config:recommended"
+  ],
+  "packageRules": [
+    {
+      "description": "6.x declares an optional peer on effect@^4, which conflicts with the effect@3 pulled in via @typeschema/main and breaks npm ci. Hold until upstream fixes its peer ranges.",
+      "matchPackageNames": ["@hookform/resolvers"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
+    }
   ]
 }
