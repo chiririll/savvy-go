@@ -196,7 +196,7 @@ export const AccountAdded: Story = {
         await expect(currency).toHaveTextContent('EUR')
         await userEvent.click(currency)
         await expect(await screen.findAllByRole('option')).toHaveLength(2)
-        await userEvent.click(screen.getByRole('option', { name: 'JPY' }))
+        await userEvent.click(screen.getByRole('option', { name: /JPY/ }))
         // A balance is kept as typed: a decimal string, never a float.
         await userEvent.type(canvas.getAllByRole('textbox', { name: 'Opening balance' })[1], '0.1')
         await waitFor(() =>
