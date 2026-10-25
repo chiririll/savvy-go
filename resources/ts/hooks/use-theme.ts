@@ -88,8 +88,10 @@ function waveClip(origin: ThemeOrigin, maxRadius: number, t: number): string {
 function runWave(transition: ViewTransition, origin: ThemeOrigin) {
     const root = document.documentElement
     const maxRadius =
-        Math.hypot(Math.max(origin.x, window.innerWidth - origin.x), Math.max(origin.y, window.innerHeight - origin.y)) +
-        WAVE_AMPLITUDE_PX
+        Math.hypot(
+            Math.max(origin.x, window.innerWidth - origin.x),
+            Math.max(origin.y, window.innerHeight - origin.y),
+        ) + WAVE_AMPLITUDE_PX
     const startedAt = performance.now()
 
     const tick = (now: number) => {

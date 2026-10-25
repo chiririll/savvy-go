@@ -11,7 +11,10 @@ export function BootstrapInstructions({ hint }: { hint: BootstrapHint }) {
             {/* i18n-dynamic: one text per environment (docker, systemd, binary) */}
             <p>{t(`setup.where.${hint.environment}`, { file: hint.file })}</p>
             {commands.map((command) => (
-                <code key={command} className="block overflow-x-auto rounded bg-muted px-2 py-1 font-mono text-xs text-foreground">
+                <code
+                    key={command}
+                    className="block overflow-x-auto rounded bg-muted px-2 py-1 font-mono text-xs text-foreground"
+                >
                     {command}
                 </code>
             ))}

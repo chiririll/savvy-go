@@ -91,10 +91,10 @@ export function pendingDateClassName(dateKey?: string | null): string {
 
     const today = formatDateLocal()
     if (dateKey < today) {
-        return 'text-red-600'
+        return 'text-destructive'
     }
     if (dateKey <= addDaysLocal(new Date(), 3)) {
-        return 'text-yellow-600'
+        return 'text-warning'
     }
     return 'text-muted-foreground'
 }

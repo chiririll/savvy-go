@@ -3,44 +3,37 @@ package auth
 import (
 	"net/http"
 	"time"
-
-	"savvy-go/internal/config"
 )
 
-func SessionCookieName(cfg config.Config, secure bool) string {
+// SessionCookieName is the cookie that holds the session token; the __Host- prefix is used
+// over HTTPS.
+func (sec Security) SessionCookieName(secure bool) string {
 	if secure {
-		return "__Host-" + cfg.SessionCookie
+		return "__Host-" + sec.SessionCookie
 	}
-	return cfg.SessionCookie
+	return sec.SessionCookie
 }
 
-func ReadToken(r *http.Request, cfg config.Config) string {
-	if c, err := r.Cookie("__Host-" + cfg.SessionCookie); err == nil && c.Value != "" {
-		return c.Value
-	}
-	if c, err := r.Cookie(cfg.SessionCookie); err == nil {
+// ReadToken is the session token the request carries, or "". Over HTTPS only the __Host-
+// cookie counts, over HTTP only the plain one: a plain cookie planted by a sibling domain or
+// over HTTP never signs anyone in on an HTTPS instance.
+func (sec Security) ReadToken(r *http.Request, secure bool) string {
+	if c, err := r.Cookie(sec.SessionCookieName(secure)); err == nil {
 		return c.Value
 	}
 	return ""
 }
 
-func IsSecure(r *http.Request) bool {
-	if r.TLS != nil {
-		return true
-	}
-	return r.Header.Get("X-Forwarded-Proto") == "https"
-}
-
-func SetSessionCookies(w http.ResponseWriter, r *http.Request, cfg config.Config, token, csrf string, remember bool) {
-	secure := IsSecure(r)
+// SetSessionCookies sends the session and CSRF cookies. remember makes them outlive the browser session.
+func (sec Security) SetSessionCookies(w http.ResponseWriter, secure bool, token, csrf string, remember bool) {
 	var expires time.Time
 	maxAge := 0
 	if remember {
-		expires = time.Now().Add(cfg.RememberTTL)
-		maxAge = int(cfg.RememberTTL.Seconds())
+		expires = time.Now().Add(sec.RememberTTL)
+		maxAge = int(sec.RememberTTL.Seconds())
 	}
 	http.SetCookie(w, &http.Cookie{
-		Name:     SessionCookieName(cfg, secure),
+		Name:     sec.SessionCookieName(secure),
 		Value:    token,
 		Path:     "/",
 		Expires:  expires,
@@ -50,7 +43,7 @@ func SetSessionCookies(w http.ResponseWriter, r *http.Request, cfg config.Config
 		SameSite: http.SameSiteLaxMode,
 	})
 	http.SetCookie(w, &http.Cookie{
-		Name:     cfg.CSRFCookie,
+		Name:     sec.CSRFCookie,
 		Value:    csrf,
 		Path:     "/",
 		Expires:  expires,
@@ -61,8 +54,8 @@ func SetSessionCookies(w http.ResponseWriter, r *http.Request, cfg config.Config
 	})
 }
 
-func ClearSessionCookies(w http.ResponseWriter, r *http.Request, cfg config.Config) {
-	secure := IsSecure(r)
+// ClearSessionCookies expires the session and CSRF cookies.
+func (sec Security) ClearSessionCookies(w http.ResponseWriter, secure bool) {
 	past := time.Unix(0, 0)
 	forget := func(name string, sec, httpOnly bool) {
 		http.SetCookie(w, &http.Cookie{
@@ -76,7 +69,7 @@ func ClearSessionCookies(w http.ResponseWriter, r *http.Request, cfg config.Conf
 			SameSite: http.SameSiteLaxMode,
 		})
 	}
-	forget("__Host-"+cfg.SessionCookie, secure, true)
-	forget(cfg.SessionCookie, false, true)
-	forget(cfg.CSRFCookie, secure, false)
+	forget("__Host-"+sec.SessionCookie, secure, true)
+	forget(sec.SessionCookie, false, true)
+	forget(sec.CSRFCookie, secure, false)
 }

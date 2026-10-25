@@ -16,7 +16,7 @@ import (
 
 // appLocation is the timezone used for calendar-day concepts across this
 // package: "today", and whether a date is in the future. Configured once at
-// startup from the TZ env var (see config.Config.Location); defaults to UTC.
+// startup from the TZ env var (see app.Config.Location); defaults to UTC.
 // A raw time.Now().UTC() day boundary would disagree with a client whose
 // local day has already rolled over, wrongly flagging same-day dates as future.
 var appLocation = time.UTC
@@ -92,11 +92,37 @@ func (s Transactions) repo() repo.Repo { return repo.Repo{DB: s.DB} }
 
 // ErrTransferRow is returned for a change to one side of a transfer between
 // spaces: the transfer changes, not its rows.
-var ErrTransferRow = errors.New("this transaction is one side of a transfer between spaces; change the transfer instead")
+var ErrTransferRow = errors.New(
+	"this transaction is one side of a transfer between spaces; change the transfer instead",
+)
 
 // transferSideType reports the types reserved for a transfer between spaces;
 // they are written only by Transfers.
 func transferSideType(typ string) bool { return typ == "transfer_out" || typ == "transfer_in" }
+
+// TxActions is what may be done to a transaction. The Transactions service
+// refuses what is not allowed, and the API reports the same flags to clients.
+type TxActions struct {
+	Edit, Delete, Duplicate, Confirm, Skip bool
+}
+
+// Allowed is the single source of truth for TxActions. One side of a transfer
+// between spaces changes only through the transfer, never as a transaction.
+func (t Transaction) Allowed() TxActions {
+	if transferSideType(t.Type) {
+		return TxActions{}
+	}
+	pending := t.Status == "pending"
+	skipped := t.Status == "skipped"
+	recurring := t.RecurringID != nil
+	return TxActions{
+		Edit:      !skipped && !recurring,
+		Delete:    !recurring,
+		Duplicate: !recurring && !skipped,
+		Confirm:   pending,
+		Skip:      pending && recurring,
+	}
+}
 
 func (s Transactions) Create(ctx context.Context, in TxInput) (*Transaction, error) {
 	if transferSideType(in.Type) {
@@ -153,7 +179,7 @@ func (s Transactions) Update(ctx context.Context, id int64, in TxInput) (*Transa
 	if err != nil || cur == nil {
 		return cur, err
 	}
-	if cur.Status == "skipped" || cur.RecurringID != nil {
+	if !cur.Allowed().Edit {
 		return nil, fmt.Errorf("cannot edit")
 	}
 	amount, toAmount, err := s.amounts(ctx, in)
@@ -236,7 +262,7 @@ func (s Transactions) Delete(ctx context.Context, id int64) error {
 	if err != nil || cur == nil {
 		return err
 	}
-	if cur.RecurringID != nil {
+	if !cur.Allowed().Delete {
 		return fmt.Errorf("cannot delete recurring")
 	}
 	return s.repo().DeleteTransaction(ctx, id)
@@ -245,7 +271,12 @@ func (s Transactions) Delete(ctx context.Context, id int64) error {
 // Confirm settles a pending transaction on date. The amounts it was planned
 // with stand; only an estimate can be replaced by the real amounts, and a
 // transfer given only amount delivers it converted at the current rates.
-func (s Transactions) Confirm(ctx context.Context, id int64, date string, amount, toAmount *decimal.Decimal) (*Transaction, error) {
+func (s Transactions) Confirm(
+	ctx context.Context,
+	id int64,
+	date string,
+	amount, toAmount *decimal.Decimal,
+) (*Transaction, error) {
 	if err := s.guardTransfer(ctx, id); err != nil {
 		return nil, err
 	}
@@ -253,7 +284,7 @@ func (s Transactions) Confirm(ctx context.Context, id int64, date string, amount
 	if err != nil || cur == nil {
 		return cur, err
 	}
-	if cur.Status != "pending" {
+	if !cur.Allowed().Confirm {
 		return nil, fmt.Errorf("not pending")
 	}
 	if date == "" && cur.Date != nil {
@@ -270,7 +301,13 @@ func (s Transactions) Confirm(ctx context.Context, id int64, date string, amount
 		if !cur.IsEstimated {
 			return nil, fmt.Errorf("not estimated")
 		}
-		in := TxInput{Type: cur.Type, AccountID: cur.AccountID, ToAccountID: cur.ToAccountID, Amount: cur.Amount.Decimal(), ToAmount: toAmount}
+		in := TxInput{
+			Type:        cur.Type,
+			AccountID:   cur.AccountID,
+			ToAccountID: cur.ToAccountID,
+			Amount:      cur.Amount.Decimal(),
+			ToAmount:    toAmount,
+		}
 		if amount != nil {
 			in.Amount = *amount
 		}
@@ -292,7 +329,7 @@ func (s Transactions) Skip(ctx context.Context, id int64) (*Transaction, error) 
 	if err != nil || cur == nil {
 		return cur, err
 	}
-	if cur.Status != "pending" || cur.RecurringID == nil {
+	if !cur.Allowed().Skip {
 		return nil, fmt.Errorf("cannot skip")
 	}
 	if err := s.repo().SkipTransaction(ctx, id, time.Now().UTC()); err != nil {
@@ -309,7 +346,7 @@ func (s Transactions) Duplicate(ctx context.Context, id int64) (*Transaction, er
 	if err != nil || cur == nil {
 		return cur, err
 	}
-	if cur.RecurringID != nil {
+	if !cur.Allowed().Duplicate {
 		return nil, fmt.Errorf("cannot duplicate")
 	}
 	today := time.Now().In(appLocation).Format("2006-01-02")
@@ -361,118 +398,6 @@ func (s Transactions) Filtered(ctx context.Context, f filter.TxFilter, page, per
 	}
 	list, err := s.hydrate(ctx, rows)
 	return list, total, err
-}
-
-// TransactionSummary totals transactions in the base currency (nil when there
-// is none), rounded to its decimals.
-type TransactionSummary struct {
-	Income   money.Money
-	Expense  money.Money
-	Count    int
-	Currency *Currency
-}
-
-func (s Transactions) Summary(ctx context.Context, pendingOnly bool) TransactionSummary {
-	status := "confirmed"
-	if pendingOnly {
-		status = "pending"
-	}
-	base, _ := (Currencies{DB: s.DB}).Base(ctx)
-	out := TransactionSummary{Currency: base}
-	var unit money.Unit // no base currency means no transactions either
-	if base != nil {
-		unit = base.Unit()
-	}
-	out.Income, out.Expense = money.Zero(unit), money.Zero(unit)
-	rows, err := s.repo().SummaryRows(ctx, status)
-	if err != nil {
-		return out
-	}
-	// Sum in base major units and round once: rounding each row would drift.
-	income, expense := decimal.Zero, decimal.Zero
-	for _, r := range rows {
-		amount := decimal.New(r.Minor, -int32(r.Decimals))
-		if !r.IsBase && !r.Rate.IsZero() {
-			amount = amount.Mul(r.Rate)
-		}
-		if r.Type == "income" {
-			income = income.Add(amount)
-		} else {
-			expense = expense.Add(amount)
-		}
-		out.Count++
-	}
-	out.Income, out.Expense = money.FromDecimal(income, unit), money.FromDecimal(expense, unit)
-	return out
-}
-
-// hydrate turns rows into transactions with their accounts, category, items
-// and tags: one lookup per distinct account and category, and one query each
-// for the items and tags of the whole page.
-func (s Transactions) hydrate(ctx context.Context, rows []repo.Tx) ([]Transaction, error) {
-	out := make([]Transaction, 0, len(rows))
-	ids := make([]int64, 0, len(rows))
-	at := make(map[int64]int, len(rows))
-	rel := NewRelated(ctx, s.DB)
-	for _, r := range rows {
-		t := txFrom(r)
-		t.Account = rel.Account(t.AccountID)
-		t.ToAccount = rel.OptionalAccount(t.ToAccountID)
-		t.Category = rel.Category(t.CategoryID)
-		t.Items, t.Tags = []TxItem{}, []Tag{}
-		at[t.ID] = len(out)
-		ids = append(ids, t.ID)
-		out = append(out, t)
-	}
-	if len(ids) == 0 {
-		return out, nil
-	}
-	items, err := s.repo().ItemsOf(ctx, ids)
-	if err != nil {
-		return nil, err
-	}
-	for _, r := range items {
-		t := &out[at[r.TransactionID]]
-		unit := t.Amount.Unit() // items are priced in the account currency
-		t.Items = append(t.Items, TxItem{
-			ID: r.ID, Name: r.Name, Quantity: r.Quantity,
-			PricePerUnit: money.New(r.PricePerUnit, unit), TotalPrice: money.New(r.TotalPrice, unit),
-		})
-	}
-	tags, err := s.repo().TagsOf(ctx, ids)
-	if err != nil {
-		return nil, err
-	}
-	for _, r := range tags {
-		t := &out[at[r.TransactionID]]
-		t.Tags = append(t.Tags, tagFrom(r.Tag))
-	}
-	return out, nil
-}
-
-// itemRow is a transaction line ready to store.
-type itemRow = repo.NewTxItem
-
-// itemRows checks the lines entered for a transaction against the range and
-// rounds them into unit, so nothing is written for a transaction with a bad
-// line. A line without a total costs quantity times price.
-func itemRows(items []TxItemInput, unit money.Unit) ([]itemRow, error) {
-	rows := make([]itemRow, 0, len(items))
-	for _, it := range items {
-		if it.TotalPrice.IsZero() {
-			it.TotalPrice = it.Quantity.Mul(it.PricePerUnit)
-		}
-		price, err := money.FromInput(it.PricePerUnit, unit)
-		if err != nil {
-			return nil, err
-		}
-		line, err := money.FromInput(it.TotalPrice, unit)
-		if err != nil {
-			return nil, err
-		}
-		rows = append(rows, itemRow{Name: it.Name, Quantity: it.Quantity, PricePerUnit: price, TotalPrice: line})
-	}
-	return rows, nil
 }
 
 // SetCategory changes only a transaction's category (an automation action).

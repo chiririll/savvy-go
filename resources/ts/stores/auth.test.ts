@@ -19,8 +19,12 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/api', () => ({ authApi: mocks.authApi, webauthnApi: mocks.webauthnApi }))
 vi.mock('@/api/client', () => ({
-    setOnUnauthorized: (fn: () => void) => { mocks.unauthorized.handler = fn },
-    setOnEmailUnverified: (fn: () => void) => { mocks.unverified.handler = fn },
+    setOnUnauthorized: (fn: () => void) => {
+        mocks.unauthorized.handler = fn
+    },
+    setOnEmailUnverified: (fn: () => void) => {
+        mocks.unverified.handler = fn
+    },
 }))
 vi.mock('@simplewebauthn/browser', () => ({ startAuthentication: mocks.startAuthentication }))
 vi.stubGlobal('sessionStorage', mocks.sessionStorage)
@@ -109,7 +113,10 @@ describe('loginWithPasskey', () => {
         await state().loginWithPasskey({ twoFactorToken: 'tf', useAutofill: true })
 
         expect(mocks.webauthnApi.loginOptions).toHaveBeenCalledWith('tf')
-        expect(mocks.startAuthentication).toHaveBeenCalledWith({ optionsJSON: { challenge: 'x' }, useBrowserAutofill: true })
+        expect(mocks.startAuthentication).toHaveBeenCalledWith({
+            optionsJSON: { challenge: 'x' },
+            useBrowserAutofill: true,
+        })
         expect(mocks.webauthnApi.loginVerify).toHaveBeenCalledWith('ch', { id: 'cred' }, 'tf')
         expect(state().isAuthenticated).toBe(true)
     })
@@ -174,13 +181,13 @@ describe('checkAuth', () => {
         expect(state()).toMatchObject({ user: null, isAuthenticated: false, isLoading: false, sessionExpired: false })
     })
 
-    it('settles as signed out when the request fails and nobody was signed in', async () => {
+    it('settles as signed out if the request fails and nobody was in', async () => {
         mocks.authApi.me.mockRejectedValue(new Error('offline'))
         await state().checkAuth()
         expect(state()).toMatchObject({ isAuthenticated: false, isLoading: false, sessionExpired: false })
     })
 
-    it('flags the session as expired when a signed-in user is no longer recognised', async () => {
+    it('flags the session as expired when a signed-in user is unrecognised', async () => {
         state().applySession(session as never)
         mocks.authApi.me.mockResolvedValue({ user: null })
 
@@ -189,7 +196,7 @@ describe('checkAuth', () => {
         expect(state()).toMatchObject({ sessionExpired: true, isLoading: false, isAuthenticated: true })
     })
 
-    it('flags the session as expired when the check fails for a signed-in user', async () => {
+    it('flags the session as expired when the signed-in user check fails', async () => {
         state().applySession(session as never)
         mocks.authApi.me.mockRejectedValue(new Error('401'))
 

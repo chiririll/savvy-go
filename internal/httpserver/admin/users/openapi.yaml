@@ -1,0 +1,17 @@
+paths:
+  /users:
+    get:
+      tags: [Other]
+      summary: List users
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+  /users/{id}:
+    get:
+      tags: [Other]
+      summary: Get a user
+      parameters: [{$ref: "#/components/parameters/Id"}]
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "404": {$ref: "#/components/responses/NotFound"}

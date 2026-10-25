@@ -1,4 +1,3 @@
-import { testId } from '@/lib/test-id'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Trash2, MoreHorizontal, PlugZap, ArrowUpRight } from 'lucide-react'
@@ -12,17 +11,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'
+import { Confirm } from '@/components/shared/dialogs/Confirm'
 import { BrandTile, brandVars } from './BrandIcon'
 import type { IdentityProvider } from '@/types/sso'
 
@@ -30,10 +19,19 @@ function StatusPill({ enabled }: { enabled: boolean }) {
     const { t } = useTranslation('settings')
     if (enabled) {
         return (
-            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+            <span
+                className={cn(
+                    'inline-flex items-center gap-1.5 text-xs font-medium text-success',
+                )}
+            >
                 <span className="relative flex size-2">
-                    <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-500 opacity-60" />
-                    <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+                    <span
+                        className={cn(
+                            'absolute inline-flex size-full animate-ping rounded-full bg-success',
+                            'opacity-60',
+                        )}
+                    />
+                    <span className="relative inline-flex size-2 rounded-full bg-success" />
                 </span>
                 {t('providers.active')}
             </span>
@@ -70,7 +68,10 @@ export function ProviderCard({ provider, index, onDelete, onTest }: ProviderCard
         >
             <Link
                 to={`/admin/providers/${provider.id}/edit`}
-                className="absolute inset-0 z-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className={cn(
+                    'absolute inset-0 z-0 rounded-xl focus-visible:outline-none focus-visible:ring-2',
+                    'focus-visible:ring-ring',
+                )}
             >
                 <span className="sr-only">{t('providers.editAria', { name: provider.name })}</span>
             </Link>
@@ -87,7 +88,11 @@ export function ProviderCard({ provider, index, onDelete, onTest }: ProviderCard
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="size-8 text-muted-foreground opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
+                            aria-label={tCommon('actions.more')}
+                            className={cn(
+                                'size-8 text-muted-foreground opacity-0 transition-opacity',
+                                'focus-visible:opacity-100 group-hover:opacity-100',
+                            )}
                         >
                             <MoreHorizontal className="size-4" />
                         </Button>
@@ -98,34 +103,19 @@ export function ProviderCard({ provider, index, onDelete, onTest }: ProviderCard
                             {t('providers.testConnection')}
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild {...testId('confirm')}>
-                                <DropdownMenuItem
-                                    variant="destructive"
-                                    onSelect={(e) => e.preventDefault()}
-                                >
+                        <Confirm
+                            trigger={
+                                <DropdownMenuItem variant="destructive" onSelect={(e) => e.preventDefault()}>
                                     <Trash2 className="mr-2 size-4" />
                                     {tCommon('actions.delete')}
                                 </DropdownMenuItem>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                    <AlertDialogTitle>{t('providers.deleteTitle')}</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                        {t('providers.deleteDescription', { name: provider.name })}
-                                    </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel>{tCommon('actions.cancel')}</AlertDialogCancel>
-                                    <AlertDialogAction
-                                        variant="destructive"
-                                        onClick={() => onDelete(provider.id)}
-                                    >
-                                        {tCommon('actions.delete')}
-                                    </AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
+                            }
+                            title={t('providers.deleteTitle')}
+                            description={t('providers.deleteDescription', { name: provider.name })}
+                            action={tCommon('actions.delete')}
+                            destructive
+                            onConfirm={() => onDelete(provider.id)}
+                        />
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>
@@ -136,7 +126,12 @@ export function ProviderCard({ provider, index, onDelete, onTest }: ProviderCard
             </div>
 
             <div className="mt-5 flex items-center justify-between">
-                <span className="rounded-md bg-muted px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <span
+                    className={cn(
+                        'rounded-md bg-muted px-2 py-0.5 font-mono text-[10px] font-semibold uppercase',
+                        'tracking-wider text-muted-foreground',
+                    )}
+                >
                     {provider.protocol}
                 </span>
                 <StatusPill enabled={provider.enabled} />
@@ -163,16 +158,18 @@ export function ProvidersEmptyState() {
                             }}
                             className="transition-transform duration-300 hover:-translate-y-1"
                         >
-                            <BrandTile preset={preset} iconClassName="size-7" className="size-14 rounded-2xl shadow-sm" />
+                            <BrandTile
+                                preset={preset}
+                                iconClassName="size-7"
+                                className="size-14 rounded-2xl shadow-sm"
+                            />
                         </div>
                     )
                 })}
             </div>
 
-            <h3 className="text-lg font-semibold tracking-tight">{t('providers.emptyTitle')}</h3>
-            <p className="mt-2 max-w-md text-sm text-muted-foreground">
-                {t('providers.emptyDescription')}
-            </p>
+            <h2 className="text-lg font-semibold tracking-tight">{t('providers.emptyTitle')}</h2>
+            <p className="mt-2 max-w-md text-sm text-muted-foreground">{t('providers.emptyDescription')}</p>
 
             <Button asChild className="mt-6">
                 <Link to="/admin/providers/create">

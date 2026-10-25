@@ -1,0 +1,127 @@
+package seed
+
+import ()
+
+const (
+	monthsOfHistory = 12
+	rngSeed         = 20260605
+	eurUSDRate      = 1.08
+)
+
+var merchants = map[string][]string{
+	"#GROCERIES": {
+		"Whole Foods Market",
+		"Trader Joe's",
+		"Costco Wholesale",
+		"Walmart",
+		"Kroger",
+		"Aldi",
+		"Target",
+		"Safeway",
+	},
+	"#TRANSPORT": {"Shell", "BP", "Chevron", "Uber", "Lyft", "Metro Transit", "ParkMobile", "Jiffy Lube"},
+	"#EATING_OUT": {
+		"Starbucks",
+		"Chipotle Mexican Grill",
+		"McDonald's",
+		"Olive Garden",
+		"Subway",
+		"Domino's Pizza",
+		"Panera Bread",
+		"Five Guys",
+	},
+	"#FUN": {"AMC Theatres", "Steam", "PlayStation Store", "Ticketmaster", "Netflix", "Spotify"},
+	"#HEALTH": {
+		"CVS Pharmacy",
+		"Walgreens",
+		"City Medical Clinic",
+		"Planet Fitness",
+		"LA Fitness",
+		"Quest Diagnostics",
+	},
+	"#CLOTHES_CARE": {"Nike", "Zara", "H&M", "Supercuts", "Sephora", "Ulta Beauty", "The Barber Shop"},
+	"#GIFTS":        {"Etsy", "Amazon", "Tiffany & Co.", "Local Florist"},
+	"#TRAVEL":       {"Booking.com", "Airbnb", "Delta Air Lines", "Marriott", "Expedia", "Hertz"},
+	"#UTILITIES":    {"ConEdison", "AT&T", "Xfinity", "National Grid", "Verizon Wireless"},
+	"#HOUSING":      {"IKEA", "Home Depot", "Bed Bath & Beyond"},
+	"#OTHER":        {"PayPal", "Venmo", "Cash Withdrawal", "Square"},
+}
+
+var catalogs = map[string][]string{
+	"#GROCERIES": {
+		"Organic Bananas",
+		"Whole Milk",
+		"Sourdough Bread",
+		"Free-range Eggs",
+		"Chicken Breast",
+		"Avocados",
+		"Greek Yogurt",
+		"Baby Spinach",
+		"Ground Coffee",
+		"Cheddar Cheese",
+		"Pasta",
+		"Olive Oil",
+		"Roma Tomatoes",
+		"Atlantic Salmon",
+		"Brown Rice",
+		"Butter",
+		"Orange Juice",
+		"Granola",
+	},
+	"#EATING_OUT": {
+		"Latte",
+		"Avocado Toast",
+		"Caesar Salad",
+		"Burger Combo",
+		"Iced Americano",
+		"Chicken Bowl",
+		"Fries",
+		"Cheesecake",
+		"Iced Tea",
+		"Soup of the Day",
+		"Fish Tacos",
+		"Espresso",
+	},
+	"#TRANSPORT": {
+		"Regular Gasoline",
+		"Premium Gasoline",
+		"Airport Parking",
+		"Car Wash",
+		"Metro Day Pass",
+		"Oil Change",
+		"Tire Rotation",
+		"Tolls",
+	},
+	"#FUN": {
+		"Movie Ticket",
+		"Popcorn Combo",
+		"Game Download",
+		"Arcade Tokens",
+		"Concert Ticket",
+		"Streaming Rental",
+		"Base Plan",
+	},
+	"#HEALTH": {
+		"Prescription Refill",
+		"Vitamin D",
+		"Ibuprofen",
+		"Allergy Test",
+		"Contact Lenses",
+		"First Aid Kit",
+		"Protein Powder",
+	},
+	"#CLOTHES_CARE": {"Cotton T-Shirt", "Running Shorts", "Sneakers", "Haircut", "Shampoo", "Face Moisturizer", "Sunscreen"},
+	"#TRAVEL": {
+		"Hotel Night",
+		"Airport Transfer",
+		"City Museum Pass",
+		"Travel Adapter",
+		"Bottled Water",
+		"Snack Box",
+		"Souvenir",
+	},
+	"#GIFTS":     {"Greeting Card", "Gift Wrap", "Scented Candle", "Chocolate Box", "Bouquet", "Mug"},
+	"#UTILITIES": {"Electricity Usage", "Delivery Charge", "Service Fee"},
+	"#HOUSING":   {"Shelf brackets", "Light bulbs", "Paint", "Towels", "Base Rent"},
+	"#OTHER":     {"Service Fee", "Convenience Charge", "Misc. Purchase", "Packaging"},
+}

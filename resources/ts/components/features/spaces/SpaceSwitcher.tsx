@@ -16,16 +16,9 @@ import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/c
 import { pathAfterSwitch, useCurrentSpace, useSpaces, useSwitchSpace } from '@/hooks/use-spaces'
 import { useUser } from '@/stores/auth'
 import { LazyCreateSpaceModal } from './LazyCreateSpaceModal'
+import { SpaceBadge } from './SpaceBadge'
 import { spaceRoleLabel } from '@/lib/labels'
-
-function initials(name: string) {
-    return name
-        .split(/\s+/)
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((part) => part[0]?.toUpperCase())
-        .join('') || '?'
-}
+import { cn } from '@/lib/utils'
 
 /** The current space at the top of the sidebar, and the list to switch to. */
 export function SpaceSwitcher() {
@@ -56,12 +49,14 @@ export function SpaceSwitcher() {
                         <DropdownMenuTrigger asChild>
                             <SidebarMenuButton
                                 size="lg"
+                                aria-label={current ? undefined : t('spaces.switcher.label')}
                                 {...testIdMenu('layout-space')}
-                                className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                                className={cn(
+                                    'data-[state=open]:bg-sidebar-accent',
+                                    'data-[state=open]:text-sidebar-accent-foreground',
+                                )}
                             >
-                                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-sm font-semibold text-primary-foreground">
-                                    {initials(current?.name ?? '')}
-                                </div>
+                                {current && <SpaceBadge space={current} />}
                                 <div className="grid flex-1 text-left text-sm leading-tight">
                                     <span className="truncate font-semibold">{current?.name}</span>
                                     <span className="truncate text-xs text-muted-foreground">
@@ -77,15 +72,17 @@ export function SpaceSwitcher() {
                             side={isMobile ? 'bottom' : 'right'}
                             sideOffset={4}
                         >
-                            <DropdownMenuLabel className="text-xs text-muted-foreground">{t('spaces.switcher.label')}</DropdownMenuLabel>
+                            <DropdownMenuLabel className="text-xs text-muted-foreground">
+                                {t('spaces.switcher.label')}
+                            </DropdownMenuLabel>
                             {spaces.map((space) => (
                                 <DropdownMenuItem key={space.id} onClick={() => choose(space.id)} className="gap-2 p-2">
-                                    <div className="flex size-6 items-center justify-center rounded-md border text-[10px] font-semibold">
-                                        {initials(space.name)}
-                                    </div>
+                                    <SpaceBadge space={space} className="size-6 rounded-md text-xs" />
                                     <div className="grid flex-1 leading-tight">
                                         <span className="truncate">{space.name}</span>
-                                        <span className="truncate text-xs text-muted-foreground">{spaceRoleLabel(t, space.role)}</span>
+                                        <span className="truncate text-xs text-muted-foreground">
+                                            {spaceRoleLabel(t, space.role)}
+                                        </span>
                                     </div>
                                     {space.id === current?.id && <Check className="size-4" />}
                                 </DropdownMenuItem>
@@ -96,7 +93,11 @@ export function SpaceSwitcher() {
                                 {t('spaces.switcher.settings')}
                             </DropdownMenuItem>
                             {user?.role !== 'guest' && !isReadOnly && (
-                                <DropdownMenuItem onClick={() => setCreating(true)} className="gap-2 p-2" {...testId('layout-space-create')}>
+                                <DropdownMenuItem
+                                    onClick={() => setCreating(true)}
+                                    className="gap-2 p-2"
+                                    {...testId('layout-space-create')}
+                                >
                                     <Plus className="size-4" />
                                     {t('spaces.switcher.create')}
                                 </DropdownMenuItem>

@@ -106,7 +106,11 @@ type categoryResolver struct {
 	created       []string
 }
 
-func (s Service) newCategoryResolver(ctx context.Context, cats []*importCategory, options map[string]any) (*categoryResolver, error) {
+func (s Service) newCategoryResolver(
+	ctx context.Context,
+	cats []*importCategory,
+	options map[string]any,
+) (*categoryResolver, error) {
 	existing, err := existingCategoryIndex(ctx, s.DB)
 	if err != nil {
 		return nil, err

@@ -2,11 +2,14 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
 	repo "savvy-go/internal/db/repo/auth"
 	"savvy-go/internal/store"
+
+	"savvy-go/internal/auth/password"
 )
 
 // Server roles. What a user may do with the finances of a space is decided by
@@ -62,34 +65,6 @@ func (u User) IsAdmin() bool { return u.Role == RoleAdmin }
 
 func (u User) IsGuest() bool { return u.Role == RoleGuest }
 
-func (u User) SessionJSON() map[string]any {
-	return map[string]any{
-		"id":            u.ID,
-		"name":          u.Name,
-		"email":         u.Email,
-		"role":          u.Role,
-		"isSsoOnly":     u.IsSSOOnly,
-		"emailVerified": u.EmailVerified,
-	}
-}
-
-func (u User) ResourceJSON() map[string]any {
-	var created any
-	if u.CreatedAt != nil {
-		created = u.CreatedAt.UTC().Format(time.RFC3339Nano)
-	}
-	return map[string]any{
-		"id":            u.ID,
-		"name":          u.Name,
-		"email":         u.Email,
-		"role":          u.Role,
-		"isInactive":    u.IsInactive(),
-		"isSsoOnly":     u.IsSSOOnly,
-		"emailVerified": u.EmailVerified,
-		"createdAt":     created,
-	}
-}
-
 type Users struct {
 	DB store.DB
 }
@@ -120,13 +95,13 @@ func (s Users) All(ctx context.Context) ([]User, error) {
 	return out, nil
 }
 
-func (s Users) Create(ctx context.Context, name, email string, password *string, role string) (*User, error) {
+func (s Users) Create(ctx context.Context, name, email string, plain *string, role string) (*User, error) {
 	if role == "" {
 		role = RoleUser
 	}
 	var hash string // empty: an account with no password (SSO only)
-	if password != nil && *password != "" {
-		h, err := HashPassword(*password)
+	if plain != nil && *plain != "" {
+		h, err := password.Hash(*plain)
 		if err != nil {
 			return nil, err
 		}
@@ -140,7 +115,7 @@ func (s Users) Create(ctx context.Context, name, email string, password *string,
 }
 
 func (s Users) UpdatePassword(ctx context.Context, id int64, plain string) error {
-	h, err := HashPassword(plain)
+	h, err := password.Hash(plain)
 	if err != nil {
 		return err
 	}
@@ -148,7 +123,13 @@ func (s Users) UpdatePassword(ctx context.Context, id int64, plain string) error
 }
 
 // A new address clears EmailVerified, unless verified says otherwise (an admin's word).
-func (s Users) Update(ctx context.Context, id int64, name, email, role *string, password *string, verified *bool) (*User, error) {
+func (s Users) Update(
+	ctx context.Context,
+	id int64,
+	name, email, role *string,
+	plain *string,
+	verified *bool,
+) (*User, error) {
 	u, err := s.ByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -164,14 +145,18 @@ func (s Users) Update(ctx context.Context, id int64, name, email, role *string, 
 		}
 	}
 	if role != nil {
-		u.Role = *role
+		r := NormalizeRole(*role)
+		if !ValidRole(r) {
+			return nil, errors.New("invalid role")
+		}
+		u.Role = r
 	}
 	if verified != nil {
 		u.EmailVerified = *verified
 	}
 	var hash string // empty keeps the current password
-	if password != nil && *password != "" {
-		h, err := HashPassword(*password)
+	if plain != nil && *plain != "" {
+		h, err := password.Hash(*plain)
 		if err != nil {
 			return nil, err
 		}

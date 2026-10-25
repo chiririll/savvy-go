@@ -37,7 +37,14 @@ func newMatrixEnv(t *testing.T, base moneytest.Currency) *matrixEnv {
 	if err := migrate.Space.Up(ctx, sqlDB); err != nil {
 		t.Fatal(err)
 	}
-	e := &matrixEnv{ctx: ctx, db: sqlDB, base: base, curs: map[string]Currency{}, accts: map[string]Account{}, txs: Transactions{DB: sqlDB}}
+	e := &matrixEnv{
+		ctx:   ctx,
+		db:    sqlDB,
+		base:  base,
+		curs:  map[string]Currency{},
+		accts: map[string]Account{},
+		txs:   Transactions{DB: sqlDB},
+	}
 	add := func(c moneytest.Currency) {
 		created, err := (Currencies{DB: sqlDB}).Create(ctx, Currency{
 			Code: c.Code, Name: c.Code, Symbol: c.Code, Decimals: c.Decimals, Rate: c.RateIn(base),
@@ -46,7 +53,10 @@ func newMatrixEnv(t *testing.T, base moneytest.Currency) *matrixEnv {
 			t.Fatalf("create %v: %v", c, err)
 		}
 		e.curs[c.Code] = *created
-		acct, err := (Accounts{DB: sqlDB}).Create(ctx, AccountInput{Name: c.Code, Type: "cash", CurrencyID: created.ID, IsActive: true})
+		acct, err := (Accounts{DB: sqlDB}).Create(
+			ctx,
+			AccountInput{Name: c.Code, Type: "cash", CurrencyID: created.ID, IsActive: true},
+		)
 		if err != nil {
 			t.Fatalf("account %v: %v", c, err)
 		}
@@ -99,7 +109,7 @@ func (e *matrixEnv) rawAmount(t *testing.T, id int64) int64 {
 // stored it under; a case's Currency has no id of its own.
 func (e *matrixEnv) stored(c moneytest.Currency) Currency { return e.curs[c.Code] }
 
-func TestAmountsAreStoredAndSummedExactlyInEveryCurrency(t *testing.T) {
+func TestAmountsStoredSummedExactlyEveryCurrency(t *testing.T) {
 	moneytest.ForEach(t, func(t *testing.T, c moneytest.Currency) {
 		e := newMatrixEnv(t, moneytest.Currencies[0])
 		moneytest.ForEachAmount(t, moneytest.Valid(c.Decimals), func(t *testing.T, a moneytest.Amount) {
@@ -142,7 +152,7 @@ func TestManyMaximumAmountsSumExactly(t *testing.T) {
 	})
 }
 
-func TestAmountsOutOfRangeAreRejectedAndStoreNothing(t *testing.T) {
+func TestAmountsOutRangeRejectedStoreNothing(t *testing.T) {
 	moneytest.ForEach(t, func(t *testing.T, c moneytest.Currency) {
 		e := newMatrixEnv(t, moneytest.Currencies[0])
 		acct := e.accts[c.Code]
@@ -162,11 +172,20 @@ func TestAmountsOutOfRangeAreRejectedAndStoreNothing(t *testing.T) {
 				_, err = e.txs.Create(e.ctx, TxInput{Type: "income", AccountID: acct.ID, Amount: decimal.NewFromInt(1), Date: &date,
 					Items: []TxItemInput{{Name: "x", Quantity: decimal.NewFromInt(1), PricePerUnit: in}}})
 				check("item price", err)
-				_, err = (Accounts{DB: e.db}).Create(e.ctx, AccountInput{Name: "big", Type: "cash", CurrencyID: cur.ID, InitialBalance: in, IsActive: true})
+				_, err = (Accounts{DB: e.db}).Create(
+					e.ctx,
+					AccountInput{Name: "big", Type: "cash", CurrencyID: cur.ID, InitialBalance: in, IsActive: true},
+				)
 				check("account balance", err)
-				_, err = (Accounts{DB: e.db}).Create(e.ctx, AccountInput{Name: "debt", Type: "debt", CurrencyID: cur.ID, TargetAmount: &in, IsActive: true})
+				_, err = (Accounts{DB: e.db}).Create(
+					e.ctx,
+					AccountInput{Name: "debt", Type: "debt", CurrencyID: cur.ID, TargetAmount: &in, IsActive: true},
+				)
 				check("debt target", err)
-				_, err = (Budgets{DB: e.db}).Create(e.ctx, BudgetInput{Name: "b", Amount: in, CurrencyID: &cur.ID, Period: "monthly"})
+				_, err = (Budgets{DB: e.db}).Create(
+					e.ctx,
+					BudgetInput{Name: "b", Amount: in, CurrencyID: &cur.ID, Period: "monthly"},
+				)
 				check("budget", err)
 
 				if got := e.count(t, "transactions"); got != txs {
@@ -186,7 +205,7 @@ func TestAmountsOutOfRangeAreRejectedAndStoreNothing(t *testing.T) {
 	})
 }
 
-func TestUpdateRejectsOutOfRangeAndKeepsTheOldAmount(t *testing.T) {
+func TestUpdateRejectsRangeKeepsAmount(t *testing.T) {
 	moneytest.ForEach(t, func(t *testing.T, c moneytest.Currency) {
 		e := newMatrixEnv(t, moneytest.Currencies[0])
 		orig, err := e.tx(t, "income", c, decimal.New(12345, -int32(c.Decimals)))
@@ -195,7 +214,11 @@ func TestUpdateRejectsOutOfRangeAndKeepsTheOldAmount(t *testing.T) {
 		}
 		for _, a := range moneytest.Invalid(c.Decimals) {
 			date := "2024-01-15"
-			_, err := e.txs.Update(e.ctx, orig.ID, TxInput{Type: "income", AccountID: orig.AccountID, Amount: a.Input, Date: &date})
+			_, err := e.txs.Update(
+				e.ctx,
+				orig.ID,
+				TxInput{Type: "income", AccountID: orig.AccountID, Amount: a.Input, Date: &date},
+			)
 			if !errors.Is(err, money.ErrOutOfRange) {
 				t.Errorf("%s: err = %v", a.Name, err)
 			}
@@ -206,7 +229,7 @@ func TestUpdateRejectsOutOfRangeAndKeepsTheOldAmount(t *testing.T) {
 	})
 }
 
-func TestConvertEveryPairAndAmount(t *testing.T) {
+func TestConvertEveryPairAmount(t *testing.T) {
 	// Rates against USD, so the base of this matrix is USD.
 	stored := map[string]Currency{}
 	for i, c := range moneytest.Currencies {
@@ -261,7 +284,7 @@ func mustPanic(t *testing.T, fn func()) {
 
 // A there-and-back conversion may lose at most what rounding to the two scales
 // can take, never more.
-func TestConvertRoundTripErrorIsBoundedByTheScales(t *testing.T) {
+func TestConvertRoundTripErrorBoundedScales(t *testing.T) {
 	stored := map[string]Currency{}
 	for i, c := range moneytest.Currencies {
 		stored[c.Code] = Currency{ID: int64(i + 1), Code: c.Code, Decimals: c.Decimals, Rate: c.Rate, IsBase: c.Code == "USD"}
@@ -283,7 +306,10 @@ func TestConvertRoundTripErrorIsBoundedByTheScales(t *testing.T) {
 			// which is worth rate_to/rate_from units of `from` on the way back.
 			unitFrom := decimal.New(1, -int32(from.Decimals))
 			unitTo := decimal.New(1, -int32(to.Decimals))
-			bound := half.Mul(unitFrom).Add(half.Mul(unitTo).Mul(to.Rate).DivRound(from.Rate, 40)).Add(unitFrom.Mul(half)) // + final rounding
+			bound := half.Mul(unitFrom).
+				Add(half.Mul(unitTo).Mul(to.Rate).DivRound(from.Rate, 40)).
+				Add(unitFrom.Mul(half))
+				// + final rounding
 			diff := back.Decimal().Sub(in.Decimal()).Abs()
 			if diff.GreaterThan(bound) {
 				t.Errorf("%s: %s -> %s -> %s drifted by %s, bound %s", a.Name, in, there, back, diff, bound)
@@ -293,8 +319,8 @@ func TestConvertRoundTripErrorIsBoundedByTheScales(t *testing.T) {
 }
 
 func TestTransfersBetweenEveryPairOfCurrencies(t *testing.T) {
+	e := newMatrixEnv(t, moneytest.Currencies[0]) // shared: each transfer is deleted again
 	moneytest.ForEachPair(t, func(t *testing.T, from, to moneytest.Currency) {
-		e := newMatrixEnv(t, moneytest.Currencies[0])
 		f, tt := e.stored(from), e.stored(to)
 		fromAcct, toAcct := e.accts[from.Code], e.accts[to.Code]
 		if from.Code == to.Code {
@@ -320,6 +346,7 @@ func TestTransfersBetweenEveryPairOfCurrencies(t *testing.T) {
 				t.Errorf("%s: %v", a.Name, terr)
 				continue
 			}
+			defer func() { _ = e.txs.Delete(e.ctx, tx.ID) }()
 			if tx.ToAmount == nil || !tx.ToAmount.Equal(want) {
 				t.Errorf("%s: delivered %v, want %s", a.Name, tx.ToAmount, want)
 			}
@@ -330,7 +357,7 @@ func TestTransfersBetweenEveryPairOfCurrencies(t *testing.T) {
 	})
 }
 
-func TestExplicitTransferAmountIsRoundedIntoTheDestinationScale(t *testing.T) {
+func TestExplicitTransferAmountRoundsToDestination(t *testing.T) {
 	moneytest.ForEach(t, func(t *testing.T, to moneytest.Currency) {
 		e := newMatrixEnv(t, moneytest.Currencies[0])
 		from := moneytest.Currencies[0]

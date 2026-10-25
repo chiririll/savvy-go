@@ -1,3 +1,5 @@
+//go:build integration
+
 package httpserver
 
 import (
@@ -8,12 +10,12 @@ import (
 	"sync"
 	"testing"
 
-	"savvy-go/internal/bootstrap"
 	"savvy-go/internal/currencydata"
+	"savvy-go/internal/firstrun"
 )
 
 func (a *testApp) register(password string, extra map[string]string) *http.Response {
-	body := map[string]string{"name": "A", "email": "a@a.com", "password": "secret1"}
+	body := map[string]string{"name": "A", "email": "a@a.com", "password": "secret12"}
 	if password != "" {
 		body["bootstrap_password"] = password
 	}
@@ -49,7 +51,7 @@ func TestRegisterNeedsTheBootstrapPassword(t *testing.T) {
 
 // appWithGuard is a fresh server with the given bootstrap guard, or none when
 // g is nil. It has no shared test space.
-func appWithGuard(t *testing.T, g *bootstrap.Guard) *testApp {
+func appWithGuard(t *testing.T, g *firstrun.Guard) *testApp {
 	t.Helper()
 	cfg, _ := testConfig(t)
 	st := openTestStore(t, cfg)
@@ -57,10 +59,10 @@ func appWithGuard(t *testing.T, g *bootstrap.Guard) *testApp {
 	if g != nil {
 		opts = append(opts, WithBootstrap(g))
 	}
-	s := New(cfg, st, testKeys(t, cfg), opts...)
+	s := newServer(cfg, st, testKeys(t, cfg), opts...)
 	ts := httptest.NewServer(s.Handler())
 	t.Cleanup(ts.Close)
-	return &testApp{t: t, db: st.SQL(), store: st, srv: ts, s: s, client: ts.Client(), bootstrap: g}
+	return &testApp{t: t, db: st.SQL(), store: st, srv: ts, s: s, svc: servicesOf(s), client: ts.Client(), bootstrap: g}
 }
 
 func TestRegisterWithoutAGuardIsClosed(t *testing.T) {
@@ -68,7 +70,7 @@ func TestRegisterWithoutAGuardIsClosed(t *testing.T) {
 	status(t, a.register("anything", nil), http.StatusForbidden, "register with no guard")
 }
 
-func TestRegisterIsClosedOnceAUserExists(t *testing.T) {
+func TestRegisterIsClosedOnceUserExists(t *testing.T) {
 	a := newTestApp(t)
 	pass := a.bootstrap.Password()
 	status(t, a.register(pass, nil), http.StatusCreated, "first")
@@ -76,18 +78,18 @@ func TestRegisterIsClosedOnceAUserExists(t *testing.T) {
 	if a.bootstrap.Active() {
 		t.Fatal("password still valid after the first user")
 	}
-	if _, err := os.Stat(filepath.Join(a.s.cfg.DataDir, bootstrap.FileName)); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(a.svc.Cfg.DataDir, firstrun.FileName)); !os.IsNotExist(err) {
 		t.Fatalf("password file still there: %v", err)
 	}
 }
 
-func TestRegisterIsClosedWhenUsersExistEvenWithTheRightPassword(t *testing.T) {
+func TestRegisterClosedOnceUsersExist(t *testing.T) {
 	a := newTestApp(t)
 	a.createUser("someone@test.com", "secret1", "user")
 	status(t, a.register(a.bootstrap.Password(), nil), http.StatusForbidden, "users present")
 }
 
-func TestInvalidFieldsDoNotSpendThePassword(t *testing.T) {
+func TestInvalidFieldsDoNotSpendPassword(t *testing.T) {
 	a := newTestApp(t)
 	res := a.register(a.bootstrap.Password(), map[string]string{"email": "not-an-email"})
 	fieldErrors(t, res, "email")
@@ -131,7 +133,7 @@ func TestStatusCarriesTheBootstrapHint(t *testing.T) {
 	body := decodeJSON(t, a.do("GET", "/api/auth/status", nil, "", ""))
 	hint, _ := body["bootstrap_hint"].(map[string]any)
 	if body["needs_registration"] != true || hint["environment"] != "binary" ||
-		hint["file"] != filepath.Join(a.s.cfg.DataDir, bootstrap.FileName) {
+		hint["file"] != filepath.Join(a.svc.Cfg.DataDir, firstrun.FileName) {
 		t.Fatalf("status %v", body)
 	}
 	if _, leaked := hint["password"]; leaked || len(hint) != 2 {
@@ -146,9 +148,9 @@ func TestStatusCarriesTheBootstrapHint(t *testing.T) {
 }
 
 func TestStatusHintFollowsTheEnvironment(t *testing.T) {
-	for _, env := range []bootstrap.Env{bootstrap.Docker, bootstrap.Systemd} {
+	for _, env := range []firstrun.Env{firstrun.Docker, firstrun.Systemd} {
 		cfg, _ := testConfig(t)
-		a := appWithGuard(t, bootstrap.New(cfg.DataDir, env))
+		a := appWithGuard(t, firstrun.New(cfg.DataDir, env))
 		hint, _ := decodeJSON(t, a.do("GET", "/api/auth/status", nil, "", ""))["bootstrap_hint"].(map[string]any)
 		if hint["environment"] != string(env) {
 			t.Errorf("%s: hint %v", env, hint)
@@ -174,7 +176,7 @@ func TestVerifyBootstrapPassword(t *testing.T) {
 	status(t, a.register(a.bootstrap.Password(), nil), http.StatusCreated, "register after verify")
 }
 
-func TestVerifyBootstrapIsClosedWhenUsersExist(t *testing.T) {
+func TestVerifyBootstrapClosedWhenUsersExist(t *testing.T) {
 	a := newTestApp(t)
 	pass := a.bootstrap.Password()
 	a.createUser("someone@test.com", "secret1", "user")

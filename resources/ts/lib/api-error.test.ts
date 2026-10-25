@@ -66,7 +66,10 @@ describe('getApiErrorMessage', () => {
     })
 
     it('prefers the first non-empty detail over the message', () => {
-        const error = { message: 'The given data was invalid.', details: { name: ['', 'validation.required'], other: ['x'] } }
+        const error = {
+            message: 'The given data was invalid.',
+            details: { name: ['', 'validation.required'], other: ['x'] },
+        }
         expect(getApiErrorMessage(error, 'Fallback')).toBe('This field is required')
     })
 

@@ -1,3 +1,5 @@
+//go:build integration
+
 package httpserver
 
 import (
@@ -9,6 +11,7 @@ import (
 	"time"
 
 	"savvy-go/internal/auth"
+	"savvy-go/internal/settings"
 )
 
 // invitePath is the invitations collection of the app's space.
@@ -33,10 +36,10 @@ func (a *testApp) postInvite(sess *auth.Issued, spaceID int64, email string) (in
 // has confirmed their own address.
 func (a *testApp) requireVerification(admin *auth.User) {
 	a.t.Helper()
-	if err := a.s.users.SetEmailVerified(context.Background(), admin.ID, true); err != nil {
+	if err := a.svc.Users.SetEmailVerified(context.Background(), admin.ID, true); err != nil {
 		a.t.Fatal(err)
 	}
-	if err := a.s.settings.Set(context.Background(), "require_email_verification", true); err != nil {
+	if err := a.svc.Settings.Set(context.Background(), "require_email_verification", true); err != nil {
 		a.t.Fatal(err)
 	}
 }
@@ -52,11 +55,11 @@ func (a *testApp) invitationRows() int {
 
 func (a *testApp) secondSpace() int64 {
 	a.t.Helper()
-	admin, err := a.s.users.ByEmail(context.Background(), "admin@test.com")
+	admin, err := a.svc.Users.ByEmail(context.Background(), "admin@test.com")
 	if err != nil || admin == nil {
 		a.t.Fatalf("admin: %v", err)
 	}
-	sp, err := a.s.spaces.Create(context.Background(), "Other", admin)
+	sp, err := a.svc.Spaces.Create(context.Background(), "Other", admin)
 	if err != nil {
 		a.t.Fatal(err)
 	}
@@ -97,7 +100,8 @@ func TestInvitationMethodFollowsTheServerSetup(t *testing.T) {
 		if status, _, raw := a.postInvite(sess, a.space.ID, ""); status != 422 {
 			t.Errorf("link invitation with verification required: %d %v", status, raw)
 		}
-		if status, data, raw := a.postInvite(sess, a.space.ID, "new@example.org"); status != 201 || data["emailSent"] != true {
+		if status, data, raw := a.postInvite(sess, a.space.ID, "new@example.org"); status != 201 ||
+			data["emailSent"] != true {
 			t.Errorf("email invitation: %d %v", status, raw)
 		}
 	})
@@ -116,19 +120,22 @@ func TestInvitationMethodFollowsTheServerSetup(t *testing.T) {
 	})
 }
 
-func TestInvitationsInfoTellsTheFrontendWhichMethodsApply(t *testing.T) {
+func TestInvitationMethodsTellFrontendWhatApplies(t *testing.T) {
 	cases := []struct {
 		name         string
+		appURL       string
 		mail, verify bool
 		email, link  bool
+		reason       string // what the reason for "no email" must contain; "" when email works
 	}{
-		{"mail and choice", true, false, true, true},
-		{"verification required", true, true, true, false},
-		{"no mail", false, false, false, true},
+		{"mail and choice", testURL, true, false, true, true, ""},
+		{"verification required", testURL, true, true, true, false, ""},
+		{"no mail", testURL, false, false, false, true, "mail"},
+		{"mail but no public URL", "", true, false, false, true, "public URL"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			a, sess, admin := newMailApp(t, &recorder{on: c.mail})
+			a, sess, admin := newMailAppAt(t, c.appURL, &recorder{on: c.mail})
 			if c.verify {
 				a.requireVerification(admin)
 			}
@@ -137,11 +144,15 @@ func TestInvitationsInfoTellsTheFrontendWhichMethodsApply(t *testing.T) {
 			if data["email"] != c.email || data["link"] != c.link {
 				t.Errorf("methods %v, want email=%v link=%v", data, c.email, c.link)
 			}
+			reason, _ := data["emailReason"].(string)
+			if c.email && reason != "" || !c.email && !strings.Contains(strings.ToLower(reason), strings.ToLower(c.reason)) {
+				t.Errorf("emailReason = %q, want one mentioning %q", reason, c.reason)
+			}
 		})
 	}
 }
 
-func TestRegisteringThroughAnEmailedInvitationVerifiesTheAddress(t *testing.T) {
+func TestRegisteringThroughEmailedInvitationVerifiesAddress(t *testing.T) {
 	rec := &recorder{on: true}
 	a, sess, admin := newMailApp(t, rec)
 	a.requireVerification(admin)
@@ -161,7 +172,7 @@ func TestRegisteringThroughAnEmailedInvitationVerifiesTheAddress(t *testing.T) {
 		t.Fatalf("register: %d %v", res.StatusCode, decodeJSON(t, res))
 	}
 	res.Body.Close()
-	u, _ := a.s.users.ByEmail(context.Background(), "bob@example.org")
+	u, _ := a.svc.Users.ByEmail(context.Background(), "bob@example.org")
 	if u == nil || !a.verified(u.ID) {
 		t.Fatal("registering from the emailed link left the address unverified")
 	}
@@ -170,7 +181,7 @@ func TestRegisteringThroughAnEmailedInvitationVerifiesTheAddress(t *testing.T) {
 	}
 }
 
-func TestALinkInvitationKeepsItsNoteAndAnEmailedOneDoesNot(t *testing.T) {
+func TestLinkInvitationKeepsNoteEmailedNot(t *testing.T) {
 	rec := &recorder{on: true}
 	a, sess, _ := newMailApp(t, rec)
 	post := func(body map[string]any) (int, map[string]any) {
@@ -181,7 +192,8 @@ func TestALinkInvitationKeepsItsNoteAndAnEmailedOneDoesNot(t *testing.T) {
 	if status, raw := post(map[string]any{"role": "editor", "note": "  Kim from work "}); status != 201 {
 		t.Fatalf("link with note: %d %v", status, raw)
 	}
-	if status, raw := post(map[string]any{"role": "editor", "email": "new@example.org", "note": "ignored"}); status != 201 {
+	if status,
+		raw := post(map[string]any{"role": "editor", "email": "new@example.org", "note": "ignored"}); status != 201 {
 		t.Fatalf("email with note: %d %v", status, raw)
 	}
 	if status, _ := post(map[string]any{"role": "editor", "note": strings.Repeat("x", 101)}); status != 422 {
@@ -202,25 +214,67 @@ func TestALinkInvitationKeepsItsNoteAndAnEmailedOneDoesNot(t *testing.T) {
 	}
 }
 
-func TestARegistrationThroughALinkInvitationIsAskedToConfirmByEmail(t *testing.T) {
-	rec := &recorder{on: true}
-	a, sess, _ := newMailApp(t, rec)
-	_, data, _ := a.postInvite(sess, a.space.ID, "")
-	token := data["token"].(string)
-
-	res := a.do("POST", "/api/invitations/"+token+"/register",
-		map[string]any{"name": "New", "email": "carol@example.org", "password": "secret12"}, "", "")
-	if res.StatusCode != 201 {
-		t.Fatalf("register: %d %v", res.StatusCode, decodeJSON(t, res))
+// A link nobody mailed proves nothing about the address typed at registration.
+// If the instance wants verified addresses by then, the new account is mailed a
+// confirmation link; if not, nothing is sent.
+func TestLinkInvitationRegistrationAsksEmailConfirmation(t *testing.T) {
+	register := func(a *testApp, token, email string) {
+		t.Helper()
+		res := a.do("POST", "/api/invitations/"+token+"/register",
+			map[string]any{"name": "New", "email": email, "password": "secret12"}, "", "")
+		if res.StatusCode != 201 {
+			t.Fatalf("register: %d %v", res.StatusCode, decodeJSON(t, res))
+		}
+		res.Body.Close()
 	}
-	res.Body.Close()
-	u, _ := a.s.users.ByEmail(context.Background(), "carol@example.org")
-	if u == nil || a.verified(u.ID) {
-		t.Fatalf("a link nobody mailed proved an address: %+v", u)
+
+	t.Run("verification required later", func(t *testing.T) {
+		rec := &recorder{on: true}
+		a, sess, admin := newMailApp(t, rec)
+		_, data, _ := a.postInvite(sess, a.space.ID, "")
+		a.requireVerification(admin) // the link was made while it was not required
+
+		register(a, data["token"].(string), "carol@example.org")
+		u, _ := a.svc.Users.ByEmail(context.Background(), "carol@example.org")
+		if u == nil || a.verified(u.ID) {
+			t.Fatalf("a link nobody mailed proved an address: %+v", u)
+		}
+		msgs := rec.messages()
+		if len(msgs) != 1 || msgs[0].To != "carol@example.org" ||
+			!strings.HasPrefix(linkIn(t, msgs[0]).Path, "/verify-email/") {
+			t.Fatalf("want one confirmation email to carol, got %+v", msgs)
+		}
+	})
+
+	t.Run("verification not required", func(t *testing.T) {
+		rec := &recorder{on: true}
+		a, sess, _ := newMailApp(t, rec)
+		_, data, _ := a.postInvite(sess, a.space.ID, "")
+
+		register(a, data["token"].(string), "dan@example.org")
+		if n := len(rec.messages()); n != 0 {
+			t.Errorf("%d emails sent although verification is not required", n)
+		}
+	})
+}
+
+func TestInvitationRegistrationClosedNoPassword(t *testing.T) {
+	a, sess, _ := newMailApp(t, &recorder{})
+	_, data, _ := a.postInvite(sess, a.space.ID, "")
+	insertSSO(t, a.db, true)
+	if err := (settings.Store{DB: a.db}).Set(context.Background(), "password_login_enabled", false); err != nil {
+		t.Fatal(err)
+	}
+
+	res := a.do("POST", "/api/invitations/"+data["token"].(string)+"/register",
+		map[string]any{"name": "New", "email": "eve@example.org", "password": "secret12"}, "", "")
+	status(t, res, http.StatusForbidden, "register without password sign-in")
+	if u, _ := a.svc.Users.ByEmail(context.Background(), "eve@example.org"); u != nil {
+		t.Fatal("an account was created")
 	}
 }
 
-func TestAFailedSendLeavesNoInvitationAndNoCooldown(t *testing.T) {
+func TestFailedSendLeavesNoInvitationCooldown(t *testing.T) {
 	rec := &recorder{on: true, sendErr: errors.New("connection refused")}
 	a, sess, _ := newMailApp(t, rec)
 
@@ -240,7 +294,7 @@ func TestAFailedSendLeavesNoInvitationAndNoCooldown(t *testing.T) {
 	}
 }
 
-func TestAnAddressCannotBeInvitedTwiceToTheSameSpace(t *testing.T) {
+func TestAddressCannotInvitedTwiceSameSpace(t *testing.T) {
 	a, sess, _ := newMailApp(t, &recorder{on: true})
 	if status, _, raw := a.postInvite(sess, a.space.ID, "new@example.org"); status != 201 {
 		t.Fatalf("first: %d %v", status, raw)
@@ -259,7 +313,7 @@ func TestAnAddressCannotBeInvitedTwiceToTheSameSpace(t *testing.T) {
 	}
 }
 
-func TestAMemberCannotBeInvitedByEmail(t *testing.T) {
+func TestMemberCannotBeInvitedByEmail(t *testing.T) {
 	a, sess, _ := newMailApp(t, &recorder{on: true})
 	a.createUser("member@test.com", "secret1", roleEditor)
 	status, _, raw := a.postInvite(sess, a.space.ID, "member@test.com")
@@ -268,7 +322,7 @@ func TestAMemberCannotBeInvitedByEmail(t *testing.T) {
 	}
 }
 
-func TestRevokingAnInvitationKillsTheLinkButNotTheCooldown(t *testing.T) {
+func TestRevokingInvitationKeepsCooldown(t *testing.T) {
 	rec := &recorder{on: true}
 	a, sess, _ := newMailApp(t, rec)
 	_, data, _ := a.postInvite(sess, a.space.ID, "new@example.org")
@@ -305,7 +359,7 @@ func TestRevokingAnInvitationKillsTheLinkButNotTheCooldown(t *testing.T) {
 	}
 }
 
-func TestPruningEndsTheCooldownOfOldRowsOnly(t *testing.T) {
+func TestPruningEndsCooldownOldRowsOnly(t *testing.T) {
 	a, sess, _ := newMailApp(t, &recorder{on: true})
 	ctx := context.Background()
 	now := time.Now().UTC()
@@ -329,7 +383,7 @@ func TestPruningEndsTheCooldownOfOldRowsOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	n, err := a.s.spaces.PruneInvitations(ctx)
+	n, err := a.svc.Spaces.PruneInvitations(ctx)
 	if err != nil || n != 1 {
 		t.Fatalf("pruned %d, %v; want only the row that expired two hours ago", n, err)
 	}
@@ -344,14 +398,18 @@ func TestPruningEndsTheCooldownOfOldRowsOnly(t *testing.T) {
 	}
 }
 
-func TestOnlyAServerAdminClearsInvitationCooldowns(t *testing.T) {
+func TestOnlyServerAdminClearsInvitationCooldowns(t *testing.T) {
 	a, sess, _ := newMailApp(t, &recorder{on: true})
 	for _, email := range []string{"a@example.org", "b@example.org"} {
 		_, data, _ := a.postInvite(sess, a.space.ID, email)
-		status(t, a.do("DELETE", a.invitePath(a.space.ID)+"/"+itoa(int64(data["id"].(float64))), nil, sess.Token, sess.CSRF), 204, "revoke")
+		status(
+			t,
+			a.do("DELETE", a.invitePath(a.space.ID)+"/"+itoa(int64(data["id"].(float64))), nil, sess.Token, sess.CSRF),
+			204,
+			"revoke",
+		)
 	}
-	_, pending, _ := a.postInvite(sess, a.space.ID, "c@example.org")
-	_ = pending
+	a.postInvite(sess, a.space.ID, "c@example.org")
 
 	spaceAdmin := a.createUser("spaceadmin@test.com", "secret1", roleEditor)
 	u := a.issue(spaceAdmin, false)
@@ -382,12 +440,14 @@ func TestOnlyAServerAdminClearsInvitationCooldowns(t *testing.T) {
 	}
 
 	var audited int
-	if err := a.db.QueryRow(`SELECT COUNT(*) FROM admin_audit WHERE action = 'invitations.cleared'`).Scan(&audited); err != nil || audited != 2 {
+	if err := a.db.QueryRow(`SELECT COUNT(*) FROM admin_audit ` +
+		`WHERE action = 'invitations.cleared'`).Scan(&audited); err != nil ||
+		audited != 2 {
 		t.Errorf("audit rows %d, %v; want one per clearing", audited, err)
 	}
 }
 
-func TestAcceptedInvitationsCanStillBeRemovedFromTheList(t *testing.T) {
+func TestAcceptedInvitationsRemovableFromList(t *testing.T) {
 	a, sess, _ := newMailApp(t, &recorder{})
 	_, data, _ := a.postInvite(sess, a.space.ID, "")
 	token := data["token"].(string)

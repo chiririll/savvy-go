@@ -35,7 +35,7 @@ afterEach(() => {
 })
 
 describe('server setup gate', () => {
-    it('sends an admin back to the server setup while it is pending, e.g. after a reload', () => {
+    it('sends an admin back to server setup while it is pending', () => {
         renderGate()
         expect(screen.getByText('server setup')).toBeTruthy()
     })

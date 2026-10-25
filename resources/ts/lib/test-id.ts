@@ -16,13 +16,17 @@ export const testIdMenu = (id: string): { 'data-testid-menu'?: string } =>
 
 export const testIdTabs = (): { 'data-testid-tabs'?: string } => (__TEST_IDS__ ? { 'data-testid-tabs': '' } : {})
 
-export const testIdTab = (id: string, active: boolean): { 'data-testid-tab'?: string; 'data-testid-active'?: string } =>
+export const testIdTab = (
+    id: string,
+    active: boolean,
+): { 'data-testid-tab'?: string; 'data-testid-active'?: string } =>
     __TEST_IDS__ ? { 'data-testid-tab': id, 'data-testid-active': String(active) } : {}
 
 // testIdSpoiler() marks the button that unfolds a hidden part of a page or dialog. The screenshots
 // are taken folded, then once more with every spoiler in scope unfolded.
 
-export const testIdSpoiler = (): { 'data-testid-spoiler'?: string } => (__TEST_IDS__ ? { 'data-testid-spoiler': '' } : {})
+export const testIdSpoiler = (): { 'data-testid-spoiler'?: string } =>
+    __TEST_IDS__ ? { 'data-testid-spoiler': '' } : {}
 
 // Controls: a group of choices that changes what a page shows, such as the type of a chart or
 // the period of a report. testIdControls(name) marks the group and testIdControl(id, active) each
@@ -32,7 +36,10 @@ export const testIdSpoiler = (): { 'data-testid-spoiler'?: string } => (__TEST_I
 export const testIdControls = (name: string): { 'data-testid-controls'?: string } =>
     __TEST_IDS__ ? { 'data-testid-controls': name } : {}
 
-export const testIdControl = (id: string, active: boolean): { 'data-testid-control'?: string; 'data-testid-active'?: string } =>
+export const testIdControl = (
+    id: string,
+    active: boolean,
+): { 'data-testid-control'?: string; 'data-testid-active'?: string } =>
     __TEST_IDS__ ? { 'data-testid-control': id, 'data-testid-active': String(active) } : {}
 
 export const testIdSelect = (name: string): { 'data-testid-select'?: string } =>

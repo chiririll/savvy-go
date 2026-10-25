@@ -12,7 +12,7 @@ import (
 // setTables are tables each set must create.
 var setTables = map[Set][]string{
 	Server: {
-		"users", "auth_sessions", "password_tokens", "two_factor_challenges", "webauthn_credentials",
+		"users", "auth_sessions", "password_tokens", "two_factor_challenges", "two_factor_failures", "webauthn_credentials",
 		"api_tokens", "settings", "uploads", "identity_providers", "spaces", "space_members",
 		"space_invitations", "space_links", "sync_groups", "sync_group_spaces", "trusted_keys", "admin_audit",
 	},
@@ -61,7 +61,8 @@ func TestUpCreatesTables(t *testing.T) {
 
 			for _, table := range tables {
 				var name string
-				if err := sqlDB.QueryRow(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`, table).Scan(&name); err != nil {
+				if err := sqlDB.QueryRow(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`,
+					table).Scan(&name); err != nil {
 					t.Errorf("missing table %s: %v", table, err)
 				}
 			}
@@ -79,7 +80,10 @@ func TestTablesAreStrict(t *testing.T) {
 	for _, set := range []Set{Server, Space} {
 		t.Run(string(set), func(t *testing.T) {
 			sqlDB := migrated(t, set)
-			rows, err := sqlDB.Query(`SELECT name FROM pragma_table_list WHERE schema = 'main' AND type = 'table' AND strict = 0 AND name NOT LIKE 'sqlite_%'`)
+			rows, err := sqlDB.Query(
+				`SELECT name FROM pragma_table_list WHERE schema = 'main' AND type = 'table' AND strict = 0 AND name NOT LIKE ` +
+					`'sqlite_%'`,
+			)
 			if err != nil {
 				t.Fatal(err)
 			}

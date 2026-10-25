@@ -32,7 +32,8 @@ func mapRoles(ctx context.Context, db *sql.DB) error {
 	}
 	if slices.Contains(cols, "default_role") {
 		if _, err := db.ExecContext(ctx,
-			`UPDATE identity_providers SET default_role = 'user' WHERE default_role IN ('read-write', 'read-only')`); err != nil {
+			`UPDATE identity_providers SET default_role = 'user' `+
+				`WHERE default_role IN ('read-write', 'read-only')`); err != nil {
 			return err
 		}
 	}

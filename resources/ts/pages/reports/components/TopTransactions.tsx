@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ChevronRight } from 'lucide-react'
 import { useTransactionReportTop } from '@/hooks'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, cn } from '@/lib/utils'
 import { localizeDefaultName } from '@/lib/localized-name'
 import type { ReportFilters } from '../types'
 import type { ReportTransactionType } from '@/api/reports'
@@ -31,21 +31,22 @@ export function TopTransactions({ filters, type, limit = 10 }: TopTransactionsPr
     const { data, isLoading } = useTransactionReportTop(filters, type, limit)
 
     const transactions = data?.items || []
-    const copy = type === 'income'
-        ? {
-            title: t('reports.topIncome.title'),
-            subtitle: t('reports.topIncome.subtitle'),
-            topTotal: t('reports.topIncome.topTotal', { count: transactions.length }),
-            noData: t('reports.topIncome.noData'),
-        }
-        : {
-            title: t('reports.topExpenses.title'),
-            subtitle: t('reports.topExpenses.subtitle'),
-            topTotal: t('reports.topExpenses.topTotal', { count: transactions.length }),
-            noData: t('reports.topExpenses.noData'),
-        }
+    const copy =
+        type === 'income'
+            ? {
+                  title: t('reports.topIncome.title'),
+                  subtitle: t('reports.topIncome.subtitle'),
+                  topTotal: t('reports.topIncome.topTotal', { count: transactions.length }),
+                  noData: t('reports.topIncome.noData'),
+              }
+            : {
+                  title: t('reports.topExpenses.title'),
+                  subtitle: t('reports.topExpenses.subtitle'),
+                  topTotal: t('reports.topExpenses.topTotal', { count: transactions.length }),
+                  noData: t('reports.topExpenses.noData'),
+              }
     const currency = data?.currency
-    const amountClass = type === 'income' ? 'text-green-600' : 'text-red-600'
+    const amountClass = type === 'income' ? 'text-success' : 'text-destructive'
     const amountPrefix = type === 'income' ? '+' : '-'
 
     const totalTop = useMemo(() => {
@@ -58,14 +59,14 @@ export function TopTransactions({ filters, type, limit = 10 }: TopTransactionsPr
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0">
                         <CardTitle className="text-lg">{copy.title}</CardTitle>
-                        <p className="text-sm text-muted-foreground">
-                            {copy.subtitle}
-                        </p>
+                        <p className="text-sm text-muted-foreground">{copy.subtitle}</p>
                     </div>
                     {!isLoading && transactions.length > 0 && (
                         <div className="sm:text-right">
                             <p className="text-sm text-muted-foreground">{copy.topTotal}</p>
-                            <p className={`text-lg font-semibold ${amountClass}`}>{formatCurrency(totalTop, currency)}</p>
+                            <p className={`text-lg font-semibold ${amountClass}`}>
+                                {formatCurrency(totalTop, currency)}
+                            </p>
                         </div>
                     )}
                 </div>
@@ -86,10 +87,19 @@ export function TopTransactions({ filters, type, limit = 10 }: TopTransactionsPr
                         {transactions.map((transaction, index) => (
                             <div
                                 key={transaction.id}
-                                className="group flex items-center gap-2 sm:gap-3 px-1 py-2 sm:px-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                                className={cn(
+                                    'group flex items-center gap-2 sm:gap-3 px-1 py-2 sm:px-2 rounded-lg',
+                                    'hover:bg-muted/50 cursor-pointer transition-colors',
+                                )}
                                 onClick={() => navigate(`/transactions?id=${transaction.id}`)}
                             >
-                                <div className="flex items-center justify-center size-6 shrink-0 rounded-full bg-muted text-xs font-medium text-muted-foreground">
+                                <div
+                                    className={cn(
+                                        'flex items-center justify-center size-6 shrink-0 rounded-full',
+                                        'bg-muted text-xs',
+                                        'font-medium text-muted-foreground',
+                                    )}
+                                >
                                     {index + 1}
                                 </div>
                                 <div
@@ -112,10 +122,17 @@ export function TopTransactions({ filters, type, limit = 10 }: TopTransactionsPr
                                 </div>
                                 <div className="text-right flex-shrink-0">
                                     <p className={`text-sm sm:text-base font-semibold ${amountClass}`}>
-                                        {amountPrefix}{formatCurrency(transaction.amount, currency)}
+                                        {amountPrefix}
+                                        {formatCurrency(transaction.amount, currency)}
                                     </p>
                                 </div>
-                                <ChevronRight className="hidden sm:block size-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                                <ChevronRight
+                                    className={cn(
+                                        'hidden sm:block size-4 text-muted-foreground opacity-0',
+                                        'group-hover:opacity-100',
+                                        'transition-opacity flex-shrink-0',
+                                    )}
+                                />
                             </div>
                         ))}
                     </div>

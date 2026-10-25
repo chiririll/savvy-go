@@ -29,7 +29,7 @@ func provider(slug string, enabled bool) ssorepo.Save {
 	}
 }
 
-func TestProvidersAreListedFilteredAndUpdated(t *testing.T) {
+func TestProvidersAreListedFilteredUpdated(t *testing.T) {
 	r, _ := newRepo(t)
 	now := time.Now().UTC()
 	a, err := r.Insert(ctx, provider("a", true), now)
@@ -44,10 +44,12 @@ func TestProvidersAreListedFilteredAndUpdated(t *testing.T) {
 	if on, _ := r.List(ctx, ssorepo.Filter{EnabledOnly: true}); len(on) != 1 || on[0].ID != a {
 		t.Fatalf("enabled = %+v", on)
 	}
-	if one, _ := r.List(ctx, ssorepo.Filter{ID: b}); len(one) != 1 || one[0].Slug != "b" || one[0].Config != `{"issuer":"x"}` {
+	if one, _ := r.List(ctx, ssorepo.Filter{ID: b}); len(one) != 1 || one[0].Slug != "b" ||
+		one[0].Config != `{"issuer":"x"}` {
 		t.Fatalf("by id = %+v", one)
 	}
-	if one, _ := r.List(ctx, ssorepo.Filter{Slug: "a"}); len(one) != 1 || one[0].ID != a || !one[0].AllowJIT || one[0].CreatedAt == nil {
+	if one, _ := r.List(ctx, ssorepo.Filter{Slug: "a"}); len(one) != 1 || one[0].ID != a || !one[0].AllowJIT ||
+		one[0].CreatedAt == nil {
 		t.Fatalf("by slug = %+v", one)
 	}
 	if n, _ := r.CountEnabled(ctx); n != 1 {
@@ -92,7 +94,7 @@ func TestIdentityLinks(t *testing.T) {
 	}
 }
 
-func TestTicketsWorkOnceAndExpire(t *testing.T) {
+func TestTicketsWorkOnceExpire(t *testing.T) {
 	r, user := newRepo(t)
 	now := time.Now().UTC()
 	_ = r.InsertTicket(ctx, "live", user, true, now.Add(2*time.Minute), now)
@@ -113,7 +115,7 @@ func TestTicketsWorkOnceAndExpire(t *testing.T) {
 	}
 }
 
-func TestStateIsTakenOnceAndExpires(t *testing.T) {
+func TestStateIsTakenOnceExpires(t *testing.T) {
 	r, _ := newRepo(t)
 	now := time.Now().UTC()
 	p, _ := r.Insert(ctx, provider("a", true), now)
@@ -128,7 +130,9 @@ func TestStateIsTakenOnceAndExpires(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, _ := r.TakeState(ctx, "live", now)
-	if got == nil || *got != (ssorepo.State{ProviderID: p, Nonce: "n", CodeVerifier: "v", SAMLRequestID: "req-1", RedirectAfter: "/home"}) {
+	if got == nil ||
+		*got != (ssorepo.State{ProviderID: p, Nonce: "n", CodeVerifier: "v", SAMLRequestID: "req-1",
+			RedirectAfter: "/home"}) {
 		t.Fatalf("state = %+v", got)
 	}
 	if again, _ := r.TakeState(ctx, "live", now); again != nil {

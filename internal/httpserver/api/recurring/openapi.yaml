@@ -1,0 +1,86 @@
+paths:
+  /spaces/{space}/recurring:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Recurring]
+      summary: List recurring transactions
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+    post:
+      tags: [Recurring]
+      summary: Create a recurring transaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                type: {type: string, enum: [income, expense, transfer]}
+                account_id: {type: integer}
+                to_account_id: {type: integer, nullable: true}
+                category_id: {type: integer, nullable: true}
+                amount: {type: number}
+                to_amount: {type: number, nullable: true}
+                description: {type: string, nullable: true}
+                frequency: {type: string}
+                interval: {type: integer}
+                day_of_week: {type: integer, nullable: true}
+                day_of_month: {type: integer, nullable: true}
+                start_date: {type: string, format: date}
+                end_date: {type: string, format: date, nullable: true}
+                is_active: {type: boolean}
+                tag_ids: {type: array, items: {type: integer}}
+      responses:
+        "201": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "422": {$ref: "#/components/responses/Validation"}
+  /spaces/{space}/recurring-upcoming:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Recurring]
+      summary: Upcoming runs
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+  /spaces/{space}/recurring/{id}:
+    parameters: [{$ref: "#/components/parameters/Space"}, {$ref: "#/components/parameters/Id"}]
+    get:
+      tags: [Recurring]
+      summary: Get a recurring transaction
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "404": {$ref: "#/components/responses/NotFound"}
+    put:
+      tags: [Recurring]
+      summary: Update a recurring transaction
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "422": {$ref: "#/components/responses/Validation"}
+    patch:
+      tags: [Recurring]
+      summary: Update a recurring transaction (partial)
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "422": {$ref: "#/components/responses/Validation"}
+    delete:
+      tags: [Recurring]
+      summary: Delete a recurring transaction
+      responses:
+        "204": {description: Deleted}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "422": {$ref: "#/components/responses/Validation"}
+

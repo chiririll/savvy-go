@@ -9,21 +9,20 @@ const crud = createCrudApi<AutomationRule, AutomationRuleFormData>(ENDPOINT)
 export const automationApi = {
     ...crud,
 
-    toggle: (id: number | string) =>
-        api.post<AutomationRule>(`${ENDPOINT}/${id}/toggle`),
+    toggle: (id: number | string) => api.post<AutomationRule>(`${ENDPOINT}/${id}/toggle`),
 
     reorder: (rules: Array<{ id: number; priority: number }>) =>
-        api.post<{ success: boolean }, { rules: Array<{ id: number; priority: number }> }>(`${ENDPOINT}/reorder`, { rules }),
+        api.post<{ success: boolean }, { rules: Array<{ id: number; priority: number }> }>(`${ENDPOINT}/reorder`, {
+            rules,
+        }),
 
     test: (id: number | string, transactionId: number) =>
         api.post<{ conditionsMatch: boolean; actions: unknown[] }, { transaction_id: number }>(
             `${ENDPOINT}/${id}/test`,
-            { transaction_id: transactionId }
+            { transaction_id: transactionId },
         ),
 
-    getLogs: (id: number | string) =>
-        api.get<AutomationRuleLog[]>(`${ENDPOINT}/${id}/logs`),
+    getLogs: (id: number | string) => api.get<AutomationRuleLog[]>(`${ENDPOINT}/${id}/logs`),
 
-    getTriggers: () =>
-        api.get<TriggerType[]>(`${ENDPOINT}/triggers`),
+    getTriggers: () => api.get<TriggerType[]>(`${ENDPOINT}/triggers`),
 }

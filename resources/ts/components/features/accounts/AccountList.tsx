@@ -59,17 +59,13 @@ function SortableAccountRow({
     }
 
     return (
-        <div
-            ref={setNodeRef}
-            style={style}
-            className={cn(isDragging && 'relative z-10 opacity-50')}
-        >
+        <div ref={setNodeRef} style={style} className={cn(isDragging && 'relative z-10 opacity-50')}>
             <AccountRow
                 account={account}
                 onEdit={onEdit}
                 onDelete={onDelete}
                 isReadOnly={isReadOnly}
-                dragHandle={(
+                dragHandle={
                     <div
                         className="shrink-0"
                         onClick={(event) => event.stopPropagation()}
@@ -77,7 +73,11 @@ function SortableAccountRow({
                     >
                         <button
                             type="button"
-                            className="flex size-8 cursor-grab touch-none items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground active:cursor-grabbing"
+                            className={cn(
+                                'flex size-8 cursor-grab touch-none items-center justify-center rounded-md',
+                                'text-muted-foreground hover:bg-accent hover:text-foreground',
+                                'active:cursor-grabbing',
+                            )}
                             aria-label={t('actions.reorder')}
                             {...attributes}
                             {...listeners}
@@ -85,7 +85,7 @@ function SortableAccountRow({
                             <GripVertical className="size-4" />
                         </button>
                     </div>
-                )}
+                }
             />
         </div>
     )
@@ -144,7 +144,7 @@ export function AccountList({
 
     const rows = (
         <div className="divide-y divide-border/60">
-            {accounts.map((account) => (
+            {accounts.map((account) =>
                 canReorder ? (
                     <SortableAccountRow
                         key={account.id}
@@ -161,8 +161,8 @@ export function AccountList({
                         onDelete={onDelete}
                         isReadOnly={isReadOnly}
                     />
-                )
-            ))}
+                ),
+            )}
         </div>
     )
 

@@ -53,18 +53,29 @@ type Source struct {
 	// TTL is how long fetched data is kept; Retry is how long to wait after a
 	// failed fetch before trying again.
 	TTL, Retry time.Duration
+	// RefreshEvery is the shortest time between two forced retries (Refresh).
+	RefreshEvery time.Duration
 
 	now func() time.Time
 
 	mu        sync.Mutex
 	meta      []ledger.Currency
 	metaUntil time.Time
-	rates     map[string]cachedRates // by upper-case base code; for updates only
+	// metaBuiltIn is set while meta is the short built-in list, because the
+	// names file has never been fetched.
+	metaBuiltIn bool
+	// metaFailed is set while the last fetch of the names file failed and its
+	// retry window is running.
+	metaFailed bool
+	// lastRefresh is when Refresh last let a retry through.
+	lastRefresh time.Time
+	rates       map[string]cachedRates // by upper-case base code; for updates only
 }
 
 type cachedRates struct {
 	byCode map[string]decimal.Decimal // upper-case code -> value of one unit in the base
 	until  time.Time
+	failed bool // the last fetch failed; until is the end of the retry window
 }
 
 var _ ledger.RateSource = (*Source)(nil)
@@ -74,7 +85,7 @@ func New() *Source {
 	return &Source{
 		Client:  &http.Client{Timeout: 10 * time.Second},
 		MetaURL: defaultMetaURL, RatesURL: defaultRatesURL,
-		TTL: 24 * time.Hour, Retry: 5 * time.Minute,
+		TTL: 24 * time.Hour, Retry: 5 * time.Minute, RefreshEvery: 10 * time.Second,
 		now:   time.Now,
 		rates: map[string]cachedRates{},
 	}
@@ -120,7 +131,7 @@ func (s *Source) Rates(ctx context.Context, base string) (map[string]decimal.Dec
 	byCode, err := s.fetchRates(ctx, base)
 	if err != nil {
 		// Keep what we have, and do not ask again until Retry has passed.
-		c.until = s.now().Add(s.Retry)
+		c.until, c.failed = s.now().Add(s.Retry), true
 		s.rates[base] = c
 		if c.byCode != nil {
 			return c.byCode, nil
@@ -135,6 +146,14 @@ func (s *Source) Rates(ctx context.Context, base string) (map[string]decimal.Dec
 // rate is known). The rates are looked up live, not cached. When the service
 // is unreachable it falls back to a short built-in list.
 func (s *Source) Catalog(ctx context.Context, base string) []ledger.Currency {
+	list, _ := s.CatalogStatus(ctx, base)
+	return list
+}
+
+// CatalogStatus is Catalog, and says whether the list is the short built-in
+// one because the names could not be fetched, so the caller can tell the user
+// that a currency may be missing.
+func (s *Source) CatalogStatus(ctx context.Context, base string) (list []ledger.Currency, builtIn bool) {
 	base = strings.ToUpper(strings.TrimSpace(base))
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -148,7 +167,7 @@ func (s *Source) Catalog(ctx context.Context, base string) []ledger.Currency {
 		c.Rate = rates[c.Code]
 		out[i] = c
 	}
-	return out
+	return out, s.metaBuiltIn
 }
 
 // fetchRates loads base's file: its numbers say how many units of each
@@ -196,8 +215,9 @@ func (s *Source) metaList(ctx context.Context) []ledger.Currency {
 	if err := s.fetchJSON(ctx, s.MetaURL, &raw); err != nil || len(raw) == 0 {
 		if s.meta == nil {
 			s.meta = fallbackMeta()
+			s.metaBuiltIn = true
 		}
-		s.metaUntil = s.now().Add(s.Retry)
+		s.metaUntil, s.metaFailed = s.now().Add(s.Retry), true
 		return s.meta
 	}
 	list := make([]ledger.Currency, 0, len(raw))
@@ -214,6 +234,7 @@ func (s *Source) metaList(ctx context.Context) []ledger.Currency {
 	}
 	sort.Slice(list, func(i, j int) bool { return list[i].Code < list[j].Code })
 	s.meta = list
+	s.metaBuiltIn, s.metaFailed = false, false
 	s.metaUntil = s.now().Add(s.TTL)
 	return list
 }
@@ -257,4 +278,29 @@ func significant(d decimal.Decimal, n int) decimal.Decimal {
 	}
 	magnitude := len(d.Abs().Coefficient().String()) + int(d.Exponent()) // digits before the point
 	return d.Round(int32(n - magnitude))
+}
+
+// Refresh ends the wait after a failed fetch, so the next call for that data
+// tries the network again, once. It leaves alone everything that was fetched
+// fine (that data keeps its TTL), and old data still serves if the retry fails.
+// To keep the upstream service from being hammered, it lets one retry through
+// per RefreshEvery; inside that window it changes nothing and returns false.
+func (s *Source) Refresh() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := s.now()
+	if !s.lastRefresh.IsZero() && now.Before(s.lastRefresh.Add(s.RefreshEvery)) {
+		return false
+	}
+	s.lastRefresh = now
+	if s.metaFailed {
+		s.metaUntil = time.Time{}
+	}
+	for base, c := range s.rates {
+		if c.failed {
+			c.until = time.Time{}
+			s.rates[base] = c
+		}
+	}
+	return true
 }

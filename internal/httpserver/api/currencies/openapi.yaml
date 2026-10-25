@@ -1,0 +1,98 @@
+paths:
+  /spaces/{space}/currencies:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Currencies]
+      summary: List currencies
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+    post:
+      tags: [Currencies]
+      summary: Add a currency
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses:
+        "201": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "422": {$ref: "#/components/responses/Validation"}
+  /spaces/{space}/currencies/catalog:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Currencies]
+      summary: Catalog of currencies that can be added
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+  /spaces/{space}/currencies/convert:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    post:
+      tags: [Currencies]
+      summary: Convert an amount between currencies
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                amount: {type: number}
+                from_currency_id: {type: integer}
+                to_currency_id: {type: integer}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "422": {$ref: "#/components/responses/Validation"}
+  /spaces/{space}/currencies/{id}:
+    parameters: [{$ref: "#/components/parameters/Space"}, {$ref: "#/components/parameters/Id"}]
+    get:
+      tags: [Currencies]
+      summary: Get a currency
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "404": {$ref: "#/components/responses/NotFound"}
+    put:
+      tags: [Currencies]
+      summary: Update a currency
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "422": {$ref: "#/components/responses/Validation"}
+    patch:
+      tags: [Currencies]
+      summary: Update a currency (partial)
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "422": {$ref: "#/components/responses/Validation"}
+    delete:
+      tags: [Currencies]
+      summary: Delete a currency
+      responses:
+        "204": {description: Deleted}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "422": {$ref: "#/components/responses/Validation"}
+  /spaces/{space}/currencies/{id}/set-base:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    post:
+      tags: [Currencies]
+      summary: Make this the base currency
+      parameters: [{$ref: "#/components/parameters/Id"}]
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "422": {$ref: "#/components/responses/Validation"}
+

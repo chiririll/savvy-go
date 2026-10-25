@@ -2,11 +2,13 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-function Table({ className, ...props }: React.ComponentProps<"table">) {
+/** The scrolling wrapper can be reached by keyboard, so a wide table can be panned; `focusable={false}` for a hidden placeholder. */
+function Table({ className, focusable = true, ...props }: React.ComponentProps<"table"> & { focusable?: boolean }) {
   return (
     <div
       data-slot="table-container"
-      className="relative w-full overflow-x-auto"
+      tabIndex={focusable ? 0 : undefined}
+      className="relative w-full overflow-x-auto focus-visible:outline-2 focus-visible:outline-ring"
     >
       <table
         data-slot="table"

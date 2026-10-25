@@ -4,14 +4,25 @@ import type { InviteResult, SpaceRole } from '@/types/spaces'
 import { sendInvitations } from './send-invitations'
 import type { DraftInvitation } from './draft'
 
-const item = (key: string, email: string | null, role: SpaceRole = 'editor', note: string | null = null): DraftInvitation => ({ key, email, note, role })
+const item = (
+    key: string,
+    email: string | null,
+    role: SpaceRole = 'editor',
+    note: string | null = null,
+): DraftInvitation => ({ key, email, note, role })
 
 describe('sendInvitations', () => {
     it('emails the addressed ones and builds a link for the rest', async () => {
         const invite = vi.fn(async (_space: number, _role: SpaceRole, email?: string): Promise<InviteResult> =>
-            email ? { id: 1, emailSent: true } : { id: 2, token: 'abc', emailSent: false })
+            email ? { id: 1, emailSent: true } : { id: 2, token: 'abc', emailSent: false },
+        )
 
-        const out = await sendInvitations(9, [item('a', 'bob@example.org'), item('b', null, 'viewer', 'Kim')], invite, 'https://savvy.example')
+        const out = await sendInvitations(
+            9,
+            [item('a', 'bob@example.org'), item('b', null, 'viewer', 'Kim')],
+            invite,
+            'https://savvy.example',
+        )
 
         expect(invite).toHaveBeenNthCalledWith(1, 9, 'editor', 'bob@example.org', undefined)
         expect(invite).toHaveBeenNthCalledWith(2, 9, 'viewer', undefined, 'Kim')
@@ -27,7 +38,12 @@ describe('sendInvitations', () => {
             return { id: 1, emailSent: true }
         })
 
-        const out = await sendInvitations(9, [item('a', 'bad@example.org'), item('b', 'ok@example.org')], invite, 'https://x')
+        const out = await sendInvitations(
+            9,
+            [item('a', 'bad@example.org'), item('b', 'ok@example.org')],
+            invite,
+            'https://x',
+        )
 
         expect(out[0]).toMatchObject({ emailed: false, link: null, error: 'This address was invited a moment ago.' })
         expect(out[1]).toMatchObject({ emailed: true, error: null })

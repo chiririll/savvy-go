@@ -1,0 +1,132 @@
+paths:
+  /spaces/{space}/debts:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Debts]
+      summary: List debts
+      parameters:
+        - {name: include_completed, in: query, schema: {type: boolean}}
+        - {name: with_summary, in: query, schema: {type: boolean}}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+    post:
+      tags: [Debts]
+      summary: Create a debt
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                origin: {type: string}
+                name: {type: string}
+                debt_type: {type: string}
+                account_id: {type: integer}
+                currency_id: {type: integer}
+                amount: {type: number}
+                date: {type: string, format: date}
+                due_date: {type: string, format: date, nullable: true}
+                counterparty: {type: string, nullable: true}
+                description: {type: string, nullable: true}
+      responses:
+        "201": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "422": {$ref: "#/components/responses/Validation"}
+  /spaces/{space}/debts-summary:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Debts]
+      summary: Debts summary
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+  /spaces/{space}/debts/{id}:
+    parameters: [{$ref: "#/components/parameters/Space"}, {$ref: "#/components/parameters/Id"}]
+    get:
+      tags: [Debts]
+      summary: Get a debt
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "404": {$ref: "#/components/responses/NotFound"}
+    put:
+      tags: [Debts]
+      summary: Update a debt
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "422": {$ref: "#/components/responses/Validation"}
+    patch:
+      tags: [Debts]
+      summary: Update a debt (partial)
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "422": {$ref: "#/components/responses/Validation"}
+    delete:
+      tags: [Debts]
+      summary: Delete a debt
+      responses:
+        "204": {description: Deleted}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "422": {$ref: "#/components/responses/Validation"}
+  /spaces/{space}/debts/{id}/payment:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    post:
+      tags: [Debts]
+      summary: Register a payment
+      parameters: [{$ref: "#/components/parameters/Id"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                account_id: {type: integer}
+                amount: {type: number}
+                date: {type: string, format: date}
+                description: {type: string, nullable: true}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "422": {$ref: "#/components/responses/Validation"}
+  /spaces/{space}/debts/{id}/collect:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    post:
+      tags: [Debts]
+      summary: Collect a debt
+      parameters: [{$ref: "#/components/parameters/Id"}]
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "422": {$ref: "#/components/responses/Validation"}
+  /spaces/{space}/debts/{id}/reopen:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    post:
+      tags: [Debts]
+      summary: Reopen a closed debt
+      parameters: [{$ref: "#/components/parameters/Id"}]
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "422": {$ref: "#/components/responses/Validation"}
+

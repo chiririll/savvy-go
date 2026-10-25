@@ -20,16 +20,37 @@ func TestProcessImportRow(t *testing.T) {
 		{"income from sign", []string{"2024-01-05", "100", "Pay", ""}, mapping,
 			importRow{typ: "income", amount: decimal.RequireFromString("100"), desc: "Pay"}},
 		{"bad date", []string{"05 Jan", "1", "", ""}, mapping, importRow{typ: "expense", err: "Invalid date: 05 Jan"}},
-		{"future date", []string{"2999-01-01", "1", "", ""}, mapping, importRow{typ: "expense", err: "Date is in the future."}},
-		{"bad amount", []string{"2024-01-05", "lots", "", ""}, mapping, importRow{typ: "expense", err: "Invalid amount: lots"}},
+		{
+			"future date",
+			[]string{"2999-01-01", "1", "", ""},
+			mapping,
+			importRow{typ: "expense", err: "Date is in the future."},
+		},
+		{
+			"bad amount",
+			[]string{"2024-01-05", "lots", "", ""},
+			mapping,
+			importRow{typ: "expense", err: "Invalid amount: lots"},
+		},
 		{"short row", []string{"2024-01-05"}, mapping, importRow{typ: "expense", err: "Row is too short."}},
-		{"amount not mapped", []string{"2024-01-05", "1"}, map[string]any{"date": float64(0)}, importRow{typ: "expense", err: "Amount column is not mapped."}},
-		{"date not mapped", []string{"2024-01-05", "1"}, map[string]any{"amount": float64(1)}, importRow{typ: "expense", err: "Date column is not mapped."}},
+		{
+			"amount not mapped",
+			[]string{"2024-01-05", "1"},
+			map[string]any{"date": float64(0)},
+			importRow{typ: "expense", err: "Amount column is not mapped."},
+		},
+		{
+			"date not mapped",
+			[]string{"2024-01-05", "1"},
+			map[string]any{"amount": float64(1)},
+			importRow{typ: "expense", err: "Date column is not mapped."},
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			got := processImportRow(c.row, c.mapping, options, 1)
-			if got.err != c.want.err || got.typ != c.want.typ || got.desc != c.want.desc || got.category != c.want.category || !got.amount.Equal(c.want.amount) {
+			if got.err != c.want.err || got.typ != c.want.typ || got.desc != c.want.desc || got.category != c.want.category ||
+				!got.amount.Equal(c.want.amount) {
 				t.Fatalf("got %+v want %+v", got, c.want)
 			}
 		})

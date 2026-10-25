@@ -1,3 +1,5 @@
+//go:build integration
+
 package httpserver
 
 import (
@@ -6,16 +8,18 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"savvy-go/internal/auth"
-	"savvy-go/internal/mailer"
+	"savvy-go/internal/auth/permissions"
+	"savvy-go/internal/mail/smtp"
 	"savvy-go/internal/sso"
 )
 
 var linkRe = regexp.MustCompile(`https?://\S+`)
 
 // linkIn is the one link of an email.
-func linkIn(t *testing.T, m mailer.Message) *url.URL {
+func linkIn(t *testing.T, m smtp.Message) *url.URL {
 	t.Helper()
 	raw := linkRe.FindString(m.Text)
 	u, err := url.Parse(raw)
@@ -27,19 +31,19 @@ func linkIn(t *testing.T, m mailer.Message) *url.URL {
 
 func (a *testApp) setting(key string) any {
 	a.t.Helper()
-	return a.s.settings.Get(context.Background(), key, nil)
+	return a.svc.Settings.Get(context.Background(), key, nil)
 }
 
 func (a *testApp) verified(id int64) bool {
 	a.t.Helper()
-	u, err := a.s.users.ByID(context.Background(), id)
+	u, err := a.svc.Users.ByID(context.Background(), id)
 	if err != nil || u == nil {
 		a.t.Fatalf("user %d: %v", id, err)
 	}
 	return u.EmailVerified
 }
 
-func TestRequiringVerificationNeedsAVerifiedAdminAndMail(t *testing.T) {
+func TestRequiringVerificationNeedsAVerifiedAdmin(t *testing.T) {
 	a, sess, admin := newMailApp(t, &recorder{on: true})
 	on := map[string]any{"require_email_verification": true}
 
@@ -53,7 +57,7 @@ func TestRequiringVerificationNeedsAVerifiedAdminAndMail(t *testing.T) {
 		t.Fatal("the setting changed anyway")
 	}
 
-	if err := a.s.users.SetEmailVerified(context.Background(), admin.ID, true); err != nil {
+	if err := a.svc.Users.SetEmailVerified(context.Background(), admin.ID, true); err != nil {
 		t.Fatal(err)
 	}
 	res = a.do("PATCH", "/api/settings", on, sess.Token, sess.CSRF)
@@ -71,7 +75,7 @@ func TestRequiringVerificationNeedsAVerifiedAdminAndMail(t *testing.T) {
 
 func TestRequiringVerificationNeedsMail(t *testing.T) {
 	a, sess, admin := newMailApp(t, &recorder{on: false})
-	if err := a.s.users.SetEmailVerified(context.Background(), admin.ID, true); err != nil {
+	if err := a.svc.Users.SetEmailVerified(context.Background(), admin.ID, true); err != nil {
 		t.Fatal(err)
 	}
 	res := a.do("PATCH", "/api/settings", map[string]any{"require_email_verification": true}, sess.Token, sess.CSRF)
@@ -84,9 +88,9 @@ func TestRequiringVerificationNeedsMail(t *testing.T) {
 	}
 }
 
-func TestUnverifiedUserIsHeldBackOnlyWhileVerificationIsRequired(t *testing.T) {
+func TestUnverifiedUserHeldBackWhenRequired(t *testing.T) {
 	a, sess, admin := newMailApp(t, &recorder{on: true})
-	if err := a.s.users.SetEmailVerified(context.Background(), admin.ID, true); err != nil {
+	if err := a.svc.Users.SetEmailVerified(context.Background(), admin.ID, true); err != nil {
 		t.Fatal(err)
 	}
 	user := a.createUser("u@test.com", "secret1", roleEditor)
@@ -97,7 +101,7 @@ func TestUnverifiedUserIsHeldBackOnlyWhileVerificationIsRequired(t *testing.T) {
 		t.Fatalf("not required: %d", res.StatusCode)
 	}
 
-	if err := a.s.settings.Set(context.Background(), "require_email_verification", true); err != nil {
+	if err := a.svc.Settings.Set(context.Background(), "require_email_verification", true); err != nil {
 		t.Fatal(err)
 	}
 	res := a.do("GET", "/api/spaces", nil, us.Token, us.CSRF)
@@ -126,14 +130,20 @@ func TestUnverifiedUserIsHeldBackOnlyWhileVerificationIsRequired(t *testing.T) {
 	}
 }
 
-func TestUnverifiedUserIsHeldBackOnAPITokensToo(t *testing.T) {
+func TestUnverifiedUserHeldBackOnTokens(t *testing.T) {
 	a, _, admin := newMailApp(t, &recorder{on: true})
-	if err := a.s.users.SetEmailVerified(context.Background(), admin.ID, true); err != nil {
+	if err := a.svc.Users.SetEmailVerified(context.Background(), admin.ID, true); err != nil {
 		t.Fatal(err)
 	}
 	user := a.createUser("u@test.com", "secret1", roleEditor)
 	us := a.issue(user, false)
-	res := a.do("POST", "/api/auth/api-tokens", map[string]any{"name": "t", "permissions": allPerms(auth.PermRead), "all_spaces": true}, us.Token, us.CSRF)
+	res := a.do(
+		"POST",
+		"/api/auth/api-tokens",
+		confirmed(map[string]any{"name": "t", "permissions": allPerms(permissions.Read), "all_spaces": true}),
+		us.Token,
+		us.CSRF,
+	)
 	raw, _ := decodeJSON(t, res)["data"].(map[string]any)["token"].(string)
 	if res.StatusCode != 201 || raw == "" {
 		t.Fatalf("mint a token: %d", res.StatusCode)
@@ -150,7 +160,7 @@ func TestUnverifiedUserIsHeldBackOnAPITokensToo(t *testing.T) {
 	if got := bearer(); got != 200 {
 		t.Fatalf("token while not required: %d", got)
 	}
-	if err := a.s.settings.Set(context.Background(), "require_email_verification", true); err != nil {
+	if err := a.svc.Settings.Set(context.Background(), "require_email_verification", true); err != nil {
 		t.Fatal(err)
 	}
 	if got := bearer(); got != 403 {
@@ -197,12 +207,12 @@ func TestVerifyEmailByLink(t *testing.T) {
 	}
 }
 
-func TestVerificationLinkIsOpaqueSingleUseAndReplacedByTheNextOne(t *testing.T) {
+func TestVerificationLinkOpaqueSingleUseReplaced(t *testing.T) {
 	rec := &recorder{on: true}
 	a, _, _ := newMailApp(t, rec)
 	user := a.createUser("u@test.com", "secret1", roleEditor)
 	us := a.issue(user, false)
-	tokenOf := func(m mailer.Message) string {
+	tokenOf := func(m smtp.Message) string {
 		return strings.TrimPrefix(linkIn(t, m).Path, "/verify-email/")
 	}
 	verify := func(token string) int {
@@ -241,7 +251,8 @@ func TestVerificationLinkDiesWithTheAddress(t *testing.T) {
 	a.do("POST", "/api/auth/verify-email/resend", nil, us.Token, us.CSRF)
 	token := strings.TrimPrefix(linkIn(t, rec.messages()[0]).Path, "/verify-email/")
 
-	if res := a.do("PATCH", "/api/users/"+itoa(user.ID), map[string]any{"email": "new@test.com"}, admin.Token, admin.CSRF); res.StatusCode != 200 {
+	if res := a.do("PATCH", "/api/users/"+itoa(user.ID), map[string]any{"email": "new@test.com"}, admin.Token,
+		admin.CSRF); res.StatusCode != 200 {
 		t.Fatalf("change address: %d", res.StatusCode)
 	}
 	if res := a.do("POST", "/api/auth/verify-email", map[string]any{"token": token}, "", ""); res.StatusCode != 422 {
@@ -249,6 +260,35 @@ func TestVerificationLinkDiesWithTheAddress(t *testing.T) {
 	}
 	if a.verified(user.ID) {
 		t.Fatal("verified through an old link")
+	}
+}
+
+func TestVerificationLinkExpires(t *testing.T) {
+	rec := &recorder{on: true}
+	a, _, _ := newMailApp(t, rec)
+	user := a.createUser("u@test.com", "secret1", roleEditor)
+	us := a.issue(user, false)
+	a.do("POST", "/api/auth/verify-email/resend", nil, us.Token, us.CSRF).Body.Close()
+	token := strings.TrimPrefix(linkIn(t, rec.messages()[0]).Path, "/verify-email/")
+
+	if _,
+		err := a.db.Exec(`UPDATE email_verification_tokens SET expires_at = ?`,
+		time.Now().Add(-time.Minute).UTC()); err != nil {
+		t.Fatal(err)
+	}
+	if res := a.do("POST", "/api/auth/verify-email", map[string]any{"token": token}, "", ""); res.StatusCode != 422 {
+		t.Fatalf("an expired link: %d", res.StatusCode)
+	}
+	if a.verified(user.ID) {
+		t.Fatal("verified through an expired link")
+	}
+
+	// The user asks again and the new link works.
+	a.do("POST", "/api/auth/verify-email/resend", nil, us.Token, us.CSRF).Body.Close()
+	fresh := strings.TrimPrefix(linkIn(t, rec.messages()[1]).Path, "/verify-email/")
+	if res := a.do("POST", "/api/auth/verify-email", map[string]any{"token": fresh}, "", ""); res.StatusCode != 200 ||
+		!a.verified(user.ID) {
+		t.Fatalf("the new link: %d", res.StatusCode)
 	}
 }
 
@@ -261,9 +301,15 @@ func TestResendNeedsMail(t *testing.T) {
 	}
 }
 
-func TestAdminSetsVerifiedByHandAndAddressChangeClearsIt(t *testing.T) {
+func TestAdminVerifiesAddressChangeClears(t *testing.T) {
 	a, sess, _ := newMailApp(t, &recorder{on: true})
-	create := a.do("POST", "/api/users", map[string]any{"name": "N", "email": "n@test.com", "password": "secret12", "role": "user", "emailVerified": true}, sess.Token, sess.CSRF)
+	create := a.do(
+		"POST",
+		"/api/users",
+		map[string]any{"name": "N", "email": "n@test.com", "password": "secret12", "role": "user", "emailVerified": true},
+		sess.Token,
+		sess.CSRF,
+	)
 	data := decodeJSON(t, create)["data"].(map[string]any)
 	id := int64(data["id"].(float64))
 	if create.StatusCode != 201 || data["emailVerified"] != true {
@@ -289,7 +335,13 @@ func TestAdminSetsVerifiedByHandAndAddressChangeClearsIt(t *testing.T) {
 		t.Fatal("a new address stayed verified")
 	}
 	// Changing the address and marking it verified in one request is the admin's word.
-	a.do("PATCH", "/api/users/"+itoa(id), map[string]any{"email": "again@test.com", "emailVerified": true}, sess.Token, sess.CSRF)
+	a.do(
+		"PATCH",
+		"/api/users/"+itoa(id),
+		map[string]any{"email": "again@test.com", "emailVerified": true},
+		sess.Token,
+		sess.CSRF,
+	)
 	if !a.verified(id) {
 		t.Fatal("the admin's explicit mark was lost")
 	}
@@ -300,17 +352,17 @@ func TestFirstAdminStartsUnverified(t *testing.T) {
 	if res := a.register(a.bootstrap.Password(), nil); res.StatusCode != 201 {
 		t.Fatalf("register: %d", res.StatusCode)
 	}
-	u, _ := a.s.users.ByEmail(context.Background(), "a@a.com")
+	u, _ := a.svc.Users.ByEmail(context.Background(), "a@a.com")
 	if u == nil || u.EmailVerified {
 		t.Fatalf("the first admin must verify like everyone else: %+v", u)
 	}
 }
 
-func TestSSOAddressIsVerifiedOnlyWhenTheProviderVouchesForIt(t *testing.T) {
+func TestSSOAddressVerifiedIfProviderVouches(t *testing.T) {
 	a := newTestApp(t)
 	a.createUser("root@test.com", "secret1", auth.RoleAdmin)
 	existing := a.createUser("jane@test.com", "secret1", roleEditor)
-	p, err := a.s.sso.Create(context.Background(), sso.IdPWrite{
+	p, err := a.svc.SSO.Create(context.Background(), sso.IdPWrite{
 		Name: "IdP", Slug: "idp", Preset: "custom_oidc", Enabled: boolPtr(true),
 		Fields: map[string]any{
 			"discovery_url": "https://idp.test/.well-known/openid-configuration",
@@ -322,7 +374,7 @@ func TestSSOAddressIsVerifiedOnlyWhenTheProviderVouchesForIt(t *testing.T) {
 	}
 	provision := func(subject, email string, verified bool) *auth.User {
 		t.Helper()
-		u, _, err := a.s.sso.Provision(context.Background(), *p, sso.NormalizedIdentity{
+		u, _, err := a.svc.SSO.Provision(context.Background(), *p, sso.NormalizedIdentity{
 			Subject: subject, Email: email, EmailVerified: verified, Name: "N",
 		})
 		if err != nil {

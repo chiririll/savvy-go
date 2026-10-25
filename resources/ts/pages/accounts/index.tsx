@@ -3,7 +3,14 @@ import { Plus } from 'lucide-react'
 import { Page, PageHeader } from '@/components/shared'
 import { AccountFormDialog, AccountList } from '@/components/features/accounts'
 import { Button } from '@/components/ui/button'
-import { useAccounts, useCreateAccount, useDeleteAccount, useReorderAccounts, useUpdateAccount, useResourceFormDialog } from '@/hooks'
+import {
+    useAccounts,
+    useCreateAccount,
+    useDeleteAccount,
+    useReorderAccounts,
+    useUpdateAccount,
+    useResourceFormDialog,
+} from '@/hooks'
 import { useReadOnly } from '@/components/providers/ReadOnlyProvider'
 import type { Account } from '@/types'
 import type { AccountFormData } from '@/schemas'
@@ -49,9 +56,13 @@ export default function AccountsPage() {
                     }
                     onEdit={form.openEdit}
                     onDelete={(id) => deleteAccount.mutate(id)}
-                    onReorder={isReadOnly ? undefined : (reordered) => {
-                        reorderAccounts.mutate(reordered.map((account) => account.id))
-                    }}
+                    onReorder={
+                        isReadOnly
+                            ? undefined
+                            : (reordered) => {
+                                  reorderAccounts.mutate(reordered.map((account) => account.id))
+                              }
+                    }
                     isReadOnly={isReadOnly}
                 />
             </div>

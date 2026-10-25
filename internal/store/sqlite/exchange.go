@@ -104,7 +104,11 @@ func copyPlain(src, dst string) error {
 	return out.Close()
 }
 
-func (s *Store) PrepareSpace(ctx context.Context, src string, opts ...store.PrepareOption) (*store.PreparedSpace, error) {
+func (s *Store) PrepareSpace(
+	ctx context.Context,
+	src string,
+	opts ...store.PrepareOption,
+) (*store.PreparedSpace, error) {
 	o := store.ResolvePrepare(opts)
 	kind, err := inspect(ctx, src)
 	if err != nil {
@@ -172,7 +176,10 @@ func (s *Store) convertLaravel(ctx context.Context, src, staging, appKey string)
 			rows.Close()
 			return "", err
 		}
-		drops = append(drops, fmt.Sprintf("DROP %s IF EXISTS %s", map[string]string{"trigger": "TRIGGER", "view": "VIEW"}[typ], quoteIdent(name)))
+		drops = append(
+			drops,
+			fmt.Sprintf("DROP %s IF EXISTS %s", map[string]string{"trigger": "TRIGGER", "view": "VIEW"}[typ], quoteIdent(name)),
+		)
 	}
 	rows.Close()
 	for _, q := range drops {
@@ -189,7 +196,11 @@ func (s *Store) convertLaravel(ctx context.Context, src, staging, appKey string)
 	return dst, nil
 }
 
-func (s *Store) PrepareServer(ctx context.Context, src string, opts ...store.PrepareOption) (*store.PreparedServer, error) {
+func (s *Store) PrepareServer(
+	ctx context.Context,
+	src string,
+	opts ...store.PrepareOption,
+) (*store.PreparedServer, error) {
 	o := store.ResolvePrepare(opts)
 	if o.LegacyKey != "" {
 		if err := legacy.CheckKey(o.LegacyKey); err != nil {
@@ -261,7 +272,8 @@ func (s *Store) prepareServerDir(ctx context.Context, dir, staging string) ([]in
 		} else if kind != kindSpace {
 			return nil, fmt.Errorf("space %d: %w", id, ErrWrongKind)
 		}
-		if err := sanitize(ctx, filepath.Join(dir, spacesDir, name), filepath.Join(staging, spacesDir, name), migrate.Space); err != nil {
+		if err := sanitize(ctx, filepath.Join(dir, spacesDir, name), filepath.Join(staging, spacesDir, name),
+			migrate.Space); err != nil {
 			return nil, fmt.Errorf("space %d: %w", id, err)
 		}
 	}
@@ -276,7 +288,8 @@ func spaceIDs(dir string) ([]int64, error) {
 	var ids []int64
 	for _, e := range entries {
 		var id int64
-		if _, err := fmt.Sscanf(e.Name(), "%d"+spaceExt, &id); err == nil && id > 0 && e.Name() == strconv.FormatInt(id, 10)+spaceExt {
+		if _, err := fmt.Sscanf(e.Name(), "%d"+spaceExt, &id); err == nil && id > 0 &&
+			e.Name() == strconv.FormatInt(id, 10)+spaceExt {
 			ids = append(ids, id)
 		}
 	}
@@ -337,7 +350,9 @@ func splitLaravel(ctx context.Context, src, staging string) error {
 	defer d.Close()
 	now := time.Now().UTC().Format(time.RFC3339)
 	err = store.Tx(ctx, d, func(tx store.DB) error {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO spaces (id, uuid, name, created_at, updated_at) VALUES (1, ?, 'Default', ?, ?)`,
+		if _,
+			err := tx.ExecContext(ctx,
+			`INSERT INTO spaces (id, uuid, name, created_at, updated_at) VALUES (1, ?, 'Default', ?, ?)`,
 			id7.String(), now, now); err != nil {
 			return err
 		}
@@ -346,7 +361,8 @@ func splitLaravel(ctx context.Context, src, staging string) error {
 			if spaceRole == "" {
 				spaceRole = "viewer"
 			}
-			if _, err := tx.ExecContext(ctx, `INSERT INTO space_members (space_id, user_id, role, created_at) VALUES (1, ?, ?, ?)`,
+			if _,
+				err := tx.ExecContext(ctx, `INSERT INTO space_members (space_id, user_id, role, created_at) VALUES (1, ?, ?, ?)`,
 				userID, spaceRole, now); err != nil {
 				return err
 			}
@@ -403,17 +419,17 @@ func (s *Store) ReplaceSpace(ctx context.Context, id int64, p *store.PreparedSpa
 	}
 	prepared := filepath.Join(p.Artifact, "space"+spaceExt)
 	if err := writeSettings(ctx, prepared, p.Settings); err != nil {
-		return s.reopenOrFail(ctx, sp, err)
+		return s.reopenSpace(ctx, sp, err)
 	}
 	if err := swapIn(prepared, s.spacePath(id)); err != nil {
-		return s.reopenOrFail(ctx, sp, err)
+		return s.reopenSpace(ctx, sp, err)
 	}
-	return s.reopenOrFail(ctx, sp, nil)
+	return s.reopenSpace(ctx, sp, nil)
 }
 
-// reopenOrFail reopens a space after its file changed; a space that cannot be
+// reopenSpace reopens a space after its file changed; a space that cannot be
 // opened becomes unavailable.
-func (s *Store) reopenOrFail(ctx context.Context, sp *space, cause error) error {
+func (s *Store) reopenSpace(ctx context.Context, sp *space, cause error) error {
 	sdb, err := s.openSpace(ctx, sp.id)
 	if err != nil {
 		sp.gone = true

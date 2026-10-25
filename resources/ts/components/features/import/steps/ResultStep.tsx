@@ -1,4 +1,4 @@
-import { CheckCircle2, XCircle, Tag, FolderOpen } from 'lucide-react'
+import { CheckCircle2, XCircle, Tag, FolderOpen, Coins } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -18,11 +18,11 @@ export function ResultStep({ result }: ResultStepProps) {
 
     return (
         <div className="space-y-6">
-            <div className={`p-6 border rounded-lg text-center ${hasCreated ? 'bg-green-500/10' : 'bg-yellow-500/10'}`}>
+            <div className={`p-6 border rounded-lg text-center ${hasCreated ? 'bg-success/10' : 'bg-warning/10'}`}>
                 {hasCreated ? (
-                    <CheckCircle2 className="size-16 text-green-500 mx-auto mb-4" />
+                    <CheckCircle2 className="size-16 text-success mx-auto mb-4" />
                 ) : (
-                    <XCircle className="size-16 text-yellow-500 mx-auto mb-4" />
+                    <XCircle className="size-16 text-warning mx-auto mb-4" />
                 )}
                 <h2 className="text-2xl font-bold mb-2">
                     {hasCreated ? t('import.complete') : t('import.noneImported')}
@@ -36,15 +36,15 @@ export function ResultStep({ result }: ResultStepProps) {
 
             <div className="grid gap-4 sm:grid-cols-3">
                 <div className="p-4 border rounded-lg text-center">
-                    <div className="text-3xl font-bold text-green-600">{result.created}</div>
+                    <div className="text-3xl font-bold text-success">{result.created}</div>
                     <div className="text-sm text-muted-foreground">{t('import.created')}</div>
                 </div>
                 <div className="p-4 border rounded-lg text-center">
-                    <div className="text-3xl font-bold text-yellow-600">{result.skippedDuplicates}</div>
+                    <div className="text-3xl font-bold text-warning">{result.skippedDuplicates}</div>
                     <div className="text-sm text-muted-foreground">{t('import.skippedDuplicates')}</div>
                 </div>
                 <div className="p-4 border rounded-lg text-center">
-                    <div className="text-3xl font-bold text-red-600">{result.errors.length}</div>
+                    <div className="text-3xl font-bold text-destructive">{result.errors.length}</div>
                     <div className="text-sm text-muted-foreground">{t('import.errors')}</div>
                 </div>
             </div>
@@ -81,17 +81,31 @@ export function ResultStep({ result }: ResultStepProps) {
                                 </div>
                             </div>
                         )}
+                        {result.createdCurrencies.length > 0 && (
+                            <div className="flex items-start gap-2">
+                                <Coins className="size-4 text-muted-foreground mt-0.5" />
+                                <div>
+                                    <div className="text-sm font-medium">{t('import.currenciesLabel')}</div>
+                                    <div className="flex flex-wrap gap-1 mt-1">
+                                        {result.createdCurrencies.map((code) => (
+                                            <Badge key={code} variant="outline">{code}</Badge>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
 
             {hasErrors && (
-                <div className="p-4 border rounded-lg bg-red-500/10">
+                <div className="p-4 border rounded-lg bg-destructive/10">
                     <div className="flex items-center gap-2 mb-2">
-                        <XCircle className="size-4 text-red-500" />
+                        <XCircle className="size-4 text-destructive" />
                         <span className="font-medium">{t('import.errorsCount', { count: result.errors.length })}</span>
                     </div>
-                    <div className="max-h-[200px] overflow-y-auto">
+                    {/* Scrolls when long, so it takes focus for keyboard scrolling. */}
+                    <div className="max-h-[200px] overflow-y-auto" tabIndex={0}>
                         <ul className="text-sm space-y-1">
                             {result.errors.map((err, i) => (
                                 <li key={i}>

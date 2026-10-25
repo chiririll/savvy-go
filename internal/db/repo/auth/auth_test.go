@@ -2,20 +2,18 @@ package auth_test
 
 import (
 	"context"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	authrepo "savvy-go/internal/db/repo/auth"
-	"savvy-go/internal/store/sqlite"
+	"savvy-go/internal/store/sqlite/sqlitetest"
 )
 
 func newRepo(t *testing.T) (authrepo.Repo, int64) {
 	t.Helper()
-	st, err := sqlite.OpenApp(context.Background(), t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = st.Close() })
+	st := sqlitetest.Open(t)
 	r := authrepo.Repo{DB: st.Server()}
 	id, err := r.InsertUser(context.Background(), "Ann", "ann@test.com", "hash", "user", time.Now())
 	if err != nil {
@@ -44,7 +42,7 @@ func TestMissingRowsAreNilNotErrors(t *testing.T) {
 	}
 }
 
-func TestUserRoundTripAndPasswordOptional(t *testing.T) {
+func TestUserRoundTripPasswordOptional(t *testing.T) {
 	r, id := newRepo(t)
 	ctx := context.Background()
 	u, _ := r.UserByEmail(ctx, "ann@test.com")
@@ -117,10 +115,13 @@ func TestEmailVerifiedFlag(t *testing.T) {
 	}
 }
 
-func TestTombstoneKeepsTheRowAndDropsAccess(t *testing.T) {
+func TestTombstoneKeepsTheRowDropsAccess(t *testing.T) {
 	r, id := newRepo(t)
 	ctx := context.Background()
-	if _, err := r.InsertAPIToken(ctx, authrepo.NewAPIToken{UserID: id, Name: "t", Hash: "h", Prefix: "svy_", AllSpaces: true, Now: time.Now()}); err != nil {
+	if _,
+		err := r.InsertAPIToken(ctx,
+		authrepo.NewAPIToken{UserID: id, Name: "t", Hash: "h", Prefix: "svy_", AllSpaces: true,
+			Now: time.Now()}); err != nil {
 		t.Fatal(err)
 	}
 	if err := r.InsertRecoveryCode(ctx, id, "c", time.Now()); err != nil {
@@ -138,6 +139,28 @@ func TestTombstoneKeepsTheRowAndDropsAccess(t *testing.T) {
 	}
 	if n, _ := r.CountUnusedRecoveryCodes(ctx, id); n != 0 {
 		t.Fatalf("%d recovery codes survived", n)
+	}
+}
+
+func TestDeleteAPITokensKeepsTheUser(t *testing.T) {
+	r, id := newRepo(t)
+	ctx := context.Background()
+	for _, hash := range []string{"h1", "h2"} {
+		if _,
+			err := r.InsertAPIToken(ctx,
+			authrepo.NewAPIToken{UserID: id, Name: hash, Hash: hash, Prefix: "svy_", AllSpaces: true,
+				Now: time.Now()}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := r.DeleteAPITokens(ctx, id); err != nil {
+		t.Fatal(err)
+	}
+	if tokens, _ := r.APITokens(ctx, id); len(tokens) != 0 {
+		t.Fatalf("%d tokens survived", len(tokens))
+	}
+	if u, _ := r.UserByID(ctx, id); u == nil || u.Deleted {
+		t.Fatalf("user = %+v", u)
 	}
 }
 
@@ -183,7 +206,7 @@ func TestSessionLifecycle(t *testing.T) {
 	}
 }
 
-func TestOneTimeTokensWorkOnceAndExpire(t *testing.T) {
+func TestOneTimeTokensWorkOnceExpire(t *testing.T) {
 	r, id := newRepo(t)
 	ctx := context.Background()
 	now := time.Now().UTC()
@@ -241,7 +264,10 @@ func TestPasskeysBelongToTheirOwner(t *testing.T) {
 	r, id := newRepo(t)
 	ctx := context.Background()
 	other, _ := r.InsertUser(ctx, "Bob", "bob@test.com", "h", "user", time.Now())
-	pid, err := r.InsertPasskey(ctx, authrepo.NewPasskey{UserID: id, CredentialID: "cred", Name: "Laptop", AAGUID: "ab", Record: "{}", Now: time.Now()})
+	pid, err := r.InsertPasskey(
+		ctx,
+		authrepo.NewPasskey{UserID: id, CredentialID: "cred", Name: "Laptop", AAGUID: "ab", Record: "{}", Now: time.Now()},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -269,11 +295,12 @@ func TestPasskeysBelongToTheirOwner(t *testing.T) {
 	}
 }
 
-func TestPasskeyChallengeIsTakenOnceAndPerType(t *testing.T) {
+func TestPasskeyChallengeTakenOncePerType(t *testing.T) {
 	r, id := newRepo(t)
 	ctx := context.Background()
 	now := time.Now().UTC()
-	if err := r.InsertPasskeyChallenge(ctx, &id, "tok", "registration", `{"x":1}`, now.Add(5*time.Minute), now); err != nil {
+	if err := r.InsertPasskeyChallenge(ctx, &id, "tok", "registration", `{"x":1}`, now.Add(5*time.Minute),
+		now); err != nil {
 		t.Fatal(err)
 	}
 	if c, _ := r.TakePasskeyChallenge(ctx, "tok", "authentication", now); c != nil {
@@ -296,7 +323,7 @@ func TestPasskeyChallengeIsTakenOnceAndPerType(t *testing.T) {
 	}
 }
 
-func TestEmailVerificationTokenIsOnePerUserAndSingleUse(t *testing.T) {
+func TestEmailVerifyTokenSingleUse(t *testing.T) {
 	r, id := newRepo(t)
 	now := time.Now().UTC().Truncate(time.Second)
 	ctx := context.Background()
@@ -311,7 +338,8 @@ func TestEmailVerificationTokenIsOnePerUserAndSingleUse(t *testing.T) {
 		t.Fatalf("the replaced token is still valid: %+v", tok)
 	}
 	tok, err := r.EmailVerificationTokenByHash(ctx, "second")
-	if err != nil || tok == nil || tok.UserID != id || tok.Email != "ann@test.com" || !tok.ExpiresAt.Equal(now.Add(time.Hour)) {
+	if err != nil || tok == nil || tok.UserID != id || tok.Email != "ann@test.com" ||
+		!tok.ExpiresAt.Equal(now.Add(time.Hour)) {
 		t.Fatalf("token = %+v, %v", tok, err)
 	}
 	if ok, _ := r.ConsumeEmailVerificationToken(ctx, "second"); !ok {
@@ -319,5 +347,29 @@ func TestEmailVerificationTokenIsOnePerUserAndSingleUse(t *testing.T) {
 	}
 	if ok, _ := r.ConsumeEmailVerificationToken(ctx, "second"); ok {
 		t.Fatal("a token was used twice")
+	}
+}
+
+func TestPasskeyChallengeSingleUseUnderRace(t *testing.T) {
+	r, id := newRepo(t)
+	ctx := context.Background()
+	now := time.Now().UTC()
+	if err := r.InsertPasskeyChallenge(ctx, &id, "tok", "authentication", "{}", now.Add(time.Minute), now); err != nil {
+		t.Fatal(err)
+	}
+	var wins atomic.Int32
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if c, err := r.TakePasskeyChallenge(ctx, "tok", "authentication", now); err == nil && c != nil {
+				wins.Add(1)
+			}
+		}()
+	}
+	wg.Wait()
+	if wins.Load() != 1 {
+		t.Fatalf("one passkey challenge was taken %d times", wins.Load())
 	}
 }

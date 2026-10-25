@@ -11,7 +11,7 @@ import {
 import { Plus, Trash2 } from 'lucide-react'
 import type { Action, ActionType } from '@/types/automation'
 import { ACTION_TYPES } from '@/types/automation'
-import { AccountSelect } from '@/components/shared/AccountSelect'
+import { AccountSelect } from '@/components/shared/pickers/AccountSelect'
 import { CategorySelect, TagSelect } from '@/components/shared'
 import { actionTypeLabel } from '@/lib/labels'
 
@@ -47,6 +47,7 @@ export function ActionBuilder({ value, onChange }: ActionBuilderProps) {
                 return (
                     <CategorySelect
                         plain
+                        ariaLabel={t('automation.actionTypes.set_category')}
                         value={action.category_id as number | undefined}
                         onChange={(categoryId) => updateAction(index, { category_id: categoryId })}
                     />
@@ -76,6 +77,7 @@ export function ActionBuilder({ value, onChange }: ActionBuilderProps) {
                     <div className="grid grid-cols-2 gap-2">
                         <AccountSelect
                             plain
+                            ariaLabel={t('automation.toAccount')}
                             excludeDebts={false}
                             activeOnly={false}
                             value={action.to_account_id as number | undefined}
@@ -106,7 +108,7 @@ export function ActionBuilder({ value, onChange }: ActionBuilderProps) {
                                 value={action.type}
                                 onValueChange={(type) => updateAction(index, { type: type as ActionType })}
                             >
-                                <SelectTrigger className="w-full">
+                                <SelectTrigger className="w-full" aria-label={t('automation.actionType')}>
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -123,6 +125,8 @@ export function ActionBuilder({ value, onChange }: ActionBuilderProps) {
                                 variant="ghost"
                                 size="icon"
                                 className="shrink-0"
+                                aria-label={t('automation.removeAction')}
+                                title={t('automation.removeAction')}
                                 onClick={() => removeAction(index)}
                             >
                                 <Trash2 className="size-4 text-muted-foreground hover:text-destructive" />

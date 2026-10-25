@@ -8,9 +8,9 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	"savvy-go/internal/calendar"
 	repo "savvy-go/internal/db/repo/ledger"
 	"savvy-go/internal/money"
+	"savvy-go/internal/platform/calendar"
 	"savvy-go/internal/store"
 )
 
@@ -197,7 +197,8 @@ func (s Budgets) spent(ctx context.Context, b *Budget, start, end time.Time) mon
 	for _, t := range b.Tags {
 		tagIDs = append(tagIDs, t.ID)
 	}
-	spent, err := s.repo().BudgetSpent(ctx, start.Format("2006-01-02"), end.Format("2006-01-02"), catIDs, tagIDs, unit, targetRate)
+	spent, err := s.repo().
+		BudgetSpent(ctx, start.Format("2006-01-02"), end.Format("2006-01-02"), catIDs, tagIDs, unit, targetRate)
 	if err != nil {
 		return money.Zero(unit)
 	}

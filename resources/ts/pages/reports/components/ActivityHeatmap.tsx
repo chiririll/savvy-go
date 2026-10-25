@@ -57,7 +57,7 @@ export function ActivityHeatmap({ filters }: ActivityHeatmapProps) {
         if (!data?.items?.length) return null
 
         return {
-            cells: data.items.map(item => ({ value: item.value, count: item.count, date: item.date })),
+            cells: data.items.map((item) => ({ value: item.value, count: item.count, date: item.date })),
             max: data.max,
             currency: data.currency,
         }
@@ -100,9 +100,7 @@ export function ActivityHeatmap({ filters }: ActivityHeatmapProps) {
     if (error) {
         return (
             <Card>
-                <CardContent className="py-8 text-center text-red-500">
-                    {t('reports.errors.heatmap')}
-                </CardContent>
+                <CardContent className="py-8 text-center text-destructive">{t('reports.errors.heatmap')}</CardContent>
             </Card>
         )
     }
@@ -113,9 +111,7 @@ export function ActivityHeatmap({ filters }: ActivityHeatmapProps) {
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0">
                         <CardTitle className="text-lg">{t('reports.heatmap.title')}</CardTitle>
-                        <p className="text-sm text-muted-foreground">
-                            {t('reports.heatmap.subtitle')}
-                        </p>
+                        <p className="text-sm text-muted-foreground">{t('reports.heatmap.subtitle')}</p>
                     </div>
                     {heatmapData && (
                         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -146,36 +142,40 @@ export function ActivityHeatmap({ filters }: ActivityHeatmapProps) {
                             {heatmapData.cells.map((cell, i) => {
                                 const color = colorForValue(cell.value, heatmapData.max)
                                 return (
-                                <Tooltip key={i}>
-                                    <TooltipTrigger asChild>
-                                        <div
-                                            style={{ backgroundColor: color ?? undefined }}
-                                            className={cn(
-                                                'size-full rounded-[2px] cursor-default transition-colors',
-                                                'hover:ring-2 hover:ring-ring hover:ring-offset-1 hover:z-10',
-                                                color ? '' : 'bg-muted',
+                                    <Tooltip key={i}>
+                                        <TooltipTrigger asChild>
+                                            <div
+                                                style={{ backgroundColor: color ?? undefined }}
+                                                className={cn(
+                                                    'size-full rounded-[2px] cursor-default transition-colors',
+                                                    'hover:ring-2 hover:ring-ring hover:ring-offset-1 hover:z-10',
+                                                    color ? '' : 'bg-muted',
+                                                )}
+                                            />
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top" className="text-center">
+                                            <p className="font-medium">
+                                                {parseLocalDate(cell.date).toLocaleDateString(intlLocale(), {
+                                                    weekday: 'short',
+                                                    month: 'short',
+                                                    day: 'numeric',
+                                                    year: 'numeric',
+                                                })}
+                                            </p>
+                                            {cell.value > 0 ? (
+                                                <>
+                                                    <p className="font-semibold">
+                                                        {formatCurrency(cell.value, heatmapData.currency)}
+                                                    </p>
+                                                    <p className="opacity-70">
+                                                        {t('reports.heatmap.transactions', { count: cell.count })}
+                                                    </p>
+                                                </>
+                                            ) : (
+                                                <p className="opacity-70">{t('reports.heatmap.noExpenses')}</p>
                                             )}
-                                        />
-                                    </TooltipTrigger>
-                                    <TooltipContent side="top" className="text-center">
-                                        <p className="font-medium">
-                                            {parseLocalDate(cell.date).toLocaleDateString(intlLocale(), {
-                                                weekday: 'short',
-                                                month: 'short',
-                                                day: 'numeric',
-                                                year: 'numeric',
-                                            })}
-                                        </p>
-                                        {cell.value > 0 ? (
-                                            <>
-                                                <p className="text-amber-300">{formatCurrency(cell.value, heatmapData.currency)}</p>
-                                                <p className="opacity-70">{t('reports.heatmap.transactions', { count: cell.count })}</p>
-                                            </>
-                                        ) : (
-                                            <p className="opacity-70">{t('reports.heatmap.noExpenses')}</p>
-                                        )}
-                                    </TooltipContent>
-                                </Tooltip>
+                                        </TooltipContent>
+                                    </Tooltip>
                                 )
                             })}
                         </div>

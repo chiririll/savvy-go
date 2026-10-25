@@ -5,6 +5,10 @@ export interface Space {
     id: number
     uuid: string
     name: string
+    /** One emoji, or null. */
+    emoji: string | null
+    /** #rrggbb, or null. */
+    color: string | null
     role: SpaceRole
 }
 
@@ -193,6 +197,8 @@ export interface SpaceOverview {
     id: number
     uuid: string
     name: string
+    emoji: string | null
+    color: string | null
     members: number
     admins: number
     size: number
@@ -218,9 +224,18 @@ export interface SpacePresets {
     tags: string[]
 }
 
+/** The body of PATCH /spaces/{id}; an empty emoji or color clears it. */
+export interface SpaceUpdate {
+    name: string
+    emoji: string
+    color: string
+}
+
 /** Optional content of POST /spaces beside the name. */
 export interface CreateSpaceInput {
     name: string
+    emoji?: string
+    color?: string
     baseCurrency?: string
     currencies?: string[]
     accounts?: { name: string; type?: string; currency: string; initialBalance?: string }[]

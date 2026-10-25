@@ -5,13 +5,18 @@ import {
     addInvitation,
     buildContent,
     canRemoveCurrency,
+    DRAFT_STEPS,
     draftProblems,
+    effectiveSourceId,
+    migrateStep,
+    effectiveStep,
     emptyDraft,
     nextStep,
     noCopy,
     previousStep,
     removeCategory,
     removeInvitation,
+    stepProblems,
     toCopySource,
     toRequest,
     type CopySource,
@@ -19,7 +24,7 @@ import {
 
 const presets: SpacePresets = {
     categories: [
-        { name: '#RENT', type: 'expense', icon: 'home', color: '#111111', isDefault: false },
+        { name: '#HOUSING', type: 'expense', icon: 'home', color: '#111111', isDefault: false },
         { name: '#OTHER', type: 'expense', icon: 'tag', color: '#222222', isDefault: true },
         { name: '#SALARY', type: 'income', icon: 'wallet', color: '#333333', isDefault: false },
         { name: '#OTHER_INCOME', type: 'income', icon: 'tag', color: '#444444', isDefault: true },
@@ -42,25 +47,64 @@ const source: CopySource = {
 }
 
 describe('steps', () => {
+    it('has currencies, categories and tags as separate steps', () => {
+        expect([...DRAFT_STEPS]).toEqual(['name', 'copy', 'currencies', 'categories', 'tags', 'confirm'])
+    })
+
     it('skips the copy step when the user belongs to no other space', () => {
-        expect(nextStep('name', 0)).toBe('entities')
-        expect(previousStep('entities', 0)).toBe('name')
+        expect(nextStep('name', 0)).toBe('currencies')
+        expect(previousStep('currencies', 0)).toBe('name')
     })
 
-    it('goes through the copy step when there is a space to copy from', () => {
+    it('goes through the copy step when there is a space to copy', () => {
         expect(nextStep('name', 2)).toBe('copy')
-        expect(nextStep('copy', 2)).toBe('entities')
-        expect(previousStep('entities', 2)).toBe('copy')
+        expect(nextStep('copy', 2)).toBe('currencies')
+        expect(previousStep('currencies', 2)).toBe('copy')
     })
 
-    it('goes from the entities straight to the summary: inviting is not a step', () => {
-        expect(nextStep('entities', 0)).toBe('confirm')
-        expect(previousStep('confirm', 0)).toBe('entities')
+    it('walks currencies, categories, tags and the summary in order, and back', () => {
+        expect(nextStep('currencies', 0)).toBe('categories')
+        expect(nextStep('categories', 0)).toBe('tags')
+        expect(nextStep('tags', 0)).toBe('confirm')
+        expect(previousStep('confirm', 0)).toBe('tags')
+        expect(previousStep('tags', 0)).toBe('categories')
+        expect(previousStep('categories', 0)).toBe('currencies')
+    })
+
+    it('maps a draft saved with the old entities step to currencies', () => {
+        expect(migrateStep('entities')).toBe('currencies')
+        expect(migrateStep('tags')).toBe('tags')
+        expect(migrateStep('nonsense')).toBeNull()
+    })
+
+    it('going back and forth never touches the content', () => {
+        const draft = { ...emptyDraft(), ...buildContent(noCopy(), null, presets), baseCurrency: 'EUR' }
+        const before = JSON.stringify(draft)
+        let step = nextStep('currencies', 0)
+        step = nextStep(step, 0)
+        step = previousStep(step, 0)
+        step = previousStep(step, 0)
+        expect(step).toBe('currencies')
+        expect(JSON.stringify(draft)).toBe(before)
     })
 
     it('stays inside the first and last step', () => {
         expect(previousStep('name', 1)).toBe('name')
         expect(nextStep('confirm', 1)).toBe('confirm')
+    })
+})
+
+describe('effective step and source', () => {
+    it('returns to the name step when there is nothing to copy from', () => {
+        expect(effectiveStep('copy', 0)).toBe('name')
+        expect(effectiveStep('copy', 2)).toBe('copy')
+        expect(effectiveStep('currencies', 0)).toBe('currencies')
+    })
+
+    it('ignores a source space that is gone', () => {
+        expect(effectiveSourceId(3, [1, 3])).toBe(3)
+        expect(effectiveSourceId(3, [1, 2])).toBeNull()
+        expect(effectiveSourceId(null, [1, 2])).toBeNull()
     })
 })
 
@@ -86,7 +130,7 @@ describe('buildContent', () => {
         expect(content.baseCurrency).toBe('EUR')
         expect(content.currencies).toEqual(['USD'])
         expect(content.accounts).toEqual([])
-        expect(content.categories.map((c) => c.name)).toContain('#RENT')
+        expect(content.categories.map((c) => c.name)).toContain('#HOUSING')
     })
 
     it('copies accounts without balances', () => {
@@ -110,8 +154,12 @@ describe('buildContent', () => {
 
     it('keeps a default category per type when copied categories lack one', () => {
         const content = buildContent({ ...noCopy(), categories: true }, source, presets)
-        expect(content.categories.filter((c) => c.type === 'expense' && c.isDefault).map((c) => c.name)).toEqual(['Misc'])
-        expect(content.categories.filter((c) => c.type === 'income' && c.isDefault).map((c) => c.name)).toEqual(['#OTHER_INCOME'])
+        expect(content.categories.filter((c) => c.type === 'expense' && c.isDefault).map((c) => c.name)).toEqual([
+            'Misc',
+        ])
+        expect(content.categories.filter((c) => c.type === 'income' && c.isDefault).map((c) => c.name)).toEqual([
+            '#OTHER_INCOME',
+        ])
     })
 })
 
@@ -126,8 +174,8 @@ describe('categories', () => {
 
     it('removes any other category', () => {
         const categories = buildContent(noCopy(), null, presets).categories
-        const rent = categories.findIndex((c) => c.name === '#RENT')
-        expect(removeCategory(categories, rent).map((c) => c.name)).not.toContain('#RENT')
+        const rent = categories.findIndex((c) => c.name === '#HOUSING')
+        expect(removeCategory(categories, rent).map((c) => c.name)).not.toContain('#HOUSING')
     })
 })
 
@@ -149,8 +197,29 @@ describe('request', () => {
     })
 
     it('reports what is missing', () => {
-        expect(draftProblems(emptyDraft())).toEqual(['name', 'baseCurrency'])
+        expect(draftProblems(emptyDraft())).toEqual(['name', 'baseCurrency', 'noAccounts'])
         expect(draftProblems(ready())).toEqual([])
+    })
+
+    it('blocks only the currencies step, by the base currency and the accounts', () => {
+        expect(stepProblems('currencies', emptyDraft())).toEqual(['baseCurrency', 'noAccounts'])
+        expect(stepProblems('currencies', ready())).toEqual([])
+        // The name is the name step's own business.
+        expect(stepProblems('currencies', { ...ready(), name: '' })).toEqual([])
+        const badBalance = ready()
+        badBalance.accounts[0].initialBalance = '1.2.3'
+        expect(stepProblems('currencies', badBalance)).toEqual(['balances'])
+        expect(stepProblems('categories', emptyDraft())).toEqual([])
+        expect(stepProblems('tags', emptyDraft())).toEqual([])
+    })
+
+    it('needs at least one account, copied or added', () => {
+        const none = { ...ready(), accounts: [] }
+        expect(draftProblems(none)).toEqual(['noAccounts'])
+        const own = { ...none, accounts: [{ key: 'k', name: 'Wallet', type: 'cash' as const, currency: 'EUR', initialBalance: '' }] }
+        expect(draftProblems(own)).toEqual([])
+        // Accounts copied from another space are in the draft like any other.
+        expect(draftProblems(ready())).not.toContain('noAccounts')
     })
 
     it('rejects an unnamed account and a malformed balance', () => {
@@ -169,7 +238,7 @@ describe('request', () => {
         expect(body.accounts?.[1]).not.toHaveProperty('initialBalance')
     })
 
-    it('adds the currency of an account to the list and drops duplicate tags', () => {
+    it('adds the account currency to the list and drops duplicate tags', () => {
         const draft = { ...ready(), currencies: [], tags: ['Family', ' family ', '', 'Work'] }
         const body = toRequest(draft)
         expect(body.currencies).toEqual(['GBP'])
@@ -220,7 +289,7 @@ describe('invitation list', () => {
         expect(list[0].key).not.toBe(list[1].key)
     })
 
-    it('keeps the note of a link invitation, trimmed, and drops an empty one', () => {
+    it('keeps the link invitation note, trimmed, and drops an empty one', () => {
         const list = addInvitation([], { email: null, note: '  Kim from work ', role: 'viewer' })
         expect(list[0].note).toBe('Kim from work')
         expect(addInvitation([], { email: null, note: '   ', role: 'viewer' })[0].note).toBeNull()
@@ -231,12 +300,31 @@ describe('invitation list', () => {
     })
 
     it('removes one entry by its key', () => {
-        const list = addInvitation(addInvitation([], { email: 'a@example.org', role: 'viewer' }), { email: 'b@example.org', role: 'viewer' })
+        const list = addInvitation(addInvitation([], { email: 'a@example.org', role: 'viewer' }), {
+            email: 'b@example.org',
+            role: 'viewer',
+        })
         expect(removeInvitation(list, list[0].key).map((i) => i.email)).toEqual(['b@example.org'])
     })
 
-    it('is not part of the draft or the request that creates the space', () => {
+    it('is not part of the draft or the create-space request', () => {
         expect(emptyDraft()).not.toHaveProperty('invitations')
         expect(toRequest({ ...emptyDraft(), name: 'Home', baseCurrency: 'EUR' })).not.toHaveProperty('invitations')
+    })
+})
+
+describe('look in the request', () => {
+    it('sends the emoji and color only when picked', () => {
+        const draft = { ...emptyDraft(), name: ' Trip ', baseCurrency: 'EUR' }
+        expect(toRequest(draft)).not.toHaveProperty('emoji')
+        expect(toRequest(draft)).not.toHaveProperty('color')
+        const body = toRequest({ ...draft, emoji: '🏖️', color: '#ff8800' })
+        expect(body.emoji).toBe('🏖️')
+        expect(body.color).toBe('#ff8800')
+    })
+
+    it('leaves an emptied emoji out of the request', () => {
+        const draft = { ...emptyDraft(), name: 'Trip', baseCurrency: 'EUR', emoji: '🏖️' }
+        expect(toRequest({ ...draft, emoji: '' })).not.toHaveProperty('emoji')
     })
 })

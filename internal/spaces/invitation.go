@@ -95,7 +95,12 @@ type invitation struct {
 // already invited to the space, or is in its cooldown.
 // The note says who a link is for, so the inviter can tell their links apart; it
 // is kept only for an invitation without an address.
-func (s Service) Invite(ctx context.Context, spaceID int64, inviter *auth.User, email, note, role string) (string, int64, error) {
+func (s Service) Invite(
+	ctx context.Context,
+	spaceID int64,
+	inviter *auth.User,
+	email, note, role string,
+) (string, int64, error) {
 	if !ValidRole(role) {
 		return "", 0, errors.New("invalid space role")
 	}
@@ -288,7 +293,11 @@ func (s Service) Accept(ctx context.Context, token string, u *auth.User) (*Space
 // Register creates an account through an invitation and accepts it. The new
 // user is a guest unless a server admin sent the invitation; they get no
 // personal space (P7).
-func (s Service) Register(ctx context.Context, users auth.Users, token, name, email, password string) (*auth.User, *Space, error) {
+func (s Service) Register(
+	ctx context.Context,
+	users auth.Users,
+	token, name, email, password string,
+) (*auth.User, *Space, error) {
 	if !s.settings().Bool(ctx, "space_invites_can_register", true) {
 		return nil, nil, ErrRegistrationClosed
 	}

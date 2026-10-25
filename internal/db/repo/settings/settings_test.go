@@ -8,7 +8,7 @@ import (
 	settingsrepo "savvy-go/internal/db/repo/settings"
 )
 
-func TestSettingsRoundTripOnServerAndSpace(t *testing.T) {
+func TestSettingsRoundTripOnServerSpace(t *testing.T) {
 	ctx := context.Background()
 	for name, repo := range map[string]settingsrepo.Repo{
 		"server": {DB: dbtest.Server(t)},

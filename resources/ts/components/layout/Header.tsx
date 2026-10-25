@@ -1,7 +1,7 @@
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Separator } from '@/components/ui/separator'
-import { LanguageSwitcher } from '@/components/shared/LanguageSwitcher'
-import { ThemeSwitcher } from '@/components/shared/ThemeSwitcher'
+import { LanguageSwitcher } from '@/components/shared/appearance/LanguageSwitcher'
+import { ThemeSwitcher } from '@/components/shared/appearance/ThemeSwitcher'
 import { CreateTransactionMenu } from './header/CreateTransactionMenu'
 import { HeaderBalance } from './header/HeaderBalance'
 import { UserMenu } from './header/UserMenu'
@@ -15,7 +15,8 @@ export function Header() {
                     <Separator orientation="vertical" className="h-4" />
                 </div>
 
-                <div className="flex items-center gap-3">
+                {/* Five controls share 390px: tighter gaps below sm keep a long balance (Russian groups digits with spaces) in the window. */}
+                <div className="flex min-w-0 items-center gap-1 sm:gap-3">
                     <CreateTransactionMenu />
                     <HeaderBalance />
                     <LanguageSwitcher />

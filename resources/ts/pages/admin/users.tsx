@@ -4,9 +4,15 @@ import { useTranslation } from 'react-i18next'
 import { ListPage } from '@/components/shared'
 import { createUserColumns, UserFormDialog, UserPasswordLinkDialog } from '@/components/features/users'
 import {
-    useUsers, useDeleteUser, useCreateUser, useUpdateUser, useIssuePasswordToken, useResourceFormDialog,
+    useUsers,
+    useDeleteUser,
+    useCreateUser,
+    useUpdateUser,
+    useIssuePasswordToken,
+    useResourceFormDialog,
     useSetEmailVerified,
-    useMailStatus, useSettings,
+    useMailStatus,
+    useSettings,
 } from '@/hooks'
 import { useUser as useCurrentUser } from '@/stores/auth'
 import { useReadOnly } from '@/components/providers/ReadOnlyProvider'
@@ -35,17 +41,17 @@ export default function UsersPage() {
     // With verification on, a link the admin hands over proves nothing about the mailbox: only email will do.
     const mustEmail = !!settings?.require_email_verification
 
-    const [linkUrl, setLinkUrl] = useState<string | null>(null)
+    const [link, setLink] = useState<{ url: string; expiresAt?: string } | null>(null)
     const form = useResourceFormDialog<User, CreateUserFormData | UpdateUserFormData>({
         items: users ?? [],
         isLoading,
         syncSearchParams: false,
     })
 
-    const showLink = (token?: string) => {
+    const showLink = (token?: string, expiresAt?: string) => {
         if (!token) return
         form.setOpen(false)
-        setLinkUrl(setPasswordUrl(token))
+        setLink({ url: setPasswordUrl(token), expiresAt })
     }
 
     const handleSubmit = (data: CreateUserFormData | UpdateUserFormData) => {
@@ -71,7 +77,7 @@ export default function UsersPage() {
             {
                 onSuccess: (user) => {
                     if (user.token) {
-                        showLink(user.token)
+                        showLink(user.token, user.expiresAt)
                     } else if (user.emailError) {
                         form.setOpen(false)
                         toast.error(t('users.linkEmailFailed', { email: user.email }))
@@ -85,22 +91,26 @@ export default function UsersPage() {
     }
 
     const handleReset = (user: User) => {
-        issueToken.mutate({ id: user.id }, {
-            onSuccess: (result) => showLink(result.token),
-        })
+        issueToken.mutate(
+            { id: user.id },
+            {
+                onSuccess: (result) => showLink(result.token, result.expiresAt),
+            },
+        )
     }
 
     const handleEmailReset = (user: User) => issueToken.mutate({ id: user.id, send: true })
 
-    const columns = createUserColumns(
-        (id) => deleteUser.mutate(id),
-        form.openEdit,
-        handleReset,
-        currentUser?.id,
+    const columns = createUserColumns({
+        onDelete: (id) => deleteUser.mutate(id),
+        onEdit: form.openEdit,
+        onResetPassword: handleReset,
+        currentUserId: currentUser?.id,
         isReadOnly,
-        canEmail ? handleEmailReset : undefined,
-        (user, verified) => setEmailVerified.mutate({ id: user.id, verified }),
-    )
+        onEmailReset: canEmail ? handleEmailReset : undefined,
+        showUnverified: !!mail?.enabled || mustEmail,
+        onSetEmailVerified: (user, verified) => setEmailVerified.mutate({ id: user.id, verified }),
+    })
 
     return (
         <>
@@ -124,10 +134,11 @@ export default function UsersPage() {
             />
 
             <UserPasswordLinkDialog
-                url={linkUrl}
-                open={linkUrl !== null}
+                url={link?.url ?? null}
+                expiresAt={link?.expiresAt}
+                open={link !== null}
                 onOpenChange={(open) => {
-                    if (!open) setLinkUrl(null)
+                    if (!open) setLink(null)
                 }}
             />
         </>

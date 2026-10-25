@@ -216,7 +216,8 @@ func TestArchiveRefusesInconsistentContent(t *testing.T) {
 
 func TestArchiveRefusesUnexpectedEntryNames(t *testing.T) {
 	f := newArchiveFixture(t)
-	for _, name := range []string{"../escape.sqlite", "/abs.sqlite", "spaces/../x.sqlite", "spaces/0.sqlite", "extra.txt", "keys/other.ed25519"} {
+	for _, name := range []string{"../escape.sqlite", "/abs.sqlite", "spaces/../x.sqlite", "spaces/0.sqlite", "extra.txt",
+		"keys/other.ed25519"} {
 		t.Run(name, func(t *testing.T) {
 			bad := f.rewrite(nil, map[string][]byte{name: []byte("x")})
 			root := t.TempDir()

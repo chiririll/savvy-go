@@ -18,7 +18,8 @@ vi.mock('@/lib/i18n', () => ({
 const account = { name: 'Cash' }
 const base = { account, category: null, toAccount: null, description: null }
 type Input = Parameters<typeof displayTransactionDescription>[0]
-const tx = (overrides: Partial<Record<keyof Input, unknown>>) => ({ ...base, type: 'expense', ...overrides }) as unknown as Input
+const tx = (overrides: Partial<Record<keyof Input, unknown>>) =>
+    ({ ...base, type: 'expense', ...overrides }) as unknown as Input
 
 describe('displayTransactionDescription', () => {
     it('prefers the stored description', () => {
@@ -26,8 +27,9 @@ describe('displayTransactionDescription', () => {
     })
 
     it('ignores a stored message key and builds a fallback', () => {
-        expect(displayTransactionDescription(tx({ description: 'messages.debt_payment', type: 'debt_payment' })))
-            .toBe('pages:transactions.fallback.payment(Cash)')
+        expect(displayTransactionDescription(tx({ description: 'messages.debt_payment', type: 'debt_payment' }))).toBe(
+            'pages:transactions.fallback.payment(Cash)',
+        )
     })
 
     it('ignores a blank description', () => {
@@ -45,10 +47,10 @@ describe('displayTransactionDescription', () => {
         ['debt_lend', 'lend'],
         ['debt_borrow', 'borrow'],
     ])('describes %s by the debt account', (type, key) => {
-        expect(displayTransactionDescription(tx({ type, toAccount: { name: 'Debt' } })))
-            .toBe(`pages:transactions.fallback.${key}(Debt)`)
-        expect(displayTransactionDescription(tx({ type })))
-            .toBe(`pages:transactions.fallback.${key}(Cash)`)
+        expect(displayTransactionDescription(tx({ type, toAccount: { name: 'Debt' } }))).toBe(
+            `pages:transactions.fallback.${key}(Debt)`,
+        )
+        expect(displayTransactionDescription(tx({ type }))).toBe(`pages:transactions.fallback.${key}(Cash)`)
     })
 
     it('falls back to the category, then to the type', () => {
@@ -60,8 +62,12 @@ describe('displayTransactionDescription', () => {
 
 describe('transactionSubtitle', () => {
     it('joins the account and the category', () => {
-        expect(transactionSubtitle({ account, category: { name: 'Taxi' } } as unknown as Transaction)).toBe('Cash · Taxi')
-        expect(transactionSubtitle({ account, category: { name: '#SALARY' } } as unknown as Transaction)).toBe('Cash · categories.SALARY')
+        expect(transactionSubtitle({ account, category: { name: 'Taxi' } } as unknown as Transaction)).toBe(
+            'Cash · Taxi',
+        )
+        expect(transactionSubtitle({ account, category: { name: '#SALARY' } } as unknown as Transaction)).toBe(
+            'Cash · categories.SALARY',
+        )
     })
 
     it('shows only the account without a category', () => {
@@ -71,20 +77,26 @@ describe('transactionSubtitle', () => {
 
 describe('transactionAmountAppearance', () => {
     it.each(['income', 'debt_collection', 'debt_borrow', 'transfer_in'] as const)('%s is a green plus', (type) => {
-        expect(transactionAmountAppearance(type)).toEqual({ sign: '+', className: 'text-green-600' })
+        expect(transactionAmountAppearance(type)).toEqual({ sign: '+', className: 'text-success' })
     })
 
     it.each(['expense', 'debt_payment', 'debt_lend', 'transfer_out'] as const)('%s is a red minus', (type) => {
-        expect(transactionAmountAppearance(type)).toEqual({ sign: '-', className: 'text-red-600' })
+        expect(transactionAmountAppearance(type)).toEqual({ sign: '-', className: 'text-destructive' })
     })
 
     it('shows a transfer between own accounts without a sign', () => {
-        expect(transactionAmountAppearance('transfer')).toEqual({ sign: '', className: 'text-blue-600' })
+        expect(transactionAmountAppearance('transfer')).toEqual({ sign: '', className: 'text-info' })
     })
 
     it('mutes skipped transactions whatever the type', () => {
-        expect(transactionAmountAppearance('income', 'skipped')).toEqual({ sign: '', className: 'text-muted-foreground' })
-        expect(transactionAmountAppearance('expense', 'skipped')).toEqual({ sign: '', className: 'text-muted-foreground' })
+        expect(transactionAmountAppearance('income', 'skipped')).toEqual({
+            sign: '',
+            className: 'text-muted-foreground',
+        })
+        expect(transactionAmountAppearance('expense', 'skipped')).toEqual({
+            sign: '',
+            className: 'text-muted-foreground',
+        })
     })
 
     it('does not mute other statuses', () => {

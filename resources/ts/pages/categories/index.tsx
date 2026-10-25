@@ -32,10 +32,7 @@ export default function CategoriesPage() {
     const isReadOnly = useReadOnly()
     const synced = useSyncs('categories')
     const items = categories ?? []
-    const visibleItems = useMemo(
-        () => items.filter((category) => category.type === type),
-        [items, type],
-    )
+    const visibleItems = useMemo(() => items.filter((category) => category.type === type), [items, type])
     const form = useResourceFormDialog<Category, CategoryFormData>({
         items,
         isLoading,
@@ -43,10 +40,13 @@ export default function CategoriesPage() {
         update: updateCategory,
     })
 
-    const typeCounts = useMemo(() => ({
-        income: items.filter((category) => category.type === 'income').length,
-        expense: items.filter((category) => category.type === 'expense').length,
-    }), [items])
+    const typeCounts = useMemo(
+        () => ({
+            income: items.filter((category) => category.type === 'income').length,
+            expense: items.filter((category) => category.type === 'expense').length,
+        }),
+        [items],
+    )
 
     return (
         <Page title={t('categories.title')}>
@@ -78,8 +78,14 @@ export default function CategoriesPage() {
                 <FeedList
                     items={visibleItems}
                     isLoading={isLoading}
-                    emptyTitle={type === 'income' ? t('categories.emptyIncomeTitle') : t('categories.emptyExpenseTitle')}
-                    emptyDescription={type === 'income' ? t('categories.emptyIncomeDescription') : t('categories.emptyExpenseDescription')}
+                    emptyTitle={
+                        type === 'income' ? t('categories.emptyIncomeTitle') : t('categories.emptyExpenseTitle')
+                    }
+                    emptyDescription={
+                        type === 'income'
+                            ? t('categories.emptyIncomeDescription')
+                            : t('categories.emptyExpenseDescription')
+                    }
                     emptyAction={
                         !isReadOnly ? (
                             <Button onClick={form.openCreate}>

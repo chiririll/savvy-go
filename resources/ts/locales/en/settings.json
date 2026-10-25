@@ -37,8 +37,9 @@
             "title": "Server",
             "description": "How this instance is reached from outside.",
             "appUrl": "Public URL",
-            "appUrlDescription": "Full address users open Savvy at, e.g. https://savvy.example.com. Needed for SSO and passkeys. Can also be set as app_url in config.toml.",
+            "appUrlDescription": "Full address users open Savvy at, e.g. https://savvy.example.com. Needed for SSO and passkeys. Can also be set as app_url in config.toml. Changing between http and https signs everyone out, so open Savvy at the new address.",
             "appUrlPlaceholder": "https://savvy.example.com",
+            "useBrowserUrl": "Use {{url}}",
             "configReadOnly": "Savvy can't write to config.toml, so this can't be changed here. Set app_url in the file and restart."
         },
         "mail": {
@@ -71,6 +72,8 @@
             "from": "Sender",
             "password": "Password",
             "noAppUrl": "The public URL is not set. Links in emails need it.",
+            "checkConnection": "Test connection",
+            "connectionOk": "Connected to the mail server",
             "testTitle": "Send a test email",
             "testPlaceholder": "Recipient (default: your email)",
             "testSend": "Send",
@@ -289,6 +292,7 @@
         "newEntitiesCreated": "New entities created",
         "categoriesLabel": "Categories",
         "tagsLabel": "Tags",
+        "currenciesLabel": "Currencies",
         "errorsCount": "Errors ({{count}})",
         "viewTransactions": "View transactions"
     },
@@ -507,7 +511,14 @@
         "title": "Space",
         "description": "Your role here: {{role}}.",
         "fields": {
-            "name": "Name"
+            "name": "Name",
+            "emoji": "Emoji",
+            "color": "Color"
+        },
+        "look": {
+            "clearEmoji": "Remove emoji",
+            "clearColor": "No color",
+            "preview": "Preview"
         },
         "roles": {
             "admin": "Admin",
@@ -550,11 +561,19 @@
                 "add": "Add a currency",
                 "remove": "Remove {{code}}",
                 "loading": "Loading currencies…",
-                "failed": "Could not load the currency list."
+                "failed": "Could not load the currency list.",
+                "search": "Search by code, name or symbol",
+                "none": "No currency found.",
+                "more": "{{count}} more: keep typing to narrow down",
+                "useCode": "use this code",
+                "builtIn": "Showing a short list: the currency service is unavailable. Type any currency code to use it.",
+                "refreshing": "Checking the currency service…",
+                "recovered": "Currencies loaded.",
+                "stillBuiltIn": "Still the built-in list: the currency service did not answer."
             },
             "accounts": {
                 "title": "Accounts",
-                "hint": "Optional. Wallets and bank cards, each in one currency.",
+                "hint": "Wallets and bank cards, each in one currency.",
                 "name": "Name",
                 "currency": "Currency",
                 "balance": "Opening balance",
@@ -566,9 +585,12 @@
                 "hint": "Rename, remove or add. The default category of each type stays.",
                 "name": "Category name",
                 "new": "New category",
+                "groupExpense": "Expenses",
+                "groupIncome": "Incomes",
                 "add": "Add the category",
                 "remove": "Remove {{name}}",
-                "protected": "The default category of its type cannot be removed"
+                "protected": "The default category of its type cannot be removed",
+                "about": "About this category"
             },
             "tags": {
                 "title": "Tags",
@@ -605,7 +627,7 @@
         "toasts": {
             "created": "Space created",
             "imported": "Space imported",
-            "renamed": "Space renamed",
+            "updated": "Space updated",
             "deleted": "Space deleted",
             "left": "You left the space",
             "roleChanged": "Role changed",
@@ -646,6 +668,7 @@
             "copied": "Link copied",
             "emailSent": "Invitation emailed to {{email}}",
             "anyone": "Anyone with the link",
+            "none": "No open invitations.",
             "expires": "Expires {{date}}",
             "revoke": "Revoke",
             "copy": "Copy link",
@@ -710,7 +733,19 @@
                 "successor": "Move its transactions to",
                 "successorPlaceholder": "Choose a category",
                 "defaultTitle": "Default {{type}} category",
-                "apply": "Apply"
+                "apply": "Apply",
+                "back": "Back",
+                "next": "Next",
+                "stepOf": "Step {{current}} of {{total}}: {{step}}",
+                "steps": {
+                    "categories": "Categories",
+                    "merge": "Move transactions",
+                    "tags": "Tags",
+                    "summary": "Defaults and summary"
+                },
+                "summaryCategories": "Categories: {{kept}} stay, {{dropped}} deleted everywhere.",
+                "summaryTags": "Tags: {{kept}} stay, {{dropped}} deleted everywhere.",
+                "summaryDefaults": "Only the default categories differ."
             }
         },
         "transfers": {
@@ -761,11 +796,9 @@
         }
     },
     "user": {
-        "title": "User",
-        "description": "Your own settings: they apply in every space.",
         "tabs": {
-            "preferences": "Preferences",
             "security": "Security",
+            "passkeys": "Passkeys",
             "api": "API"
         },
         "theme": {
@@ -810,6 +843,7 @@
             "defaultQuota": "Default",
             "chooseUser": "User",
             "assign": "Make admin",
+            "actions": "Actions",
             "members": "Members",
             "size": "Size",
             "quota": "Size limit",

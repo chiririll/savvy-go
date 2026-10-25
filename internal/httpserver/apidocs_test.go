@@ -1,3 +1,5 @@
+//go:build integration
+
 package httpserver
 
 import (
@@ -8,6 +10,8 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+
+	"savvy-go/internal/httpserver/ui"
 )
 
 var (
@@ -16,14 +20,18 @@ var (
 	paramRe      = regexp.MustCompile(`\{[^}]+\}`)
 )
 
-// specOperations returns "METHOD /path" for every operation in openapi.yaml, with path
+// specOperations returns "METHOD /path" for every operation in the merged spec, with path
 // parameter names normalised so {id} and {upload} compare equal.
 func specOperations(t *testing.T) map[string]bool {
 	t.Helper()
+	raw, err := ui.Spec()
+	if err != nil {
+		t.Fatal(err)
+	}
 	ops := map[string]bool{}
 	path := ""
 	inPaths := false
-	for _, line := range strings.Split(string(openAPISpec), "\n") {
+	for _, line := range strings.Split(string(raw), "\n") {
 		line = strings.TrimRight(line, "\r")
 		if strings.HasPrefix(line, "paths:") {
 			inPaths = true
@@ -102,27 +110,26 @@ func TestOpenAPICoversRoutes(t *testing.T) {
 
 	for op := range routes {
 		if !spec[op] {
-			t.Errorf("route %s is missing from apidocs/openapi.yaml", op)
+			t.Errorf("route %s is missing from the OpenAPI spec", op)
 		}
 	}
 	for op := range spec {
 		if !routes[op] {
-			t.Errorf("openapi.yaml documents %s, which is not a route", op)
+			t.Errorf("the OpenAPI spec documents %s, which is not a route", op)
 		}
 	}
 }
 
-func TestAPIDocsServed(t *testing.T) {
+// The reference and the merged spec are served by the API itself, so they work without the
+// frontend.
+func TestAPIDocsPage(t *testing.T) {
 	a := newTestApp(t)
-	for path, want := range map[string]string{
-		"/api/docs":         "swagger-ui",
-		"/api/openapi.yaml": "openapi: 3.0.3",
-	} {
+	for path, want := range map[string]string{"/api/docs": "swagger-ui", "/api/openapi.yaml": "openapi: 3.0.3"} {
 		res := a.do("GET", path, nil, "", "")
 		body, _ := io.ReadAll(res.Body)
 		res.Body.Close()
-		if res.StatusCode != 200 || !strings.Contains(string(body), want) {
-			t.Fatalf("%s: %d", path, res.StatusCode)
+		if res.StatusCode != http.StatusOK || !strings.Contains(string(body), want) {
+			t.Errorf("%s: %d, body lacks %q", path, res.StatusCode, want)
 		}
 	}
 }

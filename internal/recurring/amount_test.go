@@ -17,7 +17,7 @@ import (
 
 // A recurring transaction template with an amount that does not fit the
 // currency is refused and stores nothing, in every currency scale.
-func TestAmountsOutOfRangeAreRejectedAndStoreNothing(t *testing.T) {
+func TestAmountsOutRangeRejectedStoreNothing(t *testing.T) {
 	moneytest.ForEach(t, func(t *testing.T, c moneytest.Currency) {
 		ctx := context.Background()
 		sqlDB, err := db.Open(filepath.Join(t.TempDir(), "database.sqlite"))
@@ -34,7 +34,10 @@ func TestAmountsOutOfRangeAreRejectedAndStoreNothing(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		acct, err := (ledger.Accounts{DB: sqlDB}).Create(ctx, ledger.AccountInput{Name: "a", Type: "cash", CurrencyID: cur.ID, IsActive: true})
+		acct, err := (ledger.Accounts{DB: sqlDB}).Create(
+			ctx,
+			ledger.AccountInput{Name: "a", Type: "cash", CurrencyID: cur.ID, IsActive: true},
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -42,7 +45,10 @@ func TestAmountsOutOfRangeAreRejectedAndStoreNothing(t *testing.T) {
 
 		moneytest.ForEachAmount(t, moneytest.Invalid(c.Decimals), func(t *testing.T, a moneytest.Amount) {
 			for _, in := range []decimal.Decimal{a.Input, a.Input.Neg()} {
-				_, err := svc.Create(ctx, Input{Type: "expense", AccountID: acct.ID, Amount: in, Frequency: "monthly", StartDate: "2024-01-15"})
+				_, err := svc.Create(
+					ctx,
+					Input{Type: "expense", AccountID: acct.ID, Amount: in, Frequency: "monthly", StartDate: "2024-01-15"},
+				)
 				if !errors.Is(err, money.ErrOutOfRange) {
 					t.Errorf("amount %s: err = %v, want ErrOutOfRange", in, err)
 				}

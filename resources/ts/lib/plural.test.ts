@@ -100,8 +100,12 @@ describe('plurals in the locale files', () => {
 
     it('renders English too', async () => {
         await i18n.changeLanguage('en')
-        expect(i18n.t('settings:security.recovery.remaining', { count: 1 })).toBe('1 code remaining. Regenerating invalidates the old set.')
-        expect(i18n.t('settings:security.recovery.remaining', { count: 4 })).toBe('4 codes remaining. Regenerating invalidates the old set.')
+        expect(i18n.t('settings:security.recovery.remaining', { count: 1 })).toBe(
+            '1 code remaining. Regenerating invalidates the old set.',
+        )
+        expect(i18n.t('settings:security.recovery.remaining', { count: 4 })).toBe(
+            '4 codes remaining. Regenerating invalidates the old set.',
+        )
         expect(i18n.t('dashboard.pendingCount', { count: 1 })).toBe('1 transaction')
         expect(i18n.t('dashboard.pendingCount', { count: 0 })).toBe('0 transactions')
         await i18n.changeLanguage('ru')

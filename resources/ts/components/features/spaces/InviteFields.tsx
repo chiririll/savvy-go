@@ -24,7 +24,11 @@ interface Props {
      * the optional note for a link. Returning false keeps the address in the
      * field, as after a refusal.
      */
-    onSubmit: (input: { email: string | null; note: string | null; role: SpaceRole }) => boolean | void | Promise<boolean | void>
+    onSubmit: (input: {
+        email: string | null
+        note: string | null
+        role: SpaceRole
+    }) => boolean | void | Promise<boolean | void>
 }
 
 /**
@@ -59,7 +63,9 @@ export function InviteFields({ submitLabel, busy, error, onEdit, onSubmit }: Pro
 
     return (
         <div className="space-y-3">
-            {methods && method === null && <p className="text-sm text-muted-foreground">{t('spaces.invitations.unavailable')}</p>}
+            {methods && method === null && (
+                <p className="text-sm text-muted-foreground">{t('spaces.invitations.unavailable')}</p>
+            )}
             {methods?.email && methods.link && (
                 <div className="flex gap-2" role="group" aria-label={t('spaces.invitations.method')}>
                     {(['email', 'link'] as const).map((m) => (
@@ -88,6 +94,7 @@ export function InviteFields({ submitLabel, busy, error, onEdit, onSubmit }: Pro
                             className="col-span-2 sm:col-span-1"
                             type="email"
                             placeholder={t('spaces.invitations.emailPlaceholder')}
+                            aria-label={t('spaces.invitations.emailPlaceholder')}
                             value={email}
                             aria-invalid={!!error}
                             {...testId('invite-email')}
@@ -108,25 +115,38 @@ export function InviteFields({ submitLabel, busy, error, onEdit, onSubmit }: Pro
                         />
                     )}
                     <Select value={role} onValueChange={(r) => setRole(r as SpaceRole)}>
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger className="w-full" aria-label={t('common:fields.role')}>
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                             {ROLES.map((r) => (
-                                <SelectItem key={r} value={r}>{spaceRoleLabel(t, r)}</SelectItem>
+                                <SelectItem key={r} value={r}>
+                                    {spaceRoleLabel(t, r)}
+                                </SelectItem>
                             ))}
                         </SelectContent>
                     </Select>
-                    <Button type="submit" size="icon" disabled={busy} aria-label={submitLabel} title={submitLabel} {...testId('invite-add')}>
+                    <Button
+                        type="submit"
+                        size="icon"
+                        disabled={busy}
+                        aria-label={submitLabel}
+                        title={submitLabel}
+                        {...testId('invite-add')}
+                    >
                         <Plus className="size-4" />
                     </Button>
                 </form>
             )}
             {error && <p className="text-sm text-destructive">{error}</p>}
             {methods && !methods.email && methods.emailReason && (
-                <p className="text-xs text-muted-foreground">{t('spaces.invitations.emailOff', { reason: methods.emailReason })}</p>
+                <p className="text-xs text-muted-foreground">
+                    {t('spaces.invitations.emailOff', { reason: methods.emailReason })}
+                </p>
             )}
-            {methods?.email && !methods.link && <p className="text-xs text-muted-foreground">{t('spaces.invitations.emailRequired')}</p>}
+            {methods?.email && !methods.link && (
+                <p className="text-xs text-muted-foreground">{t('spaces.invitations.emailRequired')}</p>
+            )}
         </div>
     )
 }

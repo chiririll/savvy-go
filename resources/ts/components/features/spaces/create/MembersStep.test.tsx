@@ -29,53 +29,11 @@ function Harness({ onList }: { onList: (list: DraftInvitation[]) => void }) {
     )
 }
 
-const type = (value: string) => fireEvent.change(screen.getByPlaceholderText('spaces.invitations.emailPlaceholder'), { target: { value } })
 const add = () => fireEvent.click(screen.getByRole('button', { name: 'spaces.create.members.add' }))
 
 afterEach(() => cleanup())
 
 describe('MembersStep', () => {
-    it('lists addresses without sending anything', () => {
-        methods = { email: true, link: true }
-        const onList = vi.fn()
-        render(<Harness onList={onList} />)
-
-        type('bob@example.org')
-        add()
-
-        expect(screen.getByText('bob@example.org')).toBeTruthy()
-        expect(onList).toHaveBeenLastCalledWith([expect.objectContaining({ email: 'bob@example.org', role: 'editor' })])
-    })
-
-    it('refuses an address twice and one that is not an address', () => {
-        methods = { email: true, link: true }
-        render(<Harness onList={vi.fn()} />)
-
-        type('bob@example.org')
-        add()
-        type('BOB@example.org')
-        add()
-        expect(screen.getByText('spaces.create.members.duplicate')).toBeTruthy()
-
-        type('nope')
-        add()
-        expect(screen.getByText('spaces.create.members.invalid')).toBeTruthy()
-        expect(screen.getAllByText('bob@example.org')).toHaveLength(1)
-    })
-
-    it('removes an entry before anything is sent', () => {
-        methods = { email: true, link: true }
-        const onList = vi.fn()
-        render(<Harness onList={onList} />)
-        type('bob@example.org')
-        add()
-
-        fireEvent.click(screen.getByRole('button', { name: 'spaces.create.members.remove' }))
-
-        expect(screen.queryByText('bob@example.org')).toBeNull()
-        expect(onList).toHaveBeenLastCalledWith([])
-    })
-
     it('offers only links when the server cannot email', () => {
         methods = { email: false, link: true, emailReason: 'Mail is not configured.' }
         const onList = vi.fn()

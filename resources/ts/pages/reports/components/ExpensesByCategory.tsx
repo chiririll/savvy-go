@@ -20,7 +20,7 @@ export function ExpensesByCategory({ filters }: ExpensesByCategoryProps) {
 
     const maxValue = useMemo(() => {
         if (!data?.categories.length) return 0
-        return Math.max(...data.categories.flatMap(c => [c.current, c.previous]))
+        return Math.max(...data.categories.flatMap((c) => [c.current, c.previous]))
     }, [data])
 
     const handleCategoryClick = (categoryId: number) => {
@@ -30,7 +30,7 @@ export function ExpensesByCategory({ filters }: ExpensesByCategoryProps) {
     if (error) {
         return (
             <Card>
-                <CardContent className="py-8 text-center text-red-500">
+                <CardContent className="py-8 text-center text-destructive">
                     {t('reports.errors.expensesByCategory')}
                 </CardContent>
             </Card>
@@ -41,9 +41,7 @@ export function ExpensesByCategory({ filters }: ExpensesByCategoryProps) {
         <Card>
             <CardHeader className="pb-2">
                 <CardTitle className="text-lg">{t('reports.expensesByCategory.title')}</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                    {t('reports.expensesByCategory.subtitle')}
-                </p>
+                <p className="text-sm text-muted-foreground">{t('reports.expensesByCategory.subtitle')}</p>
             </CardHeader>
             <CardContent className="space-y-1 px-3 sm:px-6">
                 {isLoading ? (
@@ -58,18 +56,24 @@ export function ExpensesByCategory({ filters }: ExpensesByCategoryProps) {
                     </div>
                 ) : (
                     data.categories.map((category) => {
-                        const change = category.previous > 0
-                            ? ((category.current - category.previous) / category.previous) * 100
-                            : 0
+                        const change =
+                            category.previous > 0
+                                ? ((category.current - category.previous) / category.previous) * 100
+                                : 0
                         const isIncrease = change > 0
                         const isAnomalous = Math.abs(change) > 50
                         const currentWidth = maxValue > 0 ? (category.current / maxValue) * 100 : 0
                         const previousWidth = maxValue > 0 ? (category.previous / maxValue) * 100 : 0
 
                         return (
-                            <div
+                            <button
+                                type="button"
                                 key={category.id}
-                                className="group cursor-pointer rounded-lg px-1 py-2 transition-colors hover:bg-muted/50"
+                                className={cn(
+                                    'group block w-full cursor-pointer rounded-lg px-1 py-2 text-left transition-colors',
+                                    'hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2',
+                                    'focus-visible:ring-ring',
+                                )}
                                 onClick={() => handleCategoryClick(category.id)}
                             >
                                 {/* Header row: icon, name, amounts */}
@@ -82,25 +86,36 @@ export function ExpensesByCategory({ filters }: ExpensesByCategoryProps) {
                                     </div>
 
                                     <div className="flex min-w-0 flex-1 items-center gap-2">
-                                        <span className="font-medium text-sm truncate">{localizeDefaultName(category.name)}</span>
+                                        <span className="font-medium text-sm truncate">
+                                            {localizeDefaultName(category.name)}
+                                        </span>
                                         {isAnomalous && filters.compareWith !== 'none' && (
-                                            <AlertTriangle className="size-4 shrink-0 text-amber-500" />
+                                            <AlertTriangle className="size-4 shrink-0 text-warning" />
                                         )}
                                     </div>
 
-                                    <div className="flex shrink-0 flex-col items-end text-sm sm:flex-row sm:items-center sm:gap-3">
+                                    <div
+                                        className={cn(
+                                            'flex shrink-0 flex-col items-end text-sm sm:flex-row',
+                                            'sm:items-center sm:gap-3',
+                                        )}
+                                    >
                                         <span className="font-semibold">
                                             {formatCurrency(category.current, data.currency)}
                                         </span>
                                         {filters.compareWith !== 'none' && category.previous > 0 && (
                                             <span className="flex items-center gap-2 text-xs sm:text-sm">
                                                 <span className="text-muted-foreground">
-                                                    {t('reports.vsAmount', { amount: formatCurrency(category.previous, data.currency) })}
+                                                    {t('reports.vsAmount', {
+                                                        amount: formatCurrency(category.previous, data.currency),
+                                                    })}
                                                 </span>
-                                                <span className={cn(
-                                                    'flex items-center gap-0.5 text-xs font-medium',
-                                                    isIncrease ? 'text-red-600' : 'text-green-600'
-                                                )}>
+                                                <span
+                                                    className={cn(
+                                                        'flex items-center gap-0.5 text-xs font-medium',
+                                                        isIncrease ? 'text-destructive' : 'text-success',
+                                                    )}
+                                                >
                                                     {isIncrease ? (
                                                         <TrendingUp className="size-3" />
                                                     ) : (
@@ -111,7 +126,12 @@ export function ExpensesByCategory({ filters }: ExpensesByCategoryProps) {
                                             </span>
                                         )}
                                     </div>
-                                    <ChevronRight className="hidden size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 sm:block" />
+                                    <ChevronRight
+                                        className={cn(
+                                            'hidden size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity',
+                                            'group-hover:opacity-100 sm:block',
+                                        )}
+                                    />
                                 </div>
 
                                 {/* Bars: full row width */}
@@ -137,7 +157,7 @@ export function ExpensesByCategory({ filters }: ExpensesByCategoryProps) {
                                         </div>
                                     )}
                                 </div>
-                            </div>
+                            </button>
                         )
                     })
                 )}

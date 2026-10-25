@@ -85,7 +85,7 @@ func (f *fakeService) source(clock *time.Time) *Source {
 	return s
 }
 
-func TestRatesAreWhatOneUnitIsWorthInTheBase(t *testing.T) {
+func TestRatesWhatOneUnitWorthBase(t *testing.T) {
 	clock := time.Now()
 	s := newFakeService(t).source(&clock)
 	rates, err := s.Rates(context.Background(), "usd")
@@ -135,7 +135,7 @@ func TestSignificant(t *testing.T) {
 }
 
 // Spaces with the same base share one request; each other base costs one.
-func TestSpacesWithTheSameBaseShareOneFetch(t *testing.T) {
+func TestSameBaseSharesOneFetch(t *testing.T) {
 	clock := time.Now()
 	f := newFakeService(t)
 	s := f.source(&clock)
@@ -149,7 +149,7 @@ func TestSpacesWithTheSameBaseShareOneFetch(t *testing.T) {
 	}
 }
 
-func TestExpireMakesEachBaseFetchOnceMore(t *testing.T) {
+func TestExpireRefetchesEachBase(t *testing.T) {
 	clock := time.Now()
 	f := newFakeService(t)
 	s := f.source(&clock)
@@ -185,7 +185,7 @@ func TestCacheExpiresAfterTTL(t *testing.T) {
 	}
 }
 
-func TestOldRatesServeWhileTheServiceIsDown(t *testing.T) {
+func TestOldRatesServeWhileServiceDown(t *testing.T) {
 	clock := time.Now()
 	f := newFakeService(t)
 	s := f.source(&clock)
@@ -235,7 +235,7 @@ func TestUnknownBaseIsAnError(t *testing.T) {
 	}
 }
 
-func TestCatalogCombinesNamesAndLiveRatesWithoutCaching(t *testing.T) {
+func TestCatalogCombinesNamesLiveRatesUncached(t *testing.T) {
 	clock := time.Now()
 	f := newFakeService(t)
 	s := f.source(&clock)
@@ -270,7 +270,7 @@ func TestCatalogCombinesNamesAndLiveRatesWithoutCaching(t *testing.T) {
 	}
 }
 
-func TestCatalogFallsBackToTheBuiltInList(t *testing.T) {
+func TestCatalogFallsBackBuiltInList(t *testing.T) {
 	list := NewOffline().Catalog(context.Background(), "eur")
 	if len(list) != len(fallback) {
 		t.Fatalf("%d currencies, want %d", len(list), len(fallback))
@@ -282,5 +282,172 @@ func TestCatalogFallsBackToTheBuiltInList(t *testing.T) {
 	// In euros: 1 EUR is 1, and 1 USD is worth 0.92 EUR.
 	if !rate["EUR"].Equal(dec("1")) || !rate["USD"].Equal(dec("0.92")) {
 		t.Fatalf("EUR=%s USD=%s", rate["EUR"], rate["USD"])
+	}
+}
+
+func TestCatalogStatusMarksFallbackList(t *testing.T) {
+	clock := time.Now()
+	f := newFakeService(t)
+	s := f.source(&clock)
+
+	if _, fallback := s.CatalogStatus(context.Background(), "usd"); fallback {
+		t.Fatal("the live list was reported as the built-in one")
+	}
+
+	// A server error on the names file: the short built-in list, and it says so.
+	broken := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "boom", http.StatusInternalServerError)
+	}))
+	t.Cleanup(broken.Close)
+	down := f.source(&clock)
+	down.MetaURL = broken.URL
+	list, fallback := down.CatalogStatus(context.Background(), "usd")
+	if !fallback || len(list) != len(fallbackMeta()) {
+		t.Fatalf("fallback=%v with %d currencies", fallback, len(list))
+	}
+	// Still the short list, and still said so, until the names can be fetched again.
+	if _, again := down.CatalogStatus(context.Background(), "usd"); !again {
+		t.Fatal("the flag was lost while the built-in list was in use")
+	}
+	down.MetaURL = f.srv.URL + "/meta.json"
+	clock = clock.Add(down.Retry + time.Second)
+	if _, recovered := down.CatalogStatus(context.Background(), "usd"); recovered {
+		t.Fatal("still reported as the built-in list after the service came back")
+	}
+}
+
+// countingNames serves a names file and counts the requests that reach it.
+func countingNames(t *testing.T, fail *bool) (url string, hits *int) {
+	t.Helper()
+	var mu sync.Mutex
+	n := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		mu.Lock()
+		n++
+		down := *fail
+		mu.Unlock()
+		if down {
+			http.Error(w, "boom", http.StatusInternalServerError)
+			return
+		}
+		_, _ = w.Write([]byte(`{"USD": {"code": "USD", "name": "US Dollar", "symbol": "$", "symbol_native": "$", "decimal_digits": 2}}`))
+	}))
+	t.Cleanup(srv.Close)
+	return srv.URL, &n
+}
+
+func TestRefreshRetriesFailedNamesOnce(t *testing.T) {
+	clock := time.Now()
+	f := newFakeService(t)
+	down := true
+	url, hits := countingNames(t, &down)
+	s := f.source(&clock)
+	s.MetaURL = url
+	ctx := context.Background()
+
+	if _, builtIn := s.CatalogStatus(ctx, "usd"); !builtIn || *hits != 1 {
+		t.Fatalf("builtIn=%v hits=%d, want the built-in list after one try", builtIn, *hits)
+	}
+	// Inside the retry window a normal call answers from the cache.
+	s.CatalogStatus(ctx, "usd")
+	if *hits != 1 {
+		t.Fatalf("hits=%d, a normal call must not touch the network in the window", *hits)
+	}
+	// The service recovers; Refresh makes the next call hit the network once.
+	down = false
+	if !s.Refresh() {
+		t.Fatal("first Refresh was refused")
+	}
+	if _, builtIn := s.CatalogStatus(ctx, "usd"); builtIn || *hits != 2 {
+		t.Fatalf("builtIn=%v hits=%d, want recovered after one more request", builtIn, *hits)
+	}
+}
+
+func TestRefreshIsThrottled(t *testing.T) {
+	clock := time.Now()
+	f := newFakeService(t)
+	down := true
+	url, hits := countingNames(t, &down)
+	s := f.source(&clock)
+	s.MetaURL = url
+	ctx := context.Background()
+	s.CatalogStatus(ctx, "usd") // hits=1, fails
+
+	if !s.Refresh() {
+		t.Fatal("first Refresh refused")
+	}
+	s.CatalogStatus(ctx, "usd") // hits=2, fails again
+	if s.Refresh() {
+		t.Fatal("second Refresh inside the throttle was accepted")
+	}
+	s.CatalogStatus(ctx, "usd")
+	if *hits != 2 {
+		t.Fatalf("hits=%d, a throttled Refresh must not reach the network", *hits)
+	}
+	clock = clock.Add(s.RefreshEvery + time.Second)
+	if !s.Refresh() {
+		t.Fatal("Refresh refused after the throttle passed")
+	}
+	s.CatalogStatus(ctx, "usd")
+	if *hits != 3 {
+		t.Fatalf("hits=%d, want 3", *hits)
+	}
+}
+
+func TestRefreshKeepsGoodData(t *testing.T) {
+	clock := time.Now()
+	f := newFakeService(t)
+	s := f.source(&clock)
+	ctx := context.Background()
+	if _, err := s.Rates(ctx, "usd"); err != nil {
+		t.Fatal(err)
+	}
+	s.CatalogStatus(ctx, "usd")
+	before := f.requests("usd")
+
+	s.Refresh()
+	if _, err := s.Rates(ctx, "usd"); err != nil {
+		t.Fatal(err)
+	}
+	if f.requests("usd") != before {
+		t.Fatal("Refresh threw away rates that were fetched fine")
+	}
+}
+
+func TestRefreshRetriesFailedRatesKeepingOld(t *testing.T) {
+	clock := time.Now()
+	f := newFakeService(t)
+	s := f.source(&clock)
+	ctx := context.Background()
+	if _, err := s.Rates(ctx, "jpy"); err != nil {
+		t.Fatal(err)
+	}
+	// Expire, then the service goes down: the old rates serve and a retry window starts.
+	s.Expire()
+	f.set(func() { f.down = true })
+	if _, err := s.Rates(ctx, "jpy"); err != nil {
+		t.Fatal(err)
+	}
+	failedAt := f.requests("jpy")
+	s.Rates(ctx, "jpy")
+	if f.requests("jpy") != failedAt {
+		t.Fatal("a call inside the retry window reached the network")
+	}
+
+	// Refresh while still down: one more attempt, and the old data stays in use.
+	s.Refresh()
+	rates, err := s.Rates(ctx, "jpy")
+	if err != nil || !rates["USD"].Equal(dec("160")) {
+		t.Fatalf("old rates lost: %v %v", rates, err)
+	}
+	if f.requests("jpy") != failedAt+1 {
+		t.Fatalf("requests=%d, want one forced attempt", f.requests("jpy")-failedAt)
+	}
+	// Recovered after the throttle.
+	clock = clock.Add(s.RefreshEvery + time.Second)
+	f.set(func() { f.down = false })
+	s.Refresh()
+	if _, err := s.Rates(ctx, "jpy"); err != nil || f.requests("jpy") != failedAt+2 {
+		t.Fatalf("err=%v requests=%d", err, f.requests("jpy"))
 	}
 }

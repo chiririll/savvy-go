@@ -28,7 +28,7 @@ export default function AutomationLogsPage() {
         <div className="space-y-6">
             <div className="flex items-center gap-4">
                 <Button variant="ghost" size="icon" asChild>
-                    <Link to="/automation">
+                    <Link to="/automation" aria-label={t('actions.back', { ns: 'common' })}>
                         <ArrowLeft className="size-4" />
                     </Link>
                 </Button>
@@ -40,17 +40,14 @@ export default function AutomationLogsPage() {
 
             {logsLoading ? (
                 <div className="space-y-2">
-                    {[1, 2, 3].map(i => (
+                    {[1, 2, 3].map((i) => (
                         <Skeleton key={i} className="h-16 w-full" />
                     ))}
                 </div>
             ) : logs && logs.length > 0 ? (
                 <div className="space-y-2">
-                    {logs.map(log => (
-                        <div
-                            key={log.id}
-                            className="flex items-center justify-between p-4 border rounded-lg"
-                        >
+                    {logs.map((log) => (
+                        <div key={log.id} className="flex items-center justify-between p-4 border rounded-lg">
                             <div className="space-y-1">
                                 <div className="flex items-center gap-2">
                                     <Badge
@@ -66,18 +63,19 @@ export default function AutomationLogsPage() {
                                     </Badge>
                                     {log.triggerEntityType && (
                                         <span className="text-sm text-muted-foreground">
-                                            {t('automation.logsEntity', { type: log.triggerEntityType, id: log.triggerEntityId })}
+                                            {t('automation.logsEntity', {
+                                                type: log.triggerEntityType,
+                                                id: log.triggerEntityId,
+                                            })}
                                         </span>
                                     )}
                                 </div>
-                                {log.errorMessage && (
-                                    <p className="text-sm text-destructive">{log.errorMessage}</p>
-                                )}
+                                {log.errorMessage && <p className="text-sm text-destructive">{log.errorMessage}</p>}
                                 {log.actionsExecuted && log.actionsExecuted.length > 0 && (
                                     <p className="text-sm text-muted-foreground">
                                         {t('automation.logsActions', {
                                             actions: log.actionsExecuted
-                                                .map(a => actionTypeLabelLoose(t, a.type))
+                                                .map((a) => actionTypeLabelLoose(t, a.type))
                                                 .join(', '),
                                         })}
                                     </p>
@@ -90,9 +88,7 @@ export default function AutomationLogsPage() {
                     ))}
                 </div>
             ) : (
-                <div className="text-center py-12 text-muted-foreground">
-                    {t('automation.logsEmpty')}
-                </div>
+                <div className="text-center py-12 text-muted-foreground">{t('automation.logsEmpty')}</div>
             )}
         </div>
     )

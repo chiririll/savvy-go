@@ -1,8 +1,7 @@
 import { useTranslation } from 'react-i18next'
-import { MetricCard } from '../components/MetricCard'
+import { OverviewMetricCards } from '../components/OverviewMetricCards'
 import { CashFlowChart } from '../components/CashFlowChart'
 import { useOverviewMetrics } from '@/hooks'
-import { Skeleton } from '@/components/ui/skeleton'
 import type { ReportFilters } from '../types'
 
 interface CashFlowTabProps {
@@ -15,7 +14,7 @@ export function CashFlowTab({ filters }: CashFlowTabProps) {
 
     if (error) {
         return (
-            <div className="text-center py-8 text-red-500">
+            <div className="text-center py-8 text-destructive">
                 {t('reports.errors.cashflow')}
             </div>
         )
@@ -24,45 +23,17 @@ export function CashFlowTab({ filters }: CashFlowTabProps) {
     return (
         <div className="space-y-6">
             {/* Cash Flow Metrics - 3 cards in a row */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {isLoading ? (
-                    <>
-                        <Skeleton className="h-[140px]" />
-                        <Skeleton className="h-[140px]" />
-                        <Skeleton className="h-[140px]" />
-                    </>
-                ) : data ? (
-                    <>
-                        <MetricCard
-                            title={t('reports.metrics.inflow')}
-                            value={data.income.value}
-                            previousValue={data.income.previous}
-                            sparklineData={data.income.sparkline}
-                            type="income"
-                            compareWith={filters.compareWith}
-                            currency={data.currency}
-                        />
-                        <MetricCard
-                            title={t('reports.metrics.outflow')}
-                            value={data.expenses.value}
-                            previousValue={data.expenses.previous}
-                            sparklineData={data.expenses.sparkline}
-                            type="expense"
-                            compareWith={filters.compareWith}
-                            currency={data.currency}
-                        />
-                        <MetricCard
-                            title={t('reports.metrics.netCashFlow')}
-                            value={data.netCashFlow.value}
-                            previousValue={data.netCashFlow.previous}
-                            sparklineData={data.netCashFlow.sparkline}
-                            type="net"
-                            compareWith={filters.compareWith}
-                            currency={data.currency}
-                        />
-                    </>
-                ) : null}
-            </div>
+            <OverviewMetricCards
+                className="sm:grid-cols-3"
+                metrics={[
+                    { key: 'income', title: t('reports.metrics.inflow'), type: 'income' },
+                    { key: 'expenses', title: t('reports.metrics.outflow'), type: 'expense' },
+                    { key: 'netCashFlow', title: t('reports.metrics.netCashFlow'), type: 'net' },
+                ]}
+                data={data}
+                isLoading={isLoading}
+                compareWith={filters.compareWith}
+            />
 
             {/* Cash Flow Chart */}
             <CashFlowChart filters={filters} />

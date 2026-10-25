@@ -58,7 +58,8 @@ func (r Repo) ByID(ctx context.Context, id string) (*Import, error) {
 	for _, f := range []struct {
 		from db.NString
 		to   **string
-	}{{row.Mapping, &im.Mapping}, {row.Options, &im.Options}, {row.Errors, &im.Errors}, {row.Meta, &im.Meta}, {row.Message, &im.Message}} {
+	}{{row.Mapping, &im.Mapping}, {row.Options, &im.Options}, {row.Errors, &im.Errors}, {row.Meta, &im.Meta},
+		{row.Message, &im.Message}} {
 		if f.from.Valid {
 			s := f.from.String
 			*f.to = &s

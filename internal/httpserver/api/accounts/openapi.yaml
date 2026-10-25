@@ -1,0 +1,107 @@
+paths:
+  /spaces/{space}/accounts:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Accounts]
+      summary: List accounts
+      parameters:
+        - {name: active, in: query, schema: {type: boolean}, description: Only active accounts}
+        - {name: exclude_debts, in: query, schema: {type: boolean}}
+        - {name: with_summary, in: query, schema: {type: boolean}}
+        - {name: base_currency_id, in: query, schema: {type: integer}}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+    post:
+      tags: [Accounts]
+      summary: Create an account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/AccountInput"}
+      responses:
+        "201": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "422": {$ref: "#/components/responses/Validation"}
+  /spaces/{space}/accounts/reorder:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    post:
+      tags: [Accounts]
+      summary: Reorder accounts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids: {type: array, items: {type: integer}}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "422": {$ref: "#/components/responses/Validation"}
+  /spaces/{space}/accounts-balance-history:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Accounts]
+      summary: Balance history of accounts
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+  /spaces/{space}/accounts-balance-comparison:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Accounts]
+      summary: Compare balances between two dates
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+  /spaces/{space}/accounts/{id}:
+    parameters: [{$ref: "#/components/parameters/Space"}, {$ref: "#/components/parameters/Id"}]
+    get:
+      tags: [Accounts]
+      summary: Get an account
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "404": {$ref: "#/components/responses/NotFound"}
+    put:
+      tags: [Accounts]
+      summary: Update an account
+      requestBody:
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/AccountInput"}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "422": {$ref: "#/components/responses/Validation"}
+    patch:
+      tags: [Accounts]
+      summary: Update an account (partial)
+      requestBody:
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/AccountInput"}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "422": {$ref: "#/components/responses/Validation"}
+    delete:
+      tags: [Accounts]
+      summary: Delete an account
+      responses:
+        "204": {description: Deleted}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "422": {$ref: "#/components/responses/Validation"}
+

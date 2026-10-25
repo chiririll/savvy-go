@@ -1,0 +1,46 @@
+paths:
+  /spaces/{space}/settings:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Spaces]
+      summary: Read the settings of a space
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "404": {$ref: "#/components/responses/NotFound"}
+    patch:
+      tags: [Spaces]
+      summary: Update the settings of a space
+      description: Space admins only, session only.
+      security: [{cookieAuth: []}]
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+  /settings:
+    get:
+      tags: [Other]
+      summary: Read instance settings
+      description: >-
+        Besides the stored settings it returns `app_url` (from config.toml) and
+        `config_writable`, false when config.toml is read-only and `app_url`
+        cannot be changed. `onboarding_server_done` is true once the admin has
+        finished or skipped the server setup.
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+    patch:
+      tags: [Other]
+      summary: Update instance settings
+      description: >-
+        Server administrators only, session only. `app_url` is saved to
+        config.toml and applies at once; `409` (`config_read_only`) when the file
+        cannot be written. Switching the URL between `http` and `https` signs
+        everyone out.
+      security: [{cookieAuth: []}]
+      requestBody: {$ref: "#/components/requestBodies/Object"}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "409": {description: The config file is read-only, so app_url cannot be changed}
+        "422": {$ref: "#/components/responses/Validation"}
+

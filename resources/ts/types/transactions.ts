@@ -3,7 +3,17 @@ import { Account } from './accounts'
 import { Category } from './categories'
 import { Tag } from './tags'
 
-export const ALL_TRANSACTION_TYPES = ['income', 'expense', 'transfer', 'debt_payment', 'debt_collection', 'debt_lend', 'debt_borrow', 'transfer_out', 'transfer_in'] as const
+export const ALL_TRANSACTION_TYPES = [
+    'income',
+    'expense',
+    'transfer',
+    'debt_payment',
+    'debt_collection',
+    'debt_lend',
+    'debt_borrow',
+    'transfer_out',
+    'transfer_in',
+] as const
 export type TransactionType = (typeof ALL_TRANSACTION_TYPES)[number]
 export const TRANSACTION_STATUSES = ['pending', 'confirmed', 'skipped'] as const
 export type TransactionStatus = (typeof TRANSACTION_STATUSES)[number]

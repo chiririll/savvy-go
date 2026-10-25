@@ -16,3 +16,9 @@ export interface CurrencyCatalogItem {
     decimals: number
     rate: number | null
 }
+
+/** The server-wide catalog; `source` is "fallback" while it is the short built-in list. */
+export interface CurrencyCatalog {
+    items: CurrencyCatalogItem[]
+    source: 'live' | 'fallback' | string
+}

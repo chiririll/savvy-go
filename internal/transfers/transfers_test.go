@@ -73,11 +73,17 @@ func newTransferEnv(t *testing.T) *transferEnv {
 func (e *transferEnv) account(t *testing.T, spaceID int64, code string) int64 {
 	t.Helper()
 	d, _ := e.st.Space(context.Background(), spaceID)
-	cur, err := (ledger.Currencies{DB: d}).Create(context.Background(), ledger.Currency{Code: code, Name: code, Symbol: code, Decimals: 2, IsBase: true, Rate: decimal.NewFromInt(1)})
+	cur, err := (ledger.Currencies{DB: d}).Create(
+		context.Background(),
+		ledger.Currency{Code: code, Name: code, Symbol: code, Decimals: 2, IsBase: true, Rate: decimal.NewFromInt(1)},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	acc, err := (ledger.Accounts{DB: d}).Create(context.Background(), ledger.AccountInput{Name: code, Type: "cash", CurrencyID: cur.ID})
+	acc, err := (ledger.Accounts{DB: d}).Create(
+		context.Background(),
+		ledger.AccountInput{Name: code, Type: "cash", CurrencyID: cur.ID},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +114,7 @@ func (e *transferEnv) records(t *testing.T, spaceID int64) map[string]Transfer {
 
 // P22: a crash between the two commits leaves the transfer in A only; the
 // merge at startup finishes it in B.
-func TestP22CrashBetweenCommitsIsMerged(t *testing.T) {
+func TestP22CrashBetweenCommitsMerged(t *testing.T) {
 	e := newTransferEnv(t)
 	*e.crash = true
 	_, err := e.tr.Create(context.Background(), e.owner, Input{
@@ -192,7 +198,7 @@ func TestP23MergeRules(t *testing.T) {
 }
 
 // P43: the merge never copies a record whose signature does not verify.
-func TestP43UnsignedRecordIsNotMerged(t *testing.T) {
+func TestP43UnsignedRecordNotMerged(t *testing.T) {
 	e := newTransferEnv(t)
 	ctx := context.Background()
 	tr := e.send(t, "10")
@@ -247,7 +253,7 @@ func TestP47KeyRotation(t *testing.T) {
 // P27, P46: spaces moved together to a server with another key keep their
 // uuids; their transfers do not verify there until the old key is trusted
 // or the members re-sign them, and then they merge again.
-func TestP27P46MoveToAnotherServer(t *testing.T) {
+func TestP27P46MoveServer(t *testing.T) {
 	e := newTransferEnv(t)
 	ctx := context.Background()
 	tr := e.send(t, "4")
@@ -282,7 +288,10 @@ func TestP27P46MoveToAnotherServer(t *testing.T) {
 		t.Fatal(err)
 	}
 	// An update on the old server's record is refused until it is trusted.
-	if _, err := n.tr.Update(ctx, n.owner, a2.ID, tr.UUID, Update{Date: ptr("2026-10-02")}); !errors.Is(err, ErrUnverified) {
+	if _, err := n.tr.Update(ctx, n.owner, a2.ID, tr.UUID, Update{Date: ptr("2026-10-02")}); !errors.Is(
+		err,
+		ErrUnverified,
+	) {
 		t.Fatalf("update of an unverified record: %v", err)
 	}
 	pub := base64.StdEncoding.EncodeToString(e.holder.Key().Public())
@@ -319,7 +328,7 @@ var _ store.Store = (*sqlite.Store)(nil)
 
 // An update keeps a description it does not set; HasDescription with nil
 // clears it on both sides.
-func TestTransferUpdateClearsDescriptionOnlyWhenAsked(t *testing.T) {
+func TestTransferUpdateClearsDescriptionOnRequest(t *testing.T) {
 	e := newTransferEnv(t)
 	ctx := context.Background()
 	tr, err := e.tr.Create(ctx, e.owner, Input{

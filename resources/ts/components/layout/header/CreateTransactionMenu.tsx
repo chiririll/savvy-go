@@ -8,7 +8,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { useCreateTransactionDialog } from '@/components/features/transactions/CreateTransactionProvider'
+import { useCreateTransactionDialog } from '@/components/features/transactions/form/CreateTransactionProvider'
 import { SPACE_TRANSFER_OPTION, TRANSACTION_TYPE_OPTIONS } from '@/constants'
 import { useTransferTargets } from '@/hooks'
 import { createMenuLabel } from '@/lib/labels'
@@ -28,7 +28,7 @@ export function CreateTransactionMenu() {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button size="sm" className="gap-1" {...testIdMenu('layout-transaction')}>
+                <Button size="sm" className="gap-1" aria-label={t('newTransaction')} {...testIdMenu('layout-transaction')}>
                     <Plus className="size-4" />
                     <span className="hidden sm:inline">{t('newTransaction')}</span>
                 </Button>

@@ -46,7 +46,12 @@ func loadScales(ctx context.Context, q querier) (*scales, error) {
 		}
 	}
 	// is_base only exists on newer Laravel schemas; keep the lowest id otherwise.
-	_ = scanPairs(ctx, q, `SELECT id, is_base FROM currencies WHERE is_base = 1 ORDER BY id LIMIT 1`, func(id, _ int64) { s.base = id })
+	_ = scanPairs(
+		ctx,
+		q,
+		`SELECT id, is_base FROM currencies WHERE is_base = 1 ORDER BY id LIMIT 1`,
+		func(id, _ int64) { s.base = id },
+	)
 	return s, nil
 }
 
@@ -109,57 +114,76 @@ func (s *scales) fixMoney(table string, cols []string, vals []any) error {
 	for i, c := range cols {
 		idx[c] = i
 	}
-	get := func(name string) int64 {
-		i, ok := idx[name]
-		if !ok {
-			return 0
-		}
-		n, _ := asInt(vals[i])
-		return n
-	}
-	conv := func(name string, dec int) error {
-		i, ok := idx[name]
-		if !ok || vals[i] == nil {
-			return nil
-		}
-		d, err := toDecimal(vals[i])
-		if err != nil {
-			return fmt.Errorf("%s.%s: %w", table, name, err)
-		}
-		m, err := money.FromInput(d, money.Unit{Decimals: dec}) // only the scale matters here
-		if err != nil {
-			return fmt.Errorf("%s.%s = %s: %w", table, name, d, err)
-		}
-		vals[i] = m.Minor()
-		return nil
-	}
-	var errs [3]error
+	row := moneyRow{table: table, idx: idx, vals: vals}
 	switch table {
 	case "accounts":
-		dec := s.decimals(get("currency_id"))
-		errs[0], errs[1] = conv("initial_balance", dec), conv("target_amount", dec)
+		dec := s.decimals(row.get("currency_id"))
+		return row.convAll(dec, "initial_balance", "target_amount")
 	case "transactions", "recurring_transactions":
-		dec := s.accountDec(get("account_id"))
+		dec := s.accountDec(row.get("account_id"))
 		toDec := dec
-		if to := get("to_account_id"); to > 0 {
+		if to := row.get("to_account_id"); to > 0 {
 			toDec = s.accountDec(to)
 		}
-		errs[0], errs[1] = conv("amount", dec), conv("to_amount", toDec)
+		if err := row.conv("amount", dec); err != nil {
+			return err
+		}
+		return row.conv("to_amount", toDec)
 	case "transaction_items":
-		dec := s.accountDec(s.txAccount[get("transaction_id")])
-		errs[0], errs[1] = conv("price_per_unit", dec), conv("total_price", dec)
+		dec := s.accountDec(s.txAccount[row.get("transaction_id")])
+		return row.convAll(dec, "price_per_unit", "total_price")
 	case "budgets":
-		cid := get("currency_id")
+		cid := row.get("currency_id")
 		if cid == 0 {
 			cid = s.base
 		}
 		if i, ok := idx["currency_id"]; ok {
 			vals[i] = cid
 		}
-		errs[0] = conv("amount", s.decimals(cid))
+		return row.conv("amount", s.decimals(cid))
 	}
-	for _, err := range errs {
-		if err != nil {
+	return nil
+}
+
+// moneyRow is one row (columns by name in idx, values in vals) whose money
+// columns are converted in place.
+type moneyRow struct {
+	table string
+	idx   map[string]int
+	vals  []any
+}
+
+func (r moneyRow) get(name string) int64 {
+	i, ok := r.idx[name]
+	if !ok {
+		return 0
+	}
+	n, _ := asInt(r.vals[i])
+	return n
+}
+
+// conv turns one column from major to minor units; a missing or NULL column
+// is left alone.
+func (r moneyRow) conv(name string, dec int) error {
+	i, ok := r.idx[name]
+	if !ok || r.vals[i] == nil {
+		return nil
+	}
+	d, err := toDecimal(r.vals[i])
+	if err != nil {
+		return fmt.Errorf("%s.%s: %w", r.table, name, err)
+	}
+	m, err := money.FromInput(d, money.Unit{Decimals: dec}) // only the scale matters here
+	if err != nil {
+		return fmt.Errorf("%s.%s = %s: %w", r.table, name, d, err)
+	}
+	r.vals[i] = m.Minor()
+	return nil
+}
+
+func (r moneyRow) convAll(dec int, names ...string) error {
+	for _, name := range names {
+		if err := r.conv(name, dec); err != nil {
 			return err
 		}
 	}
@@ -197,27 +221,9 @@ var inPlaceMoney = []struct {
 // It avoids a table rebuild, which would cascade through foreign keys. One
 // transaction; upgradeInPlace calls it once; Upgrade skips stamped databases.
 func convertMoneyInPlace(ctx context.Context, db *sql.DB) error {
-	type plan struct {
-		table string
-		read  []string
-		write []moneyCol
-		fill  bool
-	}
-	var plans []plan
-	for _, spec := range inPlaceMoney {
-		have, err := columns(ctx, db, spec.table)
-		if err != nil {
-			return err
-		}
-		p := plan{table: spec.table, read: intersect(spec.read, have), fill: spec.table == "budgets" && slices.Contains(have, "currency_id")}
-		for _, c := range spec.write {
-			if slices.Contains(have, c.name) {
-				p.write = append(p.write, c)
-			}
-		}
-		if len(p.write) > 0 {
-			plans = append(plans, p)
-		}
+	plans, err := planMoney(ctx, db)
+	if err != nil {
+		return err
 	}
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
@@ -229,87 +235,8 @@ func convertMoneyInPlace(ctx context.Context, db *sql.DB) error {
 		return err
 	}
 	for _, p := range plans {
-		cols := append([]string{"id"}, p.read...)
-		rows, err := tx.QueryContext(ctx, fmt.Sprintf("SELECT %s FROM %s", strings.Join(quoteAll(cols), ", "), p.table))
-		if err != nil {
+		if err := p.convert(ctx, tx, sc); err != nil {
 			return err
-		}
-		var all [][]any
-		for rows.Next() {
-			raw := make([]any, len(cols))
-			ptrs := make([]any, len(cols))
-			for i := range raw {
-				ptrs[i] = &raw[i]
-			}
-			if err := rows.Scan(ptrs...); err != nil {
-				_ = rows.Close()
-				return err
-			}
-			all = append(all, raw)
-		}
-		if err := rows.Err(); err != nil {
-			return err
-		}
-		_ = rows.Close()
-
-		for _, c := range p.write {
-			ddl := fmt.Sprintf(`ALTER TABLE %s ADD COLUMN "%s__minor" INTEGER`, p.table, c.name)
-			if c.notNull {
-				ddl += " NOT NULL DEFAULT 0"
-			}
-			if _, err := tx.ExecContext(ctx, ddl); err != nil {
-				return fmt.Errorf("%s: %w", ddl, err)
-			}
-		}
-		sets := make([]string, 0, len(p.write)+1)
-		for _, c := range p.write {
-			sets = append(sets, fmt.Sprintf(`"%s__minor" = ?`, c.name))
-		}
-		if p.fill {
-			sets = append(sets, `"currency_id" = ?`)
-		}
-		update := fmt.Sprintf("UPDATE %s SET %s WHERE id = ?", p.table, strings.Join(sets, ", "))
-		for _, raw := range all {
-			if err := sc.fixMoney(p.table, cols, raw); err != nil {
-				return err
-			}
-			byName := make(map[string]any, len(cols))
-			for i, c := range cols {
-				byName[c] = raw[i]
-			}
-			args := make([]any, 0, len(sets)+1)
-			for _, c := range p.write {
-				v := byName[c.name]
-				if v == nil && c.notNull {
-					v = int64(0)
-				}
-				args = append(args, v)
-			}
-			if p.fill {
-				args = append(args, byName["currency_id"])
-			}
-			args = append(args, byName["id"])
-			if _, err := tx.ExecContext(ctx, update, args...); err != nil {
-				return fmt.Errorf("%s: %w", p.table, err)
-			}
-		}
-
-		old := make([]string, len(p.write))
-		for i, c := range p.write {
-			old[i] = c.name
-		}
-		if err := dropIndexesOn(ctx, tx, p.table, old); err != nil {
-			return err
-		}
-		for _, c := range p.write {
-			for _, ddl := range []string{
-				fmt.Sprintf(`ALTER TABLE %s DROP COLUMN "%s"`, p.table, c.name),
-				fmt.Sprintf(`ALTER TABLE %s RENAME COLUMN "%s__minor" TO "%s"`, p.table, c.name, c.name),
-			} {
-				if _, err := tx.ExecContext(ctx, ddl); err != nil {
-					return fmt.Errorf("%s: %w", ddl, err)
-				}
-			}
 		}
 	}
 	if err := tx.Commit(); err != nil {
@@ -317,6 +244,146 @@ func convertMoneyInPlace(ctx context.Context, db *sql.DB) error {
 	}
 	// Indexes on the swapped columns were dropped; recreate every declared index.
 	return ensureIndexes(ctx, db)
+}
+
+// moneyPlan is what convertMoneyInPlace does to one table that has money.
+type moneyPlan struct {
+	table string
+	read  []string
+	write []moneyCol
+	fill  bool
+}
+
+// planMoney keeps, per table, only the columns that exist in this database.
+func planMoney(ctx context.Context, db *sql.DB) ([]moneyPlan, error) {
+	var plans []moneyPlan
+	for _, spec := range inPlaceMoney {
+		have, err := columns(ctx, db, spec.table)
+		if err != nil {
+			return nil, err
+		}
+		p := moneyPlan{
+			table: spec.table,
+			read:  intersect(spec.read, have),
+			fill:  spec.table == "budgets" && slices.Contains(have, "currency_id"),
+		}
+		for _, c := range spec.write {
+			if slices.Contains(have, c.name) {
+				p.write = append(p.write, c)
+			}
+		}
+		if len(p.write) > 0 {
+			plans = append(plans, p)
+		}
+	}
+	return plans, nil
+}
+
+func (p moneyPlan) convert(ctx context.Context, tx *sql.Tx, sc *scales) error {
+	cols := append([]string{"id"}, p.read...)
+	all, err := p.readRows(ctx, tx, cols)
+	if err != nil {
+		return err
+	}
+	if err := p.addMinorColumns(ctx, tx); err != nil {
+		return err
+	}
+	if err := p.rewriteRows(ctx, tx, sc, cols, all); err != nil {
+		return err
+	}
+	return p.swapColumns(ctx, tx)
+}
+
+func (p moneyPlan) readRows(ctx context.Context, tx *sql.Tx, cols []string) ([][]any, error) {
+	rows, err := tx.QueryContext(ctx, fmt.Sprintf("SELECT %s FROM %s", strings.Join(quoteAll(cols), ", "), p.table))
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	var all [][]any
+	for rows.Next() {
+		raw := make([]any, len(cols))
+		ptrs := make([]any, len(cols))
+		for i := range raw {
+			ptrs[i] = &raw[i]
+		}
+		if err := rows.Scan(ptrs...); err != nil {
+			return nil, err
+		}
+		all = append(all, raw)
+	}
+	return all, rows.Err()
+}
+
+func (p moneyPlan) addMinorColumns(ctx context.Context, tx *sql.Tx) error {
+	for _, c := range p.write {
+		ddl := fmt.Sprintf(`ALTER TABLE %s ADD COLUMN "%s__minor" INTEGER`, p.table, c.name)
+		if c.notNull {
+			ddl += " NOT NULL DEFAULT 0"
+		}
+		if _, err := tx.ExecContext(ctx, ddl); err != nil {
+			return fmt.Errorf("%s: %w", ddl, err)
+		}
+	}
+	return nil
+}
+
+func (p moneyPlan) rewriteRows(ctx context.Context, tx *sql.Tx, sc *scales, cols []string, all [][]any) error {
+	sets := make([]string, 0, len(p.write)+1)
+	for _, c := range p.write {
+		sets = append(sets, fmt.Sprintf(`"%s__minor" = ?`, c.name))
+	}
+	if p.fill {
+		sets = append(sets, `"currency_id" = ?`)
+	}
+	update := fmt.Sprintf("UPDATE %s SET %s WHERE id = ?", p.table, strings.Join(sets, ", "))
+	for _, raw := range all {
+		if err := sc.fixMoney(p.table, cols, raw); err != nil {
+			return err
+		}
+		byName := make(map[string]any, len(cols))
+		for i, c := range cols {
+			byName[c] = raw[i]
+		}
+		args := make([]any, 0, len(sets)+1)
+		for _, c := range p.write {
+			v := byName[c.name]
+			if v == nil && c.notNull {
+				v = int64(0)
+			}
+			args = append(args, v)
+		}
+		if p.fill {
+			args = append(args, byName["currency_id"])
+		}
+		args = append(args, byName["id"])
+		if _, err := tx.ExecContext(ctx, update, args...); err != nil {
+			return fmt.Errorf("%s: %w", p.table, err)
+		}
+	}
+	return nil
+}
+
+// swapColumns drops each old column and renames its __minor twin into place.
+func (p moneyPlan) swapColumns(ctx context.Context, tx *sql.Tx) error {
+	old := make([]string, len(p.write))
+	for i, c := range p.write {
+		old[i] = c.name
+	}
+	if err := dropIndexesOn(ctx, tx, p.table, old); err != nil {
+		return err
+	}
+	for _, c := range p.write {
+		for _, ddl := range []string{
+			fmt.Sprintf(`ALTER TABLE %s DROP COLUMN "%s"`, p.table, c.name),
+			fmt.Sprintf(`ALTER TABLE %s RENAME COLUMN "%s__minor" TO "%s"`, p.table, c.name, c.name),
+		} {
+			if _, err := tx.ExecContext(ctx, ddl); err != nil {
+				return fmt.Errorf("%s: %w", ddl, err)
+			}
+		}
+	}
+	return nil
 }
 
 // dropIndexesOn drops the CREATE INDEX indexes of table that include any of cols.

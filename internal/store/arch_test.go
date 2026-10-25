@@ -15,7 +15,11 @@ import (
 // packages below may use the store only through internal/store; only the
 // store's SQLite implementation (and the SQLite helpers it uses) know about
 // files, PRAGMAs and ATTACH.
-var businessPackages = []string{"ledger", "sso", "oauth", "spaces", "transfers", "refsync", "uploads", "currencydata", "automation", "recurring", "reports", "calendar", "backup", "importer", "legacy/restore", "httpserver", "auth", "settings", "seed", "signing", "schedule", "jobs", "bootstrap"}
+var businessPackages = []string{
+	"ledger", "sso", "oauth", "spaces", "transfers", "refsync", "uploads", "currencydata", "automation",
+	"recurring", "reports", "calendar", "backup", "importer", "legacy/restore", "httpserver", "auth",
+	"settings", "seed", "signing", "schedule", "jobs", "bootstrap", "spacefill", "app", "signin", "emailverify",
+}
 
 var sqliteOnlyImports = []string{
 	"savvy-go/internal/store/sqlite",
@@ -32,7 +36,7 @@ var sqliteOnlyImports = []string{
 
 var sqliteOnlySQL = regexp.MustCompile(`(?i)\bPRAGMA\b|\bATTACH\s+DATABASE\b|\bsqlite_master\b|\bsqlite_sequence\b`)
 
-func TestP34BusinessLogicDoesNotKnowTheFiles(t *testing.T) {
+func TestP34BusinessLogicIgnoresFiles(t *testing.T) {
 	for _, pkg := range businessPackages {
 		dir := filepath.Join("..", pkg)
 		files, err := filepath.Glob(filepath.Join(dir, "*.go"))
@@ -68,7 +72,7 @@ func TestP34BusinessLogicDoesNotKnowTheFiles(t *testing.T) {
 
 // P57: Laravel is only ever converted by internal/legacy, and the migrations
 // know nothing about it: they create and update Go databases and no more.
-func TestP57MigrationsKnowNothingOfLaravel(t *testing.T) {
+func TestP57MigrationsKnowNothingLaravel(t *testing.T) {
 	files, err := filepath.Glob(filepath.Join("..", "migrate", "*.go"))
 	if err != nil {
 		t.Fatal(err)
@@ -86,7 +90,12 @@ func TestP57MigrationsKnowNothingOfLaravel(t *testing.T) {
 			t.Errorf("%s mentions %q: Laravel conversion belongs in internal/legacy", f, loc)
 		}
 	}
-	parsed, err := parser.ParseFile(token.NewFileSet(), filepath.Join("..", "migrate", "migrate.go"), nil, parser.ImportsOnly)
+	parsed, err := parser.ParseFile(
+		token.NewFileSet(),
+		filepath.Join("..", "migrate", "migrate.go"),
+		nil,
+		parser.ImportsOnly,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,14 +116,26 @@ var forbiddenImports = map[string][]string{
 		"savvy-go/internal/automation", "savvy-go/internal/transfers", "savvy-go/internal/uploads",
 		"savvy-go/internal/currencydata", "savvy-go/internal/spaces",
 	},
-	"spaces":     {"net/http", "savvy-go/internal/ledger", "savvy-go/internal/transfers", "savvy-go/internal/backup"},
-	"transfers":  {"net/http", "savvy-go/internal/ledger", "savvy-go/internal/backup"},
-	"refsync":    {"net/http", "savvy-go/internal/httpserver", "savvy-go/internal/backup", "savvy-go/internal/transfers"},
-	"reports":    {"net/http", "savvy-go/internal/recurring", "savvy-go/internal/automation"},
-	"recurring":  {"net/http", "savvy-go/internal/reports", "savvy-go/internal/automation"},
-	"automation": {"net/http", "savvy-go/internal/reports", "savvy-go/internal/recurring"},
-	"uploads":    {"savvy-go/internal/ledger", "savvy-go/internal/importer"},
-	"calendar":   {"savvy-go/internal/ledger", "savvy-go/internal/db"},
+	"spaces": {
+		"net/http",
+		"savvy-go/internal/ledger",
+		"savvy-go/internal/transfers",
+		"savvy-go/internal/backup",
+	},
+	"transfers": {"net/http", "savvy-go/internal/ledger", "savvy-go/internal/backup"},
+	"refsync": {
+		"net/http",
+		"savvy-go/internal/httpserver",
+		"savvy-go/internal/backup",
+		"savvy-go/internal/transfers",
+	},
+	"reports":           {"net/http", "savvy-go/internal/recurring", "savvy-go/internal/automation"},
+	"recurring":         {"net/http", "savvy-go/internal/reports", "savvy-go/internal/automation"},
+	"automation":        {"net/http", "savvy-go/internal/reports", "savvy-go/internal/recurring"},
+	"uploads":           {"savvy-go/internal/ledger", "savvy-go/internal/importer"},
+	"platform/calendar": {"savvy-go/internal/ledger", "savvy-go/internal/db"},
+	"app/signin":        {"net/http", "savvy-go/internal/httpserver"},
+	"mail":              {"net/http", "savvy-go/internal/httpserver"},
 }
 
 func TestPackagesRespectTheLayering(t *testing.T) {
@@ -177,7 +198,7 @@ func TestRepositoriesDoNotImportBusinessCode(t *testing.T) {
 // A business package reaches rows of another area through that area's
 // package, never through its repository. reports and seed read and write
 // ledger and automation rows directly by design.
-func TestBusinessCodeUsesOnlyItsOwnRepository(t *testing.T) {
+func TestBusinessCodeUsesOnlyOwnRepository(t *testing.T) {
 	allowed := map[string]bool{"reports": true, "seed": true}
 	const prefix = "savvy-go/internal/db/repo/"
 	for _, pkg := range businessPackages {

@@ -2,6 +2,7 @@ import { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { cn } from '@/lib/utils'
 
 /** What a Laravel database is restored as: the whole server, the current space, or a new space. */
 export type LaravelTarget = 'server' | 'space' | 'new'
@@ -10,18 +11,28 @@ export type LaravelTarget = 'server' | 'space' | 'new'
 export const isLaravelFile = (file: File | null) => !!file && file.name.toLowerCase().endsWith('.sqlite')
 
 /** Title and explanation of each target. */
-const targetTexts = (t: TFunction) => ({
-    server: { title: t('backups.laravel.target.server.title'), description: t('backups.laravel.target.server.description') },
-    space: { title: t('backups.laravel.target.space.title'), description: t('backups.laravel.target.space.description') },
-    new: { title: t('backups.laravel.target.new.title'), description: t('backups.laravel.target.new.description') },
-} satisfies Record<LaravelTarget, { title: string; description: string }>)
+const targetTexts = (t: TFunction) =>
+    ({
+        server: {
+            title: t('backups.laravel.target.server.title'),
+            description: t('backups.laravel.target.server.description'),
+        },
+        space: {
+            title: t('backups.laravel.target.space.title'),
+            description: t('backups.laravel.target.space.description'),
+        },
+        new: { title: t('backups.laravel.target.new.title'), description: t('backups.laravel.target.new.description') },
+    }) satisfies Record<LaravelTarget, { title: string; description: string }>
 
 /** The label of the button that restores as the target. */
-export const laravelActionLabel = (t: TFunction, target: LaravelTarget): string => ({
-    server: t('backups.laravel.action.server'),
-    space: t('backups.laravel.action.space'),
-    new: t('backups.laravel.action.new'),
-} satisfies Record<LaravelTarget, string>)[target]
+export const laravelActionLabel = (t: TFunction, target: LaravelTarget): string =>
+    (
+        ({
+            server: t('backups.laravel.action.server'),
+            space: t('backups.laravel.action.space'),
+            new: t('backups.laravel.action.new'),
+        }) satisfies Record<LaravelTarget, string>
+    )[target]
 
 interface LaravelRestoreOptionsProps {
     targets: LaravelTarget[]
@@ -44,7 +55,13 @@ export function LaravelRestoreOptions({ targets, target, onTarget, appKey, onApp
             <p className="text-sm text-muted-foreground">{t('backups.laravel.intro')}</p>
             <div role="radiogroup" className="space-y-2">
                 {targets.map((option) => (
-                    <label key={option} className="flex cursor-pointer items-start gap-3 rounded-md border p-3 has-[:checked]:border-primary">
+                    <label
+                        key={option}
+                        className={cn(
+                            'flex cursor-pointer items-start gap-3 rounded-md border p-3',
+                            'has-[:checked]:border-primary',
+                        )}
+                    >
                         <input
                             type="radio"
                             name="laravel-target"

@@ -87,7 +87,9 @@ func (r Repo) Insert(ctx context.Context, p Save, now time.Time) (int64, error) 
 	res, err := r.q().InsertIdentityProvider(ctx, sqlc.InsertIdentityProviderParams{
 		Name: p.Name, Slug: p.Slug, Protocol: p.Protocol, Preset: p.Preset,
 		Enabled: db.BoolInt(p.Enabled), SortOrder: int64(p.SortOrder),
-		Config: db.NS(p.Config), Secrets: db.NS(p.Secrets), ClaimMappings: db.NS(p.ClaimMappings), RoleMapping: db.NS(p.RoleMapping),
+		Config: db.NS(
+			p.Config,
+		), Secrets: db.NS(p.Secrets), ClaimMappings: db.NS(p.ClaimMappings), RoleMapping: db.NS(p.RoleMapping),
 		DefaultRole: p.DefaultRole, AllowJit: db.BoolInt(p.AllowJIT), SyncRoleOnLogin: db.BoolInt(p.SyncRoleOnLogin),
 		LinkByEmail: db.BoolInt(p.LinkByEmail), CreatedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now),
 	})
@@ -101,7 +103,9 @@ func (r Repo) Update(ctx context.Context, id int64, p Save, now time.Time) error
 	return r.q().UpdateIdentityProvider(ctx, sqlc.UpdateIdentityProviderParams{
 		Name: p.Name, Slug: p.Slug, Protocol: p.Protocol, Preset: p.Preset,
 		Enabled: db.BoolInt(p.Enabled), SortOrder: int64(p.SortOrder),
-		Config: db.NS(p.Config), Secrets: db.NS(p.Secrets), ClaimMappings: db.NS(p.ClaimMappings), RoleMapping: db.NS(p.RoleMapping),
+		Config: db.NS(
+			p.Config,
+		), Secrets: db.NS(p.Secrets), ClaimMappings: db.NS(p.ClaimMappings), RoleMapping: db.NS(p.RoleMapping),
 		DefaultRole: p.DefaultRole, AllowJit: db.BoolInt(p.AllowJIT),
 		SyncRoleOnLogin: db.BoolInt(p.SyncRoleOnLogin), LinkByEmail: db.BoolInt(p.LinkByEmail),
 		UpdatedAt: db.TimeNS(now), ID: id,
@@ -150,7 +154,13 @@ func (r Repo) TouchLink(ctx context.Context, id int64, claims string, now time.T
 
 // Sign-in tickets and state
 
-func (r Repo) InsertTicket(ctx context.Context, ticket string, userID int64, requires2FA bool, expires, now time.Time) error {
+func (r Repo) InsertTicket(
+	ctx context.Context,
+	ticket string,
+	userID int64,
+	requires2FA bool,
+	expires, now time.Time,
+) error {
 	return r.q().InsertSSOTicket(ctx, sqlc.InsertSSOTicketParams{
 		Ticket: ticket, UserID: userID, Requires2fa: db.BoolInt(requires2FA),
 		ExpiresAt: db.FormatTime(expires), CreatedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now),
@@ -159,7 +169,11 @@ func (r Repo) InsertTicket(ctx context.Context, ticket string, userID int64, req
 
 // TakeTicket uses up an unexpired ticket. ok is false for one that is
 // unknown, used or expired.
-func (r Repo) TakeTicket(ctx context.Context, ticket string, now time.Time) (userID int64, requires2FA, ok bool, err error) {
+func (r Repo) TakeTicket(
+	ctx context.Context,
+	ticket string,
+	now time.Time,
+) (userID int64, requires2FA, ok bool, err error) {
 	res, err := r.q().ConsumeSSOTicket(ctx, sqlc.ConsumeSSOTicketParams{
 		ConsumedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now), Ticket: ticket, ExpiresAt: db.FormatTime(now),
 	})

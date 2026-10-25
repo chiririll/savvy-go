@@ -1,10 +1,14 @@
 import { useTranslation } from 'react-i18next'
 import { FeedRow, RowActions, type FeedGroupKey } from '@/components/shared'
-import { transactionIconProps } from '@/components/features/transactions/transaction-icon'
+import { transactionIconProps } from '@/components/features/transactions/list/transaction-icon'
 import { useRelativeDay } from '@/hooks'
 import { pendingDateClassName } from '@/lib/dates'
 import i18n from '@/lib/i18n'
-import { displayTransactionDescription, transactionAmountAppearance, transactionSubtitle } from '@/lib/transaction-description'
+import {
+    displayTransactionDescription,
+    transactionAmountAppearance,
+    transactionSubtitle,
+} from '@/lib/transaction-description'
 import { cn, formatCurrency } from '@/lib/utils'
 import { RecurringFrequency, RecurringTransaction } from '@/types'
 import { frequencyLabel } from '@/lib/labels'
@@ -16,18 +20,24 @@ export function recurringGroup(recurring: RecurringTransaction): FeedGroupKey {
     const frequency = frequencyLabel(i18n.t, recurring.frequency)
     return {
         key: `${recurring.frequency}:${recurring.interval}`,
-        title: recurring.interval === 1
-            ? frequency
-            : i18n.t('pages:recurring.everyInterval', { count: recurring.interval, frequency: frequency.toLowerCase() }),
+        title:
+            recurring.interval === 1
+                ? frequency
+                : i18n.t('pages:recurring.everyInterval', {
+                      count: recurring.interval,
+                      frequency: frequency.toLowerCase(),
+                  }),
     }
 }
 
 /** Schedule order, then active before paused, then the next run. */
 export function compareRecurring(a: RecurringTransaction, b: RecurringTransaction): number {
-    return FREQUENCY_ORDER.indexOf(a.frequency) - FREQUENCY_ORDER.indexOf(b.frequency)
-        || a.interval - b.interval
-        || Number(b.isActive) - Number(a.isActive)
-        || a.nextRunDate.localeCompare(b.nextRunDate)
+    return (
+        FREQUENCY_ORDER.indexOf(a.frequency) - FREQUENCY_ORDER.indexOf(b.frequency) ||
+        a.interval - b.interval ||
+        Number(b.isActive) - Number(a.isActive) ||
+        a.nextRunDate.localeCompare(b.nextRunDate)
+    )
 }
 
 interface RecurringRowProps {
@@ -43,19 +53,25 @@ export function RecurringRow({ recurring, onEdit, onDelete, isReadOnly }: Recurr
     const canEdit = !!onEdit && !isReadOnly
     const canDelete = !!onDelete && !isReadOnly
     const { sign, className } = transactionAmountAppearance(recurring.type)
+    const amount = formatCurrency(recurring.amount, recurring.account.currency)
 
     return (
         <FeedRow
             {...transactionIconProps(recurring.type, recurring.category)}
             title={displayTransactionDescription(recurring)}
             subtitle={transactionSubtitle(recurring)}
-            amount={`${recurring.isEstimated ? '≈ ' : ''}${sign}${formatCurrency(recurring.amount, recurring.account.currency)}`}
+            amount={`${recurring.isEstimated ? '≈ ' : ''}${sign}${amount}`}
             amountClassName={className}
-            extraAmount={(
-                <span className={cn('font-sans', recurring.isActive && pendingDateClassName(recurring.nextRunDate.slice(0, 10)))}>
+            extraAmount={
+                <span
+                    className={cn(
+                        'font-sans',
+                        recurring.isActive && pendingDateClassName(recurring.nextRunDate.slice(0, 10)),
+                    )}
+                >
                     {relativeDay(recurring.nextRunDate)}
                 </span>
-            )}
+            }
             muted={!recurring.isActive}
             onOpen={canEdit ? () => onEdit(recurring) : undefined}
             hasActions={canEdit || canDelete}

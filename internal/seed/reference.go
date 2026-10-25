@@ -27,9 +27,14 @@ func withRate(c ledger.Currency, rate string) ledger.Currency {
 	return c
 }
 
-func seedReference(ctx context.Context, db store.DB, currencies []ledger.Currency) error {
+// seedReference seeds a space's currencies and, unless the space brings its own
+// (ownReference.replacesPresets), the preset categories and tags.
+func seedReference(ctx context.Context, db store.DB, currencies []ledger.Currency, presets bool) error {
 	if err := seedCurrencies(ctx, ledger.Currencies{DB: db}, currencies); err != nil {
 		return fmt.Errorf("currencies: %w", err)
+	}
+	if !presets {
+		return nil
 	}
 	if err := seedCategories(ctx, ledger.Categories{DB: db}); err != nil {
 		return fmt.Errorf("categories: %w", err)
@@ -56,8 +61,30 @@ func seedCurrencies(ctx context.Context, curs ledger.Currencies, list []ledger.C
 	return nil
 }
 
+// ownReference is what a space has besides the presets, or instead of them when
+// replacesPresets is set.
+type ownReference struct {
+	categories      []Category
+	tags            []string
+	replacesPresets bool
+}
+
+func seedOwn(ctx context.Context, db store.DB, own ownReference) error {
+	if err := createCategories(ctx, ledger.Categories{DB: db}, own.categories); err != nil {
+		return fmt.Errorf("categories: %w", err)
+	}
+	if err := createTags(ctx, ledger.Tags{DB: db}, own.tags); err != nil {
+		return fmt.Errorf("tags: %w", err)
+	}
+	return nil
+}
+
 func seedCategories(ctx context.Context, cats ledger.Categories) error {
-	for _, c := range DefaultCategories() {
+	return createCategories(ctx, cats, DefaultCategories())
+}
+
+func createCategories(ctx context.Context, cats ledger.Categories, list []Category) error {
+	for _, c := range list {
 		icon, color := c.Icon, c.Color
 		if _, err := cats.Create(ctx, ledger.Category{
 			Name: c.Name, Type: c.Type, Icon: &icon, Color: &color, IsDefault: c.IsDefault,
@@ -69,7 +96,11 @@ func seedCategories(ctx context.Context, cats ledger.Categories) error {
 }
 
 func seedTags(ctx context.Context, tags ledger.Tags) error {
-	for _, name := range DefaultTags() {
+	return createTags(ctx, tags, DefaultTags())
+}
+
+func createTags(ctx context.Context, tags ledger.Tags, names []string) error {
+	for _, name := range names {
 		if _, err := tags.Create(ctx, name); err != nil {
 			return err
 		}
@@ -77,42 +108,23 @@ func seedTags(ctx context.Context, tags ledger.Tags) error {
 	return nil
 }
 
-// Category is a preset category. Names are translation tokens (#RENT) that the
-// SPA translates; IsDefault marks the default of its type.
-type Category struct {
-	Name, Type, Icon, Color string
-	IsDefault               bool
-}
-
-// DefaultCategories returns the preset categories, in display order.
-func DefaultCategories() []Category { return append([]Category(nil), defaultCategories...) }
-
-// DefaultTags returns the preset tag names, in display order.
-func DefaultTags() []string { return append([]string(nil), defaultTags...) }
-
-var defaultCategories = []Category{
-	{"#RENT", "expense", "🏢", "#94a3b8", false},
-	{"#HOUSING", "expense", "🏠", "#a78bfa", false},
-	{"#UTILITIES", "expense", "⚡", "#fbbf24", false},
-	{"#GROCERIES", "expense", "🛒", "#4ade80", false},
-	{"#TRANSPORT", "expense", "🚗", "#60a5fa", false},
-	{"#HEALTH", "expense", "🏥", "#f87171", false},
-	{"#DINING", "expense", "🍽️", "#fb923c", false},
-	{"#ENTERTAINMENT", "expense", "🎮", "#f472b6", false},
-	{"#SHOPPING", "expense", "🛍️", "#2dd4bf", false},
-	{"#PERSONAL_CARE", "expense", "✨", "#e879f9", false},
-	{"#GIFTS", "expense", "🎁", "#fb7185", false},
-	{"#TRAVEL", "expense", "✈️", "#38bdf8", false},
-	{"#OTHER", "expense", "📌", "#94a3b8", true},
-	{"#SALARY", "income", "💵", "#4ade80", false},
-	{"#FREELANCE", "income", "💻", "#60a5fa", false},
-	{"#INVESTMENTS", "income", "📈", "#a78bfa", false},
-	{"#GIFTS_RECEIVED", "income", "🎀", "#f472b6", false},
-	{"#REFUNDS", "income", "↩️", "#2dd4bf", false},
-	{"#OTHER_INCOME", "income", "💰", "#94a3b8", true},
-}
-
-var defaultTags = []string{
-	"Essential", "Optional", "Recurring", "One-time", "Business",
-	"Personal", "Family", "Vacation", "Emergency", "Planned",
+// studioReference is the categories and tags of Studio GmbH, a business with
+// nothing in common with the household presets.
+var studioReference = ownReference{
+	replacesPresets: true,
+	categories: []Category{
+		{"Rent & office", "expense", "🏢", "#a78bfa", false},
+		{"Software & tools", "expense", "🧰", "#818cf8", false},
+		{"Contractors", "expense", "🤝", "#60a5fa", false},
+		{"Marketing", "expense", "📣", "#f472b6", false},
+		{"Hardware", "expense", "🖥️", "#2dd4bf", false},
+		{"Taxes & VAT", "expense", "🧾", "#fbbf24", false},
+		{"Events & travel", "expense", "🚆", "#38bdf8", false},
+		{"Other costs", "expense", "📌", "#94a3b8", true},
+		{"Client projects", "income", "🎨", "#4ade80", false},
+		{"Retainers", "income", "🔁", "#34d399", false},
+		{"Licensing", "income", "📜", "#a3e635", false},
+		{"Other revenue", "income", "💰", "#94a3b8", true},
+	},
+	tags: []string{"Client work", "Billable", "Overhead", "Reimbursable", "Q4 deadline"},
 }

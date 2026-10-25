@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"savvy-go/internal/auth"
+	"savvy-go/internal/auth/permissions"
 	repo "savvy-go/internal/db/repo/oauth"
 	"savvy-go/internal/store"
 )
@@ -74,7 +75,7 @@ type CodeRequest struct {
 	// Spaces the user let the app read: every space, or just these.
 	AllSpaces bool
 	SpaceIDs  []int64
-	// Permissions the user chose, grants on auth.MCPResources. Empty means read
+	// Permissions the user chose, grants on permissions.MCPResources. Empty means read
 	// on all of them: write and delete are never given by default.
 	Permissions []string
 }
@@ -109,7 +110,13 @@ type Service struct {
 }
 
 func New(db store.DB) *Service {
-	return &Service{DB: db, Tokens: auth.APITokens{DB: db}, Users: auth.Users{DB: db}, Now: func() time.Time { return time.Now().UTC() }, codes: map[string]codeEntry{}}
+	return &Service{
+		DB:     db,
+		Tokens: auth.APITokens{DB: db},
+		Users:  auth.Users{DB: db},
+		Now:    func() time.Time { return time.Now().UTC() },
+		codes:  map[string]codeEntry{},
+	}
 }
 
 func (s *Service) repo() repo.Repo { return repo.Repo{DB: s.DB} }
@@ -154,7 +161,11 @@ func (s *Service) Register(ctx context.Context, name string, redirectURIs []stri
 	if r := []rune(name); len(r) > maxNameLen {
 		name = string(r[:maxNameLen])
 	}
-	info = RequestInfo{IP: clip(info.IP, maxIPLen), UserAgent: clip(info.UserAgent, maxUALen), Origin: clip(info.Origin, maxOriginLen)}
+	info = RequestInfo{
+		IP:        clip(info.IP, maxIPLen),
+		UserAgent: clip(info.UserAgent, maxUALen),
+		Origin:    clip(info.Origin, maxOriginLen),
+	}
 	now := s.Now()
 	n, err := s.repo().CountClients(ctx)
 	if err != nil {
@@ -346,26 +357,20 @@ func (s *Service) Refresh(ctx context.Context, clientID, refreshToken string) (*
 		_ = s.Tokens.Revoke(ctx, row.UserID, row.APITokenID)
 		return nil, bad
 	}
-	user, err := s.Users.ByID(ctx, row.UserID)
+	user, c, prev, err := s.refreshParties(ctx, row, clientID)
 	if err != nil {
-		return nil, fail("server_error", err.Error())
-	}
-	c, err := s.repo().Client(ctx, clientID)
-	if err != nil {
-		return nil, fail("server_error", err.Error())
-	}
-	if user == nil || c == nil {
-		return nil, bad
-	}
-	prev, err := s.accessToken(ctx, row.UserID, row.APITokenID)
-	if err != nil {
-		return nil, fail("server_error", err.Error())
+		return nil, err
 	}
 	if prev == nil {
 		return nil, bad
 	}
-	access, tokenID, err := s.issueAccess(ctx, user, c, spaceGrant{all: prev.AllSpaces, ids: prev.SpaceIDs, perms: prev.Permissions})
-	if errors.Is(err, auth.ErrBadGrant) {
+	access, tokenID, err := s.issueAccess(
+		ctx,
+		user,
+		c,
+		spaceGrant{all: prev.AllSpaces, ids: prev.SpaceIDs, perms: prev.Permissions},
+	)
+	if errors.Is(err, permissions.ErrBadGrant) {
 		// Every space the connection could reach is gone.
 		return nil, bad
 	}
@@ -383,6 +388,29 @@ func (s *Service) Refresh(ctx context.Context, clientID, refreshToken string) (*
 	}
 	_ = s.Tokens.Revoke(ctx, user.ID, row.APITokenID)
 	return &TokenSet{AccessToken: access, RefreshToken: next, ExpiresIn: int(AccessTTL / time.Second)}, nil
+}
+
+// refreshParties loads who a refresh token belongs to: the user, the client and
+// the access token it replaces. Any of them nil means the grant is gone.
+func (s *Service) refreshParties(
+	ctx context.Context, row *repo.Refresh, clientID string,
+) (*auth.User, *repo.Client, *auth.APIToken, error) {
+	user, err := s.Users.ByID(ctx, row.UserID)
+	if err != nil {
+		return nil, nil, nil, fail("server_error", err.Error())
+	}
+	c, err := s.repo().Client(ctx, clientID)
+	if err != nil {
+		return nil, nil, nil, fail("server_error", err.Error())
+	}
+	if user == nil || c == nil {
+		return nil, nil, nil, fail("invalid_grant", "The refresh token is invalid or expired.")
+	}
+	prev, err := s.accessToken(ctx, row.UserID, row.APITokenID)
+	if err != nil {
+		return nil, nil, nil, fail("server_error", err.Error())
+	}
+	return user, c, prev, nil
 }
 
 // accessToken is the user's API token with that id, nil when it is gone.
@@ -404,13 +432,13 @@ func (s *Service) accessToken(ctx context.Context, userID, id int64) (*auth.APIT
 // all of them; write and delete are always a deliberate choice.
 func mcpPermissions(in []string) ([]string, error) {
 	if len(in) == 0 {
-		return auth.ReadPerms(auth.MCPResources...), nil
+		return permissions.ReadAll(permissions.MCPResources...), nil
 	}
-	perms, err := auth.NormalizePermissions(in)
+	perms, err := permissions.Normalize(in)
 	if err != nil {
 		return nil, err
 	}
-	if err := auth.CheckKindPermissions(auth.TokenMCP, perms); err != nil {
+	if err := permissions.CheckKind(permissions.KindMCP, perms); err != nil {
 		return nil, err
 	}
 	return perms, nil
@@ -418,14 +446,19 @@ func mcpPermissions(in []string) ([]string, error) {
 
 // issueAccess creates the API token an MCP client calls with: the read access
 // the user chose, in the spaces they chose, and nothing else.
-func (s *Service) issueAccess(ctx context.Context, user *auth.User, c *Client, spaces spaceGrant) (raw string, id int64, err error) {
+func (s *Service) issueAccess(
+	ctx context.Context,
+	user *auth.User,
+	c *Client,
+	spaces spaceGrant,
+) (raw string, id int64, err error) {
 	exp := s.Now().Add(AccessTTL)
-	grant := auth.Grant{Kind: auth.TokenMCP, Permissions: spaces.perms, AllSpaces: spaces.all, SpaceIDs: spaces.ids}
+	grant := auth.Grant{Kind: permissions.KindMCP, Permissions: spaces.perms, AllSpaces: spaces.all, SpaceIDs: spaces.ids}
 	raw, tok, err := s.Tokens.Issue(ctx, user, "MCP: "+c.Name, grant, &exp)
 	if errors.Is(err, auth.ErrTokenLimit) {
 		return "", 0, fail("server_error", "Too many API tokens: revoke some in Settings, then connect again.")
 	}
-	if errors.Is(err, auth.ErrBadGrant) {
+	if errors.Is(err, permissions.ErrBadGrant) {
 		return "", 0, err
 	}
 	if err != nil {
