@@ -172,6 +172,18 @@ Usually run on a `v*` tag push.
 
 Runs `mage release`: builds the Linux packages (`.deb`, `.rpm`), the standalone Linux and Windows binaries and `SHA256SUMS`, and publishes a GitHub release. The frontend is built once and shared by all of them. To run it locally, install [nfpm](https://nfpm.goreleaser.com) and set `APP_VERSION`.
 
+#### pages
+
+Separate workflow (`pages.yaml`), run when `dist` succeeds for a stable tag, or by hand. `dist` marks tags with a `-` (like `v1.2.0-rc1`) as pre-releases and the repository skips them. `deploy/repo/build.sh` downloads the packages of the last 5 stable releases, builds a signed apt and dnf repository and publishes it to GitHub Pages, replacing the whole site each time. A release deleted on GitHub therefore disappears from the repository on the next run. Packages are not kept anywhere else, so the releases are the source of truth. Like every `workflow_run` workflow, it runs from the default branch.
+
+One-time setup:
+
+1. Settings → Pages → Source: **GitHub Actions**.
+2. Make a signing key without a passphrase: `gpg --quick-generate-key "Go Savvy <you@example.com>" ed25519 sign 3y`.
+3. Add its private key (`gpg --armor --export-secret-keys <id>`) as the secret `PACKAGES_GPG_PRIVATE_KEY`.
+
+Rotating the key means changing the secret and asking users to fetch the new public key, so set an expiry and note the date. The script needs `gh`, `gpg`, `apt-ftparchive` and `createrepo_c`, and signs with the default secret key of the keyring.
+
 #### docker
 
 Builds and pushes the Docker Hub image. Also runs on every push to `main`.

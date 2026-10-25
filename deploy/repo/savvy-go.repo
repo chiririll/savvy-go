@@ -1,0 +1,7 @@
+[savvy-go]
+name=Go Savvy
+baseurl=@SITE_URL@/rpm
+enabled=1
+gpgcheck=0
+repo_gpgcheck=1
+gpgkey=@SITE_URL@/savvy-go.asc
