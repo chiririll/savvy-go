@@ -12,9 +12,10 @@ export const overlayA11y = {
     config: { rules: [...base, { id: 'aria-hidden-focus', enabled: false }] },
 } as const
 
-/** For an open emoji picker: emoji-picker-react points aria-controls at an element it has not rendered yet. */
+/** For an open emoji picker: emoji-picker-react points aria-controls at an element it has not rendered yet, and puts
+ * role grid and rowgroup on a ul and li, which axe reports as aria-allowed-role. */
 export const emojiPickerA11y = {
-    config: { rules: [...base, { id: 'aria-valid-attr-value', enabled: false }] },
+    config: { rules: [...base, { id: 'aria-valid-attr-value', enabled: false }, { id: 'aria-allowed-role', enabled: false }] },
 } as const
 
 /** For a page whose tabs show only the active panel: Radix leaves aria-controls of the other triggers pointing at

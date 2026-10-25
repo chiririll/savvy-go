@@ -42,11 +42,11 @@ export function HeaderBalance() {
                 <Button
                     variant="ghost"
                     size="sm"
-                    className="gap-2 font-normal"
+                    className="min-w-0 gap-2 font-normal"
                     aria-label={`${t('header.accountBalances')}: ${total}`}
                 >
                     <Wallet className="size-4 text-muted-foreground" />
-                    <span className="font-mono font-medium">{total}</span>
+                    <span className="truncate font-mono font-medium">{total}</span>
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent

@@ -34,26 +34,43 @@ export function startMatrixChecks(context: { globals: Record<string, unknown> })
     i18n.options.postProcess = isMatrixRun(context.globals) ? [PROCESSOR] : []
 }
 
-/** The elements that stick out of the window and are not inside a scrolling or clipping box, as tag.class (right edge). */
+/** A short path to an element, e.g. `div#root > main.flex > a.truncate`, so it can be found in the DOM. */
+function describe(el: Element): string {
+    const part = (node: Element) => {
+        const classes = String(node.getAttribute('class') ?? '').split(/\s+/).filter(Boolean).slice(0, 3)
+        return node.tagName.toLowerCase() + (node.id ? `#${node.id}` : '') + classes.map((c) => `.${c}`).join('')
+    }
+    const path: string[] = []
+    for (let node: Element | null = el; node && node !== document.body && path.length < 4; node = node.parentElement) {
+        path.unshift(part(node))
+    }
+    const text = (el.textContent ?? '').trim().replace(/\s+/g, ' ').slice(0, 40)
+    return `${path.join(' > ')}${text ? ` "${text}"` : ''}`
+}
+
+/** The elements that make the page wider than the window, widest first, as a path, text and right edge. */
 function widest(windowWidth: number): string {
+    const root = document.documentElement
+    // A box that scrolls or clips by itself keeps what sticks out of it from widening the page. The body and the root are
+    // skipped: their overflow is handed to the window, which is the very scroll bar being looked for.
     const clipped = (el: Element) => {
-        for (let parent = el.parentElement; parent && parent !== document.documentElement; parent = parent.parentElement) {
+        for (let parent = el.parentElement; parent && parent !== document.body && parent !== root; parent = parent.parentElement) {
             if (getComputedStyle(parent).overflowX !== 'visible') return true
         }
         return false
     }
-    const sticksOut = (el: Element) => el.getBoundingClientRect().right > windowWidth
+    const right = (el: Element) => el.getBoundingClientRect().right
+    const sticksOut = (el: Element) => right(el) > windowWidth + 0.5
+    const all = [...document.body.querySelectorAll('*')].filter(sticksOut)
     // Only the innermost ones: a parent is wide because of the child that makes it so.
-    const found = [...document.body.querySelectorAll('*')]
-        .filter((el) => sticksOut(el) && !clipped(el) && ![...el.children].some(sticksOut))
-        .map((el) => ({ el, right: Math.round(el.getBoundingClientRect().right) }))
-        .sort((a, b) => b.right - a.right)
-        .slice(0, 3)
-    return (
-        found
-            .map(({ el, right }) => `${el.tagName.toLowerCase()}.${String(el.className).slice(0, 50).replace(/ +/g, '.')} (${right}px)`)
-            .join(', ') || 'unknown'
-    )
+    const innermost = all.filter((el) => ![...el.children].some(sticksOut))
+    const visible = innermost.filter((el) => !clipped(el))
+    // Everything may be clipped yet the page still scroll (a fixed or transformed box, a pseudo element): list them all then.
+    const found = (visible.length > 0 ? visible : innermost).sort((a, b) => right(b) - right(a)).slice(0, 3)
+    if (found.length === 0) {
+        return `unknown (document scrollWidth ${root.scrollWidth}, body scrollWidth ${document.body.scrollWidth})`
+    }
+    return found.map((el) => `${describe(el)} (right edge ${Math.round(right(el))}px)`).join('; ')
 }
 
 /** Throws when the story shows a raw key, uses a string the language lacks, or scrolls the page sideways. */
