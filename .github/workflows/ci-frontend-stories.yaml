@@ -17,7 +17,7 @@ jobs:
 
       - name: List story projects
         id: list
-        run: echo "projects=$(node scripts/test-stories-full.mjs --list)" >> "$GITHUB_OUTPUT"
+        run: echo "projects=$(node scripts/test-stories-full.mts --list)" >> "$GITHUB_OUTPUT"
 
   stories-matrix:
     name: ${{ matrix.project }}

@@ -96,7 +96,7 @@ The language and the theme are Storybook globals (`locale`, `theme`; the toolbar
 | `npm run test:stories` (local, job `frontend` in `ci-frontend.yaml`) | `stories-desktop`, `stories-mobile` | English, light | desktop, phone |
 | `npm run test:stories:full` (`ci-frontend-stories.yaml`, manual only: "Run workflow" on the Actions tab) | the two above, plus `stories-mobile-<locale>` for every other language and `stories-desktop-dark` | each project sets its own | phone for a language (longest text, narrowest screen), desktop for dark |
 
-`test:stories:full` (`scripts/test-stories-full.mjs`) runs the projects one after another, because starting a browser for every project at once hung on a CI-sized host. Extra arguments go to every vitest run, e.g. `npm run test:stories:full -- --reporter=dot`. The workflow does not use this loop: it takes the project list from `node scripts/test-stories-full.mjs --list` and runs each project on its own runner, in parallel.
+`test:stories:full` (`scripts/test-stories-full.mts`) runs the projects one after another, because starting a browser for every project at once hung on a CI-sized host. Extra arguments go to every vitest run, e.g. `npm run test:stories:full -- --reporter=dot`. The workflow does not use this loop: it takes the project list from `node scripts/test-stories-full.mts --list` and runs each project on its own runner, in parallel.
 
 A project picks its globals from environment variables set in `vite.config.ts` (`STORYBOOK_LOCALE`, `STORYBOOK_THEME`), which `initialGlobals` in `.storybook/preview.tsx` reads. A story can still set `globals: { locale: 'ru' }` itself, for a check that is about Russian (number format, a Russian label), like `ApplicationInRussian` in `Layout.stories.tsx`.
 
