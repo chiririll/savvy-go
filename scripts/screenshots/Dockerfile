@@ -6,7 +6,7 @@ ARG PLAYWRIGHT_VERSION=1.63.0
 
 # The throwaway OAuth app of the oauth-app scenario (cmd/oauth-probe, stdlib only), built here so
 # the image needs no Go toolchain.
-FROM golang:1.26-alpine AS probe
+FROM golang:1.27-alpine AS probe
 WORKDIR /src
 COPY go.mod go.sum ./
 COPY cmd/oauth-probe ./cmd/oauth-probe

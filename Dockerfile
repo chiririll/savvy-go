@@ -15,7 +15,7 @@ COPY vite.config.ts ./
 RUN npm run build
 
 # Build the backend
-FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS gobuild
+FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS gobuild
 ARG TARGETOS
 ARG TARGETARCH
 ARG APP_VERSION
