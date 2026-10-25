@@ -176,6 +176,8 @@ Runs `mage release`: builds the Linux packages (`.deb`, `.rpm`), the standalone 
 
 Builds and pushes the Docker Hub image. Also runs on every push to `main`.
 
+Before pushing, it builds the amd64 image locally and scans it with [Trivy](https://trivy.dev). Fixable `CRITICAL` and `HIGH` vulnerabilities fail the job, so nothing is pushed. To report only, set `exit-code: '0'` on the scan step.
+
 Skipped while the `DOCKER_IMAGE` variable is unset, so forks don't fail. To enable, set under Settings → Secrets and variables → Actions:
 
 - variable `DOCKER_IMAGE`: Docker Hub repository, e.g. `chiririll/savvy-go`
