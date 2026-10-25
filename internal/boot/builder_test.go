@@ -12,6 +12,8 @@ import (
 	"savvy-go/internal/locator"
 	"savvy-go/internal/signing"
 	"savvy-go/internal/store"
+
+	"github.com/google/uuid"
 )
 
 // configIn writes a config file that keeps all data under dir.
@@ -84,6 +86,31 @@ func TestRestartKeepsSigningKeyPassword(t *testing.T) {
 	}
 	if string(pass1) != string(pass2) {
 		t.Error("a restart changed the first-run password while no user exists")
+	}
+}
+
+func TestInstanceIDSurvivesRestartsAndDiffersBetweenInstalls(t *testing.T) {
+	ctx := context.Background()
+	build := func(cfgPath string) string {
+		t.Helper()
+		p, err := NewBuilder(appconfig.Build{}).ConfigFile(cfgPath).Build(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer p.Close(ctx)
+		return locator.Get[appconfig.Build](p.Loc).InstanceID
+	}
+
+	cfgPath := configIn(t, t.TempDir())
+	first, second := build(cfgPath), build(cfgPath)
+	if _, err := uuid.Parse(first); err != nil {
+		t.Fatalf("instance id %q is not a uuid: %v", first, err)
+	}
+	if first != second {
+		t.Errorf("a restart changed the instance id: %q then %q", first, second)
+	}
+	if other := build(configIn(t, t.TempDir())); other == first {
+		t.Error("a new install got the id of another one")
 	}
 }
 

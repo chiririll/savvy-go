@@ -91,11 +91,16 @@ func (b *Builder) Build(ctx context.Context) (*Process, error) {
 		return nil, err
 	}
 
+	build := b.build
+	if build.InstanceID, err = loadInstanceID(ctx, st); err != nil {
+		return nil, fmt.Errorf("instance id: %w", err)
+	}
+
 	queue := jobs.NewQueue(2)
 	rates := currencydata.New()
 	loc, err := app.New(cfg, st, keys,
 		app.WithConfig(file),
-		app.WithBuild(b.build), app.WithRates(rates), app.WithBootstrap(guard), app.WithQueue(queue))
+		app.WithBuild(build), app.WithRates(rates), app.WithBootstrap(guard), app.WithQueue(queue))
 	if err != nil {
 		return nil, fmt.Errorf("build services: %w", err)
 	}

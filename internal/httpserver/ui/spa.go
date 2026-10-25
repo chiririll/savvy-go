@@ -27,15 +27,16 @@ type viteChunk struct {
 func init() {
 	routing.Register(func(d *routing.Deps) []routing.Mount {
 		b := routing.Get[appconfig.Build](d)
-		spa := NewSPA(b.Version, b.Env)
+		spa := NewSPA(b)
 		return []routing.Mount{routing.Fallback(func(r chi.Router) { r.Get("/*", spa.ServeHTTP) })}
 	})
 }
 
 // NewSPA is the frontend of the running binary: the copy built into it, or public/ next to
-// the working directory in development builds. version and env show in the page shell.
-func NewSPA(version, env string) *SPA {
-	return &SPA{Assets: Resolve(embeddedFS()), Version: version, Env: env}
+// the working directory in development builds. The version, env and instance id of b show in
+// the page shell.
+func NewSPA(b appconfig.Build) *SPA {
+	return &SPA{Assets: Resolve(embeddedFS()), Version: b.Version, Env: b.Env, InstanceID: b.InstanceID}
 }
 
 // Resolve picks where the frontend comes from: the copy built into the
@@ -52,6 +53,8 @@ type SPA struct {
 	Assets  fs.FS
 	Version string // the release, shown in the page shell
 	Env     string // the build environment
+
+	InstanceID string // the id of this install, shown in the page shell
 }
 
 // ServeHTTP serves the file asked for, or index.html for a client-side route.
@@ -90,10 +93,11 @@ func (h *SPA) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // indexData is what public/index.html is rendered with.
 type indexData struct {
-	Version string
-	Env     string
-	JS      []string
-	CSS     []string
+	Version    string
+	Env        string
+	InstanceID string
+	JS         []string
+	CSS        []string
 }
 
 // renderIndex renders the public/index.html template.
@@ -103,7 +107,7 @@ func (h *SPA) renderIndex() ([]byte, error) {
 		return nil, err
 	}
 
-	data := indexData{Version: h.Version, Env: h.Env}
+	data := indexData{Version: h.Version, Env: h.Env, InstanceID: h.InstanceID}
 	data.JS, data.CSS = h.viteAssets()
 
 	var buf bytes.Buffer

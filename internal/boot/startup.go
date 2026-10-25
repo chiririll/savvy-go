@@ -17,6 +17,8 @@ import (
 	"savvy-go/internal/spaces"
 	"savvy-go/internal/store/sqlite"
 	"savvy-go/internal/transfers"
+
+	"github.com/google/uuid"
 )
 
 // prepare brings the databases to a servable state: loads the signing key,
@@ -96,6 +98,24 @@ func openURL(listenAddr, publicURL string) string {
 // signingKeyUsedKey records the key id once the server has a key, so a key
 // file that disappears later is noticed instead of silently replaced.
 const signingKeyUsedKey = "signing_kid"
+
+// instanceIDKey holds the random id of this install. Not a setting a user can see or change:
+// settings.Store.All only lists known keys.
+const instanceIDKey = "instance_id"
+
+// loadInstanceID returns the id of this install, made on first start and kept in the server
+// database from then on, so it survives restarts and a new data directory gets a new one.
+func loadInstanceID(ctx context.Context, st *sqlite.Store) (string, error) {
+	server := settings.Store{DB: st.Server()}
+	if id, _ := server.Get(ctx, instanceIDKey, "").(string); id != "" {
+		return id, nil
+	}
+	id := uuid.NewString()
+	if err := server.Set(ctx, instanceIDKey, id); err != nil {
+		return "", err
+	}
+	return id, nil
+}
 
 func loadSigningKey(ctx context.Context, dataDir string, st *sqlite.Store) (*signing.Holder, error) {
 	server := settings.Store{DB: st.Server()}

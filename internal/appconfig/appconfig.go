@@ -39,8 +39,10 @@ func decodePaths(t pathsTable) (Paths, error) {
 var PathsSection = config.Section[pathsTable, Paths]{Name: "paths", Decode: decodePaths}
 
 // Build says which release is running. The binary sets it at link time; it is handed down
-// so no package reads a global.
-type Build struct{ Version, Env string }
+// so no package reads a global. InstanceID is not from the binary: startup fills it with the
+// random id of this install, kept in the server database, so browsers can tell one install
+// from another.
+type Build struct{ Version, Env, InstanceID string }
 
 // Config is what the process shares: the directories and time zone, fixed at start, and
 // the public URL, which can change while the process runs. It is a small value: pass it
