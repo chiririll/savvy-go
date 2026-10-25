@@ -42,6 +42,27 @@ jobs:
             echo "version=dev" >> $GITHUB_OUTPUT
           fi
 
+      # Scan before pushing: a failing scan blocks the publish.
+      - name: Build image for scan
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: savvy-go:scan
+          platforms: linux/amd64
+          cache-from: type=gha
+          build-args: |
+            APP_VERSION=${{ steps.version.outputs.version }}
+            APP_ENV=production
+
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: savvy-go:scan
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'
+
       - name: Build and push
         uses: docker/build-push-action@v7
         with:
