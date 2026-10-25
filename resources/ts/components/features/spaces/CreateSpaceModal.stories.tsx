@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, fn, screen, userEvent, waitFor, within } from 'storybook/test'
 
+import { getInstanceId } from '@/lib/instance-id'
 import { overlayA11y } from '@/test/a11y'
 import { fail, hang, reply, spy } from '@/test/api-mocks'
 import { space } from '@/test/app-state'
@@ -31,9 +32,12 @@ const created = { ...space(), id: 9, name: 'Family', emoji: null, color: null }
 
 const sent: { bodies: unknown[] } = { bodies: [] }
 
-// Saved in this browser, as the store would keep it for user 1.
+// Saved in this browser, as the store would keep it for user 1 on this install.
 const saveDraft = (draft: Partial<SpaceDraft>) =>
-    localStorage.setItem(`${spaceDraft.key}:1`, JSON.stringify({ state: { draft: { ...emptyDraft(), ...draft } } }))
+    localStorage.setItem(
+        `${spaceDraft.key}:1`,
+        JSON.stringify({ state: { draft: { ...emptyDraft(), ...draft }, instance: getInstanceId() } }),
+    )
 
 const meta = {
     title: 'features/spaces/CreateSpaceModal',
