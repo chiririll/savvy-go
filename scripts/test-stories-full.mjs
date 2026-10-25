@@ -13,6 +13,12 @@ const locales = fs
     .map((entry) => entry.name)
 
 const projects = ['stories-desktop', 'stories-mobile', ...locales.map((locale) => `stories-mobile-${locale}`), 'stories-desktop-dark']
+// `--list` prints the projects as JSON for the CI matrix (.github/workflows/ci-frontend-stories.yaml), one runner each.
+if (process.argv[2] === '--list') {
+    console.log(JSON.stringify(projects))
+    process.exit(0)
+}
+
 const extra = process.argv.slice(2)
 
 const failed = []
