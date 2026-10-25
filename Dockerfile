@@ -38,7 +38,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     -o /out/savvy-go .
 
 # Build the final image
-FROM alpine:3.22
+FROM alpine:3.24
 # wget (used by the healthcheck) is provided by busybox
 RUN apk upgrade --no-cache \
     && apk add --no-cache ca-certificates tzdata libcap \
