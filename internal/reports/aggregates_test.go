@@ -75,9 +75,9 @@ func TestReportTotalsFoldCurrenciesIntoBase(t *testing.T) {
 
 func TestEachCurrencyConvertsRoundsToBase(t *testing.T) {
 	forEachBase(t, func(t *testing.T, base moneytest.Currency) {
+		e := newMatrixEnv(t, base) // shared: each transaction is deleted again
 		for _, c := range moneytest.Currencies {
 			t.Run(c.Code, func(t *testing.T) {
-				e := newMatrixEnv(t, base)
 				moneytest.ForEachAmount(t, moneytest.Valid(c.Decimals), func(t *testing.T, a moneytest.Amount) {
 					if a.Minor == 0 {
 						return

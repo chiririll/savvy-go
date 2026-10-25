@@ -15,11 +15,12 @@ type Job struct {
 
 // Scheduler runs jobs in-process. There is no Laravel scheduler table.
 type Scheduler struct {
-	jobs []Job
+	jobs     []Job
+	firstRun time.Duration // delay before the first run of each job
 }
 
 func NewScheduler(jobs ...Job) *Scheduler {
-	return &Scheduler{jobs: jobs}
+	return &Scheduler{jobs: jobs, firstRun: 2 * time.Second}
 }
 
 func (s *Scheduler) Start(ctx context.Context) {
@@ -34,7 +35,7 @@ func (s *Scheduler) loop(ctx context.Context, job Job) {
 		return
 	}
 	// Run once shortly after boot, then on the interval.
-	timer := time.NewTimer(2 * time.Second)
+	timer := time.NewTimer(s.firstRun)
 	defer timer.Stop()
 	for {
 		select {

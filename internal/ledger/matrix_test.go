@@ -319,8 +319,8 @@ func TestConvertRoundTripErrorBoundedScales(t *testing.T) {
 }
 
 func TestTransfersBetweenEveryPairOfCurrencies(t *testing.T) {
+	e := newMatrixEnv(t, moneytest.Currencies[0]) // shared: each transfer is deleted again
 	moneytest.ForEachPair(t, func(t *testing.T, from, to moneytest.Currency) {
-		e := newMatrixEnv(t, moneytest.Currencies[0])
 		f, tt := e.stored(from), e.stored(to)
 		fromAcct, toAcct := e.accts[from.Code], e.accts[to.Code]
 		if from.Code == to.Code {
@@ -346,6 +346,7 @@ func TestTransfersBetweenEveryPairOfCurrencies(t *testing.T) {
 				t.Errorf("%s: %v", a.Name, terr)
 				continue
 			}
+			defer func() { _ = e.txs.Delete(e.ctx, tx.ID) }()
 			if tx.ToAmount == nil || !tx.ToAmount.Equal(want) {
 				t.Errorf("%s: delivered %v, want %s", a.Name, tx.ToAmount, want)
 			}

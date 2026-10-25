@@ -153,8 +153,9 @@ func TestChangingTheBaseKeepsEveryConversion(t *testing.T) {
 		if !changed.IsBase || !changed.Rate.Equal(one) {
 			t.Fatalf("new base = %+v", changed)
 		}
+		after := convert()
 		for k, was := range before {
-			if got := convert()[k]; got != was {
+			if got := after[k]; got != was {
 				t.Errorf("%s->%s: %s before, %s after the base changed", k.from, k.to, was, got)
 			}
 		}

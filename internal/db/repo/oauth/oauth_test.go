@@ -7,16 +7,12 @@ import (
 
 	authrepo "savvy-go/internal/db/repo/auth"
 	repo "savvy-go/internal/db/repo/oauth"
-	"savvy-go/internal/store/sqlite"
+	"savvy-go/internal/store/sqlite/sqlitetest"
 )
 
 func newRepos(t *testing.T) (repo.Repo, authrepo.Repo, int64) {
 	t.Helper()
-	st, err := sqlite.OpenApp(context.Background(), t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = st.Close() })
+	st := sqlitetest.Open(t)
 	a := authrepo.Repo{DB: st.Server()}
 	uid, err := a.InsertUser(context.Background(), "Ann", "ann@test.com", "hash", "user", time.Now())
 	if err != nil {

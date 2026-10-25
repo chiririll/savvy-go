@@ -1,3 +1,5 @@
+//go:build integration
+
 package httpserver
 
 import (
@@ -15,6 +17,7 @@ import (
 	"savvy-go/internal/spaces"
 	"savvy-go/internal/store"
 	"savvy-go/internal/store/sqlite"
+	"savvy-go/internal/store/sqlite/sqlitetest"
 )
 
 // Test roles for createUser: admin is a server admin and admin of the shared
@@ -40,12 +43,7 @@ type testApp struct {
 // openTestStore opens a store in cfg.DataDir with the embedded migrations.
 func openTestStore(t *testing.T, cfg appconfig.Config) *sqlite.Store {
 	t.Helper()
-	st, err := sqlite.OpenApp(context.Background(), cfg.DataDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = st.Close() })
-	return st
+	return sqlitetest.OpenIn(t, cfg.DataDir)
 }
 
 // testKeys is a signing key in the test's data directory.

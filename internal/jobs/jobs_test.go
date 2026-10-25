@@ -66,12 +66,12 @@ func TestSchedulerRunsJobsIntervalSurvivesFailures(t *testing.T) {
 	defer cancel()
 	var failing atomic.Int32
 	reached := make(chan struct{})
-	NewScheduler(Job{Name: "flaky", Interval: 20 * time.Millisecond, Run: func(context.Context) error {
+	quick(NewScheduler(Job{Name: "flaky", Interval: 20 * time.Millisecond, Run: func(context.Context) error {
 		if failing.Add(1) == 3 {
 			close(reached)
 		}
 		return errors.New("always fails")
-	}}).Start(ctx)
+	}})).Start(ctx)
 
 	select {
 	case <-reached:
@@ -84,12 +84,12 @@ func TestSchedulerStopsWithItsContext(t *testing.T) {
 	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	var runs atomic.Int32
-	NewScheduler(Job{Name: "j", Interval: 10 * time.Millisecond, Run: func(context.Context) error {
+	quick(NewScheduler(Job{Name: "j", Interval: 10 * time.Millisecond, Run: func(context.Context) error {
 		runs.Add(1)
 		return nil
-	}}).Start(ctx)
-	cancel() // before the first run, which comes a couple of seconds after the start
-	time.Sleep(2500 * time.Millisecond)
+	}})).Start(ctx)
+	cancel() // before the first run
+	time.Sleep(100 * time.Millisecond)
 	if got := runs.Load(); got != 0 {
 		t.Errorf("a cancelled scheduler ran its job %d times", got)
 	}
@@ -100,9 +100,15 @@ func TestSchedulerIgnoresJobsWithoutAnInterval(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	var runs atomic.Int32
-	NewScheduler(Job{Name: "never", Run: func(context.Context) error { runs.Add(1); return nil }}).Start(ctx)
-	time.Sleep(2500 * time.Millisecond)
+	quick(NewScheduler(Job{Name: "never", Run: func(context.Context) error { runs.Add(1); return nil }})).Start(ctx)
+	time.Sleep(100 * time.Millisecond)
 	if got := runs.Load(); got != 0 {
 		t.Errorf("a job without an interval ran %d times", got)
 	}
+}
+
+// quick shortens the delay before the first run, which tests have no reason to wait for.
+func quick(s *Scheduler) *Scheduler {
+	s.firstRun = 50 * time.Millisecond
+	return s
 }

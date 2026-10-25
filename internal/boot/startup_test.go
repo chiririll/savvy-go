@@ -10,17 +10,13 @@ import (
 	"savvy-go/internal/auth"
 	"savvy-go/internal/firstrun"
 	"savvy-go/internal/store/sqlite"
+	"savvy-go/internal/store/sqlite/sqlitetest"
 )
 
 func openStore(t *testing.T) (*sqlite.Store, appconfig.Config) {
 	t.Helper()
 	cfg := appconfig.Config{DataDir: t.TempDir()}
-	st, err := sqlite.OpenApp(context.Background(), cfg.DataDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = st.Close() })
-	return st, cfg
+	return sqlitetest.OpenIn(t, cfg.DataDir), cfg
 }
 
 func TestStartBootstrapOnAnEmptyServer(t *testing.T) {

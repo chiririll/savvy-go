@@ -5,8 +5,11 @@
 ```bash
 go generate ./internal/db   # sqlc: internal/db/queries → internal/db/sqlc
 go test ./...
+go test -tags integration ./internal/httpserver   # HTTP server tests, slow
 go run .
 ```
+
+The tests of `internal/httpserver` start a whole app per test and take about a minute, so they carry the build tag `integration` and are left out of `go test ./...`. CI runs them on demand with the *CI Go integration* workflow. Tests in other packages open stores with `sqlitetest.Open` (`internal/store/sqlite/sqlitetest`), which copies a database migrated once per test binary instead of migrating each time.
 
 `go run .` listens on `localhost:8080`. Data and the generated `config.toml` go to `./savvy-data`, see [Data and backups](data-and-backups.md) and [Configuration](deployment.md#configuration). A plain `go build` or `go run` serves the frontend from `public/` on disk; release builds embed it, see [Build tasks](#build-tasks).
 

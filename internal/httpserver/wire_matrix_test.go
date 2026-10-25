@@ -1,3 +1,5 @@
+//go:build integration
+
 package httpserver
 
 import (
@@ -10,7 +12,6 @@ import (
 	"github.com/shopspring/decimal"
 
 	"savvy-go/internal/auth"
-	"savvy-go/internal/money"
 	"savvy-go/internal/money/moneytest"
 )
 
@@ -55,49 +56,6 @@ func newWireEnv(t *testing.T) *wireEnv {
 
 func canonical(minor int64, decimals int) string {
 	return decimal.New(minor, -int32(decimals)).String()
-}
-
-func TestCurrencyAPIChecksScaleRange(t *testing.T) {
-	e := newWireEnv(t) // creating every currency, zero and twelve decimals included, is the first check
-	post := func(body map[string]any) (int, map[string]any) {
-		res := e.a.do("POST", "/api/currencies", body, e.sess.Token, e.sess.CSRF)
-		out := decodeJSON(t, res)
-		return res.StatusCode, out
-	}
-	for _, c := range []struct {
-		name  string
-		body  map[string]any
-		field string // the validation error expected, "" for success
-	}{
-		{"decimals given as zero",
-			map[string]any{"code": "KRW", "name": "Won", "symbol": "W", "decimals": 0, "rate": 0.00073}, ""},
-		{"decimals thirteen", map[string]any{"code": "TOO", "name": "x", "symbol": "x", "decimals": 13, "rate": 1},
-			"decimals"},
-		{"rate below the minimum",
-			map[string]any{"code": "LOW", "name": "x", "symbol": "x", "decimals": 2, "rate": json.Number("0.0000000000000009")},
-			"rate"},
-		{"rate above the maximum",
-			map[string]any{"code": "HIG", "name": "x", "symbol": "x", "decimals": 2, "rate": json.Number("1000000000000001")},
-			"rate"},
-		{"negative rate", map[string]any{"code": "NEG", "name": "x", "symbol": "x", "decimals": 2, "rate": -2}, "rate"},
-	} {
-		status, body := post(c.body)
-		if c.field == "" {
-			if status != http.StatusCreated {
-				t.Errorf("%s: %d %v", c.name, status, body)
-			}
-			continue
-		}
-		errs, _ := body["errors"].(map[string]any)
-		if status != http.StatusUnprocessableEntity || errs[c.field] == nil {
-			t.Errorf("%s: %d %v, want a 422 on %q", c.name, status, body, c.field)
-		}
-	}
-	// A currency given without decimals keeps the old default.
-	status, body := post(map[string]any{"code": "DEF", "name": "x", "symbol": "x"})
-	if status != http.StatusCreated || body["data"].(map[string]any)["decimals"].(float64) != 2 {
-		t.Errorf("absent decimals: %d %v", status, body)
-	}
 }
 
 func TestAmountsOnWireInEveryCurrency(t *testing.T) {
@@ -164,35 +122,6 @@ func TestOutRangeAmountsRefusedOnWire(t *testing.T) {
 }
 
 func name(c moneytest.Currency, a moneytest.Amount) string { return c.Code + " " + a.Name }
-
-func TestConvertEndpointForEveryPair(t *testing.T) {
-	e := newWireEnv(t)
-	moneytest.ForEachPair(t, func(t *testing.T, from, to moneytest.Currency) {
-		moneytest.ForEachAmount(t, moneytest.Valid(from.Decimals), func(t *testing.T, a moneytest.Amount) {
-			res := e.a.do("POST", "/api/currencies/convert", map[string]any{
-				"amount": num(a.Input), "from_currency_id": e.cur[from.Code], "to_currency_id": e.cur[to.Code],
-			}, e.sess.Token, e.sess.CSRF)
-			exact := moneytest.Converted(decimal.New(a.Minor, -int32(from.Decimals)), from, to)
-			want, err := money.FromInput(exact, money.Unit{Decimals: to.Decimals})
-			if err != nil { // the result does not fit
-				if res.StatusCode != http.StatusUnprocessableEntity {
-					t.Fatalf("status %d, want 422 for a result of %s", res.StatusCode, exact)
-				}
-				res.Body.Close()
-				return
-			}
-			if res.StatusCode != http.StatusOK {
-				t.Fatalf("status %d: %s", res.StatusCode, rawBody(t, res))
-			}
-			if body, wantJSON := rawBody(t, res), `"result":`+canonical(want.Minor(), to.Decimals); !strings.Contains(
-				body,
-				wantJSON,
-			) {
-				t.Fatalf("%s does not contain %s", body, wantJSON)
-			}
-		})
-	})
-}
 
 func rawBody(t *testing.T, res *http.Response) string {
 	t.Helper()

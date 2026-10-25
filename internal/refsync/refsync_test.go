@@ -13,6 +13,7 @@ import (
 	"savvy-go/internal/spaces"
 	"savvy-go/internal/store"
 	"savvy-go/internal/store/sqlite"
+	"savvy-go/internal/store/sqlite/sqlitetest"
 )
 
 var ctx = context.Background()
@@ -26,11 +27,7 @@ type env struct {
 
 func newEnv(t *testing.T) *env {
 	t.Helper()
-	st, err := sqlite.OpenApp(ctx, t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = st.Close() })
+	st := sqlitetest.Open(t)
 	sps := spaces.Service{Store: st}
 	e := &env{st: st, svc: Service{Spaces: sps}, owner: e0(t, st, "Owner", "o@test.com")}
 	for _, name := range []string{"A", "B", "C"} {

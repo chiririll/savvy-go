@@ -13,7 +13,7 @@ import (
 	"savvy-go/internal/auth/permissions"
 	authrepo "savvy-go/internal/db/repo/auth"
 	"savvy-go/internal/oauth"
-	"savvy-go/internal/store/sqlite"
+	"savvy-go/internal/store/sqlite/sqlitetest"
 )
 
 const (
@@ -31,11 +31,7 @@ type env struct {
 
 func newEnv(t *testing.T) *env {
 	t.Helper()
-	st, err := sqlite.OpenApp(context.Background(), t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = st.Close() })
+	st := sqlitetest.Open(t)
 	srv := st.Server()
 	uid, err := authrepo.Repo{DB: srv}.InsertUser(context.Background(), "Ann", "ann@test.com", "hash", "user", time.Now())
 	if err != nil {

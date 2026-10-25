@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Persisted stores read localStorage when they are created, so it has to exist
 // before they are imported. (Node's own experimental localStorage is unusable here.)
+// zustand reads `window.localStorage`, and the unit project runs in plain node, so `window` is stubbed too.
 const storage = vi.hoisted(() => {
     const data = new Map<string, string>()
     const fake = {
@@ -11,6 +12,7 @@ const storage = vi.hoisted(() => {
         clear: () => data.clear(),
     }
     vi.stubGlobal('localStorage', fake)
+    vi.stubGlobal('window', { localStorage: fake })
     return fake
 })
 

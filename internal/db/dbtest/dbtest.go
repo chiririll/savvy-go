@@ -9,17 +9,10 @@ import (
 
 	"savvy-go/internal/store"
 	"savvy-go/internal/store/sqlite"
+	"savvy-go/internal/store/sqlite/sqlitetest"
 )
 
-func open(t *testing.T) *sqlite.Store {
-	t.Helper()
-	st, err := sqlite.OpenApp(context.Background(), t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = st.Close() })
-	return st
-}
+func open(t *testing.T) *sqlite.Store { return sqlitetest.Open(t) }
 
 // Server is a fresh server database.
 func Server(t *testing.T) store.DB { return open(t).Server() }
