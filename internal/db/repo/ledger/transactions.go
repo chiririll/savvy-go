@@ -25,6 +25,7 @@ type Tx struct {
 	Description, Date       *string
 	RecurringID             *int64
 	CreatedAt               *time.Time
+	GroupUUID               *string
 }
 
 func txOf(x sqlc.GetTransactionRow) Tx {
@@ -35,6 +36,7 @@ func txOf(x sqlc.GetTransactionRow) Tx {
 		ToAmount:    MoneyFromNull(x.ToAmount, money.Unit{ID: x.ToCurrencyID, Decimals: int(x.ToDecimals)}),
 		IsEstimated: x.IsEstimated != 0, Description: optString(x.Description), Date: optString(x.Date),
 		RecurringID: optInt64(x.RecurringTransactionID), CreatedAt: optTime(x.CreatedAt),
+		GroupUUID: optString(x.GroupUuid),
 	}
 }
 
@@ -86,7 +88,8 @@ type TxFields struct {
 	ToAmount                *money.Money
 	IsEstimated             bool
 	Description, Date       *string
-	RecurringID             *int64 // insert only
+	RecurringID             *int64  // insert only
+	GroupUUID               *string // insert only
 }
 
 func (r Repo) InsertTransaction(ctx context.Context, t TxFields, now time.Time) (int64, error) {
@@ -95,6 +98,7 @@ func (r Repo) InsertTransaction(ctx context.Context, t TxFields, now time.Time) 
 		CategoryID: db.NullInt64(t.CategoryID), Amount: t.Amount.Minor(), ToAmount: db.NullMoney(t.ToAmount),
 		IsEstimated: db.BoolInt(t.IsEstimated), Description: db.NullString(t.Description),
 		Date: db.NullString(t.Date), Status: t.Status, RecurringTransactionID: db.NullInt64(t.RecurringID),
+		GroupUuid: db.NullString(t.GroupUUID),
 		CreatedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now),
 	})
 	if err != nil {
@@ -313,4 +317,23 @@ func dateOrEmpty(d *string) string {
 		return ""
 	}
 	return *d
+}
+
+// GroupUUID is the group a transaction is a leg of; "" when it is on its own.
+func (r Repo) GroupUUID(ctx context.Context, id int64) string {
+	v, err := r.q().GetTransactionGroupUUID(ctx, id)
+	if err != nil {
+		return ""
+	}
+	return v.String
+}
+
+// GroupTransactionIDs lists the legs of a group, oldest first.
+func (r Repo) GroupTransactionIDs(ctx context.Context, group string) ([]int64, error) {
+	return r.q().ListGroupTransactionIDs(ctx, db.NullString(&group))
+}
+
+// DeleteGroup deletes every leg of a group.
+func (r Repo) DeleteGroup(ctx context.Context, group string) error {
+	return r.q().DeleteGroupTransactions(ctx, db.NullString(&group))
 }

@@ -52,6 +52,15 @@ func (q *Queries) CountAllTransactions(ctx context.Context) (int64, error) {
 	return count, err
 }
 
+const deleteGroupTransactions = `-- name: DeleteGroupTransactions :exec
+DELETE FROM transactions WHERE group_uuid = ?
+`
+
+func (q *Queries) DeleteGroupTransactions(ctx context.Context, groupUuid sql.NullString) error {
+	_, err := q.db.ExecContext(ctx, deleteGroupTransactions, groupUuid)
+	return err
+}
+
 const deleteTransaction = `-- name: DeleteTransaction :exec
 DELETE FROM transactions WHERE id = ?
 `
@@ -81,7 +90,7 @@ func (q *Queries) DeleteTransactionTags(ctx context.Context, transactionID int64
 
 const getTransaction = `-- name: GetTransaction :one
 SELECT t.id, t.type, t.account_id, t.to_account_id, t.category_id, t.amount, t.to_amount,
-	t.is_estimated, t.description, t.date, t.status, t.recurring_transaction_id, t.created_at,
+	t.is_estimated, t.description, t.date, t.status, t.recurring_transaction_id, t.created_at, t.group_uuid,
 	ca.id AS currency_id, ca.decimals AS decimals,
 	COALESCE(cb.id, ca.id) AS to_currency_id, COALESCE(cb.decimals, ca.decimals) AS to_decimals
 FROM transactions t
@@ -106,6 +115,7 @@ type GetTransactionRow struct {
 	Status                 string
 	RecurringTransactionID sql.NullInt64
 	CreatedAt              sql.NullString
+	GroupUuid              sql.NullString
 	CurrencyID             int64
 	Decimals               int64
 	ToCurrencyID           int64
@@ -130,6 +140,7 @@ func (q *Queries) GetTransaction(ctx context.Context, id int64) (GetTransactionR
 		&i.Status,
 		&i.RecurringTransactionID,
 		&i.CreatedAt,
+		&i.GroupUuid,
 		&i.CurrencyID,
 		&i.Decimals,
 		&i.ToCurrencyID,
@@ -138,10 +149,21 @@ func (q *Queries) GetTransaction(ctx context.Context, id int64) (GetTransactionR
 	return i, err
 }
 
+const getTransactionGroupUUID = `-- name: GetTransactionGroupUUID :one
+SELECT group_uuid FROM transactions WHERE id = ?
+`
+
+func (q *Queries) GetTransactionGroupUUID(ctx context.Context, id int64) (sql.NullString, error) {
+	row := q.db.QueryRowContext(ctx, getTransactionGroupUUID, id)
+	var group_uuid sql.NullString
+	err := row.Scan(&group_uuid)
+	return group_uuid, err
+}
+
 const insertTransaction = `-- name: InsertTransaction :execresult
 INSERT INTO transactions (type, account_id, to_account_id, category_id, amount, to_amount, is_estimated,
-	description, date, status, recurring_transaction_id, created_at, updated_at)
-VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+	description, date, status, recurring_transaction_id, group_uuid, created_at, updated_at)
+VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 `
 
 type InsertTransactionParams struct {
@@ -156,6 +178,7 @@ type InsertTransactionParams struct {
 	Date                   sql.NullString
 	Status                 string
 	RecurringTransactionID sql.NullInt64
+	GroupUuid              sql.NullString
 	CreatedAt              sql.NullString
 	UpdatedAt              sql.NullString
 }
@@ -173,6 +196,7 @@ func (q *Queries) InsertTransaction(ctx context.Context, arg InsertTransactionPa
 		arg.Date,
 		arg.Status,
 		arg.RecurringTransactionID,
+		arg.GroupUuid,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
@@ -252,6 +276,33 @@ type InsertTransactionTagParams struct {
 func (q *Queries) InsertTransactionTag(ctx context.Context, arg InsertTransactionTagParams) error {
 	_, err := q.db.ExecContext(ctx, insertTransactionTag, arg.TransactionID, arg.TagID)
 	return err
+}
+
+const listGroupTransactionIDs = `-- name: ListGroupTransactionIDs :many
+SELECT id FROM transactions WHERE group_uuid = ? ORDER BY id
+`
+
+func (q *Queries) ListGroupTransactionIDs(ctx context.Context, groupUuid sql.NullString) ([]int64, error) {
+	rows, err := q.db.QueryContext(ctx, listGroupTransactionIDs, groupUuid)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listItemsOfTransactions = `-- name: ListItemsOfTransactions :many

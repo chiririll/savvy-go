@@ -382,6 +382,7 @@ type Transaction struct {
 	CreatedAt              sql.NullString
 	UpdatedAt              sql.NullString
 	DayOrder               sql.NullInt64
+	GroupUuid              sql.NullString
 }
 
 type TransactionImport struct {

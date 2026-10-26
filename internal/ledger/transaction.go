@@ -64,6 +64,7 @@ type Transaction struct {
 	Status      string
 	RecurringID *int64
 	CreatedAt   *time.Time
+	GroupUUID   *string // the payment this transaction is a leg of, see Groups
 	Account     *Account
 	ToAccount   *Account
 	Category    *Category
@@ -85,6 +86,8 @@ type TxInput struct {
 	RecurringID *int64
 	TagIDs      []int64
 	Items       []TxItemInput
+
+	group *string // set by Groups only
 }
 
 type Transactions struct{ DB store.DB }
@@ -112,6 +115,9 @@ type TxActions struct {
 func (t Transaction) Allowed() TxActions {
 	switch {
 	case transferSideType(t.Type):
+		return TxActions{}
+	case t.GroupUUID != nil:
+		// A leg changes with its payment, through Groups.
 		return TxActions{}
 	case t.Status == "skipped":
 		return TxActions{Delete: true}
@@ -156,7 +162,7 @@ func (s Transactions) Create(ctx context.Context, in TxInput) (*Transaction, err
 	id, err := s.repo().InsertTransaction(ctx, repo.TxFields{
 		Type: in.Type, Status: status, AccountID: in.AccountID, ToAccountID: in.ToAccountID, CategoryID: in.CategoryID,
 		Amount: amount, ToAmount: toAmount, IsEstimated: in.IsEstimated && keepsEstimate(in.Type, status, len(items)),
-		Description: in.Description, Date: in.Date, RecurringID: in.RecurringID,
+		Description: in.Description, Date: in.Date, RecurringID: in.RecurringID, GroupUUID: in.group,
 	}, now)
 	if err != nil {
 		return nil, err
@@ -171,7 +177,7 @@ func (s Transactions) Create(ctx context.Context, in TxInput) (*Transaction, err
 }
 
 func (s Transactions) Update(ctx context.Context, id int64, in TxInput) (*Transaction, error) {
-	if err := s.guardTransfer(ctx, id); err != nil {
+	if err := s.guardRow(ctx, id); err != nil {
 		return nil, err
 	}
 	if transferSideType(in.Type) {
@@ -290,17 +296,21 @@ func (s Transactions) Replan(ctx context.Context, id int64, p Plan) error {
 	return s.SetTags(ctx, id, p.TagIDs)
 }
 
-// guardTransfer refuses changing a transaction that mirrors a transfer
-// between spaces (P31): such rows change only through the transfer.
-func (s Transactions) guardTransfer(ctx context.Context, id int64) error {
+// guardRow refuses changing a transaction that mirrors a transfer between
+// spaces (P31), or is a leg of a payment: such rows change only through the
+// transfer or the group.
+func (s Transactions) guardRow(ctx context.Context, id int64) error {
 	if s.repo().TransferUUID(ctx, id) != "" {
 		return ErrTransferRow
+	}
+	if s.repo().GroupUUID(ctx, id) != "" {
+		return ErrGroupLeg
 	}
 	return nil
 }
 
 func (s Transactions) Delete(ctx context.Context, id int64) error {
-	if err := s.guardTransfer(ctx, id); err != nil {
+	if err := s.guardRow(ctx, id); err != nil {
 		return err
 	}
 	cur, err := s.ByID(ctx, id)
@@ -322,7 +332,7 @@ func (s Transactions) Confirm(
 	date string,
 	amount, toAmount *decimal.Decimal,
 ) (*Transaction, error) {
-	if err := s.guardTransfer(ctx, id); err != nil {
+	if err := s.guardRow(ctx, id); err != nil {
 		return nil, err
 	}
 	cur, err := s.ByID(ctx, id)
@@ -367,7 +377,7 @@ func (s Transactions) Confirm(
 }
 
 func (s Transactions) Skip(ctx context.Context, id int64) (*Transaction, error) {
-	if err := s.guardTransfer(ctx, id); err != nil {
+	if err := s.guardRow(ctx, id); err != nil {
 		return nil, err
 	}
 	cur, err := s.ByID(ctx, id)
@@ -384,7 +394,7 @@ func (s Transactions) Skip(ctx context.Context, id int64) (*Transaction, error) 
 }
 
 func (s Transactions) Duplicate(ctx context.Context, id int64) (*Transaction, error) {
-	if err := s.guardTransfer(ctx, id); err != nil {
+	if err := s.guardRow(ctx, id); err != nil {
 		return nil, err
 	}
 	cur, err := s.ByID(ctx, id)
@@ -520,6 +530,7 @@ func txFrom(r repo.Tx) Transaction {
 		ID: r.ID, Type: r.Type, AccountID: r.AccountID, ToAccountID: r.ToAccountID, CategoryID: r.CategoryID,
 		Amount: r.Amount, ToAmount: r.ToAmount, IsEstimated: r.IsEstimated, Description: r.Description, Date: r.Date,
 		Status: r.Status, RecurringID: r.RecurringID, CreatedAt: r.CreatedAt,
+		GroupUUID: r.GroupUUID,
 	}
 }
 

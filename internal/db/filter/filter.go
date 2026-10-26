@@ -124,7 +124,7 @@ func ListTransactions(
 	args = append(args, limit, offset)
 	rows, err := sqlDB.QueryContext(ctx, `
 		SELECT t.id, t.type, t.account_id, t.to_account_id, t.category_id, t.amount, t.to_amount,
-			t.is_estimated, t.description, t.date, t.status, t.recurring_transaction_id, t.created_at,
+			t.is_estimated, t.description, t.date, t.status, t.recurring_transaction_id, t.created_at, t.group_uuid,
 			c.id, c.decimals, COALESCE(cb.id, c.id), COALESCE(cb.decimals, c.decimals)
 		FROM transactions t
 		LEFT JOIN accounts a ON a.id = t.account_id
@@ -142,7 +142,7 @@ func ListTransactions(
 	for rows.Next() {
 		var r sqlc.GetTransactionRow
 		if err := rows.Scan(&r.ID, &r.Type, &r.AccountID, &r.ToAccountID, &r.CategoryID, &r.Amount, &r.ToAmount,
-			&r.IsEstimated, &r.Description, &r.Date, &r.Status, &r.RecurringTransactionID, &r.CreatedAt,
+			&r.IsEstimated, &r.Description, &r.Date, &r.Status, &r.RecurringTransactionID, &r.CreatedAt, &r.GroupUuid,
 			&r.CurrencyID, &r.Decimals, &r.ToCurrencyID, &r.ToDecimals); err != nil {
 			return nil, err
 		}

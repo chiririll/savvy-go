@@ -1,7 +1,7 @@
 -- name: InsertTransaction :execresult
 INSERT INTO transactions (type, account_id, to_account_id, category_id, amount, to_amount, is_estimated,
-	description, date, status, recurring_transaction_id, created_at, updated_at)
-VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?);
+	description, date, status, recurring_transaction_id, group_uuid, created_at, updated_at)
+VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?);
 
 -- name: UpdateTransaction :exec
 -- A move to another day drops the manual place: it was a slot of the old day.
@@ -32,7 +32,7 @@ SELECT COUNT(*) FROM transactions;
 -- name: GetTransaction :one
 -- Lists go through filter.ListTransactions, which selects the same columns.
 SELECT t.id, t.type, t.account_id, t.to_account_id, t.category_id, t.amount, t.to_amount,
-	t.is_estimated, t.description, t.date, t.status, t.recurring_transaction_id, t.created_at,
+	t.is_estimated, t.description, t.date, t.status, t.recurring_transaction_id, t.created_at, t.group_uuid,
 	ca.id AS currency_id, ca.decimals AS decimals,
 	COALESCE(cb.id, ca.id) AS to_currency_id, COALESCE(cb.decimals, ca.decimals) AS to_decimals
 FROM transactions t
@@ -88,3 +88,12 @@ FROM transactions WHERE id IN (sqlc.slice('ids'));
 
 -- name: SetTransactionDayOrder :exec
 UPDATE transactions SET day_order = ? WHERE id = ?;
+
+-- name: GetTransactionGroupUUID :one
+SELECT group_uuid FROM transactions WHERE id = ?;
+
+-- name: ListGroupTransactionIDs :many
+SELECT id FROM transactions WHERE group_uuid = ? ORDER BY id;
+
+-- name: DeleteGroupTransactions :exec
+DELETE FROM transactions WHERE group_uuid = ?;
