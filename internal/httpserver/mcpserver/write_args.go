@@ -198,3 +198,32 @@ type testRuleArgs struct {
 	ID            int64 `json:"id" jsonschema:"Id of the rule."`
 	TransactionID int64 `json:"transaction_id" jsonschema:"The transaction to try the rule on."`
 }
+
+// txLegArgs is one leg of a payment, as createTxArgs without the space.
+type txLegArgs struct {
+	Type        string  `json:"type" jsonschema:"expense, income or transfer."`
+	AccountID   int64   `json:"account_id" jsonschema:"Account money leaves (expense, transfer) or enters (income)."`
+	ToAccountID int64   `json:"to_account_id,omitempty" jsonschema:"Transfer only: the receiving account."`
+	CategoryID  int64   `json:"category_id,omitempty" jsonschema:"Category id, from list_categories."`
+	Amount      string  `json:"amount" jsonschema:"Amount in account_id's currency, decimal string like \"12.50\"."`
+	ToAmount    string  `json:"to_amount,omitempty" jsonschema:"Amount that arrives, for a transfer between currencies."`
+	Description string  `json:"description,omitempty"`
+	Date        string  `json:"date" jsonschema:"YYYY-MM-DD, the same for every leg and not in the future."`
+	TagIDs      []int64 `json:"tag_ids,omitempty" jsonschema:"Tag ids, from list_tags."`
+}
+
+type createTxGroupArgs struct {
+	SpaceID int64       `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
+	Legs    []txLegArgs `json:"legs" jsonschema:"At least two legs."`
+}
+
+type updateTxGroupArgs struct {
+	SpaceID int64       `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
+	UUID    string      `json:"uuid" jsonschema:"Uuid of the payment, from its transactions' groupUuid."`
+	Legs    []txLegArgs `json:"legs" jsonschema:"All legs of the payment as they should be now."`
+}
+
+type txGroupIDArgs struct {
+	SpaceID int64  `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
+	UUID    string `json:"uuid" jsonschema:"Uuid of the payment, from its transactions' groupUuid."`
+}

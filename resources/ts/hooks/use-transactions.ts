@@ -1,13 +1,14 @@
 import { useMemo } from 'react'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData, type QueryKey } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { transactionsApi, type ConfirmTransactionOptions, type TransactionsResponse } from '@/api'
+import { transactionsApi, transactionGroupsApi, type ConfirmTransactionOptions, type TransactionsResponse } from '@/api'
 import { Transaction, TransactionFilters } from '@/types'
 import { TransactionFormData } from '@/schemas'
 import { useResourceItem, useResourceMutation } from './use-crud'
 import i18n from '@/lib/i18n'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { dayOrderForApi, placeInSlots } from '@/lib/transaction-order'
+import type { PaymentLeg } from '@/lib/split-payment'
 
 const QUERY_KEY = ['transactions']
 const TRANSACTION_INVALIDATE = [
@@ -197,5 +198,40 @@ export function useReorderTransactions() {
         onSettled: () => {
             queryClient.invalidateQueries({ queryKey: QUERY_KEY })
         },
+    })
+}
+
+export function useTransactionGroup(uuid: string | null) {
+    return useQuery({
+        queryKey: [...QUERY_KEY, 'group', uuid],
+        queryFn: () => transactionGroupsApi.getByUuid(uuid as string),
+        enabled: uuid !== null,
+    })
+}
+
+export function useCreateTransactionGroup() {
+    return useResourceMutation({
+        mutationFn: (legs: PaymentLeg[]) => transactionGroupsApi.create(legs),
+        invalidateKeys: [...TRANSACTION_INVALIDATE],
+        resetKeys: [...TRANSACTION_INFINITE_RESET],
+        successMessage: i18n.t('toasts.transaction.paymentCreated'),
+    })
+}
+
+export function useUpdateTransactionGroup() {
+    return useResourceMutation({
+        mutationFn: ({ uuid, legs }: { uuid: string; legs: PaymentLeg[] }) => transactionGroupsApi.update(uuid, legs),
+        invalidateKeys: [...TRANSACTION_INVALIDATE],
+        resetKeys: [...TRANSACTION_INFINITE_RESET],
+        successMessage: i18n.t('toasts.transaction.paymentUpdated'),
+    })
+}
+
+export function useDeleteTransactionGroup() {
+    return useResourceMutation({
+        mutationFn: (uuid: string) => transactionGroupsApi.delete(uuid),
+        invalidateKeys: [...TRANSACTION_INVALIDATE],
+        resetKeys: [...TRANSACTION_INFINITE_RESET],
+        successMessage: i18n.t('toasts.transaction.paymentDeleted'),
     })
 }

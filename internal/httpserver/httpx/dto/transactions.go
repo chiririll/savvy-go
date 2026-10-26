@@ -43,6 +43,7 @@ type Transaction struct {
 	Date                   *string      `json:"date"`
 	Status                 string       `json:"status"`
 	RecurringTransactionID *int64       `json:"recurringTransactionId"`
+	GroupUUID              *string      `json:"groupUuid"`
 	Actions                TxActions    `json:"actions"`
 	Account                *Account     `json:"account"`
 	ToAccount              *Account     `json:"toAccount"`
@@ -56,6 +57,7 @@ func NewTransaction(t ledger.Transaction) Transaction {
 	return Transaction{
 		ID: t.ID, Type: t.Type, Amount: t.Amount, ToAmount: t.ToAmount, IsEstimated: t.IsEstimated,
 		Description: t.Description, Date: t.Date, Status: t.Status, RecurringTransactionID: t.RecurringID,
+		GroupUUID: t.GroupUUID,
 		Actions:   transactionActions(t),
 		Account:   ptr(t.Account, NewAccount),
 		ToAccount: ptr(t.ToAccount, NewAccount),
@@ -96,4 +98,14 @@ type TransactionPage struct {
 	Data    []Transaction       `json:"data"`
 	Meta    PageMeta            `json:"meta"`
 	Summary *TransactionSummary `json:"summary,omitempty"`
+}
+
+// TransactionGroup is one payment made in several parts: its legs, oldest first.
+type TransactionGroup struct {
+	UUID string        `json:"uuid"`
+	Legs []Transaction `json:"legs"`
+}
+
+func NewTransactionGroup(g ledger.Group) TransactionGroup {
+	return TransactionGroup{UUID: g.UUID, Legs: Map(g.Legs, NewTransaction)}
 }

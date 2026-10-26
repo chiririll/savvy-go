@@ -32,6 +32,10 @@ func Routes(r chi.Router) {
 	r.Post("/transactions/{id}/duplicate", transactionsDuplicate)
 	r.Post("/transactions/{id}/confirm", transactionsConfirm)
 	r.Post("/transactions/{id}/skip", transactionsSkip)
+	r.Post("/transaction-groups", groupsStore)
+	r.Get("/transaction-groups/{uuid}", groupsShow)
+	r.Put("/transaction-groups/{uuid}", groupsUpdate)
+	r.Delete("/transaction-groups/{uuid}", groupsDestroy)
 	r.Get("/transactions-summary", transactionsSummary)
 	r.Get("/transactions-pending-summary", transactionsPendingSummary)
 }

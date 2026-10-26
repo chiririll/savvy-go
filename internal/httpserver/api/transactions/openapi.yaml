@@ -172,3 +172,64 @@ paths:
         "404": {$ref: "#/components/responses/NotFound"}
         "422": {$ref: "#/components/responses/Validation"}
 
+  /spaces/{space}/transaction-groups:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    post:
+      tags: [Transactions]
+      summary: Create a payment made in several parts
+      description: >
+        One payment settled with several accounts or currencies, such as cash
+        and card, or euros with the change given back in dinars. It is saved as
+        ordinary transactions (legs) that share a group. At least two legs, all
+        confirmed, on the same day, of type expense, income or transfer. All
+        legs are written or none. Money owed for the price is an expense; the
+        surplus handed over and the change received are a transfer between the
+        accounts, so the expense never depends on an exchange rate.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/TransactionGroupInput"}
+      responses:
+        "201": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "422": {$ref: "#/components/responses/Validation"}
+  /spaces/{space}/transaction-groups/{uuid}:
+    parameters:
+      - {$ref: "#/components/parameters/Space"}
+      - {name: uuid, in: path, required: true, schema: {type: string}}
+    get:
+      tags: [Transactions]
+      summary: Get a payment with its legs
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+    put:
+      tags: [Transactions]
+      summary: Replace the legs of a payment
+      description: >
+        Replaces all legs in one step. The legs get new ids; the payment keeps
+        its uuid. A leg cannot be changed or deleted on its own through
+        /transactions/{id}.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/TransactionGroupInput"}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "422": {$ref: "#/components/responses/Validation"}
+    delete:
+      tags: [Transactions]
+      summary: Delete a payment with all its legs
+      responses:
+        "204": {description: Deleted}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -24,7 +25,7 @@ import (
 // clients use to decide whether to ask the user first.
 type writeTool struct {
 	name, title, desc string
-	method, path      string // path may use {space_id} and {id}
+	method, path      string // path may use {space_id}, {id} and {uuid}
 	destructive       bool
 	idempotent        bool
 }
@@ -54,6 +55,10 @@ func addWrite[In any](h Handler, srv *mcp.Server, t writeTool) {
 					path = strings.ReplaceAll(path, "{"+key+"}", strconv.FormatInt(int64(v.(float64)), 10))
 					delete(args, key)
 				}
+			}
+			if v, ok := args["uuid"].(string); ok {
+				path = strings.ReplaceAll(path, "{uuid}", url.PathEscape(v))
+				delete(args, "uuid")
 			}
 			var body []byte
 			if t.method != http.MethodDelete {
@@ -94,6 +99,12 @@ func (k writeSet) patch(name, title, desc, path string) writeTool {
 	return k.tool(name, title, desc, http.MethodPatch, path)
 }
 
+func (k writeSet) put(name, title, desc, path string) writeTool {
+	t := k.tool(name, title, desc, http.MethodPut, path)
+	t.idempotent = true
+	return t
+}
+
 func (k writeSet) del(name, title, desc, path string) writeTool {
 	t := k.tool(name, title, desc, http.MethodDelete, path)
 	t.destructive, t.idempotent = true, true
@@ -131,6 +142,18 @@ func (k writeSet) transactionTools() {
 		"Skip a pending (scheduled) transaction.", "transactions/{id}/skip"))
 	register[idArgs](k, k.post("duplicate_transaction", "Duplicate transaction",
 		"Copy a transaction.", "transactions/{id}/duplicate"))
+	register[createTxGroupArgs](k, k.post("create_transaction_group", "Create split payment",
+		"Record one payment made with several accounts or currencies, such as cash and card, or euros with the "+
+			"change given back in dinars. Legs are written together or not at all, all on the same day. "+
+			"Record the price as an expense and the money exchanged on the way as a transfer between the two "+
+			"accounts with to_amount: rent of 450 EUR paid with 500 EUR and 5900 RSD back is an expense of 450 EUR "+
+			"plus a transfer of 50 EUR to the dinar account with to_amount 5900. Never use a negative amount.",
+		"transaction-groups"))
+	register[updateTxGroupArgs](k, k.put("update_transaction_group", "Update split payment",
+		"Replace all legs of a split payment. Send every leg, not only the ones that change.",
+		"transaction-groups/{uuid}"))
+	register[txGroupIDArgs](k, k.del("delete_transaction_group", "Delete split payment",
+		"Permanently delete a split payment with all its legs. Ask the user first.", "transaction-groups/{uuid}"))
 }
 
 func (k writeSet) accountTools() {

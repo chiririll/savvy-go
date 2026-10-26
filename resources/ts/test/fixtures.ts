@@ -176,6 +176,7 @@ export const transaction = (overrides: Partial<Transaction> = {}): Transaction =
     date: '2020-05-04',
     status: 'confirmed',
     recurringTransactionId: null,
+    groupUuid: null,
     actions: { edit: true, duplicate: true, delete: true, confirm: false, skip: false },
     account: accounts[0],
     toAccount: null,

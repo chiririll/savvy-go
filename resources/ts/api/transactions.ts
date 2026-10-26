@@ -1,8 +1,9 @@
 import { api, apiClient } from './client'
 import { createCrudApi } from './crud'
 import { toQueryString } from '@/lib/query-string'
-import { Transaction, TransactionFilters, TransactionSummary } from '@/types'
+import { Transaction, TransactionFilters, TransactionGroup, TransactionSummary } from '@/types'
 import { TransactionFormData } from '@/schemas'
+import type { PaymentLeg } from '@/lib/split-payment'
 
 const ENDPOINT = '/transactions'
 
@@ -80,4 +81,18 @@ export const transactionsApi = {
             start_date: filters?.start_date,
             end_date: filters?.end_date,
         })}`),
+}
+
+const GROUPS_ENDPOINT = '/transaction-groups'
+
+export const transactionGroupsApi = {
+    getByUuid: (uuid: string) => api.get<TransactionGroup>(`${GROUPS_ENDPOINT}/${uuid}`),
+
+    create: (legs: PaymentLeg[]) => api.post<TransactionGroup, { legs: PaymentLeg[] }>(GROUPS_ENDPOINT, { legs }),
+
+    /** Replaces every leg of the payment. */
+    update: (uuid: string, legs: PaymentLeg[]) =>
+        api.put<TransactionGroup, { legs: PaymentLeg[] }>(`${GROUPS_ENDPOINT}/${uuid}`, { legs }),
+
+    delete: (uuid: string) => api.delete<void>(`${GROUPS_ENDPOINT}/${uuid}`),
 }

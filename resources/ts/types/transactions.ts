@@ -43,6 +43,8 @@ export interface Transaction extends BaseEntity {
     date: string | null
     status: TransactionStatus
     recurringTransactionId: number | null
+    /** The split payment this transaction is a leg of; its legs change together. */
+    groupUuid: string | null
     actions: TransactionActions
     account: Account
     toAccount: Account | null
@@ -72,4 +74,10 @@ export interface TransactionSummary {
     balance: number
     transactionsCount: number
     currency: string | null
+}
+
+/** One payment made in several parts: its legs, oldest first. */
+export interface TransactionGroup {
+    uuid: string
+    legs: Transaction[]
 }

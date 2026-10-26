@@ -14,7 +14,12 @@ export { ssoApi, ssoRedirectUrl } from './sso'
 export { webauthnApi } from './webauthn'
 export { apiTokensApi } from './api-tokens'
 export { tagsApi } from './tags'
-export { transactionsApi, type ConfirmTransactionOptions, type TransactionsResponse } from './transactions'
+export {
+    transactionsApi,
+    transactionGroupsApi,
+    type ConfirmTransactionOptions,
+    type TransactionsResponse,
+} from './transactions'
 export { reportsApi } from './reports'
 export { automationApi } from './automation'
 export { backupsApi } from './backups'

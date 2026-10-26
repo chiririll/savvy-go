@@ -27,6 +27,7 @@ func (s *Server) newScope(id int64, role string, d store.DB) *httpx.SpaceScope {
 		Categories: ledger.Categories{DB: d},
 		Tags:       ledger.Tags{DB: d},
 		Txs:        txs,
+		Groups:     ledger.Groups{DB: d},
 		Debts:      ledger.Debts{Accounts: accounts, Transactions: txs},
 		Recurring:  recurring.Service{DB: d, Txs: txs},
 		Budgets:    ledger.Budgets{DB: d},

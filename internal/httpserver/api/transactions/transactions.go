@@ -129,7 +129,7 @@ func transactionsDestroy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := httpx.Scope(r).Txs.Delete(r.Context(), tx.ID); err != nil {
-		if errors.Is(err, ledger.ErrTransferRow) {
+		if errors.Is(err, ledger.ErrTransferRow) || errors.Is(err, ledger.ErrGroupLeg) {
 			httpx.WriteMessage(w, 422, err.Error())
 			return
 		}
@@ -196,7 +196,7 @@ func transactionsSkip(w http.ResponseWriter, r *http.Request) {
 	}
 	out, err := httpx.Scope(r).Txs.Skip(r.Context(), tx.ID)
 	if err != nil {
-		if errors.Is(err, ledger.ErrTransferRow) {
+		if errors.Is(err, ledger.ErrTransferRow) || errors.Is(err, ledger.ErrGroupLeg) {
 			httpx.WriteMessage(w, 422, err.Error())
 			return
 		}
@@ -234,26 +234,46 @@ func txParam(w http.ResponseWriter, r *http.Request) *ledger.Transaction {
 	return httpx.Lookup(w, r, httpx.Scope(r).Txs.ByID)
 }
 
+// txBody is a transaction as sent by a client.
+type txBody struct {
+	Type        string           `json:"type"`
+	AccountID   int64            `json:"account_id"`
+	ToAccountID *int64           `json:"to_account_id"`
+	CategoryID  *int64           `json:"category_id"`
+	Amount      decimal.Decimal  `json:"amount"`
+	ToAmount    *decimal.Decimal `json:"to_amount"`
+	IsEstimated bool             `json:"is_estimated"`
+	Description *string          `json:"description"`
+	Date        *string          `json:"date"`
+	TagIDs      []int64          `json:"tag_ids"`
+	Items       []struct {
+		Name         string          `json:"name"`
+		Quantity     decimal.Decimal `json:"quantity"`
+		PricePerUnit decimal.Decimal `json:"price_per_unit"`
+	} `json:"items"`
+}
+
+func (b txBody) input() ledger.TxInput {
+	in := ledger.TxInput{
+		Type: b.Type, AccountID: b.AccountID, ToAccountID: b.ToAccountID,
+		CategoryID: b.CategoryID, Amount: b.Amount, ToAmount: b.ToAmount,
+		IsEstimated: b.IsEstimated, Description: b.Description, Date: b.Date,
+		TagIDs: b.TagIDs,
+	}
+	for _, it := range b.Items {
+		qty := it.Quantity
+		if qty.IsZero() {
+			qty = decimal.NewFromInt(1)
+		}
+		in.Items = append(in.Items, ledger.TxItemInput{Name: it.Name, Quantity: qty, PricePerUnit: it.PricePerUnit})
+	}
+	return in
+}
+
 // decodeTx reads a transaction from the body; on update, over base: fields
 // the body leaves out keep their values. Items and tags left out are kept by the update itself.
 func decodeTx(w http.ResponseWriter, r *http.Request, base *ledger.Transaction) (ledger.TxInput, bool) {
-	var body struct {
-		Type        string           `json:"type"`
-		AccountID   int64            `json:"account_id"`
-		ToAccountID *int64           `json:"to_account_id"`
-		CategoryID  *int64           `json:"category_id"`
-		Amount      decimal.Decimal  `json:"amount"`
-		ToAmount    *decimal.Decimal `json:"to_amount"`
-		IsEstimated bool             `json:"is_estimated"`
-		Description *string          `json:"description"`
-		Date        *string          `json:"date"`
-		TagIDs      []int64          `json:"tag_ids"`
-		Items       []struct {
-			Name         string          `json:"name"`
-			Quantity     decimal.Decimal `json:"quantity"`
-			PricePerUnit decimal.Decimal `json:"price_per_unit"`
-		} `json:"items"`
-	}
+	var body txBody
 	if base != nil {
 		body.Type, body.AccountID, body.ToAccountID = base.Type, base.AccountID, httpx.Clone(base.ToAccountID)
 		body.CategoryID, body.Amount = httpx.Clone(base.CategoryID), base.Amount.Decimal()
@@ -271,18 +291,5 @@ func decodeTx(w http.ResponseWriter, r *http.Request, base *ledger.Transaction) 
 		httpx.WriteValidation(w, map[string][]string{"account_id": {"The account id field is required."}})
 		return ledger.TxInput{}, false
 	}
-	in := ledger.TxInput{
-		Type: body.Type, AccountID: body.AccountID, ToAccountID: body.ToAccountID,
-		CategoryID: body.CategoryID, Amount: body.Amount, ToAmount: body.ToAmount,
-		IsEstimated: body.IsEstimated, Description: body.Description, Date: body.Date,
-		TagIDs: body.TagIDs,
-	}
-	for _, it := range body.Items {
-		qty := it.Quantity
-		if qty.IsZero() {
-			qty = decimal.NewFromInt(1)
-		}
-		in.Items = append(in.Items, ledger.TxItemInput{Name: it.Name, Quantity: qty, PricePerUnit: it.PricePerUnit})
-	}
-	return in, true
+	return body.input(), true
 }

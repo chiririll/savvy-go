@@ -217,6 +217,7 @@ components:
         date: {type: string}
         status: {type: string}
         recurringTransactionId: {type: integer, nullable: true}
+        groupUuid: {type: string, nullable: true, description: The payment this transaction is a leg of}
         account: {type: object, additionalProperties: true}
         toAccount: {type: object, additionalProperties: true}
         category: {type: object, additionalProperties: true}
@@ -227,6 +228,14 @@ components:
           type: object
           additionalProperties: {type: boolean}
         createdAt: {type: string, format: date-time}
+    TransactionGroupInput:
+      type: object
+      required: [legs]
+      properties:
+        legs:
+          type: array
+          minItems: 2
+          items: {$ref: "#/components/schemas/TransactionInput"}
     BudgetInput:
       type: object
       properties:

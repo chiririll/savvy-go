@@ -30,6 +30,7 @@ type SpaceScope struct {
 	Categories ledger.Categories
 	Tags       ledger.Tags
 	Txs        ledger.Transactions
+	Groups     ledger.Groups
 	Debts      ledger.Debts
 	Recurring  recurring.Service
 	Budgets    ledger.Budgets
