@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect, fn, screen, userEvent, within } from 'storybook/test'
+import { expect, fn, screen, userEvent, waitFor, within } from 'storybook/test'
 
 import { Button } from './button'
 import {
@@ -50,6 +50,6 @@ export const ClosedByEscape: Story = {
         await userEvent.click(within(canvasElement).getByRole('button', { name: 'Actions' }))
         await screen.findByRole('menu')
         await userEvent.keyboard('{Escape}')
-        await expect(screen.queryByRole('menu')).toBeNull()
+        await waitFor(() => expect(screen.queryByRole('menu')).toBeNull())
     },
 }
