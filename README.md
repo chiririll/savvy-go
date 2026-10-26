@@ -16,6 +16,10 @@
 <img src="https://img.shields.io/github/license/chiririll/savvy-go?style=for-the-badge" alt="License">
 </p>
 
+<p align="center">
+A Go rewrite of <a href="https://github.com/truenormis/savvy"><b>Savvy</b></a> by <a href="https://github.com/truenormis">truenormis</a>
+</p>
+
 ---
 
 <p align="center">
