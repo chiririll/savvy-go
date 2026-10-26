@@ -2,7 +2,7 @@
 # of the app's image (compose: additional_contexts). Build from the
 # repository root. The image carries the browsers; the playwright package comes from
 # scripts/package.json, and its version must be the one of the image tag below.
-ARG PLAYWRIGHT_VERSION=1.63.0
+ARG PLAYWRIGHT_VERSION=1.64.1
 
 # The throwaway OAuth app of the oauth-app scenario (cmd/oauth-probe, stdlib only), built here so
 # the image needs no Go toolchain.
