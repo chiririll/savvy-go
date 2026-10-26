@@ -58,19 +58,19 @@ export const ReadOnly: Story = { args: { isReadOnly: true } }
 // Coffee and Bus ticket share a day: the first can only go down, the second only up.
 export const MovedWithMenu: Story = {
     tags: ['desktop-only'],
-    args: { onReorderDay: fn() },
+    args: { onReorder: fn() },
     play: async ({ canvasElement, args }) => {
         const menus = within(canvasElement).getAllByRole('button', { name: /more actions/i })
         await userEvent.click(menus[0])
         await expect(screen.queryByRole('menuitem', { name: /move up/i })).toBeNull()
         await userEvent.click(await screen.findByRole('menuitem', { name: /move down/i }))
-        await expect(args.onReorderDay).toHaveBeenCalledWith('2020-05-04', [2, 1])
+        await expect(args.onReorder).toHaveBeenCalledWith('2020-05-04', [2, 1])
     },
 }
 
 export const NoMoveWhenReadOnly: Story = {
     tags: ['desktop-only'],
-    args: { onReorderDay: fn(), isReadOnly: true },
+    args: { onReorder: fn(), isReadOnly: true },
     play: async ({ canvasElement }) => {
         await userEvent.click(within(canvasElement).getAllByRole('button', { name: /more actions/i })[0])
         await expect(screen.queryByRole('menuitem', { name: /move/i })).toBeNull()

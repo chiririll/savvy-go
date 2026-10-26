@@ -63,7 +63,7 @@ export const transactionsApi = {
         }),
 
     /** Puts the transactions in that order within one day; ids go oldest first. */
-    reorderDay: (date: string, ids: number[]) =>
+    reorder: (date: string, ids: number[]) =>
         api.post<{ success: boolean }, { date: string; ids: number[] }>(`${ENDPOINT}/reorder`, { date, ids }),
 
     getPendingSummary: () =>

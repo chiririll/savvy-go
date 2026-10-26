@@ -20,7 +20,7 @@ func dayIDs(t *testing.T, e *moneyEnv, dir string) []int64 {
 	return ids
 }
 
-func TestReorderDayChangesOrderWithinTheDay(t *testing.T) {
+func TestReorderChangesOrderWithinTheDay(t *testing.T) {
 	e := newMoneyEnv(t)
 	a := e.tx(t, "expense", e.usdAcc.ID, "1")
 	b := e.tx(t, "expense", e.usdAcc.ID, "2")
@@ -29,7 +29,7 @@ func TestReorderDayChangesOrderWithinTheDay(t *testing.T) {
 	if got := dayIDs(t, e, "asc"); !slices.Equal(got, []int64{a.ID, b.ID, c.ID}) {
 		t.Fatalf("default asc = %v", got)
 	}
-	if err := e.txs.ReorderDay(e.ctx, "2024-01-15", []int64{c.ID, a.ID, b.ID}); err != nil {
+	if err := e.txs.Reorder(e.ctx, "2024-01-15", []int64{c.ID, a.ID, b.ID}); err != nil {
 		t.Fatal(err)
 	}
 	if got := dayIDs(t, e, "asc"); !slices.Equal(got, []int64{c.ID, a.ID, b.ID}) {
@@ -46,13 +46,13 @@ func TestReorderDayChangesOrderWithinTheDay(t *testing.T) {
 	}
 }
 
-func TestReorderDayAcceptsASubsetOfTheDay(t *testing.T) {
+func TestReorderAcceptsASubsetOfTheDay(t *testing.T) {
 	e := newMoneyEnv(t)
 	a := e.tx(t, "expense", e.usdAcc.ID, "1")
 	b := e.tx(t, "expense", e.usdAcc.ID, "2")
 	c := e.tx(t, "expense", e.usdAcc.ID, "3")
 	// Only a and c are shown (a filter); swapping them leaves b between.
-	if err := e.txs.ReorderDay(e.ctx, "2024-01-15", []int64{c.ID, a.ID}); err != nil {
+	if err := e.txs.Reorder(e.ctx, "2024-01-15", []int64{c.ID, a.ID}); err != nil {
 		t.Fatal(err)
 	}
 	if got := dayIDs(t, e, "asc"); !slices.Equal(got, []int64{c.ID, b.ID, a.ID}) {
@@ -60,7 +60,7 @@ func TestReorderDayAcceptsASubsetOfTheDay(t *testing.T) {
 	}
 }
 
-func TestReorderDayRejectsOtherDaysAndUnknownIDs(t *testing.T) {
+func TestReorderRejectsOtherDaysAndUnknownIDs(t *testing.T) {
 	e := newMoneyEnv(t)
 	a := e.tx(t, "expense", e.usdAcc.ID, "1")
 	other := "2024-02-01"
@@ -73,11 +73,11 @@ func TestReorderDayRejectsOtherDaysAndUnknownIDs(t *testing.T) {
 		"unknown":   {a.ID, 9999},
 		"duplicate": {a.ID, a.ID},
 	} {
-		if err := e.txs.ReorderDay(e.ctx, "2024-01-15", ids); err == nil {
+		if err := e.txs.Reorder(e.ctx, "2024-01-15", ids); err == nil {
 			t.Errorf("%s: want an error", name)
 		}
 	}
-	if err := e.txs.ReorderDay(e.ctx, "not a date", []int64{a.ID}); err == nil {
+	if err := e.txs.Reorder(e.ctx, "not a date", []int64{a.ID}); err == nil {
 		t.Error("bad date: want an error")
 	}
 }
@@ -86,7 +86,7 @@ func TestMovingATransactionToAnotherDayDropsItsManualPlace(t *testing.T) {
 	e := newMoneyEnv(t)
 	a := e.tx(t, "expense", e.usdAcc.ID, "1")
 	b := e.tx(t, "expense", e.usdAcc.ID, "2")
-	if err := e.txs.ReorderDay(e.ctx, "2024-01-15", []int64{b.ID, a.ID}); err != nil {
+	if err := e.txs.Reorder(e.ctx, "2024-01-15", []int64{b.ID, a.ID}); err != nil {
 		t.Fatal(err)
 	}
 	day := "2024-01-16"
@@ -103,7 +103,7 @@ func TestMovingATransactionToAnotherDayDropsItsManualPlace(t *testing.T) {
 		t.Errorf("day_order = %d, want NULL after the date changed", *order)
 	}
 	// Saving it again on the same day keeps a manual place.
-	if err := e.txs.ReorderDay(e.ctx, "2024-01-15", []int64{b.ID}); err != nil {
+	if err := e.txs.Reorder(e.ctx, "2024-01-15", []int64{b.ID}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := e.txs.Update(e.ctx, b.ID, TxInput{

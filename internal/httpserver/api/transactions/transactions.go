@@ -182,7 +182,7 @@ func transactionsReorder(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	if err := httpx.Scope(r).Txs.ReorderDay(r.Context(), body.Date, body.IDs); err != nil {
+	if err := httpx.Scope(r).Txs.Reorder(r.Context(), body.Date, body.IDs); err != nil {
 		httpx.WriteMessage(w, 422, err.Error())
 		return
 	}

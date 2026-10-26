@@ -148,7 +148,7 @@ export function useTransactionSummary(filters?: TransactionFilters) {
     })
 }
 
-interface ReorderDayVariables {
+interface ReorderVariables {
     date: string
     /** The day's transactions as the list shows them. */
     shownIds: number[]
@@ -156,13 +156,13 @@ interface ReorderDayVariables {
 }
 
 /** Drags within one day: the lists show the new order at once and the server confirms it. */
-export function useReorderTransactionDay() {
+export function useReorderTransactions() {
     const queryClient = useQueryClient()
     const listKey = [...QUERY_KEY, 'infinite']
 
     return useMutation({
-        mutationFn: ({ date, shownIds, direction }: ReorderDayVariables) =>
-            transactionsApi.reorderDay(date, dayOrderForApi(shownIds, direction)),
+        mutationFn: ({ date, shownIds, direction }: ReorderVariables) =>
+            transactionsApi.reorder(date, dayOrderForApi(shownIds, direction)),
         onMutate: async ({ shownIds }) => {
             await queryClient.cancelQueries({ queryKey: listKey })
             const previous = queryClient.getQueriesData({ queryKey: listKey })

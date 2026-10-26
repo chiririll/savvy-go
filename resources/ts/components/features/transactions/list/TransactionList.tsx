@@ -21,7 +21,7 @@ interface TransactionListProps {
     isReadOnly?: boolean
     grouped?: boolean
     /** Called with a day and its transactions in the new order, as listed. Move up/down menu items show when set. */
-    onReorderDay?: (date: string, shownIds: number[]) => void
+    onReorder?: (date: string, shownIds: number[]) => void
 }
 
 export function TransactionList({
@@ -39,16 +39,16 @@ export function TransactionList({
     onEdit,
     isReadOnly,
     grouped = true,
-    onReorderDay,
+    onReorder,
 }: TransactionListProps) {
     const relativeDay = useRelativeDay()
     const groups = grouped ? groupByDateKey(transactions) : []
     const canReorder = (group: { date: string | null; items: Transaction[] }) =>
-        !!onReorderDay && !isReadOnly && group.date !== null && group.items.length > 1
+        !!onReorder && !isReadOnly && group.date !== null && group.items.length > 1
     const move = (group: { date: string | null; items: Transaction[] }, index: number, step: -1 | 1) => {
         const ids = group.items.map((item) => item.id)
         ;[ids[index], ids[index + step]] = [ids[index + step], ids[index]]
-        onReorderDay?.(group.date as string, ids)
+        onReorder?.(group.date as string, ids)
     }
     const rowProps = (transaction: Transaction) => ({
         transaction,

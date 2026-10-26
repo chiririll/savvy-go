@@ -17,7 +17,7 @@ import {
     useDeleteTransaction,
     useDuplicateTransaction,
     useSkipTransaction,
-    useReorderTransactionDay,
+    useReorderTransactions,
     useCategories,
     useTags,
     useTransactionListFilters,
@@ -50,7 +50,7 @@ export default function TransactionsPage() {
     const deleteTransaction = useDeleteTransaction()
     const duplicateTransaction = useDuplicateTransaction()
     const skipTransaction = useSkipTransaction()
-    const reorderDay = useReorderTransactionDay()
+    const reorder = useReorderTransactions()
     const { data: categories } = useCategories()
     const { data: tags } = useTags()
     const isReadOnly = useReadOnly()
@@ -150,8 +150,8 @@ export default function TransactionsPage() {
                                 onSkip={(id) => skipTransaction.mutate(id)}
                                 onEdit={openEdit}
                                 isReadOnly={isReadOnly}
-                                onReorderDay={(date, shownIds) =>
-                                    reorderDay.mutate({
+                                onReorder={(date, shownIds) =>
+                                    reorder.mutate({
                                         date: date.slice(0, 10),
                                         shownIds,
                                         direction: list.params.sortDir,
