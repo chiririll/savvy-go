@@ -8,7 +8,7 @@ export function TransactionTagsField({ control }: { control: Control<Transaction
         <FormField
             control={control}
             name="tag_ids"
-            render={({ field }) => <TagSelect value={field.value ?? []} onChange={field.onChange} asFormItem />}
+            render={({ field }) => <TagSelect value={field.value ?? []} onChange={field.onChange} asFormItem allowCreate />}
         />
     )
 }
