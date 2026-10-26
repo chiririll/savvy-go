@@ -3,8 +3,18 @@ import { usersApi } from '@/api/users'
 import type { UserFormData } from '@/schemas'
 import { useResourceItem, useResourceMutation } from './use-crud'
 import i18n from '@/lib/i18n'
+import { useAuthStore } from '@/stores/auth'
+import type { User } from '@/types/users'
 
 const QUERY_KEY = ['users']
+
+/** The session user is not in react-query: editing yourself on the users page must reach it too. */
+function refreshSessionUser(edited: User) {
+    const { user, checkAuth } = useAuthStore.getState()
+    if (user?.id === edited.id) {
+        void checkAuth()
+    }
+}
 
 export function useUsers() {
     return useQuery({
@@ -30,6 +40,7 @@ export function useUpdateUser() {
         mutationFn: ({ id, data }: { id: string | number; data: Partial<UserFormData> }) =>
             usersApi.update(id, data),
         invalidateKeys: [QUERY_KEY],
+        onSuccess: refreshSessionUser,
         successMessage: i18n.t('toasts.user.updated'),
     })
 }
@@ -38,6 +49,7 @@ export function useSetEmailVerified() {
     return useResourceMutation({
         mutationFn: ({ id, verified }: { id: number; verified: boolean }) => usersApi.setEmailVerified(id, verified),
         invalidateKeys: [QUERY_KEY],
+        onSuccess: refreshSessionUser,
         successMessage: i18n.t('toasts.user.updated'),
     })
 }

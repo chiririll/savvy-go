@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { settingsApi } from '@/api'
 import { Settings } from '@/types'
 import { useResourceMutation } from './use-crud'
+import { SERVER_CHECKS_KEY } from './use-server-checks'
 import i18n from '@/lib/i18n'
 
 const QUERY_KEY = ['settings']
@@ -27,7 +28,7 @@ export function useInstanceSettings(enabled = true) {
 export function useUpdateSettings() {
     return useResourceMutation({
         mutationFn: (data: Partial<Settings>) => settingsApi.update(data),
-        invalidateKeys: [QUERY_KEY],
+        invalidateKeys: [QUERY_KEY, SERVER_CHECKS_KEY],
         successMessage: i18n.t('toasts.settings.updated'),
     })
 }

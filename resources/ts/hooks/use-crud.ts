@@ -9,6 +9,8 @@ interface UseResourceMutationOptions<TData, TVariables> {
     successMessage?: string | ((data: TData, variables: TVariables) => string)
     redirectTo?: string
     invalidateAll?: boolean
+    /** For state outside react-query, e.g. the session user in the auth store. */
+    onSuccess?: (data: TData, variables: TVariables) => void
 }
 
 export function useResourceMutation<TData, TVariables = void>({
@@ -18,6 +20,7 @@ export function useResourceMutation<TData, TVariables = void>({
     successMessage,
     redirectTo,
     invalidateAll = false,
+    onSuccess,
 }: UseResourceMutationOptions<TData, TVariables>) {
     const queryClient = useQueryClient()
     const navigate = useNavigate()
@@ -35,6 +38,8 @@ export function useResourceMutation<TData, TVariables = void>({
                     queryClient.invalidateQueries({ queryKey })
                 })
             }
+
+            onSuccess?.(data, variables)
 
             if (successMessage) {
                 toast.success(

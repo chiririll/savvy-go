@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { mailApi } from '@/api/mail'
 import type { MailInput } from '@/types/mail'
 import { useResourceMutation } from './use-crud'
+import { SERVER_CHECKS_KEY } from './use-server-checks'
 import i18n from '@/lib/i18n'
 
 const QUERY_KEY = ['mail']
@@ -18,7 +19,7 @@ export function useMailStatus(enabled = true) {
 export function useUpdateMail() {
     return useResourceMutation({
         mutationFn: (input: MailInput) => mailApi.update(input),
-        invalidateKeys: [QUERY_KEY],
+        invalidateKeys: [QUERY_KEY, SERVER_CHECKS_KEY],
         successMessage: i18n.t('system.mail.saved', { ns: 'settings' }),
     })
 }
