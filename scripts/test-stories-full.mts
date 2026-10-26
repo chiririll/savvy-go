@@ -24,7 +24,7 @@ const extra = process.argv.slice(2)
 const failed: string[] = []
 for (const project of projects) {
     console.log(`\n=== ${project} ===`)
-    const run = spawnSync('npx', ['vitest', 'run', '--project', project, ...extra], { cwd: root, stdio: 'inherit', shell: true })
+    const run = spawnSync('npx', ['vitest', 'run', '--config', 'vitest.stories.config.ts', '--project', project, ...extra], { cwd: root, stdio: 'inherit', shell: true })
     if (run.status !== 0) failed.push(project)
 }
 

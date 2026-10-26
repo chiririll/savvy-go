@@ -83,7 +83,7 @@ npm run test:stories:full # the same stories again in every other language and i
 npm run storybook         # the stories in the browser, with a language and theme switch
 ```
 
-Components are tested through Storybook (`*.stories.tsx` next to the component). A story is one state of a component: loading, empty, error, read-only, a currency with 0 or 3 decimals. `npm run test:stories` runs each story twice, at a desktop size (1280×800, project `stories-desktop`) and a phone size (390×844, project `stories-mobile`), so a responsive break fails the same way a logic bug does. Story tags narrow that: `tags: ['mobile-only']` skips the desktop run, `tags: ['desktop-only']` (on `meta`, for a component with no responsive classes or `use-mobile` in its tree, or on a story that uses a control the phone layout lacks, like a row's "more actions" button) skips the phone run. Untagged stories run at both sizes. Tag names and the projects live in `.storybook/tags.ts` and `vite.config.ts`. A story with a `play` function also clicks and types, and asserts. Every story is checked for accessibility (axe) as well, and a violation fails it.
+Components are tested through Storybook (`*.stories.tsx` next to the component). A story is one state of a component: loading, empty, error, read-only, a currency with 0 or 3 decimals. `npm run test:stories` runs each story twice, at a desktop size (1280×800, project `stories-desktop`) and a phone size (390×844, project `stories-mobile`), so a responsive break fails the same way a logic bug does. Story tags narrow that: `tags: ['mobile-only']` skips the desktop run, `tags: ['desktop-only']` (on `meta`, for a component with no responsive classes or `use-mobile` in its tree, or on a story that uses a control the phone layout lacks, like a row's "more actions" button) skips the phone run. Untagged stories run at both sizes. Tag names and the projects live in `.storybook/tags.ts` and `vitest.stories.config.ts`. A story with a `play` function also clicks and types, and asserts. Every story is checked for accessibility (axe) as well, and a violation fails it.
 
 The first run needs a browser: `npx playwright install chromium`.
 
@@ -98,7 +98,7 @@ The language and the theme are Storybook globals (`locale`, `theme`; the toolbar
 
 `test:stories:full` (`scripts/test-stories-full.mts`) runs the projects one after another, because starting a browser for every project at once hung on a CI-sized host. Extra arguments go to every vitest run, e.g. `npm run test:stories:full -- --reporter=dot`. The workflow does not use this loop: it takes the project list from `node scripts/test-stories-full.mts --list` and runs each project on its own runner, in parallel.
 
-A project picks its globals from environment variables set in `vite.config.ts` (`STORYBOOK_LOCALE`, `STORYBOOK_THEME`), which `initialGlobals` in `.storybook/preview.tsx` reads. A story can still set `globals: { locale: 'ru' }` itself, for a check that is about Russian (number format, a Russian label), like `ApplicationInRussian` in `Layout.stories.tsx`.
+A project picks its globals from environment variables set in `vitest.stories.config.ts` (`STORYBOOK_LOCALE`, `STORYBOOK_THEME`), which `initialGlobals` in `.storybook/preview.tsx` reads. A story can still set `globals: { locale: 'ru' }` itself, for a check that is about Russian (number format, a Russian label), like `ApplicationInRussian` in `Layout.stories.tsx`.
 
 In a project that is not English and light, `.storybook/matrix-checks.ts` fails a story that:
 
@@ -109,14 +109,14 @@ The language projects leave out the `play` function (it finds elements by Englis
 
 To add a language: add the folder `resources/ts/locales/<code>/` with the same files as `en`, and add the code to `SUPPORTED_LOCALES` and `LOCALE_LABELS` in `resources/ts/lib/i18n.ts`. The matrix projects come from the folder names, so there is no story and no test config to change. `lib/i18n-keys.test.ts` checks that the files match `en`.
 
-The browser size is not taken from the project: addon-vitest resets it before each story to the story's `viewport` global, so `vite.config.ts` also sets `STORYBOOK_VIEWPORT` and the preview has a `desktop` and a `mobile` viewport option.
+The browser size is not taken from the project: addon-vitest resets it before each story to the story's `viewport` global, so `vitest.stories.config.ts` also sets `STORYBOOK_VIEWPORT` and the preview has a `desktop` and a `mobile` viewport option.
 
-Coverage of the stories: `npx vitest run --project stories-desktop --project stories-mobile --coverage.enabled --coverage.provider=v8` (needs `@vitest/coverage-v8`, not a dependency). Which files it counts is set under `coverage` in `vite.config.ts`.
+Coverage of the stories: `npx vitest run --config vitest.stories.config.ts --project stories-desktop --project stories-mobile --coverage.enabled --coverage.provider=v8` (needs `@vitest/coverage-v8`, not a dependency). Which files it counts is set under `coverage` in `vite.config.ts`.
 
 - **Data.** Components read the API through the real client; a story answers it with MSW (`resources/ts/test/api-mocks.ts`: `reply`, `fail`, `hang` for a request that never ends). A request a story did not mock fails the story. Sample data is in `resources/ts/test/fixtures.ts`.
 - **Forms.** Components built on the ShadCN form parts need a form around them: `decorators: [withForm({ label: 'Currency' })]` from `resources/ts/test/form-decorator.tsx`.
 - **Menus and selects.** Radix hides the page behind an open menu, which axe reports. Add `parameters: { a11y: overlayA11y }` from `resources/ts/test/a11y.ts`.
-- **Colour contrast is checked** (WCAG AA, axe `color-contrast`) in every run. `STORYBOOK_CONTRAST=off npx vitest run ...` skips it while you chase another failure. Toasts take their colours from the status tokens in `components/providers/AppToaster.tsx`.
+- **Colour contrast is checked** (WCAG AA, axe `color-contrast`) in every run. `STORYBOOK_CONTRAST=off npm run test:stories` skips it while you chase another failure. Toasts take their colours from the status tokens in `components/providers/AppToaster.tsx`.
 - **Status colours are tokens.** Use `text-destructive`, `text-success`, `text-warning`, `text-info` and tints like `bg-success/10` (defined per theme in `resources/ts/index.css`, checked against WCAG AA), not `text-red-600` plus a `dark:` variant. Do not dim text with `opacity-*`: use `text-muted-foreground`, or `aria-disabled` for a disabled control.
 - **Language and theme.** See "Language and theme matrix" above.
 - **Animations are off**, so a check never sees an element half faded in.

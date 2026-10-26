@@ -69,7 +69,7 @@ const preview: Preview = {
     afterEach({ globals }) {
         finishMatrixChecks(globals)
     },
-    // English and light, unless the vitest project asks for another pair (vite.config.ts; the language and theme matrix).
+    // English and light, unless the vitest project asks for another pair (vitest.stories.config.ts; the language and theme matrix).
     initialGlobals: {
         locale: import.meta.env.STORYBOOK_LOCALE ?? 'en',
         theme: import.meta.env.STORYBOOK_THEME ?? 'light',
