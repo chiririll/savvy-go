@@ -72,3 +72,41 @@ func seedMoney(t *testing.T, a *testApp, sess *auth.Issued) (accID, catID int64)
 	catID = int64(decodeJSON(t, res)["data"].(map[string]any)["id"].(float64))
 	return accID, catID
 }
+
+// Reordering sets the order of a day's transactions in the list.
+func TestReorderTransactionsWithinADay(t *testing.T) {
+	a := newTestApp(t)
+	sess := a.issue(a.createUser("reorder@test.com", "secret1", roleEditor), false)
+	accID, _ := seedMoney(t, a, sess)
+	var ids []int64
+	for _, amount := range []int{1, 2, 3} {
+		ids = append(ids, apiID(t, a, sess, "/api/transactions", map[string]any{
+			"type": "expense", "account_id": accID, "amount": amount, "date": "2024-01-15",
+		}))
+	}
+	listed := func() []int64 {
+		data := decodeJSON(t, a.do("GET", "/api/transactions?sort_by=date&sort_direction=asc", nil, sess.Token, ""))["data"].([]any)
+		var out []int64
+		for _, row := range data {
+			out = append(out, int64(row.(map[string]any)["id"].(float64)))
+		}
+		return out
+	}
+
+	want := []int64{ids[2], ids[0], ids[1]}
+	status(t, a.do("POST", "/api/transactions/reorder",
+		map[string]any{"date": "2024-01-15", "ids": want}, sess.Token, sess.CSRF), http.StatusOK, "reorder")
+	got := listed()
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("order = %v, want %v", got, want)
+		}
+	}
+
+	status(t, a.do("POST", "/api/transactions/reorder",
+		map[string]any{"date": "2024-02-01", "ids": want}, sess.Token, sess.CSRF),
+		http.StatusUnprocessableEntity, "ids of another day")
+	status(t, a.do("POST", "/api/transactions/reorder",
+		map[string]any{"date": "2024-01-15"}, sess.Token, sess.CSRF),
+		http.StatusUnprocessableEntity, "no ids")
+}

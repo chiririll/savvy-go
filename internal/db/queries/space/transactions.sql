@@ -4,8 +4,12 @@ INSERT INTO transactions (type, account_id, to_account_id, category_id, amount, 
 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?);
 
 -- name: UpdateTransaction :exec
+-- A move to another day drops the manual place: it was a slot of the old day.
+-- The CASE reads the old date, the SET list the new one.
 UPDATE transactions SET type=?, account_id=?, to_account_id=?, category_id=?, amount=?, to_amount=?,
-	is_estimated=?, description=?, date=?, updated_at=? WHERE id=?;
+	is_estimated=?, description=?, date=?,
+	day_order = CASE WHEN substr(date, 1, 10) IS substr(CAST(? AS TEXT), 1, 10) THEN day_order END,
+	updated_at=? WHERE id=?;
 
 -- name: DeleteTransactionItems :exec
 DELETE FROM transaction_items WHERE transaction_id = ?;
@@ -15,7 +19,9 @@ DELETE FROM transactions WHERE id = ?;
 
 -- name: ConfirmTransaction :exec
 -- A confirmed transaction has its real amount, so it is no longer an estimate.
-UPDATE transactions SET status='confirmed', amount=?, to_amount=?, is_estimated=0, date=?, updated_at=? WHERE id=?;
+UPDATE transactions SET status='confirmed', amount=?, to_amount=?, is_estimated=0, date=?,
+	day_order = CASE WHEN substr(date, 1, 10) IS substr(CAST(? AS TEXT), 1, 10) THEN day_order END,
+	updated_at=? WHERE id=?;
 
 -- name: SkipTransaction :exec
 UPDATE transactions SET status='skipped', updated_at=? WHERE id=?;
@@ -74,3 +80,11 @@ UPDATE transactions SET category_id=?, updated_at=? WHERE id=?;
 
 -- name: UpdateTransactionDescription :exec
 UPDATE transactions SET description=?, updated_at=? WHERE id=?;
+
+-- name: ListTransactionDayOrder :many
+-- The sort key of each id and its day, in the order the list shows them.
+SELECT id, substr(date, 1, 10) AS day, COALESCE(day_order, id) AS sort_key
+FROM transactions WHERE id IN (sqlc.slice('ids'));
+
+-- name: SetTransactionDayOrder :exec
+UPDATE transactions SET day_order = ? WHERE id = ?;

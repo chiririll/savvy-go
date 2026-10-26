@@ -134,6 +134,31 @@ paths:
         "403": {$ref: "#/components/responses/Forbidden"}
         "404": {$ref: "#/components/responses/NotFound"}
         "422": {$ref: "#/components/responses/Validation"}
+  /spaces/{space}/transactions/reorder:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    post:
+      tags: [Transactions]
+      summary: Reorder transactions within one day
+      description: >
+        Puts the given transactions in that order on the day, oldest first.
+        The ids may be only some of the day's transactions; they trade the
+        places they hold. Every id must be a transaction of that day.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [date, ids]
+              properties:
+                date: {type: string, format: date}
+                ids: {type: array, items: {type: integer}}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "422": {$ref: "#/components/responses/Validation"}
   /spaces/{space}/transactions/{id}/skip:
     parameters: [{$ref: "#/components/parameters/Space"}]
     post:

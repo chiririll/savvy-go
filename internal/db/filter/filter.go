@@ -102,7 +102,8 @@ func txOrderBy(sortBy, sortDir string) string {
 	case "created_at":
 		return `t.created_at ` + dir + `, t.id ` + dir
 	default:
-		return `CASE WHEN t.date IS NULL THEN 1 ELSE 0 END, t.date ` + dir + `, t.id ` + dir
+		return `CASE WHEN t.date IS NULL THEN 1 ELSE 0 END, t.date ` + dir +
+			`, COALESCE(t.day_order, t.id) ` + dir + `, t.id ` + dir
 	}
 }
 

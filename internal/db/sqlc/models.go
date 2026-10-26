@@ -381,6 +381,7 @@ type Transaction struct {
 	CreatedBy              sql.NullInt64
 	CreatedAt              sql.NullString
 	UpdatedAt              sql.NullString
+	DayOrder               sql.NullInt64
 }
 
 type TransactionImport struct {

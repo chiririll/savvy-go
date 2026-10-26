@@ -1,6 +1,6 @@
 import { testId } from '@/lib/test-id'
 import { useState } from 'react'
-import { Check, Copy, SkipForward } from 'lucide-react'
+import { ArrowDown, ArrowUp, Check, Copy, SkipForward } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { FeedRow, FeedStatusBadge, RowActions } from '@/components/shared'
@@ -26,6 +26,9 @@ interface TransactionRowProps {
     isReadOnly?: boolean
     showActions?: boolean
     showDate?: boolean
+    /** Move the row one place up or down within its day; each is set only when the row can go that way. */
+    onMoveUp?: () => void
+    onMoveDown?: () => void
 }
 
 interface RowHandlers {
@@ -33,13 +36,15 @@ interface RowHandlers {
     confirm?: () => void
     skip?: () => void
     duplicate?: () => void
+    moveUp?: () => void
+    moveDown?: () => void
     remove?: () => void
 }
 
 /** Each action the row offers, or undefined when the transaction, the role or the caller rules it out. */
 function rowHandlers(
     transaction: Transaction,
-    { onEdit, onConfirm, onSkip, onDuplicate, onDelete, isReadOnly }: TransactionRowProps,
+    { onEdit, onConfirm, onSkip, onDuplicate, onDelete, onMoveUp, onMoveDown, isReadOnly }: TransactionRowProps,
 ): RowHandlers {
     const { edit, duplicate, delete: canRemove, confirm, skip } = transaction.actions
     const writable = !isReadOnly
@@ -48,6 +53,8 @@ function rowHandlers(
         confirm: writable && confirm && onConfirm ? () => onConfirm(transaction) : undefined,
         skip: writable && skip && onSkip ? () => onSkip(transaction.id) : undefined,
         duplicate: writable && duplicate && onDuplicate ? () => onDuplicate(transaction.id) : undefined,
+        moveUp: writable ? onMoveUp : undefined,
+        moveDown: writable ? onMoveDown : undefined,
         remove: writable && canRemove && onDelete ? () => onDelete(transaction.id) : undefined,
     }
 }
@@ -103,6 +110,18 @@ function TransactionMenu({ handlers, open, onOpenChange, showTrigger }: Transact
                 <DropdownMenuItem onClick={handlers.duplicate}>
                     <Copy className="mr-2 size-4" />
                     {t('actions.duplicate')}
+                </DropdownMenuItem>
+            )}
+            {handlers.moveUp && (
+                <DropdownMenuItem onClick={handlers.moveUp} {...testId('move-up')}>
+                    <ArrowUp className="mr-2 size-4" />
+                    {t('actions.moveUp')}
+                </DropdownMenuItem>
+            )}
+            {handlers.moveDown && (
+                <DropdownMenuItem onClick={handlers.moveDown} {...testId('move-down')}>
+                    <ArrowDown className="mr-2 size-4" />
+                    {t('actions.moveDown')}
                 </DropdownMenuItem>
             )}
         </RowActions>

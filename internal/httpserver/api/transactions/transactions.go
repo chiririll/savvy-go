@@ -169,6 +169,26 @@ func transactionsConfirm(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteData(w, http.StatusOK, dto.NewTransaction(*out))
 }
 
+// transactionsReorder sets the order of transactions within one day. ids go
+// oldest first, whichever way the client lists them.
+func transactionsReorder(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Date string  `json:"date"`
+		IDs  []int64 `json:"ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Date == "" || len(body.IDs) == 0 {
+		httpx.WriteValidation(w, map[string][]string{
+			"ids": {"The date and ids fields are required."},
+		})
+		return
+	}
+	if err := httpx.Scope(r).Txs.ReorderDay(r.Context(), body.Date, body.IDs); err != nil {
+		httpx.WriteMessage(w, 422, err.Error())
+		return
+	}
+	httpx.WriteSuccess(w)
+}
+
 func transactionsSkip(w http.ResponseWriter, r *http.Request) {
 	tx := txParam(w, r)
 	if tx == nil {

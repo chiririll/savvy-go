@@ -24,6 +24,7 @@ func init() {
 func Routes(r chi.Router) {
 	r.Get("/transactions", transactionsIndex)
 	r.Post("/transactions", transactionsStore)
+	r.Post("/transactions/reorder", transactionsReorder)
 	r.Get("/transactions/{id}", transactionsShow)
 	r.Put("/transactions/{id}", transactionsUpdate)
 	r.Patch("/transactions/{id}", transactionsUpdate)

@@ -62,6 +62,10 @@ export const transactionsApi = {
             ...(options.to_amount != null ? { to_amount: options.to_amount } : {}),
         }),
 
+    /** Puts the transactions in that order within one day; ids go oldest first. */
+    reorderDay: (date: string, ids: number[]) =>
+        api.post<{ success: boolean }, { date: string; ids: number[] }>(`${ENDPOINT}/reorder`, { date, ids }),
+
     getPendingSummary: () =>
         api.get<TransactionSummary>('/transactions-pending-summary'),
 

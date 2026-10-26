@@ -110,7 +110,7 @@ func (r Repo) UpdateTransaction(ctx context.Context, id int64, t TxFields, now t
 		Type: t.Type, AccountID: t.AccountID, ToAccountID: db.NullInt64(t.ToAccountID),
 		CategoryID: db.NullInt64(t.CategoryID), Amount: t.Amount.Minor(), ToAmount: db.NullMoney(t.ToAmount),
 		IsEstimated: db.BoolInt(t.IsEstimated), Description: db.NullString(t.Description),
-		Date: db.NullString(t.Date), UpdatedAt: db.TimeNS(now), ID: id,
+		Date: db.NullString(t.Date), Column10: dateOrEmpty(t.Date), UpdatedAt: db.TimeNS(now), ID: id,
 	})
 }
 
@@ -128,7 +128,7 @@ func (r Repo) ConfirmTransaction(
 	now time.Time,
 ) error {
 	return r.q().ConfirmTransaction(ctx, sqlc.ConfirmTransactionParams{
-		Amount: amount.Minor(), ToAmount: db.NullMoney(toAmount), Date: db.NS(date), UpdatedAt: db.TimeNS(now), ID: id,
+		Amount: amount.Minor(), ToAmount: db.NullMoney(toAmount), Date: db.NS(date), Column4: date, UpdatedAt: db.TimeNS(now), ID: id,
 	})
 }
 
@@ -280,4 +280,37 @@ func (r Repo) CountTransactions(ctx context.Context) int {
 func (r Repo) CountAccounts(ctx context.Context) int {
 	n, _ := r.q().CountAccounts(ctx)
 	return int(n)
+}
+
+// DaySlot is where a transaction sits in the list: its calendar day and the
+// key the list sorts that day by.
+type DaySlot struct {
+	ID  int64
+	Day string
+	Key int64
+}
+
+// DaySlots returns the slots of the given ids; an unknown id has none.
+func (r Repo) DaySlots(ctx context.Context, ids []int64) ([]DaySlot, error) {
+	rows, err := r.q().ListTransactionDayOrder(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]DaySlot, len(rows))
+	for i, x := range rows {
+		out[i] = DaySlot{ID: x.ID, Day: x.Day, Key: x.SortKey}
+	}
+	return out, nil
+}
+
+// SetDayOrder places a transaction at a sort key within its day.
+func (r Repo) SetDayOrder(ctx context.Context, id, key int64) error {
+	return r.q().SetTransactionDayOrder(ctx, sqlc.SetTransactionDayOrderParams{DayOrder: db.NI(key), ID: id})
+}
+
+func dateOrEmpty(d *string) string {
+	if d == nil {
+		return ""
+	}
+	return *d
 }

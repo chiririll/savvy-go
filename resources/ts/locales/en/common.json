@@ -29,10 +29,13 @@
         "clear": "Clear",
         "processing": "Processing...",
         "reorder": "Reorder",
+        "moveUp": "Move up",
+        "moveDown": "Move down",
         "help": "Help",
         "expand": "Expand",
         "collapse": "Collapse",
-        "more": "More actions",
+        "more": "More actions"
+,
         "closeNotification": "Close notification",
         "copy": "Copy"
     },
@@ -220,6 +223,7 @@
             "updateFailed": "Failed to update transaction",
             "deleteFailed": "Failed to delete transaction",
             "duplicateFailed": "Failed to duplicate transaction",
+            "reorderFailed": "Failed to reorder transactions",
             "pendingCreated": "Pending transaction created",
             "confirmed": "Transaction confirmed",
             "skipped": "Occurrence skipped",

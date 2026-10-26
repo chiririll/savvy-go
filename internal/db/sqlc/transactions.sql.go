@@ -14,13 +14,16 @@ import (
 )
 
 const confirmTransaction = `-- name: ConfirmTransaction :exec
-UPDATE transactions SET status='confirmed', amount=?, to_amount=?, is_estimated=0, date=?, updated_at=? WHERE id=?
+UPDATE transactions SET status='confirmed', amount=?, to_amount=?, is_estimated=0, date=?,
+	day_order = CASE WHEN substr(date, 1, 10) IS substr(CAST(? AS TEXT), 1, 10) THEN day_order END,
+	updated_at=? WHERE id=?
 `
 
 type ConfirmTransactionParams struct {
 	Amount    int64
 	ToAmount  sql.NullInt64
 	Date      sql.NullString
+	Column4   string
 	UpdatedAt sql.NullString
 	ID        int64
 }
@@ -31,6 +34,7 @@ func (q *Queries) ConfirmTransaction(ctx context.Context, arg ConfirmTransaction
 		arg.Amount,
 		arg.ToAmount,
 		arg.Date,
+		arg.Column4,
 		arg.UpdatedAt,
 		arg.ID,
 	)
@@ -357,6 +361,51 @@ func (q *Queries) ListTagsOfTransactions(ctx context.Context, ids []int64) ([]Li
 	return items, nil
 }
 
+const listTransactionDayOrder = `-- name: ListTransactionDayOrder :many
+SELECT id, substr(date, 1, 10) AS day, COALESCE(day_order, id) AS sort_key
+FROM transactions WHERE id IN (/*SLICE:ids*/?)
+`
+
+type ListTransactionDayOrderRow struct {
+	ID      int64
+	Day     string
+	SortKey int64
+}
+
+// The sort key of each id and its day, in the order the list shows them.
+func (q *Queries) ListTransactionDayOrder(ctx context.Context, ids []int64) ([]ListTransactionDayOrderRow, error) {
+	query := listTransactionDayOrder
+	var queryParams []interface{}
+	if len(ids) > 0 {
+		for _, v := range ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListTransactionDayOrderRow{}
+	for rows.Next() {
+		var i ListTransactionDayOrderRow
+		if err := rows.Scan(&i.ID, &i.Day, &i.SortKey); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTransactionSummaryRows = `-- name: ListTransactionSummaryRows :many
 SELECT t.type, t.amount, c.rate, c.is_base, c.decimals
 FROM transactions t
@@ -402,6 +451,20 @@ func (q *Queries) ListTransactionSummaryRows(ctx context.Context, status string)
 	return items, nil
 }
 
+const setTransactionDayOrder = `-- name: SetTransactionDayOrder :exec
+UPDATE transactions SET day_order = ? WHERE id = ?
+`
+
+type SetTransactionDayOrderParams struct {
+	DayOrder sql.NullInt64
+	ID       int64
+}
+
+func (q *Queries) SetTransactionDayOrder(ctx context.Context, arg SetTransactionDayOrderParams) error {
+	_, err := q.db.ExecContext(ctx, setTransactionDayOrder, arg.DayOrder, arg.ID)
+	return err
+}
+
 const skipTransaction = `-- name: SkipTransaction :exec
 UPDATE transactions SET status='skipped', updated_at=? WHERE id=?
 `
@@ -418,7 +481,9 @@ func (q *Queries) SkipTransaction(ctx context.Context, arg SkipTransactionParams
 
 const updateTransaction = `-- name: UpdateTransaction :exec
 UPDATE transactions SET type=?, account_id=?, to_account_id=?, category_id=?, amount=?, to_amount=?,
-	is_estimated=?, description=?, date=?, updated_at=? WHERE id=?
+	is_estimated=?, description=?, date=?,
+	day_order = CASE WHEN substr(date, 1, 10) IS substr(CAST(? AS TEXT), 1, 10) THEN day_order END,
+	updated_at=? WHERE id=?
 `
 
 type UpdateTransactionParams struct {
@@ -431,10 +496,13 @@ type UpdateTransactionParams struct {
 	IsEstimated int64
 	Description sql.NullString
 	Date        sql.NullString
+	Column10    string
 	UpdatedAt   sql.NullString
 	ID          int64
 }
 
+// A move to another day drops the manual place: it was a slot of the old day.
+// The CASE reads the old date, the SET list the new one.
 func (q *Queries) UpdateTransaction(ctx context.Context, arg UpdateTransactionParams) error {
 	_, err := q.db.ExecContext(ctx, updateTransaction,
 		arg.Type,
@@ -446,6 +514,7 @@ func (q *Queries) UpdateTransaction(ctx context.Context, arg UpdateTransactionPa
 		arg.IsEstimated,
 		arg.Description,
 		arg.Date,
+		arg.Column10,
 		arg.UpdatedAt,
 		arg.ID,
 	)

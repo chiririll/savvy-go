@@ -20,6 +20,8 @@ interface TransactionListProps {
     onEdit?: (transaction: Transaction) => void
     isReadOnly?: boolean
     grouped?: boolean
+    /** Called with a day and its transactions in the new order, as listed. Move up/down menu items show when set. */
+    onReorderDay?: (date: string, shownIds: number[]) => void
 }
 
 export function TransactionList({
@@ -37,9 +39,26 @@ export function TransactionList({
     onEdit,
     isReadOnly,
     grouped = true,
+    onReorderDay,
 }: TransactionListProps) {
     const relativeDay = useRelativeDay()
     const groups = grouped ? groupByDateKey(transactions) : []
+    const canReorder = (group: { date: string | null; items: Transaction[] }) =>
+        !!onReorderDay && !isReadOnly && group.date !== null && group.items.length > 1
+    const move = (group: { date: string | null; items: Transaction[] }, index: number, step: -1 | 1) => {
+        const ids = group.items.map((item) => item.id)
+        ;[ids[index], ids[index + step]] = [ids[index + step], ids[index]]
+        onReorderDay?.(group.date as string, ids)
+    }
+    const rowProps = (transaction: Transaction) => ({
+        transaction,
+        onDelete,
+        onDuplicate,
+        onConfirm,
+        onSkip,
+        onEdit,
+        isReadOnly,
+    })
 
     if (isLoading) {
         return (
@@ -90,16 +109,16 @@ export function TransactionList({
                     key={group.date ?? 'undated'}
                     title={relativeDay(group.date)}
                 >
-                    {group.items.map((transaction) => (
+                    {group.items.map((transaction, index) => (
                         <TransactionRow
                             key={transaction.id}
-                            transaction={transaction}
-                            onDelete={onDelete}
-                            onDuplicate={onDuplicate}
-                            onConfirm={onConfirm}
-                            onSkip={onSkip}
-                            onEdit={onEdit}
-                            isReadOnly={isReadOnly}
+                            {...rowProps(transaction)}
+                            onMoveUp={canReorder(group) && index > 0 ? () => move(group, index, -1) : undefined}
+                            onMoveDown={
+                                canReorder(group) && index < group.items.length - 1
+                                    ? () => move(group, index, 1)
+                                    : undefined
+                            }
                         />
                     ))}
                 </FeedGroup>
