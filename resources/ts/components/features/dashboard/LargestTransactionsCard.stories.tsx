@@ -4,11 +4,11 @@ import { expect, fn, userEvent, within } from 'storybook/test'
 import { currencies, pendingTransaction, transaction } from '@/test/fixtures'
 import { useCurrenciesStore } from '@/stores/currencies'
 
-import { RecentTransactionsCard } from './RecentTransactionsCard'
+import { LargestTransactionsCard } from './LargestTransactionsCard'
 
 const meta = {
-    title: 'features/dashboard/RecentTransactionsCard',
-    component: RecentTransactionsCard,
+    title: 'features/dashboard/LargestTransactionsCard',
+    component: LargestTransactionsCard,
     beforeEach: () => useCurrenciesStore.getState().setAll(currencies),
     args: {
         onEdit: fn(),
@@ -18,7 +18,7 @@ const meta = {
             pendingTransaction({ id: 3, description: 'Rent', amount: 1100 }),
         ],
     },
-} satisfies Meta<typeof RecentTransactionsCard>
+} satisfies Meta<typeof LargestTransactionsCard>
 
 export default meta
 type Story = StoryObj<typeof meta>

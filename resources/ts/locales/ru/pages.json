@@ -476,7 +476,7 @@
         "balanceDynamics": "Динамика баланса",
         "accountBalances": "Балансы счетов",
         "expensesByCategory": "Расходы по категориям",
-        "recentTransactions": "Последние транзакции",
+        "largestTransactions": "Крупнейшие транзакции за 30 дней",
         "budgets": "Бюджеты",
         "noBudgets": "Бюджетов пока нет",
         "allExpenses": "Все расходы",
