@@ -27,6 +27,7 @@ func init() {
 type Handler struct{ Rates ledger.RateSource }
 
 func (h Handler) Routes(r chi.Router) {
-	r.Get("/currencies/catalog", h.currencies)
-	r.Get("/presets", h.presets)
+	// Under /catalog, not /currencies: the SPA prefixes space roots with /spaces/{id}.
+	r.Get("/catalog/currencies", h.currencies)
+	r.Get("/catalog/presets", h.presets)
 }

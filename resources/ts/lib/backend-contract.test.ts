@@ -229,6 +229,25 @@ describe('API routes', () => {
         expect(roots.length).toBeGreaterThan(50)
         expect(sorted(SPACE_ROOTS)).toEqual(sorted(roots))
     })
+
+    it('keeps account-wide routes out of the space roots', () => {
+        // The client puts /spaces/{id} before any path that starts with a space root,
+        // so an account route there is unreachable (/currencies/catalog got the space's list).
+        const clashes: string[] = []
+        let accountRoutes = 0
+        for (const file of goFiles('internal/httpserver/api').filter((f) => f.endsWith('/routes.go'))) {
+            const source = read(file)
+            for (const [, name] of source.matchAll(/routing\.Account\((?:\w+\.)?(\w+)\)/g)) {
+                const body = goFunc(file, source.includes(`func ${name}(`) ? `func ${name}(` : `) ${name}(`)
+                for (const [, root] of body.matchAll(/r\.(?:Get|Post|Put|Patch|Delete)\("\/([^/"{]+)/g)) {
+                    accountRoutes++
+                    if (SPACE_ROOTS.has(root)) clashes.push(`${file}: ${name} serves /${root}`)
+                }
+            }
+        }
+        expect(accountRoutes).toBeGreaterThan(2)
+        expect(clashes).toEqual([])
+    })
 })
 
 describe('API token permissions', () => {

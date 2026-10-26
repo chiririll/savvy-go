@@ -48,8 +48,8 @@ const meta = {
         sent.bodies = create.bodies
         msw.use(
             create.handler,
-            reply('get', '/presets', presets),
-            reply('get', '/currencies/catalog', items),
+            reply('get', '/catalog/presets', presets),
+            reply('get', '/catalog/currencies', items),
             reply('get', '/invitation-methods', { email: true, link: true }),
         )
     },
@@ -73,7 +73,7 @@ export const NameStep: Story = {
 
 // The presets are needed to leave the first step.
 export const WaitingForPresets: Story = {
-    beforeEach: ({ msw }) => msw.use(hang('get', '/presets')),
+    beforeEach: ({ msw }) => msw.use(hang('get', '/catalog/presets')),
     play: async () => {
         const d = await dialog()
         await userEvent.type(await d.findByLabelText('Name'), 'Family')

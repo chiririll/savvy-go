@@ -6,8 +6,6 @@
 //   space  - the current space's data
 //   user   - the signed-in user's own settings
 //   admin  - a server administrator
-//
-// Old addresses that only redirect are not pages; they stay in router.tsx.
 
 export type PageScope = 'public' | 'space' | 'user' | 'admin'
 
