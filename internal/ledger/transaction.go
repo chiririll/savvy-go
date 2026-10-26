@@ -109,18 +109,19 @@ type TxActions struct {
 // Allowed is the single source of truth for TxActions. One side of a transfer
 // between spaces changes only through the transfer, never as a transaction.
 func (t Transaction) Allowed() TxActions {
-	if transferSideType(t.Type) {
+	switch {
+	case transferSideType(t.Type):
 		return TxActions{}
-	}
-	pending := t.Status == "pending"
-	skipped := t.Status == "skipped"
-	recurring := t.RecurringID != nil
-	return TxActions{
-		Edit:      !skipped && !recurring,
-		Delete:    !recurring,
-		Duplicate: !recurring && !skipped,
-		Confirm:   pending,
-		Skip:      pending && recurring,
+	case t.Status == "skipped":
+		return TxActions{Delete: true}
+	case t.Status == "pending" && t.RecurringID != nil:
+		// The open occurrence belongs to its recurrence, which replans it. Once
+		// confirmed or skipped it is an ordinary transaction.
+		return TxActions{Confirm: true, Skip: true}
+	case t.Status == "pending":
+		return TxActions{Edit: true, Delete: true, Duplicate: true, Confirm: true}
+	default:
+		return TxActions{Edit: true, Delete: true, Duplicate: true}
 	}
 }
 

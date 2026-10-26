@@ -28,7 +28,12 @@ func TestTransactionAllowed(t *testing.T) {
 			Transaction{Type: "expense", Status: "pending", RecurringID: &id},
 			TxActions{Confirm: true, Skip: true},
 		},
-		{"confirmed recurring", Transaction{Type: "expense", Status: "confirmed", RecurringID: &id}, TxActions{}},
+		{
+				"confirmed recurring",
+				Transaction{Type: "expense", Status: "confirmed", RecurringID: &id},
+				TxActions{Edit: true, Delete: true, Duplicate: true},
+			},
+			{"skipped recurring", Transaction{Type: "expense", Status: "skipped", RecurringID: &id}, TxActions{Delete: true}},
 		{"skipped", Transaction{Type: "expense", Status: "skipped"}, TxActions{Delete: true}},
 		{"transfer out", Transaction{Type: "transfer_out", Status: "confirmed"}, TxActions{}},
 		{"transfer in", Transaction{Type: "transfer_in", Status: "pending"}, TxActions{}},
