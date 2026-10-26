@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import type { UseFormReturn } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { useNegativeBalanceConfirm } from '@/components/shared'
@@ -45,12 +46,22 @@ export function useTransactionHandlers({
         )
     })
 
+    // Categories are per income/expense type: keep each, so a slip onto another tab loses nothing.
+    const categoryByType = useRef<Partial<Record<TransactionFormValues['type'], number>>>({})
+
     const handleTypeChange = (value: TransactionFormValues['type']) => {
         if ((value === 'transfer_out') !== isSpaceTransfer) {
             // The destination account belongs to another space now.
             form.setValue('to_account_id', null)
         }
+        const current = form.getValues('type')
+        const categoryId = form.getValues('category_id')
+        if (categoryId && (current === 'income' || current === 'expense')) {
+            categoryByType.current[current] = categoryId
+        }
         form.setValue('type', value)
+        // Null lets the party defaults pick the type's default category.
+        form.setValue('category_id', categoryByType.current[value] ?? null)
         onTypeChange?.(value)
     }
 

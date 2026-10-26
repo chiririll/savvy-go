@@ -30,12 +30,12 @@ export function useTransactionPartyDefaults(
             return
         }
 
-        const popular = [...(categories ?? [])]
-            .filter((category) => category.type === type)
-            .sort((a, b) => (b.transactionsCount ?? 0) - (a.transactionsCount ?? 0))
+        const ofType = (categories ?? []).filter((category) => category.type === type)
+        const preselected = ofType.find((category) => category.isDefault)
+            ?? [...ofType].sort((a, b) => (b.transactionsCount ?? 0) - (a.transactionsCount ?? 0))[0]
 
-        if (popular[0]) {
-            form.setValue('category_id', popular[0].id)
+        if (preselected) {
+            form.setValue('category_id', preselected.id)
         }
     }, [categoryId, type, categories, form])
 }

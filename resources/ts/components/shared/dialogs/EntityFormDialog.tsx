@@ -54,7 +54,8 @@ export function EntityFormDialog<TEntity extends { id?: string | number }, TForm
         entityKey: entity?.id,
     })
     const defaultValues = useMemo(
-        () => (entity ? toFormValues(entity) : (draft ?? fallbackValues)),
+        // Values the opener asks for (a button preselecting an account, a type) beat the stale draft.
+        () => (entity ? toFormValues(entity) : draft || fallbackValues ? { ...draft, ...fallbackValues } : undefined),
         [entity, toFormValues, draft, fallbackValues],
     )
 
