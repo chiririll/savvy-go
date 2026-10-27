@@ -95,8 +95,6 @@
         "dateRequired": "Укажите дату",
         "dateCannotBeFuture": "Дата не может быть в будущем",
         "paymentNeedsTwoAccounts": "Добавьте счёт, которым оплатили остаток",
-        "handedOverTooLow": "Отданная сумма должна быть больше цены",
-        "changeSameCurrency": "Сдача в той же валюте: укажите лучше сумму, которую вы заплатили на самом деле",
         "amountRequired": "Укажите сумму",
         "amountPositive": "Сумма должна быть больше нуля",
         "amountGreaterThanZero": "Сумма должна быть больше нуля",

@@ -41,18 +41,11 @@
     "transactions": {
         "toAccount": "Destination account",
     "payment": {
-        "label": "Paid with",
-        "mode": { "single": "One account", "several": "Several accounts", "change": "With change" },
-        "amount": { "several": "Paid from this account", "change": "Price" },
-        "severalHelp": "Each account pays its own amount. The first one is the amount above.",
-        "addAccount": "Add account",
-        "removeAccount": "Remove account",
-        "changeHelp": "The price is recorded as an expense. What you handed over beyond it is exchanged into the change.",
-        "handedOver": "Handed over",
-        "changeAmount": "Change received",
-        "changeAccount": "Change goes to",
-        "exchanged": "Exchanged {{from}} for {{to}} (rate {{rate}}).",
-        "rateOff": "That is {{percent}}% away from the stored rate."
+        "addAccount": "Add another account",
+        "removeRow": "Remove",
+        "changeCount": "Change ({{count}})",
+        "addChange": "Add change",
+        "changeHelp": "Money given back to you, e.g. dinars for euros handed over. Add the account it went to."
     },
         "swapAccounts": "Swap accounts",
         "toSpace": "Destination space",

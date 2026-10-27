@@ -2,27 +2,18 @@
 
 One purchase is often paid in more than one piece: half in cash and half by card, or in euros with the change handed back in dinars. A transaction has one account and one currency, so such a purchase is saved as a **payment** with several **parts**. Each part is an ordinary transaction, so balances, budgets and reports work on the parts exactly as before.
 
-In the transaction form, pick **Expense**, then choose how it was paid under the amount:
+In the transaction form, pick **Expense**. The **+** next to the account adds a row (amount and account) for another account that paid; only the last row has a **+**, and **×** removes a row. Rows can be in different currencies, and the form shows one total per currency.
 
-| Paid with | Use it when | What is saved |
-|-----------|-------------|---------------|
-| One account | the usual case | one expense |
-| Several accounts | cash and card, or two currencies | one expense on each account, for the amount that account paid |
-| With change | you handed over more than the price and got change back in another currency | an expense of the price, and an exchange of the rest into the change |
-
-## With change
+## Change
 
 Rent is 450 EUR. You hand over 500 EUR and get 5,900 RSD back.
 
-- **Amount** is the price, 450, from the account you paid with.
-- **Handed over** is 500, in the currency of that account.
-- **Change received** is 5,900, in the account the change went to.
+- **Amount** is what you handed over, 500, from the account you paid with.
+- **Add change** (above the items) adds a row for the change: 5,900 and the dinar account it went to. Add one row for each account that got change.
 
-Two transactions are saved: an expense of 450 EUR, and a transfer of the remaining 50 EUR into 5,900 RSD (a rate of 118). Rent is exactly 450 EUR in every report, whatever today's rate is, and both balances are exact. The form shows the rate you got and warns when it is far from the stored rate, which usually means a typo.
+Two transactions are saved: an expense of 500 EUR, and an income of 5,900 RSD on the dinar account. No exchange rate is stored: reports convert each part to the base currency by their own rates.
 
-The change has to be in another currency than the one you handed over. If it is in the same currency, enter what you actually paid (the price) as an ordinary expense.
-
-The form covers a price in the currency you handed over. When the price is in the currency of the change (say you hand over euros for a bill in dinars), record it through the [API](api.md) or an assistant over [MCP](mcp.md), which accept any parts.
+A payment that has items cannot have more rows or change: the items add up to a single amount.
 
 ## In the list
 
@@ -31,7 +22,7 @@ Every part is a row of its own, so filtering by account shows only that account'
 ## Rules
 
 - A payment has at least two parts, all on the same day, and cannot be dated in the future: it moves balances at once.
-- Parts are expenses, incomes (a refund) or transfers between your accounts. Debts and transfers to another space cannot be parts.
+- Parts are expenses, incomes (a refund, or change) or transfers between your accounts. Debts and transfers to another space cannot be parts. The form makes expenses and the incomes of the change; a payment with an exchange between accounts, made through the API, cannot be opened in the form.
 - Items (the lines of a receipt) are not available on a split payment.
 - All parts are saved together or not at all. Saving a changed payment replaces its parts.
 - Automation rules run on each part, as they do on any new transaction.

@@ -95,8 +95,6 @@
         "dateRequired": "Date is required",
         "dateCannotBeFuture": "Date cannot be in the future",
         "paymentNeedsTwoAccounts": "Add the account that paid the rest",
-        "handedOverTooLow": "Handed over must be more than the price",
-        "changeSameCurrency": "Change in the same currency: enter what you actually paid instead",
         "amountRequired": "Amount is required",
         "amountPositive": "Amount must be positive",
         "amountGreaterThanZero": "Amount must be greater than 0",

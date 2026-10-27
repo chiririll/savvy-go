@@ -14,8 +14,6 @@ import type { useTransferRate } from './transfer-rate'
 const PAYMENT_ERROR_FIELDS: Record<PaymentError, keyof TransactionFormValues> = {
     needTwoParts: 'extra_payments',
     amountPositive: 'amount',
-    sameCurrency: 'change_account_id',
-    handedOverTooLow: 'handed_over',
     unknownAccount: 'account_id',
 }
 
@@ -25,10 +23,6 @@ function paymentErrorMessage(t: TFunction, error: PaymentError): string {
             return t('validation.paymentNeedsTwoAccounts')
         case 'amountPositive':
             return t('validation.amountPositive')
-        case 'sameCurrency':
-            return t('validation.changeSameCurrency')
-        case 'handedOverTooLow':
-            return t('validation.handedOverTooLow')
         case 'unknownAccount':
             return t('validation.selectAccount')
     }
@@ -36,14 +30,7 @@ function paymentErrorMessage(t: TFunction, error: PaymentError): string {
 
 /** The form values without the fields that only describe a split payment. */
 function withoutPayment(data: TransactionFormValues): TransactionFormValues {
-    const {
-        payment_mode: _mode,
-        extra_payments: _extra,
-        handed_over: _handed,
-        change_account_id: _changeAccount,
-        change_amount: _change,
-        ...rest
-    } = data
+    const { extra_payments: _extra, changes: _changes, ...rest } = data
     return rest
 }
 
@@ -118,8 +105,9 @@ export function useTransactionHandlers({
         }
         form.setValue('type', value)
         if (value !== 'expense') {
-            form.setValue('payment_mode', 'single')
             form.setValue('extra_payments', [])
+            form.setValue('changes', [])
+            form.clearErrors(['extra_payments', 'changes'])
         }
         // Null lets the party defaults pick the type's default category.
         form.setValue('category_id', categoryByType.current[value] ?? null)

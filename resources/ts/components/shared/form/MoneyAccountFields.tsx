@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import type { Control, FieldPath, FieldValues } from 'react-hook-form'
 import { useFormContext } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
@@ -18,6 +19,12 @@ interface MoneyAccountFieldsProps<T extends FieldValues> {
     amountDisabled?: boolean
     /** Replaces the label of the amount, when it means something other than the whole amount. */
     amountLabel?: string
+    /**
+     * Sets a column after the account for a button of the row (add another
+     * row), as wide as this; rows below it use the same width to line up.
+     */
+    actionWidth?: string
+    rowAction?: ReactNode
     toAmountReadOnly?: boolean
     toAmountPlaceholder?: string
     onSwapAccounts?: () => void
@@ -36,6 +43,8 @@ export function MoneyAccountFields<T extends FieldValues>({
     toCurrencySymbol,
     amountDisabled,
     amountLabel,
+    actionWidth,
+    rowAction,
     toAmountReadOnly,
     toAmountPlaceholder,
     onSwapAccounts,
@@ -62,7 +71,10 @@ export function MoneyAccountFields<T extends FieldValues>({
     return (
         <div className={swappable ? 'relative' : undefined}>
             <div className={cn(isTransfer && 'space-y-2', swappable && 'pr-12')}>
-                <div className="grid grid-cols-2 gap-4">
+                <div
+                    className={cn('grid gap-4', !actionWidth && 'grid-cols-2')}
+                    style={actionWidth ? { gridTemplateColumns: `1fr 1fr ${actionWidth}` } : undefined}
+                >
                     <FormField
                         control={control}
                         name={'amount' as FieldPath<T>}
@@ -100,6 +112,7 @@ export function MoneyAccountFields<T extends FieldValues>({
                             </FormItem>
                         )}
                     />
+                    {actionWidth && <div className="mt-[1.375rem] flex justify-end gap-1">{rowAction}</div>}
                 </div>
 
                 {isTransfer && (

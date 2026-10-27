@@ -18,7 +18,7 @@ import { useTransactionModel } from './use-transaction-model'
 import { TransactionDetailsRow } from './TransactionDetailsRow'
 import { TransactionTagsField } from './TransactionTagsField'
 import { SpaceTransferTargetField } from './SpaceTransferTargetField'
-import { PaymentSection } from './PaymentSection'
+import { ChangeSection, ExtraPaymentRows, useFirstRow } from './PaymentRows'
 import type { PaymentLeg } from '@/lib/split-payment'
 
 interface TransactionFormProps {
@@ -73,7 +73,6 @@ export function TransactionForm({
         isTransfer,
         isSpaceTransfer,
         isSplit,
-        paymentMode,
         hasItems,
         dateRequired,
         isPendingDate,
@@ -93,6 +92,10 @@ export function TransactionForm({
         onPreviewChange,
         open,
     })
+
+    // An expense can be paid from more accounts, and have change, unless it is made of items.
+    const canSplit = transactionType === 'expense' && Boolean(onSubmitPayment) && !hasItems
+    const firstRow = useFirstRow(form, canSplit)
 
     const { handleSubmit, handleTypeChange, negativeBalanceDialog } = useTransactionHandlers({
         form,
@@ -136,20 +139,12 @@ export function TransactionForm({
                         fromCurrencySymbol={selectedAccount?.currency?.symbol}
                         toCurrencySymbol={selectedToAccount?.currency?.symbol}
                         amountDisabled={hasItems}
-                        amountLabel={
-                            isSplit
-                                ? paymentMode === 'change'
-                                    ? t('forms:transactions.payment.amount.change')
-                                    : t('forms:transactions.payment.amount.several')
-                                : undefined
-                        }
+                        {...firstRow}
                         toAmountReadOnly={rate.sameCurrency}
                         onSwapAccounts={rate.keepNextPair}
                     />
 
-                    {transactionType === 'expense' && onSubmitPayment && (
-                        <PaymentSection form={form} paymentEdit={paymentEdit} />
-                    )}
+                    {canSplit && <ExtraPaymentRows form={form} />}
 
                     {(isPendingDate || (isEdit && !originalAffectsBalance)) &&
                         !hasItems &&
@@ -181,6 +176,8 @@ export function TransactionForm({
 
                     {/* The transfers API keeps no tags. */}
                     {!isSpaceTransfer && <TransactionTagsField control={form.control} />}
+
+                    {canSplit && <ChangeSection form={form} />}
 
                     {!isTransfer && !isSplit && (
                         <TransactionFormItems form={form} currency={selectedAccount?.currency} />
