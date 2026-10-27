@@ -117,8 +117,9 @@ func (t Transaction) Allowed() TxActions {
 	case transferSideType(t.Type):
 		return TxActions{}
 	case t.GroupUUID != nil:
-		// A leg changes with its payment, through Groups.
-		return TxActions{}
+		// A leg is edited and deleted with its payment, through Groups: the
+		// flags are the payment's, and the service refuses the leg itself.
+		return TxActions{Edit: true, Delete: true}
 	case t.Status == "skipped":
 		return TxActions{Delete: true}
 	case t.Status == "pending" && t.RecurringID != nil:

@@ -18,10 +18,16 @@ import { useTransactionModel } from './use-transaction-model'
 import { TransactionDetailsRow } from './TransactionDetailsRow'
 import { TransactionTagsField } from './TransactionTagsField'
 import { SpaceTransferTargetField } from './SpaceTransferTargetField'
+import { PaymentSection } from './PaymentSection'
+import type { PaymentLeg } from '@/lib/split-payment'
 
 interface TransactionFormProps {
     defaultValues?: Partial<TransactionFormValues>
     onSubmit: (data: TransactionFormValues) => void
+    /** Called instead of onSubmit for an expense paid in several parts. */
+    onSubmitPayment?: (legs: PaymentLeg[]) => void
+    /** A saved split payment is being changed: it stays an expense paid in parts. */
+    paymentEdit?: boolean
     onTypeChange?: (type: TransactionFormValues['type']) => void
     onValuesChange?: (data: TransactionFormValues) => void
     isSubmitting?: boolean
@@ -37,6 +43,8 @@ interface TransactionFormProps {
 export function TransactionForm({
     defaultValues,
     onSubmit,
+    onSubmitPayment,
+    paymentEdit,
     onTypeChange,
     onValuesChange,
     isSubmitting,
@@ -59,10 +67,13 @@ export function TransactionForm({
     })
 
     const {
+        accounts,
         transactionType,
         accountId,
         isTransfer,
         isSpaceTransfer,
+        isSplit,
+        paymentMode,
         hasItems,
         dateRequired,
         isPendingDate,
@@ -89,7 +100,10 @@ export function TransactionForm({
         warnings: balances.warnings,
         dateRequired,
         isSpaceTransfer,
+        isSplit,
+        accounts,
         onSubmit,
+        onSubmitPayment,
         onTypeChange,
     })
 
@@ -97,13 +111,15 @@ export function TransactionForm({
         <FormWrapper>
             <Form {...form}>
                 <form id={formId} noValidate onSubmit={handleSubmit} className="space-y-6">
-                    <TransactionTypeTabs
-                        value={transactionType}
-                        withSpaceTransfer={!isEdit && transferTargets.length > 0}
-                        onChange={handleTypeChange}
-                    />
+                    {!paymentEdit && (
+                        <TransactionTypeTabs
+                            value={transactionType}
+                            withSpaceTransfer={!isEdit && transferTargets.length > 0}
+                            onChange={handleTypeChange}
+                        />
+                    )}
 
-                    {!onPreviewChange && balanceHint}
+                    {!onPreviewChange && !isSplit && balanceHint}
 
                     {isSpaceTransfer && (
                         <SpaceTransferTargetField
@@ -120,11 +136,25 @@ export function TransactionForm({
                         fromCurrencySymbol={selectedAccount?.currency?.symbol}
                         toCurrencySymbol={selectedToAccount?.currency?.symbol}
                         amountDisabled={hasItems}
+                        amountLabel={
+                            isSplit
+                                ? paymentMode === 'change'
+                                    ? t('forms:transactions.payment.amount.change')
+                                    : t('forms:transactions.payment.amount.several')
+                                : undefined
+                        }
                         toAmountReadOnly={rate.sameCurrency}
                         onSwapAccounts={rate.keepNextPair}
                     />
 
-                    {(isPendingDate || (isEdit && !originalAffectsBalance)) && !hasItems && !isSpaceTransfer && (
+                    {transactionType === 'expense' && onSubmitPayment && (
+                        <PaymentSection form={form} paymentEdit={paymentEdit} />
+                    )}
+
+                    {(isPendingDate || (isEdit && !originalAffectsBalance)) &&
+                        !hasItems &&
+                        !isSpaceTransfer &&
+                        !isSplit && (
                         <FormEstimatedField control={form.control} help={t('forms:transactions.estimatedHelp')} />
                     )}
 
@@ -152,7 +182,9 @@ export function TransactionForm({
                     {/* The transfers API keeps no tags. */}
                     {!isSpaceTransfer && <TransactionTagsField control={form.control} />}
 
-                    {!isTransfer && <TransactionFormItems form={form} currency={selectedAccount?.currency} />}
+                    {!isTransfer && !isSplit && (
+                        <TransactionFormItems form={form} currency={selectedAccount?.currency} />
+                    )}
 
                     <FormSubmitButton hidden={hideSubmit} isSubmitting={isSubmitting} label={submitLabel} />
                 </form>

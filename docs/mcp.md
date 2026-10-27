@@ -61,7 +61,9 @@ On the consent page pick **Editor** or **Admin**, or tick Write and Delete under
 | Tool | Needs | Does |
 |------|-------|------|
 | `create_transaction`, `update_transaction`, `confirm_transaction`, `skip_transaction`, `duplicate_transaction` | transactions: write | record, change or settle a transaction |
+| `create_transaction_group`, `update_transaction_group` | transactions: write | record or replace a [split payment](split-payments.md) |
 | `delete_transaction` | transactions: delete | remove a transaction |
+| `delete_transaction_group` | transactions: delete | remove a split payment with all its parts |
 | `create_account`, `update_account` | accounts: write | add or change an account |
 | `create_category`, `update_category`, `set_default_category` | categories: write | add or change a category |
 | `create_tag`, `rename_tag` | tags: write | add or rename a tag |

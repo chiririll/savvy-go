@@ -129,6 +129,8 @@
         "create": "New transaction",
         "createTitle": "New transaction",
         "editTitle": "Edit transaction",
+    "editPaymentTitle": "Edit payment",
+    "paymentBadge": "Part of a payment",
         "emptyTitle": "No transactions found",
         "emptyDescription": "Create your first transaction to start tracking",
         "emptyPendingTitle": "No pending transactions",
@@ -206,6 +208,8 @@
             "transfer_in": "Received from another space"
         },
         "deleteTitle": "Delete transaction?",
+    "deletePaymentTitle": "Delete payment?",
+    "deletePaymentDescription": "This deletes every part of the payment. This action cannot be undone.",
         "deleteDescription": "This action cannot be undone."
     },
     "recurring": {

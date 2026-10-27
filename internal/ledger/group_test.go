@@ -161,8 +161,9 @@ func TestGroupLegRefusesSingleLegChanges(t *testing.T) {
 	g := e.createGroup(t, e.leg("expense", e.usdAcc.ID, "1"), e.leg("expense", e.jpyAcc.ID, "100"))
 	leg := g.Legs[0]
 
-	if a := leg.Allowed(); a != (TxActions{}) {
-		t.Errorf("allowed = %+v, want none", a)
+	// The flags are the payment's: it can be edited and deleted, a leg cannot be copied.
+	if a := leg.Allowed(); a != (TxActions{Edit: true, Delete: true}) {
+		t.Errorf("allowed = %+v, want edit and delete", a)
 	}
 	if _, err := e.txs.Update(e.ctx, leg.ID, e.leg("expense", e.usdAcc.ID, "2")); !errors.Is(err, ErrGroupLeg) {
 		t.Errorf("update err = %v, want ErrGroupLeg", err)

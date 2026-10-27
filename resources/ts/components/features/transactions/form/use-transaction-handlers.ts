@@ -1,10 +1,51 @@
 import { useRef } from 'react'
 import type { UseFormReturn } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { useNegativeBalanceConfirm } from '@/components/shared'
 import type { NegativeBalanceWarning } from '@/lib/negative-balance'
+import { buildPaymentLegs, type PaymentError } from '@/lib/payment-input'
+import type { PaymentLeg } from '@/lib/split-payment'
 import type { TransactionFormValues } from '@/schemas/transactions'
+import type { Account } from '@/types'
 import type { useTransferRate } from './transfer-rate'
+
+/** The field the form shows each way a payment can fail on. */
+const PAYMENT_ERROR_FIELDS: Record<PaymentError, keyof TransactionFormValues> = {
+    needTwoParts: 'extra_payments',
+    amountPositive: 'amount',
+    sameCurrency: 'change_account_id',
+    handedOverTooLow: 'handed_over',
+    unknownAccount: 'account_id',
+}
+
+function paymentErrorMessage(t: TFunction, error: PaymentError): string {
+    switch (error) {
+        case 'needTwoParts':
+            return t('validation.paymentNeedsTwoAccounts')
+        case 'amountPositive':
+            return t('validation.amountPositive')
+        case 'sameCurrency':
+            return t('validation.changeSameCurrency')
+        case 'handedOverTooLow':
+            return t('validation.handedOverTooLow')
+        case 'unknownAccount':
+            return t('validation.selectAccount')
+    }
+}
+
+/** The form values without the fields that only describe a split payment. */
+function withoutPayment(data: TransactionFormValues): TransactionFormValues {
+    const {
+        payment_mode: _mode,
+        extra_payments: _extra,
+        handed_over: _handed,
+        change_account_id: _changeAccount,
+        change_amount: _change,
+        ...rest
+    } = data
+    return rest
+}
 
 interface TransactionHandlersOptions {
     form: UseFormReturn<TransactionFormValues>
@@ -12,7 +53,11 @@ interface TransactionHandlersOptions {
     warnings: NegativeBalanceWarning[]
     dateRequired: boolean
     isSpaceTransfer: boolean
+    /** The expense is a split payment: it is saved as legs, through onSubmitPayment. */
+    isSplit?: boolean
+    accounts?: Account[]
     onSubmit: (data: TransactionFormValues) => void
+    onSubmitPayment?: (legs: PaymentLeg[]) => void
     onTypeChange?: (type: TransactionFormValues['type']) => void
 }
 
@@ -22,7 +67,10 @@ export function useTransactionHandlers({
     warnings,
     dateRequired,
     isSpaceTransfer,
+    isSplit,
+    accounts,
     onSubmit,
+    onSubmitPayment,
     onTypeChange,
 }: TransactionHandlersOptions) {
     const { t } = useTranslation('common')
@@ -33,10 +81,19 @@ export function useTransactionHandlers({
             form.setError('date', { message: t('validation.dateRequired') })
             return
         }
+        if (isSplit && onSubmitPayment) {
+            const built = buildPaymentLegs(data, accounts ?? [])
+            if (!built.ok) {
+                form.setError(PAYMENT_ERROR_FIELDS[built.error], { message: paymentErrorMessage(t, built.error) })
+                return
+            }
+            onSubmitPayment(built.legs)
+            return
+        }
         rate.commit()
         confirmIfNeeded(
             {
-                ...data,
+                ...withoutPayment(data),
                 to_amount: form.getValues('to_amount'),
                 // UI-only helper; the server derives it from the amounts.
                 exchange_rate: undefined,
@@ -60,6 +117,10 @@ export function useTransactionHandlers({
             categoryByType.current[current] = categoryId
         }
         form.setValue('type', value)
+        if (value !== 'expense') {
+            form.setValue('payment_mode', 'single')
+            form.setValue('extra_payments', [])
+        }
         // Null lets the party defaults pick the type's default category.
         form.setValue('category_id', categoryByType.current[value] ?? null)
         onTypeChange?.(value)

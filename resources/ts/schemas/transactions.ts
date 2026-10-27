@@ -21,6 +21,59 @@ export const transactionItemSchema = z.object({
 
 export { isTransferType }
 
+export const PAYMENT_MODES = ['single', 'several', 'change'] as const
+export type PaymentMode = (typeof PAYMENT_MODES)[number]
+
+export const extraPaymentSchema = z.object({
+    account_id: z.coerce.number({
+        error: i18n.t('validation.selectAccount'),
+    }).positive(i18n.t('validation.selectAccount')),
+    amount: z.coerce.number({
+        error: i18n.t('validation.amountRequired'),
+    }).positive(i18n.t('validation.amountPositive')),
+})
+
+interface PaymentFields {
+    date?: string | null
+    amount: number
+    payment_mode?: PaymentMode
+    extra_payments?: unknown[]
+    handed_over?: number | null
+    change_account_id?: number | null
+    change_amount?: number | null
+}
+
+/** What a split payment needs that one field cannot say; the accounts' currencies are checked on submit. */
+function applyPaymentIssues(data: PaymentFields, ctx: z.RefinementCtx) {
+    const mode = data.payment_mode ?? 'single'
+    if (mode === 'single') {
+        return
+    }
+    const issue = (path: string, message: string) =>
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message, path: [path] })
+
+    // A payment is settled: it moves balances at once.
+    if (!data.date) {
+        issue('date', i18n.t('validation.dateRequired'))
+    }
+    if (mode === 'several' && !data.extra_payments?.length) {
+        issue('extra_payments', i18n.t('validation.paymentNeedsTwoAccounts'))
+    }
+    if (mode === 'change') {
+        if (!data.handed_over) {
+            issue('handed_over', i18n.t('validation.amountRequired'))
+        } else if (data.handed_over <= data.amount) {
+            issue('handed_over', i18n.t('validation.handedOverTooLow'))
+        }
+        if (!data.change_account_id) {
+            issue('change_account_id', i18n.t('validation.selectAccount'))
+        }
+        if (!data.change_amount) {
+            issue('change_amount', i18n.t('validation.amountRequired'))
+        }
+    }
+}
+
 export const transactionSchema = z.object({
     type: z.enum(['income', 'expense', 'transfer', 'transfer_out'], {
         error: i18n.t('validation.selectTransactionType'),
@@ -57,7 +110,24 @@ export const transactionSchema = z.object({
     items: z.array(transactionItemSchema).optional(),
 
     tag_ids: z.array(z.number()).optional(),
+
+    /**
+     * How an expense was paid: from one account (the default), from several, or
+     * with change given back in another currency. The fields below are only
+     * read in the last two modes, which save a split payment.
+     */
+    payment_mode: z.enum(PAYMENT_MODES).optional(),
+
+    /** "several": the accounts that paid besides account_id, which pays amount. */
+    extra_payments: z.array(extraPaymentSchema).optional(),
+
+    /** "change": what was handed over (in account_id's currency), and the change that came back. */
+    handed_over: z.coerce.number().positive().optional().nullable(),
+    change_account_id: z.coerce.number().positive().optional().nullable(),
+    change_amount: z.coerce.number().positive().optional().nullable(),
 }).superRefine((data, ctx) => {
+    applyPaymentIssues(data, ctx)
+
     const isTransfer = isTransferType(data.type)
 
     // Transfers require to_account_id
@@ -129,7 +199,8 @@ export function getTransactionSchema(options?: TransactionSchemaOptions) {
     return transactionSchema.superRefine((data, ctx) => {
         applyItemsTotalIssue(data, ctx, options?.currencyDecimals ?? 2)
 
-        if (options?.rejectFutureDate && data.date && isDateInFuture(data.date)) {
+        const settled = options?.rejectFutureDate || (data.payment_mode ?? 'single') !== 'single'
+        if (settled && data.date && isDateInFuture(data.date)) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
                 message: i18n.t('validation.dateCannotBeFuture'),

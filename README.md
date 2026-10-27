@@ -39,6 +39,7 @@ Open http://localhost:8080 and create your account. For Docker Compose, reverse 
 - **Multi-currency** — any fiat or crypto, transfers between them, rates updated automatically
 - **Spaces** — separate books for yourself, your family or a project, each with its own accounts, categories and base currency
 - **Sharing** — invite people to a space as admin, editor or viewer
+- **Split payments** — pay one bill with cash and card, or in euros with the change back in dinars
 - **Transfers between spaces** — send money from one linked space to another, each side in its own currency
 - **Recurring transactions** — scheduled payments (daily, weekly, monthly, yearly)
 - **Automation rules** — auto-categorize transactions based on conditions
@@ -67,6 +68,7 @@ Fully responsive design built with ShadCN/UI — track expenses from your phone 
 ## 📚 Documentation
 
 - [Spaces and roles](docs/spaces.md) — spaces, server and space roles, invitations, linked spaces and transfers
+- [Split payments](docs/split-payments.md) — one purchase paid with several accounts or currencies, change in another currency
 - [Deployment](docs/deployment.md) — Docker Compose, first run, configuration, reverse proxies, health checks, Kubernetes, packages, updating
 - [Email and security](docs/email-and-security.md) — email setup, confirmation, password links, rate limits, two-factor lockout
 - [Data and backups](docs/data-and-backups.md) — the data directory, the signing key, backups and upgrading from the Laravel version

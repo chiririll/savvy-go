@@ -256,3 +256,68 @@ export const OverdrawingAsksFirst: Story = {
         await waitFor(() => expect(args.onSubmit).toHaveBeenCalledOnce())
     },
 }
+
+// An expense paid from several accounts is saved as one payment, a leg for each.
+export const PaidFromSeveralAccounts: Story = {
+    args: {
+        onSubmitPayment: fn(),
+        defaultValues: { ...expense, amount: 15, payment_mode: 'several', extra_payments: [{ account_id: 3, amount: 1000 }] },
+    },
+    play: async ({ canvasElement, args }) => {
+        await expect(await within(canvasElement).findByText(/total/i)).toBeVisible()
+        await userEvent.click(saveButton(canvasElement))
+        await waitFor(() => expect(args.onSubmitPayment).toHaveBeenCalledOnce())
+        await expect(args.onSubmit).not.toHaveBeenCalled()
+        const legs = (args.onSubmitPayment as ReturnType<typeof fn>).mock.calls[0][0]
+        await expect(legs.map((leg: { account_id: number; amount: number }) => [leg.account_id, leg.amount])).toEqual([
+            [1, 15],
+            [3, 1000],
+        ])
+    },
+}
+
+// A price paid with a larger note, the change coming back in another currency: the price is an
+// expense and the rest is exchanged into the change.
+export const PaidWithChange: Story = {
+    args: {
+        onSubmitPayment: fn(),
+        defaultValues: {
+            ...expense,
+            amount: 20,
+            payment_mode: 'change',
+            handed_over: 30,
+            change_account_id: 3,
+            change_amount: 1500,
+        },
+    },
+    play: async ({ canvasElement, args }) => {
+        await expect(await within(canvasElement).findByText(/exchanged/i)).toBeVisible()
+        await userEvent.click(saveButton(canvasElement))
+        await waitFor(() => expect(args.onSubmitPayment).toHaveBeenCalledOnce())
+        const legs = (args.onSubmitPayment as ReturnType<typeof fn>).mock.calls[0][0]
+        await expect(legs).toMatchObject([
+            { type: 'expense', account_id: 1, amount: 20 },
+            { type: 'transfer', account_id: 1, to_account_id: 3, amount: 10, to_amount: 1500 },
+        ])
+    },
+}
+
+// Change in the currency that was handed over is no exchange: the form says so and saves nothing.
+export const ChangeInTheSameCurrencyIsRefused: Story = {
+    args: {
+        onSubmitPayment: fn(),
+        defaultValues: {
+            ...expense,
+            amount: 20,
+            payment_mode: 'change',
+            handed_over: 30,
+            change_account_id: 1,
+            change_amount: 10,
+        },
+    },
+    play: async ({ canvasElement, args }) => {
+        await userEvent.click(saveButton(canvasElement))
+        await expect(await within(canvasElement).findByText(/same currency/i)).toBeVisible()
+        await expect(args.onSubmitPayment).not.toHaveBeenCalled()
+    },
+}

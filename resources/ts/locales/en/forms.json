@@ -40,6 +40,20 @@
     },
     "transactions": {
         "toAccount": "Destination account",
+    "payment": {
+        "label": "Paid with",
+        "mode": { "single": "One account", "several": "Several accounts", "change": "With change" },
+        "amount": { "several": "Paid from this account", "change": "Price" },
+        "severalHelp": "Each account pays its own amount. The first one is the amount above.",
+        "addAccount": "Add account",
+        "removeAccount": "Remove account",
+        "changeHelp": "The price is recorded as an expense. What you handed over beyond it is exchanged into the change.",
+        "handedOver": "Handed over",
+        "changeAmount": "Change received",
+        "changeAccount": "Change goes to",
+        "exchanged": "Exchanged {{from}} for {{to}} (rate {{rate}}).",
+        "rateOff": "That is {{percent}}% away from the stored rate."
+    },
         "swapAccounts": "Swap accounts",
         "toSpace": "Destination space",
         "toSpaceNoAccounts": "That space has no accounts yet.",

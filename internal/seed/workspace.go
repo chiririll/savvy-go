@@ -178,5 +178,8 @@ func (s *seeder) createTransactions(
 	if err := s.seedVariableExpenses(accounts, expenses, tags); err != nil {
 		return err
 	}
+	if err := s.seedSplitPayments(accounts, expenses); err != nil {
+		return err
+	}
 	return s.seedTransfersDebt(accounts)
 }

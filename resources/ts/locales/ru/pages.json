@@ -129,6 +129,8 @@
         "create": "Новая транзакция",
         "createTitle": "Новая транзакция",
         "editTitle": "Изменить транзакцию",
+    "editPaymentTitle": "Редактирование платежа",
+    "paymentBadge": "Часть платежа",
         "emptyTitle": "Транзакций нет",
         "emptyDescription": "Создайте первую транзакцию, чтобы начать учёт",
         "emptyPendingTitle": "Нет отложенных транзакций",
@@ -206,6 +208,8 @@
             "transfer_in": "Из другого пространства"
         },
         "deleteTitle": "Удалить транзакцию?",
+    "deletePaymentTitle": "Удалить платёж?",
+    "deletePaymentDescription": "Будут удалены все части платежа. Это действие нельзя отменить.",
         "deleteDescription": "Это действие нельзя отменить."
     },
     "recurring": {

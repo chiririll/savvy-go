@@ -16,6 +16,8 @@ interface MoneyAccountFieldsProps<T extends FieldValues> {
     fromCurrencySymbol?: string
     toCurrencySymbol?: string
     amountDisabled?: boolean
+    /** Replaces the label of the amount, when it means something other than the whole amount. */
+    amountLabel?: string
     toAmountReadOnly?: boolean
     toAmountPlaceholder?: string
     onSwapAccounts?: () => void
@@ -33,6 +35,7 @@ export function MoneyAccountFields<T extends FieldValues>({
     fromCurrencySymbol,
     toCurrencySymbol,
     amountDisabled,
+    amountLabel,
     toAmountReadOnly,
     toAmountPlaceholder,
     onSwapAccounts,
@@ -66,7 +69,7 @@ export function MoneyAccountFields<T extends FieldValues>({
                         render={({ field }) => (
                             <FormItem className="min-w-0">
                                 <FormLabel>
-                                    {isTransfer ? t('forms:transactions.sendAmount') : t('fields.amount')}
+                                    {amountLabel ?? (isTransfer ? t('forms:transactions.sendAmount') : t('fields.amount'))}
                                     {fromCurrencySymbol && (
                                         <span className="text-muted-foreground ml-1">({fromCurrencySymbol})</span>
                                     )}
