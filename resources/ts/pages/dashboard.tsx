@@ -18,9 +18,10 @@ import { BudgetsCard } from '@/components/features/dashboard/BudgetsCard'
 import { DebtsCard } from '@/components/features/dashboard/DebtsCard'
 import { ExpensesByCategoryCard } from '@/components/features/dashboard/ExpensesByCategoryCard'
 import { PeriodPicker } from '@/components/features/dashboard/PeriodPicker'
-import { RecentTransactionsCard } from '@/components/features/dashboard/RecentTransactionsCard'
+import { LargestTransactionsCard } from '@/components/features/dashboard/LargestTransactionsCard'
 import { DashboardStats } from '@/components/features/dashboard/StatCards'
 import {
+    getPresetDates,
     percentChange,
     resolvePeriodDates,
     toReportFilters,
@@ -46,7 +47,15 @@ export default function DashboardPage() {
         [period, customStartDate, customEndDate],
     )
 
-    const { data: recentTransactions } = useTransactions({ per_page: 5, status: 'confirmed' })
+    // Always the last 30 days, whatever the period picker says. The API sorts by amount in the base currency.
+    const largestRange = useMemo(() => getPresetDates('last_30_days'), [])
+    const { data: largestTransactions } = useTransactions({
+        ...largestRange,
+        per_page: 5,
+        status: 'confirmed',
+        sort_by: 'amount',
+        sort_direction: 'desc',
+    })
     const { data: pendingSummary } = usePendingSummary()
     const { data: expensesByCategory } = useCategorySummary({ type: 'expense', ...periodDates })
     const { data: budgets } = useBudgets()
@@ -111,7 +120,7 @@ export default function DashboardPage() {
 
             <div className="grid min-w-0 gap-4 lg:grid-cols-2">
                 <ExpensesByCategoryCard summary={expensesByCategory} currency={currency} />
-                <RecentTransactionsCard transactions={recentTransactions?.data} onEdit={openEdit} />
+                <LargestTransactionsCard transactions={largestTransactions?.data} onEdit={openEdit} />
             </div>
 
             <BudgetsCard budgets={activeBudgets} />

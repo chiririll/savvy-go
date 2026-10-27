@@ -212,7 +212,7 @@ export interface SigningKeys {
     trusted: { kid: string; publicKey: string; name: string; createdAt: string | null }[]
 }
 
-/** The categories and tags a new space can start with (GET /presets). */
+/** The categories and tags a new space can start with (GET /catalog/presets). */
 export interface SpacePresets {
     categories: {
         name: string

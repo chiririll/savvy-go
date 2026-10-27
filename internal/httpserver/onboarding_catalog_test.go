@@ -40,7 +40,7 @@ func TestServerCurrencyCatalogMatchesSpaceCatalog(t *testing.T) {
 	a := newTestApp(t)
 	user := a.issue(a.createUser("u@test.com", "secret1", roleEditor), false)
 
-	res := a.serverGet("/api/currencies/catalog?base=USD", user.Token)
+	res := a.serverGet("/api/catalog/currencies?base=USD", user.Token)
 	if res.StatusCode != 200 {
 		t.Fatalf("status %d", res.StatusCode)
 	}
@@ -81,7 +81,7 @@ func TestServerCurrencyCatalogMatchesSpaceCatalog(t *testing.T) {
 func TestServerCurrencyCatalogRejectsBadBase(t *testing.T) {
 	a := newTestApp(t)
 	user := a.issue(a.createUser("u@test.com", "secret1", roleEditor), false)
-	res := a.serverGet("/api/currencies/catalog?base=../x", user.Token)
+	res := a.serverGet("/api/catalog/currencies?base=../x", user.Token)
 	if res.StatusCode != 422 {
 		t.Fatalf("bad base got %d", res.StatusCode)
 	}
@@ -92,7 +92,7 @@ func TestPresetsServeTheCategoriesTags(t *testing.T) {
 	a := newTestApp(t)
 	user := a.issue(a.createUser("u@test.com", "secret1", roleViewer), false)
 
-	res := a.serverGet("/api/presets", user.Token)
+	res := a.serverGet("/api/catalog/presets", user.Token)
 	if res.StatusCode != 200 {
 		t.Fatalf("status %d", res.StatusCode)
 	}
@@ -125,7 +125,7 @@ func TestPresetsServeTheCategoriesTags(t *testing.T) {
 // The catalogs of the setup screens are for people who are signed in.
 func TestServerCatalogsNeedSignedInUser(t *testing.T) {
 	a := newTestApp(t)
-	for _, path := range []string{"/api/currencies/catalog", "/api/presets"} {
+	for _, path := range []string{"/api/catalog/currencies", "/api/catalog/presets"} {
 		status(t, a.serverGet(path, ""), 401, path)
 	}
 }
@@ -134,7 +134,7 @@ func TestServerCurrencyCatalogFlagsBuiltInList(t *testing.T) {
 	a := newTestApp(t) // its rate source is offline: only the built-in list is known
 	user := a.issue(a.createUser("u@test.com", "secret1", roleEditor), false)
 
-	res := a.serverGet("/api/currencies/catalog?base=USD", user.Token)
+	res := a.serverGet("/api/catalog/currencies?base=USD", user.Token)
 	body := decodeJSON(t, res)
 	meta, _ := body["meta"].(map[string]any)
 	if meta["source"] != "fallback" {

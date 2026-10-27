@@ -32,6 +32,9 @@
     },
     "tags": {
         "label": "Tags",
+        "new": "New tag",
+        "newName": "New tag name",
+        "createFailed": "Could not create the tag",
         "namePlaceholder": "vacation",
         "nameHelp": "Tag name without #. Only letters, numbers, _ and - allowed."
     },

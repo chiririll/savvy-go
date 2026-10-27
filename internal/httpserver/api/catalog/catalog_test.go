@@ -37,7 +37,7 @@ func (r *refreshable) Refresh() bool {
 
 func get(h Handler, query string) *httptest.ResponseRecorder {
 	w := httptest.NewRecorder()
-	h.currencies(w, httptest.NewRequest(http.MethodGet, "/currencies/catalog"+query, nil))
+	h.currencies(w, httptest.NewRequest(http.MethodGet, "/catalog/currencies"+query, nil))
 	return w
 }
 

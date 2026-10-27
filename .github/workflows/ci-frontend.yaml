@@ -11,6 +11,7 @@ on:
       - 'package-lock.json'
       - 'tsconfig*.json'
       - 'vite.config.ts'
+      - 'vitest.stories.config.ts'
       - '.storybook/**'
       - 'components.json'
       - '.github/workflows/ci-frontend.yaml'

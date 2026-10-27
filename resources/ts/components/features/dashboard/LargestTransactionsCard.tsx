@@ -6,19 +6,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { TransactionRow, useCreateTransactionDialog } from '@/components/features/transactions'
 import type { Transaction } from '@/types'
 
-interface RecentTransactionsCardProps {
+interface LargestTransactionsCardProps {
     transactions?: Transaction[]
     onEdit: ReturnType<typeof useCreateTransactionDialog>['openEdit']
 }
 
-export function RecentTransactionsCard({ transactions, onEdit }: RecentTransactionsCardProps) {
+export function LargestTransactionsCard({ transactions, onEdit }: LargestTransactionsCardProps) {
     const { t } = useTranslation('pages')
     const { t: tCommon } = useTranslation('common')
 
     return (
         <Card className="min-w-0">
             <CardHeader className="flex min-w-0 flex-row items-center justify-between gap-2">
-                <CardTitle className="min-w-0 truncate">{t('dashboard.recentTransactions')}</CardTitle>
+                <CardTitle className="min-w-0 truncate">{t('dashboard.largestTransactions')}</CardTitle>
                 <Button variant="ghost" size="sm" asChild className="shrink-0">
                     <Link to="/transactions">
                         <span className="hidden sm:inline">{tCommon('actions.viewAll')}</span>

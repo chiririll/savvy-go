@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect, userEvent, within } from 'storybook/test'
+import { expect, userEvent, waitFor, within } from 'storybook/test'
 
 import { tags } from '@/test/fixtures'
 import { hang, reply } from '@/test/api-mocks'
@@ -46,6 +46,37 @@ export const ToggledByClick: Story = {
         const work = await within(canvasElement).findByRole('button', { name: '#work' })
         await userEvent.click(work)
         await expect(work).toHaveAttribute('aria-pressed', 'true')
+    },
+}
+
+export const CreatesAndSelectsTag: Story = {
+    args: { allowCreate: true },
+    beforeEach: ({ msw }) =>
+        msw.use(reply('get', '/tags', tags), reply('post', '/tags', { id: 99, name: 'fresh' }, 201)),
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement)
+        await userEvent.click(await canvas.findByRole('button', { name: /new tag/i }))
+        await userEvent.type(canvas.getByRole('textbox', { name: /new tag name/i }), 'fresh{Enter}')
+        // The input closes once the tag is created.
+        await waitFor(() => expect(canvas.queryByRole('textbox')).toBeNull())
+    },
+}
+
+export const RejectsInvalidTagName: Story = {
+    args: { allowCreate: true },
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement)
+        await userEvent.click(await canvas.findByRole('button', { name: /new tag/i }))
+        await userEvent.type(canvas.getByRole('textbox', { name: /new tag name/i }), 'bad name{Enter}')
+        await expect(await canvas.findByText(/only letters/i)).toBeInTheDocument()
+    },
+}
+
+export const CreateWithoutTags: Story = {
+    args: { allowCreate: true },
+    beforeEach: ({ msw }) => msw.use(reply('get', '/tags', [])),
+    play: async ({ canvasElement }) => {
+        await expect(await within(canvasElement).findByRole('button', { name: /new tag/i })).toBeInTheDocument()
     },
 }
 

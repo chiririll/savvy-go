@@ -33,16 +33,17 @@ export const spacesApi = {
     create: (input: CreateSpaceInput) => api.post<Space, CreateSpaceInput>('/spaces', input),
 
     /** Categories and tags a new space can start with. */
-    presets: () => api.get<SpacePresets>('/presets'),
+    presets: () => api.get<SpacePresets>('/catalog/presets'),
     /**
-     * Every currency the server knows, priced in `base`; needs no space. `refresh`
-     * asks the server to try its data service again now instead of answering from
-     * the cache it keeps after a failure.
+     * Every currency the server knows, priced in `base`; needs no space. Not under
+     * `/currencies`, which is a space root: that path is the current space's catalog,
+     * which hides what the space already has. `refresh` asks the server to try its
+     * data service again now instead of answering from the cache it keeps after a failure.
      */
     currencyCatalog: (base?: string, opts?: { refresh?: boolean }) =>
         apiClient
             .get<{ data: CurrencyCatalogItem[]; meta?: { source?: string } }>(
-                `/currencies/catalog${toQueryString({ base, refresh: opts?.refresh ? 1 : undefined })}`,
+                `/catalog/currencies${toQueryString({ base, refresh: opts?.refresh ? 1 : undefined })}`,
             )
             .then((res): CurrencyCatalog => ({ items: res.data.data, source: res.data.meta?.source ?? 'live' })),
     /** The currencies, accounts, categories and tags of a space, read with viewer rights. */

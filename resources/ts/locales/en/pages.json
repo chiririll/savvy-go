@@ -476,7 +476,7 @@
         "balanceDynamics": "Balance dynamics",
         "accountBalances": "Account balances",
         "expensesByCategory": "Expenses by Category",
-        "recentTransactions": "Recent transactions",
+        "largestTransactions": "Largest transactions, last 30 days",
         "budgets": "Budgets",
         "noBudgets": "No budgets yet",
         "allExpenses": "All expenses",

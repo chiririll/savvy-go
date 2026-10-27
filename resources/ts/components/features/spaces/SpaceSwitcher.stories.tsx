@@ -75,7 +75,7 @@ export const AsGuest: Story = {
 
 export const CreateOpensTheModal: Story = {
     beforeEach: ({ msw }) =>
-        msw.use(reply('get', '/presets', { categories: [], tags: [] }), reply('get', '/currencies/catalog', [])),
+        msw.use(reply('get', '/catalog/presets', { categories: [], tags: [] }), reply('get', '/catalog/currencies', [])),
     play: async ({ canvasElement }) => {
         const menu = await open(canvasElement)
         await userEvent.click(menu.getByRole('menuitem', { name: /create a space/i }))
