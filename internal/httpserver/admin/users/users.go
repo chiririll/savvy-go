@@ -84,7 +84,11 @@ func (h Handler) validateNewUser(r *http.Request, body userStoreBody) (errs map[
 // attachSetupLink issues the set-password token of a user without a password
 // and either returns it in the payload or emails it.
 func (h Handler) attachSetupLink(r *http.Request, u *auth.User, send bool) (*dto.SetupLink, error) {
-	tok, exp, err := h.Tokens.Issue(r.Context(), u)
+	issue := h.Tokens.Issue
+	if send {
+		issue = h.Tokens.IssueEmailed
+	}
+	tok, exp, err := issue(r.Context(), u)
 	if err != nil {
 		return nil, err
 	}
@@ -254,7 +258,11 @@ func (h Handler) usersIssueToken(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	tok, exp, err := h.Tokens.Issue(r.Context(), u)
+	issue := h.Tokens.Issue
+	if body.Send {
+		issue = h.Tokens.IssueEmailed
+	}
+	tok, exp, err := issue(r.Context(), u)
 	if err != nil {
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 		return

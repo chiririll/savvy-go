@@ -52,6 +52,7 @@ paths:
       responses:
         "200": {$ref: "#/components/responses/Data"}
         "401": {$ref: "#/components/responses/Unauthenticated"}
+        "422": {$ref: "#/components/responses/Validation"}
   /spaces/{space}/accounts-balance-comparison:
     parameters: [{$ref: "#/components/parameters/Space"}]
     get:
@@ -60,6 +61,7 @@ paths:
       responses:
         "200": {$ref: "#/components/responses/Data"}
         "401": {$ref: "#/components/responses/Unauthenticated"}
+        "422": {$ref: "#/components/responses/Validation"}
   /spaces/{space}/accounts/{id}:
     parameters: [{$ref: "#/components/parameters/Space"}, {$ref: "#/components/parameters/Id"}]
     get:

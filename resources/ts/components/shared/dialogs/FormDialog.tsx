@@ -59,7 +59,7 @@ function FormDialogActions({
     const isReadOnly = useReadOnly()
 
     return (
-        <>
+        <div data-slot="form-dialog-actions" className="ml-auto flex shrink-0 items-center gap-2">
             <Button type="button" variant="outline" onClick={onCancel}>
                 {t('actions.cancel')}
             </Button>
@@ -68,7 +68,7 @@ function FormDialogActions({
                     {isSubmitting ? t('actions.saving') : isEdit ? t('actions.save') : t('actions.create')}
                 </Button>
             )}
-        </>
+        </div>
     )
 }
 
@@ -89,7 +89,7 @@ export function FormDialog({
     const footerStartSlot = (
         <div
             ref={setFooterStart}
-            className="mr-auto flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 empty:hidden"
+            className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-2 empty:hidden"
         />
     )
     const body = <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">{children}</div>

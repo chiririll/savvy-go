@@ -5,7 +5,6 @@ import (
 	"sort"
 	"time"
 
-	"savvy-go/internal/httpserver/admin/sysinfo"
 	"savvy-go/internal/httpserver/httpx"
 )
 
@@ -111,7 +110,7 @@ func (h Handler) index(w http.ResponseWriter, r *http.Request) {
 // diskPercent is the used share of the volume that holds the uploads, nil when
 // the platform cannot tell.
 func (h Handler) diskPercent() *float64 {
-	total, free, ok := sysinfo.VolumeSpace(h.UploadsDir)
+	total, free, ok := h.Host.VolumeSpace(h.UploadsDir)
 	if !ok || total <= 0 {
 		return nil
 	}

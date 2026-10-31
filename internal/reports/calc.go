@@ -104,7 +104,7 @@ type catTotal struct {
 }
 
 func (q report) byCategory(typ string, r dateRange) []catTotal {
-	var out []catTotal
+	out := []catTotal{}
 	for _, x := range filter.SumGroupedByCategory(q.ctx, q.DB, q.where(typ, r, 0), q.unit) {
 		out = append(out, catTotal{
 			ID: x.ID, Name: x.Name, Icon: coalesce(x.Icon.String, "circle"),
@@ -144,8 +144,8 @@ func (s Service) Overview(ctx context.Context, f Filter) OverviewReport {
 		m := q.metrics(*cmp)
 		prev = &m
 	}
-	var incSpark, expSpark, netSpark []money.Money
-	var savSpark []float64
+	incSpark, expSpark, netSpark := []money.Money{}, []money.Money{}, []money.Money{}
+	savSpark := []float64{}
 	for _, p := range f.Sparkline(now, 6) {
 		m := q.metrics(p)
 		incSpark = append(incSpark, m.Income)

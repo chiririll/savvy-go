@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { getPresetDates, percentChange, resolvePeriodDates, toReportFilters } from './period'
+import { getPresetDates, isValidDateRange, percentChange, resolvePeriodDates, toReportFilters } from './period'
 
 const NOW = new Date(2026, 4, 15) // 15 May 2026
 
@@ -24,12 +24,28 @@ describe('getPresetDates', () => {
     })
 })
 
+describe('isValidDateRange', () => {
+    it.each([
+        ['2026-01-02', '2026-01-09', true],
+        ['2026-01-02', '2026-01-02', true],
+        ['2026-02-01', '2026-01-09', false],
+        ['2026-01-02', '', false],
+        ['', '', false],
+    ])('%s to %s is %s', (start, end, valid) => {
+        expect(isValidDateRange(start, end)).toBe(valid)
+    })
+})
+
 describe('resolvePeriodDates', () => {
     it('uses a complete custom range', () => {
         expect(resolvePeriodDates('custom', '2026-01-02', '2026-01-09')).toEqual({
             start_date: '2026-01-02',
             end_date: '2026-01-09',
         })
+    })
+
+    it('does not query a custom range that ends before it starts', () => {
+        expect(resolvePeriodDates('custom', '2026-02-01', '2026-01-09')).toEqual(getPresetDates('last_30_days'))
     })
 
     it('falls back to 30 days while a custom range is incomplete', () => {

@@ -253,3 +253,45 @@ func TestAdminSettingPasswordRevokesPendingLink(t *testing.T) {
 	}
 	status(t, a.do("GET", "/api/auth/password/"+token, nil, "", ""), 404, "link after the admin chose a password")
 }
+
+func setPasswordVia(t *testing.T, a *testApp, token string, want int) {
+	t.Helper()
+	set := map[string]string{"password": "newpass12", "password_confirmation": "newpass12"}
+	status(t, a.do("POST", "/api/auth/password/"+token, set, "", ""), want, "set password")
+}
+
+func TestEmailedSetPasswordLinkConfirmsEmail(t *testing.T) {
+	a := newTestApp(t)
+	invited, err := a.svc.Users.Create(context.Background(), "Invited", "invited@test.com", nil, auth.RoleUser)
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, _, err := a.svc.PasswordTokens.IssueEmailed(context.Background(), invited)
+	if err != nil {
+		t.Fatal(err)
+	}
+	setPasswordVia(t, a, token, 200)
+	u, _ := a.svc.Users.ByID(context.Background(), invited.ID)
+	if !u.EmailVerified {
+		t.Fatal("email stays unconfirmed after the emailed link was used")
+	}
+}
+
+func TestHandedOverSetPasswordLinkLeavesEmailUnconfirmed(t *testing.T) {
+	a := newTestApp(t)
+	invited, err := a.svc.Users.Create(context.Background(), "Invited", "invited@test.com", nil, auth.RoleUser)
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, _, err := a.svc.PasswordTokens.Issue(context.Background(), invited)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Prefixing a handed-over token must not turn it into an emailed one.
+	setPasswordVia(t, a, "m_"+token, 404)
+	setPasswordVia(t, a, token, 200)
+	u, _ := a.svc.Users.ByID(context.Background(), invited.ID)
+	if u.EmailVerified {
+		t.Fatal("a link the admin held proved nothing about the mailbox")
+	}
+}

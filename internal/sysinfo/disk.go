@@ -1,4 +1,3 @@
-// Package sysinfo reads facts about the machine the server runs on.
 package sysinfo
 
 import (
@@ -6,9 +5,9 @@ import (
 	"path/filepath"
 )
 
-// VolumeSpace is the size and free space of the volume holding path, or of its
+// volumeSpace is the size and free space of the volume holding path, or of its
 // nearest existing parent.
-func VolumeSpace(path string) (total, free int64, ok bool) {
+func volumeSpace(path string) (total, free int64, ok bool) {
 	probe := path
 	for probe != "" {
 		if st, err := os.Stat(probe); err == nil && st.IsDir() {

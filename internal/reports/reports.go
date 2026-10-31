@@ -1,6 +1,7 @@
 package reports
 
 import (
+	"errors"
 	"strconv"
 	"time"
 
@@ -37,6 +38,26 @@ func (s Service) loc() *time.Location {
 }
 
 func (s Service) now() time.Time { return time.Now().In(s.loc()) }
+
+// ErrInvalidRange is returned for a custom period that cannot be read or ends
+// before it starts. Range itself still falls back to the default period so
+// that scheduled and internal callers always get something; request handlers
+// call Validate first so a bad period is reported, not silently replaced.
+var ErrInvalidRange = errors.New("invalid date range")
+
+// Validate reports whether a custom period is usable. Other period types and a
+// custom period with no dates at all (the default period) are always valid.
+func (f Filter) Validate() error {
+	if f.PeriodType != "custom" || (f.StartDate == "" && f.EndDate == "") {
+		return nil
+	}
+	start, errStart := time.Parse("2006-01-02", f.StartDate)
+	end, errEnd := time.Parse("2006-01-02", f.EndDate)
+	if errStart != nil || errEnd != nil || end.Before(start) {
+		return ErrInvalidRange
+	}
+	return nil
+}
 
 func (f Filter) Range(now time.Time) dateRange {
 	switch f.PeriodType {
@@ -151,7 +172,7 @@ type periodPoint struct{ Key string }
 // first day of each. Stepping begins at the bucket that holds start, so a range
 // beginning on the 31st still reaches every month it touches.
 func generatePeriods(start, end time.Time, groupBy string) []periodPoint {
-	var out []periodPoint
+	out := []periodPoint{}
 	cur := start
 	switch groupBy {
 	case "week":

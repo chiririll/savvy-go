@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { Calendar } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import type { PeriodPreset } from './period'
+import { isValidDateRange, type PeriodPreset } from './period'
 
 interface PeriodPickerProps {
     period: PeriodPreset
@@ -22,6 +22,7 @@ export function PeriodPicker({
     onCustomEndChange,
 }: PeriodPickerProps) {
     const { t } = useTranslation('pages')
+    const rangeInvalid = Boolean(customStartDate && customEndDate) && !isValidDateRange(customStartDate, customEndDate)
 
     return (
         <div className="flex flex-col gap-2 sm:items-end">
@@ -48,6 +49,8 @@ export function PeriodPicker({
                         type="date"
                         aria-label={t('transactions.dateFrom')}
                         value={customStartDate}
+                        max={customEndDate || undefined}
+                        aria-invalid={rangeInvalid}
                         onChange={(e) => onCustomStartChange(e.target.value)}
                         className="h-8 w-full sm:w-[140px]"
                     />
@@ -56,10 +59,17 @@ export function PeriodPicker({
                         type="date"
                         aria-label={t('transactions.dateTo')}
                         value={customEndDate}
+                        min={customStartDate || undefined}
+                        aria-invalid={rangeInvalid}
                         onChange={(e) => onCustomEndChange(e.target.value)}
                         className="h-8 w-full sm:w-[140px]"
                     />
                 </div>
+            )}
+            {period === 'custom' && rangeInvalid && (
+                <p role="alert" className="text-xs text-destructive">
+                    {t('dashboard.periodInvalid')}
+                </p>
             )}
         </div>
     )

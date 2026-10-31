@@ -110,3 +110,22 @@ func TestReorderTransactionsWithinADay(t *testing.T) {
 		map[string]any{"date": "2024-01-15"}, sess.Token, sess.CSRF),
 		http.StatusUnprocessableEntity, "no ids")
 }
+
+// A period that cannot be read, or ends before it starts, is refused: a silent
+// fallback to the default period would show data the client never asked for.
+func TestInvalidPeriodIsAClientError(t *testing.T) {
+	a := newTestApp(t)
+	sess := a.issue(a.createUser("rw@test.com", "secret1", roleEditor), false)
+
+	for _, c := range []struct{ name, path string }{
+		{"summary, end before start", "/api/categories-summary?type=expense&start_date=2025-02-01&end_date=2025-01-01"},
+		{"summary, unreadable date", "/api/categories-summary?type=expense&start_date=nope&end_date=2025-01-01"},
+		{"summary, one date only", "/api/categories-summary?type=expense&start_date=2025-01-01"},
+		{"balance history", "/api/accounts-balance-history?start_date=2025-02-01&end_date=2025-01-01"},
+		{"balance comparison", "/api/accounts-balance-comparison?start_date=2025-02-01&end_date=2025-01-01"},
+	} {
+		status(t, a.do("GET", c.path, nil, sess.Token, ""), http.StatusUnprocessableEntity, c.name)
+	}
+	status(t, a.do("GET", "/api/categories-summary?type=expense&start_date=2025-01-01&end_date=2025-01-31", nil, sess.Token, ""), http.StatusOK, "valid range")
+	status(t, a.do("GET", "/api/categories-summary?type=expense", nil, sess.Token, ""), http.StatusOK, "no range")
+}

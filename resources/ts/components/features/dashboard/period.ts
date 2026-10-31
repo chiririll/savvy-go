@@ -43,9 +43,14 @@ export function getPresetDates(preset: PeriodPreset, now = new Date()): DateRang
     return { start_date: addDaysLocal(now, -29), end_date: formatDateLocal(now) }
 }
 
-/** The range the dashboard shows: the picked dates for a complete custom range, else the preset's. */
+/** True when both dates are set and the range does not end before it starts (ISO dates compare as text). */
+export function isValidDateRange(start: string, end: string): boolean {
+    return Boolean(start && end && start <= end)
+}
+
+/** The range the dashboard shows: the picked dates for a valid custom range, else the preset's. */
 export function resolvePeriodDates(preset: PeriodPreset, customStart: string, customEnd: string): DateRange {
-    if (preset === 'custom' && customStart && customEnd) {
+    if (preset === 'custom' && isValidDateRange(customStart, customEnd)) {
         return { start_date: customStart, end_date: customEnd }
     }
     return getPresetDates(preset)
