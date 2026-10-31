@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query'
 import { transactionsApi, type ConfirmTransactionOptions } from '@/api'
+import type { TransactionsResponse } from '@/api/transactions'
 import { Transaction, TransactionFilters } from '@/types'
 import { TransactionFormData } from '@/schemas'
 import { useResourceItem, useResourceMutation } from './use-crud'
@@ -84,11 +85,28 @@ export function useCreateTransaction(redirectTo?: string) {
 }
 
 export function useUpdateTransaction(redirectTo?: string) {
+    const queryClient = useQueryClient()
+
     return useResourceMutation({
         mutationFn: ({ id, data }: { id: string | number; data: Partial<TransactionFormData> }) =>
             transactionsApi.update(id, data),
+        // No reset: dropping the loaded pages collapses the list and loses scroll position.
+        // The saved row is put into the loaded pages at once; invalidation then refetches
+        // them in place, which also re-sorts a row whose date or amount changed.
+        onSuccess: (saved) => {
+            queryClient.setQueriesData<InfiniteData<TransactionsResponse>>(
+                { queryKey: [...QUERY_KEY, 'infinite'] },
+                (cached) =>
+                    cached && {
+                        ...cached,
+                        pages: cached.pages.map((page) => ({
+                            ...page,
+                            data: page.data.map((item) => (item.id === saved.id ? saved : item)),
+                        })),
+                    },
+            )
+        },
         invalidateKeys: [...TRANSACTION_INVALIDATE],
-        resetKeys: [...TRANSACTION_INFINITE_RESET],
         successMessage: i18n.t('toasts.transaction.updated'),
         redirectTo,
     })
