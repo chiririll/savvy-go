@@ -39,6 +39,7 @@ export const SubmittedFromTheFooter: Story = {
     args: { recurring: recurring() },
     play: async ({ args }) => {
         const dialog = await screen.findByRole('dialog')
+        await expect(within(dialog).getByRole('button', { name: /^cancel$/i })).toBeVisible()
         await userEvent.click(within(dialog).getByRole('button', { name: /^save$/i }))
         await expect(args.onSubmit).toHaveBeenCalledOnce()
     },

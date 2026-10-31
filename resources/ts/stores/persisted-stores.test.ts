@@ -40,7 +40,7 @@ describe('space store', () => {
     it('remembers the choice in the browser under a stable key', () => {
         useSpaceStore.getState().setCurrentId(7)
         const saved = JSON.parse(storage.getItem('savvy-space')!)
-        expect(saved.state).toEqual({ currentId: 7 })
+        expect(saved.state).toEqual({ currentId: 7, ownerId: null })
     })
 
     it('restores the choice on the next visit', async () => {

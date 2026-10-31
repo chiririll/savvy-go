@@ -12,16 +12,18 @@ type CategorySummary = NonNullable<ReturnType<typeof useCategorySummary>['data']
 
 interface ExpensesByCategoryCardProps {
     summary?: CategorySummary
+    /** The summary could not be loaded; shown instead of "no data". */
+    isError?: boolean
     /** Fallback when the summary names no currency of its own. */
     currency?: NonNullable<ReturnType<typeof useTotalBalance>['data']>['currency']
 }
 
-export function ExpensesByCategoryCard({ summary, currency }: ExpensesByCategoryCardProps) {
+export function ExpensesByCategoryCard({ summary, currency, isError }: ExpensesByCategoryCardProps) {
     const { t, i18n } = useTranslation('pages')
     const chartTheme = useChartTheme()
 
     const option = useMemo(() => {
-        if (!summary?.data.length) return {}
+        if (!summary?.data?.length) return {}
 
         const categoryCurrency = summary.currency || currency
         const data = summary.data
@@ -79,7 +81,11 @@ export function ExpensesByCategoryCard({ summary, currency }: ExpensesByCategory
                 <CardTitle>{t('dashboard.expensesByCategory')}</CardTitle>
             </CardHeader>
             <CardContent className="min-w-0">
-                {summary && summary.data.some((c) => (c.totalAmount ?? 0) > 0) ? (
+                {isError ? (
+                    <div role="alert" className="flex items-center justify-center h-[280px] text-muted-foreground">
+                        {t('common:errors.somethingWrong')}
+                    </div>
+                ) : summary?.data?.some((c) => (c.totalAmount ?? 0) > 0) ? (
                     <div className="min-w-0 overflow-x-auto overscroll-x-contain">
                         <ReactECharts
                             option={option}

@@ -6,6 +6,7 @@ import (
 	"savvy-go/internal/appconfig"
 	"savvy-go/internal/httpserver/httpx/routing"
 	"savvy-go/internal/store"
+	"savvy-go/internal/sysinfo"
 	"savvy-go/internal/uploads"
 )
 
@@ -17,6 +18,7 @@ func init() {
 			UploadsDir: routing.Get[appconfig.Config](d).UploadsDir,
 			Version:    routing.Get[appconfig.Build](d).Version,
 			Env:        routing.Get[appconfig.Build](d).Env,
+			Host:       routing.Get[sysinfo.Service](d),
 		}
 		return []routing.Mount{
 			routing.Admin(h.Routes),
@@ -31,6 +33,7 @@ type Handler struct {
 	UploadsDir string
 	Version    string // the release
 	Env        string // the build environment
+	Host       sysinfo.Service
 }
 
 func (h Handler) Routes(r chi.Router) {
