@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { startAuthentication } from '@simplewebauthn/browser'
 import { authApi, webauthnApi } from '@/api'
+import { queryClient } from '@/lib/query-client'
+import { useSpaceStore } from './space'
 import { setOnUnauthorized, setOnEmailUnverified } from '@/api/client'
 import { User, LoginCredentials, RegisterData, AuthResponse, TwoFactorAuthResponse, MeResponse } from '@/types'
 
@@ -40,6 +42,20 @@ function sessionTimes(
     return {
         expiresAt: response.expires_at ?? null,
         refreshAt: response.refresh_at ?? null,
+    }
+}
+
+/**
+ * Cached data and the remembered space belong to one account. Logout is not the
+ * only way to switch accounts: an expired session or a reloaded tab can sign in
+ * as someone else without passing through clear().
+ */
+function adoptUser(id: number) {
+    const space = useSpaceStore.getState()
+    if (space.ownerId !== id) {
+        queryClient.clear()
+        space.setCurrentId(null)
+        space.setOwnerId(id)
     }
 }
 
@@ -97,6 +113,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         try {
             const response = await authApi.me()
             if (response.user) {
+                adoptUser(response.user.id)
                 set({
                     user: response.user,
                     isAuthenticated: true,
@@ -137,7 +154,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
     },
 
-    applySession: (response) =>
+    applySession: (response) => {
+        adoptUser(response.user.id)
         set({
             user: response.user,
             isAuthenticated: true,
@@ -145,7 +163,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             sessionExpired: false,
             emailVerificationRequired: response.email_verification_required ?? false,
             ...sessionTimes(response),
-        }),
+        })
+    },
 
     holdBackForVerification: () =>
         set((state) => ({
@@ -162,7 +181,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ sessionExpired: true, isLoading: false })
     },
 
-    clear: () =>
+    clear: () => {
+        // Cached data and the remembered space belong to the previous account.
+        queryClient.clear()
+        useSpaceStore.getState().setCurrentId(null)
+        useSpaceStore.getState().setOwnerId(null)
         set({
             user: null,
             isAuthenticated: false,
@@ -171,7 +194,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             expiresAt: null,
             refreshAt: null,
             emailVerificationRequired: false,
-        }),
+        })
+    },
 }))
 
 setOnUnauthorized(() => {

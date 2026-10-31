@@ -30,6 +30,8 @@ vi.mock('@simplewebauthn/browser', () => ({ startAuthentication: mocks.startAuth
 vi.stubGlobal('sessionStorage', mocks.sessionStorage)
 
 import { useAuthStore } from './auth'
+import { queryClient } from '@/lib/query-client'
+import { useSpaceStore } from './space'
 
 const user = { id: 1, name: 'Ann', email: 'ann@example.com', role: 'user' } as User
 const session = { user, expires_at: '2026-01-02T00:00:00Z', refresh_at: '2026-01-01T12:00:00Z' }
@@ -152,6 +154,47 @@ describe('register', () => {
     })
 })
 
+describe('signing in as another account without logging out', () => {
+    const other = { ...session, user: { ...user, id: 2 } }
+
+    beforeEach(() => {
+        queryClient.clear()
+        useSpaceStore.setState({ currentId: null, ownerId: null })
+    })
+
+    it('drops the previous account data when the session expired and someone else logs in', async () => {
+        state().applySession(session as never)
+        queryClient.setQueryData(['dashboard'], { stale: true })
+        useSpaceStore.getState().setCurrentId(7)
+        state().expire()
+
+        mocks.authApi.login.mockResolvedValue(other)
+        await state().login({ email: 'b', password: 'b' })
+
+        expect(queryClient.getQueryData(['dashboard'])).toBeUndefined()
+        expect(useSpaceStore.getState().currentId).toBeNull()
+    })
+
+    it('drops a space remembered by another account after a reload', async () => {
+        useSpaceStore.setState({ currentId: 7, ownerId: 1 })
+        mocks.authApi.me.mockResolvedValue({ user: other.user })
+
+        await state().checkAuth()
+
+        expect(useSpaceStore.getState().currentId).toBeNull()
+        expect(useSpaceStore.getState().ownerId).toBe(2)
+    })
+
+    it('keeps the space when the same account signs in again', async () => {
+        useSpaceStore.setState({ currentId: 7, ownerId: 1 })
+        mocks.authApi.login.mockResolvedValue(session)
+
+        await state().login({ email: 'a', password: 'b' })
+
+        expect(useSpaceStore.getState().currentId).toBe(7)
+    })
+})
+
 describe('logout', () => {
     beforeEach(() => state().applySession(session as never))
 
@@ -159,6 +202,15 @@ describe('logout', () => {
         mocks.authApi.logout.mockResolvedValue(undefined)
         await state().logout()
         expect(state()).toMatchObject({ user: null, isAuthenticated: false, expiresAt: null, refreshAt: null })
+    })
+
+    it('drops cached data and the remembered space so the next login starts clean', async () => {
+        mocks.authApi.logout.mockResolvedValue(undefined)
+        queryClient.setQueryData(['dashboard'], { stale: true })
+        useSpaceStore.getState().setCurrentId(7)
+        await state().logout()
+        expect(queryClient.getQueryData(['dashboard'])).toBeUndefined()
+        expect(useSpaceStore.getState().currentId).toBeNull()
     })
 
     it('clears the session even if the server call fails', async () => {
