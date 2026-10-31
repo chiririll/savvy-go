@@ -160,11 +160,16 @@ func (s Handler) categoriesSummary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q := r.URL.Query()
-	list, total := httpx.Scope(r).Reports.CategorySummary(r.Context(), reports.Filter{
+	filter := reports.Filter{
 		PeriodType: "custom",
 		StartDate:  q.Get("start_date"),
 		EndDate:    q.Get("end_date"),
-	}, typ)
+	}
+	if filter.Validate() != nil {
+		httpx.WriteValidation(w, map[string][]string{"end_date": {"The period must be a valid date range."}})
+		return
+	}
+	list, total := httpx.Scope(r).Reports.CategorySummary(r.Context(), filter, typ)
 	base, _ := httpx.Scope(r).Currencies.Base(r.Context())
 	code := ""
 	if base != nil {

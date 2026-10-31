@@ -171,7 +171,11 @@ func (s Handler) accountsDestroy(w http.ResponseWriter, r *http.Request) {
 
 func (s Handler) accountsBalanceHistory(w http.ResponseWriter, r *http.Request) {
 	base, _ := httpx.Scope(r).Currencies.Base(r.Context())
-	start, end := s.queryPeriod(r)
+	start, end, ok := s.queryPeriod(r)
+	if !ok {
+		invalidPeriod(w)
+		return
+	}
 	if base == nil {
 		httpx.WriteJSON(w, http.StatusOK, dto.BalanceHistory{Dates: []string{}, Series: []dto.BalanceSeries{}, Decimals: 2})
 		return
@@ -208,16 +212,26 @@ func (s Handler) accountsBalanceHistory(w http.ResponseWriter, r *http.Request) 
 	)
 }
 
-// queryPeriod resolves start_date/end_date from the query, falling back to the
-// shared default report period when either is missing or invalid.
-func (s Handler) queryPeriod(r *http.Request) (start, end string) {
+// queryPeriod resolves start_date/end_date from the query. No dates at all gives
+// the shared default report period; dates that cannot be read, or that end
+// before they start, are reported as ok=false so the caller answers with an
+// error instead of a period the client never asked for.
+func (s Handler) queryPeriod(r *http.Request) (start, end string, ok bool) {
 	q := r.URL.Query()
-	rng := reports.Filter{
+	f := reports.Filter{
 		PeriodType: "custom",
 		StartDate:  q.Get("start_date"),
 		EndDate:    q.Get("end_date"),
-	}.Range(time.Now().In(s.Loc))
-	return rng.Start.Format("2006-01-02"), rng.End.Format("2006-01-02")
+	}
+	if f.Validate() != nil {
+		return "", "", false
+	}
+	rng := f.Range(time.Now().In(s.Loc))
+	return rng.Start.Format("2006-01-02"), rng.End.Format("2006-01-02"), true
+}
+
+func invalidPeriod(w http.ResponseWriter) {
+	httpx.WriteValidation(w, map[string][]string{"end_date": {"The period must be a valid date range."}})
 }
 
 // accountsBalanceComparison returns the current total balance and the total
@@ -226,8 +240,12 @@ func (s Handler) accountsBalanceComparison(w http.ResponseWriter, r *http.Reques
 	base, _ := httpx.Scope(r).Currencies.Base(r.Context())
 	sum := dto.NewAccountsSummary(httpx.Scope(r).Accounts.Summary(r.Context(), base))
 	var previous *money.Money
+	start, _, ok := s.queryPeriod(r)
+	if !ok {
+		invalidPeriod(w)
+		return
+	}
 	if base != nil {
-		start, _ := s.queryPeriod(r)
 		if from, err := time.Parse("2006-01-02", start); err == nil {
 			total := httpx.Scope(r).Accounts.TotalAt(r.Context(), *base, from.AddDate(0, 0, -1).Format("2006-01-02"))
 			previous = &total

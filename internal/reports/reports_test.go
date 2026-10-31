@@ -4,6 +4,7 @@ import (
 	"context"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"savvy-go/internal/db"
 	"savvy-go/internal/ledger"
@@ -179,5 +180,35 @@ func TestOverviewSavingsRate(t *testing.T) {
 	net := got.NetCashFlow.Value
 	if !net.Equal(money.FromDecimal(dec("150"), e.usd.Unit())) {
 		t.Fatalf("net = %s, want 150", net)
+	}
+}
+
+// An empty period must give empty lists, never nil: Go encodes a nil slice as
+// JSON null, which the dashboard cannot read.
+func TestByCategoryEmptyPeriodIsNotNil(t *testing.T) {
+	e := newMoneyEnv(t)
+	q := (Service{DB: e.db}).open(e.ctx, janRange)
+	if got := q.byCategory("expense", janRange.Range(time.Now())); got == nil {
+		t.Fatal("byCategory = nil, want an empty slice")
+	}
+}
+
+func TestFilterValidate(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		f    Filter
+		ok   bool
+	}{
+		{"no dates is the default period", Filter{PeriodType: "custom"}, true},
+		{"other period types are not checked", Filter{PeriodType: "month", StartDate: "nope"}, true},
+		{"valid range", Filter{PeriodType: "custom", StartDate: "2025-01-01", EndDate: "2025-01-31"}, true},
+		{"one day", Filter{PeriodType: "custom", StartDate: "2025-01-01", EndDate: "2025-01-01"}, true},
+		{"end before start", Filter{PeriodType: "custom", StartDate: "2025-02-01", EndDate: "2025-01-31"}, false},
+		{"unreadable start", Filter{PeriodType: "custom", StartDate: "yesterday", EndDate: "2025-01-31"}, false},
+		{"only one date", Filter{PeriodType: "custom", StartDate: "2025-01-01"}, false},
+	} {
+		if got := tc.f.Validate() == nil; got != tc.ok {
+			t.Errorf("%s: valid = %v, want %v", tc.name, got, tc.ok)
+		}
 	}
 }

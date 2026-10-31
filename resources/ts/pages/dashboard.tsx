@@ -57,7 +57,7 @@ export default function DashboardPage() {
         sort_direction: 'desc',
     })
     const { data: pendingSummary } = usePendingSummary()
-    const { data: expensesByCategory } = useCategorySummary({ type: 'expense', ...periodDates })
+    const { data: expensesByCategory, isError: expensesByCategoryError } = useCategorySummary({ type: 'expense', ...periodDates })
     const { data: budgets } = useBudgets()
     const { data: debtsData } = useDebtsWithSummary()
     const { data: overviewData } = useOverviewMetrics(reportFilters)
@@ -119,7 +119,7 @@ export default function DashboardPage() {
             </div>
 
             <div className="grid min-w-0 gap-4 lg:grid-cols-2">
-                <ExpensesByCategoryCard summary={expensesByCategory} currency={currency} />
+                <ExpensesByCategoryCard summary={expensesByCategory} isError={expensesByCategoryError} currency={currency} />
                 <LargestTransactionsCard transactions={largestTransactions?.data} onEdit={openEdit} />
             </div>
 

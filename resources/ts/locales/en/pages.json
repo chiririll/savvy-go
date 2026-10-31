@@ -488,6 +488,7 @@
         "upcoming": "Upcoming payments",
         "recurring": "Recurring",
         "noPending": "No upcoming payments",
+        "periodInvalid": "The end date must not be before the start date",
         "noDataPeriod": "No data for this period",
         "noAccounts": "No active accounts",
         "noTransactions": "No transactions yet",
