@@ -11,6 +11,7 @@ import (
 	"savvy-go/internal/settings"
 	"savvy-go/internal/spaces"
 	"savvy-go/internal/sso"
+	"savvy-go/internal/sysinfo"
 	"savvy-go/internal/transfers"
 	"savvy-go/internal/uploads"
 )
@@ -19,7 +20,7 @@ import (
 func registerServices(l *locator.Locator) {
 	for _, register := range []func(*locator.Locator){
 		auth.Register, settings.Register, spaces.Register, refsync.Register, transfers.Register,
-		backup.Register, uploads.Register, sso.Register, oauth.Register, mail.Register, signin.Register,
+		backup.Register, sysinfo.Register, uploads.Register, sso.Register, oauth.Register, mail.Register, signin.Register,
 	} {
 		register(l)
 	}

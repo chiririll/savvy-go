@@ -2,13 +2,15 @@ package monitoring
 
 import (
 	"context"
+	"math"
 	"net/http"
 	"runtime"
+	"runtime/debug"
 	"time"
 
-	"savvy-go/internal/httpserver/admin/sysinfo"
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/importer"
+	"savvy-go/internal/sysinfo"
 )
 
 var processStarted = time.Now()
@@ -17,7 +19,7 @@ func (h Handler) storage(w http.ResponseWriter, r *http.Request) {
 	managed, uploads := h.uploadStats(r.Context())
 	importBy, importTotal := h.importStats(r.Context())
 	httpx.WriteJSON(w, http.StatusOK, storageBody{
-		Volume:  volumeStats(h.UploadsDir),
+		Volume:  h.volumeStats(),
 		Managed: managed,
 		Uploads: uploads,
 		Imports: statusCounts{Total: importTotal, ByStatus: importBy},
@@ -25,9 +27,10 @@ func (h Handler) storage(w http.ResponseWriter, r *http.Request) {
 }
 
 // volumeStats describes the disk the uploads live on; sizes are null when unknown.
-func volumeStats(root string) volumeBody {
+func (h Handler) volumeStats() volumeBody {
+	root := h.UploadsDir
 	out := volumeBody{Disk: "local", Path: root}
-	if total, free, ok := sysinfo.VolumeSpace(root); ok {
+	if total, free, ok := h.Host.VolumeSpace(root); ok {
 		used := max(total-free, 0)
 		out.TotalBytes, out.FreeBytes, out.UsedBytes = &total, &free, &used
 		if total > 0 {
@@ -140,8 +143,8 @@ func (h Handler) resources(w http.ResponseWriter, r *http.Request) {
 	var ms runtime.MemStats
 	runtime.ReadMemStats(&ms)
 	httpx.WriteJSON(w, http.StatusOK, resourcesBody{
-		CPU:    cpuBody{Cores: float64(runtime.NumCPU())},
-		Memory: memoryBody{},
+		CPU:    cpuStats(h.Host, runtime.NumCPU()),
+		Memory: memoryStats(h.Host),
 		Process: processBody{
 			MemoryBytes: ms.Alloc, PeakBytes: ms.Sys, Goroutines: runtime.NumGoroutine(), GCCycles: ms.NumGC,
 		},
@@ -152,8 +155,53 @@ func (h Handler) resources(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// resourcesBody is the process page. The load and host memory figures are
-// null: this process cannot measure them portably.
+// cpuStats is the load average and the 1-minute load as a share of the cores.
+// Both stay null where the host cannot tell. The cores are the host's own count
+// where it gives one (a container may have fewer), else the runtime's.
+func cpuStats(c sysinfo.Collector, cores int) cpuBody {
+	out := cpuBody{Cores: float64(cores)}
+	if c == nil {
+		return out
+	}
+	if cpu, ok := c.CPU(); ok {
+		out.Load = cpu.Load[:]
+		if cpu.Cores > 0 {
+			out.Cores = cpu.Cores
+		}
+		if pct, ok := cpu.LoadPercent(); ok {
+			out.LoadPercent = &pct
+		}
+	}
+	return out
+}
+
+func memoryStats(c sysinfo.Collector) memoryBody {
+	if c == nil {
+		return memoryBody{}
+	}
+	m, ok := c.Memory()
+	if !ok {
+		return memoryBody{}
+	}
+	out := memoryBody{TotalBytes: &m.Total, UsedBytes: &m.Used, FreeBytes: &m.Free, Source: &m.Source}
+	if pct, ok := m.UsedPercent(); ok {
+		out.UsedPercent = &pct
+	}
+	return out
+}
+
+// goMemoryLimit is the soft limit of the Go runtime (GOMEMLIMIT), nil when unset.
+func goMemoryLimit() *uint64 {
+	lim := debug.SetMemoryLimit(-1) // a negative input only reads
+	if lim <= 0 || lim == math.MaxInt64 {
+		return nil
+	}
+	u := uint64(lim)
+	return &u
+}
+
+// resourcesBody is the process page. The load and host memory figures are null
+// where the host has no collector or the figure cannot be read.
 type resourcesBody struct {
 	CPU     cpuBody     `json:"cpu"`
 	Memory  memoryBody  `json:"memory"`
@@ -162,9 +210,9 @@ type resourcesBody struct {
 }
 
 type cpuBody struct {
-	Cores       float64  `json:"cores"`
-	Load        *float64 `json:"load"`
-	LoadPercent *float64 `json:"load_percent"`
+	Cores       float64   `json:"cores"`
+	Load        []float64 `json:"load"` // 1, 5, 15 minutes
+	LoadPercent *float64  `json:"load_percent"`
 }
 
 type memoryBody struct {
