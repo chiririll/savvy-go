@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	repo "savvy-go/internal/db/repo/auth"
@@ -21,6 +22,8 @@ type PasswordToken struct {
 	UserID    int64
 	ExpiresAt time.Time
 	User      *User
+	// Emailed is true when the link was issued by IssueEmailed: its holder read the mail.
+	Emailed bool
 }
 
 type PasswordTokens struct {
@@ -44,12 +47,28 @@ func (p PasswordTokens) ttl(user *User) time.Duration {
 	return defaultResetTTL
 }
 
-// Issue replaces the user's pending link with a new one.
+// emailedPrefix marks a link that is sent by email. RandomString never yields "_", so a
+// link that was handed over cannot carry it, and adding it to one changes its hash. The
+// mark therefore needs no column: it lives in the token the mailbox owner received.
+const emailedPrefix = "m_"
+
+// Issue replaces the user's pending link with a new one that the caller hands over as is.
+// Whoever holds it has not proven the mailbox.
 func (p PasswordTokens) Issue(ctx context.Context, user *User) (token string, expires time.Time, err error) {
+	return p.issue(ctx, user, "")
+}
+
+// IssueEmailed is Issue for a link that is only sent to the user's address, so using it
+// proves the mailbox (see PasswordToken.Emailed). The caller must not reveal the token.
+func (p PasswordTokens) IssueEmailed(ctx context.Context, user *User) (token string, expires time.Time, err error) {
+	return p.issue(ctx, user, emailedPrefix)
+}
+
+func (p PasswordTokens) issue(ctx context.Context, user *User, prefix string) (token string, expires time.Time, err error) {
 	if err = p.RevokeActive(ctx, user.ID); err != nil {
 		return "", time.Time{}, err
 	}
-	token = RandomString(64)
+	token = prefix + RandomString(64)
 	now := time.Now().UTC()
 	expires = now.Add(p.ttl(user))
 	err = p.repo().InsertPasswordToken(ctx, user.ID, HashToken(token), expires, now)
@@ -58,7 +77,7 @@ func (p PasswordTokens) Issue(ctx context.Context, user *User) (token string, ex
 
 func (p PasswordTokens) Preview(ctx context.Context, token string) (*PasswordToken, error) {
 	row, err := p.repo().ValidPasswordToken(ctx, HashToken(token), time.Now().UTC())
-	return p.withUser(ctx, row, err)
+	return p.withUser(ctx, row, err, token)
 }
 
 func (p PasswordTokens) Consume(ctx context.Context, token string) (*PasswordToken, error) {
@@ -68,14 +87,14 @@ func (p PasswordTokens) Consume(ctx context.Context, token string) (*PasswordTok
 		return nil, err
 	}
 	row, err := p.repo().PasswordTokenByHash(ctx, hash)
-	return p.withUser(ctx, row, err)
+	return p.withUser(ctx, row, err, token)
 }
 
 func (p PasswordTokens) RevokeActive(ctx context.Context, userID int64) error {
 	return p.repo().RevokeActivePasswordTokens(ctx, userID, time.Now().UTC())
 }
 
-func (p PasswordTokens) withUser(ctx context.Context, row *repo.OneTime, err error) (*PasswordToken, error) {
+func (p PasswordTokens) withUser(ctx context.Context, row *repo.OneTime, err error, token string) (*PasswordToken, error) {
 	if row == nil || err != nil {
 		return nil, err
 	}
@@ -83,5 +102,6 @@ func (p PasswordTokens) withUser(ctx context.Context, row *repo.OneTime, err err
 	if err != nil {
 		return nil, err
 	}
-	return &PasswordToken{ID: row.ID, UserID: row.UserID, ExpiresAt: row.ExpiresAt, User: u}, nil
+	return &PasswordToken{ID: row.ID, UserID: row.UserID, ExpiresAt: row.ExpiresAt, User: u,
+		Emailed: strings.HasPrefix(token, emailedPrefix)}, nil
 }

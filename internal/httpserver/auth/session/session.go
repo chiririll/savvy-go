@@ -297,6 +297,13 @@ func (h Handler) passwordAccept(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	// Only a link that was emailed proves the mailbox; one the admin held does not.
+	if row.Emailed && !row.User.EmailVerified {
+		if err := h.Users.SetEmailVerified(r.Context(), row.User.ID, true); err != nil {
+			httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+	}
 	u, _ := h.Users.ByID(r.Context(), row.User.ID)
 	// A reset is for taking an account back, so nothing from before it may stay: neither
 	// sessions nor API tokens. Failing here must not hand out a fresh session.

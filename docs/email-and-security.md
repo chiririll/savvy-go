@@ -35,7 +35,7 @@ from = "Go Savvy <savvy@example.com>"
 With mail working and `app_url` set:
 
 - **Administration → Users → Email a reset link** sends a one-time password link (valid 1 hour). Not offered for yourself, SSO-only users, or when password sign-in is off. **Reset password** still shows a link to copy.
-- **Administration → Users → New user** (no password) can email the set-password link (valid 7 days). With email confirmation on, emailing is the only option, because a link you hand over proves nothing about the mailbox.
+- **Administration → Users → New user** (no password) can email the set-password link (valid 7 days). With email confirmation on, emailing is the only option, because a link you hand over proves nothing about the mailbox. Setting the password through an emailed link also marks the email confirmed; a link you hand over never does.
 - **Settings → Space** invitations by email send the link to that address only. The inviter never sees it.
 
 ## Email confirmation
