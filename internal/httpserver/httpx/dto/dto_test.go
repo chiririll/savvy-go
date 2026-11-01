@@ -59,16 +59,17 @@ func TestDecimalMarshalingIsNotGlobal(t *testing.T) {
 func TestNewDebt(t *testing.T) {
 	target := money.New(10000, usd)
 	cur := &ledger.Currency{ID: 1, Code: "USD", Decimals: 2}
-	d := dto.NewDebt(ledger.Account{Currency: cur, Balance: money.New(2500, usd), TargetAmount: &target})
+	account := func(balance int64) ledger.Account { return ledger.Account{Currency: cur, Balance: money.New(balance, usd)} }
+	d := dto.NewDebt(ledger.Debt{Account: account(-2500), Direction: ledger.DebtIOwe, Principal: target})
 	if d.PaymentProgress != 75 || d.TargetAmount.Minor() != 10000 {
 		t.Fatalf("debt = %+v", d)
 	}
-	over := dto.NewDebt(ledger.Account{Currency: cur, Balance: money.New(-500, usd), TargetAmount: &target})
+	over := dto.NewDebt(ledger.Debt{Account: account(500), Direction: ledger.DebtIOwe, Principal: target})
 	if over.PaymentProgress != 100 {
 		t.Fatalf("overpaid progress = %v, want 100", over.PaymentProgress)
 	}
 	// An account without a currency must not crash the handler.
-	noCur := dto.NewDebt(ledger.Account{Balance: money.New(2500, usd)})
+	noCur := dto.NewDebt(ledger.Debt{Account: ledger.Account{Balance: money.New(-2500, usd)}, Direction: ledger.DebtIOwe})
 	if noCur.Currency != nil || noCur.PaymentProgress != 0 {
 		t.Fatalf("debt without currency = %+v", noCur)
 	}

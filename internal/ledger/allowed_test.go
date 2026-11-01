@@ -47,13 +47,13 @@ func TestTransactionAllowed(t *testing.T) {
 
 var testUnit = money.Unit{ID: 1, Decimals: 2}
 
-func debtAccount(target *int64, balance int64) Account {
-	a := Account{Balance: money.New(balance, testUnit)}
-	if target != nil {
-		m := money.New(*target, testUnit)
-		a.TargetAmount = &m
+// debtOwing is a debt I owe: its balance is minus what is still to be paid.
+func debtOwing(principal *int64, owed int64) Debt {
+	d := Debt{Account: Account{Balance: money.New(-owed, testUnit)}, Direction: DebtIOwe, Principal: money.Zero(testUnit)}
+	if principal != nil {
+		d.Principal = money.New(*principal, testUnit)
 	}
-	return a
+	return d
 }
 
 func TestPaymentProgress(t *testing.T) {
@@ -73,16 +73,17 @@ func TestPaymentProgress(t *testing.T) {
 		{"no target", nil, 5000, 0},
 	}
 	for _, c := range cases {
-		if got := debtAccount(c.target, c.balance).PaymentProgress(); got != c.want {
+		if got := debtOwing(c.target, c.balance).PaymentProgress(); got != c.want {
 			t.Errorf("%s: PaymentProgress() = %v, want %v", c.name, got, c.want)
 		}
 	}
 }
 
-func TestDebtTargetWithoutCurrencyNotPanic(t *testing.T) {
-	a := Account{Balance: money.New(500, testUnit)} // Currency is nil
-	if got := a.DebtTarget(); !got.IsZero() || got.Unit() != testUnit {
-		t.Fatalf("DebtTarget() = %+v", got)
+func TestOwedFollowsDirection(t *testing.T) {
+	owe := Debt{Account: Account{Balance: money.New(-500, testUnit)}, Direction: DebtIOwe}
+	owed := Debt{Account: Account{Balance: money.New(500, testUnit)}, Direction: DebtOwedToMe}
+	if owe.Owed().Minor() != 500 || owed.Owed().Minor() != 500 {
+		t.Fatalf("owed %d and %d, want 500 both", owe.Owed().Minor(), owed.Owed().Minor())
 	}
 }
 

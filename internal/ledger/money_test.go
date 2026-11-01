@@ -252,7 +252,7 @@ func TestDebtIsPaidOffExactly(t *testing.T) {
 	e := newMoneyEnv(t)
 	accts := Accounts{DB: e.db}
 	debts := Debts{Accounts: accts, Transactions: e.txs}
-	debt, err := debts.Create(e.ctx, DebtInput{Name: "Loan", DebtType: "i_owe", CurrencyID: e.usd.ID, Amount: dec("0.30")})
+	debt, err := debts.Create(e.ctx, DebtInput{Name: "Loan", Direction: "i_owe", CurrencyID: e.usd.ID, Amount: dec("0.30")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -261,8 +261,8 @@ func TestDebtIsPaidOffExactly(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	got, _ := accts.ByID(e.ctx, debt.ID)
-	if got == nil || !got.Balance.IsZero() || !got.IsPaidOff {
+	got, _ := debts.ByID(e.ctx, debt.ID)
+	if got == nil || !got.Balance.IsZero() || !got.IsPaidOff() {
 		t.Fatalf("debt after full payment = %+v", got)
 	}
 }

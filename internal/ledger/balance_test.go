@@ -32,7 +32,7 @@ func TestBalanceFollowsEveryTransactionType(t *testing.T) {
 	e := newMoneyEnv(t)
 	usd, jpy := e.usdAcc.ID, e.jpyAcc.ID // start at 100 USD and 3000 JPY
 	debt, err := (Debts{Accounts: Accounts{DB: e.db}, Transactions: e.txs}).Create(
-		e.ctx, DebtInput{Name: "loan", DebtType: "owed_to_me", CurrencyID: e.usd.ID, Amount: dec("1")})
+		e.ctx, DebtInput{Name: "loan", Direction: "owed_to_me", CurrencyID: e.usd.ID, Amount: dec("1")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,7 +135,7 @@ func TestDebtBalanceNotDependOnDate(t *testing.T) {
 	e := newMoneyEnv(t)
 	accts := Accounts{DB: e.db}
 	debts := Debts{Accounts: accts, Transactions: e.txs}
-	debt, err := debts.Create(e.ctx, DebtInput{Name: "loan", DebtType: "i_owe", CurrencyID: e.usd.ID, Amount: dec("100")})
+	debt, err := debts.Create(e.ctx, DebtInput{Name: "loan", Direction: "i_owe", CurrencyID: e.usd.ID, Amount: dec("100")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +172,7 @@ func TestNewAccountsGetIncreasingSortOrders(t *testing.T) {
 		t.Errorf("sort orders %d then %d, want consecutive", a.SortOrder, b.SortOrder)
 	}
 	// Debts have their own sequence, which starts at zero.
-	d, err := accts.Create(e.ctx, AccountInput{Name: "d", Type: "debt", CurrencyID: e.usd.ID, IsActive: true})
+	d, err := newDebts(e).Create(e.ctx, DebtInput{Name: "d", Direction: DebtIOwe, CurrencyID: e.usd.ID, Amount: dec("1")})
 	if err != nil {
 		t.Fatal(err)
 	}

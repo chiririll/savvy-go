@@ -177,11 +177,11 @@ func TestAmountsOutRangeRejectedStoreNothing(t *testing.T) {
 					AccountInput{Name: "big", Type: "cash", CurrencyID: cur.ID, InitialBalance: in, IsActive: true},
 				)
 				check("account balance", err)
-				_, err = (Accounts{DB: e.db}).Create(
+				_, err = (Debts{Accounts: Accounts{DB: e.db}, Transactions: e.txs}).Create(
 					e.ctx,
-					AccountInput{Name: "debt", Type: "debt", CurrencyID: cur.ID, TargetAmount: &in, IsActive: true},
+					DebtInput{Name: "debt", Direction: DebtIOwe, CurrencyID: cur.ID, Amount: in},
 				)
-				check("debt target", err)
+				check("debt principal", err)
 				_, err = (Budgets{DB: e.db}).Create(
 					e.ctx,
 					BudgetInput{Name: "b", Amount: in, CurrencyID: &cur.ID, Period: "monthly"},
