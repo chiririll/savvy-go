@@ -6,12 +6,14 @@ import (
 	"errors"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/shopspring/decimal"
 
 	"savvy-go/internal/auth"
-	"savvy-go/internal/ledger"
+	ledgerrepo "savvy-go/internal/db/repo/ledger"
 	"savvy-go/internal/migrate"
+	"savvy-go/internal/money"
 	"savvy-go/internal/signing"
 	"savvy-go/internal/spaces"
 	"savvy-go/internal/store"
@@ -72,22 +74,22 @@ func newTransferEnv(t *testing.T) *transferEnv {
 
 func (e *transferEnv) account(t *testing.T, spaceID int64, code string) int64 {
 	t.Helper()
-	d, _ := e.st.Space(context.Background(), spaceID)
-	cur, err := (ledger.Currencies{DB: d}).Create(
-		context.Background(),
-		ledger.Currency{Code: code, Name: code, Symbol: code, Decimals: 2, IsBase: true, Rate: decimal.NewFromInt(1)},
-	)
+	ctx := context.Background()
+	d, _ := e.st.Space(ctx, spaceID)
+	l := ledgerrepo.Repo{DB: d}
+	now := time.Now().UTC()
+	cur, err := l.InsertCurrency(
+		ctx, ledgerrepo.Currency{Code: code, Name: code, Symbol: code, Decimals: 2, IsBase: true, Rate: decimal.NewFromInt(1)}, now)
 	if err != nil {
 		t.Fatal(err)
 	}
-	acc, err := (ledger.Accounts{DB: d}).Create(
-		context.Background(),
-		ledger.AccountInput{Name: code, Type: "cash", CurrencyID: cur.ID},
-	)
+	acc, err := l.InsertAccount(ctx, ledgerrepo.AccountFields{
+		Name: code, Type: "cash", CurrencyID: cur, IsActive: true, InitialBalance: money.New(0, money.Unit{ID: cur, Decimals: 2}),
+	}, now)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return acc.ID
+	return acc
 }
 
 func (e *transferEnv) send(t *testing.T, amount string) *Transfer {
@@ -205,6 +207,7 @@ func TestP43UnsignedRecordNotMerged(t *testing.T) {
 	dB, _ := e.st.Space(ctx, e.B.ID)
 	forged := *tr
 	forged.Version, forged.To.Amount = 9, 999999
+	forged.signed = nil // the edit is made on the fields, and the old signature stays
 	if err := writeRecord(ctx, dB, e.B.UUID, forged, "confirmed", nil, nil); err != nil {
 		t.Fatal(err)
 	}

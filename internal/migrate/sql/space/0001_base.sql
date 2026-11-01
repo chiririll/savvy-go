@@ -162,8 +162,8 @@ CREATE TABLE IF NOT EXISTS space_transfers (
     source_sig TEXT,
     destination_kid TEXT,
     destination_sig TEXT,
-    source TEXT GENERATED ALWAYS AS (COALESCE(payload, remote) ->> '$.from.space_uuid') VIRTUAL,
-    destination TEXT GENERATED ALWAYS AS (COALESCE(payload, remote) ->> '$.to.space_uuid') VIRTUAL,
+    source TEXT GENERATED ALWAYS AS (COALESCE(payload, remote) ->> '$.from.space') VIRTUAL,
+    destination TEXT GENERATED ALWAYS AS (COALESCE(payload, remote) ->> '$.to.space') VIRTUAL,
     version INTEGER GENERATED ALWAYS AS (COALESCE(payload, remote) ->> '$.version') VIRTUAL,
     status TEXT NOT NULL DEFAULT 'confirmed' CHECK (status IN ('confirmed', 'in_review')),
     -- The other space's version while in review, as JSON. NULL there means the

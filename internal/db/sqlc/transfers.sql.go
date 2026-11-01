@@ -14,42 +14,51 @@ const deleteSpaceTransfer = `-- name: DeleteSpaceTransfer :exec
 DELETE FROM space_transfers WHERE uuid = ?
 `
 
+// Its mirror transaction goes first: a payment restricts the delete.
 func (q *Queries) DeleteSpaceTransfer(ctx context.Context, uuid string) error {
 	_, err := q.db.ExecContext(ctx, deleteSpaceTransfer, uuid)
 	return err
 }
 
-const deleteTransferTransaction = `-- name: DeleteTransferTransaction :exec
-DELETE FROM transactions WHERE space_transfer_uuid = ?
+const deleteTransferMirror = `-- name: DeleteTransferMirror :exec
+DELETE FROM transactions WHERE id IN (SELECT transaction_id FROM payments WHERE space_transfer_uuid = ?)
 `
 
-func (q *Queries) DeleteTransferTransaction(ctx context.Context, spaceTransferUuid sql.NullString) error {
-	_, err := q.db.ExecContext(ctx, deleteTransferTransaction, spaceTransferUuid)
+// Its payments go with it (cascade).
+func (q *Queries) DeleteTransferMirror(ctx context.Context, spaceTransferUuid sql.NullString) error {
+	_, err := q.db.ExecContext(ctx, deleteTransferMirror, spaceTransferUuid)
 	return err
 }
 
 const getAccountCurrency = `-- name: GetAccountCurrency :one
-SELECT a.id, c.code, c.decimals FROM accounts a JOIN currencies c ON c.id = a.currency_id WHERE a.id = ?
+SELECT a.id, a.type, c.id AS currency_id, c.code, c.decimals
+FROM accounts a JOIN currencies c ON c.id = a.currency_id WHERE a.id = ?
 `
 
 type GetAccountCurrencyRow struct {
-	ID       int64
-	Code     string
-	Decimals int64
+	ID         int64
+	Type       string
+	CurrencyID int64
+	Code       string
+	Decimals   int64
 }
 
 func (q *Queries) GetAccountCurrency(ctx context.Context, id int64) (GetAccountCurrencyRow, error) {
 	row := q.db.QueryRowContext(ctx, getAccountCurrency, id)
 	var i GetAccountCurrencyRow
-	err := row.Scan(&i.ID, &i.Code, &i.Decimals)
+	err := row.Scan(
+		&i.ID,
+		&i.Type,
+		&i.CurrencyID,
+		&i.Code,
+		&i.Decimals,
+	)
 	return i, err
 }
 
 const getSpaceTransfer = `-- name: GetSpaceTransfer :one
-SELECT uuid, from_space_uuid, from_account_id, from_amount, from_currency, from_decimals,
-	to_space_uuid, to_account_id, to_amount, to_currency, to_decimals,
-	date, description, created_by, version, deleted_at, sig_v, signer_kid, signature,
-	status, review, remote, updated_at
+SELECT uuid, payload, sig_v, source_kid, source_sig, destination_kid, destination_sig,
+	source, destination, version, status, remote, updated_at
 FROM space_transfers WHERE uuid = ?
 `
 
@@ -58,102 +67,51 @@ func (q *Queries) GetSpaceTransfer(ctx context.Context, uuid string) (SpaceTrans
 	var i SpaceTransfer
 	err := row.Scan(
 		&i.Uuid,
-		&i.FromSpaceUuid,
-		&i.FromAccountID,
-		&i.FromAmount,
-		&i.FromCurrency,
-		&i.FromDecimals,
-		&i.ToSpaceUuid,
-		&i.ToAccountID,
-		&i.ToAmount,
-		&i.ToCurrency,
-		&i.ToDecimals,
-		&i.Date,
-		&i.Description,
-		&i.CreatedBy,
-		&i.Version,
-		&i.DeletedAt,
+		&i.Payload,
 		&i.SigV,
-		&i.SignerKid,
-		&i.Signature,
+		&i.SourceKid,
+		&i.SourceSig,
+		&i.DestinationKid,
+		&i.DestinationSig,
+		&i.Source,
+		&i.Destination,
+		&i.Version,
 		&i.Status,
-		&i.Review,
 		&i.Remote,
 		&i.UpdatedAt,
 	)
 	return i, err
 }
 
-const getTransactionTransferUUID = `-- name: GetTransactionTransferUUID :one
-SELECT space_transfer_uuid FROM transactions WHERE id = ?
+const getTransferMirror = `-- name: GetTransferMirror :one
+
+SELECT t.id, t.status FROM transactions t
+JOIN payments p ON p.transaction_id = t.id
+WHERE p.space_transfer_uuid = ?
 `
 
-func (q *Queries) GetTransactionTransferUUID(ctx context.Context, id int64) (sql.NullString, error) {
-	row := q.db.QueryRowContext(ctx, getTransactionTransferUUID, id)
-	var space_transfer_uuid sql.NullString
-	err := row.Scan(&space_transfer_uuid)
-	return space_transfer_uuid, err
-}
-
-const getTransferTransaction = `-- name: GetTransferTransaction :one
-SELECT id, status FROM transactions WHERE space_transfer_uuid = ?
-`
-
-type GetTransferTransactionRow struct {
+type GetTransferMirrorRow struct {
 	ID     int64
 	Status string
 }
 
-func (q *Queries) GetTransferTransaction(ctx context.Context, spaceTransferUuid sql.NullString) (GetTransferTransactionRow, error) {
-	row := q.db.QueryRowContext(ctx, getTransferTransaction, spaceTransferUuid)
-	var i GetTransferTransactionRow
+// Mirror: the transaction of this space's side. Its payment on the space
+// account carries the uuid.
+func (q *Queries) GetTransferMirror(ctx context.Context, spaceTransferUuid sql.NullString) (GetTransferMirrorRow, error) {
+	row := q.db.QueryRowContext(ctx, getTransferMirror, spaceTransferUuid)
+	var i GetTransferMirrorRow
 	err := row.Scan(&i.ID, &i.Status)
 	return i, err
 }
 
-const insertTransferTransaction = `-- name: InsertTransferTransaction :exec
-INSERT INTO transactions (type, account_id, amount, description, date, status, space_transfer_uuid, created_by, created_at, updated_at)
-VALUES (?,?,?,?,?,?,?,?,?,?)
-`
-
-type InsertTransferTransactionParams struct {
-	Type              string
-	AccountID         int64
-	Amount            int64
-	Description       sql.NullString
-	Date              sql.NullString
-	Status            string
-	SpaceTransferUuid sql.NullString
-	CreatedBy         sql.NullInt64
-	CreatedAt         sql.NullString
-	UpdatedAt         sql.NullString
-}
-
-func (q *Queries) InsertTransferTransaction(ctx context.Context, arg InsertTransferTransactionParams) error {
-	_, err := q.db.ExecContext(ctx, insertTransferTransaction,
-		arg.Type,
-		arg.AccountID,
-		arg.Amount,
-		arg.Description,
-		arg.Date,
-		arg.Status,
-		arg.SpaceTransferUuid,
-		arg.CreatedBy,
-		arg.CreatedAt,
-		arg.UpdatedAt,
-	)
-	return err
-}
-
 const listSpaceTransfers = `-- name: ListSpaceTransfers :many
-SELECT uuid, from_space_uuid, from_account_id, from_amount, from_currency, from_decimals,
-	to_space_uuid, to_account_id, to_amount, to_currency, to_decimals,
-	date, description, created_by, version, deleted_at, sig_v, signer_kid, signature,
-	status, review, remote, updated_at
+SELECT uuid, payload, sig_v, source_kid, source_sig, destination_kid, destination_sig,
+	source, destination, version, status, remote, updated_at
 FROM space_transfers
-ORDER BY date DESC, uuid DESC
+ORDER BY COALESCE(payload, remote) ->> '$.date' DESC, uuid DESC
 `
 
+// source, destination and version are generated from payload (or remote).
 func (q *Queries) ListSpaceTransfers(ctx context.Context) ([]SpaceTransfer, error) {
 	rows, err := q.db.QueryContext(ctx, listSpaceTransfers)
 	if err != nil {
@@ -165,26 +123,16 @@ func (q *Queries) ListSpaceTransfers(ctx context.Context) ([]SpaceTransfer, erro
 		var i SpaceTransfer
 		if err := rows.Scan(
 			&i.Uuid,
-			&i.FromSpaceUuid,
-			&i.FromAccountID,
-			&i.FromAmount,
-			&i.FromCurrency,
-			&i.FromDecimals,
-			&i.ToSpaceUuid,
-			&i.ToAccountID,
-			&i.ToAmount,
-			&i.ToCurrency,
-			&i.ToDecimals,
-			&i.Date,
-			&i.Description,
-			&i.CreatedBy,
-			&i.Version,
-			&i.DeletedAt,
+			&i.Payload,
 			&i.SigV,
-			&i.SignerKid,
-			&i.Signature,
+			&i.SourceKid,
+			&i.SourceSig,
+			&i.DestinationKid,
+			&i.DestinationSig,
+			&i.Source,
+			&i.Destination,
+			&i.Version,
 			&i.Status,
-			&i.Review,
 			&i.Remote,
 			&i.UpdatedAt,
 		); err != nil {
@@ -201,125 +149,55 @@ func (q *Queries) ListSpaceTransfers(ctx context.Context) ([]SpaceTransfer, erro
 	return items, nil
 }
 
-const setSpaceTransferState = `-- name: SetSpaceTransferState :exec
-UPDATE space_transfers SET status = ?, review = ?, remote = ?, updated_at = ? WHERE uuid = ?
+const setTransferMirrorStatus = `-- name: SetTransferMirrorStatus :exec
+UPDATE transactions SET status = ?, updated_at = ? WHERE id = ?
 `
 
-type SetSpaceTransferStateParams struct {
+type SetTransferMirrorStatusParams struct {
 	Status    string
-	Review    sql.NullString
-	Remote    sql.NullString
 	UpdatedAt sql.NullString
-	Uuid      string
+	ID        int64
 }
 
-func (q *Queries) SetSpaceTransferState(ctx context.Context, arg SetSpaceTransferStateParams) error {
-	_, err := q.db.ExecContext(ctx, setSpaceTransferState,
-		arg.Status,
-		arg.Review,
-		arg.Remote,
-		arg.UpdatedAt,
-		arg.Uuid,
-	)
-	return err
-}
-
-const updateTransferTransaction = `-- name: UpdateTransferTransaction :exec
-UPDATE transactions SET type = ?, account_id = ?, amount = ?, description = ?, date = ?, status = ?, updated_at = ?
-WHERE space_transfer_uuid = ?
-`
-
-type UpdateTransferTransactionParams struct {
-	Type              string
-	AccountID         int64
-	Amount            int64
-	Description       sql.NullString
-	Date              sql.NullString
-	Status            string
-	UpdatedAt         sql.NullString
-	SpaceTransferUuid sql.NullString
-}
-
-func (q *Queries) UpdateTransferTransaction(ctx context.Context, arg UpdateTransferTransactionParams) error {
-	_, err := q.db.ExecContext(ctx, updateTransferTransaction,
-		arg.Type,
-		arg.AccountID,
-		arg.Amount,
-		arg.Description,
-		arg.Date,
-		arg.Status,
-		arg.UpdatedAt,
-		arg.SpaceTransferUuid,
-	)
+func (q *Queries) SetTransferMirrorStatus(ctx context.Context, arg SetTransferMirrorStatusParams) error {
+	_, err := q.db.ExecContext(ctx, setTransferMirrorStatus, arg.Status, arg.UpdatedAt, arg.ID)
 	return err
 }
 
 const upsertSpaceTransfer = `-- name: UpsertSpaceTransfer :exec
-INSERT INTO space_transfers (uuid, from_space_uuid, from_account_id, from_amount, from_currency, from_decimals,
-	to_space_uuid, to_account_id, to_amount, to_currency, to_decimals,
-	date, description, created_by, version, deleted_at, sig_v, signer_kid, signature,
-	status, review, remote, updated_at)
-VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+INSERT INTO space_transfers (uuid, payload, sig_v, source_kid, source_sig, destination_kid, destination_sig,
+	status, remote, updated_at)
+VALUES (?,?,?,?,?,?,?,?,?,?)
 ON CONFLICT (uuid) DO UPDATE SET
-	from_space_uuid = excluded.from_space_uuid, from_account_id = excluded.from_account_id,
-	from_amount = excluded.from_amount, from_currency = excluded.from_currency, from_decimals = excluded.from_decimals,
-	to_space_uuid = excluded.to_space_uuid, to_account_id = excluded.to_account_id,
-	to_amount = excluded.to_amount, to_currency = excluded.to_currency, to_decimals = excluded.to_decimals,
-	date = excluded.date, description = excluded.description, created_by = excluded.created_by,
-	version = excluded.version, deleted_at = excluded.deleted_at, sig_v = excluded.sig_v,
-	signer_kid = excluded.signer_kid, signature = excluded.signature,
-	status = excluded.status, review = excluded.review, remote = excluded.remote, updated_at = excluded.updated_at
+	payload = excluded.payload, sig_v = excluded.sig_v,
+	source_kid = excluded.source_kid, source_sig = excluded.source_sig,
+	destination_kid = excluded.destination_kid, destination_sig = excluded.destination_sig,
+	status = excluded.status, remote = excluded.remote, updated_at = excluded.updated_at
 `
 
 type UpsertSpaceTransferParams struct {
-	Uuid          string
-	FromSpaceUuid string
-	FromAccountID int64
-	FromAmount    int64
-	FromCurrency  string
-	FromDecimals  int64
-	ToSpaceUuid   string
-	ToAccountID   int64
-	ToAmount      int64
-	ToCurrency    string
-	ToDecimals    int64
-	Date          string
-	Description   sql.NullString
-	CreatedBy     sql.NullInt64
-	Version       int64
-	DeletedAt     sql.NullString
-	SigV          int64
-	SignerKid     sql.NullString
-	Signature     sql.NullString
-	Status        string
-	Review        sql.NullString
-	Remote        sql.NullString
-	UpdatedAt     sql.NullString
+	Uuid           string
+	Payload        sql.NullString
+	SigV           int64
+	SourceKid      sql.NullString
+	SourceSig      sql.NullString
+	DestinationKid sql.NullString
+	DestinationSig sql.NullString
+	Status         string
+	Remote         sql.NullString
+	UpdatedAt      sql.NullString
 }
 
 func (q *Queries) UpsertSpaceTransfer(ctx context.Context, arg UpsertSpaceTransferParams) error {
 	_, err := q.db.ExecContext(ctx, upsertSpaceTransfer,
 		arg.Uuid,
-		arg.FromSpaceUuid,
-		arg.FromAccountID,
-		arg.FromAmount,
-		arg.FromCurrency,
-		arg.FromDecimals,
-		arg.ToSpaceUuid,
-		arg.ToAccountID,
-		arg.ToAmount,
-		arg.ToCurrency,
-		arg.ToDecimals,
-		arg.Date,
-		arg.Description,
-		arg.CreatedBy,
-		arg.Version,
-		arg.DeletedAt,
+		arg.Payload,
 		arg.SigV,
-		arg.SignerKid,
-		arg.Signature,
+		arg.SourceKid,
+		arg.SourceSig,
+		arg.DestinationKid,
+		arg.DestinationSig,
 		arg.Status,
-		arg.Review,
 		arg.Remote,
 		arg.UpdatedAt,
 	)

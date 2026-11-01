@@ -27,9 +27,14 @@ type transferPayloadV1 struct {
 
 const currentSigV = 1
 
+// payload is what sigV signs: the stored bytes when the record was read from
+// the database or signed here, otherwise the format rebuilt from the fields.
 func (t Transfer) payload(sigV int64) ([]byte, bool) {
 	switch sigV {
 	case 1:
+		if len(t.signed) > 0 && t.SigV == sigV {
+			return t.signed, true
+		}
 		b, err := json.Marshal(
 			transferPayloadV1{t.UUID, t.From, t.To, t.Date, t.Description, t.CreatedBy, t.Version, t.DeletedAt},
 		)
@@ -41,7 +46,9 @@ func (t Transfer) payload(sigV int64) ([]byte, bool) {
 func signTransfer(k signing.KeyRing, t *Transfer) {
 	key := k.Holder.Key()
 	t.SigV = currentSigV
+	t.signed = nil // the fields changed; sign what they now say
 	p, _ := t.payload(currentSigV)
+	t.signed = p
 	t.SignerKID = key.KID()
 	t.Signature = base64.StdEncoding.EncodeToString(key.Sign(p))
 }

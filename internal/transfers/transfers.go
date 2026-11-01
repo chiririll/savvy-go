@@ -57,12 +57,17 @@ type Transfer struct {
 	Status string    `json:"-"`
 	Review *string   `json:"-"`
 	Remote *Transfer `json:"-"`
+	// signed is the payload as it was signed and stored. It is kept so that
+	// a signature is checked over those bytes; signTransfer replaces it.
+	signed []byte
 }
 
 const (
-	transferOK             = "ok"
-	transferNeedsAttention = "needs_attention"
-	transferPending        = "pending"
+	// Status is local bookkeeping: not signed, not synced. A transfer whose
+	// account is missing here is confirmed too; it has no transaction, which
+	// View.NeedsAttention reports.
+	transferConfirmed = "confirmed"
+	transferInReview  = "in_review"
 
 	reviewCreatedRemote = "created_remote"
 	reviewDeletedRemote = "deleted_remote"
@@ -90,6 +95,7 @@ var (
 	ErrSameSpace      = errors.New("a transfer between spaces needs two different spaces")
 	ErrRights         = errors.New("you need to be an editor in both spaces")
 	ErrAccountMissing = errors.New("the account does not exist in that space")
+	ErrServiceAccount = errors.New("a debt or a space account cannot take part in a transfer")
 	ErrUnverified     = errors.New("this transfer's signature cannot be verified on this server")
 	ErrNotUnderReview = errors.New("this transfer is not waiting for a decision")
 	ErrPending        = errors.New("decide on this transfer's pending change first")
@@ -249,6 +255,9 @@ func sideFor(ctx context.Context, d store.DB, spaceUUID string, account int64, a
 	if acc == nil {
 		return Side{}, ErrAccountMissing
 	}
+	if acc.IsService {
+		return Side{}, ErrServiceAccount
+	}
 	m, err := money.FromInput(amount, money.Unit{Decimals: int(acc.Decimals)})
 	if err != nil {
 		return Side{}, err
@@ -316,7 +325,7 @@ func (s Service) Create(ctx context.Context, actor *auth.User, in Input) (*Trans
 	if err != nil {
 		return nil, err
 	}
-	t.Status = transferOK
+	t.Status = transferConfirmed
 	return &t, nil
 }
 
@@ -375,7 +384,7 @@ func (s Service) change(
 	if cur.DeletedAt != nil {
 		return nil, ErrGone
 	}
-	if cur.Status == transferPending {
+	if cur.Status == transferInReview {
 		return nil, ErrPending
 	}
 	if !verifyTransfer(s.Keys, *cur) {
@@ -474,6 +483,9 @@ type View struct {
 	Verified   bool
 	OtherSpace *spaces.Space // nil when the other space is not on this server
 	Outgoing   bool
+	// NeedsAttention: a confirmed transfer with no transaction here, because
+	// this space's account is missing. Nothing is stored for it.
+	NeedsAttention bool
 }
 
 // List lists the live transfers of a space, newest first.
@@ -494,10 +506,17 @@ func (s Service) List(ctx context.Context, spaceID int64) ([]View, error) {
 	out := []View{}
 	for _, r := range rows {
 		t := transferFromRecord(r)
-		if t.DeletedAt != nil && t.Status != transferPending {
+		if t.DeletedAt != nil && t.Status != transferInReview {
 			continue
 		}
 		v := View{Transfer: t, Verified: verifyTransfer(s.Keys, t), Outgoing: t.From.SpaceUUID == own.UUID}
+		if t.DeletedAt == nil && t.Status == transferConfirmed {
+			has, err := repo.Space{DB: d}.HasMirror(ctx, t.UUID)
+			if err != nil {
+				return nil, err
+			}
+			v.NeedsAttention = !has
+		}
 		otherUUID := t.To.SpaceUUID
 		if !v.Outgoing {
 			otherUUID = t.From.SpaceUUID

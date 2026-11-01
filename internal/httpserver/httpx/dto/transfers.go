@@ -37,20 +37,23 @@ type RemoteTransfer struct {
 
 // Transfer is a transfer between spaces as a member of one space sees it.
 type Transfer struct {
-	UUID        string          `json:"uuid"`
-	From        TransferSide    `json:"from"`
-	To          TransferSide    `json:"to"`
-	Outgoing    bool            `json:"outgoing"`
-	Date        string          `json:"date"`
-	Description *string         `json:"description"`
-	Version     int64           `json:"version"`
-	Status      string          `json:"status"`
-	Review      *string         `json:"review"`
-	Frozen      bool            `json:"frozen"`
-	Verified    bool            `json:"verified"`
-	Deleted     bool            `json:"deleted"`
-	OtherSpace  *SpaceName      `json:"otherSpace,omitempty"`
-	Remote      *RemoteTransfer `json:"remote,omitempty"`
+	UUID        string       `json:"uuid"`
+	From        TransferSide `json:"from"`
+	To          TransferSide `json:"to"`
+	Outgoing    bool         `json:"outgoing"`
+	Date        string       `json:"date"`
+	Description *string      `json:"description"`
+	Version     int64        `json:"version"`
+	Status      string       `json:"status"`
+	Review      *string      `json:"review"`
+	// NeedsAttention: confirmed, but this space's account is gone, so there
+	// is no transaction for it.
+	NeedsAttention bool            `json:"needsAttention"`
+	Frozen         bool            `json:"frozen"`
+	Verified       bool            `json:"verified"`
+	Deleted        bool            `json:"deleted"`
+	OtherSpace     *SpaceName      `json:"otherSpace,omitempty"`
+	Remote         *RemoteTransfer `json:"remote,omitempty"`
 }
 
 // NewTransfer converts v. seesOther says whether the viewer also belongs to the
@@ -60,7 +63,7 @@ func NewTransfer(v transfers.View, seesOther bool) Transfer {
 		UUID: v.UUID, From: newTransferSide(v.From, v.Outgoing || seesOther),
 		To:       newTransferSide(v.To, !v.Outgoing || seesOther),
 		Outgoing: v.Outgoing, Date: v.Date, Description: v.Description, Version: v.Version, Status: v.Status,
-		Review: v.Review,
+		Review: v.Review, NeedsAttention: v.NeedsAttention,
 		Frozen: v.Frozen, Verified: v.Verified, Deleted: v.DeletedAt != nil,
 		OtherSpace: ptr(v.OtherSpace, NewSpaceName),
 	}

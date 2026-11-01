@@ -1,64 +1,70 @@
 -- name: InsertRecurring :execresult
-INSERT INTO recurring_transactions (
-	type, account_id, to_account_id, category_id, amount, to_amount, is_estimated, description,
-	frequency, interval, day_of_week, day_of_month, start_date, end_date,
-	next_run_date, is_active, created_at, updated_at)
-VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);
+INSERT INTO recurring_transactions (template, schedule, is_active, error, created_at, updated_at)
+VALUES (?,?,?,?,?,?);
 
 -- name: UpdateRecurring :exec
-UPDATE recurring_transactions SET type=?, account_id=?, to_account_id=?, category_id=?,
-	amount=?, to_amount=?, is_estimated=?, description=?, frequency=?, interval=?, day_of_week=?,
-	day_of_month=?, start_date=?, end_date=?, next_run_date=?, is_active=?, updated_at=?
-WHERE id=?;
+-- Saving a rule replaces its error: the caller passes NULL once the rule is valid.
+UPDATE recurring_transactions SET template=?, schedule=?, is_active=?, error=?, updated_at=? WHERE id=?;
 
--- name: DeletePendingForRecurring :exec
-DELETE FROM transactions WHERE recurring_transaction_id = ? AND status = 'pending';
+-- name: StopRecurring :exec
+UPDATE recurring_transactions SET is_active=0, error=?, updated_at=? WHERE id=?;
 
 -- name: DeleteRecurring :exec
+-- Its instances go with it (cascade); its transactions stay.
 DELETE FROM recurring_transactions WHERE id = ?;
-
--- name: AdvanceRecurring :exec
-UPDATE recurring_transactions SET last_run_date=?, next_run_date=?, updated_at=? WHERE id=?;
-
--- name: GetPendingRecurringTx :one
-SELECT id FROM transactions WHERE recurring_transaction_id = ? AND status = 'pending' LIMIT 1;
-
--- name: DeleteRecurringTags :exec
-DELETE FROM recurring_transaction_tag WHERE recurring_transaction_id = ?;
-
--- name: InsertRecurringTag :exec
-INSERT INTO recurring_transaction_tag (recurring_transaction_id, tag_id) VALUES (?,?) ON CONFLICT DO NOTHING;
 
 -- name: GetRecurring :one
 -- The same columns as ListRecurring, so its row converts to ListRecurringRow.
-SELECT r.id, r.type, r.account_id, r.to_account_id, r.category_id, r.amount, r.to_amount, r.is_estimated, r.description,
-	r.frequency, r.interval, r.day_of_week, r.day_of_month, r.start_date, r.end_date,
-	r.next_run_date, r.last_run_date, r.is_active,
-	ca.id AS currency_id, ca.decimals AS decimals,
-	COALESCE(cb.id, ca.id) AS to_currency_id, COALESCE(cb.decimals, ca.decimals) AS to_decimals
+-- last_due is the latest handled due date, whatever became of it; last_run the
+-- latest one that was confirmed; pending_due the open occurrence's.
+SELECT r.id, r.template, r.schedule, r.is_active, r.error, r.created_at, r.updated_at,
+	(SELECT MAX(i.due_date) FROM recurring_instances i WHERE i.recurring_transaction_id = r.id) AS last_due,
+	(SELECT MAX(i.due_date) FROM recurring_instances i
+		JOIN transactions t ON t.id = i.transaction_id
+		WHERE i.recurring_transaction_id = r.id AND t.status = 'confirmed') AS last_run,
+	(SELECT MIN(i.due_date) FROM recurring_instances i
+		JOIN transactions t ON t.id = i.transaction_id
+		WHERE i.recurring_transaction_id = r.id AND t.status = 'pending') AS pending_due
 FROM recurring_transactions r
-JOIN accounts a ON a.id = r.account_id
-JOIN currencies ca ON ca.id = a.currency_id
-LEFT JOIN accounts ta ON ta.id = r.to_account_id
-LEFT JOIN currencies cb ON cb.id = ta.currency_id
 WHERE r.id = ?;
 
 -- name: ListRecurring :many
-SELECT r.id, r.type, r.account_id, r.to_account_id, r.category_id, r.amount, r.to_amount, r.is_estimated, r.description,
-	r.frequency, r.interval, r.day_of_week, r.day_of_month, r.start_date, r.end_date,
-	r.next_run_date, r.last_run_date, r.is_active,
-	ca.id AS currency_id, ca.decimals AS decimals,
-	COALESCE(cb.id, ca.id) AS to_currency_id, COALESCE(cb.decimals, ca.decimals) AS to_decimals
+SELECT r.id, r.template, r.schedule, r.is_active, r.error, r.created_at, r.updated_at,
+	(SELECT MAX(i.due_date) FROM recurring_instances i WHERE i.recurring_transaction_id = r.id) AS last_due,
+	(SELECT MAX(i.due_date) FROM recurring_instances i
+		JOIN transactions t ON t.id = i.transaction_id
+		WHERE i.recurring_transaction_id = r.id AND t.status = 'confirmed') AS last_run,
+	(SELECT MIN(i.due_date) FROM recurring_instances i
+		JOIN transactions t ON t.id = i.transaction_id
+		WHERE i.recurring_transaction_id = r.id AND t.status = 'pending') AS pending_due
 FROM recurring_transactions r
-JOIN accounts a ON a.id = r.account_id
-JOIN currencies ca ON ca.id = a.currency_id
-LEFT JOIN accounts ta ON ta.id = r.to_account_id
-LEFT JOIN currencies cb ON cb.id = ta.currency_id
 WHERE r.is_active = COALESCE(sqlc.narg('active_only'), r.is_active)
-ORDER BY r.next_run_date, r.id
-LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
+ORDER BY r.id;
 
--- name: ListRecurringTags :many
-SELECT tags.id, tags.name, tags.created_at, 0 AS transactions_count FROM tags
-JOIN recurring_transaction_tag rt ON rt.tag_id = tags.id
-WHERE rt.recurring_transaction_id = ?;
+-- name: InsertRecurringInstance :execresult
+-- A due date is handled once: a second insert for it changes nothing.
+INSERT INTO recurring_instances (recurring_transaction_id, due_date, transaction_id) VALUES (?,?,?)
+ON CONFLICT DO NOTHING;
+
+-- name: GetPendingRecurringInstance :one
+-- The open occurrence of a rule: an instance whose transaction is pending.
+SELECT i.due_date, i.transaction_id FROM recurring_instances i
+JOIN transactions t ON t.id = i.transaction_id
+WHERE i.recurring_transaction_id = ? AND t.status = 'pending'
+ORDER BY i.due_date LIMIT 1;
+
+-- name: GetRecurringInstanceOf :one
+-- The rule and due date a transaction was made for.
+SELECT recurring_transaction_id, due_date FROM recurring_instances WHERE transaction_id = ?;
+
+-- name: MoveRecurringInstance :execresult
+-- The caller checks the new date is free: it is part of the key.
+UPDATE recurring_instances SET due_date = ?
+WHERE recurring_transaction_id = ? AND due_date = ?;
+
+-- name: CountRecurringInstancesOn :one
+SELECT COUNT(*) FROM recurring_instances WHERE recurring_transaction_id = ? AND due_date = ?;
+
+-- name: ListRecurringInstances :many
+SELECT due_date, transaction_id FROM recurring_instances
+WHERE recurring_transaction_id = ? ORDER BY due_date;

@@ -23,7 +23,7 @@ func (s Service) Resolve(ctx context.Context, actor *auth.User, spaceID int64, i
 	if err != nil {
 		return err
 	}
-	if cur.Status != transferPending || cur.Review == nil {
+	if cur.Status != transferInReview || cur.Review == nil {
 		return ErrNotUnderReview
 	}
 	own, other, err := s.counterpart(ctx, spaceID, *cur)

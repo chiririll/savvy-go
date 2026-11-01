@@ -102,7 +102,7 @@ func (s Service) syncOne(ctx context.Context, a, b syncSide, review int64) error
 		}
 		return s.reviewOne(ctx, own.db, own.uuid, own.rec, other.rec, own.has, other.has)
 	}
-	if (a.has && a.rec.Status == transferPending) || (b.has && b.rec.Status == transferPending) {
+	if (a.has && a.rec.Status == transferInReview) || (b.has && b.rec.Status == transferInReview) {
 		return nil // waits for a decision; never moved automatically
 	}
 	switch {
