@@ -33,6 +33,13 @@ func transactionsIndex(w http.ResponseWriter, r *http.Request) {
 	f.SortBy, f.SortDir = q.Get("sort_by"), q.Get("sort_direction")
 	f.CategoryIDs = int64List(q, "category_ids")
 	f.TagIDs = int64List(q, "tag_ids")
+	f.AccountIDs = int64List(q, "account_ids")
+	for _, code := range strings.Split(q.Get("currency"), ",") {
+		if code = strings.TrimSpace(code); code != "" {
+			f.Currencies = append(f.Currencies, code)
+		}
+	}
+	f.Search = q.Get("q")
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	per, _ := strconv.Atoi(r.URL.Query().Get("per_page"))
 	list, total, err := httpx.Scope(r).Txs.Filtered(r.Context(), f, page, per)
@@ -55,7 +62,7 @@ func transactionsIndex(w http.ResponseWriter, r *http.Request) {
 		Meta: dto.PageMeta{CurrentPage: page, LastPage: last, PerPage: per, Total: total},
 	}
 	if r.URL.Query().Get("with_summary") == "1" || r.URL.Query().Get("with_summary") == "true" {
-		summary := dto.NewTransactionSummary(httpx.Scope(r).Txs.Summary(r.Context(), false))
+		summary := dto.NewTransactionSummary(httpx.Scope(r).Txs.Summary(r.Context(), f, false))
 		payload.Summary = &summary
 	}
 	httpx.WriteJSON(w, http.StatusOK, payload)
@@ -203,11 +210,11 @@ func transactionsDuplicate(w http.ResponseWriter, r *http.Request) {
 }
 
 func transactionsSummary(w http.ResponseWriter, r *http.Request) {
-	httpx.WriteJSON(w, http.StatusOK, dto.NewTransactionSummary(httpx.Scope(r).Txs.Summary(r.Context(), false)))
+	httpx.WriteJSON(w, http.StatusOK, dto.NewTransactionSummary(httpx.Scope(r).Txs.Summary(r.Context(), filter.TxFilter{}, false)))
 }
 
 func transactionsPendingSummary(w http.ResponseWriter, r *http.Request) {
-	httpx.WriteJSON(w, http.StatusOK, dto.NewTransactionSummary(httpx.Scope(r).Txs.Summary(r.Context(), true)))
+	httpx.WriteJSON(w, http.StatusOK, dto.NewTransactionSummary(httpx.Scope(r).Txs.Summary(r.Context(), filter.TxFilter{}, true)))
 }
 
 func txParam(w http.ResponseWriter, r *http.Request) *ledger.Transaction {

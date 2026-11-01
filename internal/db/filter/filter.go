@@ -36,15 +36,30 @@ func toBase(minor, decimals int64, rate decimal.Decimal) decimal.Decimal {
 type TxFilter struct {
 	Type        string
 	AccountID   int64
+	AccountIDs  []int64
+	Currencies  []string // codes; a transfer matches when either side is one
 	CategoryID  int64
 	CategoryIDs []int64
 	TagIDs      []int64
 	Status      string
 	StartDate   string
 	EndDate     string
-	SortBy      string
-	SortDir     string
+	// Search is free text: space-separated terms, all of which must match
+	// (see searchWhere).
+	Search  string
+	SortBy  string
+	SortDir string
 }
+
+// txJoins gives txWhere and the sort the currency of the transaction's account
+// (c) and of the account it goes to (cb). Each join is many-to-one, so rows
+// are never repeated.
+const txJoins = `
+		LEFT JOIN accounts a ON a.id = t.account_id
+		LEFT JOIN currencies c ON c.id = a.currency_id
+		LEFT JOIN accounts ta ON ta.id = t.to_account_id
+		LEFT JOIN currencies cb ON cb.id = ta.currency_id
+		`
 
 func txWhere(f TxFilter) (string, []any) {
 	q := `WHERE 1=1`
@@ -56,6 +71,22 @@ func txWhere(f TxFilter) (string, []any) {
 	if f.AccountID > 0 {
 		q += ` AND t.account_id = ?`
 		args = append(args, f.AccountID)
+	}
+	if len(f.AccountIDs) > 0 {
+		q += ` AND t.account_id IN (` + Placeholders(len(f.AccountIDs)) + `)`
+		for _, id := range f.AccountIDs {
+			args = append(args, id)
+		}
+	}
+	if len(f.Currencies) > 0 {
+		ph := Placeholders(len(f.Currencies))
+		// currencies.code compares without regard to case.
+		q += ` AND (c.code IN (` + ph + `) OR cb.code IN (` + ph + `))`
+		for range 2 {
+			for _, code := range f.Currencies {
+				args = append(args, code)
+			}
+		}
 	}
 	if f.CategoryID > 0 {
 		q += ` AND t.category_id = ?`
@@ -87,7 +118,8 @@ func txWhere(f TxFilter) (string, []any) {
 		q += ` AND (t.date IS NULL OR t.date <= ?)`
 		args = append(args, f.EndDate)
 	}
-	return q, args
+	sq, sargs := searchWhere(f.Search)
+	return q + sq, append(args, sargs...)
 }
 
 // txOrderBy maps whitelisted sort keys to SQL; request strings never reach the query.
@@ -109,8 +141,43 @@ func txOrderBy(sortBy, sortDir string) string {
 func CountTransactions(ctx context.Context, sqlDB store.DB, f TxFilter) (int64, error) {
 	where, args := txWhere(f)
 	var n int64
-	err := sqlDB.QueryRowContext(ctx, `SELECT COUNT(*) FROM transactions t `+where, args...).Scan(&n)
+	err := sqlDB.QueryRowContext(ctx, `SELECT COUNT(*) FROM transactions t `+txJoins+where, args...).Scan(&n)
 	return n, err
+}
+
+// SummaryRow is one income or expense with what folds it into the base currency.
+type SummaryRow struct {
+	Type     string
+	Minor    int64
+	Decimals int64
+	Rate     decimal.Decimal
+	IsBase   bool
+}
+
+// SummaryRows lists the income and expenses in a status that match f. The
+// Status of f is replaced by status, since a summary covers one status; a Type
+// of f still narrows it, so "transfer" leaves nothing.
+func SummaryRows(ctx context.Context, sqlDB store.DB, f TxFilter, status string) ([]SummaryRow, error) {
+	f.Status = status
+	where, args := txWhere(f)
+	rows, err := sqlDB.QueryContext(ctx, `
+		SELECT t.type, t.amount, c.rate, c.is_base, c.decimals
+		FROM transactions t`+txJoins+where+` AND t.type IN ('income', 'expense')`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []SummaryRow{}
+	for rows.Next() {
+		var r SummaryRow
+		var isBase int64
+		if err := rows.Scan(&r.Type, &r.Minor, &r.Rate, &isBase, &r.Decimals); err != nil {
+			return nil, err
+		}
+		r.IsBase = isBase != 0
+		out = append(out, r)
+	}
+	return out, rows.Err()
 }
 
 func ListTransactions(
@@ -125,11 +192,7 @@ func ListTransactions(
 		SELECT t.id, t.type, t.account_id, t.to_account_id, t.category_id, t.amount, t.to_amount,
 			t.is_estimated, t.description, t.date, t.status, t.recurring_transaction_id, t.created_at,
 			c.id, c.decimals, COALESCE(cb.id, c.id), COALESCE(cb.decimals, c.decimals)
-		FROM transactions t
-		LEFT JOIN accounts a ON a.id = t.account_id
-		LEFT JOIN currencies c ON c.id = a.currency_id
-		LEFT JOIN accounts ta ON ta.id = t.to_account_id
-		LEFT JOIN currencies cb ON cb.id = ta.currency_id
+		FROM transactions t`+txJoins+`
 		`+where+`
 		ORDER BY `+txOrderBy(f.SortBy, f.SortDir)+`
 		LIMIT ? OFFSET ?`, args...)

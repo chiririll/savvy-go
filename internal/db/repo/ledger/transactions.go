@@ -231,15 +231,16 @@ type SummaryRow struct {
 	IsBase   bool
 }
 
-// SummaryRows lists the amounts of the transactions in a status.
-func (r Repo) SummaryRows(ctx context.Context, status string) ([]SummaryRow, error) {
-	rows, err := r.q().ListTransactionSummaryRows(ctx, status)
+// SummaryRows lists the amounts of the income and expenses in a status that
+// match f.
+func (r Repo) SummaryRows(ctx context.Context, f filter.TxFilter, status string) ([]SummaryRow, error) {
+	rows, err := filter.SummaryRows(ctx, r.DB, f, status)
 	if err != nil {
 		return nil, err
 	}
 	out := make([]SummaryRow, len(rows))
 	for i, x := range rows {
-		out[i] = SummaryRow{Type: x.Type, Minor: x.Amount, Decimals: int(x.Decimals), Rate: x.Rate, IsBase: x.IsBase != 0}
+		out[i] = SummaryRow{Type: x.Type, Minor: x.Minor, Decimals: int(x.Decimals), Rate: x.Rate, IsBase: x.IsBase}
 	}
 	return out, nil
 }

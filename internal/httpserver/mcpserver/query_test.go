@@ -37,6 +37,20 @@ func TestQueryHelpersRefuseBadDatesValues(t *testing.T) {
 	}
 }
 
+func TestTransactionsQueryPassesTheSearchText(t *testing.T) {
+	q, err := transactionsQuery(transactionsArgs{Query: "armchair & 1 879"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if q.Get("q") != "armchair & 1 879" || len(q["q"]) != 1 {
+		t.Errorf("q = %q", q["q"])
+	}
+	q, _ = transactionsQuery(transactionsArgs{})
+	if _, ok := q["q"]; ok {
+		t.Errorf("an empty search reached the query: %v", q)
+	}
+}
+
 func TestQueryIDsSkipUnsetOnes(t *testing.T) {
 	q := url.Values{}
 	setID(q, "account_id", 0)

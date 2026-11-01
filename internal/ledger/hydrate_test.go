@@ -75,3 +75,45 @@ func TestPageHydrationKeepsItemsTags(t *testing.T) {
 		t.Fatal("expected the account to be loaded once and shared")
 	}
 }
+
+// The summary totals what the list shows: the same filter narrows both.
+func TestSummaryFollowsTheFilter(t *testing.T) {
+	e := newMoneyEnv(t)
+	date := "2024-01-15"
+	mk := func(typ string, acct int64, amount, desc string) {
+		t.Helper()
+		if _, err := e.txs.Create(e.ctx, TxInput{
+			Type: typ, AccountID: acct, Amount: dec(amount), Date: &date, Description: &desc,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mk("income", e.usdAcc.ID, "100", "salary")
+	mk("expense", e.usdAcc.ID, "30", "armchair")
+	mk("expense", e.usdAcc.ID, "5", "coffee")
+	mk("expense", e.jpyAcc.ID, "500", "armchair cover")
+
+	all := e.txs.Summary(e.ctx, filter.TxFilter{}, false)
+	if all.Count != 4 {
+		t.Fatalf("unfiltered count = %d, want 4", all.Count)
+	}
+	usd := e.txs.Summary(e.ctx, filter.TxFilter{Currencies: []string{"usd"}}, false)
+	if usd.Count != 3 || !usd.Income.Decimal().Equal(dec("100")) || !usd.Expense.Decimal().Equal(dec("35")) {
+		t.Fatalf("usd = %d, income %s, expense %s", usd.Count, usd.Income, usd.Expense)
+	}
+	chairs := e.txs.Summary(e.ctx, filter.TxFilter{Search: "armchair", Currencies: []string{"USD"}}, false)
+	if chairs.Count != 1 || !chairs.Income.IsZero() || !chairs.Expense.Decimal().Equal(dec("30")) {
+		t.Fatalf("armchair = %d, income %s, expense %s", chairs.Count, chairs.Income, chairs.Expense)
+	}
+	// Type and status narrow the list, but the summary stays income and
+	// expense in the status it was asked for.
+	if got := e.txs.Summary(e.ctx, filter.TxFilter{Type: "transfer"}, false); got.Count != 0 {
+		t.Fatalf("transfer filter counted %d", got.Count)
+	}
+	if got := e.txs.Summary(e.ctx, filter.TxFilter{Status: "pending"}, false); got.Count != 4 {
+		t.Fatalf("a status filter must not change which status the summary covers: %d", got.Count)
+	}
+	if got := e.txs.Summary(e.ctx, filter.TxFilter{Search: "nothing"}, false); got.Count != 0 || !got.Expense.IsZero() {
+		t.Fatalf("no match = %d, expense %s", got.Count, got.Expense)
+	}
+}
