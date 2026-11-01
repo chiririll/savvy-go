@@ -1,9 +1,23 @@
 import { type ReactNode } from 'react'
 import { FeedEmpty, FeedGroup, FeedRowSkeleton } from '@/components/shared'
 import { useRelativeDay } from '@/hooks'
+import { formatCurrency } from '@/lib/currency'
 import { groupByDateKey } from '@/lib/dates'
+import { largestTotals, netTotalsByCurrency } from '@/lib/transaction-totals'
 import { Transaction } from '@/types'
 import { TransactionRow } from './TransactionRow'
+
+const MAX_DAY_TOTALS = 2
+
+function dayTotalsLabel(transactions: Transaction[]): string | null {
+    const { shown, hidden } = largestTotals(netTotalsByCurrency(transactions), MAX_DAY_TOTALS)
+    if (shown.length === 0) {
+        return null
+    }
+
+    const parts = shown.map(({ currency, amount }) => `${amount > 0 ? '+' : ''}${formatCurrency(amount, currency)}`)
+    return (hidden > 0 ? [...parts, '…'] : parts).join(' · ')
+}
 
 interface TransactionListProps {
     transactions: Transaction[]
@@ -88,7 +102,8 @@ export function TransactionList({
             {groups.map((group) => (
                 <FeedGroup
                     key={group.date ?? 'undated'}
-                    title={relativeDay(group.date)}
+                    title={relativeDay(group.date, { weekday: true })}
+                    aside={dayTotalsLabel(group.items)}
                 >
                     {group.items.map((transaction) => (
                         <TransactionRow

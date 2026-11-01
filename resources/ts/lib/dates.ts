@@ -40,6 +40,7 @@ export function formatTransactionGroupHeading(
     dateKey: string | null,
     locale: string,
     labels: { today: string; yesterday: string; tomorrow?: string; noDate: string },
+    { weekday = false }: { weekday?: boolean } = {},
 ): string {
     if (!dateKey) {
         return labels.noDate
@@ -58,6 +59,9 @@ export function formatTransactionGroupHeading(
 
     const date = parseDateKey(dateKey)
     const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long' }
+    if (weekday) {
+        options.weekday = 'short'
+    }
     if (date.getFullYear() !== new Date().getFullYear()) {
         options.year = 'numeric'
     }
