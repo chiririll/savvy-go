@@ -21,6 +21,7 @@ import { PeriodPicker } from '@/components/features/dashboard/PeriodPicker'
 import { LargestTransactionsCard } from '@/components/features/dashboard/LargestTransactionsCard'
 import { DashboardStats } from '@/components/features/dashboard/StatCards'
 import {
+    includesToday,
     percentChange,
     resolvePeriodDates,
     toReportFilters,
@@ -56,8 +57,10 @@ export default function DashboardPage() {
     })
     const { data: pendingSummary } = usePendingSummary()
     const { data: expensesByCategory, isError: expensesByCategoryError } = useCategorySummary({ type: 'expense', ...periodDates })
-    const { data: budgets } = useBudgets()
-    const { data: debtsData } = useDebtsWithSummary()
+    // Budgets and debts describe the present, so they are hidden for a period that does not reach today.
+    const showCurrent = useMemo(() => includesToday(periodDates), [periodDates])
+    const { data: budgets } = useBudgets({ enabled: showCurrent })
+    const { data: debtsData } = useDebtsWithSummary(undefined, { enabled: showCurrent })
     const { data: overviewData } = useOverviewMetrics(reportFilters)
     const { data: balanceComparison } = useBalanceComparison(periodDates)
 
@@ -121,9 +124,13 @@ export default function DashboardPage() {
                 <LargestTransactionsCard transactions={largestTransactions?.data} onEdit={openEdit} />
             </div>
 
-            <BudgetsCard budgets={activeBudgets} />
+            {showCurrent && (
+                <>
+                    <BudgetsCard budgets={activeBudgets} />
 
-            <DebtsCard summary={debtsData?.summary} debts={activeDebts} />
+                    <DebtsCard summary={debtsData?.summary} debts={activeDebts} />
+                </>
+            )}
         </div>
     )
 }
