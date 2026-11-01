@@ -54,15 +54,16 @@ func txWhere(f TxFilter) (string, []any) {
 		args = append(args, f.Type)
 	}
 	if f.AccountID > 0 {
-		q += ` AND t.account_id = ?`
+		q += ` AND EXISTS (SELECT 1 FROM payments p WHERE p.transaction_id = t.id AND p.account_id = ?)`
 		args = append(args, f.AccountID)
 	}
 	if f.CategoryID > 0 {
-		q += ` AND t.category_id = ?`
+		q += ` AND EXISTS (SELECT 1 FROM transaction_lines l WHERE l.transaction_id = t.id AND l.category_id = ?)`
 		args = append(args, f.CategoryID)
 	}
 	if len(f.CategoryIDs) > 0 {
-		q += ` AND t.category_id IN (` + Placeholders(len(f.CategoryIDs)) + `)`
+		q += ` AND EXISTS (SELECT 1 FROM transaction_lines l WHERE l.transaction_id = t.id AND l.category_id IN (` +
+			Placeholders(len(f.CategoryIDs)) + `))`
 		for _, id := range f.CategoryIDs {
 			args = append(args, id)
 		}
@@ -90,6 +91,17 @@ func txWhere(f TxFilter) (string, []any) {
 	return q, args
 }
 
+// txSize is how much money a transaction moved, in the base currency: the
+// larger of what came in and what went out, so a transfer counts once and a
+// transfer fee is not added to it.
+const txSize = `(SELECT MAX(
+		COALESCE(SUM(CASE WHEN p.amount > 0 THEN p.amount * COALESCE(NULLIF(CAST(c.rate AS REAL), 0), 1) / pow(10, c.decimals) END), 0),
+		COALESCE(-SUM(CASE WHEN p.amount < 0 THEN p.amount * COALESCE(NULLIF(CAST(c.rate AS REAL), 0), 1) / pow(10, c.decimals) END), 0))
+	FROM payments p
+	JOIN accounts a ON a.id = p.account_id
+	JOIN currencies c ON c.id = a.currency_id
+	WHERE p.transaction_id = t.id)`
+
 // txOrderBy maps whitelisted sort keys to SQL; request strings never reach the query.
 func txOrderBy(sortBy, sortDir string) string {
 	dir := "DESC"
@@ -98,7 +110,7 @@ func txOrderBy(sortBy, sortDir string) string {
 	}
 	switch sortBy {
 	case "amount":
-		return `t.amount * COALESCE(NULLIF(CAST(c.rate AS REAL), 0), 1) / pow(10, c.decimals) ` + dir + `, t.id ` + dir
+		return txSize + ` ` + dir + `, t.id ` + dir
 	case "created_at":
 		return `t.created_at ` + dir + `, t.id ` + dir
 	default:
@@ -123,14 +135,9 @@ func ListTransactions(
 	where, args := txWhere(f)
 	args = append(args, limit, offset)
 	rows, err := sqlDB.QueryContext(ctx, `
-		SELECT t.id, t.type, t.account_id, t.to_account_id, t.category_id, t.amount, t.to_amount,
-			t.is_estimated, t.description, t.date, t.status, t.recurring_transaction_id, t.created_at, t.group_uuid,
-			c.id, c.decimals, COALESCE(cb.id, c.id), COALESCE(cb.decimals, c.decimals)
+		SELECT t.id, t.type, t.status, t.description, t.date, t.day_order, t.external_id, t.created_by,
+			t.created_at, t.updated_at
 		FROM transactions t
-		LEFT JOIN accounts a ON a.id = t.account_id
-		LEFT JOIN currencies c ON c.id = a.currency_id
-		LEFT JOIN accounts ta ON ta.id = t.to_account_id
-		LEFT JOIN currencies cb ON cb.id = ta.currency_id
 		`+where+`
 		ORDER BY `+txOrderBy(f.SortBy, f.SortDir)+`
 		LIMIT ? OFFSET ?`, args...)
@@ -141,9 +148,8 @@ func ListTransactions(
 	out := []sqlc.GetTransactionRow{}
 	for rows.Next() {
 		var r sqlc.GetTransactionRow
-		if err := rows.Scan(&r.ID, &r.Type, &r.AccountID, &r.ToAccountID, &r.CategoryID, &r.Amount, &r.ToAmount,
-			&r.IsEstimated, &r.Description, &r.Date, &r.Status, &r.RecurringTransactionID, &r.CreatedAt, &r.GroupUuid,
-			&r.CurrencyID, &r.Decimals, &r.ToCurrencyID, &r.ToDecimals); err != nil {
+		if err := rows.Scan(&r.ID, &r.Type, &r.Status, &r.Description, &r.Date, &r.DayOrder, &r.ExternalID,
+			&r.CreatedBy, &r.CreatedAt, &r.UpdatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, r)
