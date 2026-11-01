@@ -1,4 +1,5 @@
 import { formatCurrency, formatCurrencyCompact } from '@/lib/utils'
+import { isDimmed, tooltipRow } from '@/lib/chart-tooltip'
 import { axisStyle, verticalFade, type ChartTheme } from '@/lib/chart-theme'
 import type { BalanceHistorySeries } from '@/api/accounts'
 
@@ -45,9 +46,11 @@ export interface BalanceOptionInput {
     hiddenKeys: ReadonlySet<string>
     baseCurrency: string | null
     theme: ChartTheme
+    /** Index of the line under the cursor; the tooltip greys out every other row. */
+    getHoveredIndex?: () => number | null
 }
 
-export function balanceOption({ dates, series, hiddenKeys, baseCurrency, theme }: BalanceOptionInput) {
+export function balanceOption({ dates, series, hiddenKeys, baseCurrency, theme, getHoveredIndex }: BalanceOptionInput) {
     const pointCount = dates.length
     const formatLabel = dateLabeler(pointCount)
     const axisCurrency = axisCurrencyOf(
@@ -69,15 +72,19 @@ export function balanceOption({ dates, series, hiddenKeys, baseCurrency, theme }
             formatter: (params: { seriesName: string; seriesIndex: number; dataIndex: number; color: string }[]) => {
                 const date = dates[params[0]?.dataIndex]
                 let html = `<div class="font-medium mb-2">${date ? formatLabel(date) : ''}</div>`
+                const hovered = getHoveredIndex?.() ?? null
                 params.forEach((param) => {
                     const item =
                         series[param.seriesIndex] ?? series.find((candidate) => candidate.label === param.seriesName)
                     if (!item || hiddenKeys.has(item.key)) return
                     const value = seriesNativeValues(item)[param.dataIndex] ?? 0
-                    html += `<div class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full" style="background:${param.color}"></span>
-                        <span>${param.seriesName}: <strong>${formatCurrency(value, item.currency)}</strong></span>
-                    </div>`
+                    if (value === 0) return
+                    html += tooltipRow({
+                        color: param.color,
+                        label: param.seriesName,
+                        amount: formatCurrency(value, item.currency),
+                        dimmed: isDimmed(hovered, param.seriesIndex),
+                    })
                 })
                 return html
             },

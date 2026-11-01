@@ -56,10 +56,32 @@ interface SeriesPickerProps {
     label: string
     series: SeriesConfig[]
     onToggle: (id: number) => void
+    onToggleAll: (enabled: boolean) => void
 }
 
-export function SeriesPicker({ label, series, onToggle }: SeriesPickerProps) {
+/** The backend's aggregate series; it sits beside "Select all", not among the categories. */
+export const TOTAL_SERIES_ID = 0
+
+function PickerRow({ item, onToggle }: { item: SeriesConfig; onToggle: (id: number) => void }) {
+    return (
+        <div
+            className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer"
+            onClick={() => onToggle(item.id)}
+        >
+            <Checkbox checked={item.enabled} aria-label={item.name} className="pointer-events-none" />
+            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+            <Label className="text-sm cursor-pointer flex-1">{item.name}</Label>
+        </div>
+    )
+}
+
+export function SeriesPicker({ label, series, onToggle, onToggleAll }: SeriesPickerProps) {
+    const { t } = useTranslation('pages')
+    const total = series.find((item) => item.id === TOTAL_SERIES_ID)
+    const items = series.filter((item) => item.id !== TOTAL_SERIES_ID)
     const enabledCount = series.filter((item) => item.enabled).length
+    const enabledItems = items.filter((item) => item.enabled).length
+    const allEnabled = items.length > 0 && enabledItems === items.length
 
     return (
         <Popover>
@@ -74,16 +96,21 @@ export function SeriesPicker({ label, series, onToggle }: SeriesPickerProps) {
             </PopoverTrigger>
             <PopoverContent className="w-56 p-2" align="end" aria-label={label}>
                 <div className="space-y-1">
-                    {series.map((item) => (
-                        <div
-                            key={item.id}
-                            className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer"
-                            onClick={() => onToggle(item.id)}
-                        >
-                            <Checkbox checked={item.enabled} aria-label={item.name} className="pointer-events-none" />
-                            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                            <Label className="text-sm cursor-pointer flex-1">{item.name}</Label>
-                        </div>
+                    <div
+                        className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer"
+                        onClick={() => onToggleAll(!allEnabled)}
+                    >
+                        <Checkbox
+                            checked={allEnabled ? true : enabledItems > 0 ? 'indeterminate' : false}
+                            aria-label={t('reports.series.selectAll')}
+                            className="pointer-events-none"
+                        />
+                        <Label className="text-sm cursor-pointer flex-1">{t('reports.series.selectAll')}</Label>
+                    </div>
+                    {total && <PickerRow item={total} onToggle={onToggle} />}
+                    <div className="my-1 border-b" />
+                    {items.map((item) => (
+                        <PickerRow key={item.id} item={item} onToggle={onToggle} />
                     ))}
                 </div>
             </PopoverContent>

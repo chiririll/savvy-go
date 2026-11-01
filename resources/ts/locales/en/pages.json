@@ -382,6 +382,7 @@
             "today": "Today",
             "total": "Total",
             "sources": "Sources",
+            "selectAll": "Select all",
             "day": "Day {{day}}",
             "budgetLabel": "Budget: {{amount}}",
             "savings": "Savings"

@@ -382,6 +382,7 @@
             "today": "Сегодня",
             "total": "Итого",
             "sources": "Источники",
+            "selectAll": "Выбрать все",
             "day": "День {{day}}",
             "budgetLabel": "Бюджет: {{amount}}",
             "savings": "Сбережения"

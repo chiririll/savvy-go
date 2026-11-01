@@ -66,3 +66,28 @@ func TestListSummaryFollowsTheSearch(t *testing.T) {
 		t.Errorf("unfiltered summary = %v, want 3 transactions and 10 spent", got)
 	}
 }
+
+func TestListSummaryFollowsTheSearch(t *testing.T) {
+	a := newTestApp(t)
+	sess := a.issue(a.createUser("rw@test.com", "secret1", roleEditor), false)
+	acc, cat := seedMoney(t, a, sess)
+	for desc, amount := range map[string]float64{"Coffee": 5, "Armchair": 30} {
+		res := a.do("POST", "/api/transactions", map[string]any{
+			"type": "expense", "account_id": acc, "category_id": cat, "date": "2024-01-15",
+			"description": desc, "amount": amount,
+		}, sess.Token, sess.CSRF)
+		status(t, res, http.StatusCreated, "create")
+	}
+	summary := func(q string) map[string]any {
+		t.Helper()
+		out := decodeJSON(t, a.do("GET", "/api/transactions?with_summary=1&q="+url.QueryEscape(q), nil, sess.Token, ""))
+		return out["summary"].(map[string]any)
+	}
+	if got := summary("")["transactionsCount"].(float64); got != 2 {
+		t.Errorf("no search counted %v, want 2", got)
+	}
+	s := summary("armchair")
+	if s["transactionsCount"].(float64) != 1 || s["expense"].(float64) != 30 {
+		t.Errorf("armchair summary = %v", s)
+	}
+}
