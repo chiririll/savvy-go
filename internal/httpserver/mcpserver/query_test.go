@@ -65,3 +65,17 @@ func TestQueryIDsSkipUnsetOnes(t *testing.T) {
 		t.Errorf("query = %v", q)
 	}
 }
+
+func TestTransactionsQueryPassesAccountsAndCurrencies(t *testing.T) {
+	q, err := transactionsQuery(transactionsArgs{AccountIDs: []int64{1, 0, 2}, Currency: []string{"usd", " ", "JPY"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if q.Get("account_ids") != "1,2" || q.Get("currency") != "usd,JPY" {
+		t.Errorf("account_ids = %q, currency = %q", q.Get("account_ids"), q.Get("currency"))
+	}
+	q, _ = transactionsQuery(transactionsArgs{})
+	if _, ok := q["currency"]; ok {
+		t.Errorf("an empty currency list reached the query: %v", q)
+	}
+}

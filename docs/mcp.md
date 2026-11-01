@@ -45,7 +45,7 @@ Access tokens last an hour and renew in the background. A connection unused for 
 |------|---------|
 | `list_spaces` | your spaces and your role in each |
 | `list_accounts`, `list_categories`, `list_tags`, `list_currencies` | reference data of a space |
-| `list_transactions`, `get_transaction` | transactions; filters (dates, type, status, account, categories, tags) and free-text search `q` (description, item names, or an amount in the account's currency); pages of up to 100 |
+| `list_transactions`, `get_transaction` | transactions; filters (dates, type, status, account or accounts, currencies, categories, tags) and free-text search `q` (description, item names, or an amount in the account's currency); pages of up to 100 |
 | `get_transactions_summary` | transaction totals |
 | `list_budgets` | budgets with progress |
 | `list_debts`, `get_debts_summary` | debts and totals |

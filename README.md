@@ -67,6 +67,7 @@ Fully responsive design built with ShadCN/UI — track expenses from your phone 
 ## 📚 Documentation
 
 - [Spaces and roles](docs/spaces.md) — spaces, server and space roles, invitations, linked spaces and transfers
+- [Searching transactions](docs/transactions.md) — search field, filters, the `/` palette and its keywords
 - [Deployment](docs/deployment.md) — Docker Compose, first run, configuration, reverse proxies, health checks, Kubernetes, packages, updating
 - [Email and security](docs/email-and-security.md) — email setup, confirmation, password links, rate limits, two-factor lockout
 - [Data and backups](docs/data-and-backups.md) — the data directory, the signing key, backups and upgrading from the Laravel version

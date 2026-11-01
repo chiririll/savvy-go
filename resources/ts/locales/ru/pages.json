@@ -169,6 +169,10 @@
         "dateTo": "По",
         "categories": "Категории",
         "tags": "Теги",
+        "accounts": "Счета",
+        "currencies": "Валюты",
+        "search": "Поиск",
+        "searchPlaceholder": "Поиск по транзакциям",
         "sort": {
             "dateNewest": "Дата (сначала новые)",
             "dateOldest": "Дата (сначала старые)",
@@ -206,7 +210,16 @@
             "transfer_in": "Из другого пространства"
         },
         "deleteTitle": "Удалить транзакцию?",
-        "deleteDescription": "Это действие нельзя отменить."
+        "deleteDescription": "Это действие нельзя отменить.",
+        "palette": {
+            "title": "Поиск по транзакциям",
+            "description": "Введите слова или ключи, например account:Карта или tags:еда,кофе. Выбирайте результат стрелками.",
+            "placeholder": "Поиск или фильтр: account:Карта tags:еда",
+            "empty": "Ничего не найдено",
+            "totals": "Доходы {{income}} · Расходы {{expense}}",
+            "showAll": "Показать все: {{count, plural(one: # транзакция; few: # транзакции; other: # транзакций)}}",
+            "keys": "Tab дополнить · ↑↓ выбор · Enter открыть · Ctrl+Enter показать все"
+        }
     },
     "recurring": {
         "title": "Регулярные платежи",
