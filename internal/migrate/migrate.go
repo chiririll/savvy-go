@@ -4,8 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"embed"
+	"errors"
 	"fmt"
 	"io/fs"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -60,6 +62,18 @@ func (s Set) PendingVersions(ctx context.Context, db *sql.DB) ([]string, error) 
 	return out, nil
 }
 
+// ErrV1Schema is returned by Up for a space file still at v1.0. The space base
+// uses CREATE TABLE IF NOT EXISTS, which would leave the old tables as they are,
+// so such a file must be converted into a fresh one (internal/migrate/v1).
+var ErrV1Schema = errors.New("space file is at v1.0 and must be converted, not migrated in place")
+
+// v1Version and baseVersion are the recorded versions that tell a v1.0 space
+// file from a current one.
+const (
+	v1Version   = "space/0001_initial"
+	baseVersion = "space/0001_base"
+)
+
 const tableSQL = `CREATE TABLE IF NOT EXISTS schema_migrations (
     version TEXT PRIMARY KEY,
     applied_at TEXT NOT NULL
@@ -72,6 +86,10 @@ func up(ctx context.Context, db *sql.DB, sets ...Set) error {
 	applied, err := appliedVersions(ctx, db)
 	if err != nil {
 		return err
+	}
+
+	if applied[v1Version] && !applied[baseVersion] && slices.Contains(sets, Space) {
+		return ErrV1Schema
 	}
 
 	names, err := migrationFiles(sets...)
