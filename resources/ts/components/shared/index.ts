@@ -1,4 +1,5 @@
 export { LanguageSwitcher } from './appearance/LanguageSwitcher'
+export { EmailLanguageSelect, useUiLocale } from './appearance/EmailLanguageSelect'
 export { ThemeSwitcher } from './appearance/ThemeSwitcher'
 export { Page } from './page/Page'
 export { PageHeader } from './page/PageHeader'

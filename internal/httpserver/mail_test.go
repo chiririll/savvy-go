@@ -262,6 +262,9 @@ func TestMailTestSendsAdminGivenAddress(t *testing.T) {
 	if len(got) != 2 || got[0].To != "admin@test.com" || got[1].To != "other@example.org" {
 		t.Fatalf("sent %+v", got)
 	}
+	if got[0].HTML == "" || len(got[0].Inline) == 0 {
+		t.Errorf("test email is not in the themed layout: %+v", got[0])
+	}
 
 	res = a.do("POST", "/api/admin/mail/test", map[string]any{"to": "not-an-address"}, sess.Token, sess.CSRF)
 	if res.StatusCode != 422 {

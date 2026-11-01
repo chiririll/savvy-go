@@ -8,6 +8,10 @@ Without a mail server everything works: reset and invitation links are shown for
 
 Set it up in **Administration → System → Email**, or in `[mailer]` in `config.toml`. While mail is off the panel shows only its status and the **Send email** switch; turn the switch on to reveal the server fields (they stay open if the saved settings have a problem). Saving in the panel writes the file and takes effect at once, no restart. **Test connection** connects and signs in with the values in the form, saved or not, without sending anything; **Save** runs the same test first and keeps the settings only if it passes (switching mail off is saved without a test). A **Send test email** button checks the saved connection and sends a message to you. If the application cannot write `config.toml` (a read-only mount), the form is locked and you edit the file and restart.
 
+**What the emails look like.** Password links, email confirmation and invitations are sent as an HTML email with a plain-text copy for clients that show only text. Each has a button for the action and the raw link below it, a note that it can be ignored if unexpected, and the date the link is valid until (UTC, no time). Dark mode follows the reader's client. The logo is sent inside the email, so opening it makes no request to your server or anyone else's.
+
+**Language.** English and Russian. Whoever sends a password link or an invitation picks the language of that email in the **Email language** field (it starts as their own interface language). It is used for that one email and is not saved on the account. Confirmation emails use the language of the interface of the person who asked for them. An unknown language falls back to English.
+
 In the panel, leave the password field empty to keep the stored password; clear it on purpose to remove it. A configuration that cannot work (empty host, bad port, a `user` without a password) is refused with the field at fault, unless mail is switched off.
 
 ```toml

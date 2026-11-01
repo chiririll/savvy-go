@@ -7,7 +7,15 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage, FormDes
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { createUserSchema, updateUserSchema, CreateUserFormData, UpdateUserFormData } from '@/schemas/users'
 import { useUser } from '@/stores/auth'
-import { FormCheckboxCard, FormInputField, FormSubmitButton, FormWrapper } from '@/components/shared'
+import {
+    EmailLanguageSelect,
+    FormCheckboxCard,
+    FormInputField,
+    FormSubmitButton,
+    FormWrapper,
+    useUiLocale,
+} from '@/components/shared'
+import type { AppLocale } from '@/lib/i18n'
 
 interface UserFormProps {
     defaultValues?: Partial<CreateUserFormData> & Partial<UpdateUserFormData> & { id?: number }
@@ -51,6 +59,28 @@ function UserRoleField({ form, disabled }: { form: UseFormReturn<CreateUserFormD
     )
 }
 
+/** The language of the email with the set-password link; starts as the language of the interface. */
+function UserLocaleField({ form }: { form: UseFormReturn<CreateUserFormData> }) {
+    const { t } = useTranslation('common')
+    return (
+        <FormField
+            control={form.control}
+            name="locale"
+            render={({ field }) => (
+                <FormItem>
+                    <FormLabel>{t('language.email')}</FormLabel>
+                    <EmailLanguageSelect
+                        className="w-full"
+                        value={field.value as AppLocale}
+                        onChange={field.onChange}
+                    />
+                    <FormMessage />
+                </FormItem>
+            )}
+        />
+    )
+}
+
 /** Why the set-password link may or may not be emailed. */
 const sendEmailHelp = (t: TFunction, mail: { canEmail: boolean; mustEmail: boolean }) => {
     if (!mail.mustEmail) return t('forms:users.sendEmailHelp')
@@ -71,6 +101,7 @@ export function UserForm({
     const { t } = useTranslation(['common', 'forms'])
     const currentUser = useUser()
     const isEditingSelf = isEdit && defaultValues?.id === currentUser?.id
+    const uiLocale = useUiLocale()
 
     const form = useForm<CreateUserFormData>({
         resolver: schemaResolver<CreateUserFormData>(isEdit ? updateUserSchema : createUserSchema),
@@ -81,11 +112,13 @@ export function UserForm({
             role: 'user',
             setPassword: false,
             sendEmail: mail.canEmail,
+            locale: uiLocale,
             ...defaultValues,
         },
     })
 
     const setPassword = form.watch('setPassword')
+    const sendEmail = form.watch('sendEmail')
     const showPassword = isEdit || setPassword
 
     useFormValuesChange(form, onValuesChange)
@@ -126,6 +159,10 @@ export function UserForm({
                             forceChecked={mail.mustEmail}
                             disabled={mail.mustEmail || !mail.canEmail}
                         />
+                    )}
+
+                    {!isEdit && !setPassword && mail.canEmail && (mail.mustEmail || sendEmail) && (
+                        <UserLocaleField form={form} />
                     )}
 
                     {showPassword && (

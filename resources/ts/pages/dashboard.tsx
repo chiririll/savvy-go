@@ -21,7 +21,7 @@ import { PeriodPicker } from '@/components/features/dashboard/PeriodPicker'
 import { LargestTransactionsCard } from '@/components/features/dashboard/LargestTransactionsCard'
 import { DashboardStats } from '@/components/features/dashboard/StatCards'
 import {
-    getPresetDates,
+    includesToday,
     percentChange,
     resolvePeriodDates,
     toReportFilters,
@@ -47,10 +47,9 @@ export default function DashboardPage() {
         [period, customStartDate, customEndDate],
     )
 
-    // Always the last 30 days, whatever the period picker says. The API sorts by amount in the base currency.
-    const largestRange = useMemo(() => getPresetDates('last_30_days'), [])
+    // The API sorts by amount in the base currency.
     const { data: largestTransactions } = useTransactions({
-        ...largestRange,
+        ...periodDates,
         per_page: 5,
         status: 'confirmed',
         sort_by: 'amount',
@@ -58,8 +57,10 @@ export default function DashboardPage() {
     })
     const { data: pendingSummary } = usePendingSummary()
     const { data: expensesByCategory, isError: expensesByCategoryError } = useCategorySummary({ type: 'expense', ...periodDates })
-    const { data: budgets } = useBudgets()
-    const { data: debtsData } = useDebtsWithSummary()
+    // Budgets and debts describe the present, so they are hidden for a period that does not reach today.
+    const showCurrent = useMemo(() => includesToday(periodDates), [periodDates])
+    const { data: budgets } = useBudgets({ enabled: showCurrent })
+    const { data: debtsData } = useDebtsWithSummary(undefined, { enabled: showCurrent })
     const { data: overviewData } = useOverviewMetrics(reportFilters)
     const { data: balanceComparison } = useBalanceComparison(periodDates)
 
@@ -123,9 +124,13 @@ export default function DashboardPage() {
                 <LargestTransactionsCard transactions={largestTransactions?.data} onEdit={openEdit} />
             </div>
 
-            <BudgetsCard budgets={activeBudgets} />
+            {showCurrent && (
+                <>
+                    <BudgetsCard budgets={activeBudgets} />
 
-            <DebtsCard summary={debtsData?.summary} debts={activeDebts} />
+                    <DebtsCard summary={debtsData?.summary} debts={activeDebts} />
+                </>
+            )}
         </div>
     )
 }

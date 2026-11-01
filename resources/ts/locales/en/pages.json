@@ -169,6 +169,10 @@
         "dateTo": "To",
         "categories": "Categories",
         "tags": "Tags",
+        "accounts": "Accounts",
+        "currencies": "Currencies",
+        "search": "Search",
+        "searchPlaceholder": "Search transactions",
         "sort": {
             "dateNewest": "Date (Newest)",
             "dateOldest": "Date (Oldest)",
@@ -206,7 +210,16 @@
             "transfer_in": "Received from another space"
         },
         "deleteTitle": "Delete transaction?",
-        "deleteDescription": "This action cannot be undone."
+        "deleteDescription": "This action cannot be undone.",
+        "palette": {
+            "title": "Search transactions",
+            "description": "Type words, or keywords such as account:Card or tags:food,coffee. Use the arrow keys to pick a result.",
+            "placeholder": "Search, or filter: account:Card tags:food",
+            "empty": "Nothing found",
+            "totals": "Income {{income}} · Expense {{expense}}",
+            "showAll": "Show all {{count, plural(one: # transaction; other: # transactions)}}",
+            "keys": "Tab complete · ↑↓ select · Enter open · Ctrl+Enter show all"
+        }
     },
     "recurring": {
         "title": "Recurring transactions",
@@ -369,6 +382,7 @@
             "today": "Today",
             "total": "Total",
             "sources": "Sources",
+            "selectAll": "Select all",
             "day": "Day {{day}}",
             "budgetLabel": "Budget: {{amount}}",
             "savings": "Savings"
@@ -476,7 +490,7 @@
         "balanceDynamics": "Balance dynamics",
         "accountBalances": "Account balances",
         "expensesByCategory": "Expenses by Category",
-        "largestTransactions": "Largest transactions, last 30 days",
+        "largestTransactions": "Largest transactions",
         "budgets": "Budgets",
         "noBudgets": "No budgets yet",
         "allExpenses": "All expenses",

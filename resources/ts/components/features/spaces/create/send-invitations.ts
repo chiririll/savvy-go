@@ -13,7 +13,13 @@ export interface InvitationOutcome {
     error: string | null
 }
 
-type Invite = (spaceId: number, role: SpaceRole, email?: string, note?: string) => Promise<InviteResult>
+type Invite = (
+    spaceId: number,
+    role: SpaceRole,
+    email?: string,
+    note?: string,
+    locale?: string,
+) => Promise<InviteResult>
 
 /**
  * Sends the draft's invitations one by one once the space exists. One refused
@@ -34,6 +40,7 @@ export async function sendInvitations(
                 invitation.role,
                 invitation.email ?? undefined,
                 invitation.note ?? undefined,
+                invitation.locale ?? undefined,
             )
             out.push({ invitation, link: token ? `${origin}/invite/${token}` : null, emailed: emailSent, error: null })
         } catch (error) {

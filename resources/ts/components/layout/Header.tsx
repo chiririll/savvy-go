@@ -4,6 +4,7 @@ import { LanguageSwitcher } from '@/components/shared/appearance/LanguageSwitche
 import { ThemeSwitcher } from '@/components/shared/appearance/ThemeSwitcher'
 import { CreateTransactionMenu } from './header/CreateTransactionMenu'
 import { HeaderBalance } from './header/HeaderBalance'
+import { SearchButton } from './header/SearchButton'
 import { UserMenu } from './header/UserMenu'
 
 export function Header() {
@@ -17,6 +18,7 @@ export function Header() {
 
                 {/* Five controls share 390px: tighter gaps below sm keep a long balance (Russian groups digits with spaces) in the window. */}
                 <div className="flex min-w-0 items-center gap-1 sm:gap-3">
+                    <SearchButton />
                     <CreateTransactionMenu />
                     <HeaderBalance />
                     <LanguageSwitcher />

@@ -27,6 +27,12 @@ export function isAppLocale(value: string): value is AppLocale {
     return (SUPPORTED_LOCALES as readonly string[]).includes(value)
 }
 
+/** The supported locale of a language tag such as `ru-RU`; English when there is none. */
+export function toAppLocale(language: string): AppLocale {
+    const base = language.split('-')[0]
+    return isAppLocale(base) ? base : 'en'
+}
+
 const I18N_NAMESPACES = ['common', 'nav', 'auth', 'settings', 'pages', 'forms', 'defaults'] as const
 
 /** BCP 47 tag for Intl formatters. */

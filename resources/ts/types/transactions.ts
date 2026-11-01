@@ -55,6 +55,11 @@ export interface TransactionFilters {
     type?: TransactionType
     account_id?: number
     category_id?: number
+    account_ids?: number[]
+    /** Currency codes; a transfer matches if either account is in one. */
+    currency?: string[]
+    /** Free text: every word must match the description, an item name or a number. */
+    q?: string
     category_ids?: number[]
     tag_ids?: number[]
     start_date?: string

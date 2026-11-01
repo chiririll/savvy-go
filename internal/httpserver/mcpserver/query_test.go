@@ -37,6 +37,20 @@ func TestQueryHelpersRefuseBadDatesValues(t *testing.T) {
 	}
 }
 
+func TestTransactionsQueryPassesTheSearchText(t *testing.T) {
+	q, err := transactionsQuery(transactionsArgs{Query: "armchair & 1 879"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if q.Get("q") != "armchair & 1 879" || len(q["q"]) != 1 {
+		t.Errorf("q = %q", q["q"])
+	}
+	q, _ = transactionsQuery(transactionsArgs{})
+	if _, ok := q["q"]; ok {
+		t.Errorf("an empty search reached the query: %v", q)
+	}
+}
+
 func TestQueryIDsSkipUnsetOnes(t *testing.T) {
 	q := url.Values{}
 	setID(q, "account_id", 0)
@@ -49,5 +63,19 @@ func TestQueryIDsSkipUnsetOnes(t *testing.T) {
 	setIDs(q, "tag_ids", []int64{3, 0, 5})
 	if q.Get("account_id") != "7" || q.Get("tag_ids") != "3,5" {
 		t.Errorf("query = %v", q)
+	}
+}
+
+func TestTransactionsQueryPassesAccountsAndCurrencies(t *testing.T) {
+	q, err := transactionsQuery(transactionsArgs{AccountIDs: []int64{1, 0, 2}, Currency: []string{"usd", " ", "JPY"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if q.Get("account_ids") != "1,2" || q.Get("currency") != "usd,JPY" {
+		t.Errorf("account_ids = %q, currency = %q", q.Get("account_ids"), q.Get("currency"))
+	}
+	q, _ = transactionsQuery(transactionsArgs{})
+	if _, ok := q["currency"]; ok {
+		t.Errorf("an empty currency list reached the query: %v", q)
 	}
 }

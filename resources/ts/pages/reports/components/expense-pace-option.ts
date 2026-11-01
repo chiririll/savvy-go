@@ -1,5 +1,6 @@
 import { formatCurrency, formatCurrencyCompact } from '@/lib/utils'
 import i18n from '@/lib/i18n'
+import { tooltipRow } from '@/lib/chart-tooltip'
 import { CHART_COLORS, axisStyle, verticalFade, withAlpha, type ChartTheme } from '@/lib/chart-theme'
 import type { MonthChartData } from './expense-pace'
 
@@ -120,10 +121,7 @@ export function buildChartOption(
                             [nameBudget]: CHART_COLORS.income,
                         }
                         const color = colors[p.seriesName] || theme.text
-                        html += `<div class="flex items-center gap-2">
-                            <span style="background:${color}" class="w-2 h-2 rounded-full inline-block"></span>
-                            <span>${p.seriesName}: <strong>${formatCurrency(p.value, currency)}</strong></span>
-                        </div>`
+                        html += tooltipRow({ color, label: p.seriesName, amount: formatCurrency(p.value, currency) })
                     }
                 })
                 return html

@@ -15,10 +15,11 @@ export function useDebts(params?: { include_completed?: boolean }) {
     })
 }
 
-export function useDebtsWithSummary(params?: { include_completed?: boolean }) {
+export function useDebtsWithSummary(params?: { include_completed?: boolean }, { enabled = true }: { enabled?: boolean } = {}) {
     return useQuery({
         queryKey: [...QUERY_KEY, 'with-summary', params],
         queryFn: () => debtsApi.getAllWithSummary(params),
+        enabled,
     })
 }
 

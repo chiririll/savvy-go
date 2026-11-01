@@ -15,7 +15,6 @@ import (
 	"strings"
 
 	"savvy-go/internal/auth"
-	"savvy-go/internal/mail/smtp"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -46,6 +45,8 @@ type userStoreBody struct {
 	EmailVerified bool `json:"emailVerified"`
 	// Email the set-password link instead of returning it. Needs a user without a password.
 	Send bool `json:"send"`
+	// Language of that email; see mail.Lang. Unknown or empty is English.
+	Locale string `json:"locale"`
 }
 
 func (b userStoreBody) hasPassword() bool { return b.Password != nil && *b.Password != "" }
@@ -83,7 +84,7 @@ func (h Handler) validateNewUser(r *http.Request, body userStoreBody) (errs map[
 
 // attachSetupLink issues the set-password token of a user without a password
 // and either returns it in the payload or emails it.
-func (h Handler) attachSetupLink(r *http.Request, u *auth.User, send bool) (*dto.SetupLink, error) {
+func (h Handler) attachSetupLink(r *http.Request, u *auth.User, send bool, locale string) (*dto.SetupLink, error) {
 	issue := h.Tokens.Issue
 	if send {
 		issue = h.Tokens.IssueEmailed
@@ -96,7 +97,7 @@ func (h Handler) attachSetupLink(r *http.Request, u *auth.User, send bool) (*dto
 	switch {
 	case !send:
 		link.Token = tok
-	case h.Mail.Send(r.Context(), smtp.PasswordReset(u.Email, u.Name, h.Cfg.AppURL()+"/set-password/"+tok, exp)) != nil:
+	case h.Mail.Send(r.Context(), mail.PasswordReset(locale, u.Email, u.Name, h.Cfg.AppURL()+"/set-password/"+tok, exp)) != nil:
 		// The user exists but nobody saw the link: do not leave it valid. A reset can try again.
 		_ = h.Tokens.RevokeActive(r.Context(), u.ID)
 		link.EmailError = "Could not send the email."
@@ -135,7 +136,7 @@ func (h Handler) usersStore(w http.ResponseWriter, r *http.Request) {
 	}
 	payload := dto.UserWithLink{User: dto.NewUser(*u)}
 	if u.IsInactive() {
-		link, err := h.attachSetupLink(r, u, body.Send)
+		link, err := h.attachSetupLink(r, u, body.Send, body.Locale)
 		if err != nil {
 			httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 			return
@@ -244,9 +245,10 @@ func (h Handler) usersIssueToken(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusUnprocessableEntity, "This user signs in with SSO and has no password.")
 		return
 	}
-	// The body is optional: {"send": true} emails the link instead of returning it.
+	// The body is optional: {"send": true} emails the link instead of returning it, in the language of "locale".
 	var body struct {
-		Send bool `json:"send"`
+		Send   bool   `json:"send"`
+		Locale string `json:"locale"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil && !errors.Is(err, io.EOF) {
 		httpx.WriteValidation(w, map[string][]string{"body": {"The given data was invalid."}})
@@ -274,7 +276,7 @@ func (h Handler) usersIssueToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.Mail.Send(r.Context(),
-		smtp.PasswordReset(u.Email, u.Name, h.Cfg.AppURL()+"/set-password/"+tok, exp)); err != nil {
+		mail.PasswordReset(body.Locale, u.Email, u.Name, h.Cfg.AppURL()+"/set-password/"+tok, exp)); err != nil {
 		// The link was never seen by anyone: do not leave it valid.
 		_ = h.Tokens.RevokeActive(r.Context(), u.ID)
 		httpx.WriteMessage(w, http.StatusUnprocessableEntity, "Could not send the email: "+err.Error())

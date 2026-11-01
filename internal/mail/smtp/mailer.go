@@ -1,8 +1,9 @@
-// Package mailer sends plain-text email through an SMTP server. It is a leaf:
+// Package mailer sends email (plain text, with an HTML alternative when there is one) through an SMTP server. It is a leaf:
 // it knows nothing of users, spaces or HTTP.
 package smtp
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"errors"
@@ -77,6 +78,19 @@ type Message struct {
 	To      string
 	Subject string
 	Text    string
+	// HTML is the same email as a page. When set it is sent as the second part of
+	// multipart/alternative, after Text.
+	HTML string
+	// Inline are the images HTML shows as cid:<CID>.
+	Inline []Inline
+}
+
+// Inline is an image sent inside the email, so it needs no request to a remote server.
+type Inline struct {
+	CID  string
+	Name string
+	Type string // media type, e.g. image/png
+	Data []byte
 }
 
 // Mailer sends email. Callers hold the interface so tests can record messages.
@@ -155,6 +169,16 @@ func (s *server) Send(ctx context.Context, m Message) error {
 	}
 	msg.Subject(m.Subject)
 	msg.SetBodyString(gomail.TypeTextPlain, m.Text)
+	if m.HTML != "" {
+		msg.AddAlternativeString(gomail.TypeTextHTML, m.HTML)
+		for _, in := range m.Inline {
+			err := msg.EmbedReader(in.Name, bytes.NewReader(in.Data),
+				gomail.WithFileContentID("<"+in.CID+">"), gomail.WithFileContentType(gomail.ContentType(in.Type)))
+			if err != nil {
+				return fmt.Errorf("inline %s: %w", in.Name, err)
+			}
+		}
+	}
 	c, err := s.client()
 	if err != nil {
 		return err

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
-import { ListPage } from '@/components/shared'
+import { ListPage, useUiLocale } from '@/components/shared'
 import { createUserColumns, UserFormDialog, UserPasswordLinkDialog } from '@/components/features/users'
 import {
     useUsers,
@@ -25,6 +25,7 @@ function setPasswordUrl(token: string): string {
 
 export default function UsersPage() {
     const { t } = useTranslation('pages')
+    const uiLocale = useUiLocale()
     const currentUser = useCurrentUser()
     const { data: users, isLoading } = useUsers()
     const deleteUser = useDeleteUser()
@@ -73,6 +74,7 @@ export default function UsersPage() {
                 role: createData.role,
                 password: createData.setPassword ? createData.password : undefined,
                 send: send || undefined,
+                locale: send ? createData.locale : undefined,
             },
             {
                 onSuccess: (user) => {
@@ -99,7 +101,7 @@ export default function UsersPage() {
         )
     }
 
-    const handleEmailReset = (user: User) => issueToken.mutate({ id: user.id, send: true })
+    const handleEmailReset = (user: User) => issueToken.mutate({ id: user.id, send: true, locale: uiLocale })
 
     const columns = createUserColumns({
         onDelete: (id) => deleteUser.mutate(id),

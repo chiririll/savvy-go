@@ -96,7 +96,7 @@ func TestCanRequireNeedsMailURLAdmin(t *testing.T) {
 
 func TestSendEmailsLinkThatConfirmsAddress(t *testing.T) {
 	e := newVerifyEnv(t, "https://app.test", true)
-	if why := e.v.Send(e.ctx, e.user); why != "" {
+	if why := e.v.Send(e.ctx, "en", e.user); why != "" {
 		t.Fatalf("Send: %s", why)
 	}
 	if len(e.rec.sent) != 1 || e.rec.sent[0].To != "ann@test.com" {
@@ -124,16 +124,16 @@ func TestSendEmailsLinkThatConfirmsAddress(t *testing.T) {
 
 func TestSendSaysWhyItCannot(t *testing.T) {
 	off := newVerifyEnv(t, "https://app.test", false)
-	if why := off.v.Send(off.ctx, off.user); !strings.Contains(why, "Mail is not configured") {
+	if why := off.v.Send(off.ctx, "en", off.user); !strings.Contains(why, "Mail is not configured") {
 		t.Errorf("mail off: %q", why)
 	}
 	noURL := newVerifyEnv(t, "", true)
-	if why := noURL.v.Send(noURL.ctx, noURL.user); why != NoAppURLMessage || len(noURL.rec.sent) != 0 {
+	if why := noURL.v.Send(noURL.ctx, "en", noURL.user); why != NoAppURLMessage || len(noURL.rec.sent) != 0 {
 		t.Errorf("no URL: %q", why)
 	}
 	broken := newVerifyEnv(t, "https://app.test", true)
 	broken.rec.fail = errors.New("connection refused")
-	if why := broken.v.Send(broken.ctx, broken.user); !strings.Contains(why, "connection refused") {
+	if why := broken.v.Send(broken.ctx, "en", broken.user); !strings.Contains(why, "connection refused") {
 		t.Errorf("a failing server: %q", why)
 	}
 }

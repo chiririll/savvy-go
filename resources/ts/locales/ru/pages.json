@@ -169,6 +169,10 @@
         "dateTo": "По",
         "categories": "Категории",
         "tags": "Теги",
+        "accounts": "Счета",
+        "currencies": "Валюты",
+        "search": "Поиск",
+        "searchPlaceholder": "Поиск по транзакциям",
         "sort": {
             "dateNewest": "Дата (сначала новые)",
             "dateOldest": "Дата (сначала старые)",
@@ -206,7 +210,16 @@
             "transfer_in": "Из другого пространства"
         },
         "deleteTitle": "Удалить транзакцию?",
-        "deleteDescription": "Это действие нельзя отменить."
+        "deleteDescription": "Это действие нельзя отменить.",
+        "palette": {
+            "title": "Поиск по транзакциям",
+            "description": "Введите слова или ключи, например account:Карта или tags:еда,кофе. Выбирайте результат стрелками.",
+            "placeholder": "Поиск или фильтр: account:Карта tags:еда",
+            "empty": "Ничего не найдено",
+            "totals": "Доходы {{income}} · Расходы {{expense}}",
+            "showAll": "Показать все: {{count, plural(one: # транзакция; few: # транзакции; other: # транзакций)}}",
+            "keys": "Tab дополнить · ↑↓ выбор · Enter открыть · Ctrl+Enter показать все"
+        }
     },
     "recurring": {
         "title": "Регулярные платежи",
@@ -369,6 +382,7 @@
             "today": "Сегодня",
             "total": "Итого",
             "sources": "Источники",
+            "selectAll": "Выбрать все",
             "day": "День {{day}}",
             "budgetLabel": "Бюджет: {{amount}}",
             "savings": "Сбережения"
@@ -476,7 +490,7 @@
         "balanceDynamics": "Динамика баланса",
         "accountBalances": "Балансы счетов",
         "expensesByCategory": "Расходы по категориям",
-        "largestTransactions": "Крупнейшие транзакции за 30 дней",
+        "largestTransactions": "Крупнейшие транзакции",
         "budgets": "Бюджеты",
         "noBudgets": "Бюджетов пока нет",
         "allExpenses": "Все расходы",

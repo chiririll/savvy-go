@@ -4,7 +4,9 @@ import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { EmailLanguageSelect } from '@/components/shared/appearance/EmailLanguageSelect'
 import { useInviteMethods } from '@/hooks/use-spaces'
+import { toAppLocale, type AppLocale } from '@/lib/i18n'
 import { spaceRoleLabel } from '@/lib/labels'
 import { testId } from '@/lib/test-id'
 import type { SpaceRole } from '@/types/spaces'
@@ -21,13 +23,14 @@ interface Props {
     onEdit?: () => void
     /**
      * Gets what was entered: an address for an invitation by email, or null and
-     * the optional note for a link. Returning false keeps the address in the
-     * field, as after a refusal.
+     * the optional note for a link. `locale` is the language of the email, null for a link.
+     * Returning false keeps the address in the field, as after a refusal.
      */
     onSubmit: (input: {
         email: string | null
         note: string | null
         role: SpaceRole
+        locale: AppLocale | null
     }) => boolean | void | Promise<boolean | void>
 }
 
@@ -37,12 +40,15 @@ interface Props {
  * caller's: a settings page sends it at once, the create-space flow only lists it.
  */
 export function InviteFields({ submitLabel, busy, error, onEdit, onSubmit }: Props) {
-    const { t } = useTranslation('settings')
+    const { t, i18n } = useTranslation('settings')
     const { data: methods } = useInviteMethods()
     const [preferred, setPreferred] = useState<InviteMethod>('email')
     const [email, setEmail] = useState('')
     const [note, setNote] = useState('')
     const [role, setRole] = useState<SpaceRole>('editor')
+    // Not kept between invitations: each email starts from the language of the interface.
+    const [chosen, setChosen] = useState<AppLocale | null>(null)
+    const locale = chosen ?? toAppLocale(i18n.resolvedLanguage ?? i18n.language)
 
     const method = chooseInviteMethod(methods, preferred)
 
@@ -54,6 +60,7 @@ export function InviteFields({ submitLabel, busy, error, onEdit, onSubmit }: Pro
             email: method === 'email' ? email.trim() : null,
             note: method === 'link' ? note.trim() || null : null,
             role,
+            locale: method === 'email' ? locale : null,
         })
         if (keep !== false) {
             setEmail('')
@@ -136,6 +143,12 @@ export function InviteFields({ submitLabel, busy, error, onEdit, onSubmit }: Pro
                     >
                         <Plus className="size-4" />
                     </Button>
+                    {method === 'email' && (
+                        <div className="col-span-full flex items-center gap-2" {...testId('invite-locale')}>
+                            <span className="text-sm text-muted-foreground">{t('common:language.email')}</span>
+                            <EmailLanguageSelect className="w-36" value={locale} onChange={setChosen} />
+                        </div>
+                    )}
                 </form>
             )}
             {error && <p className="text-sm text-destructive">{error}</p>}

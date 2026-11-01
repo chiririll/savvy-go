@@ -357,51 +357,6 @@ func (q *Queries) ListTagsOfTransactions(ctx context.Context, ids []int64) ([]Li
 	return items, nil
 }
 
-const listTransactionSummaryRows = `-- name: ListTransactionSummaryRows :many
-SELECT t.type, t.amount, c.rate, c.is_base, c.decimals
-FROM transactions t
-JOIN accounts a ON a.id = t.account_id
-JOIN currencies c ON c.id = a.currency_id
-WHERE t.status = ? AND t.type IN ('income','expense')
-`
-
-type ListTransactionSummaryRowsRow struct {
-	Type     string
-	Amount   int64
-	Rate     decimal.Decimal
-	IsBase   int64
-	Decimals int64
-}
-
-func (q *Queries) ListTransactionSummaryRows(ctx context.Context, status string) ([]ListTransactionSummaryRowsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listTransactionSummaryRows, status)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListTransactionSummaryRowsRow{}
-	for rows.Next() {
-		var i ListTransactionSummaryRowsRow
-		if err := rows.Scan(
-			&i.Type,
-			&i.Amount,
-			&i.Rate,
-			&i.IsBase,
-			&i.Decimals,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const skipTransaction = `-- name: SkipTransaction :exec
 UPDATE transactions SET status='skipped', updated_at=? WHERE id=?
 `

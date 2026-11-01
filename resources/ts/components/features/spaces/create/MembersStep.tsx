@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import type { AppLocale } from '@/lib/i18n'
 import type { SpaceRole } from '@/types/spaces'
 import { InvitationList } from '../InvitationList'
 import { InvitationRow } from '../InvitationRow'
@@ -21,8 +22,18 @@ export function MembersStep({ invitations, onChange }: Props) {
     const { t } = useTranslation('settings')
     const [problem, setProblem] = useState<'invalid' | 'duplicate' | null>(null)
 
-    const add = ({ email, note, role }: { email: string | null; note: string | null; role: SpaceRole }) => {
-        const next = addInvitation(invitations, { email, note, role })
+    const add = ({
+        email,
+        note,
+        role,
+        locale,
+    }: {
+        email: string | null
+        note: string | null
+        role: SpaceRole
+        locale: AppLocale | null
+    }) => {
+        const next = addInvitation(invitations, { email, note, role, locale })
         if (next === invitations) {
             // addInvitation refuses an address that is not one or is listed already.
             setProblem(

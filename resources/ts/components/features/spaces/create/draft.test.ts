@@ -278,6 +278,11 @@ describe('invitation list', () => {
         expect(list).toHaveLength(1)
     })
 
+    it('keeps the email language of an address, and none for a link', () => {
+        expect(addInvitation([], { email: 'bob@example.org', role: 'editor', locale: 'ru' })[0].locale).toBe('ru')
+        expect(addInvitation([], { email: null, role: 'viewer', locale: 'ru' })[0].locale).toBeNull()
+    })
+
     it('does not add something that is not an address', () => {
         expect(addInvitation([], { email: 'not-an-address', role: 'viewer' })).toEqual([])
     })

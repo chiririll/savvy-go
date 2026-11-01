@@ -14,7 +14,6 @@ import (
 	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/httpserver/httpx/dto"
 	"savvy-go/internal/mail"
-	"savvy-go/internal/mail/smtp"
 	"savvy-go/internal/spaces"
 
 	"github.com/go-chi/chi/v5"
@@ -58,6 +57,8 @@ func (h Handler) invitationsStore(w http.ResponseWriter, r *http.Request) {
 		Email string `json:"email"`
 		Note  string `json:"note"`
 		Role  string `json:"role"`
+		// Language of the email; see mail.Lang. Unknown or empty is English.
+		Locale string `json:"locale"`
 	}
 	if !httpx.DecodeBody(w, r, &body) {
 		return
@@ -101,7 +102,7 @@ func (h Handler) invitationsStore(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteData(w, http.StatusCreated, dto.InvitationCreated{ID: id, Token: token})
 		return
 	}
-	if err := h.emailInvitation(r, body.Email, body.Role, token); err != nil {
+	if err := h.emailInvitation(r, body.Email, body.Role, body.Locale, token); err != nil {
 		// Nobody received it, so it must not hold the address in a cooldown.
 		if derr := h.Spaces.DiscardInvitation(r.Context(), id); derr != nil {
 			slog.Warn("discard unsent invitation", "err", derr)
@@ -112,13 +113,13 @@ func (h Handler) invitationsStore(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteData(w, http.StatusCreated, dto.InvitationCreated{ID: id, EmailSent: true})
 }
 
-func (h Handler) emailInvitation(r *http.Request, to, role, token string) error {
+func (h Handler) emailInvitation(r *http.Request, to, role, lang, token string) error {
 	space, err := h.Spaces.Get(r.Context(), httpx.Scope(r).ID)
 	if err != nil || space == nil {
 		return errors.New("could not read the space")
 	}
 	link := h.Cfg.AppURL() + "/invite/" + token
-	if err := h.Mail.Send(r.Context(), smtp.Invitation(to, httpx.User(r).Name, space.Name, role, link)); err != nil {
+	if err := h.Mail.Send(r.Context(), mail.Invitation(lang, to, httpx.User(r).Name, space.Name, role, link)); err != nil {
 		return errors.New("Could not send the email: " + err.Error())
 	}
 	return nil
@@ -194,18 +195,18 @@ func (h Handler) invitationRegister(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteSpaceError(w, err)
 		return
 	}
-	h.askToConfirmAddress(r.Context(), u)
+	h.askToConfirmAddress(r.Context(), httpx.Locale(r), u)
 	h.Login.Issue(w, r, u, http.StatusCreated, false)
 }
 
 // askToConfirmAddress emails a new account a confirmation link when the
 // instance requires verified addresses and the invitation did not already
 // prove theirs (one that was emailed does).
-func (h Handler) askToConfirmAddress(ctx context.Context, u *auth.User) {
+func (h Handler) askToConfirmAddress(ctx context.Context, lang string, u *auth.User) {
 	if u.EmailVerified || !h.Login.EmailRequired(ctx) {
 		return
 	}
-	if problem := h.Verify.Send(ctx, u); problem != "" {
+	if problem := h.Verify.Send(ctx, lang, u); problem != "" {
 		slog.Warn("send verification email", "problem", problem)
 	}
 }
