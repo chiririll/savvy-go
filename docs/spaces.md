@@ -58,7 +58,7 @@ How it is sent depends on the server:
 | [Email](email-and-security.md#email) set up | email, or a link to copy: you choose |
 | No email | a link to copy |
 
-- **By email**: the link goes only to that address, so only that mailbox can use it, and registering confirms the address. To invite someone else, revoke and invite again.
+- **By email**: the link goes only to that address, so only that mailbox can use it, and registering confirms the address. You choose the language of the email (English or Russian, starting from your interface language). To invite someone else, revoke and invite again.
 - **By link**: you copy it once and send it yourself. Anyone with it can use it, and the new account starts unconfirmed. Instead of an address you can add an optional note (up to 100 characters, such as "Kim from work") to tell links apart in your list.
 - **While creating a space**, people you add are only a list until you finish. Emails go out afterwards and links appear on the last screen. Remove someone before that and nothing is sent.
 - An address cannot be invited to a space it is already invited to or belongs to. After a revoked or expired invitation it cannot be invited again for 1–2 hours; a server admin can end the wait in **Administration → System**.

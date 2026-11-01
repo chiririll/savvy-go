@@ -15,7 +15,7 @@ func (h Handler) verifyEmailResend(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusUnprocessableEntity, "Your email address is already confirmed.")
 		return
 	}
-	if problem := h.Verify.Send(r.Context(), u); problem != "" {
+	if problem := h.Verify.Send(r.Context(), httpx.Locale(r), u); problem != "" {
 		httpx.WriteMessage(w, http.StatusUnprocessableEntity, problem)
 		return
 	}

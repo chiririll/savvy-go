@@ -191,3 +191,42 @@ func TestValidate(t *testing.T) {
 		}
 	}
 }
+
+func TestSendHTMLIsAnAlternativeAfterTheText(t *testing.T) {
+	b := &inbox{}
+	c := serve(t, b, false, false)
+	c.Protocol = Plain
+	m := msg()
+	m.HTML = "<p>Reset your password at <a href=\"https://x.test/set-password/abc\">this link</a></p>"
+	m.Inline = []Inline{{CID: "logo", Name: "logo.png", Type: "image/png", Data: []byte("not really a png")}}
+	if err := New(c).Send(context.Background(), m); err != nil {
+		t.Fatal(err)
+	}
+	got := b.messages()
+	if len(got) != 1 {
+		t.Fatalf("want 1 message, got %d", len(got))
+	}
+	body := got[0].body
+	if !strings.Contains(body, "multipart/alternative") {
+		t.Fatalf("not multipart/alternative:\n%s", body)
+	}
+	text, html, logo := strings.Index(body, "text/plain"), strings.Index(body, "text/html"), strings.Index(body, "Content-Id: <logo>")
+	if text < 0 || html < 0 || text > html {
+		t.Errorf("text must come first (text %d, html %d)", text, html)
+	}
+	if logo < 0 || !strings.Contains(body, "image/png") {
+		t.Errorf("logo is not attached inline:\n%s", body)
+	}
+}
+
+func TestSendWithoutHTMLStaysPlainText(t *testing.T) {
+	b := &inbox{}
+	c := serve(t, b, false, false)
+	c.Protocol = Plain
+	if err := New(c).Send(context.Background(), msg()); err != nil {
+		t.Fatal(err)
+	}
+	if body := b.messages()[0].body; strings.Contains(body, "multipart") {
+		t.Errorf("a text message became multipart:\n%s", body)
+	}
+}
