@@ -21,7 +21,6 @@ import { PeriodPicker } from '@/components/features/dashboard/PeriodPicker'
 import { LargestTransactionsCard } from '@/components/features/dashboard/LargestTransactionsCard'
 import { DashboardStats } from '@/components/features/dashboard/StatCards'
 import {
-    getPresetDates,
     percentChange,
     resolvePeriodDates,
     toReportFilters,
@@ -47,10 +46,9 @@ export default function DashboardPage() {
         [period, customStartDate, customEndDate],
     )
 
-    // Always the last 30 days, whatever the period picker says. The API sorts by amount in the base currency.
-    const largestRange = useMemo(() => getPresetDates('last_30_days'), [])
+    // The API sorts by amount in the base currency.
     const { data: largestTransactions } = useTransactions({
-        ...largestRange,
+        ...periodDates,
         per_page: 5,
         status: 'confirmed',
         sort_by: 'amount',

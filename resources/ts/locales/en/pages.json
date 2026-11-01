@@ -489,7 +489,7 @@
         "balanceDynamics": "Balance dynamics",
         "accountBalances": "Account balances",
         "expensesByCategory": "Expenses by Category",
-        "largestTransactions": "Largest transactions, last 30 days",
+        "largestTransactions": "Largest transactions",
         "budgets": "Budgets",
         "noBudgets": "No budgets yet",
         "allExpenses": "All expenses",
