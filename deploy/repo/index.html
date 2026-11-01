@@ -7,12 +7,12 @@
 <style>
   :root {
     --bg: #f6f8f7; --card: #fff; --text: #17211d; --muted: #5d6b65; --border: #dbe3df;
-    --accent: #0f8a5f; --code-bg: #101815; --code-text: #d7efe4;
+    --accent: #0f8a5f; --tab-bg: #eef3f0; --code-bg: #101815; --code-text: #d7efe4;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #0e1412; --card: #151d1a; --text: #e6efeb; --muted: #93a39b; --border: #25312c;
-      --accent: #3ccf93; --code-bg: #0a0f0d; --code-text: #d7efe4;
+      --accent: #3ccf93; --tab-bg: #1b2521; --code-bg: #0a0f0d; --code-text: #d7efe4;
     }
   }
   * { box-sizing: border-box; }
@@ -20,64 +20,132 @@
     margin: 0; background: var(--bg); color: var(--text);
     font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
-  main { max-width: 860px; margin: 0 auto; padding: 56px 16px 72px; }
+  main { max-width: 760px; margin: 0 auto; padding: 56px 16px 72px; }
   header { margin-bottom: 40px; }
   h1 { margin: 0 0 8px; font-size: 2.2rem; letter-spacing: -0.02em; }
   h1 span { color: var(--accent); }
   .lead { margin: 0; color: var(--muted); font-size: 1.1rem; }
-  .grid { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
-  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; min-width: 0; }
+  .version { margin: 16px 0 0; font-size: 0.95rem; }
+  .version a {
+    display: inline-block; margin-left: 6px; padding: 2px 10px; border: 1px solid var(--border); border-radius: 999px;
+    background: var(--card); font: 600 0.85rem ui-monospace, "SF Mono", Consolas, monospace; text-decoration: none;
+  }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 20px; min-width: 0; }
   h2 { margin: 0 0 4px; font-size: 1.25rem; }
   .for { margin: 0 0 16px; color: var(--muted); font-size: 0.9rem; }
+  [role="tablist"] {
+    display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 16px; padding: 4px;
+    background: var(--tab-bg); border-radius: 10px; width: fit-content; max-width: 100%;
+  }
+  [role="tab"] {
+    display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border: 0; border-radius: 7px;
+    background: none; color: var(--muted); font: 500 0.9rem system-ui, sans-serif; cursor: pointer;
+  }
+  [role="tab"]:hover { color: var(--text); }
+  [role="tab"][aria-selected="true"] { background: var(--card); color: var(--text); box-shadow: 0 1px 3px #0000001f; }
+  [role="tab"][aria-selected="true"] svg { color: var(--accent); }
+  [role="tab"] svg { width: 16px; height: 16px; flex: none; fill: currentColor; }
   .code { position: relative; margin: 0 0 12px; }
   pre {
     margin: 0; padding: 14px 16px; overflow-x: auto; border-radius: 8px;
     background: var(--code-bg); color: var(--code-text); font: 0.85rem/1.5 ui-monospace, "SF Mono", Consolas, monospace;
   }
-  button {
+  .copy {
     position: absolute; top: 8px; right: 8px; padding: 3px 9px; border: 1px solid #ffffff33; border-radius: 6px;
     background: #ffffff14; color: var(--code-text); font: 0.75rem system-ui, sans-serif; cursor: pointer;
   }
-  button:hover { background: #ffffff2b; }
+  .copy:hover { background: #ffffff2b; }
   .step { margin: 16px 0 6px; font-weight: 600; font-size: 0.9rem; }
+  .hint { margin: 12px 0 0; color: var(--muted); font-size: 0.9rem; }
   .note { margin: 40px 0 0; color: var(--muted); font-size: 0.9rem; }
   a { color: var(--accent); }
 </style>
 </head>
 <body>
+<!-- Simple Icons (CC0), simpleicons.org -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-debian" viewBox="0 0 24 24"><path d="M13.88 12.685c-.4 0 .08.2.601.28.14-.1.27-.22.39-.33a3.001 3.001 0 01-.99.05m2.14-.53c.23-.33.4-.69.47-1.06-.06.27-.2.5-.33.73-.75.47-.07-.27 0-.56-.8 1.01-.11.6-.14.89m.781-2.05c.05-.721-.14-.501-.2-.221.07.04.13.5.2.22M12.38.31c.2.04.45.07.42.12.23-.05.28-.1-.43-.12m.43.12l-.15.03.14-.01V.43m6.633 9.944c.02.64-.2.95-.38 1.5l-.35.181c-.28.54.03.35-.17.78-.44.39-1.34 1.22-1.62 1.301-.201 0 .14-.25.19-.34-.591.4-.481.6-1.371.85l-.03-.06c-2.221 1.04-5.303-1.02-5.253-3.842-.03.17-.07.13-.12.2a3.551 3.552 0 012.001-3.501 3.361 3.362 0 013.732.48 3.341 3.342 0 00-2.721-1.3c-1.18.01-2.281.76-2.651 1.57-.6.38-.67 1.47-.93 1.661-.361 2.601.66 3.722 2.38 5.042.27.19.08.21.12.35a4.702 4.702 0 01-1.53-1.16c.23.33.47.66.8.91-.55-.18-1.27-1.3-1.48-1.35.93 1.66 3.78 2.921 5.261 2.3a6.203 6.203 0 01-2.33-.28c-.33-.16-.77-.51-.7-.57a5.802 5.803 0 005.902-.84c.44-.35.93-.94 1.07-.95-.2.32.04.16-.12.44.44-.72-.2-.3.46-1.24l.24.33c-.09-.6.74-1.321.66-2.262.19-.3.2.3 0 .97.29-.74.08-.85.15-1.46.08.2.18.42.23.63-.18-.7.2-1.2.28-1.6-.09-.05-.28.3-.32-.53 0-.37.1-.2.14-.28-.08-.05-.26-.32-.38-.861.08-.13.22.33.34.34-.08-.42-.2-.75-.2-1.08-.34-.68-.12.1-.4-.3-.34-1.091.3-.25.34-.74.54.77.84 1.96.981 2.46-.1-.6-.28-1.2-.49-1.76.16.07-.26-1.241.21-.37A7.823 7.824 0 0017.702 1.6c.18.17.42.39.33.42-.75-.45-.62-.48-.73-.67-.61-.25-.65.02-1.06 0C15.082.73 14.862.8 13.8.4l.05.23c-.77-.25-.9.1-1.73 0-.05-.04.27-.14.53-.18-.741.1-.701-.14-1.431.03.17-.13.36-.21.55-.32-.6.04-1.44.35-1.18.07C9.6.68 7.847 1.3 6.867 2.22L6.838 2c-.45.54-1.96 1.611-2.08 2.311l-.131.03c-.23.4-.38.85-.57 1.261-.3.52-.45.2-.4.28-.6 1.22-.9 2.251-1.16 3.102.18.27 0 1.65.07 2.76-.3 5.463 3.84 10.776 8.363 12.006.67.23 1.65.23 2.49.25-.99-.28-1.12-.15-2.08-.49-.7-.32-.85-.7-1.34-1.13l.2.35c-.971-.34-.57-.42-1.361-.67l.21-.27c-.31-.03-.83-.53-.97-.81l-.34.01c-.41-.501-.63-.871-.61-1.161l-.111.2c-.13-.21-1.52-1.901-.8-1.511-.13-.12-.31-.2-.5-.55l.14-.17c-.35-.44-.64-1.02-.62-1.2.2.24.32.3.45.33-.88-2.172-.93-.12-1.601-2.202l.15-.02c-.1-.16-.18-.34-.26-.51l.06-.6c-.63-.74-.18-3.102-.09-4.402.07-.54.53-1.1.88-1.981l-.21-.04c.4-.71 2.341-2.872 3.241-2.761.43-.55-.09 0-.18-.14.96-.991 1.26-.7 1.901-.88.7-.401-.6.16-.27-.151 1.2-.3.85-.7 2.421-.85.16.1-.39.14-.52.26 1-.49 3.151-.37 4.562.27 1.63.77 3.461 3.011 3.531 5.132l.08.02c-.04.85.13 1.821-.17 2.711l.2-.42M9.54 13.236l-.05.28c.26.35.47.73.8 1.01-.24-.47-.42-.66-.75-1.3m.62-.02c-.14-.15-.22-.34-.31-.52.08.32.26.6.43.88l-.12-.36m10.945-2.382l-.07.15c-.1.76-.34 1.511-.69 2.212.4-.73.65-1.541.75-2.362M12.45.12c.27-.1.66-.05.95-.12-.37.03-.74.05-1.1.1l.15.02M3.006 5.142c.07.57-.43.8.11.42.3-.66-.11-.18-.1-.42m-.64 2.661c.12-.39.15-.62.2-.84-.35.44-.17.53-.2.83"/></symbol>
+  <symbol id="i-ubuntu" viewBox="0 0 24 24"><path d="M17.61.455a3.41 3.41 0 0 0-3.41 3.41 3.41 3.41 0 0 0 3.41 3.41 3.41 3.41 0 0 0 3.41-3.41 3.41 3.41 0 0 0-3.41-3.41zM12.92.8C8.923.777 5.137 2.941 3.148 6.451a4.5 4.5 0 0 1 .26-.007 4.92 4.92 0 0 1 2.585.737A8.316 8.316 0 0 1 12.688 3.6 4.944 4.944 0 0 1 13.723.834 11.008 11.008 0 0 0 12.92.8zm9.226 4.994a4.915 4.915 0 0 1-1.918 2.246 8.36 8.36 0 0 1-.273 8.303 4.89 4.89 0 0 1 1.632 2.54 11.156 11.156 0 0 0 .559-13.089zM3.41 7.932A3.41 3.41 0 0 0 0 11.342a3.41 3.41 0 0 0 3.41 3.409 3.41 3.41 0 0 0 3.41-3.41 3.41 3.41 0 0 0-3.41-3.41zm2.027 7.866a4.908 4.908 0 0 1-2.915.358 11.1 11.1 0 0 0 7.991 6.698 11.234 11.234 0 0 0 2.422.249 4.879 4.879 0 0 1-.999-2.85 8.484 8.484 0 0 1-.836-.136 8.304 8.304 0 0 1-5.663-4.32zm11.405.928a3.41 3.41 0 0 0-3.41 3.41 3.41 3.41 0 0 0 3.41 3.41 3.41 3.41 0 0 0 3.41-3.41 3.41 3.41 0 0 0-3.41-3.41z"/></symbol>
+  <symbol id="i-fedora" viewBox="0 0 24 24"><path d="M12.001 0C5.376 0 .008 5.369.004 11.992H.002v9.287h.002A2.726 2.726 0 0 0 2.73 24h9.275c6.626-.004 11.993-5.372 11.993-11.997C23.998 5.375 18.628 0 12 0zm2.431 4.94c2.015 0 3.917 1.543 3.917 3.671 0 .197.001.395-.03.619a1.002 1.002 0 0 1-1.137.893 1.002 1.002 0 0 1-.842-1.175 2.61 2.61 0 0 0 .013-.337c0-1.207-.987-1.672-1.92-1.672-.934 0-1.775.784-1.777 1.672.016 1.027 0 2.046 0 3.07l1.732-.012c1.352-.028 1.368 2.009.016 1.998l-1.748.013c-.004.826.006.677.002 1.093 0 0 .015 1.01-.016 1.776-.209 2.25-2.124 4.046-4.424 4.046-2.438 0-4.448-1.993-4.448-4.437.073-2.515 2.078-4.492 4.603-4.469l1.409-.01v1.996l-1.409.013h-.007c-1.388.04-2.577.984-2.6 2.47a2.438 2.438 0 0 0 2.452 2.439c1.356 0 2.441-.987 2.441-2.437l-.001-7.557c0-.14.005-.252.02-.407.23-1.848 1.883-3.256 3.754-3.256z"/></symbol>
+  <symbol id="i-redhat" viewBox="0 0 24 24"><path d="M16.009 13.386c1.577 0 3.86-.326 3.86-2.202a1.765 1.765 0 0 0-.04-.431l-.94-4.08c-.216-.898-.406-1.305-1.982-2.093-1.223-.625-3.888-1.658-4.676-1.658-.733 0-.947.946-1.822.946-.842 0-1.467-.706-2.255-.706-.757 0-1.25.515-1.63 1.576 0 0-1.06 2.99-1.197 3.424a.81.81 0 0 0-.028.245c0 1.162 4.577 4.974 10.71 4.974m4.101-1.435c.218 1.032.218 1.14.218 1.277 0 1.765-1.984 2.745-4.593 2.745-5.895.004-11.06-3.451-11.06-5.734a2.326 2.326 0 0 1 .19-.925C2.746 9.415 0 9.794 0 12.217c0 3.969 9.405 8.861 16.851 8.861 5.71 0 7.149-2.582 7.149-4.62 0-1.605-1.387-3.425-3.887-4.512"/></symbol>
+  <symbol id="i-opensuse" viewBox="0 0 24 24"><path d="M10.724 0a12 12 0 0 0-9.448 4.623c1.464.391 2.5.727 2.81.832.005-.19.037-1.893.037-1.893s.004-.04.025-.06c.026-.026.065-.018.065-.018.385.056 8.602 1.274 12.066 3.292.427.25.638.517.902.786.958.99 2.223 5.108 2.359 5.957.005.033-.036.07-.054.083a5.177 5.177 0 0 1-.313.228c-.82.55-2.708 1.872-5.13 1.656-2.176-.193-5.018-1.44-8.445-3.699.336.79.668 1.58 1 2.371.497.258 5.287 2.7 7.651 2.651 1.904-.04 3.941-.968 4.756-1.458 0 0 .179-.108.257-.048.085.066.061.167.041.27-.05.234-.164.66-.242.863l-.065.165c-.093.25-.183.482-.356.625-.48.436-1.246.784-2.446 1.305-1.855.812-4.865 1.328-7.66 1.31-1.001-.022-1.968-.133-2.817-.232-1.743-.197-3.161-.357-4.026.269A12 12 0 0 0 10.724 24a12 12 0 0 0 12-12 12 12 0 0 0-12-12zM13.4 6.963a3.503 3.503 0 0 0-2.521.942 3.498 3.498 0 0 0-1.114 2.449 3.528 3.528 0 0 0 3.39 3.64 3.48 3.48 0 0 0 2.524-.946 3.504 3.504 0 0 0 1.114-2.446 3.527 3.527 0 0 0-3.393-3.64zm-.03 1.035a2.458 2.458 0 0 1 2.368 2.539 2.43 2.43 0 0 1-.774 1.706 2.456 2.456 0 0 1-1.762.659 2.461 2.461 0 0 1-2.364-2.542c.02-.655.3-1.26.777-1.707a2.419 2.419 0 0 1 1.756-.655zm.402 1.23c-.602 0-1.087.325-1.087.727 0 .4.485.725 1.087.725.6 0 1.088-.326 1.088-.725 0-.402-.487-.726-1.088-.726Z"/></symbol>
+</svg>
 <main>
   <header>
     <h1>Go <span>Savvy</span> packages</h1>
     <p class="lead">Install Go Savvy from a signed apt or dnf repository, and get new versions with your regular system updates.</p>
+    <p class="version">Latest version <a href="https://github.com/@REPO@/releases/tag/@VERSION@">@VERSION@</a></p>
   </header>
 
-  <div class="grid">
-    <section class="card">
-      <h2>Debian &amp; Ubuntu</h2>
-      <p class="for">apt, amd64. Debian 13 or later.</p>
-      <p class="step">1. Add the repository</p>
-      <div class="code"><pre>sudo install -d -m 0755 /etc/apt/keyrings
+  <section class="card">
+    <h2>Quick install</h2>
+    <p class="for">Debian, Ubuntu, Fedora, RHEL and openSUSE on x86_64.</p>
+    <div class="tabs" data-remember="fetch">
+      <div role="tablist" aria-label="Download tool">
+        <button role="tab" data-tab="curl">curl</button>
+        <button role="tab" data-tab="wget">wget</button>
+      </div>
+      <div role="tabpanel" data-tab="curl">
+        <div class="code"><pre>curl -fsSL @SITE_URL@/install.sh | sudo sh</pre></div>
+      </div>
+      <div role="tabpanel" data-tab="wget">
+        <div class="code"><pre>wget -qO- @SITE_URL@/install.sh | sudo sh</pre></div>
+      </div>
+    </div>
+    <p class="hint">The <a href="install.sh">script</a> detects apt, dnf or zypper, adds the repository and installs <code>savvy-go</code>. Run it again to reinstall; updates come with your system updates.</p>
+  </section>
+
+  <section class="card">
+    <h2>Manual setup</h2>
+    <p class="for">The same steps, one command at a time.</p>
+    <div class="tabs" data-remember="os">
+      <div role="tablist" aria-label="Distribution">
+        <button role="tab" data-tab="apt">
+          <svg aria-hidden="true"><use href="#i-debian"/></svg><svg aria-hidden="true"><use href="#i-ubuntu"/></svg>Debian &amp; Ubuntu
+        </button>
+        <button role="tab" data-tab="dnf">
+          <svg aria-hidden="true"><use href="#i-fedora"/></svg><svg aria-hidden="true"><use href="#i-redhat"/></svg>Fedora &amp; RHEL
+        </button>
+        <button role="tab" data-tab="zypper">
+          <svg aria-hidden="true"><use href="#i-opensuse"/></svg>openSUSE
+        </button>
+      </div>
+
+      <div role="tabpanel" data-tab="apt">
+        <p class="for">apt, amd64. Debian 13 or later.</p>
+        <p class="step">1. Add the repository</p>
+        <div class="code"><pre>sudo install -d -m 0755 /etc/apt/keyrings
 sudo curl -fsSLo /etc/apt/keyrings/savvy-go.asc @SITE_URL@/savvy-go.asc
 echo "deb [signed-by=/etc/apt/keyrings/savvy-go.asc] @SITE_URL@/apt stable main" \
   | sudo tee /etc/apt/sources.list.d/savvy-go.list</pre></div>
-      <p class="step">2. Install</p>
-      <div class="code"><pre>sudo apt update
+        <p class="step">2. Install</p>
+        <div class="code"><pre>sudo apt update
 sudo apt install savvy-go</pre></div>
-      <p class="step">Update</p>
-      <div class="code"><pre>sudo apt update &amp;&amp; sudo apt upgrade savvy-go</pre></div>
-    </section>
+        <p class="step">Update</p>
+        <div class="code"><pre>sudo apt update &amp;&amp; sudo apt upgrade savvy-go</pre></div>
+      </div>
 
-    <section class="card">
-      <h2>Fedora, RHEL &amp; openSUSE</h2>
-      <p class="for">dnf, x86_64.</p>
-      <p class="step">1. Add the repository</p>
-      <div class="code"><pre>sudo curl -fsSLo /etc/yum.repos.d/savvy-go.repo @SITE_URL@/savvy-go.repo</pre></div>
-      <p class="step">2. Install</p>
-      <div class="code"><pre>sudo dnf install savvy-go</pre></div>
-      <p class="step">Update</p>
-      <div class="code"><pre>sudo dnf upgrade savvy-go</pre></div>
-    </section>
-  </div>
+      <div role="tabpanel" data-tab="dnf">
+        <p class="for">dnf, x86_64.</p>
+        <p class="step">1. Add the repository</p>
+        <div class="code"><pre>sudo curl -fsSLo /etc/yum.repos.d/savvy-go.repo @SITE_URL@/savvy-go.repo</pre></div>
+        <p class="step">2. Install</p>
+        <div class="code"><pre>sudo dnf install savvy-go</pre></div>
+        <p class="step">Update</p>
+        <div class="code"><pre>sudo dnf upgrade savvy-go</pre></div>
+      </div>
+
+      <div role="tabpanel" data-tab="zypper">
+        <p class="for">zypper, x86_64.</p>
+        <p class="step">1. Add the repository</p>
+        <div class="code"><pre>sudo zypper addrepo --refresh @SITE_URL@/savvy-go.repo</pre></div>
+        <p class="step">2. Install</p>
+        <div class="code"><pre>sudo zypper install savvy-go</pre></div>
+        <p class="step">Update</p>
+        <div class="code"><pre>sudo zypper refresh &amp;&amp; sudo zypper update savvy-go</pre></div>
+      </div>
+    </div>
+  </section>
 
   <p class="note">
     After installing, Go Savvy runs as the <code>savvy-go</code> service on <code>127.0.0.1:8080</code>.
@@ -87,8 +155,28 @@ sudo apt install savvy-go</pre></div>
   </p>
 </main>
 <script>
+  document.querySelectorAll(".tabs").forEach(function (box) {
+    var tabs = box.querySelectorAll('[role="tab"]');
+    var panels = box.querySelectorAll('[role="tabpanel"]');
+    var key = "tab-" + box.dataset.remember;
+    function show(name) {
+      tabs.forEach(function (t) { t.setAttribute("aria-selected", t.dataset.tab === name); });
+      panels.forEach(function (p) { p.hidden = p.dataset.tab !== name; });
+    }
+    tabs.forEach(function (t) {
+      t.addEventListener("click", function () {
+        show(t.dataset.tab);
+        try { localStorage.setItem(key, t.dataset.tab); } catch (e) {}
+      });
+    });
+    var saved = null;
+    try { saved = localStorage.getItem(key); } catch (e) {}
+    show(box.querySelector('[data-tab="' + saved + '"]') ? saved : tabs[0].dataset.tab);
+  });
+
   document.querySelectorAll(".code").forEach(function (box) {
     var btn = document.createElement("button");
+    btn.className = "copy";
     btn.textContent = "Copy";
     btn.addEventListener("click", function () {
       navigator.clipboard.writeText(box.querySelector("pre").textContent).then(function () {
