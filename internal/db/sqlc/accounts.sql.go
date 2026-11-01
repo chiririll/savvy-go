@@ -349,12 +349,15 @@ JOIN currencies c ON c.id = a.currency_id
 WHERE a.is_active = COALESCE(?1, a.is_active)
   AND CASE WHEN a.is_service THEN 1 ELSE 0 END
       <= CASE WHEN CAST(?2 AS INTEGER) IS NULL THEN 1 ELSE 0 END
+  AND CASE WHEN a.type = 'space' THEN 1 ELSE 0 END
+      <= CASE WHEN CAST(?3 AS INTEGER) IS NULL THEN 1 ELSE 0 END
 ORDER BY CASE a.type WHEN 'debt' THEN 1 WHEN 'space' THEN 2 ELSE 0 END, a.sort_order, a.id
 `
 
 type ListAccountsParams struct {
 	OnlyActive     sql.NullInt64
 	ExcludeService sql.NullInt64
+	ExcludeSpace   sql.NullInt64
 }
 
 type ListAccountsRow struct {
@@ -377,9 +380,10 @@ type ListAccountsRow struct {
 }
 
 // exclude_service leaves out debt and space accounts: that is the list a picker
-// offers and the one net worth sums.
+// offers. exclude_space leaves out only the space accounts: net worth counts
+// debts but not the money that went to other spaces.
 func (q *Queries) ListAccounts(ctx context.Context, arg ListAccountsParams) ([]ListAccountsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listAccounts, arg.OnlyActive, arg.ExcludeService)
+	rows, err := q.db.QueryContext(ctx, listAccounts, arg.OnlyActive, arg.ExcludeService, arg.ExcludeSpace)
 	if err != nil {
 		return nil, err
 	}

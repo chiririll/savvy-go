@@ -237,11 +237,7 @@ func TestBudgetsKeepTheirCurrencyScope(t *testing.T) {
 	}
 }
 
-// The two tests below need categories.sql, which still reads the v1.0 columns
-// until task 3 of docs/plans/db-rework-tasks.md.
-
 func TestReplacingACategoryMovesItsLines(t *testing.T) {
-	t.Skip("task 3: categories.sql still reads the old schema")
 	f := newFixture(t)
 	other, _ := f.repo.InsertCategory(ctx, ledgerrepo.Category{Name: "Other", Type: "expense"}, time.Now().UTC())
 	tx := f.expense(t, f.cash, 100, "2026-01-02")
@@ -257,7 +253,6 @@ func TestReplacingACategoryMovesItsLines(t *testing.T) {
 }
 
 func TestCategoryStatisticsGroupsByCurrency(t *testing.T) {
-	t.Skip("task 3: categories.sql still reads the old schema")
 	f := newFixture(t)
 	f.expense(t, f.cash, 1000, "2026-01-02")
 	f.expense(t, f.yen, 500, "2026-01-03")

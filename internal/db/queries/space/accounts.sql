@@ -8,7 +8,8 @@ WHERE a.id = ?;
 
 -- name: ListAccounts :many
 -- exclude_service leaves out debt and space accounts: that is the list a picker
--- offers and the one net worth sums.
+-- offers. exclude_space leaves out only the space accounts: net worth counts
+-- debts but not the money that went to other spaces.
 SELECT a.id, a.name, a.type, a.is_service, a.currency_id, a.initial_balance, a.is_active, a.sort_order, a.created_at,
 	c.id AS currency_id_join, c.code, c.name AS currency_name, c.symbol, c.decimals, c.is_base, c.rate
 FROM accounts a
@@ -16,6 +17,8 @@ JOIN currencies c ON c.id = a.currency_id
 WHERE a.is_active = COALESCE(sqlc.narg('only_active'), a.is_active)
   AND CASE WHEN a.is_service THEN 1 ELSE 0 END
       <= CASE WHEN CAST(sqlc.narg('exclude_service') AS INTEGER) IS NULL THEN 1 ELSE 0 END
+  AND CASE WHEN a.type = 'space' THEN 1 ELSE 0 END
+      <= CASE WHEN CAST(sqlc.narg('exclude_space') AS INTEGER) IS NULL THEN 1 ELSE 0 END
 ORDER BY CASE a.type WHEN 'debt' THEN 1 WHEN 'space' THEN 2 ELSE 0 END, a.sort_order, a.id;
 
 -- name: NextAccountSortOrder :one

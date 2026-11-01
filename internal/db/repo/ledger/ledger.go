@@ -221,12 +221,12 @@ func accountOf(x accountRow) Account {
 func MoneyFromNull(v db.NInt, unit money.Unit) *money.Money { return db.MoneyFromNull(v, unit) }
 
 // AccountFilter narrows Accounts; the zero value lists all. ExcludeService
-// leaves out debt and space accounts.
-type AccountFilter struct{ OnlyActive, ExcludeService bool }
+// leaves out debt and space accounts, ExcludeSpace only the space accounts.
+type AccountFilter struct{ OnlyActive, ExcludeService, ExcludeSpace bool }
 
 func (r Repo) Accounts(ctx context.Context, f AccountFilter) ([]Account, error) {
 	rows, err := r.q().ListAccounts(ctx, sqlc.ListAccountsParams{
-		OnlyActive: db.Flag(f.OnlyActive), ExcludeService: db.Flag(f.ExcludeService),
+		OnlyActive: db.Flag(f.OnlyActive), ExcludeService: db.Flag(f.ExcludeService), ExcludeSpace: db.Flag(f.ExcludeSpace),
 	})
 	if err != nil {
 		return nil, err

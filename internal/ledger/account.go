@@ -84,6 +84,25 @@ func (s Accounts) All(ctx context.Context, onlyActive, excludeService bool) ([]A
 	return out, nil
 }
 
+// ForNetWorth lists the active accounts that make up net worth: the ordinary
+// accounts and the debts (an asset when owed to the user, a liability when the
+// user owes), not the space accounts, which stand for money that left the
+// space.
+func (s Accounts) ForNetWorth(ctx context.Context) ([]Account, error) {
+	rows, err := s.repo().Accounts(ctx, repo.AccountFilter{OnlyActive: true, ExcludeSpace: true})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Account, len(rows))
+	for i, r := range rows {
+		out[i] = accountFrom(r)
+		if out[i].Balance, err = s.Balance(ctx, out[i], ""); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
 func (s Accounts) ByID(ctx context.Context, id int64) (*Account, error) {
 	row, err := s.repo().Account(ctx, id)
 	if row == nil || err != nil {
