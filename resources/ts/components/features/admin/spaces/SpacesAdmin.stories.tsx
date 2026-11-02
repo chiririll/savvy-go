@@ -113,7 +113,7 @@ export const AdminAssigned: Story = {
         // A guest cannot administer a space.
         await expect(await screen.findAllByRole('option')).toHaveLength(2)
         await userEvent.click(screen.getByRole('option', { name: 'Alex' }))
-        await userEvent.click(canvas.getByRole('button', { name: /make admin/i }))
+        await userEvent.click(await canvas.findByRole('button', { name: /make admin/i }))
         await waitFor(() => expect(sent.bodies).toEqual([{ user_id: 2 }]))
         await expect(await screen.findByText('Admin assigned')).toBeVisible()
     },
