@@ -13,7 +13,7 @@ export default defineConfig(({ mode }) => {
         publicDir: false,
         resolve: {
             alias: {
-                '@': path.resolve(__dirname, './resources/ts'),
+                '@': path.resolve(import.meta.dirname, './resources/ts'),
             },
         },
         define: {
@@ -27,7 +27,7 @@ export default defineConfig(({ mode }) => {
             manifest: true,
             chunkSizeWarningLimit: 800,
             rollupOptions: {
-                input: path.resolve(__dirname, 'resources/ts/main.tsx'),
+                input: path.resolve(import.meta.dirname, 'resources/ts/main.tsx'),
                 output: {
                     manualChunks(id) {
                         if (/node_modules\/(react|react-dom|react-router|react-router-dom|scheduler)\//.test(id)) return 'react'

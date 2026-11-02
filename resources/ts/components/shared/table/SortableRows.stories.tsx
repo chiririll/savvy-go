@@ -1,11 +1,12 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { getCoreRowModel, useReactTable } from '@tanstack/react-table'
+import { useTable } from '@tanstack/react-table'
 import { expect, fn, userEvent, within } from 'storybook/test'
 
 import { Table, TableBody } from '@/components/ui/table'
 
 import { SortableRows } from './SortableRows'
 import { SortableTableRow } from './SortableTableRow'
+import { appTableFeatures } from './table-features'
 
 type Item = { id: number; name: string }
 
@@ -16,10 +17,10 @@ const items: Item[] = [
 ]
 
 const List = ({ data, onReorder }: { data: Item[]; onReorder: (items: Item[]) => void }) => {
-    const table = useReactTable({
+    const table = useTable({
+        features: appTableFeatures,
         data,
         columns: [{ accessorKey: 'name', header: 'Name' }],
-        getCoreRowModel: getCoreRowModel(),
         getRowId: (row) => String(row.id),
     })
     return (

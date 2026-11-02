@@ -1,35 +1,30 @@
 import { createElement, Fragment } from 'react'
 import { SortableRows, getItemId } from './SortableRows'
 import { cn } from '@/lib/utils'
-import {
-    ColumnDef,
-    flexRender,
-    getCoreRowModel,
-    getPaginationRowModel,
-    useReactTable,
-    Row,
-    getExpandedRowModel,
-} from '@tanstack/react-table'
+import { flexRender, useTable } from '@tanstack/react-table'
+import type { RowData } from '@tanstack/react-table'
+import { appTableFeatures } from './table-features'
+import type { AppColumnDef, AppRow } from './table-features'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useTranslation } from 'react-i18next'
 import { DataTableSkeleton, DataTableEmpty, DataTablePagination } from './DataTableParts'
 import { SortableTableRow } from './SortableTableRow'
 
-interface DataTableProps<T> {
+interface DataTableProps<T extends RowData> {
     data: T[]
-    columns: ColumnDef<T>[]
+    columns: AppColumnDef<T>[]
     isLoading?: boolean
     emptyTitle?: string
     emptyDescription?: string
     emptyAction?: React.ReactNode
-    renderSubComponent?: (props: { row: Row<T> }) => React.ReactNode
-    getRowCanExpand?: (row: Row<T>) => boolean
-    getRowClassName?: (row: Row<T>) => string | undefined
+    renderSubComponent?: (props: { row: AppRow<T> }) => React.ReactNode
+    getRowCanExpand?: (row: AppRow<T>) => boolean
+    getRowClassName?: (row: AppRow<T>) => string | undefined
     manualPagination?: boolean
     onReorder?: (items: T[]) => void
 }
 
-export function DataTable<T>({
+export function DataTable<T extends RowData>({
     data,
     columns,
     isLoading,
@@ -47,12 +42,10 @@ export function DataTable<T>({
     const emptyDescription = emptyDescriptionProp ?? t('table.emptyDescription')
     const isReorderable = !!onReorder
     const disablePagination = manualPagination || isReorderable
-    const table = useReactTable({
+    const table = useTable({
+        features: appTableFeatures,
         data,
         columns,
-        getCoreRowModel: getCoreRowModel(),
-        getPaginationRowModel: disablePagination ? undefined : getPaginationRowModel(),
-        getExpandedRowModel: getExpandedRowModel(),
         getRowCanExpand,
         getRowId: isReorderable ? (row) => getItemId(row) : undefined,
         manualPagination: disablePagination,

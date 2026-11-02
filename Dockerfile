@@ -2,7 +2,7 @@ ARG APP_VERSION=dev
 ARG APP_ENV=production
 
 # Build the frontend
-FROM --platform=$BUILDPLATFORM node:24-alpine AS frontend
+FROM --platform=$BUILDPLATFORM node:26-alpine AS frontend
 ARG APP_VERSION
 ARG APP_ENV
 ENV APP_VERSION=${APP_VERSION}

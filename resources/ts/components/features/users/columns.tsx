@@ -1,4 +1,4 @@
-import { ColumnDef } from '@tanstack/react-table'
+import type { AppColumnDef } from '@/components/shared/table/table-features'
 import { KeyRound, Mail, MailCheck, MailX } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
@@ -30,7 +30,7 @@ export const createUserColumns = ({
     onEmailReset,
     onSetEmailVerified,
     showUnverified,
-}: UserColumnsOptions): ColumnDef<User>[] => [
+}: UserColumnsOptions): AppColumnDef<User>[] => [
     {
         accessorKey: 'name',
         header: () => i18n.t('pages:users.columns.user'),

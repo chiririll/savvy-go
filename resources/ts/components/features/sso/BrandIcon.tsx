@@ -1,6 +1,5 @@
 import { CSSProperties } from 'react'
 import { siGithub, siGoogle, siOkta, siGitlab, siKeycloak, siAuthentik } from 'simple-icons'
-import microsoftLogo from '@/assets/brands/microsoft.svg'
 import { cn } from '@/lib/utils'
 import { presetIcon } from './presetMeta'
 
@@ -67,10 +66,6 @@ interface BrandIconProps {
 }
 
 export function BrandIcon({ preset, className }: BrandIconProps) {
-    if (preset === 'entra') {
-        return <img src={microsoftLogo} className={className} alt="Microsoft" />
-    }
-
     const icon = SIMPLE_ICONS[preset]
     if (icon) {
         const mono = MONOCHROME.has(preset)

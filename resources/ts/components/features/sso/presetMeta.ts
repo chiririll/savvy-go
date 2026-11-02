@@ -1,9 +1,9 @@
 import {
-    Github,
     Globe,
     Cloud,
     ShieldCheck,
     GitBranch,
+    GitFork,
     KeyRound,
     Fingerprint,
     Network,
@@ -65,7 +65,7 @@ export function ssoFieldPlaceholder(field: PresetField, t: TFunction): string | 
 // The frontend owns provider visuals; the backend only supplies the preset key.
 const PRESET_ICONS: Record<string, LucideIcon> = {
     entra: Cloud,
-    github: Github,
+    github: GitFork,
     google: Globe,
     okta: ShieldCheck,
     gitlab: GitBranch,

@@ -16,7 +16,7 @@ import { DESKTOP_ONLY, MOBILE_ONLY } from './.storybook/tags'
 
 // Every locale folder except the English source is one more matrix project, so a new language needs no change here.
 const EXTRA_LOCALES = fs
-    .readdirSync(path.join(__dirname, 'resources/ts/locales'), { withFileTypes: true })
+    .readdirSync(path.join(import.meta.dirname, 'resources/ts/locales'), { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && entry.name !== 'en')
     .map((entry) => entry.name)
 
@@ -43,7 +43,7 @@ const storiesProject = (
     extends: true as const,
     plugins: [
         ...(globals.locale ? [withoutPlay()] : []),
-        storybookTest({ configDir: path.join(__dirname, '.storybook'), tags: { exclude: excludeTags } }),
+        storybookTest({ configDir: path.join(import.meta.dirname, '.storybook'), tags: { exclude: excludeTags } }),
     ],
     // Name every dependency up front; one found mid-run makes Vite reload and fail the run.
     optimizeDeps: {

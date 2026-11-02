@@ -1,4 +1,5 @@
-import { useReactTable } from '@tanstack/react-table'
+import type { RowData } from '@tanstack/react-table'
+import type { AppTable } from './table-features'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -59,11 +60,11 @@ export function DataTableEmpty({
     )
 }
 
-export function DataTablePagination<T>({ table }: { table: ReturnType<typeof useReactTable<T>> }) {
+export function DataTablePagination<T extends RowData>({ table }: { table: AppTable<T> }) {
     const { t } = useTranslation()
-    const pageIndex = table.getState().pagination.pageIndex
+    const pageIndex = table.state.pagination.pageIndex
     const pageCount = table.getPageCount()
-    const pageSize = table.getState().pagination.pageSize
+    const pageSize = table.state.pagination.pageSize
 
     if (pageCount <= 1) return null
 

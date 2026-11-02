@@ -1,7 +1,6 @@
-import Uppy from '@uppy/core'
-import AwsS3 from '@uppy/aws-s3'
+import axios from 'axios'
 import { uploadsApi } from '@/api/uploads'
-import type { MultipartUploadResult, UploadProgress } from '@/types/upload'
+import type { CompletedPart, MultipartUploadResult, UploadProgress } from '@/types/upload'
 
 interface MultipartUploadOptions {
     bucket: string
@@ -10,123 +9,99 @@ interface MultipartUploadOptions {
     onProgress?: (progress: UploadProgress) => void
 }
 
-const CHUNK_SIZE = 8 * 1024 * 1024
+const DEFAULT_PART_SIZE = 8 * 1024 * 1024
 
-function requireUploadIds(uploadId?: string, key?: string): { uploadId: string; key: string } {
-    if (!uploadId || !key) {
-        throw new Error('Upload is not initialized')
-    }
-
-    return { uploadId, key }
+function stripQuotes(etag: string): string {
+    return etag.replace(/^"|"$/g, '')
 }
 
+/**
+ * Uploads a file through the backend's multipart API: create, one signed PUT
+ * per part, complete. The server owns part sizing, so the file is cut by the
+ * `partSize` it returns. A failure or abort cancels the server-side upload.
+ */
 export async function multipartUpload(
     file: File,
     options: MultipartUploadOptions
 ): Promise<MultipartUploadResult> {
     const { bucket, concurrency = 4, signal, onProgress } = options
 
-    const captured: { uploadId?: string; key?: string; location?: string } = {}
+    signal?.throwIfAborted()
 
-    const uppy = new Uppy({ autoProceed: false, allowMultipleUploads: false })
-
-    uppy.use(AwsS3, {
-        shouldUseMultipart: true,
-        limit: concurrency,
-        getChunkSize: () => CHUNK_SIZE,
-
-        createMultipartUpload: async (uppyFile) => {
-            const created = await uploadsApi.create({
-                bucket,
-                filename: uppyFile.name ?? file.name,
-                type: uppyFile.type,
-                size: uppyFile.size ?? file.size,
-            })
-
-            captured.uploadId = created.uploadId
-            captured.key = created.key
-
-            return { uploadId: created.uploadId, key: created.key }
-        },
-
-        listParts: async (_uppyFile, { uploadId, key }) => {
-            const ids = requireUploadIds(uploadId, key)
-            return uploadsApi.listParts(ids.uploadId, ids.key)
-        },
-
-        signPart: async (_uppyFile, { uploadId, key, partNumber }) => {
-            const ids = requireUploadIds(uploadId, key)
-            const signed = await uploadsApi.signPart(ids.uploadId, ids.key, partNumber)
-
-            return {
-                method: 'PUT',
-                url: signed.url,
-                headers: signed.headers,
-            }
-        },
-
-        completeMultipartUpload: async (_uppyFile, { uploadId, key, parts }) => {
-            const ids = requireUploadIds(uploadId, key)
-            const result = await uploadsApi.complete(
-                ids.uploadId,
-                ids.key,
-                parts.map((part) => ({
-                    PartNumber: part.PartNumber as number,
-                    ETag: part.ETag as string,
-                }))
-            )
-
-            captured.location = result.location
-
-            return { location: result.location }
-        },
-
-        abortMultipartUpload: async (_uppyFile, { uploadId, key }) => {
-            const ids = requireUploadIds(uploadId, key)
-            await uploadsApi.abort(ids.uploadId, ids.key)
-        },
+    const created = await uploadsApi.create({
+        bucket,
+        filename: file.name,
+        type: file.type,
+        size: file.size,
     })
 
-    if (signal) {
-        if (signal.aborted) {
-            uppy.cancelAll()
-        } else {
-            signal.addEventListener('abort', () => uppy.cancelAll(), { once: true })
+    const partSize = created.partSize > 0 ? created.partSize : DEFAULT_PART_SIZE
+    const partCount = Math.max(1, Math.ceil(file.size / partSize))
+    const loadedByPart = new Array<number>(partCount).fill(0)
+    const completed: CompletedPart[] = new Array(partCount)
+
+    const report = () => {
+        const loaded = loadedByPart.reduce((sum, n) => sum + n, 0)
+        onProgress?.({
+            loaded,
+            total: file.size,
+            percentage: file.size ? Math.min(100, Math.round((loaded / file.size) * 100)) : 100,
+        })
+    }
+
+    // Aborts the in-flight parts as soon as one fails, so the others stop too.
+    const failure = new AbortController()
+    const onAbort = () => failure.abort(signal?.reason)
+    signal?.addEventListener('abort', onAbort, { once: true })
+
+    const uploadPart = async (index: number) => {
+        const partNumber = index + 1
+        const blob = file.slice(index * partSize, (index + 1) * partSize)
+        const signed = await uploadsApi.signPart(created.uploadId, created.key, partNumber)
+
+        const response = await axios.put(signed.url, blob, {
+            headers: signed.headers,
+            signal: failure.signal,
+            onUploadProgress: (event) => {
+                loadedByPart[index] = Math.min(event.loaded, blob.size)
+                report()
+            },
+        })
+
+        const etag = response.headers?.etag
+        if (typeof etag !== 'string' || etag === '') {
+            throw new Error('Upload part came back without an ETag')
+        }
+
+        loadedByPart[index] = blob.size
+        report()
+        completed[index] = { PartNumber: partNumber, ETag: stripQuotes(etag) }
+    }
+
+    let next = 0
+    const worker = async () => {
+        while (next < partCount) {
+            failure.signal.throwIfAborted()
+            await uploadPart(next++)
         }
     }
 
-    uppy.on('upload-progress', (_uppyFile, progress) => {
-        const total = progress.bytesTotal ?? file.size
-        const loaded = progress.bytesUploaded ?? 0
-
-        onProgress?.({
-            loaded,
-            total,
-            percentage: total ? Math.min(100, Math.round((loaded / total) * 100)) : 0,
-        })
-    })
-
-    uppy.addFile({
-        name: file.name,
-        type: file.type,
-        data: file,
-    })
-
     try {
-        const result = await uppy.upload()
+        const workers = Array.from({ length: Math.min(concurrency, partCount) }, () =>
+            worker().catch((error: unknown) => {
+                failure.abort(error)
+                throw error
+            })
+        )
+        await Promise.all(workers)
 
-        if (result?.failed && result.failed.length > 0) {
-            const error = result.failed[0].error
+        const result = await uploadsApi.complete(created.uploadId, created.key, completed)
 
-            throw new Error(typeof error === 'string' ? error : 'Upload failed')
-        }
-
-        return {
-            uploadId: captured.uploadId ?? '',
-            key: captured.key ?? '',
-            location: captured.location ?? '',
-        }
+        return { uploadId: created.uploadId, key: created.key, location: result.location }
+    } catch (error) {
+        await uploadsApi.abort(created.uploadId, created.key).catch(() => undefined)
+        throw error
     } finally {
-        uppy.destroy()
+        signal?.removeEventListener('abort', onAbort)
     }
 }

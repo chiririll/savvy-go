@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import type { ColumnDef } from '@tanstack/react-table'
+import type { AppColumnDef } from './table-features'
 import { expect, screen, userEvent, within } from 'storybook/test'
 
 import { Button } from '@/components/ui/button'
@@ -8,7 +8,7 @@ import { DataTable } from './DataTable'
 
 type Row = { id: number; name: string; amount: string }
 
-const columns: ColumnDef<Row>[] = [
+const columns: AppColumnDef<Row>[] = [
     { accessorKey: 'name', header: 'Name' },
     { accessorKey: 'amount', header: 'Amount' },
 ]
