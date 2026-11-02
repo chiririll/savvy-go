@@ -411,7 +411,7 @@
         "deleteDescription": "This will permanently delete the backup from {{date}}."
     },
     "api": {
-        "title": "API",
+        "title": "API tokens",
         "heading": "API access",
         "description": "Connect external apps and scripts to your Savvy instance",
         "docs": "API docs",

@@ -411,7 +411,7 @@
         "deleteDescription": "Копия от {{date}} будет удалена навсегда."
     },
     "api": {
-        "title": "API",
+        "title": "API-токены",
         "heading": "Доступ к API",
         "description": "Подключайте внешние приложения и скрипты к вашему Savvy",
         "docs": "Документация API",

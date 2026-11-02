@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
+import { Navigate, Route, Routes } from 'react-router-dom'
 import { expect, userEvent, waitFor, within } from 'storybook/test'
 
 import type { MoneyFlowData, NetWorthData, OverviewMetrics, TransactionsByCategoryData } from '@/api/reports'
@@ -8,6 +9,7 @@ import { accounts, categories, currencies, tags } from '@/test/fixtures'
 import { useCurrenciesStore } from '@/stores/currencies'
 
 import ReportsPage from './index'
+import { CashFlowRoute, ExpensesRoute, IncomeRoute, NetWorthRoute, OverviewRoute } from './routes'
 
 const overview = (currency: string | null, scale = 1): OverviewMetrics => ({
     income: { value: 3000 * scale, previous: 2500 * scale, sparkline: [1, 2, 3] },
@@ -79,7 +81,22 @@ const reports = (currency: string | null, scale = 1) => [
 const meta = {
     title: 'pages/reports/ReportsPage',
     component: ReportsPage,
-    parameters: { a11y: unmountedTabsA11y },
+    parameters: { a11y: unmountedTabsA11y, route: '/reports' },
+    // The page is the layout of the report routes, as in the router.
+    decorators: [
+        (Story) => (
+            <Routes>
+                <Route path="/reports" element={<Story />}>
+                    <Route index element={<OverviewRoute />} />
+                    <Route path="cashflow" element={<CashFlowRoute />} />
+                    <Route path="expenses" element={<ExpensesRoute />} />
+                    <Route path="income" element={<IncomeRoute />} />
+                    <Route path="networth" element={<NetWorthRoute />} />
+                    <Route path="*" element={<Navigate to="/reports" replace />} />
+                </Route>
+            </Routes>
+        ),
+    ],
     beforeEach: ({ msw }) => {
         useCurrenciesStore.getState().setAll(currencies)
         msw.use(
@@ -95,7 +112,7 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 const openTab = async (canvasElement: HTMLElement, name: RegExp) =>
-    userEvent.click(await within(canvasElement).findByRole('tab', { name }))
+    userEvent.click(await within(canvasElement).findByRole('link', { name }))
 
 export const Overview: Story = {
     play: async ({ canvasElement }) => {
@@ -163,5 +180,22 @@ export const NetWorthInDinar: Story = {
     play: async ({ canvasElement }) => {
         await openTab(canvasElement, /net worth/i)
         await waitFor(() => expect(within(canvasElement).getByText(/1,500\.500/)).toBeVisible())
+    },
+}
+
+// Every report has its own address, so a reload or a shared link opens the same one.
+export const OpensFromItsAddress: Story = {
+    parameters: { route: '/reports/expenses' },
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement)
+        await expect(await canvas.findByText('Expenses structure')).toBeVisible()
+        await expect(canvas.getByRole('link', { name: /^expenses/i })).toHaveAttribute('aria-current', 'page')
+    },
+}
+
+export const UnknownReportGoesToOverview: Story = {
+    parameters: { route: '/reports/nothing' },
+    play: async ({ canvasElement }) => {
+        await expect(await within(canvasElement).findByText('Money flow')).toBeVisible()
     },
 }

@@ -1,4 +1,5 @@
 import type { CashFlowGroupBy } from '@/api/reports'
+import { pages, type Page } from '@/app/pages'
 import { formatDateLocal, formatYearMonth } from '@/lib/dates'
 
 export type PeriodType = 'last_30_days' | 'month' | 'quarter' | 'year' | 'ytd' | 'custom'
@@ -79,3 +80,14 @@ export function defaultGroupBy(filters: ReportFilters): CashFlowGroupBy {
 }
 
 export const TABS: ReportTab[] = ['overview', 'cashflow', 'expenses', 'income', 'networth']
+
+/** The page of each report; the overview is the index page of /reports. */
+export const REPORT_TAB_PAGES = {
+    overview: pages.reports,
+    cashflow: pages.reportsCashFlow,
+    expenses: pages.reportsExpenses,
+    income: pages.reportsIncome,
+    networth: pages.reportsNetWorth,
+} as const satisfies Record<ReportTab, Page>
+
+export const reportTabUrl = (tab: ReportTab): string => REPORT_TAB_PAGES[tab].path
