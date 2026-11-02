@@ -28,7 +28,7 @@ export const Emailed: Story = {
     play: async ({ canvasElement, args }) => {
         await userEvent.type(await within(canvasElement).findByPlaceholderText(/email/i), 'alex@example.com{Enter}')
         await waitFor(() => expect(args.onCreated).toHaveBeenCalledWith({ id: 5, link: null }))
-        await expect(sent.bodies).toEqual([{ role: 'editor', email: 'alex@example.com' }])
+        await expect(sent.bodies).toEqual([{ role: 'editor', email: 'alex@example.com', locale: 'en' }])
         await expect(await screen.findByText(/emailed to alex@example.com/i)).toBeVisible()
     },
 }

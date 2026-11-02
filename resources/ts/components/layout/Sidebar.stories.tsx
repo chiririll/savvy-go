@@ -72,16 +72,17 @@ export const SidebarGroups: Story = {
     play: async ({ canvasElement }) => {
         const canvas = within(canvasElement)
         await expect(await canvas.findByRole('link', { name: /^settings$/i })).toHaveAttribute('href', '/settings/space')
-        await expect(canvas.getByRole('link', { name: /^security$/i })).toHaveAttribute('href', '/settings/security')
+        await expect(canvas.getAllByRole('link', { name: /^security$/i })[0]).toHaveAttribute('href', '/settings/security')
         await expect(canvas.getByRole('link', { name: /passkeys/i })).toHaveAttribute('href', '/settings/passkeys')
         await expect(canvas.getByRole('link', { name: /api tokens/i })).toHaveAttribute('href', '/settings/api')
-        await expect(canvas.getByRole('link', { name: /backups/i })).toBeVisible()
+        await expect(canvas.getByRole('link', { name: /^backups$/i })).toHaveAttribute('href', '/settings/backups')
     },
 }
 
 export const SidebarAsEditor: Story = {
+    tags: ['desktop-only'],
     render: () => inSidebar(<AppSidebar />),
-    parameters: { app: { role: 'editor' } },
+    parameters: { app: { role: 'editor', serverRole: 'user' } },
     play: async ({ canvasElement }) => {
         const canvas = within(canvasElement)
         await expect(await canvas.findByRole('link', { name: /^settings$/i })).toBeVisible()

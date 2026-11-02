@@ -66,17 +66,18 @@ export const SwitchesToBars: Story = {
     },
 }
 
-// The first series is on to begin with, and the picker turns the others on.
+// Every category is on to begin with, the total is not, and the picker turns series off.
 export const PicksSeries: Story = {
     play: async ({ canvasElement }) => {
         const canvas = within(canvasElement)
         const picker = await canvas.findByRole('button', { name: /categories/i })
-        await waitFor(() => expect(picker).toHaveTextContent('1'))
-        await userEvent.click(picker)
-        await userEvent.click(await screen.findByText('Groceries'))
         await waitFor(() => expect(picker).toHaveTextContent('2'))
-        await expect(await screen.findByRole('checkbox', { name: 'Rent' })).not.toBeChecked()
         await waitFor(() => expect(chartText(canvasElement)).toContain('Groceries'))
+        await userEvent.click(picker)
+        await userEvent.click(await screen.findByRole('checkbox', { name: 'Groceries' }))
+        await waitFor(() => expect(picker).toHaveTextContent('1'))
+        await expect(await screen.findByRole('checkbox', { name: 'Groceries' })).not.toBeChecked()
+        await expect(await screen.findByRole('checkbox', { name: 'Rent' })).toBeChecked()
     },
 }
 
