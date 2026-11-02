@@ -75,7 +75,7 @@ func TestWithin(t *testing.T) {
 	}
 }
 
-func TestParseScheduleRefusesWhatCannotGiveADueDate(t *testing.T) {
+func TestParseScheduleRefusesNoDueDate(t *testing.T) {
 	good := `{"frequency":"weekly","interval":2,"day_of_week":3,"start":"2026-01-07","end":"2026-12-31"}`
 	s, err := ParseSchedule(good)
 	if err != nil || s.Frequency != "weekly" || s.Interval != 2 || *s.DayOfWeek != 3 || *s.End != "2026-12-31" {

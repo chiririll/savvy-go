@@ -44,7 +44,7 @@ func amountOn(tx *ledgerrepo.Tx, account int64) (int64, bool) {
 // Each space gets a transaction with the money on its real account and the
 // opposite on the space account of its currency; the space payment carries the
 // uuid and stays on the same payment when the transfer changes.
-func TestEachSideIsATransactionWithASpacePayment(t *testing.T) {
+func TestEachSideHasSpacePayment(t *testing.T) {
 	e := newTransferEnv(t)
 	ctx := context.Background()
 	tr := e.send(t, "10")
@@ -123,7 +123,7 @@ func TestSignatureIsCheckedOverTheStoredBytes(t *testing.T) {
 	}
 }
 
-func TestServiceAccountsAreNotASideOfATransfer(t *testing.T) {
+func TestServiceAccountIsNotTransferSide(t *testing.T) {
 	e := newTransferEnv(t)
 	ctx := context.Background()
 	e.send(t, "10")
@@ -177,7 +177,7 @@ func (e *transferEnv) markRestored(t *testing.T, spaceID int64) {
 // A restored space lacking a transfer holds the other space's record as the
 // remote alone, with its transaction pending; accepting moves the remote into
 // the record and confirms the transaction.
-func TestReviewOfATransferOnlyTheOtherSpaceHas(t *testing.T) {
+func TestReviewOfRemoteOnlyTransfer(t *testing.T) {
 	e := newTransferEnv(t)
 	ctx := context.Background()
 	tr := e.send(t, "10")

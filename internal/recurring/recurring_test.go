@@ -265,7 +265,7 @@ func TestEnsureUpcomingStopsBrokenRulesWithTheReason(t *testing.T) {
 	}
 }
 
-func TestUpdateReplansTheOpenOccurrenceAndClearsTheError(t *testing.T) {
+func TestUpdateReplansOpenOccurrenceAndClearsError(t *testing.T) {
 	e := newEnv(t)
 	r := e.create(t, `{"type":"expense","n":1}`, monthly("2026-01-15"))
 	_, tx := e.pending(t, r.ID)
@@ -286,7 +286,7 @@ func TestUpdateReplansTheOpenOccurrenceAndClearsTheError(t *testing.T) {
 	}
 }
 
-func TestUpdateOfAFirstOccurrenceFollowsANewStart(t *testing.T) {
+func TestUpdateFirstOccurrenceFollowsNewStart(t *testing.T) {
 	e := newEnv(t)
 	r := e.create(t, `{}`, monthly("2026-01-15"))
 	if _, err := e.svc.Update(e.ctx, r.ID, Input{Template: json.RawMessage(`{}`), Schedule: monthly("2026-02-01")}); err != nil {
@@ -361,7 +361,7 @@ func TestUpcomingOrdersByNextDate(t *testing.T) {
 	}
 }
 
-func TestDeletingARuleKeepsItsPendingTransactionAndTellsWhichRuleMadeOne(t *testing.T) {
+func TestDeleteRuleKeepsPendingTransaction(t *testing.T) {
 	e := newEnv(t)
 	r := e.create(t, `{}`, monthly("2026-01-15"))
 	_, tx := e.pending(t, r.ID)

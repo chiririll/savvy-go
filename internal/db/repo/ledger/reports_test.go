@@ -246,7 +246,7 @@ func TestTopTransactionsAreRankedByTheirLines(t *testing.T) {
 	}
 }
 
-func TestBudgetSpentIsTheSumOfLinesInTheBudgetCurrency(t *testing.T) {
+func TestBudgetSpentSumsLinesInBudgetCurrency(t *testing.T) {
 	r := newReportFixture(t)
 	usd, jpy := r.usdUnit(), r.unit(r.jpy)
 	spent := func(cats, tags []int64, in money.Unit, rate string) money.Money {

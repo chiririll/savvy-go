@@ -19,7 +19,7 @@ const payload = `{"uuid":"t1","from":{"space":"a","account":1,"amount":1000,"cur
 	`"to":{"space":"b","account":5,"amount":90000,"currency":"JPY","decimals":0},"date":"2026-03-04",` +
 	`"description":"rent","created_by":7,"version":2,"deleted_at":null}`
 
-func TestRecordKeepsItsBytesAndReadsTheGeneratedColumns(t *testing.T) {
+func TestRecordKeepsBytesAndGeneratedColumns(t *testing.T) {
 	r := transfersrepo.Space{DB: dbtest.Space(t)}
 	now := time.Now().UTC()
 	if rec, err := r.Record(ctx, "nope"); rec != nil || err != nil {
@@ -123,7 +123,7 @@ func (b *books) mirror(t *testing.T, uuid string) *ledgerrepo.Tx {
 	return nil
 }
 
-func TestMirrorIsATransactionWithARealAndASpacePayment(t *testing.T) {
+func TestMirrorHasRealAndSpacePayment(t *testing.T) {
 	b := newBooks(t)
 	m := transfersrepo.Mirror{
 		UUID: "t1", Type: "transfer_out", Date: "2026-03-04", Status: "confirmed", AccountID: b.card, Amount: -1000,

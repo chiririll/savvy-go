@@ -298,7 +298,7 @@ func TestListFiltersReadPaymentsLinesAndTags(t *testing.T) {
 	}
 }
 
-func TestListSortsByWhatMovedInTheBaseCurrency(t *testing.T) {
+func TestListSortsByMovedBaseCurrency(t *testing.T) {
 	f := newFixture(t)
 	// 100000 yen at 0.0066 is $660; $1000 is more; the transfer moves $20 out
 	// and 3000 yen ($19.80) in and counts as the larger side, not as the sum.
@@ -316,7 +316,7 @@ func TestListSortsByWhatMovedInTheBaseCurrency(t *testing.T) {
 	}
 }
 
-func TestSummaryRowsAreLinesOfConfirmedIncomeAndExpense(t *testing.T) {
+func TestSummaryRowsAreConfirmedLines(t *testing.T) {
 	f := newFixture(t)
 	now := time.Now().UTC()
 	date := "2026-01-01"

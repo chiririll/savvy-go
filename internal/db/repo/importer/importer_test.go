@@ -142,7 +142,8 @@ func TestImportedRowIsOnePaymentAndOneLine(t *testing.T) {
 	}
 	// The same hash on another account is another row.
 	other, _ := l.InsertAccount(ctx, ledgerrepo.AccountFields{Name: "Other", Type: "cash", CurrencyID: jpy, IsActive: true}, now)
-	if added, err := r.InsertRow(ctx, importerrepo.Row{Type: "expense", AccountID: other, Minor: 1, Status: "confirmed", DedupHash: "a"}, now); !added || err != nil {
+	row := importerrepo.Row{Type: "expense", AccountID: other, Minor: 1, Status: "confirmed", DedupHash: "a"}
+	if added, err := r.InsertRow(ctx, row, now); !added || err != nil {
 		t.Fatalf("same hash, other account = %v, %v", added, err)
 	}
 
