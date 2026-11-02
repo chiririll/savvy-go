@@ -55,7 +55,7 @@ const storiesProject = (
             'echarts/charts',
             'echarts/components',
             'echarts/renderers',
-            'echarts-for-react/lib/core',
+            'echarts-for-react/esm/core',
         ],
     },
     test: {
