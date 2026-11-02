@@ -64,6 +64,19 @@ func Generate(dataDir string) (*Key, error) {
 	return &Key{priv: priv}, nil
 }
 
+// New creates a key without storing it: a space key lives in its space's
+// database, not in the data directory.
+func New() (*Key, error) {
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return nil, err
+	}
+	return &Key{priv: priv}, nil
+}
+
+// SeedString is the seed as base64, the form Parse reads.
+func (k *Key) SeedString() string { return base64.StdEncoding.EncodeToString(k.Seed()) }
+
 // Write stores a key seed (from Seed or a server backup) in dataDir.
 func Write(dataDir string, seed []byte) error {
 	if len(seed) != ed25519.SeedSize {

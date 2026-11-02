@@ -108,7 +108,7 @@ func TestSignatureIsCheckedOverTheStoredBytes(t *testing.T) {
 	if rec.Payload == nil || *rec.Payload != string(tr.signed) {
 		t.Fatalf("stored payload %v is not the signed bytes %s", rec.Payload, tr.signed)
 	}
-	if !verifyTransfer(e.tr.Keys, e.records(t, e.A.ID)[tr.UUID]) {
+	if !e.ok(e.records(t, e.A.ID)[tr.UUID]) {
 		t.Fatal("a stored record does not verify")
 	}
 
@@ -118,7 +118,7 @@ func TestSignatureIsCheckedOverTheStoredBytes(t *testing.T) {
 		tr.UUID); err != nil {
 		t.Fatal(err)
 	}
-	if got := e.records(t, e.A.ID)[tr.UUID]; got.From.Amount != 9000 || verifyTransfer(e.tr.Keys, got) {
+	if got := e.records(t, e.A.ID)[tr.UUID]; got.From.Amount != 9000 || e.ok(got) {
 		t.Fatalf("an edited payload verifies: %+v", got)
 	}
 }
@@ -150,7 +150,7 @@ func TestTransferWithoutItsAccountNeedsAttention(t *testing.T) {
 	missing := *tr
 	missing.From.AccountID = 999
 	missing.Version = 2
-	signTransfer(e.tr.Keys, &missing)
+	e.sign(t, &missing)
 	if err := writeRecord(ctx, dA, e.A.UUID, missing, "confirmed", nil, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -197,7 +197,7 @@ func TestReviewOfRemoteOnlyTransfer(t *testing.T) {
 	}
 	got := e.records(t, e.B.ID)[tr.UUID]
 	if got.Review == nil || *got.Review != reviewCreatedRemote || got.From != tr.From || got.Remote != nil ||
-		!verifyTransfer(e.tr.Keys, got) {
+		!e.ok(got) {
 		t.Fatalf("transfer = %+v", got)
 	}
 	if m := e.mirror(t, e.B.ID, tr.UUID); m == nil || m.Status != "pending" {
@@ -226,7 +226,7 @@ func TestReviewOfAChangedTransfer(t *testing.T) {
 
 	newer := *tr
 	newer.Version, newer.From.Amount, newer.To.Amount = 2, 4000, 4000
-	signTransfer(e.tr.Keys, &newer)
+	e.sign(t, &newer)
 	if err := writeRecord(ctx, dA, e.A.UUID, newer, "confirmed", nil, nil); err != nil {
 		t.Fatal(err)
 	}

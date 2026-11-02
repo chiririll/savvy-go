@@ -20,8 +20,8 @@ import (
 // A transfer between two linked spaces is one record kept in both spaces'
 // databases (space_transfers), plus in each a transaction for its own side
 // (transfer_out / transfer_in) that balances and reports use. Writes go to
-// both spaces in one store.InSpaces. Records carry a version and the server's
-// signature; a merge by version keeps the two copies in step and a deletion is
+// both spaces in one store.InSpaces. Records carry a version and the signatures
+// of both spaces' keys (internal/spacekeys); a merge by version keeps the two copies in step and a deletion is
 // a tombstone with a version of its own.
 //
 // Two rules keep one space from changing another without its members (the
@@ -51,14 +51,18 @@ type Transfer struct {
 	Version     int64   `json:"version"`
 	DeletedAt   *string `json:"deleted_at"`
 	SigV        int64   `json:"sig_v"`
-	SignerKID   string  `json:"signer_kid"`
-	Signature   string  `json:"signature"`
+	// The source space's signature (sig_v 1: the server's) and, from sig_v 2,
+	// the destination space's.
+	SignerKID     string `json:"signer_kid"`
+	Signature     string `json:"signature"`
+	DestKID       string `json:"destination_kid,omitempty"`
+	DestSignature string `json:"destination_signature,omitempty"`
 	// Local to one space, never signed or copied.
 	Status string    `json:"-"`
 	Review *string   `json:"-"`
 	Remote *Transfer `json:"-"`
 	// signed is the payload as it was signed and stored. It is kept so that
-	// a signature is checked over those bytes; signTransfer replaces it.
+	// a signature is checked over those bytes; signWithSpaces replaces it.
 	signed []byte
 }
 
@@ -97,6 +101,7 @@ var (
 	ErrAccountMissing = errors.New("the account does not exist in that space")
 	ErrServiceAccount = errors.New("a debt or a space account cannot take part in a transfer")
 	ErrUnverified     = errors.New("this transfer's signature cannot be verified on this server")
+	ErrSpaceMissing   = errors.New("both spaces of a transfer must be on this server to sign it")
 	ErrNotUnderReview = errors.New("this transfer is not waiting for a decision")
 	ErrPending        = errors.New("decide on this transfer's pending change first")
 	ErrGone           = errors.New("transfer not found")
@@ -123,8 +128,8 @@ func (t Transfer) involves(a, b string) bool {
 
 // same reports whether two records carry the same signed content.
 func (t Transfer) same(o Transfer) bool {
-	a, _ := t.payload(1)
-	b, _ := o.payload(1)
+	a, _ := t.payload(t.SigV)
+	b, _ := o.payload(o.SigV)
 	return bytes.Equal(a, b)
 }
 
@@ -314,7 +319,9 @@ func (s Service) Create(ctx context.Context, actor *auth.User, in Input) (*Trans
 			CreatedBy:   &actor.ID,
 			Version:     1,
 		}
-		signTransfer(s.Keys, &t)
+		if err := s.signWithSpaces(ctx, dbs, &t); err != nil {
+			return err
+		}
 		for _, id := range []int64{in.FromSpace, in.ToSpace} {
 			if err := writeRecord(ctx, dbs[id], byID[id].UUID, t, "confirmed", nil, nil); err != nil {
 				return err
@@ -387,7 +394,7 @@ func (s Service) change(
 	if cur.Status == transferInReview {
 		return nil, ErrPending
 	}
-	if !verifyTransfer(s.Keys, *cur) {
+	if !s.verify(ctx, *cur) {
 		return nil, ErrUnverified
 	}
 	own, other, err := s.counterpart(ctx, spaceID, *cur)
@@ -411,7 +418,9 @@ func (s Service) change(
 		if err := edit(dbs, own, other, next); err != nil {
 			return err
 		}
-		signTransfer(s.Keys, next)
+		if err := s.signWithSpaces(ctx, dbs, next); err != nil {
+			return err
+		}
 		for _, sp := range []spaces.Space{own, other} {
 			if err := writeRecord(ctx, dbs[sp.ID], sp.UUID, *next, "confirmed", nil, nil); err != nil {
 				return err
@@ -503,13 +512,17 @@ func (s Service) List(ctx context.Context, spaceID int64) ([]View, error) {
 		return nil, err
 	}
 	own := byID[spaceID]
+	v0, err := s.verifier(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
 	out := []View{}
 	for _, r := range rows {
 		t := transferFromRecord(r)
 		if t.DeletedAt != nil && t.Status != transferInReview {
 			continue
 		}
-		v := View{Transfer: t, Verified: verifyTransfer(s.Keys, t), Outgoing: t.From.SpaceUUID == own.UUID}
+		v := View{Transfer: t, Verified: v0.ok(t), Outgoing: t.From.SpaceUUID == own.UUID}
 		if t.DeletedAt == nil && t.Status == transferConfirmed {
 			has, err := repo.Space{DB: d}.HasMirror(ctx, t.UUID)
 			if err != nil {

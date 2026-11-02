@@ -104,6 +104,55 @@ func (q *Queries) GetTransferMirror(ctx context.Context, spaceTransferUuid sql.N
 	return i, err
 }
 
+const insertSpaceKey = `-- name: InsertSpaceKey :exec
+INSERT INTO space_keys (kid, seed, created_at) VALUES (?, ?, ?)
+`
+
+type InsertSpaceKeyParams struct {
+	Kid       string
+	Seed      string
+	CreatedAt string
+}
+
+func (q *Queries) InsertSpaceKey(ctx context.Context, arg InsertSpaceKeyParams) error {
+	_, err := q.db.ExecContext(ctx, insertSpaceKey, arg.Kid, arg.Seed, arg.CreatedAt)
+	return err
+}
+
+const listSpaceKeys = `-- name: ListSpaceKeys :many
+
+SELECT kid, seed, created_at, retired_at FROM space_keys ORDER BY created_at, kid
+`
+
+// Keys of this space: a retired key still verifies.
+func (q *Queries) ListSpaceKeys(ctx context.Context) ([]SpaceKey, error) {
+	rows, err := q.db.QueryContext(ctx, listSpaceKeys)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SpaceKey{}
+	for rows.Next() {
+		var i SpaceKey
+		if err := rows.Scan(
+			&i.Kid,
+			&i.Seed,
+			&i.CreatedAt,
+			&i.RetiredAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSpaceTransfers = `-- name: ListSpaceTransfers :many
 SELECT uuid, payload, sig_v, source_kid, source_sig, destination_kid, destination_sig,
 	source, destination, version, status, remote, updated_at
@@ -147,6 +196,15 @@ func (q *Queries) ListSpaceTransfers(ctx context.Context) ([]SpaceTransfer, erro
 		return nil, err
 	}
 	return items, nil
+}
+
+const retireSpaceKeys = `-- name: RetireSpaceKeys :exec
+UPDATE space_keys SET retired_at = ? WHERE retired_at IS NULL
+`
+
+func (q *Queries) RetireSpaceKeys(ctx context.Context, retiredAt sql.NullString) error {
+	_, err := q.db.ExecContext(ctx, retireSpaceKeys, retiredAt)
+	return err
 }
 
 const setTransferMirrorStatus = `-- name: SetTransferMirrorStatus :exec

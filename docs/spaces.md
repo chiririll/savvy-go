@@ -69,10 +69,11 @@ An admin of two spaces can link them in **Settings → Space**; either side's ad
 
 Editors of both can then send money between them: in the transaction dialog, choose the spaces tab next to *Transfer*, then the destination space and accounts. Each side uses its own account's currency.
 
-A transfer is stored in both spaces and signed by the server. If a space is restored or the link breaks:
+A transfer is stored in both spaces and signed by both of them: every space has its own signing key, kept in its database and included in its backups. A transfer is valid while both spaces are on this server and each one's key signed it, so moving both spaces to another server (a server backup, or both space backups restored there) keeps their transfers, and a backup of one space cannot be given a forged transfer without the other space's key. If a space is restored or the link breaks:
 
 - **Restore from an older backup**: the linked space is untouched. Differing transfers return as **pending** transactions to accept or reject; they do not affect balances.
-- **Unlink, import elsewhere or bad signature**: the transfer is **frozen**. It stays in balances but cannot be edited, and syncs again once the spaces are relinked.
+- **Unlink, only one space moved, or bad signature**: the transfer is **frozen**. It stays in balances but cannot be edited, and syncs again once the spaces are relinked (and, after a move, both are on the server).
+- **Transfers from v1.0** were signed by the server. At the first start on v1.1 they are signed again by the spaces' keys, once both spaces are here and the old signature holds.
 
 ## Shared categories and tags
 

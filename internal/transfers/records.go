@@ -47,6 +47,12 @@ func transferFromRecord(r repo.Record) Transfer {
 	if r.SourceSig != nil {
 		t.Signature = *r.SourceSig
 	}
+	if r.DestinationKID != nil {
+		t.DestKID = *r.DestinationKID
+	}
+	if r.DestSig != nil {
+		t.DestSignature = *r.DestSig
+	}
 	t.Status = r.Status
 	if r.Status != transferInReview {
 		return t
@@ -77,6 +83,7 @@ func recordOf(t Transfer, review *string, remote *Transfer) repo.Record {
 		p, _ := t.payload(t.SigV)
 		rec.Payload = ptr(string(p))
 		rec.SourceKID, rec.SourceSig = optional(t.SignerKID), optional(t.Signature)
+		rec.DestinationKID, rec.DestSig = optional(t.DestKID), optional(t.DestSignature)
 	}
 	if remote != nil {
 		b, _ := json.Marshal(remote)

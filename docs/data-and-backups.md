@@ -14,12 +14,12 @@ uploads/               uploaded files (imports)
 
 ### Signing key
 
-The server signs backups and cross-space transfers with `keys/server.ed25519`, created on first start. Only a server backup includes it.
+The server signs backups with `keys/server.ed25519`, created on first start. Only a server backup includes it. Transfers between spaces are not signed with it: each space signs them with its own key, which lives in the space's database and travels with its backups (see [Spaces](spaces.md#linked-spaces-and-transfers)).
 
 > [!IMPORTANT]
 > Keep the key with the data. If it is missing while the data has its signatures, Savvy refuses to start instead of creating a new key. Put the file back to continue.
 
-Server admins can see the public key, rotate it (old signatures stay valid) and trust another server's key in **Administration → Security**. Trusting an old server's key lets transfers of spaces moved from it sync again.
+Server admins can see the public key, rotate it (old signatures stay valid) and trust another server's key in **Administration → Security**. Trusting a key matters for backups made by another server and for transfers from v1.0 that have not been signed again.
 
 ## Backups in the app
 

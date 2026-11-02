@@ -41,8 +41,17 @@ func prepare(ctx context.Context, cfg appconfig.Config, st *sqlite.Store) (*sign
 	// Finish transfers a crash left half-written and review spaces restored
 	// just before it; an unavailable space is merged on a later start.
 	ring := signing.KeyRing{Holder: keys, Trusted: transfers.TrustedKeys(st.Server())}
-	if err := (transfers.Service{Spaces: spaces.Service{Store: st}, Keys: ring}).SyncAll(ctx); err != nil {
+	tr := transfers.Service{Spaces: spaces.Service{Store: st}, Keys: ring}
+	if err := tr.EnsureKeys(ctx); err != nil {
+		slog.Warn("make space signing keys", "err", err)
+	}
+	if err := tr.SyncAll(ctx); err != nil {
 		slog.Warn("merge transfers between spaces", "err", err)
+	}
+	// Every space is converted by now (the store opens them first), and the
+	// merge has made both copies of a transfer alike.
+	if err := tr.Resign(ctx); err != nil {
+		slog.Warn("re-sign transfers with the space keys", "err", err)
 	}
 	// Bring the spaces of sync groups back together if they drifted apart.
 	if err := (refsync.Service{Spaces: spaces.Service{Store: st}}).Heal(ctx); err != nil {

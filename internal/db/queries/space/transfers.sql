@@ -42,3 +42,14 @@ DELETE FROM transactions WHERE id IN (SELECT transaction_id FROM payments WHERE 
 -- name: GetAccountCurrency :one
 SELECT a.id, a.type, c.id AS currency_id, c.code, c.decimals
 FROM accounts a JOIN currencies c ON c.id = a.currency_id WHERE a.id = ?;
+
+-- Keys of this space: a retired key still verifies.
+
+-- name: ListSpaceKeys :many
+SELECT kid, seed, created_at, retired_at FROM space_keys ORDER BY created_at, kid;
+
+-- name: InsertSpaceKey :exec
+INSERT INTO space_keys (kid, seed, created_at) VALUES (?, ?, ?);
+
+-- name: RetireSpaceKeys :exec
+UPDATE space_keys SET retired_at = ? WHERE retired_at IS NULL;

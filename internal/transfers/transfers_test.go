@@ -12,9 +12,11 @@ import (
 
 	"savvy-go/internal/auth"
 	ledgerrepo "savvy-go/internal/db/repo/ledger"
+	spacekeysrepo "savvy-go/internal/db/repo/spacekeys"
 	"savvy-go/internal/migrate"
 	"savvy-go/internal/money"
 	"savvy-go/internal/signing"
+	"savvy-go/internal/spacekeys"
 	"savvy-go/internal/spaces"
 	"savvy-go/internal/store"
 	"savvy-go/internal/store/sqlite"
@@ -151,7 +153,7 @@ func TestP23MergeRules(t *testing.T) {
 	// B is ahead: a newer version written only there.
 	newer := *tr
 	newer.Version, newer.From.Amount = 2, 2000
-	signTransfer(e.tr.Keys, &newer)
+	e.sign(t, &newer)
 	if err := writeRecord(ctx, dB, e.B.UUID, newer, "confirmed", nil, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -165,7 +167,7 @@ func TestP23MergeRules(t *testing.T) {
 	gone.Version = 3
 	at := now()
 	gone.DeletedAt = &at
-	signTransfer(e.tr.Keys, &gone)
+	e.sign(t, &gone)
 	if err := writeRecord(ctx, dA, e.A.UUID, gone, "confirmed", nil, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -179,8 +181,8 @@ func TestP23MergeRules(t *testing.T) {
 	x, y := *other, *other
 	x.Version, y.Version = 5, 5
 	x.Description, y.Description = ptr("x"), ptr("y")
-	signTransfer(e.tr.Keys, &x)
-	signTransfer(e.tr.Keys, &y)
+	e.sign(t, &x)
+	e.sign(t, &y)
 	_ = writeRecord(ctx, dA, e.A.UUID, x, "confirmed", nil, nil)
 	_ = writeRecord(ctx, dB, e.B.UUID, y, "confirmed", nil, nil)
 	_ = e.tr.SyncAll(ctx)
@@ -222,54 +224,201 @@ func TestP43UnsignedRecordNotMerged(t *testing.T) {
 func TestP49SignatureFormatVersion(t *testing.T) {
 	e := newTransferEnv(t)
 	tr := e.send(t, "1")
-	if tr.SigV != 1 || !verifyTransfer(e.tr.Keys, *tr) {
+	if tr.SigV != 2 || !e.ok(*tr) {
 		t.Fatal("a fresh record does not verify")
 	}
 	future := *tr
 	future.SigV = 99
-	if verifyTransfer(e.tr.Keys, future) {
+	if e.ok(future) {
 		t.Fatal("an unknown format verified")
 	}
 }
 
-// P47: after a key rotation old records still verify and new ones are
-// signed with the new key.
-func TestP47KeyRotation(t *testing.T) {
+// A transfer is signed by the key of each of its spaces, not by the server.
+func TestTransferIsSignedByBothSpaceKeys(t *testing.T) {
 	e := newTransferEnv(t)
 	ctx := context.Background()
-	old := e.send(t, "1")
-	oldKID := e.holder.Key().KID()
+	tr := e.send(t, "1")
+	keyOf := func(id int64) string {
+		d, _ := e.st.Space(ctx, id)
+		k, err := spacekeys.Current(ctx, d)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return k.KID()
+	}
+	if tr.SignerKID != keyOf(e.A.ID) || tr.DestKID != keyOf(e.B.ID) || tr.SignerKID == e.holder.Key().KID() {
+		t.Fatalf("signed by %s and %s, want the keys of A (%s) and B (%s)",
+			tr.SignerKID, tr.DestKID, keyOf(e.A.ID), keyOf(e.B.ID))
+	}
+	for _, id := range []int64{e.A.ID, e.B.ID} {
+		got := e.records(t, id)[tr.UUID]
+		if got.DestKID != tr.DestKID || got.DestSignature != tr.DestSignature || !e.ok(got) {
+			t.Fatalf("space %d stores %+v", id, got)
+		}
+	}
+
+	// The server key no longer matters to a transfer.
 	if _, err := e.tr.RotateKey(ctx, e.owner, e.dir); err != nil {
 		t.Fatal(err)
 	}
-	if e.holder.Key().KID() == oldKID {
-		t.Fatal("the key did not change")
-	}
-	if !verifyTransfer(e.tr.Keys, e.records(t, e.A.ID)[old.UUID]) {
-		t.Fatal("a record signed with the old key no longer verifies")
-	}
-	if fresh := e.send(t, "2"); fresh.SignerKID != e.holder.Key().KID() {
-		t.Fatal("new records are not signed with the new key")
+	if !e.ok(e.records(t, e.A.ID)[tr.UUID]) {
+		t.Fatal("rotating the server key broke a transfer")
 	}
 }
 
-// P27, P46: spaces moved together to a server with another key keep their
-// uuids; their transfers do not verify there until the old key is trusted
-// or the members re-sign them, and then they merge again.
-func TestP27P46MoveServer(t *testing.T) {
+// One missing signature, or the two swapped, fails the check.
+func TestOneSignatureIsNotEnough(t *testing.T) {
+	e := newTransferEnv(t)
+	tr := e.send(t, "1")
+	noDest := *tr
+	noDest.DestKID, noDest.DestSignature = "", ""
+	swapped := *tr
+	swapped.SignerKID, swapped.DestKID = tr.DestKID, tr.SignerKID
+	swapped.Signature, swapped.DestSignature = tr.DestSignature, tr.Signature
+	for name, x := range map[string]Transfer{"no destination": noDest, "swapped": swapped} {
+		if e.ok(x) {
+			t.Fatalf("%s: verified", name)
+		}
+	}
+}
+
+// A retired space key still verifies what it signed; a new transfer uses the
+// new key.
+func TestSpaceKeyRotation(t *testing.T) {
 	e := newTransferEnv(t)
 	ctx := context.Background()
-	tr := e.send(t, "4")
-	exportA, exportB := filepath.Join(t.TempDir(), "a.sqlite"), filepath.Join(t.TempDir(), "b.sqlite")
-	if err := e.st.ExportSpace(ctx, e.A.ID, exportA); err != nil {
+	old := e.send(t, "1")
+	d, _ := e.st.Space(ctx, e.A.ID)
+	var fresh *signing.Key
+	if err := store.Tx(ctx, d, func(tx store.DB) (err error) {
+		fresh, err = spacekeys.Rotate(ctx, tx)
+		return err
+	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := e.st.ExportSpace(ctx, e.B.ID, exportB); err != nil {
+	if fresh.KID() == old.SignerKID {
+		t.Fatal("the key did not change")
+	}
+	if !e.ok(e.records(t, e.A.ID)[old.UUID]) {
+		t.Fatal("a record signed with the retired key no longer verifies")
+	}
+	if next := e.send(t, "2"); next.SignerKID != fresh.KID() || !e.ok(*next) {
+		t.Fatal("a new record is not signed with the new key")
+	}
+}
+
+// Spaces made here have a key from the start.
+func TestSpaceHasAKeyFromCreation(t *testing.T) {
+	e := newTransferEnv(t)
+	d, _ := e.st.Space(context.Background(), e.A.ID)
+	keys, err := (spacekeysrepo.Repo{DB: d}).List(context.Background())
+	if err != nil || len(keys) != 1 || keys[0].RetiredAt != nil {
+		t.Fatalf("keys = %+v, %v", keys, err)
+	}
+}
+
+// A space without a key (a converted v1.0 file, an old backup) gets one at
+// startup, and a space that has one keeps it.
+func TestEnsureKeys(t *testing.T) {
+	e := newTransferEnv(t)
+	ctx := context.Background()
+	dA, _ := e.st.Space(ctx, e.A.ID)
+	dB, _ := e.st.Space(ctx, e.B.ID)
+	before, _ := (spacekeysrepo.Repo{DB: dB}).List(ctx)
+	if _, err := dA.ExecContext(ctx, `DELETE FROM space_keys`); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.tr.EnsureKeys(ctx); err != nil {
+		t.Fatal(err)
+	}
+	a, _ := (spacekeysrepo.Repo{DB: dA}).List(ctx)
+	b, _ := (spacekeysrepo.Repo{DB: dB}).List(ctx)
+	if len(a) != 1 || len(b) != 1 || b[0].KID != before[0].KID {
+		t.Fatalf("keys after = %+v / %+v", a, b)
+	}
+}
+
+// signV1 signs as v1.0 did: the server key over the payload, nothing else.
+func (e *transferEnv) signV1(x *Transfer) {
+	key := e.holder.Key()
+	x.SigV, x.signed = 1, nil
+	p, _ := x.payload(1)
+	x.signed = p
+	x.SignerKID, x.Signature = key.KID(), base64.StdEncoding.EncodeToString(key.Sign(p))
+	x.DestKID, x.DestSignature = "", ""
+}
+
+// writeV1 puts a v1.0 record into both spaces.
+func (e *transferEnv) writeV1(t *testing.T, x Transfer) {
+	t.Helper()
+	ctx := context.Background()
+	for _, sp := range []*spaces.Space{e.A, e.B} {
+		d, _ := e.st.Space(ctx, sp.ID)
+		if err := writeRecord(ctx, d, sp.UUID, x, transferConfirmed, nil, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// P46: transfers v1.0 left signed by the server are re-signed by the space
+// keys over the very same bytes, and only when the server signature holds and
+// the two spaces agree.
+func TestResignV1Transfers(t *testing.T) {
+	e := newTransferEnv(t)
+	ctx := context.Background()
+	good, bad, apart := *e.send(t, "1"), *e.send(t, "2"), *e.send(t, "3")
+	for _, x := range []*Transfer{&good, &bad, &apart} {
+		e.signV1(x)
+	}
+	bad.Signature = base64.StdEncoding.EncodeToString([]byte("not a signature"))
+	e.writeV1(t, good)
+	e.writeV1(t, bad)
+	e.writeV1(t, apart)
+	dB, _ := e.st.Space(ctx, e.B.ID)
+	later := apart
+	later.Version = 2
+	e.signV1(&later)
+	if err := writeRecord(ctx, dB, e.B.UUID, later, transferConfirmed, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 
+	if err := e.tr.Resign(ctx); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []int64{e.A.ID, e.B.ID} {
+		got := e.records(t, id)
+		if g := got[good.UUID]; g.SigV != 2 || !e.ok(g) || string(g.signed) != string(good.signed) {
+			t.Fatalf("space %d: re-signed record = %+v", id, g)
+		}
+		if got[bad.UUID].SigV != 1 {
+			t.Fatalf("space %d: a record with a bad server signature was re-signed", id)
+		}
+		if got[apart.UUID].SigV != 1 {
+			t.Fatalf("space %d: a record the spaces disagree on was re-signed", id)
+		}
+	}
+	if e.mirror(t, e.A.ID, good.UUID) == nil {
+		t.Fatal("re-signing lost the transaction of the transfer")
+	}
+
+	// A second run changes nothing.
+	if err := e.tr.Resign(ctx); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// moveSpaces exports the spaces of e and imports them on a new server; with
+// onlyA the second one stays behind.
+func (e *transferEnv) moveSpaces(t *testing.T, onlyA bool) (*transferEnv, *spaces.Space, *spaces.Space) {
+	t.Helper()
+	ctx := context.Background()
 	n := newTransferEnv(t) // another server, another key
-	importSpace := func(path string) *spaces.Space {
+	importSpace := func(id int64) *spaces.Space {
+		path := filepath.Join(t.TempDir(), "space.sqlite")
+		if err := e.st.ExportSpace(ctx, id, path); err != nil {
+			t.Fatal(err)
+		}
 		p, err := n.st.PrepareSpace(ctx, path)
 		if err != nil {
 			t.Fatal(err)
@@ -280,52 +429,120 @@ func TestP27P46MoveServer(t *testing.T) {
 		}
 		return sp
 	}
-	a2, b2 := importSpace(exportA), importSpace(exportB)
+	a2 := importSpace(e.A.ID)
+	if onlyA {
+		return n, a2, nil
+	}
+	return n, a2, importSpace(e.B.ID)
+}
+
+// P27: spaces moved together to another server keep their transfers, signed
+// and editable; the keys travelled with the spaces.
+func TestP27MovedTogetherKeepTransfers(t *testing.T) {
+	e := newTransferEnv(t)
+	ctx := context.Background()
+	tr := e.send(t, "4")
+	n, a2, b2 := e.moveSpaces(t, false)
 	if a2.UUID != e.A.UUID || b2.UUID != e.B.UUID {
 		t.Fatal("moved spaces lost their uuids")
 	}
-	if verifyTransfer(n.tr.Keys, n.records(t, a2.ID)[tr.UUID]) {
-		t.Fatal("a foreign signature verified")
+	if !n.ok(n.records(t, a2.ID)[tr.UUID]) || !n.ok(n.records(t, b2.ID)[tr.UUID]) {
+		t.Fatal("the transfer does not verify on the new server")
 	}
 	if err := n.tr.Link(ctx, n.owner, a2.ID, b2.ID); err != nil {
 		t.Fatal(err)
-	}
-	// An update on the old server's record is refused until it is trusted.
-	if _, err := n.tr.Update(ctx, n.owner, a2.ID, tr.UUID, Update{Date: ptr("2026-10-02")}); !errors.Is(
-		err,
-		ErrUnverified,
-	) {
-		t.Fatalf("update of an unverified record: %v", err)
-	}
-	pub := base64.StdEncoding.EncodeToString(e.holder.Key().Public())
-	if _, err := n.tr.TrustKey(ctx, n.owner, "old server", pub); err != nil {
-		t.Fatal(err)
-	}
-	if !verifyTransfer(n.tr.Keys, n.records(t, a2.ID)[tr.UUID]) {
-		t.Fatal("trusting the old key did not verify the record")
 	}
 	updated, err := n.tr.Update(ctx, n.owner, a2.ID, tr.UUID, Update{Date: ptr("2026-10-02")})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if updated.SignerKID != n.holder.Key().KID() || n.records(t, b2.ID)[tr.UUID].Date != "2026-10-02" {
-		t.Fatal("the update was not re-signed here or did not reach the other space")
+	if updated.SignerKID != tr.SignerKID || updated.DestKID != tr.DestKID ||
+		n.records(t, b2.ID)[tr.UUID].Date != "2026-10-02" {
+		t.Fatal("the update was not signed with the travelled keys or did not reach the other space")
 	}
+}
 
-	// Without trusting the key, members can re-sign a record themselves.
-	m := newTransferEnv(t)
-	a3 := func() *spaces.Space {
-		p, _ := m.st.PrepareSpace(ctx, exportA)
-		sp, _ := m.tr.Spaces.CreateFrom(ctx, "moved", m.owner, p)
-		return sp
-	}()
-	if err := m.tr.Trust(ctx, m.owner, a3.ID, tr.UUID); err != nil {
+// P46: one moved space alone cannot vouch for a transfer: it is frozen until
+// the other space is here too.
+func TestP46OneMovedSpaceIsFrozen(t *testing.T) {
+	e := newTransferEnv(t)
+	ctx := context.Background()
+	tr := e.send(t, "4")
+	n, a2, _ := e.moveSpaces(t, true)
+	if n.ok(n.records(t, a2.ID)[tr.UUID]) {
+		t.Fatal("a transfer verified without its other space")
+	}
+	_, err := n.tr.Update(ctx, n.owner, a2.ID, tr.UUID, Update{Date: ptr("2026-10-02")})
+	if !errors.Is(err, ErrUnverified) {
+		t.Fatalf("update of a frozen transfer: %v", err)
+	}
+	views, err := n.tr.List(ctx, a2.ID)
+	if err != nil || len(views) != 1 || views[0].Verified || !views[0].Frozen {
+		t.Fatalf("view = %+v, %v", views, err)
+	}
+}
+
+// A backup of one space with an edited transfer cannot be made valid by that
+// space alone: the other space's key signs too.
+func TestForgedTransferFailsTheOtherSpacesKey(t *testing.T) {
+	e := newTransferEnv(t)
+	ctx := context.Background()
+	tr := e.send(t, "10")
+	forged := *tr
+	forged.From.Amount, forged.To.Amount = 999999, 999999
+	forged.signed = nil
+	// A's admin signs with a key of their own, put in A's file.
+	dA, _ := e.st.Space(ctx, e.A.ID)
+	var mine *signing.Key
+	if err := store.Tx(ctx, dA, func(tx store.DB) (err error) {
+		mine, err = spacekeys.Rotate(ctx, tx)
+		return err
+	}); err != nil {
 		t.Fatal(err)
 	}
-	if !verifyTransfer(m.tr.Keys, m.records(t, a3.ID)[tr.UUID]) {
+	p, _ := forged.payload(2)
+	forged.signed = p
+	forged.SignerKID, forged.Signature = mine.KID(), base64.StdEncoding.EncodeToString(mine.Sign(p))
+	if e.ok(forged) {
+		t.Fatal("a transfer signed by one space verified")
+	}
+}
+
+// Trust re-signs a transfer the keys of its spaces no longer vouch for, after
+// the members of both agree.
+func TestTrustResignsWithCurrentKeys(t *testing.T) {
+	e := newTransferEnv(t)
+	ctx := context.Background()
+	tr := e.send(t, "4")
+	dA, _ := e.st.Space(ctx, e.A.ID)
+	if _, err := dA.ExecContext(ctx, `DELETE FROM space_keys`); err != nil { // A's key is gone
+		t.Fatal(err)
+	}
+	if e.ok(e.records(t, e.A.ID)[tr.UUID]) {
+		t.Fatal("verified without A's key")
+	}
+	if err := e.tr.Trust(ctx, e.owner, e.A.ID, tr.UUID); err != nil {
+		t.Fatal(err)
+	}
+	if !e.ok(e.records(t, e.A.ID)[tr.UUID]) || !e.ok(e.records(t, e.B.ID)[tr.UUID]) {
 		t.Fatal("re-signing did not make the record verify")
 	}
 }
+
+// sign signs x with the current keys of the env's two spaces.
+func (e *transferEnv) sign(t *testing.T, x *Transfer) {
+	t.Helper()
+	ctx := context.Background()
+	err := e.st.InSpaces(ctx, []int64{e.A.ID, e.B.ID}, func(dbs map[int64]store.DB) error {
+		return e.tr.signWithSpaces(ctx, dbs, x)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// ok reports whether x verifies on this env's server.
+func (e *transferEnv) ok(x Transfer) bool { return e.tr.verify(context.Background(), x) }
 
 var _ store.Store = (*sqlite.Store)(nil)
 
