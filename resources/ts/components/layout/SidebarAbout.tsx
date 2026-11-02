@@ -1,4 +1,5 @@
-import { Github, ExternalLink } from 'lucide-react'
+import { ExternalLink } from 'lucide-react'
+import { BrandIcon } from '@/components/features/sso/BrandIcon'
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarFooter } from '@/components/ui/sidebar'
 import {
     DropdownMenu,
@@ -38,7 +39,7 @@ export function SidebarAbout() {
                                     rel="noopener noreferrer"
                                     className="cursor-pointer"
                                 >
-                                    <Github className="mr-2 size-4" />
+                                    <BrandIcon preset="github" className="mr-2 size-4" />
                                     {t('about.github')}
                                     <ExternalLink className="ml-auto size-3" />
                                 </a>

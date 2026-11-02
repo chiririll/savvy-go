@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { ColumnDef, Row } from '@tanstack/react-table'
+import type { RowData } from '@tanstack/react-table'
+import type { AppColumnDef, AppRow } from '../table/table-features'
 import { Link } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -8,23 +9,23 @@ import { PageHeader } from './PageHeader'
 import { DataTable } from '../table/DataTable'
 import { Button } from '@/components/ui/button'
 
-interface ListPageProps<T> {
+interface ListPageProps<T extends RowData> {
     title: string
     description?: string
     createLink?: string
     createLabel?: string
     onCreateClick?: () => void
     data: T[]
-    columns: ColumnDef<T>[]
+    columns: AppColumnDef<T>[]
     isLoading?: boolean
     emptyTitle?: string
     emptyDescription?: string
     toolbar?: ReactNode
-    getRowClassName?: (row: Row<T>) => string | undefined
+    getRowClassName?: (row: AppRow<T>) => string | undefined
     onReorder?: (items: T[]) => void
 }
 
-export function ListPage<T>({
+export function ListPage<T extends RowData>({
     title,
     description,
     createLink,

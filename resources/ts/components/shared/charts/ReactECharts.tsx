@@ -10,8 +10,8 @@ import {
     TooltipComponent,
 } from 'echarts/components'
 import { SVGRenderer } from 'echarts/renderers'
-import ReactEChartsCore from 'echarts-for-react/lib/core'
-import type { EChartsReactProps } from 'echarts-for-react/lib/types'
+import ReactEChartsCore from 'echarts-for-react/esm/core'
+import type { EChartsReactProps } from 'echarts-for-react/esm/types'
 
 echarts.use([
     BarChart,

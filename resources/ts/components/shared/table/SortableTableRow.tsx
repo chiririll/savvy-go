@@ -1,20 +1,22 @@
 import { createElement, CSSProperties, Fragment } from 'react'
 import { cn } from '@/lib/utils'
-import { flexRender, Row } from '@tanstack/react-table'
+import { flexRender } from '@tanstack/react-table'
+import type { RowData } from '@tanstack/react-table'
+import type { AppRow } from './table-features'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { TableCell, TableRow } from '@/components/ui/table'
 import { GripVertical } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
-export function SortableTableRow<T>({
+export function SortableTableRow<T extends RowData>({
     row,
     getRowClassName,
     renderSubComponent,
 }: {
-    row: Row<T>
-    getRowClassName?: (row: Row<T>) => string | undefined
-    renderSubComponent?: (props: { row: Row<T> }) => React.ReactNode
+    row: AppRow<T>
+    getRowClassName?: (row: AppRow<T>) => string | undefined
+    renderSubComponent?: (props: { row: AppRow<T> }) => React.ReactNode
 }) {
     const { t } = useTranslation()
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({

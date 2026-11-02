@@ -13,7 +13,7 @@ export default defineConfig(({ mode }) => {
         publicDir: false,
         resolve: {
             alias: {
-                '@': path.resolve(__dirname, './resources/ts'),
+                '@': path.resolve(import.meta.dirname, './resources/ts'),
             },
         },
         define: {
@@ -27,11 +27,11 @@ export default defineConfig(({ mode }) => {
             manifest: true,
             chunkSizeWarningLimit: 800,
             rollupOptions: {
-                input: path.resolve(__dirname, 'resources/ts/main.tsx'),
+                input: path.resolve(import.meta.dirname, 'resources/ts/main.tsx'),
                 output: {
                     manualChunks(id) {
                         if (/node_modules\/(react|react-dom|react-router|react-router-dom|scheduler)\//.test(id)) return 'react'
-                        // Name the chart engine chunk (dashboard and reports only). Not echarts-for-react: it is CJS and its interop helper would make react and echarts import each other.
+                        // Name the chart engine chunk (dashboard and reports only). Not echarts-for-react: its CJS build's default export breaks under pre-bundling, so the ESM build is imported.
                         if (/node_modules\/(echarts|zrender)\//.test(id)) return 'echarts'
                     },
                 },
