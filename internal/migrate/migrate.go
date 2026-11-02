@@ -29,6 +29,11 @@ const (
 // Up applies the pending migrations of this set.
 func (s Set) Up(ctx context.Context, db *sql.DB) error { return up(ctx, db, s) }
 
+// UpTo applies the pending migrations of this set up to and including last
+// ("<set>/<file>"). The converter from v1.0 uses it to get the base, copy the
+// rows into it and only then apply what came after.
+func (s Set) UpTo(ctx context.Context, db *sql.DB, last string) error { return upTo(ctx, db, last, s) }
+
 // EnsureIndexes creates the indexes this set declares.
 func (s Set) EnsureIndexes(ctx context.Context, db *sql.DB) error { return ensureIndexes(ctx, db, s) }
 
@@ -62,24 +67,57 @@ func (s Set) PendingVersions(ctx context.Context, db *sql.DB) ([]string, error) 
 	return out, nil
 }
 
-// ErrV1Schema is returned by Up for a space file still at v1.0. The space base
-// uses CREATE TABLE IF NOT EXISTS, which would leave the old tables as they are,
-// so such a file must be converted into a fresh one (internal/migrate/v1).
-var ErrV1Schema = errors.New("space file is at v1.0 and must be converted, not migrated in place")
+// ErrOldSchema is returned by Up for a space file of an older release. The
+// space base uses CREATE TABLE IF NOT EXISTS, which would leave the old tables
+// as they are, so such a file must be converted into a fresh one
+// (internal/migrate/upgrade), never migrated in place.
+var ErrOldSchema = errors.New("space file is of an older release and must be converted, not migrated in place")
 
-// v1Version and baseVersion are the recorded versions that tell a v1.0 space
-// file from a current one.
-const (
-	v1Version   = "space/0001_initial"
-	baseVersion = "space/0001_base"
-)
+// BaseVersion is the first migration of the current space schema. A space file
+// that records space migrations without it is of an older release.
+const BaseVersion = "space/0001_base"
+
+// IsOldSpace reports whether db records space migrations and not the current
+// base: a file of an older release, whichever it is. A database that was never
+// migrated, or holds only server migrations, is not.
+func IsOldSpace(ctx context.Context, db *sql.DB) (bool, error) {
+	var table string
+	err := db.QueryRowContext(ctx,
+		`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations'`).Scan(&table)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	applied, err := appliedVersions(ctx, db)
+	if err != nil {
+		return false, err
+	}
+	return oldSpace(applied), nil
+}
+
+func oldSpace(applied map[string]bool) bool {
+	if applied[BaseVersion] {
+		return false
+	}
+	for v := range applied {
+		if strings.HasPrefix(v, string(Space)+"/") {
+			return true
+		}
+	}
+	return false
+}
 
 const tableSQL = `CREATE TABLE IF NOT EXISTS schema_migrations (
     version TEXT PRIMARY KEY,
     applied_at TEXT NOT NULL
 ) STRICT`
 
-func up(ctx context.Context, db *sql.DB, sets ...Set) error {
+func up(ctx context.Context, db *sql.DB, sets ...Set) error { return upTo(ctx, db, "", sets...) }
+
+// upTo is up that stops after the migration called last; "" applies all.
+func upTo(ctx context.Context, db *sql.DB, last string, sets ...Set) error {
 	if _, err := db.ExecContext(ctx, tableSQL); err != nil {
 		return fmt.Errorf("create schema_migrations: %w", err)
 	}
@@ -88,8 +126,8 @@ func up(ctx context.Context, db *sql.DB, sets ...Set) error {
 		return err
 	}
 
-	if applied[v1Version] && !applied[baseVersion] && slices.Contains(sets, Space) {
-		return ErrV1Schema
+	if slices.Contains(sets, Space) && oldSpace(applied) {
+		return ErrOldSchema
 	}
 
 	names, err := migrationFiles(sets...)
@@ -100,6 +138,9 @@ func up(ctx context.Context, db *sql.DB, sets ...Set) error {
 	for _, name := range names {
 		version := strings.TrimSuffix(name, ".sql")
 		if applied[version] {
+			if version == last {
+				break
+			}
 			continue
 		}
 		body, err := fs.ReadFile(files, "sql/"+name)
@@ -114,6 +155,9 @@ func up(ctx context.Context, db *sql.DB, sets ...Set) error {
 			version, time.Now().UTC().Format(time.RFC3339),
 		); err != nil {
 			return fmt.Errorf("record %s: %w", name, err)
+		}
+		if version == last {
+			break
 		}
 	}
 	return nil

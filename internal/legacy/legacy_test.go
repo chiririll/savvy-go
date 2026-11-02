@@ -13,6 +13,7 @@ import (
 	"savvy-go/internal/db"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/migrate"
+	"savvy-go/internal/migrate/upgrade"
 )
 
 func TestUnsupportedLaravelVersionRejected(t *testing.T) {
@@ -95,6 +96,8 @@ func TestUpgradeLeavesGoSchemaUsable(t *testing.T) {
 		t.Fatalf("amount index restored = %d, %v", idx, err)
 	}
 
+	// The upgrade leaves a v1.0 space; the ledger reads it once converted.
+	sqlDB = convertedSpace(t, sqlDB)
 	btc, err := (ledger.Transactions{DB: sqlDB}).ByID(ctx, 3)
 	if err != nil || btc == nil || len(btc.Payments) != 1 || !btc.Payments[0].Amount.Decimal().Equal(decimal.RequireFromString("0.00012345")) {
 		t.Fatalf("btc tx via ledger = %+v, %v", btc, err)
@@ -106,6 +109,30 @@ func TestUpgradeLeavesGoSchemaUsable(t *testing.T) {
 	if err != nil || acct == nil || !acct.Balance.Decimal().Equal(decimal.RequireFromString("0.50012345")) {
 		t.Fatalf("btc account via ledger = %+v, %v", acct, err)
 	}
+}
+
+// convertedSpace converts the space tables of an upgraded file into a new
+// file, as the restore flow does when it splits the file, and opens it.
+func convertedSpace(t *testing.T, upgraded *sql.DB) *sql.DB {
+	t.Helper()
+	ctx := context.Background()
+	var path string
+	if err := upgraded.QueryRow(`SELECT file FROM pragma_database_list WHERE name = 'main'`).Scan(&path); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Checkpoint(ctx, upgraded); err != nil {
+		t.Fatal(err)
+	}
+	dst := filepath.Join(t.TempDir(), "space.sqlite")
+	if err := upgrade.Convert(ctx, path, dst); err != nil {
+		t.Fatal(err)
+	}
+	converted, err := db.Open(dst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = converted.Close() })
+	return converted
 }
 
 // upgradedFixture loads the Laravel fixture and runs Upgrade on it, as the

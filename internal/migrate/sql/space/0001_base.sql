@@ -1,7 +1,7 @@
 -- Space schema: the finances of one space. Each space has its own database,
 -- so no table carries a space id. Every amount is an exact integer in minor
 -- units of its own currency. v1.0 files (space/0001_initial) are converted into
--- a file with this base by internal/migrate/v1, never migrated in place; see
+-- a file with this base by internal/migrate/upgrade/v1, never migrated in place; see
 -- docs/plans/transactions-erd.md.
 
 CREATE TABLE IF NOT EXISTS currencies (
