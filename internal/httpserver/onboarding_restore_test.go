@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	"savvy-go/internal/auth"
-	"savvy-go/internal/firstrun"
+	"savvy-go/internal/auth/firstrun"
 )
 
 // firstRunRestore posts the restore form with no session, as the setup page does.

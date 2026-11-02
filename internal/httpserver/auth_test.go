@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"savvy-go/internal/firstrun"
+	"savvy-go/internal/auth/firstrun"
 	"savvy-go/internal/spaces/spacefill"
 )
 

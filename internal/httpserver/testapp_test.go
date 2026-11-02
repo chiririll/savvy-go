@@ -12,7 +12,7 @@ import (
 	"savvy-go/internal/appconfig"
 	"savvy-go/internal/auth"
 	"savvy-go/internal/currencydata"
-	"savvy-go/internal/firstrun"
+	"savvy-go/internal/auth/firstrun"
 	"savvy-go/internal/signing"
 	"savvy-go/internal/spaces"
 	"savvy-go/internal/store"

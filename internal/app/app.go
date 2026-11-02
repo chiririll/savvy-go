@@ -8,7 +8,7 @@ import (
 	"savvy-go/internal/appconfig"
 	"savvy-go/internal/config"
 	"savvy-go/internal/currencydata"
-	"savvy-go/internal/firstrun"
+	"savvy-go/internal/auth/firstrun"
 	"savvy-go/internal/jobs"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/locator"

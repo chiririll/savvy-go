@@ -4,7 +4,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"savvy-go/internal/auth"
-	"savvy-go/internal/firstrun"
+	"savvy-go/internal/auth/firstrun"
 	"savvy-go/internal/httpserver/httpx/guard"
 	"savvy-go/internal/httpserver/httpx/login"
 	"savvy-go/internal/httpserver/httpx/routing"

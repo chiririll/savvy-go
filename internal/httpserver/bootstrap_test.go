@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"savvy-go/internal/currencydata"
-	"savvy-go/internal/firstrun"
+	"savvy-go/internal/auth/firstrun"
 )
 
 func (a *testApp) register(password string, extra map[string]string) *http.Response {
