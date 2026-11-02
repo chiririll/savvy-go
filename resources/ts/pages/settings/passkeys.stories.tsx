@@ -26,8 +26,6 @@ export const Default: Story = {
     play: async ({ canvasElement }) => {
         const canvas = within(canvasElement)
         await expect(await canvas.findByText('Laptop')).toBeVisible()
-        // The tabs of the user's own settings.
-        await expect(canvas.getByRole('link', { name: /security/i })).toHaveAttribute('href', '/settings/security')
     },
 }
 export const Empty: Story = {

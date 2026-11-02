@@ -9,8 +9,6 @@ import (
 	"context"
 	"database/sql"
 	"strings"
-
-	"github.com/shopspring/decimal"
 )
 
 const confirmTransaction = `-- name: ConfirmTransaction :exec
@@ -519,53 +517,6 @@ func (q *Queries) ListTransactionLinks(ctx context.Context, ids []int64) ([]List
 	for rows.Next() {
 		var i ListTransactionLinksRow
 		if err := rows.Scan(&i.TransactionID, &i.TransferStatus, &i.RecurringID); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listTransactionSummaryRows = `-- name: ListTransactionSummaryRows :many
-SELECT t.type, l.amount, c.rate, c.is_base, c.decimals
-FROM transactions t
-JOIN transaction_lines l ON l.transaction_id = t.id
-JOIN currencies c ON c.id = l.currency_id
-WHERE t.status = ? AND t.type IN ('income','expense')
-`
-
-type ListTransactionSummaryRowsRow struct {
-	Type     string
-	Amount   int64
-	Rate     decimal.Decimal
-	IsBase   int64
-	Decimals int64
-}
-
-// What was spent or earned: the lines of confirmed income and expense, never
-// the payments (a transfer fee is a line of an expense, a change is not income).
-func (q *Queries) ListTransactionSummaryRows(ctx context.Context, status string) ([]ListTransactionSummaryRowsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listTransactionSummaryRows, status)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListTransactionSummaryRowsRow{}
-	for rows.Next() {
-		var i ListTransactionSummaryRowsRow
-		if err := rows.Scan(
-			&i.Type,
-			&i.Amount,
-			&i.Rate,
-			&i.IsBase,
-			&i.Decimals,
-		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

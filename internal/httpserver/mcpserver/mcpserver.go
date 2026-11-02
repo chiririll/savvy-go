@@ -104,13 +104,25 @@ type mcpNeed struct{ resource, level string }
 // names the missing permission.
 func (h Handler) mcpServer(perms []string) *mcp.Server {
 	srv := mcp.NewServer(
-		&mcp.Implementation{Name: "go-savvy", Version: h.Version},
+		&mcp.Implementation{Name: "go-savvy", Version: h.Version, Icons: h.icons()},
 		&mcp.ServerOptions{Instructions: mcpInstructions},
 	)
 	h.addSimpleReadTools(srv)
 	h.addQueryReadTools(srv)
 	h.hideUngrantedTools(srv, h.addMCPWriteTools(srv), perms)
 	return srv
+}
+
+// icons are the app's favicons from the public URL, which an assistant shows
+// beside the connector. The URL is read per request like the OAuth metadata one.
+func (h Handler) icons() []mcp.Icon {
+	base := h.Cfg.AppURL()
+	return []mcp.Icon{
+		{Source: base + "/favicon.svg", MIMEType: "image/svg+xml", Sizes: []string{"any"}},
+		{Source: base + "/web-app-manifest-512x512.png", MIMEType: "image/png", Sizes: []string{"512x512"}},
+		{Source: base + "/web-app-manifest-192x192.png", MIMEType: "image/png", Sizes: []string{"192x192"}},
+		{Source: base + "/favicon-96x96.png", MIMEType: "image/png", Sizes: []string{"96x96"}},
+	}
 }
 
 // hideUngrantedTools leaves out of the tool list what the token has no grant for.

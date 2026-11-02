@@ -7,7 +7,7 @@ import { intlLocale } from '@/lib/i18n'
 export function useRelativeDay() {
     const { t, i18n } = useTranslation('pages')
 
-    return useCallback((dateKey: string | null) => formatTransactionGroupHeading(
+    return useCallback((dateKey: string | null, options?: { weekday?: boolean }) => formatTransactionGroupHeading(
         dateKey?.slice(0, 10) ?? null,
         intlLocale(i18n.language),
         {
@@ -16,5 +16,6 @@ export function useRelativeDay() {
             tomorrow: t('transactions.tomorrow'),
             noDate: t('transactions.noDate'),
         },
+        options,
     ), [t, i18n.language])
 }

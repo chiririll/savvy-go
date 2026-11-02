@@ -36,14 +36,19 @@ func toBase(minor, decimals int64, rate decimal.Decimal) decimal.Decimal {
 type TxFilter struct {
 	Type        string
 	AccountID   int64
+	AccountIDs  []int64
+	Currencies  []string // codes; a transfer matches when either side is one
 	CategoryID  int64
 	CategoryIDs []int64
 	TagIDs      []int64
 	Status      string
 	StartDate   string
 	EndDate     string
-	SortBy      string
-	SortDir     string
+	// Search is free text: space-separated terms, all of which must match
+	// (see searchWhere).
+	Search  string
+	SortBy  string
+	SortDir string
 }
 
 func txWhere(f TxFilter) (string, []any) {
@@ -56,6 +61,30 @@ func txWhere(f TxFilter) (string, []any) {
 	if f.AccountID > 0 {
 		q += ` AND EXISTS (SELECT 1 FROM payments p WHERE p.transaction_id = t.id AND p.account_id = ?)`
 		args = append(args, f.AccountID)
+	}
+	if len(f.AccountIDs) > 0 {
+		q += ` AND EXISTS (SELECT 1 FROM payments p WHERE p.transaction_id = t.id AND p.account_id IN (` +
+			Placeholders(len(f.AccountIDs)) + `))`
+		for _, id := range f.AccountIDs {
+			args = append(args, id)
+		}
+	}
+	if len(f.Currencies) > 0 {
+		ph := Placeholders(len(f.Currencies))
+		// currencies.code compares without regard to case. A transaction is
+		// in a currency when it moved money in it or has a line in it.
+		q += ` AND (EXISTS (SELECT 1 FROM payments p
+				JOIN accounts a ON a.id = p.account_id
+				JOIN currencies c ON c.id = a.currency_id
+				WHERE p.transaction_id = t.id AND c.code IN (` + ph + `))
+			OR EXISTS (SELECT 1 FROM transaction_lines l
+				JOIN currencies c ON c.id = l.currency_id
+				WHERE l.transaction_id = t.id AND c.code IN (` + ph + `)))`
+		for range 2 {
+			for _, code := range f.Currencies {
+				args = append(args, code)
+			}
+		}
 	}
 	if f.CategoryID > 0 {
 		q += ` AND EXISTS (SELECT 1 FROM transaction_lines l WHERE l.transaction_id = t.id AND l.category_id = ?)`
@@ -88,7 +117,8 @@ func txWhere(f TxFilter) (string, []any) {
 		q += ` AND (t.date IS NULL OR t.date <= ?)`
 		args = append(args, f.EndDate)
 	}
-	return q, args
+	sq, sargs := searchWhere(f.Search)
+	return q + sq, append(args, sargs...)
 }
 
 // txSize is how much money a transaction moved, in the base currency: the
@@ -124,6 +154,45 @@ func CountTransactions(ctx context.Context, sqlDB store.DB, f TxFilter) (int64, 
 	var n int64
 	err := sqlDB.QueryRowContext(ctx, `SELECT COUNT(*) FROM transactions t `+where, args...).Scan(&n)
 	return n, err
+}
+
+// SummaryRow is one income or expense with what folds it into the base currency.
+type SummaryRow struct {
+	Type     string
+	Minor    int64
+	Decimals int64
+	Rate     decimal.Decimal
+	IsBase   bool
+}
+
+// SummaryRows lists the lines of the income and expenses in a status that
+// match f. The Status of f is replaced by status, since a summary covers one
+// status; a Type of f still narrows it, so "transfer" leaves nothing. Lines,
+// never payments: a transfer fee is a line of an expense, a change is not income.
+func SummaryRows(ctx context.Context, sqlDB store.DB, f TxFilter, status string) ([]SummaryRow, error) {
+	f.Status = status
+	where, args := txWhere(f)
+	rows, err := sqlDB.QueryContext(ctx, `
+		SELECT t.type, l.amount, c.rate, c.is_base, c.decimals
+		FROM transactions t
+		JOIN transaction_lines l ON l.transaction_id = t.id
+		JOIN currencies c ON c.id = l.currency_id
+		`+where+` AND t.type IN ('income', 'expense')`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []SummaryRow{}
+	for rows.Next() {
+		var r SummaryRow
+		var isBase int64
+		if err := rows.Scan(&r.Type, &r.Minor, &r.Rate, &isBase, &r.Decimals); err != nil {
+			return nil, err
+		}
+		r.IsBase = isBase != 0
+		out = append(out, r)
+	}
+	return out, rows.Err()
 }
 
 func ListTransactions(

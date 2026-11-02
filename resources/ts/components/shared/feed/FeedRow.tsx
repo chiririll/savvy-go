@@ -213,10 +213,13 @@ export function FeedProgress({ value, exceeded, muted }: { value: number; exceed
 }
 
 /** A titled section of feed rows. */
-export function FeedGroup({ title, children }: { title: ReactNode; children: ReactNode }) {
+export function FeedGroup({ title, aside, children }: { title: ReactNode; aside?: ReactNode; children: ReactNode }) {
     return (
         <section className="min-w-0">
-            <h2 className="px-1.5 pb-1 text-sm font-semibold capitalize">{title}</h2>
+            <div className="flex items-baseline justify-between gap-2 px-1.5 pb-1">
+                <h2 className="text-sm font-semibold capitalize">{title}</h2>
+                {aside != null && <span className="text-xs tabular-nums text-muted-foreground">{aside}</span>}
+            </div>
             <div className="divide-y divide-border/60">{children}</div>
         </section>
     )

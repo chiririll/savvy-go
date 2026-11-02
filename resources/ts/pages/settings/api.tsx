@@ -1,5 +1,4 @@
 import { testId } from '@/lib/test-id'
-import { UserSettingsTabs } from '@/components/features/settings/UserSettingsTabs'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ExternalLink, KeyRound, Plus } from 'lucide-react'
@@ -28,7 +27,6 @@ export default function ApiSettingsPage() {
     return (
         <Page title={t('api.title')}>
             <PageHeader title={t('api.heading')} description={t('api.description')} />
-            <UserSettingsTabs />
 
             <FormWrapper>
                 <section className="rounded-xl border bg-card shadow-sm">

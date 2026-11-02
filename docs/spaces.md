@@ -1,6 +1,6 @@
 # Spaces and Roles
 
-All finances live in a **space**: accounts, transactions, categories, tags, currencies, budgets, debts, recurring transactions and automation rules. Spaces are fully separate, each with its own base currency (say, a personal budget, a family one and a side project). Switch spaces at the top of the sidebar.
+All finances live in a **space**: accounts, transactions, categories, tags, currencies, budgets, debts, recurring transactions and automation rules. Spaces are fully separate, each with its own base currency (say, a personal budget, a family one and a side project). Switch spaces at the top of the sidebar. Under it, **Space** holds what belongs to the current space (accounts, categories, tags, currencies, automation, import, backups and **Settings**), and **Account** holds your own sign-in: security, passkeys and API tokens. Backups is shown to the space's admins only.
 
 A new user starts with no space: create one or accept an invitation. Guests cannot create spaces.
 
@@ -48,7 +48,7 @@ A space always keeps one admin: the last admin cannot leave or be demoted while 
 
 ## Invitations
 
-Space admins invite people from **Settings → Space** or the last screen of space creation. An invitation has a role, is valid for 7 days and works once. The settings page shows one list of open invitations above the form. A link is shown for copying only right after it is made: the server keeps no copy, so after a reload revoke the invitation and make a new one. Existing users join directly; new users can register through it if the server admin allows.
+Space admins invite people from **Space → Settings** or the last screen of space creation. An invitation has a role, is valid for 7 days and works once. The settings page shows one list of open invitations above the form. A link is shown for copying only right after it is made: the server keeps no copy, so after a reload revoke the invitation and make a new one. Existing users join directly; new users can register through it if the server admin allows.
 
 How it is sent depends on the server:
 
@@ -58,14 +58,14 @@ How it is sent depends on the server:
 | [Email](email-and-security.md#email) set up | email, or a link to copy: you choose |
 | No email | a link to copy |
 
-- **By email**: the link goes only to that address, so only that mailbox can use it, and registering confirms the address. To invite someone else, revoke and invite again.
+- **By email**: the link goes only to that address, so only that mailbox can use it, and registering confirms the address. You choose the language of the email (English or Russian, starting from your interface language). To invite someone else, revoke and invite again.
 - **By link**: you copy it once and send it yourself. Anyone with it can use it, and the new account starts unconfirmed. Instead of an address you can add an optional note (up to 100 characters, such as "Kim from work") to tell links apart in your list.
 - **While creating a space**, people you add are only a list until you finish. Emails go out afterwards and links appear on the last screen. Remove someone before that and nothing is sent.
 - An address cannot be invited to a space it is already invited to or belongs to. After a revoked or expired invitation it cannot be invited again for 1–2 hours; a server admin can end the wait in **Administration → System**.
 
 ## Linked spaces and transfers
 
-An admin of two spaces can link them in **Settings → Space**; either side's admin can unlink.
+An admin of two spaces can link them in **Space → Settings**; either side's admin can unlink.
 
 Editors of both can then send money between them: in the transaction dialog, choose the spaces tab next to *Transfer*, then the destination space and accounts. Each side uses its own account's currency.
 
@@ -77,7 +77,7 @@ A transfer is stored in both spaces and signed by both of them: every space has 
 
 ## Shared categories and tags
 
-Spaces that should use the same categories and tags can join a **sync group** in **Settings → Space → Shared categories and tags**. It needs no link or transfers and works between any spaces you administer. A space is in one group at most. Joining walks through the differences step by step (categories, where the transactions of a deleted category go, tags, then defaults and a summary); nothing changes until **Apply**, and **Back** keeps your choices. The dialog is a sheet on a phone.
+Spaces that should use the same categories and tags can join a **sync group** in **Space → Settings → Shared categories and tags**. It needs no link or transfers and works between any spaces you administer. A space is in one group at most. Joining walks through the differences step by step (categories, where the transactions of a deleted category go, tags, then defaults and a summary); nothing changes until **Apply**, and **Back** keeps your choices. The dialog is a sheet on a phone.
 
 Categories and tags are switched on separately. While a kind is on, any add, edit, rename, default change or delete in one space is applied to all spaces of the group in one step: if it fails anywhere, it is done nowhere. Items match by name, ignoring case (categories also by type).
 

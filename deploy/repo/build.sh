@@ -30,16 +30,20 @@ tags=$(gh release list --repo "$GITHUB_REPOSITORY" --exclude-drafts --limit 50 -
   | grep -E '^v[0-9]+(\.[0-9]+)*$' | head -n "$KEEP" || true)
 [ -n "$tags" ] || { echo "no stable releases found" >&2; exit 1; }
 
+# gh lists newest first, so the first tag that has packages is the latest version.
+latest=
 for tag in $tags; do
   v=${tag#v}
   if ! gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern 'savvy-go.deb' --pattern 'savvy-go.rpm' --dir "$work/$tag"; then
     echo "::warning::$tag has no packages, skipped"
     continue
   fi
+  latest=${latest:-$tag}
   # Release assets share one name; the repos need a distinct file per version.
   mv "$work/$tag/savvy-go.deb" "$pool/savvy-go_${v}_amd64.deb"
   mv "$work/$tag/savvy-go.rpm" "$OUT/rpm/savvy-go-${v}-1.x86_64.rpm"
 done
+[ -n "$latest" ] || { echo "no release has packages" >&2; exit 1; }
 
 # apt: pool + dists/stable, Release signed as InRelease and Release.gpg.
 (
@@ -58,6 +62,8 @@ sign --armor --detach-sign --output "$OUT/rpm/repodata/repomd.xml.asc" "$OUT/rpm
 gpg --armor --export > "$OUT/savvy-go.asc"
 
 sed "s#@SITE_URL@#$SITE_URL#g" "$here/savvy-go.repo" > "$OUT/savvy-go.repo"
-sed -e "s#@REPO@#$GITHUB_REPOSITORY#g" -e "s#@SITE_URL@#$SITE_URL#g" "$here/index.html" > "$OUT/index.html"
+sed "s#@SITE_URL@#$SITE_URL#g" "$here/install.sh" > "$OUT/install.sh"
+sed -e "s#@REPO@#$GITHUB_REPOSITORY#g" -e "s#@SITE_URL@#$SITE_URL#g" -e "s#@VERSION@#$latest#g" \
+  "$here/index.html" > "$OUT/index.html"
 
-echo "Built $OUT with: $(echo $tags)"
+echo "Built $OUT with: $(echo $tags), latest $latest"

@@ -109,10 +109,11 @@ func (h Handler) update(w http.ResponseWriter, r *http.Request) {
 }
 
 // test checks the connection and sends a test message to the given address
-// or, by default, to the admin who asked.
+// or, by default, to the admin who asked, in the language of "locale".
 func (h Handler) test(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		To string `json:"to"`
+		To     string `json:"to"`
+		Locale string `json:"locale"`
 	}
 	if r.ContentLength != 0 && !httpx.DecodeBody(w, r, &body) {
 		return
@@ -136,12 +137,7 @@ func (h Handler) test(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusUnprocessableEntity, "Could not connect to the mail server: "+err.Error())
 		return
 	}
-	err := h.Mail.Send(r.Context(), smtp.Message{
-		To:      to,
-		Subject: "Go Savvy test email",
-		Text:    "This is a test email from Go Savvy. Your mail settings work.\n",
-	})
-	if err != nil {
+	if err := h.Mail.Send(r.Context(), mail.Test(body.Locale, to)); err != nil {
 		httpx.WriteMessage(w, http.StatusUnprocessableEntity, "The mail server did not accept the message: "+err.Error())
 		return
 	}

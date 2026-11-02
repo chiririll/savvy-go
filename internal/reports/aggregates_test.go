@@ -5,6 +5,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
+	"savvy-go/internal/db/filter"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/money"
 	"savvy-go/internal/money/moneytest"
@@ -59,7 +60,7 @@ func TestReportTotalsFoldCurrenciesIntoBase(t *testing.T) {
 		if total := got.Total; !total.Equal(want) {
 			t.Fatalf("report total = %s (%+v), want %s", total, total.Unit(), want)
 		}
-		sum := (ledger.Transactions{DB: e.db}).Summary(e.ctx, false)
+		sum := (ledger.Transactions{DB: e.db}).Summary(e.ctx, filter.TxFilter{}, false)
 		if !sum.Expense.Equal(want) {
 			t.Fatalf("transaction summary = %s, want %s", sum.Expense, want)
 		}

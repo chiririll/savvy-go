@@ -1,6 +1,5 @@
 import { useTranslation } from 'react-i18next'
 import { Page, PageHeader, FormWrapper } from '@/components/shared'
-import { UserSettingsTabs } from '@/components/features/settings/UserSettingsTabs'
 import { ChangePasswordSection } from '@/components/features/security/ChangePasswordSection'
 import { SessionsSection } from '@/components/features/security/SessionsSection'
 import { TwoFactorSection, RecoverySection } from '@/components/features/security/TwoFactorSections'
@@ -14,7 +13,6 @@ export default function SecuritySettingsPage() {
     return (
         <Page title={t('security.title')}>
             <PageHeader title={t('security.heading')} description={t('security.description')} />
-            <UserSettingsTabs />
 
             <FormWrapper>
                 <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">

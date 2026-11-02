@@ -9,7 +9,8 @@ const item = (
     email: string | null,
     role: SpaceRole = 'editor',
     note: string | null = null,
-): DraftInvitation => ({ key, email, note, role })
+    locale: string | null = null,
+): DraftInvitation => ({ key, email, note, role, locale })
 
 describe('sendInvitations', () => {
     it('emails the addressed ones and builds a link for the rest', async () => {
@@ -19,13 +20,13 @@ describe('sendInvitations', () => {
 
         const out = await sendInvitations(
             9,
-            [item('a', 'bob@example.org'), item('b', null, 'viewer', 'Kim')],
+            [item('a', 'bob@example.org', 'editor', null, 'ru'), item('b', null, 'viewer', 'Kim')],
             invite,
             'https://savvy.example',
         )
 
-        expect(invite).toHaveBeenNthCalledWith(1, 9, 'editor', 'bob@example.org', undefined)
-        expect(invite).toHaveBeenNthCalledWith(2, 9, 'viewer', undefined, 'Kim')
+        expect(invite).toHaveBeenNthCalledWith(1, 9, 'editor', 'bob@example.org', undefined, 'ru')
+        expect(invite).toHaveBeenNthCalledWith(2, 9, 'viewer', undefined, 'Kim', undefined)
         expect(out).toMatchObject([
             { emailed: true, link: null, error: null },
             { emailed: false, link: 'https://savvy.example/invite/abc', error: null },

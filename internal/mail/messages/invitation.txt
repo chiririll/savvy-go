@@ -1,0 +1,4 @@
+{{template "greeting" .}}
+{{template "body" .}}
+{{template "button" .}}
+{{template "link-fallback" .}}

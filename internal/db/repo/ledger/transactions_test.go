@@ -325,12 +325,12 @@ func TestSummaryRowsAreConfirmedLines(t *testing.T) {
 	pending, _ := f.repo.InsertTransaction(ctx, ledgerrepo.TxFields{Type: "expense", Status: "pending", Date: &date}, now)
 	_ = f.repo.ReplaceLines(ctx, pending, []ledgerrepo.LineFields{{Amount: money.New(900, f.unit(f.usd))}})
 
-	rows, err := f.repo.SummaryRows(ctx, "confirmed")
+	rows, err := f.repo.SummaryRows(ctx, filter.TxFilter{}, "confirmed")
 	if err != nil || len(rows) != 1 || rows[0].Type != "expense" || rows[0].Minor != 500 || rows[0].Decimals != 0 ||
 		rows[0].IsBase {
 		t.Fatalf("confirmed = %+v, %v", rows, err)
 	}
-	if rows, _ := f.repo.SummaryRows(ctx, "pending"); len(rows) != 1 || rows[0].Minor != 900 {
+	if rows, _ := f.repo.SummaryRows(ctx, filter.TxFilter{}, "pending"); len(rows) != 1 || rows[0].Minor != 900 {
 		t.Fatalf("pending = %+v", rows)
 	}
 }

@@ -56,6 +56,12 @@ export function resolvePeriodDates(preset: PeriodPreset, customStart: string, cu
     return getPresetDates(preset)
 }
 
+/** True when today falls inside the range. Budgets and debts show the present, so only such a period fits them. */
+export function includesToday(range: DateRange, now = new Date()): boolean {
+    const today = formatDateLocal(now)
+    return range.start_date <= today && today <= range.end_date
+}
+
 export function toReportFilters(
     preset: PeriodPreset,
     customStartDate: string,

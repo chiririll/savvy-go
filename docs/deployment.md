@@ -175,6 +175,16 @@ Use a single-replica `Deployment` with a `PersistentVolumeClaim` at `/data` and 
           periodSeconds: 10
 ```
 
+## Install script
+
+On Debian, Ubuntu, Fedora, RHEL or openSUSE (x86_64), one command adds the package repository and installs the package. It detects apt, dnf or zypper; use `wget -qO-` instead of `curl -fsSL` if you have no curl:
+
+```bash
+curl -fsSL https://chiririll.github.io/savvy-go/install.sh | sudo sh
+```
+
+The steps it runs are below, if you prefer to do them by hand. The [repository page](https://chiririll.github.io/savvy-go/) shows the latest version.
+
 ## Debian package
 
 For Debian 13 (Trixie) or later. Add the repository once and `apt upgrade` delivers new versions:
@@ -202,6 +212,8 @@ For Fedora, RHEL (and derivatives) or openSUSE:
 sudo curl -fsSLo /etc/yum.repos.d/savvy-go.repo https://chiririll.github.io/savvy-go/savvy-go.repo
 sudo dnf install savvy-go
 ```
+
+On openSUSE: `sudo zypper addrepo --refresh https://chiririll.github.io/savvy-go/savvy-go.repo && sudo zypper install savvy-go`.
 
 The repository metadata is signed (`repo_gpgcheck`); the packages are not. Or download one package from the release: `sudo dnf install https://github.com/chiririll/savvy-go/releases/latest/download/savvy-go.rpm`.
 

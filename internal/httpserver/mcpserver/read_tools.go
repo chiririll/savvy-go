@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -38,19 +39,22 @@ type idArgs struct {
 }
 
 type transactionsArgs struct {
-	SpaceID       int64   `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
-	StartDate     string  `json:"start_date,omitempty" jsonschema:"Earliest date, YYYY-MM-DD."`
-	EndDate       string  `json:"end_date,omitempty" jsonschema:"Latest date, YYYY-MM-DD."`
-	Type          string  `json:"type,omitempty" jsonschema:"income, expense or transfer."`
-	Status        string  `json:"status,omitempty" jsonschema:"completed, pending or skipped."`
-	AccountID     int64   `json:"account_id,omitempty" jsonschema:"Only this account."`
-	CategoryIDs   []int64 `json:"category_ids,omitempty" jsonschema:"Only these categories."`
-	TagIDs        []int64 `json:"tag_ids,omitempty" jsonschema:"Only these tags."`
-	SortBy        string  `json:"sort_by,omitempty" jsonschema:"date (default), amount or created_at."`
-	SortDirection string  `json:"sort_direction,omitempty" jsonschema:"desc (default) or asc."`
-	Page          int     `json:"page,omitempty" jsonschema:"Page number from 1."`
-	PerPage       int     `json:"per_page,omitempty" jsonschema:"Rows per page, at most 100 (default 25)."`
-	WithSummary   bool    `json:"with_summary,omitempty" jsonschema:"Also return totals."`
+	SpaceID       int64    `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
+	StartDate     string   `json:"start_date,omitempty" jsonschema:"Earliest date, YYYY-MM-DD."`
+	EndDate       string   `json:"end_date,omitempty" jsonschema:"Latest date, YYYY-MM-DD."`
+	Type          string   `json:"type,omitempty" jsonschema:"income, expense or transfer."`
+	Status        string   `json:"status,omitempty" jsonschema:"completed, pending or skipped."`
+	AccountID     int64    `json:"account_id,omitempty" jsonschema:"Only this account."`
+	AccountIDs    []int64  `json:"account_ids,omitempty" jsonschema:"Only these source accounts."`
+	Currency      []string `json:"currency,omitempty" jsonschema:"Only these currency codes, e.g. USD. A transfer matches if either account is in one."`
+	CategoryIDs   []int64  `json:"category_ids,omitempty" jsonschema:"Only these categories."`
+	TagIDs        []int64  `json:"tag_ids,omitempty" jsonschema:"Only these tags."`
+	Query         string   `json:"q,omitempty" jsonschema:"Search words that must all match description, item names or an amount (1879, 18.79)."`
+	SortBy        string   `json:"sort_by,omitempty" jsonschema:"date (default), amount or created_at."`
+	SortDirection string   `json:"sort_direction,omitempty" jsonschema:"desc (default) or asc."`
+	Page          int      `json:"page,omitempty" jsonschema:"Page number from 1."`
+	PerPage       int      `json:"per_page,omitempty" jsonschema:"Rows per page, at most 100 (default 25)."`
+	WithSummary   bool     `json:"with_summary,omitempty" jsonschema:"Also return totals."`
 }
 
 type reportArgs struct {
@@ -229,8 +233,21 @@ func transactionsQuery(in transactionsArgs) (url.Values, error) {
 		return nil, err
 	}
 	setID(q, "account_id", in.AccountID)
+	setIDs(q, "account_ids", in.AccountIDs)
 	setIDs(q, "category_ids", in.CategoryIDs)
 	setIDs(q, "tag_ids", in.TagIDs)
+	var codes []string
+	for _, code := range in.Currency {
+		if code = strings.TrimSpace(code); code != "" {
+			codes = append(codes, code)
+		}
+	}
+	if len(codes) > 0 {
+		q.Set("currency", strings.Join(codes, ","))
+	}
+	if in.Query != "" {
+		q.Set("q", in.Query)
+	}
 	if in.Page > 0 {
 		q.Set("page", strconv.Itoa(in.Page))
 	}

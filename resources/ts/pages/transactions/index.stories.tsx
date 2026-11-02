@@ -59,8 +59,8 @@ export const Default: Story = {
         await expect(await canvas.findByText('Weekly shop')).toBeVisible()
         await expect(canvas.getByText('Ramen')).toBeVisible()
         await expect(canvas.getByText('Taxi')).toBeVisible()
-        await expect(canvas.getByText(/1,200 ¥/)).toBeVisible()
-        await expect(canvas.getByText(/1\.234/)).toBeVisible()
+        await expect(canvas.getAllByText(/1,200 ¥/)[0]).toBeVisible()
+        await expect(canvas.getAllByText(/1\.234/)[0]).toBeVisible()
         await expect(canvas.getByRole('button', { name: /new transaction/i })).toBeVisible()
     },
 }

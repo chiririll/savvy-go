@@ -3,6 +3,7 @@ package httpx
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"savvy-go/internal/auth"
 )
@@ -45,3 +46,7 @@ func User(r *http.Request) *auth.User {
 	u, _ := r.Context().Value(ctxUser).(*auth.User)
 	return u
 }
+
+// Locale is the language of the user interface that made the request (its X-Locale
+// header), for text the server writes on the user's behalf; empty when not sent.
+func Locale(r *http.Request) string { return strings.TrimSpace(r.Header.Get("X-Locale")) }

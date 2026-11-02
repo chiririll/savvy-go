@@ -42,6 +42,13 @@ const raster = (size: number, background: string | null): Promise<Buffer> => {
     return (background ? image.flatten({ background }) : image).png().toBuffer()
 }
 
+// Email logo: PNG, because Gmail and Outlook do not show SVG. 120px is the 40px slot at 3x.
+const mailLogo = (): Promise<Buffer> =>
+    sharp(Buffer.from(tile('#1f2937', '#f3f4f6')), { density: (72 * 120) / 100 })
+        .resize(120, 120)
+        .png()
+        .toBuffer()
+
 // ICO container holding PNG-encoded images.
 function ico(images: { size: number; data: Buffer }[]): Buffer {
     const head = Buffer.alloc(6 + 16 * images.length)
@@ -64,6 +71,7 @@ function ico(images: { size: number; data: Buffer }[]): Buffer {
 await writeFile(out('public/favicon.svg'), favicon)
 await writeFile(out('docs/images/logo-light.svg'), tile('#1f2937', '#f3f4f6'))
 await writeFile(out('docs/images/logo-dark.svg'), tile('#f9fafb', '#374151'))
+await writeFile(out('internal/mail/layout/logo.png'), await mailLogo())
 for (const [name, size, bg] of pngs) await writeFile(out('public', name), await raster(size, bg))
 await writeFile(
     out('public/favicon.ico'),

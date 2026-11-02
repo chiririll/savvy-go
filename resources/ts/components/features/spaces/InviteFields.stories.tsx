@@ -46,7 +46,7 @@ export const InvitedByEmail: Story = {
         await userEvent.type(field, '  alex@example.com ')
         await userEvent.click(within(canvasElement).getByRole('button', { name: 'Invite' }))
         await waitFor(() =>
-            expect(args.onSubmit).toHaveBeenCalledWith({ email: 'alex@example.com', note: null, role: 'editor' }),
+            expect(args.onSubmit).toHaveBeenCalledWith(expect.objectContaining({ email: 'alex@example.com', note: null, role: 'editor' })),
         )
         await expect(field).toHaveValue('')
     },
@@ -90,7 +90,7 @@ export const LinkWithANoteAndRole: Story = {
         await userEvent.click(await screen.findByRole('option', { name: 'Viewer' }))
         await userEvent.click(canvas.getByRole('button', { name: 'Invite' }))
         await waitFor(() =>
-            expect(args.onSubmit).toHaveBeenCalledWith({ email: null, note: 'For grandma', role: 'viewer' }),
+            expect(args.onSubmit).toHaveBeenCalledWith(expect.objectContaining({ email: null, note: 'For grandma', role: 'viewer' })),
         )
     },
 }
@@ -100,7 +100,7 @@ export const LinkWithoutANote: Story = {
         const canvas = within(canvasElement)
         await userEvent.click(await canvas.findByRole('button', { name: /copy a link/i }))
         await userEvent.click(canvas.getByRole('button', { name: 'Invite' }))
-        await waitFor(() => expect(args.onSubmit).toHaveBeenCalledWith({ email: null, note: null, role: 'editor' }))
+        await waitFor(() => expect(args.onSubmit).toHaveBeenCalledWith(expect.objectContaining({ email: null, note: null, role: 'editor' })))
     },
 }
 

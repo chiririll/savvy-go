@@ -120,11 +120,3 @@ DELETE FROM transaction_tag WHERE transaction_id = ?;
 -- name: InsertTransactionTag :exec
 INSERT INTO transaction_tag (transaction_id, tag_id) VALUES (?,?) ON CONFLICT DO NOTHING;
 
--- name: ListTransactionSummaryRows :many
--- What was spent or earned: the lines of confirmed income and expense, never
--- the payments (a transfer fee is a line of an expense, a change is not income).
-SELECT t.type, l.amount, c.rate, c.is_base, c.decimals
-FROM transactions t
-JOIN transaction_lines l ON l.transaction_id = t.id
-JOIN currencies c ON c.id = l.currency_id
-WHERE t.status = ? AND t.type IN ('income','expense');

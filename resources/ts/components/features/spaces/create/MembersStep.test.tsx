@@ -11,7 +11,7 @@ let methods: InviteMethods | undefined
 
 vi.mock('react-i18next', async (importActual) => ({
     ...(await importActual<typeof import('react-i18next')>()),
-    useTranslation: () => ({ t: (key: string) => key }),
+    useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'ru-RU', resolvedLanguage: 'ru' } }),
 }))
 vi.mock('@/hooks/use-spaces', () => ({ useInviteMethods: () => ({ data: methods }) }))
 
@@ -51,5 +51,25 @@ describe('MembersStep', () => {
         expect(screen.getByPlaceholderText('spaces.invitations.emailPlaceholder')).toBeTruthy()
         // No switch between the methods: there is only one.
         expect(screen.queryByRole('button', { name: 'spaces.invitations.methodLink' })).toBeNull()
+    })
+
+    it('writes the email in the language of the interface, and none for a link', () => {
+        methods = { email: true, link: true }
+        const onList = vi.fn()
+        render(<Harness onList={onList} />)
+
+        fireEvent.change(screen.getByPlaceholderText('spaces.invitations.emailPlaceholder'), {
+            target: { value: 'bob@example.org' },
+        })
+        add()
+        expect(onList).toHaveBeenLastCalledWith([expect.objectContaining({ email: 'bob@example.org', locale: 'ru' })])
+
+        fireEvent.click(screen.getByRole('button', { name: 'spaces.invitations.methodLink' }))
+        expect(screen.queryByTestId('invite-locale')).toBeNull()
+        add()
+        expect(onList).toHaveBeenLastCalledWith([
+            expect.objectContaining({ email: 'bob@example.org' }),
+            expect.objectContaining({ email: null, locale: null }),
+        ])
     })
 })

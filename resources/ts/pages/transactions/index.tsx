@@ -19,7 +19,9 @@ import {
     useDuplicateTransaction,
     useSkipTransaction,
     useReorderTransactions,
+    useAccounts,
     useCategories,
+    useCurrencies,
     useTags,
     useTransactionListFilters,
 } from '@/hooks'
@@ -55,6 +57,8 @@ export default function TransactionsPage() {
     const reorder = useReorderTransactions()
     const { data: categories } = useCategories()
     const { data: tags } = useTags()
+    const { data: accounts } = useAccounts({ exclude_debts: true })
+    const { data: currencies } = useCurrencies()
     const isReadOnly = useReadOnly()
     const { openCreate, openEdit } = useTransactionDeepLink(transactions)
     const { startApplying, dialogProps: applyDialog } = useApplyDeferred()
@@ -100,7 +104,13 @@ export default function TransactionsPage() {
                 )}
 
                 <div className="min-w-0 lg:col-start-1 lg:row-start-1">
-                    <TransactionFiltersPanel list={list} categories={categories} tags={tags} />
+                    <TransactionFiltersPanel
+                        list={list}
+                        categories={categories}
+                        tags={tags}
+                        accounts={accounts}
+                        currencies={currencies}
+                    />
 
                     {showListError ? (
                         <div className="rounded-lg border py-16 text-center">

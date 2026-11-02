@@ -37,6 +37,10 @@ export const pages = {
     automation: { path: '/automation', scope: 'space' },
     automationLogs: { path: '/automation/:id/logs', scope: 'space' },
     reports: { path: '/reports', scope: 'space' },
+    reportsCashFlow: { path: '/reports/cashflow', scope: 'space' },
+    reportsExpenses: { path: '/reports/expenses', scope: 'space' },
+    reportsIncome: { path: '/reports/income', scope: 'space' },
+    reportsNetWorth: { path: '/reports/networth', scope: 'space' },
     spaceSettings: { path: '/settings/space', scope: 'space' },
     importSettings: { path: '/settings/import', scope: 'space' },
     spaceBackups: { path: '/settings/backups', scope: 'space' },
@@ -60,3 +64,6 @@ export const pages = {
 
 /** A page's path relative to the layout route at "/". */
 export const childPath = (page: Page) => page.path.replace(/^\//, '')
+
+/** A page's path relative to the page it is nested in. */
+export const subPath = (parent: Page, page: Page) => page.path.slice(parent.path.length + 1)

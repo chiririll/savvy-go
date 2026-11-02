@@ -168,6 +168,7 @@
     "no": "No",
     "language": {
         "label": "Language",
+        "email": "Email language",
         "description": "Choose the interface language. Saved on this device."
     },
     "theme": {

@@ -9,6 +9,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"savvy-go/internal/db/dbtest"
+	"savvy-go/internal/db/filter"
 	importerrepo "savvy-go/internal/db/repo/importer"
 	ledgerrepo "savvy-go/internal/db/repo/ledger"
 	"savvy-go/internal/money"
@@ -154,7 +155,7 @@ func TestImportedRowIsOnePaymentAndOneLine(t *testing.T) {
 	if has, _ := l.HasExternalID(ctx, fmt.Sprintf("csv:%d:a", acc)); !has {
 		t.Fatal("the external id is csv:<account>:<hash>")
 	}
-	if rows, _ := l.SummaryRows(ctx, "confirmed"); len(rows) != 3 {
+	if rows, _ := l.SummaryRows(ctx, filter.TxFilter{}, "confirmed"); len(rows) != 3 {
 		t.Fatalf("every imported row has one line: %+v", rows)
 	}
 }
