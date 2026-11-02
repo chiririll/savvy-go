@@ -6,10 +6,11 @@ import i18n from '@/lib/i18n'
 
 const QUERY_KEY = ['budgets']
 
-export function useBudgets() {
+export function useBudgets({ enabled = true }: { enabled?: boolean } = {}) {
     return useQuery({
         queryKey: QUERY_KEY,
         queryFn: () => budgetsApi.getAll(),
+        enabled,
     })
 }
 

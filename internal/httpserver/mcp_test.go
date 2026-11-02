@@ -484,6 +484,22 @@ func TestMCPWriteToolsRecordChangeMoney(t *testing.T) {
 
 // An assistant is offered only the tools its token can use, so it does not try
 // what would fail. Calling one anyway still gets the REST error.
+// The connector icon an assistant shows next to the server, from the public URL.
+func TestMCPServerPublishesIcons(t *testing.T) {
+	a := newTestApp(t)
+	u := a.createUser("mcp@a.com", "secret1", "admin")
+	info := a.mcpFull(u).InitializeResult().ServerInfo
+	if info == nil || len(info.Icons) == 0 {
+		t.Fatalf("no icons in server info: %+v", info)
+	}
+	base := a.svc.Cfg.AppURL()
+	for _, ic := range info.Icons {
+		if !strings.HasPrefix(ic.Source, base+"/") || ic.MIMEType == "" || len(ic.Sizes) == 0 {
+			t.Errorf("incomplete icon %+v", ic)
+		}
+	}
+}
+
 func TestMCPListsOnlyUsableTools(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("mcp@a.com", "secret1", "admin")

@@ -5,6 +5,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
+	"savvy-go/internal/db/filter"
 	repo "savvy-go/internal/db/repo/ledger"
 	"savvy-go/internal/money"
 )
@@ -21,7 +22,9 @@ type TransactionSummary struct {
 // Balance is income less expense.
 func (s TransactionSummary) Balance() money.Money { return s.Income.Sub(s.Expense) }
 
-func (s Transactions) Summary(ctx context.Context, pendingOnly bool) TransactionSummary {
+// Summary totals the confirmed (or pending) income and expense matching f, in
+// the base currency.
+func (s Transactions) Summary(ctx context.Context, f filter.TxFilter, pendingOnly bool) TransactionSummary {
 	status := "confirmed"
 	if pendingOnly {
 		status = "pending"
@@ -33,7 +36,7 @@ func (s Transactions) Summary(ctx context.Context, pendingOnly bool) Transaction
 		unit = base.Unit()
 	}
 	out.Income, out.Expense = money.Zero(unit), money.Zero(unit)
-	rows, err := s.repo().SummaryRows(ctx, status)
+	rows, err := s.repo().SummaryRows(ctx, f, status)
 	if err != nil {
 		return out
 	}

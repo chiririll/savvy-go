@@ -4,7 +4,7 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import { AuthProvider } from '@/components/providers/AuthProvider'
 import { useUser } from '@/stores/auth'
 import { ErrorBoundary } from '@/components/shared/page/ErrorBoundary'
-import { childPath, pages } from './pages'
+import { childPath, pages, subPath } from './pages'
 
 // Auth pages
 const LoginPage = lazy(() => import('@/pages/auth/login'))
@@ -31,6 +31,13 @@ const AutomationPage = lazy(() => import('@/pages/automation'))
 const AutomationLogsPage = lazy(() => import('@/pages/automation/[id]/logs'))
 
 const ReportsPage = lazy(() => import('@/pages/reports'))
+const reportRoute = (name: 'OverviewRoute' | 'CashFlowRoute' | 'ExpensesRoute' | 'IncomeRoute' | 'NetWorthRoute') =>
+    lazy(() => import('@/pages/reports/routes').then((m) => ({ default: m[name] })))
+const ReportOverview = reportRoute('OverviewRoute')
+const ReportCashFlow = reportRoute('CashFlowRoute')
+const ReportExpenses = reportRoute('ExpensesRoute')
+const ReportIncome = reportRoute('IncomeRoute')
+const ReportNetWorth = reportRoute('NetWorthRoute')
 // Settings: the current space and the user's own.
 const SpaceSettingsPage = lazy(() => import('@/pages/settings/space'))
 const SecuritySettingsPage = lazy(() => import('@/pages/settings/security'))
@@ -137,7 +144,18 @@ export const router = createBrowserRouter([
                     { path: childPath(pages.recurring), element: withSuspense(RecurringPage) },
                     { path: childPath(pages.automation), element: withSuspense(AutomationPage) },
                     { path: childPath(pages.automationLogs), element: withSuspense(AutomationLogsPage) },
-                    { path: childPath(pages.reports), element: withSuspense(ReportsPage) },
+                    {
+                        path: childPath(pages.reports),
+                        element: withSuspense(ReportsPage),
+                        children: [
+                            { index: true, element: withSuspense(ReportOverview) },
+                            { path: subPath(pages.reports, pages.reportsCashFlow), element: withSuspense(ReportCashFlow) },
+                            { path: subPath(pages.reports, pages.reportsExpenses), element: withSuspense(ReportExpenses) },
+                            { path: subPath(pages.reports, pages.reportsIncome), element: withSuspense(ReportIncome) },
+                            { path: subPath(pages.reports, pages.reportsNetWorth), element: withSuspense(ReportNetWorth) },
+                            { path: '*', element: <Navigate to={pages.reports.path} replace /> },
+                        ],
+                    },
                     { path: childPath(pages.spaceSettings), element: withSuspense(SpaceSettingsPage) },
                     { path: childPath(pages.securitySettings), element: withSuspense(SecuritySettingsPage) },
                     { path: childPath(pages.passkeySettings), element: withSuspense(PasskeySettingsPage) },

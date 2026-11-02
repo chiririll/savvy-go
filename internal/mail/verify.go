@@ -6,7 +6,6 @@ import (
 
 	"savvy-go/internal/appconfig"
 	"savvy-go/internal/auth"
-	"savvy-go/internal/mail/smtp"
 )
 
 // ErrOwnAddressUnverified is returned when an admin would require verified
@@ -44,9 +43,9 @@ func (s Verifier) CanRequire(admin *auth.User) error {
 	return nil
 }
 
-// Send emails u a link that confirms their address. It says what
+// Send emails u a link that confirms their address, in lang (see Lang). It says what
 // is missing when mail cannot be sent.
-func (s Verifier) Send(ctx context.Context, u *auth.User) string {
+func (s Verifier) Send(ctx context.Context, lang string, u *auth.User) string {
 	switch {
 	case !s.Mail.Mailer().Enabled():
 		return s.Mail.OffReason()
@@ -58,7 +57,7 @@ func (s Verifier) Send(ctx context.Context, u *auth.User) string {
 		return "Could not create the link: " + err.Error()
 	}
 	if err := s.Mail.Send(ctx,
-		smtp.EmailVerification(u.Email, u.Name, s.Cfg.AppURL()+"/verify-email/"+token, exp)); err != nil {
+		EmailVerification(lang, u.Email, u.Name, s.Cfg.AppURL()+"/verify-email/"+token, exp)); err != nil {
 		return "Could not send the email: " + err.Error()
 	}
 	return ""

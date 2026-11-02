@@ -10,14 +10,33 @@ paths:
         - {name: start_date, in: query, schema: {type: string, format: date}}
         - {name: end_date, in: query, schema: {type: string, format: date}}
         - {name: account_id, in: query, schema: {type: integer}}
+        - {name: account_ids, in: query, schema: {type: string}, description: Comma separated ids}
+        - name: currency
+          in: query
+          schema: {type: string}
+          description: >-
+            Comma separated currency codes. A transfer matches when either of its accounts is in one.
         - {name: category_id, in: query, schema: {type: integer}}
         - {name: category_ids, in: query, schema: {type: string}, description: Comma separated ids}
         - {name: tag_ids, in: query, schema: {type: string}, description: Comma separated ids}
+        - name: q
+          in: query
+          schema: {type: string, maxLength: 200}
+          description: >-
+            Free-text search. Space-separated terms, all of which must match. A term matches the
+            description or an item name (any case, any script), and a number also matches the
+            amount, the received amount of a transfer or an item price, as written in the
+            currency of its account ("1879", "1 879", "18.79").
         - {name: sort_by, in: query, schema: {type: string}}
         - {name: sort_direction, in: query, schema: {type: string, enum: [asc, desc]}}
         - {name: page, in: query, schema: {type: integer, default: 1}}
         - {name: per_page, in: query, schema: {type: integer, default: 25}}
-        - {name: with_summary, in: query, schema: {type: boolean}}
+        - name: with_summary
+          in: query
+          schema: {type: boolean}
+          description: >-
+            Also return the confirmed income and expense totals (in the base currency) of the
+            transactions that match the filters above, not only of the page.
       responses:
         "200":
           description: A page of transactions

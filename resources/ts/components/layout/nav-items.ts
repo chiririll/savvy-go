@@ -18,8 +18,10 @@ import {
     LucideIcon,
     Activity,
     KeyRound,
-    UserRound,
-    Boxes,
+    Fingerprint,
+    Braces,
+    ShieldCheck,
+    SlidersHorizontal,
     ServerCog,
     HardDrive,
     ClipboardCheck,
@@ -32,6 +34,8 @@ export interface MenuItem {
     labelKey: NavKey
     /** Other paths that belong to this item (sub-pages). */
     also?: string[]
+    /** Shown only to admins of the current space. */
+    spaceAdminOnly?: boolean
 }
 
 export const mainItems: MenuItem[] = [
@@ -43,17 +47,23 @@ export const mainItems: MenuItem[] = [
     { to: '/reports', icon: BarChart3, labelKey: 'reports' },
 ]
 
-/** The current space's setup, and the user's own settings. */
-export const settingsItems: MenuItem[] = [
+/** The current space: what it holds, and how it is set up. */
+export const spaceItems: MenuItem[] = [
     { to: '/accounts', icon: CreditCard, labelKey: 'accounts' },
     { to: '/categories', icon: FolderTree, labelKey: 'categories' },
     { to: '/tags', icon: Hash, labelKey: 'tags' },
     { to: '/currencies', icon: Coins, labelKey: 'currencies' },
     { to: '/automation', icon: Zap, labelKey: 'automation' },
-    { to: '/settings/space', icon: Boxes, labelKey: 'space' },
-    { to: '/settings/security', icon: UserRound, labelKey: 'security', also: ['/settings/passkeys', '/settings/api'] },
     { to: '/settings/import', icon: Upload, labelKey: 'import' },
-    { to: '/settings/backups', icon: Database, labelKey: 'backups' },
+    { to: '/settings/backups', icon: Database, labelKey: 'backups', spaceAdminOnly: true },
+    { to: '/settings/space', icon: SlidersHorizontal, labelKey: 'settings' },
+]
+
+/** The user's own sign-in and access. */
+export const accountItems: MenuItem[] = [
+    { to: '/settings/security', icon: ShieldCheck, labelKey: 'security' },
+    { to: '/settings/passkeys', icon: Fingerprint, labelKey: 'passkeys' },
+    { to: '/settings/api', icon: Braces, labelKey: 'api' },
 ]
 
 /** The server: server administrators only. */

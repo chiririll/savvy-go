@@ -124,7 +124,7 @@ export function TransactionRow(props: TransactionRowProps) {
             ? formatCurrency(toAmount, toAccount.currency)
             : null
     const handlers = rowHandlers(transaction, props)
-    const dateLabel = showDate ? relativeDay(transaction.date) : null
+    const dateLabel = showDate ? relativeDay(transaction.date, { weekday: true }) : null
 
     return (
         <FeedRow

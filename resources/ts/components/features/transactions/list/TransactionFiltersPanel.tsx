@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import type { Category, Tag } from '@/types'
+import type { Account, Category, Currency, Tag } from '@/types'
 import type { TransactionListFilters } from '@/hooks/use-transaction-list-filters'
 import { TransactionFilterDetails } from './TransactionFilterDetails'
 import { TransactionSortSelect, TransactionTypeFilter } from './TransactionTypeAndSort'
@@ -15,9 +15,11 @@ interface TransactionFiltersPanelProps {
     list: TransactionListFilters
     categories?: Category[]
     tags?: Tag[]
+    accounts?: Account[]
+    currencies?: Currency[]
 }
 
-export function TransactionFiltersPanel({ list, categories, tags }: TransactionFiltersPanelProps) {
+export function TransactionFiltersPanel({ list, categories, tags, accounts, currencies }: TransactionFiltersPanelProps) {
     const { t } = useTranslation('pages')
     const [filtersOpen, setFiltersOpen] = useState(false)
     const { params, activeFiltersCount, setType, setStatus, setSort, clearFilters } = list
@@ -82,7 +84,13 @@ export function TransactionFiltersPanel({ list, categories, tags }: TransactionF
                     </div>
                 </div>
                 <CollapsibleContent className="mt-4 space-y-4">
-                    <TransactionFilterDetails list={list} categories={filteredCategories} tags={tags} />
+                    <TransactionFilterDetails
+                        list={list}
+                        categories={filteredCategories}
+                        tags={tags}
+                        accounts={accounts}
+                        currencies={currencies}
+                    />
                 </CollapsibleContent>
             </Collapsible>
         </>

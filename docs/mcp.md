@@ -12,9 +12,9 @@ Claude's servers call your instance over the internet, so it needs a public `htt
 2. In Claude, open **Settings → Connectors → Add custom connector** and enter the endpoint.
 3. On the Go Savvy page that opens, sign in if needed, **choose the spaces** the app may read and press **Allow access**.
 
-The connection appears in **Settings → Security → API** as an API token named `MCP: …`. Revoke it there to cut the assistant off at once.
+The connection appears in **Account → API tokens** as an API token named `MCP: …`. Revoke it there to cut the assistant off at once.
 
-Other clients: anything that supports remote MCP servers with OAuth connects the same way. Without OAuth, send an API token from **Settings → Security → API** as `Authorization: Bearer svy_…`. Tools only work within the token's grants; a missing one answers with an error naming the permission.
+Other clients: anything that supports remote MCP servers with OAuth connects the same way. Without OAuth, send an API token from **Account → API tokens** as `Authorization: Bearer svy_…`. Tools only work within the token's grants; a missing one answers with an error naming the permission.
 
 ## Who may register an app
 
@@ -45,7 +45,7 @@ Access tokens last an hour and renew in the background. A connection unused for 
 |------|---------|
 | `list_spaces` | your spaces and your role in each |
 | `list_accounts`, `list_categories`, `list_tags`, `list_currencies` | reference data of a space |
-| `list_transactions`, `get_transaction` | transactions; filters (dates, type, status, account, categories, tags); pages of up to 100 |
+| `list_transactions`, `get_transaction` | transactions; filters (dates, type, status, account or accounts, currencies, categories, tags) and free-text search `q` (description, item names, or an amount in the account's currency); pages of up to 100 |
 | `get_transactions_summary` | transaction totals |
 | `list_budgets` | budgets with progress |
 | `list_debts`, `get_debts_summary` | debts and totals |
@@ -79,7 +79,7 @@ On the consent page pick **Editor** or **Admin**, or tick Write and Delete under
 
 ## Changing a connection later
 
-No need to reconnect. In **Settings → Security → API**, press the pencil next to the `MCP: …` connection and change spaces or permissions. Removing access is immediate; added access works from the next request, with no new consent screen. Only parts of a space that the tools use can be granted.
+No need to reconnect. In **Account → API tokens**, press the pencil next to the `MCP: …` connection and change spaces or permissions. Removing access is immediate; added access works from the next request, with no new consent screen. Only parts of a space that the tools use can be granted.
 
 The assistant sees only the tools its connection can use (read-only access to transactions shows no writing tools). After a change it may take a moment, or a reconnect, for the assistant to refresh its tool list; meanwhile a call it should no longer make fails with an error naming the missing permission.
 

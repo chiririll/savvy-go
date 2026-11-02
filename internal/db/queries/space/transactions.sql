@@ -36,13 +36,6 @@ LEFT JOIN accounts ta ON ta.id = t.to_account_id
 LEFT JOIN currencies cb ON cb.id = ta.currency_id
 WHERE t.id = ?;
 
--- name: ListTransactionSummaryRows :many
-SELECT t.type, t.amount, c.rate, c.is_base, c.decimals
-FROM transactions t
-JOIN accounts a ON a.id = t.account_id
-JOIN currencies c ON c.id = a.currency_id
-WHERE t.status = ? AND t.type IN ('income','expense');
-
 -- name: ListItemsOfTransactions :many
 SELECT transaction_id, id, name, quantity, price_per_unit, total_price FROM transaction_items
 WHERE transaction_id IN (sqlc.slice('ids'))

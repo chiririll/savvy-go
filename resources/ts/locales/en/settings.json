@@ -145,6 +145,7 @@
             "deleteTitle": "Remove passkey",
             "deleteDescription": "This passkey will no longer be able to sign in to your account.",
             "empty": "No passkeys registered yet.",
+            "unsupported": "This browser doesn't support passkeys",
             "domainHint": "Passkeys need HTTPS or localhost and a real domain. IP addresses don't work.",
             "add": "Add passkey",
             "addTitle": "Add a passkey",
@@ -410,7 +411,7 @@
         "deleteDescription": "This will permanently delete the backup from {{date}}."
     },
     "api": {
-        "title": "API",
+        "title": "API tokens",
         "heading": "API access",
         "description": "Connect external apps and scripts to your Savvy instance",
         "docs": "API docs",
@@ -796,11 +797,6 @@
         }
     },
     "user": {
-        "tabs": {
-            "security": "Security",
-            "passkeys": "Passkeys",
-            "api": "API"
-        },
         "theme": {
             "title": "Theme",
             "description": "Light, dark or as your system."

@@ -46,14 +46,11 @@ export function StructureChart({
         () => ({ items: chartData, total, currency, theme, chartWidth }),
         [chartData, total, currency, theme, chartWidth, i18nInstance.language],
     )
-    const options = useMemo(
-        () => ({
-            donut: () => donutOption(input),
-            bar: () => barOption(input),
-            treemap: () => treemapOption(input),
-        }),
-        [input],
-    )
+    // Built once per input, not per render: a fresh option (new formatter functions) makes the chart
+    // re-apply it and replay the animation.
+    // New data remounts the chart so it draws in from zero like the first time, instead of morphing the old shape.
+    const dataKey = useMemo(() => chartData.map((item) => `${item.name}:${item.value}`).join('|'), [chartData])
+    const option = useMemo(() => ({ donut: donutOption, bar: barOption, treemap: treemapOption })[viewMode](input), [input, viewMode])
 
     const chartHeight = viewMode === 'donut' && isNarrowChart(chartWidth) ? NARROW_CHART_HEIGHT : CHART_HEIGHT
 
@@ -103,7 +100,7 @@ export function StructureChart({
                     <div ref={chartRef} style={{ height: chartHeight }}>
                         {/* Mount once measured so the chart animates in a single pass */}
                         {chartWidth > 0 && (
-                            <ReactECharts option={options[viewMode]()} ariaLabel={title} style={{ height: chartHeight }} key={viewMode} />
+                            <ReactECharts option={option} ariaLabel={title} style={{ height: chartHeight }} key={`${viewMode}|${dataKey}`} />
                         )}
                     </div>
                 )}

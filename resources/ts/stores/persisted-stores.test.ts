@@ -52,13 +52,23 @@ describe('space store', () => {
 
 describe('ui store', () => {
     it('opens the sidebar and keeps the menu sections closed by default', () => {
-        expect(useUiStore.getState()).toMatchObject({ sidebarOpen: true, settingsOpen: false, adminOpen: false })
+        expect(useUiStore.getState()).toMatchObject({
+            sidebarOpen: true,
+            spaceOpen: false,
+            accountOpen: false,
+            adminOpen: false,
+        })
     })
 
     it('changes each flag independently', () => {
-        useUiStore.getState().setSettingsOpen(true)
+        useUiStore.getState().setSpaceOpen(true)
         useUiStore.getState().setSidebarOpen(false)
-        expect(useUiStore.getState()).toMatchObject({ sidebarOpen: false, settingsOpen: true, adminOpen: false })
+        expect(useUiStore.getState()).toMatchObject({
+            sidebarOpen: false,
+            spaceOpen: true,
+            accountOpen: false,
+            adminOpen: false,
+        })
     })
 
     it('remembers the layout under a stable key', () => {

@@ -71,12 +71,12 @@ export const spacesApi = {
     removeMember: (id: number, userId: number) => api.delete<void>(`${base(id)}/members/${userId}`),
 
     invitations: (id: number) => api.get<SpaceInvitation[]>(`${base(id)}/invitations`),
-    invite: (id: number, role: SpaceRole, email?: string, note?: string) =>
-        api.post<InviteResult, { role: SpaceRole; email?: string; note?: string }>(`${base(id)}/invitations`, {
-            role,
-            email,
-            note,
-        }),
+    /** `locale` is the language of the email, so it only means something with an `email`. */
+    invite: (id: number, role: SpaceRole, email?: string, note?: string, locale?: string) =>
+        api.post<InviteResult, { role: SpaceRole; email?: string; note?: string; locale?: string }>(
+            `${base(id)}/invitations`,
+            { role, email, note, locale },
+        ),
     revokeInvitation: (id: number, invitationId: number) => api.delete<void>(`${base(id)}/invitations/${invitationId}`),
 
     links: (id: number) => api.get<LinkedSpace[]>(`${base(id)}/links`),

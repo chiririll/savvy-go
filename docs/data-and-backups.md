@@ -23,7 +23,7 @@ Server admins can see the public key, rotate it (old signatures stay valid) and 
 
 ## Backups in the app
 
-- **Settings → Backups** (space admins): create, download and restore backups of the space, or import one as a new space. The number of kept backups is set by the server admin.
+- **Space → Backups** (space admins): create, download and restore backups of the space, or import one as a new space. The number of kept backups is set by the server admin.
 - **Administration → System backups** (server admins): back up and restore the whole server, including the signing key.
 
 When restoring:
@@ -78,7 +78,7 @@ To restore: stop Savvy, replace the data directory contents with the archive, st
 A database of the Laravel version (a bare `.sqlite` file) is never kept as it is. Upload it in the backup dialog: Savvy sees that it is a Laravel database, upgrades it to the current format and saves **only the upgraded version**, as a backup. The dialog says so before you upload, so keep your own copy of the original file. Nothing live changes: the data is replaced only when you restore that backup, like any other. You choose what to upgrade it for:
 
 - **The whole server** (**Administration → System backups**, server admins): saves a server backup with the old users, spaces and settings. The dialog asks for the old `APP_KEY` (from the `.env` of the Laravel install), which decrypts the two-factor secrets. Without it, two-factor sign-in is switched off for the users who had it, so they can still sign in with their password and set it up again.
-- **The current space** (**Settings → Backups**, space admins): saves a backup of that space with the old finances. Restoring it replaces the data of the space. Users are not imported.
+- **The current space** (**Space → Backups**, space admins): saves a backup of that space with the old finances. Restoring it replaces the data of the space. Users are not imported.
 - **A new space**: creates a space with the old finances at once and makes you its admin, as it replaces nothing. Users are not imported.
 
 If the upgrade fails (for example the file is older than the supported Laravel version), nothing is saved.

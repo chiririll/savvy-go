@@ -1,4 +1,5 @@
 import { formatCurrency, formatCurrencyCompact } from '@/lib/utils'
+import { isDimmed, tooltipRow } from '@/lib/chart-tooltip'
 import { axisStyle, legendTextStyle, type ChartTheme } from '@/lib/chart-theme'
 
 export type DynamicsChartType = 'line' | 'bar'
@@ -17,6 +18,8 @@ export interface DynamicsOptionInput {
     currency?: string | null
     theme: ChartTheme
     isNarrow: boolean
+    /** Index of the series under the cursor; the tooltip greys out every other row. */
+    getHoveredIndex?: () => number | null
 }
 
 function dynamicsSeries(dataset: DynamicsDataset, chartType: DynamicsChartType, single: boolean) {
@@ -63,6 +66,7 @@ export function dynamicsOption({
     currency,
     theme,
     isNarrow,
+    getHoveredIndex,
 }: DynamicsOptionInput) {
     const multiple = datasets.length > 1
 
@@ -71,14 +75,20 @@ export function dynamicsOption({
             ...theme.tooltip,
             trigger: 'axis',
             axisPointer: { type: chartType === 'bar' ? 'shadow' : 'cross' },
-            formatter: (params: { seriesName: string; value: number; color: string; axisValue: string }[]) => {
+            formatter: (
+                params: { seriesName: string; seriesIndex: number; value: number; color: string; axisValue: string }[],
+            ) => {
                 const label = params[0]?.axisValue || ''
                 let html = `<div class="font-medium mb-2">${label}</div>`
+                const hovered = getHoveredIndex?.() ?? null
                 params.forEach((param) => {
-                    html += `<div class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full" style="background:${param.color}"></span>
-                        <span>${param.seriesName}: <strong>${formatCurrency(param.value, currency)}</strong></span>
-                    </div>`
+                    if (!param.value) return
+                    html += tooltipRow({
+                        color: param.color,
+                        label: param.seriesName,
+                        amount: formatCurrency(param.value, currency),
+                        dimmed: isDimmed(hovered, param.seriesIndex),
+                    })
                 })
                 return html
             },

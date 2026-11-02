@@ -40,6 +40,19 @@ describe('dynamicsOption', () => {
         expect(bar.lineStyle).toBeUndefined()
     })
 
+    it('tooltip skips zero values and fades rows other than the hovered series', () => {
+        const option = dynamicsOption(input({ getHoveredIndex: () => 0 }))
+        const html = option.tooltip.formatter([
+            { seriesName: 'Food', seriesIndex: 0, value: 5, color: '#f00', axisValue: 'Jan' },
+            { seriesName: 'Rent', seriesIndex: 1, value: 7, color: '#0f0', axisValue: 'Jan' },
+            { seriesName: 'Fun', seriesIndex: 2, value: 0, color: '#00f', axisValue: 'Jan' },
+        ])
+        expect(html).toContain('Food')
+        expect(html).toContain('Rent')
+        expect(html).not.toContain('Fun')
+        expect(html.match(/opacity:0\.4/g)).toHaveLength(1)
+    })
+
     it('thins the day labels only when grouping by day', () => {
         expect(
             (dynamicsOption(input({ groupBy: 'day' })).xAxis.axisLabel as unknown as { interval: number }).interval,

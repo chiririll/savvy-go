@@ -10,7 +10,7 @@ export const usersApi = {
     setEmailVerified: (id: number | string, emailVerified: boolean) =>
         api.patch<User, { emailVerified: boolean }>(`/users/${id}`, { emailVerified }),
 
-    /** Returns a one-time link as `token`; with `send` the server emails it instead. */
-    issuePasswordToken: (id: number | string, send = false) =>
-        api.post<User, { send?: boolean }>(`/users/${id}/password-token`, send ? { send: true } : {}),
+    /** Returns a one-time link as `token`; with `send` the server emails it instead, in the language `locale`. */
+    issuePasswordToken: (id: number | string, send = false, locale?: string) =>
+        api.post<User, { send?: boolean; locale?: string }>(`/users/${id}/password-token`, send ? { send: true, locale } : {}),
 }

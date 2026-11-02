@@ -4,6 +4,7 @@ import ReactECharts from '@/components/shared/charts/ReactECharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useBalanceHistory } from '@/hooks'
+import { useHoveredSeries } from '@/hooks/use-hovered-series'
 import { useChartTheme } from '@/lib/chart-theme'
 import { cn } from '@/lib/utils'
 import { CHART_COLORS } from '@/constants'
@@ -52,6 +53,8 @@ export function BalanceDynamicsChart({ startDate, endDate, className }: BalanceD
         })
     }
 
+    const { getHoveredIndex, events: chartEvents } = useHoveredSeries()
+
     const chartOption = useMemo(() => {
         if (!historyData || labeledSeries.length === 0) return {}
 
@@ -61,8 +64,9 @@ export function BalanceDynamicsChart({ startDate, endDate, className }: BalanceD
             hiddenKeys,
             baseCurrency: historyData.currency,
             theme: chartTheme,
+            getHoveredIndex,
         })
-    }, [historyData, labeledSeries, hiddenKeys, chartTheme])
+    }, [historyData, labeledSeries, hiddenKeys, chartTheme, getHoveredIndex])
 
     const hasData = Boolean(historyData && historyData.series.length > 0 && historyData.dates.length > 0)
 
@@ -79,6 +83,7 @@ export function BalanceDynamicsChart({ startDate, endDate, className }: BalanceD
                         <ReactECharts
                             key={periodKey}
                             option={chartOption}
+                            onEvents={chartEvents}
                             ariaLabel={t('dashboard.balanceDynamics')}
                             style={{ height: '250px', width: '100%' }}
                             className="min-w-0 max-w-full sm:[&]:!h-[300px]"

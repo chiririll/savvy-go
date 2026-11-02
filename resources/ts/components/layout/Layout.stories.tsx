@@ -26,7 +26,7 @@ const meta = {
     parameters: { a11y: overlayA11y, layout: 'fullscreen' },
     beforeEach: ({ msw }) => {
         useCurrenciesStore.getState().setAll(currencies)
-        useUiStore.setState({ sidebarOpen: true, settingsOpen: true, adminOpen: true })
+        useUiStore.setState({ sidebarOpen: true, spaceOpen: true, accountOpen: true, adminOpen: true })
         msw.use(
             accountsWithSummary(accounts, summary),
             ...currencyApi(),

@@ -54,6 +54,8 @@ export interface DraftInvitation {
     /** Who a link is for; only kept when there is no address. */
     note: string | null
     role: SpaceRole
+    /** Language of the email; unset in drafts saved before it was asked, and for a link. */
+    locale?: string | null
 }
 
 export interface SpaceDraft extends DraftContent {
@@ -105,13 +107,13 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
  */
 export function addInvitation(
     list: DraftInvitation[],
-    input: { email: string | null; note?: string | null; role: SpaceRole },
+    input: { email: string | null; note?: string | null; role: SpaceRole; locale?: string | null },
 ): DraftInvitation[] {
     const email = input.email?.trim() || null
     if (email !== null && (!EMAIL.test(email) || list.some((i) => i.email?.toLowerCase() === email.toLowerCase())))
         return list
     const note = email === null ? input.note?.trim() || null : null
-    return [...list, { key: newInvitationKey(), email, note, role: input.role }]
+    return [...list, { key: newInvitationKey(), email, note, role: input.role, locale: email ? input.locale : null }]
 }
 
 export const removeInvitation = (list: DraftInvitation[], key: string): DraftInvitation[] =>

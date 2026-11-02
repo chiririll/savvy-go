@@ -96,6 +96,21 @@ describe('formatTransactionGroupHeading', () => {
         expect(formatTransactionGroupHeading('2026-01-02', 'en-US', labels)).toBe('January 2')
         expect(formatTransactionGroupHeading('2025-12-31', 'en-US', labels)).toBe('December 31, 2025')
     })
+
+    it('adds a short weekday to dated headings only when asked', () => {
+        const weekday = { weekday: true }
+        expect(formatTransactionGroupHeading('2026-03-12', 'en-US', labels)).toBe('March 12')
+        expect(formatTransactionGroupHeading('2026-03-12', 'en-US', labels, weekday)).toBe('Thu, March 12')
+        expect(formatTransactionGroupHeading('2025-12-31', 'en-US', labels, weekday)).toBe('Wed, December 31, 2025')
+    })
+
+    it('keeps today, yesterday and tomorrow without a weekday', () => {
+        const weekday = { weekday: true }
+        expect(formatTransactionGroupHeading('2026-03-15', 'en-US', labels, weekday)).toBe('Today')
+        expect(formatTransactionGroupHeading('2026-03-14', 'en-US', labels, weekday)).toBe('Yesterday')
+        expect(formatTransactionGroupHeading('2026-03-16', 'en-US', labels, weekday)).toBe('Tomorrow')
+        expect(formatTransactionGroupHeading(null, 'en-US', labels, weekday)).toBe('No date')
+    })
 })
 
 describe('groupByDateKey', () => {

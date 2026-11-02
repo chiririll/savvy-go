@@ -1,0 +1,38 @@
+{
+  "ignore": "If you did not expect this email, you can ignore it.",
+  "linkFallback": "If the button does not work, copy this link into your browser:",
+  "sentBy": "Sent by Go Savvy",
+  "months": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+  "roles": {
+    "admin": "admin",
+    "editor": "editor",
+    "viewer": "viewer"
+  },
+  "messages": {
+    "password_reset": {
+      "subject": "Set your Go Savvy password",
+      "greeting": "Hello {{.Name}},",
+      "body": "An administrator asked to reset your Go Savvy password. Use the button below to choose a new one.",
+      "button": "Set password",
+      "expiry": "The link works once and is valid until {{.Expires}}."
+    },
+    "email_verification": {
+      "subject": "Confirm your Go Savvy email address",
+      "greeting": "Hello {{.Name}},",
+      "body": "Use the button below to confirm that this is your email address.",
+      "button": "Confirm email",
+      "expiry": "The link works once and is valid until {{.Expires}}."
+    },
+    "invitation": {
+      "subject": "You are invited to {{.Space}} on Go Savvy",
+      "greeting": "Hello,",
+      "body": "{{.Inviter}} invited you to the space \"{{.Space}}\" on Go Savvy as {{.Role}}.",
+      "button": "Join space"
+    },
+    "test": {
+      "subject": "Go Savvy test email",
+      "greeting": "Hello,",
+      "body": "This is a test email from Go Savvy. Your mail settings work."
+    }
+  }
+}

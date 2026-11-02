@@ -32,11 +32,17 @@ const crud = createCrudApi<Transaction, TransactionFormData>(ENDPOINT)
 export const transactionsApi = {
     ...crud,
 
-    getAll: async (filters?: TransactionFilters & { with_summary?: boolean }): Promise<TransactionsResponse> => {
+    getAll: async (
+        filters?: TransactionFilters & { with_summary?: boolean },
+        signal?: AbortSignal,
+    ): Promise<TransactionsResponse> => {
         const query = toQueryString({
             type: filters?.type,
             account_id: filters?.account_id,
             category_id: filters?.category_id,
+            account_ids: filters?.account_ids?.join(','),
+            currency: filters?.currency?.join(','),
+            q: filters?.q,
             category_ids: filters?.category_ids,
             tag_ids: filters?.tag_ids,
             start_date: filters?.start_date,
@@ -48,7 +54,7 @@ export const transactionsApi = {
             with_summary: filters?.with_summary,
             status: filters?.status,
         })
-        const response = await apiClient.get(`${ENDPOINT}${query}`)
+        const response = await apiClient.get(`${ENDPOINT}${query}`, { signal })
         return response.data
     },
 

@@ -1,6 +1,7 @@
-import { useQueryStates, parseAsInteger, parseAsString, parseAsArrayOf, parseAsStringLiteral } from 'nuqs'
+import { createSerializer, useQueryStates, parseAsInteger, parseAsString, parseAsArrayOf, parseAsStringLiteral } from 'nuqs'
 import { toggleIdInArray } from '@/lib/utils'
 import type { TransactionFilters } from '@/types'
+import type { ParsedSearch } from '@/lib/transaction-search'
 
 export const transactionSearchParams = {
     type: parseAsStringLiteral(['income', 'expense', 'transfer'] as const),
@@ -12,6 +13,23 @@ export const transactionSearchParams = {
     startDate: parseAsString,
     endDate: parseAsString,
     status: parseAsStringLiteral(['pending'] as const),
+    q: parseAsString,
+    accountIds: parseAsArrayOf(parseAsInteger).withDefault([]),
+    currency: parseAsArrayOf(parseAsString).withDefault([]),
+}
+
+const serializeSearchParams = createSerializer(transactionSearchParams)
+
+/** The list page URL showing the given search: what the palette applies. */
+export function transactionSearchHref(search: ParsedSearch): string {
+    return serializeSearchParams('/transactions', {
+        q: search.q || null,
+        type: search.type,
+        accountIds: search.accountIds.length ? search.accountIds : null,
+        currency: search.currency.length ? search.currency : null,
+        categoryIds: search.categoryIds.length ? search.categoryIds : null,
+        tagIds: search.tagIds.length ? search.tagIds : null,
+    })
 }
 
 export function useTransactionListFilters() {
@@ -30,9 +48,15 @@ export function useTransactionListFilters() {
         start_date: params.startDate ?? undefined,
         end_date: params.endDate ?? undefined,
         status: params.status ?? 'confirmed',
+        account_ids: params.accountIds.length > 0 ? params.accountIds : undefined,
+        currency: params.currency.length > 0 ? params.currency : undefined,
+        q: params.q ?? undefined,
     }
 
     const activeFiltersCount = [
+        params.q,
+        params.accountIds.length > 0,
+        params.currency.length > 0,
         params.categoryIds.length > 0,
         params.tagIds.length > 0,
         params.startDate,
@@ -62,7 +86,21 @@ export function useTransactionListFilters() {
             const next = toggleIdInArray(params.tagIds, id)
             setParams({ tagIds: next.length ? next : null, page: 1 })
         },
+        setQuery: (q: string) => setParams({ q: q.trim() || null, page: 1 }),
+        toggleAccount: (id: number) => {
+            const next = toggleIdInArray(params.accountIds, id)
+            setParams({ accountIds: next.length ? next : null, page: 1 })
+        },
+        toggleCurrency: (code: string) => {
+            const next = params.currency.includes(code)
+                ? params.currency.filter((item) => item !== code)
+                : [...params.currency, code]
+            setParams({ currency: next.length ? next : null, page: 1 })
+        },
         clearFilters: () => setParams({
+            q: null,
+            accountIds: null,
+            currency: null,
             categoryIds: null,
             tagIds: null,
             startDate: null,

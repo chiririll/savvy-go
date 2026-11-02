@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { useInvite } from '@/hooks/use-spaces'
 import type { ApiError } from '@/types'
+import type { AppLocale } from '@/lib/i18n'
 import type { SpaceRole } from '@/types/spaces'
 import { InviteFields } from './InviteFields'
 
@@ -20,9 +21,24 @@ export function InviteForm({ spaceId, onCreated }: Props) {
     const { t } = useTranslation('settings')
     const invite = useInvite(spaceId)
 
-    const add = async ({ email, note, role }: { email: string | null; note: string | null; role: SpaceRole }) => {
+    const add = async ({
+        email,
+        note,
+        role,
+        locale,
+    }: {
+        email: string | null
+        note: string | null
+        role: SpaceRole
+        locale: AppLocale | null
+    }) => {
         try {
-            const { id, token } = await invite.mutateAsync({ role, email: email || undefined, note: note || undefined })
+            const { id, token } = await invite.mutateAsync({
+                role,
+                email: email || undefined,
+                note: note || undefined,
+                locale: email ? (locale ?? undefined) : undefined,
+            })
             onCreated({ id, link: token ? `${window.location.origin}/invite/${token}` : null })
             if (email) toast.success(t('spaces.invitations.emailSent', { email }))
         } catch (error) {

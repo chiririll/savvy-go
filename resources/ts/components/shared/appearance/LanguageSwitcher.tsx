@@ -19,14 +19,9 @@ import {
     isAppLocale,
     LOCALE_LABELS,
     SUPPORTED_LOCALES,
-    type AppLocale,
+    toAppLocale,
 } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
-
-function currentLocale(language: string): AppLocale {
-    const base = language.split('-')[0]
-    return isAppLocale(base) ? base : 'en'
-}
 
 interface LanguageSwitcherProps {
     variant?: 'compact' | 'select' | 'auth'
@@ -35,7 +30,7 @@ interface LanguageSwitcherProps {
 
 export function LanguageSwitcher({ variant = 'compact', className }: LanguageSwitcherProps) {
     const { i18n, t } = useTranslation()
-    const locale = currentLocale(i18n.resolvedLanguage ?? i18n.language)
+    const locale = toAppLocale(i18n.resolvedLanguage ?? i18n.language)
 
     const change = (next: string) => {
         if (isAppLocale(next)) {

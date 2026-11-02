@@ -4,7 +4,7 @@ import { act, renderHook } from '@testing-library/react'
 import { NuqsTestingAdapter } from 'nuqs/adapters/testing'
 import { describe, expect, it } from 'vitest'
 
-import { useTransactionListFilters } from './use-transaction-list-filters'
+import { transactionSearchHref, useTransactionListFilters } from './use-transaction-list-filters'
 
 /** Renders the hook against an in-memory URL that updates like the real one. */
 function setup(search = '') {
@@ -198,5 +198,58 @@ describe('switching to pending', () => {
             result.current.setStatus(null)
         })
         expect(result.current.filters.status).toBe('confirmed')
+    })
+})
+
+describe('search, account and currency', () => {
+    it('reads them from the URL into API filters', () => {
+        const { result } = setup('?q=milk&accountIds=1,2&currency=USD,JPY')
+        expect(result.current.filters).toMatchObject({ q: 'milk', account_ids: [1, 2], currency: ['USD', 'JPY'] })
+        expect(result.current.activeFiltersCount).toBe(3)
+    })
+
+    it('sets the query, trimmed, and returns to page one', () => {
+        const { result } = setup('?page=3')
+        act(() => {
+            result.current.setQuery('  milk ')
+        })
+        expect(result.current.filters).toMatchObject({ q: 'milk', page: 1 })
+        act(() => {
+            result.current.setQuery('  ')
+        })
+        expect(result.current.filters.q).toBeUndefined()
+    })
+
+    it('toggles accounts and currencies', () => {
+        const { result } = setup('?accountIds=1')
+        act(() => {
+            result.current.toggleAccount(2)
+        })
+        act(() => {
+            result.current.toggleCurrency('USD')
+        })
+        expect(result.current.filters).toMatchObject({ account_ids: [1, 2], currency: ['USD'] })
+        act(() => {
+            result.current.toggleCurrency('USD')
+        })
+        expect(result.current.filters.currency).toBeUndefined()
+    })
+
+    it('clearFilters removes them too', () => {
+        const { result } = setup('?q=milk&accountIds=1&currency=USD')
+        act(() => {
+            result.current.clearFilters()
+        })
+        expect(result.current.activeFiltersCount).toBe(0)
+    })
+})
+
+describe('transactionSearchHref', () => {
+    it('writes only the filters that are set', () => {
+        const empty = { q: '', accountIds: [], currency: [], categoryIds: [], tagIds: [], type: null }
+        expect(transactionSearchHref(empty)).toBe('/transactions')
+        expect(
+            transactionSearchHref({ ...empty, q: 'milk', accountIds: [1, 2], type: 'expense', tagIds: [3] }),
+        ).toBe('/transactions?type=expense&tagIds=3&q=milk&accountIds=1,2')
     })
 })

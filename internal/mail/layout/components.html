@@ -1,0 +1,16 @@
+{{define "greeting"}}<p class="ink" style="margin:0 0 16px;font-size:16px;line-height:24px;font-weight:600;color:#1f2937;">{{.Greeting}}</p>{{end}}
+
+{{define "body"}}<p class="ink" style="margin:0 0 24px;font-size:16px;line-height:24px;color:#1f2937;">{{.Body}}</p>{{end}}
+
+{{define "button"}}<table role="presentation" align="center" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto 24px;">
+  <tr>
+    <td class="btn" align="center" style="background-color:#1f2937;border-radius:8px;">
+      <a href="{{.Link}}" style="display:inline-block;padding:12px 24px;font-size:16px;font-weight:600;color:#ffffff;text-decoration:none;">{{.Button}}</a>
+    </td>
+  </tr>
+</table>{{end}}
+
+{{define "expiry"}}<p class="ink" style="margin:0 0 16px;font-size:14px;line-height:21px;color:#1f2937;">{{.Expiry}}</p>{{end}}
+
+{{define "link-fallback"}}<p class="muted" style="margin:0 0 4px;font-size:13px;line-height:20px;color:#6b7280;">{{.LinkFallback}}</p>
+<p style="margin:0 0 24px;font-size:13px;line-height:20px;word-break:break-all;"><a class="link" href="{{.Link}}" style="color:#374151;">{{.Link}}</a></p>{{end}}

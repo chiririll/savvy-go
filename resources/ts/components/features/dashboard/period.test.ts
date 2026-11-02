@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { getPresetDates, isValidDateRange, percentChange, resolvePeriodDates, toReportFilters } from './period'
+import { getPresetDates, includesToday, isValidDateRange, percentChange, resolvePeriodDates, toReportFilters } from './period'
 
 const NOW = new Date(2026, 4, 15) // 15 May 2026
 
@@ -84,5 +84,28 @@ describe('percentChange', () => {
         expect(percentChange(150, 100)).toBe(50)
         expect(percentChange(50, 100)).toBe(-50)
         expect(percentChange(-50, -100)).toBe(50)
+    })
+})
+
+describe('includesToday', () => {
+    it.each([
+        ['last_30_days', true],
+        ['this_month', true],
+        ['last_month', false],
+        ['last_3_months', true],
+        ['last_6_months', true],
+        ['this_year', true],
+    ] as const)('%s', (preset, expected) => {
+        expect(includesToday(getPresetDates(preset, NOW), NOW)).toBe(expected)
+    })
+
+    it('covers the first and last day of the range', () => {
+        expect(includesToday({ start_date: '2026-05-15', end_date: '2026-05-20' }, NOW)).toBe(true)
+        expect(includesToday({ start_date: '2026-05-01', end_date: '2026-05-15' }, NOW)).toBe(true)
+    })
+
+    it('is false for a custom range in the past or the future', () => {
+        expect(includesToday({ start_date: '2026-05-01', end_date: '2026-05-14' }, NOW)).toBe(false)
+        expect(includesToday({ start_date: '2026-05-16', end_date: '2026-05-20' }, NOW)).toBe(false)
     })
 })
