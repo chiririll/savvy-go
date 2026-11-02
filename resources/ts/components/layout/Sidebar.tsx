@@ -1,8 +1,9 @@
 import { useEffect } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { Settings, Wrench } from 'lucide-react'
+import { Boxes, UserRound, Wrench } from 'lucide-react'
 import { SpaceSwitcher } from '@/components/features/spaces/SpaceSwitcher'
 import { useUser } from '@/stores/auth'
+import { useCurrentSpace } from '@/hooks'
 import { useServerChecks } from '@/hooks/use-server-checks'
 import {
     Sidebar,
@@ -22,13 +23,17 @@ import { useTranslation } from 'react-i18next'
 import { navLabel } from '@/lib/labels'
 import { NavGroup } from './NavGroup'
 import { SidebarAbout } from './SidebarAbout'
-import { mainItems, settingsItems, adminItems } from './nav-items'
+import { mainItems, spaceItems, accountItems, adminItems } from './nav-items'
 
 export function AppSidebar() {
     const { t } = useTranslation('nav')
     const location = useLocation()
-    const settingsOpen = useUiStore((state) => state.settingsOpen)
-    const setSettingsOpen = useUiStore((state) => state.setSettingsOpen)
+    const spaceOpen = useUiStore((state) => state.spaceOpen)
+    const setSpaceOpen = useUiStore((state) => state.setSpaceOpen)
+    const accountOpen = useUiStore((state) => state.accountOpen)
+    const setAccountOpen = useUiStore((state) => state.setAccountOpen)
+    const space = useCurrentSpace()
+    const visibleSpaceItems = spaceItems.filter((item) => !item.spaceAdminOnly || space?.role === 'admin')
     const adminOpen = useUiStore((state) => state.adminOpen)
     const setAdminOpen = useUiStore((state) => state.setAdminOpen)
     const isServerAdmin = useUser()?.role === 'admin'
@@ -74,12 +79,22 @@ export function AppSidebar() {
                     </SidebarGroupContent>
                 </SidebarGroup>
 
+                {space && (
+                    <NavGroup
+                        icon={Boxes}
+                        label={t('space')}
+                        items={visibleSpaceItems}
+                        open={spaceOpen}
+                        onOpenChange={setSpaceOpen}
+                        isActive={isActive}
+                    />
+                )}
                 <NavGroup
-                    icon={Settings}
-                    label={t('settings')}
-                    items={settingsItems}
-                    open={settingsOpen}
-                    onOpenChange={setSettingsOpen}
+                    icon={UserRound}
+                    label={t('account')}
+                    items={accountItems}
+                    open={accountOpen}
+                    onOpenChange={setAccountOpen}
                     isActive={isActive}
                 />
                 {isServerAdmin && (

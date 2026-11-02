@@ -18,7 +18,7 @@ const meta = {
     parameters: { a11y: overlayA11y, layout: 'fullscreen' },
     beforeEach: ({ msw }) => {
         useCurrenciesStore.getState().setAll(currencies)
-        useUiStore.setState({ sidebarOpen: true, settingsOpen: true, adminOpen: true })
+        useUiStore.setState({ sidebarOpen: true, spaceOpen: true, accountOpen: true, adminOpen: true })
         msw.use(
             accountsWithSummary(accounts, { totalBalance: 13150.2, currency: 'USD' }),
             ...currencyApi(),
@@ -63,6 +63,29 @@ export const SidebarWithoutAdministration: Story = {
     play: async ({ canvasElement }) => {
         await new Promise((resolve) => setTimeout(resolve, 300))
         await expect(within(canvasElement).queryByRole('link', { name: /checks/i })).toBeNull()
+    },
+}
+
+export const SidebarGroups: Story = {
+    tags: ['desktop-only'],
+    render: () => inSidebar(<AppSidebar />),
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement)
+        await expect(await canvas.findByRole('link', { name: /^settings$/i })).toHaveAttribute('href', '/settings/space')
+        await expect(canvas.getByRole('link', { name: /^security$/i })).toHaveAttribute('href', '/settings/security')
+        await expect(canvas.getByRole('link', { name: /passkeys/i })).toHaveAttribute('href', '/settings/passkeys')
+        await expect(canvas.getByRole('link', { name: /api tokens/i })).toHaveAttribute('href', '/settings/api')
+        await expect(canvas.getByRole('link', { name: /backups/i })).toBeVisible()
+    },
+}
+
+export const SidebarAsEditor: Story = {
+    render: () => inSidebar(<AppSidebar />),
+    parameters: { app: { role: 'editor' } },
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement)
+        await expect(await canvas.findByRole('link', { name: /^settings$/i })).toBeVisible()
+        await expect(canvas.queryByRole('link', { name: /backups/i })).toBeNull()
     },
 }
 

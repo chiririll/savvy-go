@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Fingerprint, Plus, Trash2 } from 'lucide-react'
+import { browserSupportsWebAuthn } from '@simplewebauthn/browser'
 import { testId } from '@/lib/test-id'
 import { intlLocale } from '@/lib/i18n'
 import { Confirm, ResponsiveDialog, SettingsSection } from '@/components/shared'
@@ -62,6 +63,7 @@ export function PasskeysSection() {
     const { t: tCommon } = useTranslation('common')
     const isReadOnly = useReadOnly()
     const passkeyDomainValid = isPasskeyDomainSupported()
+    const browserSupported = browserSupportsWebAuthn()
     const { data: passkeys, isLoading } = useWebauthnCredentials()
     const registerPasskey = useRegisterPasskey()
     const deletePasskey = useDeletePasskey()
@@ -116,13 +118,17 @@ export function PasskeysSection() {
                             {t('security.passkeys.empty')}
                         </div>
                     )}
-                    {!passkeyDomainValid && (
-                        <p className="text-sm text-muted-foreground">{t('security.passkeys.domainHint')}</p>
+                    {!browserSupported ? (
+                        <p role="alert" className="text-sm text-warning">{t('security.passkeys.unsupported')}</p>
+                    ) : (
+                        !passkeyDomainValid && (
+                            <p className="text-sm text-muted-foreground">{t('security.passkeys.domainHint')}</p>
+                        )
                     )}
                     <Button
                         onClick={() => setAddOpen(true)}
                         {...testId('add-passkey')}
-                        disabled={isReadOnly || registerPasskey.isPending || !passkeyDomainValid}
+                        disabled={isReadOnly || registerPasskey.isPending || !passkeyDomainValid || !browserSupported}
                     >
                         <Plus className="mr-2 size-4" />
                         {t('security.passkeys.add')}
