@@ -55,12 +55,24 @@ UPDATE transactions SET day_order = ? WHERE id = ?;
 -- Payments
 
 -- name: ListPaymentsOfTransactions :many
-SELECT p.transaction_id, p.account_id, p.amount, p.space_transfer_uuid, c.id AS currency_id, c.decimals
+SELECT p.transaction_id, p.account_id, p.amount, p.space_transfer_uuid, a.type AS account_type, c.id AS currency_id, c.decimals
 FROM payments p
 JOIN accounts a ON a.id = p.account_id
 JOIN currencies c ON c.id = a.currency_id
 WHERE p.transaction_id IN (sqlc.slice('ids'))
 ORDER BY p.transaction_id, p.account_id;
+
+-- name: ListTransactionLinks :many
+-- What ties a transaction to another module: the status of the space transfer
+-- its payment on a space account belongs to ('' when none), and the recurring
+-- rule that made it (0 when none).
+SELECT t.id AS transaction_id,
+       CAST(COALESCE((SELECT st.status FROM payments p JOIN space_transfers st ON st.uuid = p.space_transfer_uuid
+                      WHERE p.transaction_id = t.id), '') AS TEXT) AS transfer_status,
+       CAST(COALESCE((SELECT ri.recurring_transaction_id FROM recurring_instances ri
+                      WHERE ri.transaction_id = t.id), 0) AS INTEGER) AS recurring_id
+FROM transactions t
+WHERE t.id IN (sqlc.slice('ids'));
 
 -- name: ListPaymentAccountIDs :many
 SELECT account_id FROM payments WHERE transaction_id = ?;
@@ -91,7 +103,8 @@ DELETE FROM transaction_lines WHERE transaction_id = ?;
 INSERT INTO transaction_lines (transaction_id, seq, category_id, currency_id, amount, note) VALUES (?,?,?,?,?,?);
 
 -- name: SetTransactionLinesCategory :exec
-UPDATE transaction_lines SET category_id = ? WHERE transaction_id = ?;
+-- Gives a category to the lines that have none; a categorised line is the user's choice.
+UPDATE transaction_lines SET category_id = ? WHERE transaction_id = ? AND category_id IS NULL;
 
 -- Tags
 

@@ -81,9 +81,8 @@ var spaceSegments = map[string]string{
 	"tags":    "tags",
 	// Uploads exist for importing transactions.
 	"transactions": "transactions", "transactions-summary": "transactions", "transactions-pending-summary": "transactions",
-	"transaction-groups": "transactions",
-	"s3":                 "transactions",
-	"transfers":          "transfers",
+	"s3":        "transactions",
+	"transfers": "transfers",
 }
 
 // SpaceResource is the resource of a /spaces/{id}/... request path.

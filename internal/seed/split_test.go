@@ -11,7 +11,7 @@ import (
 	"savvy-go/internal/store/sqlite/sqlitetest"
 )
 
-// The demo shows both kinds of split payment, and they keep every balance whole.
+// The demo shows an expense paid from two accounts, one of them with change in another currency.
 func TestDemoHasSplitPayments(t *testing.T) {
 	ctx := context.Background()
 	st := sqlitetest.Open(t)
@@ -38,18 +38,16 @@ func TestDemoHasSplitPayments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	legs := map[string][]ledger.Transaction{}
+	var split int
 	for _, tx := range all {
-		if tx.GroupUUID != nil {
-			legs[*tx.GroupUUID] = append(legs[*tx.GroupUUID], tx)
+		if tx.Type == "expense" && len(tx.Payments) == 2 {
+			split++
+			if len(tx.Lines) != 1 {
+				t.Errorf("%q: %d lines, want 1", *tx.Description, len(tx.Lines))
+			}
 		}
 	}
-	if len(legs) != 2 {
-		t.Fatalf("%d split payments, want 2", len(legs))
-	}
-	for id, parts := range legs {
-		if len(parts) != 2 {
-			t.Errorf("payment %s has %d parts, want 2", id, len(parts))
-		}
+	if split != 2 {
+		t.Fatalf("%d expenses paid from two accounts, want 2", split)
 	}
 }

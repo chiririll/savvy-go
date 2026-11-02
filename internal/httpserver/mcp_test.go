@@ -259,14 +259,7 @@ func TestMCPListTransactionsForwardsFilters(t *testing.T) {
 		res := a.call(
 			s,
 			"create_transaction",
-			map[string]any{
-				"space_id":    sp,
-				"type":        tx.typ,
-				"account_id":  acc,
-				"amount":      "5",
-				"description": tx.desc,
-				"date":        tx.date,
-			},
+			mcpTx(sp, tx.typ, acc, "5", tx.desc, tx.date),
 		)
 		if res.IsError {
 			t.Fatalf("seed %s: %s", tx.desc, resultText(res))
@@ -431,27 +424,24 @@ func TestMCPWriteToolsRecordChangeMoney(t *testing.T) {
 	res := a.call(
 		s,
 		"create_transaction",
-		map[string]any{
-			"space_id":    sp,
-			"type":        "expense",
-			"account_id":  acc,
-			"amount":      "12.34",
-			"description": "lunch",
-			"date":        "2026-03-01",
-		},
+		mcpTx(sp, "expense", acc, "12.34", "lunch", "2026-03-01"),
 	)
 	if res.IsError {
 		t.Fatalf("create_transaction: %s", resultText(res))
 	}
 	tx := idOf(t, res)
-	if got := toolData(t, res).(map[string]any)["amount"]; got != 12.34 {
+	if got := toolData(t, res).(map[string]any)["amount"]; got != 12.34 { // what the payments net to
 		t.Fatalf("amount = %v, want 12.34", got)
 	}
 	if got := balance(); got != 87.66 {
 		t.Fatalf("balance = %v, want 87.66", got)
 	}
 
-	res = a.call(s, "update_transaction", map[string]any{"space_id": sp, "id": tx, "amount": "20.00"})
+	res = a.call(s, "update_transaction", map[string]any{
+		"space_id": sp, "id": tx,
+		"payments": []map[string]any{{"account_id": acc, "amount": "-20.00"}},
+		"lines":    []map[string]any{{"amount": "20.00"}},
+	})
 	if res.IsError {
 		t.Fatalf("update_transaction: %s", resultText(res))
 	}
@@ -464,7 +454,7 @@ func TestMCPWriteToolsRecordChangeMoney(t *testing.T) {
 	}
 
 	if bad := a.call(s, "create_transaction",
-		map[string]any{"space_id": sp, "type": "expense", "account_id": 0, "amount": "1"}); !bad.IsError {
+		mcpTx(sp, "expense", 0, "1", "", "2026-03-02")); !bad.IsError {
 		t.Fatalf("a transaction without an account must be refused: %s", resultText(bad))
 	}
 	if got := balance(); got != 80 {
@@ -571,4 +561,22 @@ func TestMCPAutomationRules(t *testing.T) {
 			t.Errorf("%s is offered without automation access", name)
 		}
 	}
+}
+
+// mcpTx is the arguments of create_transaction for an income or expense of
+// amount on an account: one payment, signed by the type, and one line.
+func mcpTx(space int64, typ string, account int64, amount, desc, date string) map[string]any {
+	paid := amount
+	if typ == "expense" {
+		paid = "-" + amount
+	}
+	args := map[string]any{
+		"space_id": space, "type": typ, "date": date,
+		"payments": []map[string]any{{"account_id": account, "amount": paid}},
+		"lines":    []map[string]any{{"amount": amount}},
+	}
+	if desc != "" {
+		args["description"] = desc
+	}
+	return args
 }

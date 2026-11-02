@@ -55,13 +55,7 @@ func TestPresetsViewerEditorAdmin(t *testing.T) {
 	acc := int64(decodeJSON(t, res)["data"].(map[string]any)["id"].(float64))
 	res = a.do("POST", "/api/categories", map[string]any{"name": "Food", "type": "expense"}, sess.Token, sess.CSRF)
 	cat := int64(decodeJSON(t, res)["data"].(map[string]any)["id"].(float64))
-	tx := map[string]any{
-		"type":        "expense",
-		"account_id":  acc,
-		"category_id": cat,
-		"amount":      5,
-		"date":        time.Now().UTC().Format("2006-01-02"),
-	}
+	tx := flowIn("expense", acc, cat, 5, time.Now().UTC().Format("2006-01-02"))
 
 	// Viewer: reads everything, changes nothing.
 	viewer := presetToken(a, sess, tokenBody(map[string]any{"preset": "viewer"}))

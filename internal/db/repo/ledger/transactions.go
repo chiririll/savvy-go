@@ -28,12 +28,17 @@ type Tx struct {
 	Payments          []Payment
 	Lines             []Line
 	Tags              []Tag
+	// TransferStatus is the status of the space transfer a payment belongs to
+	// ("" when none); RecurringID the rule whose occurrence this is.
+	TransferStatus string
+	RecurringID    *int64
 }
 
 // Payment is money that moved on one account; negative when it left.
 // SpaceTransferUUID is set only on a payment on a space account.
 type Payment struct {
 	AccountID         int64
+	AccountType       string
 	Amount            money.Money
 	SpaceTransferUUID *string
 }
@@ -124,6 +129,7 @@ func (r Repo) load(ctx context.Context, txs []Tx) error {
 		t := &txs[at[p.TransactionID]]
 		t.Payments = append(t.Payments, Payment{
 			AccountID:         p.AccountID,
+			AccountType:       p.AccountType,
 			Amount:            money.New(p.Amount, money.Unit{ID: p.CurrencyID, Decimals: int(p.Decimals)}),
 			SpaceTransferUUID: optString(p.SpaceTransferUuid),
 		})
@@ -138,6 +144,18 @@ func (r Repo) load(ctx context.Context, txs []Tx) error {
 			Seq: int(l.Seq), CategoryID: optInt64(l.CategoryID), Note: optString(l.Note),
 			Amount: money.New(l.Amount, money.Unit{ID: l.CurrencyID, Decimals: int(l.Decimals)}),
 		})
+	}
+	links, err := r.q().ListTransactionLinks(ctx, ids)
+	if err != nil {
+		return err
+	}
+	for _, l := range links {
+		t := &txs[at[l.TransactionID]]
+		t.TransferStatus = l.TransferStatus
+		if l.RecurringID != 0 {
+			id := l.RecurringID
+			t.RecurringID = &id
+		}
 	}
 	tags, err := r.TagsOf(ctx, ids)
 	if err != nil {
@@ -207,7 +225,7 @@ func (r Repo) SkipTransaction(ctx context.Context, id int64, now time.Time) erro
 // HasExternalID reports whether a transaction with this external id exists.
 func (r Repo) HasExternalID(ctx context.Context, externalID string) (bool, error) {
 	n, err := r.q().ExistsTransactionExternalID(ctx, db.NS(externalID))
-	return n, err
+	return n != 0, err
 }
 
 // PaymentFields is a payment to store. SpaceTransferUUID is written when the
@@ -349,7 +367,8 @@ func (r Repo) BudgetSpent(
 	return filter.BudgetSpent(ctx, r.DB, start, end, categoryIDs, tagIDs, unit, targetRate)
 }
 
-// SetTransactionCategory gives every line of a transaction one category.
+// SetTransactionCategory gives a category to the lines of a transaction that
+// have none.
 func (r Repo) SetTransactionCategory(ctx context.Context, id, categoryID int64, now time.Time) error {
 	if err := r.q().SetTransactionLinesCategory(ctx,
 		sqlc.SetTransactionLinesCategoryParams{CategoryID: db.NI(categoryID), TransactionID: id}); err != nil {

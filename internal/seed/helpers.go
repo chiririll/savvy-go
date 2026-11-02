@@ -2,6 +2,7 @@ package seed
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -29,31 +30,69 @@ func (s *seeder) addTx(
 		return nil
 	}
 	status := "confirmed"
-	in := ledger.TxInput{
-		Type: typ, AccountID: accountID, ToAccountID: toID, CategoryID: catID,
-		Amount: decimal.NewFromFloat(amount), ToAmount: floatPtrDecimal(toAmt),
-		Description: &desc, Date: &d, Status: &status, TagIDs: tagIDs,
-	}
-	created, err := s.txs.Create(s.ctx, in)
+	in, err := s.input(typ, accountID, catID, amount, toID, toAmt)
 	if err != nil {
 		return fmt.Errorf("%s %s: %w", typ, desc, err)
 	}
-	if typ == "expense" && amount >= 2 && created != nil {
+	in.Description, in.Date, in.Status, in.TagIDs = &desc, &d, &status, tagIDs
+	txs := s.txs
+	if strings.HasPrefix(typ, "debt_") {
+		txs = txs.As(ledger.ReasonDebt)
+	}
+	created, err := txs.Create(s.ctx, in)
+	if err != nil {
+		return fmt.Errorf("%s %s: %w", typ, desc, err)
+	}
+	if typ == "expense" && amount >= 2 && created != nil && len(created.Lines) > 0 {
 		name := ""
-		if created.Category != nil {
-			name = created.Category.Name
+		if c := created.Lines[0].Category; c != nil {
+			name = c.Name
 		}
-		s.expenses = append(s.expenses, expenseCand{id: created.ID, amount: amount, catName: name})
+		s.expenses = append(s.expenses, expenseCand{id: created.ID, amount: amount, catName: name, catID: created.Lines[0].CategoryID})
 	}
 	return nil
 }
 
-func floatPtrDecimal(v *float64) *decimal.Decimal {
-	if v == nil {
-		return nil
+// input builds the payments (and the line, for an income or expense) of a
+// transaction of the old flat kind: an amount on an account and, for a
+// transfer or a debt, the account it went to.
+func (s *seeder) input(typ string, accountID int64, catID *int64, amount float64, toID *int64, toAmt *float64) (ledger.TxInput, error) {
+	value := decimal.NewFromFloat(amount)
+	switch typ {
+	case "income", "expense":
+		paid := value
+		if typ == "expense" {
+			paid = value.Neg()
+		}
+		return ledger.TxInput{
+			Type:     typ,
+			Payments: []ledger.PaymentInput{{AccountID: accountID, Amount: &paid}},
+			Lines:    []ledger.LineInput{{CategoryID: catID, Amount: value}},
+		}, nil
+	case "transfer":
+		if toID == nil {
+			return ledger.TxInput{}, fmt.Errorf("a transfer needs a destination")
+		}
+		if toAmt == nil {
+			return s.txs.ConvertedTransfer(s.ctx, accountID, *toID, value)
+		}
+		out, in := value.Neg(), decimal.NewFromFloat(*toAmt)
+		return ledger.TxInput{Type: typ, Payments: []ledger.PaymentInput{
+			{AccountID: accountID, Amount: &out}, {AccountID: *toID, Amount: &in},
+		}}, nil
 	}
-	d := decimal.NewFromFloat(*v)
-	return &d
+	// A debt transaction: lending and paying add to the debt account and take
+	// from the ordinary one; borrowing and collecting do the reverse.
+	if toID == nil {
+		return ledger.TxInput{}, fmt.Errorf("a debt transaction needs the debt")
+	}
+	onDebt, onAccount := value, value.Neg()
+	if typ == "debt_borrow" || typ == "debt_collection" {
+		onDebt, onAccount = value.Neg(), value
+	}
+	return ledger.TxInput{Type: typ, Payments: []ledger.PaymentInput{
+		{AccountID: accountID, Amount: &onAccount}, {AccountID: *toID, Amount: &onDebt},
+	}}, nil
 }
 
 func (s *seeder) countTx() int {

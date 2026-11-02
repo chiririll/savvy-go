@@ -45,10 +45,10 @@ func TestInvalidValuesAreClientErrors(t *testing.T) {
 	}{
 		{"unknown account type", "/api/accounts",
 			map[string]any{"name": "A", "type": "wallet", "currency_id": usd, "initial_balance": 0}},
-		{"negative transaction amount", "/api/transactions",
-			map[string]any{"type": "income", "account_id": acc, "amount": -5, "date": "2024-01-15"}},
-		{"unknown transaction type", "/api/transactions",
-			map[string]any{"type": "gift", "account_id": acc, "amount": 5, "date": "2024-01-15"}},
+		{"income that loses money", "/api/transactions", flowBody("income", acc, -5, "2024-01-15")},
+		{"unknown transaction type", "/api/transactions", flowBody("gift", acc, 5, "2024-01-15")},
+		{"the flat shape of older versions", "/api/transactions",
+			map[string]any{"type": "income", "account_id": acc, "amount": 5, "date": "2024-01-15"}},
 	} {
 		status(t, a.do("POST", c.path, c.body, sess.Token, sess.CSRF), http.StatusUnprocessableEntity, c.name)
 	}
@@ -80,9 +80,7 @@ func TestReorderTransactionsWithinADay(t *testing.T) {
 	accID, _ := seedMoney(t, a, sess)
 	var ids []int64
 	for _, amount := range []int{1, 2, 3} {
-		ids = append(ids, apiID(t, a, sess, "/api/transactions", map[string]any{
-			"type": "expense", "account_id": accID, "amount": amount, "date": "2024-01-15",
-		}))
+		ids = append(ids, apiID(t, a, sess, "/api/transactions", flowBody("expense", accID, amount, "2024-01-15")))
 	}
 	listed := func() []int64 {
 		data := decodeJSON(t, a.do("GET", "/api/transactions?sort_by=date&sort_direction=asc", nil, sess.Token, ""))["data"].([]any)

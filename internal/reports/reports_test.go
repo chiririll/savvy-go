@@ -79,8 +79,8 @@ func TestReportsFollowTheBaseCurrencyScale(t *testing.T) {
 	date := "2024-01-15"
 	txs := ledger.Transactions{DB: sqlDB}
 	for _, in := range []ledger.TxInput{
-		{Type: "expense", AccountID: yen.ID, Amount: dec("1000"), Date: &date},
-		{Type: "expense", AccountID: dollars.ID, Amount: dec("1.00"), Date: &date}, // 150 JPY
+		at(flowTx("expense", yen.ID, nil, dec("1000")), date),
+		at(flowTx("expense", dollars.ID, nil, dec("1.00")), date), // 150 JPY
 	} {
 		if _, err := txs.Create(ctx, in); err != nil {
 			t.Fatal(err)
@@ -110,8 +110,8 @@ func TestMoneyFlowSplitsIncomeAcrossExpenses(t *testing.T) {
 	food, _ := cats.Create(e.ctx, ledger.Category{Name: "Food", Type: "expense"})
 	date := "2024-01-15"
 	for _, in := range []ledger.TxInput{
-		{Type: "income", AccountID: e.usdAcc.ID, CategoryID: &salary.ID, Amount: dec("100"), Date: &date},
-		{Type: "expense", AccountID: e.usdAcc.ID, CategoryID: &food.ID, Amount: dec("25"), Date: &date},
+		at(flowTx("income", e.usdAcc.ID, &salary.ID, dec("100")), date),
+		at(flowTx("expense", e.usdAcc.ID, &food.ID, dec("25")), date),
 	} {
 		if _, err := e.txs.Create(e.ctx, in); err != nil {
 			t.Fatal(err)
@@ -167,8 +167,7 @@ func TestOverviewSavingsRate(t *testing.T) {
 	date := "2024-01-15"
 	if _,
 		err := e.txs.Create(e.ctx,
-		ledger.TxInput{Type: "income", AccountID: e.usdAcc.ID, CategoryID: &salary.ID, Amount: dec("200"),
-			Date: &date}); err != nil {
+		at(flowTx("income", e.usdAcc.ID, &salary.ID, dec("200")), date)); err != nil {
 		t.Fatal(err)
 	}
 	e.tx(t, "expense", e.usdAcc.ID, "50")

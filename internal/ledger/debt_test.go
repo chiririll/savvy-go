@@ -254,15 +254,8 @@ func TestReorderSetsOrderOfTheList(t *testing.T) {
 
 func TestTotalFoldsBalancesAsOfDate(t *testing.T) {
 	e := newMoneyEnv(t)
-	date := func(s string) *string { return &s }
-	for _, in := range []TxInput{
-		{Type: "expense", AccountID: e.usdAcc.ID, Amount: dec("10"), Date: date("2024-01-10")},
-		{Type: "expense", AccountID: e.jpyAcc.ID, Amount: dec("1000"), Date: date("2024-01-20")}, // 10 USD
-	} {
-		if _, err := e.txs.Create(e.ctx, in); err != nil {
-			t.Fatal(err)
-		}
-	}
+	e.txOn(t, simple("expense", e.usdAcc.ID, "10"), "2024-01-10")
+	e.txOn(t, simple("expense", e.jpyAcc.ID, "1000"), "2024-01-20") // 10 USD
 	accts := Accounts{DB: e.db}
 	// Opening balances: USD 100 + JPY 3000 * 0.01.
 	for asOf, want := range map[string]string{"2024-01-01": "130", "2024-01-15": "120", "2024-01-31": "110"} {
@@ -279,7 +272,8 @@ func TestSetDescriptionChangesOnlyTheDescription(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, _ := e.txs.ByID(e.ctx, tx.ID)
-	if got.Description == nil || *got.Description != "new text" || !got.Amount.Equal(tx.Amount) || got.Type != "expense" {
+	samePayment := len(got.Payments) == 1 && got.Payments[0].Amount.Equal(tx.Payments[0].Amount)
+	if got.Description == nil || *got.Description != "new text" || !samePayment || got.Type != "expense" {
 		t.Errorf("after SetDescription %+v", got)
 	}
 }

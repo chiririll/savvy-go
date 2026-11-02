@@ -130,12 +130,18 @@ func seedMiniAccounts(ctx context.Context, db store.DB, specs []miniAccount) (ma
 }
 
 func miniTxInput(t miniTx, accountID int64, cats []ledger.Category, now time.Time) ledger.TxInput {
+	amount := decimal.NewFromFloat(t.amount)
+	paid := amount
+	if t.typ == "expense" {
+		paid = amount.Neg()
+	}
 	in := ledger.TxInput{
-		Type: t.typ, AccountID: accountID, Description: &t.desc,
-		Amount: decimal.NewFromFloat(t.amount), IsEstimated: t.estimated,
+		Type: t.typ, Description: &t.desc,
+		Payments: []ledger.PaymentInput{{AccountID: accountID, Amount: &paid}},
+		Lines:    []ledger.LineInput{{Amount: amount}},
 	}
 	if c := catByName(cats, t.category); c != nil {
-		in.CategoryID = &c.ID
+		in.Lines[0].CategoryID = &c.ID
 	}
 	date := now.AddDate(0, 0, -t.daysAgo).Format("2006-01-02")
 	status := "confirmed"

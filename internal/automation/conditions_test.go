@@ -11,13 +11,16 @@ import (
 
 func testTx() *ledger.Transaction {
 	desc, cat := "Coffee at Blue Bottle", int64(7)
+	unit := money.Unit{ID: 1, Decimals: 2}
 	return &ledger.Transaction{
 		Type:        "expense",
-		Amount:      money.FromDecimal(decimal.RequireFromString("12.50"), money.Unit{ID: 1, Decimals: 2}),
 		Description: &desc,
-		CategoryID:  &cat,
-		Account:     &ledger.Account{ID: 3, Name: "Wallet"},
-		Tags:        []ledger.Tag{{ID: 1, Name: "work"}, {ID: 2, Name: "cafe"}},
+		Payments: []ledger.Payment{{
+			AccountID: 3, Account: &ledger.Account{ID: 3, Name: "Wallet"},
+			Amount: money.FromDecimal(decimal.RequireFromString("-12.50"), unit),
+		}},
+		Lines: []ledger.Line{{CategoryID: &cat, Amount: money.FromDecimal(decimal.RequireFromString("12.50"), unit)}},
+		Tags:  []ledger.Tag{{ID: 1, Name: "work"}, {ID: 2, Name: "cafe"}},
 	}
 }
 

@@ -236,12 +236,55 @@ func (s Debts) recordIssuance(ctx context.Context, debtID int64, in DebtInput) e
 	if in.Direction == DebtIOwe {
 		typ = "debt_borrow"
 	}
-	amt := in.Amount
-	_, err := s.Transactions.Create(ctx, TxInput{
-		Type: typ, AccountID: in.AccountID, ToAccountID: &debtID,
-		Amount: amt, ToAmount: &amt, Description: in.Description, Date: &in.Date,
-	})
+	_, err := s.record(ctx, typ, debtID, in.AccountID, in.Amount, in.Date, in.Description)
 	return err
+}
+
+// record writes a debt transaction: two payments, one on the debt account in
+// its currency (amount) and one on the ordinary account in its own, converted
+// at the current rates when the currencies differ. The debt account is signed
+// like any account: lending and paying add to it, borrowing and collecting take
+// from it, and the ordinary account moves the other way.
+func (s Debts) record(
+	ctx context.Context,
+	typ string,
+	debtID, accountID int64,
+	amount decimal.Decimal,
+	date string,
+	desc *string,
+) (*Transaction, error) {
+	debt, err := s.Accounts.ByID(ctx, debtID)
+	if err != nil || debt == nil || debt.Type != "debt" {
+		return nil, ErrUnknownAccount
+	}
+	src, err := s.Accounts.ByID(ctx, accountID)
+	if err != nil || src == nil {
+		return nil, ErrUnknownAccount
+	}
+	onDebt, err := money.FromInput(amount, debt.Currency.Unit())
+	if err != nil {
+		return nil, err
+	}
+	if !onDebt.IsPositive() {
+		return nil, ErrDebtPrincipal
+	}
+	onSource, err := TryConvert(onDebt, *debt.Currency, *src.Currency)
+	if err != nil {
+		return nil, err
+	}
+	if typ == "debt_lend" || typ == "debt_payment" {
+		onSource = onSource.Neg() // the debt account grows, the ordinary one gives
+	} else {
+		onDebt = onDebt.Neg()
+	}
+	debtAmount, sourceAmount := onDebt.Decimal(), onSource.Decimal()
+	return s.Transactions.As(ReasonDebt).Create(ctx, TxInput{
+		Type: typ, Description: desc, Date: &date,
+		Payments: []PaymentInput{
+			{AccountID: accountID, Amount: &sourceAmount},
+			{AccountID: debtID, Amount: &debtAmount},
+		},
+	})
 }
 
 // Update saves the terms of a debt. A new principal moves the opening balance
@@ -309,10 +352,7 @@ func (s Debts) Payment(
 	if collect {
 		typ = "debt_collection"
 	}
-	tx, err := s.Transactions.Create(ctx, TxInput{
-		Type: typ, AccountID: accountID, ToAccountID: &debt.ID,
-		Amount: amount, ToAmount: &amount, Description: desc, Date: &date,
-	})
+	tx, err := s.record(ctx, typ, debt.ID, accountID, amount, date, desc)
 	if err != nil {
 		return nil, err
 	}

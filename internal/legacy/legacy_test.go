@@ -96,7 +96,7 @@ func TestUpgradeLeavesGoSchemaUsable(t *testing.T) {
 	}
 
 	btc, err := (ledger.Transactions{DB: sqlDB}).ByID(ctx, 3)
-	if err != nil || btc == nil || !btc.Amount.Decimal().Equal(decimal.RequireFromString("0.00012345")) {
+	if err != nil || btc == nil || len(btc.Payments) != 1 || !btc.Payments[0].Amount.Decimal().Equal(decimal.RequireFromString("0.00012345")) {
 		t.Fatalf("btc tx via ledger = %+v, %v", btc, err)
 	}
 	if btc.Date == nil || *btc.Date != "2026-01-05" {

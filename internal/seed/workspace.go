@@ -36,6 +36,7 @@ type expenseCand struct {
 	id      int64
 	amount  float64
 	catName string
+	catID   *int64
 }
 
 func seedWorkspace(ctx context.Context, db store.DB, now time.Time) (map[string]*ledger.Account, error) {
@@ -53,7 +54,7 @@ func seedWorkspace(ctx context.Context, db store.DB, now time.Time) (map[string]
 		cats:    ledger.Categories{DB: db},
 		tags:    ledger.Tags{DB: db},
 		budgets: ledger.Budgets{DB: db},
-		recur:   recurring.Service{DB: db, Txs: ledger.Transactions{DB: db}},
+		recur:   recurring.Service{DB: db, Ledger: func(d store.DB) recurring.Occurrences { return ledger.Templates{DB: d} }},
 		auto:    automation.Service{DB: db, Txs: ledger.Transactions{DB: db}},
 	}
 	curs := ledger.Currencies{DB: db}
@@ -84,7 +85,7 @@ func seedWorkspace(ctx context.Context, db store.DB, now time.Time) (map[string]
 	if err := s.createTransactions(accounts, expenses, incomes, tags); err != nil {
 		return nil, err
 	}
-	if err := s.seedTransactionItems(); err != nil {
+	if err := s.seedSplitLines(); err != nil {
 		return nil, err
 	}
 	if err := s.seedPending(accounts, expenses); err != nil {
@@ -125,11 +126,8 @@ func (s *seeder) accountSpecs(usd, eur *ledger.Currency) []accountSpec {
 		specs = append(specs, accountSpec{key: "eur", name: "Revolut EUR", typ: "bank", cur: eur, bal: 1850})
 	}
 	return append(specs,
-		// A debt standing in for a credit card, until accounts can be one.
-		accountSpec{
-			key: "credit", name: "Amex Gold Card", typ: "debt", cur: usd, debtType: "i_owe", target: &cardAmt,
-			counter: "American Express", desc: "Credit card balance",
-		},
+		// A credit card is an ordinary account that starts below zero.
+		accountSpec{key: "credit", name: "Amex Gold Card", typ: "bank", cur: usd, bal: -cardAmt},
 		accountSpec{
 			key: "mortgage", name: "Home Mortgage", typ: "debt", cur: usd, debtType: "i_owe", target: &mortgageAmt,
 			due: &mortgageDue, counter: "Wells Fargo Home Mortgage", desc: "30-year fixed mortgage",

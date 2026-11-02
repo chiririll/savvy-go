@@ -42,24 +42,14 @@ func TestDecimalMarshalingIsNotGlobal(t *testing.T) {
 	if got := marshal(t, dto.Number(decimal.RequireFromString("1.5"))); got != `1.5` {
 		t.Fatalf("Number = %s", got)
 	}
-	item := dto.NewTxItem(
-		ledger.TxItem{
-			Name:         "x",
-			Quantity:     decimal.RequireFromString("2.50"),
-			PricePerUnit: money.New(100, usd),
-			TotalPrice:   money.New(250, usd),
-		},
-	)
-	m := decode(t, item)
-	if m["quantity"] != 2.5 || m["pricePerUnit"] != 1.0 || m["totalPrice"] != 2.5 {
-		t.Fatalf("item = %v", m)
-	}
 }
 
 func TestNewDebt(t *testing.T) {
 	target := money.New(10000, usd)
 	cur := &ledger.Currency{ID: 1, Code: "USD", Decimals: 2}
-	account := func(balance int64) ledger.Account { return ledger.Account{Currency: cur, Balance: money.New(balance, usd)} }
+	account := func(balance int64) ledger.Account {
+		return ledger.Account{Currency: cur, Balance: money.New(balance, usd)}
+	}
 	d := dto.NewDebt(ledger.Debt{Account: account(-2500), Direction: ledger.DebtIOwe, Principal: target})
 	if d.PaymentProgress != 75 || d.TargetAmount.Minor() != 10000 {
 		t.Fatalf("debt = %+v", d)
@@ -80,15 +70,15 @@ func TestTransactionActionsFollowLedger(t *testing.T) {
 	for _, tx := range []ledger.Transaction{
 		{Type: "expense", Status: "confirmed"},
 		{Type: "expense", Status: "pending"},
-		{Type: "expense", Status: "pending", RecurringID: &rid},
+		{Type: "expense", Status: "pending", RecurringID: &rid, Reasons: []ledger.Reason{ledger.ReasonRecurringPending}},
 		{Type: "expense", Status: "skipped", RecurringID: &rid},
-		{Type: "transfer_in", Status: "confirmed"},
+		{Type: "transfer_in", Status: "confirmed", Reasons: []ledger.Reason{ledger.ReasonSpaceTransfer}},
+		{Type: "debt_payment", Status: "confirmed", Reasons: []ledger.Reason{ledger.ReasonDebt}},
 	} {
 		want := tx.Allowed()
 		got := dto.NewTransaction(tx).Actions
-		if got.Edit != want.Edit || got.Delete != want.Delete || got.Duplicate != want.Duplicate ||
-			got.Confirm != want.Confirm ||
-			got.Skip != want.Skip {
+		if got.Edit != want.Edit || got.EditDetails != want.EditDetails || got.Delete != want.Delete ||
+			got.Duplicate != want.Duplicate || got.Confirm != want.Confirm || got.Skip != want.Skip {
 			t.Errorf("%+v: actions %+v, ledger %+v", tx, got, want)
 		}
 	}

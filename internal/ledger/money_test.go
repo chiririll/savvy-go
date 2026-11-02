@@ -76,10 +76,9 @@ func newMoneyEnv(t *testing.T) *moneyEnv {
 func (e *moneyEnv) tx(t *testing.T, typ string, accountID int64, amount string) *Transaction {
 	t.Helper()
 	date := "2024-01-15"
-	tx, err := e.txs.Create(
-		e.ctx,
-		TxInput{Type: typ, AccountID: accountID, Amount: decimal.RequireFromString(amount), Date: &date},
-	)
+	in := simple(typ, accountID, amount)
+	in.Date = &date
+	tx, err := e.txs.Create(e.ctx, in)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,17 +114,17 @@ func TestAmountsStoredMinorUnitsPerCurrency(t *testing.T) {
 	e.tx(t, "expense", e.usdAcc.ID, "10.50")
 
 	var btcRaw, jpyRaw int64
-	if err := e.db.QueryRow(`SELECT amount FROM transactions WHERE id = ?`, btcTx.ID).Scan(&btcRaw); err != nil {
+	if err := e.db.QueryRow(`SELECT amount FROM payments WHERE transaction_id = ?`, btcTx.ID).Scan(&btcRaw); err != nil {
 		t.Fatal(err)
 	}
-	if err := e.db.QueryRow(`SELECT amount FROM transactions WHERE id = ?`, jpyTx.ID).Scan(&jpyRaw); err != nil {
+	if err := e.db.QueryRow(`SELECT amount FROM payments WHERE transaction_id = ?`, jpyTx.ID).Scan(&jpyRaw); err != nil {
 		t.Fatal(err)
 	}
-	if btcRaw != 12345 || jpyRaw != 1500 {
-		t.Fatalf("raw amounts btc=%d jpy=%d, want 12345 and 1500", btcRaw, jpyRaw)
+	if btcRaw != 12345 || jpyRaw != -1500 {
+		t.Fatalf("raw amounts btc=%d jpy=%d, want 12345 and -1500", btcRaw, jpyRaw)
 	}
-	if !btcTx.Amount.Decimal().Equal(dec("0.00012345")) || !jpyTx.Amount.Decimal().Equal(dec("1500")) {
-		t.Fatalf("read back btc=%s jpy=%s", btcTx.Amount, jpyTx.Amount)
+	if !btcTx.Payments[0].Amount.Decimal().Equal(dec("0.00012345")) || !jpyTx.Payments[0].Amount.Decimal().Equal(dec("-1500")) {
+		t.Fatalf("read back btc=%s jpy=%s", btcTx.Payments[0].Amount, jpyTx.Payments[0].Amount)
 	}
 
 	base, _ := (Currencies{DB: e.db}).Base(e.ctx)
@@ -213,10 +212,9 @@ func TestCategoryStatisticsFoldsCurrencies(t *testing.T) {
 		acct   int64
 		amount string
 	}{{e.usdAcc.ID, "10.00"}, {e.jpyAcc.ID, "500"}} {
-		if _,
-			err := e.txs.Create(e.ctx,
-			TxInput{Type: "expense", AccountID: in.acct, CategoryID: &cat.ID, Amount: dec(in.amount),
-				Date: &date}); err != nil {
+		x := simple("expense", in.acct, in.amount)
+		x.Lines[0].CategoryID, x.Date = &cat.ID, &date
+		if _, err := e.txs.Create(e.ctx, x); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -232,19 +230,19 @@ func TestCategoryStatisticsFoldsCurrencies(t *testing.T) {
 	}
 }
 
-func TestItemTotalsAreExact(t *testing.T) {
+func TestLineAmountsAreExact(t *testing.T) {
 	e := newMoneyEnv(t)
+	x := simple("expense", e.usdAcc.ID, "0.30")
+	x.Lines = []LineInput{{Amount: dec("0.10")}, {Amount: dec("0.20")}}
 	date := "2024-01-15"
-	tx, err := e.txs.Create(e.ctx, TxInput{
-		Type: "expense", AccountID: e.usdAcc.ID, Amount: dec("0.30"), Date: &date,
-		Items: []TxItemInput{{Name: "gum", Quantity: dec("3"), PricePerUnit: dec("0.10")}},
-	})
+	x.Date = &date
+	tx, err := e.txs.Create(e.ctx, x)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(tx.Items) != 1 || !tx.Items[0].TotalPrice.Decimal().Equal(dec("0.30")) ||
-		!tx.Items[0].Quantity.Equal(dec("3")) {
-		t.Fatalf("items = %+v", tx.Items)
+	if len(tx.Lines) != 2 || !tx.Lines[0].Amount.Decimal().Equal(dec("0.10")) ||
+		!tx.Lines[1].Amount.Decimal().Equal(dec("0.20")) || tx.Difference != nil {
+		t.Fatalf("lines = %+v, difference %v; want 0.10 and 0.20 that add up", tx.Lines, tx.Difference)
 	}
 }
 
@@ -300,30 +298,10 @@ func TestConvertRejectsAmountOfAnotherCurrency(t *testing.T) {
 	Convert(money.FromDecimal(dec("1"), jpy.Unit()), usd, jpy)
 }
 
-func TestTransferWithoutDestinationAmountConverts(t *testing.T) {
-	e := newMoneyEnv(t)
-	date := "2024-01-15"
-	to := e.jpyAcc.ID
-	tx, err := e.txs.Create(
-		e.ctx,
-		TxInput{Type: "transfer", AccountID: e.usdAcc.ID, ToAccountID: &to, Amount: dec("15"), Date: &date},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// 15 USD at JPY rate 0.01 (to base) is 1500 JPY, not "15 JPY".
-	if tx.ToAmount == nil || !tx.ToAmount.Decimal().Equal(dec("1500")) {
-		t.Fatalf("to amount = %v, want 1500 JPY", tx.ToAmount)
-	}
-	if tx.ToAmount.Unit() != e.jpy.Unit() {
-		t.Fatalf("to amount unit = %+v, want JPY", tx.ToAmount.Unit())
-	}
-}
-
 func rawAmount(t *testing.T, e *moneyEnv, id int64) int64 {
 	t.Helper()
 	var v int64
-	if err := e.db.QueryRow(`SELECT amount FROM transactions WHERE id = ?`, id).Scan(&v); err != nil {
+	if err := e.db.QueryRow(`SELECT amount FROM payments WHERE transaction_id = ?`, id).Scan(&v); err != nil {
 		t.Fatal(err)
 	}
 	return v
@@ -358,7 +336,7 @@ func TestAccountCurrencyIsImmutable(t *testing.T) {
 		}
 	}
 	unchanged, _ := accts.ByID(e.ctx, a.ID)
-	if unchanged.CurrencyID != e.usd.ID || rawAmount(t, e, tx.ID) != 1050 {
+	if unchanged.CurrencyID != e.usd.ID || rawAmount(t, e, tx.ID) != -1050 {
 		t.Fatalf("rejected switch must change nothing: currency=%d raw=%d", unchanged.CurrencyID, rawAmount(t, e, tx.ID))
 	}
 
@@ -427,7 +405,9 @@ func TestUnknownAccountCurrencyIsAnError(t *testing.T) {
 		t.Fatalf("create with unknown currency = %v, want ErrUnknownCurrency", err)
 	}
 	date := "2024-01-15"
-	if _, err := e.txs.Create(e.ctx, TxInput{Type: "expense", AccountID: 999, Amount: dec("1"), Date: &date}); !errors.Is(
+	ghost := simple("expense", 999, "1")
+	ghost.Date = &date
+	if _, err := e.txs.Create(e.ctx, ghost); !errors.Is(
 		err,
 		ErrUnknownAccount,
 	) {

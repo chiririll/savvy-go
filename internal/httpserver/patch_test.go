@@ -22,13 +22,12 @@ func TestPatchKeepsOmittedFieldsNullClears(t *testing.T) {
 		{
 			name: "transaction",
 			create: func(accID, catID int64) (string, map[string]any) {
-				return "/api/transactions", map[string]any{
-					"type": "expense", "account_id": accID, "category_id": catID, "amount": 25,
-					"description": "Lunch", "date": "2026-09-01",
-				}
+				body := flowIn("expense", accID, catID, 25, "2026-09-01")
+				body["description"] = "Lunch"
+				return "/api/transactions", body
 			},
-			change:   map[string]any{"amount": 30},
-			keep:     map[string]any{"description": "Lunch", "date": "2026-09-01", "amount": float64(30)},
+			change:   map[string]any{"date": "2026-09-02"},
+			keep:     map[string]any{"description": "Lunch", "date": "2026-09-02", "amount": float64(25)},
 			clearKey: "description", clearOut: "description",
 		},
 		{
@@ -76,25 +75,6 @@ func TestPatchKeepsOmittedFieldsNullClears(t *testing.T) {
 			},
 			clearKey: "due_date", clearOut: "dueDate",
 		},
-		{
-			name: "recurring transaction",
-			create: func(accID, catID int64) (string, map[string]any) {
-				return "/api/recurring", map[string]any{
-					"type": "expense", "account_id": accID, "category_id": catID, "amount": 50,
-					"description": "Gym", "frequency": "monthly", "interval": 1, "day_of_month": 5,
-					"start_date": "2030-01-05", "end_date": "2031-01-05", "is_active": true,
-				}
-			},
-			change: map[string]any{"is_active": false},
-			keep: map[string]any{
-				"description": "Gym",
-				"endDate":     "2031-01-05",
-				"dayOfMonth":  float64(5),
-				"amount":      float64(50),
-				"isActive":    false,
-			},
-			clearKey: "end_date", clearOut: "endDate",
-		},
 	}
 
 	for _, tc := range cases {
@@ -141,7 +121,7 @@ func TestPatchReplacesLinkListsOnlyWhenSent(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("patchlists@test.com", "secret1", roleEditor)
 	sess := a.issue(u, false)
-	accID, catID := seedMoney(t, a, sess)
+	_, catID := seedMoney(t, a, sess)
 
 	res := a.do("POST", "/api/tags", map[string]any{"name": "Trip"}, sess.Token, sess.CSRF)
 	tagID := int64(decodeJSON(t, res)["data"].(map[string]any)["id"].(float64))
@@ -174,26 +154,6 @@ func TestPatchReplacesLinkListsOnlyWhenSent(t *testing.T) {
 	data = patch(budget, map[string]any{"tag_ids": []int64{}})
 	if count(data, "categories") != 1 || count(data, "tags") != 0 {
 		t.Errorf("budget tag_ids [] should clear tags only: %v", data)
-	}
-
-	res = a.do("POST", "/api/recurring", map[string]any{
-		"type": "expense", "account_id": accID, "category_id": catID, "amount": 50,
-		"frequency": "monthly", "interval": 1, "day_of_month": 5, "start_date": "2030-01-05",
-		"tag_ids": []int64{tagID},
-	}, sess.Token, sess.CSRF)
-	created = decodeJSON(t, res)
-	if res.StatusCode != 201 {
-		t.Fatalf("create recurring %d %v", res.StatusCode, created)
-	}
-	rec := "/api/recurring/" + itoa(int64(created["data"].(map[string]any)["id"].(float64)))
-
-	data = patch(rec, map[string]any{"amount": 60})
-	if count(data, "tags") != 1 {
-		t.Errorf("recurring omitted tag_ids changed: %v", data)
-	}
-	data = patch(rec, map[string]any{"tag_ids": []int64{}})
-	if count(data, "tags") != 0 {
-		t.Errorf("recurring tag_ids [] should clear tags: %v", data)
 	}
 }
 

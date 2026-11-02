@@ -129,8 +129,12 @@ func (h Handler) addMCPWriteTools(srv *mcp.Server) map[string]mcpNeed {
 
 func (k writeSet) transactionTools() {
 	register[createTxArgs](k, k.post("create_transaction", "Create transaction",
-		"Record an income, expense or transfer between two accounts. The amount is in the account's currency; "+
-			"a transfer between accounts of different currencies also needs to_amount. Say which currency you used.",
+		"Record an income, expense or transfer between two accounts as payments (the money that moved, signed, "+
+			"each in its account's currency) and lines (what it was for, positive). A purchase paid with cash and card, "+
+			"or with euros and the change back in dinars, is one transaction with a payment per account. Say which "+
+			"currency you used. Payments are signed: an expense paid with 20 EUR and 10 EUR back in change has payments "+
+			"of -20 and +10; a transfer has a negative payment and a positive one. Lines are positive and add up to "+
+			"what the payments net to. The answer's difference field is not null when they disagree.",
 		"transactions"))
 	register[updateTxArgs](k, k.patch("update_transaction", "Update transaction",
 		"Change a transaction. Send only the fields that change.", "transactions/{id}"))
@@ -142,18 +146,6 @@ func (k writeSet) transactionTools() {
 		"Skip a pending (scheduled) transaction.", "transactions/{id}/skip"))
 	register[idArgs](k, k.post("duplicate_transaction", "Duplicate transaction",
 		"Copy a transaction.", "transactions/{id}/duplicate"))
-	register[createTxGroupArgs](k, k.post("create_transaction_group", "Create split payment",
-		"Record one payment made with several accounts or currencies, such as cash and card, or euros with the "+
-			"change given back in dinars. Legs are written together or not at all, all on the same day. "+
-			"Record the price as an expense and the money exchanged on the way as a transfer between the two "+
-			"accounts with to_amount: rent of 450 EUR paid with 500 EUR and 5900 RSD back is an expense of 450 EUR "+
-			"plus a transfer of 50 EUR to the dinar account with to_amount 5900. Never use a negative amount.",
-		"transaction-groups"))
-	register[updateTxGroupArgs](k, k.put("update_transaction_group", "Update split payment",
-		"Replace all legs of a split payment. Send every leg, not only the ones that change.",
-		"transaction-groups/{uuid}"))
-	register[txGroupIDArgs](k, k.del("delete_transaction_group", "Delete split payment",
-		"Permanently delete a split payment with all its legs. Ask the user first.", "transaction-groups/{uuid}"))
 }
 
 func (k writeSet) accountTools() {

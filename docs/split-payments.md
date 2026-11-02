@@ -29,6 +29,4 @@ Every part is a row of its own, so filtering by account shows only that account'
 
 ## API and MCP
 
-`POST /transaction-groups` takes `{"legs": [...]}`, each leg like the body of `POST /transactions`; `GET`, `PUT` and `DELETE /transaction-groups/{uuid}` read, replace and delete a payment. Transactions carry `groupUuid`. They need the same permissions as transactions. The interactive reference at `/api/docs` has the details.
-
-For an assistant, `create_transaction_group`, `update_transaction_group` and `delete_transaction_group` do the same. Their description teaches the pattern above: the price as an expense, the surplus and the change as a transfer with `to_amount`, never a negative amount.
+A split payment is now one transaction with a payment per account. The old `/transaction-groups` endpoints and the `*_transaction_group` tools are gone; see [Transactions](api.md#transactions) for the shape. This page describes the form, which still uses the older model until it is rewritten for payments and lines.

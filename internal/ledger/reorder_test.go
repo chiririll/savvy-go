@@ -64,7 +64,9 @@ func TestReorderRejectsOtherDaysAndUnknownIDs(t *testing.T) {
 	e := newMoneyEnv(t)
 	a := e.tx(t, "expense", e.usdAcc.ID, "1")
 	other := "2024-02-01"
-	o, err := e.txs.Create(e.ctx, TxInput{Type: "expense", AccountID: e.usdAcc.ID, Amount: dec("5"), Date: &other})
+	in := simple("expense", e.usdAcc.ID, "5")
+	in.Date = &other
+	o, err := e.txs.Create(e.ctx, in)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +84,7 @@ func TestReorderRejectsOtherDaysAndUnknownIDs(t *testing.T) {
 	}
 }
 
-func TestMovingATransactionToAnotherDayDropsItsManualPlace(t *testing.T) {
+func TestMovingToAnotherDayDropsItsManualPlace(t *testing.T) {
 	e := newMoneyEnv(t)
 	a := e.tx(t, "expense", e.usdAcc.ID, "1")
 	b := e.tx(t, "expense", e.usdAcc.ID, "2")
@@ -90,9 +92,9 @@ func TestMovingATransactionToAnotherDayDropsItsManualPlace(t *testing.T) {
 		t.Fatal(err)
 	}
 	day := "2024-01-16"
-	if _, err := e.txs.Update(e.ctx, a.ID, TxInput{
-		Type: "expense", AccountID: e.usdAcc.ID, Amount: dec("1"), Date: &day,
-	}); err != nil {
+	moved := simple("expense", e.usdAcc.ID, "1")
+	moved.Date = &day
+	if _, err := e.txs.Update(e.ctx, a.ID, moved); err != nil {
 		t.Fatal(err)
 	}
 	var order *int64
@@ -106,9 +108,9 @@ func TestMovingATransactionToAnotherDayDropsItsManualPlace(t *testing.T) {
 	if err := e.txs.Reorder(e.ctx, "2024-01-15", []int64{b.ID}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := e.txs.Update(e.ctx, b.ID, TxInput{
-		Type: "expense", AccountID: e.usdAcc.ID, Amount: dec("9"), Date: ptr("2024-01-15"),
-	}); err != nil {
+	same := simple("expense", e.usdAcc.ID, "9")
+	same.Date = ptr("2024-01-15")
+	if _, err := e.txs.Update(e.ctx, b.ID, same); err != nil {
 		t.Fatal(err)
 	}
 	if err := e.db.QueryRow(`SELECT day_order FROM transactions WHERE id = ?`, b.ID).Scan(&order); err != nil || order == nil {

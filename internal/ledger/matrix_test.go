@@ -75,7 +75,9 @@ func newMatrixEnv(t *testing.T, base moneytest.Currency) *matrixEnv {
 func (e *matrixEnv) tx(t *testing.T, typ string, c moneytest.Currency, amount decimal.Decimal) (*Transaction, error) {
 	t.Helper()
 	date := "2024-01-15"
-	return e.txs.Create(e.ctx, TxInput{Type: typ, AccountID: e.accts[c.Code].ID, Amount: amount, Date: &date})
+	in := simple(typ, e.accts[c.Code].ID, amount.String())
+	in.Date = &date
+	return e.txs.Create(e.ctx, in)
 }
 
 func (e *matrixEnv) balance(t *testing.T, c moneytest.Currency) money.Money {
@@ -99,7 +101,7 @@ func (e *matrixEnv) count(t *testing.T, table string) int {
 func (e *matrixEnv) rawAmount(t *testing.T, id int64) int64 {
 	t.Helper()
 	var v int64
-	if err := e.db.QueryRow(`SELECT amount FROM transactions WHERE id = ?`, id).Scan(&v); err != nil {
+	if err := e.db.QueryRow(`SELECT amount FROM payments WHERE transaction_id = ?`, id).Scan(&v); err != nil {
 		t.Fatal(err)
 	}
 	return v
@@ -113,6 +115,9 @@ func TestAmountsStoredSummedExactlyEveryCurrency(t *testing.T) {
 	moneytest.ForEach(t, func(t *testing.T, c moneytest.Currency) {
 		e := newMatrixEnv(t, moneytest.Currencies[0])
 		moneytest.ForEachAmount(t, moneytest.Valid(c.Decimals), func(t *testing.T, a moneytest.Amount) {
+			if a.Minor == 0 {
+				return // a payment of 0 is refused on new input
+			}
 			before := e.balance(t, c)
 			in, err := e.tx(t, "income", c, a.Input)
 			if err != nil {
@@ -121,8 +126,9 @@ func TestAmountsStoredSummedExactlyEveryCurrency(t *testing.T) {
 			if got := e.rawAmount(t, in.ID); got != a.Minor {
 				t.Fatalf("stored %d, want %d", got, a.Minor)
 			}
-			if in.Amount.Minor() != a.Minor || in.Amount.Unit() != e.stored(c).Unit() {
-				t.Fatalf("read back %s (%+v)", in.Amount, in.Amount.Unit())
+			if got, line := in.Payments[0].Amount, in.Lines[0].Amount; got.Minor() != a.Minor ||
+				got.Unit() != e.stored(c).Unit() || line.Minor() != a.Minor {
+				t.Fatalf("read back payment %s (%+v), line %s", got, got.Unit(), line)
 			}
 			if got := e.balance(t, c).Sub(before); got.Minor() != a.Minor {
 				t.Fatalf("balance moved by %s, want %d minor units", got, a.Minor)
@@ -167,11 +173,14 @@ func TestAmountsOutRangeRejectedStoreNothing(t *testing.T) {
 						t.Errorf("%s with %s: err = %v, want ErrOutOfRange", what, in, err)
 					}
 				}
-				_, err := e.txs.Create(e.ctx, TxInput{Type: "income", AccountID: acct.ID, Amount: in, Date: &date})
-				check("transaction", err)
-				_, err = e.txs.Create(e.ctx, TxInput{Type: "income", AccountID: acct.ID, Amount: decimal.NewFromInt(1), Date: &date,
-					Items: []TxItemInput{{Name: "x", Quantity: decimal.NewFromInt(1), PricePerUnit: in}}})
-				check("item price", err)
+				x := simple("income", acct.ID, "1")
+				x.Date, x.Payments[0].Amount = &date, &in
+				_, err := e.txs.Create(e.ctx, x)
+				check("payment", err)
+				x = simple("income", acct.ID, "1")
+				x.Date, x.Lines[0].Amount = &date, in
+				_, err = e.txs.Create(e.ctx, x)
+				check("line", err)
 				_, err = (Accounts{DB: e.db}).Create(
 					e.ctx,
 					AccountInput{Name: "big", Type: "cash", CurrencyID: cur.ID, InitialBalance: in, IsActive: true},
@@ -197,8 +206,8 @@ func TestAmountsOutRangeRejectedStoreNothing(t *testing.T) {
 				if got := e.count(t, "budgets"); got != budgets {
 					t.Errorf("%d budgets stored, want %d", got, budgets)
 				}
-				if e.count(t, "transaction_items") != 0 {
-					t.Error("an item of a rejected transaction was stored")
+				if e.count(t, "payments") != 0 || e.count(t, "transaction_lines") != 0 {
+					t.Error("a payment or line of a rejected transaction was stored")
 				}
 			}
 		})
@@ -214,11 +223,9 @@ func TestUpdateRejectsRangeKeepsAmount(t *testing.T) {
 		}
 		for _, a := range moneytest.Invalid(c.Decimals) {
 			date := "2024-01-15"
-			_, err := e.txs.Update(
-				e.ctx,
-				orig.ID,
-				TxInput{Type: "income", AccountID: orig.AccountID, Amount: a.Input, Date: &date},
-			)
+			x := simple("income", orig.Payments[0].AccountID, "1")
+			x.Date, x.Payments[0].Amount = &date, &a.Input
+			_, err := e.txs.Update(e.ctx, orig.ID, x)
 			if !errors.Is(err, money.ErrOutOfRange) {
 				t.Errorf("%s: err = %v", a.Name, err)
 			}
@@ -318,46 +325,9 @@ func TestConvertRoundTripErrorBoundedScales(t *testing.T) {
 	})
 }
 
-func TestTransfersBetweenEveryPairOfCurrencies(t *testing.T) {
-	e := newMatrixEnv(t, moneytest.Currencies[0]) // shared: each transfer is deleted again
-	moneytest.ForEachPair(t, func(t *testing.T, from, to moneytest.Currency) {
-		f, tt := e.stored(from), e.stored(to)
-		fromAcct, toAcct := e.accts[from.Code], e.accts[to.Code]
-		if from.Code == to.Code {
-			t.Skip("a transfer needs two accounts")
-		}
-		for _, a := range moneytest.Valid(from.Decimals) {
-			if a.Minor == 0 {
-				continue
-			}
-			in := money.New(a.Minor, f.Unit())
-			want, err := TryConvert(in, f, tt)
-			date := "2024-01-15"
-			tx, terr := e.txs.Create(e.ctx, TxInput{
-				Type: "transfer", AccountID: fromAcct.ID, ToAccountID: &toAcct.ID, Amount: a.Input, Date: &date,
-			})
-			if err != nil { // the converted amount does not fit
-				if !errors.Is(terr, money.ErrOutOfRange) {
-					t.Errorf("%s: err = %v, want ErrOutOfRange", a.Name, terr)
-				}
-				continue
-			}
-			if terr != nil {
-				t.Errorf("%s: %v", a.Name, terr)
-				continue
-			}
-			defer func() { _ = e.txs.Delete(e.ctx, tx.ID) }()
-			if tx.ToAmount == nil || !tx.ToAmount.Equal(want) {
-				t.Errorf("%s: delivered %v, want %s", a.Name, tx.ToAmount, want)
-			}
-			if tx.ToAmount.Unit() != tt.Unit() {
-				t.Errorf("%s: delivered in %+v, want %+v", a.Name, tx.ToAmount.Unit(), tt.Unit())
-			}
-		}
-	})
-}
-
-func TestExplicitTransferAmountRoundsToDestination(t *testing.T) {
+// The amount of each side of a transfer is rounded into the scale of its own
+// account, whatever the currency on the other side.
+func TestTransferPaymentsRoundToTheirAccounts(t *testing.T) {
 	moneytest.ForEach(t, func(t *testing.T, to moneytest.Currency) {
 		e := newMatrixEnv(t, moneytest.Currencies[0])
 		from := moneytest.Currencies[0]
@@ -366,17 +336,21 @@ func TestExplicitTransferAmountRoundsToDestination(t *testing.T) {
 			t.Skip("a transfer needs two accounts")
 		}
 		moneytest.ForEachAmount(t, moneytest.Valid(to.Decimals), func(t *testing.T, a moneytest.Amount) {
+			if a.Minor == 0 {
+				return
+			}
 			date := "2024-01-15"
-			explicit := a.Input
-			tx, err := e.txs.Create(e.ctx, TxInput{
-				Type: "transfer", AccountID: fromAcct.ID, ToAccountID: &toAcct.ID,
-				Amount: decimal.NewFromInt(1), ToAmount: &explicit, Date: &date,
-			})
+			x := move(fromAcct.ID, toAcct.ID, "1", a.Input.String())
+			x.Date = &date
+			tx, err := e.txs.Create(e.ctx, x)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if tx.ToAmount == nil || tx.ToAmount.Minor() != a.Minor {
-				t.Fatalf("to amount = %v, want %d minor", tx.ToAmount, a.Minor)
+			defer func() { _ = e.txs.Delete(e.ctx, tx.ID) }()
+			for _, p := range tx.Payments {
+				if p.AccountID == toAcct.ID && (p.Amount.Minor() != a.Minor || p.Amount.Unit() != e.stored(to).Unit()) {
+					t.Fatalf("destination payment = %v, want %d minor", p.Amount, a.Minor)
+				}
 			}
 		})
 	})

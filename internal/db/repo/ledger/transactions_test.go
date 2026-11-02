@@ -340,6 +340,15 @@ func TestCategoryAndDescriptionCanBeSetAlone(t *testing.T) {
 	now := time.Now().UTC()
 	other, _ := f.repo.InsertCategory(ctx, ledgerrepo.Category{Name: "Other", Type: "expense"}, now)
 	id := f.expense(t, f.cash, 100, "2026-01-01")
+	before, _ := f.repo.Transaction(ctx, id)
+	chosen := before.Lines[0].CategoryID
+	// One line the user categorised and one left without a category.
+	if err := f.repo.ReplaceLines(ctx, id, []ledgerrepo.LineFields{
+		{CategoryID: chosen, Amount: money.New(60, f.unit(f.usd))},
+		{Amount: money.New(40, f.unit(f.usd))},
+	}); err != nil {
+		t.Fatal(err)
+	}
 	if err := f.repo.SetTransactionCategory(ctx, id, other, now); err != nil {
 		t.Fatal(err)
 	}
@@ -347,7 +356,10 @@ func TestCategoryAndDescriptionCanBeSetAlone(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, _ := f.repo.Transaction(ctx, id)
-	if *got.Lines[0].CategoryID != other || *got.Description != "renamed" || got.Payments[0].Amount.Minor() != -100 {
+	if *got.Lines[0].CategoryID != *chosen || *got.Lines[1].CategoryID != other {
+		t.Fatalf("a categorised line keeps its category and an uncategorised one gets it: %+v", got.Lines)
+	}
+	if *got.Description != "renamed" || got.Payments[0].Amount.Minor() != -100 {
 		t.Fatalf("tx = %+v", got)
 	}
 }

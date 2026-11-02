@@ -89,7 +89,7 @@ func TestEachCurrencyConvertsRoundsToBase(t *testing.T) {
 					date := "2024-01-15"
 					created, terr := e.txs.Create(
 						e.ctx,
-						ledger.TxInput{Type: "expense", AccountID: e.accts[c.Code].ID, Amount: a.Input, Date: &date},
+						at(flowTx("expense", e.accts[c.Code].ID, nil, a.Input), date),
 					)
 					if terr != nil {
 						t.Fatal(terr)

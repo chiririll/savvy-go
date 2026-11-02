@@ -63,14 +63,16 @@ func TestAmountsOnWireInEveryCurrency(t *testing.T) {
 	moneytest.ForEach(t, func(t *testing.T, c moneytest.Currency) {
 		balance := int64(0)
 		moneytest.ForEachAmount(t, moneytest.Valid(c.Decimals), func(t *testing.T, a moneytest.Amount) {
-			res := e.a.do("POST", "/api/transactions", map[string]any{
-				"type": "income", "account_id": e.acct[c.Code], "amount": num(a.Input), "date": "2024-01-15",
-			}, e.sess.Token, e.sess.CSRF)
+			if a.Minor == 0 {
+				return // a payment of 0 is refused on new input
+			}
+			res := e.a.do("POST", "/api/transactions",
+				flowBody("income", e.acct[c.Code], num(a.Input), "2024-01-15"), e.sess.Token, e.sess.CSRF)
 			if res.StatusCode != http.StatusCreated {
 				t.Fatalf("status %d: %s", res.StatusCode, rawBody(t, res))
 			}
 			// A plain JSON number at the currency's scale, trailing zeros trimmed.
-			if body, want := rawBody(t, res), `"amount":`+canonical(a.Minor, c.Decimals)+`,`; !strings.Contains(body, want) {
+			if body, want := rawBody(t, res), `"amount":`+canonical(a.Minor, c.Decimals)+`}`; !strings.Contains(body, want) {
 				t.Fatalf("response %s does not contain %s", body, want)
 			}
 			balance += a.Minor
@@ -91,9 +93,8 @@ func TestOutRangeAmountsRefusedOnWire(t *testing.T) {
 		moneytest.ForEachAmount(t, moneytest.Invalid(c.Decimals), func(t *testing.T, a moneytest.Amount) {
 			for name, req := range map[string]func() *http.Response{
 				"transaction": func() *http.Response {
-					return e.a.do("POST", "/api/transactions", map[string]any{
-						"type": "income", "account_id": e.acct[c.Code], "amount": num(a.Input), "date": "2024-01-15",
-					}, e.sess.Token, e.sess.CSRF)
+					return e.a.do("POST", "/api/transactions",
+						flowBody("income", e.acct[c.Code], num(a.Input), "2024-01-15"), e.sess.Token, e.sess.CSRF)
 				},
 				"account": func() *http.Response {
 					return e.a.do("POST", "/api/accounts", map[string]any{
