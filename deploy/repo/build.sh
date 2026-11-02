@@ -61,6 +61,8 @@ sign --armor --detach-sign --output "$OUT/rpm/repodata/repomd.xml.asc" "$OUT/rpm
 
 gpg --armor --export > "$OUT/savvy-go.asc"
 
+cp "$here/../../public/favicon.svg" "$here/../../public/favicon.ico" "$OUT/"
+
 sed "s#@SITE_URL@#$SITE_URL#g" "$here/savvy-go.repo" > "$OUT/savvy-go.repo"
 sed "s#@SITE_URL@#$SITE_URL#g" "$here/install.sh" > "$OUT/install.sh"
 sed -e "s#@REPO@#$GITHUB_REPOSITORY#g" -e "s#@SITE_URL@#$SITE_URL#g" -e "s#@VERSION@#$latest#g" \
