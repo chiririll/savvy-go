@@ -128,7 +128,7 @@ func TestTransferMovesMoneyBetweenSpaces(t *testing.T) {
 	}
 	for _, sp := range []int64{p.A.ID, p.B.ID} {
 		tr := p.transfers(sp, p.sess)[id]
-		if tr == nil || tr["status"] != "ok" || tr["verified"] != true || tr["frozen"] != false {
+		if tr == nil || tr["status"] != "confirmed" || tr["verified"] != true || tr["frozen"] != false {
 			t.Fatalf("space %d transfer %v", sp, tr)
 		}
 	}
@@ -161,15 +161,22 @@ func TestTransferSidesAreReadOnly(t *testing.T) {
 	if len(list) != 1 || list[0].(map[string]any)["type"] != "transfer_out" {
 		t.Fatalf("A transactions %v", list)
 	}
+	// Its description, tags and lines are edited as usual; the rest goes through the transfer.
 	for action, allowed := range list[0].(map[string]any)["actions"].(map[string]any) {
-		if allowed == true {
+		if allowed == true && action != "edit" && action != "editDetails" {
 			t.Fatalf("the transfer side offers %s", action)
 		}
 	}
 	id := strconv.FormatInt(int64(list[0].(map[string]any)["id"].(float64)), 10)
 	status(
 		t,
-		p.a.do("PATCH", spacePath(p.A.ID, "/transactions/"+id), map[string]any{"amount": 1}, p.sess.Token, p.sess.CSRF),
+		p.a.do(
+			"PATCH",
+			spacePath(p.A.ID, "/transactions/"+id),
+			map[string]any{"payments": []map[string]any{{"account_id": p.accA, "amount": "-1"}}},
+			p.sess.Token,
+			p.sess.CSRF,
+		),
 		422,
 		"edit",
 	)
@@ -191,7 +198,10 @@ func TestTransferSidesAreReadOnly(t *testing.T) {
 		p.a.do(
 			"POST",
 			spacePath(p.A.ID, "/transactions"),
-			map[string]any{"type": "transfer_out", "account_id": p.accA, "amount": 1, "date": "2026-10-01"},
+			map[string]any{
+				"type": "transfer_out", "date": "2026-10-01",
+				"payments": []map[string]any{{"account_id": p.accA, "amount": "-1"}},
+			},
 			p.sess.Token,
 			p.sess.CSRF,
 		),
@@ -413,7 +423,11 @@ func TestReusedIDIsNotTheTransfer(t *testing.T) {
 	created := p.post(
 		p.A.ID,
 		"/transactions",
-		map[string]any{"type": "expense", "account_id": p.accA, "amount": 1, "date": "2026-10-01"},
+		map[string]any{
+			"type": "expense", "date": "2026-10-01",
+			"payments": []map[string]any{{"account_id": p.accA, "amount": "-1"}},
+			"lines":    []map[string]any{{"amount": "1"}},
+		},
 	)
 	newID := created["data"].(map[string]any)["id"]
 	if newID != sideID {
@@ -432,14 +446,18 @@ func TestReusedIDIsNotTheTransfer(t *testing.T) {
 		p.a.do(
 			"PATCH",
 			path,
-			map[string]any{"type": "expense", "account_id": p.accA, "amount": 2, "date": "2026-10-01"},
+			map[string]any{
+				"type": "expense", "date": "2026-10-01",
+				"payments": []map[string]any{{"account_id": p.accA, "amount": "-2"}},
+				"lines":    []map[string]any{{"amount": "2"}},
+			},
 			p.sess.Token,
 			p.sess.CSRF,
 		),
 		200,
 		"the new transaction is ordinary",
 	)
-	if tr := p.transfers(p.A.ID, p.sess)[id]; tr == nil || tr["status"] != "ok" {
+	if tr := p.transfers(p.A.ID, p.sess)[id]; tr == nil || tr["status"] != "confirmed" {
 		t.Fatalf("the transfer did not come back: %v", tr)
 	}
 	if b := p.balance(p.A.ID, p.accA); b != "-7" {

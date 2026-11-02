@@ -66,11 +66,11 @@ func TestRestoreReviewsTransfers(t *testing.T) {
 	inA := p.transfers(p.A.ID, p.sess)
 	for id, review := range map[string]string{created: "created_remote", changed: "changed_remote",
 		deleted: "deleted_remote"} {
-		if tr := inA[id]; tr == nil || tr["status"] != "pending" || tr["review"] != review {
+		if tr := inA[id]; tr == nil || tr["status"] != "in_review" || tr["review"] != review {
 			t.Fatalf("%s in A: %v", review, tr)
 		}
 	}
-	if inA[kept]["status"] != "ok" {
+	if inA[kept]["status"] != "confirmed" {
 		t.Fatalf("unchanged transfer %v", inA[kept])
 	}
 	if b := p.balance(p.A.ID, p.accA); b != balanceAtBackup {
@@ -111,7 +111,7 @@ func TestRestoreReviewsTransfers(t *testing.T) {
 	)
 
 	inA = p.transfers(p.A.ID, p.sess)
-	if inA[created]["status"] != "ok" || inA[deleted] != nil || inA[changed]["status"] != "ok" {
+	if inA[created]["status"] != "confirmed" || inA[deleted] != nil || inA[changed]["status"] != "confirmed" {
 		t.Fatalf("after decisions %v", inA)
 	}
 	if amt := p.transfers(p.B.ID, p.sess)[changed]["to"].(map[string]any)["amount"]; amt != "2" {
@@ -141,7 +141,7 @@ func TestReviewMarkSurvivesCrash(t *testing.T) {
 	if err := p.a.svc.Transfers.SyncAll(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if tr := p.transfers(p.A.ID, p.sess)[created]; tr == nil || tr["status"] != "pending" {
+	if tr := p.transfers(p.A.ID, p.sess)[created]; tr == nil || tr["status"] != "in_review" {
 		t.Fatalf("startup merged automatically: %v", tr)
 	}
 }
@@ -159,7 +159,7 @@ func TestMissingAccountNeedsAttention(t *testing.T) {
 	id := body["data"].(map[string]any)["uuid"].(string)
 	p.restoreA(backup)
 	status(t, p.a.do("POST", spacePath(p.A.ID, "/transfers/"+id+"/accept"), nil, p.sess.Token, p.sess.CSRF), 200, "accept")
-	if tr := p.transfers(p.A.ID, p.sess)[id]; tr["status"] != "needs_attention" {
+	if tr := p.transfers(p.A.ID, p.sess)[id]; tr["needsAttention"] != true {
 		t.Fatalf("status %v", tr)
 	}
 	status(
@@ -174,7 +174,7 @@ func TestMissingAccountNeedsAttention(t *testing.T) {
 		200,
 		"choose account",
 	)
-	if tr := p.transfers(p.A.ID, p.sess)[id]; tr["status"] != "ok" {
+	if tr := p.transfers(p.A.ID, p.sess)[id]; tr["status"] != "confirmed" || tr["needsAttention"] == true {
 		t.Fatalf("status after fix %v", tr)
 	}
 }
@@ -233,14 +233,20 @@ func TestForgedBackupCannotReachOtherSpace(t *testing.T) {
 	backup := p.backupA()
 	uuidA, uuidB := p.A.UUID, p.B.UUID
 	forged := forgeBackup(t, p.a.svc.Backups.SpacePath(p.A.ID, backup),
-		`UPDATE space_transfers SET version = 99, from_amount = 1 WHERE uuid = '`+real+`'`,
-		`INSERT INTO space_transfers (uuid, from_space_uuid, from_account_id, from_amount, from_currency, from_decimals,
-			to_space_uuid, to_account_id, to_amount, to_currency, to_decimals, date, version, signer_kid, signature)
-			VALUES ('forged', '`+uuidA+`', 1, 100000, 'EUR', 2, '`+uuidB+`', 1, 100000, 'USD', 2,
-				'2026-10-01', 1, 'nobody', 'AAAA')`,
-		`INSERT INTO space_transfers (uuid, from_space_uuid, from_account_id, from_amount, from_currency, from_decimals,
-			to_space_uuid, to_account_id, to_amount, to_currency, to_decimals, date, version, signer_kid, signature)
-			VALUES ('foreign', 'someone', 1, 1, 'EUR', 2, '`+uuidB+`', 1, 1, 'USD', 2, '2026-10-01', 1, 'nobody', 'AAAA')`,
+		`UPDATE space_transfers SET payload = json_set(payload, '$.version', 99, '$.from.amount', 1)
+			WHERE uuid = '`+real+`'`,
+		`INSERT INTO space_transfers (uuid, payload, sig_v, source_kid, source_sig) VALUES ('forged', json_object(
+			'uuid', 'forged',
+			'from', json_object('space', '`+uuidA+`', 'account', 1, 'amount', 100000, 'currency', 'EUR', 'decimals', 2),
+			'to', json_object('space', '`+uuidB+`', 'account', 1, 'amount', 100000, 'currency', 'USD', 'decimals', 2),
+			'date', '2026-10-01', 'description', NULL, 'created_by', NULL, 'version', 1, 'deleted_at', NULL),
+			1, 'nobody', 'AAAA')`,
+		`INSERT INTO space_transfers (uuid, payload, sig_v, source_kid, source_sig) VALUES ('foreign', json_object(
+			'uuid', 'foreign',
+			'from', json_object('space', 'someone', 'account', 1, 'amount', 1, 'currency', 'EUR', 'decimals', 2),
+			'to', json_object('space', '`+uuidB+`', 'account', 1, 'amount', 1, 'currency', 'USD', 'decimals', 2),
+			'date', '2026-10-01', 'description', NULL, 'created_by', NULL, 'version', 1, 'deleted_at', NULL),
+			1, 'nobody', 'AAAA')`,
 	)
 	up := createdBackup(t, p.a.upload(spacePath(p.A.ID, "/backups/upload"), "forged.zip", forged, nil, p.sess))
 	// The manifest names another uuid: restore checks the database, not it.
@@ -258,11 +264,11 @@ func TestForgedBackupCannotReachOtherSpace(t *testing.T) {
 	res.Body.Close()
 
 	inA := p.transfers(p.A.ID, p.sess)
-	if tr := inA["forged"]; tr == nil || tr["status"] != "pending" || tr["review"] != "missing_remote" ||
+	if tr := inA["forged"]; tr == nil || tr["status"] != "in_review" || tr["review"] != "missing_remote" ||
 		tr["verified"] != false {
 		t.Fatalf("forged transfer in A: %v", tr)
 	}
-	if tr := inA[real]; tr["status"] != "pending" || tr["verified"] != false {
+	if tr := inA[real]; tr["status"] != "in_review" || tr["verified"] != false {
 		t.Fatalf("raised version in A: %v", tr)
 	}
 	if _, ok := inA["foreign"]; ok {
@@ -307,7 +313,7 @@ func TestServerRestoreNeedsNoReview(t *testing.T) {
 	}
 	res.Body.Close()
 	for _, sp := range []int64{p.A.ID, p.B.ID} {
-		if tr := p.transfers(sp, p.sess)[id]; tr["status"] != "ok" || tr["from"].(map[string]any)["amount"] != "3" {
+		if tr := p.transfers(sp, p.sess)[id]; tr["status"] != "confirmed" || tr["from"].(map[string]any)["amount"] != "3" {
 			t.Fatalf("space %d %v", sp, tr)
 		}
 	}
