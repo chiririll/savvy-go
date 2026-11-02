@@ -74,7 +74,7 @@ export const PicksSeries: Story = {
         await waitFor(() => expect(picker).toHaveTextContent('2'))
         await waitFor(() => expect(chartText(canvasElement)).toContain('Groceries'))
         await userEvent.click(picker)
-        await userEvent.click(await screen.findByRole('checkbox', { name: 'Groceries' }))
+        await userEvent.click(await screen.findByText('Groceries', { selector: 'label' }))
         await waitFor(() => expect(picker).toHaveTextContent('1'))
         await expect(await screen.findByRole('checkbox', { name: 'Groceries' })).not.toBeChecked()
         await expect(await screen.findByRole('checkbox', { name: 'Rent' })).toBeChecked()
