@@ -25,7 +25,7 @@ func space(t *testing.T, prepare func(*sql.DB)) string {
 	return path
 }
 
-func TestFindTellsAnOldFileFromACurrentOne(t *testing.T) {
+func TestFindTellsOldFileFromCurrent(t *testing.T) {
 	ctx := context.Background()
 	old := space(t, func(d *sql.DB) {
 		if err := v1.Apply(ctx, d); err != nil {
@@ -45,7 +45,7 @@ func TestFindTellsAnOldFileFromACurrentOne(t *testing.T) {
 	}
 }
 
-func TestConvertTakesTheOldFileToTheCurrentSchema(t *testing.T) {
+func TestConvertUpgradesOldFileToCurrentSchema(t *testing.T) {
 	ctx := context.Background()
 	old := space(t, func(d *sql.DB) {
 		if err := v1.Apply(ctx, d); err != nil {
