@@ -94,11 +94,11 @@ const existsTransactionExternalID = `-- name: ExistsTransactionExternalID :one
 SELECT EXISTS (SELECT 1 FROM transactions WHERE external_id = ?)
 `
 
-func (q *Queries) ExistsTransactionExternalID(ctx context.Context, externalID sql.NullString) (int64, error) {
+func (q *Queries) ExistsTransactionExternalID(ctx context.Context, externalID sql.NullString) (bool, error) {
 	row := q.db.QueryRowContext(ctx, existsTransactionExternalID, externalID)
-	var column_1 int64
-	err := row.Scan(&column_1)
-	return column_1, err
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }
 
 const getTransaction = `-- name: GetTransaction :one

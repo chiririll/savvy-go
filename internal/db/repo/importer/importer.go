@@ -117,7 +117,7 @@ func (r Repo) InsertRow(ctx context.Context, row Row, now time.Time) (bool, erro
 	added := false
 	err := store.Tx(ctx, r.DB, func(d store.DB) error {
 		q := db.Q(d)
-		if dup, err := q.ExistsTransactionExternalID(ctx, db.NS(externalID)); err != nil || dup != 0 {
+		if dup, err := q.ExistsTransactionExternalID(ctx, db.NS(externalID)); err != nil || dup {
 			return err
 		}
 		unit, err := q.GetAccountUnit(ctx, row.AccountID)

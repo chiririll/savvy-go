@@ -224,8 +224,8 @@ func (r Repo) SkipTransaction(ctx context.Context, id int64, now time.Time) erro
 
 // HasExternalID reports whether a transaction with this external id exists.
 func (r Repo) HasExternalID(ctx context.Context, externalID string) (bool, error) {
-	n, err := r.q().ExistsTransactionExternalID(ctx, db.NS(externalID))
-	return n != 0, err
+	exists, err := r.q().ExistsTransactionExternalID(ctx, db.NS(externalID))
+	return exists, err
 }
 
 // PaymentFields is a payment to store. SpaceTransferUUID is written when the
