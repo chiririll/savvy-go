@@ -65,7 +65,9 @@ cp "$here/../../public/favicon.svg" "$here/../../public/favicon.ico" "$OUT/"
 
 sed "s#@SITE_URL@#$SITE_URL#g" "$here/savvy-go.repo" > "$OUT/savvy-go.repo"
 sed "s#@SITE_URL@#$SITE_URL#g" "$here/install.sh" > "$OUT/install.sh"
+# The landing page: static assets as they are, index.html with the placeholders filled in.
+cp "$here/site/style.css" "$here/site/app.js" "$here/site/icons.svg" "$OUT/"
 sed -e "s#@REPO@#$GITHUB_REPOSITORY#g" -e "s#@SITE_URL@#$SITE_URL#g" -e "s#@VERSION@#$latest#g" \
-  "$here/index.html" > "$OUT/index.html"
+  "$here/site/index.html" > "$OUT/index.html"
 
 echo "Built $OUT with: $(echo $tags), latest $latest"

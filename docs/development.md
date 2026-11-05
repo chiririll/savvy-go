@@ -174,7 +174,7 @@ Runs `mage release`: builds the Linux packages (`.deb`, `.rpm`), the standalone 
 
 #### pages
 
-Separate workflow (`pages.yaml`), run when `dist` succeeds for a stable tag, or by hand. Tags with a `-` (like `v1.2.0-rc1`) are pre-releases and the repository skips them. `deploy/repo/build.sh` downloads the packages of the last 5 stable releases, builds a signed apt and dnf repository and publishes it to GitHub Pages, replacing the whole site each time. A release deleted on GitHub therefore disappears from the repository on the next run. Packages are not kept anywhere else, so the releases are the source of truth. Like every `workflow_run` workflow, it runs from the default branch.
+Separate workflow (`pages.yaml`), run when `dist` succeeds for a stable tag, or by hand. Tags with a `-` (like `v1.2.0-rc1`) are pre-releases and the repository skips them. `deploy/repo/build.sh` downloads the packages of the last 5 stable releases, builds a signed apt and dnf repository and publishes it to GitHub Pages, replacing the whole site each time. The landing page is plain static files in `deploy/repo/site/` (`index.html`, `style.css`, `app.js`, `icons.svg`); only `index.html` has `@REPO@`, `@SITE_URL@` and `@VERSION@` placeholders, which `build.sh` fills in with `sed`. There is no bundler. A release deleted on GitHub therefore disappears from the repository on the next run. Packages are not kept anywhere else, so the releases are the source of truth. Like every `workflow_run` workflow, it runs from the default branch.
 
 One-time setup:
 

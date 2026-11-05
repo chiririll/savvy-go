@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Go Savvy packages</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="icon" type="image/x-icon" href="favicon.ico" sizes="any">
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <main>
+    <header>
+      <h1>Go <span>Savvy</span> packages</h1>
+      <p class="lead">Install Go Savvy from a signed apt or dnf repository, and get new versions with your regular
+        system updates.</p>
+      <p class="version">Latest version <a href="https://github.com/@REPO@/releases/tag/@VERSION@">@VERSION@</a></p>
+    </header>
+
+    <section class="card">
+      <h2>Quick install</h2>
+      <p class="for">Debian, Ubuntu, Fedora, RHEL and openSUSE on x86_64.</p>
+      <div class="tabs" data-remember="fetch">
+        <div role="tablist" aria-label="Download tool">
+          <button role="tab" data-tab="curl">curl</button>
+          <button role="tab" data-tab="wget">wget</button>
+        </div>
+        <div role="tabpanel" data-tab="curl">
+          <div class="code">
+            <pre>curl -fsSL @SITE_URL@/install.sh | sudo sh</pre>
+          </div>
+        </div>
+        <div role="tabpanel" data-tab="wget">
+          <div class="code">
+            <pre>wget -qO- @SITE_URL@/install.sh | sudo sh</pre>
+          </div>
+        </div>
+      </div>
+      <p class="hint">The <a href="install.sh">script</a> detects apt, dnf or zypper, adds the repository and installs
+        <code>savvy-go</code>. Run it again to reinstall; updates come with your system updates.</p>
+    </section>
+
+    <section class="card">
+      <h2>Manual setup</h2>
+      <p class="for">The same steps, one command at a time.</p>
+      <div class="tabs" data-remember="os">
+        <div role="tablist" aria-label="Distribution">
+          <button role="tab" data-tab="apt">
+            <svg aria-hidden="true">
+              <use href="icons.svg#i-debian" />
+            </svg><svg aria-hidden="true">
+              <use href="icons.svg#i-ubuntu" />
+            </svg>Debian &amp; Ubuntu
+          </button>
+          <button role="tab" data-tab="dnf">
+            <svg aria-hidden="true">
+              <use href="icons.svg#i-fedora" />
+            </svg><svg aria-hidden="true">
+              <use href="icons.svg#i-redhat" />
+            </svg>Fedora &amp; RHEL
+          </button>
+          <button role="tab" data-tab="zypper">
+            <svg aria-hidden="true">
+              <use href="icons.svg#i-opensuse" />
+            </svg>openSUSE
+          </button>
+        </div>
+
+        <div role="tabpanel" data-tab="apt">
+          <p class="for">apt, amd64. Debian 13 or later.</p>
+          <p class="step">1. Add the repository</p>
+          <div class="code">
+            <pre>sudo install -d -m 0755 /etc/apt/keyrings
+sudo curl -fsSLo /etc/apt/keyrings/savvy-go.asc @SITE_URL@/savvy-go.asc
+echo "deb [signed-by=/etc/apt/keyrings/savvy-go.asc] @SITE_URL@/apt stable main" \
+  | sudo tee /etc/apt/sources.list.d/savvy-go.list</pre>
+          </div>
+          <p class="step">2. Install</p>
+          <div class="code">
+            <pre>sudo apt update
+sudo apt install savvy-go</pre>
+          </div>
+          <p class="step">Update</p>
+          <div class="code">
+            <pre>sudo apt update &amp;&amp; sudo apt upgrade savvy-go</pre>
+          </div>
+        </div>
+
+        <div role="tabpanel" data-tab="dnf">
+          <p class="for">dnf, x86_64.</p>
+          <p class="step">1. Add the repository</p>
+          <div class="code">
+            <pre>sudo curl -fsSLo /etc/yum.repos.d/savvy-go.repo @SITE_URL@/savvy-go.repo</pre>
+          </div>
+          <p class="step">2. Install</p>
+          <div class="code">
+            <pre>sudo dnf install savvy-go</pre>
+          </div>
+          <p class="step">Update</p>
+          <div class="code">
+            <pre>sudo dnf upgrade savvy-go</pre>
+          </div>
+        </div>
+
+        <div role="tabpanel" data-tab="zypper">
+          <p class="for">zypper, x86_64.</p>
+          <p class="step">1. Add the repository</p>
+          <div class="code">
+            <pre>sudo zypper addrepo --refresh @SITE_URL@/savvy-go.repo</pre>
+          </div>
+          <p class="step">2. Install</p>
+          <div class="code">
+            <pre>sudo zypper install savvy-go</pre>
+          </div>
+          <p class="step">Update</p>
+          <div class="code">
+            <pre>sudo zypper refresh &amp;&amp; sudo zypper update savvy-go</pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <p class="note">
+      After installing, Go Savvy runs as the <code>savvy-go</code> service on <code>127.0.0.1:8080</code>.
+      The repository metadata is signed with <a href="savvy-go.asc">this key</a>. It keeps the last stable releases;
+      older ones and the standalone binaries are on <a href="https://github.com/@REPO@/releases">GitHub Releases</a>.
+      More in the <a href="https://github.com/@REPO@/blob/main/docs/deployment.md">deployment docs</a>.
+    </p>
+  </main>
+  <script src="app.js" defer></script>
+</body>
+
+</html>
