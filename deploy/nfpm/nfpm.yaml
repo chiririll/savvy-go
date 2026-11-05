@@ -1,4 +1,4 @@
-# Shared by deb and rpm; built by `mage package:deb` and `package:rpm`.
+# Shared by deb, rpm and apk; built by `mage package:deb`, `package:rpm` and `package:apk`.
 # Env: APP_VERSION. @APP_USER@ (service account) is substituted by the script.
 name: savvy-go
 arch: amd64
@@ -12,9 +12,9 @@ maintainer: Kirill Chizhov <sstive39@gmail.com>
 homepage: https://github.com/chiririll/savvy-go
 license: MIT
 description: |-
-  Selfhosted expense tracker with multi-currency support.
+  Selfhosted expense tracker with spaces and multi-currency support.
   .
-  Installs the Go Savvy binary (the web UI is built in) and a systemd unit.
+  Installs the Go Savvy binary (the web UI is built in) and a service.
   SQLite data lives in /var/lib/savvy-go, the config in /etc/savvy-go/config.toml.
 
 contents:
@@ -24,6 +24,16 @@ contents:
       mode: 0755
   - src: ../../dist/stage/savvy-go.service
     dst: /usr/lib/systemd/system/savvy-go.service
+    packager: deb
+  - src: ../../dist/stage/savvy-go.service
+    dst: /usr/lib/systemd/system/savvy-go.service
+    packager: rpm
+  # Alpine runs OpenRC, not systemd.
+  - src: ../../dist/stage/savvy-go.initd
+    dst: /etc/init.d/savvy-go
+    packager: apk
+    file_info:
+      mode: 0755
   - dst: /etc/savvy-go
     type: dir
     file_info:
@@ -45,9 +55,19 @@ overrides:
       postinstall: deb/postinst
       preremove: deb/prerm
       postremove: deb/postrm
+  apk:
+    scripts:
+      preinstall: apk/preinst
+      postinstall: apk/postinst
+      preremove: apk/prerm
   rpm:
     scripts:
       preinstall: rpm/preinst
       postinstall: rpm/postinst
       preremove: rpm/prerm
       postremove: rpm/postrm
+
+# Only apk has a separate upgrade hook; the others get $1 in the install scripts.
+apk:
+  scripts:
+    postupgrade: apk/postupgrade

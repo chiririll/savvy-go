@@ -1,15 +1,15 @@
-// Installs a built deb/rpm into a systemd container and checks that the service
+// Installs a built deb/rpm/apk into a systemd (apk: OpenRC) container and checks that the service
 // works across install, crash, upgrade and removal.
-// Usage: node test-package.mts <deb|rpm> [path/to/package]   (default: dist/savvy-go.<format>)
+// Usage: node test-package.mts <deb|rpm|apk> [path/to/package]   (default: dist/savvy-go.<format>)
 import { spawnSync, type SpawnSyncOptionsWithStringEncoding, type SpawnSyncReturns } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const format = process.argv[2] ?? '';
-const appUser = ({ deb: 'www-data', rpm: 'savvy-go' } as Record<string, string>)[format];
+const appUser = ({ deb: 'www-data', rpm: 'savvy-go', apk: 'savvy-go' } as Record<string, string>)[format];
 if (!appUser) {
-    console.error('usage: test-package.mts <deb|rpm> [package]');
+    console.error('usage: test-package.mts <deb|rpm|apk> [package]');
     process.exit(1);
 }
 
@@ -24,6 +24,7 @@ if (!existsSync(pkg)) {
 const image = `savvy-go-pkgtest-${format}`;
 const name = `${image}-${process.pid}`;
 const unit = 'savvy-go.service';
+const openrc = format === 'apk'; // Alpine has OpenRC instead of systemd
 const baseUrl = 'http://127.0.0.1:8080';
 const dataDir = '/var/lib/savvy-go';
 const config = '/etc/savvy-go/config.toml';
@@ -60,30 +61,51 @@ const waitFor = async (desc: string, ...cmd: string[]) => {
 const must = (result: Pick<SpawnSyncReturns<string>, 'status' | 'stdout' | 'stderr'>, desc: string) => {
     if (result.status !== 0) fail(`${desc}\n${result.stdout}${result.stderr}`);
 };
-const mainPid = () => dexec('systemctl', 'show', '-p', 'MainPID', '--value', unit).stdout.trim();
+const mainPid = () =>
+    (openrc
+        ? dexec('pgrep', '-f', '^/usr/bin/savvy-go').stdout.split('\n')[0]
+        : dexec('systemctl', 'show', '-p', 'MainPID', '--value', unit).stdout
+    ).trim();
+// Shell snippet that exits 0 when the service has a running main process.
+const isActive = openrc ? ['rc-service', 'savvy-go', 'status'] : ['systemctl', 'is-active', unit];
+const isEnabled = openrc
+    ? ['sh', '-c', 'rc-update show default | grep -q savvy-go']
+    : ['systemctl', 'is-enabled', unit];
+const restart = () => (openrc ? dexec('rc-service', 'savvy-go', 'restart') : dexec('systemctl', 'restart', unit));
+const unitFile = openrc ? '/etc/init.d/savvy-go' : `/usr/lib/systemd/system/${unit}`;
 
 async function run() {
     must(docker(['build', '-q', '-t', image, '-f', join(here, `Dockerfile.${format}`), here]), 'image build failed');
     // systemd needs to own the container's cgroup; --privileged is the portable way
     // on CI runners and Docker Desktop.
     must(
-        docker([
-            'run', '-d', '--name', name, '--privileged', '--cgroupns=host',
-            '-v', '/sys/fs/cgroup:/sys/fs/cgroup:rw', '--tmpfs', '/run', '--tmpfs', '/run/lock', image,
-        ]),
+        docker(
+            openrc
+                ? ['run', '-d', '--init', '--name', name, image] // --init reaps the supervisor's children, like a real init
+                : [
+                      'run', '-d', '--name', name, '--privileged', '--cgroupns=host',
+                      '-v', '/sys/fs/cgroup:/sys/fs/cgroup:rw', '--tmpfs', '/run', '--tmpfs', '/run/lock', image,
+                  ],
+        ),
         'container start failed',
     );
 
-    step('boot systemd');
-    // "degraded" (some unit that makes no sense in a container failed) is fine. Waiting for the end of
-    // the boot matters: it cleans or mounts /tmp, which would swallow the package copied before it.
-    await waitFor(
-        'systemd finished booting',
-        'sh', '-c', 'case "$(systemctl is-system-running 2>/dev/null)" in running|degraded) exit 0;; *) exit 1;; esac',
-    );
+    if (!openrc) {
+        step('boot systemd');
+        // "degraded" (some unit that makes no sense in a container failed) is fine. Waiting for the end of
+        // the boot matters: it cleans or mounts /tmp, which would swallow the package copied before it.
+        await waitFor(
+            'systemd finished booting',
+            'sh', '-c', 'case "$(systemctl is-system-running 2>/dev/null)" in running|degraded) exit 0;; *) exit 1;; esac',
+        );
+    }
     must(docker(['cp', pkg, `${name}:/tmp/pkg.${format}`]), 'docker cp failed');
 
     const install = (reinstall: boolean) => {
+        if (openrc) {
+            // The package is unsigned here; the repository signs the index, not the files.
+            return dexec('apk', 'add', '--allow-untrusted', ...(reinstall ? ['--force-overwrite'] : []), '/tmp/pkg.apk');
+        }
         if (format === 'deb') {
             must(dexec('apt-get', 'update', '-qq'), 'apt-get update failed');
             return dexec('apt-get', 'install', '-y', ...(reinstall ? ['--reinstall'] : []), '/tmp/pkg.deb');
@@ -95,16 +117,24 @@ async function run() {
         return dexec('dnf', 'install', '-y', '/tmp/pkg.rpm');
     };
     const remove = (purge = false) =>
-        format === 'deb'
-            ? dexec('apt-get', purge ? 'purge' : 'remove', '-y', 'savvy-go')
-            : dexec('dnf', 'remove', '-y', 'savvy-go');
+        openrc
+            ? dexec('apk', 'del', 'savvy-go')
+            : format === 'deb'
+              ? dexec('apt-get', purge ? 'purge' : 'remove', '-y', 'savvy-go')
+              : dexec('dnf', 'remove', '-y', 'savvy-go');
 
     step('fresh install');
     must(install(false), 'install failed');
-    check('unit file installed', 'test', '-f', `/usr/lib/systemd/system/${unit}`);
+    check(openrc ? 'init script installed' : 'unit file installed', 'test', '-f', unitFile);
     check('binary installed', 'test', '-x', '/usr/bin/savvy-go');
-    check('service enabled', 'systemctl', 'is-enabled', unit);
-    await waitFor('service active', 'systemctl', 'is-active', unit);
+    if (openrc) {
+        // Alpine packages do not start or enable services themselves.
+        checkNot('service not started by the package', ...isActive);
+        must(dexec('rc-update', 'add', 'savvy-go', 'default'), 'rc-update add failed');
+        must(dexec('rc-service', 'savvy-go', 'start'), 'rc-service start failed');
+    }
+    check('service enabled', ...isEnabled);
+    await waitFor('service active', ...isActive);
     await waitFor('/livez answers', 'curl', '-fsS', `${baseUrl}/livez`);
     await waitFor('/readyz answers', 'curl', '-fsS', `${baseUrl}/readyz`);
     // The UI is built into the binary: the page must point at a Vite asset that is served too.
@@ -114,32 +144,34 @@ async function run() {
     );
     check('config created', 'test', '-f', config);
     check('data dir owned by app user', 'sh', '-c', `[ "$(stat -c %U ${dataDir})" = ${appUser} ]`);
-    check('process runs as app user', 'sh', '-c', `[ "$(ps -o user= -p ${mainPid()} | tr -d ' ')" = ${appUser} ]`);
+    check('process runs as app user', 'sh', '-c', `[ "$(stat -c %U /proc/${mainPid()})" = ${appUser} ]`);
 
     step('crash recovery (Restart=always)');
     const oldPid = mainPid();
     dexec('kill', '-9', oldPid);
     await waitFor(
         'service restarted with a new pid',
-        'sh', '-c', `p=$(systemctl show -p MainPID --value ${unit}); [ "$p" != 0 ] && [ "$p" != ${oldPid} ]`,
+        'sh', '-c', openrc
+            ? `p=$(pgrep -f ^/usr/bin/savvy-go | head -n1); [ -n "$p" ] && [ "$p" != ${oldPid} ]`
+            : `p=$(systemctl show -p MainPID --value ${unit}); [ "$p" != 0 ] && [ "$p" != ${oldPid} ]`,
     );
     await waitFor('/livez answers after crash', 'curl', '-fsS', `${baseUrl}/livez`);
 
     step('manual restart keeps state');
-    dexec('systemctl', 'restart', unit);
+    restart();
     await waitFor('/readyz answers after restart', 'curl', '-fsS', `${baseUrl}/readyz`);
     check('database kept', 'sh', '-c', `ls ${dataDir}/*.sqlite`);
 
     step('upgrade (reinstall same version)');
     must(install(true), 'reinstall failed');
-    check('service still enabled', 'systemctl', 'is-enabled', unit);
-    await waitFor('service active after upgrade', 'systemctl', 'is-active', unit);
+    check('service still enabled', ...isEnabled);
+    await waitFor('service active after upgrade', ...isActive);
     await waitFor('/readyz answers after upgrade', 'curl', '-fsS', `${baseUrl}/readyz`);
 
     step('removal');
     must(remove(), 'remove failed');
-    checkNot('service stopped', 'systemctl', 'is-active', unit);
-    checkNot('unit file removed', 'test', '-e', `/usr/lib/systemd/system/${unit}`);
+    checkNot('service stopped', ...isActive);
+    checkNot(openrc ? 'init script removed' : 'unit file removed', 'test', '-e', unitFile);
     checkNot('binary removed', 'test', '-e', '/usr/bin/savvy-go');
     check('data kept on remove', 'test', '-d', dataDir);
     check('config kept on remove', 'test', '-f', config);
@@ -162,8 +194,8 @@ try {
 } catch (err) {
     code = 1;
     console.error(`\nFAIL: ${err instanceof Failure ? err.message : (err as Error).stack}`);
-    const journal = dexec('journalctl', '-u', unit, '--no-pager', '-n', '50');
-    console.error(`--- journal (${unit}) ---\n${journal.stdout ?? ''}`);
+    const logs = openrc ? dexec('tail', '-n', '50', '/var/log/savvy-go.log') : dexec('journalctl', '-u', unit, '--no-pager', '-n', '50');
+    console.error(`--- ${openrc ? 'log' : `journal (${unit})`} ---\n${logs.stdout ?? ''}`);
 } finally {
     docker(['rm', '-f', name]);
 }

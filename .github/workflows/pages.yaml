@@ -1,10 +1,10 @@
 name: Package repository
 
-# Rebuilds the whole apt/dnf site from the last stable releases and replaces the Pages site.
+# Rebuilds the whole apt/dnf/apk site from the last stable releases and replaces the Pages site.
 # Releases made with GITHUB_TOKEN do not fire `release` events, hence workflow_run.
 on:
   workflow_run:
-    workflows: ['Build deb and rpm']
+    workflows: ['Build deb, rpm and apk']
     types: [completed]
   workflow_dispatch:
 
@@ -35,6 +35,16 @@ jobs:
         uses: crazy-max/ghaction-import-gpg@v7
         with:
           gpg_private_key: ${{ secrets.PACKAGES_GPG_PRIVATE_KEY }}
+
+      # apk cannot use gpg: its own RSA key signs the index. Without the secret the apk repository is skipped.
+      - name: Write apk signing key
+        env:
+          APK_KEY: ${{ secrets.PACKAGES_APK_PRIVATE_KEY }}
+        run: |
+          if [ -n "$APK_KEY" ]; then
+            (umask 077; printf '%s\n' "$APK_KEY" > "$RUNNER_TEMP/savvy-go.rsa")
+            echo "APK_KEY=$RUNNER_TEMP/savvy-go.rsa" >> "$GITHUB_ENV"
+          fi
 
       - name: Build repositories
         env:

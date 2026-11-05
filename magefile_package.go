@@ -31,6 +31,7 @@ type format struct {
 var (
 	deb = format{"deb", "www-data", "savvy-go_*.deb"}
 	rpm = format{"rpm", "savvy-go", "savvy-go-*.rpm"}
+	apk = format{"apk", "savvy-go", "savvy-go_*.apk"}
 )
 
 // Deb builds dist/savvy-go.deb.
@@ -38,6 +39,9 @@ func (Package) Deb() error { return pack(deb) }
 
 // Rpm builds dist/savvy-go.rpm.
 func (Package) Rpm() error { return pack(rpm) }
+
+// Apk builds dist/savvy-go.apk.
+func (Package) Apk() error { return pack(apk) }
 
 func pack(f format) error {
 	version := os.Getenv("APP_VERSION")
@@ -62,7 +66,7 @@ func pack(f format) error {
 		return err
 	}
 	defer os.RemoveAll(stage)
-	for _, name := range []string{"savvy-go.service", "nfpm.yaml"} {
+	for _, name := range []string{"savvy-go.service", "savvy-go.initd", "nfpm.yaml"} {
 		raw, err := os.ReadFile(filepath.Join("deploy", "nfpm", name))
 		if err != nil {
 			return err
@@ -108,7 +112,7 @@ func pack(f format) error {
 }
 
 // Release builds everything a GitHub release ships into dist/: Linux and
-// Windows binaries with the frontend embedded, the deb and rpm packages and
+// Windows binaries with the frontend embedded, the deb, rpm and apk packages and
 // SHA256SUMS. Needs APP_VERSION and nfpm.
 func Release() error {
 	if os.Getenv("APP_VERSION") == "" {
@@ -139,7 +143,16 @@ func Release() error {
 	if err := pack(rpm); err != nil {
 		return err
 	}
-	return checksums(linuxNamed, windows, filepath.Join(outDir, "savvy-go.deb"), filepath.Join(outDir, "savvy-go.rpm"))
+	if err := pack(apk); err != nil {
+		return err
+	}
+	return checksums(
+		linuxNamed,
+		windows,
+		filepath.Join(outDir, "savvy-go.deb"),
+		filepath.Join(outDir, "savvy-go.rpm"),
+		filepath.Join(outDir, "savvy-go.apk"),
+	)
 }
 
 // checksums writes dist/SHA256SUMS in the format `sha256sum -c` reads.
@@ -162,17 +175,20 @@ func checksums(files ...string) error {
 	return os.WriteFile(filepath.Join(outDir, "SHA256SUMS"), []byte(sums.String()), 0o644)
 }
 
-// Packages builds the deb and rpm from the working tree, installs them in
-// systemd containers and checks that the service survives install, a crash,
+// Packages builds the deb, rpm and apk from the working tree, installs them in
+// systemd (OpenRC for apk) containers and checks that the service survives install, a crash,
 // an upgrade and removal. Needs Docker and Node. SKIP_FRONTEND=1 reuses an
 // existing public/build.
-func (Test) Packages() error { return testPackages(deb, rpm) }
+func (Test) Packages() error { return testPackages(deb, rpm, apk) }
 
 // Deb is Packages for the deb only.
 func (Test) Deb() error { return testPackages(deb) }
 
 // Rpm is Packages for the rpm only.
 func (Test) Rpm() error { return testPackages(rpm) }
+
+// Apk is Packages for the apk only.
+func (Test) Apk() error { return testPackages(apk) }
 
 func testPackages(formats ...format) error {
 	version := firstNonEmpty(os.Getenv("APP_VERSION"), "0.0.0-dev")

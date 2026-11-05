@@ -35,6 +35,7 @@ A new server has no users. To stop others from claiming it first, creating the a
 |-------------------|-----------------------------------------------------------------------------|
 | Docker            | `docker logs savvy` or `docker exec savvy cat /data/bootstrap-password`     |
 | Debian/RPM        | `journalctl -u savvy-go` or `sudo cat /var/lib/savvy-go/bootstrap-password` |
+| Alpine            | `cat /var/log/savvy-go.log` or `cat /var/lib/savvy-go/bootstrap-password` |
 | Standalone binary | the terminal, or `bootstrap-password` in the data directory                 |
 
 1. Open the app, enter the password and create the admin account.
@@ -177,7 +178,7 @@ Use a single-replica `Deployment` with a `PersistentVolumeClaim` at `/data` and 
 
 ## Install script
 
-On Debian, Ubuntu, Fedora, RHEL or openSUSE (x86_64), one command adds the package repository and installs the package. It detects apt, dnf or zypper; use `wget -qO-` instead of `curl -fsSL` if you have no curl:
+On Debian, Ubuntu, Fedora, RHEL, openSUSE or Alpine (x86_64), one command adds the package repository and installs the package. It detects apt, dnf, zypper or apk (on Alpine it also enables and starts the OpenRC service); use `wget -qO-` instead of `curl -fsSL` if you have no curl:
 
 ```bash
 curl -fsSL https://chiririll.github.io/savvy-go/install.sh | sudo sh
@@ -219,6 +220,26 @@ The repository metadata is signed (`repo_gpgcheck`); the packages are not. Or do
 
 Same as the Debian package, but runs as its own `savvy-go` system user. Removing the package keeps `/var/lib/savvy-go` and `/etc/savvy-go`; delete them to wipe the data.
 
+## Alpine package
+
+For Alpine Linux (x86_64) with OpenRC. As root:
+
+```bash
+wget -O /etc/apk/keys/savvy-go.rsa.pub https://chiririll.github.io/savvy-go/savvy-go.rsa.pub
+echo "https://chiririll.github.io/savvy-go/apk" >> /etc/apk/repositories
+apk add savvy-go
+rc-update add savvy-go default
+rc-service savvy-go start
+```
+
+`apk upgrade savvy-go` delivers new versions and restarts the service if it was running. The index is signed with the RSA key above; the package files are not signed themselves, apk checks them against the index. Or download one package from the release: `apk add --allow-untrusted ./savvy-go.apk`.
+
+- Like other Alpine packages it does not start or enable the service by itself, hence the two `rc-` commands.
+- Runs as the `savvy-go` system user under `supervise-daemon`, which restarts it if it crashes.
+- Logs go to `/var/log/savvy-go.log` (it is not rotated; add a logrotate rule if you keep it long). The first-run bootstrap password is in that log and in `/var/lib/savvy-go/bootstrap-password`.
+- Data, config and listening address are the same as for the Debian package. `apk del savvy-go` keeps `/var/lib/savvy-go` and `/etc/savvy-go`.
+- The Docker image is the alternative if you do not run OpenRC.
+
 ## Standalone binary
 
 Each GitHub release has a single-file build for Linux (`savvy-go-linux-amd64`) and Windows (`savvy-go-windows-amd64.exe`). The web UI is built in. Run it and open `http://localhost:8080`. Check the download against `SHA256SUMS` from the release.
@@ -235,7 +256,7 @@ docker compose pull
 docker compose up -d
 ```
 
-Data stays in the volume and migrations run on start. With the Debian or RPM package, use `sudo apt update && sudo apt upgrade savvy-go` or `sudo dnf upgrade savvy-go` (if you installed from the repository), or install the newer package file.
+Data stays in the volume and migrations run on start. With the Debian or RPM package, use `sudo apt update && sudo apt upgrade savvy-go` or `sudo dnf upgrade savvy-go`, on Alpine `apk update && apk upgrade savvy-go` (if you installed from the repository), or install the newer package file.
 
 When a newer version changes the database layout, Savvy first saves a server backup, then migrates. If the backup cannot be written (disk full, backups directory not writable), Savvy refuses to start and the data stays as it was. See [Backup before an upgrade](data-and-backups.md#backup-before-an-upgrade).
 

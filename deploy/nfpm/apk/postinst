@@ -1,0 +1,12 @@
+#!/bin/sh
+set -e
+
+# Like other Alpine packages, this does not start the service by itself.
+chown -R savvy-go:savvy-go /var/lib/savvy-go 2>/dev/null || true
+
+echo
+echo "Go Savvy is installed. Start it and enable it at boot with:"
+echo "    rc-update add savvy-go default"
+echo "    rc-service savvy-go start"
+
+exit 0

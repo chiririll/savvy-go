@@ -4,7 +4,7 @@
         {
             "label": "build:frontend-dev",
             "type": "shell",
-            "command": "go tool mage build:frontendDev",
+            "command": "npm run build -- --mode development",
             "problemMatcher": [],
             "group": {
                 "kind": "build",

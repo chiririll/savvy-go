@@ -30,6 +30,7 @@ for id in $ID ${ID_LIKE:-}; do
     debian | ubuntu) family=apt ;;
     fedora | rhel | centos) family=dnf ;;
     suse | opensuse*) family=zypper ;;
+    alpine) family=apk ;;
   esac
   [ -z "$family" ] || break
 done
@@ -51,6 +52,18 @@ case $family in
     zypper --non-interactive removerepo savvy-go >/dev/null 2>&1 || true
     zypper --non-interactive addrepo --refresh "$SITE/savvy-go.repo"
     zypper --non-interactive --gpg-auto-import-keys install savvy-go
+    ;;
+  apk)
+    fetch "$SITE/savvy-go.rsa.pub" /etc/apk/keys/savvy-go.rsa.pub
+    grep -qxF "$SITE/apk" /etc/apk/repositories || echo "$SITE/apk" >> /etc/apk/repositories
+    apk add --no-cache savvy-go
+    # Alpine packages do not start services themselves.
+    if command -v rc-service >/dev/null 2>&1; then
+      rc-update add savvy-go default
+      rc-service savvy-go restart
+    else
+      echo "OpenRC is not installed: start /usr/bin/savvy-go yourself, with CONFIG_FILE=/etc/savvy-go/config.toml"
+    fi
     ;;
   *)
     die "${PRETTY_NAME:-this distribution} is not supported; see $SITE for the packages"
