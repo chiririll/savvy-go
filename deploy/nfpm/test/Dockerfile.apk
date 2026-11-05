@@ -1,0 +1,10 @@
+# Alpine with OpenRC for deploy/nfpm/test/test-package.mts apk. OpenRC is not PID 1 here:
+# the test starts the service with rc-service, which is what a user does after installing.
+ARG BASE=alpine:3.22
+FROM ${BASE}
+
+RUN apk add --no-cache openrc curl \
+    && mkdir -p /run/openrc \
+    && touch /run/openrc/softlevel
+
+CMD ["sleep", "infinity"]

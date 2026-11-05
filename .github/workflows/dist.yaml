@@ -1,4 +1,4 @@
-name: Build deb and rpm
+name: Build deb, rpm and apk
 
 on:
   push:
@@ -86,6 +86,7 @@ jobs:
           files: |
             dist/*.deb
             dist/*.rpm
+            dist/*.apk
             dist/savvy-go-linux-amd64
             dist/savvy-go-windows-amd64.exe
             dist/SHA256SUMS

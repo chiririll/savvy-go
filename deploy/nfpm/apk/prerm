@@ -1,0 +1,9 @@
+#!/bin/sh
+set -e
+
+if command -v rc-service >/dev/null 2>&1; then
+    rc-service savvy-go stop >/dev/null 2>&1 || true
+    rc-update del savvy-go >/dev/null 2>&1 || true
+fi
+
+exit 0

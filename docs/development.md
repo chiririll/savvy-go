@@ -157,12 +157,12 @@ Run on PRs and pushes to `main`, only when relevant files change.
 `ci-packages` runs it on every push to `main` (not on tags). Run it by hand after changing anything in `deploy/`. Needs Docker, Go and Node; works the same on Linux, macOS and Windows:
 
 ```sh
-go tool mage test:packages     # deb and rpm
-go tool mage test:deb          # one format (test:rpm)
+go tool mage test:packages     # deb, rpm and apk
+go tool mage test:deb          # one format (test:rpm, test:apk)
 SKIP_FRONTEND=1 go tool mage test:packages   # reuse public/build (set the variable your shell's way on Windows)
 ```
 
-It builds the Linux binary with the frontend embedded on the host, runs the `package:deb` and `package:rpm` targets (a compiled Mage, so no Go is needed) in a container that has nfpm, then installs the package in a Debian (deb) or Rocky Linux (rpm) container with systemd as PID 1, then checks install, health endpoints, the service user, crash restart, upgrade and removal (plus purge for deb). The container is privileged, so only run it on a machine you trust.
+It builds the Linux binary with the frontend embedded on the host, runs the `package:deb`, `package:rpm` and `package:apk` targets (a compiled Mage, so no Go is needed) in a container that has nfpm, then installs the package in a Debian (deb) or Rocky Linux (rpm) container with systemd as PID 1, or an Alpine (apk) container where the test starts the OpenRC service itself, then checks install, health endpoints, the service user, crash restart, upgrade and removal (plus purge for deb). The systemd containers are privileged, so only run it on a machine you trust. The docker commands go to the active Docker context, and the test mounts the working tree, so it needs a local daemon (`DOCKER_CONTEXT=default`, not a remote host).
 
 ### Release
 
@@ -170,19 +170,20 @@ Usually run on a `v*` tag push.
 
 #### dist
 
-Runs `mage release`: builds the Linux packages (`.deb`, `.rpm`), the standalone Linux and Windows binaries and `SHA256SUMS`, and publishes a GitHub release. The frontend is built once and shared by all of them. To run it locally, install [nfpm](https://nfpm.goreleaser.com) and set `APP_VERSION`.
+Runs `mage release`: builds the Linux packages (`.deb`, `.rpm`, `.apk`), the standalone Linux and Windows binaries and `SHA256SUMS`, and publishes a GitHub release. The frontend is built once and shared by all of them. To run it locally, install [nfpm](https://nfpm.goreleaser.com) and set `APP_VERSION`.
 
 #### pages
 
-Separate workflow (`pages.yaml`), run when `dist` succeeds for a stable tag, or by hand. Tags with a `-` (like `v1.2.0-rc1`) are pre-releases and the repository skips them. `deploy/repo/build.sh` downloads the packages of the last 5 stable releases, builds a signed apt and dnf repository and publishes it to GitHub Pages, replacing the whole site each time. The landing page is plain static files in `deploy/repo/site/` (`index.html`, `style.css`, `app.js`, `icons.svg`); only `index.html` has `@REPO@`, `@SITE_URL@` and `@VERSION@` placeholders, which `build.sh` fills in with `sed`. There is no bundler. A release deleted on GitHub therefore disappears from the repository on the next run. Packages are not kept anywhere else, so the releases are the source of truth. Like every `workflow_run` workflow, it runs from the default branch.
+Separate workflow (`pages.yaml`), run when `dist` succeeds for a stable tag, or by hand. Tags with a `-` (like `v1.2.0-rc1`) are pre-releases and the repository skips them. `deploy/repo/build.sh` downloads the packages of the last 5 stable releases, builds a signed apt, dnf and apk repository and publishes it to GitHub Pages, replacing the whole site each time. A release deleted on GitHub therefore disappears from the repository on the next run. Packages are not kept anywhere else, so the releases are the source of truth. Like every `workflow_run` workflow, it runs from the default branch. The landing page is plain static files in `deploy/repo/site/` (`index.html`, `style.css`, `app.js`, `icons.svg`); only `index.html` has `@REPO@`, `@SITE_URL@` and `@VERSION@` placeholders, which `build.sh` fills in with `sed`. There is no bundler.
 
 One-time setup:
 
 1. Settings → Pages → Source: **GitHub Actions**.
 2. Make a signing key without a passphrase: `gpg --quick-generate-key "Go Savvy <you@example.com>" ed25519 sign 3y`.
 3. Add its private key (`gpg --armor --export-secret-keys <id>`) as the secret `PACKAGES_GPG_PRIVATE_KEY`.
+4. For the Alpine repository, make a separate RSA key (apk cannot use gpg): `openssl genrsa -out savvy-go.rsa 4096`, and add the file's contents as the secret `PACKAGES_APK_PRIVATE_KEY`. Without it the apk repository is skipped with a warning. Keep the key safe and do not commit it.
 
-Rotating the key means changing the secret and asking users to fetch the new public key, so set an expiry and note the date. The script needs `gh`, `gpg`, `apt-ftparchive` and `createrepo_c`, and signs with the default secret key of the keyring.
+Rotating the key means changing the secret and asking users to fetch the new public key, so set an expiry and note the date. The script needs `gh`, `gpg`, `apt-ftparchive` and `createrepo_c`, and signs with the default secret key of the keyring. The apk index is built and signed in an `alpine` container (`docker`), since the apk tools exist only there; `openssl` derives the public key `savvy-go.rsa.pub` from the private one. Releases made before the apk existed have none, and are left out of the apk repository.
 
 #### docker
 

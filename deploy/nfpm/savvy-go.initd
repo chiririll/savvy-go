@@ -1,0 +1,29 @@
+#!/sbin/openrc-run
+# OpenRC service for Alpine. The systemd unit is savvy-go.service.
+
+name="savvy-go"
+description="Go Savvy - expense tracker"
+
+command="/usr/bin/savvy-go"
+command_user="@APP_USER@:@APP_USER@"
+
+# supervise-daemon restarts the process when it dies, like Restart=always in the unit.
+supervisor="supervise-daemon"
+respawn_delay=3
+respawn_max=0
+
+# The only environment the app reads. The web UI is built into the binary.
+export CONFIG_FILE=/etc/savvy-go/config.toml
+
+output_log="/var/log/savvy-go.log"
+error_log="/var/log/savvy-go.log"
+
+# The log is opened after switching to the service user, who cannot create files in /var/log.
+start_pre() {
+    checkpath --file --owner @APP_USER@:@APP_USER@ --mode 0640 "$output_log"
+}
+
+depend() {
+    need net
+    after firewall
+}
