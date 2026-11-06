@@ -14,24 +14,7 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              properties:
-                type: {type: string, enum: [income, expense, transfer]}
-                account_id: {type: integer}
-                to_account_id: {type: integer, nullable: true}
-                category_id: {type: integer, nullable: true}
-                amount: {type: number}
-                to_amount: {type: number, nullable: true}
-                description: {type: string, nullable: true}
-                frequency: {type: string}
-                interval: {type: integer}
-                day_of_week: {type: integer, nullable: true}
-                day_of_month: {type: integer, nullable: true}
-                start_date: {type: string, format: date}
-                end_date: {type: string, format: date, nullable: true}
-                is_active: {type: boolean}
-                tag_ids: {type: array, items: {type: integer}}
+            schema: {$ref: "#/components/schemas/RecurringInput"}
       responses:
         "201": {$ref: "#/components/responses/Data"}
         "401": {$ref: "#/components/responses/Unauthenticated"}
@@ -57,7 +40,10 @@ paths:
     put:
       tags: [Recurring]
       summary: Update a recurring transaction
-      requestBody: {$ref: "#/components/requestBodies/Object"}
+      requestBody:
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/RecurringInput"}
       responses:
         "200": {$ref: "#/components/responses/Data"}
         "401": {$ref: "#/components/responses/Unauthenticated"}
@@ -67,7 +53,10 @@ paths:
     patch:
       tags: [Recurring]
       summary: Update a recurring transaction (partial)
-      requestBody: {$ref: "#/components/requestBodies/Object"}
+      requestBody:
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/RecurringInput"}
       responses:
         "200": {$ref: "#/components/responses/Data"}
         "401": {$ref: "#/components/responses/Unauthenticated"}

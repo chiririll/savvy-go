@@ -1,6 +1,6 @@
 import { testId } from '@/lib/test-id'
 import { useState } from 'react'
-import { Check, Copy, SkipForward } from 'lucide-react'
+import { ArrowDown, ArrowUp, Check, Copy, SkipForward } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { FeedRow, FeedStatusBadge, RowActions } from '@/components/shared'
@@ -26,6 +26,9 @@ interface TransactionRowProps {
     isReadOnly?: boolean
     showActions?: boolean
     showDate?: boolean
+    /** Move the row one place up or down within its day; each is set only when the row can go that way. */
+    onMoveUp?: () => void
+    onMoveDown?: () => void
 }
 
 interface RowHandlers {
@@ -33,13 +36,15 @@ interface RowHandlers {
     confirm?: () => void
     skip?: () => void
     duplicate?: () => void
+    moveUp?: () => void
+    moveDown?: () => void
     remove?: () => void
 }
 
 /** Each action the row offers, or undefined when the transaction, the role or the caller rules it out. */
 function rowHandlers(
     transaction: Transaction,
-    { onEdit, onConfirm, onSkip, onDuplicate, onDelete, isReadOnly }: TransactionRowProps,
+    { onEdit, onConfirm, onSkip, onDuplicate, onDelete, onMoveUp, onMoveDown, isReadOnly }: TransactionRowProps,
 ): RowHandlers {
     const { edit, duplicate, delete: canRemove, confirm, skip } = transaction.actions
     const writable = !isReadOnly
@@ -48,12 +53,17 @@ function rowHandlers(
         confirm: writable && confirm && onConfirm ? () => onConfirm(transaction) : undefined,
         skip: writable && skip && onSkip ? () => onSkip(transaction.id) : undefined,
         duplicate: writable && duplicate && onDuplicate ? () => onDuplicate(transaction.id) : undefined,
+        moveUp: writable ? onMoveUp : undefined,
+        moveDown: writable ? onMoveDown : undefined,
         remove: writable && canRemove && onDelete ? () => onDelete(transaction.id) : undefined,
     }
 }
 
-function TransactionStatusBadge({ status }: { status: Transaction['status'] }) {
+function TransactionStatusBadge({ status, inPayment }: { status: Transaction['status']; inPayment: boolean }) {
     const { t } = useTranslation('pages')
+    if (inPayment) {
+        return <FeedStatusBadge variant="outline">{t('transactions.paymentBadge')}</FeedStatusBadge>
+    }
     if (status === 'skipped') {
         return <FeedStatusBadge variant="secondary">{t('transactions.status.skipped')}</FeedStatusBadge>
     }
@@ -68,9 +78,11 @@ interface TransactionMenuProps {
     open: boolean
     onOpenChange: (open: boolean) => void
     showTrigger: boolean
+    /** The transaction is a leg of a split payment: deleting it deletes the payment. */
+    inPayment: boolean
 }
 
-function TransactionMenu({ handlers, open, onOpenChange, showTrigger }: TransactionMenuProps) {
+function TransactionMenu({ handlers, open, onOpenChange, showTrigger, inPayment }: TransactionMenuProps) {
     const { t } = useTranslation(['common', 'pages'])
     return (
         <RowActions
@@ -79,8 +91,14 @@ function TransactionMenu({ handlers, open, onOpenChange, showTrigger }: Transact
             showTrigger={showTrigger}
             onEdit={handlers.edit}
             onDelete={handlers.remove}
-            deleteTitle={t('pages:transactions.deleteTitle')}
-            deleteDescription={t('pages:transactions.deleteDescription')}
+            deleteTitle={
+                inPayment ? t('pages:transactions.deletePaymentTitle') : t('pages:transactions.deleteTitle')
+            }
+            deleteDescription={
+                inPayment
+                    ? t('pages:transactions.deletePaymentDescription')
+                    : t('pages:transactions.deleteDescription')
+            }
         >
             {handlers.confirm && (
                 <DropdownMenuItem onClick={handlers.confirm}>
@@ -103,6 +121,18 @@ function TransactionMenu({ handlers, open, onOpenChange, showTrigger }: Transact
                 <DropdownMenuItem onClick={handlers.duplicate}>
                     <Copy className="mr-2 size-4" />
                     {t('actions.duplicate')}
+                </DropdownMenuItem>
+            )}
+            {handlers.moveUp && (
+                <DropdownMenuItem onClick={handlers.moveUp} {...testId('move-up')}>
+                    <ArrowUp className="mr-2 size-4" />
+                    {t('actions.moveUp')}
+                </DropdownMenuItem>
+            )}
+            {handlers.moveDown && (
+                <DropdownMenuItem onClick={handlers.moveDown} {...testId('move-down')}>
+                    <ArrowDown className="mr-2 size-4" />
+                    {t('actions.moveDown')}
                 </DropdownMenuItem>
             )}
         </RowActions>
@@ -130,7 +160,7 @@ export function TransactionRow(props: TransactionRowProps) {
         <FeedRow
             {...transactionIconProps(transaction.type, transaction.category)}
             title={displayTransactionDescription(transaction)}
-            badge={<TransactionStatusBadge status={transaction.status} />}
+            badge={<TransactionStatusBadge status={transaction.status} inPayment={transaction.groupUuid !== null} />}
             subtitle={
                 <>
                     {dateLabel && <span className="mr-1.5 font-medium">{dateLabel} ·</span>}
@@ -162,6 +192,7 @@ export function TransactionRow(props: TransactionRowProps) {
                     open={menuOpen}
                     onOpenChange={setMenuOpen}
                     showTrigger={!isMobile}
+                    inPayment={transaction.groupUuid !== null}
                 />
             )}
             below={expanded && canExpand ? <TransactionItemsRow transaction={transaction} /> : undefined}

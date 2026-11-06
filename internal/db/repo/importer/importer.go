@@ -4,6 +4,7 @@ package importer
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"savvy-go/internal/db"
@@ -108,19 +109,51 @@ type Row struct {
 	Minor                                      int64
 }
 
-// InsertRow adds the transaction unless one with the same dedup hash exists,
-// and reports whether it added it.
+// InsertRow adds the transaction unless one with the same dedup hash exists
+// for the account, and reports whether it added it. The row is one payment on
+// the account (negative for an expense) and one line of the same amount.
 func (r Repo) InsertRow(ctx context.Context, row Row, now time.Time) (bool, error) {
-	res, err := db.Q(r.DB).InsertTransactionIgnoreDup(ctx, sqlc.InsertTransactionIgnoreDupParams{
-		Type: row.Type, AccountID: row.AccountID, CategoryID: db.NullInt64(row.CategoryID), Amount: row.Minor,
-		Description: db.NS(row.Description), Date: db.NS(row.Date), Status: row.Status, DedupHash: db.NS(row.DedupHash),
-		CreatedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now),
+	externalID := fmt.Sprintf("csv:%d:%s", row.AccountID, row.DedupHash)
+	added := false
+	err := store.Tx(ctx, r.DB, func(d store.DB) error {
+		q := db.Q(d)
+		if dup, err := q.ExistsTransactionExternalID(ctx, db.NS(externalID)); err != nil || dup {
+			return err
+		}
+		unit, err := q.GetAccountUnit(ctx, row.AccountID)
+		if err != nil {
+			return err
+		}
+		res, err := q.InsertTransaction(ctx, sqlc.InsertTransactionParams{
+			Type: row.Type, Description: db.NS(row.Description), Date: db.NS(row.Date), Status: row.Status,
+			ExternalID: db.NS(externalID), CreatedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now),
+		})
+		if err != nil {
+			return err
+		}
+		id, err := res.LastInsertId()
+		if err != nil {
+			return err
+		}
+		amount := row.Minor
+		if amount < 0 {
+			amount = -amount
+		}
+		paid := amount
+		if row.Type == "expense" {
+			paid = -amount
+		}
+		if err := q.InsertPayment(ctx, sqlc.InsertPaymentParams{
+			TransactionID: id, AccountID: row.AccountID, Amount: paid,
+		}); err != nil {
+			return err
+		}
+		added = true
+		return q.InsertTransactionLine(ctx, sqlc.InsertTransactionLineParams{
+			TransactionID: id, Seq: 0, CategoryID: db.NullInt64(row.CategoryID), CurrencyID: unit.ID, Amount: amount,
+		})
 	})
-	if err != nil {
-		return false, err
-	}
-	n, _ := res.RowsAffected()
-	return n > 0, nil
+	return added && err == nil, err
 }
 
 // CountsByStatus is how many imports are in each status.

@@ -15,8 +15,10 @@ import {
     useInfiniteTransactions,
     useTransactions,
     useDeleteTransaction,
+    useDeleteTransactionGroup,
     useDuplicateTransaction,
     useSkipTransaction,
+    useReorderTransactions,
     useAccounts,
     useCategories,
     useCurrencies,
@@ -49,8 +51,10 @@ export default function TransactionsPage() {
         per_page: 20,
     })
     const deleteTransaction = useDeleteTransaction()
+    const deleteGroup = useDeleteTransactionGroup()
     const duplicateTransaction = useDuplicateTransaction()
     const skipTransaction = useSkipTransaction()
+    const reorder = useReorderTransactions()
     const { data: categories } = useCategories()
     const { data: tags } = useTags()
     const { data: accounts } = useAccounts({ exclude_debts: true })
@@ -145,7 +149,15 @@ export default function TransactionsPage() {
                                         </Button>
                                     ) : undefined
                                 }
-                                onDelete={(id) => deleteTransaction.mutate(id)}
+                                onDelete={(id) => {
+                                    // A leg goes with its payment.
+                                    const groupUuid = transactions.find((item) => item.id === id)?.groupUuid
+                                    if (groupUuid) {
+                                        deleteGroup.mutate(groupUuid)
+                                        return
+                                    }
+                                    deleteTransaction.mutate(id)
+                                }}
                                 onDuplicate={(id) => {
                                     const transaction = transactions.find((item) => item.id === id)
                                     confirmIfNeeded(
@@ -158,6 +170,13 @@ export default function TransactionsPage() {
                                 onSkip={(id) => skipTransaction.mutate(id)}
                                 onEdit={openEdit}
                                 isReadOnly={isReadOnly}
+                                onReorder={(date, shownIds) =>
+                                    reorder.mutate({
+                                        date: date.slice(0, 10),
+                                        shownIds,
+                                        direction: list.params.sortDir,
+                                    })
+                                }
                             />
 
                             {loadedCount > 0 && (

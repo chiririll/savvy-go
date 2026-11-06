@@ -68,7 +68,7 @@ func (p *Process) Start(ctx context.Context) {
 			Name:     "recurring:ensure-upcoming",
 			Interval: time.Hour,
 			Run: eachSpace(func(ctx context.Context, d store.DB) error {
-				return recurring.Service{DB: d, Txs: ledger.Transactions{DB: d}}.EnsureUpcoming(ctx)
+				return recurring.Service{DB: d, Ledger: func(d store.DB) recurring.Occurrences { return ledger.Templates{DB: d} }}.EnsureUpcoming(ctx)
 			}),
 		},
 		jobs.Job{Name: "uploads:prune", Interval: time.Hour, Run: locator.Get[uploads.Service](l).PruneExpired},

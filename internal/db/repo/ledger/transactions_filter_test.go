@@ -5,43 +5,51 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shopspring/decimal"
-
 	"savvy-go/internal/db/filter"
 	ledgerrepo "savvy-go/internal/db/repo/ledger"
 	"savvy-go/internal/money"
 )
 
-// described stores a confirmed expense with a description and item lines,
-// priced in the account's currency.
+// described stores a confirmed expense with a description and a line for each
+// of the given ones, priced in the account's currency. Without lines the
+// expense has a single uncategorised one for the whole amount.
 func (f *fixture) described(
 	t *testing.T,
 	account, minor int64,
 	desc string,
-	items ...ledgerrepo.NewTxItem,
+	lines ...ledgerrepo.LineFields,
 ) int64 {
 	t.Helper()
 	acc, _ := f.repo.Account(ctx, account)
+	unit := acc.Currency.Unit()
 	date := "2026-01-02"
 	now := time.Now().UTC()
 	id, err := f.repo.InsertTransaction(ctx, ledgerrepo.TxFields{
-		Type: "expense", Status: "confirmed", AccountID: account, CategoryID: &f.food,
-		Amount: money.New(minor, acc.Currency.Unit()), Date: &date, Description: &desc,
+		Type: "expense", Status: "confirmed", Date: &date, Description: &desc,
 	}, now)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := f.repo.InsertItems(ctx, id, items, now); err != nil {
+	if err := f.repo.ReplacePayments(ctx, id, []ledgerrepo.PaymentFields{
+		{AccountID: account, Amount: money.New(-minor, unit)},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(lines) == 0 {
+		lines = []ledgerrepo.LineFields{{CategoryID: &f.food, Amount: money.New(minor, unit)}}
+	}
+	if err := f.repo.ReplaceLines(ctx, id, lines); err != nil {
 		t.Fatal(err)
 	}
 	return id
 }
 
-func (f *fixture) item(t *testing.T, account int64, name string, minor int64) ledgerrepo.NewTxItem {
+// line is a line of a described expense with a note, priced in the account's
+// currency.
+func (f *fixture) line(t *testing.T, account int64, note string, minor int64) ledgerrepo.LineFields {
 	t.Helper()
 	acc, _ := f.repo.Account(ctx, account)
-	m := money.New(minor, acc.Currency.Unit())
-	return ledgerrepo.NewTxItem{Name: name, Quantity: decimal.NewFromInt(1), PricePerUnit: m, TotalPrice: m}
+	return ledgerrepo.LineFields{CategoryID: &f.food, Amount: money.New(minor, acc.Currency.Unit()), Note: &note}
 }
 
 // found is the ids of the transactions a search returns, sorted, and checks
@@ -71,10 +79,10 @@ func want(ids ...int64) []int64 {
 	return ids
 }
 
-func TestSearchMatchesDescriptionAndItemNamesIgnoringCase(t *testing.T) {
+func TestSearchMatchesDescriptionAndLineNotesIgnoringCase(t *testing.T) {
 	f := newFixture(t)
 	coffee := f.described(t, f.cash, 350, "Morning Coffee")
-	chair := f.described(t, f.cash, 90000, "Кресло в гостиную", f.item(t, f.cash, "Armchair", 90000))
+	chair := f.described(t, f.cash, 90000, "Кресло в гостиную", f.line(t, f.cash, "Armchair", 90000))
 	bread := f.described(t, f.cash, 100, "Bread")
 
 	for q, ids := range map[string][]int64{
@@ -98,7 +106,7 @@ func TestSearchMatchesDescriptionAndItemNamesIgnoringCase(t *testing.T) {
 
 func TestSearchTermsAreAllRequired(t *testing.T) {
 	f := newFixture(t)
-	both := f.described(t, f.cash, 500, "Cafe latte", f.item(t, f.cash, "Croissant", 200))
+	both := f.described(t, f.cash, 500, "Cafe latte", f.line(t, f.cash, "Croissant", 200))
 	f.described(t, f.cash, 300, "Cafe espresso")
 	if got := f.found(t, "cafe croissant"); !slices.Equal(got, want(both)) {
 		t.Fatalf("got %v, want %v", got, want(both))
@@ -166,34 +174,25 @@ func TestSearchAmountGroupsOnlyWholeThousands(t *testing.T) {
 	}
 }
 
-func TestSearchAmountMatchesItemPricesAndTransferAmounts(t *testing.T) {
+func TestSearchAmountMatchesLineAmountsAndTransferAmounts(t *testing.T) {
 	f := newFixture(t)
-	receipt := f.described(t, f.cash, 500000, "Furniture store", f.item(t, f.cash, "Sofa", 187900), f.item(t, f.cash, "Lamp", 12100))
-	f.described(t, f.cash, 4200, "Other", f.item(t, f.cash, "Pen", 4200))
+	receipt := f.described(t, f.cash, 500000, "Furniture store", f.line(t, f.cash, "Sofa", 187900), f.line(t, f.cash, "Lamp", 12100))
+	f.described(t, f.cash, 4200, "Other", f.line(t, f.cash, "Pen", 4200))
 
 	if got := f.found(t, "1879"); !slices.Equal(got, want(receipt)) {
-		t.Fatalf("item price: got %v, want %v", got, want(receipt))
+		t.Fatalf("line amount: got %v, want %v", got, want(receipt))
 	}
 	if got := f.found(t, "sofa 1879"); !slices.Equal(got, want(receipt)) {
 		t.Fatalf("name and price: got %v", got)
 	}
 	if got := f.found(t, "lamp 1879"); !slices.Equal(got, want(receipt)) {
-		t.Fatalf("different items of one receipt: got %v", got)
+		t.Fatalf("different lines of one receipt: got %v", got)
 	}
 
 	// A transfer's received amount is in the other account's currency.
-	date := "2026-01-03"
-	now := time.Now().UTC()
-	to := money.New(1879, money.Unit{ID: f.jpy, Decimals: 0})
-	tr, err := f.repo.InsertTransaction(ctx, ledgerrepo.TxFields{
-		Type: "transfer", Status: "confirmed", AccountID: f.cash, ToAccountID: &f.yen,
-		Amount: money.New(12, money.Unit{ID: f.usd, Decimals: 2}), ToAmount: &to, Date: &date,
-	}, now)
-	if err != nil {
-		t.Fatal(err)
-	}
+	tr := f.transfer(t, 12, 1879, "2026-01-03")
 	if got := f.found(t, "1879"); !slices.Contains(got, tr) {
-		t.Fatalf("to_amount: got %v, want it to include %d", got, tr)
+		t.Fatalf("received amount: got %v, want it to include %d", got, tr)
 	}
 }
 
@@ -201,15 +200,7 @@ func TestFilterByCurrencyAndAccounts(t *testing.T) {
 	f := newFixture(t)
 	usd := f.described(t, f.cash, 100, "usd only")
 	yen := f.described(t, f.yen, 100, "yen only")
-	date := "2026-01-03"
-	to := money.New(150, money.Unit{ID: f.jpy, Decimals: 0})
-	tr, err := f.repo.InsertTransaction(ctx, ledgerrepo.TxFields{
-		Type: "transfer", Status: "confirmed", AccountID: f.cash, ToAccountID: &f.yen,
-		Amount: money.New(100, money.Unit{ID: f.usd, Decimals: 2}), ToAmount: &to, Date: &date,
-	}, time.Now().UTC())
-	if err != nil {
-		t.Fatal(err)
-	}
+	tr := f.transfer(t, 100, 150, "2026-01-03")
 
 	list := func(fl filter.TxFilter) []int64 {
 		t.Helper()
@@ -233,7 +224,7 @@ func TestFilterByCurrencyAndAccounts(t *testing.T) {
 		"lower case":    {filter.TxFilter{Currencies: []string{"jpy"}}, want(yen, tr)},
 		"either":        {filter.TxFilter{Currencies: []string{"USD", "JPY"}}, want(usd, yen, tr)},
 		"unknown":       {filter.TxFilter{Currencies: []string{"EUR"}}, want()},
-		"account ids":   {filter.TxFilter{AccountIDs: []int64{f.yen}}, want(yen)},
+		"account ids":   {filter.TxFilter{AccountIDs: []int64{f.yen}}, want(yen, tr)},
 		"two accounts":  {filter.TxFilter{AccountIDs: []int64{f.cash, f.yen}}, want(usd, yen, tr)},
 		"both filters":  {filter.TxFilter{AccountIDs: []int64{f.cash}, Currencies: []string{"JPY"}}, want(tr)},
 		"with a search": {filter.TxFilter{Currencies: []string{"USD"}, Search: "only"}, want(usd)},

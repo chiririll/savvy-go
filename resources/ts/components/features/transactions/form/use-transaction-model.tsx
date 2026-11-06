@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, type MutableRefObject, type ReactN
 import { useWatch, type UseFormReturn } from 'react-hook-form'
 import { useAccounts, useCategories, useCurrencies, useTransactionPartyDefaults } from '@/hooks'
 import { isDateInFuture } from '@/lib/utils'
+import { isSplitPayment } from '@/lib/payment-input'
 import { currencyDecimals, sumTransactionItems } from '@/lib/transaction-items'
 import { isTransferType, TransactionFormValues } from '@/schemas/transactions'
 import { toBalanceImpact, useBalancePreview } from './balance-preview'
@@ -34,10 +35,12 @@ export function useTransactionModel({
     const { data: categories } = useCategories()
     const { data: currencies } = useCurrencies()
 
-    const [transactionType, accountId, toAccountId, toSpaceId, items, date] = useWatch({
+    const [transactionType, accountId, toAccountId, toSpaceId, items, date, extraPayments, changes] = useWatch({
         control: form.control,
-        name: ['type', 'account_id', 'to_account_id', 'to_space_id', 'items', 'date'],
+        name: ['type', 'account_id', 'to_account_id', 'to_space_id', 'items', 'date', 'extra_payments', 'changes'],
     })
+    // A split payment is several transactions: one account's balance hint would be wrong for it.
+    const isSplit = transactionType === 'expense' && isSplitPayment({ extra_payments: extraPayments, changes })
     const isTransfer = isTransferType(transactionType)
     const isSpaceTransfer = transactionType === 'transfer_out'
     const hasItems = Boolean(items?.length)
@@ -101,14 +104,16 @@ export function useTransactionModel({
     )
 
     useLayoutEffect(() => {
-        onPreviewChange?.(balanceHint)
-    }, [onPreviewChange, balances, isPendingDate, date])
+        onPreviewChange?.(isSplit ? null : balanceHint)
+    }, [onPreviewChange, balances, isPendingDate, date, isSplit])
 
     return {
+        accounts,
         transactionType,
         accountId,
         isTransfer,
         isSpaceTransfer,
+        isSplit,
         hasItems,
         dateRequired,
         isPendingDate,

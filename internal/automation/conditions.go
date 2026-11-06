@@ -68,6 +68,9 @@ func evaluateCondition(cond map[string]any, tx *ledger.Transaction) bool {
 	}
 	value := cond["value"]
 	entity := fieldValue(tx, field)
+	if m, ok := entity.(multi); ok {
+		return matchAny(op, m, value)
+	}
 	switch op {
 	case "equals":
 		return valuesEqual(entity, value)
@@ -199,12 +202,61 @@ func namedField(id int64, name, typ, field string) any {
 	return nil
 }
 
+// multi is a field a transaction has several of (its payments' accounts, its
+// lines' categories). A condition on it holds when any element satisfies it,
+// and a negative condition when none does.
+type multi []any
+
+func matchAny(op string, m multi, value any) bool {
+	some := func(f func(any) bool) bool {
+		for _, e := range m {
+			if f(e) {
+				return true
+			}
+		}
+		return false
+	}
+	switch op {
+	case "equals":
+		return some(func(e any) bool { return valuesEqual(e, value) })
+	case "not_equals":
+		return !some(func(e any) bool { return valuesEqual(e, value) })
+	case "in":
+		return some(func(e any) bool { return inSlice(e, value) })
+	case "not_in":
+		return !some(func(e any) bool { return inSlice(e, value) })
+	case "is_null":
+		return len(m) == 0
+	case "is_not_null":
+		return len(m) > 0
+	}
+	return false
+}
+
+// scalar is the first element of a multi, for the places that need one value:
+// a template, a formula, the account a rule moves money from.
+func scalar(v any) any {
+	if m, ok := v.(multi); ok {
+		if len(m) == 0 {
+			return nil
+		}
+		return m[0]
+	}
+	return v
+}
+
+// transactionField reads a field of a transaction for a rule. amount is what
+// the payments net to in one currency (nil when they span several); account_id
+// matches any payment's account and category_id any line's category.
 func transactionField(v *ledger.Transaction, field string) any {
 	switch field {
 	case "type":
 		return v.Type
 	case "amount":
-		return v.Amount
+		if m, ok := v.Amount(); ok {
+			return m
+		}
+		return nil
 	case "description":
 		return deref(v.Description)
 	case "date":
@@ -212,17 +264,33 @@ func transactionField(v *ledger.Transaction, field string) any {
 	case "status":
 		return v.Status
 	case "account_id":
-		return v.AccountID
-	case "to_account_id":
-		return deref(v.ToAccountID)
+		var ids multi
+		for _, p := range v.Payments {
+			ids = append(ids, p.AccountID)
+		}
+		return ids
 	case "category_id":
-		return deref(v.CategoryID)
+		var ids multi
+		for _, l := range v.Lines {
+			if l.CategoryID != nil {
+				ids = append(ids, *l.CategoryID)
+			}
+		}
+		return ids
 	case "account":
-		return v.Account
-	case "toAccount", "to_account":
-		return v.ToAccount
+		for _, p := range v.Payments {
+			if p.Account != nil {
+				return p.Account
+			}
+		}
+		return nil
 	case "category":
-		return v.Category
+		for _, l := range v.Lines {
+			if l.Category != nil {
+				return l.Category
+			}
+		}
+		return nil
 	case "tags":
 		return v.Tags
 	}

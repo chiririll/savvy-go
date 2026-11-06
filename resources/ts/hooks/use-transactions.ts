@@ -1,11 +1,15 @@
 import { useMemo } from 'react'
-import { useInfiniteQuery, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query'
-import { transactionsApi, type ConfirmTransactionOptions } from '@/api'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData, type QueryKey } from '@tanstack/react-query'
+import { toast } from 'sonner'
+import { transactionsApi, transactionGroupsApi, type ConfirmTransactionOptions, type TransactionsResponse } from '@/api'
 import type { TransactionsResponse } from '@/api/transactions'
 import { Transaction, TransactionFilters } from '@/types'
 import { TransactionFormData } from '@/schemas'
 import { useResourceItem, useResourceMutation } from './use-crud'
 import i18n from '@/lib/i18n'
+import { getApiErrorMessage } from '@/lib/api-error'
+import { dayOrderForApi, placeInSlots } from '@/lib/transaction-order'
+import type { PaymentLeg } from '@/lib/split-payment'
 
 const QUERY_KEY = ['transactions']
 const TRANSACTION_INVALIDATE = [
@@ -160,5 +164,92 @@ export function useTransactionSummary(filters?: TransactionFilters) {
     return useQuery({
         queryKey: [...QUERY_KEY, 'summary', filters],
         queryFn: () => transactionsApi.getSummary(filters),
+    })
+}
+
+interface ReorderVariables {
+    date: string
+    /** The day's transactions as the list shows them. */
+    shownIds: number[]
+    direction: 'asc' | 'desc'
+}
+
+/** Drags within one day: the lists show the new order at once and the server confirms it. */
+export function useReorderTransactions() {
+    const queryClient = useQueryClient()
+    const listKey = [...QUERY_KEY, 'infinite']
+
+    return useMutation({
+        mutationFn: ({ date, shownIds, direction }: ReorderVariables) =>
+            transactionsApi.reorder(date, dayOrderForApi(shownIds, direction)),
+        onMutate: async ({ shownIds }) => {
+            await queryClient.cancelQueries({ queryKey: listKey })
+            const previous = queryClient.getQueriesData({ queryKey: listKey })
+
+            queryClient.setQueriesData<InfiniteData<TransactionsResponse>>({ queryKey: listKey }, (old) => {
+                if (!old) {
+                    return old
+                }
+
+                const flat = old.pages.flatMap((page) => page.data)
+                const placed = placeInSlots(flat, shownIds)
+                let offset = 0
+
+                return {
+                    ...old,
+                    pages: old.pages.map((page) => {
+                        const data = placed.slice(offset, offset + page.data.length)
+                        offset += page.data.length
+                        return { ...page, data }
+                    }),
+                }
+            })
+
+            return { previous }
+        },
+        onError: (error, _variables, context) => {
+            context?.previous.forEach(([key, data]: [QueryKey, unknown]) => {
+                queryClient.setQueryData(key, data)
+            })
+            toast.error(getApiErrorMessage(error, i18n.t('toasts.transaction.reorderFailed')))
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: QUERY_KEY })
+        },
+    })
+}
+
+export function useTransactionGroup(uuid: string | null) {
+    return useQuery({
+        queryKey: [...QUERY_KEY, 'group', uuid],
+        queryFn: () => transactionGroupsApi.getByUuid(uuid as string),
+        enabled: uuid !== null,
+    })
+}
+
+export function useCreateTransactionGroup() {
+    return useResourceMutation({
+        mutationFn: (legs: PaymentLeg[]) => transactionGroupsApi.create(legs),
+        invalidateKeys: [...TRANSACTION_INVALIDATE],
+        resetKeys: [...TRANSACTION_INFINITE_RESET],
+        successMessage: i18n.t('toasts.transaction.paymentCreated'),
+    })
+}
+
+export function useUpdateTransactionGroup() {
+    return useResourceMutation({
+        mutationFn: ({ uuid, legs }: { uuid: string; legs: PaymentLeg[] }) => transactionGroupsApi.update(uuid, legs),
+        invalidateKeys: [...TRANSACTION_INVALIDATE],
+        resetKeys: [...TRANSACTION_INFINITE_RESET],
+        successMessage: i18n.t('toasts.transaction.paymentUpdated'),
+    })
+}
+
+export function useDeleteTransactionGroup() {
+    return useResourceMutation({
+        mutationFn: (uuid: string) => transactionGroupsApi.delete(uuid),
+        invalidateKeys: [...TRANSACTION_INVALIDATE],
+        resetKeys: [...TRANSACTION_INFINITE_RESET],
+        successMessage: i18n.t('toasts.transaction.paymentDeleted'),
     })
 }

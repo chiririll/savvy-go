@@ -73,7 +73,7 @@ function sqlEnums(file: string): Map<string, string[]> {
 }
 
 const serverSchema = sqlEnums('internal/migrate/sql/server/0001_initial.sql')
-const spaceSchema = sqlEnums('internal/migrate/sql/space/0001_initial.sql')
+const spaceSchema = sqlEnums('internal/migrate/sql/space/0001_base.sql')
 
 describe('enum columns in the database schema', () => {
     const cases: Array<[string, Map<string, string[]>, string, readonly string[]]> = [

@@ -10,10 +10,10 @@ import (
 )
 
 // A free-text search is a list of terms, all of which must match a
-// transaction. A term matches when the transaction's description or one of its
-// item names contains it (any case, any script), or, when the term reads as a
-// number, when that number is the transaction's amount, its received amount or
-// the price of one of its items.
+// transaction. A term matches when the transaction's description or the note
+// of one of its lines contains it (any case, any script), or, when the term
+// reads as a number, when that number is the amount of one of its payments or
+// lines, in the currency of that payment or line.
 
 // amountScales is the number of currency decimal places a minor-unit amount is
 // scaled by; the schema allows 0 through 12.
@@ -118,28 +118,25 @@ func toAmount(s string) (amount, bool) {
 }
 
 // searchWhere is the condition for a search; "" and nil args when it has no
-// terms. It needs the joins of txJoins: c is the currency of the transaction's
-// account and cb that of the account it goes to.
+// terms.
 func searchWhere(q string) (string, []any) {
 	var sb strings.Builder
 	var args []any
 	for _, term := range parseSearch(q) {
 		sb.WriteString(` AND (instr(` + db.FoldFunc + `(COALESCE(t.description, '')), ?) > 0` +
-			` OR EXISTS (SELECT 1 FROM transaction_items i WHERE i.transaction_id = t.id` +
-			` AND instr(` + db.FoldFunc + `(i.name), ?) > 0)`)
+			` OR EXISTS (SELECT 1 FROM transaction_lines l WHERE l.transaction_id = t.id` +
+			` AND instr(` + db.FoldFunc + `(l.note), ?) > 0)`)
 		args = append(args, term.Text, term.Text)
 		for _, a := range term.Amounts {
 			// The stored integer is the number scaled by the currency's
 			// decimals, which only a currency with at least as many
 			// decimals as the number has can represent.
-			from := `(c.decimals >= ? AND %s = ? * ` + db.Pow10Func + `(c.decimals - ?))`
-			sb.WriteString(` OR ` + strings.ReplaceAll(from, "%s", "t.amount"))
+			sb.WriteString(` OR EXISTS (SELECT 1 FROM payments p JOIN accounts a ON a.id = p.account_id` +
+				` JOIN currencies c ON c.id = a.currency_id WHERE p.transaction_id = t.id` +
+				` AND c.decimals >= ? AND abs(p.amount) = ? * ` + db.Pow10Func + `(c.decimals - ?))`)
 			args = append(args, a.Frac, a.Minor, a.Frac)
-			sb.WriteString(` OR EXISTS (SELECT 1 FROM transaction_items i WHERE i.transaction_id = t.id` +
-				` AND c.decimals >= ? AND (i.total_price = ? * ` + db.Pow10Func + `(c.decimals - ?)` +
-				` OR i.price_per_unit = ? * ` + db.Pow10Func + `(c.decimals - ?)))`)
-			args = append(args, a.Frac, a.Minor, a.Frac, a.Minor, a.Frac)
-			sb.WriteString(` OR (cb.decimals >= ? AND t.to_amount = ? * ` + db.Pow10Func + `(cb.decimals - ?))`)
+			sb.WriteString(` OR EXISTS (SELECT 1 FROM transaction_lines l JOIN currencies c ON c.id = l.currency_id` +
+				` WHERE l.transaction_id = t.id AND c.decimals >= ? AND l.amount = ? * ` + db.Pow10Func + `(c.decimals - ?))`)
 			args = append(args, a.Frac, a.Minor, a.Frac)
 		}
 		sb.WriteString(`)`)

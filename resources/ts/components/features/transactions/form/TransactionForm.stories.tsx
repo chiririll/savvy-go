@@ -256,3 +256,64 @@ export const OverdrawingAsksFirst: Story = {
         await waitFor(() => expect(args.onSubmit).toHaveBeenCalledOnce())
     },
 }
+
+// An expense paid from several accounts is saved as one payment, a leg for each.
+export const PaidFromSeveralAccounts: Story = {
+    args: {
+        onSubmitPayment: fn(),
+        defaultValues: { ...expense, amount: 15, extra_payments: [{ account_id: 3, amount: 1000 }] },
+    },
+    play: async ({ canvasElement, args }) => {
+        await expect(await within(canvasElement).findByText(/total/i)).toBeVisible()
+        await userEvent.click(saveButton(canvasElement))
+        await waitFor(() => expect(args.onSubmitPayment).toHaveBeenCalledOnce())
+        await expect(args.onSubmit).not.toHaveBeenCalled()
+        const legs = (args.onSubmitPayment as ReturnType<typeof fn>).mock.calls[0][0]
+        await expect(legs.map((leg: { account_id: number; amount: number }) => [leg.account_id, leg.amount])).toEqual([
+            [1, 15],
+            [3, 1000],
+        ])
+    },
+}
+
+// The + next to the account adds a row for another account.
+export const PlusAddsAnAccountRow: Story = {
+    args: { onSubmitPayment: fn(), defaultValues: expense },
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement)
+        await userEvent.click(await canvas.findByRole('button', { name: /add another account/i }))
+        await expect(await canvas.findByRole('button', { name: /remove/i })).toBeVisible()
+        // The first row has no + any more: only the last row has it.
+        await expect(canvas.getAllByRole('button', { name: /add another account/i })).toHaveLength(1)
+    },
+}
+
+// What was handed over is the expense; the change that came back in another currency is an income.
+export const PaidWithChange: Story = {
+    args: {
+        onSubmitPayment: fn(),
+        defaultValues: { ...expense, amount: 30, changes: [{ account_id: 3, amount: 1500 }] },
+    },
+    play: async ({ canvasElement, args }) => {
+        await expect(await within(canvasElement).findByText(/change \(1\)/i)).toBeVisible()
+        await userEvent.click(saveButton(canvasElement))
+        await waitFor(() => expect(args.onSubmitPayment).toHaveBeenCalledOnce())
+        const legs = (args.onSubmitPayment as ReturnType<typeof fn>).mock.calls[0][0]
+        await expect(legs).toMatchObject([
+            { type: 'expense', account_id: 1, amount: 30 },
+            { type: 'income', account_id: 3, amount: 1500 },
+        ])
+    },
+}
+
+// "Add change" adds a change row, which can be removed again.
+export const AddAndRemoveChange: Story = {
+    args: { onSubmitPayment: fn(), defaultValues: expense },
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement)
+        await userEvent.click(await canvas.findByRole('button', { name: /add change/i }))
+        await expect(await canvas.findByText(/change \(1\)/i)).toBeVisible()
+        await userEvent.click(canvas.getByRole('button', { name: /remove/i }))
+        await expect(await canvas.findByText(/change \(0\)/i)).toBeVisible()
+    },
+}

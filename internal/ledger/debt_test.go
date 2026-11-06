@@ -25,7 +25,7 @@ func TestLendingFromAccountRecordsIssuanceCurrency(t *testing.T) {
 
 	// The caller names another currency; the source account decides.
 	debt, err := debts.Create(e.ctx, DebtInput{
-		Name: "Ann", DebtType: "owed_to_me", CurrencyID: e.usd.ID, AccountID: e.jpyAcc.ID,
+		Name: "Ann", Direction: "owed_to_me", CurrencyID: e.usd.ID, AccountID: e.jpyAcc.ID,
 		Amount: dec("1000"), Date: "2024-01-15", Origin: "new",
 	})
 	if err != nil {
@@ -45,7 +45,7 @@ func TestLendingFromAccountRecordsIssuanceCurrency(t *testing.T) {
 func TestBorrowingBringsMoneyIn(t *testing.T) {
 	e := newMoneyEnv(t)
 	_, err := newDebts(e).Create(e.ctx, DebtInput{
-		Name: "Bank", DebtType: "i_owe", AccountID: e.usdAcc.ID, Amount: dec("50.25"), Date: "2024-01-15", Origin: "new",
+		Name: "Bank", Direction: "i_owe", AccountID: e.usdAcc.ID, Amount: dec("50.25"), Date: "2024-01-15", Origin: "new",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -58,19 +58,19 @@ func TestBorrowingBringsMoneyIn(t *testing.T) {
 func TestDebtCannotBeFundedFromDebt(t *testing.T) {
 	e := newMoneyEnv(t)
 	debts := newDebts(e)
-	first, err := debts.Create(e.ctx, DebtInput{Name: "a", DebtType: "i_owe", CurrencyID: e.usd.ID, Amount: dec("10")})
+	first, err := debts.Create(e.ctx, DebtInput{Name: "a", Direction: "i_owe", CurrencyID: e.usd.ID, Amount: dec("10")})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _,
 		err := debts.Create(e.ctx,
-		DebtInput{Name: "b", DebtType: "i_owe", AccountID: first.ID, Amount: dec("5"), Date: "2024-01-15",
+		DebtInput{Name: "b", Direction: "i_owe", AccountID: first.ID, Amount: dec("5"), Date: "2024-01-15",
 			Origin: "new"}); err == nil {
 		t.Error("a debt cannot be the source of another")
 	}
 	if _,
 		err := debts.Create(e.ctx,
-		DebtInput{Name: "c", DebtType: "i_owe", AccountID: 9999, Amount: dec("5"), Date: "2024-01-15",
+		DebtInput{Name: "c", Direction: "i_owe", AccountID: 9999, Amount: dec("5"), Date: "2024-01-15",
 			Origin: "new"}); err == nil {
 		t.Error("an unknown source account was accepted")
 	}
@@ -81,13 +81,13 @@ func TestAnExistingDebtMovesNoMoney(t *testing.T) {
 	debt, err := newDebts(
 		e,
 	).Create(e.ctx,
-		DebtInput{Name: "old", DebtType: "i_owe", CurrencyID: e.usd.ID, AccountID: e.usdAcc.ID, Amount: dec("40"),
+		DebtInput{Name: "old", Direction: "i_owe", CurrencyID: e.usd.ID, AccountID: e.usdAcc.ID, Amount: dec("40"),
 			Origin: "existing"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if debt.Balance.Decimal().String() != "40" {
-		t.Errorf("debt %s", debt.Balance)
+	if debt.Owed().Decimal().String() != "40" {
+		t.Errorf("debt %s", debt.Owed())
 	}
 	if got := balanceOf(t, e, e.usdAcc.ID); got.Decimal().String() != "100" {
 		t.Errorf("a debt that already existed leaves the account at %s", got)
@@ -97,8 +97,7 @@ func TestAnExistingDebtMovesNoMoney(t *testing.T) {
 func TestPaymentsSettleDebtReopenRestoresIt(t *testing.T) {
 	e := newMoneyEnv(t)
 	debts := newDebts(e)
-	accts := Accounts{DB: e.db}
-	debt, err := debts.Create(e.ctx, DebtInput{Name: "loan", DebtType: "i_owe", CurrencyID: e.usd.ID, Amount: dec("30")})
+	debt, err := debts.Create(e.ctx, DebtInput{Name: "loan", Direction: "i_owe", CurrencyID: e.usd.ID, Amount: dec("30")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,13 +108,13 @@ func TestPaymentsSettleDebtReopenRestoresIt(t *testing.T) {
 	if _, err := debts.Payment(e.ctx, debt.ID, e.usdAcc.ID, dec("10"), "2024-01-15", nil, false); err != nil {
 		t.Fatal(err)
 	}
-	if d, _ := accts.ByID(e.ctx, debt.ID); d.IsPaidOff || d.Balance.Decimal().String() != "20" {
+	if d, _ := debts.ByID(e.ctx, debt.ID); d.IsPaidOff() || d.Owed().Decimal().String() != "20" {
 		t.Fatalf("after a part payment %+v", d)
 	}
 	if _, err := debts.Payment(e.ctx, debt.ID, e.usdAcc.ID, dec("20"), "2024-01-16", nil, false); err != nil {
 		t.Fatal(err)
 	}
-	if d, _ := accts.ByID(e.ctx, debt.ID); !d.IsPaidOff || !d.Balance.IsZero() {
+	if d, _ := debts.ByID(e.ctx, debt.ID); !d.IsPaidOff() || !d.Balance.IsZero() {
 		t.Fatalf("after the last payment %+v", d)
 	}
 	if got := balanceOf(t, e, e.usdAcc.ID); got.Decimal().String() != "70" {
@@ -126,7 +125,7 @@ func TestPaymentsSettleDebtReopenRestoresIt(t *testing.T) {
 	}
 
 	reopened, err := debts.Reopen(e.ctx, debt.ID)
-	if err != nil || reopened.IsPaidOff {
+	if err != nil || reopened.IsPaidOff() {
 		t.Fatalf("reopen: %+v, %v", reopened, err)
 	}
 }
@@ -138,7 +137,7 @@ func TestCollectingPaysBackDebtOwedMe(t *testing.T) {
 		e.ctx,
 		DebtInput{
 			Name:      "Ann",
-			DebtType:  "owed_to_me",
+			Direction:  "owed_to_me",
 			AccountID: e.usdAcc.ID,
 			Amount:    dec("60"),
 			Date:      "2024-01-10",
@@ -178,8 +177,8 @@ func TestDebtSummaryFoldsIntoBase(t *testing.T) {
 		t.Errorf("no debts: %+v", empty)
 	}
 
-	mk := func(name, typ string, cur Currency, amount string) *Account {
-		d, err := debts.Create(e.ctx, DebtInput{Name: name, DebtType: typ, CurrencyID: cur.ID, Amount: dec(amount)})
+	mk := func(name, typ string, cur Currency, amount string) *Debt {
+		d, err := debts.Create(e.ctx, DebtInput{Name: name, Direction: typ, CurrencyID: cur.ID, Amount: dec(amount)})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -217,8 +216,8 @@ func TestDebtSummaryFoldsIntoBase(t *testing.T) {
 func TestDeleteRefusesADebtWithHistory(t *testing.T) {
 	e := newMoneyEnv(t)
 	debts := newDebts(e)
-	clean, _ := debts.Create(e.ctx, DebtInput{Name: "clean", DebtType: "i_owe", CurrencyID: e.usd.ID, Amount: dec("10")})
-	used, _ := debts.Create(e.ctx, DebtInput{Name: "used", DebtType: "i_owe", CurrencyID: e.usd.ID, Amount: dec("10")})
+	clean, _ := debts.Create(e.ctx, DebtInput{Name: "clean", Direction: "i_owe", CurrencyID: e.usd.ID, Amount: dec("10")})
+	used, _ := debts.Create(e.ctx, DebtInput{Name: "used", Direction: "i_owe", CurrencyID: e.usd.ID, Amount: dec("10")})
 	if _, err := debts.Payment(e.ctx, used.ID, e.usdAcc.ID, dec("1"), "2024-01-15", nil, false); err != nil {
 		t.Fatal(err)
 	}
@@ -255,15 +254,8 @@ func TestReorderSetsOrderOfTheList(t *testing.T) {
 
 func TestTotalFoldsBalancesAsOfDate(t *testing.T) {
 	e := newMoneyEnv(t)
-	date := func(s string) *string { return &s }
-	for _, in := range []TxInput{
-		{Type: "expense", AccountID: e.usdAcc.ID, Amount: dec("10"), Date: date("2024-01-10")},
-		{Type: "expense", AccountID: e.jpyAcc.ID, Amount: dec("1000"), Date: date("2024-01-20")}, // 10 USD
-	} {
-		if _, err := e.txs.Create(e.ctx, in); err != nil {
-			t.Fatal(err)
-		}
-	}
+	e.txOn(t, simple("expense", e.usdAcc.ID, "10"), "2024-01-10")
+	e.txOn(t, simple("expense", e.jpyAcc.ID, "1000"), "2024-01-20") // 10 USD
 	accts := Accounts{DB: e.db}
 	// Opening balances: USD 100 + JPY 3000 * 0.01.
 	for asOf, want := range map[string]string{"2024-01-01": "130", "2024-01-15": "120", "2024-01-31": "110"} {
@@ -280,7 +272,8 @@ func TestSetDescriptionChangesOnlyTheDescription(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, _ := e.txs.ByID(e.ctx, tx.ID)
-	if got.Description == nil || *got.Description != "new text" || !got.Amount.Equal(tx.Amount) || got.Type != "expense" {
+	samePayment := len(got.Payments) == 1 && got.Payments[0].Amount.Equal(tx.Payments[0].Amount)
+	if got.Description == nil || *got.Description != "new text" || !samePayment || got.Type != "expense" {
 		t.Errorf("after SetDescription %+v", got)
 	}
 }

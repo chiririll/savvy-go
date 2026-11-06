@@ -35,6 +35,8 @@ export function useTransactionForm({
             date: defaultValues?.date !== undefined ? (defaultValues.date ?? '') : formatDateLocal(),
             items: defaultValues?.items ?? [],
             tag_ids: defaultValues?.tag_ids ?? [],
+            extra_payments: defaultValues?.extra_payments ?? [],
+            changes: defaultValues?.changes ?? [],
         }),
         [defaultValues],
     )

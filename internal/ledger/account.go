@@ -13,23 +13,18 @@ import (
 	"savvy-go/internal/store"
 )
 
-// Account is an account as stored; every amount is in its Currency. A debt is
-// an account too: Balance is then what is still owed and TargetAmount what
-// was owed in total.
+// Account is an account as stored; every amount is in its Currency and Balance
+// is signed. A debt is an account too (type debt, a service account), but its
+// terms are a Debt and are written only through Debts.
 type Account struct {
 	ID             int64
 	Name           string
 	Type           string
+	IsService      bool
 	CurrencyID     int64
 	InitialBalance money.Money
 	IsActive       bool
 	SortOrder      int
-	DebtType       *string
-	TargetAmount   *money.Money
-	DueDate        *string
-	IsPaidOff      bool
-	Counterparty   *string
-	DebtDesc       *string
 	CreatedAt      *time.Time
 	Currency       *Currency
 	Balance        money.Money
@@ -44,26 +39,14 @@ type AccountInput struct {
 	CurrencyID     int64
 	InitialBalance decimal.Decimal
 	IsActive       bool
-	DebtType       *string
-	TargetAmount   *decimal.Decimal
-	DueDate        *string
-	IsPaidOff      bool
-	Counterparty   *string
-	DebtDesc       *string
 }
 
 // Input is the account as an update input, for read-modify-write.
 func (a Account) Input() AccountInput {
-	in := AccountInput{
+	return AccountInput{
 		Name: a.Name, Type: a.Type, CurrencyID: a.CurrencyID, InitialBalance: a.InitialBalance.Decimal(),
-		IsActive: a.IsActive, DebtType: a.DebtType, DueDate: a.DueDate, IsPaidOff: a.IsPaidOff,
-		Counterparty: a.Counterparty, DebtDesc: a.DebtDesc,
+		IsActive: a.IsActive,
 	}
-	if a.TargetAmount != nil {
-		d := a.TargetAmount.Decimal()
-		in.TargetAmount = &d
-	}
-	return in
 }
 
 var (
@@ -74,18 +57,50 @@ var (
 	ErrUnknownAccount = errors.New("unknown account")
 	// ErrUnknownCurrency is returned when a currency referenced by id does not exist.
 	ErrUnknownCurrency = errors.New("unknown currency")
+	// ErrServiceAccount is returned when an account of type debt or space is
+	// written through Accounts: debts belong to Debts, and a space account is
+	// made by SpaceAccount.
+	ErrServiceAccount = errors.New("a debt or space account cannot be changed as an account")
 )
 
 type Accounts struct{ DB store.DB }
 
 func (s Accounts) repo() repo.Repo { return repo.Repo{DB: s.DB} }
 
-func (s Accounts) All(ctx context.Context, onlyActive, excludeDebts bool) ([]Account, error) {
-	return s.list(ctx, repo.AccountFilter{OnlyActive: onlyActive, ExcludeDebts: excludeDebts})
+// All lists the accounts. excludeService leaves out debts and space accounts,
+// which is what a picker and net worth want.
+func (s Accounts) All(ctx context.Context, onlyActive, excludeService bool) ([]Account, error) {
+	rows, err := s.repo().Accounts(ctx, repo.AccountFilter{OnlyActive: onlyActive, ExcludeService: excludeService})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Account, len(rows))
+	for i, r := range rows {
+		out[i] = accountFrom(r)
+		if out[i].Balance, err = s.Balance(ctx, out[i], ""); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
 }
 
-func (s Accounts) Debts(ctx context.Context, includeCompleted bool) ([]Account, error) {
-	return s.list(ctx, repo.AccountFilter{OnlyDebts: true, UnpaidOnly: !includeCompleted})
+// ForNetWorth lists the active accounts that make up net worth: the ordinary
+// accounts and the debts (an asset when owed to the user, a liability when the
+// user owes), not the space accounts, which stand for money that left the
+// space.
+func (s Accounts) ForNetWorth(ctx context.Context) ([]Account, error) {
+	rows, err := s.repo().Accounts(ctx, repo.AccountFilter{OnlyActive: true, ExcludeSpace: true})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Account, len(rows))
+	for i, r := range rows {
+		out[i] = accountFrom(r)
+		if out[i].Balance, err = s.Balance(ctx, out[i], ""); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
 }
 
 func (s Accounts) ByID(ctx context.Context, id int64) (*Account, error) {
@@ -100,49 +115,90 @@ func (s Accounts) ByID(ctx context.Context, id int64) (*Account, error) {
 	return &a, nil
 }
 
+// SpaceAccount is the id of the account that stands for all other spaces in
+// one currency. It is made on first use, so a space without linked spaces has
+// none.
+func (s Accounts) SpaceAccount(ctx context.Context, currencyID int64) (int64, error) {
+	existing, err := s.repo().SpaceAccountID(ctx, currencyID)
+	if err != nil {
+		return 0, err
+	}
+	if existing != nil {
+		return *existing, nil
+	}
+	cur, err := s.repo().Currency(ctx, currencyID)
+	if err != nil {
+		return 0, err
+	}
+	if cur == nil {
+		return 0, ErrUnknownCurrency
+	}
+	id, err := s.repo().InsertAccount(ctx, repo.AccountFields{
+		Name: "Other spaces · " + cur.Code, Type: "space", CurrencyID: currencyID, IsActive: true,
+	}, time.Now().UTC())
+	if err != nil {
+		// Another writer made it first: the unique index refused a second one.
+		if again, gerr := s.repo().SpaceAccountID(ctx, currencyID); gerr == nil && again != nil {
+			return *again, nil
+		}
+		return 0, err
+	}
+	return id, nil
+}
+
 func (s Accounts) Create(ctx context.Context, a AccountInput) (*Account, error) {
 	if a.Type == "" {
 		a.Type = "cash"
+	}
+	if isServiceType(a.Type) {
+		return nil, ErrServiceAccount
 	}
 	unit, err := s.currencyUnit(ctx, a.CurrencyID)
 	if err != nil {
 		return nil, err
 	}
-	initial, target, err := accountAmounts(a, unit)
+	initial, err := money.FromInput(a.InitialBalance, unit)
 	if err != nil {
 		return nil, err
 	}
-	next, err := s.repo().NextAccountSortOrder(ctx, a.Type == "debt")
-	if err != nil {
-		return nil, err
-	}
-	id, err := s.repo().InsertAccount(ctx, repo.AccountFields{
-		Name: a.Name, Type: a.Type, DebtType: a.DebtType, CurrencyID: a.CurrencyID, InitialBalance: initial,
-		TargetAmount: target, DueDate: a.DueDate, IsPaidOff: a.IsPaidOff, Counterparty: a.Counterparty,
-		DebtDesc: a.DebtDesc, IsActive: a.IsActive, SortOrder: next,
-	}, time.Now().UTC())
+	var id int64
+	err = store.Tx(ctx, s.DB, func(tx store.DB) error {
+		r := repo.Repo{DB: tx}
+		next, err := r.NextAccountSortOrder(ctx, false)
+		if err != nil {
+			return err
+		}
+		id, err = r.InsertAccount(ctx, repo.AccountFields{
+			Name: a.Name, Type: a.Type, CurrencyID: a.CurrencyID, InitialBalance: initial,
+			IsActive: a.IsActive, SortOrder: next,
+		}, time.Now().UTC())
+		return err
+	})
 	if err != nil {
 		return nil, err
 	}
 	return s.ByID(ctx, id)
 }
 
+// Update saves an account. A debt or space account is refused, and so is a
+// change of type to one.
 func (s Accounts) Update(ctx context.Context, id int64, a AccountInput) (*Account, error) {
 	cur, err := s.ByID(ctx, id)
 	if err != nil || cur == nil {
 		return nil, err
 	}
+	if cur.IsService || isServiceType(a.Type) {
+		return nil, ErrServiceAccount
+	}
 	if a.CurrencyID != cur.CurrencyID {
 		return nil, ErrAccountCurrencyImmutable
 	}
-	initial, target, err := accountAmounts(a, cur.Currency.Unit())
+	initial, err := money.FromInput(a.InitialBalance, cur.Currency.Unit())
 	if err != nil {
 		return nil, err
 	}
 	err = s.repo().UpdateAccount(ctx, id, repo.AccountFields{
-		Name: a.Name, Type: a.Type, CurrencyID: cur.CurrencyID, InitialBalance: initial,
-		IsActive: a.IsActive, DebtType: a.DebtType, TargetAmount: target, DueDate: a.DueDate,
-		IsPaidOff: a.IsPaidOff, Counterparty: a.Counterparty, DebtDesc: a.DebtDesc,
+		Name: a.Name, Type: a.Type, CurrencyID: cur.CurrencyID, InitialBalance: initial, IsActive: a.IsActive,
 	}, time.Now().UTC())
 	if err != nil {
 		return nil, err
@@ -150,18 +206,14 @@ func (s Accounts) Update(ctx context.Context, id int64, a AccountInput) (*Accoun
 	return s.ByID(ctx, id)
 }
 
-// accountAmounts checks the amounts entered for an account against the range
-// and rounds them into the account currency.
-func accountAmounts(a AccountInput, unit money.Unit) (initial money.Money, target *money.Money, err error) {
-	if initial, err = money.FromInput(a.InitialBalance, unit); err != nil {
-		return money.Money{}, nil, err
-	}
-	target, err = money.FromNullInput(a.TargetAmount, unit)
-	return initial, target, err
-}
+func isServiceType(typ string) bool { return typ == "debt" || typ == "space" }
 
+// Delete removes an account that has no payments. A debt is deleted by Debts.
 func (s Accounts) Delete(ctx context.Context, id int64) error {
-	if s.repo().CountAccountTransactions(ctx, id) > 0 {
+	if a, err := s.ByID(ctx, id); err == nil && a != nil && a.IsService {
+		return ErrServiceAccount
+	}
+	if s.repo().CountAccountPayments(ctx, id) > 0 {
 		return fmt.Errorf("has transactions")
 	}
 	return s.repo().DeleteAccount(ctx, id)
@@ -216,36 +268,9 @@ func (s Accounts) total(ctx context.Context, accts []Account, base Currency, asO
 	return sum
 }
 
-func (s Accounts) list(ctx context.Context, f repo.AccountFilter) ([]Account, error) {
-	rows, err := s.repo().Accounts(ctx, f)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]Account, len(rows))
-	for i, r := range rows {
-		out[i] = accountFrom(r)
-		if out[i].Balance, err = s.Balance(ctx, out[i], ""); err != nil {
-			return nil, err
-		}
-	}
-	return out, nil
-}
-
-// Balance is the account's balance at the end of asOf ("" for now). A debt's
-// balance is what is still owed; it does not depend on the date.
+// Balance is the account's balance at the end of asOf ("" for now): the opening
+// balance plus its payments, whatever the account is.
 func (s Accounts) Balance(ctx context.Context, a Account, asOf string) (money.Money, error) {
-	unit := a.Currency.Unit()
-	if a.Type == "debt" {
-		paid, err := s.repo().DebtPaid(ctx, a.ID)
-		if err != nil {
-			return money.Money{}, err
-		}
-		target := money.Zero(unit)
-		if a.TargetAmount != nil {
-			target = *a.TargetAmount
-		}
-		return target.Sub(money.New(paid, unit)), nil
-	}
 	deltas, err := s.deltas(ctx, a, asOf)
 	if err != nil {
 		return money.Money{}, err
@@ -263,13 +288,6 @@ func (s Accounts) BalanceSeries(ctx context.Context, a Account, dates []string) 
 	out := make([]money.Money, len(dates))
 	if len(dates) == 0 {
 		return out, nil
-	}
-	if a.Type == "debt" {
-		bal, err := s.Balance(ctx, a, "")
-		for i := range out {
-			out[i] = bal
-		}
-		return out, err
 	}
 	deltas, err := s.deltas(ctx, a, dates[len(dates)-1])
 	if err != nil {
@@ -332,9 +350,8 @@ func (s Accounts) Unit(ctx context.Context, accountID int64) (money.Unit, error)
 func accountFrom(r repo.Account) Account {
 	cur := currencyFrom(r.Currency)
 	return Account{
-		ID: r.ID, Name: r.Name, Type: r.Type, CurrencyID: r.Currency.ID, InitialBalance: r.InitialBalance,
-		IsActive: r.IsActive, SortOrder: r.SortOrder, DebtType: r.DebtType, TargetAmount: r.TargetAmount,
-		DueDate: r.DueDate, IsPaidOff: r.IsPaidOff, Counterparty: r.Counterparty, DebtDesc: r.DebtDesc,
-		CreatedAt: r.CreatedAt, Currency: &cur,
+		ID: r.ID, Name: r.Name, Type: r.Type, IsService: r.IsService, CurrencyID: r.Currency.ID,
+		InitialBalance: r.InitialBalance, IsActive: r.IsActive, SortOrder: r.SortOrder, CreatedAt: r.CreatedAt,
+		Currency: &cur,
 	}
 }

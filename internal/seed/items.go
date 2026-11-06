@@ -5,12 +5,12 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	ledgerrepo "savvy-go/internal/db/repo/ledger"
 	"savvy-go/internal/ledger"
-	"savvy-go/internal/money"
 )
 
-func (s *seeder) seedTransactionItems() error {
+// seedSplitLines splits about a tenth of the demo's expenses into several
+// lines of the same category, each noting what it was for.
+func (s *seeder) seedSplitLines() error {
 	if len(s.expenses) == 0 {
 		return nil
 	}
@@ -29,67 +29,44 @@ func (s *seeder) seedTransactionItems() error {
 		if catName == "" {
 			catName = "#OTHER"
 		}
-		items := s.randomItems(cand.amount, catName)
-		cents := money.Unit{Decimals: 2} // the demo prices items in cents
-		lines := make([]ledgerrepo.NewTxItem, len(items))
-		for i, it := range items {
-			lines[i] = ledgerrepo.NewTxItem{
-				Name: it.Name, Quantity: it.Quantity,
-				PricePerUnit: money.FromDecimal(it.PricePerUnit, cents), TotalPrice: money.FromDecimal(it.TotalPrice, cents),
-			}
+		lines := s.randomLines(cand.amount, catName, cand.catID)
+		if len(lines) < 2 {
+			continue
 		}
-		if err := (ledgerrepo.Repo{DB: s.db}).InsertItems(s.ctx, cand.id, lines, s.now.UTC()); err != nil {
+		if _, err := s.txs.Update(s.ctx, cand.id, ledger.TxInput{Lines: lines}); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (s *seeder) randomItems(amount float64, category string) []ledger.TxItemInput {
+// randomLines splits amount into two to six lines of whole cents that add up to
+// it, each noted with something from the category's catalogue.
+func (s *seeder) randomLines(amount float64, category string, catID *int64) []ledger.LineInput {
 	catalog := catalogs[category]
 	if len(catalog) == 0 {
 		catalog = catalogs["#OTHER"]
 	}
 	remainingCents := int(math.Round(amount * 100))
-	if remainingCents < 1 {
+	maxLines := minInt(6, minInt(len(catalog), remainingCents))
+	if maxLines < 2 {
 		return nil
-	}
-	maxItems := minInt(6, minInt(len(catalog), remainingCents))
-	count := 1
-	if maxItems > 1 {
-		count = s.mtRand(2, maxItems)
 	}
 	names := append([]string{}, catalog...)
 	s.rng.Shuffle(len(names), func(i, j int) { names[i], names[j] = names[j], names[i] })
-	names = names[:count]
+	names = names[:s.mtRand(2, maxLines)]
 
-	var items []ledger.TxItemInput
-	left := len(names)
-	for _, name := range names {
-		left--
-		canSplit := left > 0 && remainingCents > left
-		if !canSplit {
-			if remainingCents < 1 {
-				break
-			}
-			price := decimal.New(int64(remainingCents), -2)
-			items = append(
-				items,
-				ledger.TxItemInput{Name: name, Quantity: decimal.NewFromInt(1), PricePerUnit: price, TotalPrice: price},
-			)
-			break
+	var lines []ledger.LineInput
+	for i := range names {
+		left := len(names) - i - 1
+		cents := remainingCents
+		if left > 0 {
+			maxShare := remainingCents - left
+			cents = maxInt(1, (maxShare*s.mtRand(25, 55))/100)
 		}
-		maxShare := remainingCents - left
-		qty := s.mtRand(1, minInt(3, maxShare))
-		share := maxInt(qty, (maxShare*s.mtRand(25, 55))/100)
-		lineCents := (share / qty) * qty
-		lineCents = maxInt(qty, minInt(lineCents, (maxShare/qty)*qty))
-		remainingCents -= lineCents
-		items = append(items, ledger.TxItemInput{
-			Name: name, Quantity: decimal.NewFromInt(int64(qty)),
-			PricePerUnit: decimal.New(int64(lineCents/qty), -2),
-			TotalPrice:   decimal.New(int64(lineCents), -2),
-		})
+		remainingCents -= cents
+		note := names[i]
+		lines = append(lines, ledger.LineInput{CategoryID: catID, Amount: decimal.New(int64(cents), -2), Note: &note})
 	}
-	return items
+	return lines
 }

@@ -54,9 +54,50 @@ From a script, the body is `{"name": "Budget bot", "preset": "editor", "space_id
 
 **Synced spaces.** Categories and tags of spaces in a [sync group](spaces.md) are mirrored into the group's other spaces. Changing them with a token needs a token that reaches every space of the group, and you must be allowed to edit each of them; otherwise the request answers `403` and nothing is changed. Tokens cannot create or change sync groups. The token form warns you when the spaces you chose are in a sync group, and names the spaces the token would not reach. Tokens cannot manage users, identity providers, passwords, 2FA, passkeys, API tokens, settings, backups, invitations or space administration, whatever they hold. Revoke a token in the same screen to cut an app off at once. To give an app more or less later, press the pencil next to the token: you can change its spaces and what it may do without creating a new token, and the app keeps its secret. A change applies from the app's next request.
 
+## Transactions
+
+A transaction is one event with the **payments** that moved the money and the **lines** that say what it was for.
+
+```json
+{
+  "type": "expense",
+  "date": "2026-11-02",
+  "description": "Souvenirs",
+  "payments": [
+    {"account_id": 1, "amount": "-50.00"},
+    {"account_id": 4, "amount": "11.50"}
+  ],
+  "lines": [
+    {"category_id": 7, "currency_id": 2, "amount": "40.00", "note": "magnets"}
+  ],
+  "tag_ids": [3]
+}
+```
+
+- A payment is money that moved on one account, signed, in that account's currency: an expense takes money (negative), an income brings it (positive), and change is a payment of the opposite sign on another account, often in another currency. An account appears once. A payment of zero is refused.
+- A line is an amount for a category: positive, in one of the currencies of the payment accounts (`currency_id` can be left out when they share one), in a category of the transaction's type. An income or expense needs at least one line, and a transfer may have fee lines in expense categories. Reports read lines only, so change is never income.
+- The database does not tie payments to lines. When you save, the API converts both to the base currency at the current rates and answers `difference` (payments less lines) if they disagree. It never refuses the save for that.
+- Debt and space accounts cannot be paid directly: a debt moves through the debts endpoints, a space account through a transfer to another space.
+- Keys the API does not know are refused, so a client sending the flat shape of earlier versions (`account_id`, `amount`, `items`) gets a `422`.
+
+An answer carries `payments`, `lines`, `amount` (what the payments net to, `null` when they span several currencies), `actions` (`edit`, `editDetails`, `delete`, `duplicate`, `confirm`, `skip`) and `restrictions`, the reasons a transaction cannot be changed freely:
+
+| Reason | Meaning | Allowed |
+|---|---|---|
+| `debt` | a payment on a debt account | details only (description, tags, notes) |
+| `space_transfer` | one side of a transfer between spaces | everything except its space payment, the paired payment and the date |
+| `transfer_review` | that transfer is in review | nothing |
+| `recurring_pending` | the open occurrence of a recurring rule | confirm or skip |
+
+`POST /transactions/{id}/confirm` takes an optional `date`; for the open occurrence of a recurring rule it may also take `payments` and `lines` with the real amounts. Confirming or skipping an occurrence makes the rule's next one.
+
+### Recurring rules
+
+A rule is `{"template": {...}, "schedule": {...}, "is_active": true}`. The template is a transaction exactly as above, except that the amount of **one** payment may be `null` (and `"estimated": true`): each occurrence then takes whatever balances the others at that day's rates, which covers a transfer between currencies. The schedule is `{"frequency": "monthly", "interval": 1, "day_of_month": 5, "start": "2026-12-05", "end": null}`. A rule with a template that stops working (an account was deleted) stops, with the reason in `error`; saving it again clears the error.
+
 ## Updates
 
-`PATCH` changes only the fields it sends: omitted fields keep their values, and an explicit `null` clears an optional field such as a description or an end date.
+`PATCH` changes only the fields it sends: omitted fields keep their values, and an explicit `null` clears an optional field such as a description or an end date. On a transaction, `payments` and `lines` are replaced as a whole when sent.
 
 ## Reference
 

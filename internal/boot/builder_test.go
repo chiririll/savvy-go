@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"savvy-go/internal/appconfig"
-	"savvy-go/internal/firstrun"
+	"savvy-go/internal/auth/firstrun"
 	"savvy-go/internal/locator"
 	"savvy-go/internal/signing"
 	"savvy-go/internal/store"

@@ -12,6 +12,7 @@ import (
 	"savvy-go/internal/db/filter"
 	authrepo "savvy-go/internal/db/repo/auth"
 	"savvy-go/internal/ledger"
+	"savvy-go/internal/money"
 	"savvy-go/internal/store"
 	"savvy-go/internal/uploads"
 )
@@ -202,15 +203,17 @@ func TestExecuteCreatesConfirmedTransactionsAccountCurrency(t *testing.T) {
 		byDesc[*tx.Description] = tx
 	}
 	coffee, salary := byDesc["Coffee"], byDesc["Salary"]
-	if coffee.Type != "expense" || coffee.Amount.Decimal().String() != "12.5" || coffee.Status != "confirmed" ||
-		coffee.AccountID != e.usdAcct.ID {
+	amount := func(tx ledger.Transaction) money.Money { m, _ := tx.Amount(); return m }
+	if coffee.Type != "expense" || amount(coffee).Decimal().String() != "12.5" || coffee.Status != "confirmed" ||
+		len(coffee.Payments) != 1 || coffee.Payments[0].AccountID != e.usdAcct.ID ||
+		len(coffee.Lines) != 1 || coffee.Lines[0].Amount.Decimal().String() != "12.5" {
 		t.Errorf("coffee %+v", coffee)
 	}
-	if salary.Type != "income" || salary.Amount.Decimal().String() != "2000" {
+	if salary.Type != "income" || amount(salary).Decimal().String() != "2000" {
 		t.Errorf("salary %+v", salary)
 	}
-	if byDesc["Gum"].Amount.Minor() != 99 {
-		t.Errorf("gum is 99 cents: %d", byDesc["Gum"].Amount.Minor())
+	if amount(byDesc["Gum"]).Minor() != 99 {
+		t.Errorf("gum is 99 cents: %d", amount(byDesc["Gum"]).Minor())
 	}
 }
 
@@ -243,7 +246,8 @@ func TestDifferentAmountsBelowCentNotDuplicates(t *testing.T) {
 	}
 	var total decimal.Decimal
 	for _, tx := range e.transactions(t) {
-		total = total.Add(tx.Amount.Decimal())
+		amount, _ := tx.Amount()
+		total = total.Add(amount.Decimal())
 	}
 	if !total.Equal(dec("2.005004")) {
 		t.Errorf("total %s", total)
@@ -326,7 +330,7 @@ func TestExecuteResolvesCategoriesByUsersChoices(t *testing.T) {
 	}
 	got := map[string]*int64{}
 	for _, tx := range e.transactions(t) {
-		got[*tx.Description] = tx.CategoryID
+		got[*tx.Description] = tx.Lines[0].CategoryID
 	}
 	if got["a"] == nil || *got["a"] != food.ID {
 		t.Errorf("food: %v", got["a"])

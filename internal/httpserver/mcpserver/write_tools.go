@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -24,7 +25,7 @@ import (
 // clients use to decide whether to ask the user first.
 type writeTool struct {
 	name, title, desc string
-	method, path      string // path may use {space_id} and {id}
+	method, path      string // path may use {space_id}, {id} and {uuid}
 	destructive       bool
 	idempotent        bool
 }
@@ -54,6 +55,10 @@ func addWrite[In any](h Handler, srv *mcp.Server, t writeTool) {
 					path = strings.ReplaceAll(path, "{"+key+"}", strconv.FormatInt(int64(v.(float64)), 10))
 					delete(args, key)
 				}
+			}
+			if v, ok := args["uuid"].(string); ok {
+				path = strings.ReplaceAll(path, "{uuid}", url.PathEscape(v))
+				delete(args, "uuid")
 			}
 			var body []byte
 			if t.method != http.MethodDelete {
@@ -94,6 +99,12 @@ func (k writeSet) patch(name, title, desc, path string) writeTool {
 	return k.tool(name, title, desc, http.MethodPatch, path)
 }
 
+func (k writeSet) put(name, title, desc, path string) writeTool {
+	t := k.tool(name, title, desc, http.MethodPut, path)
+	t.idempotent = true
+	return t
+}
+
 func (k writeSet) del(name, title, desc, path string) writeTool {
 	t := k.tool(name, title, desc, http.MethodDelete, path)
 	t.destructive, t.idempotent = true, true
@@ -118,8 +129,12 @@ func (h Handler) addMCPWriteTools(srv *mcp.Server) map[string]mcpNeed {
 
 func (k writeSet) transactionTools() {
 	register[createTxArgs](k, k.post("create_transaction", "Create transaction",
-		"Record an income, expense or transfer between two accounts. The amount is in the account's currency; "+
-			"a transfer between accounts of different currencies also needs to_amount. Say which currency you used.",
+		"Record an income, expense or transfer between two accounts as payments (the money that moved, signed, "+
+			"each in its account's currency) and lines (what it was for, positive). A purchase paid with cash and card, "+
+			"or with euros and the change back in dinars, is one transaction with a payment per account. Say which "+
+			"currency you used. Payments are signed: an expense paid with 20 EUR and 10 EUR back in change has payments "+
+			"of -20 and +10; a transfer has a negative payment and a positive one. Lines are positive and add up to "+
+			"what the payments net to. The answer's difference field is not null when they disagree.",
 		"transactions"))
 	register[updateTxArgs](k, k.patch("update_transaction", "Update transaction",
 		"Change a transaction. Send only the fields that change.", "transactions/{id}"))

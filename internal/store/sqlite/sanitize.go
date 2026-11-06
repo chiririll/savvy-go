@@ -6,12 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 
 	"savvy-go/internal/db"
 	"savvy-go/internal/migrate"
+	"savvy-go/internal/migrate/upgrade"
 	"savvy-go/internal/store"
 )
 
@@ -24,19 +24,6 @@ import (
 // and a foreign key check then validate the data.
 
 var errNotSQLite = errors.New("not a readable SQLite database")
-
-// srcURI is the read-only URI of a source file for ATTACH.
-func srcURI(path string) string {
-	abs, err := filepath.Abs(path)
-	if err != nil {
-		abs = path
-	}
-	abs = filepath.ToSlash(abs)
-	if !strings.HasPrefix(abs, "/") {
-		abs = "/" + abs
-	}
-	return "file:" + abs + "?mode=ro"
-}
 
 // sourceKind classifies a database file. Go keeps the server and every space
 // in separate files, so a file holding everything is a Laravel one.
@@ -53,6 +40,9 @@ const (
 // by a newer app.
 func knownVersions() map[string]bool {
 	known := map[string]bool{}
+	for _, v := range upgrade.Versions() {
+		known[v] = true
+	}
 	for _, set := range []migrate.Set{migrate.Server, migrate.Space} {
 		names, _ := set.Versions()
 		for _, n := range names {
@@ -129,7 +119,7 @@ func attachSource(ctx context.Context, conn store.DB, path string) error {
 	if _, err := os.Stat(path); err != nil {
 		return err
 	}
-	if _, err := conn.ExecContext(ctx, `ATTACH DATABASE ? AS src`, srcURI(path)); err != nil {
+	if _, err := conn.ExecContext(ctx, `ATTACH DATABASE ? AS src`, db.ReadOnlyURI(path)); err != nil {
 		return errNotSQLite
 	}
 	var result string
@@ -179,15 +169,44 @@ func quoteIdent(s string) string { return `"` + strings.ReplaceAll(s, `"`, `""`)
 
 // sanitize creates dst with the migrations of set and copies into it the
 // rows of src that fit: tables of the set only, columns both have. Nothing of
-// src's schema runs.
+// src's schema runs. A space file of an old release is first sanitized into a
+// file of that release made by us and then converted (internal/migrate/upgrade):
+// copying its columns into the current tables would leave them half empty
+// without an error.
 func sanitize(ctx context.Context, src, dst string, set migrate.Set) error {
+	if set == migrate.Space {
+		if need, err := upgrade.Needed(ctx, src); err == nil && need {
+			return sanitizeOld(ctx, src, dst)
+		}
+	}
+	return sanitizeWith(ctx, src, dst, set, set.Up)
+}
+
+func sanitizeOld(ctx context.Context, src, dst string) error {
+	hop, err := upgrade.Find(ctx, src)
+	if err != nil {
+		return err
+	}
+	if hop == nil {
+		return upgrade.ErrUnknownSchema
+	}
+	clean := dst + ".old"
+	defer removeFiles(clean)
+	if err := sanitizeWith(ctx, src, clean, migrate.Space, hop.Apply); err != nil {
+		return err
+	}
+	removeFiles(dst)
+	return upgrade.Convert(ctx, clean, dst)
+}
+
+func sanitizeWith(ctx context.Context, src, dst string, set migrate.Set, prepare Migrate) error {
 	removeFiles(dst)
 	fresh, err := db.Open(dst)
 	if err != nil {
 		return err
 	}
 	defer fresh.Close()
-	if err := set.Up(ctx, fresh); err != nil {
+	if err := prepare(ctx, fresh); err != nil {
 		return fmt.Errorf("prepare schema: %w", err)
 	}
 	for _, pragma := range []string{`PRAGMA trusted_schema = OFF`, `PRAGMA foreign_keys = OFF`} {

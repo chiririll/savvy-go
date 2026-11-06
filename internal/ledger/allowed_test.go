@@ -1,59 +1,60 @@
 package ledger
 
 import (
+	"errors"
 	"testing"
 
 	"savvy-go/internal/money"
 )
 
+// The restriction matrix of docs/plans/transactions-erd.md: what may be done to
+// a transaction follows from its status and the reasons derived from its data.
 func TestTransactionAllowed(t *testing.T) {
-	id := int64(7)
 	cases := []struct {
-		name string
-		tx   Transaction
-		want TxActions
+		name    string
+		status  string
+		reasons []Reason
+		want    TxActions
 	}{
-		{
-			"confirmed",
-			Transaction{Type: "expense", Status: "confirmed"},
-			TxActions{Edit: true, Delete: true, Duplicate: true},
-		},
-		{
-			"pending",
-			Transaction{Type: "expense", Status: "pending"},
-			TxActions{Edit: true, Delete: true, Duplicate: true, Confirm: true},
-		},
-		{
-			"pending recurring",
-			Transaction{Type: "expense", Status: "pending", RecurringID: &id},
-			TxActions{Confirm: true, Skip: true},
-		},
-		{
-				"confirmed recurring",
-				Transaction{Type: "expense", Status: "confirmed", RecurringID: &id},
-				TxActions{Edit: true, Delete: true, Duplicate: true},
-			},
-			{"skipped recurring", Transaction{Type: "expense", Status: "skipped", RecurringID: &id}, TxActions{Delete: true}},
-		{"skipped", Transaction{Type: "expense", Status: "skipped"}, TxActions{Delete: true}},
-		{"transfer out", Transaction{Type: "transfer_out", Status: "confirmed"}, TxActions{}},
-		{"transfer in", Transaction{Type: "transfer_in", Status: "pending"}, TxActions{}},
+		{"confirmed", "confirmed", nil, TxActions{Edit: true, Delete: true, Duplicate: true, EditDetails: true}},
+		{"pending by hand", "pending", nil,
+			TxActions{Edit: true, Delete: true, Duplicate: true, Confirm: true, EditDetails: true}},
+		{"pending occurrence", "pending", []Reason{ReasonRecurringPending}, TxActions{Confirm: true, Skip: true}},
+		{"skipped", "skipped", nil, TxActions{Delete: true}},
+		{"space transfer", "confirmed", []Reason{ReasonSpaceTransfer}, TxActions{Edit: true, EditDetails: true}},
+		{"space transfer in review", "confirmed", []Reason{ReasonSpaceTransfer, ReasonTransferReview}, TxActions{}},
+		{"debt", "confirmed", []Reason{ReasonDebt}, TxActions{EditDetails: true}},
+		{"a reason nobody mapped", "confirmed", []Reason{"unknown"}, TxActions{}},
 	}
 	for _, c := range cases {
-		if got := c.tx.Allowed(); got != c.want {
+		got := Transaction{Type: "expense", Status: c.status, Reasons: c.reasons}.Allowed()
+		if got != c.want {
 			t.Errorf("%s: Allowed() = %+v, want %+v", c.name, got, c.want)
 		}
 	}
 }
 
+func TestRefusalNamesTheReason(t *testing.T) {
+	tx := Transaction{Status: "confirmed", Reasons: []Reason{ReasonDebt}}
+	err := tx.refuse("edit")
+	var re *RestrictedError
+	if !errors.Is(err, ErrRestricted) || !errors.As(err, &re) || re.Reason != ReasonDebt {
+		t.Fatalf("refuse = %v, want a restriction by %q", err, ReasonDebt)
+	}
+	if tx.refuse("edit_details") != nil {
+		t.Error("a debt transaction can be described")
+	}
+}
+
 var testUnit = money.Unit{ID: 1, Decimals: 2}
 
-func debtAccount(target *int64, balance int64) Account {
-	a := Account{Balance: money.New(balance, testUnit)}
-	if target != nil {
-		m := money.New(*target, testUnit)
-		a.TargetAmount = &m
+// debtOwing is a debt I owe: its balance is minus what is still to be paid.
+func debtOwing(principal *int64, owed int64) Debt {
+	d := Debt{Account: Account{Balance: money.New(-owed, testUnit)}, Direction: DebtIOwe, Principal: money.Zero(testUnit)}
+	if principal != nil {
+		d.Principal = money.New(*principal, testUnit)
 	}
-	return a
+	return d
 }
 
 func TestPaymentProgress(t *testing.T) {
@@ -73,16 +74,17 @@ func TestPaymentProgress(t *testing.T) {
 		{"no target", nil, 5000, 0},
 	}
 	for _, c := range cases {
-		if got := debtAccount(c.target, c.balance).PaymentProgress(); got != c.want {
+		if got := debtOwing(c.target, c.balance).PaymentProgress(); got != c.want {
 			t.Errorf("%s: PaymentProgress() = %v, want %v", c.name, got, c.want)
 		}
 	}
 }
 
-func TestDebtTargetWithoutCurrencyNotPanic(t *testing.T) {
-	a := Account{Balance: money.New(500, testUnit)} // Currency is nil
-	if got := a.DebtTarget(); !got.IsZero() || got.Unit() != testUnit {
-		t.Fatalf("DebtTarget() = %+v", got)
+func TestOwedFollowsDirection(t *testing.T) {
+	owe := Debt{Account: Account{Balance: money.New(-500, testUnit)}, Direction: DebtIOwe}
+	owed := Debt{Account: Account{Balance: money.New(500, testUnit)}, Direction: DebtOwedToMe}
+	if owe.Owed().Minor() != 500 || owed.Owed().Minor() != 500 {
+		t.Fatalf("owed %d and %d, want 500 both", owe.Owed().Minor(), owed.Owed().Minor())
 	}
 }
 

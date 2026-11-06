@@ -48,7 +48,7 @@ func debtsStore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d, err := httpx.Scope(r).Debts.Create(r.Context(), ledger.DebtInput{
-		Name: body.Name, DebtType: body.DebtType, CurrencyID: body.CurrencyID, AccountID: body.AccountID,
+		Name: body.Name, Direction: body.DebtType, CurrencyID: body.CurrencyID, AccountID: body.AccountID,
 		Amount: body.Amount, Date: body.Date, Origin: body.Origin,
 		DueDate: body.DueDate, Counterparty: body.Counterparty, Description: body.Description,
 	})
@@ -73,7 +73,7 @@ func debtsUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Decoded over the stored debt (fields the body leaves out keep their values).
-	in := cur.Input()
+	in := cur.Edit()
 	var body struct {
 		Name         string           `json:"name"`
 		DebtType     *string          `json:"debt_type"`
@@ -83,16 +83,22 @@ func debtsUpdate(w http.ResponseWriter, r *http.Request) {
 		Counterparty *string          `json:"counterparty"`
 		Description  *string          `json:"description"`
 	}
-	body.Name, body.DebtType, body.CurrencyID = in.Name, httpx.Clone(in.DebtType), in.CurrencyID
-	body.Amount, body.DueDate = httpx.Clone(in.TargetAmount), httpx.Clone(in.DueDate)
-	body.Counterparty, body.Description = httpx.Clone(in.Counterparty), httpx.Clone(in.DebtDesc)
+	body.Name, body.DebtType, body.CurrencyID = in.Name, &in.Direction, in.CurrencyID
+	body.Amount, body.DueDate = &in.Principal, httpx.Clone(in.DueDate)
+	body.Counterparty, body.Description = httpx.Clone(in.Counterparty), httpx.Clone(in.Note)
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		httpx.WriteValidation(w, map[string][]string{"name": {"The given data was invalid."}})
 		return
 	}
-	in.Name, in.DebtType, in.CurrencyID, in.TargetAmount = body.Name, body.DebtType, body.CurrencyID, body.Amount
-	in.DueDate, in.Counterparty, in.DebtDesc = body.DueDate, body.Counterparty, body.Description
-	updated, err := httpx.Scope(r).Accounts.Update(r.Context(), cur.ID, in)
+	in.Name, in.CurrencyID = body.Name, body.CurrencyID
+	if body.DebtType != nil {
+		in.Direction = *body.DebtType
+	}
+	if body.Amount != nil {
+		in.Principal = *body.Amount
+	}
+	in.DueDate, in.Counterparty, in.Note = body.DueDate, body.Counterparty, body.Description
+	updated, err := httpx.Scope(r).Debts.Update(r.Context(), cur.ID, in)
 	if err != nil {
 		httpx.WriteAccountError(w, err)
 		return
@@ -170,10 +176,10 @@ func debtsSummary(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, dto.NewDebtSummary(httpx.Scope(r).Debts.Summary(r.Context())))
 }
 
-func debtParam(w http.ResponseWriter, r *http.Request) *ledger.Account {
+func debtParam(w http.ResponseWriter, r *http.Request) *ledger.Debt {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	a, _ := httpx.Scope(r).Accounts.ByID(r.Context(), id)
-	if a == nil || a.Type != "debt" {
+	a, _ := httpx.Scope(r).Debts.ByID(r.Context(), id)
+	if a == nil {
 		httpx.WriteMessage(w, http.StatusNotFound, "Not a debt.")
 		return nil
 	}

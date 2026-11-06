@@ -2,9 +2,11 @@
 package transactions
 
 import (
+	"bytes"
 	_ "embed"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/url"
 	"savvy-go/internal/httpserver/httpx"
@@ -14,8 +16,7 @@ import (
 	"savvy-go/internal/db/filter"
 	"savvy-go/internal/httpserver/httpx/dto"
 	"savvy-go/internal/ledger"
-
-	"github.com/shopspring/decimal"
+	"savvy-go/internal/store"
 )
 
 func transactionsIndex(w http.ResponseWriter, r *http.Request) {
@@ -81,7 +82,7 @@ func int64List(q url.Values, key string) []int64 {
 }
 
 func transactionsStore(w http.ResponseWriter, r *http.Request) {
-	in, ok := decodeTx(w, r, nil)
+	in, ok := decodeTx(w, r)
 	if !ok {
 		return
 	}
@@ -93,6 +94,7 @@ func transactionsStore(w http.ResponseWriter, r *http.Request) {
 	if tx.Status == "confirmed" {
 		httpx.Scope(r).Automation.Process(r.Context(), "on_transaction_create", tx)
 		if fresh, e := httpx.Scope(r).Txs.ByID(r.Context(), tx.ID); e == nil && fresh != nil {
+			fresh.Difference = tx.Difference // only a save knows it
 			tx = fresh
 		}
 	}
@@ -112,7 +114,7 @@ func transactionsUpdate(w http.ResponseWriter, r *http.Request) {
 	if cur == nil {
 		return
 	}
-	in, ok := decodeTx(w, r, cur)
+	in, ok := decodeTx(w, r)
 	if !ok {
 		return
 	}
@@ -124,6 +126,7 @@ func transactionsUpdate(w http.ResponseWriter, r *http.Request) {
 	if tx.Status == "confirmed" {
 		httpx.Scope(r).Automation.Process(r.Context(), "on_transaction_update", tx)
 		if fresh, e := httpx.Scope(r).Txs.ByID(r.Context(), tx.ID); e == nil && fresh != nil {
+			fresh.Difference = tx.Difference // only a save knows it
 			tx = fresh
 		}
 	}
@@ -136,14 +139,32 @@ func transactionsDestroy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := httpx.Scope(r).Txs.Delete(r.Context(), tx.ID); err != nil {
-		if errors.Is(err, ledger.ErrTransferRow) {
-			httpx.WriteMessage(w, 422, err.Error())
-			return
-		}
-		httpx.WriteMessage(w, 422, "Scheduled occurrences cannot be deleted. Skip or confirm them instead.")
+		httpx.WriteMessage(w, 422, err.Error())
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// settle runs fn, which confirms or skips an occurrence, and makes the next
+// occurrence of its rule in the same database transaction, so a crash between
+// the two leaves neither.
+func settle(r *http.Request, id int64, fn func(ledger.Transactions) (*ledger.Transaction, error)) (*ledger.Transaction, error) {
+	scope := httpx.Scope(r)
+	var out *ledger.Transaction
+	err := store.Tx(r.Context(), scope.DB, func(d store.DB) error {
+		var err error
+		if out, err = fn(scope.Txs.On(d)); err != nil {
+			return err
+		}
+		recur := scope.Recurring
+		recur.DB = d // read the rule inside the same database transaction
+		rule, err := recur.RuleOf(r.Context(), id)
+		if err != nil || rule == 0 {
+			return err
+		}
+		return recur.AdvanceAfterOccurrence(r.Context(), d, rule)
+	})
+	return out, err
 }
 
 func transactionsConfirm(w http.ResponseWriter, r *http.Request) {
@@ -152,22 +173,24 @@ func transactionsConfirm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Date     *string          `json:"date"`
-		Amount   *decimal.Decimal `json:"amount"`
-		ToAmount *decimal.Decimal `json:"to_amount"`
+		Date     *string               `json:"date"`
+		Payments []ledger.PaymentInput `json:"payments"`
+		Lines    []ledger.LineInput    `json:"lines"`
 	}
-	_ = json.NewDecoder(r.Body).Decode(&body)
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil && !errors.Is(err, io.EOF) {
+		httpx.WriteValidation(w, map[string][]string{"body": {"The given data was invalid."}})
+		return
+	}
 	date := ""
 	if body.Date != nil {
 		date = *body.Date
 	}
-	out, err := httpx.Scope(r).Txs.Confirm(r.Context(), tx.ID, date, body.Amount, body.ToAmount)
+	out, err := settle(r, tx.ID, func(txs ledger.Transactions) (*ledger.Transaction, error) {
+		return txs.Confirm(r.Context(), tx.ID, date, &ledger.Amendment{Payments: body.Payments, Lines: body.Lines})
+	})
 	if err != nil {
 		httpx.WriteMessage(w, 422, err.Error())
 		return
-	}
-	if out.RecurringID != nil {
-		_ = httpx.Scope(r).Recurring.AdvanceAfterOccurrence(r.Context(), *out.RecurringID)
 	}
 	httpx.Scope(r).Automation.Process(r.Context(), "on_transaction_create", out)
 	if fresh, e := httpx.Scope(r).Txs.ByID(r.Context(), out.ID); e == nil && fresh != nil {
@@ -176,22 +199,37 @@ func transactionsConfirm(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteData(w, http.StatusOK, dto.NewTransaction(*out))
 }
 
+// transactionsReorder sets the order of transactions within one day. ids go
+// oldest first, whichever way the client lists them.
+func transactionsReorder(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Date string  `json:"date"`
+		IDs  []int64 `json:"ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Date == "" || len(body.IDs) == 0 {
+		httpx.WriteValidation(w, map[string][]string{
+			"ids": {"The date and ids fields are required."},
+		})
+		return
+	}
+	if err := httpx.Scope(r).Txs.Reorder(r.Context(), body.Date, body.IDs); err != nil {
+		httpx.WriteMessage(w, 422, err.Error())
+		return
+	}
+	httpx.WriteSuccess(w)
+}
+
 func transactionsSkip(w http.ResponseWriter, r *http.Request) {
 	tx := txParam(w, r)
 	if tx == nil {
 		return
 	}
-	out, err := httpx.Scope(r).Txs.Skip(r.Context(), tx.ID)
+	out, err := settle(r, tx.ID, func(txs ledger.Transactions) (*ledger.Transaction, error) {
+		return txs.Skip(r.Context(), tx.ID)
+	})
 	if err != nil {
-		if errors.Is(err, ledger.ErrTransferRow) {
-			httpx.WriteMessage(w, 422, err.Error())
-			return
-		}
-		httpx.WriteMessage(w, 422, "Only a pending scheduled transaction can be skipped.")
+		httpx.WriteMessage(w, 422, err.Error())
 		return
-	}
-	if out.RecurringID != nil {
-		_ = httpx.Scope(r).Recurring.AdvanceAfterOccurrence(r.Context(), *out.RecurringID)
 	}
 	httpx.WriteData(w, http.StatusOK, dto.NewTransaction(*out))
 }
@@ -221,55 +259,29 @@ func txParam(w http.ResponseWriter, r *http.Request) *ledger.Transaction {
 	return httpx.Lookup(w, r, httpx.Scope(r).Txs.ByID)
 }
 
-// decodeTx reads a transaction from the body; on update, over base: fields
-// the body leaves out keep their values. Items and tags left out are kept by the update itself.
-func decodeTx(w http.ResponseWriter, r *http.Request, base *ledger.Transaction) (ledger.TxInput, bool) {
-	var body struct {
-		Type        string           `json:"type"`
-		AccountID   int64            `json:"account_id"`
-		ToAccountID *int64           `json:"to_account_id"`
-		CategoryID  *int64           `json:"category_id"`
-		Amount      decimal.Decimal  `json:"amount"`
-		ToAmount    *decimal.Decimal `json:"to_amount"`
-		IsEstimated bool             `json:"is_estimated"`
-		Description *string          `json:"description"`
-		Date        *string          `json:"date"`
-		TagIDs      []int64          `json:"tag_ids"`
-		Items       []struct {
-			Name         string          `json:"name"`
-			Quantity     decimal.Decimal `json:"quantity"`
-			PricePerUnit decimal.Decimal `json:"price_per_unit"`
-		} `json:"items"`
+// decodeTx reads a transaction from the body: type, description, date,
+// payments (account_id, amount), lines (category_id, currency_id, amount,
+// note) and tag_ids. On update, what the body leaves out is kept. A key the
+// API does not know is refused, so a client still sending the flat shape of
+// older versions (account_id, amount, items) is told instead of ignored.
+func decodeTx(w http.ResponseWriter, r *http.Request) (ledger.TxInput, bool) {
+	data, err := io.ReadAll(r.Body)
+	var in ledger.TxInput
+	if err == nil {
+		dec := json.NewDecoder(bytes.NewReader(data))
+		dec.DisallowUnknownFields()
+		err = dec.Decode(&in)
 	}
-	if base != nil {
-		body.Type, body.AccountID, body.ToAccountID = base.Type, base.AccountID, httpx.Clone(base.ToAccountID)
-		body.CategoryID, body.Amount = httpx.Clone(base.CategoryID), base.Amount.Decimal()
-		if base.ToAmount != nil {
-			toAmount := base.ToAmount.Decimal()
-			body.ToAmount = &toAmount
-		}
-		body.IsEstimated, body.Description, body.Date = base.IsEstimated, httpx.Clone(
-			base.Description,
-		), httpx.Clone(
-			base.Date,
-		)
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.AccountID == 0 {
-		httpx.WriteValidation(w, map[string][]string{"account_id": {"The account id field is required."}})
+	if err != nil {
+		httpx.WriteMessage(w, 422, "The given data was invalid: "+err.Error())
 		return ledger.TxInput{}, false
 	}
-	in := ledger.TxInput{
-		Type: body.Type, AccountID: body.AccountID, ToAccountID: body.ToAccountID,
-		CategoryID: body.CategoryID, Amount: body.Amount, ToAmount: body.ToAmount,
-		IsEstimated: body.IsEstimated, Description: body.Description, Date: body.Date,
-		TagIDs: body.TagIDs,
-	}
-	for _, it := range body.Items {
-		qty := it.Quantity
-		if qty.IsZero() {
-			qty = decimal.NewFromInt(1)
-		}
-		in.Items = append(in.Items, ledger.TxItemInput{Name: it.Name, Quantity: qty, PricePerUnit: it.PricePerUnit})
+	in.Status = nil // set by the date and by confirm, not by the client
+	// An explicit null clears the description; leaving it out keeps it.
+	var sent map[string]json.RawMessage
+	if json.Unmarshal(data, &sent) == nil && string(sent["description"]) == "null" {
+		blank := ""
+		in.Description = &blank
 	}
 	return in, true
 }

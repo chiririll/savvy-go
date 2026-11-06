@@ -10,6 +10,7 @@ import (
 
 	"savvy-go/internal/auth"
 	repo "savvy-go/internal/db/repo/spaces"
+	"savvy-go/internal/spacekeys"
 	"savvy-go/internal/store"
 )
 
@@ -56,6 +57,24 @@ func (s Service) stampUUID(ctx context.Context, id int64, uuid string) error {
 	return repo.Stamp{DB: spaceDB}.SetUUID(ctx, uuid)
 }
 
+// ensureKey gives a space its signing key when its file has none. With fresh
+// set the space is a copy that got a new uuid, so it must not sign with the
+// key of the space it was copied from: it gets a key of its own.
+func (s Service) ensureKey(ctx context.Context, id int64, fresh bool) error {
+	spaceDB, err := s.Store.Space(ctx, id)
+	if err != nil {
+		return err
+	}
+	return store.Tx(ctx, spaceDB, func(tx store.DB) error {
+		if fresh {
+			_, err := spacekeys.Rotate(ctx, tx)
+			return err
+		}
+		_, err := spacekeys.Current(ctx, tx)
+		return err
+	})
+}
+
 func ownerID(owner *auth.User) *int64 {
 	if owner == nil {
 		return nil
@@ -92,6 +111,10 @@ func (s Service) CreateWith(ctx context.Context, name string, owner *auth.User, 
 		return nil, fmt.Errorf("create space database: %w", err)
 	}
 	if err := s.stampUUID(ctx, id, id7.String()); err != nil {
+		s.Discard(ctx, id)
+		return nil, err
+	}
+	if err := s.ensureKey(ctx, id, false); err != nil {
 		s.Discard(ctx, id)
 		return nil, err
 	}
@@ -149,6 +172,9 @@ func (s Service) CreateFrom(
 		if err := s.stampUUID(ctx, id, id7); err != nil {
 			return nil, err
 		}
+	}
+	if err := s.ensureKey(ctx, id, id7 != p.UUID); err != nil {
+		return nil, err
 	}
 	sp := &Space{ID: id, UUID: id7, Name: name}
 	if owner != nil {

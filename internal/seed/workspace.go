@@ -23,6 +23,7 @@ type seeder struct {
 	rng      *rand.Rand
 	txs      ledger.Transactions
 	accts    ledger.Accounts
+	debts    ledger.Debts
 	cats     ledger.Categories
 	tags     ledger.Tags
 	budgets  ledger.Budgets
@@ -35,6 +36,7 @@ type expenseCand struct {
 	id      int64
 	amount  float64
 	catName string
+	catID   *int64
 }
 
 func seedWorkspace(ctx context.Context, db store.DB, now time.Time) (map[string]*ledger.Account, error) {
@@ -48,10 +50,11 @@ func seedWorkspace(ctx context.Context, db store.DB, now time.Time) (map[string]
 		rng:     rand.New(rand.NewSource(rngSeed)),
 		txs:     ledger.Transactions{DB: db},
 		accts:   ledger.Accounts{DB: db},
+		debts:   ledger.Debts{Accounts: ledger.Accounts{DB: db}, Transactions: ledger.Transactions{DB: db}},
 		cats:    ledger.Categories{DB: db},
 		tags:    ledger.Tags{DB: db},
 		budgets: ledger.Budgets{DB: db},
-		recur:   recurring.Service{DB: db, Txs: ledger.Transactions{DB: db}},
+		recur:   recurring.Service{DB: db, Ledger: func(d store.DB) recurring.Occurrences { return ledger.Templates{DB: d} }},
 		auto:    automation.Service{DB: db, Txs: ledger.Transactions{DB: db}},
 	}
 	curs := ledger.Currencies{DB: db}
@@ -82,7 +85,7 @@ func seedWorkspace(ctx context.Context, db store.DB, now time.Time) (map[string]
 	if err := s.createTransactions(accounts, expenses, incomes, tags); err != nil {
 		return nil, err
 	}
-	if err := s.seedTransactionItems(); err != nil {
+	if err := s.seedSplitLines(); err != nil {
 		return nil, err
 	}
 	if err := s.seedPending(accounts, expenses); err != nil {
@@ -111,7 +114,7 @@ type accountSpec struct {
 func (s *seeder) accountSpecs(usd, eur *ledger.Currency) []accountSpec {
 	mortgageDue := s.now.AddDate(25, 0, 0).Format("2006-01-02")
 	loanDue := s.now.AddDate(0, 4, 0).Format("2006-01-02")
-	zero, mortgageAmt, loanAmt := 0.0, 285000.00, 1200.00
+	cardAmt, mortgageAmt, loanAmt := 2400.00, 285000.00, 1200.00
 
 	specs := []accountSpec{
 		{key: "checking", name: "Chase Checking", typ: "bank", cur: usd, bal: 8200},
@@ -123,10 +126,8 @@ func (s *seeder) accountSpecs(usd, eur *ledger.Currency) []accountSpec {
 		specs = append(specs, accountSpec{key: "eur", name: "Revolut EUR", typ: "bank", cur: eur, bal: 1850})
 	}
 	return append(specs,
-		accountSpec{
-			key: "credit", name: "Amex Gold Card", typ: "debt", cur: usd, debtType: "i_owe", target: &zero,
-			counter: "American Express", desc: "Credit card balance",
-		},
+		// A credit card is an ordinary account that starts below zero.
+		accountSpec{key: "credit", name: "Amex Gold Card", typ: "bank", cur: usd, bal: -cardAmt},
 		accountSpec{
 			key: "mortgage", name: "Home Mortgage", typ: "debt", cur: usd, debtType: "i_owe", target: &mortgageAmt,
 			due: &mortgageDue, counter: "Wells Fargo Home Mortgage", desc: "30-year fixed mortgage",
@@ -141,21 +142,21 @@ func (s *seeder) accountSpecs(usd, eur *ledger.Currency) []accountSpec {
 func (s *seeder) createAccounts(usd *ledger.Currency, eur *ledger.Currency) (map[string]*ledger.Account, error) {
 	out := map[string]*ledger.Account{}
 	for _, sp := range s.accountSpecs(usd, eur) {
-		a := ledger.AccountInput{
+		if sp.debtType != "" {
+			d, err := s.debts.Create(s.ctx, ledger.DebtInput{
+				Name: sp.name, Direction: sp.debtType, CurrencyID: sp.cur.ID, Amount: decimal.NewFromFloat(*sp.target),
+				DueDate: sp.due, Counterparty: strPtr(sp.counter), Description: strPtr(sp.desc),
+			})
+			if err != nil {
+				return nil, fmt.Errorf("debt %s: %w", sp.name, err)
+			}
+			out[sp.key] = &d.Account
+			continue
+		}
+		created, err := s.accts.Create(s.ctx, ledger.AccountInput{
 			Name: sp.name, Type: sp.typ, CurrencyID: sp.cur.ID,
 			InitialBalance: decimal.NewFromFloat(sp.bal), IsActive: true,
-		}
-		if sp.debtType != "" {
-			a.DebtType = &sp.debtType
-			if sp.target != nil {
-				target := decimal.NewFromFloat(*sp.target)
-				a.TargetAmount = &target
-			}
-			a.DueDate = sp.due
-			a.Counterparty = strPtr(sp.counter)
-			a.DebtDesc = strPtr(sp.desc)
-		}
-		created, err := s.accts.Create(s.ctx, a)
+		})
 		if err != nil {
 			return nil, fmt.Errorf("account %s: %w", sp.name, err)
 		}
@@ -176,6 +177,9 @@ func (s *seeder) createTransactions(
 		return err
 	}
 	if err := s.seedVariableExpenses(accounts, expenses, tags); err != nil {
+		return err
+	}
+	if err := s.seedSplitPayments(accounts, expenses); err != nil {
 		return err
 	}
 	return s.seedTransfersDebt(accounts)

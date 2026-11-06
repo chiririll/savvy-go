@@ -23,7 +23,7 @@ func (s Service) Resolve(ctx context.Context, actor *auth.User, spaceID int64, i
 	if err != nil {
 		return err
 	}
-	if cur.Status != transferPending || cur.Review == nil {
+	if cur.Status != transferInReview || cur.Review == nil {
 		return ErrNotUnderReview
 	}
 	own, other, err := s.counterpart(ctx, spaceID, *cur)
@@ -61,7 +61,7 @@ func (s Service) authorizeResolve(
 	if err := s.requireEditor(ctx, actor, own.ID, other.ID); err != nil {
 		return err
 	}
-	if *cur.Review != reviewCreatedRemote && !verifyTransfer(s.Keys, cur) {
+	if *cur.Review != reviewCreatedRemote && !s.verify(ctx, cur) {
 		return ErrUnverified
 	}
 	return nil
@@ -100,7 +100,9 @@ func (s Service) rejectReview(
 		at := now()
 		next.DeletedAt = &at
 	}
-	signTransfer(s.Keys, &next)
+	if err := s.signWithSpaces(ctx, dbs, &next); err != nil {
+		return err
+	}
 	for _, sp := range []spaces.Space{own, other} {
 		if err := writeRecord(ctx, dbs[sp.ID], sp.UUID, next, "confirmed", nil, nil); err != nil {
 			return err
@@ -139,7 +141,9 @@ func (s Service) Trust(ctx context.Context, actor *auth.User, spaceID int64, id 
 		if err != nil {
 			return err
 		}
-		signTransfer(s.Keys, next)
+		if err := s.signWithSpaces(ctx, dbs, next); err != nil {
+			return err
+		}
 		for _, sid := range spaces {
 			if err := writeRecord(ctx, dbs[sid], byID[sid].UUID, *next, "confirmed", next.Review, next.Remote); err != nil {
 				return err

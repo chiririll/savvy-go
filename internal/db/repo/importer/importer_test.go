@@ -2,12 +2,14 @@ package importer_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/shopspring/decimal"
 
 	"savvy-go/internal/db/dbtest"
+	"savvy-go/internal/db/filter"
 	importerrepo "savvy-go/internal/db/repo/importer"
 	ledgerrepo "savvy-go/internal/db/repo/ledger"
 	"savvy-go/internal/money"
@@ -111,5 +113,49 @@ func TestRowsWithSameHashInsertedOnce(t *testing.T) {
 	}
 	if n := l.CountTransactions(ctx); n != 2 {
 		t.Fatalf("%d transactions", n)
+	}
+}
+
+func TestImportedRowIsOnePaymentAndOneLine(t *testing.T) {
+	d := dbtest.Space(t)
+	l := ledgerrepo.Repo{DB: d}
+	now := time.Now().UTC()
+	jpy, _ := l.InsertCurrency(
+		ctx,
+		ledgerrepo.Currency{Code: "JPY", Name: "Yen", Symbol: "Y", Decimals: 0, IsBase: true, Rate: decimal.NewFromInt(1)},
+		now,
+	)
+	acc, _ := l.InsertAccount(
+		ctx,
+		ledgerrepo.AccountFields{Name: "Yen", Type: "cash", CurrencyID: jpy, IsActive: true},
+		now,
+	)
+	cat, _ := l.InsertCategory(ctx, ledgerrepo.Category{Name: "Food", Type: "expense"}, now)
+
+	r := importerrepo.Repo{DB: d}
+	for _, row := range []importerrepo.Row{
+		{Type: "expense", AccountID: acc, CategoryID: &cat, Minor: 800, Date: "2026-02-01", Status: "confirmed", DedupHash: "a"},
+		{Type: "income", AccountID: acc, Minor: 5000, Date: "2026-02-02", Status: "confirmed", DedupHash: "b"},
+	} {
+		if added, err := r.InsertRow(ctx, row, now); !added || err != nil {
+			t.Fatalf("insert = %v, %v", added, err)
+		}
+	}
+	// The same hash on another account is another row.
+	other, _ := l.InsertAccount(ctx, ledgerrepo.AccountFields{Name: "Other", Type: "cash", CurrencyID: jpy, IsActive: true}, now)
+	row := importerrepo.Row{Type: "expense", AccountID: other, Minor: 1, Status: "confirmed", DedupHash: "a"}
+	if added, err := r.InsertRow(ctx, row, now); !added || err != nil {
+		t.Fatalf("same hash, other account = %v, %v", added, err)
+	}
+
+	changes, _ := l.DailyChanges(ctx, acc, "")
+	if len(changes) != 2 || changes[0].Delta != -800 || changes[1].Delta != 5000 {
+		t.Fatalf("changes = %+v", changes)
+	}
+	if has, _ := l.HasExternalID(ctx, fmt.Sprintf("csv:%d:a", acc)); !has {
+		t.Fatal("the external id is csv:<account>:<hash>")
+	}
+	if rows, _ := l.SummaryRows(ctx, filter.TxFilter{}, "confirmed"); len(rows) != 3 {
+		t.Fatalf("every imported row has one line: %+v", rows)
 	}
 }

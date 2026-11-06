@@ -2,18 +2,14 @@ package sqlite
 
 import (
 	"errors"
-	"os"
 
 	sqlite3 "modernc.org/sqlite"
 
+	"savvy-go/internal/db"
 	"savvy-go/internal/store"
 )
 
-func removeFiles(path string) {
-	for _, suffix := range []string{"", "-wal", "-shm", "-journal"} {
-		_ = os.Remove(path + suffix)
-	}
-}
+func removeFiles(path string) { db.RemoveFiles(path) }
 
 // quotaError keeps the driver error for the log while matching
 // store.ErrQuotaExceeded.

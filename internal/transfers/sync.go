@@ -40,6 +40,10 @@ func (s Service) sync(ctx context.Context, a, b, review int64) error {
 		return err
 	}
 	return s.st().InSpaces(ctx, []int64{a, b}, func(dbs map[int64]store.DB) error {
+		v, err := s.verifier(ctx, dbs)
+		if err != nil {
+			return err
+		}
 		ra, err := loadTransfers(ctx, dbs[a])
 		if err != nil {
 			return err
@@ -54,7 +58,7 @@ func (s Service) sync(ctx context.Context, a, b, review int64) error {
 			x, inA := ra[id]
 			y, inB := rb[id]
 			sa.rec, sa.has, sb.rec, sb.has = x, inA, y, inB
-			if err := s.syncOne(ctx, sa, sb, review); err != nil {
+			if err := s.syncOne(ctx, v, sa, sb, review); err != nil {
 				return err
 			}
 		}
@@ -87,7 +91,7 @@ func unionKeys(a, b map[string]Transfer) []string {
 	return keys
 }
 
-func (s Service) syncOne(ctx context.Context, a, b syncSide, review int64) error {
+func (s Service) syncOne(ctx context.Context, v *verifier, a, b syncSide, review int64) error {
 	rec := a.rec
 	if !a.has {
 		rec = b.rec
@@ -100,30 +104,30 @@ func (s Service) syncOne(ctx context.Context, a, b syncSide, review int64) error
 		if review == b.id {
 			own, other = b, a
 		}
-		return s.reviewOne(ctx, own.db, own.uuid, own.rec, other.rec, own.has, other.has)
+		return s.reviewOne(ctx, v, own.db, own.uuid, own.rec, other.rec, own.has, other.has)
 	}
-	if (a.has && a.rec.Status == transferPending) || (b.has && b.rec.Status == transferPending) {
+	if (a.has && a.rec.Status == transferInReview) || (b.has && b.rec.Status == transferInReview) {
 		return nil // waits for a decision; never moved automatically
 	}
 	switch {
 	case a.has && !b.has:
-		return s.copyVerified(ctx, b, a.rec)
+		return s.copyVerified(ctx, v, b, a.rec)
 	case b.has && !a.has:
-		return s.copyVerified(ctx, a, b.rec)
+		return s.copyVerified(ctx, v, a, b.rec)
 	case !a.rec.same(b.rec):
 		w := winner(a.rec, b.rec)
 		target := b
 		if w.same(b.rec) {
 			target = a
 		}
-		return s.copyVerified(ctx, target, w)
+		return s.copyVerified(ctx, v, target, w)
 	}
 	return nil
 }
 
 // copyVerified writes rec into the side behind, if its signature holds.
-func (s Service) copyVerified(ctx context.Context, to syncSide, rec Transfer) error {
-	if !verifyTransfer(s.Keys, rec) {
+func (s Service) copyVerified(ctx context.Context, v *verifier, to syncSide, rec Transfer) error {
+	if !v.ok(rec) {
 		return nil
 	}
 	return writeRecord(ctx, to.db, to.uuid, rec, "confirmed", nil, nil)
@@ -133,6 +137,7 @@ func (s Service) copyVerified(ctx context.Context, to syncSide, rec Transfer) er
 // from the other space's. Nothing is written to the other space.
 func (s Service) reviewOne(
 	ctx context.Context,
+	v *verifier,
 	own store.DB,
 	ownUUID string,
 	mine, theirs Transfer,
@@ -144,7 +149,7 @@ func (s Service) reviewOne(
 	}
 	switch {
 	case !haveMine && haveTheirs:
-		if theirs.DeletedAt != nil || !verifyTransfer(s.Keys, theirs) {
+		if theirs.DeletedAt != nil || !v.ok(theirs) {
 			return nil
 		}
 		// Created after the backup: here as pending, outside the balance.
@@ -157,13 +162,13 @@ func (s Service) reviewOne(
 	case mine.same(theirs) && mine.Version == theirs.Version:
 		return nil
 	case theirs.DeletedAt != nil && mine.DeletedAt == nil:
-		if !verifyTransfer(s.Keys, theirs) {
+		if !v.ok(theirs) {
 			return nil
 		}
 		r := theirs
 		return mark(mine, reviewDeletedRemote, &r, "confirmed")
 	default:
-		if !verifyTransfer(s.Keys, theirs) {
+		if !v.ok(theirs) {
 			return nil
 		}
 		r := theirs

@@ -16,9 +16,10 @@ type nwAccount struct {
 	Balance money.Money // in the base currency
 }
 
-// accounts are the active, non-debt accounts the report covers.
+// accounts are the active accounts the report covers: ordinary accounts and
+// debts, not space accounts.
 func (q report) accounts() []ledger.Account {
-	list, err := ledger.Accounts{DB: q.DB}.All(q.ctx, true, true)
+	list, err := ledger.Accounts{DB: q.DB}.ForNetWorth(q.ctx)
 	if err != nil || q.base == nil {
 		return nil
 	}

@@ -8,7 +8,7 @@ import (
 
 	"savvy-go/internal/appconfig"
 	"savvy-go/internal/auth"
-	"savvy-go/internal/firstrun"
+	"savvy-go/internal/auth/firstrun"
 	"savvy-go/internal/store/sqlite"
 	"savvy-go/internal/store/sqlite/sqlitetest"
 )

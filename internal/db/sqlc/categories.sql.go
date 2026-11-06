@@ -13,11 +13,11 @@ import (
 )
 
 const categoryStatistics = `-- name: CategoryStatistics :many
-SELECT COUNT(*) AS cnt, CAST(COALESCE(SUM(t.amount),0) AS INTEGER) AS total, c.decimals, c.rate
-FROM transactions t
-JOIN accounts a ON a.id = t.account_id
-JOIN currencies c ON c.id = a.currency_id
-WHERE t.category_id = ?1 AND t.status = 'confirmed'
+SELECT COUNT(DISTINCT t.id) AS cnt, CAST(COALESCE(SUM(l.amount),0) AS INTEGER) AS total, c.decimals, c.rate
+FROM transaction_lines l
+JOIN transactions t ON t.id = l.transaction_id
+JOIN currencies c ON c.id = l.currency_id
+WHERE l.category_id = ?1 AND t.status = 'confirmed'
   AND t.date >= COALESCE(?2, t.date)
   AND t.date <= COALESCE(?3, t.date)
 GROUP BY c.id
@@ -36,6 +36,9 @@ type CategoryStatisticsRow struct {
 	Rate     decimal.Decimal
 }
 
+// Per currency of the lines: how many transactions, and what their lines in
+// this category add up to. A transaction counts once however many of its lines
+// are in the category.
 func (q *Queries) CategoryStatistics(ctx context.Context, arg CategoryStatisticsParams) ([]CategoryStatisticsRow, error) {
 	rows, err := q.db.QueryContext(ctx, categoryStatistics, arg.CategoryID, arg.StartDate, arg.EndDate)
 	if err != nil {
@@ -95,7 +98,7 @@ func (q *Queries) DeleteCategory(ctx context.Context, id int64) error {
 
 const getCategory = `-- name: GetCategory :one
 SELECT categories.id, categories.name, categories.type, categories.icon, categories.color, categories.is_default,
-	(SELECT COUNT(*) FROM transactions t WHERE t.category_id = categories.id)
+	(SELECT COUNT(DISTINCT l.transaction_id) FROM transaction_lines l WHERE l.category_id = categories.id)
 FROM categories WHERE categories.id = ?
 `
 
@@ -126,7 +129,7 @@ func (q *Queries) GetCategory(ctx context.Context, id int64) (GetCategoryRow, er
 
 const getDefaultCategory = `-- name: GetDefaultCategory :one
 SELECT categories.id, categories.name, categories.type, categories.icon, categories.color, categories.is_default,
-	(SELECT COUNT(*) FROM transactions t WHERE t.category_id = categories.id)
+	(SELECT COUNT(DISTINCT l.transaction_id) FROM transaction_lines l WHERE l.category_id = categories.id)
 FROM categories WHERE categories.type = ? AND categories.is_default = 1 LIMIT 1
 `
 
@@ -183,7 +186,7 @@ func (q *Queries) InsertCategory(ctx context.Context, arg InsertCategoryParams) 
 
 const listCategories = `-- name: ListCategories :many
 SELECT c.id, c.name, c.type, c.icon, c.color, c.is_default,
-	(SELECT COUNT(*) FROM transactions t WHERE t.category_id = c.id)
+	(SELECT COUNT(DISTINCT l.transaction_id) FROM transaction_lines l WHERE l.category_id = c.id)
 FROM categories c
 WHERE c.type = COALESCE(?1, c.type)
 ORDER BY c.name
@@ -231,7 +234,7 @@ func (q *Queries) ListCategories(ctx context.Context, type_ sql.NullString) ([]L
 }
 
 const reassignCategoryTransactions = `-- name: ReassignCategoryTransactions :exec
-UPDATE transactions SET category_id = ? WHERE category_id = ?
+UPDATE transaction_lines SET category_id = ? WHERE category_id = ?
 `
 
 type ReassignCategoryTransactionsParams struct {
@@ -239,6 +242,7 @@ type ReassignCategoryTransactionsParams struct {
 	CategoryID_2 sql.NullInt64
 }
 
+// Every line of the old category moves to the new one.
 func (q *Queries) ReassignCategoryTransactions(ctx context.Context, arg ReassignCategoryTransactionsParams) error {
 	_, err := q.db.ExecContext(ctx, reassignCategoryTransactions, arg.CategoryID, arg.CategoryID_2)
 	return err

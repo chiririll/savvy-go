@@ -129,10 +129,12 @@ func (e *env) spend(t *testing.T, i int, categoryID int64) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _,
-		err := d.ExecContext(ctx,
-		`INSERT INTO transactions (type, account_id, category_id, amount, status, date) VALUES ('expense', ?, ?, 100, `+
-			`'confirmed', '2026-01-01')`, acc.ID, categoryID); err != nil {
+	paid, date := decimal.NewFromInt(-1), "2026-01-01"
+	if _, err := (ledger.Transactions{DB: d}).Create(ctx, ledger.TxInput{
+		Type: "expense", Date: &date,
+		Payments: []ledger.PaymentInput{{AccountID: acc.ID, Amount: &paid}},
+		Lines:    []ledger.LineInput{{CategoryID: &categoryID, Amount: decimal.NewFromInt(1)}},
+	}); err != nil {
 		t.Fatal(err)
 	}
 }

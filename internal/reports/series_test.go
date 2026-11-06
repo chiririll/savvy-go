@@ -34,8 +34,7 @@ func (e *seriesEnv) add(t *testing.T, typ string, accountID int64, categoryID *i
 	t.Helper()
 	if _,
 		err := e.txs.Create(e.ctx,
-		ledger.TxInput{Type: typ, AccountID: accountID, CategoryID: categoryID, Amount: dec(amount),
-			Date: &date}); err != nil {
+		at(flowTx(typ, accountID, categoryID, dec(amount)), date)); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -59,8 +58,7 @@ func TestCashFlowOverTimeAccumulatesDaily(t *testing.T) {
 	date := "2024-01-15"
 	if _,
 		err := e.txs.Create(e.ctx,
-		ledger.TxInput{Type: "expense", AccountID: e.usdAcc.ID, Amount: dec("999"), Date: &date,
-			Status: &pending}); err != nil {
+		withStatus(at(flowTx("expense", e.usdAcc.ID, nil, dec("999")), date), &pending)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -263,7 +261,7 @@ func TestFiltersNarrowEveryReport(t *testing.T) {
 	date := "2024-01-14"
 	tagged, err := e.txs.Create(
 		e.ctx,
-		ledger.TxInput{Type: "expense", AccountID: e.usdAcc.ID, Amount: dec("4"), Date: &date, TagIDs: []int64{tag.ID}},
+		withTags(at(flowTx("expense", e.usdAcc.ID, nil, dec("4")), date), tag.ID),
 	)
 	if err != nil || tagged == nil {
 		t.Fatal(err)
@@ -315,4 +313,14 @@ func TestReportsEmptySpaceEmptyNotBroken(t *testing.T) {
 	if got := svc.CashFlowOverTime(ctx, janRange, "day"); len(got.Items) != 3 {
 		t.Errorf("one point per day even without data: %d", len(got.Items))
 	}
+}
+
+func withStatus(in ledger.TxInput, status *string) ledger.TxInput {
+	in.Status = status
+	return in
+}
+
+func withTags(in ledger.TxInput, ids ...int64) ledger.TxInput {
+	in.TagIDs = ids
+	return in
 }

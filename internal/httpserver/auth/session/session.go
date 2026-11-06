@@ -12,7 +12,7 @@ import (
 
 	"savvy-go/internal/auth"
 	"savvy-go/internal/auth/password"
-	"savvy-go/internal/firstrun"
+	"savvy-go/internal/auth/firstrun"
 
 	"github.com/go-chi/chi/v5"
 )

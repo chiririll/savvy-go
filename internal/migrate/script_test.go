@@ -92,12 +92,12 @@ func TestEnsureIndexesRestoresADroppedIndex(t *testing.T) {
 	sqlDB := migrated(t, Space)
 	var name string
 	err := sqlDB.QueryRow(`SELECT name FROM sqlite_master WHERE type='index' AND ` +
-		`name='transactions_account_dedup_unique'`).
+		`name='payments_space_transfer_unique'`).
 		Scan(&name)
 	if err != nil {
-		t.Fatalf("the dedup index must exist after migrating: %v", err)
+		t.Fatalf("the transfer index must exist after migrating: %v", err)
 	}
-	if _, err := sqlDB.Exec(`DROP INDEX transactions_account_dedup_unique`); err != nil {
+	if _, err := sqlDB.Exec(`DROP INDEX payments_space_transfer_unique`); err != nil {
 		t.Fatal(err)
 	}
 	for range 2 { // idempotent
@@ -106,7 +106,7 @@ func TestEnsureIndexesRestoresADroppedIndex(t *testing.T) {
 		}
 	}
 	if err := sqlDB.QueryRow(`SELECT name FROM sqlite_master WHERE type='index' AND ` +
-		`name='transactions_account_dedup_unique'`).Scan(&name); err != nil {
+		`name='payments_space_transfer_unique'`).Scan(&name); err != nil {
 		t.Errorf("the index was not restored: %v", err)
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 
 	"savvy-go/internal/migrate"
+	"savvy-go/internal/migrate/upgrade"
 )
 
 // querier is the read side shared by *sql.DB, *sql.Tx and *sql.Conn.
@@ -38,25 +39,23 @@ func columns(ctx context.Context, q querier, table string) ([]string, error) {
 	return out, rows.Err()
 }
 
-// upBoth applies the server and the space migrations to one file: a Laravel
-// database holds everything until it is split. Their versions are recorded
-// with the set's prefix, so they do not clash.
+// upBoth gives one file the server schema and the space schema of the oldest
+// release: a Laravel database holds everything until it is split, and the
+// conform code is written against that shape. Its space tables are converted
+// to the current schema afterwards, like any old space
+// (internal/migrate/upgrade).
 func upBoth(ctx context.Context, db *sql.DB) error {
-	for _, set := range []migrate.Set{migrate.Server, migrate.Space} {
-		if err := set.Up(ctx, db); err != nil {
-			return err
-		}
+	if err := migrate.Server.Up(ctx, db); err != nil {
+		return err
 	}
-	return nil
+	return upgrade.Entry().Apply(ctx, db)
 }
 
-// ensureIndexes recreates the indexes of both sets, which schema surgery on
-// a Laravel file drops together with the columns they covered.
+// ensureIndexes recreates the indexes of both schemas, which schema surgery
+// on a Laravel file drops together with the columns they covered.
 func ensureIndexes(ctx context.Context, db *sql.DB) error {
-	for _, set := range []migrate.Set{migrate.Server, migrate.Space} {
-		if err := set.EnsureIndexes(ctx, db); err != nil {
-			return err
-		}
+	if err := migrate.Server.EnsureIndexes(ctx, db); err != nil {
+		return err
 	}
-	return nil
+	return upgrade.Entry().EnsureIndexes(ctx, db)
 }

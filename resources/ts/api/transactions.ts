@@ -1,8 +1,9 @@
 import { api, apiClient } from './client'
 import { createCrudApi } from './crud'
 import { toQueryString } from '@/lib/query-string'
-import { Transaction, TransactionFilters, TransactionSummary } from '@/types'
+import { Transaction, TransactionFilters, TransactionGroup, TransactionSummary } from '@/types'
 import { TransactionFormData } from '@/schemas'
+import type { PaymentLeg } from '@/lib/split-payment'
 
 const ENDPOINT = '/transactions'
 
@@ -68,6 +69,10 @@ export const transactionsApi = {
             ...(options.to_amount != null ? { to_amount: options.to_amount } : {}),
         }),
 
+    /** Puts the transactions in that order within one day; ids go oldest first. */
+    reorder: (date: string, ids: number[]) =>
+        api.post<{ success: boolean }, { date: string; ids: number[] }>(`${ENDPOINT}/reorder`, { date, ids }),
+
     getPendingSummary: () =>
         api.get<TransactionSummary>('/transactions-pending-summary'),
 
@@ -82,4 +87,18 @@ export const transactionsApi = {
             start_date: filters?.start_date,
             end_date: filters?.end_date,
         })}`),
+}
+
+const GROUPS_ENDPOINT = '/transaction-groups'
+
+export const transactionGroupsApi = {
+    getByUuid: (uuid: string) => api.get<TransactionGroup>(`${GROUPS_ENDPOINT}/${uuid}`),
+
+    create: (legs: PaymentLeg[]) => api.post<TransactionGroup, { legs: PaymentLeg[] }>(GROUPS_ENDPOINT, { legs }),
+
+    /** Replaces every leg of the payment. */
+    update: (uuid: string, legs: PaymentLeg[]) =>
+        api.put<TransactionGroup, { legs: PaymentLeg[] }>(`${GROUPS_ENDPOINT}/${uuid}`, { legs }),
+
+    delete: (uuid: string) => api.delete<void>(`${GROUPS_ENDPOINT}/${uuid}`),
 }

@@ -13,24 +13,18 @@ import (
 )
 
 const accountDailyDeltas = `-- name: AccountDailyDeltas :many
-WITH p AS (SELECT CAST(?2 AS INTEGER) AS id)
-SELECT t.date AS day,
-	CAST(SUM(
-		CASE WHEN t.account_id = p.id THEN
-			CASE WHEN t.type IN ('income', 'debt_collection', 'debt_borrow', 'transfer_in') THEN t.amount ELSE -t.amount END
-		ELSE 0 END
-		+ CASE WHEN t.to_account_id = p.id AND t.type = 'transfer' THEN COALESCE(t.to_amount, 0) ELSE 0 END
-	) AS INTEGER) AS delta
-FROM transactions t, p
-WHERE t.status = 'confirmed' AND (t.account_id = p.id OR t.to_account_id = p.id)
-	AND t.date <= COALESCE(?1, t.date)
+SELECT t.date AS day, CAST(SUM(p.amount) AS INTEGER) AS delta
+FROM payments p
+JOIN transactions t ON t.id = p.transaction_id
+WHERE p.account_id = ?1 AND t.status = 'confirmed'
+	AND t.date <= COALESCE(?2, t.date)
 GROUP BY t.date
 ORDER BY t.date
 `
 
 type AccountDailyDeltasParams struct {
-	AsOf sql.NullString
 	ID   int64
+	AsOf sql.NullString
 }
 
 type AccountDailyDeltasRow struct {
@@ -38,16 +32,14 @@ type AccountDailyDeltasRow struct {
 	Delta int64
 }
 
-// The net change of a non-debt account per day, oldest first, for confirmed
-// transactions up to as_of (all of them when NULL). This is the only place that
-// knows how a transaction moves money: it adds to the account for income,
-// debt_collection, debt_borrow and transfer_in, takes from it for every other type, and a
-// transfer adds to_amount to its destination account (a transfer from an account
-// to itself therefore does both). A balance is the sum of these rows, a balance
-// history their running total.
+// The net change of an account per day, oldest first, for confirmed
+// transactions up to as_of (all of them when NULL). A payment is signed money
+// in the account's own currency, so a change is just their sum; this is the
+// only place that reads how money moved. A balance is initial_balance plus
+// these rows, a balance history their running total.
 // CAST: sqlc would type a SUM as float; the sum of integers is an integer.
 func (q *Queries) AccountDailyDeltas(ctx context.Context, arg AccountDailyDeltasParams) ([]AccountDailyDeltasRow, error) {
-	rows, err := q.db.QueryContext(ctx, accountDailyDeltas, arg.AsOf, arg.ID)
+	rows, err := q.db.QueryContext(ctx, accountDailyDeltas, arg.ID, arg.AsOf)
 	if err != nil {
 		return nil, err
 	}
@@ -69,17 +61,26 @@ func (q *Queries) AccountDailyDeltas(ctx context.Context, arg AccountDailyDeltas
 	return items, nil
 }
 
-const countAccountTransactions = `-- name: CountAccountTransactions :one
-SELECT COUNT(*) FROM transactions WHERE account_id = ? OR to_account_id = ?
+const closeDebt = `-- name: CloseDebt :exec
+UPDATE debts SET closed_at = ? WHERE account_id = ?
 `
 
-type CountAccountTransactionsParams struct {
-	AccountID   int64
-	ToAccountID sql.NullInt64
+type CloseDebtParams struct {
+	ClosedAt  sql.NullString
+	AccountID int64
 }
 
-func (q *Queries) CountAccountTransactions(ctx context.Context, arg CountAccountTransactionsParams) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countAccountTransactions, arg.AccountID, arg.ToAccountID)
+func (q *Queries) CloseDebt(ctx context.Context, arg CloseDebtParams) error {
+	_, err := q.db.ExecContext(ctx, closeDebt, arg.ClosedAt, arg.AccountID)
+	return err
+}
+
+const countAccountPayments = `-- name: CountAccountPayments :one
+SELECT COUNT(*) FROM payments WHERE account_id = ?
+`
+
+func (q *Queries) CountAccountPayments(ctx context.Context, accountID int64) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countAccountPayments, accountID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -97,12 +98,13 @@ func (q *Queries) CountAccounts(ctx context.Context) (int64, error) {
 }
 
 const countDebtHistory = `-- name: CountDebtHistory :one
-SELECT COUNT(*) FROM transactions
-WHERE to_account_id = ? AND type IN ('debt_payment','debt_collection')
+SELECT COUNT(*) FROM payments p JOIN transactions t ON t.id = p.transaction_id
+WHERE p.account_id = ? AND t.type IN ('debt_payment','debt_collection')
 `
 
-func (q *Queries) CountDebtHistory(ctx context.Context, toAccountID sql.NullInt64) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countDebtHistory, toAccountID)
+// Payments and collections made on a debt; its issuance is not history.
+func (q *Queries) CountDebtHistory(ctx context.Context, accountID int64) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countDebtHistory, accountID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -121,23 +123,25 @@ const deleteDebtAccount = `-- name: DeleteDebtAccount :exec
 DELETE FROM accounts WHERE id = ? AND type = 'debt'
 `
 
+// The debts row goes with the account (cascade).
 func (q *Queries) DeleteDebtAccount(ctx context.Context, id int64) error {
 	_, err := q.db.ExecContext(ctx, deleteDebtAccount, id)
 	return err
 }
 
 const deleteDebtIssuance = `-- name: DeleteDebtIssuance :exec
-DELETE FROM transactions WHERE to_account_id = ? AND type IN ('debt_lend','debt_borrow')
+DELETE FROM transactions WHERE type IN ('debt_lend','debt_borrow')
+	AND id IN (SELECT transaction_id FROM payments WHERE account_id = ?)
 `
 
-func (q *Queries) DeleteDebtIssuance(ctx context.Context, toAccountID sql.NullInt64) error {
-	_, err := q.db.ExecContext(ctx, deleteDebtIssuance, toAccountID)
+// The payments go with the transaction (cascade).
+func (q *Queries) DeleteDebtIssuance(ctx context.Context, accountID int64) error {
+	_, err := q.db.ExecContext(ctx, deleteDebtIssuance, accountID)
 	return err
 }
 
 const getAccount = `-- name: GetAccount :one
-SELECT a.id, a.name, a.type, a.currency_id, a.initial_balance, a.is_active, a.sort_order,
-	a.debt_type, a.target_amount, a.due_date, a.is_paid_off, a.counterparty, a.debt_description, a.created_at,
+SELECT a.id, a.name, a.type, a.is_service, a.currency_id, a.initial_balance, a.is_active, a.sort_order, a.created_at,
 	c.id AS currency_id_join, c.code, c.name AS currency_name, c.symbol, c.decimals, c.is_base, c.rate
 FROM accounts a
 JOIN currencies c ON c.id = a.currency_id
@@ -145,27 +149,22 @@ WHERE a.id = ?
 `
 
 type GetAccountRow struct {
-	ID              int64
-	Name            string
-	Type            string
-	CurrencyID      int64
-	InitialBalance  int64
-	IsActive        int64
-	SortOrder       int64
-	DebtType        sql.NullString
-	TargetAmount    sql.NullInt64
-	DueDate         sql.NullString
-	IsPaidOff       int64
-	Counterparty    sql.NullString
-	DebtDescription sql.NullString
-	CreatedAt       sql.NullString
-	CurrencyIDJoin  int64
-	Code            string
-	CurrencyName    string
-	Symbol          string
-	Decimals        int64
-	IsBase          int64
-	Rate            decimal.Decimal
+	ID             int64
+	Name           string
+	Type           string
+	IsService      sql.NullInt64
+	CurrencyID     int64
+	InitialBalance int64
+	IsActive       int64
+	SortOrder      int64
+	CreatedAt      sql.NullString
+	CurrencyIDJoin int64
+	Code           string
+	CurrencyName   string
+	Symbol         string
+	Decimals       int64
+	IsBase         int64
+	Rate           decimal.Decimal
 }
 
 // The same columns as ListAccounts, so its row converts to ListAccountsRow.
@@ -176,16 +175,11 @@ func (q *Queries) GetAccount(ctx context.Context, id int64) (GetAccountRow, erro
 		&i.ID,
 		&i.Name,
 		&i.Type,
+		&i.IsService,
 		&i.CurrencyID,
 		&i.InitialBalance,
 		&i.IsActive,
 		&i.SortOrder,
-		&i.DebtType,
-		&i.TargetAmount,
-		&i.DueDate,
-		&i.IsPaidOff,
-		&i.Counterparty,
-		&i.DebtDescription,
 		&i.CreatedAt,
 		&i.CurrencyIDJoin,
 		&i.Code,
@@ -214,41 +208,106 @@ func (q *Queries) GetAccountUnit(ctx context.Context, id int64) (GetAccountUnitR
 	return i, err
 }
 
+const getDebt = `-- name: GetDebt :one
+SELECT a.id, a.name, a.type, a.is_service, a.currency_id, a.initial_balance, a.is_active, a.sort_order, a.created_at,
+	d.direction, d.principal, d.due_date, d.counterparty, d.note, d.closed_at,
+	c.id AS currency_id_join, c.code, c.name AS currency_name, c.symbol, c.decimals, c.is_base, c.rate
+FROM debts d
+JOIN accounts a ON a.id = d.account_id
+JOIN currencies c ON c.id = a.currency_id
+WHERE d.account_id = ?
+`
+
+type GetDebtRow struct {
+	ID             int64
+	Name           string
+	Type           string
+	IsService      sql.NullInt64
+	CurrencyID     int64
+	InitialBalance int64
+	IsActive       int64
+	SortOrder      int64
+	CreatedAt      sql.NullString
+	Direction      string
+	Principal      int64
+	DueDate        sql.NullString
+	Counterparty   sql.NullString
+	Note           sql.NullString
+	ClosedAt       sql.NullString
+	CurrencyIDJoin int64
+	Code           string
+	CurrencyName   string
+	Symbol         string
+	Decimals       int64
+	IsBase         int64
+	Rate           decimal.Decimal
+}
+
+// The same columns as ListDebts, so its row converts to ListDebtsRow.
+func (q *Queries) GetDebt(ctx context.Context, accountID int64) (GetDebtRow, error) {
+	row := q.db.QueryRowContext(ctx, getDebt, accountID)
+	var i GetDebtRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Type,
+		&i.IsService,
+		&i.CurrencyID,
+		&i.InitialBalance,
+		&i.IsActive,
+		&i.SortOrder,
+		&i.CreatedAt,
+		&i.Direction,
+		&i.Principal,
+		&i.DueDate,
+		&i.Counterparty,
+		&i.Note,
+		&i.ClosedAt,
+		&i.CurrencyIDJoin,
+		&i.Code,
+		&i.CurrencyName,
+		&i.Symbol,
+		&i.Decimals,
+		&i.IsBase,
+		&i.Rate,
+	)
+	return i, err
+}
+
+const getSpaceAccountID = `-- name: GetSpaceAccountID :one
+SELECT id FROM accounts WHERE type = 'space' AND currency_id = ?
+`
+
+// The account of type space for a currency: at most one exists (unique index).
+func (q *Queries) GetSpaceAccountID(ctx context.Context, currencyID int64) (int64, error) {
+	row := q.db.QueryRowContext(ctx, getSpaceAccountID, currencyID)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const insertAccount = `-- name: InsertAccount :execresult
-INSERT INTO accounts (name, type, debt_type, currency_id, initial_balance, target_amount, due_date,
-	is_paid_off, counterparty, debt_description, is_active, sort_order, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO accounts (name, type, currency_id, initial_balance, is_active, sort_order, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type InsertAccountParams struct {
-	Name            string
-	Type            string
-	DebtType        sql.NullString
-	CurrencyID      int64
-	InitialBalance  int64
-	TargetAmount    sql.NullInt64
-	DueDate         sql.NullString
-	IsPaidOff       int64
-	Counterparty    sql.NullString
-	DebtDescription sql.NullString
-	IsActive        int64
-	SortOrder       int64
-	CreatedAt       sql.NullString
-	UpdatedAt       sql.NullString
+	Name           string
+	Type           string
+	CurrencyID     int64
+	InitialBalance int64
+	IsActive       int64
+	SortOrder      int64
+	CreatedAt      sql.NullString
+	UpdatedAt      sql.NullString
 }
 
 func (q *Queries) InsertAccount(ctx context.Context, arg InsertAccountParams) (sql.Result, error) {
 	return q.db.ExecContext(ctx, insertAccount,
 		arg.Name,
 		arg.Type,
-		arg.DebtType,
 		arg.CurrencyID,
 		arg.InitialBalance,
-		arg.TargetAmount,
-		arg.DueDate,
-		arg.IsPaidOff,
-		arg.Counterparty,
-		arg.DebtDescription,
 		arg.IsActive,
 		arg.SortOrder,
 		arg.CreatedAt,
@@ -256,58 +315,75 @@ func (q *Queries) InsertAccount(ctx context.Context, arg InsertAccountParams) (s
 	)
 }
 
+const insertDebt = `-- name: InsertDebt :exec
+INSERT INTO debts (account_id, direction, principal, due_date, counterparty, note)
+VALUES (?, ?, ?, ?, ?, ?)
+`
+
+type InsertDebtParams struct {
+	AccountID    int64
+	Direction    string
+	Principal    int64
+	DueDate      sql.NullString
+	Counterparty sql.NullString
+	Note         sql.NullString
+}
+
+func (q *Queries) InsertDebt(ctx context.Context, arg InsertDebtParams) error {
+	_, err := q.db.ExecContext(ctx, insertDebt,
+		arg.AccountID,
+		arg.Direction,
+		arg.Principal,
+		arg.DueDate,
+		arg.Counterparty,
+		arg.Note,
+	)
+	return err
+}
+
 const listAccounts = `-- name: ListAccounts :many
-SELECT a.id, a.name, a.type, a.currency_id, a.initial_balance, a.is_active, a.sort_order,
-	a.debt_type, a.target_amount, a.due_date, a.is_paid_off, a.counterparty, a.debt_description, a.created_at,
+SELECT a.id, a.name, a.type, a.is_service, a.currency_id, a.initial_balance, a.is_active, a.sort_order, a.created_at,
 	c.id AS currency_id_join, c.code, c.name AS currency_name, c.symbol, c.decimals, c.is_base, c.rate
 FROM accounts a
 JOIN currencies c ON c.id = a.currency_id
 WHERE a.is_active = COALESCE(?1, a.is_active)
-  AND CASE a.type WHEN 'bank' THEN 1 WHEN 'crypto' THEN 1 WHEN 'cash' THEN 1 ELSE 0 END
-      >= COALESCE(CAST(?2 AS INTEGER), 0)
-  AND CASE a.type WHEN 'debt' THEN 1 ELSE 0 END >= COALESCE(CAST(?3 AS INTEGER), 0)
-  AND a.is_paid_off <= CASE WHEN CAST(?4 AS INTEGER) IS NULL THEN 1 ELSE 0 END
-ORDER BY CASE WHEN a.type = 'debt' THEN 1 ELSE 0 END, a.sort_order, a.id
+  AND CASE WHEN a.is_service THEN 1 ELSE 0 END
+      <= CASE WHEN CAST(?2 AS INTEGER) IS NULL THEN 1 ELSE 0 END
+  AND CASE WHEN a.type = 'space' THEN 1 ELSE 0 END
+      <= CASE WHEN CAST(?3 AS INTEGER) IS NULL THEN 1 ELSE 0 END
+ORDER BY CASE a.type WHEN 'debt' THEN 1 WHEN 'space' THEN 2 ELSE 0 END, a.sort_order, a.id
 `
 
 type ListAccountsParams struct {
-	OnlyActive   sql.NullInt64
-	ExcludeDebts sql.NullInt64
-	OnlyDebts    sql.NullInt64
-	UnpaidOnly   sql.NullInt64
+	OnlyActive     sql.NullInt64
+	ExcludeService sql.NullInt64
+	ExcludeSpace   sql.NullInt64
 }
 
 type ListAccountsRow struct {
-	ID              int64
-	Name            string
-	Type            string
-	CurrencyID      int64
-	InitialBalance  int64
-	IsActive        int64
-	SortOrder       int64
-	DebtType        sql.NullString
-	TargetAmount    sql.NullInt64
-	DueDate         sql.NullString
-	IsPaidOff       int64
-	Counterparty    sql.NullString
-	DebtDescription sql.NullString
-	CreatedAt       sql.NullString
-	CurrencyIDJoin  int64
-	Code            string
-	CurrencyName    string
-	Symbol          string
-	Decimals        int64
-	IsBase          int64
-	Rate            decimal.Decimal
+	ID             int64
+	Name           string
+	Type           string
+	IsService      sql.NullInt64
+	CurrencyID     int64
+	InitialBalance int64
+	IsActive       int64
+	SortOrder      int64
+	CreatedAt      sql.NullString
+	CurrencyIDJoin int64
+	Code           string
+	CurrencyName   string
+	Symbol         string
+	Decimals       int64
+	IsBase         int64
+	Rate           decimal.Decimal
 }
 
+// exclude_service leaves out debt and space accounts: that is the list a picker
+// offers. exclude_space leaves out only the space accounts: net worth counts
+// debts but not the money that went to other spaces.
 func (q *Queries) ListAccounts(ctx context.Context, arg ListAccountsParams) ([]ListAccountsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listAccounts,
-		arg.OnlyActive,
-		arg.ExcludeDebts,
-		arg.OnlyDebts,
-		arg.UnpaidOnly,
-	)
+	rows, err := q.db.QueryContext(ctx, listAccounts, arg.OnlyActive, arg.ExcludeService, arg.ExcludeSpace)
 	if err != nil {
 		return nil, err
 	}
@@ -319,16 +395,11 @@ func (q *Queries) ListAccounts(ctx context.Context, arg ListAccountsParams) ([]L
 			&i.ID,
 			&i.Name,
 			&i.Type,
+			&i.IsService,
 			&i.CurrencyID,
 			&i.InitialBalance,
 			&i.IsActive,
 			&i.SortOrder,
-			&i.DebtType,
-			&i.TargetAmount,
-			&i.DueDate,
-			&i.IsPaidOff,
-			&i.Counterparty,
-			&i.DebtDescription,
 			&i.CreatedAt,
 			&i.CurrencyIDJoin,
 			&i.Code,
@@ -351,13 +422,88 @@ func (q *Queries) ListAccounts(ctx context.Context, arg ListAccountsParams) ([]L
 	return items, nil
 }
 
-const markAccountPaidOff = `-- name: MarkAccountPaidOff :exec
-UPDATE accounts SET is_paid_off = 1 WHERE id = ?
+const listDebts = `-- name: ListDebts :many
+SELECT a.id, a.name, a.type, a.is_service, a.currency_id, a.initial_balance, a.is_active, a.sort_order, a.created_at,
+	d.direction, d.principal, d.due_date, d.counterparty, d.note, d.closed_at,
+	c.id AS currency_id_join, c.code, c.name AS currency_name, c.symbol, c.decimals, c.is_base, c.rate
+FROM debts d
+JOIN accounts a ON a.id = d.account_id
+JOIN currencies c ON c.id = a.currency_id
+WHERE CASE WHEN d.closed_at IS NULL THEN 0 ELSE 1 END
+      <= CASE WHEN CAST(?1 AS INTEGER) IS NULL THEN 1 ELSE 0 END
+ORDER BY a.sort_order, a.id
 `
 
-func (q *Queries) MarkAccountPaidOff(ctx context.Context, id int64) error {
-	_, err := q.db.ExecContext(ctx, markAccountPaidOff, id)
-	return err
+type ListDebtsRow struct {
+	ID             int64
+	Name           string
+	Type           string
+	IsService      sql.NullInt64
+	CurrencyID     int64
+	InitialBalance int64
+	IsActive       int64
+	SortOrder      int64
+	CreatedAt      sql.NullString
+	Direction      string
+	Principal      int64
+	DueDate        sql.NullString
+	Counterparty   sql.NullString
+	Note           sql.NullString
+	ClosedAt       sql.NullString
+	CurrencyIDJoin int64
+	Code           string
+	CurrencyName   string
+	Symbol         string
+	Decimals       int64
+	IsBase         int64
+	Rate           decimal.Decimal
+}
+
+// open_only leaves out closed debts.
+func (q *Queries) ListDebts(ctx context.Context, openOnly sql.NullInt64) ([]ListDebtsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listDebts, openOnly)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListDebtsRow{}
+	for rows.Next() {
+		var i ListDebtsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Type,
+			&i.IsService,
+			&i.CurrencyID,
+			&i.InitialBalance,
+			&i.IsActive,
+			&i.SortOrder,
+			&i.CreatedAt,
+			&i.Direction,
+			&i.Principal,
+			&i.DueDate,
+			&i.Counterparty,
+			&i.Note,
+			&i.ClosedAt,
+			&i.CurrencyIDJoin,
+			&i.Code,
+			&i.CurrencyName,
+			&i.Symbol,
+			&i.Decimals,
+			&i.IsBase,
+			&i.Rate,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const nextAccountSortOrder = `-- name: NextAccountSortOrder :one
@@ -365,6 +511,7 @@ SELECT COALESCE(MAX(sort_order), -1) + 1 FROM accounts
 WHERE CASE WHEN ?1 IS NULL THEN type IN ('bank','crypto','cash') ELSE type = 'debt' END
 `
 
+// Debts are ordered among themselves, the other accounts among theirs.
 func (q *Queries) NextAccountSortOrder(ctx context.Context, debtOnly interface{}) (int64, error) {
 	row := q.db.QueryRowContext(ctx, nextAccountSortOrder, debtOnly)
 	var column_1 int64
@@ -372,17 +519,12 @@ func (q *Queries) NextAccountSortOrder(ctx context.Context, debtOnly interface{}
 	return column_1, err
 }
 
-const reopenAccount = `-- name: ReopenAccount :exec
-UPDATE accounts SET is_paid_off = 0, updated_at = ? WHERE id = ?
+const reopenDebt = `-- name: ReopenDebt :exec
+UPDATE debts SET closed_at = NULL WHERE account_id = ?
 `
 
-type ReopenAccountParams struct {
-	UpdatedAt sql.NullString
-	ID        int64
-}
-
-func (q *Queries) ReopenAccount(ctx context.Context, arg ReopenAccountParams) error {
-	_, err := q.db.ExecContext(ctx, reopenAccount, arg.UpdatedAt, arg.ID)
+func (q *Queries) ReopenDebt(ctx context.Context, accountID int64) error {
+	_, err := q.db.ExecContext(ctx, reopenDebt, accountID)
 	return err
 }
 
@@ -400,38 +542,19 @@ func (q *Queries) SetAccountSortOrder(ctx context.Context, arg SetAccountSortOrd
 	return err
 }
 
-const sumDebtPayments = `-- name: SumDebtPayments :one
-SELECT CAST(COALESCE(SUM(to_amount),0) AS INTEGER) FROM transactions
-WHERE to_account_id = ? AND status = 'confirmed' AND type IN ('debt_payment','debt_collection')
-`
-
-func (q *Queries) SumDebtPayments(ctx context.Context, toAccountID sql.NullInt64) (int64, error) {
-	row := q.db.QueryRowContext(ctx, sumDebtPayments, toAccountID)
-	var column_1 int64
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
 const updateAccount = `-- name: UpdateAccount :exec
-UPDATE accounts SET name=?, type=?, currency_id=?, initial_balance=?, is_active=?,
-	debt_type=?, target_amount=?, due_date=?, is_paid_off=?, counterparty=?, debt_description=?, updated_at=?
+UPDATE accounts SET name=?, type=?, currency_id=?, initial_balance=?, is_active=?, updated_at=?
 WHERE id=?
 `
 
 type UpdateAccountParams struct {
-	Name            string
-	Type            string
-	CurrencyID      int64
-	InitialBalance  int64
-	IsActive        int64
-	DebtType        sql.NullString
-	TargetAmount    sql.NullInt64
-	DueDate         sql.NullString
-	IsPaidOff       int64
-	Counterparty    sql.NullString
-	DebtDescription sql.NullString
-	UpdatedAt       sql.NullString
-	ID              int64
+	Name           string
+	Type           string
+	CurrencyID     int64
+	InitialBalance int64
+	IsActive       int64
+	UpdatedAt      sql.NullString
+	ID             int64
 }
 
 func (q *Queries) UpdateAccount(ctx context.Context, arg UpdateAccountParams) error {
@@ -441,14 +564,33 @@ func (q *Queries) UpdateAccount(ctx context.Context, arg UpdateAccountParams) er
 		arg.CurrencyID,
 		arg.InitialBalance,
 		arg.IsActive,
-		arg.DebtType,
-		arg.TargetAmount,
-		arg.DueDate,
-		arg.IsPaidOff,
-		arg.Counterparty,
-		arg.DebtDescription,
 		arg.UpdatedAt,
 		arg.ID,
+	)
+	return err
+}
+
+const updateDebt = `-- name: UpdateDebt :exec
+UPDATE debts SET direction=?, principal=?, due_date=?, counterparty=?, note=? WHERE account_id=?
+`
+
+type UpdateDebtParams struct {
+	Direction    string
+	Principal    int64
+	DueDate      sql.NullString
+	Counterparty sql.NullString
+	Note         sql.NullString
+	AccountID    int64
+}
+
+func (q *Queries) UpdateDebt(ctx context.Context, arg UpdateDebtParams) error {
+	_, err := q.db.ExecContext(ctx, updateDebt,
+		arg.Direction,
+		arg.Principal,
+		arg.DueDate,
+		arg.Counterparty,
+		arg.Note,
+		arg.AccountID,
 	)
 	return err
 }

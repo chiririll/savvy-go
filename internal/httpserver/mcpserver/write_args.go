@@ -5,41 +5,39 @@ const (
 	spaceDoc  = "Id of the space, from list_spaces."
 )
 
-type txItemArgs struct {
-	Name         string `json:"name" jsonschema:"Name of the line item."`
-	Quantity     string `json:"quantity,omitempty" jsonschema:"Exact decimal as a string (default 1)."`
-	PricePerUnit string `json:"price_per_unit" jsonschema:"Price per unit in the transaction's currency, decimal string."`
+// txPaymentArgs is money that moves on one account.
+type txPaymentArgs struct {
+	AccountID int64  `json:"account_id" jsonschema:"Account id, from list_accounts (not a debt)."`
+	Amount    string `json:"amount" jsonschema:"Signed decimal string, account currency: negative leaves, positive enters."`
+}
+
+// txLineArgs is an amount for a category.
+type txLineArgs struct {
+	CategoryID int64  `json:"category_id,omitempty" jsonschema:"Category id, from list_categories; its type fits the transaction. Omit for none."`
+	CurrencyID int64  `json:"currency_id,omitempty" jsonschema:"Currency id, one of the payment accounts' currencies; optional when they share one."`
+	Amount     string `json:"amount" jsonschema:"Positive decimal string in the line's currency."`
+	Note       string `json:"note,omitempty" jsonschema:"What it was for, for example bus."`
 }
 
 type createTxArgs struct {
-	SpaceID     int64        `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
-	Type        string       `json:"type" jsonschema:"income, expense or transfer (between two accounts of this space)."`
-	AccountID   int64        `json:"account_id" jsonschema:"Account money leaves (expense, transfer) or enters (income)."`
-	ToAccountID int64        `json:"to_account_id,omitempty" jsonschema:"Transfer only: the receiving account."`
-	CategoryID  int64        `json:"category_id,omitempty" jsonschema:"Category id, from list_categories."`
-	Amount      string       `json:"amount" jsonschema:"Amount in account_id's currency, decimal string like \"12.50\"."`
-	ToAmount    string       `json:"to_amount,omitempty" jsonschema:"Amount that arrives, for a cross-currency transfer."`
-	IsEstimated bool         `json:"is_estimated,omitempty" jsonschema:"True when the amount is approximate."`
-	Description string       `json:"description,omitempty"`
-	Date        string       `json:"date,omitempty" jsonschema:"YYYY-MM-DD. Defaults to today."`
-	TagIDs      []int64      `json:"tag_ids,omitempty" jsonschema:"Tag ids, from list_tags."`
-	Items       []txItemArgs `json:"items,omitempty" jsonschema:"Optional line items."`
+	SpaceID     int64           `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
+	Type        string          `json:"type" jsonschema:"income, expense or transfer (between two accounts of this space)."`
+	Description string          `json:"description,omitempty"`
+	Date        string          `json:"date,omitempty" jsonschema:"YYYY-MM-DD. Defaults to today."`
+	Payments    []txPaymentArgs `json:"payments" jsonschema:"The money that moved, one payment per account, signed (see the tool description)."`
+	Lines       []txLineArgs    `json:"lines,omitempty" jsonschema:"What it was for: required for an income or expense, optional fee lines for a transfer."`
+	TagIDs      []int64         `json:"tag_ids,omitempty" jsonschema:"Tag ids, from list_tags."`
 }
 
 type updateTxArgs struct {
-	SpaceID     int64        `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
-	ID          int64        `json:"id" jsonschema:"Id of the transaction."`
-	Type        string       `json:"type,omitempty" jsonschema:"income, expense or transfer."`
-	AccountID   int64        `json:"account_id,omitempty"`
-	ToAccountID int64        `json:"to_account_id,omitempty"`
-	CategoryID  int64        `json:"category_id,omitempty"`
-	Amount      string       `json:"amount,omitempty" jsonschema:"Exact decimal as a string, for example \"12.50\"."`
-	ToAmount    string       `json:"to_amount,omitempty"`
-	IsEstimated *bool        `json:"is_estimated,omitempty"`
-	Description *string      `json:"description,omitempty"`
-	Date        string       `json:"date,omitempty" jsonschema:"YYYY-MM-DD."`
-	TagIDs      []int64      `json:"tag_ids,omitempty" jsonschema:"Replaces the tags."`
-	Items       []txItemArgs `json:"items,omitempty" jsonschema:"Replaces the line items."`
+	SpaceID     int64           `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
+	ID          int64           `json:"id" jsonschema:"Id of the transaction."`
+	Type        string          `json:"type,omitempty" jsonschema:"income, expense or transfer."`
+	Description *string         `json:"description,omitempty"`
+	Date        string          `json:"date,omitempty" jsonschema:"YYYY-MM-DD."`
+	Payments    []txPaymentArgs `json:"payments,omitempty" jsonschema:"Replaces all payments: send every one, not only those that change."`
+	Lines       []txLineArgs    `json:"lines,omitempty" jsonschema:"Replaces all lines: send every one."`
+	TagIDs      []int64         `json:"tag_ids,omitempty" jsonschema:"Replaces the tags."`
 }
 
 type createAccountArgs struct {

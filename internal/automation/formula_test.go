@@ -15,7 +15,7 @@ func TestFormulaIsExact(t *testing.T) {
 	if got := evaluateFormula("0.1 + 0.2", nil); !got.Equal(dec("0.3")) {
 		t.Fatalf("0.1+0.2 = %s", got)
 	}
-	tx := &ledger.Transaction{Amount: money.FromDecimal(dec("0.1"), money.Unit{ID: 1, Decimals: 2})}
+	tx := txOf(dec("0.1"))
 	if got := evaluateFormula("{{transaction.amount}} * 3", tx); !got.Equal(dec("0.3")) {
 		t.Fatalf("amount*3 = %s", got)
 	}
@@ -54,7 +54,7 @@ func TestFormulaArithmetic(t *testing.T) {
 
 func TestFormulaTakesNumbersPlaceholders(t *testing.T) {
 	dec := decimal.RequireFromString
-	tx := &ledger.Transaction{Amount: money.FromDecimal(dec("20"), money.Unit{ID: 1, Decimals: 2})}
+	tx := txOf(dec("20"))
 	for name, tc := range map[string]struct {
 		formula any
 		want    string
@@ -175,4 +175,11 @@ func TestEqualityNumericForNumbersTextOtherwise(t *testing.T) {
 	if inSlice("a", "a") {
 		t.Error("in needs a list")
 	}
+}
+
+// txOf is an expense of amount from one account.
+func txOf(amount decimal.Decimal) *ledger.Transaction {
+	return &ledger.Transaction{Type: "expense", Payments: []ledger.Payment{{
+		Amount: money.FromDecimal(amount.Neg(), money.Unit{ID: 1, Decimals: 2}),
+	}}}
 }

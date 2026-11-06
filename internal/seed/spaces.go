@@ -74,7 +74,7 @@ var demoSpaces = []spaceSpec{
 		members:    map[string]string{userJordan: spaces.RoleViewer},
 		currencies: currencySet(eurCurrency, withRate(usdCurrency, "0.9259")),
 		own:        studioReference,
-		workspace: miniWorkspace(studioSpace),
+		workspace:  miniWorkspace(studioSpace),
 	},
 }
 
