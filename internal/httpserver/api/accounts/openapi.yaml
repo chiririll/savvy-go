@@ -7,6 +7,7 @@ paths:
       parameters:
         - {name: active, in: query, schema: {type: boolean}, description: Only active accounts}
         - {name: exclude_debts, in: query, schema: {type: boolean}}
+        - {name: type, in: query, schema: {type: string}, description: "Only accounts of these types, comma-separated (bank, crypto, cash, credit, debt, space). A credit account has a creditCard object with its terms and state."}
         - {name: with_summary, in: query, schema: {type: boolean}}
         - {name: base_currency_id, in: query, schema: {type: integer}}
       responses:

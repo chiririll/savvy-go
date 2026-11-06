@@ -123,6 +123,7 @@ func (h Handler) addMCPWriteTools(srv *mcp.Server) map[string]mcpNeed {
 	k.currencyTools()
 	k.budgetTools()
 	k.debtTools()
+	k.creditCardTools()
 	k.ruleTools()
 	return k.needs
 }
@@ -193,6 +194,16 @@ func (k writeSet) budgetTools() {
 		"Change a budget. Send only the fields that change.", "budgets/{id}"))
 	register[idArgs](k, k.del("delete_budget", "Delete budget",
 		"Permanently delete a budget. Ask the user first.", "budgets/{id}"))
+}
+
+func (k writeSet) creditCardTools() {
+	register[createCreditCardArgs](k, k.post("create_credit_card", "Create credit card",
+		"Add a credit card, or turn a bank account into one with account_id. Its terms are only shown, never calculated.",
+		"credit-cards"))
+	register[updateCreditCardArgs](k, k.patch("update_credit_card", "Update credit card",
+		"Change a credit card. Send only the fields that change.", "credit-cards/{id}"))
+	register[idArgs](k, k.del("delete_credit_card", "Delete credit card",
+		"Permanently delete a card without transactions. Ask the user first.", "credit-cards/{id}"))
 }
 
 func (k writeSet) debtTools() {

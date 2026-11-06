@@ -55,6 +55,7 @@ tags:
   - name: Sync groups
   - name: Currencies
   - name: Accounts
+  - name: Credit cards
   - name: Categories
   - name: Tags
   - name: Transactions

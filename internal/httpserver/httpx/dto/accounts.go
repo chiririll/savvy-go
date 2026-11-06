@@ -17,6 +17,8 @@ type Account struct {
 	SortOrder      int         `json:"sortOrder"`
 	Currency       *Currency   `json:"currency"`
 	CreatedAt      *time.Time  `json:"createdAt"`
+	// CreditCard is set by the account list for an account of type credit.
+	CreditCard *CardInfo `json:"creditCard,omitempty"`
 }
 
 func NewAccount(a ledger.Account) Account {

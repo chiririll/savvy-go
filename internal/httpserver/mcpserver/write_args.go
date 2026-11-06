@@ -131,6 +131,30 @@ type updateBudgetArgs struct {
 	budgetFields
 }
 
+type createCreditCardArgs struct {
+	SpaceID        int64  `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
+	AccountID      int64  `json:"account_id,omitempty" jsonschema:"A bank account to turn into a card; then only the terms are used."`
+	Name           string `json:"name,omitempty"`
+	CurrencyID     int64  `json:"currency_id,omitempty" jsonschema:"Currency id (list_currencies) or currency_code."`
+	CurrencyCode   string `json:"currency_code,omitempty" jsonschema:"Currency code such as EUR, added if missing."`
+	InitialBalance string `json:"initial_balance,omitempty" jsonschema:"Exact decimal as a string, negative when money is already owed."`
+	IsActive       *bool  `json:"is_active,omitempty"`
+	Limit          string `json:"limit" jsonschema:"Credit limit, exact decimal as a string, in the account currency."`
+	StatementDay   int    `json:"statement_day" jsonschema:"Day of the month the billing period closes (1-31; a shorter month uses its last day)."`
+	GraceDays      int    `json:"grace_days,omitempty" jsonschema:"Days from the statement to the payment due date (0-60)."`
+}
+
+type updateCreditCardArgs struct {
+	SpaceID        int64   `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
+	ID             int64   `json:"id" jsonschema:"Id of the credit card."`
+	Name           *string `json:"name,omitempty"`
+	InitialBalance string  `json:"initial_balance,omitempty" jsonschema:"Exact decimal as a string."`
+	IsActive       *bool   `json:"is_active,omitempty"`
+	Limit          string  `json:"limit,omitempty" jsonschema:"Exact decimal as a string."`
+	StatementDay   *int    `json:"statement_day,omitempty"`
+	GraceDays      *int    `json:"grace_days,omitempty"`
+}
+
 type createDebtArgs struct {
 	SpaceID      int64  `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
 	Name         string `json:"name"`

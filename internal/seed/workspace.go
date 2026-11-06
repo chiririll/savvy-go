@@ -24,6 +24,7 @@ type seeder struct {
 	txs      ledger.Transactions
 	accts    ledger.Accounts
 	debts    ledger.Debts
+	cards    ledger.CreditCards
 	cats     ledger.Categories
 	tags     ledger.Tags
 	budgets  ledger.Budgets
@@ -51,6 +52,7 @@ func seedWorkspace(ctx context.Context, db store.DB, now time.Time) (map[string]
 		txs:     ledger.Transactions{DB: db},
 		accts:   ledger.Accounts{DB: db},
 		debts:   ledger.Debts{Accounts: ledger.Accounts{DB: db}, Transactions: ledger.Transactions{DB: db}},
+		cards:   ledger.CreditCards{Accounts: ledger.Accounts{DB: db}},
 		cats:    ledger.Categories{DB: db},
 		tags:    ledger.Tags{DB: db},
 		budgets: ledger.Budgets{DB: db},
@@ -109,6 +111,7 @@ type accountSpec struct {
 	target         *float64
 	due            *string
 	counter, desc  string
+	card           *ledger.CardInput
 }
 
 func (s *seeder) accountSpecs(usd, eur *ledger.Currency) []accountSpec {
@@ -126,8 +129,14 @@ func (s *seeder) accountSpecs(usd, eur *ledger.Currency) []accountSpec {
 		specs = append(specs, accountSpec{key: "eur", name: "Revolut EUR", typ: "bank", cur: eur, bal: 1850})
 	}
 	return append(specs,
-		// A credit card is an ordinary account that starts below zero.
-		accountSpec{key: "credit", name: "Amex Gold Card", typ: "bank", cur: usd, bal: -cardAmt},
+		// A credit card is an account that starts below zero. Its statement closed
+		// 12 days ago, so what it owed then is waiting for its payment.
+		accountSpec{
+			key: "credit", name: "Amex Gold Card", typ: "credit", cur: usd, bal: -cardAmt,
+			card: &ledger.CardInput{
+				Limit: decimal.NewFromInt(15000), StatementDay: s.now.AddDate(0, 0, -12).Day(), GraceDays: 25,
+			},
+		},
 		accountSpec{
 			key: "mortgage", name: "Home Mortgage", typ: "debt", cur: usd, debtType: "i_owe", target: &mortgageAmt,
 			due: &mortgageDue, counter: "Wells Fargo Home Mortgage", desc: "30-year fixed mortgage",
@@ -151,6 +160,17 @@ func (s *seeder) createAccounts(usd *ledger.Currency, eur *ledger.Currency) (map
 				return nil, fmt.Errorf("debt %s: %w", sp.name, err)
 			}
 			out[sp.key] = &d.Account
+			continue
+		}
+		if sp.card != nil {
+			c, err := s.cards.Create(s.ctx, ledger.NewCard{
+				Name: sp.name, CurrencyID: sp.cur.ID, InitialBalance: decimal.NewFromFloat(sp.bal), IsActive: true,
+				Terms: *sp.card,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("credit card %s: %w", sp.name, err)
+			}
+			out[sp.key] = &c.Account
 			continue
 		}
 		created, err := s.accts.Create(s.ctx, ledger.AccountInput{

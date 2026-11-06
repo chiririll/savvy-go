@@ -22,11 +22,19 @@ func (s *seeder) seedTransfersDebt(accounts map[string]*ledger.Account) error {
 
 		dCard := dateOn(cursor, minInt(25, daysInMonth(cursor)))
 		if s.inRange(dCard) {
-			pay := float64(s.mtRand(600, 1400))
-			to := accounts["credit"].ID
-			if err := s.addTx("transfer", accounts["checking"].ID, nil, pay,
-				"Amex statement payment", dCard, &to, &pay, nil); err != nil {
+			// The card is paid in full on the 25th. The draw keeps the random
+			// stream of the other data as it was.
+			_ = s.mtRand(600, 1400)
+			debt, err := s.accts.Balance(s.ctx, *accounts["credit"], dCard.Format("2006-01-02"))
+			if err != nil {
 				return err
+			}
+			if pay, _ := debt.Neg().Decimal().Float64(); pay > 0 {
+				to := accounts["credit"].ID
+				if err := s.addTx("transfer", accounts["checking"].ID, nil, pay,
+					"Amex statement payment", dCard, &to, &pay, nil); err != nil {
+					return err
+				}
 			}
 		}
 

@@ -44,7 +44,7 @@ Access tokens last an hour and renew in the background. A connection unused for 
 | Tool | Returns |
 |------|---------|
 | `list_spaces` | your spaces and your role in each |
-| `list_accounts`, `list_categories`, `list_tags`, `list_currencies` | reference data of a space |
+| `list_accounts`, `list_categories`, `list_tags`, `list_currencies` | reference data of a space. `list_accounts` takes `type` (one or several, such as `credit`) to narrow the list; a credit card in it comes with its terms, available credit, last statement and status |
 | `list_transactions`, `get_transaction` | transactions; filters (dates, type, status, account or accounts, currencies, categories, tags) and free-text search `q` (description, item names, or an amount in the account's currency); pages of up to 100 |
 | `get_transactions_summary` | transaction totals |
 | `list_budgets` | budgets with progress |
@@ -63,6 +63,7 @@ On the consent page pick **Editor** or **Admin**, or tick Write and Delete under
 | `create_transaction`, `update_transaction`, `confirm_transaction`, `skip_transaction`, `duplicate_transaction` | transactions: write | record, change or settle a transaction: payments (the signed money that moved, one per account) and lines (what it was for), see [Transactions](api.md#transactions) |
 | `delete_transaction` | transactions: delete | remove a transaction |
 | `create_account`, `update_account` | accounts: write | add or change an account |
+| `create_credit_card`, `update_credit_card` | accounts: write | a credit card with its limit, statement day and grace days, see [Credit cards](api.md#credit-cards) |
 | `create_category`, `update_category`, `set_default_category` | categories: write | add or change a category |
 | `create_tag`, `rename_tag` | tags: write | add or rename a tag |
 | `create_currency`, `update_currency`, `set_base_currency` | currencies: write | add a currency, change its rate or the base currency |
@@ -70,7 +71,7 @@ On the consent page pick **Editor** or **Admin**, or tick Write and Delete under
 | `create_automation_rule`, `update_automation_rule`, `toggle_automation_rule`, `test_automation_rule` | automation: write | add, change, switch or try a rule |
 | `delete_automation_rule` | automation: delete | remove a rule |
 | `create_debt`, `update_debt`, `add_debt_payment`, `collect_debt`, `reopen_debt` | debts: write | record a debt or payment, or reopen it |
-| `delete_account`, `delete_category`, `delete_tag`, `delete_currency`, `delete_budget`, `delete_debt` | that part: delete | remove it |
+| `delete_account`, `delete_category`, `delete_tag`, `delete_currency`, `delete_budget`, `delete_debt`, `delete_credit_card` | that part: delete | remove it |
 
 - The tools are the [API](api.md) operations made with the connection's token: same checks, errors and role limits. Amounts are exact decimals sent as text, in the account's currency.
 - Delete tools are marked destructive, so clients such as Claude ask before running them.

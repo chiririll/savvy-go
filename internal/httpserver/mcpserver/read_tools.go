@@ -29,8 +29,9 @@ type spaceArgs struct {
 }
 
 type accountsArgs struct {
-	SpaceID     int64 `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
-	WithSummary bool  `json:"with_summary,omitempty" jsonschema:"Also return totals across the accounts."`
+	SpaceID     int64  `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
+	WithSummary bool   `json:"with_summary,omitempty" jsonschema:"Also return totals across the accounts."`
+	Type        string `json:"type,omitempty" jsonschema:"Only accounts of these types, comma-separated: bank, crypto, cash, credit, debt, space. For example credit lists the credit cards."`
 }
 
 type idArgs struct {
@@ -150,12 +151,17 @@ func (h Handler) addQueryReadTools(srv *mcp.Server) {
 	mcp.AddTool(
 		srv,
 		&mcp.Tool{
-			Name:        "list_accounts",
-			Description: "List the space's accounts with their currency and current balance.",
+			Name: "list_accounts",
+			Description: "List the space's accounts with their currency and current balance. A credit card (type credit) " +
+				"also has its terms, available credit, last statement with the amount due and due date, and a status " +
+				"(ok, warning or danger).",
 			Annotations: ro("List accounts"),
 		},
 		func(ctx context.Context, req *mcp.CallToolRequest, in accountsArgs) (*mcp.CallToolResult, any, error) {
 			q := url.Values{}
+			if in.Type != "" {
+				q.Set("type", in.Type)
+			}
 			if in.WithSummary {
 				q.Set("with_summary", "1")
 			}

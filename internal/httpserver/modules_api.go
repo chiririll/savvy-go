@@ -9,6 +9,7 @@ import (
 	_ "savvy-go/internal/httpserver/api/budgets"
 	_ "savvy-go/internal/httpserver/api/catalog"
 	_ "savvy-go/internal/httpserver/api/categories"
+	_ "savvy-go/internal/httpserver/api/creditcards"
 	_ "savvy-go/internal/httpserver/api/currencies"
 	_ "savvy-go/internal/httpserver/api/debts"
 )

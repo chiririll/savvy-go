@@ -76,7 +76,9 @@ var spaceSegments = map[string]string{
 	"categories":       "categories", "categories-summary": "categories",
 	"currencies": "currencies",
 	"debts":      "debts", "debts-summary": "debts",
-	"recurring": "recurring", "recurring-upcoming": "recurring",
+	// A card is an account: its token permission is the accounts one.
+	"credit-cards": "accounts",
+	"recurring":    "recurring", "recurring-upcoming": "recurring",
 	"reports": "reports",
 	"tags":    "tags",
 	// Uploads exist for importing transactions.

@@ -133,6 +133,15 @@ type Category struct {
 	UpdatedAt sql.NullString
 }
 
+type CreditCard struct {
+	AccountID    int64
+	CreditLimit  int64
+	Cycle        string
+	StatementDay sql.NullInt64
+	PeriodDays   sql.NullInt64
+	GraceDays    int64
+}
+
 type Currency struct {
 	ID        int64
 	Code      string

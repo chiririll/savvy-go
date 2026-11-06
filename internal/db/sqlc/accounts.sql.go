@@ -508,7 +508,7 @@ func (q *Queries) ListDebts(ctx context.Context, openOnly sql.NullInt64) ([]List
 
 const nextAccountSortOrder = `-- name: NextAccountSortOrder :one
 SELECT COALESCE(MAX(sort_order), -1) + 1 FROM accounts
-WHERE CASE WHEN ?1 IS NULL THEN type IN ('bank','crypto','cash') ELSE type = 'debt' END
+WHERE CASE WHEN ?1 IS NULL THEN type IN ('bank','crypto','cash','credit') ELSE type = 'debt' END
 `
 
 // Debts are ordered among themselves, the other accounts among theirs.

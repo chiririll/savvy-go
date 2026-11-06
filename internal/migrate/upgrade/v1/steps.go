@@ -72,6 +72,20 @@ func bumpSequence(ctx context.Context, tx *sql.Tx, table string) error {
 	return nil
 }
 
+// cardDebts finds the v1.0 debts that are really credit cards. v1.0 had no card,
+// so a card was a debt with no target that money was spent from (an expense on
+// the debt account) and that was paid with debt payments. It becomes an
+// ordinary account of type bank that starts at zero, its payments as they were
+// (its debt payments become transfers), and the user can make it a credit card
+// by giving it a limit and a statement day. A debt that was lent or borrowed
+// (it has an issuance) or has a target is a debt, whatever else was spent from it.
+const cardDebts = `CREATE TEMP TABLE card_debts AS
+	SELECT a.id AS id FROM src.accounts a
+	WHERE a.type = 'debt' AND COALESCE(a.debt_type, 'owed_to_me') = 'i_owe' AND COALESCE(a.target_amount, 0) = 0
+		AND NOT EXISTS (SELECT 1 FROM src.transactions t
+			WHERE t.to_account_id = a.id AND t.type IN ('debt_lend', 'debt_borrow'))
+		AND EXISTS (SELECT 1 FROM src.transactions t WHERE t.account_id = a.id AND t.type IN ('income', 'expense'))`
+
 // debtBasis is what a debt account's balance is rebuilt from: its principal
 // (the target, else what was issued, else 1 as the base wants it above 0) and
 // what was issued. The balance was target - paid; it is now initial_balance
@@ -83,21 +97,24 @@ const debtBasis = `CREATE TEMP TABLE debt_basis AS
 	FROM src.accounts a
 	LEFT JOIN (SELECT to_account_id AS id, SUM(COALESCE(to_amount, amount)) AS total FROM src.transactions
 		WHERE type IN ('debt_lend', 'debt_borrow') GROUP BY to_account_id) i ON i.id = a.id
-	WHERE a.type = 'debt'`
+	WHERE a.type = 'debt' AND a.id NOT IN (SELECT id FROM card_debts)`
 
 var accountSteps = []string{
+	cardDebts,
 	debtBasis,
 	`INSERT INTO main.accounts (id, name, type, currency_id, initial_balance, is_active, sort_order, created_at, updated_at)
-	SELECT a.id, a.name, a.type, a.currency_id,
-		CASE WHEN a.type = 'debt'
+	SELECT a.id, a.name, CASE WHEN c.id IS NOT NULL THEN 'bank' ELSE a.type END, a.currency_id,
+		CASE WHEN c.id IS NOT NULL THEN 0
+			WHEN a.type = 'debt'
 			THEN (CASE COALESCE(a.debt_type, 'owed_to_me') WHEN 'owed_to_me' THEN 1 ELSE -1 END) * (b.principal - b.issued)
 			ELSE a.initial_balance END,
 		a.is_active, a.sort_order, a.created_at, a.updated_at
-	FROM src.accounts a LEFT JOIN debt_basis b ON b.id = a.id`,
+	FROM src.accounts a LEFT JOIN debt_basis b ON b.id = a.id LEFT JOIN card_debts c ON c.id = a.id`,
 	`INSERT INTO main.debts (account_id, direction, principal, due_date, counterparty, note, closed_at)
 	SELECT a.id, COALESCE(a.debt_type, 'owed_to_me'), b.principal, a.due_date, a.counterparty, a.debt_description,
 		CASE WHEN a.is_paid_off = 1 THEN COALESCE(a.updated_at, strftime('%Y-%m-%dT%H:%M:%SZ', 'now')) END
 	FROM src.accounts a JOIN debt_basis b ON b.id = a.id`,
+	// card_debts lives on for the transactions, which drop it.
 	`DROP TABLE debt_basis`,
 }
 
@@ -126,8 +143,12 @@ func copyAccounts(ctx context.Context, tx *sql.Tx) error {
 
 // transactionSteps follow the mapping table of the plan, row kind by row kind.
 var transactionSteps = []string{
+	// a debt payment to a card is a transfer to an ordinary account
 	`INSERT INTO main.transactions (id, type, description, date, status, external_id, created_by, created_at, updated_at)
-	SELECT id, type, description, date, status,
+	SELECT id,
+		CASE WHEN type IN ('debt_lend', 'debt_borrow', 'debt_payment', 'debt_collection')
+			AND to_account_id IN (SELECT id FROM card_debts) THEN 'transfer' ELSE type END,
+		description, date, status,
 		CASE WHEN dedup_hash IS NOT NULL THEN 'csv:' || account_id || ':' || dedup_hash END,
 		created_by, created_at, updated_at
 	FROM src.transactions`,
@@ -192,6 +213,9 @@ func copyTransactions(ctx context.Context, tx *sql.Tx) error {
 		if _, err := tx.ExecContext(ctx, stmt); err != nil {
 			return fmt.Errorf("%s: %w", firstLine(stmt), err)
 		}
+	}
+	if _, err := tx.ExecContext(ctx, `DROP TABLE card_debts`); err != nil {
+		return err
 	}
 	return bumpSequence(ctx, tx, "transactions")
 }

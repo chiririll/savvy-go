@@ -22,7 +22,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS currencies_single_base_unique ON currencies (i
 CREATE TABLE IF NOT EXISTS accounts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
-    type TEXT NOT NULL CHECK (type IN ('bank', 'crypto', 'cash', 'debt', 'space')),
+    type TEXT NOT NULL CHECK (type IN ('bank', 'crypto', 'cash', 'credit', 'debt', 'space')),
     is_service INTEGER GENERATED ALWAYS AS (type IN ('debt', 'space')) VIRTUAL,
     currency_id INTEGER NOT NULL REFERENCES currencies(id),
     initial_balance INTEGER NOT NULL DEFAULT 0,
@@ -33,6 +33,24 @@ CREATE TABLE IF NOT EXISTS accounts (
 ) STRICT;
 CREATE INDEX IF NOT EXISTS accounts_currency_idx ON accounts (currency_id);
 CREATE UNIQUE INDEX IF NOT EXISTS accounts_space_currency_unique ON accounts (currency_id) WHERE type = 'space';
+
+-- A credit card is an ordinary account of type credit; this is how its billing
+-- period runs. The app only shows its state (limit, statement, due date): it
+-- computes no interest or fees. fixed_day closes a period on statement_day of
+-- every month; first_expense (a period that starts when the balance goes below
+-- zero and lasts period_days) is kept for later, the service refuses it.
+CREATE TABLE IF NOT EXISTS credit_cards (
+    account_id INTEGER PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
+    credit_limit INTEGER NOT NULL CHECK (credit_limit > 0),
+    cycle TEXT NOT NULL CHECK (cycle IN ('fixed_day', 'first_expense')),
+    statement_day INTEGER CHECK (statement_day BETWEEN 1 AND 31),
+    period_days INTEGER CHECK (period_days > 0),
+    grace_days INTEGER NOT NULL CHECK (grace_days >= 0),
+    CHECK (
+        (cycle = 'fixed_day' AND statement_day IS NOT NULL AND period_days IS NULL)
+        OR (cycle = 'first_expense' AND period_days IS NOT NULL AND statement_day IS NULL)
+    )
+) STRICT;
 
 CREATE TABLE IF NOT EXISTS debts (
     account_id INTEGER PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,

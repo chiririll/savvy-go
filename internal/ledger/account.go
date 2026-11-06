@@ -61,6 +61,9 @@ var (
 	// written through Accounts: debts belong to Debts, and a space account is
 	// made by SpaceAccount.
 	ErrServiceAccount = errors.New("a debt or space account cannot be changed as an account")
+	// ErrCardAccount is returned when a credit card is written through Accounts:
+	// it belongs to CreditCards, which keeps its terms with the account.
+	ErrCardAccount = errors.New("a credit card cannot be changed as an account")
 )
 
 type Accounts struct{ DB store.DB }
@@ -153,6 +156,9 @@ func (s Accounts) Create(ctx context.Context, a AccountInput) (*Account, error) 
 	if isServiceType(a.Type) {
 		return nil, ErrServiceAccount
 	}
+	if a.Type == TypeCredit {
+		return nil, ErrCardAccount
+	}
 	unit, err := s.currencyUnit(ctx, a.CurrencyID)
 	if err != nil {
 		return nil, err
@@ -190,6 +196,9 @@ func (s Accounts) Update(ctx context.Context, id int64, a AccountInput) (*Accoun
 	if cur.IsService || isServiceType(a.Type) {
 		return nil, ErrServiceAccount
 	}
+	if cur.Type == TypeCredit || a.Type == TypeCredit {
+		return nil, ErrCardAccount
+	}
 	if a.CurrencyID != cur.CurrencyID {
 		return nil, ErrAccountCurrencyImmutable
 	}
@@ -212,6 +221,8 @@ func isServiceType(typ string) bool { return typ == "debt" || typ == "space" }
 func (s Accounts) Delete(ctx context.Context, id int64) error {
 	if a, err := s.ByID(ctx, id); err == nil && a != nil && a.IsService {
 		return ErrServiceAccount
+	} else if err == nil && a != nil && a.Type == TypeCredit {
+		return ErrCardAccount
 	}
 	if s.repo().CountAccountPayments(ctx, id) > 0 {
 		return fmt.Errorf("has transactions")

@@ -24,7 +24,7 @@ ORDER BY CASE a.type WHEN 'debt' THEN 1 WHEN 'space' THEN 2 ELSE 0 END, a.sort_o
 -- name: NextAccountSortOrder :one
 -- Debts are ordered among themselves, the other accounts among theirs.
 SELECT COALESCE(MAX(sort_order), -1) + 1 FROM accounts
-WHERE CASE WHEN sqlc.narg('debt_only') IS NULL THEN type IN ('bank','crypto','cash') ELSE type = 'debt' END;
+WHERE CASE WHEN sqlc.narg('debt_only') IS NULL THEN type IN ('bank','crypto','cash','credit') ELSE type = 'debt' END;
 
 -- name: InsertAccount :execresult
 INSERT INTO accounts (name, type, currency_id, initial_balance, is_active, sort_order, created_at, updated_at)
