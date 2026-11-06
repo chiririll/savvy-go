@@ -1,12 +1,13 @@
 import { z } from 'zod'
 import i18n from '@/lib/i18n'
+import { FORM_ACCOUNT_TYPES } from '@/types/accounts'
 
 export const accountSchema = z.object({
     name: z.string()
         .min(1, i18n.t('validation.nameRequired'))
         .max(255, i18n.t('validation.maxChars', { count: 255 })),
 
-    type: z.enum(['bank', 'crypto', 'cash'], {
+    type: z.enum(FORM_ACCOUNT_TYPES, {
         error: i18n.t('validation.selectAccountType'),
     }),
 

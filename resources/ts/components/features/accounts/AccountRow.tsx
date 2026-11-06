@@ -10,7 +10,9 @@ const TYPE_ICON_TONES = {
     bank: 'bg-info/15 text-info',
     cash: 'bg-success/15 text-success',
     crypto: 'bg-warning/15 text-warning',
+    credit: 'bg-info/15 text-info',
     debt: 'bg-purple-100 text-purple-600 dark:bg-purple-950/40',
+    space: 'bg-muted text-muted-foreground',
 } as const
 
 interface AccountRowProps {

@@ -16,7 +16,6 @@ export { apiTokensApi } from './api-tokens'
 export { tagsApi } from './tags'
 export {
     transactionsApi,
-    transactionGroupsApi,
     type ConfirmTransactionOptions,
     type TransactionsResponse,
 } from './transactions'

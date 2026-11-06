@@ -6,10 +6,12 @@ import type {
     Currency,
     CurrencyCatalogItem,
     Debt,
+    Payment,
     RecurringTransaction,
     Settings,
     Tag,
     Transaction,
+    TransactionLine,
 } from '@/types'
 
 export const currency = (overrides: Partial<Currency> = {}): Currency => ({
@@ -166,22 +168,37 @@ export const recurring = (overrides: Partial<RecurringTransaction> = {}): Recurr
     ...overrides,
 })
 
+export const payment = (overrides: Partial<Payment> = {}): Payment => ({
+    accountId: overrides.account?.id ?? 1,
+    account: accounts[0],
+    amount: -42.5,
+    ...overrides,
+})
+
+export const line = (overrides: Partial<TransactionLine> = {}): TransactionLine => ({
+    seq: 0,
+    categoryId: categories[0].id,
+    category: categories[0],
+    currencyId: currencies[0].id,
+    amount: 42.5,
+    note: null,
+    ...overrides,
+})
+
+/** An expense of 42.50 on the first account, in one line. */
 export const transaction = (overrides: Partial<Transaction> = {}): Transaction => ({
     id: 1,
     type: 'expense',
-    amount: 42.5,
-    toAmount: null,
-    isEstimated: false,
+    amount: -42.5,
+    difference: null,
     description: 'Weekly shop',
     date: '2020-05-04',
     status: 'confirmed',
     recurringTransactionId: null,
-    groupUuid: null,
-    actions: { edit: true, duplicate: true, delete: true, confirm: false, skip: false },
-    account: accounts[0],
-    toAccount: null,
-    category: categories[0],
-    items: [],
+    actions: { edit: true, editDetails: true, duplicate: true, delete: true, confirm: false, skip: false },
+    restrictions: [],
+    payments: [payment()],
+    lines: [line()],
     tags: [],
     ...overrides,
 })
@@ -191,6 +208,6 @@ export const pendingTransaction = (overrides: Partial<Transaction> = {}): Transa
     transaction({
         status: 'pending',
         date: '2099-06-01',
-        actions: { edit: true, duplicate: false, delete: true, confirm: true, skip: true },
+        actions: { edit: true, editDetails: true, duplicate: false, delete: true, confirm: true, skip: true },
         ...overrides,
     })

@@ -56,13 +56,15 @@ The core of the rework.
 
 ### 6. Frontend and docs
 
+The frontend half moved to [frontend-rework-tasks.md](frontend-rework-tasks.md) (tasks F1 to F8). What follows is the original list.
+
 - `resources/ts`: the transaction form (payments and lines, change, several currencies), lists, enum constants in `types/` (`space` account type, `in_review` transfer status) and `lib/backend-contract.test.ts` (it now reads `0001_base.sql`).
 - Docs: rewrite `docs/split-payments.md`, update `docs/api.md`, `docs/mcp.md`, `docs/spaces.md` and `docs/development.md` where they show the schema; release notes (items become a note, v1.0 quantities and prices are dropped).
 - Done when: `npx tsc --noEmit -p tsconfig.ci.json` and the frontend tests pass.
 
 ### 11. Credit cards (frontend)
 
-Separate task, after 10 and together with task 6.
+Separate task, after 10 and together with task 6. Moved to [frontend-rework-tasks.md](frontend-rework-tasks.md) (F7), where the account form has no `first_expense` switch, because task 10 builds only `fixed_day`. What follows is the original list.
 
 - `types/`: `credit` account type, the card and status shapes; `lib/backend-contract.test.ts` must still match `0001_base.sql`.
 - An icon for the type (account lists, pickers, the account form), the card fields in the account form (limit, a switch between "closes on day N of the month" and "starts when the balance goes below zero" with the day or the period length, grace days), and on the account page: available credit, spent in the period, statement balance, due date and amount due.

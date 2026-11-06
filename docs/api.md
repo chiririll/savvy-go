@@ -76,6 +76,7 @@ A transaction is one event with the **payments** that moved the money and the **
 
 - A payment is money that moved on one account, signed, in that account's currency: an expense takes money (negative), an income brings it (positive), and change is a payment of the opposite sign on another account, often in another currency. An account appears once. A payment of zero is refused.
 - A line is an amount for a category: positive, in one of the currencies of the payment accounts (`currency_id` can be left out when they share one), in a category of the transaction's type. An income or expense needs at least one line, and a transfer may have fee lines in expense categories. Reports read lines only, so change is never income.
+- A line's `note` is markdown (bold, italic, lists, task lists, links, inline code); a list of products is a markdown list. It has no length limit of its own. Upgrading from v1.0 turns a transaction's item names into such a list; quantities and prices are dropped.
 - The database does not tie payments to lines. When you save, the API converts both to the base currency at the current rates and answers `difference` (payments less lines) if they disagree. It never refuses the save for that.
 - Debt and space accounts cannot be paid directly: a debt moves through the debts endpoints, a space account through a transfer to another space.
 - Keys the API does not know are refused, so a client sending the flat shape of earlier versions (`account_id`, `amount`, `items`) gets a `422`.

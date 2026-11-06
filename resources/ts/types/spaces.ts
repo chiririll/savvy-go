@@ -155,6 +155,10 @@ export interface SyncPlan extends SyncChange {
 export const TRANSFER_REVIEWS = ['created_remote', 'deleted_remote', 'changed_remote', 'missing_remote'] as const
 export type TransferReview = (typeof TRANSFER_REVIEWS)[number]
 
+/** `space_transfers.status`: a transfer in review waits for the owner to pick a side. */
+export const TRANSFER_STATUSES = ['confirmed', 'in_review'] as const
+export type TransferStatus = (typeof TRANSFER_STATUSES)[number]
+
 export interface SpaceTransfer {
     uuid: string
     from: TransferSide

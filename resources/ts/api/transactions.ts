@@ -1,16 +1,22 @@
 import { api, apiClient } from './client'
 import { createCrudApi } from './crud'
 import { toQueryString } from '@/lib/query-string'
-import { Transaction, TransactionFilters, TransactionGroup, TransactionSummary } from '@/types'
-import { TransactionFormData } from '@/schemas'
-import type { PaymentLeg } from '@/lib/split-payment'
+import type {
+    LineInput,
+    PaymentInput,
+    Transaction,
+    TransactionFilters,
+    TransactionInput,
+    TransactionSummary,
+} from '@/types'
 
 const ENDPOINT = '/transactions'
 
+/** Confirming the open occurrence of a recurring rule may bring the real payments and lines. */
 export interface ConfirmTransactionOptions {
     date?: string | null
-    amount?: number | null
-    to_amount?: number | null
+    payments?: PaymentInput[]
+    lines?: LineInput[]
 }
 
 type ConfirmTransactionBody = Omit<ConfirmTransactionOptions, 'date'> & { date?: string }
@@ -28,7 +34,7 @@ export interface TransactionsResponse {
     }
 }
 
-const crud = createCrudApi<Transaction, TransactionFormData>(ENDPOINT)
+const crud = createCrudApi<Transaction, TransactionInput>(ENDPOINT)
 
 export const transactionsApi = {
     ...crud,
@@ -65,8 +71,8 @@ export const transactionsApi = {
     confirm: (id: number | string, options: ConfirmTransactionOptions = {}) =>
         api.post<Transaction, ConfirmTransactionBody>(`${ENDPOINT}/${id}/confirm`, {
             ...(options.date ? { date: options.date } : {}),
-            ...(options.amount != null ? { amount: options.amount } : {}),
-            ...(options.to_amount != null ? { to_amount: options.to_amount } : {}),
+            ...(options.payments ? { payments: options.payments } : {}),
+            ...(options.lines ? { lines: options.lines } : {}),
         }),
 
     /** Puts the transactions in that order within one day; ids go oldest first. */
@@ -87,18 +93,4 @@ export const transactionsApi = {
             start_date: filters?.start_date,
             end_date: filters?.end_date,
         })}`),
-}
-
-const GROUPS_ENDPOINT = '/transaction-groups'
-
-export const transactionGroupsApi = {
-    getByUuid: (uuid: string) => api.get<TransactionGroup>(`${GROUPS_ENDPOINT}/${uuid}`),
-
-    create: (legs: PaymentLeg[]) => api.post<TransactionGroup, { legs: PaymentLeg[] }>(GROUPS_ENDPOINT, { legs }),
-
-    /** Replaces every leg of the payment. */
-    update: (uuid: string, legs: PaymentLeg[]) =>
-        api.put<TransactionGroup, { legs: PaymentLeg[] }>(`${GROUPS_ENDPOINT}/${uuid}`, { legs }),
-
-    delete: (uuid: string) => api.delete<void>(`${GROUPS_ENDPOINT}/${uuid}`),
 }

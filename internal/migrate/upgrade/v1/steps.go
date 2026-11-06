@@ -190,10 +190,10 @@ var transactionSteps = []string{
 	WHERE type IN ('debt_lend', 'debt_borrow', 'debt_payment', 'debt_collection')
 		AND to_account_id IS NOT NULL AND to_account_id <> account_id`,
 
-	// income and expense of more than 0: one line, noted with the item names
+	// income and expense of more than 0: one line, its note a markdown list of the item names
 	`INSERT INTO main.transaction_lines (transaction_id, seq, category_id, currency_id, amount, note)
 	SELECT t.id, 0, t.category_id, a.currency_id, t.amount,
-		(SELECT group_concat(trim(i.name), ', ' ORDER BY i.id) FROM src.transaction_items i
+		(SELECT group_concat('- ' || trim(i.name), char(10) ORDER BY i.id) FROM src.transaction_items i
 			WHERE i.transaction_id = t.id AND trim(i.name) <> '')
 	FROM src.transactions t JOIN src.accounts a ON a.id = t.account_id
 	WHERE t.type IN ('income', 'expense') AND t.amount > 0`,

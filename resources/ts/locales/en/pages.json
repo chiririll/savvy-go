@@ -15,7 +15,9 @@
             "bank": "Bank",
             "cash": "Cash",
             "crypto": "Crypto",
-            "debt": "Debt"
+            "credit": "Credit card",
+            "debt": "Debt",
+            "space": "Other space"
         },
         "status": {
             "active": "Active",

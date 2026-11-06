@@ -12,7 +12,6 @@ export const SPACE_ROOTS = new Set([
     'categories-summary',
     'tags',
     'transactions',
-    'transaction-groups',
     'transactions-summary',
     'transactions-pending-summary',
     'debts',

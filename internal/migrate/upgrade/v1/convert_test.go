@@ -125,7 +125,7 @@ func TestLinesCarryCategoryCurrencyAndItemNames(t *testing.T) {
 	d, _, _ := converted(t)
 	expect(t, d,
 		`SELECT transaction_id, seq, category_id, currency_id, amount, note FROM transaction_lines ORDER BY 1, 2`,
-		"1|0|1|1|1250|Milk, Bread", // the items' names, trimmed, in item order
+		"1|0|1|1|1250|- Milk\n- Bread", // the items' names, trimmed, in item order, as a markdown list
 		"2|0|2|1|300000|NULL", "12|0|1|1|1500|NULL", "13|0|1|1|1400|NULL",
 		"14|0|1|1|90|NULL") // a blank item name leaves no note; amount 0 (tx 5) has no line
 }

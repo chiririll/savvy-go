@@ -18,39 +18,85 @@ export type TransactionType = (typeof ALL_TRANSACTION_TYPES)[number]
 export const TRANSACTION_STATUSES = ['pending', 'confirmed', 'skipped'] as const
 export type TransactionStatus = (typeof TRANSACTION_STATUSES)[number]
 
-export interface TransactionItem {
-    id?: number
-    name: string
-    quantity: number
-    pricePerUnit: number
-    totalPrice: number
+/** Why a transaction cannot be changed freely; mirrors `ledger.Reason`. */
+export const RESTRICTION_REASONS = ['debt', 'space_transfer', 'transfer_review', 'recurring_pending'] as const
+export type RestrictionReason = (typeof RESTRICTION_REASONS)[number]
+
+export interface TransactionRestriction {
+    reason: RestrictionReason
+    /** The reason in words, in English; the app shows its own translation by `reason`. */
+    message: string
 }
 
 export interface TransactionActions {
     edit: boolean
+    /** Only the description, tags and the categories and notes of lines can change. */
+    editDetails: boolean
     duplicate: boolean
     delete: boolean
     confirm: boolean
     skip: boolean
 }
 
+/** Money that moved on one account: signed, in the account's currency. Change is a payment of the opposite sign. */
+export interface Payment {
+    accountId: number
+    account: Account | null
+    amount: number
+}
+
+/** An amount for a category, positive, in the currency `currencyId` names (one of the payment accounts'). */
+export interface TransactionLine {
+    seq: number
+    categoryId: number | null
+    category: Category | null
+    currencyId: number
+    amount: number
+    /** Markdown. */
+    note: string | null
+}
+
 export interface Transaction extends BaseEntity {
     type: TransactionType
-    amount: number
-    toAmount: number | null
-    isEstimated: boolean
     description: string | null
     date: string | null
     status: TransactionStatus
     recurringTransactionId: number | null
-    /** The split payment this transaction is a leg of; its legs change together. */
-    groupUuid: string | null
+    /** What the payments net to; null when they span several currencies. */
+    amount: number | null
+    /** Payments less lines in the base currency; set only on the answer to a save, when they disagree. */
+    difference: number | null
     actions: TransactionActions
-    account: Account
-    toAccount: Account | null
-    category: Category | null
-    items: TransactionItem[]
+    restrictions: TransactionRestriction[]
+    payments: Payment[]
+    lines: TransactionLine[]
     tags: Tag[]
+}
+
+/** A payment as sent to the API. An empty amount is allowed only in a recurring template. */
+export interface PaymentInput {
+    account_id: number
+    amount: number | null
+    estimated?: boolean
+}
+
+/** A line as sent to the API. A missing `currency_id` means the currency all the payment accounts share. */
+export interface LineInput {
+    category_id: number | null
+    currency_id?: number
+    amount: number
+    note?: string | null
+}
+
+/** A transaction as sent to create or update it; left out, payments, lines and tags stay as they are on update. */
+export interface TransactionInput {
+    type: TransactionType
+    description?: string | null
+    date?: string | null
+    status?: TransactionStatus
+    payments?: PaymentInput[]
+    lines?: LineInput[]
+    tag_ids?: number[]
 }
 
 export interface TransactionFilters {
@@ -60,7 +106,7 @@ export interface TransactionFilters {
     account_ids?: number[]
     /** Currency codes; a transfer matches if either account is in one. */
     currency?: string[]
-    /** Free text: every word must match the description, an item name or a number. */
+    /** Free text: every word must match the description or a number. */
     q?: string
     category_ids?: number[]
     tag_ids?: number[]
@@ -79,10 +125,4 @@ export interface TransactionSummary {
     balance: number
     transactionsCount: number
     currency: string | null
-}
-
-/** One payment made in several parts: its legs, oldest first. */
-export interface TransactionGroup {
-    uuid: string
-    legs: Transaction[]
 }

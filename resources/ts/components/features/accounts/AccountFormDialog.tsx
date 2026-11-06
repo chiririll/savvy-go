@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { EntityFormDialog } from '@/components/shared'
 import { AccountFormValues, AccountFormData, encodeAccountCurrency } from '@/schemas'
-import { Account } from '@/types'
+import { Account, FORM_ACCOUNT_TYPES } from '@/types'
 import { AccountForm } from './AccountForm'
 
 const FORM_ID = 'account-form'
@@ -35,7 +35,7 @@ export function AccountFormDialog({
             description={t('accounts.description')}
             toFormValues={(item) => ({
                 name: item.name,
-                type: item.type === 'debt' ? 'bank' : item.type,
+                type: FORM_ACCOUNT_TYPES.find((type) => type === item.type) ?? 'bank',
                 currency: encodeAccountCurrency({ id: item.currency?.id }),
                 initial_balance: item.initialBalance,
                 is_active: item.isActive,
