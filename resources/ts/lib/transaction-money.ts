@@ -1,5 +1,5 @@
 import { useCurrenciesStore } from '@/stores/currencies'
-import type { Category, Currency, Transaction, TransactionLine } from '@/types'
+import { isServiceAccountType, type Category, type Currency, type Payment, type Transaction, type TransactionLine } from '@/types'
 
 /** An amount in one currency. Currencies are never mixed: a transaction has one total per currency. */
 export interface CurrencyAmount {
@@ -84,4 +84,68 @@ export function primaryCategory(transaction: WithLines): Category | null {
     }
 
     return best?.category ?? null
+}
+
+/** An amount in another currency, by the space's rates (base per unit), rounded to the target's decimals. */
+export function convertAmount(amount: number, from: Currency, to: Currency): number {
+    if (from.code === to.code) {
+        return amount
+    }
+    const toBase = (currency: Currency) => (currency.isBase ? 1 : currency.rate || 0)
+    if (toBase(to) === 0) {
+        return amount
+    }
+    return Number(((amount * toBase(from)) / toBase(to)).toFixed(to.decimals))
+}
+
+/** What a row shows as its amount: one value, and the exact totals it stands for. */
+export interface RowAmount {
+    /** In the first currency of `totals`; converted at current rates when there are several. */
+    main: CurrencyAmount
+    /** Exact totals per currency, in order of first appearance. */
+    totals: CurrencyAmount[]
+    /** True when `main` is a conversion of several currencies (the row marks it with an asterisk). */
+    converted: boolean
+}
+
+function toRowAmount(totals: CurrencyAmount[]): RowAmount | null {
+    if (totals.length === 0) {
+        return null
+    }
+    const [first] = totals
+    if (totals.length === 1) {
+        return { main: first, totals, converted: false }
+    }
+    const sum = totals.reduce((acc, t) => acc + convertAmount(t.amount, t.currency, first.currency), 0)
+    return { main: { currency: first.currency, amount: sum }, totals, converted: true }
+}
+
+const isOrdinary = (payment: Payment) => !!payment.account && !isServiceAccountType(payment.account.type)
+
+/**
+ * The amount of a row, unsigned: what was spent or earned, from the lines. Without lines (a debt
+ * payment) it is the payments on ordinary accounts. Null when there is nothing to show.
+ */
+export function rowAmount(transaction: WithLines): RowAmount | null {
+    const spent = spentByCurrency(transaction).map((t) => ({ ...t, amount: Math.abs(t.amount) }))
+    if (spent.length > 0) {
+        return toRowAmount(spent)
+    }
+    const ordinary = transaction.payments.filter(isOrdinary)
+    return toRowAmount(
+        netByCurrency({ payments: ordinary }).map((t) => ({ ...t, amount: Math.abs(t.amount) })),
+    )
+}
+
+/** What left and what arrived on the ordinary accounts of a transfer; each is null when that side is missing. */
+export function transferSides(transaction: WithPayments): { sent: RowAmount | null; received: RowAmount | null } {
+    const ordinary = transaction.payments.filter(isOrdinary)
+    const side = (sign: 1 | -1) =>
+        toRowAmount(
+            netByCurrency({ payments: ordinary.filter((p) => Math.sign(p.amount) === sign) }).map((t) => ({
+                ...t,
+                amount: Math.abs(t.amount),
+            })),
+        )
+    return { sent: side(-1), received: side(1) }
 }

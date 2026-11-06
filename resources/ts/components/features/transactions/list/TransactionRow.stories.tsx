@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, fn, screen, userEvent, waitFor, within } from 'storybook/test'
 
-import { accounts, categories, currencies, pendingTransaction, transaction } from '@/test/fixtures'
+import { accounts, categories, currencies, line, payment, pendingTransaction, transaction } from '@/test/fixtures'
 import { overlayA11y } from '@/test/a11y'
 import { useCurrenciesStore } from '@/stores/currencies'
 
@@ -25,21 +25,39 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-const items = [
-    { id: 1, name: 'Bread', quantity: 2, pricePerUnit: 2.5, totalPrice: 5 },
-    { id: 2, name: 'Cheese', quantity: 1, pricePerUnit: 12.5, totalPrice: 12.5 },
-]
+// An expense paid from one account: the lines are what was spent, the payment what left the account.
+const spent = (account: (typeof accounts)[number], amount: number, overrides = {}) =>
+    transaction({
+        payments: [payment({ account, accountId: account.id, amount: -amount })],
+        lines: [line({ amount, currencyId: account.currency?.id })],
+        ...overrides,
+    })
 
 const openMenu = (canvasElement: HTMLElement) =>
     userEvent.click(within(canvasElement).getByRole('button', { name: /more actions/i }))
 
 export const Expense: Story = {}
 export const Income: Story = {
-    args: { transaction: transaction({ type: 'income', amount: 3200, description: 'Salary', category: categories[1] }) },
+    args: {
+        transaction: transaction({
+            type: 'income',
+            description: 'Salary',
+            payments: [payment({ amount: 3200 })],
+            lines: [line({ amount: 3200, category: categories[1], categoryId: categories[1].id })],
+        }),
+    },
 }
 export const Transfer: Story = {
     args: {
-        transaction: transaction({ type: 'transfer', description: null, category: null, toAccount: accounts[0], account: accounts[0] }),
+        transaction: transaction({
+            type: 'transfer',
+            description: null,
+            payments: [
+                payment({ amount: -100 }),
+                payment({ account: accounts[1], accountId: accounts[1].id, amount: 100 }),
+            ],
+            lines: [],
+        }),
     },
 }
 
@@ -47,24 +65,101 @@ export const Transfer: Story = {
 export const TransferBetweenCurrencies: Story = {
     args: {
         transaction: transaction({
-            type: 'transfer', description: null, category: null, amount: 100, account: accounts[0],
-            toAccount: accounts[2], toAmount: 15000,
+            type: 'transfer',
+            description: null,
+            payments: [
+                payment({ amount: -100 }),
+                payment({ account: accounts[2], accountId: accounts[2].id, amount: 15000 }),
+            ],
+            lines: [],
         }),
     },
 }
-export const DebtPayment: Story = { args: { transaction: transaction({ type: 'debt_payment', description: null, category: null }) } }
-export const DebtCollection: Story = { args: { transaction: transaction({ type: 'debt_collection', description: null, category: null }) } }
-export const NoCategory: Story = { args: { transaction: transaction({ category: null, description: null }) } }
-export const Estimated: Story = { args: { transaction: transaction({ isEstimated: true }) } }
-export const ThreeDecimals: Story = { args: { transaction: transaction({ amount: 12.345, account: accounts[3] }) } }
-export const ZeroDecimals: Story = { args: { transaction: transaction({ amount: 1500, account: accounts[2] }) } }
+export const DebtPayment: Story = {
+    args: {
+        transaction: transaction({
+            type: 'debt_payment',
+            description: null,
+            payments: [
+                payment({ amount: -50 }),
+                payment({ account: { ...accounts[0], id: 9, name: 'Alex', type: 'debt' }, accountId: 9, amount: 50 }),
+            ],
+            lines: [],
+        }),
+    },
+}
+export const NoCategory: Story = {
+    args: { transaction: transaction({ lines: [line({ category: null, categoryId: null })], description: null }) },
+}
+export const ThreeDecimals: Story = { args: { transaction: spent(accounts[3], 12.345) } }
+export const ZeroDecimals: Story = { args: { transaction: spent(accounts[2], 1500) } }
+
+// Several categories: two emojis in the icon, a count in the subtitle, and no notes in the row.
+export const SeveralCategories: Story = {
+    args: {
+        transaction: transaction({
+            description: 'Market trip',
+            lines: [
+                line({ amount: 30, note: '- Bread\n- Cheese' }),
+                line({ seq: 1, amount: 12.5, category: categories[2], categoryId: categories[2].id }),
+            ],
+            payments: [payment({ amount: -42.5 })],
+        }),
+    },
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement)
+        await expect(canvas.getByText(/2 categories/)).toBeVisible()
+        await expect(canvas.queryByText(/Bread/)).toBeNull()
+    },
+}
+
+// Several currencies: one value in the first, with an asterisk; the exact totals appear on hover.
+export const SeveralCurrencies: Story = {
+    args: {
+        transaction: transaction({
+            description: 'Trip',
+            payments: [
+                payment({ amount: -30 }),
+                payment({ account: accounts[1], accountId: accounts[1].id, amount: -10 }),
+            ],
+            lines: [
+                line({ amount: 30, currencyId: currencies[0].id }),
+                line({ seq: 1, amount: 10, currencyId: currencies[1].id, category: categories[2], categoryId: categories[2].id }),
+            ],
+        }),
+    },
+    play: async ({ canvasElement }) => {
+        const amount = within(canvasElement).getByTestId('converted-amount')
+        await expect(amount).toHaveTextContent(/\*$/)
+        await userEvent.hover(amount)
+        await waitFor(() => expect(screen.getAllByText(/€/).length).toBeGreaterThan(0))
+    },
+}
+
+export const SeveralAccounts: Story = {
+    args: {
+        transaction: transaction({
+            payments: [
+                payment({ amount: -30 }),
+                payment({ account: accounts[1], accountId: accounts[1].id, amount: -12.5 }),
+            ],
+            lines: [line({ amount: 42.5 })],
+        }),
+    },
+}
 
 export const Pending: Story = { args: { transaction: pendingTransaction() } }
 export const Skipped: Story = { args: { transaction: transaction({ status: 'skipped' }) } }
 export const SkippedTransfer: Story = {
     args: {
         transaction: transaction({
-            status: 'skipped', type: 'transfer', category: null, toAccount: accounts[2], toAmount: 15000, amount: 100,
+            status: 'skipped',
+            type: 'transfer',
+            payments: [
+                payment({ amount: -100 }),
+                payment({ account: accounts[2], accountId: accounts[2].id, amount: 15000 }),
+            ],
+            lines: [],
         }),
     },
 }
@@ -73,29 +168,15 @@ export const LongDescription: Story = {
     args: { transaction: transaction({ description: 'A description so long that it can never fit on the single line it is given' }) },
 }
 
-export const WithItems: Story = {
-    args: { transaction: transaction({ items }) },
-    play: async ({ canvasElement }) => {
-        const canvas = within(canvasElement)
-        const toggle = canvas.getByRole('button', { name: /^\(2/ })
-        await expect(toggle).toHaveAttribute('aria-expanded', 'false')
-        await userEvent.click(toggle)
-        await expect(toggle).toHaveAttribute('aria-expanded', 'true')
-        await expect(canvas.getByText('Cheese')).toBeVisible()
-    },
-}
-
-export const SingleItemHasNoToggle: Story = {
-    args: { transaction: transaction({ items: [items[0]] }) },
-    play: async ({ canvasElement }) => {
-        await expect(within(canvasElement).queryByRole('button', { name: /^\(1/ })).toBeNull()
-    },
-}
-
 // A viewer may still open a transaction to look at it, but cannot confirm, skip, duplicate or delete it.
 export const ReadOnly: Story = {
     tags: ['desktop-only'],
-    args: { isReadOnly: true, transaction: pendingTransaction({ actions: { edit: true, duplicate: true, delete: true, confirm: true, skip: true } }) },
+    args: {
+        isReadOnly: true,
+        transaction: pendingTransaction({
+            actions: { edit: true, editDetails: true, duplicate: true, delete: true, confirm: true, skip: true },
+        }),
+    },
     play: async ({ canvasElement }) => {
         await openMenu(canvasElement)
         await screen.findByRole('menuitem', { name: /edit/i })
@@ -113,7 +194,7 @@ export const ActionsHidden: Story = {
 // What the server allows decides what the menu offers.
 export const NothingAllowed: Story = {
     args: {
-        transaction: transaction({ actions: { edit: false, duplicate: false, delete: false, confirm: false, skip: false } }),
+        transaction: transaction({ actions: { edit: false, editDetails: false, duplicate: false, delete: false, confirm: false, skip: false } }),
     },
     play: async ({ canvasElement }) => {
         await expect(within(canvasElement).queryByRole('button')).toBeNull()
@@ -124,7 +205,7 @@ export const NothingAllowed: Story = {
 export const NothingAllowedKeepsDotsColumn: Story = {
     tags: ['desktop-only'],
     args: {
-        transaction: transaction({ actions: { edit: false, duplicate: false, delete: false, confirm: false, skip: false } }),
+        transaction: transaction({ actions: { edit: false, editDetails: false, duplicate: false, delete: false, confirm: false, skip: false } }),
     },
     play: async ({ canvasElement }) => {
         await expect(within(canvasElement).getByTestId('feed-row-actions-spacer')).toBeInTheDocument()

@@ -64,6 +64,22 @@ Mockup first.
 - Remove the "Part of a payment" badge and `TransactionItemsRow`; update `lib/transaction-description.ts`, `lib/labels.ts`, the list filters (account and category match any payment or line), pending strip cards.
 - Row click and its menu are not changed here (F5 decides what a click opens).
 
+**Done 6 Nov 2026.** Decided with the owner: the icon is the budget's (up to two category emojis stacked; now shared as `categoryIcons` in `components/shared`); several currencies show **one value converted to the first currency with an asterisk** (`TransactionAmount`, tooltip with the exact totals; the full list also goes to the F5 dialog; a tooltip does not open by touch); a row with nothing to show (a pending template without a figure) shows a dash. Built: `lib/transaction-money.ts` (`convertAmount`, `rowAmount`, `transferSides`), `lib/transaction-description.ts` (description, `accountLabel` "Cash +N", subtitle with "N categories"), `netTotalsByCurrency` on lines (a transfer's fee is spending), `TransactionRow`, `UpcomingPendingCard`; `TransactionItemsRow`, the payment badge and the group delete are gone; stories and tests. `RecurringRow` adapts its flat shape locally until F4f. The `≈` of an estimated amount is not shown until F4e/F4f read `estimated`. Left red for later tasks: `lib/negative-balance.ts` (F4c) and the files listed under F1 for F4/F6.
+
+Agreed mockup:
+
+```
+DESKTOP
+(🛒)  Groceries                                   −52.40 EUR
+      Today · Cash · Food
+(🛒🚌) Market trip              [Pending]          −40.00 EUR*   <- hover: −40.00 EUR / −300.00 RSD
+      Yesterday · Cash +1 · 3 categories
+(⇄)   Cash → Visa                                 −200.00 EUR
+      Mon · Cash                                  +200.00 EUR
+(💼)  Template without a figure                          —
+MOBILE: the subtitle truncates, the amount stays
+```
+
 ### F3. Markdown renderer and editor
 
 Mockup first (the toolbar and the preview).

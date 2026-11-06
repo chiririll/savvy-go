@@ -1,19 +1,19 @@
 import { testId } from '@/lib/test-id'
-import { useState } from 'react'
 import { ArrowDown, ArrowUp, Check, Copy, SkipForward } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { FeedRow, FeedStatusBadge, RowActions } from '@/components/shared'
 import { useRelativeDay } from '@/hooks'
-import { cn, formatCurrency } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import {
     displayTransactionDescription,
     transactionAmountAppearance,
     transactionSubtitle,
 } from '@/lib/transaction-description'
+import { rowAmount, transferSides } from '@/lib/transaction-money'
 import { Transaction } from '@/types'
 import { SkipTransactionAlert } from '../deferred/SkipTransactionAlert'
-import { TransactionItemsRow } from './TransactionItemsRow'
+import { TransactionAmount } from './TransactionAmount'
 import { transactionIconProps } from './transaction-icon'
 
 interface TransactionRowProps {
@@ -59,11 +59,8 @@ function rowHandlers(
     }
 }
 
-function TransactionStatusBadge({ status, inPayment }: { status: Transaction['status']; inPayment: boolean }) {
+function TransactionStatusBadge({ status }: { status: Transaction['status'] }) {
     const { t } = useTranslation('pages')
-    if (inPayment) {
-        return <FeedStatusBadge variant="outline">{t('transactions.paymentBadge')}</FeedStatusBadge>
-    }
     if (status === 'skipped') {
         return <FeedStatusBadge variant="secondary">{t('transactions.status.skipped')}</FeedStatusBadge>
     }
@@ -78,11 +75,9 @@ interface TransactionMenuProps {
     open: boolean
     onOpenChange: (open: boolean) => void
     showTrigger: boolean
-    /** The transaction is a leg of a split payment: deleting it deletes the payment. */
-    inPayment: boolean
 }
 
-function TransactionMenu({ handlers, open, onOpenChange, showTrigger, inPayment }: TransactionMenuProps) {
+function TransactionMenu({ handlers, open, onOpenChange, showTrigger }: TransactionMenuProps) {
     const { t } = useTranslation(['common', 'pages'])
     return (
         <RowActions
@@ -91,14 +86,8 @@ function TransactionMenu({ handlers, open, onOpenChange, showTrigger, inPayment 
             showTrigger={showTrigger}
             onEdit={handlers.edit}
             onDelete={handlers.remove}
-            deleteTitle={
-                inPayment ? t('pages:transactions.deletePaymentTitle') : t('pages:transactions.deleteTitle')
-            }
-            deleteDescription={
-                inPayment
-                    ? t('pages:transactions.deletePaymentDescription')
-                    : t('pages:transactions.deleteDescription')
-            }
+            deleteTitle={t('pages:transactions.deleteTitle')}
+            deleteDescription={t('pages:transactions.deleteDescription')}
         >
             {handlers.confirm && (
                 <DropdownMenuItem onClick={handlers.confirm}>
@@ -141,48 +130,33 @@ function TransactionMenu({ handlers, open, onOpenChange, showTrigger, inPayment 
 
 export function TransactionRow(props: TransactionRowProps) {
     const { transaction, showActions = true, showDate = false } = props
-    const { t } = useTranslation('pages')
     const relativeDay = useRelativeDay()
-    const [expanded, setExpanded] = useState(false)
-    const itemsCount = transaction.items.length
-    const canExpand = itemsCount > 1
     const { sign, className } = transactionAmountAppearance(transaction.type, transaction.status)
-    const amount = formatCurrency(transaction.amount, transaction.account.currency)
-    const { toAmount, toAccount } = transaction
-    const received =
-        transaction.type === 'transfer' && toAmount != null && toAccount
-            ? formatCurrency(toAmount, toAccount.currency)
-            : null
+    const isTransfer = transaction.type === 'transfer'
+    const { sent, received } = transferSides(transaction)
+    const amount = isTransfer && sent ? sent : rowAmount(transaction)
     const handlers = rowHandlers(transaction, props)
     const dateLabel = showDate ? relativeDay(transaction.date, { weekday: true }) : null
+    const categories = [...new Map(transaction.lines.flatMap((l) => (l.category ? [[l.category.id, l.category]] : []))).values()]
 
     return (
         <FeedRow
-            {...transactionIconProps(transaction.type, transaction.category)}
+            {...transactionIconProps(transaction.type, categories)}
             title={displayTransactionDescription(transaction)}
-            badge={<TransactionStatusBadge status={transaction.status} inPayment={transaction.groupUuid !== null} />}
+            badge={<TransactionStatusBadge status={transaction.status} />}
             subtitle={
                 <>
                     {dateLabel && <span className="mr-1.5 font-medium">{dateLabel} ·</span>}
                     {transactionSubtitle(transaction)}
-                    {canExpand && (
-                        <button
-                            type="button"
-                            className="ml-1.5 text-primary hover:underline"
-                            aria-expanded={expanded}
-                            onClick={(event) => {
-                                event.stopPropagation()
-                                setExpanded((value) => !value)
-                            }}
-                        >
-                            ({t('transactions.items.count', { count: itemsCount })})
-                        </button>
-                    )}
                 </>
             }
-            amount={`${transaction.isEstimated ? '≈ ' : ''}${sign}${amount}`}
+            amount={<TransactionAmount amount={amount} sign={sign} />}
             amountClassName={cn(className, transaction.status === 'pending' && 'italic')}
-            extraAmount={received ? `${transaction.status === 'skipped' ? '' : '+'}${received}` : undefined}
+            extraAmount={
+                isTransfer && received ? (
+                    <TransactionAmount amount={received} sign={transaction.status === 'skipped' ? '' : '+'} />
+                ) : undefined
+            }
             onOpen={handlers.edit}
             hasActions={showActions && Object.values(handlers).some(Boolean)}
             reserveActions={showActions && !props.isReadOnly}
@@ -192,10 +166,8 @@ export function TransactionRow(props: TransactionRowProps) {
                     open={menuOpen}
                     onOpenChange={setMenuOpen}
                     showTrigger={!isMobile}
-                    inPayment={transaction.groupUuid !== null}
                 />
             )}
-            below={expanded && canExpand ? <TransactionItemsRow transaction={transaction} /> : undefined}
         />
     )
 }

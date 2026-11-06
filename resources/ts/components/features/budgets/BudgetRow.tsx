@@ -1,6 +1,6 @@
 import { PiggyBank } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { FeedProgress, FeedRow, progressAmounts, RowActions, type FeedGroupKey } from '@/components/shared'
+import { categoryIcons, FeedProgress, FeedRow, progressAmounts, RowActions, type FeedGroupKey } from '@/components/shared'
 import i18n from '@/lib/i18n'
 import { localizeDefaultName } from '@/lib/localized-name'
 import { Budget, BudgetPeriod } from '@/types'
@@ -22,23 +22,6 @@ export function compareBudgets(a: Budget, b: Budget): number {
         || Number(b.isActive) - Number(a.isActive)
 }
 
-/** Up to two of the budget's category emojis, else a piggy bank. */
-function BudgetIcon({ budget }: { budget: Budget }) {
-    const icons = budget.categories.map((category) => category.icon).filter(Boolean).slice(0, 2)
-    if (icons.length === 0) {
-        return <PiggyBank className="size-4" />
-    }
-    if (icons.length === 1) {
-        return <>{icons[0]}</>
-    }
-    return (
-        <span className="relative block size-full text-sm">
-            <span className="absolute left-1 top-1">{icons[0]}</span>
-            <span className="absolute bottom-1 right-1">{icons[1]}</span>
-        </span>
-    )
-}
-
 interface BudgetRowProps {
     budget: Budget
     onEdit?: (budget: Budget) => void
@@ -58,7 +41,7 @@ export function BudgetRow({ budget, onEdit, onDelete, isReadOnly }: BudgetRowPro
 
     return (
         <FeedRow
-            icon={<BudgetIcon budget={budget} />}
+            icon={categoryIcons(budget.categories) ?? <PiggyBank className="size-4" />}
             iconClassName={color ? undefined : 'bg-muted text-muted-foreground'}
             iconColor={color}
             title={budget.name}

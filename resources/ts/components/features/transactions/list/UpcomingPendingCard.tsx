@@ -1,12 +1,14 @@
 import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Banknote, Check, HandCoins, SkipForward } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
-import { formatCurrency, cn } from '@/lib/utils'
+import { cn } from '@/lib/utils'
+import { rowAmount, transferSides } from '@/lib/transaction-money'
 import { parseDateKey, pendingDateClassName } from '@/lib/dates'
 import { intlLocale } from '@/lib/i18n'
 import { displayTransactionDescription, transactionAmountAppearance } from '@/lib/transaction-description'
 import { Transaction } from '@/types'
 import { SkipTransactionAlert } from '../deferred/SkipTransactionAlert'
+import { TransactionAmount } from './TransactionAmount'
 
 const TYPE_ICONS: Record<Transaction['type'], typeof ArrowDownLeft> = {
     income: ArrowDownLeft,
@@ -53,9 +55,10 @@ export function UpcomingPendingCard({ transaction, isReadOnly, onConfirm, onSkip
                 {dateLabel}
             </p>
             <p className={`row-span-2 self-start pt-0.5 font-mono text-base font-medium truncate ${className}`}>
-                {transaction.isEstimated && '≈ '}
-                {sign}
-                {formatCurrency(transaction.amount, transaction.account.currency)}
+                <TransactionAmount
+                    amount={transaction.type === 'transfer' ? transferSides(transaction).sent : rowAmount(transaction)}
+                    sign={sign}
+                />
             </p>
             {!isReadOnly && (
                 <div className="col-start-2 row-start-3 flex items-end justify-end gap-1">

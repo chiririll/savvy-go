@@ -2,7 +2,16 @@ import { beforeEach, describe, expect, it } from 'vitest'
 
 import { useCurrenciesStore } from '@/stores/currencies'
 import { accounts, categories, currencies, line, payment, transaction } from '@/test/fixtures'
-import { lineCurrency, mainAmount, netByCurrency, primaryCategory, spentByCurrency } from './transaction-money'
+import {
+    convertAmount,
+    lineCurrency,
+    mainAmount,
+    netByCurrency,
+    primaryCategory,
+    rowAmount,
+    spentByCurrency,
+    transferSides,
+} from './transaction-money'
 
 const [usd, eur, jpy] = currencies
 const [cash, euroCard, yenWallet] = accounts
@@ -111,5 +120,90 @@ describe('primaryCategory', () => {
         })
         expect(primaryCategory(tied)).toBe(groceries)
         expect(primaryCategory(transaction({ lines: [] }))).toBeNull()
+    })
+})
+
+describe('convertAmount', () => {
+    it('goes through the base currency and rounds to the target decimals', () => {
+        expect(convertAmount(10, eur, usd)).toBe(12.5)
+        expect(convertAmount(100, usd, jpy)).toBe(20000)
+        expect(convertAmount(1000, jpy, eur)).toBe(4)
+    })
+
+    it('leaves the same currency alone', () => {
+        expect(convertAmount(1.234, usd, usd)).toBe(1.234)
+    })
+})
+
+describe('rowAmount', () => {
+    it('is the lines of one currency, unsigned, not converted', () => {
+        expect(rowAmount(transaction())).toEqual({
+            main: { currency: usd, amount: 42.5 },
+            totals: [{ currency: usd, amount: 42.5 }],
+            converted: false,
+        })
+    })
+
+    it('ignores change: it is only in the payments', () => {
+        const tx = transaction({
+            payments: [payment({ amount: -50 }), payment({ account: cash, accountId: 9, amount: 7.5 })],
+        })
+        expect(rowAmount(tx)?.main).toEqual({ currency: usd, amount: 42.5 })
+    })
+
+    it('shows one value in the first currency, with the exact totals behind it', () => {
+        const tx = transaction({
+            payments: [payment({ amount: -30 }), payment({ account: euroCard, accountId: 2, amount: -10 })],
+            lines: [
+                line({ amount: 30, currencyId: usd.id }),
+                line({ seq: 1, amount: 10, currencyId: eur.id, categoryId: categories[2].id, category: categories[2] }),
+            ],
+        })
+        expect(rowAmount(tx)).toEqual({
+            main: { currency: usd, amount: 42.5 },
+            totals: [
+                { currency: usd, amount: 30 },
+                { currency: eur, amount: 10 },
+            ],
+            converted: true,
+        })
+    })
+
+    it('falls back to the payments on ordinary accounts when there are no lines', () => {
+        const debt = { ...accounts[0], id: 7, type: 'debt' as const }
+        const tx = transaction({
+            lines: [],
+            payments: [payment({ amount: -20 }), payment({ account: debt, accountId: 7, amount: 20 })],
+        })
+        expect(rowAmount(tx)?.main).toEqual({ currency: usd, amount: 20 })
+    })
+
+    it('is null with nothing to show', () => {
+        expect(rowAmount(transaction({ lines: [], payments: [] }))).toBeNull()
+    })
+})
+
+describe('transferSides', () => {
+    it('splits what left from what arrived, each in its own currency', () => {
+        const tx = transaction({
+            type: 'transfer',
+            payments: [payment({ amount: -100 }), payment({ account: yenWallet, accountId: 3, amount: 20000 })],
+            lines: [],
+        })
+        const { sent, received } = transferSides(tx)
+        expect(sent?.main).toEqual({ currency: usd, amount: 100 })
+        expect(received?.main).toEqual({ currency: jpy, amount: 20000 })
+    })
+
+    it('leaves out the space account of a transfer to another space', () => {
+        const space = { ...accounts[0], id: 8, type: 'space' as const }
+        const tx = transaction({
+            type: 'transfer',
+            payments: [payment({ amount: -100 }), payment({ account: space, accountId: 8, amount: 100 })],
+            lines: [],
+        })
+        const { sent, received } = transferSides(tx)
+        expect(sent?.main.amount).toBe(100)
+        expect(received).toBeNull()
     })
 })

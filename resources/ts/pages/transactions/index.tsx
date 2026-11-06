@@ -15,7 +15,6 @@ import {
     useInfiniteTransactions,
     useTransactions,
     useDeleteTransaction,
-    useDeleteTransactionGroup,
     useDuplicateTransaction,
     useSkipTransaction,
     useReorderTransactions,
@@ -51,7 +50,6 @@ export default function TransactionsPage() {
         per_page: 20,
     })
     const deleteTransaction = useDeleteTransaction()
-    const deleteGroup = useDeleteTransactionGroup()
     const duplicateTransaction = useDuplicateTransaction()
     const skipTransaction = useSkipTransaction()
     const reorder = useReorderTransactions()
@@ -149,15 +147,7 @@ export default function TransactionsPage() {
                                         </Button>
                                     ) : undefined
                                 }
-                                onDelete={(id) => {
-                                    // A leg goes with its payment.
-                                    const groupUuid = transactions.find((item) => item.id === id)?.groupUuid
-                                    if (groupUuid) {
-                                        deleteGroup.mutate(groupUuid)
-                                        return
-                                    }
-                                    deleteTransaction.mutate(id)
-                                }}
+                                onDelete={(id) => deleteTransaction.mutate(id)}
                                 onDuplicate={(id) => {
                                     const transaction = transactions.find((item) => item.id === id)
                                     confirmIfNeeded(

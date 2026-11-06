@@ -132,7 +132,7 @@
         "createTitle": "New transaction",
         "editTitle": "Edit transaction",
     "editPaymentTitle": "Edit payment",
-    "paymentBadge": "Part of a payment",
+        "categoriesCount": "{{count, plural(one: # category; other: # categories)}}",
         "emptyTitle": "No transactions found",
         "emptyDescription": "Create your first transaction to start tracking",
         "emptyPendingTitle": "No pending transactions",
@@ -183,13 +183,6 @@
             "amountHigh": "Amount (High to Low)",
             "amountLow": "Amount (Low to High)"
         },
-        "items": {
-            "item": "Item",
-            "qty": "Qty",
-            "price": "Price",
-            "total": "Total",
-            "count": "{{count, plural(one: # item; other: # items)}}"
-        },
         "fallback": {
             "payment": "Payment: {{name}}",
             "collection": "Collection: {{name}}",
@@ -214,8 +207,6 @@
             "transfer_in": "Received from another space"
         },
         "deleteTitle": "Delete transaction?",
-        "deletePaymentTitle": "Delete payment?",
-        "deletePaymentDescription": "This deletes every part of the payment. This action cannot be undone.",
         "deleteDescription": "This action cannot be undone.",
         "palette": {
             "title": "Search transactions",

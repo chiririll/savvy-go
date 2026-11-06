@@ -10,8 +10,35 @@ import {
     transactionSubtitle,
 } from '@/lib/transaction-description'
 import { cn, formatCurrency } from '@/lib/utils'
-import { RecurringFrequency, RecurringTransaction } from '@/types'
+import { RecurringFrequency, RecurringTransaction, Transaction } from '@/types'
 import { frequencyLabel } from '@/lib/labels'
+
+/**
+ * The rule still has the flat shape (F4f moves it to a template of payments and lines): this shows it
+ * as the payments and lines the shared row texts read.
+ */
+function asPaymentsAndLines(recurring: RecurringTransaction): Pick<Transaction, 'payments' | 'lines'> {
+    const sign = recurring.type === 'income' ? 1 : -1
+    const payments = [{ accountId: recurring.account.id, account: recurring.account, amount: sign * recurring.amount }]
+    if (recurring.toAccount) {
+        payments.push({
+            accountId: recurring.toAccount.id,
+            account: recurring.toAccount,
+            amount: recurring.toAmount ?? recurring.amount,
+        })
+    }
+    const lines = recurring.category
+        ? [{
+              seq: 0,
+              categoryId: recurring.category.id,
+              category: recurring.category,
+              currencyId: recurring.account.currency?.id ?? 0,
+              amount: recurring.amount,
+              note: null,
+          }]
+        : []
+    return { payments, lines }
+}
 
 const FREQUENCY_ORDER: RecurringFrequency[] = ['daily', 'weekly', 'monthly', 'yearly']
 
@@ -54,12 +81,13 @@ export function RecurringRow({ recurring, onEdit, onDelete, isReadOnly }: Recurr
     const canDelete = !!onDelete && !isReadOnly
     const { sign, className } = transactionAmountAppearance(recurring.type)
     const amount = formatCurrency(recurring.amount, recurring.account.currency)
+    const shape = { ...asPaymentsAndLines(recurring), type: recurring.type, description: recurring.description }
 
     return (
         <FeedRow
             {...transactionIconProps(recurring.type, recurring.category)}
-            title={displayTransactionDescription(recurring)}
-            subtitle={transactionSubtitle(recurring)}
+            title={displayTransactionDescription(shape)}
+            subtitle={transactionSubtitle(shape)}
             amount={`${recurring.isEstimated ? '≈ ' : ''}${sign}${amount}`}
             amountClassName={className}
             extraAmount={

@@ -132,7 +132,7 @@
         "createTitle": "Новая транзакция",
         "editTitle": "Изменить транзакцию",
     "editPaymentTitle": "Редактирование платежа",
-    "paymentBadge": "Часть платежа",
+        "categoriesCount": "{{count, plural(one: # категория; few: # категории; other: # категорий)}}",
         "emptyTitle": "Транзакций нет",
         "emptyDescription": "Создайте первую транзакцию, чтобы начать учёт",
         "emptyPendingTitle": "Нет отложенных транзакций",
@@ -183,13 +183,6 @@
             "amountHigh": "Сумма (по убыванию)",
             "amountLow": "Сумма (по возрастанию)"
         },
-        "items": {
-            "item": "Позиция",
-            "qty": "Кол-во",
-            "price": "Цена",
-            "total": "Итого",
-            "count": "{{count, plural(one: # позиция; few: # позиции; other: # позиций)}}"
-        },
         "fallback": {
             "payment": "Платёж: {{name}}",
             "collection": "Возврат: {{name}}",
@@ -214,8 +207,6 @@
             "transfer_in": "Из другого пространства"
         },
         "deleteTitle": "Удалить транзакцию?",
-        "deletePaymentTitle": "Удалить платёж?",
-        "deletePaymentDescription": "Будут удалены все части платежа. Это действие нельзя отменить.",
         "deleteDescription": "Это действие нельзя отменить.",
         "palette": {
             "title": "Поиск по транзакциям",

@@ -5,6 +5,7 @@ import {
     Banknote,
     HandCoins,
 } from 'lucide-react'
+import { categoryIcons } from '@/components/shared'
 import type { Category, TransactionType } from '@/types'
 
 const TYPE_ICONS = {
@@ -31,12 +32,17 @@ const TYPE_ICON_TONES = {
     transfer_in: 'bg-info/15 text-info',
 } as const
 
-/** FeedRow icon props of a transaction: its category's emoji, else its type. */
-export function transactionIconProps(type: TransactionType, category?: Pick<Category, 'icon' | 'color'> | null) {
+/**
+ * FeedRow icon props of a transaction: the emojis of its categories (two stacked for several), else its
+ * type. The colour is the first category's that has one.
+ */
+export function transactionIconProps(type: TransactionType, categories?: Category | Category[] | null) {
+    const list = categories == null ? [] : Array.isArray(categories) ? categories : [categories]
     const TypeIcon = TYPE_ICONS[type]
+    const color = list.find((category) => category.color)?.color
     return {
-        icon: category?.icon || <TypeIcon className="size-4" />,
-        iconClassName: category?.color ? undefined : TYPE_ICON_TONES[type],
-        iconColor: category?.color,
+        icon: categoryIcons(list) ?? <TypeIcon className="size-4" />,
+        iconClassName: color ? undefined : TYPE_ICON_TONES[type],
+        iconColor: color,
     }
 }

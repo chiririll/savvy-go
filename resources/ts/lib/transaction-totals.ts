@@ -1,8 +1,10 @@
 import { transactionAmountAppearance } from '@/lib/transaction-description'
+import { rowAmount, spentByCurrency } from '@/lib/transaction-money'
+import type { Currency } from '@/types'
 import type { Transaction } from '@/types'
 
 export interface CurrencyTotal {
-    currency: NonNullable<Transaction['account']['currency']>
+    currency: Currency
     amount: number
 }
 
@@ -19,29 +21,36 @@ export function largestTotals(totals: CurrencyTotal[], limit: number): { shown: 
 }
 
 /**
- * Net income minus expense per account currency, in order of first appearance. Currencies are never
- * mixed. Skipped rows and plain transfers don't change the balance sheet of a day, so they're left out.
+ * Net income minus expense per currency, in order of first appearance. Currencies are never mixed.
+ * Skipped rows don't change the balance sheet of a day. A plain transfer moves money between accounts
+ * and adds nothing, but its fee lines are spending.
  */
 export function netTotalsByCurrency(
-    transactions: Pick<Transaction, 'type' | 'status' | 'amount' | 'account'>[],
+    transactions: Pick<Transaction, 'type' | 'status' | 'payments' | 'lines'>[],
 ): CurrencyTotal[] {
     const totals = new Map<string, { currency: CurrencyTotal['currency']; units: number }>()
 
-    for (const { type, status, amount, account } of transactions) {
-        const { currency } = account
-        const { sign } = transactionAmountAppearance(type, status)
-        if (!currency || !sign) {
+    for (const transaction of transactions) {
+        if (transaction.status === 'skipped') {
+            continue
+        }
+        const isTransfer = transaction.type === 'transfer'
+        const sign = isTransfer ? '-' : transactionAmountAppearance(transaction.type).sign
+        const parts = isTransfer ? spentByCurrency(transaction) : (rowAmount(transaction)?.totals ?? [])
+        if (!sign) {
             continue
         }
 
-        const scale = 10 ** (currency.decimals ?? 2)
-        const entry = totals.get(currency.code) ?? { currency, units: 0 }
-        entry.units += (sign === '-' ? -1 : 1) * Math.round(amount * scale)
-        totals.set(currency.code, entry)
+        for (const { currency, amount } of parts) {
+            const scale = 10 ** currency.decimals
+            const entry = totals.get(currency.code) ?? { currency, units: 0 }
+            entry.units += (sign === '-' ? -1 : 1) * Math.round(Math.abs(amount) * scale)
+            totals.set(currency.code, entry)
+        }
     }
 
     return [...totals.values()].map(({ currency, units }) => ({
         currency,
-        amount: units / 10 ** (currency.decimals ?? 2),
+        amount: units / 10 ** currency.decimals,
     }))
 }
