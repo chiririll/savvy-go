@@ -366,5 +366,18 @@
         "dateRequired": "Укажите колонку даты",
         "amountRequired": "Укажите колонку суммы",
         "accountRequired": "Укажите счёт"
+    },
+    "markdown": {
+        "write": "Текст",
+        "preview": "Просмотр",
+        "previewEmpty": "Нечего показывать",
+        "toolbar": "Форматирование",
+        "bold": "Жирный",
+        "italic": "Курсив",
+        "bulletList": "Список",
+        "taskList": "Список задач",
+        "link": "Ссылка",
+        "code": "Код",
+        "taskItem": "Задача"
     }
 }

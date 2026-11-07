@@ -366,5 +366,18 @@
         "dateRequired": "Date column is required",
         "amountRequired": "Amount column is required",
         "accountRequired": "Account is required"
+    },
+    "markdown": {
+        "write": "Write",
+        "preview": "Preview",
+        "previewEmpty": "Nothing to preview",
+        "toolbar": "Formatting",
+        "bold": "Bold",
+        "italic": "Italic",
+        "bulletList": "List",
+        "taskList": "Task list",
+        "link": "Link",
+        "code": "Code",
+        "taskItem": "Task"
     }
 }

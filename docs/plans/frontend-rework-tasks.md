@@ -88,6 +88,19 @@ Mockup first (the toolbar and the preview).
 - The toolbar actions are pure functions `(text, selection) -> (text, selection)` with table tests.
 - Stories. No form uses it yet. Independent of F1: can go first.
 
+**Done 7 Nov 2026.** Library: `react-markdown` + `remark-gfm` (decided with the owner). Built in `components/shared/markdown/`: `Markdown` (lazy wrapper, plain-text fallback), `MarkdownContent` (renderer; headings and images dropped, raw HTML never enabled so it shows as escaped text, links `target="_blank" rel="noopener noreferrer"`), `safe-url.ts` (only http, https, mailto, tel and relative links survive), `MarkdownField` (toolbar of icons, Write/Preview switch, `Ctrl+B/I/K`, Enter continues or ends a list). Pure editing functions in `lib/markdown-edit.ts` with table tests. Strings in `forms:markdown.*` (en, ru). Stories for both components; they pass on desktop and mobile (run in a Playwright container on the remote Docker context). Not exported from the `shared` barrel yet: import the files directly so the parser stays out of the entry chunk. Undo (`Ctrl+Z`) after a toolbar action is not guaranteed: the text is set through React state.
+
+Agreed mockup (toolbar is icons only on mobile too, one scrollable row):
+
+```
+[B] [I] [• ] [☑] [🔗] [</>]                [ Write | Preview ]
+┌──────────────────────────────────────────────────────────┐
+│ - milk                                                   │
+│ - [ ] eggs                                               │
+└──────────────────────────────────────────────────────────┘
+Preview: same box, toolbar disabled, rendered text or "Nothing to preview".
+```
+
 **Question to answer before starting:** the library. The proposal is `react-markdown` with `remark-gfm`; the alternative is a smaller one that passes the `javascript:` and raw HTML tests (the agent measures both in the bundle). Say if you have a size limit or a preference.
 
 ### F4. Transaction form (split into steps)
