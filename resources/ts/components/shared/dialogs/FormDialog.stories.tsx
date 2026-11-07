@@ -6,7 +6,9 @@ import { FormHarness } from '@/test/form-harness'
 import { FormActiveField } from '../form/FormActiveField'
 import { FormEstimatedField } from '../form/FormEstimatedField'
 import { FormInputField } from '../form/FormInputField'
-import { FormDialog } from './FormDialog'
+import { Button } from '@/components/ui/button'
+
+import { FormDialog, FormDialogCancel, FormDialogSubmit } from './FormDialog'
 
 type Values = { name: string; is_active: boolean; is_estimated: boolean }
 
@@ -91,3 +93,32 @@ export const FooterCheckboxes: Story = {
     },
 }
 
+
+// Extra buttons beside the defaults: only the right region is overridden.
+export const CustomFooterEnd: Story = {
+    args: {
+        isEdit: true,
+        footerEnd: (
+            <div className="ml-auto flex items-center gap-2">
+                <Button type="button" variant="destructive">
+                    Delete
+                </Button>
+                <FormDialogCancel />
+                <FormDialogSubmit />
+            </div>
+        ),
+    },
+    play: async () => {
+        await expect(await screen.findByRole('button', { name: /delete/i })).toBeVisible()
+        await expect(screen.getByRole('button', { name: /^save$/i })).toBeVisible()
+    },
+}
+
+// The whole footer replaced.
+export const CustomFooter: Story = {
+    args: { footer: <p className="border-t px-6 py-4 text-sm">Read only: nothing to save.</p> },
+    play: async () => {
+        await expect(await screen.findByText(/nothing to save/i)).toBeVisible()
+        await expect(screen.queryByRole('button', { name: /cancel/i })).toBeNull()
+    },
+}

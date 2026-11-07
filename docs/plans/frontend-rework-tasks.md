@@ -40,16 +40,15 @@ Today the frontend is still on the flat model: `types/transactions.ts` has `amou
 
 **Question to answer before starting (decide before B1 and F1, it touches both):** you call the line text "description", but the column and the API key are `note`. Keep `note`, or rename it everywhere (column, Go types, API, MCP, docs, frontend) before release? The base is unreleased, so a rename is still cheap, but it must come before F1 so the types are written once.
 
-### R1. Overridable dialog footer actions (refactor)
+### R1. Overridable dialog footer (refactor)
 
-Mockup first: footers on desktop and mobile for the form (Cancel, Save), the view dialog (Edit, Confirm, Skip, Duplicate, Delete) and a restricted form. Independent of the rest; needed by F4e and F5, so do it before them.
+**Done 7 Nov 2026.** No mockup: the default footer is drawn exactly as before. Decided with the owner: not a single `actions` render prop but three override levels, so the whole footer or either half can be replaced.
 
-- `components/shared/dialogs/FormDialog.tsx`: the right side of the footer (`FormDialogActions`, hardcoded Cancel and Save/Create today) becomes an `actions` prop of `FormDialog` and `EntityFormDialog`: a render function given `{ formId, isSubmitting, isEdit, close, isReadOnly }`. Left out, it draws what is there now, so no other dialog changes.
-- `FormDialogActions` is exported, so an override can reuse it and add buttons beside it. The footer start slot (`FormDialogFooterStart`, used by `FormFooterCheckbox`) stays as it is.
-- The desktop dialog and the mobile sheet read the same prop.
-- Tests: default footer, an override, the read-only role hides Save; a story with a custom footer. Check that the existing dialogs look the same.
-
-**Question to answer before starting:** I read "move the footer buttons out of the form's left handler" as making the right-hand Cancel/Save overridable, by default drawn as now. Is that right, or did you mean the left slot (`FormDialogFooterStart`), or moving the row-menu actions (Duplicate, Delete) into the form footer?
+- `components/shared/dialogs/FormDialog.tsx`: the footer is built from exported parts that share a context: `FormDialogFooter` (the row, dialog or mobile sheet), `FormDialogFooterStartSlot` (left, filled by `FormDialogFooterStart`, which works as before), `FormDialogActions` (right, default Cancel and Save) made of `FormDialogCancel` and `FormDialogSubmit` (hidden for the read-only role). `useFormDialog()` gives `{ formId, isSubmitting, isEdit, isReadOnly, close }`.
+- Props of `FormDialog` and `EntityFormDialog`, each a node or `(ctx) => node`: `footerStart` (replaces the left region), `footerEnd` (the right), `footer` (the whole row; compose it from `FormDialogFooter` and the parts above).
+- No portal-style "end" slot for now; add it if a form body has to contribute buttons.
+- Tests in `FormDialog.test.tsx` (defaults, each override, reuse of Cancel/Submit, read-only, mobile sheet); stories `CustomFooterEnd`, `CustomFooter`.
+- F5 uses `footerEnd` (or `footer`) built from `transaction.actions`; F4e uses `footerEnd` for the restricted form.
 
 ### F2. Transaction row and the list
 

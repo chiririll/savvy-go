@@ -7,7 +7,17 @@ export { UserAvatar } from './appearance/UserAvatar'
 export { DataTable } from './table/DataTable'
 export { ListPage } from './page/ListPage'
 export { FormPage } from './form/FormPage'
-export { FormDialog, FormDialogFooterStart } from './dialogs/FormDialog'
+export {
+    FormDialog,
+    FormDialogActions,
+    FormDialogCancel,
+    FormDialogFooter,
+    FormDialogFooterStart,
+    FormDialogFooterStartSlot,
+    FormDialogSubmit,
+    useFormDialog,
+} from './dialogs/FormDialog'
+export type { FormDialogContextValue, FormDialogProps } from './dialogs/FormDialog'
 export { Confirm } from './dialogs/Confirm'
 export { ResponsiveDialog } from './dialogs/ResponsiveDialog'
 export { EntityFormDialog } from './dialogs/EntityFormDialog'

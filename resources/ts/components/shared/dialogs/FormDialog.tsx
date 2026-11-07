@@ -15,23 +15,127 @@ import { useReadOnly } from '@/components/providers/ReadOnlyProvider'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
 
-const FormDialogFooterStartContext = createContext<HTMLElement | null | undefined>(undefined)
+export interface FormDialogContextValue {
+    formId: string
+    isSubmitting: boolean
+    isEdit: boolean
+    isReadOnly: boolean
+    close: () => void
+}
 
+interface FormDialogInternalContext extends FormDialogContextValue {
+    footerStart: HTMLElement | null
+    setFooterStart: (el: HTMLDivElement | null) => void
+}
+
+const FormDialogContext = createContext<FormDialogInternalContext | null>(null)
+
+/** State of the surrounding FormDialog, for footer overrides. */
+export function useFormDialog(): FormDialogContextValue {
+    const ctx = useContext(FormDialogContext)
+    if (!ctx) {
+        throw new Error('useFormDialog must be used inside FormDialog')
+    }
+    return ctx
+}
+
+/** Puts its children into the footer's left region, from anywhere inside the form. */
 export function FormDialogFooterStart({ children }: { children: ReactNode }) {
-    const slot = useContext(FormDialogFooterStartContext)
+    const ctx = useContext(FormDialogContext)
 
-    if (slot === undefined) {
+    // Outside a dialog the children stay where they are.
+    if (!ctx) {
         return children
     }
 
-    if (!slot) {
+    // The region is overridden, or not mounted yet.
+    if (!ctx.footerStart) {
         return null
     }
 
-    return createPortal(children, slot)
+    return createPortal(children, ctx.footerStart)
 }
 
-interface FormDialogProps {
+/** The footer row: border, padding and layout for the dialog and the mobile sheet. */
+export function FormDialogFooter({ children }: { children: ReactNode }) {
+    const isMobile = useIsMobile()
+
+    if (isMobile) {
+        return (
+            <SheetFooter
+                className={cn(
+                    'shrink-0 flex-row flex-wrap items-center justify-end gap-2 border-t px-6 py-4',
+                    'pb-[max(1rem,env(safe-area-inset-bottom))]',
+                )}
+            >
+                {children}
+            </SheetFooter>
+        )
+    }
+
+    return (
+        <DialogFooter className="shrink-0 flex-row flex-wrap items-center border-t px-6 py-4 sm:justify-end">
+            {children}
+        </DialogFooter>
+    )
+}
+
+/** The left region, filled by FormDialogFooterStart. */
+export function FormDialogFooterStartSlot() {
+    const { setFooterStart } = useContext(FormDialogContext) ?? {}
+
+    return (
+        <div
+            ref={setFooterStart}
+            className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-2 empty:hidden"
+        />
+    )
+}
+
+export function FormDialogCancel() {
+    const { t } = useTranslation('common')
+    const { close } = useFormDialog()
+
+    return (
+        <Button type="button" variant="outline" onClick={close}>
+            {t('actions.cancel')}
+        </Button>
+    )
+}
+
+/** Submits the dialog's form. Not drawn for the read-only role. */
+export function FormDialogSubmit() {
+    const { t } = useTranslation('common')
+    const { formId, isSubmitting, isEdit, isReadOnly } = useFormDialog()
+
+    if (isReadOnly) {
+        return null
+    }
+
+    return (
+        <Button type="submit" form={formId} disabled={isSubmitting}>
+            {isSubmitting ? t('actions.saving') : isEdit ? t('actions.save') : t('actions.create')}
+        </Button>
+    )
+}
+
+/** The default right region: Cancel and Save. */
+export function FormDialogActions() {
+    return (
+        <div data-slot="form-dialog-actions" className="ml-auto flex shrink-0 items-center gap-2">
+            <FormDialogCancel />
+            <FormDialogSubmit />
+        </div>
+    )
+}
+
+type FooterOverride = ReactNode | ((ctx: FormDialogContextValue) => ReactNode)
+
+function resolve(value: FooterOverride, ctx: FormDialogContextValue): ReactNode {
+    return typeof value === 'function' ? value(ctx) : value
+}
+
+export interface FormDialogProps {
     open: boolean
     onOpenChange: (open: boolean) => void
     title: string
@@ -41,35 +145,13 @@ interface FormDialogProps {
     isEdit?: boolean
     className?: string
     headerExtra?: ReactNode
+    /** Replaces the whole footer row. Compose it from FormDialogFooter and the default parts. */
+    footer?: FooterOverride
+    /** Replaces the left region only (default: the FormDialogFooterStart slot). */
+    footerStart?: FooterOverride
+    /** Replaces the right region only (default: Cancel and Save). */
+    footerEnd?: FooterOverride
     children: ReactNode
-}
-
-function FormDialogActions({
-    formId,
-    isSubmitting,
-    isEdit,
-    onCancel,
-}: {
-    formId: string
-    isSubmitting?: boolean
-    isEdit: boolean
-    onCancel: () => void
-}) {
-    const { t } = useTranslation('common')
-    const isReadOnly = useReadOnly()
-
-    return (
-        <div data-slot="form-dialog-actions" className="ml-auto flex shrink-0 items-center gap-2">
-            <Button type="button" variant="outline" onClick={onCancel}>
-                {t('actions.cancel')}
-            </Button>
-            {!isReadOnly && (
-                <Button type="submit" form={formId} disabled={isSubmitting}>
-                    {isSubmitting ? t('actions.saving') : isEdit ? t('actions.save') : t('actions.create')}
-                </Button>
-            )}
-        </div>
-    )
 }
 
 export function FormDialog({
@@ -82,28 +164,36 @@ export function FormDialog({
     isEdit = false,
     className,
     headerExtra,
+    footer,
+    footerStart,
+    footerEnd,
     children,
 }: FormDialogProps) {
     const isMobile = useIsMobile()
-    const [footerStart, setFooterStart] = useState<HTMLDivElement | null>(null)
-    const footerStartSlot = (
-        <div
-            ref={setFooterStart}
-            className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-2 empty:hidden"
-        />
-    )
+    const isReadOnly = useReadOnly()
+    const [footerStartEl, setFooterStart] = useState<HTMLDivElement | null>(null)
+    const ctx: FormDialogInternalContext = {
+        formId,
+        isSubmitting: !!isSubmitting,
+        isEdit,
+        isReadOnly,
+        close: () => onOpenChange(false),
+        footerStart: footerStartEl,
+        setFooterStart,
+    }
     const body = <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">{children}</div>
-    const actions = (
-        <FormDialogActions
-            formId={formId}
-            isSubmitting={isSubmitting}
-            isEdit={isEdit}
-            onCancel={() => onOpenChange(false)}
-        />
-    )
+    const footerNode =
+        footer !== undefined ? (
+            resolve(footer, ctx)
+        ) : (
+            <FormDialogFooter>
+                {footerStart !== undefined ? resolve(footerStart, ctx) : <FormDialogFooterStartSlot />}
+                {footerEnd !== undefined ? resolve(footerEnd, ctx) : <FormDialogActions />}
+            </FormDialogFooter>
+        )
 
     return (
-        <FormDialogFooterStartContext.Provider value={footerStart}>
+        <FormDialogContext.Provider value={ctx}>
             {isMobile ? (
                 <Sheet open={open} onOpenChange={onOpenChange}>
                     <SheetContent
@@ -119,15 +209,7 @@ export function FormDialog({
                             {headerExtra}
                         </SheetHeader>
                         {body}
-                        <SheetFooter
-                            className={cn(
-                                'shrink-0 flex-row flex-wrap items-center justify-end gap-2 border-t px-6 py-4',
-                                'pb-[max(1rem,env(safe-area-inset-bottom))]',
-                            )}
-                        >
-                            {footerStartSlot}
-                            {actions}
-                        </SheetFooter>
+                        {footerNode}
                     </SheetContent>
                 </Sheet>
             ) : (
@@ -141,15 +223,10 @@ export function FormDialog({
                             {headerExtra}
                         </DialogHeader>
                         {body}
-                        <DialogFooter
-                            className={cn('shrink-0 flex-row flex-wrap items-center border-t px-6 py-4 sm:justify-end')}
-                        >
-                            {footerStartSlot}
-                            {actions}
-                        </DialogFooter>
+                        {footerNode}
                     </DialogContent>
                 </Dialog>
             )}
-        </FormDialogFooterStartContext.Provider>
+        </FormDialogContext.Provider>
     )
 }
