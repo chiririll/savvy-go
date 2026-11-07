@@ -6,9 +6,8 @@ import { changeTooLarge, nextFreeAccount } from '@/lib/transaction-payments'
 import type { TransactionFormValues } from '@/schemas/transactions'
 import type { Account } from '@/types'
 import type { BalancePreview } from './balance-preview'
-import { BalanceAfter } from './TransactionBalanceHint'
-import { PaymentRow } from './PaymentRow'
-import { PaymentRowButtons } from './PaymentRowButtons'
+import { PaymentGrid } from './PaymentGrid'
+import type { BalanceMode } from './TransactionBalanceHint'
 
 const EMPTY_AMOUNT = '' as unknown as number
 
@@ -16,14 +15,14 @@ interface ChangeSectionProps {
     accounts?: Account[]
     usedAccountIds: number[]
     balances: BalancePreview[]
-    showBalances: boolean
+    balanceMode: BalanceMode
 }
 
 /**
  * Money that came back to other accounts, drawn apart from the payments although it is a payment too, of the
  * opposite sign. Any account and any currency; an account is in a transaction once.
  */
-export function ChangeSection({ accounts, usedAccountIds, balances, showBalances }: ChangeSectionProps) {
+export function ChangeSection({ accounts, usedAccountIds, balances, balanceMode }: ChangeSectionProps) {
     const { t } = useTranslation(['common', 'forms'])
     const { control } = useFormContext<TransactionFormValues>()
     const { fields, append, remove } = useFieldArray({ control, name: 'change' })
@@ -57,33 +56,24 @@ export function ChangeSection({ accounts, usedAccountIds, balances, showBalances
                 )}
             </div>
 
-            {fields.map((field, index) => {
-                const account = accounts?.find((a) => a.id === Number(change?.[index]?.account_id))
-                const balance = balances.find((row) => row.account.id === account?.id)
-                const last = index === fields.length - 1
-                return (
-                    <PaymentRow
-                        key={field.id}
-                        control={control}
-                        list="change"
-                        index={index}
-                        currency={account?.currency}
-                        excludeIds={usedAccountIds.filter((id) => id !== account?.id)}
-                        action={
-                            <PaymentRowButtons
-                                onRemove={() => remove(index)}
-                                removeLabel={t('forms:transactions.removeChange')}
-                                onAdd={last ? () => append({ account_id: free!.id, amount: EMPTY_AMOUNT }) : undefined}
-                                addLabel={t('forms:transactions.addChange')}
-                                addDisabled={!free}
-                                addDisabledReason={t('forms:transactions.noAccountLeft')}
-                            />
-                        }
-                    >
-                        {showBalances && balance && <BalanceAfter preview={balance} />}
-                    </PaymentRow>
-                )
-            })}
+            {fields.length > 0 && (
+                <PaymentGrid
+                    control={control}
+                    list="change"
+                    keys={fields.map((field) => field.id)}
+                    rows={change}
+                    accounts={accounts}
+                    usedAccountIds={usedAccountIds}
+                    balances={balances}
+                    balanceMode={balanceMode}
+                    onAdd={() => append({ account_id: free!.id, amount: EMPTY_AMOUNT })}
+                    addLabel={t('forms:transactions.addChange')}
+                    addDisabled={!free}
+                    addDisabledReason={t('forms:transactions.noAccountLeft')}
+                    onRemove={remove}
+                    removeLabel={t('forms:transactions.removeChange')}
+                />
+            )}
 
             {tooLarge && (
                 <p role="alert" className="text-xs font-medium text-destructive">

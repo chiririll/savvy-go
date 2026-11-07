@@ -16,6 +16,11 @@ describe('MarkdownContent', () => {
         expect(out).toContain('next')
     })
 
+    it('keeps a new line of the editor as a new line, in paragraphs and in list items', () => {
+        expect(html('one\ntwo')).toMatch(/one<br\/>\s*two/)
+        expect(html('- one\n  two')).toMatch(/one<br\/>\s*two/)
+    })
+
     it('renders bullet and numbered lists', () => {
         const out = html('- milk\n- bread\n\n1. one\n2. two')
         expect(out).toContain('<ul')

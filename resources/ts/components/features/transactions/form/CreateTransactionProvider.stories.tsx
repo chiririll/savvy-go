@@ -120,7 +120,7 @@ export const CreateOpened: Story = {
 export const CreateWithDefaults: Story = {
     play: async ({ canvasElement }) => {
         await open(canvasElement, 'New income')
-        await expect(await screen.findByRole('spinbutton', { name: /amount/i }, { timeout: 5000 })).toHaveValue(10)
+        await expect(await screen.findByRole('textbox', { name: /^amount$/i }, { timeout: 5000 })).toHaveValue('10')
     },
 }
 
@@ -136,8 +136,8 @@ export const EditOfLinesOpensTheForm: Story = {
     play: async ({ canvasElement }) => {
         await open(canvasElement, 'Edit lines')
         const group = await screen.findByRole('group', { name: /lines|строки/i }, { timeout: 5000 })
-        await expect(within(group).getAllByRole('spinbutton')).toHaveLength(2)
-        await expect(within(group).getAllByRole('spinbutton')[1]).toHaveValue(12.5)
+        await expect(within(group).getAllByRole('textbox', { name: /^amount$/i })).toHaveLength(2)
+        await expect(within(group).getAllByRole('textbox', { name: /^amount$/i })[1]).toHaveValue('12.5')
     },
 }
 
@@ -146,7 +146,7 @@ export const EditOfSeveralPaymentsOpensTheForm: Story = {
     play: async ({ canvasElement }) => {
         await open(canvasElement, 'Edit split')
         const dialog = await screen.findByRole('dialog', {}, { timeout: 5000 })
-        const amounts = await within(dialog).findAllByRole('spinbutton')
+        const amounts = await within(dialog).findAllByRole('textbox', { name: /^amount$/i })
         await expect(amounts.slice(0, 2).map((a) => (a as HTMLInputElement).value)).toEqual(['30', '10'])
     },
 }
@@ -167,7 +167,7 @@ export const EditOfASpaceTransferOpensRestricted: Story = {
         await open(canvasElement, 'Edit space transfer')
         const dialog = await screen.findByRole('dialog', {}, { timeout: 5000 })
         await expect(await within(dialog).findByRole('note')).toBeVisible()
-        await expect(within(dialog).queryByRole('spinbutton')).toBeNull()
+        await expect(within(dialog).queryByRole('textbox', { name: /^amount$/i })).toBeNull()
     },
 }
 
@@ -211,7 +211,7 @@ export const CreateSent: Story = {
     play: async ({ canvasElement }) => {
         await open(canvasElement, 'New income')
         const dialog = await screen.findByRole('dialog', {}, { timeout: 5000 })
-        await within(dialog).findByRole('spinbutton', { name: /amount/i })
+        await within(dialog).findByRole('textbox', { name: /^amount$/i })
         await userEvent.click(within(dialog).getByRole('button', { name: /^create$/i }))
         await waitFor(() => expect(created.bodies).toHaveLength(1))
         await expect(created.bodies[0]).toMatchObject({

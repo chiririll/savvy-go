@@ -25,6 +25,9 @@ export function useTypeChange(
     onTypeChange?: (type: TransactionFormValues['type']) => void,
 ) {
     const categoryByType = useRef<Partial<Record<TransactionFormValues['type'], number>>>({})
+    // The lines as they were on each of income and expense, and on the last of them before a transfer wiped the lines.
+    const linesByType = useRef<Partial<Record<TransactionFormValues['type'], TransactionFormValues['lines']>>>({})
+    const lastLines = useRef<NonNullable<TransactionFormValues['lines']>>([])
 
     const handleTypeChange = (value: string) => {
         if (value !== 'income' && value !== 'expense' && value !== 'transfer' && value !== 'transfer_out') {
@@ -35,17 +38,22 @@ export function useTypeChange(
         if (categoryId && (current === 'income' || current === 'expense')) {
             categoryByType.current[current] = categoryId
         }
+        const lines = form.getValues('lines') ?? []
+        if (current === 'income' || current === 'expense') {
+            linesByType.current[current] = lines
+            if (lines.length > 0) lastLines.current = lines
+        }
         form.setValue('type', value)
         if (value === 'transfer' || value === 'transfer_out') {
             toTransfer(form, current, value)
             onTypeChange?.(value)
             return
         }
-        // The categories of the lines are of the old type too.
-        const lines = form.getValues('lines') ?? []
-        if (lines.some((line) => line.category_id)) {
-            form.setValue('lines', lines.map((line) => ({ ...line, category_id: null })))
-        }
+        // The lines come back after a transfer. The categories of the lines are of the other type: each has its own.
+        const base = lines.length > 0 ? lines : lastLines.current
+        const own = linesByType.current[value] ?? []
+        const next = base.map((line, i) => ({ ...line, category_id: own[i]?.category_id ?? null }))
+        if (next.length > 0 || lines.length > 0) form.setValue('lines', next)
         // Null lets the model pick the default category of the type.
         form.setValue('default_category_id', categoryByType.current[value] ?? null)
         onTypeChange?.(value)

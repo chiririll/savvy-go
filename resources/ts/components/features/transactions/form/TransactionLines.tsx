@@ -5,15 +5,13 @@ import { TriangleAlert, X } from 'lucide-react'
 import { CategorySelect } from '@/components/shared'
 import { Button } from '@/components/ui/button'
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
-import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatCurrency } from '@/lib/utils'
 import { linesNeedNotes, type LineCoverage } from '@/lib/transaction-lines'
 import type { TransactionFormValues } from '@/schemas/transactions'
 import type { Currency } from '@/types'
+import { AmountInput } from './AmountInput'
 import { LineNoteField } from './LineNoteField'
-
-const SUFFIX = 'pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-foreground'
 
 interface TransactionLinesProps {
     control: Control<TransactionFormValues>
@@ -23,10 +21,12 @@ interface TransactionLinesProps {
     /** The currencies of the payment and change accounts: what a line can be in. */
     currencies: Currency[]
     coverage: LineCoverage
+    /** What the lines leave uncovered, as text, when it is not nothing. */
+    uncovered?: string | null
 }
 
 /** The lines the user wrote: a category and an amount each, a note from two lines on. */
-export function TransactionLines({ control, fields, remove, type, currencies, coverage }: TransactionLinesProps) {
+export function TransactionLines({ control, fields, remove, type, currencies, coverage, uncovered }: TransactionLinesProps) {
     const { t } = useTranslation(['common', 'forms'])
     const { setValue } = useFormContext<TransactionFormValues>()
     const lines = useWatch({ control, name: 'lines' })
@@ -47,6 +47,12 @@ export function TransactionLines({ control, fields, remove, type, currencies, co
         return null
     }
 
+    // One place for what is off with the lines: they cover too much, or too little.
+    const warning =
+        coverage.excess > 0 && coverage.currency
+            ? t('forms:transactions.linesExceed', { amount: formatCurrency(coverage.excess, coverage.currency) })
+            : uncovered
+
     return (
         <div className="space-y-3" role="group" aria-label={t('forms:transactions.lines')}>
             {fields.map((field, index) => {
@@ -55,7 +61,7 @@ export function TransactionLines({ control, fields, remove, type, currencies, co
                 const decimals = currency?.decimals ?? 2
                 return (
                     <div key={field.id} className="space-y-1.5">
-                        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-start gap-2 sm:gap-4">
+                        <div className="flex min-w-0 items-start gap-x-2 sm:gap-x-4 [&>*]:min-w-0 [&>*]:flex-1 [&>*]:basis-0">
                             <FormField
                                 control={control}
                                 name={`lines.${index}.category_id`}
@@ -79,25 +85,15 @@ export function TransactionLines({ control, fields, remove, type, currencies, co
                                     <FormItem className="min-w-0">
                                         {index === 0 && <FormLabel>{t('common:fields.amount')}</FormLabel>}
                                         <div className="flex min-w-0 items-center gap-1">
-                                            <div className="relative min-w-0 flex-1">
+                                            <div className="min-w-0 flex-1">
                                                 <FormControl>
-                                                    <Input
-                                                        type="number"
-                                                        inputMode="decimal"
-                                                        step={decimals > 0 ? 10 ** -decimals : 1}
-                                                        min={0}
-                                                        placeholder="0.00"
+                                                    <AmountInput
                                                         aria-label={t('common:fields.amount')}
-                                                        className={!pickCurrency && currency ? 'pr-12' : undefined}
+                                                        currency={currency}
+                                                        hideCode={pickCurrency}
                                                         {...f}
-                                                        value={f.value ?? ''}
                                                     />
                                                 </FormControl>
-                                                {!pickCurrency && currency && (
-                                                    <span className={SUFFIX}>
-                                                        {currency.code}
-                                                    </span>
-                                                )}
                                             </div>
                                             {pickCurrency && (
                                                 <FormField
@@ -127,23 +123,22 @@ export function TransactionLines({ control, fields, remove, type, currencies, co
                                                     )}
                                                 />
                                             )}
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                className="size-8 shrink-0"
+                                                aria-label={t('forms:transactions.removeLine')}
+                                                title={t('forms:transactions.removeLine')}
+                                                onClick={() => remove(index)}
+                                            >
+                                                <X />
+                                            </Button>
                                         </div>
                                         <FormMessage />
                                     </FormItem>
                                 )}
                             />
-                            <div className={index === 0 ? 'pt-[1.375rem]' : undefined}>
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    aria-label={t('forms:transactions.removeLine')}
-                                    title={t('forms:transactions.removeLine')}
-                                    onClick={() => remove(index)}
-                                >
-                                    <X />
-                                </Button>
-                            </div>
                         </div>
                         {notes && (
                             <FormField
@@ -164,10 +159,10 @@ export function TransactionLines({ control, fields, remove, type, currencies, co
                     </div>
                 )
             })}
-            {coverage.excess > 0 && coverage.currency && (
+            {warning && (
                 <p role="status" className="flex items-center gap-1.5 text-xs text-warning">
                     <TriangleAlert className="size-3.5 shrink-0" />
-                    {t('forms:transactions.linesExceed', { amount: formatCurrency(coverage.excess, coverage.currency) })}
+                    {warning}
                 </p>
             )}
         </div>

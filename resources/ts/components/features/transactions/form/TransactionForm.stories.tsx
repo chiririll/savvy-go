@@ -41,7 +41,7 @@ const expense = {
 }
 
 const lineGroup = (canvasElement: HTMLElement) => within(canvasElement).findByRole('group', { name: /lines|строки/i })
-const amountsOf = (group: HTMLElement) => within(group).getAllByRole('spinbutton') as HTMLInputElement[]
+const amountsOf = (group: HTMLElement) => within(group).getAllByRole('textbox', { name: /^amount$/i }) as HTMLInputElement[]
 const closeButton = /close the editor|закрыть редактор/i
 const noteButtons = /format the note|форматировать заметку/i
 
@@ -80,8 +80,18 @@ export const AmountShowsTheCurrency: Story = {
 export const BalancePreview: Story = {
     args: { defaultValues: expense },
     play: async ({ canvasElement }) => {
-        await expect(await within(canvasElement).findByText(/120\.50/)).toBeVisible()
-        await expect(within(canvasElement).getByText(/100\.50/)).toBeVisible()
+        const balance = await within(canvasElement).findByTestId('balance-after')
+        await expect(balance).toHaveTextContent(/120\.50.*100\.50/)
+    },
+}
+
+// The amount takes digits and one separator, no more decimals than the currency has; a comma works as the point.
+export const AmountTakesDigitsOnly: Story = {
+    args: { defaultValues: { ...expense, payments: [{ account_id: 1, amount: '' as unknown as number }] } },
+    play: async ({ canvasElement }) => {
+        const amount = await within(canvasElement).findByRole('textbox', { name: /^amount$/i })
+        await userEvent.type(amount, '-1e2,567x')
+        await expect(amount).toHaveValue('12.56')
     },
 }
 
@@ -237,8 +247,8 @@ export const SplitByCategory: Story = {
         await userEvent.click(await canvas.findByRole('button', { name: /split by category|разбить по категориям/i }))
         const amounts = amountsOf(await lineGroup(canvasElement))
         await expect(amounts).toHaveLength(2)
-        await expect(amounts[0]).toHaveValue(20)
-        await expect(amounts[1]).toHaveValue(null)
+        await expect(amounts[0]).toHaveValue('20')
+        await expect(amounts[1]).toHaveValue('')
         await expect(canvas.getAllByRole('combobox')[1]).toBeDisabled()
     },
 }
@@ -265,12 +275,12 @@ export const LinesCoverThePayment: Story = {
     },
 }
 
-// Lines that cover less: the default category opens, and a yellow triangle says how much goes to it.
+// Lines that cover less: the default category opens, and the one warning under the lines says how much goes to it.
 export const LinesLeaveARest: Story = {
     args: { defaultValues: { ...split, lines: [split.lines[0]] } },
     play: async ({ canvasElement }) => {
         const canvas = within(canvasElement)
-        await expect(await canvas.findByRole('button', { name: /8\.00|8,00/ })).toBeVisible()
+        await expect(await canvas.findByRole('status')).toHaveTextContent(/8\.00|8,00/)
         await expect(canvas.getAllByRole('combobox')[1]).toBeEnabled()
     },
 }
@@ -375,7 +385,7 @@ export const AddingAPayment: Story = {
     play: async ({ canvasElement }) => {
         const canvas = within(canvasElement)
         await userEvent.click(await canvas.findByRole('button', { name: addPayment }))
-        await waitFor(() => expect(canvas.getAllByRole('spinbutton')).toHaveLength(2))
+        await waitFor(() => expect(canvas.getAllByRole('textbox', { name: /^amount$/i })).toHaveLength(2))
         await expect(canvas.getAllByRole('combobox')[1]).toHaveTextContent(/euro card/i)
     },
 }
@@ -411,7 +421,7 @@ export const RemovingAPayment: Story = {
     play: async ({ canvasElement }) => {
         const canvas = within(canvasElement)
         await userEvent.click((await canvas.findAllByRole('button', { name: removePayment }))[0])
-        await waitFor(() => expect(canvas.getAllByRole('spinbutton')).toHaveLength(1))
+        await waitFor(() => expect(canvas.getAllByRole('textbox', { name: /^amount$/i })).toHaveLength(1))
         await expect(canvas.queryByRole('button', { name: removePayment })).toBeNull()
     },
 }
@@ -434,11 +444,19 @@ export const TotalsPerCurrency: Story = {
     },
 }
 
-export const OnePaymentHasNoTotals: Story = {
+// The total is there from the start, so the form does not move when a second payment comes.
+export const OnePaymentHasATotal: Story = {
     args: { defaultValues: expense },
     play: async ({ canvasElement }) => {
-        await within(canvasElement).findByRole('textbox', { name: /description/i })
-        await expect(within(canvasElement).queryByTestId('payment-totals')).toBeNull()
+        await expect(await within(canvasElement).findByTestId('payment-totals')).toHaveTextContent(/20\.00/)
+    },
+}
+
+// The balance of the account is there before an amount is typed.
+export const BalanceBeforeAnAmount: Story = {
+    args: { defaultValues: { ...expense, payments: [{ account_id: 1, amount: '' as unknown as number }] } },
+    play: async ({ canvasElement }) => {
+        await expect(await within(canvasElement).findByTestId('balance-after')).toHaveTextContent(/120\.50/)
     },
 }
 
@@ -447,9 +465,9 @@ export const ChangeSectionOfAnExpense: Story = {
     args: { defaultValues: expense },
     play: async ({ canvasElement }) => {
         const section = await changeSection(canvasElement)
-        await expect(within(section).queryAllByRole('spinbutton')).toHaveLength(0)
+        await expect(within(section).queryAllByRole('textbox', { name: /^amount$/i })).toHaveLength(0)
         await userEvent.click(within(section).getByRole('button', { name: addChange }))
-        await waitFor(() => expect(within(section).getAllByRole('spinbutton')).toHaveLength(1))
+        await waitFor(() => expect(within(section).getAllByRole('textbox', { name: /^amount$/i })).toHaveLength(1))
         await expect(within(section).getByRole('combobox')).toHaveTextContent(/euro card/i)
     },
 }
@@ -459,10 +477,10 @@ export const ChangeOfASavedExpense: Story = {
     args: { defaultValues: { ...expense, change: [{ account_id: 2, amount: 5 }] } },
     play: async ({ canvasElement }) => {
         const section = await changeSection(canvasElement)
-        await expect(within(section).getByRole('spinbutton')).toHaveValue(5)
+        await expect(within(section).getByRole('textbox', { name: /^amount$/i })).toHaveValue('5')
         await expect(await within(section).findByText(/balance after|баланс после/i)).toBeVisible()
         await userEvent.click(within(section).getByRole('button', { name: removeChange }))
-        await waitFor(() => expect(within(section).queryAllByRole('spinbutton')).toHaveLength(0))
+        await waitFor(() => expect(within(section).queryAllByRole('textbox', { name: /^amount$/i })).toHaveLength(0))
     },
 }
 

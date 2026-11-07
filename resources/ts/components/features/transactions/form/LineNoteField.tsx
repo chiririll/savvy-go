@@ -1,9 +1,10 @@
 import { Pencil } from 'lucide-react'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { MarkdownField } from '@/components/shared/markdown/MarkdownField'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { useAutoGrow } from '@/hooks/use-auto-grow'
 
 interface LineNoteFieldProps {
     value: string
@@ -20,6 +21,9 @@ interface LineNoteFieldProps {
 export function LineNoteField({ value, onChange, onBlur, label }: LineNoteFieldProps) {
     const { t } = useTranslation('forms')
     const [editing, setEditing] = useState(() => value.trim() !== '')
+    const textarea = useRef<HTMLTextAreaElement>(null)
+
+    useAutoGrow(textarea, [value, editing])
 
     if (editing) {
         return (
@@ -37,11 +41,12 @@ export function LineNoteField({ value, onChange, onBlur, label }: LineNoteFieldP
     return (
         <div className="flex items-start gap-1">
             <Textarea
+                ref={textarea}
                 rows={1}
                 value={value}
                 aria-label={label}
                 placeholder={t('transactions.lineNotePlaceholder')}
-                className="min-h-9 resize-none py-1.5"
+                className="field-sizing-fixed max-h-40 min-h-9 resize-none overflow-y-auto py-1.5"
                 onChange={(e) => onChange(e.target.value)}
                 onBlur={onBlur}
             />

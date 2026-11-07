@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm'
 
 import { cn } from '@/lib/utils'
 
+import { remarkLineBreaks } from './remark-line-breaks'
 import { safeUrl } from './safe-url'
 
 // No headings and no images; raw HTML is never enabled (no rehype-raw), so it is dropped.
@@ -34,14 +35,13 @@ const components: Components = {
     input: TaskCheckbox,
     code: ({ node: _node, ...props }) => <code {...props} className="rounded bg-muted px-1 py-0.5 font-mono text-[0.85em]" />,
     pre: ({ node: _node, ...props }) => <pre {...props} className="overflow-x-auto rounded-md bg-muted p-2 text-xs" />,
-    p: ({ node: _node, ...props }) => <p {...props} className="whitespace-pre-wrap" />,
 }
 
 export default function MarkdownContent({ children, className }: { children: string; className?: string }) {
     return (
         <div className={cn('flex flex-col gap-1 text-sm break-words', className)}>
             <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
+                remarkPlugins={[remarkGfm, remarkLineBreaks]}
                 disallowedElements={DISALLOWED}
                 unwrapDisallowed
                 urlTransform={safeUrl}

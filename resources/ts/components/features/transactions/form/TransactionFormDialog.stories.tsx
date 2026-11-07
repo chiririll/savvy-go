@@ -33,7 +33,7 @@ export const Create: Story = {}
 export const CreateWithDefaults: Story = {
     args: { defaultValues: { type: 'income', payments: [{ account_id: 2, amount: 50 }] } },
     play: async () => {
-        await expect(await screen.findByRole('spinbutton', { name: /amount/i })).toHaveValue(50)
+        await expect(await screen.findByRole('textbox', { name: /^amount$/i })).toHaveValue('50')
     },
 }
 export const Edit: Story = {
@@ -165,7 +165,7 @@ export const RestrictedByADebt: Story = {
         await expect(await within(dialog).findByRole('note')).toHaveTextContent(/debt/i)
         await expect(within(dialog).getByDisplayValue('Back to Alex')).toBeEnabled()
         // The amount and the account are text, not fields.
-        await expect(within(dialog).queryByRole('spinbutton')).toBeNull()
+        await expect(within(dialog).queryByRole('textbox', { name: /^amount$/i })).toBeNull()
         await expect(within(dialog).getByText(/40/)).toBeVisible()
     },
 }
@@ -199,7 +199,7 @@ export const RestrictedLinesChangeCategoryAndNote: Story = {
     play: async ({ args }) => {
         const dialog = await screen.findByRole('dialog')
         const group = await within(dialog).findByRole('group', { name: /lines|строки/i })
-        await expect(within(group).queryByRole('spinbutton')).toBeNull()
+        await expect(within(group).queryByRole('textbox', { name: /^amount$/i })).toBeNull()
         await expect(within(group).getAllByRole('combobox')).toHaveLength(2)
         await userEvent.click(within(dialog).getByRole('button', { name: /^save$/i }))
         await waitFor(() => expect(args.onSubmitDetails).toHaveBeenCalledOnce())
@@ -229,6 +229,6 @@ export const UnshowableShapeOpensRestricted: Story = {
     play: async () => {
         const dialog = await screen.findByRole('dialog')
         await expect(await within(dialog).findByRole('note')).toHaveTextContent(/can't show/i)
-        await expect(within(dialog).queryByRole('spinbutton')).toBeNull()
+        await expect(within(dialog).queryByRole('textbox', { name: /^amount$/i })).toBeNull()
     },
 }

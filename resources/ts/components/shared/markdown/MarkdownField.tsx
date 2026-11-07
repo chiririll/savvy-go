@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { useAutoGrow } from '@/hooks/use-auto-grow'
 import {
     continueList,
     insertLink,
@@ -65,6 +66,9 @@ export function MarkdownField({
     const pending = useRef<{ start: number; end: number } | null>(null)
     const autoId = useId()
     const fieldId = id ?? autoId
+    const writing = mode === 'write'
+    // The editor grows with the text, up to its cap; back from the preview it is measured again.
+    useAutoGrow(ref, [value, writing])
 
     // Restore the selection after React has written the new text into the textarea.
     useLayoutEffect(() => {
@@ -114,7 +118,6 @@ export function MarkdownField({
         }
     }
 
-    const writing = mode === 'write'
     const labels: Record<Action, string> = {
         bold: t('markdown.bold'),
         italic: t('markdown.italic'),
@@ -187,7 +190,7 @@ export function MarkdownField({
                     onChange={(e) => onChange(e.target.value)}
                     onBlur={onBlur}
                     onKeyDown={onKeyDown}
-                    className="font-mono text-sm md:text-sm"
+                    className="field-sizing-fixed max-h-72 overflow-y-auto font-mono text-sm md:text-sm"
                 />
             ) : (
                 <div className="min-h-16 rounded-md border bg-transparent px-3 py-2">

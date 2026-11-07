@@ -4,7 +4,7 @@ import type { TransactionFormValues } from '@/schemas/transactions'
 import type { LinkedSpace } from '@/types/spaces'
 import { PendingHint } from './TransactionBalanceHint'
 import { ChangeSection } from './ChangeSection'
-import { PaymentTotals, PaymentsSection } from './PaymentsSection'
+import { PaymentsSection } from './PaymentsSection'
 import { TemplateModeContext } from './template-mode'
 import { TransactionDescriptionField } from './TransactionDescriptionField'
 import { TransactionDetailsRow } from './TransactionDetailsRow'
@@ -28,7 +28,7 @@ interface TransactionFormBodyProps {
 }
 
 /**
- * The fields of a transaction, from its type to the change: the body of the transaction form, and of the
+ * The fields of a transaction, from its type to the tags and the fee: the body of the transaction form, and of the
  * template of a recurring rule, which draws the same fields. The caller owns the `<form>`, the submit and the
  * confirmations.
  */
@@ -70,6 +70,9 @@ export function TransactionFormBody({
     const showChange = !isTransfer && (transactionType === 'expense' || (form.watch('change')?.length ?? 0) > 0)
     // A template moves no balance: there is nothing to preview, and no date to be pending by.
     const showBalances = !template && !isPendingDate
+    // The balance now stands under every account, so nothing moves when an amount is typed; a pending date only
+    // keeps it from moving.
+    const balanceMode = template ? 'none' : showBalances ? 'after' : 'current'
 
     return (
         <TemplateModeContext.Provider value={template}>
@@ -90,15 +93,12 @@ export function TransactionFormBody({
                     showBalances={showBalances}
                 />
             ) : (
-                <>
-                    <PaymentsSection
-                        accounts={accounts}
-                        usedAccountIds={usedAccountIds}
-                        balances={balances.rows}
-                        showBalances={showBalances}
-                    />
-                    <PaymentTotals accounts={accounts} />
-                </>
+                <PaymentsSection
+                    accounts={accounts}
+                    usedAccountIds={usedAccountIds}
+                    balances={balances.rows}
+                    balanceMode={balanceMode}
+                />
             )}
             {!template && isPendingDate && <PendingHint isUndated={isUndated} />}
 
@@ -108,12 +108,7 @@ export function TransactionFormBody({
                 dateRequired={dateRequired}
                 withDate={!template}
                 pastOnly={originalAffectsBalance}
-                category={{
-                    hasLines,
-                    locked: coverage.remainder === 0,
-                    uncovered,
-                    onAddLine: addLine,
-                }}
+                category={{ hasLines, locked: coverage.remainder === 0, onAddLine: addLine }}
             />
 
             {!isTransfer && (
@@ -124,6 +119,16 @@ export function TransactionFormBody({
                     type={transactionType === 'income' ? 'income' : 'expense'}
                     currencies={lineCurrencies}
                     coverage={coverage}
+                    uncovered={uncovered}
+                />
+            )}
+
+            {showChange && (
+                <ChangeSection
+                    accounts={accounts}
+                    usedAccountIds={usedAccountIds}
+                    balances={balances.rows}
+                    balanceMode={balanceMode}
                 />
             )}
 
@@ -131,15 +136,6 @@ export function TransactionFormBody({
             {!isSpaceTransfer && <TransactionTagsField control={form.control} />}
 
             {isTransfer && !isSpaceTransfer && <TransferFeeSection currency={selectedAccount?.currency} />}
-
-            {showChange && (
-                <ChangeSection
-                    accounts={accounts}
-                    usedAccountIds={usedAccountIds}
-                    balances={balances.rows}
-                    showBalances={showBalances}
-                />
-            )}
         </TemplateModeContext.Provider>
     )
 }

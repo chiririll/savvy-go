@@ -72,6 +72,33 @@ describe('useTransactionHandlers type change', () => {
         ])
     })
 
+    it('restores the categories of the lines chosen earlier for a type', () => {
+        const lines = [
+            { category_id: 1, currency_id: null, amount: 12, note: 'milk' },
+            { category_id: 3, currency_id: null, amount: 8, note: null },
+        ]
+        const { result } = setup({ lines })
+
+        act(() => result.current.handleTypeChange('income'))
+        act(() => result.current.form.setValue('lines.0.category_id', 7))
+        act(() => result.current.handleTypeChange('expense'))
+        expect(result.current.form.getValues('lines')?.map((l) => l.category_id)).toEqual([1, 3])
+
+        act(() => result.current.handleTypeChange('income'))
+        expect(result.current.form.getValues('lines')?.map((l) => l.category_id)).toEqual([7, null])
+    })
+
+    it('brings the lines back after a transfer', () => {
+        const lines = [{ category_id: 1, currency_id: null, amount: 12, note: 'milk' }]
+        const { result } = setup({ lines })
+
+        act(() => result.current.handleTypeChange('transfer'))
+        expect(result.current.form.getValues('lines')).toEqual([])
+
+        act(() => result.current.handleTypeChange('expense'))
+        expect(result.current.form.getValues('lines')).toEqual(lines)
+    })
+
     it('ignores a type it does not know', () => {
         const { result } = setup()
 

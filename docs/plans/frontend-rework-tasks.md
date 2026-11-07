@@ -162,6 +162,18 @@ Rules:
 
 **F4f. Recurring form.** `RecurringForm` on the same body: template + schedule, one payment with an empty amount, the `estimated` flag, the rule's `error` shown.
 
+**F4g. Form layout rework (income and expense).** Decided with the owner on 7 Nov 2026; it changes the agreed design above for expense and income. Transfers keep the old layout until their own pass.
+
+- Two equal columns for every row: amount | account, date | category, and for lines category | amount. A row's button (remove, clear the date, add a line) sits inside its column and takes room from the field, so the columns never change.
+- The `Amount` and `Account` labels are drawn once, and the (+) that adds a payment sits at the end of that label row. Each row has an (X) only. The change section works the same way.
+- Under the account, from the start: the balance now, and `current -> new` once an amount is typed (nothing appears or jumps; a pending date shows the balance now only; a template none). The total is a small text at the end of the `Amount` label (always there, no line of its own). A message about the amount stands in the same line as the balance, in the left half. Plain numbers, shortened from ten thousand up (`123.5K`, `2.5M`, `100 тыс.`), no symbol. A balance that goes negative gets a red triangle; no tooltip, the red number says it. Screen readers get the full numbers and the words.
+- Amount fields are plain text that takes digits and one decimal separator (a comma works), cut to the decimals of the currency; no spinners. The currency code stays at the end of the field.
+- Date and its clear cross together are as wide as the amount; the default category and its (+) as wide as the account.
+- One warning for the lines, a line of text under them: they cover too little (the rest goes to the default category) or too much. The triangle on the category label is gone.
+- A line note grows with its text up to about seven rows, then scrolls.
+- Lines stay `Category | Amount | (X)`.
+- Not in this step: transfers; the default category as the default in every category dropdown of the transfer page.
+
 ### F5. Transaction detail dialog (view)
 
 Mockup first. A separate view-only dialog, not a read-only form. In `components/shared/dialogs`.
