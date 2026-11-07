@@ -198,3 +198,27 @@ func TestAddMatchesCreateAndBareSkipsTotals(t *testing.T) {
 		t.Errorf("Bare = %+v, %v", bare, err)
 	}
 }
+
+// AddMany stores a list in one go, in order, or none of it when one is refused.
+func TestAddManyIsAllOrNone(t *testing.T) {
+	e := newMoneyEnv(t)
+	date := "2024-02-01"
+	mk := func(account int64, amount string) TxInput {
+		in := simple("income", account, amount)
+		in.Date = &date
+		return in
+	}
+	ids, err := e.txs.AddMany(e.ctx, []TxInput{mk(e.usdAcc.ID, "10"), mk(e.usdAcc.ID, "5")})
+	if err != nil || len(ids) != 2 || ids[0] >= ids[1] {
+		t.Fatalf("AddMany = %v, %v", ids, err)
+	}
+	if got := e.balance(t, e.usdAcc.ID); !got.Equal(dec("115")) {
+		t.Fatalf("balance = %s, want 115", got)
+	}
+	if _, err := e.txs.AddMany(e.ctx, []TxInput{mk(e.usdAcc.ID, "1"), mk(0, "1")}); err == nil {
+		t.Fatal("a list with a bad transaction was accepted")
+	}
+	if got := e.balance(t, e.usdAcc.ID); !got.Equal(dec("115")) {
+		t.Fatalf("a refused list changed the balance to %s", got)
+	}
+}

@@ -31,6 +31,8 @@ type seeder struct {
 	recur    recurring.Service
 	auto     automation.Service
 	expenses []expenseCand
+	// queue holds the transactions addTx has not stored yet; see flush.
+	queue []queuedTx
 	// catNames is the name of each expense category, by id.
 	catNames map[int64]string
 }
@@ -103,7 +105,13 @@ func seedWorkspace(ctx context.Context, db store.DB, now time.Time, months int) 
 		{"automation", func() error { return s.createAutomation(tags) }},
 	}
 	for _, p := range phases {
-		if err := timed("seed "+p.name, p.run); err != nil {
+		err := timed("seed "+p.name, func() error {
+			if err := p.run(); err != nil {
+				return err
+			}
+			return s.flush()
+		})
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -205,6 +213,10 @@ func (s *seeder) createTransactions(
 		return err
 	}
 	if err := s.seedVariableExpenses(accounts, expenses, tags); err != nil {
+		return err
+	}
+	// The split payments are stored at once, so what was queued goes first.
+	if err := s.flush(); err != nil {
 		return err
 	}
 	if err := s.seedSplitPayments(accounts, expenses); err != nil {

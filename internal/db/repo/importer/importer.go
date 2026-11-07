@@ -113,47 +113,94 @@ type Row struct {
 // for the account, and reports whether it added it. The row is one payment on
 // the account (negative for an expense) and one line of the same amount.
 func (r Repo) InsertRow(ctx context.Context, row Row, now time.Time) (bool, error) {
-	externalID := fmt.Sprintf("csv:%d:%s", row.AccountID, row.DedupHash)
 	added := false
 	err := store.Tx(ctx, r.DB, func(d store.DB) error {
-		q := db.Q(d)
-		if dup, err := q.ExistsTransactionExternalID(ctx, db.NS(externalID)); err != nil || dup {
-			return err
-		}
-		unit, err := q.GetAccountUnit(ctx, row.AccountID)
-		if err != nil {
-			return err
-		}
-		res, err := q.InsertTransaction(ctx, sqlc.InsertTransactionParams{
-			Type: row.Type, Description: db.NS(row.Description), Date: db.NS(row.Date), Status: row.Status,
-			ExternalID: db.NS(externalID), CreatedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now),
-		})
-		if err != nil {
-			return err
-		}
-		id, err := res.LastInsertId()
-		if err != nil {
-			return err
-		}
-		amount := row.Minor
-		if amount < 0 {
-			amount = -amount
-		}
-		paid := amount
-		if row.Type == "expense" {
-			paid = -amount
-		}
-		if err := q.InsertPayment(ctx, sqlc.InsertPaymentParams{
-			TransactionID: id, AccountID: row.AccountID, Amount: paid,
-		}); err != nil {
-			return err
-		}
-		added = true
-		return q.InsertTransactionLine(ctx, sqlc.InsertTransactionLineParams{
-			TransactionID: id, Seq: 0, CategoryID: db.NullInt64(row.CategoryID), CurrencyID: unit.ID, Amount: amount,
-		})
+		var err error
+		added, err = insertRow(ctx, db.Q(d), row, now)
+		return err
 	})
 	return added && err == nil, err
+}
+
+// RowResult is what became of one row of InsertRows.
+type RowResult struct {
+	// Added is false for a duplicate and for a row that failed.
+	Added bool
+	// Err is why the row could not be stored; nothing of it was kept.
+	Err error
+}
+
+// InsertRows is InsertRow for many rows in one database transaction, which pays
+// the cost of a commit once instead of for each row. A row that fails is rolled
+// back on its own and the others are kept; only a failure of the transaction
+// itself is returned as an error. A duplicate is also caught within the batch.
+func (r Repo) InsertRows(ctx context.Context, rows []Row, now time.Time) ([]RowResult, error) {
+	out := make([]RowResult, len(rows))
+	err := store.Tx(ctx, r.DB, func(d store.DB) error {
+		q := db.Q(d)
+		for i, row := range rows {
+			if _, err := d.ExecContext(ctx, "SAVEPOINT import_row"); err != nil {
+				return err
+			}
+			added, err := insertRow(ctx, q, row, now)
+			if err != nil {
+				if _, rb := d.ExecContext(ctx, "ROLLBACK TO import_row"); rb != nil {
+					return rb
+				}
+				out[i] = RowResult{Err: err}
+			} else {
+				out[i] = RowResult{Added: added}
+			}
+			if _, err := d.ExecContext(ctx, "RELEASE import_row"); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// insertRow stores row through q unless its dedup hash is known.
+func insertRow(ctx context.Context, q *sqlc.Queries, row Row, now time.Time) (bool, error) {
+	externalID := fmt.Sprintf("csv:%d:%s", row.AccountID, row.DedupHash)
+	if dup, err := q.ExistsTransactionExternalID(ctx, db.NS(externalID)); err != nil || dup {
+		return false, err
+	}
+	unit, err := q.GetAccountUnit(ctx, row.AccountID)
+	if err != nil {
+		return false, err
+	}
+	res, err := q.InsertTransaction(ctx, sqlc.InsertTransactionParams{
+		Type: row.Type, Description: db.NS(row.Description), Date: db.NS(row.Date), Status: row.Status,
+		ExternalID: db.NS(externalID), CreatedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now),
+	})
+	if err != nil {
+		return false, err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return false, err
+	}
+	amount := row.Minor
+	if amount < 0 {
+		amount = -amount
+	}
+	paid := amount
+	if row.Type == "expense" {
+		paid = -amount
+	}
+	if err := q.InsertPayment(ctx, sqlc.InsertPaymentParams{
+		TransactionID: id, AccountID: row.AccountID, Amount: paid,
+	}); err != nil {
+		return false, err
+	}
+	err = q.InsertTransactionLine(ctx, sqlc.InsertTransactionLineParams{
+		TransactionID: id, Seq: 0, CategoryID: db.NullInt64(row.CategoryID), CurrencyID: unit.ID, Amount: amount,
+	})
+	return err == nil, err
 }
 
 // CountsByStatus is how many imports are in each status.

@@ -288,13 +288,22 @@ func decodeTx(w http.ResponseWriter, r *http.Request) (ledger.TxInput, bool) {
 	data, err := io.ReadAll(r.Body)
 	var in ledger.TxInput
 	if err == nil {
-		dec := json.NewDecoder(bytes.NewReader(data))
-		dec.DisallowUnknownFields()
-		err = dec.Decode(&in)
+		in, err = parseTx(data)
 	}
 	if err != nil {
 		httpx.WriteMessage(w, 422, "The given data was invalid: "+err.Error())
 		return ledger.TxInput{}, false
+	}
+	return in, true
+}
+
+// parseTx reads one transaction from its JSON.
+func parseTx(data []byte) (ledger.TxInput, error) {
+	var in ledger.TxInput
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&in); err != nil {
+		return ledger.TxInput{}, err
 	}
 	in.Status = nil // set by the date and by confirm, not by the client
 	// An explicit null clears the description; leaving it out keeps it.
@@ -303,5 +312,55 @@ func decodeTx(w http.ResponseWriter, r *http.Request) (ledger.TxInput, bool) {
 		blank := ""
 		in.Description = &blank
 	}
-	return in, true
+	return in, nil
+}
+
+// maxBulk is how many transactions one bulk request may carry.
+const maxBulk = 500
+
+// transactionsBulkStore creates many transactions at once, all or none.
+func transactionsBulkStore(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Transactions []json.RawMessage `json:"transactions"`
+	}
+	data, err := io.ReadAll(r.Body)
+	if err == nil {
+		dec := json.NewDecoder(bytes.NewReader(data))
+		dec.DisallowUnknownFields()
+		err = dec.Decode(&body)
+	}
+	if err != nil {
+		httpx.WriteMessage(w, 422, "The given data was invalid: "+err.Error())
+		return
+	}
+	if len(body.Transactions) == 0 || len(body.Transactions) > maxBulk {
+		httpx.WriteMessage(w, 422, "Send between 1 and "+strconv.Itoa(maxBulk)+" transactions.")
+		return
+	}
+	ins := make([]ledger.TxInput, len(body.Transactions))
+	for i, raw := range body.Transactions {
+		if ins[i], err = parseTx(raw); err != nil {
+			httpx.WriteMessage(w, 422, "The given data was invalid: transaction "+strconv.Itoa(i+1)+": "+err.Error())
+			return
+		}
+	}
+	scope := httpx.Scope(r)
+	created, err := scope.Txs.CreateMany(r.Context(), ins)
+	if err != nil {
+		httpx.WriteMessage(w, 422, err.Error())
+		return
+	}
+	for i, tx := range created {
+		if tx == nil || tx.Status != "confirmed" {
+			continue
+		}
+		scope.Automation.Process(r.Context(), "on_transaction_create", tx)
+		if fresh, e := scope.Txs.ByID(r.Context(), tx.ID); e == nil && fresh != nil {
+			fresh.Difference = tx.Difference // only a save knows it
+			created[i] = fresh
+		}
+	}
+	httpx.WriteData(w, http.StatusCreated, dto.Map(created, func(t *ledger.Transaction) dto.Transaction {
+		return dto.NewTransaction(*t)
+	}))
 }

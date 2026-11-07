@@ -329,52 +329,6 @@ func (s Transactions) Create(ctx context.Context, in TxInput) (*Transaction, err
 	return tx, err
 }
 
-// Add is Create without reading the transaction back, which loads every
-// account balance and category count it touches. It returns the new id; use it
-// to add many transactions, where that read costs more than the insert.
-func (s Transactions) Add(ctx context.Context, in TxInput) (int64, error) {
-	id, _, err := s.add(ctx, in)
-	return id, err
-}
-
-// add validates and stores a new transaction.
-func (s Transactions) add(ctx context.Context, in TxInput) (int64, built, error) {
-	status := "confirmed"
-	if in.Status != nil {
-		status = *in.Status
-	} else if in.Date == nil || IsFuture(*in.Date) {
-		status = "pending"
-	}
-	if status == "confirmed" {
-		if in.Date == nil {
-			return 0, built{}, fmt.Errorf("date required")
-		}
-		if IsFuture(*in.Date) {
-			return 0, built{}, fmt.Errorf("future")
-		}
-	}
-	b, err := s.build(ctx, in, false)
-	if err != nil {
-		return 0, built{}, err
-	}
-	var id int64
-	err = store.Tx(ctx, s.DB, func(d store.DB) error {
-		r := repo.Repo{DB: d}
-		id, err = r.InsertTransaction(ctx, repo.TxFields{
-			Type: in.Type, Status: status, Description: blankToNil(in.Description), Date: in.Date,
-			ExternalID: in.ExternalID, CreatedBy: in.CreatedBy,
-		}, time.Now().UTC())
-		if err != nil {
-			return err
-		}
-		return s.store(ctx, d, id, b, in.TagIDs)
-	})
-	if err != nil {
-		return 0, built{}, err
-	}
-	return id, b, nil
-}
-
 // store writes the payments, lines and tags of a transaction.
 func (s Transactions) store(ctx context.Context, d store.DB, id int64, b built, tagIDs []int64) error {
 	r := repo.Repo{DB: d}

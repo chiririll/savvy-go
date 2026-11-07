@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"time"
 
 	repo "savvy-go/internal/db/repo/importer"
@@ -187,8 +188,14 @@ func (s Service) Execute(ctx context.Context, importID string, mapping, options 
 	}
 	run := importRun{s: s, accountID: accountID, unit: unit, resolver: resolver, now: now, errs: []RowError{}}
 	for i, row := range rows {
-		run.row(ctx, row, mapping, options, i+1)
+		if err := run.row(ctx, row, mapping, options, i+1); err != nil {
+			return s.fail(ctx, importID, err.Error())
+		}
 	}
+	if err := run.flush(ctx); err != nil {
+		return s.fail(ctx, importID, err.Error())
+	}
+	sort.SliceStable(run.errs, func(i, j int) bool { return run.errs[i].Row < run.errs[j].Row })
 	errJSON, _ := json.Marshal(run.errs)
 	meta := im.Meta
 	meta.CreatedCurrencies, meta.CreatedTags, meta.CreatedCategories = []string{}, []string{}, resolver.created
@@ -207,6 +214,9 @@ func (s Service) Execute(ctx context.Context, importID string, mapping, options 
 // maxRowErrors caps how many row errors an import report keeps.
 const maxRowErrors = 200
 
+// importBatch is how many rows are stored in one database transaction.
+const importBatch = 500
+
 // importRun tallies one Execute pass over the rows.
 type importRun struct {
 	s                Service
@@ -216,6 +226,9 @@ type importRun struct {
 	now              time.Time
 	created, skipped int
 	errs             []RowError
+	// batch holds the rows read but not stored yet, with their numbers.
+	batch   []repo.Row
+	numbers []int
 }
 
 func (r *importRun) reject(n int, msg string) {
@@ -224,30 +237,51 @@ func (r *importRun) reject(n int, msg string) {
 	}
 }
 
-// row imports one CSV row; n is its 1-based position.
-func (r *importRun) row(ctx context.Context, row []string, mapping, options map[string]any, n int) {
+// row reads one CSV row; n is its 1-based position. A row that is fine waits in
+// the batch for flush. The error is one that stops the whole import.
+func (r *importRun) row(ctx context.Context, row []string, mapping, options map[string]any, n int) error {
 	res := processImportRow(row, mapping, options, n)
 	if res.err != "" {
 		r.reject(n, res.err)
-		return
+		return nil
 	}
 	amount, err := money.FromInput(res.amount, r.unit)
 	if err != nil {
 		r.reject(n, err.Error())
-		return
+		return nil
 	}
-	added, err := r.s.repo().InsertRow(ctx, repo.Row{
+	r.batch = append(r.batch, repo.Row{
 		Type: res.typ, AccountID: r.accountID, CategoryID: r.resolver.resolve(res.category), Minor: amount.Minor(),
 		Description: res.desc, Date: res.date, Status: "confirmed", DedupHash: dedupHash(res.date, res.amount, res.desc),
-	}, r.now)
-	switch {
-	case err != nil:
-		r.errs = append(r.errs, RowError{Row: n, Message: err.Error()})
-	case added:
-		r.created++
-	default:
-		r.skipped++
+	})
+	r.numbers = append(r.numbers, n)
+	if len(r.batch) >= importBatch {
+		return r.flush(ctx)
 	}
+	return nil
+}
+
+// flush stores the waiting rows in one database transaction.
+func (r *importRun) flush(ctx context.Context) error {
+	if len(r.batch) == 0 {
+		return nil
+	}
+	results, err := r.s.repo().InsertRows(ctx, r.batch, r.now)
+	if err != nil {
+		return err
+	}
+	for i, res := range results {
+		switch {
+		case res.Err != nil:
+			r.reject(r.numbers[i], res.Err.Error())
+		case res.Added:
+			r.created++
+		default:
+			r.skipped++
+		}
+	}
+	r.batch, r.numbers = r.batch[:0], r.numbers[:0]
+	return nil
 }
 
 func (s Service) Preview(ctx context.Context, im *Import, mapping, options map[string]any) (*PreviewResult, error) {

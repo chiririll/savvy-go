@@ -579,6 +579,58 @@ func TestMCPAutomationRules(t *testing.T) {
 	}
 }
 
+// create_transactions stores a whole list in one save, or nothing when one of
+// them is refused, and says which one.
+func TestMCPCreateTransactionsIsAllOrNone(t *testing.T) {
+	a := newTestApp(t)
+	u := a.createUser("mcp@a.com", "secret1", "admin")
+	sp := a.space.ID
+	s := a.mcpFull(u)
+	acc := idOf(t, a.call(s, "create_account", map[string]any{
+		"space_id": sp, "name": "Wallet", "type": "cash", "currency_code": "EUR", "initial_balance": "100.00",
+	}))
+	balance := func() float64 {
+		t.Helper()
+		accs := toolData(t, a.call(s, "list_accounts", map[string]any{"space_id": sp})).([]any)
+		return accs[0].(map[string]any)["currentBalance"].(float64)
+	}
+	item := func(typ string, account int64, amount, desc string) map[string]any {
+		args := mcpTx(sp, typ, account, amount, desc, "2026-03-01")
+		delete(args, "space_id")
+		return args
+	}
+
+	res := a.call(s, "create_transactions", map[string]any{
+		"space_id":     sp,
+		"transactions": []map[string]any{item("expense", acc, "10.50", "bread"), item("expense", acc, "4.50", "milk")},
+	})
+	if res.IsError {
+		t.Fatalf("create_transactions: %s", resultText(res))
+	}
+	created := toolData(t, res).([]any)
+	if len(created) != 2 || created[0].(map[string]any)["description"] != "bread" ||
+		created[1].(map[string]any)["description"] != "milk" {
+		t.Fatalf("created = %s", resultText(res))
+	}
+	if got := balance(); got != 85 {
+		t.Fatalf("balance = %v, want 85", got)
+	}
+
+	bad := a.call(s, "create_transactions", map[string]any{
+		"space_id":     sp,
+		"transactions": []map[string]any{item("expense", acc, "1", "ok"), item("expense", 0, "1", "no account")},
+	})
+	if !bad.IsError || !strings.Contains(resultText(bad), "transaction 2") {
+		t.Fatalf("a bad second transaction = %v %s", bad.IsError, resultText(bad))
+	}
+	if got := balance(); got != 85 {
+		t.Fatalf("a refused list changed the balance to %v", got)
+	}
+	if empty := a.call(s, "create_transactions", map[string]any{"space_id": sp, "transactions": []map[string]any{}}); !empty.IsError {
+		t.Fatal("an empty list must be refused")
+	}
+}
+
 // mcpTx is the arguments of create_transaction for an income or expense of
 // amount on an account: one payment, signed by the type, and one line.
 func mcpTx(space int64, typ string, account int64, amount, desc, date string) map[string]any {

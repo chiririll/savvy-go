@@ -35,22 +35,17 @@ func (s *seeder) addTx(
 		return fmt.Errorf("%s %s: %w", typ, desc, err)
 	}
 	in.Description, in.Date, in.Status, in.TagIDs = &desc, &d, &status, tagIDs
-	txs := s.txs
-	if strings.HasPrefix(typ, "debt_") {
-		txs = txs.As(ledger.ReasonDebt)
-	}
-	// Add, not Create: reading each transaction back costs more with every one
-	// added, which is most of the time of a long history.
-	id, err := txs.Add(s.ctx, in)
-	if err != nil {
-		return fmt.Errorf("%s %s: %w", typ, desc, err)
-	}
+	q := queuedTx{in: in, debt: strings.HasPrefix(typ, "debt_")}
 	if typ == "expense" && amount >= 2 {
 		name := ""
 		if catID != nil {
 			name = s.catNames[*catID]
 		}
-		s.expenses = append(s.expenses, expenseCand{id: id, amount: amount, catName: name, catID: catID})
+		q.cand = &expenseCand{amount: amount, catName: name, catID: catID}
+	}
+	s.queue = append(s.queue, q)
+	if len(s.queue) >= flushEvery {
+		return s.flush()
 	}
 	return nil
 }
@@ -148,4 +143,48 @@ func inList(v string, opts ...string) bool {
 		}
 	}
 	return false
+}
+
+// flushEvery is how many queued transactions are stored at once.
+const flushEvery = 2000
+
+// queuedTx is a transaction addTx has accepted but not stored yet.
+type queuedTx struct {
+	in   ledger.TxInput
+	debt bool
+	cand *expenseCand // set for an expense that may be split into lines later
+}
+
+// flush stores the queued transactions, in the order they were added, in one
+// database transaction per run of the same kind. Nothing else may add or read
+// transactions between addTx and flush, so every step that does calls it first.
+func (s *seeder) flush() error {
+	queue := s.queue
+	s.queue = nil
+	for start := 0; start < len(queue); {
+		end := start
+		for end < len(queue) && queue[end].debt == queue[start].debt {
+			end++
+		}
+		txs := s.txs
+		if queue[start].debt {
+			txs = txs.As(ledger.ReasonDebt)
+		}
+		batch := make([]ledger.TxInput, 0, end-start)
+		for _, q := range queue[start:end] {
+			batch = append(batch, q.in)
+		}
+		ids, err := txs.AddMany(s.ctx, batch)
+		if err != nil {
+			return fmt.Errorf("seed transactions: %w", err)
+		}
+		for i, q := range queue[start:end] {
+			if q.cand != nil {
+				q.cand.id = ids[i]
+				s.expenses = append(s.expenses, *q.cand)
+			}
+		}
+		start = end
+	}
+	return nil
 }

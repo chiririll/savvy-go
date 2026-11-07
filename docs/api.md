@@ -90,6 +90,8 @@ An answer carries `payments`, `lines`, `amount` (what the payments net to, `null
 | `transfer_review` | that transfer is in review | nothing |
 | `recurring_pending` | the open occurrence of a recurring rule | confirm or skip |
 
+`POST /transactions/bulk` takes `{"transactions": [...]}`, up to 500 records shaped like one `POST /transactions` body, and stores all of them or none in one save; an invalid record fails the request with its position (`transaction 3: …`). It answers with the created transactions in the order sent.
+
 `POST /transactions/{id}/confirm` takes an optional `date`; for the open occurrence of a recurring rule it may also take `payments` and `lines` with the real amounts. Confirming or skipping an occurrence makes the rule's next one.
 
 ### Recurring rules

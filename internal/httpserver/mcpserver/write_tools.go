@@ -137,6 +137,12 @@ func (k writeSet) transactionTools() {
 			"of -20 and +10; a transfer has a negative payment and a positive one. Lines are positive and add up to "+
 			"what the payments net to. The answer's difference field is not null when they disagree.",
 		"transactions"))
+	register[createTxsArgs](k, k.post("create_transactions", "Create many transactions",
+		"Record up to 500 transactions in one call, each as for create_transaction. Prefer this to calling "+
+			"create_transaction in a loop: it is one request and one save, much faster. All or none are stored: if one "+
+			"is invalid nothing is written and the error names its position (transaction 3). Answers with the "+
+			"created transactions in the same order. Split a longer list into several calls.",
+		"transactions/bulk"))
 	register[updateTxArgs](k, k.patch("update_transaction", "Update transaction",
 		"Change a transaction. Send only the fields that change.", "transactions/{id}"))
 	register[idArgs](k, k.del("delete_transaction", "Delete transaction",

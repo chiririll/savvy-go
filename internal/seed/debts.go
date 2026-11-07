@@ -25,6 +25,10 @@ func (s *seeder) seedTransfersDebt(accounts map[string]*ledger.Account) error {
 			// The card is paid in full on the 25th. The draw keeps the random
 			// stream of the other data as it was.
 			_ = s.mtRand(600, 1400)
+			// The balance reads the stored transactions, so store the queued ones.
+			if err := s.flush(); err != nil {
+				return err
+			}
 			debt, err := s.accts.Balance(s.ctx, *accounts["credit"], dCard.Format("2006-01-02"))
 			if err != nil {
 				return err

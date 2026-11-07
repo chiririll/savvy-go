@@ -60,7 +60,7 @@ On the consent page pick **Editor** or **Admin**, or tick Write and Delete under
 
 | Tool | Needs | Does |
 |------|-------|------|
-| `create_transaction`, `update_transaction`, `confirm_transaction`, `skip_transaction`, `duplicate_transaction` | transactions: write | record, change or settle a transaction: payments (the signed money that moved, one per account) and lines (what it was for), see [Transactions](api.md#transactions); a line's `note` is markdown |
+| `create_transaction`, `create_transactions`, `update_transaction`, `confirm_transaction`, `skip_transaction`, `duplicate_transaction` | transactions: write | record, change or settle a transaction: payments (the signed money that moved, one per account) and lines (what it was for), see [Transactions](api.md#transactions); a line's `note` is markdown. `create_transactions` takes a list of up to 500 and stores all or none in one save, so use it instead of calling `create_transaction` in a loop |
 | `delete_transaction` | transactions: delete | remove a transaction |
 | `create_account`, `update_account` | accounts: write | add or change an account |
 | `create_credit_card`, `update_credit_card` | accounts: write | a credit card with its limit, statement day and grace days, see [Credit cards](api.md#credit-cards) |

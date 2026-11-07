@@ -159,3 +159,52 @@ func TestImportedRowIsOnePaymentAndOneLine(t *testing.T) {
 		t.Fatalf("every imported row has one line: %+v", rows)
 	}
 }
+
+// A batch stores in one transaction what InsertRow stores one by one: it skips
+// duplicates, also those inside the batch, and a row that fails leaves nothing
+// behind and does not stop the others.
+func TestInsertRowsKeepsGoodRowsAroundBadOne(t *testing.T) {
+	d := dbtest.Space(t)
+	l := ledgerrepo.Repo{DB: d}
+	now := time.Now().UTC()
+	usd, _ := l.InsertCurrency(
+		ctx,
+		ledgerrepo.Currency{Code: "USD", Name: "Dollar", Symbol: "$", Decimals: 2, IsBase: true, Rate: decimal.NewFromInt(1)},
+		now,
+	)
+	acc, _ := l.InsertAccount(
+		ctx,
+		ledgerrepo.AccountFields{
+			Name: "Cash", Type: "cash", CurrencyID: usd,
+			InitialBalance: money.New(0, money.Unit{ID: usd, Decimals: 2}), IsActive: true,
+		},
+		now,
+	)
+	r := importerrepo.Repo{DB: d}
+	row := func(hash string, account int64) importerrepo.Row {
+		return importerrepo.Row{
+			Type: "expense", AccountID: account, Minor: 100, Description: "x", Date: "2026-02-01",
+			Status: "confirmed", DedupHash: hash,
+		}
+	}
+	got, err := r.InsertRows(ctx, []importerrepo.Row{row("a", acc), row("a", acc), row("b", 9999), row("c", acc)}, now)
+	if err != nil || len(got) != 4 {
+		t.Fatalf("InsertRows = %v, %v", got, err)
+	}
+	want := []string{"added", "skipped", "failed", "added"}
+	for i, res := range got {
+		state := "skipped"
+		switch {
+		case res.Err != nil:
+			state = "failed"
+		case res.Added:
+			state = "added"
+		}
+		if state != want[i] {
+			t.Errorf("row %d is %s, want %s", i+1, state, want[i])
+		}
+	}
+	if n := l.CountTransactions(ctx); n != 2 {
+		t.Fatalf("%d transactions, want 2 (the failed row must leave nothing)", n)
+	}
+}

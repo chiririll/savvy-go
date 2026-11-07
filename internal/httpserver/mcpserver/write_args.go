@@ -19,14 +19,24 @@ type txLineArgs struct {
 	Note       string `json:"note,omitempty" jsonschema:"What it was for, for example bus."`
 }
 
-type createTxArgs struct {
-	SpaceID     int64           `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
+// txFields is what a new transaction is made of.
+type txFields struct {
 	Type        string          `json:"type" jsonschema:"income, expense or transfer (between two accounts of this space)."`
 	Description string          `json:"description,omitempty"`
 	Date        string          `json:"date,omitempty" jsonschema:"YYYY-MM-DD. Defaults to today."`
 	Payments    []txPaymentArgs `json:"payments" jsonschema:"The money that moved, one payment per account, signed (see the tool description)."`
 	Lines       []txLineArgs    `json:"lines,omitempty" jsonschema:"What it was for: required for an income or expense, optional fee lines for a transfer."`
 	TagIDs      []int64         `json:"tag_ids,omitempty" jsonschema:"Tag ids, from list_tags."`
+}
+
+type createTxArgs struct {
+	SpaceID int64 `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
+	txFields
+}
+
+type createTxsArgs struct {
+	SpaceID      int64      `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
+	Transactions []txFields `json:"transactions" jsonschema:"1 to 500 transactions, each as for create_transaction."`
 }
 
 type updateTxArgs struct {
