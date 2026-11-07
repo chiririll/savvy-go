@@ -1,17 +1,28 @@
 import { useTranslation } from 'react-i18next'
 import { Transaction } from '@/types'
 import { isDateOverdue } from '@/lib/dates'
+import { isApproximateOccurrence } from '@/lib/recurring-template'
 import { UpcomingPendingCard } from './UpcomingPendingCard'
 import { cn } from '@/lib/utils'
+
+const NO_RULES: ReadonlySet<number> = new Set()
 
 interface UpcomingPendingStripProps {
     transactions: Transaction[]
     isReadOnly?: boolean
     onConfirm: (transaction: Transaction) => void
     onSkip: (id: number) => void
+    /** The ids of the rules whose amount is a guess: their occurrences show `≈` (see `useApproximateRuleIds`). */
+    approximateRuleIds?: ReadonlySet<number>
 }
 
-export function UpcomingPendingStrip({ transactions, isReadOnly, onConfirm, onSkip }: UpcomingPendingStripProps) {
+export function UpcomingPendingStrip({
+    transactions,
+    isReadOnly,
+    onConfirm,
+    onSkip,
+    approximateRuleIds = NO_RULES,
+}: UpcomingPendingStripProps) {
     const { t } = useTranslation('pages')
 
     if (transactions.length === 0) {
@@ -33,6 +44,7 @@ export function UpcomingPendingStrip({ transactions, isReadOnly, onConfirm, onSk
                 isReadOnly={isReadOnly}
                 onConfirm={onConfirm}
                 onSkip={onSkip}
+                approximate={isApproximateOccurrence(transaction, approximateRuleIds)}
             />
         ))
 

@@ -74,12 +74,24 @@ function feeOf(values: TransferValues): { amount: number } | TransferError | nul
     return amount > 0 ? { amount } : null
 }
 
+export interface TransferBuildOptions {
+    /**
+     * The transfer is the template of a recurring rule: between two currencies the amount received may stay open
+     * (`null`), and each occurrence takes what the rates of its day make of the amount sent.
+     */
+    template?: boolean
+}
+
 /**
  * The payload for a transfer between two accounts of this space: a payment that takes money from the source and
  * one that brings it to the destination. The fee is paid by the source on top of the amount, and saved as a line,
  * so reports count it as spending.
  */
-export function buildTransferInput(values: TransferValues, accounts: Account[]): TransferResult {
+export function buildTransferInput(
+    values: TransferValues,
+    accounts: Account[],
+    options?: TransferBuildOptions,
+): TransferResult {
     const from = accountById(accounts, values.payments[0]?.account_id)
     const to = accountById(accounts, values.to_account_id)
     if (!from?.currency) {
@@ -96,7 +108,8 @@ export function buildTransferInput(values: TransferValues, accounts: Account[]):
         return { ok: false, error: 'amountZero' }
     }
     const received = transferReceived(values, accounts)
-    if (!(received > 0)) {
+    const open = Boolean(options?.template) && !(received > 0)
+    if (!(received > 0) && !open) {
         return { ok: false, error: 'receivedZero' }
     }
     const fee = feeOf(values)
@@ -113,7 +126,7 @@ export function buildTransferInput(values: TransferValues, accounts: Account[]):
             date: values.date ? values.date : null,
             payments: [
                 { account_id: from.id, amount: -roundToCurrency(sent + feeAmount, from.currency) },
-                { account_id: to.id, amount: received },
+                { account_id: to.id, amount: open ? null : received },
             ],
             lines:
                 feeAmount > 0

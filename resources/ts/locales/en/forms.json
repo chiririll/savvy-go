@@ -155,13 +155,9 @@
     },
     "recurring": {
         "frequency": "Frequency",
-        "interval": "Interval",
         "startDate": "Start date",
-        "toAccount": "Destination account",
         "toAmount": "To amount",
-        "toAmountPlaceholder": "Same as amount",
-        "toAmountHelp": "Leave empty for same currency",
-        "descriptionPlaceholder": "e.g., Monthly rent payment",
+        "toAmountPlaceholder": "At each run's rate",
         "schedule": "Schedule",
         "every": "Every",
         "days": "day(s)",
@@ -189,7 +185,9 @@
             "4": "Thursday",
             "5": "Friday",
             "6": "Saturday"
-        }
+        },
+        "stopped": "This rule stopped: {{reason}}. Saving it clears this message; tick Active to run it again.",
+        "cannotEdit": "The form cannot show this rule without losing part of it: an account it uses was removed, or it has a shape only the API makes. Delete it and make a new one, or change it through the API."
     },
     "budgets": {
         "period": "Period",

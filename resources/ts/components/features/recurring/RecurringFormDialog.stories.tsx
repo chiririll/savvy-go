@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, fn, screen, userEvent, within } from 'storybook/test'
 
-import { accounts, categories, currencies, recurring, tags } from '@/test/fixtures'
+import { accounts, categories, currencies, recurring, recurringTemplate, tags } from '@/test/fixtures'
 import { reply } from '@/test/api-mocks'
 import { overlayA11y } from '@/test/a11y'
 import { useCurrenciesStore } from '@/stores/currencies'
@@ -15,7 +15,12 @@ const meta = {
     args: { open: true, onOpenChange: fn(), onSubmit: fn() },
     beforeEach: ({ msw }) => {
         useCurrenciesStore.getState().setAll(currencies)
-        msw.use(reply('get', '/accounts', accounts), reply('get', '/categories', categories), reply('get', '/tags', tags))
+        msw.use(
+            reply('get', '/accounts', accounts),
+            reply('get', '/categories', categories),
+            reply('get', '/currencies', currencies),
+            reply('get', '/tags', tags),
+        )
     },
 } satisfies Meta<typeof RecurringFormDialog>
 
@@ -30,8 +35,60 @@ export const Edit: Story = {
     },
 }
 export const EditTransfer: Story = {
-    args: { recurring: recurring({ type: 'transfer', category: null, toAccount: accounts[1], toAmount: 920 }) },
+    args: {
+        recurring: recurring({
+            template: recurringTemplate({
+                type: 'transfer',
+                description: 'To the card',
+                payments: [
+                    { account_id: 1, amount: -100 },
+                    { account_id: 2, amount: 80 },
+                ],
+                lines: [],
+            }),
+        }),
+    },
 }
+
+// The amount received was left open: it stays open when the rule is opened.
+export const EditTransferWithTheAmountReceivedOpen: Story = {
+    args: {
+        recurring: recurring({
+            template: recurringTemplate({
+                type: 'transfer',
+                description: 'To the card',
+                payments: [
+                    { account_id: 1, amount: -100 },
+                    { account_id: 2, amount: null, estimated: true },
+                ],
+                lines: [],
+            }),
+        }),
+    },
+    play: async () => {
+        await expect(await screen.findByPlaceholderText(/at each run/i)).toBeVisible()
+    },
+}
+
+export const EditStoppedRule: Story = {
+    args: { recurring: recurring({ isActive: false, error: 'unknown account', nextRunDate: null }) },
+    play: async () => {
+        await expect(await screen.findByText(/unknown account/i)).toBeVisible()
+    },
+}
+
+// A rule the form cannot show whole (here, an account of it is gone) is not opened, so nothing is lost by saving.
+export const RuleTheFormCannotShow: Story = {
+    args: {
+        recurring: recurring({ template: recurringTemplate({ payments: [{ account_id: 99, amount: -5 }] }) }),
+    },
+    play: async () => {
+        const dialog = await screen.findByRole('dialog')
+        await expect(await within(dialog).findByText(/cannot show this rule/i)).toBeVisible()
+        await expect(within(dialog).queryByRole('button', { name: /^save$/i })).toBeNull()
+    },
+}
+
 export const Submitting: Story = { args: { isSubmitting: true } }
 export const ReadOnly: Story = { parameters: { app: { role: 'viewer' } }, args: { recurring: recurring() } }
 

@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { useWatch, type UseFormReturn } from 'react-hook-form'
 import { useAccounts, useCategories, useCurrencies } from '@/hooks'
-import { pickDefaultCategory } from '@/hooks/use-transaction-party-defaults'
+import { pickDefaultCategory } from '@/lib/default-category'
 import { isDateInFuture } from '@/lib/utils'
 import { isTransferType } from '@/lib/transaction-type'
 import type { TransactionFormValues } from '@/schemas/transactions'
@@ -20,10 +20,14 @@ interface TransactionModelOptions {
     originalAffectsBalance?: boolean
     /** The form (re)opens: a transfer starts its exchange rate over. */
     open: boolean
+    /** The form draws the template of a recurring rule: no date, and a transfer's amounts do not follow a rate. */
+    template?: boolean
 }
 
+export type TransactionModel = ReturnType<typeof useTransactionModel>
+
 // What the form derives from what it holds: the accounts it uses, their balances, whether the date makes it pending.
-export function useTransactionModel({ form, transaction, isEdit, originalAffectsBalance, open }: TransactionModelOptions) {
+export function useTransactionModel({ form, transaction, isEdit, originalAffectsBalance, open, template }: TransactionModelOptions) {
     const { data: accounts } = useAccounts(ACCOUNT_FILTER)
     const { data: categories } = useCategories()
     const { data: currencies } = useCurrencies()
@@ -71,6 +75,7 @@ export function useTransactionModel({ form, transaction, isEdit, originalAffects
         toRate: currencies?.find((c) => c.code === selectedToAccount?.currency?.code)?.rate,
         open,
         ratesReady: currencies !== undefined,
+        sync: !template,
     })
 
     const posted = useMemo(

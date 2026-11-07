@@ -33,6 +33,11 @@ interface TransferRateOptions {
     open: boolean
     /** The currency list is loaded: until it is, a rate cannot be told from a missing one. */
     ratesReady?: boolean
+    /**
+     * Whether the amounts and the rate follow each other. A recurring rule's template turns it off: it has no rate
+     * of its own, and an amount received left open is worked out at each occurrence.
+     */
+    sync?: boolean
 }
 
 /**
@@ -40,14 +45,14 @@ interface TransferRateOptions {
  * edits the amounts, the rate or the accounts. The amount sent is the first
  * payment's; the fee is paid on top of it and is not part of the rate.
  */
-export function useTransferRate({ form, from, to, toRate, open, ratesReady = true }: TransferRateOptions) {
+export function useTransferRate({ form, from, to, toRate, open, ratesReady = true, sync = true }: TransferRateOptions) {
     const [type, amount, toAmount, accountId, toSpaceId, toAccountId] = useWatch({
         control: form.control,
         name: ['type', 'payments.0.amount', 'to_amount', 'payments.0.account_id', 'to_space_id', 'to_account_id'],
     })
     const isTransfer = isTransferType(type)
     const sameCurrency = Boolean(from && to && from.currency?.code === to.currency?.code)
-    const editable = Boolean(isTransfer && from && to && !sameCurrency)
+    const editable = Boolean(sync && isTransfer && from && to && !sameCurrency)
     const fromRate = from?.currency?.rate
     const destDecimals = to?.currency?.decimals ?? 2
     const pairKey = `${accountId ?? ''}:${toSpaceId ?? ''}:${toAccountId ?? ''}`
@@ -101,7 +106,7 @@ export function useTransferRate({ form, from, to, toRate, open, ratesReady = tru
     }, [editable, form, fromRate, toRate, applyReceiveFromRate])
 
     useEffect(() => {
-        if (!isTransfer) {
+        if (!isTransfer || !sync) {
             lastPairRef.current = null
             return
         }
@@ -171,7 +176,7 @@ export function useTransferRate({ form, from, to, toRate, open, ratesReady = tru
             }
             applyReceiveFromRate(rate)
         }
-    }, [isTransfer, sameCurrency, ratesReady, amount, toAmount, pairKey, from, to, fromRate, toRate, form, applyReceiveFromRate])
+    }, [isTransfer, sync, sameCurrency, ratesReady, amount, toAmount, pairKey, from, to, fromRate, toRate, form, applyReceiveFromRate])
 
     return { sameCurrency, editable, commit, startEditing, keepNextPair }
 }

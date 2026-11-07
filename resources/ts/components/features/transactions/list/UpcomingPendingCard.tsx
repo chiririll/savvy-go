@@ -27,9 +27,11 @@ interface UpcomingPendingCardProps {
     isReadOnly?: boolean
     onConfirm: (transaction: Transaction) => void
     onSkip: (id: number) => void
+    /** The amount is a guess (the occurrence of a rule with an estimate): shown as `≈`. */
+    approximate?: boolean
 }
 
-export function UpcomingPendingCard({ transaction, isReadOnly, onConfirm, onSkip }: UpcomingPendingCardProps) {
+export function UpcomingPendingCard({ transaction, isReadOnly, onConfirm, onSkip, approximate }: UpcomingPendingCardProps) {
     const { t } = useTranslation(['common', 'pages'])
     const Icon = TYPE_ICONS[transaction.type]
     const { sign, className } = transactionAmountAppearance(transaction.type)
@@ -58,6 +60,7 @@ export function UpcomingPendingCard({ transaction, isReadOnly, onConfirm, onSkip
                 <TransactionAmount
                     amount={transaction.type === 'transfer' ? transferSides(transaction).sent : rowAmount(transaction)}
                     sign={sign}
+                    approximate={approximate}
                 />
             </p>
             {!isReadOnly && (

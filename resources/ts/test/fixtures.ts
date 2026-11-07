@@ -7,6 +7,7 @@ import type {
     CurrencyCatalogItem,
     Debt,
     Payment,
+    RecurringTemplate,
     RecurringTransaction,
     Settings,
     Tag,
@@ -145,26 +146,24 @@ export const debt = (overrides: Partial<Debt> = {}): Debt => ({
     ...overrides,
 })
 
+/** What a rule makes: rent, paid from the first account, in one line. Amounts are signed, as the API keeps them. */
+export const recurringTemplate = (overrides: Partial<RecurringTemplate> = {}): RecurringTemplate => ({
+    type: 'expense',
+    description: 'Rent',
+    payments: [{ account_id: accounts[0].id, amount: -1100 }],
+    lines: [{ category_id: categories[0].id, currency_id: currencies[0].id, amount: 1100 }],
+    tag_ids: [],
+    ...overrides,
+})
+
 export const recurring = (overrides: Partial<RecurringTransaction> = {}): RecurringTransaction => ({
     id: 1,
-    type: 'expense',
-    amount: 1100,
-    toAmount: null,
-    isEstimated: false,
-    description: 'Rent',
-    frequency: 'monthly',
-    interval: 1,
-    dayOfWeek: null,
-    dayOfMonth: 1,
-    startDate: '2026-01-01',
-    endDate: null,
+    template: recurringTemplate(),
+    schedule: { frequency: 'monthly', interval: 1, day_of_month: 1, start: '2026-01-01', end: null },
+    isActive: true,
+    error: null,
     nextRunDate: '2099-01-01',
     lastRunDate: null,
-    isActive: true,
-    account: accounts[0],
-    toAccount: null,
-    category: categories[0],
-    tags: [],
     ...overrides,
 })
 

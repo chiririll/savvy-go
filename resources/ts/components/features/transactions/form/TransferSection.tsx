@@ -9,6 +9,7 @@ import { swapTransfer } from '@/lib/transfer-payload'
 import type { TransactionFormValues } from '@/schemas/transactions'
 import type { Account } from '@/types'
 import type { BalancePreview } from './balance-preview'
+import { useTemplateMode } from './template-mode'
 import { PaymentRow } from './PaymentRow'
 import { BalanceAfter } from './TransactionBalanceHint'
 import { TransferRateField } from './TransferRateField'
@@ -34,6 +35,7 @@ export function TransferSection({ from, to, rate, destinationSpaceId, balances, 
     const form = useFormContext<TransactionFormValues>()
     const toAccountId = useWatch({ control: form.control, name: 'to_account_id' })
     const isSpaceTransfer = destinationSpaceId !== undefined
+    const template = useTemplateMode()
 
     const swap = () => {
         const updates = swapTransfer({
@@ -105,7 +107,7 @@ export function TransferSection({ from, to, rate, destinationSpaceId, balances, 
                                                 inputMode="decimal"
                                                 step={to?.currency?.decimals ? 10 ** -to.currency.decimals : 1}
                                                 min={0}
-                                                placeholder="0.00"
+                                                placeholder={template ? t('forms:recurring.toAmountPlaceholder') : '0.00'}
                                                 className="pr-12"
                                                 {...field}
                                                 value={field.value ?? ''}

@@ -127,6 +127,54 @@ describe('buildTransferInput', () => {
     })
 })
 
+describe('buildTransferInput for a template', () => {
+    it('leaves the amount received open between currencies: each occurrence works it out at its rates', () => {
+        const built = buildTransferInput(values({ to_amount: null }), all, { template: true })
+
+        expect(built).toMatchObject({
+            ok: true,
+            input: {
+                payments: [
+                    { account_id: cash.id, amount: -100 },
+                    { account_id: euroCard.id, amount: null },
+                ],
+            },
+        })
+    })
+
+    it('keeps an amount received that was written', () => {
+        const built = buildTransferInput(values(), all, { template: true })
+
+        expect(built).toMatchObject({ ok: true, input: { payments: [{ amount: -100 }, { amount: 80 }] } })
+    })
+
+    it('still sends the same amount both ways in one currency', () => {
+        const built = buildTransferInput(
+            values({ payments: [{ account_id: euroCard.id, amount: 30 }], to_account_id: 9, to_amount: null }),
+            all,
+            { template: true },
+        )
+
+        expect(built).toMatchObject({ ok: true, input: { payments: [{ amount: -30 }, { amount: 30 }] } })
+    })
+
+    it('takes the fee on top of what is sent, as a transfer does', () => {
+        const built = buildTransferInput(values({ to_amount: null, fee: { amount: 2, category_id: 4 } }), all, { template: true })
+
+        expect(built).toMatchObject({
+            ok: true,
+            input: {
+                payments: [{ amount: -102 }, { amount: null }],
+                lines: [{ category_id: 4, amount: 2 }],
+            },
+        })
+    })
+
+    it('still refuses without it: a transfer made now has an amount received', () => {
+        expect(buildTransferInput(values({ to_amount: null }), all)).toEqual({ ok: false, error: 'receivedZero' })
+    })
+})
+
 describe('buildSpaceTransferInput', () => {
     const space = (overrides: Partial<TransferValues> = {}) =>
         values({ type: 'transfer_out', to_space_id: 5, to_account_id: 12, to_amount: 90, ...overrides })

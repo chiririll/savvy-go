@@ -149,6 +149,14 @@ export const SeveralAccounts: Story = {
 }
 
 export const Pending: Story = { args: { transaction: pendingTransaction() } }
+
+// The pending occurrence of a rule with an estimate: its amount is a guess until it is confirmed.
+export const PendingWithAnEstimate: Story = {
+    args: { transaction: pendingTransaction(), approximate: true },
+    play: async ({ canvasElement }) => {
+        await expect(within(canvasElement).getByText(/≈/)).toBeVisible()
+    },
+}
 export const Skipped: Story = { args: { transaction: transaction({ status: 'skipped' }) } }
 export const SkippedTransfer: Story = {
     args: {

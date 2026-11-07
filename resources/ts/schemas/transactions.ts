@@ -38,7 +38,7 @@ export const descriptionSchema = z
     .max(500)
     .refine((value) => !/[\r\n]/.test(value), i18n.t('validation.singleLine'))
 
-export const transactionSchema = z.object({
+export const transactionObject = z.object({
     /** `transfer_out` is a transfer to a linked space: it goes through the transfers API. */
     type: z.enum(['income', 'expense', 'transfer', 'transfer_out'], {
         error: i18n.t('validation.selectTransactionType'),
@@ -78,9 +78,23 @@ export const transactionSchema = z.object({
 
     /** The note of the line of the default category: kept so a saved note is not lost by editing. */
     default_note: z.string().optional().nullable(),
-}).superRefine((data, ctx) => {
+})
+
+type TransactionData = z.infer<typeof transactionObject>
+
+export type TransactionIssueOptions = {
+    /** A recurring rule's template: what it makes later has no date, and a transfer may leave what it receives open. */
+    template?: boolean
+}
+
+/** What the fields say together that no field can say by itself. */
+export function applyTransactionIssues(
+    data: Pick<TransactionData, 'payments' | 'change' | 'lines' | 'default_category_id' | 'to_account_id' | 'to_space_id' | 'to_amount'> & { type: string },
+    ctx: z.RefinementCtx,
+    options?: TransactionIssueOptions,
+) {
     if (isTransferType(data.type)) {
-        applyTransferIssues(data, ctx)
+        applyTransferIssues(data, ctx, options)
         return
     }
 
@@ -109,7 +123,9 @@ export const transactionSchema = z.object({
             path: ['default_category_id'],
         })
     }
-})
+}
+
+export const transactionSchema = transactionObject.superRefine((data, ctx) => applyTransactionIssues(data, ctx))
 
 export { isTransferType }
 
@@ -122,7 +138,7 @@ type TransferFields = {
 }
 
 /** What a transfer needs that a field cannot say by itself: a destination, and not the source again. */
-function applyTransferIssues(data: TransferFields, ctx: z.RefinementCtx) {
+function applyTransferIssues(data: TransferFields, ctx: z.RefinementCtx, options?: TransactionIssueOptions) {
     const issue = (message: string, path: string[]) =>
         ctx.addIssue({ code: z.ZodIssueCode.custom, message, path })
 
@@ -134,8 +150,9 @@ function applyTransferIssues(data: TransferFields, ctx: z.RefinementCtx) {
     } else if (data.type === 'transfer' && Number(data.payments[0]?.account_id) === Number(data.to_account_id)) {
         issue(i18n.t('validation.accountUsedTwice'), ['to_account_id'])
     }
-    // The destination receives something; the form fills it in when both accounts share a currency.
-    if (!(Number(data.to_amount) > 0)) {
+    // The destination receives something; the form fills it in when both accounts share a currency. A template
+    // may leave it open: each occurrence takes what the rates of its day make of the amount sent.
+    if (!options?.template && !(Number(data.to_amount) > 0)) {
         issue(i18n.t('validation.amountRequired'), ['to_amount'])
     }
 }

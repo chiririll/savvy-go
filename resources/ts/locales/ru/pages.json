@@ -131,7 +131,7 @@
         "create": "Новая транзакция",
         "createTitle": "Новая транзакция",
         "editTitle": "Изменить транзакцию",
-    "editPaymentTitle": "Редактирование платежа",
+        "editPaymentTitle": "Редактирование платежа",
         "categoriesCount": "{{count, plural(one: # категория; few: # категории; other: # категорий)}}",
         "emptyTitle": "Транзакций нет",
         "emptyDescription": "Создайте первую транзакцию, чтобы начать учёт",
@@ -228,7 +228,8 @@
         "editTitle": "Изменить регулярный платёж",
         "everyInterval": "Каждые {{count}} {{frequency}}",
         "deleteTitle": "Удалить регулярный платёж?",
-        "deleteDescription": "Это действие нельзя отменить."
+        "deleteDescription": "Это действие нельзя отменить.",
+        "stopped": "Остановлено"
     },
     "budgets": {
         "title": "Бюджеты",

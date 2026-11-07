@@ -1,7 +1,10 @@
+import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { EntityFormDialog } from '@/components/shared'
-import { RecurringFormData } from '@/schemas'
-import { RecurringTransaction } from '@/types'
+import { EntityFormDialog, FormDialogCancel } from '@/components/shared'
+import { useAccounts } from '@/hooks'
+import { canEditRecurringInForm, recurringToFormValues } from '@/lib/recurring-template'
+import type { RecurringFormValues } from '@/schemas/recurring'
+import { RecurringInput, RecurringTransaction } from '@/types'
 import { RecurringForm } from './RecurringForm'
 
 const FORM_ID = 'recurring-form'
@@ -10,7 +13,7 @@ interface RecurringFormDialogProps {
     recurring?: RecurringTransaction | null
     open: boolean
     onOpenChange: (open: boolean) => void
-    onSubmit: (data: RecurringFormData) => void
+    onSubmit: (data: RecurringInput) => void
     isSubmitting?: boolean
 }
 
@@ -21,48 +24,48 @@ export function RecurringFormDialog({
     onSubmit,
     isSubmitting,
 }: RecurringFormDialogProps) {
-    const { t } = useTranslation('pages')
+    const { t } = useTranslation(['pages', 'forms'])
+    // Every account, the inactive ones too: a rule may be about one the form no longer offers for new ones.
+    const { data: accounts } = useAccounts()
+    const toFormValues = useCallback(
+        (rule: RecurringTransaction) => recurringToFormValues(rule, accounts ?? []) ?? {},
+        [accounts],
+    )
+    // The rule is read with its accounts; until they arrive there is nothing to show.
+    const ready = !recurring || accounts !== undefined
+    const editable = !recurring || (accounts !== undefined && canEditRecurringInForm(recurring, accounts))
 
     return (
-        <EntityFormDialog<RecurringTransaction, RecurringFormData, RecurringFormData>
+        <EntityFormDialog<RecurringTransaction, RecurringInput, RecurringFormValues>
             entity={recurring}
             open={open}
             onOpenChange={onOpenChange}
             onSubmit={onSubmit}
             isSubmitting={isSubmitting}
             formId={FORM_ID}
-            title={recurring ? t('recurring.editTitle') : t('recurring.createTitle')}
-            description={t('recurring.description')}
-            toFormValues={(item) => ({
-                type: item.type,
-                account_id: item.account.id,
-                to_account_id: item.toAccount?.id,
-                category_id: item.category?.id,
-                amount: item.amount,
-                to_amount: item.toAmount,
-                is_estimated: item.isEstimated,
-                description: item.description,
-                frequency: item.frequency,
-                interval: item.interval,
-                day_of_week: item.dayOfWeek,
-                day_of_month: item.dayOfMonth,
-                start_date: item.startDate,
-                end_date: item.endDate,
-                is_active: item.isActive,
-                tag_ids: item.tags.map((tag) => tag.id),
-            })}
+            title={recurring ? t('pages:recurring.editTitle') : t('pages:recurring.createTitle')}
+            description={t('pages:recurring.description')}
+            className="sm:max-w-xl"
+            toFormValues={toFormValues}
+            footerEnd={ready && !editable ? <FormDialogCancel /> : undefined}
         >
-            {({ formKey, formProps }) => (
-                <RecurringForm
-                    key={formKey}
-                    defaultValues={formProps.defaultValues}
-                    onSubmit={onSubmit}
-                    onValuesChange={formProps.onValuesChange}
-                    isSubmitting={formProps.isSubmitting}
-                    formId={formProps.formId}
-                    hideSubmit
-                />
-            )}
+            {({ formKey, formProps }) =>
+                !ready ? null : !editable ? (
+                    <p className="text-sm text-muted-foreground">{t('forms:recurring.cannotEdit')}</p>
+                ) : (
+                    <RecurringForm
+                        key={`${formKey}-${open}`}
+                        defaultValues={formProps.defaultValues}
+                        onSubmit={onSubmit}
+                        onValuesChange={formProps.onValuesChange}
+                        isSubmitting={formProps.isSubmitting}
+                        formId={formProps.formId}
+                        error={recurring?.error}
+                        open={open}
+                        hideSubmit
+                    />
+                )
+            }
         </EntityFormDialog>
     )
 }

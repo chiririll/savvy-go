@@ -25,7 +25,12 @@ const base: TransactionFormValues = {
     exchange_rate: null,
 }
 
-function setup(values: Partial<TransactionFormValues>, from: Account | undefined, to: Account | undefined) {
+function setup(
+    values: Partial<TransactionFormValues>,
+    from: Account | undefined,
+    to: Account | undefined,
+    sync?: boolean,
+) {
     return renderHook(
         (props: { from?: Account; to?: Account }) => {
             const form = useForm<TransactionFormValues>({ defaultValues: { ...base, ...values } })
@@ -35,12 +40,37 @@ function setup(values: Partial<TransactionFormValues>, from: Account | undefined
                 to: props.to,
                 toRate: props.to?.currency?.rate,
                 open: true,
+                sync,
             })
             return { form, rate }
         },
         { initialProps: { from, to } },
     )
 }
+
+describe('useTransferRate without sync (the template of a recurring rule)', () => {
+    it('leaves the received amount open between two currencies: it is worked out at each occurrence', () => {
+        const { result } = setup({}, cash, euroCard, false)
+
+        expect(result.current.form.getValues('to_amount')).toBeNull()
+        expect(result.current.form.getValues('exchange_rate')).toBeNull()
+    })
+
+    it('has no rate to edit, but still knows the currencies differ', () => {
+        const { result } = setup({}, cash, euroCard, false)
+
+        expect(result.current.rate.sameCurrency).toBe(false)
+        expect(result.current.rate.editable).toBe(false)
+    })
+
+    it('keeps an amount received that was written when the amount sent changes', () => {
+        const { result } = setup({ to_amount: 80 }, cash, euroCard, false)
+
+        act(() => result.current.form.setValue('payments.0.amount', 200))
+
+        expect(result.current.form.getValues('to_amount')).toBe(80)
+    })
+})
 
 describe('useTransferRate', () => {
     it('is not editable, and the received amount is the amount sent, in one currency', () => {

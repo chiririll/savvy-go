@@ -26,6 +26,8 @@ interface TransactionRowProps {
     isReadOnly?: boolean
     showActions?: boolean
     showDate?: boolean
+    /** The amount is a guess (the pending occurrence of a rule with an estimate): shown as `≈`. */
+    approximate?: boolean
     /** Move the row one place up or down within its day; each is set only when the row can go that way. */
     onMoveUp?: () => void
     onMoveDown?: () => void
@@ -150,11 +152,15 @@ export function TransactionRow(props: TransactionRowProps) {
                     {transactionSubtitle(transaction)}
                 </>
             }
-            amount={<TransactionAmount amount={amount} sign={sign} />}
+            amount={<TransactionAmount amount={amount} sign={sign} approximate={props.approximate} />}
             amountClassName={cn(className, transaction.status === 'pending' && 'italic')}
             extraAmount={
                 isTransfer && received ? (
-                    <TransactionAmount amount={received} sign={transaction.status === 'skipped' ? '' : '+'} />
+                    <TransactionAmount
+                        amount={received}
+                        sign={transaction.status === 'skipped' ? '' : '+'}
+                        approximate={props.approximate}
+                    />
                 ) : undefined
             }
             onOpen={handlers.edit}

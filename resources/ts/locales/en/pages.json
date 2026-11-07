@@ -131,7 +131,7 @@
         "create": "New transaction",
         "createTitle": "New transaction",
         "editTitle": "Edit transaction",
-    "editPaymentTitle": "Edit payment",
+        "editPaymentTitle": "Edit payment",
         "categoriesCount": "{{count, plural(one: # category; other: # categories)}}",
         "emptyTitle": "No transactions found",
         "emptyDescription": "Create your first transaction to start tracking",
@@ -228,7 +228,8 @@
         "editTitle": "Edit recurring transaction",
         "everyInterval": "Every {{count}} {{frequency}}",
         "deleteTitle": "Delete recurring transaction?",
-        "deleteDescription": "This action cannot be undone."
+        "deleteDescription": "This action cannot be undone.",
+        "stopped": "Stopped"
     },
     "budgets": {
         "title": "Budgets",

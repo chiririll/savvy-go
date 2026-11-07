@@ -22,6 +22,12 @@ type Story = StoryObj<typeof meta>
 
 export const Upcoming: Story = {}
 export const Overdue: Story = { args: { transaction: overdue } }
+export const WithAnEstimate: Story = {
+    args: { approximate: true },
+    play: async ({ canvasElement }) => {
+        await expect(within(canvasElement).getByText(/≈/)).toBeVisible()
+    },
+}
 export const Income: Story = {
     args: {
         transaction: pendingTransaction({

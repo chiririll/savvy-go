@@ -34,8 +34,7 @@
         "help": "Help",
         "expand": "Expand",
         "collapse": "Collapse",
-        "more": "More actions"
-,
+        "more": "More actions",
         "closeNotification": "Close notification",
         "copy": "Copy"
     },
@@ -130,7 +129,8 @@
         "oneCondition": "At least one condition is required",
         "actionTypeRequired": "Action type is required",
         "oneAction": "At least one action is required",
-        "tagFormat": "Only letters, numbers, _ and - allowed"
+        "tagFormat": "Only letters, numbers, _ and - allowed",
+        "endBeforeStart": "The end date must not be before the start date"
     },
     "table": {
         "emptyTitle": "No data",

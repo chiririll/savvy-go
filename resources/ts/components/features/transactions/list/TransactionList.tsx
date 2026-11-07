@@ -3,11 +3,13 @@ import { FeedEmpty, FeedGroup, FeedRowSkeleton } from '@/components/shared'
 import { useRelativeDay } from '@/hooks'
 import { formatCurrency } from '@/lib/currency'
 import { groupByDateKey } from '@/lib/dates'
+import { isApproximateOccurrence } from '@/lib/recurring-template'
 import { largestTotals, netTotalsByCurrency } from '@/lib/transaction-totals'
 import { Transaction } from '@/types'
 import { TransactionRow } from './TransactionRow'
 
 const MAX_DAY_TOTALS = 2
+const NO_RULES: ReadonlySet<number> = new Set()
 
 function dayTotalsLabel(transactions: Transaction[]): string | null {
     const { shown, hidden } = largestTotals(netTotalsByCurrency(transactions), MAX_DAY_TOTALS)
@@ -33,6 +35,8 @@ interface TransactionListProps {
     onSkip?: (id: number) => void
     onEdit?: (transaction: Transaction) => void
     isReadOnly?: boolean
+    /** The ids of the rules whose amount is a guess: their pending occurrences show `≈` (see `useApproximateRuleIds`). */
+    approximateRuleIds?: ReadonlySet<number>
     grouped?: boolean
     /** Called with a day and its transactions in the new order, as listed. Move up/down menu items show when set. */
     onReorder?: (date: string, shownIds: number[]) => void
@@ -52,6 +56,7 @@ export function TransactionList({
     onSkip,
     onEdit,
     isReadOnly,
+    approximateRuleIds = NO_RULES,
     grouped = true,
     onReorder,
 }: TransactionListProps) {
@@ -72,6 +77,7 @@ export function TransactionList({
         onSkip,
         onEdit,
         isReadOnly,
+        approximate: isApproximateOccurrence(transaction, approximateRuleIds),
     })
 
     if (isLoading) {
@@ -109,6 +115,7 @@ export function TransactionList({
                         onSkip={onSkip}
                         onEdit={onEdit}
                         isReadOnly={isReadOnly}
+                        approximate={isApproximateOccurrence(transaction, approximateRuleIds)}
                         showDate
                     />
                 ))}
