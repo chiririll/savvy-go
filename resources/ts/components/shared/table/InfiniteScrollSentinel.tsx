@@ -6,20 +6,6 @@ interface InfiniteScrollSentinelProps {
     rootMargin?: string
 }
 
-function findScrollParent(element: HTMLElement | null): Element | null {
-    let node = element?.parentElement ?? null
-
-    while (node) {
-        const overflowY = getComputedStyle(node).overflowY
-        if (overflowY === 'auto' || overflowY === 'scroll') {
-            return node
-        }
-        node = node.parentElement
-    }
-
-    return element?.closest('main') ?? null
-}
-
 export function InfiniteScrollSentinel({
     enabled,
     onVisible,
@@ -37,7 +23,6 @@ export function InfiniteScrollSentinel({
             return
         }
 
-        const root = findScrollParent(element)
         const observer = new IntersectionObserver(
             (entries) => {
                 if (!entries[0]?.isIntersecting || lockedRef.current) {
@@ -47,7 +32,10 @@ export function InfiniteScrollSentinel({
                 lockedRef.current = true
                 onVisibleRef.current()
             },
-            { root, rootMargin, threshold: 0 },
+            // Viewport root: the observer already clips by every scrolling ancestor. A wrapper
+            // with overflow-y-auto but no fixed height grows with its content and never scrolls;
+            // using it as root made the sentinel always visible and loaded every page at once.
+            { root: null, rootMargin, threshold: 0 },
         )
 
         observer.observe(element)
