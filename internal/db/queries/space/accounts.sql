@@ -65,6 +65,15 @@ WHERE p.account_id = sqlc.arg('id') AND t.status = 'confirmed'
 GROUP BY t.date
 ORDER BY t.date;
 
+-- name: AccountDeltaSum :one
+-- The total of AccountDailyDeltas in one row: a balance needs only the sum, and
+-- reading a row per day costs far more than adding them up here.
+SELECT CAST(COALESCE(SUM(p.amount), 0) AS INTEGER) AS delta
+FROM payments p
+JOIN transactions t ON t.id = p.transaction_id
+WHERE p.account_id = sqlc.arg('id') AND t.status = 'confirmed'
+	AND t.date <= COALESCE(sqlc.narg('as_of'), t.date);
+
 -- name: GetAccountUnit :one
 SELECT c.id, c.decimals FROM accounts a JOIN currencies c ON c.id = a.currency_id WHERE a.id = ?;
 

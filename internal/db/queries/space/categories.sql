@@ -10,6 +10,10 @@ SELECT categories.id, categories.name, categories.type, categories.icon, categor
 	(SELECT COUNT(DISTINCT l.transaction_id) FROM transaction_lines l WHERE l.category_id = categories.id)
 FROM categories WHERE categories.id = ?;
 
+-- name: GetCategoryBare :one
+-- GetCategory without the transaction count, which scans every line of the category.
+SELECT id, name, type, icon, color, is_default FROM categories WHERE id = ?;
+
 -- name: InsertCategory :execresult
 INSERT INTO categories (name, type, icon, color, is_default, created_at, updated_at) VALUES (?,?,?,?,?,?,?);
 

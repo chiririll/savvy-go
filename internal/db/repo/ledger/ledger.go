@@ -344,6 +344,12 @@ func (r Repo) DailyChanges(ctx context.Context, id int64, asOf string) ([]DayCha
 	return out, nil
 }
 
+// DeltaSum is the sum of DailyChanges: what the account's payments add up to
+// up to asOf ("" for all), in one row.
+func (r Repo) DeltaSum(ctx context.Context, id int64, asOf string) (int64, error) {
+	return r.q().AccountDeltaSum(ctx, sqlc.AccountDeltaSumParams{ID: id, AsOf: db.Narg(asOf)})
+}
+
 // Categories
 
 // Tags

@@ -39,16 +39,18 @@ func (s *seeder) addTx(
 	if strings.HasPrefix(typ, "debt_") {
 		txs = txs.As(ledger.ReasonDebt)
 	}
-	created, err := txs.Create(s.ctx, in)
+	// Add, not Create: reading each transaction back costs more with every one
+	// added, which is most of the time of a long history.
+	id, err := txs.Add(s.ctx, in)
 	if err != nil {
 		return fmt.Errorf("%s %s: %w", typ, desc, err)
 	}
-	if typ == "expense" && amount >= 2 && created != nil && len(created.Lines) > 0 {
+	if typ == "expense" && amount >= 2 {
 		name := ""
-		if c := created.Lines[0].Category; c != nil {
-			name = c.Name
+		if catID != nil {
+			name = s.catNames[*catID]
 		}
-		s.expenses = append(s.expenses, expenseCand{id: created.ID, amount: amount, catName: name, catID: created.Lines[0].CategoryID})
+		s.expenses = append(s.expenses, expenseCand{id: id, amount: amount, catName: name, catID: catID})
 	}
 	return nil
 }

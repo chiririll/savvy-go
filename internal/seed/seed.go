@@ -3,6 +3,7 @@ package seed
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"time"
 
@@ -74,14 +75,21 @@ func Demo(ctx context.Context, st store.Store, keys signing.KeyRing, opts Option
 		return nil, fmt.Errorf("seed copies %d: want 0 or more", opts.Copies)
 	}
 	manifest := &Manifest{Now: now}
+	started := time.Now()
+	slog.Info("demo seed started", "date", now.Format("2006-01-02"), "months", months, "copies", opts.Copies)
 	for n := 0; n <= opts.Copies; n++ {
-		if err := seedSet(ctx, st, keys, users, manifest, n, now, months); err != nil {
+		err := timed("demo set", func() error {
+			return seedSet(ctx, st, keys, users, manifest, n, now, months)
+		}, "set", n, "of", opts.Copies)
+		if err != nil {
 			return nil, err
 		}
 	}
 	if err := server.Set(ctx, demoSeededKey, true); err != nil {
 		return nil, fmt.Errorf("mark demo seeded: %w", err)
 	}
+	slog.Info("demo seed done", "users", len(manifest.Users), "spaces", len(manifest.Spaces),
+		"took", time.Since(started).Round(time.Millisecond))
 	return manifest, nil
 }
 
@@ -95,6 +103,7 @@ func seedSet(
 	if err != nil {
 		return err
 	}
+	slog.Info("seed users created", "set", n, "count", len(made), "first", made[0].email)
 	d := &demo{
 		ctx: ctx, st: st, spaces: spaces.Service{Store: st}, people: people, now: now, months: months,
 		manifest: manifest, nameSuffix: copySuffix(n),
@@ -104,15 +113,18 @@ func seedSet(
 			Key: u.key, Name: u.name, Email: u.email, Password: u.pass, Role: u.role, Verified: !u.unverified,
 		})
 	}
-	steps := []func() error{
-		d.createSpaces,
-		d.syncReference,
-		func() error { return d.linkTransfer(transfers.Service{Spaces: d.spaces, Keys: keys}) },
-		d.invite,
-		d.recordAutomations,
+	steps := []struct {
+		name string
+		run  func() error
+	}{
+		{"create spaces", d.createSpaces},
+		{"sync reference data", d.syncReference},
+		{"link spaces and transfer", func() error { return d.linkTransfer(transfers.Service{Spaces: d.spaces, Keys: keys}) }},
+		{"invite", d.invite},
+		{"record automations", d.recordAutomations},
 	}
 	for _, step := range steps {
-		if err := step(); err != nil {
+		if err := timed("seed "+step.name, step.run, "set", n); err != nil {
 			return err
 		}
 	}

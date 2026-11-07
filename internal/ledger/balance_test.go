@@ -178,3 +178,23 @@ func TestNewAccountsGetIncreasingSortOrders(t *testing.T) {
 		t.Errorf("first debt sort order = %d, want 0", d.SortOrder)
 	}
 }
+
+// Add stores what Create does, and Bare reads an account or category without
+// the figures that cost a pass over the ledger.
+func TestAddMatchesCreateAndBareSkipsTotals(t *testing.T) {
+	e := newMoneyEnv(t)
+	date := "2024-02-01"
+	in := simple("income", e.usdAcc.ID, "25")
+	in.Date = &date
+	id, err := e.txs.Add(e.ctx, in)
+	if err != nil || id == 0 {
+		t.Fatalf("Add = %d, %v", id, err)
+	}
+	if got := e.balance(t, e.usdAcc.ID); !got.Equal(dec("125")) {
+		t.Errorf("balance after Add = %s, want 125", got)
+	}
+	bare, err := (Accounts{DB: e.db}).Bare(e.ctx, e.usdAcc.ID)
+	if err != nil || bare == nil || bare.Name != e.usdAcc.Name || !bare.Balance.IsZero() {
+		t.Errorf("Bare = %+v, %v", bare, err)
+	}
+}

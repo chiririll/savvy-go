@@ -107,14 +107,24 @@ func (s Accounts) ForNetWorth(ctx context.Context) ([]Account, error) {
 }
 
 func (s Accounts) ByID(ctx context.Context, id int64) (*Account, error) {
+	a, err := s.Bare(ctx, id)
+	if a == nil || err != nil {
+		return nil, err
+	}
+	if a.Balance, err = s.Balance(ctx, *a, ""); err != nil {
+		return nil, err
+	}
+	return a, nil
+}
+
+// Bare is ByID without the balance, which costs a pass over every payment of
+// the account. Use it when only the account itself is needed.
+func (s Accounts) Bare(ctx context.Context, id int64) (*Account, error) {
 	row, err := s.repo().Account(ctx, id)
 	if row == nil || err != nil {
 		return nil, err
 	}
 	a := accountFrom(*row)
-	if a.Balance, err = s.Balance(ctx, a, ""); err != nil {
-		return nil, err
-	}
 	return &a, nil
 }
 
@@ -282,15 +292,11 @@ func (s Accounts) total(ctx context.Context, accts []Account, base Currency, asO
 // Balance is the account's balance at the end of asOf ("" for now): the opening
 // balance plus its payments, whatever the account is.
 func (s Accounts) Balance(ctx context.Context, a Account, asOf string) (money.Money, error) {
-	deltas, err := s.deltas(ctx, a, asOf)
+	sum, err := s.repo().DeltaSum(ctx, a.ID, asOf)
 	if err != nil {
 		return money.Money{}, err
 	}
-	bal := a.InitialBalance
-	for _, d := range deltas {
-		bal = bal.Add(d.change)
-	}
-	return bal, nil
+	return a.InitialBalance.Add(money.New(sum, a.Currency.Unit())), nil
 }
 
 // BalanceSeries is the balance at the end of each of dates, which must be

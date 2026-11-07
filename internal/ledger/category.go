@@ -48,6 +48,17 @@ func (s Categories) ByID(ctx context.Context, id int64) (*Category, error) {
 	return &c, nil
 }
 
+// Bare is ByID without the count of transactions, which costs a pass over all
+// the lines of the category. Use it when only the category itself is needed.
+func (s Categories) Bare(ctx context.Context, id int64) (*Category, error) {
+	r, err := s.repo().CategoryBare(ctx, id)
+	if r == nil || err != nil {
+		return nil, err
+	}
+	c := categoryFrom(*r)
+	return &c, nil
+}
+
 func (s Categories) Create(ctx context.Context, c Category) (*Category, error) {
 	if c.IsDefault {
 		if err := s.repo().ClearDefaultCategory(ctx, c.Type); err != nil {

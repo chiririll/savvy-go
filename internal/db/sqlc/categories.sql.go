@@ -127,6 +127,34 @@ func (q *Queries) GetCategory(ctx context.Context, id int64) (GetCategoryRow, er
 	return i, err
 }
 
+const getCategoryBare = `-- name: GetCategoryBare :one
+SELECT id, name, type, icon, color, is_default FROM categories WHERE id = ?
+`
+
+type GetCategoryBareRow struct {
+	ID        int64
+	Name      string
+	Type      string
+	Icon      sql.NullString
+	Color     sql.NullString
+	IsDefault int64
+}
+
+// GetCategory without the transaction count, which scans every line of the category.
+func (q *Queries) GetCategoryBare(ctx context.Context, id int64) (GetCategoryBareRow, error) {
+	row := q.db.QueryRowContext(ctx, getCategoryBare, id)
+	var i GetCategoryBareRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Type,
+		&i.Icon,
+		&i.Color,
+		&i.IsDefault,
+	)
+	return i, err
+}
+
 const getDefaultCategory = `-- name: GetDefaultCategory :one
 SELECT categories.id, categories.name, categories.type, categories.icon, categories.color, categories.is_default,
 	(SELECT COUNT(DISTINCT l.transaction_id) FROM transaction_lines l WHERE l.category_id = categories.id)

@@ -31,6 +31,8 @@ type seeder struct {
 	recur    recurring.Service
 	auto     automation.Service
 	expenses []expenseCand
+	// catNames is the name of each expense category, by id.
+	catNames map[int64]string
 }
 
 type expenseCand struct {
@@ -76,6 +78,10 @@ func seedWorkspace(ctx context.Context, db store.DB, now time.Time, months int) 
 	if err != nil {
 		return nil, err
 	}
+	s.catNames = map[int64]string{}
+	for _, c := range expenses {
+		s.catNames[c.ID] = c.Name
+	}
 	incomes, err := s.cats.All(ctx, "income")
 	if err != nil {
 		return nil, err
@@ -84,25 +90,24 @@ func seedWorkspace(ctx context.Context, db store.DB, now time.Time, months int) 
 	if err != nil {
 		return nil, err
 	}
-	if err := s.createTransactions(accounts, expenses, incomes, tags); err != nil {
-		return nil, err
+	phases := []struct {
+		name string
+		run  func() error
+	}{
+		{"transactions", func() error { return s.createTransactions(accounts, expenses, incomes, tags) }},
+		{"split lines", s.seedSplitLines},
+		{"rich transactions", func() error { return s.seedRich(accounts, expenses, incomes, tags) }},
+		{"pending", func() error { return s.seedPending(accounts, expenses) }},
+		{"budgets", func() error { return s.createBudgets(usd, expenses, tags) }},
+		{"recurring", func() error { return s.createRecurring(accounts, expenses, incomes) }},
+		{"automation", func() error { return s.createAutomation(tags) }},
 	}
-	if err := s.seedSplitLines(); err != nil {
-		return nil, err
+	for _, p := range phases {
+		if err := timed("seed "+p.name, p.run); err != nil {
+			return nil, err
+		}
 	}
-	if err := s.seedRich(accounts, expenses, incomes, tags); err != nil {
-		return nil, err
-	}
-	if err := s.seedPending(accounts, expenses); err != nil {
-		return nil, err
-	}
-	if err := s.createBudgets(usd, expenses, tags); err != nil {
-		return nil, err
-	}
-	if err := s.createRecurring(accounts, expenses, incomes); err != nil {
-		return nil, err
-	}
-	return accounts, s.createAutomation(tags)
+	return accounts, nil
 }
 
 // accountSpec describes one demo account; the debt fields are empty for the others.

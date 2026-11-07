@@ -112,7 +112,11 @@ func (d *demo) createSpaces() error {
 		if err != nil {
 			return err
 		}
-		accts, err := d.fill(sp, spec)
+		var accts map[string]*ledger.Account
+		err = timed("seed space", func() (err error) {
+			accts, err = d.fill(sp, spec)
+			return err
+		}, "space", sp.Name, "id", sp.ID, "members", len(spec.members)+1)
 		if err != nil {
 			return err
 		}

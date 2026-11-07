@@ -61,6 +61,28 @@ func (q *Queries) AccountDailyDeltas(ctx context.Context, arg AccountDailyDeltas
 	return items, nil
 }
 
+const accountDeltaSum = `-- name: AccountDeltaSum :one
+SELECT CAST(COALESCE(SUM(p.amount), 0) AS INTEGER) AS delta
+FROM payments p
+JOIN transactions t ON t.id = p.transaction_id
+WHERE p.account_id = ?1 AND t.status = 'confirmed'
+	AND t.date <= COALESCE(?2, t.date)
+`
+
+type AccountDeltaSumParams struct {
+	ID   int64
+	AsOf sql.NullString
+}
+
+// The total of AccountDailyDeltas in one row: a balance needs only the sum, and
+// reading a row per day costs far more than adding them up here.
+func (q *Queries) AccountDeltaSum(ctx context.Context, arg AccountDeltaSumParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, accountDeltaSum, arg.ID, arg.AsOf)
+	var delta int64
+	err := row.Scan(&delta)
+	return delta, err
+}
+
 const closeDebt = `-- name: CloseDebt :exec
 UPDATE debts SET closed_at = ? WHERE account_id = ?
 `

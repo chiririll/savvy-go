@@ -212,7 +212,7 @@ func (s Transactions) build(ctx context.Context, in TxInput, template bool) (bui
 	accts := Accounts{DB: s.DB}
 	currencies := map[int64]Currency{}
 	for _, p := range in.Payments {
-		a, err := accts.ByID(ctx, p.AccountID)
+		a, err := accts.Bare(ctx, p.AccountID)
 		if err != nil {
 			return built{}, err
 		}
@@ -260,7 +260,7 @@ func (s Transactions) build(ctx context.Context, in TxInput, template bool) (bui
 		}
 		sl := shapeLine{Currency: cur, Amount: amount}
 		if l.CategoryID != nil {
-			if sl.Category, err = cats.ByID(ctx, *l.CategoryID); err != nil {
+			if sl.Category, err = cats.Bare(ctx, *l.CategoryID); err != nil {
 				return built{}, err
 			}
 			if sl.Category == nil {
@@ -318,6 +318,27 @@ func (s Transactions) difference(ctx context.Context, b built) *money.Money {
 }
 
 func (s Transactions) Create(ctx context.Context, in TxInput) (*Transaction, error) {
+	id, b, err := s.add(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	tx, err := s.ByID(ctx, id)
+	if tx != nil {
+		tx.Difference = s.difference(ctx, b)
+	}
+	return tx, err
+}
+
+// Add is Create without reading the transaction back, which loads every
+// account balance and category count it touches. It returns the new id; use it
+// to add many transactions, where that read costs more than the insert.
+func (s Transactions) Add(ctx context.Context, in TxInput) (int64, error) {
+	id, _, err := s.add(ctx, in)
+	return id, err
+}
+
+// add validates and stores a new transaction.
+func (s Transactions) add(ctx context.Context, in TxInput) (int64, built, error) {
 	status := "confirmed"
 	if in.Status != nil {
 		status = *in.Status
@@ -326,15 +347,15 @@ func (s Transactions) Create(ctx context.Context, in TxInput) (*Transaction, err
 	}
 	if status == "confirmed" {
 		if in.Date == nil {
-			return nil, fmt.Errorf("date required")
+			return 0, built{}, fmt.Errorf("date required")
 		}
 		if IsFuture(*in.Date) {
-			return nil, fmt.Errorf("future")
+			return 0, built{}, fmt.Errorf("future")
 		}
 	}
 	b, err := s.build(ctx, in, false)
 	if err != nil {
-		return nil, err
+		return 0, built{}, err
 	}
 	var id int64
 	err = store.Tx(ctx, s.DB, func(d store.DB) error {
@@ -349,13 +370,9 @@ func (s Transactions) Create(ctx context.Context, in TxInput) (*Transaction, err
 		return s.store(ctx, d, id, b, in.TagIDs)
 	})
 	if err != nil {
-		return nil, err
+		return 0, built{}, err
 	}
-	tx, err := s.ByID(ctx, id)
-	if tx != nil {
-		tx.Difference = s.difference(ctx, b)
-	}
-	return tx, err
+	return id, b, nil
 }
 
 // store writes the payments, lines and tags of a transaction.
