@@ -23,12 +23,6 @@ function derivedTransferRate(amount: number, toAmount: number): number | null {
     return roundTo(toAmount / amount, RATE_DECIMALS)
 }
 
-/** The rate a form opens with: the one its amounts imply, if any. */
-export function resolveOpeningTransferRate(values?: Partial<TransactionFormValues>): number | null {
-    if (values?.type && !isTransferType(values.type)) return null
-    return derivedTransferRate(Number(values?.amount) || 0, Number(values?.to_amount) || 0)
-}
-
 interface TransferRateOptions {
     form: UseFormReturn<TransactionFormValues>
     from?: Account
@@ -43,12 +37,13 @@ interface TransferRateOptions {
 
 /**
  * Keeps a transfer's exchange_rate and to_amount consistent while the user
- * edits the amounts, the rate or the accounts.
+ * edits the amounts, the rate or the accounts. The amount sent is the first
+ * payment's; the fee is paid on top of it and is not part of the rate.
  */
 export function useTransferRate({ form, from, to, toRate, open, ratesReady = true }: TransferRateOptions) {
     const [type, amount, toAmount, accountId, toSpaceId, toAccountId] = useWatch({
         control: form.control,
-        name: ['type', 'amount', 'to_amount', 'account_id', 'to_space_id', 'to_account_id'],
+        name: ['type', 'payments.0.amount', 'to_amount', 'payments.0.account_id', 'to_space_id', 'to_account_id'],
     })
     const isTransfer = isTransferType(type)
     const sameCurrency = Boolean(from && to && from.currency?.code === to.currency?.code)
@@ -81,7 +76,7 @@ export function useTransferRate({ form, from, to, toRate, open, ratesReady = tru
     }, [])
 
     const applyReceiveFromRate = useCallback((rate: number) => {
-        const sourceAmount = Number(form.getValues('amount')) || 0
+        const sourceAmount = Number(form.getValues('payments.0.amount')) || 0
         if (!(sourceAmount > 0) || !(rate > 0)) return
         skipRateFromAmountRef.current = true
         form.setValue('to_amount', roundTo(sourceAmount * rate, destDecimals), { shouldValidate: false })
@@ -94,7 +89,7 @@ export function useTransferRate({ form, from, to, toRate, open, ratesReady = tru
 
         let rate = Number(form.getValues('exchange_rate'))
         if (!(rate > 0)) {
-            const sourceAmount = Number(form.getValues('amount')) || 0
+            const sourceAmount = Number(form.getValues('payments.0.amount')) || 0
             const destAmount = Number(form.getValues('to_amount')) || 0
             rate = derivedTransferRate(sourceAmount, destAmount)
                 ?? catalogTransferRate(fromRate, toRate)

@@ -205,3 +205,67 @@ describe('toFormValues', () => {
         expect(toFormValues(transaction({ description: null })).description).toBe('')
     })
 })
+
+describe('transfers', () => {
+    const sent = (amount = -100) => paidFrom(cash, amount)
+    const received = (amount = 80) => paidFrom(euroCard, amount)
+    const transfer = (overrides: Parameters<typeof transaction>[0] = {}) =>
+        transaction({ type: 'transfer', payments: [sent(), received()], lines: [], ...overrides })
+
+    it('opens a transfer between two accounts, with or without a fee line', () => {
+        expect(canEditInForm(transfer())).toBe(true)
+        expect(canEditInForm(transfer({ payments: [sent(-101.5), paidFrom({ ...cash, id: 9 }, 100)], lines: [line({ amount: 1.5 })] }))).toBe(true)
+    })
+
+    it('does not open a transfer that does not move money both ways', () => {
+        expect(canEditInForm(transfer({ payments: [sent(-100), paidFrom(euroCard, -80)] }))).toBe(false)
+        expect(canEditInForm(transfer({ payments: [sent()] }))).toBe(false)
+        expect(canEditInForm(transfer({ payments: [sent(), received(), paidFrom(yen, 5)] }))).toBe(false)
+    })
+
+    it('does not open a transfer with several lines or a foreign fee', () => {
+        expect(canEditInForm(transfer({ lines: [line({ amount: 1 }), line({ seq: 1, amount: 1 })] }))).toBe(false)
+        // a fee in the currency of the destination
+        expect(canEditInForm(transfer({ lines: [line({ amount: 1, currencyId: euroCard.currency!.id })] }))).toBe(false)
+        // a fee that is all of what was taken
+        expect(canEditInForm(transfer({ payments: [sent(-1), received(1)], lines: [line({ amount: 1 })] }))).toBe(false)
+    })
+
+    it('does not open a transfer the backend restricts', () => {
+        const restricted = transfer({ restrictions: [{ reason: 'transfer_review', message: 'in review' }] })
+
+        expect(canEditInForm(restricted)).toBe(false)
+    })
+
+    it('does not open the sides of a transfer to another space, or a debt', () => {
+        expect(canEditInForm(transfer({ type: 'transfer_out' }))).toBe(false)
+        expect(canEditInForm(transfer({ type: 'transfer_in' }))).toBe(false)
+    })
+
+    it('shows the accounts, the amount sent and the amount received', () => {
+        expect(toFormValues(transfer({ description: 'To the card', tags: [tags[0]] }))).toEqual({
+            type: 'transfer',
+            description: 'To the card',
+            date: '2020-05-04',
+            tag_ids: [tags[0].id],
+            payments: [{ account_id: cash.id, amount: 100 }],
+            change: [],
+            lines: [],
+            default_category_id: null,
+            default_note: null,
+            to_account_id: euroCard.id,
+            to_amount: 80,
+            to_space_id: null,
+            fee: null,
+        })
+    })
+
+    it('takes the fee off the amount sent', () => {
+        const values = toFormValues(
+            transfer({ payments: [sent(-101.5), paidFrom({ ...cash, id: 9 }, 100)], lines: [line({ amount: 1.5, categoryId: 4 })] }),
+        )
+
+        expect(values.payments).toEqual([{ account_id: cash.id, amount: 100 }])
+        expect(values.fee).toEqual({ amount: 1.5, category_id: 4 })
+    })
+})

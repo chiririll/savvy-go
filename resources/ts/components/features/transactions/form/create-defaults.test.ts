@@ -29,7 +29,15 @@ describe('fromCreateDefaults', () => {
         expect(fromCreateDefaults({ amount: 5 })?.payments).toEqual([{ account_id: 0, amount: 5 }])
     })
 
-    it('passes a transfer through; the form opens an expense until transfers are back', () => {
-        expect(fromCreateDefaults({ type: 'transfer', account_id: 1 })?.type).toBe('transfer')
+    it('opens a transfer from one account to another, as F7b pays a card', () => {
+        expect(fromCreateDefaults({ type: 'transfer', account_id: 1, to_account_id: 4, amount: 250 })).toEqual({
+            type: 'transfer',
+            payments: [{ account_id: 1, amount: 250 }],
+            to_account_id: 4,
+        })
+    })
+
+    it('leaves the destination alone when it is not asked for', () => {
+        expect(fromCreateDefaults({ type: 'transfer', account_id: 1 })).not.toHaveProperty('to_account_id')
     })
 })

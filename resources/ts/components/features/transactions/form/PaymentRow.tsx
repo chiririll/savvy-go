@@ -16,6 +16,9 @@ interface PaymentRowProps {
     currency?: Currency | null
     /** Accounts the other rows use; an account is in a transaction once. */
     excludeIds?: readonly number[]
+    /** Replaces the labels, when the row means something other than a payment: a transfer's source. */
+    amountLabel?: string
+    accountLabel?: string
     /** A button at the end of the row: remove it, or add another. */
     action?: ReactNode
     /** The balance of the account after saving, drawn under the row. */
@@ -23,7 +26,17 @@ interface PaymentRowProps {
 }
 
 /** One payment: an amount (positive, in the currency of the account) and the account. Fits one line at 360px. */
-export function PaymentRow({ control, list, index, currency, excludeIds, action, children }: PaymentRowProps) {
+export function PaymentRow({
+    control,
+    list,
+    index,
+    currency,
+    excludeIds,
+    amountLabel,
+    accountLabel,
+    action,
+    children,
+}: PaymentRowProps) {
     const { t } = useTranslation('common')
     const decimals = currency?.decimals ?? 2
 
@@ -35,7 +48,7 @@ export function PaymentRow({ control, list, index, currency, excludeIds, action,
                     name={`${list}.${index}.amount`}
                     render={({ field }) => (
                         <FormItem className="min-w-0">
-                            <FormLabel>{t('fields.amount')}</FormLabel>
+                            <FormLabel>{amountLabel ?? t('fields.amount')}</FormLabel>
                             <div className="relative">
                                 <FormControl>
                                     <Input
@@ -65,7 +78,7 @@ export function PaymentRow({ control, list, index, currency, excludeIds, action,
                     name={`${list}.${index}.account_id`}
                     render={({ field }) => (
                         <FormItem className="min-w-0">
-                            <FormLabel>{t('fields.account')}</FormLabel>
+                            <FormLabel>{accountLabel ?? t('fields.account')}</FormLabel>
                             <div className="flex items-center gap-1">
                                 <div className="min-w-0 flex-1">
                                     <AccountSelect value={field.value} onChange={field.onChange} excludeIds={excludeIds} />

@@ -27,10 +27,6 @@ describe('the transaction form', () => {
         expect(issues({ type: 'income' })).toEqual([])
     })
 
-    it('does not take a transfer yet', () => {
-        expect(issues({ type: 'transfer' as never })).toEqual(['type'])
-    })
-
     it('needs an account and a positive amount in a payment', () => {
         expect(issues({ payments: [{ account_id: 0, amount: 0 }] })).toEqual([
             'payments.0.account_id',
@@ -92,5 +88,49 @@ describe('the transaction form', () => {
     it('refuses a future date for a transaction that already moved balances', () => {
         expect(issues({ date: '2999-01-01' }, { rejectFutureDate: true })).toEqual(['date'])
         expect(issues({ date: '2999-01-01' })).toEqual([])
+    })
+
+    describe('a transfer', () => {
+        const transfer: Partial<TransactionFormValues> = {
+            type: 'transfer',
+            default_category_id: null,
+            to_account_id: 2,
+            to_amount: 80,
+        }
+
+        it('needs no category', () => {
+            expect(issues(transfer)).toEqual([])
+        })
+
+        it('needs a destination account, and an amount to receive', () => {
+            expect(issues({ ...transfer, to_account_id: null, to_amount: null })).toEqual(['to_account_id', 'to_amount'])
+        })
+
+        it('does not send to the account it takes from', () => {
+            expect(issues({ ...transfer, to_account_id: 1 })).toEqual(['to_account_id'])
+        })
+
+        it('accepts a fee with an amount, in no category or in one', () => {
+            expect(issues({ ...transfer, fee: { amount: 1.5, category_id: null } })).toEqual([])
+            expect(issues({ ...transfer, fee: { amount: 1.5, category_id: 3 } })).toEqual([])
+        })
+
+        it('needs the fee to have an amount once it is asked for', () => {
+            expect(issues({ ...transfer, fee: { amount: 0, category_id: null } })).toEqual(['fee.amount'])
+        })
+
+        it('still needs a source account and an amount', () => {
+            expect(issues({ ...transfer, payments: [{ account_id: 0, amount: 0 }] })).toEqual([
+                'payments.0.account_id',
+                'payments.0.amount',
+            ])
+        })
+
+        it('to a linked space also needs the space; the account may have any id there', () => {
+            const out = { ...transfer, type: 'transfer_out' as const, to_account_id: 1 }
+
+            expect(issues(out)).toEqual(['to_space_id'])
+            expect(issues({ ...out, to_space_id: 5 })).toEqual([])
+        })
     })
 })

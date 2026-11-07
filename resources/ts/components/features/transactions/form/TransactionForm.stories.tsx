@@ -124,8 +124,8 @@ export const EditingCannotMoveToTheFuture: Story = {
     },
 }
 
-// The transfer tabs are in the row but cannot be picked until the transfer form is back.
-export const TransfersAreDisabled: Story = {
+// The transfer tabs are pickable: a transfer to a linked space needs a link the user can write to.
+export const TransferTabsCanBePicked: Story = {
     beforeEach: ({ msw }) => {
         msw.use(
             reply('get', '/spaces', [space('admin'), { ...space('editor'), id: 2, name: 'Trip' }]),
@@ -135,18 +135,8 @@ export const TransfersAreDisabled: Story = {
     args: { defaultValues: expense },
     play: async ({ canvasElement }) => {
         const canvas = within(canvasElement)
-        const transfer = await canvas.findByRole('button', { name: /transfer/i })
-        await expect(transfer).toBeDisabled()
-        await expect(await canvas.findByRole('button', { name: /space/i })).toBeDisabled()
-    },
-}
-
-// An opener that asks for a transfer gets an expense.
-export const TransferRequestedOpensAnExpense: Story = {
-    args: { defaultValues: { type: 'transfer', payments: [{ account_id: 1, amount: 100 }] } },
-    play: async ({ canvasElement }) => {
-        const canvas = within(canvasElement)
-        await expect(await canvas.findByRole('button', { name: /expense/i })).toHaveAttribute('aria-pressed', 'true')
+        await expect(await canvas.findByRole('button', { name: /transfer/i })).toBeEnabled()
+        await expect(await canvas.findByRole('button', { name: /space/i })).toBeEnabled()
     },
 }
 

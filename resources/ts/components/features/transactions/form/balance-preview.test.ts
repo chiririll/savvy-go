@@ -28,6 +28,38 @@ describe('formImpact', () => {
         ])
     })
 
+    it('takes a transfer, and its fee, off the source and brings what arrives to the destination', () => {
+        const transfer = {
+            type: 'transfer' as const,
+            payments: [{ account_id: 1, amount: 100 }],
+            to_account_id: 2,
+            to_amount: 80,
+            fee: { amount: 1.5 },
+        }
+
+        expect(formImpact(transfer)).toEqual([
+            { accountId: 1, delta: -101.5 },
+            { accountId: 2, delta: 80 },
+        ])
+    })
+
+    it('shows only the source of a transfer to another space', () => {
+        const impact = formImpact({
+            type: 'transfer_out',
+            payments: [{ account_id: 1, amount: 100 }],
+            to_account_id: 2,
+            to_amount: 80,
+        })
+
+        expect(impact).toEqual([{ accountId: 1, delta: -100 }])
+    })
+
+    it('waits for the destination and its amount before it shows them', () => {
+        expect(formImpact({ type: 'transfer', payments: [{ account_id: 1, amount: 100 }], to_account_id: 2 })).toEqual([
+            { accountId: 1, delta: -100 },
+        ])
+    })
+
     it('skips rows with no account or amount yet', () => {
         expect(formImpact({ type: 'expense', payments: [{ account_id: 0, amount: 10 }] })).toEqual([])
         expect(formImpact({ type: 'expense', payments: [{ account_id: 1, amount: Number.NaN }] })).toEqual([])

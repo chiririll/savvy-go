@@ -1,10 +1,10 @@
 import { createContext, lazy, Suspense, useCallback, useContext, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { useCreateTransaction, useUpdateTransaction } from '@/hooks'
+import { useCreateTransaction, useSendTransfer, useUpdateTransaction } from '@/hooks'
 import i18n from '@/lib/i18n'
 import { canEditInForm } from '@/lib/transaction-form-values'
-import type { Transaction, TransactionInput } from '@/types'
+import type { SpaceTransferInput, Transaction, TransactionInput } from '@/types'
 import { fromCreateDefaults, type CreateTransactionDefaults } from './create-defaults'
 import type { TransactionFormDefaults } from './use-transaction-form'
 
@@ -27,6 +27,7 @@ export function CreateTransactionProvider({ children }: { children: React.ReactN
     const navigate = useNavigate()
     const createTransaction = useCreateTransaction()
     const updateTransaction = useUpdateTransaction()
+    const sendTransfer = useSendTransfer()
     const [open, setOpen] = useState(false)
     const [mounted, setMounted] = useState(false)
     const [defaults, setDefaults] = useState<TransactionFormDefaults>()
@@ -43,8 +44,8 @@ export function CreateTransactionProvider({ children }: { children: React.ReactN
         if (!next.actions.edit) {
             return
         }
-        // The form shows one payment in lines for now; several payments, change and transfers come
-        // with the next steps of the form. Better a message than a save that drops them.
+        // A transaction the form cannot show whole (a debt, a transfer to another space, an unusual shape) is
+        // refused: better a message than a save that drops what the form leaves out.
         if (!canEditInForm(next)) {
             toast.error(i18n.t('toasts.transaction.notEditableYet'))
             return
@@ -56,21 +57,23 @@ export function CreateTransactionProvider({ children }: { children: React.ReactN
         setOpen(true)
     }, [])
 
+    const onCreated = () => {
+        setOpen(false)
+        if (location.pathname !== '/transactions') {
+            navigate('/transactions')
+        }
+    }
+
     const handleSubmit = (data: TransactionInput) => {
         if (transaction) {
             updateTransaction.mutate({ id: transaction.id, data }, { onSuccess: () => setOpen(false) })
             return
         }
 
-        createTransaction.mutate(data, {
-            onSuccess: () => {
-                setOpen(false)
-                if (location.pathname !== '/transactions') {
-                    navigate('/transactions')
-                }
-            },
-        })
+        createTransaction.mutate(data, { onSuccess: onCreated })
     }
+
+    const handleSubmitSpaceTransfer = (data: SpaceTransferInput) => sendTransfer.mutate(data, { onSuccess: onCreated })
 
     const value = useMemo(() => ({ openCreate, openEdit }), [openCreate, openEdit])
 
@@ -84,7 +87,8 @@ export function CreateTransactionProvider({ children }: { children: React.ReactN
                         open={open}
                         onOpenChange={setOpen}
                         onSubmit={handleSubmit}
-                        isSubmitting={createTransaction.isPending || updateTransaction.isPending}
+                        onSubmitSpaceTransfer={handleSubmitSpaceTransfer}
+                        isSubmitting={createTransaction.isPending || updateTransaction.isPending || sendTransfer.isPending}
                         defaultValues={defaults}
                     />
                 </Suspense>

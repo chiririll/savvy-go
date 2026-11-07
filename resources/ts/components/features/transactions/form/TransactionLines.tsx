@@ -19,7 +19,7 @@ interface TransactionLinesProps {
     control: Control<TransactionFormValues>
     fields: UseFieldArrayReturn<TransactionFormValues, 'lines'>['fields']
     remove: UseFieldArrayReturn<TransactionFormValues, 'lines'>['remove']
-    type: TransactionFormValues['type']
+    type: 'income' | 'expense'
     /** The currencies of the payment and change accounts: what a line can be in. */
     currencies: Currency[]
     coverage: LineCoverage

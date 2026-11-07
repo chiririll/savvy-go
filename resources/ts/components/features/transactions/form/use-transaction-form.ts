@@ -5,10 +5,8 @@ import { useFormValuesChange } from '@/hooks'
 import { formatDateLocal } from '@/lib/utils'
 import { getTransactionSchema, TransactionFormValues } from '@/schemas/transactions'
 
-/** What an opener can ask for. A kind the form does not take yet (a transfer) opens an expense. */
-export type TransactionFormDefaults = Omit<Partial<TransactionFormValues>, 'type'> & {
-    type?: TransactionFormValues['type'] | 'transfer' | 'transfer_out'
-}
+/** What an opener can ask for. */
+export type TransactionFormDefaults = Partial<TransactionFormValues>
 
 interface TransactionFormOptions {
     defaultValues?: TransactionFormDefaults
@@ -19,7 +17,7 @@ interface TransactionFormOptions {
 
 export function toFormDefaults(defaultValues?: TransactionFormDefaults): TransactionFormValues {
     return {
-        type: defaultValues?.type === 'income' ? 'income' : 'expense',
+        type: defaultValues?.type ?? 'expense',
         description: defaultValues?.description ?? '',
         date: defaultValues?.date !== undefined ? (defaultValues.date ?? '') : formatDateLocal(),
         tag_ids: defaultValues?.tag_ids ?? [],
@@ -28,6 +26,11 @@ export function toFormDefaults(defaultValues?: TransactionFormDefaults): Transac
         lines: defaultValues?.lines ?? [],
         default_category_id: defaultValues?.default_category_id ?? null,
         default_note: defaultValues?.default_note ?? null,
+        to_account_id: defaultValues?.to_account_id ?? null,
+        to_amount: defaultValues?.to_amount ?? null,
+        exchange_rate: defaultValues?.exchange_rate ?? null,
+        to_space_id: defaultValues?.to_space_id ?? null,
+        fee: defaultValues?.fee ?? null,
     }
 }
 

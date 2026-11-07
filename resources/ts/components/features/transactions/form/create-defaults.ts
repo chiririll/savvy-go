@@ -4,6 +4,8 @@ import type { TransactionFormDefaults } from './use-transaction-form'
 export interface CreateTransactionDefaults {
     type?: 'income' | 'expense' | 'transfer' | 'transfer_out'
     account_id?: number
+    /** A transfer: the account that receives. */
+    to_account_id?: number
     amount?: number
     category_id?: number
     description?: string
@@ -14,10 +16,11 @@ export function fromCreateDefaults(next?: CreateTransactionDefaults): Transactio
     if (!next) {
         return undefined
     }
-    const { type, account_id, amount, category_id, description } = next
+    const { type, account_id, to_account_id, amount, category_id, description } = next
     return {
         ...(type ? { type } : {}),
         ...(description !== undefined ? { description } : {}),
+        ...(to_account_id !== undefined ? { to_account_id } : {}),
         ...(category_id !== undefined ? { default_category_id: category_id } : {}),
         ...(account_id !== undefined || amount !== undefined
             ? { payments: [{ account_id: account_id ?? 0, amount: (amount ?? '') as number }] }

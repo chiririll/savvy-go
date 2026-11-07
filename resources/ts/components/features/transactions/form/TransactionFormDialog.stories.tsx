@@ -128,3 +128,19 @@ export const PaymentsAndChangeBecomeFormValues: Story = {
         })
     },
 }
+
+// A saved transfer opens with the accounts, the amount sent (the fee taken off) and the amount received.
+export const TransferBecomesFormValues: Story = {
+    args: {
+        transaction: transaction({
+            type: 'transfer',
+            status: 'confirmed',
+            payments: [payment({ amount: -102 }), payment({ account: accounts[1], accountId: 2, amount: 80 })],
+            lines: [line({ amount: 2, categoryId: 3, category: categories[2] })],
+        }),
+    },
+    play: async () => {
+        const amounts = await screen.findAllByRole('spinbutton', {}, { timeout: 5000 })
+        await expect(amounts.slice(0, 2).map((a) => (a as HTMLInputElement).value)).toEqual(['100', '80'])
+    },
+}

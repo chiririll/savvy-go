@@ -5,15 +5,15 @@ import { Input } from '@/components/ui/input'
 import { TransactionFormValues } from '@/schemas/transactions'
 import { useTransferTargets } from '@/hooks'
 import { FormSubmitButton, FormWrapper, TransactionTypeTabs } from '@/components/shared'
-import { linesToAdd } from '@/lib/transaction-lines'
-import { formatCurrency } from '@/lib/utils'
-import type { Transaction, TransactionInput } from '@/types'
+import type { SpaceTransferInput, Transaction, TransactionInput } from '@/types'
 import { PendingHint } from './TransactionBalanceHint'
 import { ChangeSection } from './ChangeSection'
 import { PaymentTotals, PaymentsSection } from './PaymentsSection'
 import { TransactionDetailsRow } from './TransactionDetailsRow'
 import { TransactionLines } from './TransactionLines'
 import { TransactionTagsField } from './TransactionTagsField'
+import { TransferAccounts } from './TransferAccounts'
+import { TransferFeeSection } from './TransferFeeSection'
 import { useTransactionForm, type TransactionFormDefaults } from './use-transaction-form'
 import { useTransactionHandlers } from './use-transaction-handlers'
 import { useTransactionModel } from './use-transaction-model'
@@ -21,6 +21,8 @@ import { useTransactionModel } from './use-transaction-model'
 interface TransactionFormProps {
     defaultValues?: TransactionFormDefaults
     onSubmit: (data: TransactionInput) => void
+    /** A transfer to a linked space goes through the transfers API: called instead of onSubmit for it. */
+    onSubmitSpaceTransfer?: (data: SpaceTransferInput) => void
     onTypeChange?: (type: TransactionFormValues['type']) => void
     onValuesChange?: (data: TransactionFormValues) => void
     isSubmitting?: boolean
@@ -34,12 +36,10 @@ interface TransactionFormProps {
     open?: boolean
 }
 
-// Transfers come back with their own form (F4d).
-const TRANSFER_KINDS = ['transfer', 'transfer_out'] as const
-
 export function TransactionForm({
     defaultValues,
     onSubmit,
+    onSubmitSpaceTransfer,
     onTypeChange,
     onValuesChange,
     isSubmitting,
@@ -61,26 +61,25 @@ export function TransactionForm({
         coverage,
         lineCurrencies,
         hasLines,
+        uncovered,
+        nextLine,
         transactionType,
+        isTransfer,
+        isSpaceTransfer,
+        destinationSpaceId,
+        destinationSpaceAccounts,
+        selectedAccount,
+        selectedToAccount,
+        rate,
         dateRequired,
         isPendingDate,
         isUndated,
         balances,
         usedAccountIds,
-    } = useTransactionModel({ form, transaction, isEdit, originalAffectsBalance })
+    } = useTransactionModel({ form, transaction, isEdit, originalAffectsBalance, open })
 
     const lines = useFieldArray({ control: form.control, name: 'lines' })
-    const addLine = () => lines.append(linesToAdd(form.getValues(), accounts ?? []))
-    const defaultCategoryId = form.watch('default_category_id')
-    // What the lines leave uncovered goes to the default category: said where that category is chosen.
-    const uncovered =
-        hasLines && coverage.remainder > 0 && coverage.currency
-            ? defaultCategoryId
-                ? t('forms:transactions.uncovered', { amount: formatCurrency(coverage.remainder, coverage.currency) })
-                : t('forms:transactions.uncoveredNoCategory', {
-                      amount: formatCurrency(coverage.remainder, coverage.currency),
-                  })
-            : null
+    const addLine = () => lines.append(nextLine())
 
     const { handleSubmit, handleTypeChange, negativeBalanceDialog } = useTransactionHandlers({
         form,
@@ -88,11 +87,12 @@ export function TransactionForm({
         dateRequired,
         accounts,
         onSubmit,
+        onSubmitSpaceTransfer,
         onTypeChange,
     })
 
     // Change is for what is paid; an income shows it only when a saved one has some.
-    const showChange = transactionType === 'expense' || (form.watch('change')?.length ?? 0) > 0
+    const showChange = !isTransfer && (transactionType === 'expense' || (form.watch('change')?.length ?? 0) > 0)
 
     return (
         <FormWrapper>
@@ -101,7 +101,6 @@ export function TransactionForm({
                     <TransactionTypeTabs
                         value={transactionType}
                         withSpaceTransfer={!isEdit && transferTargets.length > 0}
-                        disabledKinds={TRANSFER_KINDS}
                         onChange={handleTypeChange}
                     />
 
@@ -123,13 +122,29 @@ export function TransactionForm({
                         )}
                     />
 
-                    <PaymentsSection
-                        accounts={accounts}
-                        usedAccountIds={usedAccountIds}
-                        balances={balances.rows}
-                        showBalances={!isPendingDate}
-                    />
-                    <PaymentTotals accounts={accounts} />
+                    {isTransfer ? (
+                        <TransferAccounts
+                            isSpaceTransfer={isSpaceTransfer}
+                            links={transferTargets}
+                            destinationAccounts={destinationSpaceAccounts}
+                            destinationSpaceId={destinationSpaceId}
+                            from={selectedAccount}
+                            to={selectedToAccount}
+                            rate={rate}
+                            balances={balances.rows}
+                            showBalances={!isPendingDate}
+                        />
+                    ) : (
+                        <>
+                            <PaymentsSection
+                                accounts={accounts}
+                                usedAccountIds={usedAccountIds}
+                                balances={balances.rows}
+                                showBalances={!isPendingDate}
+                            />
+                            <PaymentTotals accounts={accounts} />
+                        </>
+                    )}
                     {isPendingDate && <PendingHint isUndated={isUndated} />}
 
                     <TransactionDetailsRow
@@ -145,16 +160,21 @@ export function TransactionForm({
                         }}
                     />
 
-                    <TransactionLines
-                        control={form.control}
-                        fields={lines.fields}
-                        remove={lines.remove}
-                        type={transactionType}
-                        currencies={lineCurrencies}
-                        coverage={coverage}
-                    />
+                    {!isTransfer && (
+                        <TransactionLines
+                            control={form.control}
+                            fields={lines.fields}
+                            remove={lines.remove}
+                            type={transactionType === 'income' ? 'income' : 'expense'}
+                            currencies={lineCurrencies}
+                            coverage={coverage}
+                        />
+                    )}
 
-                    <TransactionTagsField control={form.control} />
+                    {/* The transfers API keeps no tags. */}
+                    {!isSpaceTransfer && <TransactionTagsField control={form.control} />}
+
+                    {isTransfer && !isSpaceTransfer && <TransferFeeSection currency={selectedAccount?.currency} />}
 
                     {showChange && (
                         <ChangeSection

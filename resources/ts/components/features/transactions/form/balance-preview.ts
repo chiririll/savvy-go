@@ -3,6 +3,7 @@ import { useWatch, type Control } from 'react-hook-form'
 import type { TransactionFormValues } from '@/schemas/transactions'
 import { collectNegativeBalanceWarnings, warningIfResultNegative } from '@/lib/negative-balance'
 import { paymentSign } from '@/lib/transaction-payload'
+import { isTransferType } from '@/lib/transaction-type'
 import type { Account, Currency, Transaction } from '@/types'
 
 /** Money that moves on one account: signed, in the account's currency. */
@@ -20,11 +21,30 @@ type ImpactValues = {
     type?: TransactionFormValues['type']
     payments?: Array<{ account_id?: number | string | null; amount?: number | string | null }>
     change?: Array<{ account_id?: number | string | null; amount?: number | string | null }>
+    to_account_id?: number | string | null
+    to_amount?: number | string | null
+    fee?: { amount?: number | string | null } | null
+}
+
+/** A transfer: the source gives the amount and the fee, the destination gets what arrives. */
+function transferImpact(values: ImpactValues): AccountImpact[] {
+    const from = Number(values.payments?.[0]?.account_id)
+    const sent = Number(values.payments?.[0]?.amount)
+    const to = Number(values.to_account_id)
+    const received = Number(values.to_amount)
+    const fee = Number(values.fee?.amount) > 0 ? Number(values.fee?.amount) : 0
+    const out = from > 0 && sent > 0 ? [{ accountId: from, delta: -(sent + fee) }] : []
+    // A transfer to another space ends in that space: its account ids are not this one's.
+    const into = values.type === 'transfer' && to > 0 && received > 0 ? [{ accountId: to, delta: received }] : []
+    return [...out, ...into]
 }
 
 /** What the form does to the accounts: the payments by the sign of the type, the change by the opposite one. */
 export function formImpact(values: ImpactValues): AccountImpact[] {
-    const sign = values.type ? paymentSign(values.type) : 0
+    if (isTransferType(values.type)) {
+        return transferImpact(values)
+    }
+    const sign = values.type ? paymentSign(values.type as 'income' | 'expense') : 0
     const rows = (list: ImpactValues['payments'], direction: number) =>
         (list ?? []).flatMap((row) => {
             const accountId = Number(row.account_id)
@@ -84,10 +104,14 @@ interface BalancePreviewOptions {
 
 /** Account balances before and after saving the form, and what goes negative. */
 export function useBalancePreview({ control, accounts, posted, willPost }: BalancePreviewOptions) {
-    const [type, payments, change] = useWatch({ control, name: ['type', 'payments', 'change'] })
+    const [type, payments, change, toAccountId, toAmount, fee] = useWatch({
+        control,
+        name: ['type', 'payments', 'change', 'to_account_id', 'to_amount', 'fee'],
+    })
 
     return useMemo(() => {
-        const rows = projectBalances(accounts ?? [], formImpact({ type, payments, change }), posted)
+        const impact = formImpact({ type, payments, change, to_account_id: toAccountId, to_amount: toAmount, fee })
+        const rows = projectBalances(accounts ?? [], impact, posted)
         const warnings = willPost
             ? collectNegativeBalanceWarnings(
                 rows.map((row) =>
@@ -102,5 +126,5 @@ export function useBalancePreview({ control, accounts, posted, willPost }: Balan
             : []
 
         return { rows, warnings }
-    }, [type, payments, change, accounts, posted, willPost])
+    }, [type, payments, change, toAccountId, toAmount, fee, accounts, posted, willPost])
 }

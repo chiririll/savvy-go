@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { EntityFormDialog } from '@/components/shared'
 import { toFormValues } from '@/lib/transaction-form-values'
 import type { TransactionFormValues } from '@/schemas/transactions'
-import type { Transaction, TransactionInput } from '@/types'
+import type { SpaceTransferInput, Transaction, TransactionInput } from '@/types'
 import { TransactionForm } from './TransactionForm'
 import type { TransactionFormDefaults } from './use-transaction-form'
 
@@ -14,6 +14,8 @@ interface TransactionFormDialogProps {
     open: boolean
     onOpenChange: (open: boolean) => void
     onSubmit: (data: TransactionInput) => void
+    /** A transfer to a linked space goes through the transfers API. */
+    onSubmitSpaceTransfer?: (data: SpaceTransferInput) => void
     isSubmitting?: boolean
     defaultValues?: TransactionFormDefaults
 }
@@ -23,6 +25,7 @@ export function TransactionFormDialog({
     open,
     onOpenChange,
     onSubmit,
+    onSubmitSpaceTransfer,
     isSubmitting,
     defaultValues,
 }: TransactionFormDialogProps) {
@@ -46,6 +49,7 @@ export function TransactionFormDialog({
                 <TransactionForm
                     key={`${formKey}-${open}`}
                     {...formProps}
+                    onSubmitSpaceTransfer={onSubmitSpaceTransfer}
                     defaultValues={formProps.defaultValues}
                     open={open}
                     isEdit={isEdit}
