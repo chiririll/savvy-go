@@ -1,6 +1,8 @@
 import { type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FeedRow, RowActions } from '@/components/shared'
+import { FeedRow, progressAmounts, RowActions } from '@/components/shared'
+import { cardProgress } from '@/lib/credit-card'
+import { CardStatusIcon } from './CardStatusIcon'
 import { ACCOUNT_TYPE_CONFIG } from '@/constants'
 import { formatCurrency } from '@/lib/utils'
 import { Account } from '@/types'
@@ -38,6 +40,14 @@ export function AccountRow({
     const canEdit = !!onEdit && !isReadOnly
     const canDelete = !!onDelete && !isReadOnly
     const hasActions = canEdit || canDelete
+    const card = account.creditCard
+    // A card shows what is owed against its limit, like a debt or a budget.
+    const cardAmounts = card
+        ? {
+            ...progressAmounts({ remaining: card.used, total: card.limit, currency: account.currency }),
+            amountClassName: card.available < 0 ? 'text-destructive' : undefined,
+        }
+        : undefined
 
     return (
         <FeedRow
@@ -47,12 +57,22 @@ export function AccountRow({
             title={account.name}
             titleClassName={account.isActive ? undefined : 'text-muted-foreground'}
             subtitle={`${currency} · ${typeLabel}`}
-            amount={formatCurrency(account.currentBalance, account.currency)}
-            amountClassName={account.currentBalance >= 0 ? 'text-success' : 'text-destructive'}
-            extraAmount={showInitial
-                ? t('pages:accounts.initial', {
-                    amount: formatCurrency(account.initialBalance, account.currency),
-                })
+            badge={<CardStatusIcon account={account} />}
+            amount={cardAmounts?.amount ?? formatCurrency(account.currentBalance, account.currency)}
+            amountClassName={cardAmounts ? cardAmounts.amountClassName : account.currentBalance >= 0 ? 'text-success' : 'text-destructive'}
+            extraAmount={cardAmounts
+                ? cardAmounts.extraAmount
+                : showInitial
+                    ? t('pages:accounts.initial', {
+                        amount: formatCurrency(account.initialBalance, account.currency),
+                    })
+                    : undefined}
+            progress={card && card.limit > 0
+                ? {
+                    value: cardProgress(card),
+                    exceeded: card.status.level === 'danger' || card.available < 0,
+                    warning: card.status.level === 'warning',
+                }
                 : undefined}
             onOpen={canEdit ? () => onEdit(account) : undefined}
             hasActions={hasActions}

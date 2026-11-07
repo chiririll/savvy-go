@@ -6,7 +6,7 @@ import { currencies } from '@/test/fixtures'
 import { formatCurrency } from '@/lib/currency'
 import { useCurrenciesStore } from '@/stores/currencies'
 
-import { FeedEmpty, FeedList, FeedProgress, FeedRow, FeedRowSkeleton, FeedStatusBadge } from './FeedRow'
+import { FeedEmpty, FeedList, FeedRow, FeedRowSkeleton, FeedStatusBadge } from './FeedRow'
 import { progressAmounts } from './progress-amounts'
 import { RowActions } from '../table/RowActions'
 
@@ -78,21 +78,21 @@ export const WithActions: Story = {
 
 export const Progress: Story = {
     args: {
-        below: <FeedProgress value={60} />,
+        progress: { value: 60 },
         ...progressAmounts({ remaining: 120, total: 300, currency: usd }),
     },
 }
 
 export const ProgressExceeded: Story = {
     args: {
-        below: <FeedProgress value={140} exceeded />,
+        progress: { value: 140, exceeded: true },
         ...progressAmounts({ remaining: -40, total: 300, currency: usd }),
     },
 }
 
 export const ProgressDone: Story = {
     args: {
-        below: <FeedProgress value={100} />,
+        progress: { value: 100 },
         ...progressAmounts({ remaining: 0, total: 300, currency: usd, done: 'Paid off' }),
     },
 }

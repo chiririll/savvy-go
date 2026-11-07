@@ -2,7 +2,7 @@ import { testId } from '@/lib/test-id'
 import { Banknote, HandCoins, RotateCcw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
-import { FeedProgress, FeedRow, progressAmounts, RowActions } from '@/components/shared'
+import { FeedRow, progressAmounts, RowActions } from '@/components/shared'
 import { useRelativeDay } from '@/hooks'
 import { isDateOverdue } from '@/lib/dates'
 import { cn } from '@/lib/utils'
@@ -121,7 +121,7 @@ export function DebtRow(props: DebtRowProps) {
                 currency: debt.currency,
                 done: debt.isPaidOff ? t('debts.paidOff') : undefined,
             })}
-            below={!debt.isPaidOff && debt.targetAmount > 0 && <FeedProgress value={debt.paymentProgress} />}
+            progress={!debt.isPaidOff && debt.targetAmount > 0 ? { value: debt.paymentProgress } : undefined}
             onOpen={handlers.edit}
             hasActions={Object.values(handlers).some(Boolean)}
             actions={({ menuOpen, setMenuOpen, isMobile }) => (

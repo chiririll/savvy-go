@@ -1,6 +1,6 @@
 import { PiggyBank } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { categoryIcons, FeedProgress, FeedRow, progressAmounts, RowActions, type FeedGroupKey } from '@/components/shared'
+import { categoryIcons, FeedRow, progressAmounts, RowActions, type FeedGroupKey } from '@/components/shared'
 import i18n from '@/lib/i18n'
 import { localizeDefaultName } from '@/lib/localized-name'
 import { Budget, BudgetPeriod } from '@/types'
@@ -52,9 +52,7 @@ export function BudgetRow({ budget, onEdit, onDelete, isReadOnly }: BudgetRowPro
                 currency: budget.currency,
             }))}
             muted={!budget.isActive}
-            below={progress && (
-                <FeedProgress value={progress.percent} exceeded={progress.isExceeded} muted={!budget.isActive} />
-            )}
+            progress={progress ? { value: progress.percent, exceeded: progress.isExceeded, muted: !budget.isActive } : undefined}
             onOpen={canEdit ? () => onEdit(budget) : undefined}
             hasActions={canEdit || canDelete}
             actions={({ menuOpen, setMenuOpen, isMobile }) => (

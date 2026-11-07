@@ -27,7 +27,14 @@
         "emptyTitle": "No accounts yet",
         "emptyDescription": "Create your first account to start tracking balances",
         "deleteTitle": "Delete account?",
-        "deleteDescription": "This action cannot be undone. The account \"{{name}}\" will be permanently deleted."
+        "deleteDescription": "This action cannot be undone. The account \"{{name}}\" will be permanently deleted.",
+        "card": {
+            "status": {
+                "overdue": "Overdue: {{amount}} was due {{date}}",
+                "over_limit": "Over the limit by {{amount}}",
+                "payment_due": "Pay {{amount}} by {{date}}"
+            }
+        }
     },
     "categories": {
         "title": "Categories",

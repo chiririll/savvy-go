@@ -59,4 +59,5 @@ export const FORM_ACCOUNT_TYPE_CONFIG: Record<FormAccountType, AccountTypeConfig
     bank: ACCOUNT_TYPE_CONFIG.bank,
     cash: ACCOUNT_TYPE_CONFIG.cash,
     crypto: ACCOUNT_TYPE_CONFIG.crypto,
+    credit: ACCOUNT_TYPE_CONFIG.credit,
 }

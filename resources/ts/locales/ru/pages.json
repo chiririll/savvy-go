@@ -27,7 +27,14 @@
         "emptyTitle": "Счетов пока нет",
         "emptyDescription": "Создайте первый счёт, чтобы начать учёт балансов",
         "deleteTitle": "Удалить счёт?",
-        "deleteDescription": "Это действие нельзя отменить. Счёт «{{name}}» будет удалён навсегда."
+        "deleteDescription": "Это действие нельзя отменить. Счёт «{{name}}» будет удалён навсегда.",
+        "card": {
+            "status": {
+                "overdue": "Просрочено: {{amount}}, срок был {{date}}",
+                "over_limit": "Лимит превышен на {{amount}}",
+                "payment_due": "Внесите {{amount}} до {{date}}"
+            }
+        }
     },
     "categories": {
         "title": "Категории",
