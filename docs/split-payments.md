@@ -1,34 +1,54 @@
 # Split payments
 
-> **In progress.** The transaction form is being rebuilt for the new model (payments and lines). It now records several accounts (one **+** per payment, one total per currency), change in its own section, and one or several categories (lines), for an expense or an income; see [Transactions](transactions.md#the-transaction-form). Transfers are back, with an optional commission (see the same section). The rest of this page describes the old form (parts, items) and is rewritten when the rebuild is done.
+One purchase is often paid in more than one piece: half in cash and half by card, or in euros with the change handed back in dinars. It is still **one transaction**. It has a **payment** for each account that moved money, and one or more **lines** that say what the money was for. Balances follow the payments; budgets and reports follow the lines.
 
-One purchase is often paid in more than one piece: half in cash and half by card, or in euros with the change handed back in dinars. A transaction has one account and one currency, so such a purchase is saved as a **payment** with several **parts**. Each part is an ordinary transaction, so balances, budgets and reports work on the parts exactly as before.
+## Paying from several accounts
 
-In the transaction form, pick **Expense**. The **+** next to the account adds a row (amount and account) for another account that paid; only the last row has a **+**, and **×** removes a row. Rows can be in different currencies, and the form shows one total per currency.
+In the transaction form pick **Expense** (or **Income**). The **+** at the end of the **Amount / Account** labels adds a payment: an amount and another account. **×** removes a row. An account can be used once in a transaction, so each picker leaves out the accounts already taken.
+
+Payments can be in different currencies. The **Amount** label shows a small total for each currency, and under every account the form shows its balance before and after. Saving a transaction that takes an account below zero asks first.
 
 ## Change
 
 Rent is 450 EUR. You hand over 500 EUR and get 5,900 RSD back.
 
 - **Amount** is what you handed over, 500, from the account you paid with.
-- **Add change** (above the items) adds a row for the change: 5,900 and the dinar account it went to. Add one row for each account that got change.
+- **Change** (above the tags) takes a row for the money that came back: 5,900 and the dinar account it went to. Add one row for each account that got change.
 
-Two transactions are saved: an expense of 500 EUR, and an income of 5,900 RSD on the dinar account. No exchange rate is stored: reports convert each part to the base currency by their own rates.
+The transaction has two payments, −500 EUR and +5,900 RSD, and one line of 450 EUR for the category. No exchange rate is stored: reports convert each amount to the base currency by its own day's rates. Change can be in any currency, but it cannot be worth as much as the payments or more, counted in the base currency; the form says so and does not save.
 
-A payment that has items cannot have more rows or change: the items add up to a single amount.
+## Several categories
+
+The **+** beside the category adds lines, so one payment can cover several categories (a shop with food and cleaning products). Each line has a category and an amount, and, when the accounts use more than one currency, a currency. From two lines on each line can also have a **note** in markdown, for example a list of what you bought:
+
+```
+- milk
+- bread, 2 pcs
+- [ ] return the bottle
+```
+
+A note is shown in the transaction's details, never in the list. Lines that cover less than the payments put the rest into the **default category**; the form warns when the lines cover too little or too much, and still saves.
 
 ## In the list
 
-Every part is a row of its own, so filtering by account shows only that account's part. Each part is marked **Part of a payment**. Editing or deleting any of them opens or deletes the whole payment. A part cannot be changed on its own.
+A transaction is one row, however many accounts paid. The amount is what the payments net to; across several currencies the row shows the total converted to the first currency, marked with an asterisk, with the exact amounts in a tooltip. The subtitle says "N categories" when there are several lines. Filtering by account shows every transaction that has a payment on it.
+
+Click the row for the payments, lines and notes, see [Opening a transaction](transactions.md#opening-a-transaction).
 
 ## Rules
 
-- A payment has at least two parts, all on the same day, and cannot be dated in the future: it moves balances at once.
-- Parts are expenses, incomes (a refund, or change) or transfers between your accounts. Debts and transfers to another space cannot be parts. The form makes expenses and the incomes of the change; a payment with an exchange between accounts, made through the API, cannot be opened in the form.
-- Items (the lines of a receipt) are not available on a split payment.
-- All parts are saved together or not at all. Saving a changed payment replaces its parts.
-- Automation rules run on each part, as they do on any new transaction.
+- Editing a transaction opens all of its payments, change and lines in the same form. Transfers, debt payments and one side of a transfer to another space have their own limits, see [The transaction form](transactions.md#the-transaction-form).
+- A payment of zero is refused. A transaction dated in the future, or without a date, is pending and moves no balance.
+- The payments and the lines are saved together or not at all.
+- Automation rules run once on the transaction.
+
+## Upgrading from v1.0
+
+The first start on v1.1 converts what was saved:
+
+- **Parts of a v1.0 split payment** stay separate transactions, each with one payment. They are not merged; make a new split payment in the form if you want one transaction.
+- **Items** of a transaction become a markdown list in the note of its line, one item per line (`- name`). Quantities and prices are dropped.
 
 ## API and MCP
 
-A split payment is now one transaction with a payment per account. The old `/transaction-groups` endpoints and the `*_transaction_group` tools are gone; see [Transactions](api.md#transactions) for the shape. The form is being rewritten for payments and lines; see the note at the top of this page.
+A transaction carries `payments` and `lines`, see [Transactions](api.md#transactions). The old `/transaction-groups` endpoints and the `*_transaction_group` tools are gone.

@@ -68,6 +68,7 @@ export function TransactionForm({
                         transferTargets={transferTargets}
                         withSpaceTransfer={!isEdit && transferTargets.length > 0}
                         originalAffectsBalance={originalAffectsBalance}
+                        hideTypeSelector={isEdit}
                     />
 
                     <FormSubmitButton hidden={hideSubmit} isSubmitting={isSubmitting} label={submitLabel} />

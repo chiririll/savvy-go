@@ -230,4 +230,6 @@ Out of scope for good: interest, fee and minimum payment calculation, automatic 
 
 ### F8. Docs and finish
 
+**Done 8 Nov 2026.** `docs/split-payments.md` rewritten (payments, change, lines, notes, v1.0 upgrade: old split parts stay separate transactions, items become a markdown list); `docs/transactions.md` search text fixed and a new "Opening a transaction" section. Release notes are generated from commits by `cliff.toml`, so the upgrade note lives in the docs. Fixed the last type errors (`warningsForConfirmedDuplicate` now reads payments; the page story). Removed dead `PaymentRow.tsx`. `tsc` and all 1139 frontend tests pass. Not done: stories were not run (remote Docker only); 15 unused locale keys remain (`accounts.columns.*`, `accounts.status.*`, `tags.columns.*`, `transactions.columns.*`, `common:appTagline`, `settings:system.language.*`) and are older than the rework, so they were left for you to decide.
+
 Rewrite `docs/split-payments.md` for the new form, update `docs/transactions.md`, release notes (items become a markdown list in a line's note; quantities and prices are dropped). Check that every string has `en` and `ru`, remove dead code and unused locale keys. Then the full check.

@@ -2,7 +2,7 @@
 
 ## On the Transactions page
 
-- **Search field** at the top of the **Filters** panel: words you type must all match. A word matches a transaction's description or the name of one of its items (any letters, upper or lower case). A number also matches an amount, a transfer's received amount or an item price, in the currency of its account: `1879`, `1 879`, `18.79` and `18,79` all work.
+- **Search field** at the top of the **Filters** panel: words you type must all match. A word matches a transaction's description or the note of one of its lines (any letters, upper or lower case). A number also matches the amount of a payment or of a line, in the currency of its account: `1879`, `1 879`, `18.79` and `18,79` all work.
 - **Filters** button opens the panel: the search field, date range, accounts, currencies (shown when the space has more than one), categories and tags. The badge counts the active filter groups, and **Clear** removes them. Within one group a transaction needs to match any of the chosen values; different groups all have to match. A transfer matches a currency if either of its accounts uses it.
 - The list's **totals** (the Income and Expense figures in the base currency) follow the same search and filters.
 
@@ -37,6 +37,10 @@ On a phone there is no palette; use the Filters panel, which holds the search fi
 ## API and MCP
 
 `GET /api/transactions` takes `q`, `account_ids` (`1,2`) and `currency` (`usd,jpy`) next to the existing filters. With `with_summary=1` the totals cover only the matching transactions. With `count=0` the server does not count every match: `meta.has_more` says whether another page follows and `meta.total` is only what the page holds. The MCP tool `list_transactions` takes the same filters (see [MCP](mcp.md)).
+
+## Opening a transaction
+
+Click a row to see it whole: the title, date and status, every **payment** (account and amount, change included), every **line** (category, amount and its note, shown as formatted markdown), tags, and a **Recurring** badge that links to the rule. The buttons at the bottom come from what you may do with it: **Edit**, **Confirm**, **Skip** and **Delete** (the last two ask first). **Duplicate** is in the row's menu. On a phone, Skip and Delete are under the **⋯** button. The address `?view=<id>` opens the dialog on a transaction, `?edit=<id>` opens the form.
 
 ## The transaction form
 

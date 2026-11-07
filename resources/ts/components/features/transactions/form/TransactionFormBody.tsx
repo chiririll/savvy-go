@@ -26,6 +26,8 @@ interface TransactionFormBodyProps {
     originalAffectsBalance?: boolean
     /** The form draws the template of a recurring rule: no date, no balances, a transfer may leave its amount open. */
     template?: boolean
+    /** The type of a saved transaction cannot change: the selector is not drawn. */
+    hideTypeSelector?: boolean
 }
 
 /**
@@ -41,6 +43,7 @@ export function TransactionFormBody({
     withSpaceTransfer,
     originalAffectsBalance,
     template = false,
+    hideTypeSelector = false,
 }: TransactionFormBodyProps) {
     const {
         accounts,
@@ -77,7 +80,9 @@ export function TransactionFormBody({
 
     return (
         <TemplateModeContext.Provider value={template}>
-            <TransactionTypeTabs value={transactionType} withSpaceTransfer={withSpaceTransfer} onChange={onTypeChange} />
+            {!hideTypeSelector && (
+                <TransactionTypeTabs value={transactionType} withSpaceTransfer={withSpaceTransfer} onChange={onTypeChange} />
+            )}
 
             <TransactionDescriptionField control={form.control} />
 

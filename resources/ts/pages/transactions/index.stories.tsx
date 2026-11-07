@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw'
 import { expect, screen, userEvent, waitFor, within } from 'storybook/test'
 
 import { overlayA11y } from '@/test/a11y'
-import { accounts, categories, currencies, pendingTransaction, tags, transaction } from '@/test/fixtures'
+import { accounts, categories, currencies, payment, pendingTransaction, tags, transaction } from '@/test/fixtures'
 import { fail, hang, raw, reply } from '@/test/api-mocks'
 import { useCurrenciesStore } from '@/stores/currencies'
 import { CreateTransactionProvider } from '@/components/features/transactions/form/CreateTransactionProvider'
@@ -23,9 +23,21 @@ const list = (rows: unknown[], pending: unknown[] = []) =>
 
 // One account per currency precision: a yen has no fraction, a dinar has three digits.
 const rows = [
-    transaction({ id: 1, description: 'Weekly shop', amount: 42.5 }),
-    transaction({ id: 2, description: 'Ramen', amount: 1200, account: accounts[2], date: '2020-05-03' }),
-    transaction({ id: 3, description: 'Taxi', amount: 1.234, account: accounts[3], date: '2020-05-02' }),
+    transaction({ id: 1, description: 'Weekly shop' }),
+    transaction({
+        id: 2,
+        description: 'Ramen',
+        amount: -1200,
+        payments: [payment({ account: accounts[2], accountId: accounts[2].id, amount: -1200 })],
+        date: '2020-05-03',
+    }),
+    transaction({
+        id: 3,
+        description: 'Taxi',
+        amount: -1.234,
+        payments: [payment({ account: accounts[3], accountId: accounts[3].id, amount: -1.234 })],
+        date: '2020-05-02',
+    }),
 ]
 
 const meta = {

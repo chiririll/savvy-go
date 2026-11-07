@@ -7,8 +7,6 @@ export type NegativeBalanceWarning = {
     currency?: Currency | string | null
 }
 
-const OUTFLOW_TYPES = new Set(['expense', 'transfer', 'debt_payment', 'debt_lend'])
-
 export function warningIfResultNegative(options: {
     accountName: string
     currentBalance: number
@@ -52,27 +50,19 @@ export function warningsForAccountOutflow(
     return warning ? [warning] : []
 }
 
-export function warningsForTransactionOutflow(transaction: {
-    type: string
-    amount: number
-    account: { name: string; currentBalance: number; currency?: Currency | null }
-}): NegativeBalanceWarning[] {
-    if (!OUTFLOW_TYPES.has(transaction.type)) {
-        return []
-    }
-
-    return warningsForAccountOutflow(transaction.account, transaction.amount)
-}
-
+/** A duplicate of a confirmed transaction takes the same money again: warn for each account its payments take below zero. */
 export function warningsForConfirmedDuplicate(transaction: {
-    type: string
-    amount: number
     status: string
-    account: { name: string; currentBalance: number; currency?: Currency | null }
+    payments: Array<{
+        amount: number
+        account: { name: string; currentBalance: number; currency?: Currency | null } | null
+    }>
 }): NegativeBalanceWarning[] {
     if (transaction.status !== 'confirmed') {
         return []
     }
 
-    return warningsForTransactionOutflow(transaction)
+    return transaction.payments.flatMap((payment) =>
+        warningsForAccountOutflow(payment.account ?? undefined, payment.amount < 0 ? -payment.amount : 0),
+    )
 }
