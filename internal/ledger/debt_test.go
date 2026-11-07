@@ -137,7 +137,7 @@ func TestCollectingPaysBackDebtOwedMe(t *testing.T) {
 		e.ctx,
 		DebtInput{
 			Name:      "Ann",
-			Direction:  "owed_to_me",
+			Direction: "owed_to_me",
 			AccountID: e.usdAcc.ID,
 			Amount:    dec("60"),
 			Date:      "2024-01-10",

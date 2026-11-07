@@ -31,7 +31,7 @@ type spaceArgs struct {
 type accountsArgs struct {
 	SpaceID     int64  `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
 	WithSummary bool   `json:"with_summary,omitempty" jsonschema:"Also return totals across the accounts."`
-	Type        string `json:"type,omitempty" jsonschema:"Only accounts of these types, comma-separated: bank, crypto, cash, credit, debt, space. For example credit lists the credit cards."`
+	Type        string `json:"type,omitempty" jsonschema:"Only these types, comma-separated: bank, crypto, cash, credit, debt, space."`
 }
 
 type idArgs struct {

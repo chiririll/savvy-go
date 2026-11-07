@@ -38,8 +38,8 @@ func TestBalanceFollowsEveryTransactionType(t *testing.T) {
 		t.Fatal(err)
 	}
 	debts := newDebts(e)
-	e.txOn(t, simple("income", usd, "50"), "2024-01-10")                                                      // +50
-	e.txOn(t, simple("expense", usd, "20"), "2024-01-11")                                                     // -20
+	e.txOn(t, simple("income", usd, "50"), "2024-01-10")                                                   // +50
+	e.txOn(t, simple("expense", usd, "20"), "2024-01-11")                                                  // -20
 	e.txOn(t, move(usd, jpy, "10", "1000"), "2024-01-12")                                                  // -10 USD, +1000 JPY
 	if _, err := debts.record(e.ctx, "debt_lend", debt.ID, usd, dec("5"), "2024-01-13", nil); err != nil { // -5
 		t.Fatal(err)
