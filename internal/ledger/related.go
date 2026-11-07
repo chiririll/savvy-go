@@ -15,6 +15,9 @@ type Related struct {
 	cats       Categories
 	accounts   map[int64]*Account
 	categories map[int64]*Category
+	// bare loads accounts without their balance, for a caller that only reads
+	// how a transaction is made up.
+	bare bool
 }
 
 // NewRelated starts an empty cache over one space database.
@@ -30,7 +33,12 @@ func (r *Related) Account(id int64) *Account {
 	if a, ok := r.accounts[id]; ok {
 		return a
 	}
-	a, _ := r.accts.ByID(r.ctx, id)
+	var a *Account
+	if r.bare {
+		a, _ = r.accts.Bare(r.ctx, id)
+	} else {
+		a, _ = r.accts.ByID(r.ctx, id)
+	}
 	r.accounts[id] = a
 	return a
 }
@@ -51,7 +59,12 @@ func (r *Related) Category(id *int64) *Category {
 	if c, ok := r.categories[*id]; ok {
 		return c
 	}
-	c, _ := r.cats.ByID(r.ctx, *id)
+	var c *Category
+	if r.bare {
+		c, _ = r.cats.Bare(r.ctx, *id)
+	} else {
+		c, _ = r.cats.ByID(r.ctx, *id)
+	}
 	r.categories[*id] = c
 	return c
 }

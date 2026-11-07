@@ -303,6 +303,9 @@ func (s Transactions) ConvertedTransfer(ctx context.Context, from, to int64, amo
 // ErrUnknownCategory is returned when a category referenced by id does not exist.
 var ErrUnknownCategory = errors.New("unknown category")
 
+// ErrUnknownTransaction is returned for a transaction id that does not exist.
+var ErrUnknownTransaction = errors.New("unknown transaction")
+
 // difference is the soft check on a built transaction: nil when payments and
 // lines agree, or when there is no base currency to compare in.
 func (s Transactions) difference(ctx context.Context, b built) *money.Money {
@@ -357,7 +360,23 @@ func blankToNil(s *string) *string {
 var ErrDetailsOnly = errors.New("only the description, tags and the categories and notes of lines can change")
 
 func (s Transactions) Update(ctx context.Context, id int64, in TxInput) (*Transaction, error) {
-	cur, err := s.ByID(ctx, id)
+	return s.update(ctx, id, in, true)
+}
+
+// Modify is Update without reading the transaction back; see Add. It reports
+// ErrUnknownTransaction for an id that does not exist.
+func (s Transactions) Modify(ctx context.Context, id int64, in TxInput) error {
+	tx, err := s.update(ctx, id, in, false)
+	if err == nil && tx == nil {
+		return ErrUnknownTransaction
+	}
+	return err
+}
+
+// update changes a transaction; read says whether to return it as stored.
+// Without it the result is the transaction as it was, only to tell it exists.
+func (s Transactions) update(ctx context.Context, id int64, in TxInput, read bool) (*Transaction, error) {
+	cur, err := s.byID(ctx, id, true)
 	if err != nil || cur == nil {
 		return cur, err
 	}
@@ -412,6 +431,9 @@ func (s Transactions) Update(ctx context.Context, id int64, in TxInput) (*Transa
 	})
 	if err != nil {
 		return nil, err
+	}
+	if !read {
+		return cur, nil
 	}
 	tx, err := s.ByID(ctx, id)
 	if tx != nil && changed {
@@ -634,11 +656,18 @@ func (s Transactions) Duplicate(ctx context.Context, id int64) (*Transaction, er
 }
 
 func (s Transactions) ByID(ctx context.Context, id int64) (*Transaction, error) {
+	return s.byID(ctx, id, false)
+}
+
+// byID is ByID; bare leaves out the account balances and category counts.
+func (s Transactions) byID(ctx context.Context, id int64, bare bool) (*Transaction, error) {
 	r, err := s.repo().Transaction(ctx, id)
 	if r == nil || err != nil {
 		return nil, err
 	}
-	list, err := s.hydrate(ctx, []repo.Tx{*r})
+	rel := NewRelated(ctx, s.DB)
+	rel.bare = bare
+	list, err := s.hydrateWith(ctx, []repo.Tx{*r}, rel)
 	if err != nil {
 		return nil, err
 	}

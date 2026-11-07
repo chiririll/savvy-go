@@ -33,7 +33,7 @@ func (s *seeder) seedSplitLines() error {
 		if len(lines) < 2 {
 			continue
 		}
-		if _, err := s.txs.Update(s.ctx, cand.id, ledger.TxInput{Lines: lines}); err != nil {
+		if err := s.txs.Modify(s.ctx, cand.id, ledger.TxInput{Lines: lines}); err != nil {
 			return err
 		}
 	}

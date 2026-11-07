@@ -63,8 +63,11 @@ func (s Transactions) Summary(ctx context.Context, f filter.TxFilter, pendingOnl
 // lookup per distinct one) and the reasons that restrict them. The payments,
 // lines and tags came with the rows, in a few queries for the whole page.
 func (s Transactions) hydrate(ctx context.Context, rows []repo.Tx) ([]Transaction, error) {
+	return s.hydrateWith(ctx, rows, NewRelated(ctx, s.DB))
+}
+
+func (s Transactions) hydrateWith(ctx context.Context, rows []repo.Tx, rel *Related) ([]Transaction, error) {
 	out := make([]Transaction, 0, len(rows))
-	rel := NewRelated(ctx, s.DB)
 	for _, r := range rows {
 		t := Transaction{
 			ID: r.ID, Type: r.Type, Description: r.Description, Date: r.Date, Status: r.Status,
