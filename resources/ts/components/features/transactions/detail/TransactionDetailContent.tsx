@@ -63,33 +63,41 @@ function Header({ transaction, onNavigate }: { transaction: Transaction; onNavig
     )
 }
 
+function PaymentRow({ payment }: { payment: Transaction['payments'][number] }) {
+    return (
+        <li className="flex min-w-0 justify-between gap-4">
+            <span className="truncate">{payment.account?.name ?? payment.accountId}</span>
+            <span className={cn('shrink-0 font-medium tabular-nums', payment.amount > 0 && 'text-success')}>
+                {signed(payment.amount)}
+                {formatCurrency(payment.amount, payment.account?.currency)}
+            </span>
+        </li>
+    )
+}
+
+/** The payments, then the change below them, set apart under its own label. */
 function Payments({ transaction }: { transaction: Transaction }) {
     const { t } = useTranslation('pages')
+    const change = transaction.payments.filter((p) => isChangePayment(transaction, p))
+    const paid = transaction.payments.filter((p) => !isChangePayment(transaction, p))
 
     return (
         <Section title={t('transactions.detail.payments')}>
             <ul className="space-y-1.5 text-sm">
-                {transaction.payments.map((payment, index) => {
-                    const change = isChangePayment(transaction, payment)
-                    return (
-                        <li key={`${payment.accountId}-${index}`} className="flex min-w-0 justify-between gap-4">
-                            <span className="flex min-w-0 items-center gap-2">
-                                <span className="truncate">{payment.account?.name ?? payment.accountId}</span>
-                                {change && <Badge variant="secondary">{t('transactions.detail.change')}</Badge>}
-                            </span>
-                            <span
-                                className={cn(
-                                    'shrink-0 font-medium tabular-nums',
-                                    payment.amount > 0 && 'text-success',
-                                )}
-                            >
-                                {signed(payment.amount)}
-                                {formatCurrency(payment.amount, payment.account?.currency)}
-                            </span>
-                        </li>
-                    )
-                })}
+                {paid.map((payment, index) => (
+                    <PaymentRow key={`${payment.accountId}-${index}`} payment={payment} />
+                ))}
             </ul>
+            {change.length > 0 && (
+                <div className="space-y-1.5 border-t border-dashed pt-2">
+                    <h4 className="text-xs text-muted-foreground">{t('transactions.detail.change')}</h4>
+                    <ul className="space-y-1.5 text-sm">
+                        {change.map((payment, index) => (
+                            <PaymentRow key={`${payment.accountId}-${index}`} payment={payment} />
+                        ))}
+                    </ul>
+                </div>
+            )}
         </Section>
     )
 }

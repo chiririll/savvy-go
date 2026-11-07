@@ -40,14 +40,11 @@ func TestDemoHasSplitPayments(t *testing.T) {
 	}
 	var split int
 	for _, tx := range all {
-		if tx.Type == "expense" && len(tx.Payments) == 2 {
+		if tx.Type == "expense" && len(tx.Payments) == 2 && len(tx.Lines) == 1 {
 			split++
-			if len(tx.Lines) != 1 {
-				t.Errorf("%q: %d lines, want 1", *tx.Description, len(tx.Lines))
-			}
 		}
 	}
 	if split != 2 {
-		t.Fatalf("%d expenses paid from two accounts, want 2", split)
+		t.Fatalf("%d single-line expenses paid from two accounts, want 2", split)
 	}
 }

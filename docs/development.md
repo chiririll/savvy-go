@@ -32,6 +32,13 @@ With `--seed-config <file>` (any TOML file, even empty), the first boot creates 
 | `guest@savvy.app`  | `password` | guest       |
 | `demo@demo.com`    | `demo`     | user        |
 
+The data covers the transaction model, not only plain expenses. Most are one payment on one account for one category; next to them are:
+
+- an expense paid from three accounts (cash, debit and credit card), and one paid in euros with the change back in dollars, on a EUR account;
+- a basket over several categories, whose lines carry **markdown notes**: product lists, a list with done and open items, a link;
+- an income split between two accounts, and a transfer between currencies with a wire fee;
+- a **pending shopping list** in each space (a task list in the notes of its lines, items ticked off or not yet) that moves no balance until it is confirmed.
+
 Roles differ per space, so each user sees a different view. Every space has its own emoji and color. Family Budget and Demo are in one sync group, each with a category and a tag the other lacked. Studio GmbH is outside it and has a set of categories and tags of its own (clients, retainers, VAT) instead of the presets. About a dozen transfers cross the links between the spaces, some in the last few days and some between currencies. All addresses are verified except the guest's, which shows as unverified once mail is set up.
 
 Example `seed.toml`:

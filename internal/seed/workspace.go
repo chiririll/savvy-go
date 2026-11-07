@@ -90,6 +90,9 @@ func seedWorkspace(ctx context.Context, db store.DB, now time.Time) (map[string]
 	if err := s.seedSplitLines(); err != nil {
 		return nil, err
 	}
+	if err := s.seedRich(accounts, expenses, incomes, tags); err != nil {
+		return nil, err
+	}
 	if err := s.seedPending(accounts, expenses); err != nil {
 		return nil, err
 	}
