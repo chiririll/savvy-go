@@ -1,4 +1,4 @@
-import { Bold, Code, Italic, Link, List, ListChecks, type LucideIcon } from 'lucide-react'
+import { Bold, Code, Italic, Link, List, ListChecks, X, type LucideIcon } from 'lucide-react'
 import { useId, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -29,6 +29,8 @@ interface MarkdownFieldProps {
     className?: string
     /** Visible rows of the editor, default 4. Compact fields use 2. */
     rows?: number
+    /** Shows a cross at the right end of the toolbar that calls this, e.g. to fold the editor into a compact field. */
+    onClose?: () => void
 }
 
 type Action = 'bold' | 'italic' | 'bulletList' | 'taskList' | 'link' | 'code'
@@ -54,6 +56,7 @@ export function MarkdownField({
     disabled,
     className,
     rows = 4,
+    onClose,
     ...rest
 }: MarkdownFieldProps) {
     const { t } = useTranslation('forms')
@@ -156,6 +159,19 @@ export function MarkdownField({
                             {m === 'write' ? t('markdown.write') : t('markdown.preview')}
                         </Button>
                     ))}
+                    {onClose && (
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label={t('markdown.close')}
+                            title={t('markdown.close')}
+                            className="ml-1"
+                            onClick={onClose}
+                        >
+                            <X />
+                        </Button>
+                    )}
                 </div>
             </div>
             {writing ? (

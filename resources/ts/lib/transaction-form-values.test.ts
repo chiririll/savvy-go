@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { accounts, line, payment, tags, transaction } from '@/test/fixtures'
-import { isSimpleTransaction, toFormValues } from './transaction-form-values'
+import { canEditInForm, isSimpleTransaction, toFormValues } from './transaction-form-values'
 
 const [cash, euroCard] = accounts
 
@@ -39,7 +39,57 @@ describe('isSimpleTransaction', () => {
     })
 })
 
+describe('canEditInForm', () => {
+    it('is true for a simple transaction and for one payment split in several lines', () => {
+        expect(canEditInForm(transaction())).toBe(true)
+        expect(canEditInForm(transaction({ lines: [line({ amount: 40 }), line({ seq: 1, amount: 2.5 })] }))).toBe(true)
+    })
+
+    it('is true for lines that cover less than the payment', () => {
+        expect(canEditInForm(transaction({ lines: [line({ amount: 40 })] }))).toBe(true)
+    })
+
+    it('is false for a transfer, a debt payment, no lines, several payments or the wrong sign', () => {
+        const back = payment({ account: euroCard, accountId: euroCard.id, amount: 5 })
+        expect(canEditInForm(transaction({ type: 'transfer' }))).toBe(false)
+        expect(canEditInForm(transaction({ type: 'debt_payment' }))).toBe(false)
+        expect(canEditInForm(transaction({ lines: [] }))).toBe(false)
+        expect(canEditInForm(transaction({ payments: [payment({ amount: -50 }), back] }))).toBe(false)
+        expect(canEditInForm(transaction({ payments: [payment({ amount: 42.5 })] }))).toBe(false)
+    })
+
+    it('is false when a line is in a currency other than the account', () => {
+        expect(canEditInForm(transaction({ lines: [line({ currencyId: 2 })] }))).toBe(false)
+    })
+})
+
 describe('toFormValues', () => {
+    it('shows several lines as lines, with the category, amount and note of each, in their order', () => {
+        const tx = transaction({
+            lines: [
+                line({ seq: 1, categoryId: 3, category: null, amount: 2.5, note: null }),
+                line({ seq: 0, categoryId: 1, amount: 40, note: '- milk\n- bread' }),
+            ],
+        })
+
+        expect(toFormValues(tx)).toMatchObject({
+            payments: [{ account_id: cash.id, amount: 42.5 }],
+            lines: [
+                { category_id: 1, currency_id: 1, amount: 40, note: '- milk\n- bread' },
+                { category_id: 3, currency_id: 1, amount: 2.5, note: null },
+            ],
+            default_category_id: null,
+            default_note: null,
+        })
+    })
+
+    it('shows a line that covers less as a line, not as the category', () => {
+        const values = toFormValues(transaction({ lines: [line({ amount: 40 })] }))
+
+        expect(values.lines).toHaveLength(1)
+        expect(values.default_category_id).toBeNull()
+    })
+
     it('shows an expense with a positive amount and the category of its line', () => {
         const tx = transaction({ tags: [tags[0]], description: 'Weekly shop' })
 

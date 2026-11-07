@@ -79,6 +79,11 @@ export function useTransactionHandlers({
             categoryByType.current[current] = categoryId
         }
         form.setValue('type', value)
+        // The categories of the lines are of the old type too.
+        const lines = form.getValues('lines') ?? []
+        if (lines.some((line) => line.category_id)) {
+            form.setValue('lines', lines.map((line) => ({ ...line, category_id: null })))
+        }
         // Null lets the model pick the default category of the type.
         form.setValue('default_category_id', categoryByType.current[value] ?? null)
         onTypeChange?.(value)

@@ -1,13 +1,17 @@
+import { useFieldArray } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { Form, FormControl, FormField, FormItem } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { TransactionFormValues } from '@/schemas/transactions'
 import { useTransferTargets } from '@/hooks'
 import { FormSubmitButton, FormWrapper, TransactionTypeTabs } from '@/components/shared'
+import { linesToAdd } from '@/lib/transaction-lines'
+import { formatCurrency } from '@/lib/utils'
 import type { Transaction, TransactionInput } from '@/types'
 import { BalanceAfter, PendingHint } from './TransactionBalanceHint'
 import { PaymentRow } from './PaymentRow'
 import { TransactionDetailsRow } from './TransactionDetailsRow'
+import { TransactionLines } from './TransactionLines'
 import { TransactionTagsField } from './TransactionTagsField'
 import { useTransactionForm, type TransactionFormDefaults } from './use-transaction-form'
 import { useTransactionHandlers } from './use-transaction-handlers'
@@ -51,8 +55,31 @@ export function TransactionForm({
 
     const { form } = useTransactionForm({ defaultValues, onValuesChange, originalAffectsBalance, open })
 
-    const { accounts, transactionType, dateRequired, isPendingDate, isUndated, balances, usedAccountIds } =
-        useTransactionModel({ form, transaction, isEdit, originalAffectsBalance })
+    const {
+        accounts,
+        coverage,
+        lineCurrencies,
+        hasLines,
+        transactionType,
+        dateRequired,
+        isPendingDate,
+        isUndated,
+        balances,
+        usedAccountIds,
+    } = useTransactionModel({ form, transaction, isEdit, originalAffectsBalance })
+
+    const lines = useFieldArray({ control: form.control, name: 'lines' })
+    const addLine = () => lines.append(linesToAdd(form.getValues(), accounts ?? []))
+    const defaultCategoryId = form.watch('default_category_id')
+    // What the lines leave uncovered goes to the default category: said where that category is chosen.
+    const uncovered =
+        hasLines && coverage.remainder > 0 && coverage.currency
+            ? defaultCategoryId
+                ? t('forms:transactions.uncovered', { amount: formatCurrency(coverage.remainder, coverage.currency) })
+                : t('forms:transactions.uncoveredNoCategory', {
+                      amount: formatCurrency(coverage.remainder, coverage.currency),
+                  })
+            : null
 
     const { handleSubmit, handleTypeChange, negativeBalanceDialog } = useTransactionHandlers({
         form,
@@ -63,8 +90,8 @@ export function TransactionForm({
         onTypeChange,
     })
 
-    // F4a has the one payment; the rows are a list so the next steps only add to it.
-    const paymentIndexes = [0]
+    // One row per payment; adding and removing them comes with the next step of the form.
+    const paymentIndexes = (form.watch('payments') ?? []).map((_, index) => index)
 
     return (
         <FormWrapper>
@@ -118,6 +145,21 @@ export function TransactionForm({
                         type={transactionType}
                         dateRequired={dateRequired}
                         pastOnly={originalAffectsBalance}
+                        category={{
+                            hasLines,
+                            locked: coverage.remainder === 0,
+                            uncovered,
+                            onAddLine: addLine,
+                        }}
+                    />
+
+                    <TransactionLines
+                        control={form.control}
+                        fields={lines.fields}
+                        remove={lines.remove}
+                        type={transactionType}
+                        currencies={lineCurrencies}
+                        coverage={coverage}
                     />
 
                     <TransactionTagsField control={form.control} />

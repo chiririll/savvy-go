@@ -3,6 +3,7 @@ import { useWatch, type UseFormReturn } from 'react-hook-form'
 import { useAccounts, useCategories } from '@/hooks'
 import { pickDefaultCategory } from '@/hooks/use-transaction-party-defaults'
 import { isDateInFuture } from '@/lib/utils'
+import { lineCoverage, paymentCurrencies } from '@/lib/transaction-lines'
 import type { TransactionFormValues } from '@/schemas/transactions'
 import type { Transaction } from '@/types'
 import { postedImpact, useBalancePreview } from './balance-preview'
@@ -61,8 +62,17 @@ export function useTransactionModel({ form, transaction, isEdit, originalAffects
 
     const usedAccountIds = [...(payments ?? []), ...(change ?? [])].map((row) => Number(row?.account_id)).filter((id) => id > 0)
 
+    // How far the lines cover the payments: the default category takes the rest.
+    const values = { payments: payments ?? [], change: change ?? [], lines: lines ?? [] }
+    const coverage = lineCoverage(values, accounts ?? [])
+    const lineCurrencies = paymentCurrencies(values, accounts ?? [])
+    const hasLines = Boolean(lines?.length)
+
     return {
         accounts,
+        coverage,
+        lineCurrencies,
+        hasLines,
         transactionType,
         dateRequired,
         isPendingDate,

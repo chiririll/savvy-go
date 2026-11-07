@@ -10,14 +10,16 @@ interface TransactionDetailsRowProps {
     dateRequired: boolean
     /** A transaction that already moved a balance cannot be dated in the future. */
     pastOnly?: boolean
+    /** The category field: see `TransactionCategoryField`. */
+    category?: Omit<React.ComponentProps<typeof TransactionCategoryField>, 'control' | 'type'>
 }
 
 /** The date and the category, side by side. */
-export function TransactionDetailsRow({ control, type, dateRequired, pastOnly }: TransactionDetailsRowProps) {
+export function TransactionDetailsRow({ control, type, dateRequired, pastOnly, category }: TransactionDetailsRowProps) {
     return (
         <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
             <TransactionDateField required={dateRequired} max={pastOnly ? formatDateLocal() : undefined} />
-            <TransactionCategoryField control={control} type={type} />
+            <TransactionCategoryField control={control} type={type} {...category} />
         </div>
     )
 }

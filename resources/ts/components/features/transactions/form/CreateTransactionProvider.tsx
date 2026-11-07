@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useCreateTransaction, useUpdateTransaction } from '@/hooks'
 import i18n from '@/lib/i18n'
-import { isSimpleTransaction } from '@/lib/transaction-form-values'
+import { canEditInForm } from '@/lib/transaction-form-values'
 import type { Transaction, TransactionInput } from '@/types'
 import { fromCreateDefaults, type CreateTransactionDefaults } from './create-defaults'
 import type { TransactionFormDefaults } from './use-transaction-form'
@@ -43,9 +43,9 @@ export function CreateTransactionProvider({ children }: { children: React.ReactN
         if (!next.actions.edit) {
             return
         }
-        // The form shows one payment in one line for now; several payments and lines, change and
-        // transfers come with the next steps of the form. Better a message than a save that drops them.
-        if (!isSimpleTransaction(next)) {
+        // The form shows one payment in lines for now; several payments, change and transfers come
+        // with the next steps of the form. Better a message than a save that drops them.
+        if (!canEditInForm(next)) {
             toast.error(i18n.t('toasts.transaction.notEditableYet'))
             return
         }

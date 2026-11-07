@@ -40,6 +40,11 @@ const expense = {
     description: 'Weekly shop',
 }
 
+const lineGroup = (canvasElement: HTMLElement) => within(canvasElement).findByRole('group', { name: /lines|строки/i })
+const amountsOf = (group: HTMLElement) => within(group).getAllByRole('spinbutton') as HTMLInputElement[]
+const closeButton = /close the editor|закрыть редактор/i
+const noteButtons = /format the note|форматировать заметку/i
+
 const saveButton = (canvasElement: HTMLElement) => within(canvasElement).getByRole('button', { name: /save/i })
 
 export const Empty: Story = {}
@@ -223,5 +228,138 @@ export const OverdrawingAsksFirst: Story = {
         await expect(args.onSubmit).not.toHaveBeenCalled()
         await userEvent.click(within(alert).getByRole('button', { name: /continue|confirm|proceed|yes/i }))
         await waitFor(() => expect(args.onSubmit).toHaveBeenCalledOnce())
+    },
+}
+
+const split = {
+    ...expense,
+    lines: [
+        { category_id: 3, currency_id: null, amount: 12, note: null },
+        { category_id: 1, currency_id: null, amount: 8, note: null },
+    ],
+}
+
+// The first (+) makes two lines: the first takes the whole payment, so the default category has nothing to take.
+export const SplitByCategory: Story = {
+    args: { defaultValues: expense },
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement)
+        await userEvent.click(await canvas.findByRole('button', { name: /split by category|разбить по категориям/i }))
+        const amounts = amountsOf(await lineGroup(canvasElement))
+        await expect(amounts).toHaveLength(2)
+        await expect(amounts[0]).toHaveValue(20)
+        await expect(amounts[1]).toHaveValue(null)
+        await expect(canvas.getAllByRole('combobox')[1]).toBeDisabled()
+    },
+}
+
+// The cross of a line takes it away; the last one gone, the category is the transaction's again.
+export const RemovingTheLines: Story = {
+    args: { defaultValues: split },
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement)
+        await userEvent.click((await canvas.findAllByRole('button', { name: /remove the line|удалить строку/i }))[0])
+        await userEvent.click(canvas.getByRole('button', { name: /remove the line|удалить строку/i }))
+        await waitFor(() => expect(canvas.queryByRole('group', { name: /lines|строки/i })).toBeNull())
+    },
+}
+
+// Lines that cover the payment leave nothing for the default category: it is locked and no warning shows.
+export const LinesCoverThePayment: Story = {
+    args: { defaultValues: split },
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement)
+        await lineGroup(canvasElement)
+        await waitFor(() => expect(canvas.getAllByRole('combobox')[1]).toBeDisabled())
+        await expect(canvas.queryByRole('button', { name: /8\.00|8,00/ })).toBeNull()
+    },
+}
+
+// Lines that cover less: the default category opens, and a yellow triangle says how much goes to it.
+export const LinesLeaveARest: Story = {
+    args: { defaultValues: { ...split, lines: [split.lines[0]] } },
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement)
+        await expect(await canvas.findByRole('button', { name: /8\.00|8,00/ })).toBeVisible()
+        await expect(canvas.getAllByRole('combobox')[1]).toBeEnabled()
+    },
+}
+
+// Lines above the payment are only a warning; the form still saves.
+export const LinesAboveThePayment: Story = {
+    args: { defaultValues: { ...split, lines: [{ ...split.lines[0], amount: 25 }] } },
+    play: async ({ canvasElement }) => {
+        await expect(await within(canvasElement).findByRole('status')).toHaveTextContent(/5\.00|5,00/)
+        await userEvent.click(saveButton(canvasElement))
+    },
+}
+
+// A single line has no note: the title says what it is. From two lines on every line has one.
+export const NotesFromTwoLines: Story = {
+    args: { defaultValues: { ...split, lines: [split.lines[0]] } },
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement)
+        await lineGroup(canvasElement)
+        await expect(canvas.queryByRole('button', { name: noteButtons })).toBeNull()
+        await userEvent.click(canvas.getByRole('button', { name: /split by category|разбить по категориям/i }))
+        await waitFor(() => expect(canvas.getAllByRole('button', { name: noteButtons })).toHaveLength(2))
+    },
+}
+
+// The pencil opens the markdown editor in place of the compact note, and the cross folds it back.
+export const NoteOpensInTheEditor: Story = {
+    args: { defaultValues: split },
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement)
+        await userEvent.click((await canvas.findAllByRole('button', { name: noteButtons }))[0])
+        await userEvent.click(await canvas.findByRole('button', { name: closeButton }))
+        await waitFor(() => expect(canvas.queryByRole('button', { name: closeButton })).toBeNull())
+        await expect(canvas.getAllByRole('button', { name: noteButtons })).toHaveLength(2)
+    },
+}
+
+// A note that was saved opens in the editor, so its formatting is not hidden.
+export const SavedNoteOpensExpanded: Story = {
+    args: {
+        defaultValues: { ...split, lines: [{ ...split.lines[0], note: '- milk\n- bread' }, split.lines[1]] },
+    },
+    play: async ({ canvasElement }) => {
+        await expect(await within(canvasElement).findByRole('button', { name: closeButton })).toBeVisible()
+        await expect(within(canvasElement).getAllByRole('button', { name: noteButtons })).toHaveLength(1)
+    },
+}
+
+// Accounts in two currencies: a line picks the currency it is in.
+export const LineCurrencyFromTheAccounts: Story = {
+    args: {
+        defaultValues: {
+            ...split,
+            payments: [
+                { account_id: 1, amount: 10 },
+                { account_id: 2, amount: 8 },
+            ],
+            lines: [{ category_id: 3, currency_id: 2, amount: 4, note: null }, split.lines[1]],
+        },
+    },
+    play: async ({ canvasElement }) => {
+        const group = await lineGroup(canvasElement)
+        await expect(within(group).getAllByRole('combobox', { name: /currency of the line|валюта строки/i })).toHaveLength(2)
+        await expect(within(group).getAllByRole('combobox', { name: /currency of the line|валюта строки/i })[0]).toHaveTextContent('EUR')
+    },
+}
+
+// The lines and what they leave over are saved; the rest goes to the default category.
+export const SubmitsLines: Story = {
+    args: { defaultValues: { ...split, lines: [split.lines[0]] } },
+    play: async ({ canvasElement, args }) => {
+        await userEvent.click(saveButton(canvasElement))
+        await waitFor(() => expect(args.onSubmit).toHaveBeenCalledOnce())
+        await expect((args.onSubmit as ReturnType<typeof fn>).mock.calls[0][0]).toMatchObject({
+            payments: [{ account_id: 1, amount: -20 }],
+            lines: [
+                { category_id: 3, amount: 12 },
+                { category_id: 1, amount: 8 },
+            ],
+        })
     },
 }

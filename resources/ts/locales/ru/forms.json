@@ -54,6 +54,17 @@
         "receiveAmount": "Сумма получения",
         "transferRate": "Курс перевода",
         "notesPlaceholder": "Необязательные заметки...",
+        "lines": "Строки",
+        "lineNote": "Заметка к строке",
+        "lineNotePlaceholder": "Заметка (markdown)",
+        "editNote": "Форматировать заметку",
+        "lineCurrency": "Валюта строки",
+        "removeLine": "Удалить строку",
+        "addLine": "Разбить по категориям",
+        "defaultCategory": "Категория по умолчанию",
+        "linesExceed": "Строки больше платежа на {{amount}}.",
+        "uncovered": "{{amount}}, не покрытые строками, попадут в категорию по умолчанию.",
+        "uncoveredNoCategory": "{{amount}}, не покрытые строками, останутся без категории.",
         "titlePlaceholder": "Название или описание",
         "balanceAfter": "Баланс после:",
         "insufficientFunds": "Недостаточно средств",
@@ -369,6 +380,7 @@
         "taskList": "Список задач",
         "link": "Ссылка",
         "code": "Код",
+        "close": "Закрыть редактор",
         "taskItem": "Задача"
     }
 }

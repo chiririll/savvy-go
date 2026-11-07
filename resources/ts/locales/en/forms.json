@@ -54,6 +54,17 @@
         "receiveAmount": "Receive amount",
         "transferRate": "Transfer rate",
         "notesPlaceholder": "Notes (optional)",
+        "lines": "Lines",
+        "lineNote": "Note of the line",
+        "lineNotePlaceholder": "Note (markdown)",
+        "editNote": "Format the note",
+        "lineCurrency": "Currency of the line",
+        "removeLine": "Remove the line",
+        "addLine": "Split by category",
+        "defaultCategory": "Default category",
+        "linesExceed": "The lines are {{amount}} more than the payment.",
+        "uncovered": "{{amount}} that the lines don't cover goes to the default category.",
+        "uncoveredNoCategory": "{{amount}} that the lines don't cover stays without a category.",
         "titlePlaceholder": "Title or description",
         "balanceAfter": "Balance after:",
         "insufficientFunds": "Insufficient funds",
@@ -369,6 +380,7 @@
         "taskList": "Task list",
         "link": "Link",
         "code": "Code",
+        "close": "Close the editor",
         "taskItem": "Task"
     }
 }

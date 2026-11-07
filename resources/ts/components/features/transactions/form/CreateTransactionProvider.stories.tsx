@@ -18,7 +18,13 @@ const Buttons = ({ editable = true }: { editable?: boolean }) => {
         actions: { edit: editable, editDetails: false, duplicate: true, delete: true, confirm: false, skip: false },
     })
 
-    // Several payments and lines have no place in the form yet.
+    // One payment in two lines opens; several payments have no place in the form yet.
+    const lines = transaction({
+        status: 'confirmed',
+        lines: [line({ amount: 30, note: '- milk' }), line({ seq: 1, categoryId: 3, category: categories[2], amount: 12.5 })],
+    })
+
+
     const split = transaction({
         status: 'confirmed',
         payments: [payment({ amount: -30 }), payment({ account: accounts[1], accountId: 2, amount: -10 })],
@@ -30,6 +36,7 @@ const Buttons = ({ editable = true }: { editable?: boolean }) => {
             <Button onClick={() => openCreate()}>New</Button>
             <Button onClick={() => openCreate({ type: 'income', account_id: 1, category_id: 2, amount: 10 })}>New income</Button>
             <Button variant="outline" onClick={() => openEdit(existing)}>Edit</Button>
+            <Button variant="outline" onClick={() => openEdit(lines)}>Edit lines</Button>
             <Button variant="outline" onClick={() => openEdit(split)}>Edit split</Button>
         </div>
     )
@@ -84,7 +91,17 @@ export const EditOpened: Story = {
     },
 }
 
-// Several payments or lines, or a transfer, are not opened until the form can show them: a save would drop them.
+// One payment in several lines opens in the form, with the amount and note of each line.
+export const EditOfLinesOpensTheForm: Story = {
+    play: async ({ canvasElement }) => {
+        await open(canvasElement, 'Edit lines')
+        const group = await screen.findByRole('group', { name: /lines|строки/i }, { timeout: 5000 })
+        await expect(within(group).getAllByRole('spinbutton')).toHaveLength(2)
+        await expect(within(group).getAllByRole('spinbutton')[1]).toHaveValue(12.5)
+    },
+}
+
+// Several payments, or a transfer, are not opened until the form can show them: a save would drop them.
 export const EditOfASplitIsRefused: Story = {
     play: async ({ canvasElement }) => {
         await open(canvasElement, 'Edit split')

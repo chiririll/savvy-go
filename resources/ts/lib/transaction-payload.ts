@@ -41,7 +41,7 @@ export type PayloadError = 'unknownAccount' | 'duplicateAccount' | 'lineCurrency
 
 export type PayloadResult = { ok: true; input: TransactionInput } | { ok: false; error: PayloadError }
 
-const toBase = (currency: Currency): number => (currency.isBase ? 1 : currency.rate || 0)
+export const toBase = (currency: Currency): number => (currency.isBase ? 1 : currency.rate || 0)
 
 /** Rounds to the decimals of a currency, so `0.1 + 0.2` is `0.3`. */
 export function roundToCurrency(amount: number, currency: Currency): number {
@@ -49,7 +49,7 @@ export function roundToCurrency(amount: number, currency: Currency): number {
     return Math.round((amount + Number.EPSILON * Math.sign(amount)) * factor) / factor
 }
 
-const baseValue = (rows: MoneyRow[]): number => rows.reduce((sum, row) => sum + row.amount * toBase(row.currency), 0)
+export const baseValue = (rows: MoneyRow[]): number => rows.reduce((sum, row) => sum + row.amount * toBase(row.currency), 0)
 
 /** The first account id used twice among the rows, or null. Ids may arrive as numeric strings from a select. */
 export function findDuplicateAccount(...groups: Array<Array<{ account_id: number }>>): number | null {

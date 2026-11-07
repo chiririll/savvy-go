@@ -88,3 +88,20 @@ export const SavedTransactionBecomesFormValues: Story = {
         })
     },
 }
+
+// A payment in two lines becomes lines: the first with its note, and no default category.
+export const LinesBecomeFormValues: Story = {
+    play: async () => {
+        const values = toFormValues(
+            transaction({ lines: [line({ amount: 30, note: '- milk' }), line({ seq: 1, categoryId: 3, amount: 12.5 })] }),
+        )
+        await expect(values).toMatchObject({
+            payments: [{ account_id: 1, amount: 42.5 }],
+            lines: [
+                { category_id: 1, amount: 30, note: '- milk' },
+                { category_id: 3, amount: 12.5, note: null },
+            ],
+            default_category_id: null,
+        })
+    },
+}

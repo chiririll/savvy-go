@@ -69,3 +69,12 @@ export const PreviewEmpty: Story = {
         await expect(await c.findByText(/nothing to preview|нечего/i)).toBeVisible()
     },
 }
+
+// A cross at the right end of the toolbar, for a field that folds into a compact one.
+export const WithClose: Story = {
+    args: { value: '- milk', onClose: () => {} },
+    play: async ({ canvasElement }) => {
+        const c = within(canvasElement)
+        await expect(c.getByRole('button', { name: /close the editor|закрыть редактор/i })).toBeVisible()
+    },
+}

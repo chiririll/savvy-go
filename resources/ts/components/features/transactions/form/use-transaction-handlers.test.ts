@@ -55,6 +55,21 @@ describe('useTransactionHandlers type change', () => {
         expect(result.current.form.getValues('default_category_id')).toBe(7)
     })
 
+    it('clears the categories of the lines: they belong to the other type', () => {
+        const lines = [
+            { category_id: 1, currency_id: null, amount: 12, note: 'milk' },
+            { category_id: 3, currency_id: null, amount: 8, note: null },
+        ]
+        const { result } = setup({ lines })
+
+        act(() => result.current.handleTypeChange('income'))
+
+        expect(result.current.form.getValues('lines')).toEqual([
+            { ...lines[0], category_id: null },
+            { ...lines[1], category_id: null },
+        ])
+    })
+
     it('ignores a transfer: its tabs are disabled until the transfer form is back', () => {
         const { result } = setup()
 
@@ -65,6 +80,33 @@ describe('useTransactionHandlers type change', () => {
 })
 
 describe('useTransactionHandlers submit', () => {
+    it('saves the lines, and what they leave uncovered in the default category', async () => {
+        const lines = [{ category_id: 3, currency_id: null, amount: 12, note: null }]
+        const { result, onSubmit } = setup({ lines })
+
+        await act(() => result.current.handleSubmit())
+
+        expect(onSubmit).toHaveBeenCalledWith(
+            expect.objectContaining({
+                lines: [
+                    { category_id: 3, currency_id: accounts[0].currency!.id, amount: 12 },
+                    { category_id: 1, currency_id: accounts[0].currency!.id, amount: 8 },
+                ],
+            }),
+        )
+    })
+
+    it('does not ask for the default category when the lines say where all of it went', async () => {
+        const lines = [{ category_id: 3, currency_id: null, amount: 20, note: null }]
+        const { result, onSubmit } = setup({ lines, default_category_id: null })
+
+        await act(() => result.current.handleSubmit())
+
+        expect(onSubmit).toHaveBeenCalledWith(
+            expect.objectContaining({ lines: [{ category_id: 3, currency_id: accounts[0].currency!.id, amount: 20 }] }),
+        )
+    })
+
     it('hands the API payload over, with the amount signed', async () => {
         const { result, onSubmit } = setup()
 

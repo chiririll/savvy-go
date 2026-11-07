@@ -1,6 +1,6 @@
 # Split payments
 
-> **In progress.** The transaction form is being rebuilt for the new model (payments and lines). For now it records one payment with one category: expense and income only, no items, no extra accounts and no change. Several accounts, change, several categories and transfers return one step at a time, and a transaction that has several payments or lines (made through the API, or imported) cannot be opened in the form yet: it shows a message. The rest of this page describes the old form and is rewritten when the rebuild is done.
+> **In progress.** The transaction form is being rebuilt for the new model (payments and lines). For now it records one payment, in one or several categories (lines): expense and income only, no items, no extra accounts and no change. Several accounts, change and transfers return one step at a time, and a transaction that has several payments (made through the API, or imported) cannot be opened in the form yet: it shows a message. The rest of this page describes the old form and is rewritten when the rebuild is done.
 
 One purchase is often paid in more than one piece: half in cash and half by card, or in euros with the change handed back in dinars. A transaction has one account and one currency, so such a purchase is saved as a **payment** with several **parts**. Each part is an ordinary transaction, so balances, budgets and reports work on the parts exactly as before.
 
