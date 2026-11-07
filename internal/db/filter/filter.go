@@ -144,8 +144,13 @@ func txOrderBy(sortBy, sortDir string) string {
 	case "created_at":
 		return `t.created_at ` + dir + `, t.id ` + dir
 	default:
-		return `CASE WHEN t.date IS NULL THEN 1 ELSE 0 END, t.date ` + dir +
-			`, COALESCE(t.day_order, t.id) ` + dir + `, t.id ` + dir
+		// Undated last in both directions, in the shape of the indexes in
+		// migrate/sql/space/0001_base: DESC puts NULL last by itself, ASC needs the
+		// (date IS NULL) key first.
+		if dir == "DESC" {
+			return `t.date DESC NULLS LAST, COALESCE(t.day_order, t.id) DESC, t.id DESC`
+		}
+		return `(t.date IS NULL), t.date ASC, COALESCE(t.day_order, t.id) ASC, t.id ASC`
 	}
 }
 

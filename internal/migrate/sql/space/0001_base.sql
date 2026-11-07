@@ -101,7 +101,12 @@ CREATE TABLE IF NOT EXISTS transactions (
     created_at TEXT,
     updated_at TEXT
 ) STRICT;
-CREATE INDEX IF NOT EXISTS transactions_date_idx ON transactions (date);
+-- The list is ordered by date, then manual day order (id when unset), then id;
+-- undated rows come last in either direction. These match txOrderBy in
+-- internal/db/filter, so a page is read in index order and stops at LIMIT
+-- instead of sorting every matching row. The descending one also serves date ranges.
+CREATE INDEX IF NOT EXISTS transactions_order_desc_idx ON transactions (date DESC, (COALESCE(day_order, id)) DESC, id DESC);
+CREATE INDEX IF NOT EXISTS transactions_order_asc_idx ON transactions ((date IS NULL), date, (COALESCE(day_order, id)), id);
 CREATE INDEX IF NOT EXISTS transactions_external_id_idx ON transactions (external_id) WHERE external_id IS NOT NULL;
 
 -- Money that moved, signed, in the account's currency. One per account in a
