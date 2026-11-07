@@ -71,7 +71,7 @@
         "linesExceed": "The lines are {{amount}} more than the payment.",
         "uncovered": "{{amount}} that the lines don't cover goes to the default category.",
         "uncoveredNoCategory": "{{amount}} that the lines don't cover stays without a category.",
-        "titlePlaceholder": "Title or description",
+        "titlePlaceholder": "Title",
         "balanceAfter": "Balance after:",
         "insufficientFunds": "Insufficient funds",
         "willGoNegative": "Balance will go negative",

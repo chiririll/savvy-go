@@ -23,6 +23,7 @@ export function TransactionDescriptionField<T extends { description?: string }>(
                         <Input
                             {...field}
                             value={(field.value as string | undefined) ?? ''}
+                            autoFocus
                             maxLength={500}
                             disabled={disabled}
                             aria-label={t('fields.description')}

@@ -15,16 +15,19 @@ interface TransactionDetailsRowProps {
     pastOnly?: boolean
     /** The category field: see `TransactionCategoryField`. A transfer has none. */
     category?: Omit<React.ComponentProps<typeof TransactionCategoryField>, 'control' | 'type'>
+    /** A field beside the date in place of the category: the rate of a transfer. */
+    aside?: React.ReactNode
 }
 
-/** The date and the category, side by side; a template has the category alone. */
-export function TransactionDetailsRow({ control, type, dateRequired, withDate = true, pastOnly, category }: TransactionDetailsRowProps) {
+/** The date and the category (or the rate of a transfer), side by side; a template has the category alone. */
+export function TransactionDetailsRow({ control, type, dateRequired, withDate = true, pastOnly, category, aside }: TransactionDetailsRowProps) {
     return (
-        <div className={withDate ? FORM_ROW : 'min-w-0'}>
+        <div className={withDate || aside ? FORM_ROW : 'min-w-0'}>
             {withDate && <TransactionDateField required={dateRequired} max={pastOnly ? formatDateLocal() : undefined} />}
             {(type === 'income' || type === 'expense') && (
                 <TransactionCategoryField control={control} type={type} {...category} />
             )}
+            {aside}
         </div>
     )
 }

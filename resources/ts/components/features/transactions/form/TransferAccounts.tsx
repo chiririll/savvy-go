@@ -1,6 +1,7 @@
 import type { LinkedSpace } from '@/types/spaces'
 import type { Account } from '@/types'
 import type { BalancePreview } from './balance-preview'
+import type { BalanceMode } from './TransactionBalanceHint'
 import { SpaceTransferTargetField } from './SpaceTransferTargetField'
 import { TransferSection } from './TransferSection'
 import type { useTransferRate } from './transfer-rate'
@@ -16,10 +17,10 @@ interface TransferAccountsProps {
     to?: Account
     rate: ReturnType<typeof useTransferRate>
     balances: BalancePreview[]
-    showBalances: boolean
+    balanceMode: BalanceMode
 }
 
-/** Where a transfer goes: the linked space (if it leaves this one), then both accounts and their amounts. */
+/** Where a transfer goes: the linked space (if it leaves this one), then both accounts and their amounts (the rate is in the row of the date). */
 export function TransferAccounts({
     isSpaceTransfer,
     links,
@@ -29,7 +30,7 @@ export function TransferAccounts({
     to,
     rate,
     balances,
-    showBalances,
+    balanceMode,
 }: TransferAccountsProps) {
     return (
         <div className="space-y-4">
@@ -42,7 +43,7 @@ export function TransferAccounts({
                 rate={rate}
                 destinationSpaceId={destinationSpaceId}
                 balances={balances}
-                showBalances={showBalances}
+                balanceMode={balanceMode}
             />
         </div>
     )

@@ -71,7 +71,7 @@
         "linesExceed": "Строки больше платежа на {{amount}}.",
         "uncovered": "{{amount}}, не покрытые строками, попадут в категорию по умолчанию.",
         "uncoveredNoCategory": "{{amount}}, не покрытые строками, останутся без категории.",
-        "titlePlaceholder": "Название или описание",
+        "titlePlaceholder": "Название",
         "balanceAfter": "Баланс после:",
         "insufficientFunds": "Недостаточно средств",
         "willGoNegative": "Баланс уйдёт в минус",

@@ -12,6 +12,7 @@ import { TransactionLines } from './TransactionLines'
 import { TransactionTagsField } from './TransactionTagsField'
 import { TransferAccounts } from './TransferAccounts'
 import { TransferFeeSection } from './TransferFeeSection'
+import { TransferRateField } from './TransferRateField'
 import type { TransactionModel } from './use-transaction-model'
 
 interface TransactionFormBodyProps {
@@ -90,7 +91,7 @@ export function TransactionFormBody({
                     to={selectedToAccount}
                     rate={rate}
                     balances={balances.rows}
-                    showBalances={showBalances}
+                    balanceMode={balanceMode}
                 />
             ) : (
                 <PaymentsSection
@@ -109,6 +110,11 @@ export function TransactionFormBody({
                 withDate={!template}
                 pastOnly={originalAffectsBalance}
                 category={{ hasLines, locked: coverage.remainder === 0, onAddLine: addLine }}
+                aside={
+                    isTransfer ? (
+                        <TransferRateField rate={rate} fromCode={selectedAccount?.currency?.code} toCode={selectedToAccount?.currency?.code} />
+                    ) : undefined
+                }
             />
 
             {!isTransfer && (
@@ -132,10 +138,11 @@ export function TransactionFormBody({
                 />
             )}
 
+            {isTransfer && !isSpaceTransfer && <TransferFeeSection currency={selectedAccount?.currency} />}
+
             {/* The transfers API keeps no tags. */}
             {!isSpaceTransfer && <TransactionTagsField control={form.control} />}
 
-            {isTransfer && !isSpaceTransfer && <TransferFeeSection currency={selectedAccount?.currency} />}
         </TemplateModeContext.Provider>
     )
 }

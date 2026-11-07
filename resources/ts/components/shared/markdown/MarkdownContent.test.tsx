@@ -16,7 +16,7 @@ describe('MarkdownContent', () => {
         expect(out).toContain('next')
     })
 
-    it('keeps a new line of the editor as a new line, in paragraphs and in list items', () => {
+    it('turns a new line into a line break, in paragraphs and lists', () => {
         expect(html('one\ntwo')).toMatch(/one<br\/>\s*two/)
         expect(html('- one\n  two')).toMatch(/one<br\/>\s*two/)
     })

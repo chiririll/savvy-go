@@ -1,18 +1,14 @@
 import { ArrowUpDown } from 'lucide-react'
 import { useFormContext, useWatch } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
-import { AccountSelect } from '@/components/shared'
 import { Button } from '@/components/ui/button'
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
-import { Input } from '@/components/ui/input'
 import { swapTransfer } from '@/lib/transfer-payload'
 import type { TransactionFormValues } from '@/schemas/transactions'
 import type { Account } from '@/types'
 import type { BalancePreview } from './balance-preview'
+import { AmountAccountRow, RowLabels } from './AmountAccountRow'
 import { useTemplateMode } from './template-mode'
-import { PaymentRow } from './PaymentRow'
-import { BalanceAfter } from './TransactionBalanceHint'
-import { TransferRateField } from './TransferRateField'
+import { BalanceShort, type BalanceMode } from './TransactionBalanceHint'
 import type { useTransferRate } from './transfer-rate'
 
 interface TransferSectionProps {
@@ -22,18 +18,20 @@ interface TransferSectionProps {
     /** undefined: this space. null: a transfer to another space, none chosen yet. */
     destinationSpaceId?: number | null
     balances: BalancePreview[]
-    /** Whether saving moves balances now; a pending transfer shows a hint instead of the balances. */
-    showBalances: boolean
+    balanceMode: BalanceMode
 }
 
 /**
- * The two accounts of a transfer and what leaves one and arrives on the other. Between two currencies the
- * destination has an amount of its own and there is a rate; in one currency the amount is the same on both.
+ * The two accounts of a transfer, in two columns and two rows: the amount and the account that sends, then the amount
+ * and the account that receives. The swap button stands at the end of both rows. Between two currencies the
+ * destination has an amount of its own; in one currency it shows the amount sent and cannot be changed. The rate
+ * stands in the row of the date: see `TransferRateField`.
  */
-export function TransferSection({ from, to, rate, destinationSpaceId, balances, showBalances }: TransferSectionProps) {
+export function TransferSection({ from, to, rate, destinationSpaceId, balances, balanceMode }: TransferSectionProps) {
     const { t } = useTranslation(['common', 'forms'])
     const form = useFormContext<TransactionFormValues>()
     const toAccountId = useWatch({ control: form.control, name: 'to_account_id' })
+    const sent = useWatch({ control: form.control, name: 'payments.0.amount' })
     const isSpaceTransfer = destinationSpaceId !== undefined
     const template = useTemplateMode()
 
@@ -57,28 +55,34 @@ export function TransferSection({ from, to, rate, destinationSpaceId, balances, 
     }
 
     const balanceOf = (account?: Account) => balances.find((row) => row.account.id === account?.id)
-    const fromBalance = balanceOf(from)
-    const toBalance = isSpaceTransfer ? undefined : balanceOf(to)
     // The destination has an amount of its own only when its currency is not the source's.
     const ownAmount = Boolean(from && to && !rate.sameCurrency)
 
     return (
-        <div className="space-y-3">
-            <PaymentRow
+        <div className="space-y-1.5">
+            <RowLabels amount={t('forms:transactions.sendAmount')} account={t('forms:fromAccount')} />
+            <AmountAccountRow
                 control={form.control}
-                list="payments"
-                index={0}
-                currency={from?.currency}
-                excludeIds={Number(toAccountId) > 0 && !isSpaceTransfer ? [Number(toAccountId)] : undefined}
+                amountName="payments.0.amount"
+                accountName="payments.0.account_id"
                 amountLabel={t('forms:transactions.sendAmount')}
                 accountLabel={t('forms:fromAccount')}
-                action={
-                    isSpaceTransfer ? undefined : (
+                account={from}
+                excludeIds={Number(toAccountId) > 0 && !isSpaceTransfer ? [Number(toAccountId)] : undefined}
+                balance={balanceMode !== 'none' ? <BalanceShort account={from} preview={balanceOf(from)} mode={balanceMode} /> : undefined}
+            />
+
+            <RowLabels
+                amount={t('forms:transactions.receiveAmount')}
+                account={t('forms:transactions.toAccount')}
+                accountEnd={
+                    !isSpaceTransfer && (
+                        // Lifted into the gap between the two rows; it takes no height, so the labels stay level with the others.
                         <Button
                             type="button"
                             variant="outline"
                             size="icon-sm"
-                            className="shrink-0 rounded-full"
+                            className="-my-1.5 shrink-0 -translate-y-3 rounded-full"
                             onClick={swap}
                             aria-label={t('forms:transactions.swapAccounts')}
                             title={t('forms:transactions.swapAccounts')}
@@ -87,69 +91,24 @@ export function TransferSection({ from, to, rate, destinationSpaceId, balances, 
                         </Button>
                     )
                 }
-            >
-                {showBalances && fromBalance && <BalanceAfter preview={fromBalance} />}
-            </PaymentRow>
-
-            <div className="space-y-1">
-                <div className="grid min-w-0 grid-cols-[minmax(6.5rem,0.8fr)_minmax(0,1fr)] gap-2 sm:gap-4">
-                    {ownAmount && (
-                        <FormField
-                            control={form.control}
-                            name="to_amount"
-                            render={({ field }) => (
-                                <FormItem className="min-w-0">
-                                    <FormLabel>{t('forms:transactions.receiveAmount')}</FormLabel>
-                                    <div className="relative">
-                                        <FormControl>
-                                            <Input
-                                                type="number"
-                                                inputMode="decimal"
-                                                step={to?.currency?.decimals ? 10 ** -to.currency.decimals : 1}
-                                                min={0}
-                                                placeholder={template ? t('forms:recurring.toAmountPlaceholder') : '0.00'}
-                                                className="pr-12"
-                                                {...field}
-                                                value={field.value ?? ''}
-                                                onChange={(event) =>
-                                                    field.onChange(event.target.value ? Number(event.target.value) : null)
-                                                }
-                                            />
-                                        </FormControl>
-                                        <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-foreground">
-                                            {to?.currency?.code}
-                                        </span>
-                                    </div>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                    )}
-                    <FormField
-                        control={form.control}
-                        name="to_account_id"
-                        render={({ field }) => (
-                            <FormItem className={ownAmount ? 'min-w-0' : 'col-span-2 min-w-0'}>
-                                <FormLabel>{t('forms:transactions.toAccount')}</FormLabel>
-                                <AccountSelect
-                                    value={field.value}
-                                    onChange={field.onChange}
-                                    excludeId={isSpaceTransfer ? undefined : from?.id}
-                                    spaceId={destinationSpaceId}
-                                />
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                </div>
-                {showBalances && toBalance && <BalanceAfter preview={toBalance} />}
-            </div>
-
-            {rate.editable && (
-                <div className="grid grid-cols-2 gap-2 sm:gap-4">
-                    <TransferRateField rate={rate} fromCode={from?.currency?.code} toCode={to?.currency?.code} />
-                </div>
-            )}
+            />
+            <AmountAccountRow
+                control={form.control}
+                amountName="to_amount"
+                accountName="to_account_id"
+                amountLabel={t('forms:transactions.receiveAmount')}
+                accountLabel={t('forms:transactions.toAccount')}
+                account={to}
+                excludeId={isSpaceTransfer ? undefined : from?.id}
+                spaceId={destinationSpaceId}
+                fixedAmount={ownAmount ? undefined : (sent as string | number | null)}
+                amountPlaceholder={template ? t('forms:recurring.toAmountPlaceholder') : undefined}
+                balance={
+                    balanceMode !== 'none' && !isSpaceTransfer ? (
+                        <BalanceShort account={to} preview={balanceOf(to)} mode={balanceMode} />
+                    ) : undefined
+                }
+            />
         </div>
     )
 }

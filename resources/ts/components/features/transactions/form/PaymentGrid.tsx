@@ -2,14 +2,11 @@ import { Plus, X } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { Control } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
-import { AccountSelect } from '@/components/shared'
 import { Button } from '@/components/ui/button'
-import { FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form'
 import type { TransactionFormValues } from '@/schemas/transactions'
 import type { Account } from '@/types'
 import type { BalancePreview } from './balance-preview'
-import { AmountInput } from './AmountInput'
-import { FORM_ROW } from './form-grid'
+import { AmountAccountRow, ROW_BUTTON, RowLabels } from './AmountAccountRow'
 import { BalanceShort, type BalanceMode } from './TransactionBalanceHint'
 
 interface PaymentGridProps {
@@ -34,8 +31,6 @@ interface PaymentGridProps {
     /** Small text at the end of the Amount label: the totals. */
     summary?: ReactNode
 }
-
-const BUTTON = 'size-8 shrink-0'
 
 /**
  * The accounts that paid (or got the change), in two columns: the amount, and the account with the (X) of its row
@@ -63,20 +58,18 @@ export function PaymentGrid({
 
     return (
         <div className="space-y-1.5">
-            <div className={`${FORM_ROW} items-center`}>
-                <div className="flex min-w-0 items-baseline justify-between gap-2">
-                    <span className="text-sm leading-none font-medium">{t('fields.amount')}</span>
-                    {summary}
-                </div>
-                <div className="flex items-center justify-between gap-1">
-                    <span className="text-sm leading-none font-medium">{t('fields.account')}</span>
-                    {/* A disabled button takes no hover, so the reason sits on the wrapper. */}
+            <RowLabels
+                amount={t('fields.amount')}
+                amountEnd={summary}
+                account={t('fields.account')}
+                accountEnd={
+                    // A disabled button takes no hover, so the reason sits on the wrapper.
                     <span className="-my-1.5" title={addDisabled ? addDisabledReason : addLabel}>
                         <Button
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className={BUTTON}
+                            className={ROW_BUTTON}
                             aria-label={addLabel}
                             disabled={addDisabled}
                             onClick={onAdd}
@@ -84,83 +77,39 @@ export function PaymentGrid({
                             <Plus />
                         </Button>
                     </span>
-                </div>
-            </div>
+                }
+            />
 
             {keys.map((key, index) => {
                 const account = accounts?.find((a) => a.id === Number(rows?.[index]?.account_id))
                 const preview = balances.find((row) => row.account.id === account?.id)
                 return (
-                    <div key={key} className="space-y-0.5">
-                        <div className={FORM_ROW}>
-                            <FormField
-                                control={control}
-                                name={`${list}.${index}.amount`}
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormControl>
-                                            <AmountInput
-                                                aria-label={t('fields.amount')}
-                                                currency={account?.currency}
-                                                {...field}
-                                            />
-                                        </FormControl>
-
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={control}
-                                name={`${list}.${index}.account_id`}
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <div className="flex items-center gap-1">
-                                            <div className="min-w-0 flex-1">
-                                                <AccountSelect
-                                                    value={field.value}
-                                                    onChange={field.onChange}
-                                                    excludeIds={usedAccountIds.filter((id) => id !== account?.id)}
-                                                    ariaLabel={t('fields.account')}
-                                                />
-                                            </div>
-                                            {onRemove && (
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className={BUTTON}
-                                                    aria-label={removeLabel}
-                                                    title={removeLabel}
-                                                    onClick={() => onRemove(index)}
-                                                >
-                                                    <X />
-                                                </Button>
-                                            )}
-                                        </div>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        </div>
-                        {/* Always there, even with no balance, so a message does not move the form. */}
-                        <div className={FORM_ROW}>
-                            {/* What is wrong with the amount, in the line of the balance. */}
-                            <FormField
-                                control={control}
-                                name={`${list}.${index}.amount`}
-                                render={() => (
-                                    <FormItem className="min-h-5">
-                                        <FormMessage role="alert" className="truncate text-xs leading-5" />
-                                    </FormItem>
-                                )}
-                            />
-                            {balanceMode !== 'none' ? (
-                                <BalanceShort account={account} preview={preview} mode={balanceMode} />
-                            ) : (
-                                <span className="min-h-5" />
-                            )}
-                        </div>
-                    </div>
+                    <AmountAccountRow
+                        key={key}
+                        control={control}
+                        amountName={`${list}.${index}.amount`}
+                        accountName={`${list}.${index}.account_id`}
+                        amountLabel={t('fields.amount')}
+                        accountLabel={t('fields.account')}
+                        account={account}
+                        excludeIds={usedAccountIds.filter((id) => id !== account?.id)}
+                        action={
+                            onRemove && (
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className={ROW_BUTTON}
+                                    aria-label={removeLabel}
+                                    title={removeLabel}
+                                    onClick={() => onRemove(index)}
+                                >
+                                    <X />
+                                </Button>
+                            )
+                        }
+                        balance={balanceMode !== 'none' ? <BalanceShort account={account} preview={preview} mode={balanceMode} /> : undefined}
+                    />
                 )
             })}
         </div>
