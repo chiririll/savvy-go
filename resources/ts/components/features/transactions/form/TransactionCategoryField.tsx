@@ -9,13 +9,14 @@ interface TransactionCategoryFieldProps {
     type: 'income' | 'expense'
 }
 
+/** The category of the transaction: what the payment was for, unless lines say it in parts. */
 export function TransactionCategoryField({ control, type }: TransactionCategoryFieldProps) {
     const { t } = useTranslation('common')
 
     return (
         <FormField
             control={control}
-            name="category_id"
+            name="default_category_id"
             render={({ field }) => (
                 <FormItem className="min-w-0">
                     <FormLabel>{t('fields.category')}</FormLabel>

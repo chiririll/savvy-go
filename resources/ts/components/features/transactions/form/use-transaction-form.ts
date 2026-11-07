@@ -4,47 +4,39 @@ import { schemaResolver } from '@/lib/form-resolver'
 import { useFormValuesChange } from '@/hooks'
 import { formatDateLocal } from '@/lib/utils'
 import { getTransactionSchema, TransactionFormValues } from '@/schemas/transactions'
-import { resolveOpeningTransferRate } from './transfer-rate'
+
+/** What an opener can ask for. A kind the form does not take yet (a transfer) opens an expense. */
+export type TransactionFormDefaults = Omit<Partial<TransactionFormValues>, 'type'> & {
+    type?: TransactionFormValues['type'] | 'transfer' | 'transfer_out'
+}
 
 interface TransactionFormOptions {
-    defaultValues?: Partial<TransactionFormValues>
+    defaultValues?: TransactionFormDefaults
     onValuesChange?: (data: TransactionFormValues) => void
     originalAffectsBalance?: boolean
     open: boolean
 }
 
-// The form, its defaults and the schema options the amount rounding feeds back into.
-export function useTransactionForm({
-    defaultValues,
-    onValuesChange,
-    originalAffectsBalance,
-    open,
-}: TransactionFormOptions) {
-    const formDefaults = useMemo(
-        () => ({
-            type: defaultValues?.type ?? ('expense' as const),
-            account_id: defaultValues?.account_id ?? 0,
-            to_account_id: defaultValues?.to_account_id ?? null,
-            to_space_id: defaultValues?.to_space_id ?? null,
-            category_id: defaultValues?.category_id ?? null,
-            amount: defaultValues?.amount ?? 0,
-            to_amount: defaultValues?.to_amount ?? null,
-            is_estimated: defaultValues?.is_estimated ?? false,
-            exchange_rate: resolveOpeningTransferRate(defaultValues),
-            description: defaultValues?.description ?? '',
-            date: defaultValues?.date !== undefined ? (defaultValues.date ?? '') : formatDateLocal(),
-            items: defaultValues?.items ?? [],
-            tag_ids: defaultValues?.tag_ids ?? [],
-            extra_payments: defaultValues?.extra_payments ?? [],
-            changes: defaultValues?.changes ?? [],
-        }),
-        [defaultValues],
-    )
+export function toFormDefaults(defaultValues?: TransactionFormDefaults): TransactionFormValues {
+    return {
+        type: defaultValues?.type === 'income' ? 'income' : 'expense',
+        description: defaultValues?.description ?? '',
+        date: defaultValues?.date !== undefined ? (defaultValues.date ?? '') : formatDateLocal(),
+        tag_ids: defaultValues?.tag_ids ?? [],
+        payments: defaultValues?.payments ?? [{ account_id: 0, amount: '' as unknown as number }],
+        change: defaultValues?.change ?? [],
+        lines: defaultValues?.lines ?? [],
+        default_category_id: defaultValues?.default_category_id ?? null,
+        default_note: defaultValues?.default_note ?? null,
+    }
+}
 
-    const schemaOptionsRef = useRef({
-        rejectFutureDate: Boolean(originalAffectsBalance),
-        currencyDecimals: 2,
-    })
+// The form and its defaults.
+export function useTransactionForm({ defaultValues, onValuesChange, originalAffectsBalance, open }: TransactionFormOptions) {
+    const formDefaults = useMemo(() => toFormDefaults(defaultValues), [defaultValues])
+
+    const schemaOptionsRef = useRef({ rejectFutureDate: Boolean(originalAffectsBalance) })
+    schemaOptionsRef.current = { rejectFutureDate: Boolean(originalAffectsBalance) }
 
     const form = useForm<TransactionFormValues>({
         resolver: (values, context, options) =>
@@ -65,7 +57,7 @@ export function useTransactionForm({
         }
     }, [open, form])
 
-    useFormValuesChange(form, onValuesChange ? (data) => onValuesChange({ ...data, exchange_rate: null }) : undefined)
+    useFormValuesChange(form, onValuesChange)
 
-    return { form, schemaOptionsRef }
+    return { form }
 }

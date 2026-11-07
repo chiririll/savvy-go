@@ -19,6 +19,8 @@ interface AccountSelectProps {
     value?: number | null
     onChange: (value: number) => void
     excludeId?: number | null
+    /** Accounts that cannot be picked, such as the ones other rows of the form already use. */
+    excludeIds?: readonly number[]
     excludeDebts?: boolean
     activeOnly?: boolean
     placeholder?: string
@@ -38,6 +40,7 @@ export function AccountSelect({
     value,
     onChange,
     excludeId,
+    excludeIds,
     excludeDebts = true,
     activeOnly = true,
     placeholder,
@@ -59,6 +62,9 @@ export function AccountSelect({
             return true
         }
         if (excludeId && account.id === excludeId) {
+            return false
+        }
+        if (excludeIds?.includes(account.id)) {
             return false
         }
         return true

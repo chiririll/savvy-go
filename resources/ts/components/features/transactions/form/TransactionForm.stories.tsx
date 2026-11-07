@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, fn, screen, userEvent, waitFor, within } from 'storybook/test'
 
 import { accounts, categories, currencies, tags } from '@/test/fixtures'
-import { reply, slowly } from '@/test/api-mocks'
+import { reply } from '@/test/api-mocks'
 import { space } from '@/test/app-state'
 import { overlayA11y } from '@/test/a11y'
 import { useCurrenciesStore } from '@/stores/currencies'
@@ -34,9 +34,8 @@ const FUTURE = '2099-05-04'
 
 const expense = {
     type: 'expense' as const,
-    account_id: 1,
-    category_id: 1,
-    amount: 20,
+    payments: [{ account_id: 1, amount: 20 }],
+    default_category_id: 1,
     date: PAST,
     description: 'Weekly shop',
 }
@@ -45,18 +44,34 @@ const saveButton = (canvasElement: HTMLElement) => within(canvasElement).getByRo
 
 export const Empty: Story = {}
 export const Expense: Story = { args: { defaultValues: expense } }
-export const Income: Story = { args: { defaultValues: { ...expense, type: 'income', category_id: 2 } } }
+export const Income: Story = { args: { defaultValues: { ...expense, type: 'income', default_category_id: 2 } } }
 export const Submitting: Story = { args: { isSubmitting: true } }
 export const WithoutOwnSubmit: Story = { args: { hideSubmit: true } }
 export const ReadOnly: Story = {
     parameters: { app: { role: 'viewer' } },
     args: { defaultValues: expense },
     play: async ({ canvasElement }) => {
-        await waitFor(() => expect(within(canvasElement).getByRole('textbox', { name: /description|notes/i })).toBeDisabled())
+        await waitFor(() => expect(within(canvasElement).getByRole('textbox', { name: /description/i })).toBeDisabled())
     },
 }
 
-// What the balance becomes is shown while a transaction is dated today or earlier.
+// A new transaction starts with the first account and the default category of its type.
+export const StartsWithDefaults: Story = {
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement)
+        await waitFor(() => expect(canvas.getAllByRole('combobox')[0]).toHaveTextContent(/cash/i))
+    },
+}
+
+// The currency of the account stands at the end of the amount.
+export const AmountShowsTheCurrency: Story = {
+    args: { defaultValues: { ...expense, payments: [{ account_id: 2, amount: 8 }] } },
+    play: async ({ canvasElement }) => {
+        await expect(await within(canvasElement).findByText('EUR')).toBeVisible()
+    },
+}
+
+// What the balance becomes is shown under the payment while a transaction is dated today or earlier.
 export const BalancePreview: Story = {
     args: { defaultValues: expense },
     play: async ({ canvasElement }) => {
@@ -66,7 +81,7 @@ export const BalancePreview: Story = {
 }
 
 export const GoesNegative: Story = {
-    args: { defaultValues: { ...expense, amount: 500 } },
+    args: { defaultValues: { ...expense, payments: [{ account_id: 1, amount: 500 }] } },
     play: async ({ canvasElement }) => {
         await expect(await within(canvasElement).findByText(/negative/i)).toBeVisible()
     },
@@ -81,116 +96,13 @@ export const PendingDate: Story = {
     },
 }
 
-export const PendingMayBeEstimated: Story = {
-    args: { defaultValues: { ...expense, date: FUTURE } },
-    play: async ({ canvasElement }) => {
-        await expect(await within(canvasElement).findByRole('checkbox', { name: /approximate/i })).toBeVisible()
-    },
-}
-
-export const Transfer: Story = {
-    args: { defaultValues: { type: 'transfer', account_id: 1, to_account_id: 2, amount: 100, date: PAST } },
-}
-
-// Between currencies the rate is editable and the received amount follows from it.
-export const TransferBetweenCurrencies: Story = {
-    args: { defaultValues: { type: 'transfer', account_id: 1, to_account_id: 3, amount: 100, date: PAST } },
-    play: async ({ canvasElement }) => {
-        const canvas = within(canvasElement)
-        const rate = await canvas.findByRole('spinbutton', { name: /rate/i })
-        await waitFor(() => expect(rate).toBeEnabled())
-        // 1 USD buys 200 JPY in the sample rates: 100 USD arrive as 20,000 yen, in whole units.
-        await waitFor(() => expect(rate).toHaveValue(200), { timeout: 4000 })
-        await waitFor(() => expect(canvas.getByRole('spinbutton', { name: /receive/i })).toHaveValue(20000), { timeout: 4000 })
-    },
-}
-
-// The accounts arrive before the currencies: the rate must wait for them, not open as 1.
-export const RateWaitsForTheCurrencyList: Story = {
-    beforeEach: ({ msw }) => msw.use(slowly('get', '/currencies', currencies, 600)),
-    args: { defaultValues: { type: 'transfer', account_id: 1, to_account_id: 3, amount: 100, date: PAST } },
-    play: async ({ canvasElement }) => {
-        const canvas = within(canvasElement)
-        const rate = await canvas.findByRole('spinbutton', { name: /rate/i })
-        await waitFor(() => expect(rate).toHaveValue(200), { timeout: 5000 })
-        await expect(canvas.getByRole('spinbutton', { name: /receive/i })).toHaveValue(20000)
-    },
-}
-
-// Typing a rate recalculates the received amount when the field is left.
-export const RateEdited: Story = {
-    args: { defaultValues: { type: 'transfer', account_id: 1, to_account_id: 3, amount: 100, date: PAST } },
-    play: async ({ canvasElement }) => {
-        const canvas = within(canvasElement)
-        const rate = await canvas.findByRole('spinbutton', { name: /rate/i })
-        await waitFor(() => expect(rate).toHaveValue(200), { timeout: 4000 })
-        await userEvent.clear(rate)
-        await userEvent.type(rate, '150')
-        await userEvent.tab()
-        await waitFor(() => expect(canvas.getByRole('spinbutton', { name: /receive/i })).toHaveValue(15000), { timeout: 4000 })
-    },
-}
-
-// Editing the received amount works the rate out from it.
-export const ReceivedAmountEdited: Story = {
-    args: { defaultValues: { type: 'transfer', account_id: 1, to_account_id: 3, amount: 100, date: PAST } },
-    play: async ({ canvasElement }) => {
-        const canvas = within(canvasElement)
-        const received = await canvas.findByRole('spinbutton', { name: /receive/i })
-        await waitFor(() => expect(received).toHaveValue(20000), { timeout: 4000 })
-        // Clearing the field would put the calculated amount straight back, so the text is selected and replaced.
-        const input = received as HTMLInputElement
-        input.focus()
-        input.select()
-        await userEvent.keyboard('18000')
-        await waitFor(() => expect(canvas.getByRole('spinbutton', { name: /rate/i })).toHaveValue(180), { timeout: 4000 })
-    },
-}
-
-// Swapping puts the accounts the other way round and keeps both amounts.
-export const AccountsSwapped: Story = {
-    args: { defaultValues: { type: 'transfer', account_id: 1, to_account_id: 2, amount: 100, date: PAST } },
-    play: async ({ canvasElement }) => {
-        const canvas = within(canvasElement)
-        await canvas.findByRole('spinbutton', { name: /rate/i })
-        await userEvent.click(canvas.getByRole('button', { name: /swap/i }))
-        await waitFor(() => expect(canvas.getByRole('spinbutton', { name: /send/i })).toBeVisible())
-    },
-}
-
-// Within one currency the rate is 1 and cannot be changed.
-export const TransferInOneCurrency: Story = {
-    args: { defaultValues: { type: 'transfer', account_id: 1, to_account_id: 1, amount: 100, date: PAST } },
-}
-
-export const WithItems: Story = {
-    args: {
-        defaultValues: {
-            ...expense,
-            amount: 0,
-            items: [
-                { name: 'Bread', quantity: 2, price_per_unit: 2.5 },
-                { name: 'Cheese', quantity: 1, price_per_unit: 12.5 },
-            ],
-        },
-    },
-    play: async ({ canvasElement }) => {
-        await expect(await within(canvasElement).findByText('17.50')).toBeVisible()
-    },
-}
-
-export const ItemsFixTheAmount: Story = {
-    args: { defaultValues: { ...expense, amount: 0, items: [{ name: 'Bread', quantity: 2, price_per_unit: 2.5 }] } },
-    play: async ({ canvasElement }) => {
-        await waitFor(() => expect(within(canvasElement).getByRole('spinbutton', { name: /amount/i })).toHaveValue(5))
-    },
-}
-
-export const ItemAdded: Story = {
+// Clearing the date makes the transaction pending.
+export const ClearingTheDateMakesItPending: Story = {
     args: { defaultValues: expense },
     play: async ({ canvasElement }) => {
-        await userEvent.click(within(canvasElement).getByRole('button', { name: /add item/i }))
-        await expect(await within(canvasElement).findByRole('textbox', { name: /item name/i })).toBeVisible()
+        const canvas = within(canvasElement)
+        await userEvent.click(await canvas.findByRole('button', { name: /clear/i }))
+        await expect(await canvas.findByText(/no date set/i)).toBeVisible()
     },
 }
 
@@ -207,7 +119,8 @@ export const EditingCannotMoveToTheFuture: Story = {
     },
 }
 
-export const SpaceTransferOffered: Story = {
+// The transfer tabs are in the row but cannot be picked until the transfer form is back.
+export const TransfersAreDisabled: Story = {
     beforeEach: ({ msw }) => {
         msw.use(
             reply('get', '/spaces', [space('admin'), { ...space('editor'), id: 2, name: 'Trip' }]),
@@ -216,19 +129,40 @@ export const SpaceTransferOffered: Story = {
     },
     args: { defaultValues: expense },
     play: async ({ canvasElement }) => {
-        await waitFor(() => expect(within(canvasElement).getAllByRole('button').length).toBeGreaterThan(3))
-        await expect(await within(canvasElement).findByRole('button', { name: /space/i })).toBeVisible()
+        const canvas = within(canvasElement)
+        const transfer = await canvas.findByRole('button', { name: /transfer/i })
+        await expect(transfer).toBeDisabled()
+        await expect(await canvas.findByRole('button', { name: /space/i })).toBeDisabled()
+    },
+}
+
+// An opener that asks for a transfer gets an expense.
+export const TransferRequestedOpensAnExpense: Story = {
+    args: { defaultValues: { type: 'transfer', payments: [{ account_id: 1, amount: 100 }] } },
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement)
+        await expect(await canvas.findByRole('button', { name: /expense/i })).toHaveAttribute('aria-pressed', 'true')
+    },
+}
+
+export const SwitchingToIncomeKeepsEachCategory: Story = {
+    args: { defaultValues: expense },
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement)
+        await userEvent.click(await canvas.findByRole('button', { name: /income/i }))
+        await waitFor(() => expect(canvas.getByRole('button', { name: /income/i })).toHaveAttribute('aria-pressed', 'true'))
     },
 }
 
 export const RejectsEmptyForm: Story = {
     play: async ({ canvasElement, args }) => {
         await userEvent.click(saveButton(canvasElement))
-        await waitFor(() => expect(within(canvasElement).getAllByText(/select|greater|required/i).length).toBeGreaterThan(0))
+        await waitFor(() => expect(within(canvasElement).getAllByText(/select|greater|required|positive/i).length).toBeGreaterThan(0))
         await expect(args.onSubmit).not.toHaveBeenCalled()
     },
 }
 
+// The form hands over what the API takes: the payment is negative for an expense, one line covers it.
 export const Submits: Story = {
     args: { defaultValues: expense },
     play: async ({ canvasElement, args }) => {
@@ -236,17 +170,52 @@ export const Submits: Story = {
         await waitFor(() => expect(args.onSubmit).toHaveBeenCalledOnce())
         await expect((args.onSubmit as ReturnType<typeof fn>).mock.calls[0][0]).toMatchObject({
             type: 'expense',
-            account_id: 1,
-            category_id: 1,
-            amount: 20,
+            description: 'Weekly shop',
             date: PAST,
+            payments: [{ account_id: 1, amount: -20 }],
+            lines: [{ category_id: 1, amount: 20 }],
         })
+    },
+}
+
+export const SubmitsAnIncomeAsPositive: Story = {
+    args: { defaultValues: { ...expense, type: 'income', default_category_id: 2 } },
+    play: async ({ canvasElement, args }) => {
+        await userEvent.click(saveButton(canvasElement))
+        await waitFor(() => expect(args.onSubmit).toHaveBeenCalledOnce())
+        await expect((args.onSubmit as ReturnType<typeof fn>).mock.calls[0][0]).toMatchObject({
+            type: 'income',
+            payments: [{ account_id: 1, amount: 20 }],
+            lines: [{ category_id: 2, amount: 20 }],
+        })
+    },
+}
+
+// The note of a transaction saved with one line is kept when it is changed.
+export const KeepsTheNoteOfTheLine: Story = {
+    args: { defaultValues: { ...expense, default_note: '- milk\n- bread' } },
+    play: async ({ canvasElement, args }) => {
+        await userEvent.click(saveButton(canvasElement))
+        await waitFor(() => expect(args.onSubmit).toHaveBeenCalledOnce())
+        await expect((args.onSubmit as ReturnType<typeof fn>).mock.calls[0][0]).toMatchObject({
+            lines: [{ note: '- milk\n- bread' }],
+        })
+    },
+}
+
+// A date left empty is sent as null: the transaction is pending.
+export const SubmitsPendingWithoutDate: Story = {
+    args: { defaultValues: { ...expense, date: '' } },
+    play: async ({ canvasElement, args }) => {
+        await userEvent.click(saveButton(canvasElement))
+        await waitFor(() => expect(args.onSubmit).toHaveBeenCalledOnce())
+        await expect((args.onSubmit as ReturnType<typeof fn>).mock.calls[0][0]).toMatchObject({ date: null })
     },
 }
 
 // Spending more than the account holds asks first.
 export const OverdrawingAsksFirst: Story = {
-    args: { defaultValues: { ...expense, amount: 500 } },
+    args: { defaultValues: { ...expense, payments: [{ account_id: 1, amount: 500 }] } },
     play: async ({ canvasElement, args }) => {
         await within(canvasElement).findByText(/negative/i)
         await userEvent.click(saveButton(canvasElement))
@@ -254,66 +223,5 @@ export const OverdrawingAsksFirst: Story = {
         await expect(args.onSubmit).not.toHaveBeenCalled()
         await userEvent.click(within(alert).getByRole('button', { name: /continue|confirm|proceed|yes/i }))
         await waitFor(() => expect(args.onSubmit).toHaveBeenCalledOnce())
-    },
-}
-
-// An expense paid from several accounts is saved as one payment, a leg for each.
-export const PaidFromSeveralAccounts: Story = {
-    args: {
-        onSubmitPayment: fn(),
-        defaultValues: { ...expense, amount: 15, extra_payments: [{ account_id: 3, amount: 1000 }] },
-    },
-    play: async ({ canvasElement, args }) => {
-        await expect(await within(canvasElement).findByText(/total/i)).toBeVisible()
-        await userEvent.click(saveButton(canvasElement))
-        await waitFor(() => expect(args.onSubmitPayment).toHaveBeenCalledOnce())
-        await expect(args.onSubmit).not.toHaveBeenCalled()
-        const legs = (args.onSubmitPayment as ReturnType<typeof fn>).mock.calls[0][0]
-        await expect(legs.map((leg: { account_id: number; amount: number }) => [leg.account_id, leg.amount])).toEqual([
-            [1, 15],
-            [3, 1000],
-        ])
-    },
-}
-
-// The + next to the account adds a row for another account.
-export const PlusAddsAnAccountRow: Story = {
-    args: { onSubmitPayment: fn(), defaultValues: expense },
-    play: async ({ canvasElement }) => {
-        const canvas = within(canvasElement)
-        await userEvent.click(await canvas.findByRole('button', { name: /add another account/i }))
-        await expect(await canvas.findByRole('button', { name: /remove/i })).toBeVisible()
-        // The first row has no + any more: only the last row has it.
-        await expect(canvas.getAllByRole('button', { name: /add another account/i })).toHaveLength(1)
-    },
-}
-
-// What was handed over is the expense; the change that came back in another currency is an income.
-export const PaidWithChange: Story = {
-    args: {
-        onSubmitPayment: fn(),
-        defaultValues: { ...expense, amount: 30, changes: [{ account_id: 3, amount: 1500 }] },
-    },
-    play: async ({ canvasElement, args }) => {
-        await expect(await within(canvasElement).findByText(/change \(1\)/i)).toBeVisible()
-        await userEvent.click(saveButton(canvasElement))
-        await waitFor(() => expect(args.onSubmitPayment).toHaveBeenCalledOnce())
-        const legs = (args.onSubmitPayment as ReturnType<typeof fn>).mock.calls[0][0]
-        await expect(legs).toMatchObject([
-            { type: 'expense', account_id: 1, amount: 30 },
-            { type: 'income', account_id: 3, amount: 1500 },
-        ])
-    },
-}
-
-// "Add change" adds a change row, which can be removed again.
-export const AddAndRemoveChange: Story = {
-    args: { onSubmitPayment: fn(), defaultValues: expense },
-    play: async ({ canvasElement }) => {
-        const canvas = within(canvasElement)
-        await userEvent.click(await canvas.findByRole('button', { name: /add change/i }))
-        await expect(await canvas.findByText(/change \(1\)/i)).toBeVisible()
-        await userEvent.click(canvas.getByRole('button', { name: /remove/i }))
-        await expect(await canvas.findByText(/change \(0\)/i)).toBeVisible()
     },
 }

@@ -7,6 +7,13 @@ interface TransactionPartyForm {
     setValue: (name: 'account_id' | 'category_id', value: number | null) => void
 }
 
+/** The category a new income or expense starts with: the default one, else the one used most. */
+export function pickDefaultCategory(categories: Category[] | undefined, type: string): Category | undefined {
+    const ofType = (categories ?? []).filter((category) => category.type === type)
+    return ofType.find((category) => category.isDefault)
+        ?? [...ofType].sort((a, b) => (b.transactionsCount ?? 0) - (a.transactionsCount ?? 0))[0]
+}
+
 export function useTransactionPartyDefaults(
     form: TransactionPartyForm,
     accounts: Account[] | undefined,
@@ -30,9 +37,7 @@ export function useTransactionPartyDefaults(
             return
         }
 
-        const ofType = (categories ?? []).filter((category) => category.type === type)
-        const preselected = ofType.find((category) => category.isDefault)
-            ?? [...ofType].sort((a, b) => (b.transactionsCount ?? 0) - (a.transactionsCount ?? 0))[0]
+        const preselected = pickDefaultCategory(categories, type)
 
         if (preselected) {
             form.setValue('category_id', preselected.id)

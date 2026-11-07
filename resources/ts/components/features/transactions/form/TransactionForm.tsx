@@ -1,33 +1,21 @@
-import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Form } from '@/components/ui/form'
+import { Form, FormControl, FormField, FormItem } from '@/components/ui/form'
+import { Input } from '@/components/ui/input'
 import { TransactionFormValues } from '@/schemas/transactions'
 import { useTransferTargets } from '@/hooks'
-import {
-    FormEstimatedField,
-    FormInputField,
-    FormSubmitButton,
-    FormWrapper,
-    MoneyAccountFields,
-    TransactionTypeTabs,
-} from '@/components/shared'
-import { TransactionFormItems } from './TransactionFormItems'
-import { useTransactionForm } from './use-transaction-form'
-import { useTransactionHandlers } from './use-transaction-handlers'
-import { useTransactionModel } from './use-transaction-model'
+import { FormSubmitButton, FormWrapper, TransactionTypeTabs } from '@/components/shared'
+import type { Transaction, TransactionInput } from '@/types'
+import { BalanceAfter, PendingHint } from './TransactionBalanceHint'
+import { PaymentRow } from './PaymentRow'
 import { TransactionDetailsRow } from './TransactionDetailsRow'
 import { TransactionTagsField } from './TransactionTagsField'
-import { SpaceTransferTargetField } from './SpaceTransferTargetField'
-import { ChangeSection, ExtraPaymentRows, useFirstRow } from './PaymentRows'
-import type { PaymentLeg } from '@/lib/split-payment'
+import { useTransactionForm, type TransactionFormDefaults } from './use-transaction-form'
+import { useTransactionHandlers } from './use-transaction-handlers'
+import { useTransactionModel } from './use-transaction-model'
 
 interface TransactionFormProps {
-    defaultValues?: Partial<TransactionFormValues>
-    onSubmit: (data: TransactionFormValues) => void
-    /** Called instead of onSubmit for an expense paid in several parts. */
-    onSubmitPayment?: (legs: PaymentLeg[]) => void
-    /** A saved split payment is being changed: it stays an expense paid in parts. */
-    paymentEdit?: boolean
+    defaultValues?: TransactionFormDefaults
+    onSubmit: (data: TransactionInput) => void
     onTypeChange?: (type: TransactionFormValues['type']) => void
     onValuesChange?: (data: TransactionFormValues) => void
     isSubmitting?: boolean
@@ -35,16 +23,18 @@ interface TransactionFormProps {
     formId?: string
     hideSubmit?: boolean
     isEdit?: boolean
+    /** The transaction being edited. */
+    transaction?: Transaction | null
     originalAffectsBalance?: boolean
-    onPreviewChange?: (preview: ReactNode) => void
     open?: boolean
 }
+
+// Transfers come back with their own form (F4d).
+const TRANSFER_KINDS = ['transfer', 'transfer_out'] as const
 
 export function TransactionForm({
     defaultValues,
     onSubmit,
-    onSubmitPayment,
-    paymentEdit,
     onTypeChange,
     onValuesChange,
     isSubmitting,
@@ -52,136 +42,85 @@ export function TransactionForm({
     formId,
     hideSubmit,
     isEdit,
+    transaction,
     originalAffectsBalance,
-    onPreviewChange,
     open = true,
 }: TransactionFormProps) {
     const { t } = useTranslation(['common', 'forms'])
     const transferTargets = useTransferTargets()
 
-    const { form, schemaOptionsRef } = useTransactionForm({
-        defaultValues,
-        onValuesChange,
-        originalAffectsBalance,
-        open,
-    })
+    const { form } = useTransactionForm({ defaultValues, onValuesChange, originalAffectsBalance, open })
 
-    const {
-        accounts,
-        transactionType,
-        accountId,
-        isTransfer,
-        isSpaceTransfer,
-        isSplit,
-        hasItems,
-        dateRequired,
-        isPendingDate,
-        destinationSpaceId,
-        destinationSpaceAccounts,
-        selectedAccount,
-        selectedToAccount,
-        rate,
-        balances,
-        balanceHint,
-    } = useTransactionModel({
-        form,
-        schemaOptionsRef,
-        defaultValues,
-        isEdit,
-        originalAffectsBalance,
-        onPreviewChange,
-        open,
-    })
-
-    // An expense can be paid from more accounts, and have change, unless it is made of items.
-    const canSplit = transactionType === 'expense' && Boolean(onSubmitPayment) && !hasItems
-    const firstRow = useFirstRow(form, canSplit)
+    const { accounts, transactionType, dateRequired, isPendingDate, isUndated, balances, usedAccountIds } =
+        useTransactionModel({ form, transaction, isEdit, originalAffectsBalance })
 
     const { handleSubmit, handleTypeChange, negativeBalanceDialog } = useTransactionHandlers({
         form,
-        rate,
         warnings: balances.warnings,
         dateRequired,
-        isSpaceTransfer,
-        isSplit,
         accounts,
         onSubmit,
-        onSubmitPayment,
         onTypeChange,
     })
+
+    // F4a has the one payment; the rows are a list so the next steps only add to it.
+    const paymentIndexes = [0]
 
     return (
         <FormWrapper>
             <Form {...form}>
-                <form id={formId} noValidate onSubmit={handleSubmit} className="space-y-6">
-                    {!paymentEdit && (
-                        <TransactionTypeTabs
-                            value={transactionType}
-                            withSpaceTransfer={!isEdit && transferTargets.length > 0}
-                            onChange={handleTypeChange}
-                        />
-                    )}
-
-                    {!onPreviewChange && !isSplit && balanceHint}
-
-                    {isSpaceTransfer && (
-                        <SpaceTransferTargetField
-                            links={transferTargets}
-                            noAccounts={destinationSpaceAccounts?.length === 0}
-                        />
-                    )}
-
-                    <MoneyAccountFields
-                        control={form.control}
-                        isTransfer={isTransfer}
-                        toSpaceId={destinationSpaceId}
-                        accountId={accountId}
-                        fromCurrencySymbol={selectedAccount?.currency?.symbol}
-                        toCurrencySymbol={selectedToAccount?.currency?.symbol}
-                        amountDisabled={hasItems}
-                        {...firstRow}
-                        toAmountReadOnly={rate.sameCurrency}
-                        onSwapAccounts={rate.keepNextPair}
+                <form id={formId} noValidate onSubmit={handleSubmit} className="space-y-4">
+                    <TransactionTypeTabs
+                        value={transactionType}
+                        withSpaceTransfer={!isEdit && transferTargets.length > 0}
+                        disabledKinds={TRANSFER_KINDS}
+                        onChange={handleTypeChange}
                     />
 
-                    {canSplit && <ExtraPaymentRows form={form} />}
+                    <FormField
+                        control={form.control}
+                        name="description"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormControl>
+                                    <Input
+                                        {...field}
+                                        value={field.value ?? ''}
+                                        maxLength={500}
+                                        aria-label={t('fields.description')}
+                                        placeholder={t('forms:transactions.titlePlaceholder')}
+                                    />
+                                </FormControl>
+                            </FormItem>
+                        )}
+                    />
 
-                    {(isPendingDate || (isEdit && !originalAffectsBalance)) &&
-                        !hasItems &&
-                        !isSpaceTransfer &&
-                        !isSplit && (
-                        <FormEstimatedField control={form.control} help={t('forms:transactions.estimatedHelp')} />
-                    )}
+                    {paymentIndexes.map((index) => {
+                        const account = accounts?.find((a) => a.id === Number(form.watch(`payments.${index}.account_id`)))
+                        const balance = balances.rows.find((row) => row.account.id === account?.id)
+                        return (
+                            <PaymentRow
+                                key={index}
+                                control={form.control}
+                                list="payments"
+                                index={index}
+                                currency={account?.currency}
+                                excludeIds={usedAccountIds.filter((id) => id !== account?.id)}
+                            >
+                                {!isPendingDate && balance && <BalanceAfter preview={balance} />}
+                            </PaymentRow>
+                        )
+                    })}
+                    {isPendingDate && <PendingHint isUndated={isUndated} />}
 
                     <TransactionDetailsRow
                         control={form.control}
                         type={transactionType}
-                        rate={rate}
-                        fromCode={selectedAccount?.currency?.code}
-                        toCode={selectedToAccount?.currency?.code}
                         dateRequired={dateRequired}
                         pastOnly={originalAffectsBalance}
                     />
 
-                    <FormInputField
-                        control={form.control}
-                        name="description"
-                        label={t('fields.description')}
-                        multiline
-                        textareaProps={{
-                            placeholder: t('forms:transactions.notesPlaceholder'),
-                            className: 'resize-none h-20',
-                        }}
-                    />
-
-                    {/* The transfers API keeps no tags. */}
-                    {!isSpaceTransfer && <TransactionTagsField control={form.control} />}
-
-                    {canSplit && <ChangeSection form={form} />}
-
-                    {!isTransfer && !isSplit && (
-                        <TransactionFormItems form={form} currency={selectedAccount?.currency} />
-                    )}
+                    <TransactionTagsField control={form.control} />
 
                     <FormSubmitButton hidden={hideSubmit} isSubmitting={isSubmitting} label={submitLabel} />
                 </form>

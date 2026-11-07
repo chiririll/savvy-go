@@ -1,12 +1,13 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, fn, screen, userEvent, waitFor, within } from 'storybook/test'
 
-import { accounts, categories, currencies, tags, transaction } from '@/test/fixtures'
+import { toFormValues } from '@/lib/transaction-form-values'
+import { accounts, categories, currencies, line, payment, tags, transaction } from '@/test/fixtures'
 import { reply } from '@/test/api-mocks'
 import { overlayA11y } from '@/test/a11y'
 import { useCurrenciesStore } from '@/stores/currencies'
 
-import { TransactionFormDialog, toTransactionFormValues } from './TransactionFormDialog'
+import { TransactionFormDialog } from './TransactionFormDialog'
 
 const meta = {
     title: 'features/transactions/form/TransactionFormDialog',
@@ -30,7 +31,7 @@ type Story = StoryObj<typeof meta>
 
 export const Create: Story = {}
 export const CreateWithDefaults: Story = {
-    args: { defaultValues: { type: 'income', account_id: 2, amount: 50 } },
+    args: { defaultValues: { type: 'income', payments: [{ account_id: 2, amount: 50 }] } },
     play: async () => {
         await expect(await screen.findByRole('spinbutton', { name: /amount/i })).toHaveValue(50)
     },
@@ -49,9 +50,9 @@ export const ReadOnly: Story = {
     parameters: { app: { role: 'viewer' } },
     args: { transaction: transaction() },
 }
-// The balance after the change sits in the dialog's header, out of the way of the form.
-export const BalancePreviewInHeader: Story = {
-    args: { transaction: transaction({ status: 'confirmed', amount: 20 }) },
+// Editing a posted transaction: the balance already has it, so the preview takes it back first.
+export const BalancePreviewOfAnEdit: Story = {
+    args: { transaction: transaction({ status: 'confirmed' }) },
     play: async () => {
         const dialog = await screen.findByRole('dialog')
         await expect((await within(dialog).findAllByText(/120\.50/)).length).toBeGreaterThan(0)
@@ -68,17 +69,22 @@ export const SubmittedFromTheFooter: Story = {
     },
 }
 
-export const ChangesBecomeFormValues: Story = {
+export const SavedTransactionBecomesFormValues: Story = {
     play: async () => {
-        const values = toTransactionFormValues(
+        const values = toFormValues(
             transaction({
-                type: 'transfer', amount: 100, toAmount: 20000, toAccount: accounts[2], tags: [tags[0]],
-                items: [{ id: 1, name: 'Fee', quantity: 2, pricePerUnit: 1, totalPrice: 2 }],
+                type: 'income',
+                payments: [payment({ amount: 42.5 })],
+                lines: [line({ categoryId: 2, note: '- salary' })],
+                tags: [tags[0]],
             }),
         )
         await expect(values).toMatchObject({
-            type: 'transfer', amount: 100, to_amount: 20000, to_account_id: 3, tag_ids: [1],
-            items: [{ name: 'Fee', quantity: 2, price_per_unit: 1 }],
+            type: 'income',
+            payments: [{ account_id: 1, amount: 42.5 }],
+            default_category_id: 2,
+            default_note: '- salary',
+            tag_ids: [1],
         })
     },
 }

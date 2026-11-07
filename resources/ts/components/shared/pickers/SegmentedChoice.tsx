@@ -9,6 +9,8 @@ export interface SegmentedChoiceOption<T extends string> {
     color?: string
     /** A small square button: the icon alone, the label as its tooltip. */
     iconOnly?: boolean
+    /** This choice cannot be picked now (the others can). */
+    disabled?: boolean
 }
 
 interface SegmentedChoiceProps<T extends string> {
@@ -21,12 +23,12 @@ interface SegmentedChoiceProps<T extends string> {
 export function SegmentedChoice<T extends string>({ value, onChange, options, disabled }: SegmentedChoiceProps<T>) {
     return (
         <div className="flex gap-1 sm:gap-2 p-1 bg-muted rounded-lg" {...testIdTabs()}>
-            {options.map(({ value: option, label, icon: Icon, color, iconOnly }) => (
+            {options.map(({ value: option, label, icon: Icon, color, iconOnly, disabled: optionDisabled }) => (
                 <button
                     key={option}
                     type="button"
                     {...testIdTab(option, value === option)}
-                    disabled={disabled}
+                    disabled={disabled || optionDisabled}
                     onClick={() => onChange(option)}
                     aria-pressed={value === option}
                     title={iconOnly ? label : undefined}
@@ -36,7 +38,7 @@ export function SegmentedChoice<T extends string>({ value, onChange, options, di
                         'font-medium transition-all',
                         iconOnly ? 'aspect-square shrink-0 px-2' : 'min-w-0 flex-1 px-1.5 sm:px-4',
                         value === option ? 'bg-background shadow-sm' : 'hover:bg-background/50',
-                        disabled && 'opacity-50 pointer-events-none',
+                        (disabled || optionDisabled) && 'opacity-50 pointer-events-none',
                     )}
                 >
                     {Icon && <Icon className={cn('size-4 shrink-0', value === option && color)} />}

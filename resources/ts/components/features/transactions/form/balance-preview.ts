@@ -1,110 +1,106 @@
 import { useMemo } from 'react'
 import { useWatch, type Control } from 'react-hook-form'
-import { isTransferType, type TransactionFormValues } from '@/schemas/transactions'
+import type { TransactionFormValues } from '@/schemas/transactions'
 import { collectNegativeBalanceWarnings, warningIfResultNegative } from '@/lib/negative-balance'
-import type { formatCurrency } from '@/lib/utils'
-import type { Account } from '@/types'
+import { paymentSign } from '@/lib/transaction-payload'
+import type { Account, Currency, Transaction } from '@/types'
+
+/** Money that moves on one account: signed, in the account's currency. */
+export type AccountImpact = { accountId: number; delta: number }
 
 export type BalancePreview = {
+    account: Account
     currentBalance: number
     newBalance: number
-    insufficientFunds?: boolean
-    currency: Parameters<typeof formatCurrency>[1]
+    insufficientFunds: boolean
+    currency: Currency | null
 }
 
-/** What a transaction does to account balances. */
-export type BalanceImpact = {
+type ImpactValues = {
     type?: TransactionFormValues['type']
-    amount: number
-    accountId: number | null
-    toAccountId: number | null
-    toAmount: number
+    payments?: Array<{ account_id?: number | string | null; amount?: number | string | null }>
+    change?: Array<{ account_id?: number | string | null; amount?: number | string | null }>
 }
 
-const SOURCE_SIGN = { income: 1, expense: -1, transfer: -1, transfer_out: -1 } as const
-
-export function toBalanceImpact(values: Partial<TransactionFormValues>): BalanceImpact {
-    return {
-        type: values.type,
-        amount: Number(values.amount) || 0,
-        accountId: Number(values.account_id) || null,
-        toAccountId: Number(values.to_account_id) || null,
-        toAmount: Number(values.to_amount) || Number(values.amount) || 0,
-    }
-}
-
-function impactOn(accountId: number, tx: BalanceImpact, side: 'source' | 'destination'): number {
-    if (side === 'destination') {
-        return isTransferType(tx.type) && tx.toAccountId === accountId ? tx.toAmount : 0
-    }
-
-    return tx.accountId === accountId && tx.type
-        ? SOURCE_SIGN[tx.type] * tx.amount
-        : 0
-}
-
-function project(
-    account: Account,
-    next: BalanceImpact,
-    posted: BalanceImpact | null,
-    side: 'source' | 'destination',
-): BalancePreview {
-    const currentBalance = account.currentBalance
-    return {
-        currentBalance,
-        newBalance: currentBalance
-            - (posted ? impactOn(account.id, posted, side) : 0)
-            + impactOn(account.id, next, side),
-        currency: account.currency,
-    }
-}
-
-function negativeWarning(account?: Account, preview?: BalancePreview | null) {
-    return account && preview
-        ? warningIfResultNegative({
-            accountName: account.name,
-            currentBalance: preview.currentBalance,
-            resultingBalance: preview.newBalance,
-            currency: account.currency,
+/** What the form does to the accounts: the payments by the sign of the type, the change by the opposite one. */
+export function formImpact(values: ImpactValues): AccountImpact[] {
+    const sign = values.type ? paymentSign(values.type) : 0
+    const rows = (list: ImpactValues['payments'], direction: number) =>
+        (list ?? []).flatMap((row) => {
+            const accountId = Number(row.account_id)
+            const amount = Number(row.amount)
+            return accountId > 0 && amount > 0 ? [{ accountId, delta: direction * amount }] : []
         })
-        : null
+
+    return [...rows(values.payments, sign), ...rows(values.change, -sign)]
+}
+
+/** What a saved transaction did to the accounts, if it counts in their balances. */
+export function postedImpact(transaction: Pick<Transaction, 'payments'>): AccountImpact[] {
+    return transaction.payments.map((p) => ({ accountId: p.accountId, delta: p.amount }))
+}
+
+const sumOn = (impact: AccountImpact[] | null, accountId: number) =>
+    (impact ?? []).filter((i) => i.accountId === accountId).reduce((sum, i) => sum + i.delta, 0)
+
+/** Balances before and after saving, for each account the next payments touch. */
+export function projectBalances(
+    accounts: Account[],
+    next: AccountImpact[],
+    posted: AccountImpact[] | null,
+): BalancePreview[] {
+    const ids = [...new Set(next.map((i) => i.accountId))]
+
+    return ids.flatMap((id) => {
+        const account = accounts.find((a) => a.id === id)
+        if (!account) {
+            return []
+        }
+        const decimals = account.currency?.decimals ?? 2
+        const factor = 10 ** decimals
+        const units = Math.round(account.currentBalance * factor)
+            - Math.round(sumOn(posted, id) * factor)
+            + Math.round(sumOn(next, id) * factor)
+        const newBalance = units / factor
+
+        return [{
+            account,
+            currentBalance: account.currentBalance,
+            newBalance,
+            insufficientFunds: sumOn(next, id) < 0 && newBalance < 0,
+            currency: account.currency,
+        }]
+    })
 }
 
 interface BalancePreviewOptions {
     control: Control<TransactionFormValues>
-    from?: Account
-    to?: Account
+    accounts?: Account[]
     /** The edited transaction as it is posted now, if it affects balances. */
-    posted: BalanceImpact | null
+    posted: AccountImpact[] | null
     /** Whether saving changes balances, so negative results need confirming. */
     willPost: boolean
 }
 
 /** Account balances before and after saving the form, and what goes negative. */
-export function useBalancePreview({ control, from, to, posted, willPost }: BalancePreviewOptions) {
-    const [type, amount, accountId, toAccountId, toAmount] = useWatch({
-        control,
-        name: ['type', 'amount', 'account_id', 'to_account_id', 'to_amount'],
-    })
+export function useBalancePreview({ control, accounts, posted, willPost }: BalancePreviewOptions) {
+    const [type, payments, change] = useWatch({ control, name: ['type', 'payments', 'change'] })
 
     return useMemo(() => {
-        const next = toBalanceImpact({
-            type,
-            amount,
-            account_id: accountId,
-            to_account_id: toAccountId,
-            to_amount: toAmount,
-        })
-        const source = from ? project(from, next, posted, 'source') : null
-        const fromPreview = source && {
-            ...source,
-            insufficientFunds: (type === 'expense' || isTransferType(type)) && source.newBalance < 0,
-        }
-        const toPreview = to && isTransferType(type) ? project(to, next, posted, 'destination') : null
+        const rows = projectBalances(accounts ?? [], formImpact({ type, payments, change }), posted)
         const warnings = willPost
-            ? collectNegativeBalanceWarnings([negativeWarning(from, fromPreview), negativeWarning(to, toPreview)])
+            ? collectNegativeBalanceWarnings(
+                rows.map((row) =>
+                    warningIfResultNegative({
+                        accountName: row.account.name,
+                        currentBalance: row.currentBalance,
+                        resultingBalance: row.newBalance,
+                        currency: row.currency,
+                    }),
+                ),
+            )
             : []
 
-        return { from: fromPreview, to: toPreview, warnings }
-    }, [type, amount, accountId, toAccountId, toAmount, from, to, posted, willPost])
+        return { rows, warnings }
+    }, [type, payments, change, accounts, posted, willPost])
 }

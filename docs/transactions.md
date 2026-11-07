@@ -35,3 +35,11 @@ On a phone there is no palette; use the Filters panel, which holds the search fi
 ## API and MCP
 
 `GET /api/transactions` takes `q`, `account_ids` (`1,2`) and `currency` (`usd,jpy`) next to the existing filters. With `with_summary=1` the totals cover only the matching transactions. The MCP tool `list_transactions` takes the same filters (see [MCP](mcp.md)).
+
+## The transaction form
+
+- **Expense** and **Income** tabs. The **Transfer** tabs are shown but cannot be picked yet; they come back with the next steps of the form.
+- One line at the top for the **title or description** (plain text, one line).
+- **Amount** and **account**: the currency of the account stands at the end of the amount. Under it the form shows the account's balance now and after saving. A transaction dated in the future, or without a date, is pending and moves no balance, and the form says so instead.
+- **Date** (the cross clears it, which makes the transaction pending) and **category**. A transaction made through the API or imported with several payments or lines cannot be edited in the form yet; the app says so and leaves it as it is.
+- **Tags**. Saving an expense that takes an account below zero asks for confirmation first.

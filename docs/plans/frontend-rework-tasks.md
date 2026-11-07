@@ -107,6 +107,49 @@ Preview: same box, toolbar disabled, rendered text or "Nothing to preview".
 
 Each step has its own mockup. The form keeps working after every step: the old form is replaced in F4a, later steps add modes.
 
+**Agreed design (7 Nov 2026).** One layout for every step: it is built once in F4a with single rows, and F4b and F4c only turn on the (+) buttons. The backend needs no change: it already allows change in any currency, refuses a repeated account (`ErrDuplicateAccount`), a zero payment and a net of the wrong sign, and reports `difference` without refusing the save.
+
+```
+┌ New transaction ─────────────────────────────┐
+│ [Expense] [Income] [Transfer] [To space]     │   Transfer tabs: inactive until F4d
+│ [ Title / Description                      ] │   one line, plain text
+│ Amount                 Account               │
+│ [ 22.70        ] USD   [Cash         ▾]  (X) │   payment: positive amount, currency from the account
+│ Balance after: 184.90 USD                    │
+│ Amount                 Account               │
+│ [ 52.40        ] EUR   [Visa         ▾]  (+) │   (+) on the last row adds a payment (F4c)
+│ Balance after: 947.60 EUR                    │
+│ Date                   Default category (!)  │   (!) yellow: lines exist and cover less than paid
+│ [ 11/11/2011 []] (X)   [ 🛒 Foo      ▾]  (+) │   (X) clears the date = pending; (+) adds a line (F4b)
+│ Category          Amount        Currency     │   lines block, from the first (+)
+│ [ 🛒 Foo      ▾] [Amount      ] [EUR  ▾] (X) │
+│ [ Note, one line, grows       [Pencil]     ] │   compact note; pencil opens the editor
+│ [ 🛒 Foo      ▾] [Amount      ] [EUR  ▾] (X) │
+│ [ [Bold] [Italic] [List] ...  Edit/Preview ✕] │   open editor; ✕ returns to the compact note
+│ [ Note                                     ] │
+│ Tags       [ + ]                             │
+│ Change                                   (+) │   change is a payment, drawn apart (F4c)
+│ Amount                 Account               │
+│ [ 52.40        ] EUR   [Cash         ▾]  (X) │
+│ Balance after: 947.60 EUR                    │
+│                          [Cancel]  [Save]    │
+└──────────────────────────────────────────────┘
+Mobile: account and amount stay on one row; the account shrinks to icon and truncated name,
+the amount keeps its width, (X)/(+) stay at the end. Checked at 360px in the stories.
+```
+
+Rules:
+
+- **Form values.** `payments: [{account_id, amount}]` (amounts positive), `change: [{account_id, amount}]`, `lines: [{category_id, amount, currency_id, note}]`, `default_category_id`, plus type, date, description, tag_ids. The simple mode is one payment and no explicit lines. The builder signs the amounts: paid rows negative for an expense and positive for an income, change rows the opposite.
+- **Accounts are unique** across all payment and change rows. Each picker hides the accounts used in other rows, (+) is disabled when none is left, and the schema rejects duplicates. No other limit on change: any account, any currency.
+- **Change** is only for money that comes back to another account. Blocking errors: a zero amount, and a net of the wrong sign in the base currency (the API refuses both).
+- **Line currency** is one of the currencies of the payment and change accounts (`ErrLineCurrency`).
+- **Line notes.** A single line has no note field. From two lines on, each line has a compact note (one line, grows) with a pencil that opens the markdown editor (F3 `MarkdownField`); the editor has a cross at the right end of its toolbar that closes it. A line with a saved note opens expanded.
+- **First (+) on a category:** the first line takes the whole payment total and the new line starts empty.
+- **Default category and the remainder.** With no lines, the default category is the transaction's category. With lines, the field is locked while they cover the payment and unlocks when they cover less; the yellow triangle shows only then, and its tooltip says how much goes to the default category. The builder saves the uncovered part as one more line in the default category (uncategorised if none), so the saved lines cover the payment and `difference` stays empty. Covering is compared in the base currency at the current rates, as the backend does; the remainder line takes the currency of the first payment. If the lines exceed the payment there is no remainder, the triangle becomes a warning about the excess, and saving is never blocked. The remainder is fixed at the rates of the save, like `difference`.
+- **Editing** a saved transaction opens all its lines as ordinary lines; the default category is empty and locked. A transaction with one line opens in the simple mode.
+- **Tests first** for the pure functions: the payload builder, the remainder, account uniqueness and the net-sign rule.
+
 **F4a. Form shell, schema and the simple case.** Mockup of the whole form, all modes sketched, only the first built. Rewrite `schemas/transactions.ts`, the payload builder (form values to `payments` + `lines`) and the model hooks. Simple mode: one account, one amount, one category, date, description, tags, for expense and income. Remove the items code: `lib/transaction-items.ts`, `TransactionFormItems`, `TransactionItemRow`, `ItemNumberField`, `item-keys` and their tests, and the leg-based `PaymentRows`.
 
 **F4b. Several lines.** "Split by category" turns the one amount into lines: category, amount, currency (when the accounts have several), and from two lines on the markdown note (F3 `MarkdownField`, compact). Sum of lines against the payment shown as a hint.

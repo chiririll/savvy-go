@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, screen, userEvent, waitFor, within } from 'storybook/test'
 
 import { Button } from '@/components/ui/button'
-import { accounts, categories, currencies, tags, transaction } from '@/test/fixtures'
+import { accounts, categories, currencies, line, payment, tags, transaction } from '@/test/fixtures'
 import { reply, spy } from '@/test/api-mocks'
 import { overlayA11y } from '@/test/a11y'
 import { useCurrenciesStore } from '@/stores/currencies'
@@ -13,13 +13,24 @@ import { CreateTransactionProvider, useTransactionFormDialog } from './CreateTra
 
 const Buttons = ({ editable = true }: { editable?: boolean }) => {
     const { openCreate, openEdit } = useTransactionFormDialog()
-    const existing = transaction({ status: 'confirmed', actions: { edit: editable, duplicate: true, delete: true, confirm: false, skip: false } })
+    const existing = transaction({
+        status: 'confirmed',
+        actions: { edit: editable, editDetails: false, duplicate: true, delete: true, confirm: false, skip: false },
+    })
+
+    // Several payments and lines have no place in the form yet.
+    const split = transaction({
+        status: 'confirmed',
+        payments: [payment({ amount: -30 }), payment({ account: accounts[1], accountId: 2, amount: -10 })],
+        lines: [line({ amount: 30 }), line({ seq: 1, amount: 10, currencyId: 2 })],
+    })
 
     return (
         <div className="flex gap-2">
             <Button onClick={() => openCreate()}>New</Button>
             <Button onClick={() => openCreate({ type: 'income', account_id: 1, category_id: 2, amount: 10 })}>New income</Button>
             <Button variant="outline" onClick={() => openEdit(existing)}>Edit</Button>
+            <Button variant="outline" onClick={() => openEdit(split)}>Edit split</Button>
         </div>
     )
 }
@@ -73,6 +84,15 @@ export const EditOpened: Story = {
     },
 }
 
+// Several payments or lines, or a transfer, are not opened until the form can show them: a save would drop them.
+export const EditOfASplitIsRefused: Story = {
+    play: async ({ canvasElement }) => {
+        await open(canvasElement, 'Edit split')
+        await new Promise((resolve) => setTimeout(resolve, 300))
+        await expect(screen.queryByRole('dialog')).toBeNull()
+    },
+}
+
 // A transaction the server does not let the user edit is not opened.
 export const EditRefused: Story = {
     args: { editable: false },
@@ -97,6 +117,10 @@ export const CreateSent: Story = {
         await within(dialog).findByRole('spinbutton', { name: /amount/i })
         await userEvent.click(within(dialog).getByRole('button', { name: /^create$/i }))
         await waitFor(() => expect(created.bodies).toHaveLength(1))
-        await expect(created.bodies[0]).toMatchObject({ type: 'income', amount: 10 })
+        await expect(created.bodies[0]).toMatchObject({
+            type: 'income',
+            payments: [{ account_id: 1, amount: 10 }],
+            lines: [{ category_id: 2, amount: 10 }],
+        })
     },
 }

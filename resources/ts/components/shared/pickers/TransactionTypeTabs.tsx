@@ -11,9 +11,11 @@ interface TransactionTypeTabsProps {
     onChange: (value: TransactionFormKind) => void
     /** Adds a square tab for a transfer to a linked space. */
     withSpaceTransfer?: boolean
+    /** Kinds shown but not pickable. */
+    disabledKinds?: readonly TransactionFormKind[]
 }
 
-export function TransactionTypeTabs({ value, onChange, withSpaceTransfer }: TransactionTypeTabsProps) {
+export function TransactionTypeTabs({ value, onChange, withSpaceTransfer, disabledKinds }: TransactionTypeTabsProps) {
     const { t } = useTranslation('pages')
     const options = [
         ...TRANSACTION_TYPE_OPTIONS,
@@ -27,6 +29,7 @@ export function TransactionTypeTabs({ value, onChange, withSpaceTransfer }: Tran
             options={options.map((option) => ({
                 ...option,
                 label: transactionTypeLabel(t, option.value),
+                disabled: disabledKinds?.includes(option.value),
             }))}
         />
     )

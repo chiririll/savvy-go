@@ -1,5 +1,7 @@
 # Split payments
 
+> **In progress.** The transaction form is being rebuilt for the new model (payments and lines). For now it records one payment with one category: expense and income only, no items, no extra accounts and no change. Several accounts, change, several categories and transfers return one step at a time, and a transaction that has several payments or lines (made through the API, or imported) cannot be opened in the form yet: it shows a message. The rest of this page describes the old form and is rewritten when the rebuild is done.
+
 One purchase is often paid in more than one piece: half in cash and half by card, or in euros with the change handed back in dinars. A transaction has one account and one currency, so such a purchase is saved as a **payment** with several **parts**. Each part is an ordinary transaction, so balances, budgets and reports work on the parts exactly as before.
 
 In the transaction form, pick **Expense**. The **+** next to the account adds a row (amount and account) for another account that paid; only the last row has a **+**, and **×** removes a row. Rows can be in different currencies, and the form shows one total per currency.
@@ -29,4 +31,4 @@ Every part is a row of its own, so filtering by account shows only that account'
 
 ## API and MCP
 
-A split payment is now one transaction with a payment per account. The old `/transaction-groups` endpoints and the `*_transaction_group` tools are gone; see [Transactions](api.md#transactions) for the shape. This page describes the form, which still uses the older model until it is rewritten for payments and lines.
+A split payment is now one transaction with a payment per account. The old `/transaction-groups` endpoints and the `*_transaction_group` tools are gone; see [Transactions](api.md#transactions) for the shape. The form is being rewritten for payments and lines; see the note at the top of this page.
