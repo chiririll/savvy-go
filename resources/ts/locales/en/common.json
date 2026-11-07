@@ -224,7 +224,6 @@
             "paymentCreated": "Payment saved",
             "paymentUpdated": "Payment updated",
             "paymentDeleted": "Payment deleted",
-            "notEditableYet": "The form can't edit this transaction.",
             "createFailed": "Failed to create transaction",
             "updateFailed": "Failed to update transaction",
             "deleteFailed": "Failed to delete transaction",

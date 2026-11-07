@@ -38,6 +38,27 @@ const Buttons = ({ editable = true }: { editable?: boolean }) => {
         lines: [],
     })
 
+    // A payment on a debt: only its details change.
+    const debtPayment = transaction({
+        type: 'debt_payment',
+        status: 'confirmed',
+        description: 'Back to Alex',
+        payments: [payment({ amount: -40 })],
+        lines: [],
+        restrictions: [{ reason: 'debt', message: 'debt' }],
+        actions: { edit: false, editDetails: true, duplicate: false, delete: true, confirm: false, skip: false },
+    })
+
+    // A transfer between spaces that is in review: nothing can change.
+    const inReview = transaction({
+        type: 'transfer_in',
+        status: 'confirmed',
+        payments: [payment({ amount: 30 })],
+        lines: [],
+        restrictions: [{ reason: 'transfer_review', message: 'in review' }],
+        actions: { edit: false, editDetails: false, duplicate: false, delete: false, confirm: false, skip: false },
+    })
+
     // The other side of a transfer to a linked space: the form cannot show it.
     const spaceSide = transaction({
         type: 'transfer_out',
@@ -55,6 +76,8 @@ const Buttons = ({ editable = true }: { editable?: boolean }) => {
             <Button variant="outline" onClick={() => openEdit(split)}>Edit split</Button>
             <Button variant="outline" onClick={() => openEdit(transfer)}>Edit transfer</Button>
             <Button variant="outline" onClick={() => openEdit(spaceSide)}>Edit space transfer</Button>
+            <Button variant="outline" onClick={() => openEdit(debtPayment)}>Edit debt payment</Button>
+            <Button variant="outline" onClick={() => openEdit(inReview)}>Edit transfer in review</Button>
         </div>
     )
 }
@@ -138,10 +161,30 @@ export const EditOfATransferOpensTheForm: Story = {
     },
 }
 
-// The side of a transfer to another space is not opened: the form would drop its space account.
-export const EditOfASpaceTransferIsRefused: Story = {
+// The side of a transfer to another space cannot be shown whole: it opens with only its details to change.
+export const EditOfASpaceTransferOpensRestricted: Story = {
     play: async ({ canvasElement }) => {
         await open(canvasElement, 'Edit space transfer')
+        const dialog = await screen.findByRole('dialog', {}, { timeout: 5000 })
+        await expect(await within(dialog).findByRole('note')).toBeVisible()
+        await expect(within(dialog).queryByRole('spinbutton')).toBeNull()
+    },
+}
+
+// A payment on a debt opens with its title and tags to change, and the reason.
+export const EditOfADebtPaymentOpensRestricted: Story = {
+    play: async ({ canvasElement }) => {
+        await open(canvasElement, 'Edit debt payment')
+        const dialog = await screen.findByRole('dialog', {}, { timeout: 5000 })
+        await expect(await within(dialog).findByDisplayValue('Back to Alex')).toBeEnabled()
+        await expect(within(dialog).getByRole('note')).toHaveTextContent(/debt/i)
+    },
+}
+
+// A transfer in review cannot be changed at all: nothing opens, the reason is a message.
+export const EditOfATransferInReviewIsRefused: Story = {
+    play: async ({ canvasElement }) => {
+        await open(canvasElement, 'Edit transfer in review')
         await new Promise((resolve) => setTimeout(resolve, 300))
         await expect(screen.queryByRole('dialog')).toBeNull()
     },

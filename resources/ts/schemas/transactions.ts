@@ -32,14 +32,19 @@ export const transferFeeSchema = z.object({
     category_id: z.coerce.number().positive().optional().nullable(),
 })
 
+/** One line of plain text: the title of the transaction. */
+export const descriptionSchema = z
+    .string()
+    .max(500)
+    .refine((value) => !/[\r\n]/.test(value), i18n.t('validation.singleLine'))
+
 export const transactionSchema = z.object({
     /** `transfer_out` is a transfer to a linked space: it goes through the transfers API. */
     type: z.enum(['income', 'expense', 'transfer', 'transfer_out'], {
         error: i18n.t('validation.selectTransactionType'),
     }),
 
-    /** One line of plain text: the title of the transaction. */
-    description: z.string().max(500).refine((value) => !/[\r\n]/.test(value), i18n.t('validation.singleLine')).optional(),
+    description: descriptionSchema.optional(),
 
     date: z.preprocess(
         (val) => (val === '' || val === undefined ? null : val),

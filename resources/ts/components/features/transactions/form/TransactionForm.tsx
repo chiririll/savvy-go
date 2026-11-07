@@ -1,7 +1,6 @@
 import { useFieldArray } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
-import { Form, FormControl, FormField, FormItem } from '@/components/ui/form'
-import { Input } from '@/components/ui/input'
+import { Form } from '@/components/ui/form'
 import { TransactionFormValues } from '@/schemas/transactions'
 import { useTransferTargets } from '@/hooks'
 import { FormSubmitButton, FormWrapper, TransactionTypeTabs } from '@/components/shared'
@@ -9,6 +8,7 @@ import type { SpaceTransferInput, Transaction, TransactionInput } from '@/types'
 import { PendingHint } from './TransactionBalanceHint'
 import { ChangeSection } from './ChangeSection'
 import { PaymentTotals, PaymentsSection } from './PaymentsSection'
+import { TransactionDescriptionField } from './TransactionDescriptionField'
 import { TransactionDetailsRow } from './TransactionDetailsRow'
 import { TransactionLines } from './TransactionLines'
 import { TransactionTagsField } from './TransactionTagsField'
@@ -104,23 +104,7 @@ export function TransactionForm({
                         onChange={handleTypeChange}
                     />
 
-                    <FormField
-                        control={form.control}
-                        name="description"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormControl>
-                                    <Input
-                                        {...field}
-                                        value={field.value ?? ''}
-                                        maxLength={500}
-                                        aria-label={t('fields.description')}
-                                        placeholder={t('forms:transactions.titlePlaceholder')}
-                                    />
-                                </FormControl>
-                            </FormItem>
-                        )}
-                    />
+                    <TransactionDescriptionField control={form.control} />
 
                     {isTransfer ? (
                         <TransferAccounts

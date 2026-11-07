@@ -1,9 +1,11 @@
 import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { EntityFormDialog } from '@/components/shared'
+import { formModeOf, type TransactionPatch } from '@/lib/transaction-details'
 import { toFormValues } from '@/lib/transaction-form-values'
 import type { TransactionFormValues } from '@/schemas/transactions'
 import type { SpaceTransferInput, Transaction, TransactionInput } from '@/types'
+import { TransactionDetailsForm } from './TransactionDetailsForm'
 import { TransactionForm } from './TransactionForm'
 import type { TransactionFormDefaults } from './use-transaction-form'
 
@@ -14,6 +16,8 @@ interface TransactionFormDialogProps {
     open: boolean
     onOpenChange: (open: boolean) => void
     onSubmit: (data: TransactionInput) => void
+    /** A transaction that allows only its details sends just those. */
+    onSubmitDetails?: (data: TransactionPatch) => void
     /** A transfer to a linked space goes through the transfers API. */
     onSubmitSpaceTransfer?: (data: SpaceTransferInput) => void
     isSubmitting?: boolean
@@ -25,12 +29,18 @@ export function TransactionFormDialog({
     open,
     onOpenChange,
     onSubmit,
+    onSubmitDetails,
     onSubmitSpaceTransfer,
     isSubmitting,
     defaultValues,
 }: TransactionFormDialogProps) {
     const { t } = useTranslation('pages')
-    const toValues = useCallback((tx: Transaction) => toFormValues(tx), [])
+    // A transaction that allows only its details is edited in the restricted form.
+    const detailsOnly = transaction ? formModeOf(transaction) === 'details' : false
+    const toValues = useCallback(
+        (tx: Transaction) => (formModeOf(tx) === 'details' ? {} : toFormValues(tx)),
+        [],
+    )
 
     return (
         <EntityFormDialog<Transaction, TransactionInput, TransactionFormValues>
@@ -45,18 +55,30 @@ export function TransactionFormDialog({
             fallbackValues={defaultValues as Partial<TransactionFormValues> | undefined}
             toFormValues={toValues}
         >
-            {({ formKey, formProps, isEdit }) => (
-                <TransactionForm
-                    key={`${formKey}-${open}`}
-                    {...formProps}
-                    onSubmitSpaceTransfer={onSubmitSpaceTransfer}
-                    defaultValues={formProps.defaultValues}
-                    open={open}
-                    isEdit={isEdit}
-                    transaction={transaction}
-                    originalAffectsBalance={transaction?.status === 'confirmed'}
-                />
-            )}
+            {({ formKey, formProps, isEdit }) =>
+                detailsOnly && transaction ? (
+                    <TransactionDetailsForm
+                        key={`${formKey}-${open}`}
+                        transaction={transaction}
+                        onSubmit={onSubmitDetails ?? (() => {})}
+                        formId={formProps.formId}
+                        isSubmitting={formProps.isSubmitting}
+                        hideSubmit
+                        open={open}
+                    />
+                ) : (
+                    <TransactionForm
+                        key={`${formKey}-${open}`}
+                        {...formProps}
+                        onSubmitSpaceTransfer={onSubmitSpaceTransfer}
+                        defaultValues={formProps.defaultValues}
+                        open={open}
+                        isEdit={isEdit}
+                        transaction={transaction}
+                        originalAffectsBalance={transaction?.status === 'confirmed'}
+                    />
+                )
+            }
         </EntityFormDialog>
     )
 }

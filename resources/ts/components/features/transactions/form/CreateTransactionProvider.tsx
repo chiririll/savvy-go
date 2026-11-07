@@ -3,8 +3,9 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useCreateTransaction, useSendTransfer, useUpdateTransaction } from '@/hooks'
 import i18n from '@/lib/i18n'
-import { canEditInForm } from '@/lib/transaction-form-values'
+import { formModeOf, refusalReason, type TransactionPatch } from '@/lib/transaction-details'
 import type { SpaceTransferInput, Transaction, TransactionInput } from '@/types'
+import { restrictionText } from './restriction-text'
 import { fromCreateDefaults, type CreateTransactionDefaults } from './create-defaults'
 import type { TransactionFormDefaults } from './use-transaction-form'
 
@@ -41,13 +42,13 @@ export function CreateTransactionProvider({ children }: { children: React.ReactN
     }, [])
 
     const openEdit = useCallback((next: Transaction) => {
-        if (!next.actions.edit) {
-            return
-        }
-        // A transaction the form cannot show whole (a debt, a transfer to another space, an unusual shape) is
-        // refused: better a message than a save that drops what the form leaves out.
-        if (!canEditInForm(next)) {
-            toast.error(i18n.t('toasts.transaction.notEditableYet'))
+        // The whole form, or the one with only the details, when that is all the server allows or all the form can
+        // show without dropping something. What nothing can change says why, when the server gave a reason.
+        if (formModeOf(next) === null) {
+            const reason = refusalReason(next)
+            if (reason) {
+                toast.error(restrictionText(i18n.t.bind(i18n) as (key: string) => string, reason))
+            }
             return
         }
 
@@ -73,6 +74,12 @@ export function CreateTransactionProvider({ children }: { children: React.ReactN
         createTransaction.mutate(data, { onSuccess: onCreated })
     }
 
+    const handleSubmitDetails = (data: TransactionPatch) => {
+        if (transaction) {
+            updateTransaction.mutate({ id: transaction.id, data }, { onSuccess: () => setOpen(false) })
+        }
+    }
+
     const handleSubmitSpaceTransfer = (data: SpaceTransferInput) => sendTransfer.mutate(data, { onSuccess: onCreated })
 
     const value = useMemo(() => ({ openCreate, openEdit }), [openCreate, openEdit])
@@ -87,6 +94,7 @@ export function CreateTransactionProvider({ children }: { children: React.ReactN
                         open={open}
                         onOpenChange={setOpen}
                         onSubmit={handleSubmit}
+                        onSubmitDetails={handleSubmitDetails}
                         onSubmitSpaceTransfer={handleSubmitSpaceTransfer}
                         isSubmitting={createTransaction.isPending || updateTransaction.isPending || sendTransfer.isPending}
                         defaultValues={defaults}

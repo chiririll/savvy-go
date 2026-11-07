@@ -78,7 +78,19 @@
         "pendingHint": "This date is in the future. The transaction stays pending and won't change the balance until you confirm it.",
         "noDateHint": "No date set. The transaction stays pending and won't change the balance until you confirm it.",
         "dateOptionalHelp": "Leave empty to postpone without a date.",
-        "estimatedHelp": "The amount is approximate. Enter the real amount when you confirm."
+        "estimatedHelp": "The amount is approximate. Enter the real amount when you confirm.",
+        "restriction": {
+            "debt": "This transaction is a payment on a debt. Only its title, tags and notes can change here; change the amount in the debt.",
+            "space_transfer": "This is one side of a transfer to another space. Only its title, tags and notes can change here; the amount and the date change in the transfer.",
+            "transfer_review": "This transfer between spaces is in review. Resolve the review first.",
+            "recurring_pending": "This is the next occurrence of a recurring transaction. Confirm or skip it."
+        },
+        "detailsOnly": "The form can't show this transaction whole, so only its title, tags and the categories and notes of its lines can change.",
+        "lockedTitle": "Can't be changed here",
+        "lockedDate": "Date",
+        "lockedNoDate": "No date",
+        "lockedPayments": "Payments",
+        "lockedLineAmount": "Amount of the line"
     },
     "currencies": {
         "code": "Code",

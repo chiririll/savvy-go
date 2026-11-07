@@ -144,3 +144,91 @@ export const TransferBecomesFormValues: Story = {
         await expect(amounts.slice(0, 2).map((a) => (a as HTMLInputElement).value)).toEqual(['100', '80'])
     },
 }
+
+// A transaction that allows only its details: what it will not change is shown as text, with the reason.
+const debtPayment = (overrides = {}) =>
+    transaction({
+        type: 'debt_payment',
+        status: 'confirmed',
+        description: 'Back to Alex',
+        payments: [payment({ amount: -40 })],
+        lines: [],
+        restrictions: [{ reason: 'debt', message: 'this transaction belongs to a debt' }],
+        actions: { edit: false, editDetails: true, duplicate: false, delete: true, confirm: false, skip: false },
+        ...overrides,
+    })
+
+export const RestrictedByADebt: Story = {
+    args: { transaction: debtPayment() },
+    play: async () => {
+        const dialog = await screen.findByRole('dialog')
+        await expect(await within(dialog).findByRole('note')).toHaveTextContent(/debt/i)
+        await expect(within(dialog).getByDisplayValue('Back to Alex')).toBeEnabled()
+        // The amount and the account are text, not fields.
+        await expect(within(dialog).queryByRole('spinbutton')).toBeNull()
+        await expect(within(dialog).getByText(/40/)).toBeVisible()
+    },
+}
+
+export const RestrictedSavesOnlyTheDetails: Story = {
+    args: { transaction: debtPayment({ tags: [tags[0]] }), onSubmitDetails: fn() },
+    play: async ({ args }) => {
+        const dialog = await screen.findByRole('dialog')
+        const title = await within(dialog).findByDisplayValue('Back to Alex')
+        await userEvent.clear(title)
+        await userEvent.type(title, 'Paid back')
+        await userEvent.click(within(dialog).getByRole('button', { name: /^save$/i }))
+        await waitFor(() => expect(args.onSubmitDetails).toHaveBeenCalledOnce())
+        const sent = (args.onSubmitDetails as ReturnType<typeof fn>).mock.calls[0][0]
+        await expect(sent).toEqual({ description: 'Paid back', tag_ids: [tags[0].id] })
+    },
+}
+
+// One side of a transfer between spaces with fee lines: the lines keep their amounts, the categories and notes change.
+export const RestrictedLinesChangeCategoryAndNote: Story = {
+    args: {
+        transaction: transaction({
+            status: 'confirmed',
+            restrictions: [{ reason: 'space_transfer', message: 'one side of a transfer' }],
+            actions: { edit: true, editDetails: true, duplicate: false, delete: false, confirm: false, skip: false },
+            payments: [payment({ amount: -50 })],
+            lines: [line({ amount: 30, note: '- bread' }), line({ seq: 1, categoryId: 3, category: categories[2], amount: 20 })],
+        }),
+        onSubmitDetails: fn(),
+    },
+    play: async ({ args }) => {
+        const dialog = await screen.findByRole('dialog')
+        const group = await within(dialog).findByRole('group', { name: /lines|строки/i })
+        await expect(within(group).queryByRole('spinbutton')).toBeNull()
+        await expect(within(group).getAllByRole('combobox')).toHaveLength(2)
+        await userEvent.click(within(dialog).getByRole('button', { name: /^save$/i }))
+        await waitFor(() => expect(args.onSubmitDetails).toHaveBeenCalledOnce())
+        const sent = (args.onSubmitDetails as ReturnType<typeof fn>).mock.calls[0][0]
+        await expect(sent.lines).toEqual([
+            { category_id: 1, currency_id: 1, amount: 30, note: '- bread' },
+            { category_id: 3, currency_id: 1, amount: 20, note: null },
+        ])
+        await expect(sent).not.toHaveProperty('payments')
+    },
+}
+
+// A shape the form cannot show whole is not refused: its details can still be changed.
+export const UnshowableShapeOpensRestricted: Story = {
+    args: {
+        transaction: transaction({
+            status: 'confirmed',
+            payments: [
+                payment({ amount: -50 }),
+                payment({ account: accounts[1], accountId: 2, amount: -5 }),
+                payment({ account: accounts[2], accountId: 3, amount: 9 }),
+            ],
+            type: 'transfer_out',
+            lines: [],
+        }),
+    },
+    play: async () => {
+        const dialog = await screen.findByRole('dialog')
+        await expect(await within(dialog).findByRole('note')).toHaveTextContent(/can't show/i)
+        await expect(within(dialog).queryByRole('spinbutton')).toBeNull()
+    },
+}
