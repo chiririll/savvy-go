@@ -17,6 +17,8 @@ const item = (id: number, amount: number, overrides: Partial<TopTransactionItem>
     date: '2030-01-05',
     category: { id: 1, name: 'Groceries', icon: '🛒', color: '#16a34a' },
     account: { id: 1, name: 'Cash' },
+    category_count: 1,
+    account_count: 1,
     ...overrides,
 })
 
@@ -93,7 +95,28 @@ export const OpensTheTransaction: Story = {
     play: async ({ canvasElement }) => {
         const canvas = within(canvasElement)
         await userEvent.click(await canvas.findByText('Payment 11'))
-        await expect(canvas.getByTestId('place')).toHaveTextContent('/transactions?id=11')
+        await expect(canvas.getByTestId('place')).toHaveTextContent('/transactions?view=11')
+    },
+}
+
+// Several lines and accounts, and no category at all.
+export const ManyCategoriesAndNoCategory: Story = {
+    beforeEach: ({ msw }) =>
+        msw.use(
+            reply(
+                'get',
+                '/reports/transactions/top',
+                top('USD', [
+                    item(1, 40, { description: 'Market trip', category_count: 3, account_count: 2 }),
+                    item(2, 12, { description: null, category: null }),
+                ]),
+            ),
+        ),
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement)
+        await expect(await canvas.findByText(/3 categories/)).toBeVisible()
+        await expect(canvas.getByText(/Cash \+1/)).toBeVisible()
+        await expect(canvas.getByText('Without category')).toBeVisible()
     },
 }
 

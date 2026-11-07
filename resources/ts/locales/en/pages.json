@@ -458,6 +458,7 @@
             "title": "Income dynamics",
             "subtitle": "How your income changes over time"
         },
+        "withoutCategory": "Without category",
         "topExpenses": {
             "title": "Top expenses",
             "subtitle": "Largest transactions this period",

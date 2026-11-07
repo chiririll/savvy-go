@@ -500,6 +500,11 @@ type TopRow struct {
 	Color       sql.NullString
 	AccID       int64
 	AccName     sql.NullString
+	// CatCount and AccCount are how many distinct categories the lines and
+	// how many accounts the moving payments touch. CatID and AccID are the
+	// largest of each.
+	CatCount int
+	AccCount int
 }
 
 // TopTransactions are the largest transactions by value in the base currency.
@@ -547,6 +552,7 @@ func TopTransactions(ctx context.Context, sqlDB store.DB, w ReportWhere, limit i
 	defer lines.Close()
 	totals := map[int64]decimal.Decimal{}
 	largest := map[int64]decimal.Decimal{}
+	cats := map[int64]map[int64]bool{}
 	for lines.Next() {
 		var id, minor, decimals int64
 		var rate decimal.Decimal
@@ -558,6 +564,12 @@ func TopTransactions(ctx context.Context, sqlDB store.DB, w ReportWhere, limit i
 		v := toBase(minor, decimals, rate)
 		totals[id] = totals[id].Add(v)
 		x := &out[at[id]]
+		if catID.Valid {
+			if cats[id] == nil {
+				cats[id] = map[int64]bool{}
+			}
+			cats[id][catID.Int64] = true
+		}
 		if best, seen := largest[id]; !seen || v.GreaterThan(best) {
 			largest[id] = v
 			x.CatID, x.CatName, x.Icon, x.Color = catID, name, icon, color
@@ -584,6 +596,7 @@ func TopTransactions(ctx context.Context, sqlDB store.DB, w ReportWhere, limit i
 	}
 	defer pays.Close()
 	moved := map[int64]decimal.Decimal{}
+	accs := map[int64]map[int64]bool{}
 	for pays.Next() {
 		var id, minor, decimals, accID int64
 		var rate decimal.Decimal
@@ -593,6 +606,10 @@ func TopTransactions(ctx context.Context, sqlDB store.DB, w ReportWhere, limit i
 		}
 		v := toBase(minor, decimals, rate).Abs()
 		x := &out[at[id]]
+		if accs[id] == nil {
+			accs[id] = map[int64]bool{}
+		}
+		accs[id][accID] = true
 		if best, seen := moved[id]; !seen || v.GreaterThan(best) {
 			moved[id] = v
 			x.AccID, x.AccName = accID, name
@@ -604,6 +621,8 @@ func TopTransactions(ctx context.Context, sqlDB store.DB, w ReportWhere, limit i
 
 	for i := range out {
 		out[i].Amount = money.FromDecimal(totals[out[i].ID], base)
+		out[i].CatCount = len(cats[out[i].ID])
+		out[i].AccCount = len(accs[out[i].ID])
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Amount.Cmp(out[j].Amount) > 0 })
 	return out

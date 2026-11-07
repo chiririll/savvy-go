@@ -98,6 +98,7 @@ func (s Service) TxTop(ctx context.Context, f Filter, typ string, limit int) TxT
 		items = append(items, TopTransaction{
 			ID: x.ID, Description: ptrIfSet(x.Description.String), Amount: x.Amount, Date: x.Date.String,
 			Category: cat, Account: TopAccount{ID: x.AccID, Name: x.AccName.String},
+			CategoryCount: x.CatCount, AccountCount: x.AccCount,
 		})
 	}
 	return TxTopReport{Items: items, Currency: q.code()}

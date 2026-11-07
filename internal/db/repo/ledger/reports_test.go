@@ -241,6 +241,11 @@ func TestTopTransactionsAreRankedByTheirLines(t *testing.T) {
 	if !top[2].CatID.Valid || top[2].CatID.Int64 != r.food {
 		t.Errorf("category of the yen dinner = %+v, want food", top[2].CatID)
 	}
+	for i, x := range top {
+		if x.CatCount < 1 || x.AccCount < 1 {
+			t.Errorf("top[%d] counts = %d categories, %d accounts; want at least one of each", i, x.CatCount, x.AccCount)
+		}
+	}
 	if more := filter.TopTransactions(ctx, r.repo.DB, r.where("income"), 5, base); len(more) != 1 || more[0].AccID != r.cash {
 		t.Errorf("income top = %+v", more)
 	}

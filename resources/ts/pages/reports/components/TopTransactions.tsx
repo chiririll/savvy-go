@@ -7,9 +7,11 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { ChevronRight } from 'lucide-react'
 import { useTransactionReportTop } from '@/hooks'
 import { formatCurrency, cn } from '@/lib/utils'
-import { localizeDefaultName } from '@/lib/localized-name'
 import type { ReportFilters } from '../types'
 import type { ReportTransactionType } from '@/api/reports'
+import { topTransactionAccount, topTransactionCategory, topTransactionTitle } from '../top-transaction'
+
+const NEUTRAL_COLOR = '#64748b'
 
 interface TopTransactionsProps {
     filters: ReportFilters
@@ -91,7 +93,7 @@ export function TopTransactions({ filters, type, limit = 10 }: TopTransactionsPr
                                     'group flex items-center gap-2 sm:gap-3 px-1 py-2 sm:px-2 rounded-lg',
                                     'hover:bg-muted/50 cursor-pointer transition-colors',
                                 )}
-                                onClick={() => navigate(`/transactions?id=${transaction.id}`)}
+                                onClick={() => navigate(`/transactions?view=${transaction.id}`)}
                             >
                                 <div
                                     className={cn(
@@ -104,20 +106,22 @@ export function TopTransactions({ filters, type, limit = 10 }: TopTransactionsPr
                                 </div>
                                 <div
                                     className="flex items-center justify-center size-9 rounded-lg flex-shrink-0"
-                                    style={{ backgroundColor: transaction.category.color }}
+                                    style={{ backgroundColor: transaction.category?.color ?? NEUTRAL_COLOR }}
                                 >
-                                    <span className="text-lg">{transaction.category.icon}</span>
+                                    <span className="text-lg">{transaction.category?.icon ?? '◌'}</span>
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <p className="font-medium text-sm truncate">
-                                        {transaction.description || localizeDefaultName(transaction.category.name)}
+                                        {topTransactionTitle(transaction, t('reports.withoutCategory'))}
                                     </p>
                                     <p className="truncate text-xs text-muted-foreground">
                                         {[
                                             formatShortDate(transaction.date),
-                                            localizeDefaultName(transaction.category.name),
-                                            transaction.account.name,
-                                        ].join(' • ')}
+                                            topTransactionCategory(transaction, t),
+                                            topTransactionAccount(transaction),
+                                        ]
+                                            .filter(Boolean)
+                                            .join(' • ')}
                                     </p>
                                 </div>
                                 <div className="text-right flex-shrink-0">

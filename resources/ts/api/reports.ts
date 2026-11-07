@@ -139,19 +139,24 @@ export interface TransactionDynamicsData {
 
 export interface TopTransactionItem {
     id: number
-    description: string
+    description: string | null
     amount: number
     date: string
+    /** The category of the largest line; null when no line has one. */
     category: {
         id: number
         name: string
         icon: string
         color: string
-    }
+    } | null
+    /** The account that moved the most. */
     account: {
         id: number
         name: string
     }
+    /** How many categories the lines span and how many accounts the payments touch. */
+    category_count: number
+    account_count: number
 }
 
 export interface TopTransactionsData {
