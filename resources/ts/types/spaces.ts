@@ -167,8 +167,10 @@ export interface SpaceTransfer {
     date: string
     description: string | null
     version: number
-    status: 'ok' | 'needs_attention' | 'pending'
+    status: TransferStatus
     review: TransferReview | null
+    /** Confirmed, but this space's account is gone, so there is no transaction for it. */
+    needsAttention: boolean
     /** The other space is no longer linked here. */
     frozen: boolean
     /** Signed by this server or a key it trusts. */

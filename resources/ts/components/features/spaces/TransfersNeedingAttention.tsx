@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAccounts, useDeleteTransfer, useResolveTransfer, useSpaceTransfers, useUpdateTransfer } from '@/hooks'
 import { transferReviewLabel } from '@/lib/labels'
 import { Space, SpaceTransfer } from '@/types/spaces'
+import { sideAmount, sidesForSpace, transferNeedsDecision } from './transfer-review'
 
 /** Transfers that need someone: pending after a restore, missing an account, unverifiable or frozen. */
 export function TransfersNeedingAttention({ space }: { space: Space }) {
@@ -18,18 +19,13 @@ export function TransfersNeedingAttention({ space }: { space: Space }) {
     const update = useUpdateTransfer(space.id)
     const remove = useDeleteTransfer(space.id)
     const [choice, setChoice] = useState<Record<string, string>>({})
-    const items = transfers.filter((tr) => tr.status !== 'ok' || !tr.verified || tr.frozen)
+    const items = transfers.filter(transferNeedsDecision)
 
     if (!items.length) return null
 
     const amount = (tr: SpaceTransfer) => {
         const side = tr.outgoing ? tr.from : tr.to
-        return `${tr.outgoing ? '−' : '+'}${side.amount} ${side.currency}`
-    }
-
-    const remoteAmount = (remote: NonNullable<SpaceTransfer['remote']>, outgoing: boolean) => {
-        const side = outgoing ? remote.from : remote.to
-        return `${side.amount} ${side.currency}`
+        return sideAmount(side, tr.outgoing ? '−' : '+')
     }
 
     const setAccount = (tr: SpaceTransfer) => {
@@ -58,24 +54,15 @@ export function TransfersNeedingAttention({ space }: { space: Space }) {
                         </div>
                         <div className="flex flex-wrap gap-1.5">
                             {tr.review && <Badge variant="outline">{transferReviewLabel(t, tr.review)}</Badge>}
-                            {tr.status === 'needs_attention' && (
+                            {tr.needsAttention && (
                                 <Badge variant="outline">{t('spaces.transfers.needsAccount')}</Badge>
                             )}
                             {!tr.verified && <Badge variant="destructive">{t('spaces.transfers.unverified')}</Badge>}
                             {tr.frozen && <Badge variant="secondary">{t('spaces.transfers.frozen')}</Badge>}
                         </div>
-                        {tr.remote && (
-                            <p className="text-xs text-muted-foreground">
-                                {tr.remote.deleted
-                                    ? t('spaces.transfers.remoteDeleted')
-                                    : t('spaces.transfers.remoteVersion', {
-                                          amount: remoteAmount(tr.remote, tr.outgoing),
-                                          date: tr.remote.date,
-                                      })}
-                            </p>
-                        )}
+                        {tr.status === 'in_review' && <TransferSides tr={tr} />}
                         <div className="flex flex-wrap gap-2">
-                            {tr.status === 'pending' && (
+                            {tr.status === 'in_review' && (
                                 <>
                                     <Button
                                         size="sm"
@@ -102,7 +89,7 @@ export function TransfersNeedingAttention({ space }: { space: Space }) {
                                     {t('spaces.transfers.trust')}
                                 </Button>
                             )}
-                            {tr.status === 'needs_attention' && (
+                            {tr.needsAttention && (
                                 <>
                                     <Select
                                         value={choice[tr.uuid] ?? ''}
@@ -127,7 +114,7 @@ export function TransfersNeedingAttention({ space }: { space: Space }) {
                                     </Button>
                                 </>
                             )}
-                            {tr.status !== 'pending' && !tr.frozen && tr.verified && (
+                            {tr.status !== 'in_review' && !tr.frozen && tr.verified && (
                                 <Button size="sm" variant="ghost" onClick={() => remove.mutate(tr.uuid)}>
                                     {t('actions.delete', { ns: 'common' })}
                                 </Button>
@@ -137,5 +124,36 @@ export function TransfersNeedingAttention({ space }: { space: Space }) {
                 ))}
             </ul>
         </SettingsSection>
+    )
+}
+
+/** Both sides of a transfer in review: ours and the other space's version, each in its own currencies. */
+function TransferSides({ tr }: { tr: SpaceTransfer }) {
+    const { t } = useTranslation('settings')
+    const [here, there] = sidesForSpace(tr, tr.outgoing)
+
+    return (
+        <dl className="grid grid-cols-[auto_1fr_1fr] gap-x-4 gap-y-1 text-xs tabular-nums">
+            <span />
+            <dt className="text-muted-foreground">{t('spaces.transfers.thisSpace')}</dt>
+            <dt className="text-muted-foreground">{t('spaces.transfers.otherSpace')}</dt>
+            <dd className="text-muted-foreground">{t('spaces.transfers.ours')}</dd>
+            <dd>{here}</dd>
+            <dd>{there}</dd>
+            {tr.remote &&
+                (tr.remote.deleted ? (
+                    <>
+                        <dd className="text-muted-foreground">{t('spaces.transfers.remote')}</dd>
+                        <dd className="col-span-2">{t('spaces.transfers.remoteDeleted')}</dd>
+                    </>
+                ) : (
+                    <>
+                        <dd className="text-muted-foreground">{t('spaces.transfers.remote')}</dd>
+                        {sidesForSpace(tr.remote, tr.outgoing).map((side, i) => (
+                            <dd key={i}>{side}</dd>
+                        ))}
+                    </>
+                ))}
+        </dl>
     )
 }
