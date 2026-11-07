@@ -31,6 +31,12 @@ paths:
         - {name: sort_direction, in: query, schema: {type: string, enum: [asc, desc]}}
         - {name: page, in: query, schema: {type: integer, default: 1}}
         - {name: per_page, in: query, schema: {type: integer, default: 25}}
+        - name: count
+          in: query
+          schema: {type: string, enum: ["0"]}
+          description: >-
+            `0` skips counting every match (a slow scan on a big space). `meta.total` is then
+            only what the page holds and `meta.has_more` says whether a page follows.
         - name: with_summary
           in: query
           schema: {type: boolean}
@@ -55,6 +61,7 @@ paths:
                       last_page: {type: integer}
                       per_page: {type: integer}
                       total: {type: integer}
+                      has_more: {type: boolean, description: Only with count=0.}
         "401": {$ref: "#/components/responses/Unauthenticated"}
     post:
       tags: [Transactions]

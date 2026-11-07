@@ -215,8 +215,7 @@
             "description": "Type words, or keywords such as account:Card or tags:food,coffee. Use the arrow keys to pick a result.",
             "placeholder": "Search, or filter: account:Card tags:food",
             "empty": "Nothing found",
-            "totals": "Income {{income}} · Expense {{expense}}",
-            "showAll": "Show all {{count, plural(one: # transaction; other: # transactions)}}",
+            "showAll": "Show all: more than {{count}} transactions",
             "keys": "Tab complete · ↑↓ select · Enter open · Ctrl+Enter show all"
         },
         "detail": {

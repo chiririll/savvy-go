@@ -689,6 +689,23 @@ func (s Transactions) Filtered(ctx context.Context, f filter.TxFilter, page, per
 	return list, total, err
 }
 
+// FilteredMore is Filtered without the count of all matches: whether there is
+// a page after this one instead.
+func (s Transactions) FilteredMore(ctx context.Context, f filter.TxFilter, page, perPage int) ([]Transaction, bool, error) {
+	if perPage <= 0 {
+		perPage = 25
+	}
+	if page <= 0 {
+		page = 1
+	}
+	rows, more, err := s.repo().FilteredMore(ctx, f, perPage, (page-1)*perPage)
+	if err != nil {
+		return nil, false, err
+	}
+	list, err := s.hydrate(ctx, rows)
+	return list, more, err
+}
+
 // SetCategory gives a category to the uncategorised lines of a transaction (an
 // automation action). The category must fit the transaction type, as for a
 // line entered by hand.

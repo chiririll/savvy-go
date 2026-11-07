@@ -29,6 +29,8 @@ export interface TransactionsResponse {
         last_page: number
         per_page: number
         total: number
+        /** Only when asked with `count: false`: `total` is then just the page. */
+        has_more?: boolean
         from: number
         to: number
     }
@@ -40,7 +42,7 @@ export const transactionsApi = {
     ...crud,
 
     getAll: async (
-        filters?: TransactionFilters & { with_summary?: boolean },
+        filters?: TransactionFilters & { with_summary?: boolean; count?: boolean },
         signal?: AbortSignal,
     ): Promise<TransactionsResponse> => {
         const query = toQueryString({
@@ -59,6 +61,7 @@ export const transactionsApi = {
             per_page: filters?.per_page,
             page: filters?.page,
             with_summary: filters?.with_summary,
+            count: filters?.count === false ? '0' : undefined,
             status: filters?.status,
         })
         const response = await apiClient.get(`${ENDPOINT}${query}`, { signal })

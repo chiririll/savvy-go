@@ -110,6 +110,28 @@ func (r Repo) Filtered(ctx context.Context, f filter.TxFilter, limit, offset int
 	return out, int(total), nil
 }
 
+// FilteredMore lists one page like Filtered but does not count the matches: it
+// reads one row past the page to tell whether there are more. For a preview,
+// where scanning every match for a total is not worth it.
+func (r Repo) FilteredMore(ctx context.Context, f filter.TxFilter, limit, offset int) ([]Tx, bool, error) {
+	rows, err := filter.ListTransactions(ctx, r.DB, f, limit+1, offset)
+	if err != nil {
+		return nil, false, err
+	}
+	more := len(rows) > limit
+	if more {
+		rows = rows[:limit]
+	}
+	out := make([]Tx, len(rows))
+	for i, x := range rows {
+		out[i] = txOf(x)
+	}
+	if err := r.load(ctx, out); err != nil {
+		return nil, false, err
+	}
+	return out, more, nil
+}
+
 // load fills the payments, lines and tags of txs: three queries for all.
 func (r Repo) load(ctx context.Context, txs []Tx) error {
 	if len(txs) == 0 {

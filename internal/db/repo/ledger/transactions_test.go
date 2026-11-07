@@ -378,3 +378,20 @@ func TestExternalIDIsLookedUp(t *testing.T) {
 		t.Fatalf("external id = %v", got.ExternalID)
 	}
 }
+
+func TestFilteredMoreReportsAnotherPageWithoutCounting(t *testing.T) {
+	f := newFixture(t)
+	for _, date := range []string{"2026-03-01", "2026-03-02", "2026-03-03"} {
+		f.transfer(t, 1000, 150000, date)
+	}
+	for _, c := range []struct {
+		limit int
+		rows  int
+		more  bool
+	}{{2, 2, true}, {3, 3, false}, {10, 3, false}} {
+		page, more, err := f.repo.FilteredMore(ctx, filter.TxFilter{}, c.limit, 0)
+		if err != nil || len(page) != c.rows || more != c.more {
+			t.Fatalf("limit %d: %d rows, more %v, err %v", c.limit, len(page), more, err)
+		}
+	}
+}

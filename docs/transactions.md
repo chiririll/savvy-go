@@ -8,7 +8,7 @@
 
 ## Search palette (desktop)
 
-Press **`/`** anywhere (not while typing in a field or with a dialog open), or click **Search** in the header. Type to see the best matches and their totals.
+Press **`/`** anywhere (not while typing in a field or with a dialog open), or click **Search** in the header. Type to see the matches.
 
 | Key | Does |
 | --- | --- |
@@ -30,11 +30,13 @@ Keywords narrow the search. Names are matched without regard to case:
 
 Separate several values with commas (`tags:food,coffee`), quote a name with spaces (`account:"Cash USD"`), and repeat a keyword to add values. Values of one keyword are alternatives; different keywords all have to match. A keyword that is unknown, or a name that does not exist, is searched as plain text. The filters the palette applies show in the Filters panel and in the address, so the page can be bookmarked.
 
+Plain words match the transaction's description and the notes of its lines (any case), and a number matches the amount of a payment or line. In the palette, the matching text of the description is marked in yellow. When a word is found in a line's note, the part of the note around it is shown under the transaction, with the match marked. Results are ordered by date, not by where the match is. The palette lists up to eight results; if five or fewer more exist, they are listed too, otherwise the last row says there are more than 13. The palette does not count every match or total them, so it stays fast on a big space.
+
 On a phone there is no palette; use the Filters panel, which holds the search field.
 
 ## API and MCP
 
-`GET /api/transactions` takes `q`, `account_ids` (`1,2`) and `currency` (`usd,jpy`) next to the existing filters. With `with_summary=1` the totals cover only the matching transactions. The MCP tool `list_transactions` takes the same filters (see [MCP](mcp.md)).
+`GET /api/transactions` takes `q`, `account_ids` (`1,2`) and `currency` (`usd,jpy`) next to the existing filters. With `with_summary=1` the totals cover only the matching transactions. With `count=0` the server does not count every match: `meta.has_more` says whether another page follows and `meta.total` is only what the page holds. The MCP tool `list_transactions` takes the same filters (see [MCP](mcp.md)).
 
 ## The transaction form
 

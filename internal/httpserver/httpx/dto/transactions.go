@@ -119,6 +119,9 @@ type PageMeta struct {
 	LastPage    int `json:"last_page"`
 	PerPage     int `json:"per_page"`
 	Total       int `json:"total"`
+	// HasMore is set instead of an exact Total when the request asked not to
+	// count (count=0): Total is then only what this page holds.
+	HasMore *bool `json:"has_more,omitempty"`
 }
 
 // TransactionPage is a page of transactions, with the summary when asked for.

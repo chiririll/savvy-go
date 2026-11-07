@@ -43,24 +43,44 @@ func transactionsIndex(w http.ResponseWriter, r *http.Request) {
 	f.Search = q.Get("q")
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	per, _ := strconv.Atoi(r.URL.Query().Get("per_page"))
-	list, total, err := httpx.Scope(r).Txs.Filtered(r.Context(), f, page, per)
-	if err != nil {
-		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
-		return
-	}
 	if per <= 0 {
 		per = 25
 	}
 	if page <= 0 {
 		page = 1
 	}
-	last := (total + per - 1) / per
-	if last < 1 {
-		last = 1
-	}
-	payload := dto.TransactionPage{
-		Data: dto.Map(list, dto.NewTransaction),
-		Meta: dto.PageMeta{CurrentPage: page, LastPage: last, PerPage: per, Total: total},
+	var payload dto.TransactionPage
+	if q.Get("count") == "0" {
+		// A preview: no scan of every match for a total, only whether a page follows.
+		list, more, err := httpx.Scope(r).Txs.FilteredMore(r.Context(), f, page, per)
+		if err != nil {
+			httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		last := page
+		if more {
+			last++
+		}
+		payload = dto.TransactionPage{
+			Data: dto.Map(list, dto.NewTransaction),
+			Meta: dto.PageMeta{
+				CurrentPage: page, LastPage: last, PerPage: per, Total: (page-1)*per + len(list), HasMore: &more,
+			},
+		}
+	} else {
+		list, total, err := httpx.Scope(r).Txs.Filtered(r.Context(), f, page, per)
+		if err != nil {
+			httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		last := (total + per - 1) / per
+		if last < 1 {
+			last = 1
+		}
+		payload = dto.TransactionPage{
+			Data: dto.Map(list, dto.NewTransaction),
+			Meta: dto.PageMeta{CurrentPage: page, LastPage: last, PerPage: per, Total: total},
+		}
 	}
 	if r.URL.Query().Get("with_summary") == "1" || r.URL.Query().Get("with_summary") == "true" {
 		summary := dto.NewTransactionSummary(httpx.Scope(r).Txs.Summary(r.Context(), f, false))

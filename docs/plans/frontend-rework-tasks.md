@@ -193,9 +193,21 @@ Mockup first. A separate view-only dialog, not a read-only form. In `components/
 
 Mockup of each changed screen.
 
-**Question to answer before starting:** should the search palette and the list search (`q`) match a line's note? Today `q` matches item names; the proposal is to match the transaction description and line notes, so "milk" finds a receipt with a list of products. The backend filter (`internal/db/filter`) would need to follow, so say yes or no before the mockup.
+**Search, decided with the owner (7 Nov 2026).** The list search `q` already matches the description, line notes and amounts (`internal/db/filter/search.go`), so the backend needs no change. No ranking for now: the order stays by date. Fields that are not text have their own filters, so `q` does not match category, tag or account names. Marks only in the palette: the matching text of the description in yellow, and under a transaction the part of a line's note around the first hit, also marked (lists stay without notes). A palette result opens the view dialog (`?view=`).
 
-Screens: import preview (`PreviewParts`, `types/import.ts`), the search palette and `lib/transaction-search.ts` (matches item names today; decide whether it searches line notes), reports that list transactions (top transactions), sync and transfer review (`SyncReconcile*`), dashboard.
+Search built: `lib/search-highlight.ts` (`searchTerms`, `highlightParts`, `flattenNote`, `noteSnippet`, tests), `Highlight` and the snippet in `TransactionSearchPalette`, the palette amount through `rowAmount`/`TransactionAmount`. No story: the palette needs the router and the API.
+
+Agreed mockup:
+
+```
+(🛒)  Oat [milk] run                              −12.40 EUR
+      Today · Cash · Food
+(🛒)  Groceries                                   −52.40 EUR
+      Yesterday · Cash · 2 categories
+      …oat [milk] 2 l · eggs
+```
+
+Screens: import preview (`PreviewParts`, `types/import.ts`), reports that list transactions (top transactions), sync and transfer review (`SyncReconcile*`), dashboard.
 
 ### F7. Credit cards (task 11 of the rework)
 
