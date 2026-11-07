@@ -18,7 +18,7 @@ const Buttons = ({ editable = true }: { editable?: boolean }) => {
         actions: { edit: editable, editDetails: false, duplicate: true, delete: true, confirm: false, skip: false },
     })
 
-    // One payment in two lines opens; several payments have no place in the form yet.
+    // One payment in two lines, and several payments, open in the form; a transfer has no place in it yet.
     const lines = transaction({
         status: 'confirmed',
         lines: [line({ amount: 30, note: '- milk' }), line({ seq: 1, categoryId: 3, category: categories[2], amount: 12.5 })],
@@ -31,6 +31,13 @@ const Buttons = ({ editable = true }: { editable?: boolean }) => {
         lines: [line({ amount: 30 }), line({ seq: 1, amount: 10, currencyId: 2 })],
     })
 
+    const transfer = transaction({
+        type: 'transfer',
+        status: 'confirmed',
+        payments: [payment({ amount: -30 }), payment({ account: accounts[1], accountId: 2, amount: 24 })],
+        lines: [],
+    })
+
     return (
         <div className="flex gap-2">
             <Button onClick={() => openCreate()}>New</Button>
@@ -38,6 +45,7 @@ const Buttons = ({ editable = true }: { editable?: boolean }) => {
             <Button variant="outline" onClick={() => openEdit(existing)}>Edit</Button>
             <Button variant="outline" onClick={() => openEdit(lines)}>Edit lines</Button>
             <Button variant="outline" onClick={() => openEdit(split)}>Edit split</Button>
+            <Button variant="outline" onClick={() => openEdit(transfer)}>Edit transfer</Button>
         </div>
     )
 }
@@ -101,10 +109,20 @@ export const EditOfLinesOpensTheForm: Story = {
     },
 }
 
-// Several payments, or a transfer, are not opened until the form can show them: a save would drop them.
-export const EditOfASplitIsRefused: Story = {
+// Several payments open in the form, one row each, with the line of each currency.
+export const EditOfSeveralPaymentsOpensTheForm: Story = {
     play: async ({ canvasElement }) => {
         await open(canvasElement, 'Edit split')
+        const dialog = await screen.findByRole('dialog', {}, { timeout: 5000 })
+        const amounts = await within(dialog).findAllByRole('spinbutton')
+        await expect(amounts.slice(0, 2).map((a) => (a as HTMLInputElement).value)).toEqual(['30', '10'])
+    },
+}
+
+// A transfer is not opened until the form can show it: a save would drop its second account.
+export const EditOfATransferIsRefused: Story = {
+    play: async ({ canvasElement }) => {
+        await open(canvasElement, 'Edit transfer')
         await new Promise((resolve) => setTimeout(resolve, 300))
         await expect(screen.queryByRole('dialog')).toBeNull()
     },

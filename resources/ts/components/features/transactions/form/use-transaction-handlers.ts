@@ -1,21 +1,13 @@
 import { useRef } from 'react'
-import type { UseFormReturn } from 'react-hook-form'
+import type { FieldPath, UseFormReturn } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { useNegativeBalanceConfirm } from '@/components/shared'
 import type { NegativeBalanceWarning } from '@/lib/negative-balance'
+import { payloadErrorPath } from '@/lib/transaction-payments'
 import { buildTransactionInput, type PayloadError } from '@/lib/transaction-payload'
 import type { TransactionFormValues } from '@/schemas/transactions'
 import type { Account, TransactionInput } from '@/types'
-
-/** The field the form shows each way the payload can fail on. */
-const PAYLOAD_ERROR_FIELDS: Record<PayloadError, 'payments.0.account_id' | 'payments.0.amount' | 'change'> = {
-    unknownAccount: 'payments.0.account_id',
-    duplicateAccount: 'payments.0.account_id',
-    amountZero: 'payments.0.amount',
-    netSign: 'change',
-    lineCurrency: 'payments.0.account_id',
-}
 
 function payloadErrorMessage(t: TFunction, error: PayloadError): string {
     switch (error) {
@@ -59,7 +51,9 @@ export function useTransactionHandlers({
         }
         const built = buildTransactionInput(data, accounts ?? [])
         if (!built.ok) {
-            form.setError(PAYLOAD_ERROR_FIELDS[built.error], { message: payloadErrorMessage(t, built.error) })
+            form.setError(payloadErrorPath(built.error, data, accounts ?? []) as FieldPath<TransactionFormValues>, {
+                message: payloadErrorMessage(t, built.error),
+            })
             return
         }
         confirmIfNeeded(built.input, warnings, onSubmit)

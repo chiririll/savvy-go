@@ -224,7 +224,7 @@
             "paymentCreated": "Payment saved",
             "paymentUpdated": "Payment updated",
             "paymentDeleted": "Payment deleted",
-            "notEditableYet": "This transaction has several payments, several lines or is a transfer. The form can't edit it yet.",
+            "notEditableYet": "This transaction is a transfer. The form can't edit it yet.",
             "createFailed": "Failed to create transaction",
             "updateFailed": "Failed to update transaction",
             "deleteFailed": "Failed to delete transaction",

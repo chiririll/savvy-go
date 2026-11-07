@@ -150,4 +150,77 @@ describe('useTransactionHandlers submit', () => {
         expect(onSubmit).not.toHaveBeenCalled()
         expect(result.current.errors.change).toBeDefined()
     })
+
+    it('puts the message of a change that is too large on the amount of the change', async () => {
+        const { result } = setup({
+            payments: [{ account_id: accounts[0].id, amount: 5 }],
+            change: [{ account_id: accounts[1].id, amount: 10 }],
+        })
+
+        await act(() => result.current.handleSubmit())
+
+        expect(result.current.errors.change?.[0]?.amount).toBeDefined()
+    })
+
+    it('puts the message of an account used twice on the second row that uses it', async () => {
+        const { result, onSubmit } = setup({
+            payments: [
+                { account_id: accounts[0].id, amount: 5 },
+                { account_id: accounts[1].id, amount: 5 },
+            ],
+            change: [{ account_id: accounts[1].id, amount: 1 }],
+        })
+
+        await act(() => result.current.handleSubmit())
+
+        expect(onSubmit).not.toHaveBeenCalled()
+        expect(result.current.errors.change?.[0]?.account_id).toBeDefined()
+        expect(result.current.errors.payments).toBeUndefined()
+    })
+
+    it('saves several payments and the change, each with its sign', async () => {
+        const { result, onSubmit } = setup({
+            payments: [
+                { account_id: accounts[0].id, amount: 30 },
+                { account_id: accounts[1].id, amount: 8 },
+            ],
+            change: [{ account_id: accounts[2].id, amount: 100 }],
+        })
+
+        await act(() => result.current.handleSubmit())
+
+        expect(onSubmit).toHaveBeenCalledWith(
+            expect.objectContaining({
+                payments: [
+                    { account_id: accounts[0].id, amount: -30 },
+                    { account_id: accounts[1].id, amount: -8 },
+                    { account_id: accounts[2].id, amount: 100 },
+                ],
+            }),
+        )
+    })
+
+    it('asks about every account that goes negative before saving several payments', async () => {
+        const warnings = [
+            { accountName: 'Cash', currentBalance: 10, resultingBalance: -5, currency: accounts[0].currency },
+            { accountName: 'Euro card', currentBalance: 2, resultingBalance: -1, currency: accounts[1].currency },
+        ]
+        const onSubmit = vi.fn()
+        const { result } = renderHook(() => {
+            const form = useForm<TransactionFormValues>({
+                defaultValues: {
+                    ...filled,
+                    payments: [
+                        { account_id: accounts[0].id, amount: 15 },
+                        { account_id: accounts[1].id, amount: 3 },
+                    ],
+                },
+            })
+            return useTransactionHandlers({ form, warnings, dateRequired: false, accounts, onSubmit })
+        })
+
+        await act(() => result.current.handleSubmit())
+
+        expect(confirmIfNeeded).toHaveBeenLastCalledWith(expect.anything(), warnings, onSubmit)
+    })
 })

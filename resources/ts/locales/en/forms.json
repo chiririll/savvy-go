@@ -40,13 +40,14 @@
     },
     "transactions": {
         "toAccount": "Destination account",
-    "payment": {
-        "addAccount": "Add another account",
-        "removeRow": "Remove",
-        "changeCount": "Change ({{count}})",
+        "addPayment": "Add another account",
+        "noAccountLeft": "Every account is already used in this transaction",
+        "removePayment": "Remove the payment",
+        "changeTitle": "Change",
         "addChange": "Add change",
-        "changeHelp": "Money given back to you, e.g. dinars for euros handed over. Add the account it went to."
-    },
+        "removeChange": "Remove the change",
+        "changeHelp": "Money that came back to you on another account, e.g. dinars for the euros you handed over.",
+        "totalPaid": "Total",
         "swapAccounts": "Swap accounts",
         "toSpace": "Destination space",
         "toSpaceNoAccounts": "That space has no accounts yet.",

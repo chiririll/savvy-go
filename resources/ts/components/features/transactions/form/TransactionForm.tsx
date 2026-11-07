@@ -8,8 +8,9 @@ import { FormSubmitButton, FormWrapper, TransactionTypeTabs } from '@/components
 import { linesToAdd } from '@/lib/transaction-lines'
 import { formatCurrency } from '@/lib/utils'
 import type { Transaction, TransactionInput } from '@/types'
-import { BalanceAfter, PendingHint } from './TransactionBalanceHint'
-import { PaymentRow } from './PaymentRow'
+import { PendingHint } from './TransactionBalanceHint'
+import { ChangeSection } from './ChangeSection'
+import { PaymentTotals, PaymentsSection } from './PaymentsSection'
 import { TransactionDetailsRow } from './TransactionDetailsRow'
 import { TransactionLines } from './TransactionLines'
 import { TransactionTagsField } from './TransactionTagsField'
@@ -90,8 +91,8 @@ export function TransactionForm({
         onTypeChange,
     })
 
-    // One row per payment; adding and removing them comes with the next step of the form.
-    const paymentIndexes = (form.watch('payments') ?? []).map((_, index) => index)
+    // Change is for what is paid; an income shows it only when a saved one has some.
+    const showChange = transactionType === 'expense' || (form.watch('change')?.length ?? 0) > 0
 
     return (
         <FormWrapper>
@@ -122,22 +123,13 @@ export function TransactionForm({
                         )}
                     />
 
-                    {paymentIndexes.map((index) => {
-                        const account = accounts?.find((a) => a.id === Number(form.watch(`payments.${index}.account_id`)))
-                        const balance = balances.rows.find((row) => row.account.id === account?.id)
-                        return (
-                            <PaymentRow
-                                key={index}
-                                control={form.control}
-                                list="payments"
-                                index={index}
-                                currency={account?.currency}
-                                excludeIds={usedAccountIds.filter((id) => id !== account?.id)}
-                            >
-                                {!isPendingDate && balance && <BalanceAfter preview={balance} />}
-                            </PaymentRow>
-                        )
-                    })}
+                    <PaymentsSection
+                        accounts={accounts}
+                        usedAccountIds={usedAccountIds}
+                        balances={balances.rows}
+                        showBalances={!isPendingDate}
+                    />
+                    <PaymentTotals accounts={accounts} />
                     {isPendingDate && <PendingHint isUndated={isUndated} />}
 
                     <TransactionDetailsRow
@@ -163,6 +155,15 @@ export function TransactionForm({
                     />
 
                     <TransactionTagsField control={form.control} />
+
+                    {showChange && (
+                        <ChangeSection
+                            accounts={accounts}
+                            usedAccountIds={usedAccountIds}
+                            balances={balances.rows}
+                            showBalances={!isPendingDate}
+                        />
+                    )}
 
                     <FormSubmitButton hidden={hideSubmit} isSubmitting={isSubmitting} label={submitLabel} />
                 </form>

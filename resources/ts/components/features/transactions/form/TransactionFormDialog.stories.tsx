@@ -105,3 +105,26 @@ export const LinesBecomeFormValues: Story = {
         })
     },
 }
+
+// Payments of the type's sign are the payments of the form; the ones of the opposite sign are the change.
+export const PaymentsAndChangeBecomeFormValues: Story = {
+    play: async () => {
+        const values = toFormValues(
+            transaction({
+                payments: [
+                    payment({ amount: -30 }),
+                    payment({ account: accounts[1], accountId: 2, amount: -8 }),
+                    payment({ account: accounts[2], accountId: 3, amount: 300 }),
+                ],
+                lines: [line({ amount: 30 }), line({ seq: 1, categoryId: 3, amount: 10, currencyId: 2 })],
+            }),
+        )
+        await expect(values).toMatchObject({
+            payments: [
+                { account_id: 1, amount: 30 },
+                { account_id: 2, amount: 8 },
+            ],
+            change: [{ account_id: 3, amount: 300 }],
+        })
+    },
+}

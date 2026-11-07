@@ -363,3 +363,191 @@ export const SubmitsLines: Story = {
         })
     },
 }
+
+const addPayment = /add another account|добавить ещё счёт/i
+const removePayment = /remove the payment|убрать платёж/i
+const addChange = /add change|добавить сдачу/i
+const removeChange = /remove the change|убрать сдачу/i
+const changeSection = (canvasElement: HTMLElement) =>
+    within(canvasElement).findByRole('region', { name: /^change$|^сдача$/i })
+
+const twoAccounts = {
+    ...expense,
+    payments: [
+        { account_id: 1, amount: 10 },
+        { account_id: 2, amount: 8 },
+    ],
+}
+
+// The (+) at the end of the last payment adds a row on the first account no row uses.
+export const AddingAPayment: Story = {
+    args: { defaultValues: expense },
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement)
+        await userEvent.click(await canvas.findByRole('button', { name: addPayment }))
+        await waitFor(() => expect(canvas.getAllByRole('spinbutton')).toHaveLength(2))
+        await expect(canvas.getAllByRole('combobox')[1]).toHaveTextContent(/euro card/i)
+    },
+}
+
+// An account is in a transaction once: the picker of a row does not offer the accounts of the others.
+export const AccountsAreUnique: Story = {
+    args: { defaultValues: twoAccounts },
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement)
+        await userEvent.click((await canvas.findAllByRole('combobox'))[1])
+        const options = await screen.findAllByRole('option')
+        await expect(options.some((option) => /cash/i.test(option.textContent ?? ''))).toBe(false)
+        await expect(options.some((option) => /yen wallet/i.test(option.textContent ?? ''))).toBe(true)
+    },
+}
+
+// With every account in use there is nothing left to add: the (+) is off.
+export const AddingIsOffWhenNoAccountIsLeft: Story = {
+    args: {
+        defaultValues: {
+            ...expense,
+            payments: [1, 2, 3, 4].map((account_id) => ({ account_id, amount: 1 })),
+        },
+    },
+    play: async ({ canvasElement }) => {
+        await expect(await within(canvasElement).findByRole('button', { name: addPayment })).toBeDisabled()
+    },
+}
+
+// The cross takes a payment away; the only one left cannot be removed.
+export const RemovingAPayment: Story = {
+    args: { defaultValues: twoAccounts },
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement)
+        await userEvent.click((await canvas.findAllByRole('button', { name: removePayment }))[0])
+        await waitFor(() => expect(canvas.getAllByRole('spinbutton')).toHaveLength(1))
+        await expect(canvas.queryByRole('button', { name: removePayment })).toBeNull()
+    },
+}
+
+// Each account shows what it will hold; the date is today or earlier, so they are posted at once.
+export const BalanceOfEachAccount: Story = {
+    args: { defaultValues: twoAccounts },
+    play: async ({ canvasElement }) => {
+        await waitFor(() => expect(within(canvasElement).getAllByText(/balance after|баланс после/i)).toHaveLength(2))
+    },
+}
+
+// One total per currency, once there are several payments.
+export const TotalsPerCurrency: Story = {
+    args: { defaultValues: twoAccounts },
+    play: async ({ canvasElement }) => {
+        const totals = await within(canvasElement).findByTestId('payment-totals')
+        await expect(totals).toHaveTextContent(/10\.00/)
+        await expect(totals).toHaveTextContent(/8\.00/)
+    },
+}
+
+export const OnePaymentHasNoTotals: Story = {
+    args: { defaultValues: expense },
+    play: async ({ canvasElement }) => {
+        await within(canvasElement).findByRole('textbox', { name: /description/i })
+        await expect(within(canvasElement).queryByTestId('payment-totals')).toBeNull()
+    },
+}
+
+// The Change section is apart from the payments, with its own (+).
+export const ChangeSectionOfAnExpense: Story = {
+    args: { defaultValues: expense },
+    play: async ({ canvasElement }) => {
+        const section = await changeSection(canvasElement)
+        await expect(within(section).queryAllByRole('spinbutton')).toHaveLength(0)
+        await userEvent.click(within(section).getByRole('button', { name: addChange }))
+        await waitFor(() => expect(within(section).getAllByRole('spinbutton')).toHaveLength(1))
+        await expect(within(section).getByRole('combobox')).toHaveTextContent(/euro card/i)
+    },
+}
+
+// A saved change comes back in the section, with the balance of its account.
+export const ChangeOfASavedExpense: Story = {
+    args: { defaultValues: { ...expense, change: [{ account_id: 2, amount: 5 }] } },
+    play: async ({ canvasElement }) => {
+        const section = await changeSection(canvasElement)
+        await expect(within(section).getByRole('spinbutton')).toHaveValue(5)
+        await expect(await within(section).findByText(/balance after|баланс после/i)).toBeVisible()
+        await userEvent.click(within(section).getByRole('button', { name: removeChange }))
+        await waitFor(() => expect(within(section).queryAllByRole('spinbutton')).toHaveLength(0))
+    },
+}
+
+// Change worth as much as the payments is refused by the API, so the form says so and does not save.
+export const ChangeTooLarge: Story = {
+    args: { defaultValues: { ...expense, change: [{ account_id: 2, amount: 20 }] } },
+    play: async ({ canvasElement, args }) => {
+        const section = await changeSection(canvasElement)
+        await expect(await within(section).findByRole('alert')).toBeVisible()
+        await userEvent.click(saveButton(canvasElement))
+        await waitFor(() => expect(within(section).getByRole('alert')).toBeVisible())
+        await expect(args.onSubmit).not.toHaveBeenCalled()
+    },
+}
+
+// An income has no change to give, unless a saved one has some.
+export const IncomeHasNoChangeSection: Story = {
+    args: { defaultValues: { ...expense, type: 'income', default_category_id: 2 } },
+    play: async ({ canvasElement }) => {
+        await within(canvasElement).findByRole('textbox', { name: /description/i })
+        await expect(within(canvasElement).queryByRole('region', { name: /^change$|^сдача$/i })).toBeNull()
+    },
+}
+
+// Payments and change are saved with their signs: the change is the opposite of the payments.
+export const SubmitsPaymentsAndChange: Story = {
+    args: { defaultValues: { ...twoAccounts, change: [{ account_id: 3, amount: 100 }] } },
+    play: async ({ canvasElement, args }) => {
+        await userEvent.click(await within(canvasElement).findByRole('button', { name: /save/i }))
+        await waitFor(() => expect(args.onSubmit).toHaveBeenCalledOnce())
+        await expect((args.onSubmit as ReturnType<typeof fn>).mock.calls[0][0]).toMatchObject({
+            payments: [
+                { account_id: 1, amount: -10 },
+                { account_id: 2, amount: -8 },
+                { account_id: 3, amount: 100 },
+            ],
+        })
+    },
+}
+
+// A line can be in the currency of a change account too.
+export const LineCurrencyIncludesTheChange: Story = {
+    args: {
+        defaultValues: {
+            ...split,
+            change: [{ account_id: 2, amount: 2 }],
+            lines: [{ category_id: 3, currency_id: null, amount: 5, note: null }, split.lines[1]],
+        },
+    },
+    play: async ({ canvasElement }) => {
+        const group = await lineGroup(canvasElement)
+        const currency = within(group).getAllByRole('combobox', { name: /currency of the line|валюта строки/i })[0]
+        await userEvent.click(currency)
+        const options = await screen.findAllByRole('option')
+        await expect(options.map((o) => o.textContent)).toEqual(['USD', 'EUR'])
+    },
+}
+
+// Two accounts below zero: one question lists both before anything is saved.
+export const OverdrawingTwoAccountsAsksOnce: Story = {
+    args: {
+        defaultValues: {
+            ...expense,
+            payments: [
+                { account_id: 1, amount: 500 },
+                { account_id: 2, amount: 2000 },
+            ],
+        },
+    },
+    play: async ({ canvasElement, args }) => {
+        await within(canvasElement).findAllByText(/negative/i)
+        await userEvent.click(saveButton(canvasElement))
+        const alert = await screen.findByRole('alertdialog')
+        await expect(within(alert).getAllByText(/^cash$/i).length).toBeGreaterThan(0)
+        await expect(within(alert).getAllByText(/euro card/i).length).toBeGreaterThan(0)
+        await expect(args.onSubmit).not.toHaveBeenCalled()
+    },
+}
