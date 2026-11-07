@@ -34,6 +34,8 @@ interface TransactionListProps {
     onConfirm?: (transaction: Transaction) => void
     onSkip?: (id: number) => void
     onEdit?: (transaction: Transaction) => void
+    /** What a click on a row does (the view dialog); the form when left out. */
+    onOpen?: (transaction: Transaction) => void
     isReadOnly?: boolean
     /** The ids of the rules whose amount is a guess: their pending occurrences show `≈` (see `useApproximateRuleIds`). */
     approximateRuleIds?: ReadonlySet<number>
@@ -55,6 +57,7 @@ export function TransactionList({
     onConfirm,
     onSkip,
     onEdit,
+    onOpen,
     isReadOnly,
     approximateRuleIds = NO_RULES,
     grouped = true,
@@ -76,6 +79,7 @@ export function TransactionList({
         onConfirm,
         onSkip,
         onEdit,
+        onOpen,
         isReadOnly,
         approximate: isApproximateOccurrence(transaction, approximateRuleIds),
     })
@@ -114,6 +118,7 @@ export function TransactionList({
                         onConfirm={onConfirm}
                         onSkip={onSkip}
                         onEdit={onEdit}
+                        onOpen={onOpen}
                         isReadOnly={isReadOnly}
                         approximate={isApproximateOccurrence(transaction, approximateRuleIds)}
                         showDate

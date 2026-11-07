@@ -14,11 +14,16 @@ const TransactionFormDialog = lazy(() =>
     import('./TransactionFormDialog').then((m) => ({ default: m.TransactionFormDialog })),
 )
 
+// Same for the detail dialog: it brings the mutations and the confirm dialogs along.
+const TransactionDetailHost = lazy(() => import('../detail/TransactionDetailHost'))
+
 export type { CreateTransactionDefaults }
 
 interface TransactionFormContextValue {
     openCreate: (defaults?: CreateTransactionDefaults) => void
     openEdit: (transaction: Transaction) => void
+    /** Opens the view-only dialog of a transaction; what a click on a row does. */
+    openView: (transaction: Transaction) => void
 }
 
 const TransactionFormContext = createContext<TransactionFormContextValue | null>(null)
@@ -33,6 +38,8 @@ export function CreateTransactionProvider({ children }: { children: React.ReactN
     const [mounted, setMounted] = useState(false)
     const [defaults, setDefaults] = useState<TransactionFormDefaults>()
     const [transaction, setTransaction] = useState<Transaction | null>(null)
+    const [viewed, setViewed] = useState<Transaction | null>(null)
+    const [viewOpen, setViewOpen] = useState(false)
 
     const openCreate = useCallback((next?: CreateTransactionDefaults) => {
         setTransaction(null)
@@ -56,6 +63,11 @@ export function CreateTransactionProvider({ children }: { children: React.ReactN
         setTransaction(next)
         setMounted(true)
         setOpen(true)
+    }, [])
+
+    const openView = useCallback((next: Transaction) => {
+        setViewed(next)
+        setViewOpen(true)
     }, [])
 
     const onCreated = () => {
@@ -82,11 +94,21 @@ export function CreateTransactionProvider({ children }: { children: React.ReactN
 
     const handleSubmitSpaceTransfer = (data: SpaceTransferInput) => sendTransfer.mutate(data, { onSuccess: onCreated })
 
-    const value = useMemo(() => ({ openCreate, openEdit }), [openCreate, openEdit])
+    const value = useMemo(() => ({ openCreate, openEdit, openView }), [openCreate, openEdit, openView])
 
     return (
         <TransactionFormContext.Provider value={value}>
             {children}
+            {viewed && (
+                <Suspense fallback={null}>
+                    <TransactionDetailHost
+                        transaction={viewed}
+                        open={viewOpen}
+                        onOpenChange={setViewOpen}
+                        onEdit={openEdit}
+                    />
+                </Suspense>
+            )}
             {mounted && (
                 <Suspense fallback={null}>
                     <TransactionFormDialog

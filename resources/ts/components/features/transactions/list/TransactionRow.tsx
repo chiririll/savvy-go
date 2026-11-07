@@ -23,6 +23,8 @@ interface TransactionRowProps {
     onConfirm?: (transaction: Transaction) => void
     onSkip?: (id: number) => void
     onEdit?: (transaction: Transaction) => void
+    /** What a click on the row does; the form (`onEdit`) when left out. The menu's Edit is always `onEdit`. */
+    onOpen?: (transaction: Transaction) => void
     isReadOnly?: boolean
     showActions?: boolean
     showDate?: boolean
@@ -163,7 +165,7 @@ export function TransactionRow(props: TransactionRowProps) {
                     />
                 ) : undefined
             }
-            onOpen={handlers.edit}
+            onOpen={props.onOpen ? () => props.onOpen?.(transaction) : handlers.edit}
             hasActions={showActions && Object.values(handlers).some(Boolean)}
             reserveActions={showActions && !props.isReadOnly}
             actions={({ menuOpen, setMenuOpen, isMobile }) => (

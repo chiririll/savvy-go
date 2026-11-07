@@ -218,6 +218,15 @@
             "totals": "Income {{income}} · Expense {{expense}}",
             "showAll": "Show all {{count, plural(one: # transaction; other: # transactions)}}",
             "keys": "Tab complete · ↑↓ select · Enter open · Ctrl+Enter show all"
+        },
+        "detail": {
+            "payments": "Payments",
+            "lines": "Lines",
+            "tags": "Tags",
+            "change": "Change",
+            "noCategory": "No category",
+            "recurring": "Recurring",
+            "difference": "Payments and lines differ by {{amount}}"
         }
     },
     "recurring": {

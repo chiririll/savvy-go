@@ -218,6 +218,15 @@
             "totals": "Доходы {{income}} · Расходы {{expense}}",
             "showAll": "Показать все: {{count, plural(one: # транзакция; few: # транзакции; other: # транзакций)}}",
             "keys": "Tab дополнить · ↑↓ выбор · Enter открыть · Ctrl+Enter показать все"
+        },
+        "detail": {
+            "payments": "Платежи",
+            "lines": "Строки",
+            "tags": "Теги",
+            "change": "Сдача",
+            "noCategory": "Без категории",
+            "recurring": "Регулярная",
+            "difference": "Платежи и строки расходятся на {{amount}}"
         }
     },
     "recurring": {

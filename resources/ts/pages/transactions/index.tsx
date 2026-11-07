@@ -58,7 +58,7 @@ export default function TransactionsPage() {
     const { data: accounts } = useAccounts({ exclude_debts: true })
     const { data: currencies } = useCurrencies()
     const isReadOnly = useReadOnly()
-    const { openCreate, openEdit } = useTransactionDeepLink(transactions)
+    const { openCreate, openEdit, openView } = useTransactionDeepLink(transactions)
     const { startApplying, dialogProps: applyDialog } = useApplyDeferred()
     const { confirmIfNeeded, dialog: negativeBalanceDialog } = useNegativeBalanceConfirm<number>()
     const loadedCount = transactions.length
@@ -159,6 +159,7 @@ export default function TransactionsPage() {
                                 onConfirm={startApplying}
                                 onSkip={(id) => skipTransaction.mutate(id)}
                                 onEdit={openEdit}
+                                onOpen={openView}
                                 isReadOnly={isReadOnly}
                                 onReorder={(date, shownIds) =>
                                     reorder.mutate({

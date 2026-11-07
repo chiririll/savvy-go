@@ -174,6 +174,8 @@ Rules:
 - Lines stay `Category | Amount | (X)`.
 - Not in this step: transfers; the default category as the default in every category dropdown of the transfer page.
 
+**F4h. No type selector when editing (later).** Asked by the owner on 7 Nov 2026. The Expense / Income / Transfer / To space tabs are shown only when creating. A saved transaction keeps its type: on edit the tabs are gone (the type is still readable from the icon and the title). Check `use-type-change.ts` and the restricted form, and drop what only the edit-time switch used. Mockup: the form without the tab row.
+
 ### F5. Transaction detail dialog (view)
 
 Mockup first. A separate view-only dialog, not a read-only form. In `components/shared/dialogs`.
@@ -183,7 +185,9 @@ Mockup first. A separate view-only dialog, not a read-only form. In `components/
 - Works for what the form cannot open: `transfer_review`, a viewer role, skipped.
 - `use-transaction-deep-link` follows whatever a click opens.
 
-**Question to answer before starting:** what does a row click open? (a) The view dialog, with Edit in the row menu and the dialog footer (proposed; it also works for transactions the form cannot open). (b) The form where editing is allowed and the view only for locked ones (as today).
+**Done 7 Nov 2026.** Mockup agreed with the owner. Decisions: a row click opens the view dialog (option a); no amount block in the header (the payments carry the amounts); the rule is a "Recurring" badge linking to the recurring page; a skipped transaction shows only its badge. Built in `components/features/transactions/detail/` (not `shared/dialogs`: it needs the transaction helpers; it uses `ResponsiveDialog` and `Confirm`): `TransactionDetailContent`, `TransactionDetailDialog` (footer from `transaction.actions`, no Duplicate: the row menu has it; Edit only where `formModeOf` allows; Skip and Delete ask first; on a phone Skip and Delete move to a "⋯" menu), `TransactionDetailHost` (mutations, lazy-loaded). `CreateTransactionProvider` gains `openView`; `TransactionRow` and `TransactionList` get `onOpen` (a click), the menu's Edit still opens the form; the dashboard card uses it too. Deep link: `?view=<id>` opens the dialog, `?edit=<id>` still opens the form. `lib/transaction-view.ts` (`isChangePayment`). Stories and strings (`en`, `ru`). Left for later: the dialog does not show a rule's schedule (only the badge).
+
+**Question that was answered:** what does a row click open? (a) The view dialog, with Edit in the row menu and the dialog footer (proposed; it also works for transactions the form cannot open). (b) The form where editing is allowed and the view only for locked ones (as today).
 
 ### F6. Other screens
 

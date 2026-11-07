@@ -30,7 +30,7 @@ import {
 
 export default function DashboardPage() {
     const { t } = useTranslation('pages')
-    const { openCreate, openEdit } = useCreateTransactionDialog()
+    const { openCreate, openView } = useCreateTransactionDialog()
     const { data: balance } = useTotalBalance()
     const { data: accounts } = useAccounts({ active: true, exclude_debts: true })
 
@@ -121,7 +121,7 @@ export default function DashboardPage() {
 
             <div className="grid min-w-0 gap-4 lg:grid-cols-2">
                 <ExpensesByCategoryCard summary={expensesByCategory} isError={expensesByCategoryError} currency={currency} />
-                <LargestTransactionsCard transactions={largestTransactions?.data} onEdit={openEdit} />
+                <LargestTransactionsCard transactions={largestTransactions?.data} onOpen={openView} />
             </div>
 
             {showCurrent && (
