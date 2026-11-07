@@ -40,8 +40,8 @@ type expenseCand struct {
 	catID   *int64
 }
 
-func seedWorkspace(ctx context.Context, db store.DB, now time.Time) (map[string]*ledger.Account, error) {
-	start := startOfMonth(now.AddDate(0, -monthsOfHistory, 0))
+func seedWorkspace(ctx context.Context, db store.DB, now time.Time, months int) (map[string]*ledger.Account, error) {
+	start := startOfMonth(now.AddDate(0, -months, 0))
 	s := &seeder{
 		ctx:     ctx,
 		db:      db,

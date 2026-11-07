@@ -52,6 +52,15 @@ enabled = true
 # Place the data relative to this day (YYYY-MM-DD) instead of today.
 date = "2026-06-05"
 
+# Months of history in the Demo space, counted back from the date. Default: 12.
+# 120 is ten years, for performance tests.
+months = 12
+
+# Extra sets of users and spaces next to the regular one. Default: 0.
+# 2 adds admin1, editor1, guest1, demo1 and admin2, ... each with their own
+# copy of the three spaces ("Demo 1", "Family Budget 1", ...).
+copies = 0
+
 # Write the seeded users, spaces and invitation tokens to this file.
 manifest = "./savvy-data/manifest.json"
 ```
@@ -60,7 +69,7 @@ manifest = "./savvy-data/manifest.json"
 go run . --seed-config seed.toml
 ```
 
-`enabled` (default `true`) turns seeding off without removing the flag. `date` places the data relative to that day instead of today. `manifest` is a file the seed writes users (with whether their address is verified), spaces (emoji, color, sync group) and invitation tokens to; [Scripts](scripts.md) uses it. Unknown keys are an error. Seeding only happens on an empty database: if the server already has a user, or was seeded before, the flag does nothing, so start from a fresh data directory.
+`enabled` (default `true`) turns seeding off without removing the flag. `date` places the data relative to that day instead of today. `months` sets how much history the Demo space gets (the other two spaces stay small). `copies` seeds that many more sets of users and spaces, so a server can be loaded with many spaces: the users are `admin1@savvy.app`, `editor1@savvy.app`, `guest1@savvy.app`, `demo1@demo.com` (same passwords), then `admin2@…`, and so on, and the spaces get the same number after their name. Each copy has its own links, sync group and invitations. `manifest` is a file the seed writes users (with whether their address is verified), spaces (emoji, color, sync group) and invitation tokens to; [Scripts](scripts.md) uses it. Unknown keys are an error. Seeding only happens on an empty database: if the server already has a user, or was seeded before, the flag does nothing, so start from a fresh data directory.
 
 ## Architecture
 

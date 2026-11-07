@@ -3,6 +3,7 @@ package seed
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"savvy-go/internal/auth"
@@ -22,6 +23,12 @@ type Options struct {
 	// Now is the moment the data is placed relative to; the current time when
 	// zero. Pin it to seed the same data on any day.
 	Now time.Time
+	// Months is how many months of history the Demo space gets; 12 when zero.
+	Months int
+	// Copies is how many extra sets of users and spaces to create next to the
+	// regular one: admin1, editor1, ... for the first, admin2, ... for the
+	// second. Handy to load the server for performance tests.
+	Copies int
 }
 
 // Demo seeds demo users and several spaces when the server has
@@ -59,24 +66,44 @@ func Demo(ctx context.Context, st store.Store, keys signing.KeyRing, opts Option
 		return nil, err
 	}
 
-	people, err := createDemoUsers(ctx, users)
+	months := opts.Months
+	if months <= 0 {
+		months = monthsOfHistory
+	}
+	if opts.Copies < 0 {
+		return nil, fmt.Errorf("seed copies %d: want 0 or more", opts.Copies)
+	}
+	manifest := &Manifest{Now: now}
+	for n := 0; n <= opts.Copies; n++ {
+		if err := seedSet(ctx, st, keys, users, manifest, n, now, months); err != nil {
+			return nil, err
+		}
+	}
+	if err := server.Set(ctx, demoSeededKey, true); err != nil {
+		return nil, fmt.Errorf("mark demo seeded: %w", err)
+	}
+	return manifest, nil
+}
+
+// seedSet creates copy n of the users and spaces (0 is the regular set) and
+// adds what it made to manifest.
+func seedSet(
+	ctx context.Context, st store.Store, keys signing.KeyRing, users auth.Users,
+	manifest *Manifest, n int, now time.Time, months int,
+) error {
+	people, made, err := createDemoUsers(ctx, users, n)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	d := &demo{
-		ctx: ctx, st: st, spaces: spaces.Service{Store: st}, people: people, now: now,
-		manifest: &Manifest{Now: now},
+		ctx: ctx, st: st, spaces: spaces.Service{Store: st}, people: people, now: now, months: months,
+		manifest: manifest, nameSuffix: copySuffix(n),
 	}
-	for _, u := range demoUsers {
-		d.manifest.Users = append(
-			d.manifest.Users,
-			ManifestUser{
-				Key: u.key, Name: u.name, Email: u.email, Password: u.pass, Role: u.role,
-				Verified: !u.unverified,
-			},
-		)
+	for _, u := range made {
+		manifest.Users = append(manifest.Users, ManifestUser{
+			Key: u.key, Name: u.name, Email: u.email, Password: u.pass, Role: u.role, Verified: !u.unverified,
+		})
 	}
-
 	steps := []func() error{
 		d.createSpaces,
 		d.syncReference,
@@ -86,16 +113,18 @@ func Demo(ctx context.Context, st store.Store, keys signing.KeyRing, opts Option
 	}
 	for _, step := range steps {
 		if err := step(); err != nil {
-			return nil, err
+			return err
 		}
 	}
-	if err := server.Set(ctx, demoSeededKey, true); err != nil {
-		return nil, fmt.Errorf("mark demo seeded: %w", err)
+	return d.logSeeded()
+}
+
+// copySuffix is what is added to the names of copy n: nothing for the regular set.
+func copySuffix(n int) string {
+	if n == 0 {
+		return ""
 	}
-	if err := d.logSeeded(); err != nil {
-		return nil, err
-	}
-	return d.manifest, nil
+	return " " + strconv.Itoa(n)
 }
 
 // alreadySeeded reports whether Demo has nothing to do: it ran before, or the

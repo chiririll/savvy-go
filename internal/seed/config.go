@@ -22,6 +22,13 @@ type Config struct {
 	// Date (YYYY-MM-DD) is the day the data is placed relative to, the current
 	// day when empty. Pin it to seed the same data on any day.
 	Date string `toml:"date"`
+	// Months is how many months of history the Demo space gets, counting back
+	// from the date. Default 12; 120 is ten years.
+	Months int `toml:"months"`
+	// Copies is how many extra sets of users and spaces to create next to the
+	// regular one (admin1, editor1, guest1, demo1 with their own spaces, then
+	// admin2, ...). Default 0.
+	Copies int `toml:"copies"`
 	// Manifest is a file to write what was seeded to, if any.
 	Manifest string `toml:"manifest"`
 }
@@ -38,6 +45,9 @@ func LoadConfig(path string) (Config, error) {
 	if err := dec.Decode(&c); err != nil {
 		return Config{}, fmt.Errorf("parse %s: %w", path, err)
 	}
+	if c.Months < 0 || c.Copies < 0 {
+		return Config{}, fmt.Errorf("parse %s: months and copies cannot be negative", path)
+	}
 	return c, nil
 }
 
@@ -50,7 +60,7 @@ func Run(ctx context.Context, st store.Store, keys signing.KeyRing, cfg Config, 
 	if err != nil {
 		return err
 	}
-	manifest, err := Demo(ctx, st, keys, Options{Loc: loc, Now: now})
+	manifest, err := Demo(ctx, st, keys, Options{Loc: loc, Now: now, Months: cfg.Months, Copies: cfg.Copies})
 	if err != nil {
 		return err
 	}

@@ -23,7 +23,7 @@ const (
 
 // workspaceFunc fills a space whose reference data exists and returns its
 // accounts by key.
-type workspaceFunc func(ctx context.Context, db store.DB, now time.Time) (map[string]*ledger.Account, error)
+type workspaceFunc func(ctx context.Context, db store.DB, now time.Time, months int) (map[string]*ledger.Account, error)
 
 // spaceSpec is one seeded space: who belongs to it, what it is priced in and
 // what fills it. The owner is an admin of the space.
@@ -42,7 +42,7 @@ type spaceSpec struct {
 func (s spaceSpec) look() spaces.Look { return spaces.Look{Emoji: &s.emoji, Color: &s.color} }
 
 func miniWorkspace(spec miniSpace) workspaceFunc {
-	return func(ctx context.Context, db store.DB, now time.Time) (map[string]*ledger.Account, error) {
+	return func(ctx context.Context, db store.DB, now time.Time, _ int) (map[string]*ledger.Account, error) {
 		return seedMini(ctx, db, now, spec)
 	}
 }
@@ -91,6 +91,10 @@ type demo struct {
 	spaces spaces.Service
 	people map[string]*auth.User
 	now    time.Time
+	// months is how many months of history the Demo space gets.
+	months int
+	// nameSuffix is added to the space names, to tell the copies apart.
+	nameSuffix string
 
 	manifest *Manifest
 	byKey    map[string]*seededSpace
@@ -122,7 +126,7 @@ func (d *demo) createSpaces() error {
 // createSpace creates a space owned by the spec's owner and adds the other
 // members.
 func (d *demo) createSpace(spec spaceSpec) (*spaces.Space, error) {
-	sp, err := d.spaces.CreateWith(d.ctx, spec.name, d.people[spec.owner], spec.look())
+	sp, err := d.spaces.CreateWith(d.ctx, spec.name+d.nameSuffix, d.people[spec.owner], spec.look())
 	if err != nil {
 		return nil, fmt.Errorf("space %s: %w", spec.name, err)
 	}
@@ -134,7 +138,7 @@ func (d *demo) createSpace(spec spaceSpec) (*spaces.Space, error) {
 		roles[key] = role
 	}
 	d.manifest.Spaces = append(d.manifest.Spaces, ManifestSpace{
-		ID: sp.ID, Name: spec.name, Emoji: spec.emoji, Color: spec.color, Members: roles,
+		ID: sp.ID, Name: spec.name + d.nameSuffix, Emoji: spec.emoji, Color: spec.color, Members: roles,
 	})
 	return sp, nil
 }
@@ -151,7 +155,7 @@ func (d *demo) fill(sp *spaces.Space, spec spaceSpec) (map[string]*ledger.Accoun
 	if err := seedOwn(d.ctx, db, spec.own); err != nil {
 		return nil, fmt.Errorf("space %s: %w", sp.Name, err)
 	}
-	accts, err := spec.workspace(d.ctx, db, d.now)
+	accts, err := spec.workspace(d.ctx, db, d.now, d.months)
 	if err != nil {
 		return nil, fmt.Errorf("space %s: %w", sp.Name, err)
 	}
@@ -161,8 +165,8 @@ func (d *demo) fill(sp *spaces.Space, spec spaceSpec) (map[string]*ledger.Accoun
 // recordAutomations notes the automation rules of each space in the manifest,
 // for the pages that address a rule by id.
 func (d *demo) recordAutomations() error {
-	for i := range d.manifest.Spaces {
-		sp := &d.manifest.Spaces[i]
+	for _, made := range d.ordered {
+		sp := d.manifestSpace(made.ID)
 		db, err := d.st.Space(d.ctx, sp.ID)
 		if err != nil {
 			return err
@@ -173,6 +177,16 @@ func (d *demo) recordAutomations() error {
 		}
 		for _, r := range rules {
 			sp.Automations = append(sp.Automations, r.ID)
+		}
+	}
+	return nil
+}
+
+// manifestSpace returns the manifest entry of the space with id.
+func (d *demo) manifestSpace(id int64) *ManifestSpace {
+	for i := range d.manifest.Spaces {
+		if d.manifest.Spaces[i].ID == id {
+			return &d.manifest.Spaces[i]
 		}
 	}
 	return nil

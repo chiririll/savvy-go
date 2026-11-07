@@ -3,6 +3,8 @@ package seed
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"savvy-go/internal/auth"
 )
@@ -29,21 +31,39 @@ var demoUsers = []demoUser{
 	{userDemo, "Demo User", "demo@demo.com", "demo", auth.RoleUser, false},
 }
 
-// createDemoUsers creates the users and returns them by key.
-func createDemoUsers(ctx context.Context, users auth.Users) (map[string]*auth.User, error) {
+// copyOf returns u as the n-th copy: "admin@savvy.app" becomes "admin1@savvy.app",
+// the key "alex" becomes "alex1". Copy 0 is u itself.
+func (u demoUser) copyOf(n int) demoUser {
+	if n == 0 {
+		return u
+	}
+	sfx := strconv.Itoa(n)
+	local, domain, _ := strings.Cut(u.email, "@")
+	u.key += sfx
+	u.name += " " + sfx
+	u.email = local + sfx + "@" + domain
+	return u
+}
+
+// createDemoUsers creates copy n of the users (0 is the regular set) and
+// returns the created accounts by the base key, with the users of the copy.
+func createDemoUsers(ctx context.Context, users auth.Users, n int) (map[string]*auth.User, []demoUser, error) {
 	out := map[string]*auth.User{}
-	for _, u := range demoUsers {
+	var made []demoUser
+	for _, base := range demoUsers {
+		u := base.copyOf(n)
 		pass := u.pass
 		created, err := users.Create(ctx, u.name, u.email, &pass, u.role)
 		if err != nil {
-			return nil, fmt.Errorf("user %s: %w", u.email, err)
+			return nil, nil, fmt.Errorf("user %s: %w", u.email, err)
 		}
 		if !u.unverified {
 			if err := users.SetEmailVerified(ctx, created.ID, true); err != nil {
-				return nil, fmt.Errorf("verify %s: %w", u.email, err)
+				return nil, nil, fmt.Errorf("verify %s: %w", u.email, err)
 			}
 		}
-		out[u.key] = created
+		out[base.key] = created
+		made = append(made, u)
 	}
-	return out, nil
+	return out, made, nil
 }
