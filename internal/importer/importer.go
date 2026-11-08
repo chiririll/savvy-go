@@ -7,6 +7,7 @@ import (
 	"sort"
 	"time"
 
+	"savvy-go/internal/audit"
 	repo "savvy-go/internal/db/repo/importer"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/money"
@@ -189,10 +190,13 @@ func (s Service) Execute(ctx context.Context, importID string, mapping, options 
 	run := importRun{s: s, accountID: accountID, unit: unit, resolver: resolver, now: now, errs: []RowError{}}
 	for i, row := range rows {
 		if err := run.row(ctx, row, mapping, options, i+1); err != nil {
-			return s.fail(ctx, importID, err.Error())
+			return s.failLogged(ctx, importID, run, err)
 		}
 	}
 	if err := run.flush(ctx); err != nil {
+		return s.failLogged(ctx, importID, run, err)
+	}
+	if err := s.record(ctx, importID, run); err != nil {
 		return s.fail(ctx, importID, err.Error())
 	}
 	sort.SliceStable(run.errs, func(i, j int) bool { return run.errs[i].Row < run.errs[j].Row })
@@ -342,4 +346,31 @@ func (s Service) Preview(ctx context.Context, im *Import, mapping, options map[s
 
 func (s Service) fail(ctx context.Context, id, msg string) error {
 	return s.repo().Fail(ctx, id, msg, time.Now().UTC())
+}
+
+// EntityImport is the entity type of a CSV import in the audit log.
+const EntityImport = "import"
+
+// record writes the one audit entry of an import: how many transactions it
+// stored. The rows themselves are not logged one by one; they carry the
+// external source "csv" and the import's rows can be found by it.
+func (s Service) record(ctx context.Context, importID string, run importRun) error {
+	if run.created == 0 {
+		return nil
+	}
+	after, _ := json.Marshal(map[string]any{
+		"importId": importID, "created": run.created, "skipped": run.skipped, "rejected": len(run.errs),
+	})
+	_, err := audit.Log{DB: s.DB}.Record(ctx, s.DB, audit.Change{
+		EntityType: EntityImport, Op: audit.OpCreate, After: after,
+		Details: fmt.Sprintf("csv import %s: %d created, %d skipped, %d rejected",
+			importID, run.created, run.skipped, len(run.errs)),
+	})
+	return err
+}
+
+// failLogged fails the import and still logs what it stored before it stopped.
+func (s Service) failLogged(ctx context.Context, importID string, run importRun, cause error) error {
+	_ = s.record(ctx, importID, run)
+	return s.fail(ctx, importID, cause.Error())
 }

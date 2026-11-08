@@ -35,7 +35,9 @@ const (
 		"and always say which currency a figure is in. Dates are YYYY-MM-DD. " +
 		"Tools that create, change or delete data work only when the user granted write access; they act as the " +
 		"user, so do not use them unless the user asked for the change, " +
-		"and ask before deleting. Amounts are strings, for example \"12.50\"."
+		"and ask before deleting. Amounts are strings, for example \"12.50\". " +
+		"Everything you change is logged: if you made a mistake, find the change with list_my_actions and take it " +
+		"back with rollback_actions, which works even without permission to delete."
 )
 
 // Handler is the /mcp endpoint. Inner is the app's own router: tools call it
@@ -109,6 +111,7 @@ func (h Handler) mcpServer(perms []string) *mcp.Server {
 	)
 	h.addSimpleReadTools(srv)
 	h.addQueryReadTools(srv)
+	h.addHistoryRead(srv)
 	h.hideUngrantedTools(srv, h.addMCPWriteTools(srv), perms)
 	return srv
 }

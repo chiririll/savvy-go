@@ -53,6 +53,23 @@ type ApiTokenSpace struct {
 	SpaceID    int64
 }
 
+type AuditLog struct {
+	ID           int64
+	At           string
+	Source       string
+	UserID       sql.NullInt64
+	TokenID      sql.NullInt64
+	TokenLabel   sql.NullString
+	EntityType   string
+	EntityID     sql.NullInt64
+	Op           string
+	BeforeJson   sql.NullString
+	AfterJson    sql.NullString
+	BatchID      sql.NullString
+	RolledBackBy sql.NullInt64
+	Details      sql.NullString
+}
+
 type AuthSession struct {
 	ID                int64
 	UserID            int64

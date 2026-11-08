@@ -147,6 +147,74 @@ func (q *Queries) GetTransaction(ctx context.Context, id int64) (GetTransactionR
 	return i, err
 }
 
+const getTransactionsByIDs = `-- name: GetTransactionsByIDs :many
+SELECT t.id, t.type, t.status, t.description, t.date, t.day_order, t.external_source, t.external_id, t.created_by,
+	t.created_at, t.updated_at
+FROM transactions t
+WHERE t.id IN (/*SLICE:ids*/?)
+ORDER BY t.id
+`
+
+type GetTransactionsByIDsRow struct {
+	ID             int64
+	Type           string
+	Status         string
+	Description    sql.NullString
+	Date           sql.NullString
+	DayOrder       sql.NullInt64
+	ExternalSource sql.NullString
+	ExternalID     sql.NullString
+	CreatedBy      sql.NullInt64
+	CreatedAt      sql.NullString
+	UpdatedAt      sql.NullString
+}
+
+// GetTransaction for many ids at once, for reading back a bulk call.
+func (q *Queries) GetTransactionsByIDs(ctx context.Context, ids []int64) ([]GetTransactionsByIDsRow, error) {
+	query := getTransactionsByIDs
+	var queryParams []interface{}
+	if len(ids) > 0 {
+		for _, v := range ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetTransactionsByIDsRow{}
+	for rows.Next() {
+		var i GetTransactionsByIDsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Type,
+			&i.Status,
+			&i.Description,
+			&i.Date,
+			&i.DayOrder,
+			&i.ExternalSource,
+			&i.ExternalID,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const insertPayment = `-- name: InsertPayment :exec
 INSERT INTO payments (transaction_id, account_id, amount, space_transfer_uuid) VALUES (?,?,?,?)
 `
@@ -235,6 +303,44 @@ type InsertTransactionTagParams struct {
 
 func (q *Queries) InsertTransactionTag(ctx context.Context, arg InsertTransactionTagParams) error {
 	_, err := q.db.ExecContext(ctx, insertTransactionTag, arg.TransactionID, arg.TagID)
+	return err
+}
+
+const insertTransactionWithID = `-- name: InsertTransactionWithID :exec
+INSERT INTO transactions (id, type, description, date, status, day_order, external_source, external_id,
+	created_by, created_at, updated_at)
+VALUES (?,?,?,?,?,?,?,?,?,?,?)
+`
+
+type InsertTransactionWithIDParams struct {
+	ID             int64
+	Type           string
+	Description    sql.NullString
+	Date           sql.NullString
+	Status         string
+	DayOrder       sql.NullInt64
+	ExternalSource sql.NullString
+	ExternalID     sql.NullString
+	CreatedBy      sql.NullInt64
+	CreatedAt      sql.NullString
+	UpdatedAt      sql.NullString
+}
+
+// Puts a deleted transaction back under its own id (a rollback).
+func (q *Queries) InsertTransactionWithID(ctx context.Context, arg InsertTransactionWithIDParams) error {
+	_, err := q.db.ExecContext(ctx, insertTransactionWithID,
+		arg.ID,
+		arg.Type,
+		arg.Description,
+		arg.Date,
+		arg.Status,
+		arg.DayOrder,
+		arg.ExternalSource,
+		arg.ExternalID,
+		arg.CreatedBy,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
 	return err
 }
 
@@ -537,6 +643,35 @@ func (q *Queries) ListTransactionLinks(ctx context.Context, ids []int64) ([]List
 		return nil, err
 	}
 	return items, nil
+}
+
+const restoreTransactionRow = `-- name: RestoreTransactionRow :exec
+UPDATE transactions SET type=?, description=?, date=?, status=?, day_order=?, updated_at=? WHERE id=?
+`
+
+type RestoreTransactionRowParams struct {
+	Type        string
+	Description sql.NullString
+	Date        sql.NullString
+	Status      string
+	DayOrder    sql.NullInt64
+	UpdatedAt   sql.NullString
+	ID          int64
+}
+
+// Puts the changeable columns back (a rollback). The external key and the
+// creator are never changed after a create, so they are not written.
+func (q *Queries) RestoreTransactionRow(ctx context.Context, arg RestoreTransactionRowParams) error {
+	_, err := q.db.ExecContext(ctx, restoreTransactionRow,
+		arg.Type,
+		arg.Description,
+		arg.Date,
+		arg.Status,
+		arg.DayOrder,
+		arg.UpdatedAt,
+		arg.ID,
+	)
+	return err
 }
 
 const setTransactionDayOrder = `-- name: SetTransactionDayOrder :exec

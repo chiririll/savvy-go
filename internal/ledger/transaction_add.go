@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
+
+	"savvy-go/internal/audit"
 	repo "savvy-go/internal/db/repo/ledger"
 	"savvy-go/internal/store"
 )
@@ -60,6 +63,7 @@ func (s Transactions) addMany(ctx context.Context, ins []TxInput) ([]int64, []pr
 		ps[i] = p
 	}
 	ids := make([]int64, len(ins))
+	batch := uuid.NewString()
 	err := store.Tx(ctx, s.DB, func(d store.DB) error {
 		for i, p := range ps {
 			id, err := s.insert(ctx, d, p)
@@ -68,7 +72,7 @@ func (s Transactions) addMany(ctx context.Context, ins []TxInput) ([]int64, []pr
 			}
 			ids[i] = id
 		}
-		return nil
+		return s.recordCreated(ctx, d, ids, batch)
 	})
 	if err != nil {
 		return nil, nil, err
@@ -84,8 +88,10 @@ func (s Transactions) add(ctx context.Context, in TxInput) (int64, built, error)
 	}
 	var id int64
 	err = store.Tx(ctx, s.DB, func(d store.DB) error {
-		id, err = s.insert(ctx, d, p)
-		return err
+		if id, err = s.insert(ctx, d, p); err != nil {
+			return err
+		}
+		return s.record(ctx, d, id, audit.OpCreate, "", nil)
 	})
 	if err != nil {
 		return 0, built{}, err
@@ -146,5 +152,8 @@ func (s Transactions) insert(ctx context.Context, d store.DB, p prepared) (int64
 	if err != nil {
 		return 0, err
 	}
-	return id, s.store(ctx, d, id, p.b, p.in.TagIDs)
+	if err := s.store(ctx, d, id, p.b, p.in.TagIDs); err != nil {
+		return 0, err
+	}
+	return id, nil
 }

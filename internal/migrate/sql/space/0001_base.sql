@@ -297,3 +297,43 @@ CREATE TABLE IF NOT EXISTS space_settings (
     key TEXT PRIMARY KEY,
     value TEXT
 ) STRICT;
+
+-- What changed in the space, by whom and through which door. One row per
+-- changed entity, written in the same database transaction as the change, so
+-- the log cannot disagree with the data. before_json / after_json are
+-- snapshots of the entity (money as exact minor units with the account or
+-- currency ids it belongs to), enough to undo the change.
+--
+-- No foreign keys on purpose: the actor lives in the server database, and a
+-- row must outlive the entity, the token and the user it names. Only a space
+-- admin removes rows, by hand (internal/audit), and that is logged too.
+CREATE TABLE IF NOT EXISTS audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    at TEXT NOT NULL,
+    -- ui, api, mcp, or system (automation, recurring, import, cleanup).
+    source TEXT NOT NULL,
+    -- NULL for a system source. A server user; no foreign key across databases.
+    user_id INTEGER,
+    -- The API token of the request; NULL for a browser session and for system.
+    token_id INTEGER,
+    -- The token's name when the row was written, for reading the log after the token is gone.
+    token_label TEXT,
+    entity_type TEXT NOT NULL,
+    -- NULL only for a row about the log itself (op = 'cleanup').
+    entity_id INTEGER,
+    -- create, update, delete, confirm, skip, rollback, cleanup.
+    op TEXT NOT NULL,
+    before_json TEXT CHECK (before_json IS NULL OR json_valid(before_json)),
+    after_json TEXT CHECK (after_json IS NULL OR json_valid(after_json)),
+    -- Rows of one bulk call share it; rolling one back rolls the whole batch back.
+    batch_id TEXT,
+    -- The id of the rollback row that undid this one.
+    rolled_back_by INTEGER,
+    -- For a rollback row, the id of the row it undid; for a cleanup, what it removed.
+    details TEXT
+) STRICT;
+CREATE INDEX IF NOT EXISTS audit_log_token_idx ON audit_log (token_id, id) WHERE token_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS audit_log_user_idx ON audit_log (user_id, id) WHERE user_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS audit_log_entity_idx ON audit_log (entity_type, entity_id, id);
+CREATE INDEX IF NOT EXISTS audit_log_batch_idx ON audit_log (batch_id) WHERE batch_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS audit_log_at_idx ON audit_log (at);

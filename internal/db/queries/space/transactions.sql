@@ -35,6 +35,14 @@ SELECT t.id, t.type, t.status, t.description, t.date, t.day_order, t.external_so
 FROM transactions t
 WHERE t.id = ?;
 
+-- name: GetTransactionsByIDs :many
+-- GetTransaction for many ids at once, for reading back a bulk call.
+SELECT t.id, t.type, t.status, t.description, t.date, t.day_order, t.external_source, t.external_id, t.created_by,
+	t.created_at, t.updated_at
+FROM transactions t
+WHERE t.id IN (sqlc.slice('ids'))
+ORDER BY t.id;
+
 -- name: ExistsTransactionExternalID :one
 SELECT EXISTS (SELECT 1 FROM transactions WHERE external_id = ? AND external_source = ?);
 
@@ -127,3 +135,14 @@ DELETE FROM transaction_tag WHERE transaction_id = ?;
 -- name: InsertTransactionTag :exec
 INSERT INTO transaction_tag (transaction_id, tag_id) VALUES (?,?) ON CONFLICT DO NOTHING;
 
+
+-- name: InsertTransactionWithID :exec
+-- Puts a deleted transaction back under its own id (a rollback).
+INSERT INTO transactions (id, type, description, date, status, day_order, external_source, external_id,
+	created_by, created_at, updated_at)
+VALUES (?,?,?,?,?,?,?,?,?,?,?);
+
+-- name: RestoreTransactionRow :exec
+-- Puts the changeable columns back (a rollback). The external key and the
+-- creator are never changed after a create, so they are not written.
+UPDATE transactions SET type=?, description=?, date=?, status=?, day_order=?, updated_at=? WHERE id=?;

@@ -108,6 +108,21 @@ Send `external_id` (up to 255 characters) with a new transaction to give it your
 
 A rule is `{"template": {...}, "schedule": {...}, "is_active": true}`. The template is a transaction exactly as above, except that the amount of **one** payment may be `null` (and `"estimated": true`): each occurrence then takes whatever balances the others at that day's rates, which covers a transfer between currencies. The schedule is `{"frequency": "monthly", "interval": 1, "day_of_month": 5, "start": "2026-12-05", "end": null}`. A rule with a template that stops working (an account was deleted) stops, with the reason in `error`; saving it again clears the error.
 
+## Audit log
+
+Every change to a transaction (created, edited, deleted, confirmed, skipped, or part of a bulk create) is written to the space's audit log in the same save as the change: when, who (the user, and the API token if there was one), through which door (`ui`, `api`, `mcp`, or `system` for rules and the like, with no user), and the transaction before and after, with exact amounts as minor units. Occurrences that recurring rules make on schedule are logged as `system`. A CSV import is one entry (`entity_type` `import`, no entity id) saying how many transactions it created, skipped and rejected; it is not rolled back from the log, and its transactions can be found by the external source `csv`. Not logged yet: accounts, categories and the other parts of a space, and putting transactions in a different order within a day.
+
+| Route | Needs | Does |
+|-------|-------|------|
+| `GET /spaces/{id}/audit-log` | `audit:read` | newest first; filters `entity_type`, `entity_id`, `before` (the next page), `limit` (up to 200). A token sees the entries it made, a space admin all (and may filter with `token_id`), any other member their own. Each entry has `rollbackable` and, if not, `rollbackBlockedReason` |
+| `GET /spaces/{id}/audit-log/{entry}` | `audit:read` | one entry with `before` and `after` |
+| `POST /spaces/{id}/audit-log/rollback` | `audit:write` | undo `{"ids": [..]}` or a bulk call `{"batch_id": ".."}`, newest first, all or none. A token undoes only its own entries; in the app a space admin undoes any |
+| `DELETE /spaces/{id}/audit-log` | space admin, signed in | clear the log (`?token_id=` only that token's entries) |
+
+Rolling back puts the saved copy back; it does not repeat the change through the normal rules, so a token that may add but not delete still takes its own create back. It answers `409` when the transaction was changed after the entry (`changed_since`), the entry was already rolled back (`already_rolled_back`), or a restored `external_id` is taken again (`external_id_exists`). The `audit` permission is separate from the others: an Editor token has `audit:write`, a token made before it existed does not.
+
+**Clearing** is manual and only by a space admin in a signed-in session; nothing prunes the log by itself. Afterwards the log holds one entry saying who cleared it, when, and how many entries went. Cleared entries can no longer be rolled back. Entries stay after the transaction, the token or the user they name is deleted.
+
 ## Updates
 
 `PATCH` changes only the fields it sends: omitted fields keep their values, and an explicit `null` clears an optional field such as a description or an end date. On a transaction, `payments` and `lines` are replaced as a whole when sent.

@@ -125,6 +125,7 @@ func (h Handler) addMCPWriteTools(srv *mcp.Server) map[string]mcpNeed {
 	k.debtTools()
 	k.creditCardTools()
 	k.ruleTools()
+	k.historyTools()
 	return k.needs
 }
 

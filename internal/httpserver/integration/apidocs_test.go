@@ -71,7 +71,7 @@ var undocumentedInSpace = []string{"/s3/multipart", "/transactions/import", "/ba
 func isUndocumented(path string) bool {
 	if rest, ok := strings.CutPrefix(path, "/api/spaces/{space}"); ok {
 		for _, p := range undocumentedInSpace {
-			if strings.HasPrefix(rest, p) {
+			if rest == p || strings.HasPrefix(rest, p+"/") {
 				return true
 			}
 		}

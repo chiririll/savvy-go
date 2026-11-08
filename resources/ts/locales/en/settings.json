@@ -469,6 +469,7 @@
         },
         "resource": {
             "accounts": "Accounts",
+            "audit": "Change log (rolling back own changes)",
             "automation": "Automation rules",
             "budgets": "Budgets",
             "categories": "Categories",

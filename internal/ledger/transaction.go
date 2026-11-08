@@ -10,6 +10,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
+	"savvy-go/internal/audit"
 	"savvy-go/internal/db/filter"
 	repo "savvy-go/internal/db/repo/ledger"
 	"savvy-go/internal/money"
@@ -438,7 +439,7 @@ func (s Transactions) update(ctx context.Context, id int64, in TxInput, read boo
 	default:
 		return nil, seen.refuse(ActionEdit)
 	}
-	err = store.Tx(ctx, s.DB, func(d store.DB) error {
+	err = s.audited(ctx, id, audit.OpUpdate, func(d store.DB) error {
 		if err := (repo.Repo{DB: d}).UpdateTransaction(ctx, id, repo.TxFields{
 			Type: in.Type, Description: blankToNil(in.Description), Date: in.Date,
 		}, time.Now().UTC()); err != nil {
@@ -521,49 +522,6 @@ func sameInt(a, b *int64) bool   { return (a == nil) == (b == nil) && (a == nil 
 func sameStr(a, b *string) bool  { return (a == nil) == (b == nil) && (a == nil || *a == *b) }
 func sameDate(a, b *string) bool { return sameStr(a, b) }
 
-// ErrReorder is returned for a reorder the list cannot show: ids that repeat,
-// do not exist or are not on the day.
-var ErrReorder = errors.New("reorder: ids must be distinct transactions of that day")
-
-// Reorder puts the transactions ids, oldest first, in that order within
-// the calendar day (YYYY-MM-DD). The ids may be only some of the day's
-// transactions (a filtered list): they trade the places they already hold and
-// the rest stay where they are. Across days nothing moves.
-func (s Transactions) Reorder(ctx context.Context, day string, ids []int64) error {
-	if _, err := time.Parse("2006-01-02", day); err != nil {
-		return fmt.Errorf("day must be YYYY-MM-DD")
-	}
-	if len(ids) == 0 {
-		return nil
-	}
-	return store.Tx(ctx, s.DB, func(d store.DB) error {
-		r := repo.Repo{DB: d}
-		slots, err := r.DaySlots(ctx, ids)
-		if err != nil {
-			return err
-		}
-		if len(slots) != len(ids) {
-			return ErrReorder
-		}
-		keys := make([]int64, 0, len(slots))
-		seen := make(map[int64]bool, len(ids))
-		for _, sl := range slots {
-			if sl.Day != day || seen[sl.ID] {
-				return ErrReorder
-			}
-			seen[sl.ID] = true
-			keys = append(keys, sl.Key)
-		}
-		slices.Sort(keys)
-		for i, id := range ids {
-			if err := r.SetDayOrder(ctx, id, keys[i]); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-}
-
 func (s Transactions) Delete(ctx context.Context, id int64) error {
 	cur, err := s.ByID(ctx, id)
 	if err != nil || cur == nil {
@@ -572,7 +530,9 @@ func (s Transactions) Delete(ctx context.Context, id int64) error {
 	if err := cur.without(s.as).refuse(ActionDelete); err != nil {
 		return err
 	}
-	return s.repo().DeleteTransaction(ctx, id)
+	return s.audited(ctx, id, audit.OpDelete, func(d store.DB) error {
+		return (repo.Repo{DB: d}).DeleteTransaction(ctx, id)
+	})
 }
 
 // Amendment replaces the payments and lines of a pending occurrence when it
@@ -620,7 +580,7 @@ func (s Transactions) Confirm(ctx context.Context, id int64, date string, amend 
 			return nil, err
 		}
 	}
-	err = store.Tx(ctx, s.DB, func(d store.DB) error {
+	err = s.audited(ctx, id, audit.OpConfirm, func(d store.DB) error {
 		r := repo.Repo{DB: d}
 		if amended {
 			if err := r.ReplacePayments(ctx, id, b.payments); err != nil {
@@ -650,7 +610,10 @@ func (s Transactions) Skip(ctx context.Context, id int64) (*Transaction, error) 
 	if err := cur.without(s.as).refuse(ActionSkip); err != nil {
 		return nil, err
 	}
-	if err := s.repo().SkipTransaction(ctx, id, time.Now().UTC()); err != nil {
+	err = s.audited(ctx, id, audit.OpSkip, func(d store.DB) error {
+		return (repo.Repo{DB: d}).SkipTransaction(ctx, id, time.Now().UTC())
+	})
+	if err != nil {
 		return nil, err
 	}
 	return s.ByID(ctx, id)
@@ -763,17 +726,23 @@ func (s Transactions) SetCategory(ctx context.Context, id, categoryID int64) err
 	if cat.Type != lineCategoryType(tx.Type) {
 		return ErrLineCategory
 	}
-	return s.repo().SetTransactionCategory(ctx, id, categoryID, time.Now().UTC())
+	return s.audited(ctx, id, audit.OpUpdate, func(d store.DB) error {
+		return (repo.Repo{DB: d}).SetTransactionCategory(ctx, id, categoryID, time.Now().UTC())
+	})
 }
 
 // SetDescription changes only a transaction's description (an automation action).
 func (s Transactions) SetDescription(ctx context.Context, id int64, description string) error {
-	return s.repo().SetTransactionDescription(ctx, id, description, time.Now().UTC())
+	return s.audited(ctx, id, audit.OpUpdate, func(d store.DB) error {
+		return (repo.Repo{DB: d}).SetTransactionDescription(ctx, id, description, time.Now().UTC())
+	})
 }
 
 // SetTags replaces the tags of a transaction.
 func (s Transactions) SetTags(ctx context.Context, txID int64, ids []int64) error {
-	return s.repo().SetTags(ctx, txID, ids)
+	return s.audited(ctx, txID, audit.OpUpdate, func(d store.DB) error {
+		return (repo.Repo{DB: d}).SetTags(ctx, txID, ids)
+	})
 }
 
 // IsFuture compares plain "YYYY-MM-DD" calendar dates as strings, using

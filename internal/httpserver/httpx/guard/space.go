@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"savvy-go/internal/audit"
 	"savvy-go/internal/auth"
 	"savvy-go/internal/auth/permissions"
 	"savvy-go/internal/httpserver/httpx"
@@ -62,15 +63,30 @@ func (g *Guard) WithSpace(next http.Handler) http.Handler {
 			return
 		}
 		ctx = httpx.WithScope(ctx, g.Space.NewScope(id, role, db))
+		ctx = audit.WithActor(ctx, actorOf(r, u))
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// actorOf is who a change made by this request is attributed to: the user, and
+// the token and the door it came through (the browser has no token).
+func actorOf(r *http.Request, u *auth.User) audit.Actor {
+	a := audit.Actor{UserID: &u.ID, Source: audit.SourceUI}
+	if t := httpx.Token(r); t != nil {
+		a.TokenID, a.TokenLabel, a.Source = &t.ID, t.Name, audit.SourceAPI
+		if t.Kind == permissions.KindMCP {
+			a.Source = audit.SourceMCP
+		}
+	}
+	return a
 }
 
 // spaceSegments maps the first path segment after /spaces/{id} to the
 // resource a token needs for it. A segment missing here is closed to tokens.
 var spaceSegments = map[string]string{
 	"": "space", "members": "space", "settings": "space", "links": "space", "sync-group": "space",
-	"accounts": "accounts", "accounts-balance-history": "accounts", "accounts-balance-comparison": "accounts",
+	"audit-log": "audit",
+	"accounts":  "accounts", "accounts-balance-history": "accounts", "accounts-balance-comparison": "accounts",
 	"automation-rules": "automation",
 	"budgets":          "budgets",
 	"categories":       "categories", "categories-summary": "categories",

@@ -83,6 +83,23 @@ On the consent page pick **Editor** or **Admin**, or tick Write and Delete under
 - Rules run by themselves on later transactions and can move money between accounts. Grant automation write only to an assistant you trust.
 - Changes look like yours in the app.
 
+## Taking changes back
+
+An assistant that may add and change data can still make a mistake, and a connection without the Delete permission cannot remove the wrong transaction it just made. So every change an assistant makes is logged, and it can take back **its own** changes without Delete:
+
+| Tool | Needs | Does |
+|------|-------|------|
+| `list_my_actions` | audit: read | the changes made with this connection, newest first, each saying whether it can be rolled back now (`rollbackable`) and, if not, why (`rollbackBlockedReason`) |
+| `rollback_actions` | audit: write | undo entries by `ids`, or a whole bulk call by `batch_id`. A created transaction is removed; a changed or deleted one is put back exactly as it was, with its exact amounts in each currency |
+
+- A connection sees and undoes only the entries it made itself. Another connection's entries, yours from the app, or those of a personal API token look as if they did not exist.
+- It is refused, and nothing at all is undone, if the same transaction was changed again after the assistant's change, by anyone: you in the app, another connection, or the assistant itself (it then undoes the newest change first). Whatever you did by hand after it stays.
+- Undoing a delete needs the transaction's account, categories and tags to still exist, and its `external_id` not to be used again by another transaction.
+- Undoing is itself logged and cannot be undone; make the change again instead.
+- `rollback_actions` is marked destructive, so clients ask before running it.
+- The Editor tab of the consent page includes the audit permission. Connections made before it existed do not have it until you add it with the pencil, see below.
+- For now only transactions are logged (a CSV import as one entry that cannot be rolled back). Not logged yet: accounts, categories and the other parts of a space.
+
 ## Changing a connection later
 
 No need to reconnect. In **Account → API tokens**, press the pencil next to the `MCP: …` connection and change spaces or permissions. Removing access is immediate; added access works from the next request, with no new consent screen. Only parts of a space that the tools use can be granted.

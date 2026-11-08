@@ -162,7 +162,8 @@ func TestMCPSessionCookieIsNotEnough(t *testing.T) {
 }
 
 // A client decides what to run unasked from these hints. DestructiveHint is
-// true when absent, so every tool that is not a delete must say false.
+// true when absent, so every tool that is not a delete must say false. The
+// one exception is rollback_actions: it can remove what was created, so it asks.
 func TestMCPToolsMarkedWhatTheyDo(t *testing.T) {
 	a := newTestApp(t)
 	u := a.createUser("mcp@a.com", "secret1", "admin")
@@ -181,7 +182,7 @@ func TestMCPToolsMarkedWhatTheyDo(t *testing.T) {
 			continue
 		}
 		reads := strings.HasPrefix(tool.Name, "list_") || strings.HasPrefix(tool.Name, "get_")
-		deletes := strings.HasPrefix(tool.Name, "delete_")
+		deletes := strings.HasPrefix(tool.Name, "delete_") || tool.Name == "rollback_actions"
 		if ann.ReadOnlyHint != reads {
 			t.Errorf("tool %s: read-only hint must be %v", tool.Name, reads)
 		}
@@ -369,6 +370,7 @@ func TestMCPReadToolsNeedTheirPermissions(t *testing.T) {
 		"list_transactions":           {"space_id": sp},
 		"get_transactions_day_totals": {"space_id": sp, "dates": []string{"2026-02-01"}},
 		"get_report":                  {"space_id": sp, "report": "overview"},
+		"list_my_actions":             {"space_id": sp},
 	}
 	for name, args := range calls {
 		if res := a.call(gs, name, args); res.IsError {
