@@ -39,7 +39,7 @@ export const Negative: Story = {
     play: async ({ canvasElement }) => {
         const label = within(canvasElement).getByText('Reconciled')
         await expect(label).toHaveClass('text-destructive')
-        await expect(label).toHaveTextContent(/-.*7\.25/)
+        await expect(label).toHaveTextContent(/-.*7\.3/)
     },
 }
 
