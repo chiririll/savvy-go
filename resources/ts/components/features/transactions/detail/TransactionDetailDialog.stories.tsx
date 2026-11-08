@@ -104,7 +104,9 @@ export const ReadOnly: Story = {
     },
 }
 
+// On a phone Delete is in the "more" menu, not a footer button.
 export const DeleteAsks: Story = {
+    tags: ['desktop-only'],
     play: async ({ args }) => {
         const view = await dialog()
         await userEvent.click(view.getByRole('button', { name: 'Delete' }))

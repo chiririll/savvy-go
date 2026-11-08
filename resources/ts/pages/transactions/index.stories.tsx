@@ -30,6 +30,11 @@ const rows = [
         amount: -1200,
         payments: [payment({ account: accounts[2], accountId: accounts[2].id, amount: -1200 })],
         lines: [line({ amount: 1200, currencyId: accounts[2].currency?.id })],
+        rowAmount: {
+            main: { currency: accounts[2].currency!, amount: 1200 },
+            totals: [{ currency: accounts[2].currency!, amount: 1200 }],
+            converted: false,
+        },
         date: '2020-05-03',
     }),
     transaction({
@@ -38,6 +43,11 @@ const rows = [
         amount: -1.234,
         payments: [payment({ account: accounts[3], accountId: accounts[3].id, amount: -1.234 })],
         lines: [line({ amount: 1.234, currencyId: accounts[3].currency?.id })],
+        rowAmount: {
+            main: { currency: accounts[3].currency!, amount: 1.234 },
+            totals: [{ currency: accounts[3].currency!, amount: 1.234 }],
+            converted: false,
+        },
         date: '2020-05-02',
     }),
 ]

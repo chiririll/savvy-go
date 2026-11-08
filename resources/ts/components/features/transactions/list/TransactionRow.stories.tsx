@@ -30,6 +30,11 @@ const spent = (account: (typeof accounts)[number], amount: number, overrides = {
     transaction({
         payments: [payment({ account, accountId: account.id, amount: -amount })],
         lines: [line({ amount, currencyId: account.currency?.id })],
+        rowAmount: {
+            main: { currency: account.currency!, amount },
+            totals: [{ currency: account.currency!, amount }],
+            converted: false,
+        },
         ...overrides,
     })
 
@@ -126,6 +131,14 @@ export const SeveralCurrencies: Story = {
                 line({ amount: 30, currencyId: currencies[0].id }),
                 line({ seq: 1, amount: 10, currencyId: currencies[1].id, category: categories[2], categoryId: categories[2].id }),
             ],
+            rowAmount: {
+                main: { currency: currencies[0], amount: 41.2 },
+                totals: [
+                    { currency: currencies[0], amount: 30 },
+                    { currency: currencies[1], amount: 10 },
+                ],
+                converted: true,
+            },
         }),
     },
     play: async ({ canvasElement }) => {
