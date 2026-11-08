@@ -2,6 +2,8 @@ package ledger
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -21,6 +23,7 @@ type Tx struct {
 	Type, Status      string
 	Description, Date *string
 	DayOrder          *int64
+	ExternalSource    *string
 	ExternalID        *string
 	CreatedBy         *int64
 	CreatedAt         *time.Time
@@ -55,7 +58,8 @@ type Line struct {
 func txOf(x sqlc.GetTransactionRow) Tx {
 	return Tx{
 		ID: x.ID, Type: x.Type, Status: x.Status, Description: optString(x.Description), Date: optString(x.Date),
-		DayOrder: optInt64(x.DayOrder), ExternalID: optString(x.ExternalID), CreatedBy: optInt64(x.CreatedBy),
+		DayOrder: optInt64(x.DayOrder), ExternalSource: optString(x.ExternalSource), ExternalID: optString(x.ExternalID),
+		CreatedBy: optInt64(x.CreatedBy),
 		CreatedAt: optTime(x.CreatedAt), UpdatedAt: optTime(x.UpdatedAt),
 		Payments: []Payment{}, Lines: []Line{}, Tags: []Tag{},
 	}
@@ -196,6 +200,7 @@ func (r Repo) load(ctx context.Context, txs []Tx) error {
 type TxFields struct {
 	Type, Status      string
 	Description, Date *string
+	ExternalSource    *string
 	ExternalID        *string
 	CreatedBy         *int64
 }
@@ -209,7 +214,8 @@ func (r Repo) InsertTransaction(ctx context.Context, t TxFields, now time.Time) 
 	}
 	res, err := r.q().InsertTransaction(ctx, sqlc.InsertTransactionParams{
 		Type: t.Type, Description: db.NullString(t.Description), Date: db.NullString(t.Date), Status: status,
-		ExternalID: db.NullString(t.ExternalID), CreatedBy: db.NullInt64(t.CreatedBy),
+		ExternalSource: db.NullString(t.ExternalSource), ExternalID: db.NullString(t.ExternalID),
+		CreatedBy: db.NullInt64(t.CreatedBy),
 		CreatedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now),
 	})
 	if err != nil {
@@ -244,10 +250,46 @@ func (r Repo) SkipTransaction(ctx context.Context, id int64, now time.Time) erro
 	return r.q().SkipTransaction(ctx, sqlc.SkipTransactionParams{UpdatedAt: db.TimeNS(now), ID: id})
 }
 
-// HasExternalID reports whether a transaction with this external id exists.
-func (r Repo) HasExternalID(ctx context.Context, externalID string) (bool, error) {
-	exists, err := r.q().ExistsTransactionExternalID(ctx, db.NS(externalID))
-	return exists, err
+// HasExternalID reports whether a transaction with this external source and
+// id exists.
+func (r Repo) HasExternalID(ctx context.Context, source, externalID string) (bool, error) {
+	return r.q().ExistsTransactionExternalID(ctx, sqlc.ExistsTransactionExternalIDParams{
+		ExternalSource: db.NS(source), ExternalID: db.NS(externalID),
+	})
+}
+
+// IDByExternalID returns the id of the transaction stored with this external
+// source and id, and false when there is none.
+func (r Repo) IDByExternalID(ctx context.Context, source, externalID string) (int64, bool, error) {
+	id, err := r.q().TransactionIDByExternalID(ctx, sqlc.TransactionIDByExternalIDParams{
+		ExternalSource: db.NS(source), ExternalID: db.NS(externalID),
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, false, nil
+	}
+	return id, err == nil, err
+}
+
+// ExternalIDMatch is a transaction that has an external id under a source.
+type ExternalIDMatch struct {
+	Source        string
+	TransactionID int64
+}
+
+// OtherSourcesWithExternalID lists the transactions that have this external id
+// under any source but source, oldest first.
+func (r Repo) OtherSourcesWithExternalID(ctx context.Context, source, externalID string) ([]ExternalIDMatch, error) {
+	rows, err := r.q().TransactionsWithExternalIDOfOtherSources(ctx, sqlc.TransactionsWithExternalIDOfOtherSourcesParams{
+		ExternalID: db.NS(externalID), ExternalSource: db.NS(source),
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]ExternalIDMatch, len(rows))
+	for i, x := range rows {
+		out[i] = ExternalIDMatch{Source: x.ExternalSource.String, TransactionID: x.ID}
+	}
+	return out, nil
 }
 
 // PaymentFields is a payment to store. SpaceTransferUUID is written when the

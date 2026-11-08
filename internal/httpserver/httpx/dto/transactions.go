@@ -84,22 +84,25 @@ func NewDayTotals(days []ledger.DayTotal) []DayTotal {
 // Difference is set only on the answer to a save, when the payments and the
 // lines disagree, in the base currency.
 type Transaction struct {
-	ID                     int64         `json:"id"`
-	Type                   string        `json:"type"`
-	Description            *string       `json:"description"`
-	Date                   *string       `json:"date"`
-	Status                 string        `json:"status"`
-	RecurringTransactionID *int64        `json:"recurringTransactionId"`
-	Amount                 *money.Money  `json:"amount"`
-	RowAmount              *RowAmount    `json:"rowAmount"`
-	ReceivedAmount         *RowAmount    `json:"receivedAmount"`
-	Difference             *money.Money  `json:"difference"`
-	Actions                TxActions     `json:"actions"`
-	Restrictions           []Restriction `json:"restrictions"`
-	Payments               []Payment     `json:"payments"`
-	Lines                  []Line        `json:"lines"`
-	Tags                   []Tag         `json:"tags"`
-	CreatedAt              *time.Time    `json:"createdAt"`
+	ID                     int64           `json:"id"`
+	Type                   string          `json:"type"`
+	Description            *string         `json:"description"`
+	Date                   *string         `json:"date"`
+	Status                 string          `json:"status"`
+	RecurringTransactionID *int64          `json:"recurringTransactionId"`
+	ExternalSource         *string         `json:"externalSource"`
+	ExternalID             *string         `json:"externalId"`
+	ExternalMatches        []ExternalMatch `json:"externalMatches"`
+	Amount                 *money.Money    `json:"amount"`
+	RowAmount              *RowAmount      `json:"rowAmount"`
+	ReceivedAmount         *RowAmount      `json:"receivedAmount"`
+	Difference             *money.Money    `json:"difference"`
+	Actions                TxActions       `json:"actions"`
+	Restrictions           []Restriction   `json:"restrictions"`
+	Payments               []Payment       `json:"payments"`
+	Lines                  []Line          `json:"lines"`
+	Tags                   []Tag           `json:"tags"`
+	CreatedAt              *time.Time      `json:"createdAt"`
 }
 
 func newActions(a ledger.TxActions) TxActions {
@@ -131,6 +134,10 @@ func NewTransaction(t ledger.Transaction) Transaction {
 		Tags:         Map(t.Tags, NewTag),
 		CreatedAt:    utc(t.CreatedAt),
 	}
+	out.ExternalSource, out.ExternalID = t.ExternalSource, t.ExternalID
+	out.ExternalMatches = Map(t.ExternalMatches, func(m ledger.ExternalMatch) ExternalMatch {
+		return ExternalMatch{Source: m.Source, TransactionID: m.TransactionID}
+	})
 	main, received := t.ListAmounts()
 	out.RowAmount, out.ReceivedAmount = newRowAmount(main), newRowAmount(received)
 	if m, ok := t.Amount(); ok {
@@ -173,4 +180,43 @@ type TransactionPage struct {
 	Data    []Transaction       `json:"data"`
 	Meta    PageMeta            `json:"meta"`
 	Summary *TransactionSummary `json:"summary,omitempty"`
+}
+
+// ExternalIDConflict is the answer to creating a transaction whose external
+// key is taken: TransactionID is the one that has it.
+type ExternalIDConflict struct {
+	Message        string `json:"message"`
+	Error          string `json:"error"`
+	ExternalSource string `json:"external_source"`
+	ExternalID     string `json:"external_id"`
+	TransactionID  int64  `json:"transaction_id"`
+}
+
+// ExternalMatch is a transaction with the same external id under another
+// source. It may be the same event entered twice or may not: look before
+// deciding.
+type ExternalMatch struct {
+	Source        string `json:"source"`
+	TransactionID int64  `json:"transactionId"`
+}
+
+// SimilarMatch is an entered transaction that looks like an item searched for,
+// with what they have in common (external_id, amount, date, account, description).
+type SimilarMatch struct {
+	Transaction Transaction `json:"transaction"`
+	Reasons     []string    `json:"reasons"`
+}
+
+// SimilarResult is the answer for one item of a find-similar request, in the
+// order sent; Matches is empty when nothing looks like it.
+type SimilarResult struct {
+	Index   int            `json:"index"`
+	Key     string         `json:"key"`
+	Matches []SimilarMatch `json:"matches"`
+}
+
+func NewSimilarResult(index int, key string, ms []ledger.SimilarMatch) SimilarResult {
+	return SimilarResult{Index: index, Key: key, Matches: Map(ms, func(m ledger.SimilarMatch) SimilarMatch {
+		return SimilarMatch{Transaction: NewTransaction(*m.Transaction), Reasons: m.Reasons}
+	})}
 }

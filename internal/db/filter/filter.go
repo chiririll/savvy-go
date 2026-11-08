@@ -34,17 +34,19 @@ func toBase(minor, decimals int64, rate decimal.Decimal) decimal.Decimal {
 // TxFilter is the HTTP/list filter for transactions. Optional fields are
 // empty when unset; IDs use 0 as unset. Domain code maps this to sqlc nargs.
 type TxFilter struct {
-	Type        string
-	AccountID   int64
-	AccountIDs  []int64
-	Currencies  []string // codes; a transfer matches when either side is one
-	CategoryID  int64
-	CategoryIDs []int64
-	TagIDs      []int64
-	Status      string
-	StartDate   string
-	EndDate     string
-	Dates       []string // only these days (YYYY-MM-DD)
+	Type           string
+	AccountID      int64
+	AccountIDs     []int64
+	Currencies     []string // codes; a transfer matches when either side is one
+	CategoryID     int64
+	CategoryIDs    []int64
+	TagIDs         []int64
+	Status         string
+	ExternalID     string // the caller's own key; with ExternalSource empty, under any source
+	ExternalSource string
+	StartDate      string
+	EndDate        string
+	Dates          []string // only these days (YYYY-MM-DD)
 	// Search is free text: space-separated terms, all of which must match
 	// (see searchWhere).
 	Search  string
@@ -109,6 +111,14 @@ func txWhere(f TxFilter) (string, []any) {
 	if f.Status != "" {
 		q += ` AND t.status = ?`
 		args = append(args, f.Status)
+	}
+	if f.ExternalID != "" {
+		q += ` AND t.external_id = ?`
+		args = append(args, f.ExternalID)
+		if f.ExternalSource != "" {
+			q += ` AND t.external_source = ?`
+			args = append(args, f.ExternalSource)
+		}
 	}
 	if f.StartDate != "" {
 		q += ` AND (t.date IS NULL OR t.date >= ?)`
@@ -216,7 +226,7 @@ func ListTransactions(
 	where, args := txWhere(f)
 	args = append(args, limit, offset)
 	rows, err := sqlDB.QueryContext(ctx, `
-		SELECT t.id, t.type, t.status, t.description, t.date, t.day_order, t.external_id, t.created_by,
+		SELECT t.id, t.type, t.status, t.description, t.date, t.day_order, t.external_source, t.external_id, t.created_by,
 			t.created_at, t.updated_at
 		FROM transactions t
 		`+where+`
@@ -229,7 +239,7 @@ func ListTransactions(
 	out := []sqlc.GetTransactionRow{}
 	for rows.Next() {
 		var r sqlc.GetTransactionRow
-		if err := rows.Scan(&r.ID, &r.Type, &r.Status, &r.Description, &r.Date, &r.DayOrder, &r.ExternalID,
+		if err := rows.Scan(&r.ID, &r.Type, &r.Status, &r.Description, &r.Date, &r.DayOrder, &r.ExternalSource, &r.ExternalID,
 			&r.CreatedBy, &r.CreatedAt, &r.UpdatedAt); err != nil {
 			return nil, err
 		}

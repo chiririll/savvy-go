@@ -144,12 +144,13 @@ func copyAccounts(ctx context.Context, tx *sql.Tx) error {
 // transactionSteps follow the mapping table of the plan, row kind by row kind.
 var transactionSteps = []string{
 	// a debt payment to a card is a transfer to an ordinary account
-	`INSERT INTO main.transactions (id, type, description, date, status, external_id, created_by, created_at, updated_at)
+	`INSERT INTO main.transactions (id, type, description, date, status, external_source, external_id, created_by, created_at, updated_at)
 	SELECT id,
 		CASE WHEN type IN ('debt_lend', 'debt_borrow', 'debt_payment', 'debt_collection')
 			AND to_account_id IN (SELECT id FROM card_debts) THEN 'transfer' ELSE type END,
 		description, date, status,
-		CASE WHEN dedup_hash IS NOT NULL THEN 'csv:' || account_id || ':' || dedup_hash END,
+		CASE WHEN dedup_hash IS NOT NULL THEN 'csv' END,
+		CASE WHEN dedup_hash IS NOT NULL THEN account_id || ':' || dedup_hash END,
 		created_by, created_at, updated_at
 	FROM src.transactions`,
 

@@ -9,11 +9,12 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"savvy-go/internal/httpserver/httpx"
 	"strconv"
 	"strings"
 
+	"savvy-go/internal/auth/permissions"
 	"savvy-go/internal/db/filter"
+	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/httpserver/httpx/dto"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/store"
@@ -43,7 +44,34 @@ func listFilter(r *http.Request) filter.TxFilter {
 	}
 	f.Search = q.Get("q")
 	f.Dates = stringList(q, "dates")
+	f.ExternalID, f.ExternalSource = strings.TrimSpace(q.Get("external_id")), q.Get("external_source")
 	return f
+}
+
+// requestSource is the external source of what this request creates: where it
+// came from, set by the server and never by the client.
+func requestSource(r *http.Request) string {
+	switch t := httpx.Token(r); {
+	case t == nil:
+		return ledger.SourceUI
+	case t.Kind == permissions.KindMCP:
+		return ledger.SourceMCP
+	}
+	return ledger.SourceAPI
+}
+
+// writeCreateError answers a failed create: 409 with the id of the transaction
+// that already has the external key, 422 for anything else.
+func writeCreateError(w http.ResponseWriter, err error) {
+	var dup *ledger.ExternalIDExistsError
+	if errors.As(err, &dup) {
+		httpx.WriteJSON(w, http.StatusConflict, dto.ExternalIDConflict{
+			Message: err.Error(), Error: "external_id_exists",
+			ExternalSource: dup.Source, ExternalID: dup.ExternalID, TransactionID: dup.TransactionID,
+		})
+		return
+	}
+	httpx.WriteMessage(w, 422, err.Error())
 }
 
 func stringList(q url.Values, key string) []string {
@@ -143,7 +171,7 @@ func transactionsStore(w http.ResponseWriter, r *http.Request) {
 	}
 	tx, err := httpx.Scope(r).Txs.Create(r.Context(), in)
 	if err != nil {
-		httpx.WriteMessage(w, 422, err.Error())
+		writeCreateError(w, err)
 		return
 	}
 	if tx.Status == "confirmed" {
@@ -329,7 +357,17 @@ func decodeTx(w http.ResponseWriter, r *http.Request) (ledger.TxInput, bool) {
 		httpx.WriteMessage(w, 422, "The given data was invalid: "+err.Error())
 		return ledger.TxInput{}, false
 	}
-	return in, true
+	return fromRequest(r, in), true
+}
+
+// fromRequest gives an input that carries an external id the source of the
+// request.
+func fromRequest(r *http.Request, in ledger.TxInput) ledger.TxInput {
+	if in.ExternalID != nil {
+		src := requestSource(r)
+		in.ExternalSource = &src
+	}
+	return in
 }
 
 // parseTx reads one transaction from its JSON.
@@ -378,11 +416,12 @@ func transactionsBulkStore(w http.ResponseWriter, r *http.Request) {
 			httpx.WriteMessage(w, 422, "The given data was invalid: transaction "+strconv.Itoa(i+1)+": "+err.Error())
 			return
 		}
+		ins[i] = fromRequest(r, ins[i])
 	}
 	scope := httpx.Scope(r)
 	created, err := scope.Txs.CreateMany(r.Context(), ins)
 	if err != nil {
-		httpx.WriteMessage(w, 422, err.Error())
+		writeCreateError(w, err)
 		return
 	}
 	for i, tx := range created {

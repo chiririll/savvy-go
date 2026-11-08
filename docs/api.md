@@ -92,6 +92,16 @@ An answer carries `payments`, `lines`, `amount` (what the payments net to, `null
 
 `POST /transactions/bulk` takes `{"transactions": [...]}`, up to 500 records shaped like one `POST /transactions` body, and stores all of them or none in one save; an invalid record fails the request with its position (`transaction 3: …`). It answers with the created transactions in the order sent.
 
+### External id and duplicates
+
+Send `external_id` (up to 255 characters) with a new transaction to give it your own key, for example the receipt number `F6HDVMNQ-5105`. Savvy records where the request came from as `externalSource`: `ui` for the app, `api` for a personal API token, `mcp` for a connected AI assistant (the CSV import writes `csv`). You cannot set the source, so nobody can pose as another one. The key can be set only when the transaction is created; an update that sends one is refused.
+
+- **Same source, same id: 409.** Creating it again, for example a retry after a timeout, stores nothing and answers `{"error": "external_id_exists", "external_id": "…", "transaction_id": 42}`, with the id of the transaction that has the key. A bulk request is all or none, so one repeated key stops the whole request, and a key repeated inside the request counts too.
+- **Same id, another source: stored, with a warning.** The answer lists such transactions in `externalMatches` (`[{"source": "api", "transactionId": 42}]`). It may be the same event entered twice or two events that share a number; look before you delete one.
+- **"Was this receipt entered?"** `GET /transactions?external_id=F6HDVMNQ-5105` finds it under any source; add `external_source` to narrow it to one.
+
+`POST /transactions/find-similar` helps when a source has no key, such as a bank statement. It takes `{"items": [...], "date_tolerance_days": 1, "max_per_item": 5}` with up to 500 items. An item is `{"key", "date", "amount", "currency" or "account_id", "description", "external_id"}`, and the answer has one entry per item, in order, with `matches`: the entered transactions that look like it, best first, each with its `reasons` (`external_id`, `amount`, `date`, `account`, `description`). The amount must equal a payment exactly in the item's currency, the sign is ignored, and an amount with more decimals than the currency keeps matches nothing, so 10 USD never matches 10 JPY. The date may differ by `date_tolerance_days` (0 to 31). Skipped transactions never match. A match is a hint, not proof. The request stores nothing, but it is a POST, so it needs write permission.
+
 `POST /transactions/{id}/confirm` takes an optional `date`; for the open occurrence of a recurring rule it may also take `payments` and `lines` with the real amounts. Confirming or skipping an occurrence makes the rule's next one.
 
 ### Recurring rules

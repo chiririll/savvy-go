@@ -366,16 +366,45 @@ func TestCategoryAndDescriptionCanBeSetAlone(t *testing.T) {
 
 func TestExternalIDIsLookedUp(t *testing.T) {
 	f := newFixture(t)
-	ext := "csv:1:abc"
-	if has, _ := f.repo.HasExternalID(ctx, ext); has {
+	ext, src := "1:abc", "csv"
+	if has, _ := f.repo.HasExternalID(ctx, src, ext); has {
 		t.Fatal("found an id nothing was stored with")
 	}
-	id, _ := f.repo.InsertTransaction(ctx, ledgerrepo.TxFields{Type: "expense", ExternalID: &ext}, time.Now().UTC())
-	if has, _ := f.repo.HasExternalID(ctx, ext); !has {
+	id, _ := f.repo.InsertTransaction(ctx, ledgerrepo.TxFields{Type: "expense", ExternalSource: &src, ExternalID: &ext}, time.Now().UTC())
+	if has, _ := f.repo.HasExternalID(ctx, src, ext); !has {
 		t.Fatal("did not find the external id")
 	}
 	if got, _ := f.repo.Transaction(ctx, id); got.ExternalID == nil || *got.ExternalID != ext {
 		t.Fatalf("external id = %v", got.ExternalID)
+	}
+}
+
+func TestFilterByExternalID(t *testing.T) {
+	f := newFixture(t)
+	a, b, api, mcp := "R-1", "R-2", "api", "mcp"
+	idA, _ := f.repo.InsertTransaction(ctx, ledgerrepo.TxFields{Type: "expense", ExternalSource: &api, ExternalID: &a}, time.Now().UTC())
+	f.repo.InsertTransaction(ctx, ledgerrepo.TxFields{Type: "expense", ExternalSource: &api, ExternalID: &b}, time.Now().UTC())
+	idM, _ := f.repo.InsertTransaction(ctx, ledgerrepo.TxFields{Type: "expense", ExternalSource: &mcp, ExternalID: &a}, time.Now().UTC())
+	f.repo.InsertTransaction(ctx, ledgerrepo.TxFields{Type: "expense"}, time.Now().UTC())
+	if id, found, err := f.repo.IDByExternalID(ctx, "api", a); err != nil || !found || id != idA {
+		t.Fatalf("IDByExternalID = %d, %v, %v", id, found, err)
+	}
+	if _, found, _ := f.repo.IDByExternalID(ctx, "api", "nope"); found {
+		t.Fatal("found an id nothing was stored with")
+	}
+	if _, found, _ := f.repo.IDByExternalID(ctx, "ui", a); found {
+		t.Fatal("found an id under a source it was not stored with")
+	}
+	list, _, err := f.repo.Filtered(ctx, filter.TxFilter{ExternalID: a, ExternalSource: "api"}, 50, 0)
+	if err != nil || len(list) != 1 || list[0].ID != idA {
+		t.Fatalf("filtered by source and id = %+v, %v", list, err)
+	}
+	if list, _, _ = f.repo.Filtered(ctx, filter.TxFilter{ExternalID: a}, 50, 0); len(list) != 2 {
+		t.Fatalf("the id alone must find it under every source: %+v", list)
+	}
+	others, err := f.repo.OtherSourcesWithExternalID(ctx, "api", a)
+	if err != nil || len(others) != 1 || others[0].TransactionID != idM || others[0].Source != "mcp" {
+		t.Fatalf("other sources = %+v, %v", others, err)
 	}
 }
 

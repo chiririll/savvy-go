@@ -31,7 +31,8 @@ erDiagram
         TEXT date
         TEXT status "pending, confirmed, skipped"
         INTEGER day_order "NULL = by id; set only by hand"
-        TEXT external_id "NULL; not unique; importer adds a prefix"
+        TEXT external_source "NULL; ui, api, mcp or csv; set by the server"
+        TEXT external_id "NULL with the source; not unique by constraint"
         INTEGER created_by "server user, no FK"
         TEXT created_at
         TEXT updated_at
@@ -239,7 +240,7 @@ The space set starts again from one base file with the whole v1.1 schema. v1.0 f
 
 Every foreign key column first in some index (`TestForeignKeysAreIndexed`).
 
-- `transactions (date)`, `transactions (external_id) WHERE external_id IS NOT NULL` (not unique).
+- `transactions (date)`, `transactions (external_id, external_source) WHERE external_id IS NOT NULL` (not unique; the ledger refuses a repeat of source and id).
 - `payments`: the primary key `(transaction_id, account_id)` serves the foreign key and the list; `(account_id, transaction_id, amount)` for balances.
 - `transaction_lines`: the primary key `(transaction_id, seq)` serves the foreign key and the list; `(category_id, currency_id, amount)` for reports; `(currency_id)` for the foreign key.
 - `debts`: the primary key serves the foreign key; no other index (a space has few debts).
@@ -260,7 +261,7 @@ Every foreign key column first in some index (`TestForeignKeysAreIndexed`).
 | `transaction_items` | not a table any more. The trimmed names, in the order of the item ids, joined with `, `, become the `note` of the transaction's line; quantities and prices are dropped |
 | `is_estimated` | dropped on transactions; on a recurring rule it goes to the payments in its `template` |
 | recurring rule | `template` = `json_object` of type, description, payments and line as for a transaction of its type, and tags from `recurring_transaction_tag` (`json_group_array`); `to_amount` NULL stays NULL on the receiving payment (see the note on converted amounts); `schedule` = `json_object` of the old schedule columns; `next_run_date`, `last_run_date` dropped. The pending occurrence's `due_date` is the rule's `next_run_date` (not the transaction's date, which may have been edited); a rule with no instance gets `start` = `next_run_date` when that is later, so the derived date matches |
-| `dedup_hash` | `external_id = 'csv:' \|\| account_id \|\| ':' \|\| dedup_hash`, so a CSV imported before the upgrade is not imported twice after it |
+| `dedup_hash` | `external_source = 'csv'`, `external_id = account_id \|\| ':' \|\| dedup_hash`, so a CSV imported before the upgrade is not imported twice after it |
 | amount 0 | a payment of 0, no line |
 
 Row ids are kept, so tags and `day_order` stay valid. Sequences are restored so no id is reused.

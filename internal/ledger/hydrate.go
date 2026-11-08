@@ -71,7 +71,7 @@ func (s Transactions) hydrateWith(ctx context.Context, rows []repo.Tx, rel *Rela
 	for _, r := range rows {
 		t := Transaction{
 			ID: r.ID, Type: r.Type, Description: r.Description, Date: r.Date, Status: r.Status,
-			ExternalID: r.ExternalID, CreatedAt: r.CreatedAt, RecurringID: r.RecurringID,
+			ExternalSource: r.ExternalSource, ExternalID: r.ExternalID, CreatedAt: r.CreatedAt, RecurringID: r.RecurringID,
 			Payments: make([]Payment, len(r.Payments)), Lines: make([]Line, len(r.Lines)),
 			Tags: make([]Tag, len(r.Tags)), Reasons: reasonsOf(r),
 		}

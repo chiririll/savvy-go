@@ -96,12 +96,13 @@ func src2(t *testing.T, path string) *sql.DB {
 func TestConvertKeepsRowsAndFindsNoOrphans(t *testing.T) {
 	d, _, _ := converted(t)
 	expect(t, d, `SELECT * FROM pragma_foreign_key_check`)
-	expect(t, d, `SELECT id, type, status, external_id FROM transactions ORDER BY id`,
-		"1|expense|confirmed|csv:1:abc", "2|income|confirmed|NULL", "3|transfer|confirmed|NULL",
-		"4|transfer|confirmed|NULL", "5|expense|confirmed|NULL", "6|debt_lend|confirmed|NULL",
-		"7|debt_collection|confirmed|NULL", "8|debt_borrow|confirmed|NULL", "9|debt_payment|confirmed|NULL",
-		"10|transfer_out|confirmed|NULL", "11|transfer_in|confirmed|NULL", "12|expense|pending|NULL",
-		"13|expense|confirmed|NULL", "14|expense|skipped|NULL")
+	expect(t, d, `SELECT id, type, status, external_source, external_id FROM transactions ORDER BY id`,
+		"1|expense|confirmed|csv|1:abc", "2|income|confirmed|NULL|NULL", "3|transfer|confirmed|NULL|NULL",
+		"4|transfer|confirmed|NULL|NULL", "5|expense|confirmed|NULL|NULL", "6|debt_lend|confirmed|NULL|NULL",
+		"7|debt_collection|confirmed|NULL|NULL", "8|debt_borrow|confirmed|NULL|NULL",
+		"9|debt_payment|confirmed|NULL|NULL", "10|transfer_out|confirmed|NULL|NULL",
+		"11|transfer_in|confirmed|NULL|NULL", "12|expense|pending|NULL|NULL", "13|expense|confirmed|NULL|NULL",
+		"14|expense|skipped|NULL|NULL")
 	expect(t, d, `SELECT transaction_id, tag_id FROM transaction_tag ORDER BY 1, 2`, "1|1", "12|2")
 	// Ids are not reused: the sequence of the v1.0 file was 20.
 	expect(t, d, `SELECT name, seq FROM sqlite_sequence WHERE name = 'transactions'`, "transactions|20")

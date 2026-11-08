@@ -69,9 +69,17 @@ type TxInput struct {
 	Lines       []LineInput    `json:"lines"`
 	TagIDs      []int64        `json:"tag_ids"`
 
-	// ExternalID and CreatedBy are written when the transaction is created.
-	ExternalID *string `json:"-"`
-	CreatedBy  *int64  `json:"-"`
+	// ExternalID is the caller's own key for the transaction, such as a receipt
+	// number. ExternalSource is set by the server, never read from JSON, and
+	// the pair is stored as "source:id". The key is unique in the space:
+	// creating a second transaction with it fails with ErrExternalIDExists, so
+	// a retry adds nothing. The same id from another source is stored and
+	// reported in Transaction.ExternalMatches. It is written when the
+	// transaction is created and not changed by an update.
+	ExternalSource *string `json:"-"`
+	ExternalID     *string `json:"external_id,omitempty"`
+	// CreatedBy is written when the transaction is created.
+	CreatedBy *int64 `json:"-"`
 }
 
 // Payment is money that moved on Account; negative when it left.
@@ -95,18 +103,22 @@ type Line struct {
 // lines that say what it was for. Nothing ties the two by constraint; Difference
 // reports where they disagree.
 type Transaction struct {
-	ID          int64
-	Type        string
-	Description *string
-	Date        *string
-	Status      string
-	ExternalID  *string
-	CreatedAt   *time.Time
-	RecurringID *int64 // the rule whose occurrence this is
-	Payments    []Payment
-	Lines       []Line
-	Tags        []Tag
-	Reasons     []Reason
+	ID             int64
+	Type           string
+	Description    *string
+	Date           *string
+	Status         string
+	ExternalSource *string // ui, api, mcp or csv
+	ExternalID     *string
+	CreatedAt      *time.Time
+	RecurringID    *int64 // the rule whose occurrence this is
+	Payments       []Payment
+	Lines          []Line
+	Tags           []Tag
+	Reasons        []Reason
+	// ExternalMatches is set only on the result of Create: transactions with
+	// the same external id under another source.
+	ExternalMatches []ExternalMatch
 	// Difference is what the payments moved less what the lines account for, in
 	// the base currency at the current rates. It is set only on the result of
 	// Create and Update when payments or lines changed, and nil when they agree.
@@ -329,6 +341,7 @@ func (s Transactions) Create(ctx context.Context, in TxInput) (*Transaction, err
 	tx, err := s.ByID(ctx, id)
 	if tx != nil {
 		tx.Difference = s.difference(ctx, b)
+		tx.ExternalMatches = s.externalMatches(ctx, tx)
 	}
 	return tx, err
 }
@@ -377,6 +390,9 @@ func (s Transactions) Modify(ctx context.Context, id int64, in TxInput) error {
 // update changes a transaction; read says whether to return it as stored.
 // Without it the result is the transaction as it was, only to tell it exists.
 func (s Transactions) update(ctx context.Context, id int64, in TxInput, read bool) (*Transaction, error) {
+	if in.ExternalID != nil || in.ExternalSource != nil {
+		return nil, fmt.Errorf("external_id is set when a transaction is created and cannot be changed")
+	}
 	cur, err := s.byID(ctx, id, true)
 	if err != nil || cur == nil {
 		return cur, err

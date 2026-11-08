@@ -89,34 +89,40 @@ func (q *Queries) DeleteTransactionTags(ctx context.Context, transactionID int64
 }
 
 const existsTransactionExternalID = `-- name: ExistsTransactionExternalID :one
-SELECT EXISTS (SELECT 1 FROM transactions WHERE external_id = ?)
+SELECT EXISTS (SELECT 1 FROM transactions WHERE external_id = ? AND external_source = ?)
 `
 
-func (q *Queries) ExistsTransactionExternalID(ctx context.Context, externalID sql.NullString) (bool, error) {
-	row := q.db.QueryRowContext(ctx, existsTransactionExternalID, externalID)
+type ExistsTransactionExternalIDParams struct {
+	ExternalID     sql.NullString
+	ExternalSource sql.NullString
+}
+
+func (q *Queries) ExistsTransactionExternalID(ctx context.Context, arg ExistsTransactionExternalIDParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, existsTransactionExternalID, arg.ExternalID, arg.ExternalSource)
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
 }
 
 const getTransaction = `-- name: GetTransaction :one
-SELECT t.id, t.type, t.status, t.description, t.date, t.day_order, t.external_id, t.created_by,
+SELECT t.id, t.type, t.status, t.description, t.date, t.day_order, t.external_source, t.external_id, t.created_by,
 	t.created_at, t.updated_at
 FROM transactions t
 WHERE t.id = ?
 `
 
 type GetTransactionRow struct {
-	ID          int64
-	Type        string
-	Status      string
-	Description sql.NullString
-	Date        sql.NullString
-	DayOrder    sql.NullInt64
-	ExternalID  sql.NullString
-	CreatedBy   sql.NullInt64
-	CreatedAt   sql.NullString
-	UpdatedAt   sql.NullString
+	ID             int64
+	Type           string
+	Status         string
+	Description    sql.NullString
+	Date           sql.NullString
+	DayOrder       sql.NullInt64
+	ExternalSource sql.NullString
+	ExternalID     sql.NullString
+	CreatedBy      sql.NullInt64
+	CreatedAt      sql.NullString
+	UpdatedAt      sql.NullString
 }
 
 // Lists go through filter.ListTransactions, which selects the same columns in the
@@ -132,6 +138,7 @@ func (q *Queries) GetTransaction(ctx context.Context, id int64) (GetTransactionR
 		&i.Description,
 		&i.Date,
 		&i.DayOrder,
+		&i.ExternalSource,
 		&i.ExternalID,
 		&i.CreatedBy,
 		&i.CreatedAt,
@@ -162,19 +169,20 @@ func (q *Queries) InsertPayment(ctx context.Context, arg InsertPaymentParams) er
 }
 
 const insertTransaction = `-- name: InsertTransaction :execresult
-INSERT INTO transactions (type, description, date, status, external_id, created_by, created_at, updated_at)
-VALUES (?,?,?,?,?,?,?,?)
+INSERT INTO transactions (type, description, date, status, external_source, external_id, created_by, created_at, updated_at)
+VALUES (?,?,?,?,?,?,?,?,?)
 `
 
 type InsertTransactionParams struct {
-	Type        string
-	Description sql.NullString
-	Date        sql.NullString
-	Status      string
-	ExternalID  sql.NullString
-	CreatedBy   sql.NullInt64
-	CreatedAt   sql.NullString
-	UpdatedAt   sql.NullString
+	Type           string
+	Description    sql.NullString
+	Date           sql.NullString
+	Status         string
+	ExternalSource sql.NullString
+	ExternalID     sql.NullString
+	CreatedBy      sql.NullInt64
+	CreatedAt      sql.NullString
+	UpdatedAt      sql.NullString
 }
 
 func (q *Queries) InsertTransaction(ctx context.Context, arg InsertTransactionParams) (sql.Result, error) {
@@ -183,6 +191,7 @@ func (q *Queries) InsertTransaction(ctx context.Context, arg InsertTransactionPa
 		arg.Description,
 		arg.Date,
 		arg.Status,
+		arg.ExternalSource,
 		arg.ExternalID,
 		arg.CreatedBy,
 		arg.CreatedAt,
@@ -585,6 +594,60 @@ type TouchTransactionParams struct {
 func (q *Queries) TouchTransaction(ctx context.Context, arg TouchTransactionParams) error {
 	_, err := q.db.ExecContext(ctx, touchTransaction, arg.UpdatedAt, arg.ID)
 	return err
+}
+
+const transactionIDByExternalID = `-- name: TransactionIDByExternalID :one
+SELECT id FROM transactions WHERE external_id = ? AND external_source = ? LIMIT 1
+`
+
+type TransactionIDByExternalIDParams struct {
+	ExternalID     sql.NullString
+	ExternalSource sql.NullString
+}
+
+func (q *Queries) TransactionIDByExternalID(ctx context.Context, arg TransactionIDByExternalIDParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, transactionIDByExternalID, arg.ExternalID, arg.ExternalSource)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
+const transactionsWithExternalIDOfOtherSources = `-- name: TransactionsWithExternalIDOfOtherSources :many
+SELECT id, external_source FROM transactions
+WHERE external_id = ? AND external_source <> ? ORDER BY id
+`
+
+type TransactionsWithExternalIDOfOtherSourcesParams struct {
+	ExternalID     sql.NullString
+	ExternalSource sql.NullString
+}
+
+type TransactionsWithExternalIDOfOtherSourcesRow struct {
+	ID             int64
+	ExternalSource sql.NullString
+}
+
+func (q *Queries) TransactionsWithExternalIDOfOtherSources(ctx context.Context, arg TransactionsWithExternalIDOfOtherSourcesParams) ([]TransactionsWithExternalIDOfOtherSourcesRow, error) {
+	rows, err := q.db.QueryContext(ctx, transactionsWithExternalIDOfOtherSources, arg.ExternalID, arg.ExternalSource)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []TransactionsWithExternalIDOfOtherSourcesRow{}
+	for rows.Next() {
+		var i TransactionsWithExternalIDOfOtherSourcesRow
+		if err := rows.Scan(&i.ID, &i.ExternalSource); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const updatePaymentAmount = `-- name: UpdatePaymentAmount :exec

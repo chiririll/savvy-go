@@ -82,6 +82,7 @@ type transactionsArgs struct {
 	CategoryIDs   []int64  `json:"category_ids,omitempty" jsonschema:"Only these categories."`
 	TagIDs        []int64  `json:"tag_ids,omitempty" jsonschema:"Only these tags."`
 	Query         string   `json:"q,omitempty" jsonschema:"Search words that must all match description, item names or an amount (1879, 18.79)."`
+	ExternalID    string   `json:"external_id,omitempty" jsonschema:"Only transactions entered with this key, from any source: is this receipt already in?"`
 	SortBy        string   `json:"sort_by,omitempty" jsonschema:"date (default), amount or created_at."`
 	SortDirection string   `json:"sort_direction,omitempty" jsonschema:"desc (default) or asc."`
 	Page          int      `json:"page,omitempty" jsonschema:"Page number from 1."`
@@ -364,6 +365,9 @@ func transactionsQuery(in transactionsArgs) (url.Values, error) {
 	}
 	if in.Query != "" {
 		q.Set("q", in.Query)
+	}
+	if in.ExternalID != "" {
+		q.Set("external_id", in.ExternalID)
 	}
 	if in.Page > 0 {
 		q.Set("page", strconv.Itoa(in.Page))

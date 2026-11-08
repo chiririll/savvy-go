@@ -152,8 +152,8 @@ func TestImportedRowIsOnePaymentAndOneLine(t *testing.T) {
 	if len(changes) != 2 || changes[0].Delta != -800 || changes[1].Delta != 5000 {
 		t.Fatalf("changes = %+v", changes)
 	}
-	if has, _ := l.HasExternalID(ctx, fmt.Sprintf("csv:%d:a", acc)); !has {
-		t.Fatal("the external id is csv:<account>:<hash>")
+	if has, _ := l.HasExternalID(ctx, "csv", fmt.Sprintf("%d:a", acc)); !has {
+		t.Fatal("the external source is csv and the id <account>:<hash>")
 	}
 	if rows, _ := l.SummaryRows(ctx, filter.TxFilter{}, "confirmed"); len(rows) != 3 {
 		t.Fatalf("every imported row has one line: %+v", rows)

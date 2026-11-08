@@ -27,6 +27,26 @@ type txFields struct {
 	Payments    []txPaymentArgs `json:"payments" jsonschema:"The money that moved, one payment per account, signed (see the tool description)."`
 	Lines       []txLineArgs    `json:"lines,omitempty" jsonschema:"What it was for: required for an income or expense, optional fee lines for a transfer."`
 	TagIDs      []int64         `json:"tag_ids,omitempty" jsonschema:"Tag ids, from list_tags."`
+	// The key makes a retry safe: a second create with it fails and names the first transaction.
+	ExternalID string `json:"external_id,omitempty" jsonschema:"Your own key, e.g. a receipt number. A repeat fails naming the first one: retries are safe."`
+}
+
+// similarItemArgs is what a bank line or receipt says about a transaction.
+type similarItemArgs struct {
+	Key         string `json:"key,omitempty" jsonschema:"Your label for the item, echoed back, e.g. the line number."`
+	ExternalID  string `json:"external_id,omitempty" jsonschema:"Its receipt number or other key: finds it under any source, whatever its amount."`
+	Date        string `json:"date,omitempty" jsonschema:"YYYY-MM-DD. With amount, finds transactions of about this day."`
+	Amount      string `json:"amount,omitempty" jsonschema:"Exact decimal string, sign ignored, in the currency below."`
+	Currency    string `json:"currency,omitempty" jsonschema:"Currency code of the amount, e.g. EUR. Not needed with account_id."`
+	AccountID   int64  `json:"account_id,omitempty" jsonschema:"Only transactions paid from this account; its currency is the amount's."`
+	Description string `json:"description,omitempty" jsonschema:"Text on the line; an equal description ranks a match higher."`
+}
+
+type findSimilarArgs struct {
+	SpaceID           int64             `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
+	Items             []similarItemArgs `json:"items" jsonschema:"1 to 500 items to look for."`
+	DateToleranceDays *int              `json:"date_tolerance_days,omitempty" jsonschema:"Days either side of the date that still count (default 1, at most 31)."`
+	MaxPerItem        int               `json:"max_per_item,omitempty" jsonschema:"Most matches per item (default 5, at most 50)."`
 }
 
 type createTxArgs struct {

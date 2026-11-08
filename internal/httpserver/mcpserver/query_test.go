@@ -126,3 +126,17 @@ func TestShapeDataKeepsAmpersands(t *testing.T) {
 		t.Errorf("%s %v", out, err)
 	}
 }
+
+func TestTransactionsQueryPassesTheExternalKey(t *testing.T) {
+	q, err := transactionsQuery(transactionsArgs{ExternalID: "F6HDVMNQ-5105"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if q.Get("external_id") != "F6HDVMNQ-5105" {
+		t.Errorf("query = %v", q)
+	}
+	q, _ = transactionsQuery(transactionsArgs{})
+	if q.Has("external_id") {
+		t.Errorf("an unset key reached the query: %v", q)
+	}
+}

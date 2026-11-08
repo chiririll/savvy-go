@@ -31,6 +31,9 @@ func decode(template json.RawMessage) (TxInput, error) {
 	if err := dec.Decode(&in); err != nil {
 		return TxInput{}, fmt.Errorf("%w: %v", ErrTemplate, err)
 	}
+	if in.ExternalID != nil || in.ExternalSource != nil {
+		return TxInput{}, fmt.Errorf("%w: a template cannot carry an external id", ErrTemplate)
+	}
 	return in, nil
 }
 

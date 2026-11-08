@@ -25,6 +25,7 @@ func Routes(r chi.Router) {
 	r.Get("/transactions", transactionsIndex)
 	r.Post("/transactions", transactionsStore)
 	r.Post("/transactions/bulk", transactionsBulkStore)
+	r.Post("/transactions/find-similar", transactionsFindSimilar)
 	r.Post("/transactions/reorder", transactionsReorder)
 	r.Get("/transactions/{id}", transactionsShow)
 	r.Put("/transactions/{id}", transactionsUpdate)

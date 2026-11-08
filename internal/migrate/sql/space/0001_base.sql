@@ -94,12 +94,17 @@ CREATE TABLE IF NOT EXISTS transactions (
     status TEXT NOT NULL DEFAULT 'confirmed' CHECK (status IN ('pending', 'confirmed', 'skipped')),
     -- Manual order within a day. NULL sorts by id; set only by hand.
     day_order INTEGER,
-    -- Set by the importer; not unique, the importer alone prevents duplicates.
+    -- The caller's own key for the transaction (a receipt number, a bank line id)
+    -- and where it comes from: ui, api, mcp, or csv for the importer. Both or
+    -- neither. Not unique by constraint: the ledger refuses a repeat of the same
+    -- source and id, and reports the same id under another source.
+    external_source TEXT,
     external_id TEXT,
     -- A server user; no foreign key across databases.
     created_by INTEGER,
     created_at TEXT,
-    updated_at TEXT
+    updated_at TEXT,
+    CHECK ((external_source IS NULL) = (external_id IS NULL))
 ) STRICT;
 -- The list is ordered by date, then manual day order (id when unset), then id;
 -- undated rows come last in either direction. These match txOrderBy in
@@ -107,7 +112,7 @@ CREATE TABLE IF NOT EXISTS transactions (
 -- instead of sorting every matching row. The descending one also serves date ranges.
 CREATE INDEX IF NOT EXISTS transactions_order_desc_idx ON transactions (date DESC, (COALESCE(day_order, id)) DESC, id DESC);
 CREATE INDEX IF NOT EXISTS transactions_order_asc_idx ON transactions ((date IS NULL), date, (COALESCE(day_order, id)), id);
-CREATE INDEX IF NOT EXISTS transactions_external_id_idx ON transactions (external_id) WHERE external_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS transactions_external_id_idx ON transactions (external_id, external_source) WHERE external_id IS NOT NULL;
 
 -- Money that moved, signed, in the account's currency. One per account in a
 -- transaction. 0 is allowed only because v1.0 rows have it; the ledger rejects

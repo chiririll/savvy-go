@@ -43,6 +43,7 @@ func (s Transactions) CreateMany(ctx context.Context, ins []TxInput) ([]*Transac
 		}
 		if tx != nil {
 			tx.Difference = s.difference(ctx, ps[i].b)
+			tx.ExternalMatches = s.externalMatches(ctx, tx)
 		}
 		out[i] = tx
 	}
@@ -101,6 +102,10 @@ type prepared struct {
 
 // prepare settles the status of a new transaction and checks it.
 func (s Transactions) prepare(ctx context.Context, in TxInput) (prepared, error) {
+	var err error
+	if in.ExternalSource, in.ExternalID, err = cleanExternalID(in.ExternalSource, in.ExternalID); err != nil {
+		return prepared{}, err
+	}
 	status := "confirmed"
 	if in.Status != nil {
 		status = *in.Status
@@ -124,9 +129,19 @@ func (s Transactions) prepare(ctx context.Context, in TxInput) (prepared, error)
 
 // insert writes a prepared transaction on d and returns its id.
 func (s Transactions) insert(ctx context.Context, d store.DB, p prepared) (int64, error) {
+	if ext := p.in.ExternalID; ext != nil {
+		// Inside the database transaction, so an earlier item of the same
+		// bulk call counts too.
+		src := *p.in.ExternalSource
+		if existing, found, err := (repo.Repo{DB: d}).IDByExternalID(ctx, src, *ext); err != nil {
+			return 0, err
+		} else if found {
+			return 0, &ExternalIDExistsError{Source: src, ExternalID: *ext, TransactionID: existing}
+		}
+	}
 	id, err := repo.Repo{DB: d}.InsertTransaction(ctx, repo.TxFields{
 		Type: p.in.Type, Status: p.status, Description: blankToNil(p.in.Description), Date: p.in.Date,
-		ExternalID: p.in.ExternalID, CreatedBy: p.in.CreatedBy,
+		ExternalSource: p.in.ExternalSource, ExternalID: p.in.ExternalID, CreatedBy: p.in.CreatedBy,
 	}, time.Now().UTC())
 	if err != nil {
 		return 0, err

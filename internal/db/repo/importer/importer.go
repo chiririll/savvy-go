@@ -163,10 +163,15 @@ func (r Repo) InsertRows(ctx context.Context, rows []Row, now time.Time) ([]RowR
 	return out, nil
 }
 
+// ImportSource is the external source of the transactions the CSV import adds.
+const ImportSource = "csv"
+
 // insertRow stores row through q unless its dedup hash is known.
 func insertRow(ctx context.Context, q *sqlc.Queries, row Row, now time.Time) (bool, error) {
-	externalID := fmt.Sprintf("csv:%d:%s", row.AccountID, row.DedupHash)
-	if dup, err := q.ExistsTransactionExternalID(ctx, db.NS(externalID)); err != nil || dup {
+	// The id is per account: the same bank line on two accounts is two lines.
+	externalID := fmt.Sprintf("%d:%s", row.AccountID, row.DedupHash)
+	known := sqlc.ExistsTransactionExternalIDParams{ExternalSource: db.NS(ImportSource), ExternalID: db.NS(externalID)}
+	if dup, err := q.ExistsTransactionExternalID(ctx, known); err != nil || dup {
 		return false, err
 	}
 	unit, err := q.GetAccountUnit(ctx, row.AccountID)
@@ -175,7 +180,7 @@ func insertRow(ctx context.Context, q *sqlc.Queries, row Row, now time.Time) (bo
 	}
 	res, err := q.InsertTransaction(ctx, sqlc.InsertTransactionParams{
 		Type: row.Type, Description: db.NS(row.Description), Date: db.NS(row.Date), Status: row.Status,
-		ExternalID: db.NS(externalID), CreatedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now),
+		ExternalSource: db.NS(ImportSource), ExternalID: db.NS(externalID), CreatedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now),
 	})
 	if err != nil {
 		return false, err

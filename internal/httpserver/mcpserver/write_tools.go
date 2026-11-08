@@ -135,14 +135,26 @@ func (k writeSet) transactionTools() {
 			"or with euros and the change back in dinars, is one transaction with a payment per account. Say which "+
 			"currency you used. Payments are signed: an expense paid with 20 EUR and 10 EUR back in change has payments "+
 			"of -20 and +10; a transfer has a negative payment and a positive one. Lines are positive and add up to "+
-			"what the payments net to. The answer's difference field is not null when they disagree.",
+			"what the payments net to. The answer's difference field is not null when they disagree. For something that "+
+			"may be sent twice (a receipt, a bank line) give external_id: a second create with "+
+			"it fails and names the first transaction instead of adding a duplicate.",
 		"transactions"))
 	register[createTxsArgs](k, k.post("create_transactions", "Create many transactions",
 		"Record up to 500 transactions in one call, each as for create_transaction. Prefer this to calling "+
 			"create_transaction in a loop: it is one request and one save, much faster. All or none are stored: if one "+
 			"is invalid nothing is written and the error names its position (transaction 3). Answers with the "+
-			"created transactions in the same order. Split a longer list into several calls.",
+			"created transactions in the same order. Split a longer list into several calls. With external_id on the "+
+			"items, a retry after a timeout fails naming the transaction that already has the key "+
+			"and stores nothing, so look it up with list_transactions and send only what is missing.",
 		"transactions/bulk"))
+	register[findSimilarArgs](k, k.post("find_similar_transactions", "Find similar transactions",
+		"Before adding transactions from a statement or receipts, check which are already entered. For each item "+
+			"(date, amount and currency or account, optionally a description or an external_id) it returns the "+
+			"transactions that look like it, best first, each with reasons (external_id, amount, date, account, "+
+			"description). The amount must be equal exactly in the same currency; the sign is ignored and the date may "+
+			"differ by date_tolerance_days. A match is a hint, not proof: two real purchases can look alike, so look "+
+			"at the matches before skipping an item. It stores nothing. Answers one entry per item, in order.",
+		"transactions/find-similar"))
 	register[updateTxArgs](k, k.patch("update_transaction", "Update transaction",
 		"Change a transaction. Send only the fields that change.", "transactions/{id}"))
 	register[idArgs](k, k.del("delete_transaction", "Delete transaction",

@@ -1,6 +1,6 @@
 -- name: InsertTransaction :execresult
-INSERT INTO transactions (type, description, date, status, external_id, created_by, created_at, updated_at)
-VALUES (?,?,?,?,?,?,?,?);
+INSERT INTO transactions (type, description, date, status, external_source, external_id, created_by, created_at, updated_at)
+VALUES (?,?,?,?,?,?,?,?,?);
 
 -- name: UpdateTransaction :exec
 -- Status, external_id and created_by are never changed here. A move to another
@@ -30,13 +30,20 @@ SELECT COUNT(*) FROM transactions;
 -- Lists go through filter.ListTransactions, which selects the same columns in the
 -- same order. The order differs from the table's, so sqlc makes a row type here
 -- instead of reusing the model.
-SELECT t.id, t.type, t.status, t.description, t.date, t.day_order, t.external_id, t.created_by,
+SELECT t.id, t.type, t.status, t.description, t.date, t.day_order, t.external_source, t.external_id, t.created_by,
 	t.created_at, t.updated_at
 FROM transactions t
 WHERE t.id = ?;
 
 -- name: ExistsTransactionExternalID :one
-SELECT EXISTS (SELECT 1 FROM transactions WHERE external_id = ?);
+SELECT EXISTS (SELECT 1 FROM transactions WHERE external_id = ? AND external_source = ?);
+
+-- name: TransactionIDByExternalID :one
+SELECT id FROM transactions WHERE external_id = ? AND external_source = ? LIMIT 1;
+
+-- name: TransactionsWithExternalIDOfOtherSources :many
+SELECT id, external_source FROM transactions
+WHERE external_id = ? AND external_source <> ? ORDER BY id;
 
 -- name: UpdateTransactionDescription :exec
 UPDATE transactions SET description=?, updated_at=? WHERE id=?;

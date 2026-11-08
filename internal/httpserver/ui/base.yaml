@@ -218,6 +218,15 @@ components:
               amount: {type: string, description: Exact decimal above zero.}
               note: {type: string, nullable: true}
         tag_ids: {type: array, items: {type: integer}}
+        external_id:
+          type: string
+          maxLength: 255
+          description: >
+            Your own key for the transaction, such as a receipt number. The server records where the request came from
+            (`ui` session, `api` token, `mcp` client) as `externalSource`; clients cannot set it. The same source and id
+            twice is refused with 409 and the id of the transaction that has it, so a retry after a timeout adds
+            nothing. The same id under another source is stored, and the answer lists it in `externalMatches`.
+            Cannot be changed by an update.
     Transaction:
       type: object
       properties:
@@ -227,6 +236,16 @@ components:
         date: {type: string, nullable: true}
         status: {type: string}
         recurringTransactionId: {type: integer, nullable: true}
+        externalSource: {type: string, nullable: true, enum: [ui, api, mcp, csv], description: "Where the key came from; set by the server."}
+        externalId: {type: string, nullable: true, description: "The caller's own key, unique with externalSource."}
+        externalMatches:
+          type: array
+          description: Only on the answer to a create. Transactions with the same externalId under another source. They may be the same event entered twice or not; check them.
+          items:
+            type: object
+            properties:
+              source: {type: string}
+              transactionId: {type: integer}
         amount: {type: number, nullable: true, description: "What the payments net to (an income or expense) or what left the accounts, always positive; null when the payments are in several currencies."}
         difference: {type: number, nullable: true, description: "Payments less lines in the base currency; set only on the answer to a save."}
         payments:

@@ -370,16 +370,17 @@ type Tag struct {
 }
 
 type Transaction struct {
-	ID          int64
-	Type        string
-	Description sql.NullString
-	Date        sql.NullString
-	Status      string
-	DayOrder    sql.NullInt64
-	ExternalID  sql.NullString
-	CreatedBy   sql.NullInt64
-	CreatedAt   sql.NullString
-	UpdatedAt   sql.NullString
+	ID             int64
+	Type           string
+	Description    sql.NullString
+	Date           sql.NullString
+	Status         string
+	DayOrder       sql.NullInt64
+	ExternalSource sql.NullString
+	ExternalID     sql.NullString
+	CreatedBy      sql.NullInt64
+	CreatedAt      sql.NullString
+	UpdatedAt      sql.NullString
 }
 
 type TransactionImport struct {

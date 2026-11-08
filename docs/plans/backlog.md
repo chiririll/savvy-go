@@ -65,10 +65,9 @@ All of this overlaps the payments/transactions split. Check coverage in [payment
 
 ## Import
 
-Today only CSV import exists (`internal/importer`, `CsvImportWizard`). It avoids duplicates with a `dedup_hash` per account, not with an id from the source.
+Today only CSV import exists (`internal/importer`, `CsvImportWizard`). It avoids duplicates with `external_source = 'csv'` and an id of the account and a hash of date, amount and description, not with an id from the source.
 
 - Import by fiscal receipt link or QR code: `import_receipt(url)`. The Savvy server downloads the JSON (for example from `suf.purs.gov.rs`) and fills items, shop, time and payment method (cash or card). The remote Claude environment could not reach the tax site, so it must run server-side (P2).
-- `external_id` or idempotency key, for example the receipt number `F6HDVMNQ-5105`. A retry after a timeout then creates no duplicate, and "was this receipt entered?" is one query (P1). Related: `import_fingerprints` in the split plan.
 
 ## MCP / AI access
 
