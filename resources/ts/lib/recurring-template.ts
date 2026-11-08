@@ -100,7 +100,7 @@ export function templateAsTransaction(
 
     const lines: TransactionLine[] = []
     let linesInBase = 0
-    for (const [seq, line] of template.lines.entries()) {
+    for (const [seq, line] of (template.lines ?? []).entries()) {
         const currency = lineCurrencyOf(line, template.payments, accounts)
         if (!currency) {
             return null

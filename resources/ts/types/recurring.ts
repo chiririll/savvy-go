@@ -1,6 +1,6 @@
 import { BaseEntity } from './api'
 
-import type { LineInput, PaymentInput, TransactionInput, TransactionType } from './transactions'
+import type { LineInput, PaymentInput, RowAmount, TransactionInput, TransactionType } from './transactions'
 
 export const RECURRING_FREQUENCIES = ['daily', 'weekly', 'monthly', 'yearly'] as const
 export type RecurringFrequency = (typeof RECURRING_FREQUENCIES)[number]
@@ -41,6 +41,9 @@ export interface RecurringTransaction extends BaseEntity {
     /** The due date of its open occurrence; null when the rule is stopped or its schedule has ended. */
     nextRunDate: string | null
     lastRunDate: string | null
+    /** What the transaction of the rule will show in a list, at today's rates (a transfer: what leaves). Null when the template cannot be read. */
+    rowAmount: RowAmount | null
+    receivedAmount: RowAmount | null
 }
 
 /** A rule as sent to create or update it. */

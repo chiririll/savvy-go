@@ -104,3 +104,34 @@ func (s Templates) Replan(ctx context.Context, txID int64, template json.RawMess
 	_, err = s.txs().Update(ctx, txID, in)
 	return err
 }
+
+// Preview is the transaction a template makes, worked out and not saved: the
+// payment without an amount takes what balances the others at today's rates.
+// It is for showing a rule; the occurrence itself is made by Create.
+func (s Templates) Preview(ctx context.Context, template json.RawMessage) (Transaction, error) {
+	in, err := decode(template)
+	if err != nil {
+		return Transaction{}, err
+	}
+	b, err := s.txs().build(ctx, in, true)
+	if err != nil {
+		return Transaction{}, err
+	}
+	sh := b.shape
+	if at, amount, ok := sh.balancing(); ok {
+		rounded, err := money.FromInput(amount, sh.Payments[at].Account.Currency.Unit())
+		if err != nil {
+			return Transaction{}, err
+		}
+		sh.Payments[at].Amount = rounded
+	}
+	tx := Transaction{Type: sh.Type, Status: "pending"}
+	for _, p := range sh.Payments {
+		account := p.Account
+		tx.Payments = append(tx.Payments, Payment{AccountID: account.ID, Account: &account, Amount: p.Amount})
+	}
+	for _, l := range sh.Lines {
+		tx.Lines = append(tx.Lines, Line{Amount: l.Amount})
+	}
+	return tx, nil
+}

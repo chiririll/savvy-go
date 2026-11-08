@@ -57,6 +57,18 @@ describe('templateAsTransaction', () => {
         })
     })
 
+    it('reads a template saved with no lines (null) as having none', () => {
+        const rule = recurring({
+            template: recurringTemplate({
+                type: 'transfer',
+                payments: [{ account_id: cash.id, amount: -10 }, { account_id: euroCard.id, amount: 9 }],
+                lines: null as unknown as [],
+            }),
+        })
+
+        expect(templateAsTransaction(rule, accounts, categories)).toMatchObject({ lines: [] })
+    })
+
     it('gives a line without a currency the one all the payment accounts share', () => {
         const rule = recurring({ template: recurringTemplate({ lines: [{ category_id: 1, amount: 1100 } as never] }) })
 

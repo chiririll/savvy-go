@@ -8,8 +8,22 @@ import (
 	"savvy-go/internal/httpserver/httpx"
 
 	"savvy-go/internal/httpserver/httpx/dto"
+	"savvy-go/internal/ledger"
 	"savvy-go/internal/recurring"
 )
+
+// presenter maps a rule with the transaction its template makes; a template that
+// cannot be read (a stopped rule) has none.
+func presenter(r *http.Request) func(recurring.Rule) dto.Recurring {
+	templates := ledger.Templates{DB: httpx.Scope(r).DB}
+	return func(rule recurring.Rule) dto.Recurring {
+		preview, err := templates.Preview(r.Context(), rule.Template)
+		if err != nil {
+			return dto.NewRecurring(rule, nil)
+		}
+		return dto.NewRecurring(rule, &preview)
+	}
+}
 
 func index(w http.ResponseWriter, r *http.Request) {
 	list, err := httpx.Scope(r).Recurring.All(r.Context())
@@ -17,7 +31,7 @@ func index(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	httpx.WriteData(w, http.StatusOK, dto.Map(list, dto.NewRecurring))
+	httpx.WriteData(w, http.StatusOK, dto.Map(list, presenter(r)))
 }
 
 func upcoming(w http.ResponseWriter, r *http.Request) {
@@ -26,7 +40,7 @@ func upcoming(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	httpx.WriteData(w, http.StatusOK, dto.Map(list, dto.NewRecurring))
+	httpx.WriteData(w, http.StatusOK, dto.Map(list, presenter(r)))
 }
 
 func store(w http.ResponseWriter, r *http.Request) {
@@ -39,7 +53,7 @@ func store(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, 422, err.Error())
 		return
 	}
-	httpx.WriteData(w, http.StatusCreated, dto.NewRecurring(*rec))
+	httpx.WriteData(w, http.StatusCreated, presenter(r)(*rec))
 }
 
 func show(w http.ResponseWriter, r *http.Request) {
@@ -47,7 +61,7 @@ func show(w http.ResponseWriter, r *http.Request) {
 	if rec == nil {
 		return
 	}
-	httpx.WriteData(w, http.StatusOK, dto.NewRecurring(*rec))
+	httpx.WriteData(w, http.StatusOK, presenter(r)(*rec))
 }
 
 func update(w http.ResponseWriter, r *http.Request) {
@@ -64,7 +78,7 @@ func update(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, 422, err.Error())
 		return
 	}
-	httpx.WriteData(w, http.StatusOK, dto.NewRecurring(*rec))
+	httpx.WriteData(w, http.StatusOK, presenter(r)(*rec))
 }
 
 func destroy(w http.ResponseWriter, r *http.Request) {

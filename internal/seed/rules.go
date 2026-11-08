@@ -14,7 +14,7 @@ import (
 // rule makes a monthly recurring rule from the transaction it creates. Its
 // template is the JSON of a transaction input, as the API takes it.
 func (s *seeder) rule(in ledger.TxInput, day int, start time.Time) error {
-	template, err := json.Marshal(in)
+	template, err := templateJSON(in)
 	if err != nil {
 		return err
 	}
@@ -23,6 +23,21 @@ func (s *seeder) rule(in ledger.TxInput, day int, start time.Time) error {
 		Schedule: recurring.Schedule{Frequency: "monthly", Interval: 1, DayOfMonth: &day, Start: start.Format("2006-01-02")},
 	})
 	return err
+}
+
+// templateJSON is a template as stored. Lists the input leaves out are empty,
+// not null: clients read the stored JSON as it is.
+func templateJSON(in ledger.TxInput) ([]byte, error) {
+	if in.Payments == nil {
+		in.Payments = []ledger.PaymentInput{}
+	}
+	if in.Lines == nil {
+		in.Lines = []ledger.LineInput{}
+	}
+	if in.TagIDs == nil {
+		in.TagIDs = []int64{}
+	}
+	return json.Marshal(in)
 }
 
 // flow is an income or an expense of amount on an account, as a template.

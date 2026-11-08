@@ -12,7 +12,6 @@ import {
     transactionAmountAppearance,
     transactionSubtitle,
 } from '@/lib/transaction-description'
-import { rowAmount, transferSides } from '@/lib/transaction-money'
 import { cn } from '@/lib/utils'
 import type { Category, RecurringFrequency, RecurringTransaction } from '@/types'
 
@@ -62,7 +61,6 @@ export function RecurringRow({ recurring, onEdit, onDelete, isReadOnly }: Recurr
     // has only the title the rule was saved with.
     const made = accounts ? templateAsTransaction(recurring, accounts, categories) : null
     const shape = made ?? { type: template.type, description: template.description ?? null, payments: [], lines: [] }
-    const amount = made ? (template.type === 'transfer' ? transferSides(made).sent : rowAmount(made)) : null
     const rowCategories = [
         ...new Map(shape.lines.flatMap((l) => (l.category ? [[l.category.id, l.category] as [number, Category]] : []))).values(),
     ]
@@ -73,7 +71,7 @@ export function RecurringRow({ recurring, onEdit, onDelete, isReadOnly }: Recurr
             title={displayTransactionDescription(shape)}
             badge={recurring.error ? <FeedStatusBadge variant="outline">{t('recurring.stopped')}</FeedStatusBadge> : undefined}
             subtitle={recurring.error ?? transactionSubtitle(shape)}
-            amount={<TransactionAmount amount={amount} sign={sign} approximate={isApproximateRule(template)} />}
+            amount={<TransactionAmount amount={recurring.rowAmount} sign={sign} approximate={isApproximateRule(template)} />}
             amountClassName={className}
             extraAmount={
                 nextRunDate ? (

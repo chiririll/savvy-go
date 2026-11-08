@@ -81,6 +81,10 @@ func TestRecurringRuleOccurrencesOnTheWire(t *testing.T) {
 	if got := rule["data"].(map[string]any)["nextRunDate"]; got != "2030-01-05" {
 		t.Errorf("nextRunDate = %v", got)
 	}
+	// The rule arrives with the amount its transaction will show.
+	if got := rule["data"].(map[string]any)["rowAmount"].(map[string]any)["main"].(map[string]any)["amount"]; got != float64(50) {
+		t.Errorf("rule rowAmount = %v, want 50", got)
+	}
 
 	pending := func() []map[string]any {
 		var out []map[string]any

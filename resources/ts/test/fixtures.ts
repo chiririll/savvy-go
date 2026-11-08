@@ -164,6 +164,8 @@ export const recurring = (overrides: Partial<RecurringTransaction> = {}): Recurr
     error: null,
     nextRunDate: '2099-01-01',
     lastRunDate: null,
+    rowAmount: { main: { currency: currencies[0], amount: 1100 }, totals: [{ currency: currencies[0], amount: 1100 }], converted: false },
+    receivedAmount: null,
     ...overrides,
 })
 

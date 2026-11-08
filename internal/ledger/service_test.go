@@ -374,3 +374,33 @@ func TestDayTotalsCoverTheWholeDayAcrossPages(t *testing.T) {
 		t.Errorf("a day outside the filter is counted: %+v", only)
 	}
 }
+
+// A rule is shown as the transaction it will make, without making one: the open
+// payment is worked out at today's rates, nothing is written.
+func TestTemplatePreviewIsWhatTheOccurrenceWillBe(t *testing.T) {
+	e := newMoneyEnv(t)
+	tpl := json.RawMessage(fmt.Sprintf(transferTemplate, e.usdAcc.ID, e.jpyAcc.ID))
+	tx, err := (Templates{DB: e.db}).Preview(e.ctx, tpl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sent, received := tx.ListAmounts()
+	if sent == nil || sent.Main.Currency.Code != "USD" || sent.Main.Amount.Decimal().String() != "15" {
+		t.Fatalf("sent = %+v", sent)
+	}
+	if received == nil || received.Main.Currency.Code != "JPY" || received.Main.Amount.Decimal().String() != "1500" {
+		t.Fatalf("received = %+v", received)
+	}
+	var n int
+	e.db.QueryRowContext(e.ctx, `SELECT COUNT(*) FROM transactions`).Scan(&n)
+	if n != 0 {
+		t.Errorf("a preview wrote %d transactions", n)
+	}
+}
+
+func TestTemplatePreviewRefusesABrokenTemplate(t *testing.T) {
+	e := newMoneyEnv(t)
+	if _, err := (Templates{DB: e.db}).Preview(e.ctx, json.RawMessage(`{"type":"expense","amout":"1"}`)); err == nil {
+		t.Fatal("a template with an unknown key must not preview")
+	}
+}

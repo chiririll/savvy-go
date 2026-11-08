@@ -3,6 +3,7 @@ package dto
 import (
 	"encoding/json"
 
+	"savvy-go/internal/ledger"
 	"savvy-go/internal/recurring"
 )
 
@@ -17,11 +18,22 @@ type Recurring struct {
 	Error       *string            `json:"error"`
 	NextRunDate *string            `json:"nextRunDate"`
 	LastRunDate *string            `json:"lastRunDate"`
+	// RowAmount and ReceivedAmount are what the rule's transaction will show in
+	// a list, at today's rates (see Transaction). Null when the template cannot
+	// be read.
+	RowAmount      *RowAmount `json:"rowAmount"`
+	ReceivedAmount *RowAmount `json:"receivedAmount"`
 }
 
-func NewRecurring(r recurring.Rule) Recurring {
-	return Recurring{
+// NewRecurring maps a rule; preview is the transaction its template makes, if it can be read.
+func NewRecurring(r recurring.Rule, preview *ledger.Transaction) Recurring {
+	out := Recurring{
 		ID: r.ID, Template: r.Template, Schedule: r.Schedule, IsActive: r.IsActive, Error: r.Error,
 		NextRunDate: r.NextRunDate, LastRunDate: r.LastRunDate,
 	}
+	if preview != nil {
+		main, received := preview.ListAmounts()
+		out.RowAmount, out.ReceivedAmount = newRowAmount(main), newRowAmount(received)
+	}
+	return out
 }
