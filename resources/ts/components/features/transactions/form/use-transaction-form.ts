@@ -15,13 +15,22 @@ interface TransactionFormOptions {
     open: boolean
 }
 
+/**
+ * A new income or expense starts with one line that takes all of the payment: see `TransactionLines`. The amount is
+ * set here, not by an effect: the reset that applies these defaults would wipe an amount an effect had set.
+ */
+function startingLines(type: string, defaultValues?: TransactionFormDefaults): TransactionFormValues['lines'] {
+    if (type !== 'income' && type !== 'expense') {
+        return []
+    }
+    const payments = defaultValues?.payments
+    const amount = payments?.length === 1 && !defaultValues?.change?.length ? payments[0].amount : ''
+    return [{ category_id: defaultValues?.default_category_id ?? null, currency_id: null, amount: amount as number, note: defaultValues?.default_note ?? '' }]
+}
+
 export function toFormDefaults(defaultValues?: TransactionFormDefaults): TransactionFormValues {
     const type = defaultValues?.type ?? 'expense'
-    // A new income or expense starts with one line that takes all of the payment: see `TransactionLines`.
-    const startLines: TransactionFormValues['lines'] =
-        type === 'income' || type === 'expense'
-            ? [{ category_id: defaultValues?.default_category_id ?? null, currency_id: null, amount: '' as unknown as number, note: '' }]
-            : []
+    const startLines = defaultValues?.lines ?? startingLines(type, defaultValues)
     return {
         type,
         description: defaultValues?.description ?? '',
@@ -29,7 +38,7 @@ export function toFormDefaults(defaultValues?: TransactionFormDefaults): Transac
         tag_ids: defaultValues?.tag_ids ?? [],
         payments: defaultValues?.payments ?? [{ account_id: 0, amount: '' as unknown as number }],
         change: defaultValues?.change ?? [],
-        lines: defaultValues?.lines ?? startLines,
+        lines: startLines,
         default_category_id: defaultValues?.default_category_id ?? null,
         default_note: defaultValues?.default_note ?? null,
         to_account_id: defaultValues?.to_account_id ?? null,

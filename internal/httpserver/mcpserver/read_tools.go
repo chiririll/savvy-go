@@ -35,21 +35,21 @@ type spaceArgs struct {
 // listArgs is spaceArgs for the lists that can be trimmed with fields.
 type listArgs struct {
 	SpaceID int64    `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
-	Fields  []string `json:"fields,omitempty" jsonschema:"Keys to keep of each item, to make the answer small, e.g. [id, name]. A dotted path picks inside a nested object or list: currency.code. Default all."`
+	Fields  []string `json:"fields,omitempty" jsonschema:"Keys to keep of each item, e.g. [id, name]. A dotted path goes inside: currency.code. Default all."`
 }
 
 // getArgs is idArgs for the one item that can be trimmed with fields.
 type getArgs struct {
 	SpaceID int64    `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
 	ID      int64    `json:"id" jsonschema:"Id of the item."`
-	Fields  []string `json:"fields,omitempty" jsonschema:"Keys to keep of each item, to make the answer small, e.g. [id, name]. A dotted path picks inside a nested object or list: currency.code. Default all."`
+	Fields  []string `json:"fields,omitempty" jsonschema:"Keys to keep of each item, e.g. [id, name]. A dotted path goes inside: currency.code. Default all."`
 }
 
 type accountsArgs struct {
 	SpaceID     int64    `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
 	WithSummary bool     `json:"with_summary,omitempty" jsonschema:"Also return totals across the accounts."`
 	Type        string   `json:"type,omitempty" jsonschema:"Only these types, comma-separated: bank, crypto, cash, credit, debt, space."`
-	Fields      []string `json:"fields,omitempty" jsonschema:"Keys to keep of each item, to make the answer small, e.g. [id, name]. A dotted path picks inside a nested object or list: currency.code. Default all."`
+	Fields      []string `json:"fields,omitempty" jsonschema:"Keys to keep of each item, e.g. [id, name]. A dotted path goes inside: currency.code. Default all."`
 }
 
 type balanceArgs struct {
@@ -88,7 +88,7 @@ type transactionsArgs struct {
 	Page          int      `json:"page,omitempty" jsonschema:"Page number from 1."`
 	PerPage       int      `json:"per_page,omitempty" jsonschema:"Rows per page, at most 100 (default 25)."`
 	WithSummary   bool     `json:"with_summary,omitempty" jsonschema:"Also return totals."`
-	Fields        []string `json:"fields,omitempty" jsonschema:"Keys to keep in each row: id, type, description, date, status, amount, rowAmount, receivedAmount, payments, lines, tags, createdAt, ... A dotted path picks inside a list: payments.accountId, payments.amount, lines.categoryId. Default all, with the full account and category of every payment and line."`
+	Fields        []string `json:"fields,omitempty" jsonschema:"Keys to keep per row, e.g. id, amount, payments. Dotted: payments.accountId. Default all."`
 }
 
 // txFieldKeys are the keys of a transaction row, as the REST API names them.
@@ -123,7 +123,8 @@ type reportArgs struct {
 
 // mcpReadNeeds is the resource each read tool needs; list_spaces needs none.
 var mcpReadNeeds = map[string]string{
-	"list_accounts": "accounts", "get_balance": "accounts", "get_balance_history": "accounts", "list_categories": "categories", "list_tags": "tags", "list_currencies": "currencies",
+	"list_accounts": "accounts", "get_balance": "accounts", "get_balance_history": "accounts",
+	"list_categories": "categories", "list_tags": "tags", "list_currencies": "currencies",
 	"list_budgets": "budgets", "list_debts": "debts", "get_debts_summary": "debts",
 	"list_transactions": "transactions", "get_transaction": "transactions", "get_transactions_summary": "transactions",
 	"get_transactions_day_totals": "transactions",

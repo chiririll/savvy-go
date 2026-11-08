@@ -33,7 +33,9 @@ export const Create: Story = {}
 export const CreateWithDefaults: Story = {
     args: { defaultValues: { type: 'income', payments: [{ account_id: 2, amount: 50 }] } },
     play: async () => {
-        await expect(await screen.findByRole('textbox', { name: /^amount$/i })).toHaveValue('50')
+        // The payment, and the line that takes all of it.
+        const amounts = await screen.findAllByRole('textbox', { name: /^amount$/i })
+        await waitFor(() => expect(amounts.map((a) => (a as HTMLInputElement).value)).toEqual(['50', '50']))
     },
 }
 export const Edit: Story = {
@@ -84,8 +86,8 @@ export const SavedTransactionBecomesFormValues: Story = {
         await expect(values).toMatchObject({
             type: 'income',
             payments: [{ account_id: 1, amount: 42.5 }],
+            lines: [{ category_id: 2, amount: 42.5, note: '- salary' }],
             default_category_id: 2,
-            default_note: '- salary',
             tag_ids: [1],
         })
     },

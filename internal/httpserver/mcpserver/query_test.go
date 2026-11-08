@@ -108,7 +108,7 @@ func TestParseFieldsRefusesUnknownAndMalformed(t *testing.T) {
 	}
 }
 
-func TestShapeDataTakesOneObjectAndAnyKeyWithoutAllowedSet(t *testing.T) {
+func TestShapeDataTakesOneObjectAndAnyKey(t *testing.T) {
 	tree, err := parseFields([]string{"name", "currency.code"}, nil)
 	if err != nil {
 		t.Fatal(err)

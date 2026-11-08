@@ -79,7 +79,8 @@ export const AmountShowsTheCurrency: Story = {
     args: { defaultValues: { ...expense, payments: [{ account_id: 2, amount: 8 }] } },
     play: async ({ canvasElement }) => {
         await ready(canvasElement)
-        await expect(await within(canvasElement).findByText('EUR')).toBeVisible()
+        // The line is in the currency of the payment, so the code is shown twice.
+        await expect((await within(canvasElement).findAllByText('EUR'))[0]).toBeVisible()
     },
 }
 
@@ -98,7 +99,8 @@ export const AmountTakesDigitsOnly: Story = {
     args: { defaultValues: { ...expense, payments: [{ account_id: 1, amount: '' as unknown as number }] } },
     play: async ({ canvasElement }) => {
         await ready(canvasElement)
-        const amount = await within(canvasElement).findByRole('textbox', { name: /^amount$/i })
+        // The first amount is the payment's; the line below it has one too.
+        const amount = (await within(canvasElement).findAllByRole('textbox', { name: /^amount$/i }))[0]
         await userEvent.type(amount, '-1e2,567x')
         await expect(amount).toHaveValue('12.56')
     },
@@ -346,15 +348,16 @@ export const NoteOpensInTheEditor: Story = {
     },
 }
 
-// A note that was saved opens in the editor, so its formatting is not hidden.
-export const SavedNoteOpensExpanded: Story = {
+// A note that was saved opens closed: its text shows as written, and the pencil opens the editor.
+export const SavedNoteOpensClosed: Story = {
     args: {
         defaultValues: { ...split, lines: [{ ...split.lines[0], note: '- milk\n- bread' }, split.lines[1]] },
     },
     play: async ({ canvasElement }) => {
         await ready(canvasElement)
-        await expect(await within(canvasElement).findByRole('button', { name: closeButton })).toBeVisible()
-        await expect(within(canvasElement).getAllByRole('button', { name: noteButtons })).toHaveLength(1)
+        await expect(await within(canvasElement).findByDisplayValue(/- milk/)).toBeVisible()
+        await expect(within(canvasElement).queryByRole('button', { name: closeButton })).toBeNull()
+        await expect(within(canvasElement).getAllByRole('button', { name: noteButtons })).toHaveLength(2)
     },
 }
 
@@ -397,11 +400,6 @@ export const SubmitsLines: Story = {
 
 const addPayment = /add another account|добавить ещё счёт/i
 const removePayment = /remove the payment|убрать платёж/i
-const addChange = /add change|добавить сдачу/i
-const removeChange = /remove the change|убрать сдачу/i
-const changeSection = (canvasElement: HTMLElement) =>
-    within(canvasElement).findByRole('region', { name: /^change$|^сдача$/i })
-
 const twoAccounts = {
     ...expense,
     payments: [
@@ -417,7 +415,8 @@ export const AddingAPayment: Story = {
         await ready(canvasElement)
         const canvas = within(canvasElement)
         await userEvent.click(await canvas.findByRole('button', { name: addPayment }))
-        await waitFor(() => expect(canvas.getAllByRole('textbox', { name: /^amount$/i })).toHaveLength(2))
+        // Two payments and the line.
+        await waitFor(() => expect(canvas.getAllByRole('textbox', { name: /^amount$/i })).toHaveLength(3))
         await expect(canvas.getAllByRole('combobox')[1]).toHaveTextContent(/euro card/i)
     },
 }
@@ -456,7 +455,8 @@ export const RemovingAPayment: Story = {
         await ready(canvasElement)
         const canvas = within(canvasElement)
         await userEvent.click((await canvas.findAllByRole('button', { name: removePayment }))[0])
-        await waitFor(() => expect(canvas.getAllByRole('textbox', { name: /^amount$/i })).toHaveLength(1))
+        // The payment and the line.
+        await waitFor(() => expect(canvas.getAllByRole('textbox', { name: /^amount$/i })).toHaveLength(2))
         await expect(canvas.queryByRole('button', { name: removePayment })).toBeNull()
     },
 }
@@ -499,91 +499,6 @@ export const BalanceBeforeAnAmount: Story = {
     },
 }
 
-// The Change section is apart from the payments, with its own (+).
-export const ChangeSectionOfAnExpense: Story = {
-    args: { defaultValues: expense },
-    play: async ({ canvasElement }) => {
-        await ready(canvasElement)
-        const section = await changeSection(canvasElement)
-        await expect(within(section).queryAllByRole('textbox', { name: /^amount$/i })).toHaveLength(0)
-        await userEvent.click(within(section).getByRole('button', { name: addChange }))
-        await waitFor(() => expect(within(section).getAllByRole('textbox', { name: /^amount$/i })).toHaveLength(1))
-        await expect(within(section).getByRole('combobox')).toHaveTextContent(/euro card/i)
-    },
-}
-
-// A saved change comes back in the section, with the balance of its account.
-export const ChangeOfASavedExpense: Story = {
-    args: { defaultValues: { ...expense, change: [{ account_id: 2, amount: 5 }] } },
-    play: async ({ canvasElement }) => {
-        await ready(canvasElement)
-        const section = await changeSection(canvasElement)
-        await expect(within(section).getByRole('textbox', { name: /^amount$/i })).toHaveValue('5')
-        await expect(await within(section).findByText(/balance after|баланс после/i)).toBeVisible()
-        await userEvent.click(within(section).getByRole('button', { name: removeChange }))
-        await waitFor(() => expect(within(section).queryAllByRole('textbox', { name: /^amount$/i })).toHaveLength(0))
-    },
-}
-
-// Change worth as much as the payments is refused by the API, so the form says so and does not save.
-export const ChangeTooLarge: Story = {
-    args: { defaultValues: { ...expense, change: [{ account_id: 2, amount: 20 }] } },
-    play: async ({ canvasElement, args }) => {
-        await ready(canvasElement)
-        const section = await changeSection(canvasElement)
-        await expect((await within(section).findAllByRole('alert'))[0]).toBeVisible()
-        await userEvent.click(saveButton(canvasElement))
-        await waitFor(() => expect(within(section).getAllByRole('alert')[0]).toBeVisible())
-        await expect(args.onSubmit).not.toHaveBeenCalled()
-    },
-}
-
-// An income has no change to give, unless a saved one has some.
-export const IncomeHasNoChangeSection: Story = {
-    args: { defaultValues: { ...expense, type: 'income', default_category_id: 2 } },
-    play: async ({ canvasElement }) => {
-        await ready(canvasElement)
-        await within(canvasElement).findByRole('textbox', { name: /description/i })
-        await expect(within(canvasElement).queryByRole('region', { name: /^change$|^сдача$/i })).toBeNull()
-    },
-}
-
-// Payments and change are saved with their signs: the change is the opposite of the payments.
-export const SubmitsPaymentsAndChange: Story = {
-    args: { defaultValues: { ...twoAccounts, change: [{ account_id: 3, amount: 100 }] } },
-    play: async ({ canvasElement, args }) => {
-        await ready(canvasElement)
-        await userEvent.click(await within(canvasElement).findByRole('button', { name: /save/i }))
-        await waitFor(() => expect(args.onSubmit).toHaveBeenCalledOnce())
-        await expect((args.onSubmit as ReturnType<typeof fn>).mock.calls[0][0]).toMatchObject({
-            payments: [
-                { account_id: 1, amount: -10 },
-                { account_id: 2, amount: -8 },
-                { account_id: 3, amount: 100 },
-            ],
-        })
-    },
-}
-
-// A line can be in the currency of a change account too.
-export const LineCurrencyIncludesTheChange: Story = {
-    args: {
-        defaultValues: {
-            ...split,
-            change: [{ account_id: 2, amount: 2 }],
-            lines: [{ category_id: 3, currency_id: null, amount: 5, note: null }, split.lines[1]],
-        },
-    },
-    play: async ({ canvasElement }) => {
-        await ready(canvasElement)
-        const group = await lineGroup(canvasElement)
-        const currency = within(group).getAllByRole('combobox', { name: /currency of the line|валюта строки/i })[0]
-        await userEvent.click(currency)
-        const options = await screen.findAllByRole('option')
-        await expect(options.map((o) => o.textContent)).toEqual(['USD', 'EUR'])
-    },
-}
-
 // Two accounts below zero: one question lists both before anything is saved.
 export const OverdrawingTwoAccountsAsksOnce: Story = {
     args: {
@@ -593,6 +508,8 @@ export const OverdrawingTwoAccountsAsksOnce: Story = {
                 { account_id: 1, amount: 500 },
                 { account_id: 2, amount: 2000 },
             ],
+            // With two payments the line is the user's to fill.
+            lines: [{ category_id: 1, currency_id: null, amount: 500, note: '' }],
         },
     },
     play: async ({ canvasElement, args }) => {

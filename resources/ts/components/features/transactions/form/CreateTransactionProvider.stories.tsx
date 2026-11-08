@@ -120,7 +120,8 @@ export const CreateOpened: Story = {
 export const CreateWithDefaults: Story = {
     play: async ({ canvasElement }) => {
         await open(canvasElement, 'New income')
-        await expect(await screen.findByRole('textbox', { name: /^amount$/i }, { timeout: 5000 })).toHaveValue('10')
+        // The payment's amount, and the line's that takes all of it.
+        await expect((await screen.findAllByRole('textbox', { name: /^amount$/i }, { timeout: 5000 }))[0]).toHaveValue('10')
     },
 }
 
@@ -213,7 +214,7 @@ export const CreateSent: Story = {
     play: async ({ canvasElement }) => {
         await open(canvasElement, 'New income')
         const dialog = await screen.findByRole('dialog', {}, { timeout: 5000 })
-        await within(dialog).findByRole('textbox', { name: /^amount$/i })
+        await within(dialog).findAllByRole('textbox', { name: /^amount$/i })
         // The accounts come from the mocked API: the form is ready when the first one is drawn.
         await waitFor(() => expect(dialog).toHaveTextContent(/cash/i))
         await userEvent.click(within(dialog).getByRole('button', { name: /^create$/i }))
