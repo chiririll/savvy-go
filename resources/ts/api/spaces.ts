@@ -12,6 +12,7 @@ import {
     Space,
     SpaceDetails,
     SpaceInvitation,
+    SpaceAction,
     SpaceMember,
     CreateSpaceInput,
     SpaceOverview,
@@ -69,6 +70,14 @@ export const spacesApi = {
     setRole: (id: number, userId: number, role: SpaceRole) =>
         api.patch<SpaceMember[], { role: SpaceRole }>(`${base(id)}/members/${userId}`, { role }),
     removeMember: (id: number, userId: number) => api.delete<void>(`${base(id)}/members/${userId}`),
+
+    /** The change log, newest first; the server shows a member only their own changes. `before` is the last id seen. */
+    actions: (id: number, before?: number, limit = 50, filters: { op?: string; entityType?: string; source?: string } = {}) =>
+        api.get<SpaceAction[]>(
+            `${base(id)}/audit-log${toQueryString({ before, limit, op: filters.op, entity_type: filters.entityType, source: filters.source })}`,
+        ),
+    /** Space admins only. Leaves one entry saying who cleared the log. */
+    clearActions: (id: number) => api.delete<{ removed: number }>(`${base(id)}/audit-log`),
 
     invitations: (id: number) => api.get<SpaceInvitation[]>(`${base(id)}/invitations`),
     /** `locale` is the language of the email, so it only means something with an `email`. */

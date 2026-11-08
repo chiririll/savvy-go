@@ -95,6 +95,12 @@ func (s Users) All(ctx context.Context) ([]User, error) {
 	return out, nil
 }
 
+// LastActivity is, per user id, when they last used a session or API token;
+// a user who never signed in is absent.
+func (s Users) LastActivity(ctx context.Context) (map[int64]time.Time, error) {
+	return s.repo().LastActivity(ctx)
+}
+
 func (s Users) Create(ctx context.Context, name, email string, plain *string, role string) (*User, error) {
 	if role == "" {
 		role = RoleUser

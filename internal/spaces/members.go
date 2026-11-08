@@ -33,6 +33,8 @@ type Member struct {
 	Email     string
 	Role      string
 	CreatedAt *time.Time
+	// LastActiveAt is when the member last used the app or an API token; nil if never.
+	LastActiveAt *time.Time
 }
 
 func (s Service) settings() settings.Store { return settings.Store{DB: s.Store.Server()} }
@@ -87,7 +89,7 @@ func (s Service) Members(ctx context.Context, spaceID int64) ([]Member, error) {
 	}
 	out := make([]Member, len(rows))
 	for i, r := range rows {
-		out[i] = Member{UserID: r.UserID, Name: r.Name, Email: r.Email, Role: r.Role, CreatedAt: r.CreatedAt}
+		out[i] = Member{UserID: r.UserID, Name: r.Name, Email: r.Email, Role: r.Role, CreatedAt: r.CreatedAt, LastActiveAt: r.LastActiveAt}
 	}
 	return out, nil
 }

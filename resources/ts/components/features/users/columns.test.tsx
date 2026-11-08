@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createUserColumns } from './columns'
 import type { User } from '@/types/users'
 
-vi.mock('@/lib/i18n', () => ({ default: { t: (key: string) => key } }))
+vi.mock('@/lib/i18n', () => ({ default: { t: (key: string) => key }, intlLocale: () => 'en' }))
 vi.mock('@/components/shared', () => ({
     UserAvatar: () => null,
     RowActions: ({ children }: { children: ReactNode }) => <div>{children}</div>,
@@ -24,6 +24,7 @@ const user: User = {
     isSsoOnly: false,
     emailVerified: false,
     createdAt: '2026-01-01',
+    lastActiveAt: null,
 }
 
 const noop = () => {}
@@ -65,12 +66,22 @@ describe('mark verified menu item', () => {
         renderCell(3)
         expect(screen.queryByText('pages:users.markVerified')).toBeNull()
         cleanup()
-        renderCell(3, true)
+        renderCell(4, true)
         expect(screen.getByText('pages:users.markVerified')).toBeTruthy()
     })
 
     it('still lets an admin withdraw a verified address when shown', () => {
-        renderCell(3, true, { ...user, emailVerified: true })
+        renderCell(4, true, { ...user, emailVerified: true })
         expect(screen.getByText('pages:users.markUnverified')).toBeTruthy()
+    })
+})
+
+describe('last activity column', () => {
+    it('shows the date, or that the user never signed in', () => {
+        renderCell(3, false, { ...user, lastActiveAt: '2026-03-05T14:30:00Z' })
+        expect(screen.queryByText('pages:users.neverActive')).toBeNull()
+        cleanup()
+        renderCell(3)
+        expect(screen.getByText('pages:users.neverActive')).toBeTruthy()
     })
 })

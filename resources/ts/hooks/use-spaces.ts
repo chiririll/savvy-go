@@ -1,5 +1,5 @@
 import { useCallback, useRef } from 'react'
-import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import i18n from '@/lib/i18n'
 import { adminSpacesApi, invitationsApi, spacesApi, syncGroupsApi } from '@/api/spaces'
 import { useUser } from '@/stores/auth'
@@ -173,6 +173,27 @@ export function useRemoveMember(id: number) {
         mutationFn: (userId: number) => spacesApi.removeMember(id, userId),
         invalidateKeys: [spaceKey(id, 'members')],
         successMessage: i18n.t('spaces.toasts.memberRemoved', { ns: 'settings' }),
+    })
+}
+
+export const ACTIONS_PAGE = 50
+
+/** The change log of a space, a page at a time, newest first. */
+export function useSpaceActions(id: number | null, filters: { op?: string; entityType?: string; source?: string } = {}) {
+    return useInfiniteQuery({
+        queryKey: [...spaceKey(id, 'actions'), filters],
+        queryFn: ({ pageParam }) => spacesApi.actions(id!, pageParam, ACTIONS_PAGE, filters),
+        initialPageParam: undefined as number | undefined,
+        getNextPageParam: (last) => (last.length < ACTIONS_PAGE ? undefined : last[last.length - 1]?.id),
+        enabled: id !== null,
+    })
+}
+
+export function useClearSpaceActions(id: number) {
+    return useResourceMutation({
+        mutationFn: () => spacesApi.clearActions(id),
+        invalidateKeys: [spaceKey(id, 'actions')],
+        successMessage: i18n.t('spaces.actions.cleared', { ns: 'settings' }),
     })
 }
 

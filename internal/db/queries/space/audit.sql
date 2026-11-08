@@ -13,6 +13,8 @@ WHERE id < sqlc.arg(before_id)
 	AND token_id IS COALESCE(sqlc.narg(token_id), token_id)
 	AND entity_type = COALESCE(sqlc.narg(entity_type), entity_type)
 	AND COALESCE(entity_id, 0) = COALESCE(sqlc.narg(entity_id), COALESCE(entity_id, 0))
+	AND op = COALESCE(sqlc.narg(op), op)
+	AND source = COALESCE(sqlc.narg(source), source)
 ORDER BY id DESC
 LIMIT sqlc.arg(row_limit);
 
@@ -21,6 +23,9 @@ LIMIT sqlc.arg(row_limit);
 SELECT * FROM audit_log
 WHERE id < sqlc.arg(before_id)
 	AND user_id = sqlc.arg(user_id)
+	AND entity_type = COALESCE(sqlc.narg(entity_type), entity_type)
+	AND op = COALESCE(sqlc.narg(op), op)
+	AND source = COALESCE(sqlc.narg(source), source)
 ORDER BY id DESC
 LIMIT sqlc.arg(row_limit);
 

@@ -25,7 +25,18 @@ func (h Handler) usersIndex(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	httpx.WriteData(w, http.StatusOK, dto.Map(list, dto.NewUser))
+	seen, err := h.Users.LastActivity(r.Context())
+	if err != nil {
+		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	out := dto.Map(list, dto.NewUser)
+	for i, u := range list {
+		if t, ok := seen[u.ID]; ok {
+			out[i].LastActiveAt = &t
+		}
+	}
+	httpx.WriteData(w, http.StatusOK, out)
 }
 
 func (h Handler) usersShow(w http.ResponseWriter, r *http.Request) {

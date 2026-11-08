@@ -33,10 +33,12 @@ type Member struct {
 	Email     string     `json:"email"`
 	Role      string     `json:"role"`
 	CreatedAt *time.Time `json:"createdAt"`
+	// LastActiveAt is null for a member who never signed in.
+	LastActiveAt *time.Time `json:"lastActiveAt"`
 }
 
 func NewMember(m spaces.Member) Member {
-	return Member{UserID: m.UserID, Name: m.Name, Email: m.Email, Role: m.Role, CreatedAt: utc(m.CreatedAt)}
+	return Member{UserID: m.UserID, Name: m.Name, Email: m.Email, Role: m.Role, CreatedAt: utc(m.CreatedAt), LastActiveAt: utc(m.LastActiveAt)}
 }
 
 type Invitation struct {

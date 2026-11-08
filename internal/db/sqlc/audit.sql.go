@@ -123,8 +123,10 @@ WHERE id < ?1
 	AND token_id IS COALESCE(?2, token_id)
 	AND entity_type = COALESCE(?3, entity_type)
 	AND COALESCE(entity_id, 0) = COALESCE(?4, COALESCE(entity_id, 0))
+	AND op = COALESCE(?5, op)
+	AND source = COALESCE(?6, source)
 ORDER BY id DESC
-LIMIT ?5
+LIMIT ?7
 `
 
 type ListAuditLogParams struct {
@@ -132,6 +134,8 @@ type ListAuditLogParams struct {
 	TokenID    sql.NullInt64
 	EntityType sql.NullString
 	EntityID   sql.NullInt64
+	Op         sql.NullString
+	Source     sql.NullString
 	RowLimit   int64
 }
 
@@ -142,6 +146,8 @@ func (q *Queries) ListAuditLog(ctx context.Context, arg ListAuditLogParams) ([]A
 		arg.TokenID,
 		arg.EntityType,
 		arg.EntityID,
+		arg.Op,
+		arg.Source,
 		arg.RowLimit,
 	)
 	if err != nil {
@@ -226,19 +232,32 @@ const listAuditLogUser = `-- name: ListAuditLogUser :many
 SELECT id, at, source, user_id, token_id, token_label, entity_type, entity_id, op, before_json, after_json, batch_id, rolled_back_by, details FROM audit_log
 WHERE id < ?1
 	AND user_id = ?2
+	AND entity_type = COALESCE(?3, entity_type)
+	AND op = COALESCE(?4, op)
+	AND source = COALESCE(?5, source)
 ORDER BY id DESC
-LIMIT ?3
+LIMIT ?6
 `
 
 type ListAuditLogUserParams struct {
-	BeforeID int64
-	UserID   sql.NullInt64
-	RowLimit int64
+	BeforeID   int64
+	UserID     sql.NullInt64
+	EntityType sql.NullString
+	Op         sql.NullString
+	Source     sql.NullString
+	RowLimit   int64
 }
 
 // Like ListAuditLog, for the rows of one user whatever the door.
 func (q *Queries) ListAuditLogUser(ctx context.Context, arg ListAuditLogUserParams) ([]AuditLog, error) {
-	rows, err := q.db.QueryContext(ctx, listAuditLogUser, arg.BeforeID, arg.UserID, arg.RowLimit)
+	rows, err := q.db.QueryContext(ctx, listAuditLogUser,
+		arg.BeforeID,
+		arg.UserID,
+		arg.EntityType,
+		arg.Op,
+		arg.Source,
+		arg.RowLimit,
+	)
 	if err != nil {
 		return nil, err
 	}

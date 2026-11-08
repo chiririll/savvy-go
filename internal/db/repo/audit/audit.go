@@ -139,6 +139,8 @@ type Filter struct {
 	UserID     int64
 	EntityType string
 	EntityID   int64
+	Op         string
+	Source     string
 	BeforeID   int64 // rows with a smaller id: the next page
 }
 
@@ -148,9 +150,17 @@ func (r Repo) List(ctx context.Context, f Filter, limit int) ([]Row, error) {
 		f.BeforeID = math.MaxInt64
 	}
 	if f.UserID != 0 {
-		list, err := r.q().ListAuditLogUser(ctx, sqlc.ListAuditLogUserParams{
-			BeforeID: f.BeforeID, UserID: db.NI(f.UserID), RowLimit: int64(limit),
-		})
+		p := sqlc.ListAuditLogUserParams{BeforeID: f.BeforeID, UserID: db.NI(f.UserID), RowLimit: int64(limit)}
+		if f.EntityType != "" {
+			p.EntityType = db.NS(f.EntityType)
+		}
+		if f.Op != "" {
+			p.Op = db.NS(f.Op)
+		}
+		if f.Source != "" {
+			p.Source = db.NS(f.Source)
+		}
+		list, err := r.q().ListAuditLogUser(ctx, p)
 		return rowsOf(list), err
 	}
 	p := sqlc.ListAuditLogParams{BeforeID: f.BeforeID, RowLimit: int64(limit)}
@@ -162,6 +172,12 @@ func (r Repo) List(ctx context.Context, f Filter, limit int) ([]Row, error) {
 	}
 	if f.EntityID != 0 {
 		p.EntityID = db.NI(f.EntityID)
+	}
+	if f.Op != "" {
+		p.Op = db.NS(f.Op)
+	}
+	if f.Source != "" {
+		p.Source = db.NS(f.Source)
 	}
 	list, err := r.q().ListAuditLog(ctx, p)
 	return rowsOf(list), err

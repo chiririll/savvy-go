@@ -48,6 +48,8 @@ CREATE TABLE IF NOT EXISTS auth_sessions (
 ) STRICT;
 CREATE INDEX IF NOT EXISTS auth_sessions_user_revoked_idx ON auth_sessions (user_id, revoked_at);
 CREATE INDEX IF NOT EXISTS auth_sessions_idle_idx ON auth_sessions (idle_expires_at);
+-- Last activity of a user (users list, space members): MAX(last_used_at) per user from the index alone.
+CREATE INDEX IF NOT EXISTS auth_sessions_user_used_idx ON auth_sessions (user_id, last_used_at);
 CREATE TABLE IF NOT EXISTS password_tokens (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -144,7 +146,7 @@ CREATE TABLE IF NOT EXISTS api_tokens (
     created_at TEXT,
     updated_at TEXT
 ) STRICT;
-CREATE INDEX IF NOT EXISTS api_tokens_user_idx ON api_tokens (user_id);
+CREATE INDEX IF NOT EXISTS api_tokens_user_idx ON api_tokens (user_id, last_used_at);
 CREATE TABLE IF NOT EXISTS oauth_clients (
     client_id TEXT PRIMARY KEY,
     name TEXT NOT NULL,

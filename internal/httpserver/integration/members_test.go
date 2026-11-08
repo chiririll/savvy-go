@@ -551,3 +551,37 @@ func TestSpaceSettingsAreAdminEditable(t *testing.T) {
 	res.Body.Close()
 	status(t, a.do("POST", "/api/spaces", map[string]any{"name": "Yes"}, user.Token, user.CSRF), 201, "unlimited again")
 }
+
+// The users list of the instance and the members list of a space say when each
+// person last used the app; someone who never signed in has no date.
+func TestLastActiveInUserAndMemberLists(t *testing.T) {
+	a := newTestApp(t)
+	admin := a.createUser("admin@test.com", "secret1", auth.RoleAdmin)
+	as := a.issue(admin, false)
+	idle := a.createUser("idle@test.com", "secret1", roleViewer) // member, never signed in
+
+	find := func(list []any, key string, id int64) map[string]any {
+		for _, x := range list {
+			if m := x.(map[string]any); int64(m[key].(float64)) == id {
+				return m
+			}
+		}
+		t.Fatalf("id %d not in %v", id, list)
+		return nil
+	}
+	res := a.do("GET", "/api/users", nil, as.Token, "")
+	users := decodeJSON(t, res)["data"].([]any)
+	if find(users, "id", admin.ID)["lastActiveAt"] == nil {
+		t.Fatal("the admin has a session: want lastActiveAt")
+	}
+	if v, ok := find(users, "id", idle.ID)["lastActiveAt"]; !ok || v != nil {
+		t.Fatalf("never signed in: lastActiveAt = %v, want null", v)
+	}
+	members := decodeJSON(t, a.do("GET", spacePath(a.space.ID, "/members"), nil, as.Token, ""))["data"].([]any)
+	if find(members, "userId", admin.ID)["lastActiveAt"] == nil {
+		t.Fatal("member list: want lastActiveAt for the admin")
+	}
+	if v, ok := find(members, "userId", idle.ID)["lastActiveAt"]; !ok || v != nil {
+		t.Fatalf("member list, never signed in: lastActiveAt = %v, want null", v)
+	}
+}

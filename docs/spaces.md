@@ -1,6 +1,6 @@
 # Spaces and Roles
 
-All finances live in a **space**: accounts, transactions, categories, tags, currencies, budgets, debts, recurring transactions and automation rules. Spaces are fully separate, each with its own base currency (say, a personal budget, a family one and a side project). Switch spaces at the top of the sidebar. Under it, **Space** holds what belongs to the current space (accounts, categories, tags, currencies, automation, import, backups and **Settings**), and **Account** holds your own sign-in: security, passkeys and API tokens. Backups is shown to the space's admins only.
+All finances live in a **space**: accounts, transactions, categories, tags, currencies, budgets, debts, recurring transactions and automation rules. Spaces are fully separate, each with its own base currency (say, a personal budget, a family one and a side project). Switch spaces at the top of the sidebar. Under it, **Space** holds what belongs to the current space (accounts, categories, tags, currencies, automation, import, **Recent actions**, backups and **Settings**), and **Account** holds your own sign-in: security, passkeys and API tokens. Backups is shown to the space's admins only.
 
 A new user starts with no space: create one or accept an invitation. Guests cannot create spaces.
 
@@ -39,6 +39,12 @@ Progress is kept in your browser only, so you can close the window and return (a
 | **Viewer** | read data and reports only |
 
 A space always keeps one admin: the last admin cannot leave or be demoted while other members remain.
+
+**Last activity.** The members list in the space settings and **Administration → Users** show when each person last used the app or one of their API tokens, or that they never signed in. It is the latest use of any of their sessions or tokens, so it can lag a person's real last visit by no more than a request.
+
+## Recent actions
+
+**Space → Recent actions** lists what was changed in the space, newest first: what (for now transactions and CSV imports), who, through which door (the app, an API token, an AI assistant, or automatic for recurring rules and the like) and when. Every member sees only their own changes; a space admin sees everyone's. Entries of one bulk call (demo data, a bulk create from an AI assistant) that sit next to each other are folded into one row, such as "Created transaction ×500"; click it to see them one by one. Filters above the list narrow it by operation, type and source. Only a space admin can **Clear log**, which removes all entries for everyone, cannot be undone and leaves one entry saying who cleared it. Rolling changes back is not done on this page. See the [audit log API](api.md#audit-log).
 
 ## Server roles
 

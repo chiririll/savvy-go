@@ -83,6 +83,17 @@ func TestMCPRollbackOfItsOwnMistakes(t *testing.T) {
 	if !sources["mcp"] || !sources["ui"] {
 		t.Fatalf("the admin's view has sources %v, want mcp and ui", sources)
 	}
+	for _, c := range []struct{ query, field, want string }{{"source=mcp", "source", "mcp"}, {"source=ui", "source", "ui"}, {"op=update", "op", "update"}} {
+		got := decodeJSON(t, a.inSpace(sp, "GET", "/api/audit-log?"+c.query, nil, sess))["data"].([]any)
+		if len(got) == 0 {
+			t.Fatalf("?%s found nothing", c.query)
+		}
+		for _, e := range got {
+			if e.(map[string]any)[c.field] != c.want {
+				t.Fatalf("?%s returned %v", c.query, e)
+			}
+		}
+	}
 	if code := a.bearer("DELETE", "/api/spaces/"+itoa(sp)+"/audit-log", nil, tok).StatusCode; code != 403 {
 		t.Fatalf("a token cleared the log: %d", code)
 	}

@@ -63,6 +63,7 @@ paths:
     get:
       tags: [Spaces]
       summary: List the members of a space
+      description: Each member has lastActiveAt, when a session or API token of theirs was last used (null if never).
       responses:
         "200": {$ref: "#/components/responses/Data"}
         "404": {$ref: "#/components/responses/NotFound"}

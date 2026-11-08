@@ -202,6 +202,45 @@ func (q *Queries) InsertUser(ctx context.Context, arg InsertUserParams) (sql.Res
 	)
 }
 
+const lastActivity = `-- name: LastActivity :many
+SELECT user_id, CAST(MAX(last_used_at) AS TEXT) AS at
+FROM auth_sessions GROUP BY user_id
+UNION ALL
+SELECT user_id, CAST(MAX(last_used_at) AS TEXT)
+FROM api_tokens WHERE last_used_at IS NOT NULL GROUP BY user_id
+`
+
+type LastActivityRow struct {
+	UserID int64
+	At     string
+}
+
+// Per user, the latest time a session or an API token of theirs was used.
+// Sessions and tokens each report their own latest; the caller takes the later.
+// A user who never signed in has no row.
+func (q *Queries) LastActivity(ctx context.Context) ([]LastActivityRow, error) {
+	rows, err := q.db.QueryContext(ctx, lastActivity)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []LastActivityRow{}
+	for rows.Next() {
+		var i LastActivityRow
+		if err := rows.Scan(&i.UserID, &i.At); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listUserNames = `-- name: ListUserNames :many
 SELECT id, name, deleted_at FROM users
 `

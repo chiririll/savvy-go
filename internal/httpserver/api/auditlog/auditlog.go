@@ -110,7 +110,7 @@ func views(r *http.Request, rows []audit.Entry, withSnapshots bool) ([]entry, er
 // admin everything, any other member their own.
 func (Handler) list(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	f := audit.Filter{EntityType: q.Get("entity_type")}
+	f := audit.Filter{EntityType: q.Get("entity_type"), Op: q.Get("op"), Source: q.Get("source")}
 	f.EntityID, _ = strconv.ParseInt(q.Get("entity_id"), 10, 64)
 	f.BeforeID, _ = strconv.ParseInt(q.Get("before"), 10, 64)
 	switch t := httpx.Token(r); {

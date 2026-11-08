@@ -157,6 +157,8 @@ type Member struct {
 	Name, Email string
 	Role        string
 	CreatedAt   *time.Time
+	// LastActiveAt is when a session or API token of the user was last used; nil if never.
+	LastActiveAt *time.Time
 }
 
 func (r Repo) UpsertMember(ctx context.Context, spaceID, userID int64, role string, now time.Time) error {
@@ -186,14 +188,26 @@ func (r Repo) Members(ctx context.Context, spaceID int64) ([]Member, error) {
 	out := make([]Member, len(rows))
 	for i, row := range rows {
 		out[i] = Member{
-			UserID:    row.UserID,
-			Name:      row.Name,
-			Email:     row.Email,
-			Role:      row.Role,
-			CreatedAt: optTime(row.CreatedAt),
+			UserID:       row.UserID,
+			Name:         row.Name,
+			Email:        row.Email,
+			Role:         row.Role,
+			CreatedAt:    optTime(row.CreatedAt),
+			LastActiveAt: latest(row.SessionAt, row.TokenAt),
 		}
 	}
 	return out, nil
+}
+
+// latest is the later of two stored timestamps; "" or unparsable is none.
+func latest(raws ...string) *time.Time {
+	var best *time.Time
+	for _, raw := range raws {
+		if t, ok := db.ParseTimeString(raw); ok && (best == nil || t.After(*best)) {
+			best = &t
+		}
+	}
+	return best
 }
 
 func (r Repo) CountMembers(ctx context.Context, spaceID int64) (int64, error) {

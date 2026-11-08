@@ -37,6 +37,9 @@ type User struct {
 	IsSSOOnly     bool       `json:"isSsoOnly"`
 	EmailVerified bool       `json:"emailVerified"`
 	CreatedAt     *time.Time `json:"createdAt"`
+	// LastActiveAt is when a session or API token of the user was last used;
+	// null if never, and wherever the list does not look it up.
+	LastActiveAt *time.Time `json:"lastActiveAt"`
 }
 
 func NewUser(u auth.User) User {

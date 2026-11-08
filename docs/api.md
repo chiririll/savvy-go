@@ -114,7 +114,7 @@ Every change to a transaction (created, edited, deleted, confirmed, skipped, or 
 
 | Route | Needs | Does |
 |-------|-------|------|
-| `GET /spaces/{id}/audit-log` | `audit:read` | newest first; filters `entity_type`, `entity_id`, `before` (the next page), `limit` (up to 200). A token sees the entries it made, a space admin all (and may filter with `token_id`), any other member their own. Each entry has `rollbackable` and, if not, `rollbackBlockedReason` |
+| `GET /spaces/{id}/audit-log` | `audit:read` | newest first; filters `entity_type`, `entity_id`, `op`, `source`, `before` (the next page), `limit` (up to 200). A token sees the entries it made, a space admin all (and may filter with `token_id`), any other member their own. Each entry has `rollbackable` and, if not, `rollbackBlockedReason` |
 | `GET /spaces/{id}/audit-log/{entry}` | `audit:read` | one entry with `before` and `after` |
 | `POST /spaces/{id}/audit-log/rollback` | `audit:write` | undo `{"ids": [..]}` or a bulk call `{"batch_id": ".."}`, newest first, all or none. A token undoes only its own entries; in the app a space admin undoes any |
 | `DELETE /spaces/{id}/audit-log` | space admin, signed in | clear the log (`?token_id=` only that token's entries) |
@@ -122,6 +122,8 @@ Every change to a transaction (created, edited, deleted, confirmed, skipped, or 
 Rolling back puts the saved copy back; it does not repeat the change through the normal rules, so a token that may add but not delete still takes its own create back. It answers `409` when the transaction was changed after the entry (`changed_since`), the entry was already rolled back (`already_rolled_back`), or a restored `external_id` is taken again (`external_id_exists`). The `audit` permission is separate from the others: an Editor token has `audit:write`, a token made before it existed does not.
 
 **Clearing** is manual and only by a space admin in a signed-in session; nothing prunes the log by itself. Afterwards the log holds one entry saying who cleared it, when, and how many entries went. Cleared entries can no longer be rolled back. Entries stay after the transaction, the token or the user they name is deleted.
+
+The app shows the log under **Space → Recent actions** (see [spaces](spaces.md#recent-actions)). `GET /users` and `GET /spaces/{id}/members` carry `lastActiveAt`: when a session or API token of the user was last used, `null` if never.
 
 ## Updates
 

@@ -8,6 +8,7 @@ import { useRemoveMember, useSetMemberRole, useSpaceMembers } from '@/hooks'
 import { useUser } from '@/stores/auth'
 import { Space, SpaceRole } from '@/types/spaces'
 import { spaceRoleLabel } from '@/lib/labels'
+import { formatDateTime } from '@/lib/format'
 
 const ROLES: SpaceRole[] = ['admin', 'editor', 'viewer']
 
@@ -41,6 +42,11 @@ export function Members({ space, isAdmin }: { space: Space; isAdmin: boolean }) 
                                     )}
                                 </p>
                                 <p className="truncate text-xs text-muted-foreground">{m.email}</p>
+                                <p className="truncate text-xs text-muted-foreground">
+                                    {m.lastActiveAt
+                                        ? t('spaces.members.lastActive', { date: formatDateTime(m.lastActiveAt) })
+                                        : t('spaces.members.neverActive')}
+                                </p>
                             </div>
                         </div>
                         <div className="flex items-center gap-2 sm:ml-auto">

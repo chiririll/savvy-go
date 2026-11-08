@@ -94,12 +94,14 @@
         "editTitle": "Edit user",
         "editDescription": "Update the user's name, email, role, or password.",
         "resetPassword": "Reset password",
+        "neverActive": "Never",
         "sendResetEmail": "Email a reset link",
         "inviteLinkTitle": "Set-password link",
         "inviteLinkDescription": "Copy this link and send it to the user. It is shown only once and works until {{date}}.",
         "columns": {
             "user": "User",
             "email": "Email",
+            "lastActive": "Last activity",
             "role": "Role",
             "actions": "Actions"
         },

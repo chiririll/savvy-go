@@ -24,6 +24,8 @@ export interface SpaceMember {
     email: string
     role: SpaceRole
     createdAt: string | null
+    /** When the member last used the app or an API token; null if never. */
+    lastActiveAt: string | null
 }
 
 export interface SpaceInvitation {
@@ -188,6 +190,23 @@ export interface SpaceTransferInput {
     to_amount: string
     date: string
     description?: string | null
+}
+
+/** A row of the space's change log (`GET /spaces/{id}/audit-log`). Values are open-ended: show unknown ones as they are. */
+export interface SpaceAction {
+    id: number
+    at: string
+    /** The door the change came through: ui, api, mcp, or system. */
+    source: string
+    userId: number | null
+    tokenLabel?: string
+    entityType: string
+    entityId: number | null
+    /** create, update, delete, confirm, skip, rollback, cleanup. */
+    op: string
+    /** Entries of one bulk call (seeding, MCP bulk create) share it. */
+    batchId?: string
+    details?: string
 }
 
 export interface AuditEntry {

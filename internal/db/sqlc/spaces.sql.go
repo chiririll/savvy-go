@@ -536,7 +536,9 @@ func (q *Queries) ListInvitations(ctx context.Context, arg ListInvitationsParams
 }
 
 const listMembers = `-- name: ListMembers :many
-SELECT m.user_id, u.name, u.email, m.role, m.created_at
+SELECT m.user_id, u.name, u.email, m.role, m.created_at,
+	CAST(COALESCE((SELECT MAX(s.last_used_at) FROM auth_sessions s WHERE s.user_id = m.user_id), '') AS TEXT) AS session_at,
+	CAST(COALESCE((SELECT MAX(t.last_used_at) FROM api_tokens t WHERE t.user_id = m.user_id), '') AS TEXT) AS token_at
 FROM space_members m JOIN users u ON u.id = m.user_id
 WHERE m.space_id = ?
 ORDER BY u.name
@@ -548,6 +550,8 @@ type ListMembersRow struct {
 	Email     string
 	Role      string
 	CreatedAt sql.NullString
+	SessionAt string
+	TokenAt   string
 }
 
 func (q *Queries) ListMembers(ctx context.Context, spaceID int64) ([]ListMembersRow, error) {
@@ -565,6 +569,8 @@ func (q *Queries) ListMembers(ctx context.Context, spaceID int64) ([]ListMembers
 			&i.Email,
 			&i.Role,
 			&i.CreatedAt,
+			&i.SessionAt,
+			&i.TokenAt,
 		); err != nil {
 			return nil, err
 		}

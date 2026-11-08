@@ -356,10 +356,11 @@ export const transactionTypeLabel = (t: TFunction, type: TransactionType): strin
 export type NavKey =
     | 'dashboard' | 'transactions' | 'recurring' | 'budgets' | 'debts' | 'reports'
     | 'accounts' | 'categories' | 'tags' | 'currencies' | 'automation' | 'settings' | 'passkeys' | 'api' | 'import'
-    | 'backups' | 'system' | 'checks' | 'monitoring' | 'sso' | 'security' | 'systemBackups' | 'users' | 'spaces'
+    | 'backups' | 'recentActions' | 'system' | 'checks' | 'monitoring' | 'sso' | 'security' | 'systemBackups' | 'users' | 'spaces'
 
 export const navLabel = (t: TFunction, key: NavKey): string => ({
     dashboard: t('nav:dashboard'),
+    recentActions: t('nav:recentActions'),
     transactions: t('nav:transactions'),
     recurring: t('nav:recurring'),
     budgets: t('nav:budgets'),

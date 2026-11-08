@@ -11,6 +11,8 @@ paths:
       parameters:
         - {name: entity_type, in: query, schema: {type: string}}
         - {name: entity_id, in: query, schema: {type: integer}}
+        - {name: op, in: query, description: "create, update, delete, confirm, skip, rollback or cleanup", schema: {type: string}}
+        - {name: source, in: query, description: "ui, api, mcp or system", schema: {type: string}}
         - {name: token_id, in: query, description: Space admins only, schema: {type: integer}}
         - {name: before, in: query, description: Entries with a smaller id (the next page), schema: {type: integer}}
         - {name: limit, in: query, schema: {type: integer, default: 50, maximum: 200}}
