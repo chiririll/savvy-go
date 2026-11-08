@@ -8,13 +8,43 @@ Endpoint: `https://your-savvy.example/mcp`
 
 Claude's servers call your instance over the internet, so it needs a public `https://` address set as `app_url` (see [Deployment](deployment.md#configuration)). An instance only on your home network is unreachable.
 
-1. As administrator, open **Administration → Security** and press **Allow a new app for 5 minutes**.
-2. In Claude, open **Settings → Connectors → Add custom connector** and enter the endpoint.
+1. As administrator, choose how Claude will identify itself, see [Ways to connect an app](#ways-to-connect-an-app). The simplest is **Allow a new app for 5 minutes** in **Administration → Security**.
+2. In Claude, open **Settings → Connectors → Add custom connector** and enter the endpoint. For an [own client](#own-client), open the advanced settings and enter its client ID (and secret).
 3. On the Go Savvy page that opens, sign in if needed, **choose the spaces** the app may read and press **Allow access**.
 
 The connection appears in **Account → API tokens** as an API token named `MCP: …`. Revoke it there to cut the assistant off at once.
 
 Other clients: anything that supports remote MCP servers with OAuth connects the same way. Without OAuth, send an API token from **Account → API tokens** as `Authorization: Bearer svy_…`. Tools only work within the token's grants; a missing one answers with an error naming the permission.
+
+## Ways to connect an app
+
+Claude offers three ways to identify itself. The server supports all of them; an administrator decides which are open in **Administration → Security**.
+
+| Way | Setup | Notes |
+|-----|-------|-------|
+| [Dynamic registration](#who-may-register-an-app) (DCR) | Press **Allow a new app for 5 minutes** | Works with most clients. Each connection creates a registration, so it is open for one app at a time |
+| [Metadata document](#metadata-documents) (CIMD) | Add the host to **Apps that identify themselves by URL** | The app's `client_id` is a link to a JSON document it hosts. Nothing is registered on the server by hand |
+| [Own client](#own-client) | Create it under **Own client** | You give the app a client ID and, if needed, a secret |
+
+### Metadata documents
+
+A client ID Metadata Document (CIMD) app uses an `https://` link as its `client_id`. The server downloads the document at that link to learn the app's name and redirect addresses.
+
+- **Off until you allow a host.** The list of hosts in **Administration → Security → Apps that identify themselves by URL** starts empty and has no defaults. Only an administrator can add a host. Enter a bare host name such as `claude.ai`, without `https://`, a path, a port or a wildcard; matching is exact. While the list is empty the server does not advertise the feature.
+- Removing a host cuts off every app that came from it at once. Its tokens stop refreshing.
+- The document must name the same URL as its `client_id`, give 1 to 10 valid redirect addresses, and not ask for a client secret (`token_endpoint_auth_method` must be `none` or missing). It is at most 5 KB.
+- The server fetches it safely: `https` only, no redirects, 5 seconds, and never to a private, loopback or link-local address. A host that resolves to one is refused.
+- The document is cached for the time its `Cache-Control: max-age` says, kept between 5 minutes and 24 hours (an hour if absent).
+- Anyone can write a document that calls itself "Claude". The app's name comes from it, so the consent page also shows the host the app identifies itself from. Check it before you allow.
+
+### Own client
+
+For an app that asks for an OAuth client ID (and optionally a secret) in its own settings. In **Administration → Security → Own client** enter a name and the redirect addresses the app will use, one per line. For Claude on the web that is `https://claude.ai/api/mcp/auth_callback`.
+
+- Tick **Requires a client secret** if the app should prove itself with one. The server then generates a client ID and a secret and shows both **once**; copy them into the app. Without it, only a client ID is made and the app relies on PKCE alone.
+- The secret is stored only as a hash. It cannot be shown again; create a new client if it is lost.
+- The app sends the secret as `client_secret_basic` (an `Authorization: Basic` header) or `client_secret_post` (a form field) at the token endpoint, for both the first sign-in and every token renewal.
+- These clients are not removed when idle. **Disconnect** deletes one like any other app.
 
 ## Who may register an app
 
@@ -23,7 +53,7 @@ Other clients: anything that supports remote MCP servers with OAuth connects the
 - The consent page shows where your browser will be sent back to. Check it before you allow.
 - Each user then decides for themselves. **Allow access** gives the app that user's own access to the spaces they chose, nothing more. The page offers the same tabs as API tokens: Viewer (default, read-only), Editor, Admin, or Custom. The app registers once; every user can connect it.
 
-**Administration → Security → Registered apps** lists every app with what the server saw at registration, so you can check it is the one you expected:
+**Administration → Security → Registered apps** lists every app, marked as registered itself, metadata document or created by admin, with what the server saw at registration (only apps that registered themselves have these details), so you can check it is the one you expected:
 
 | Detail     | Meaning |
 |------------|---------|
@@ -33,7 +63,7 @@ Other clients: anything that supports remote MCP servers with OAuth connects the
 | Returns to | The redirect addresses it registered |
 | Registered | When |
 
-The server log records the same (`oauth app registered`) and every removal (`oauth app removed`). **Disconnect** deletes the app and revokes all its tokens for all users; it must register again in a new window.
+The server log records the same (`oauth app registered`), every created own client (`oauth client created`), every rejected metadata document (`oauth client metadata rejected`) and every removal (`oauth app removed`). **Disconnect** deletes the app and revokes all its tokens for all users; it must register again in a new window.
 
 ## What an assistant can see
 
@@ -111,7 +141,7 @@ The assistant sees only the tools its connection can use (read-only access to tr
 
 ## How it works
 
-Sign-in uses OAuth 2.1 with PKCE and dynamic client registration, as Claude expects. Discovery documents: `/.well-known/oauth-protected-resource` and `/.well-known/oauth-authorization-server`. Behind a reverse proxy, forward `/mcp`, `/oauth/*` and `/.well-known/*` like everything else.
+Sign-in uses OAuth 2.1 with PKCE. Clients identify themselves by dynamic registration, a client ID metadata document or a client ID you created. Discovery documents: `/.well-known/oauth-protected-resource` and `/.well-known/oauth-authorization-server`. Behind a reverse proxy, forward `/mcp`, `/oauth/*` and `/.well-known/*` like everything else.
 
 ## Testing the sign-in locally
 

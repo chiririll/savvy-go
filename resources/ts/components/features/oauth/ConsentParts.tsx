@@ -48,10 +48,17 @@ export function ConsentConfirmDialog({
             title={t('oauth.confirmTitle', { client })}
             description={
                 <>
-                    <p>{t('oauth.confirmChange', { client, resources: list(changes) })}</p>
+                    <p>
+                        {t('oauth.confirmChange', {
+                            client,
+                            resources: list(changes),
+                        })}
+                    </p>
                     {deletes.length > 0 && (
                         <p className="font-medium text-destructive">
-                            {t('oauth.confirmDelete', { resources: list(deletes) })}
+                            {t('oauth.confirmDelete', {
+                                resources: list(deletes),
+                            })}
                         </p>
                     )}
                     <p>{t('oauth.confirmAsYou')}</p>

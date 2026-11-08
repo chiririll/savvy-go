@@ -26,5 +26,9 @@ func (h Handler) Routes(r chi.Router) {
 	r.Post("/admin/oauth/registration", h.oauthRegistrationOpen)
 	r.Delete("/admin/oauth/registration", h.oauthRegistrationClose)
 	r.Get("/admin/oauth/clients", h.oauthClientsIndex)
+	r.Post("/admin/oauth/clients", h.oauthClientStore)
 	r.Delete("/admin/oauth/clients/{id}", h.oauthClientDestroy)
+	r.Get("/admin/oauth/cimd-hosts", h.oauthHostsIndex)
+	r.Post("/admin/oauth/cimd-hosts", h.oauthHostStore)
+	r.Delete("/admin/oauth/cimd-hosts/{host}", h.oauthHostDestroy)
 }

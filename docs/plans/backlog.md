@@ -74,10 +74,7 @@ Today only CSV import exists (`internal/importer`, `CsvImportWizard`). It avoids
 - ~~Batch create~~ (P1): done. `create_transactions` (REST `POST /transactions/bulk`) takes up to 500 records, all or none.
 - ~~Compact `list_transactions`~~ (P1): done, `fields` argument. Original note: Filtering by `account_id` already works, so only the fields choice is missing. Today every record repeats the full account object with its currency, and a month of data was cut by the response limit (pages of up to 100).
 - Rollback endpoint for MCP (P2). Needs a design: roll back what, to which point (for example a batch id). Nothing exists.
-- OAuth client choice when connecting from Claude. Today only Dynamic Client Registration works, and only while an admin has opened a 5-minute window in **Administration → Security** (`docs/mcp.md`). The server should support all three modes the client offers:
-  - Client ID Metadata Document (CIMD): Claude's identity is read from a URL hosted by Anthropic, nothing to set up, but the server must support it;
-  - Dynamic Client Registration (DCR): works with most servers, but creates many client registrations on a busy one;
-  - own OAuth client: user enters a client ID, secret only if the authorization server requires one.
+- ~~OAuth client choice when connecting from Claude~~: done. Client ID Metadata Documents (from allowed hosts only), dynamic registration and own clients with an optional secret all work, see `docs/mcp.md`.
 - Claude app shows a YouTube icon for the Savvy connector. Needs a proper icon from the server (favicon or CIMD logo) (P3). The server publishes no icon or logo in its metadata today.
 
 ## Shared spaces

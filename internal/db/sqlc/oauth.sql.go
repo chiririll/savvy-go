@@ -10,6 +10,17 @@ import (
 	"database/sql"
 )
 
+const countOAuthCIMDHost = `-- name: CountOAuthCIMDHost :one
+SELECT COUNT(*) FROM oauth_cimd_hosts WHERE host = ?
+`
+
+func (q *Queries) CountOAuthCIMDHost(ctx context.Context, host string) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countOAuthCIMDHost, host)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countOAuthClients = `-- name: CountOAuthClients :one
 SELECT COUNT(*) FROM oauth_clients
 `
@@ -42,11 +53,20 @@ func (q *Queries) DeleteExpiredOAuthRefresh(ctx context.Context, expiresAt strin
 const deleteIdleOAuthClients = `-- name: DeleteIdleOAuthClients :execresult
 DELETE FROM oauth_clients
 WHERE oauth_clients.created_at < ?
+  AND oauth_clients.kind <> 'manual'
   AND oauth_clients.client_id NOT IN (SELECT r.client_id FROM oauth_refresh_tokens r)
 `
 
 func (q *Queries) DeleteIdleOAuthClients(ctx context.Context, createdAt sql.NullString) (sql.Result, error) {
 	return q.db.ExecContext(ctx, deleteIdleOAuthClients, createdAt)
+}
+
+const deleteOAuthCIMDHost = `-- name: DeleteOAuthCIMDHost :execresult
+DELETE FROM oauth_cimd_hosts WHERE host = ?
+`
+
+func (q *Queries) DeleteOAuthCIMDHost(ctx context.Context, host string) (sql.Result, error) {
+	return q.db.ExecContext(ctx, deleteOAuthCIMDHost, host)
 }
 
 const deleteOAuthClient = `-- name: DeleteOAuthClient :execresult
@@ -67,7 +87,7 @@ func (q *Queries) DeleteOAuthRefresh(ctx context.Context, id int64) error {
 }
 
 const getOAuthClient = `-- name: GetOAuthClient :one
-SELECT client_id, name, redirect_uris, ip, user_agent, origin, created_at FROM oauth_clients WHERE client_id = ?
+SELECT client_id, name, redirect_uris, ip, user_agent, origin, created_at, kind, secret_hash, expires_at FROM oauth_clients WHERE client_id = ?
 `
 
 func (q *Queries) GetOAuthClient(ctx context.Context, clientID string) (OauthClient, error) {
@@ -81,6 +101,9 @@ func (q *Queries) GetOAuthClient(ctx context.Context, clientID string) (OauthCli
 		&i.UserAgent,
 		&i.Origin,
 		&i.CreatedAt,
+		&i.Kind,
+		&i.SecretHash,
+		&i.ExpiresAt,
 	)
 	return i, err
 }
@@ -103,6 +126,44 @@ func (q *Queries) GetOAuthRefreshByHash(ctx context.Context, tokenHash string) (
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const insertManualOAuthClient = `-- name: InsertManualOAuthClient :exec
+INSERT INTO oauth_clients (client_id, name, redirect_uris, created_at, kind, secret_hash)
+VALUES (?, ?, ?, ?, 'manual', ?)
+`
+
+type InsertManualOAuthClientParams struct {
+	ClientID     string
+	Name         string
+	RedirectUris string
+	CreatedAt    sql.NullString
+	SecretHash   string
+}
+
+func (q *Queries) InsertManualOAuthClient(ctx context.Context, arg InsertManualOAuthClientParams) error {
+	_, err := q.db.ExecContext(ctx, insertManualOAuthClient,
+		arg.ClientID,
+		arg.Name,
+		arg.RedirectUris,
+		arg.CreatedAt,
+		arg.SecretHash,
+	)
+	return err
+}
+
+const insertOAuthCIMDHost = `-- name: InsertOAuthCIMDHost :exec
+INSERT INTO oauth_cimd_hosts (host, created_at) VALUES (?, ?) ON CONFLICT (host) DO NOTHING
+`
+
+type InsertOAuthCIMDHostParams struct {
+	Host      string
+	CreatedAt sql.NullString
+}
+
+func (q *Queries) InsertOAuthCIMDHost(ctx context.Context, arg InsertOAuthCIMDHostParams) error {
+	_, err := q.db.ExecContext(ctx, insertOAuthCIMDHost, arg.Host, arg.CreatedAt)
+	return err
 }
 
 const insertOAuthClient = `-- name: InsertOAuthClient :exec
@@ -158,8 +219,35 @@ func (q *Queries) InsertOAuthRefresh(ctx context.Context, arg InsertOAuthRefresh
 	return err
 }
 
+const listOAuthCIMDHosts = `-- name: ListOAuthCIMDHosts :many
+SELECT host FROM oauth_cimd_hosts ORDER BY host
+`
+
+func (q *Queries) ListOAuthCIMDHosts(ctx context.Context) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, listOAuthCIMDHosts)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var host string
+		if err := rows.Scan(&host); err != nil {
+			return nil, err
+		}
+		items = append(items, host)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listOAuthClients = `-- name: ListOAuthClients :many
-SELECT client_id, name, redirect_uris, ip, user_agent, origin, created_at FROM oauth_clients ORDER BY created_at DESC
+SELECT client_id, name, redirect_uris, ip, user_agent, origin, created_at, kind, secret_hash, expires_at FROM oauth_clients ORDER BY created_at DESC
 `
 
 func (q *Queries) ListOAuthClients(ctx context.Context) ([]OauthClient, error) {
@@ -179,6 +267,9 @@ func (q *Queries) ListOAuthClients(ctx context.Context) ([]OauthClient, error) {
 			&i.UserAgent,
 			&i.Origin,
 			&i.CreatedAt,
+			&i.Kind,
+			&i.SecretHash,
+			&i.ExpiresAt,
 		); err != nil {
 			return nil, err
 		}
@@ -214,4 +305,30 @@ func (q *Queries) RotateOAuthRefresh(ctx context.Context, arg RotateOAuthRefresh
 		arg.ID,
 		arg.TokenHash_2,
 	)
+}
+
+const upsertCIMDOAuthClient = `-- name: UpsertCIMDOAuthClient :exec
+INSERT INTO oauth_clients (client_id, name, redirect_uris, created_at, kind, expires_at)
+VALUES (?, ?, ?, ?, 'cimd', ?)
+ON CONFLICT (client_id) DO UPDATE SET name = excluded.name, redirect_uris = excluded.redirect_uris, expires_at = excluded.expires_at
+WHERE oauth_clients.kind = 'cimd'
+`
+
+type UpsertCIMDOAuthClientParams struct {
+	ClientID     string
+	Name         string
+	RedirectUris string
+	CreatedAt    sql.NullString
+	ExpiresAt    sql.NullString
+}
+
+func (q *Queries) UpsertCIMDOAuthClient(ctx context.Context, arg UpsertCIMDOAuthClientParams) error {
+	_, err := q.db.ExecContext(ctx, upsertCIMDOAuthClient,
+		arg.ClientID,
+		arg.Name,
+		arg.RedirectUris,
+		arg.CreatedAt,
+		arg.ExpiresAt,
+	)
+	return err
 }

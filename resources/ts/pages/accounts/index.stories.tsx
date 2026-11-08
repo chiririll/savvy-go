@@ -89,7 +89,11 @@ export const OpensTheReconcileDialog: Story = {
         await userEvent.click(await within(canvasElement).findByRole('button', { name: /reconcile/i }))
         const dialog = await screen.findByRole('dialog')
         await expect(within(dialog).getByText('Reconcile accounts')).toBeVisible()
-        await expect(await within(dialog).findByRole('textbox', { name: /actual balance of cash/i })).toHaveValue('120.50')
-        await expect(within(dialog).getByRole('textbox', { name: /actual balance of kuwait savings/i })).toHaveValue('12.345')
+        await expect(await within(dialog).findByRole('textbox', { name: /actual balance of cash/i })).toHaveValue(
+            '120.50',
+        )
+        await expect(within(dialog).getByRole('textbox', { name: /actual balance of kuwait savings/i })).toHaveValue(
+            '12.345',
+        )
     },
 }

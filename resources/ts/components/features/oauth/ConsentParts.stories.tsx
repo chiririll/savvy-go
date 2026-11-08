@@ -42,7 +42,9 @@ const dialog = (props: Partial<React.ComponentProps<typeof ConsentConfirmDialog>
 )
 
 export const ConfirmChange: Story = { render: () => dialog() }
-export const ConfirmDelete: Story = { render: () => dialog({ deletes: ['transactions', 'accounts'] }) }
+export const ConfirmDelete: Story = {
+    render: () => dialog({ deletes: ['transactions', 'accounts'] }),
+}
 export const ConfirmClosed: Story = { render: () => dialog({ open: false }) }
 
 export const ConfirmAllowed: Story = {

@@ -210,6 +210,11 @@ type IdentityProvider struct {
 	UpdatedAt       sql.NullString
 }
 
+type OauthCimdHost struct {
+	Host      string
+	CreatedAt sql.NullString
+}
+
 type OauthClient struct {
 	ClientID     string
 	Name         string
@@ -218,6 +223,9 @@ type OauthClient struct {
 	UserAgent    string
 	Origin       string
 	CreatedAt    sql.NullString
+	Kind         string
+	SecretHash   string
+	ExpiresAt    sql.NullString
 }
 
 type OauthRefreshToken struct {

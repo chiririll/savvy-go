@@ -915,16 +915,54 @@
         },
         "mcp": {
             "title": "AI assistants (MCP)",
-            "description": "Let an AI app such as Claude connect to this server and read your data. New apps can only register while you allow it, for a few minutes and for one app at a time.",
+            "description": "Let an AI app such as Claude connect to this server and read your data. Pick how the app will identify itself.",
             "closed": "Closed. No new app can register.",
             "open": "Open until {{time}}. It closes by itself, or as soon as one app registers.",
             "allow": "Allow a new app for 5 minutes",
             "close": "Close now",
+            "tabs": {
+                "dcr": "Self-registration",
+                "cimd": "Metadata URL",
+                "own": "Own client"
+            },
+            "dcr": {
+                "help": "The app registers itself (Dynamic Client Registration). It works with most apps, but only while you allow it: for a few minutes and for one app at a time."
+            },
             "endpoint": "Server address to add in the app",
             "copy": "Copy",
             "copied": "Address copied",
             "openFailed": "Could not open registration.",
             "closeFailed": "Could not close registration.",
+            "kind": {
+                "dcr": "Registered itself",
+                "cimd": "Metadata document",
+                "manual": "Created by admin"
+            },
+            "confidentialBadge": "Has secret",
+            "hosts": {
+                "title": "Apps that identify themselves by URL",
+                "help": "Apps such as Claude can identify themselves with a link instead of registering (Client ID Metadata Document). The server fetches that link only for hosts listed here. Empty means this is off.",
+                "none": "No host is allowed.",
+                "placeholder": "claude.ai",
+                "add": "Allow host",
+                "remove": "Remove {{host}}",
+                "addFailed": "Could not allow this host.",
+                "removeFailed": "Could not remove this host."
+            },
+            "own": {
+                "title": "Own client",
+                "help": "For apps that ask for an OAuth client ID (and a secret) in their settings. Create the client here and paste the values into the app.",
+                "name": "Name",
+                "redirects": "Redirect URIs, one per line",
+                "confidential": "Requires a client secret",
+                "create": "Create client",
+                "createFailed": "Could not create the client.",
+                "createdTitle": "Client created",
+                "secretOnce": "The secret is shown only now. Copy it before you close this.",
+                "clientId": "Client ID",
+                "clientSecret": "Client secret",
+                "done": "Done"
+            },
             "apps": {
                 "title": "Registered apps",
                 "none": "No app has registered yet.",

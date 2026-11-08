@@ -76,7 +76,7 @@ func (h Handler) oauthConsentInfo(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	httpx.WriteData(w, http.StatusOK, consentBody{ClientName: c.Name, Spaces: dto.Map(mine, dto.NewSpace)})
+	httpx.WriteData(w, http.StatusOK, consentBody{ClientName: c.Name, ClientHost: clientHost(c), Spaces: dto.Map(mine, dto.NewSpace)})
 }
 
 // consentRequest is the user's decision on an app's access request.
@@ -150,6 +150,20 @@ func writeRedirect(w http.ResponseWriter, uri string, params map[string]string) 
 
 // consentBody is what the consent screen shows: the app and the spaces it may be given.
 type consentBody struct {
-	ClientName string      `json:"client_name"`
+	ClientName string `json:"client_name"`
+	// ClientHost is where a metadata-document app says it lives. Its name is
+	// self-declared, so the screen shows this beside it.
+	ClientHost string      `json:"client_host,omitempty"`
 	Spaces     []dto.Space `json:"spaces"`
+}
+
+// clientHost is the host of a metadata-document client's id; empty for other clients.
+func clientHost(c *oauth.Client) string {
+	if c.Kind != "cimd" {
+		return ""
+	}
+	if u, err := url.Parse(c.ID); err == nil {
+		return u.Host
+	}
+	return ""
 }

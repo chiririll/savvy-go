@@ -40,6 +40,9 @@ type serverMetadata struct {
 	CodeChallengeMethodsSupported []string `json:"code_challenge_methods_supported"`
 	TokenEndpointAuthMethods      []string `json:"token_endpoint_auth_methods_supported"`
 	ScopesSupported               []string `json:"scopes_supported"`
+	// ClientIDMetadataDocumentSupported is set once an admin has allowed a host
+	// to serve client metadata documents.
+	ClientIDMetadataDocumentSupported bool `json:"client_id_metadata_document_supported,omitempty"`
 }
 
 func (h Handler) oauthResourceMetadata(w http.ResponseWriter, r *http.Request) {
@@ -64,13 +67,16 @@ func (h Handler) oauthServerMetadata(w http.ResponseWriter, r *http.Request) {
 		ResponseTypesSupported:        []string{"code"},
 		GrantTypesSupported:           []string{"authorization_code", "refresh_token"},
 		CodeChallengeMethodsSupported: []string{"S256"},
-		TokenEndpointAuthMethods:      []string{"none"},
+		TokenEndpointAuthMethods:      []string{"none", "client_secret_post", "client_secret_basic"},
 		ScopesSupported:               oauthScopes,
 	}
 	// Registration exists only while an admin has it open; closed, nothing
 	// hints that it could be, and clients must not cache the answer.
 	if _, open := h.OAuth.RegistrationOpenUntil(); open {
 		meta.RegistrationEndpoint = base + "/oauth/register"
+	}
+	if hosts, err := h.OAuth.CIMDHosts(r.Context()); err == nil && len(hosts) > 0 {
+		meta.ClientIDMetadataDocumentSupported = true
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	httpx.WriteJSON(w, http.StatusOK, meta)

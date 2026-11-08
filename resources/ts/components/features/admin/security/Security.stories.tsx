@@ -17,21 +17,36 @@ const app = (overrides: Partial<OAuthClient> = {}): OAuthClient => ({
     user_agent: 'Claude-User',
     origin: '',
     registered_at: '2030-01-05T10:00:00Z',
+    kind: 'dcr',
+    confidential: false,
     ...overrides,
 })
 
 const keys = {
     own: { kid: 'k-own', publicKey: 'MCowBQYDK2VwAyEAown' },
-    trusted: [{ kid: 'k-friend', publicKey: 'MCowBQYDK2VwAyEAfriend', name: 'Parents server', createdAt: null }],
+    trusted: [
+        {
+            kid: 'k-friend',
+            publicKey: 'MCowBQYDK2VwAyEAfriend',
+            name: 'Parents server',
+            createdAt: null,
+        },
+    ],
 }
 
 const registration = (open: boolean) =>
-    reply('get', '/admin/oauth/registration', { open, expires_at: open ? '2030-01-05T10:05:00Z' : null })
+    reply('get', '/admin/oauth/registration', {
+        open,
+        expires_at: open ? '2030-01-05T10:05:00Z' : null,
+    })
 
 const sent: { bodies: unknown[] } = { bodies: [] }
 
 const copyable = () => {
-    Object.defineProperty(navigator, 'clipboard', { value: { writeText: fn(async () => {}) }, configurable: true })
+    Object.defineProperty(navigator, 'clipboard', {
+        value: { writeText: fn(async () => {}) },
+        configurable: true,
+    })
 }
 
 // The admin security page: AI app registration and the server's signing keys.
@@ -39,7 +54,12 @@ const meta = {
     title: 'features/admin/Security',
     parameters: { a11y: overlayA11y },
     beforeEach: ({ msw }) =>
-        msw.use(registration(false), reply('get', '/admin/oauth/clients', [app()]), reply('get', '/admin/keys', keys)),
+        msw.use(
+            registration(false),
+            reply('get', '/admin/oauth/clients', [app()]),
+            reply('get', '/admin/oauth/cimd-hosts', [{ host: 'claude.ai' }]),
+            reply('get', '/admin/keys', keys),
+        ),
 } satisfies Meta
 
 export default meta
@@ -63,11 +83,18 @@ export const McpOpened: Story = {
         let open = false
         msw.use(
             http.get(/\/api\/admin\/oauth\/registration$/, () =>
-                HttpResponse.json({ data: { open, expires_at: open ? '2030-01-05T10:05:00Z' : null } }),
+                HttpResponse.json({
+                    data: {
+                        open,
+                        expires_at: open ? '2030-01-05T10:05:00Z' : null,
+                    },
+                }),
             ),
             http.post(/\/api\/admin\/oauth\/registration$/, () => {
                 open = true
-                return HttpResponse.json({ data: { open, expires_at: '2030-01-05T10:05:00Z' } })
+                return HttpResponse.json({
+                    data: { open, expires_at: '2030-01-05T10:05:00Z' },
+                })
             }),
         )
     },
@@ -79,9 +106,25 @@ export const McpOpened: Story = {
     },
 }
 
+export const McpTabs: Story = {
+    render: () => <McpAccess />,
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement)
+        await userEvent.click(await canvas.findByRole('tab', { name: /metadata url/i }))
+        await expect(await canvas.findByText('claude.ai')).toBeVisible()
+        await userEvent.click(canvas.getByRole('tab', { name: /own client/i }))
+        await expect(await canvas.findByLabelText(/redirect uris/i)).toBeVisible()
+    },
+}
+
 export const McpNoApps: Story = {
     render: () => <McpAccess />,
-    beforeEach: ({ msw }) => msw.use(registration(true), reply('get', '/admin/oauth/clients', [])),
+    beforeEach: ({ msw }) =>
+        msw.use(
+            registration(true),
+            reply('get', '/admin/oauth/clients', []),
+            reply('get', '/admin/oauth/cimd-hosts', []),
+        ),
     play: async ({ canvasElement }) => {
         await expect(await within(canvasElement).findByText(/no app has registered yet/i)).toBeVisible()
     },
@@ -104,7 +147,11 @@ export const McpAppDisconnected: Story = {
         msw.use(remove.handler)
     },
     play: async ({ canvasElement }) => {
-        await userEvent.click(await within(canvasElement).findByRole('button', { name: /disconnect/i }))
+        await userEvent.click(
+            await within(canvasElement).findByRole('button', {
+                name: /disconnect/i,
+            }),
+        )
         const dialog = within(await screen.findByRole('alertdialog'))
         await expect(dialog.getByText('Remove Claude?')).toBeVisible()
         await userEvent.click(dialog.getByRole('button', { name: /disconnect/i }))
@@ -157,7 +204,11 @@ export const KeyUntrusted: Story = {
         msw.use(untrust.handler)
     },
     play: async ({ canvasElement }) => {
-        await userEvent.click(await within(canvasElement).findByRole('button', { name: /^remove$/i }))
+        await userEvent.click(
+            await within(canvasElement).findByRole('button', {
+                name: /^remove$/i,
+            }),
+        )
         await waitFor(() => expect(sent.bodies).toHaveLength(1))
     },
 }

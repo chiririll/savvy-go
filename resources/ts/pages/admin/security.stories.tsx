@@ -12,11 +12,22 @@ const meta = {
     parameters: { a11y: overlayA11y },
     beforeEach: ({ msw }) =>
         msw.use(
-            reply('get', '/admin/oauth/registration', { open: false, expires_at: null }),
+            reply('get', '/admin/oauth/registration', {
+                open: false,
+                expires_at: null,
+            }),
             reply('get', '/admin/oauth/clients', []),
+            reply('get', '/admin/oauth/cimd-hosts', []),
             reply('get', '/admin/keys', {
                 own: { kid: 'k-own', publicKey: 'MCowBQYDK2VwAyEAown' },
-                trusted: [{ kid: 'k-friend', publicKey: 'MCowBQYDK2VwAyEAfriend', name: 'Parents server', createdAt: null }],
+                trusted: [
+                    {
+                        kid: 'k-friend',
+                        publicKey: 'MCowBQYDK2VwAyEAfriend',
+                        name: 'Parents server',
+                        createdAt: null,
+                    },
+                ],
             }),
         ),
 } satisfies Meta<typeof AdminSecurityPage>

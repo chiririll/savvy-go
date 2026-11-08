@@ -11,6 +11,8 @@ export interface OAuthRequest {
 
 export interface OAuthConsentInfo {
     client_name: string
+    /** Where an app that identifies itself by URL lives. Its name is self-declared, so show this beside it. */
+    client_host?: string
     /** The parts of a space the app can be given (it only reads them), as in API token permissions. */
     resources: string[]
     spaces: Array<{ id: number; name: string; role: string }>
@@ -70,12 +72,42 @@ export interface OAuthClient {
     user_agent: string
     origin: string
     registered_at: string
+    /** How the server came to know the app: it registered itself, it sent a metadata document, or an admin created it. */
+    kind: 'dcr' | 'cimd' | 'manual'
+    /** Whether it must present a client secret at the token endpoint. */
+    confidential: boolean
+}
+
+export interface NewOAuthClient {
+    name: string
+    redirect_uris: string[]
+    confidential: boolean
+}
+
+/** What creating a client returns. The secret (confidential clients only) is shown this once. */
+export interface CreatedOAuthClient extends OAuthClient {
+    client_secret?: string
 }
 
 export const oauthClientsApi = {
     list: async (): Promise<OAuthClient[]> => (await apiClient.get('/admin/oauth/clients')).data.data,
+    /** Creates a client for an app that asks for a client ID (and a secret) in its own settings. */
+    create: async (body: NewOAuthClient): Promise<CreatedOAuthClient> =>
+        (await apiClient.post('/admin/oauth/clients', body)).data.data,
     /** Disconnects an app: its tokens stop working at once. */
     remove: async (id: string): Promise<void> => {
         await apiClient.delete(`/admin/oauth/clients/${encodeURIComponent(id)}`)
+    },
+}
+
+/** Hosts allowed to serve client metadata documents. Empty means apps cannot identify themselves by URL. */
+export const oauthHostsApi = {
+    list: async (): Promise<string[]> =>
+        ((await apiClient.get('/admin/oauth/cimd-hosts')).data.data as Array<{ host: string }>).map((h) => h.host),
+    add: async (host: string): Promise<void> => {
+        await apiClient.post('/admin/oauth/cimd-hosts', { host })
+    },
+    remove: async (host: string): Promise<void> => {
+        await apiClient.delete(`/admin/oauth/cimd-hosts/${encodeURIComponent(host)}`)
     },
 }
