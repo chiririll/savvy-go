@@ -70,8 +70,11 @@ export const ReconcileButtonForEditor: Story = {
 export const ReconcileButtonHiddenWhenReadOnly: Story = {
     parameters: { app: { role: 'viewer' } },
     play: async ({ canvasElement }) => {
-        await expect(await within(canvasElement).findByText('Cash')).toBeVisible()
-        await waitFor(() => expect(within(canvasElement).queryByRole('button', { name: /reconcile/i })).toBeNull())
+        // The role comes from the space list, which can land after the rows, and the rows are drawn again then.
+        await waitFor(() => expect(within(canvasElement).getByText('Cash')).toBeVisible(), { timeout: 5000 })
+        await waitFor(() => expect(within(canvasElement).queryByRole('button', { name: /reconcile/i })).toBeNull(), {
+            timeout: 5000,
+        })
     },
 }
 

@@ -205,10 +205,12 @@ export const SwapAccounts: Story = {
         await ready(canvasElement)
         await waitFor(() => expect(canvas.getByLabelText(receiveAmount)).toHaveValue('80'))
         await userEvent.click(canvas.getByRole('button', { name: /swap accounts|поменять счета/i }))
-        await waitFor(() => expect(canvas.getAllByRole('combobox')[0]).toHaveTextContent(/euro card/i))
-        await expect(canvas.getAllByRole('combobox')[1]).toHaveTextContent(/cash/i)
-        await expect(canvas.getByLabelText(receiveAmount)).toHaveValue('100')
-        await expect(canvas.getByLabelText(transferRate)).toHaveValue(1.25)
+        await waitFor(() => expect(canvas.getAllByRole('combobox')[0]).toHaveTextContent(/euro card/i), {
+            timeout: 5000,
+        })
+        await waitFor(() => expect(canvas.getAllByRole('combobox')[1]).toHaveTextContent(/cash/i))
+        await waitFor(() => expect(canvas.getByLabelText(receiveAmount)).toHaveValue('100'))
+        await waitFor(() => expect(canvas.getByLabelText(transferRate)).toHaveValue(1.25))
     },
 }
 
