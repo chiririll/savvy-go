@@ -82,6 +82,7 @@ export const OpensTheReconcileDialog: Story = {
         msw.use(raw('get', '/accounts-balance-history', { dates: [], series: [], currency: 'USD', decimals: 2 }))
     },
     play: async ({ canvasElement }) => {
+        await expect(await within(canvasElement).findByText('Cash')).toBeVisible()
         await userEvent.click(await within(canvasElement).findByRole('button', { name: /reconcile/i }))
         const dialog = await screen.findByRole('dialog')
         await expect(within(dialog).getByText('Reconcile accounts')).toBeVisible()

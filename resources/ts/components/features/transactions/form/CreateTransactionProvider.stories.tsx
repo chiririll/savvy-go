@@ -68,7 +68,7 @@ const Buttons = ({ editable = true }: { editable?: boolean }) => {
     })
 
     return (
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
             <Button onClick={() => openCreate()}>New</Button>
             <Button onClick={() => openCreate({ type: 'income', account_id: 1, category_id: 2, amount: 10 })}>New income</Button>
             <Button variant="outline" onClick={() => openEdit(existing)}>Edit</Button>
