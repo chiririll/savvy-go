@@ -5,7 +5,6 @@ import { accounts, categories, currencies, line, payment, transaction } from '@/
 import {
     convertAmount,
     lineCurrency,
-    mainAmount,
     netByCurrency,
     primaryCategory,
     rowAmount,
@@ -68,21 +67,6 @@ describe('spentByCurrency', () => {
     it('adds lines of one currency exactly', () => {
         const tx = transaction({ lines: [line({ amount: 0.1 }), line({ seq: 1, amount: 0.2 })] })
         expect(spentByCurrency(tx)).toEqual([{ currency: usd, amount: 0.3 }])
-    })
-})
-
-describe('mainAmount', () => {
-    it('is the largest by value in the base currency, not by number', () => {
-        const totals = [
-            { currency: jpy, amount: 3000 }, // 15 USD
-            { currency: eur, amount: 20 }, // 25 USD
-            { currency: usd, amount: 10 },
-        ]
-        expect(mainAmount(totals)).toBe(totals[1])
-    })
-
-    it('is null without totals', () => {
-        expect(mainAmount([])).toBeNull()
     })
 })
 

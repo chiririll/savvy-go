@@ -19,7 +19,8 @@ import (
 	"savvy-go/internal/store"
 )
 
-func transactionsIndex(w http.ResponseWriter, r *http.Request) {
+// listFilter reads the filters of a transaction list from the query.
+func listFilter(r *http.Request) filter.TxFilter {
 	f := filter.TxFilter{
 		Type: r.URL.Query().Get("type"), Status: r.URL.Query().Get("status"),
 		StartDate: r.URL.Query().Get("start_date"), EndDate: r.URL.Query().Get("end_date"),
@@ -41,6 +42,23 @@ func transactionsIndex(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	f.Search = q.Get("q")
+	f.Dates = stringList(q, "dates")
+	return f
+}
+
+func stringList(q url.Values, key string) []string {
+	var out []string
+	for _, v := range strings.Split(q.Get(key), ",") {
+		if v = strings.TrimSpace(v); v != "" {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+func transactionsIndex(w http.ResponseWriter, r *http.Request) {
+	f := listFilter(r)
+	q := r.URL.Query()
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	per, _ := strconv.Atoi(r.URL.Query().Get("per_page"))
 	if per <= 0 {
@@ -87,6 +105,23 @@ func transactionsIndex(w http.ResponseWriter, r *http.Request) {
 		payload.Summary = &summary
 	}
 	httpx.WriteJSON(w, http.StatusOK, payload)
+}
+
+// transactionsDayTotals is what each day netted per currency for the days the
+// filter selects, whatever page they are on. It reads every match, so it needs
+// the days: `dates`, or both ends of a range.
+func transactionsDayTotals(w http.ResponseWriter, r *http.Request) {
+	f := listFilter(r)
+	if len(f.Dates) == 0 && (f.StartDate == "" || f.EndDate == "") {
+		httpx.WriteMessage(w, http.StatusUnprocessableEntity, "give dates, or start_date and end_date")
+		return
+	}
+	days, err := httpx.Scope(r).Txs.DayTotals(r.Context(), f)
+	if err != nil {
+		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	httpx.WriteData(w, http.StatusOK, dto.NewDayTotals(days))
 }
 
 func int64List(q url.Values, key string) []int64 {

@@ -120,6 +120,30 @@ paths:
       responses:
         "200": {$ref: "#/components/responses/Data"}
         "401": {$ref: "#/components/responses/Unauthenticated"}
+  /spaces/{space}/transactions-day-totals:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Transactions]
+      summary: What each day netted, per currency
+      description: >-
+        Income less expense per day and currency, largest first by value in the base currency. A
+        transfer counts only its fee lines, skipped transactions not at all. It covers every
+        transaction of the day, however long the list is. Takes the filters of the list; give
+        `dates`, or both `start_date` and `end_date`.
+      parameters:
+        - {name: dates, in: query, schema: {type: string}, description: "Comma separated days, YYYY-MM-DD"}
+        - {name: start_date, in: query, schema: {type: string, format: date}}
+        - {name: end_date, in: query, schema: {type: string, format: date}}
+        - {name: type, in: query, schema: {type: string, enum: [income, expense, transfer]}}
+        - {name: account_ids, in: query, schema: {type: string}, description: Comma separated ids}
+        - {name: currency, in: query, schema: {type: string}}
+        - {name: category_ids, in: query, schema: {type: string}, description: Comma separated ids}
+        - {name: tag_ids, in: query, schema: {type: string}, description: Comma separated ids}
+        - {name: q, in: query, schema: {type: string, maxLength: 200}}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "422": {$ref: "#/components/responses/Validation"}
   /spaces/{space}/transactions-pending-summary:
     parameters: [{$ref: "#/components/parameters/Space"}]
     get:

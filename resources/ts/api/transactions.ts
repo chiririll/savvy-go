@@ -2,6 +2,7 @@ import { api, apiClient } from './client'
 import { createCrudApi } from './crud'
 import { toQueryString } from '@/lib/query-string'
 import type {
+    DayTotal,
     LineInput,
     PaymentInput,
     Transaction,
@@ -66,6 +67,24 @@ export const transactionsApi = {
         })
         const response = await apiClient.get(`${ENDPOINT}${query}`, { signal })
         return response.data
+    },
+
+    /** What each of the given days netted per currency, over every transaction of the day (not one page). */
+    getDayTotals: async (filters: TransactionFilters | undefined, dates: string[], signal?: AbortSignal) => {
+        const query = toQueryString({
+            dates: dates.join(','),
+            type: filters?.type,
+            account_ids: filters?.account_ids?.join(','),
+            currency: filters?.currency?.join(','),
+            q: filters?.q,
+            category_ids: filters?.category_ids,
+            tag_ids: filters?.tag_ids,
+            start_date: filters?.start_date,
+            end_date: filters?.end_date,
+            status: filters?.status,
+        })
+        const response = await apiClient.get<{ data: DayTotal[] }>(`/transactions-day-totals${query}`, { signal })
+        return response.data.data
     },
 
     duplicate: (id: number | string) =>

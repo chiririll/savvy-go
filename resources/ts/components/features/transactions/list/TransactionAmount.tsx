@@ -1,6 +1,6 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { formatCurrency } from '@/lib/currency'
-import type { RowAmount } from '@/lib/transaction-money'
+import type { RowAmount } from '@/types'
 
 /** Shown when a row has no amount to give: a pending template waiting for its figure. */
 export const NO_AMOUNT = '—'

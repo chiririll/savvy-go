@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"slices"
 	"testing"
+
+	"savvy-go/internal/db/filter"
 )
 
 func (e *moneyEnv) exec(t *testing.T, query string, args ...any) {
@@ -344,5 +346,31 @@ func TestOnlyAnOccurrenceCanBeSkipped(t *testing.T) {
 	}
 	if _, err := e.txs.Confirm(e.ctx, by.ID, "2024-01-01", nil); err != nil {
 		t.Errorf("confirm by hand: %v", err)
+	}
+}
+
+// A day's total covers every transaction of the day, not those of one page.
+func TestDayTotalsCoverTheWholeDayAcrossPages(t *testing.T) {
+	e := newMoneyEnv(t)
+	for _, day := range []string{"2024-02-01", "2024-02-01", "2024-02-02"} {
+		x := simple("expense", e.usdAcc.ID, "10")
+		x.Date = ptr(day)
+		if _, err := e.txs.Create(e.ctx, x); err != nil {
+			t.Fatal(err)
+		}
+	}
+	days, err := e.txs.DayTotals(e.ctx, filter.TxFilter{Dates: []string{"2024-02-01", "2024-02-02"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(days) != 2 || days[0].Date != "2024-02-02" || days[1].Date != "2024-02-01" {
+		t.Fatalf("days = %+v", days)
+	}
+	if got := days[1].Totals[0].Amount.Decimal().String(); got != "-20" {
+		t.Errorf("2024-02-01 = %s, want -20", got)
+	}
+	only, _ := e.txs.DayTotals(e.ctx, filter.TxFilter{Dates: []string{"2024-02-02"}})
+	if len(only) != 1 {
+		t.Errorf("a day outside the filter is counted: %+v", only)
 	}
 }

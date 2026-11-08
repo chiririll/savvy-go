@@ -133,6 +133,8 @@ export function templateAsTransaction(
         status: 'pending',
         recurringTransactionId: rule.id,
         amount: null,
+        rowAmount: null,
+        receivedAmount: null,
         difference: null,
         actions: { edit: false, editDetails: false, duplicate: false, delete: false, confirm: false, skip: false },
         restrictions: [],

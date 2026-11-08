@@ -34,5 +34,6 @@ func Routes(r chi.Router) {
 	r.Post("/transactions/{id}/confirm", transactionsConfirm)
 	r.Post("/transactions/{id}/skip", transactionsSkip)
 	r.Get("/transactions-summary", transactionsSummary)
+	r.Get("/transactions-day-totals", transactionsDayTotals)
 	r.Get("/transactions-pending-summary", transactionsPendingSummary)
 }

@@ -13,6 +13,7 @@ export const SPACE_ROOTS = new Set([
     'tags',
     'transactions',
     'transactions-summary',
+    'transactions-day-totals',
     'transactions-pending-summary',
     'debts',
     'debts-summary',

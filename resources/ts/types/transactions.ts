@@ -1,6 +1,7 @@
 import { BaseEntity } from './api'
 import { Account } from './accounts'
 import { Category } from './categories'
+import { Currency } from './currencies'
 import { Tag } from './tags'
 
 export const ALL_TRANSACTION_TYPES = [
@@ -56,6 +57,28 @@ export interface TransactionLine {
     note: string | null
 }
 
+/** An amount in one currency. Currencies are never mixed: a total is one amount per currency. */
+export interface CurrencyAmount {
+    currency: Currency
+    amount: number
+}
+
+/** What a row shows as its amount, worked out by the server at the current rates. */
+export interface RowAmount {
+    /** In the first currency of `totals`; the others converted into it when there are several. */
+    main: CurrencyAmount
+    /** Exact totals per currency, in order of first appearance. */
+    totals: CurrencyAmount[]
+    /** True when `main` is a conversion of several currencies (the row marks it with an asterisk). */
+    converted: boolean
+}
+
+/** What one day netted per currency, largest first by value in the base currency. */
+export interface DayTotal {
+    date: string
+    totals: CurrencyAmount[]
+}
+
 export interface Transaction extends BaseEntity {
     type: TransactionType
     description: string | null
@@ -64,6 +87,10 @@ export interface Transaction extends BaseEntity {
     recurringTransactionId: number | null
     /** What the payments net to; null when they span several currencies. */
     amount: number | null
+    /** What a list row shows (a transfer: what left). Null when there is nothing to show. */
+    rowAmount: RowAmount | null
+    /** A transfer: what arrived. */
+    receivedAmount: RowAmount | null
     /** Payments less lines in the base currency; set only on the answer to a save, when they disagree. */
     difference: number | null
     actions: TransactionActions

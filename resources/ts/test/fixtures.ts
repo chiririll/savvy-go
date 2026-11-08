@@ -189,6 +189,8 @@ export const transaction = (overrides: Partial<Transaction> = {}): Transaction =
     id: 1,
     type: 'expense',
     amount: -42.5,
+    rowAmount: { main: { currency: currencies[0], amount: 42.5 }, totals: [{ currency: currencies[0], amount: 42.5 }], converted: false },
+    receivedAmount: null,
     difference: null,
     description: 'Weekly shop',
     date: '2020-05-04',

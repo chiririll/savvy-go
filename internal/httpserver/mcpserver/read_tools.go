@@ -2,6 +2,7 @@ package mcpserver
 
 import (
 	"context"
+	"errors"
 	"net/url"
 	"strconv"
 	"strings"
@@ -58,6 +59,20 @@ type transactionsArgs struct {
 	WithSummary   bool     `json:"with_summary,omitempty" jsonschema:"Also return totals."`
 }
 
+type dayTotalsArgs struct {
+	SpaceID     int64    `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
+	Dates       []string `json:"dates,omitempty" jsonschema:"Only these days, YYYY-MM-DD. Give these, or both start_date and end_date."`
+	StartDate   string   `json:"start_date,omitempty" jsonschema:"Earliest date, YYYY-MM-DD. With end_date."`
+	EndDate     string   `json:"end_date,omitempty" jsonschema:"Latest date, YYYY-MM-DD. With start_date."`
+	Type        string   `json:"type,omitempty" jsonschema:"income, expense or transfer."`
+	AccountID   int64    `json:"account_id,omitempty" jsonschema:"Only this account."`
+	AccountIDs  []int64  `json:"account_ids,omitempty" jsonschema:"Only these source accounts."`
+	Currency    []string `json:"currency,omitempty" jsonschema:"Only these currency codes, e.g. USD."`
+	CategoryIDs []int64  `json:"category_ids,omitempty" jsonschema:"Only these categories."`
+	TagIDs      []int64  `json:"tag_ids,omitempty" jsonschema:"Only these tags."`
+	Query       string   `json:"q,omitempty" jsonschema:"Search words that must all match description, item names or an amount."`
+}
+
 type reportArgs struct {
 	SpaceID     int64   `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
 	Report      string  `json:"report" jsonschema:"Report name, one of those in the tool description."`
@@ -76,7 +91,8 @@ var mcpReadNeeds = map[string]string{
 	"list_accounts": "accounts", "list_categories": "categories", "list_tags": "tags", "list_currencies": "currencies",
 	"list_budgets": "budgets", "list_debts": "debts", "get_debts_summary": "debts",
 	"list_transactions": "transactions", "get_transaction": "transactions", "get_transactions_summary": "transactions",
-	"get_report": "reports", "list_automation_rules": "automation", "get_automation_rule": "automation",
+	"get_transactions_day_totals": "transactions",
+	"get_report":                  "reports", "list_automation_rules": "automation", "get_automation_rule": "automation",
 	"get_automation_rule_logs": "automation",
 }
 
@@ -185,6 +201,23 @@ func (h Handler) addQueryReadTools(srv *mcp.Server) {
 			return h.mcpGet(ctx, req, mcpSpacePath(in.SpaceID, "/transactions"), q), nil, nil
 		},
 	)
+	mcp.AddTool(
+		srv,
+		&mcp.Tool{
+			Name: "get_transactions_day_totals",
+			Description: "What each day netted (income less expense; a transfer counts only its fee; skipped ones not at " +
+				"all), per currency and largest first. Covers every transaction of the day, however long the list is. " +
+				"Give dates, or start_date and end_date.",
+			Annotations: ro("Transactions day totals"),
+		},
+		func(ctx context.Context, req *mcp.CallToolRequest, in dayTotalsArgs) (*mcp.CallToolResult, any, error) {
+			q, err := dayTotalsQuery(in)
+			if err != nil {
+				return mcpFail(err.Error()), nil, nil
+			}
+			return h.mcpGet(ctx, req, mcpSpacePath(in.SpaceID, "/transactions-day-totals"), q), nil, nil
+		},
+	)
 	h.addLookupReadTools(srv)
 }
 
@@ -264,6 +297,30 @@ func transactionsQuery(in transactionsArgs) (url.Values, error) {
 	q.Set("per_page", strconv.Itoa(min(per, mcpMaxPerPage)))
 	if in.WithSummary {
 		q.Set("with_summary", "1")
+	}
+	return q, nil
+}
+
+// dayTotalsQuery turns the arguments of get_transactions_day_totals into a query.
+func dayTotalsQuery(in dayTotalsArgs) (url.Values, error) {
+	q, err := transactionsQuery(transactionsArgs{
+		StartDate: in.StartDate, EndDate: in.EndDate, Type: in.Type, AccountID: in.AccountID,
+		AccountIDs: in.AccountIDs, Currency: in.Currency, CategoryIDs: in.CategoryIDs, TagIDs: in.TagIDs, Query: in.Query,
+	})
+	if err != nil {
+		return nil, err
+	}
+	q.Del("per_page")
+	for _, d := range in.Dates {
+		if err := setDate(url.Values{}, "dates", d); err != nil {
+			return nil, err
+		}
+	}
+	if len(in.Dates) > 0 {
+		q.Set("dates", strings.Join(in.Dates, ","))
+	}
+	if len(in.Dates) == 0 && (in.StartDate == "" || in.EndDate == "") {
+		return nil, errors.New("give dates, or both start_date and end_date.")
 	}
 	return q, nil
 }

@@ -10,7 +10,6 @@ import {
     transactionAmountAppearance,
     transactionSubtitle,
 } from '@/lib/transaction-description'
-import { rowAmount, transferSides } from '@/lib/transaction-money'
 import { Transaction } from '@/types'
 import { SkipTransactionAlert } from '../deferred/SkipTransactionAlert'
 import { TransactionAmount } from './TransactionAmount'
@@ -137,8 +136,6 @@ export function TransactionRow(props: TransactionRowProps) {
     const relativeDay = useRelativeDay()
     const { sign, className } = transactionAmountAppearance(transaction.type, transaction.status)
     const isTransfer = transaction.type === 'transfer'
-    const { sent, received } = transferSides(transaction)
-    const amount = isTransfer && sent ? sent : rowAmount(transaction)
     const handlers = rowHandlers(transaction, props)
     const dateLabel = showDate ? relativeDay(transaction.date, { weekday: true }) : null
     const categories = [...new Map(transaction.lines.flatMap((l) => (l.category ? [[l.category.id, l.category]] : []))).values()]
@@ -154,12 +151,12 @@ export function TransactionRow(props: TransactionRowProps) {
                     {transactionSubtitle(transaction)}
                 </>
             }
-            amount={<TransactionAmount amount={amount} sign={sign} approximate={props.approximate} />}
+            amount={<TransactionAmount amount={transaction.rowAmount} sign={sign} approximate={props.approximate} />}
             amountClassName={cn(className, transaction.status === 'pending' && 'italic')}
             extraAmount={
-                isTransfer && received ? (
+                isTransfer && transaction.receivedAmount ? (
                     <TransactionAmount
-                        amount={received}
+                        amount={transaction.receivedAmount}
                         sign={transaction.status === 'skipped' ? '' : '+'}
                         approximate={props.approximate}
                     />

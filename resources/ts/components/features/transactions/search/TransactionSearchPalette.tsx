@@ -7,7 +7,6 @@ import { transactionsApi } from '@/api'
 import { CommandDialog } from '@/components/shared/dialogs/CommandDialog'
 import { transactionSearchHref, useTransactionListFilters } from '@/hooks/use-transaction-list-filters'
 import { cn } from '@/lib/utils'
-import { rowAmount } from '@/lib/transaction-money'
 import { PREVIEW_FETCH, previewSplit } from '@/lib/palette-preview'
 import { highlightParts, noteSnippet, searchTerms } from '@/lib/search-highlight'
 import { TransactionAmount } from '../list/TransactionAmount'
@@ -272,7 +271,7 @@ function OptionContent({ option }: { option: Option }) {
                 )}
             </span>
             <span className={cn('shrink-0 tabular-nums', className)}>
-                <TransactionAmount amount={rowAmount(transaction)} sign={sign} />
+                <TransactionAmount amount={transaction.rowAmount} sign={sign} />
             </span>
         </>
     )

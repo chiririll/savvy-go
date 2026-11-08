@@ -38,6 +38,10 @@ On a phone there is no palette; use the Filters panel, which holds the search fi
 
 `GET /api/transactions` takes `q`, `account_ids` (`1,2`) and `currency` (`usd,jpy`) next to the existing filters. With `with_summary=1` the totals cover only the matching transactions. With `count=0` the server does not count every match: `meta.has_more` says whether another page follows and `meta.total` is only what the page holds. The MCP tool `list_transactions` takes the same filters (see [MCP](mcp.md)).
 
+Each transaction in a list carries `rowAmount`, the one figure a row shows, ready to draw: `main` (an amount and its currency), the exact `totals` per currency and `converted`. With several currencies, `main` is in the first of them and adds the others at the current rates, so it is an estimate; the exact amounts are in `totals`. For a transfer `rowAmount` is what left and `receivedAmount` what arrived. It is for display only: nothing that books or checks money reads it.
+
+`GET /api/transactions-day-totals` is what each day netted: income less expense per currency, largest first by value in the base currency. A transfer counts only its fee lines, skipped transactions not at all. It covers every transaction of the day, however many pages the list has. It takes the filters of the list and needs the days: `dates` (`2026-02-01,2026-02-02`), or both `start_date` and `end_date`. The list shows these under each day heading. The MCP tool `get_transactions_day_totals` takes the same.
+
 ## Opening a transaction
 
 Click a row to see it whole: the title, date and status, every **payment** (account and amount, change included), every **line** (category, amount and its note, shown as formatted markdown), tags, and a **Recurring** badge that links to the rule. The buttons at the bottom come from what you may do with it: **Edit**, **Confirm**, **Skip** and **Delete** (the last two ask first). **Duplicate** is in the row's menu. On a phone, Skip and Delete are under the **⋯** button. The address `?view=<id>` opens the dialog on a transaction, `?edit=<id>` opens the form.

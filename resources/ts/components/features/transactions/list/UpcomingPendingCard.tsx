@@ -2,7 +2,6 @@ import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Banknote, Check, HandCoins
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { rowAmount, transferSides } from '@/lib/transaction-money'
 import { parseDateKey, pendingDateClassName } from '@/lib/dates'
 import { intlLocale } from '@/lib/i18n'
 import { displayTransactionDescription, transactionAmountAppearance } from '@/lib/transaction-description'
@@ -58,7 +57,7 @@ export function UpcomingPendingCard({ transaction, isReadOnly, onConfirm, onSkip
             </p>
             <p className={`row-span-2 self-start pt-0.5 font-mono text-base font-medium truncate ${className}`}>
                 <TransactionAmount
-                    amount={transaction.type === 'transfer' ? transferSides(transaction).sent : rowAmount(transaction)}
+                    amount={transaction.rowAmount}
                     sign={sign}
                     approximate={approximate}
                 />

@@ -4,19 +4,19 @@ import { useRelativeDay } from '@/hooks'
 import { formatCurrency } from '@/lib/currency'
 import { groupByDateKey } from '@/lib/dates'
 import { isApproximateOccurrence } from '@/lib/recurring-template'
-import { largestTotals, netTotalsByCurrency } from '@/lib/transaction-totals'
-import { Transaction } from '@/types'
+import { Transaction, type DayTotal } from '@/types'
 import { TransactionRow } from './TransactionRow'
 
 const MAX_DAY_TOTALS = 2
 const NO_RULES: ReadonlySet<number> = new Set()
 
-function dayTotalsLabel(transactions: Transaction[]): string | null {
-    const { shown, hidden } = largestTotals(netTotalsByCurrency(transactions), MAX_DAY_TOTALS)
-    if (shown.length === 0) {
+function dayTotalsLabel(day: DayTotal | undefined): string | null {
+    if (!day || day.totals.length === 0) {
         return null
     }
 
+    const shown = day.totals.slice(0, MAX_DAY_TOTALS)
+    const hidden = day.totals.length - shown.length
     const parts = shown.map(({ currency, amount }) => `${amount > 0 ? '+' : ''}${formatCurrency(amount, currency)}`)
     return (hidden > 0 ? [...parts, '…'] : parts).join(' · ')
 }
@@ -40,6 +40,8 @@ interface TransactionListProps {
     /** The ids of the rules whose amount is a guess: their pending occurrences show `≈` (see `useApproximateRuleIds`). */
     approximateRuleIds?: ReadonlySet<number>
     grouped?: boolean
+    /** What each day netted, from the server: it covers the whole day, not just the rows loaded. */
+    dayTotals?: DayTotal[]
     /** Called with a day and its transactions in the new order, as listed. Move up/down menu items show when set. */
     onReorder?: (date: string, shownIds: number[]) => void
 }
@@ -61,6 +63,7 @@ export function TransactionList({
     isReadOnly,
     approximateRuleIds = NO_RULES,
     grouped = true,
+    dayTotals = [],
     onReorder,
 }: TransactionListProps) {
     const relativeDay = useRelativeDay()
@@ -134,7 +137,7 @@ export function TransactionList({
                 <FeedGroup
                     key={group.date ?? 'undated'}
                     title={relativeDay(group.date, { weekday: true })}
-                    aside={dayTotalsLabel(group.items)}
+                    aside={dayTotalsLabel(dayTotals.find((day) => day.date === group.date))}
                 >
                     {group.items.map((transaction, index) => (
                         <TransactionRow

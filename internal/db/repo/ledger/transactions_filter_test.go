@@ -234,3 +234,23 @@ func TestFilterByCurrencyAndAccounts(t *testing.T) {
 		}
 	}
 }
+
+func TestDatesFilterKeepsOnlyThoseDays(t *testing.T) {
+	f := newFixture(t)
+	a := f.expense(t, f.cash, 100, "2026-01-01")
+	f.expense(t, f.cash, 100, "2026-01-02")
+	c := f.expense(t, f.cash, 100, "2026-01-03")
+
+	rows, total, err := f.repo.Filtered(ctx, filter.TxFilter{Dates: []string{"2026-01-01", "2026-01-03"}}, 50, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ids := make([]int64, len(rows))
+	for i, r := range rows {
+		ids[i] = r.ID
+	}
+	slices.Sort(ids)
+	if total != 2 || !slices.Equal(ids, want(a, c)) {
+		t.Fatalf("total %d, ids %v, want %v", total, ids, want(a, c))
+	}
+}

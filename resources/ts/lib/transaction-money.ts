@@ -1,11 +1,14 @@
 import { useCurrenciesStore } from '@/stores/currencies'
-import { isServiceAccountType, type Category, type Currency, type Payment, type Transaction, type TransactionLine } from '@/types'
-
-/** An amount in one currency. Currencies are never mixed: a transaction has one total per currency. */
-export interface CurrencyAmount {
-    currency: Currency
-    amount: number
-}
+import {
+    isServiceAccountType,
+    type Category,
+    type Currency,
+    type CurrencyAmount,
+    type Payment,
+    type RowAmount,
+    type Transaction,
+    type TransactionLine,
+} from '@/types'
 
 type WithPayments = Pick<Transaction, 'payments'>
 type WithLines = Pick<Transaction, 'payments' | 'lines'>
@@ -52,17 +55,14 @@ export function spentByCurrency(transaction: WithLines): CurrencyAmount[] {
     )
 }
 
+/*
+ * `rowAmount`, `transferSides` and `convertAmount` below are for a recurring rule's template only: the server
+ * works the same figures out for every transaction (`Transaction.rowAmount`), but a rule has no transaction.
+ */
+
 /** The value of an amount in the base currency, for ranking only (rates are base per unit). */
 function baseWeight({ currency, amount }: CurrencyAmount): number {
     return Math.abs(amount) * (currency.isBase ? 1 : currency.rate || 0)
-}
-
-/** The largest total by value in the base currency; the "main" currency of a row. */
-export function mainAmount(totals: CurrencyAmount[]): CurrencyAmount | null {
-    return totals.reduce<CurrencyAmount | null>(
-        (best, total) => (best === null || baseWeight(total) > baseWeight(best) ? total : best),
-        null,
-    )
 }
 
 /**
@@ -96,16 +96,6 @@ export function convertAmount(amount: number, from: Currency, to: Currency): num
         return amount
     }
     return Number(((amount * toBase(from)) / toBase(to)).toFixed(to.decimals))
-}
-
-/** What a row shows as its amount: one value, and the exact totals it stands for. */
-export interface RowAmount {
-    /** In the first currency of `totals`; converted at current rates when there are several. */
-    main: CurrencyAmount
-    /** Exact totals per currency, in order of first appearance. */
-    totals: CurrencyAmount[]
-    /** True when `main` is a conversion of several currencies (the row marks it with an asterisk). */
-    converted: boolean
 }
 
 function toRowAmount(totals: CurrencyAmount[]): RowAmount | null {

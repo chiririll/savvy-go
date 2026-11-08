@@ -275,6 +275,19 @@ func TestMCPListTransactionsForwardsFilters(t *testing.T) {
 		t.Fatalf("type and start_date must both narrow the list: %s", resultText(res))
 	}
 
+	// A day's total covers the whole day: two expenses of 5 on one day, one income of 5 on another.
+	res = a.call(s, "get_transactions_day_totals", map[string]any{"space_id": sp, "start_date": "2026-02-01", "end_date": "2026-02-28"})
+	if res.IsError {
+		t.Fatalf("get_transactions_day_totals: %s", resultText(res))
+	}
+	days := toolData(t, res).([]any)
+	if len(days) != 2 || days[0].(map[string]any)["date"] != "2026-02-02" {
+		t.Fatalf("day totals = %s", resultText(res))
+	}
+	if res := a.call(s, "get_transactions_day_totals", map[string]any{"space_id": sp}); !res.IsError {
+		t.Errorf("day totals without days must be refused: %s", resultText(res))
+	}
+
 	// The page size is capped, not passed through to the database.
 	res = a.call(s, "list_transactions", map[string]any{"space_id": sp, "per_page": 5000})
 	if res.IsError || !strings.Contains(resultText(res), `"per_page":100`) {
@@ -320,18 +333,19 @@ func TestMCPReadToolsNeedTheirPermissions(t *testing.T) {
 
 	gs := a.mcpGrant(u, permissions.ReadAll(permissions.MCPResources...)...)
 	calls := map[string]map[string]any{
-		"list_spaces":              nil,
-		"list_accounts":            {"space_id": sp},
-		"list_categories":          {"space_id": sp},
-		"list_tags":                {"space_id": sp},
-		"list_currencies":          {"space_id": sp},
-		"list_budgets":             {"space_id": sp},
-		"list_debts":               {"space_id": sp},
-		"list_automation_rules":    {"space_id": sp},
-		"get_debts_summary":        {"space_id": sp},
-		"get_transactions_summary": {"space_id": sp},
-		"list_transactions":        {"space_id": sp},
-		"get_report":               {"space_id": sp, "report": "overview"},
+		"list_spaces":                 nil,
+		"list_accounts":               {"space_id": sp},
+		"list_categories":             {"space_id": sp},
+		"list_tags":                   {"space_id": sp},
+		"list_currencies":             {"space_id": sp},
+		"list_budgets":                {"space_id": sp},
+		"list_debts":                  {"space_id": sp},
+		"list_automation_rules":       {"space_id": sp},
+		"get_debts_summary":           {"space_id": sp},
+		"get_transactions_summary":    {"space_id": sp},
+		"list_transactions":           {"space_id": sp},
+		"get_transactions_day_totals": {"space_id": sp, "dates": []string{"2026-02-01"}},
+		"get_report":                  {"space_id": sp, "report": "overview"},
 	}
 	for name, args := range calls {
 		if res := a.call(gs, name, args); res.IsError {

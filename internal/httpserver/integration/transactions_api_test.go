@@ -127,3 +127,31 @@ func TestRecurringRuleOccurrencesOnTheWire(t *testing.T) {
 		t.Errorf("patched rule: %d %v", res.StatusCode, got)
 	}
 }
+
+// A row arrives ready to draw, and a day's total does not depend on the page.
+func TestTransactionRowAmountAndDayTotals(t *testing.T) {
+	a := newTestApp(t)
+	sess := a.issue(a.createUser("row-amount@test.com", "secret1", roleEditor), false)
+	acc, cat := seedMoney(t, a, sess)
+	for _, amount := range []string{"10", "5"} {
+		status(t, a.do("POST", "/api/transactions", flowIn("expense", acc, cat, amount, "2024-01-15"), sess.Token, sess.CSRF), 201, "create")
+	}
+
+	res := a.do("GET", "/api/transactions?per_page=1", nil, sess.Token, sess.CSRF)
+	row := decodeJSON(t, res)["data"].([]any)[0].(map[string]any)
+	amount := row["rowAmount"].(map[string]any)
+	if amount["converted"] != false || amount["main"].(map[string]any)["amount"] == nil || row["receivedAmount"] != nil {
+		t.Fatalf("rowAmount = %v received = %v", amount, row["receivedAmount"])
+	}
+
+	res = a.do("GET", "/api/transactions-day-totals?dates=2024-01-15", nil, sess.Token, sess.CSRF)
+	days := decodeJSON(t, res)["data"].([]any)
+	if len(days) != 1 {
+		t.Fatalf("days = %v", days)
+	}
+	total := days[0].(map[string]any)["totals"].([]any)[0].(map[string]any)["amount"]
+	if total != float64(-15) {
+		t.Errorf("the day netted %v, want -15 although the page holds one row", total)
+	}
+	status(t, a.do("GET", "/api/transactions-day-totals", nil, sess.Token, sess.CSRF), http.StatusUnprocessableEntity, "no days")
+}

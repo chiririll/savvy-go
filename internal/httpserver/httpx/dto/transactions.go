@@ -39,8 +39,48 @@ type Restriction struct {
 	Message string `json:"message"`
 }
 
+// CurrencyAmount is an amount with the currency it is in.
+type CurrencyAmount struct {
+	Currency Currency    `json:"currency"`
+	Amount   money.Money `json:"amount"`
+}
+
+func newCurrencyAmount(c ledger.CurrencyAmount) CurrencyAmount {
+	return CurrencyAmount{Currency: NewCurrency(c.Currency), Amount: c.Amount}
+}
+
+// RowAmount is the one figure a list row shows, ready to draw. Main is in the
+// first currency of Totals; when Converted, it adds the other totals at the
+// current rates (an estimate) and Totals hold the exact amounts.
+type RowAmount struct {
+	Main      CurrencyAmount   `json:"main"`
+	Totals    []CurrencyAmount `json:"totals"`
+	Converted bool             `json:"converted"`
+}
+
+func newRowAmount(r *ledger.RowAmount) *RowAmount {
+	if r == nil {
+		return nil
+	}
+	return &RowAmount{Main: newCurrencyAmount(r.Main), Totals: Map(r.Totals, newCurrencyAmount), Converted: r.Converted}
+}
+
+// DayTotal is what one day netted, per currency, largest first.
+type DayTotal struct {
+	Date   string           `json:"date"`
+	Totals []CurrencyAmount `json:"totals"`
+}
+
+func NewDayTotals(days []ledger.DayTotal) []DayTotal {
+	return Map(days, func(d ledger.DayTotal) DayTotal {
+		return DayTotal{Date: d.Date, Totals: Map(d.Totals, newCurrencyAmount)}
+	})
+}
+
 // Transaction is a transaction with its payments and lines. Amount is the one
 // figure for a list (nil when the payments are in several currencies);
+// RowAmount is what a row shows instead, converted for several currencies,
+// and ReceivedAmount the amount a transfer arrived with;
 // Difference is set only on the answer to a save, when the payments and the
 // lines disagree, in the base currency.
 type Transaction struct {
@@ -51,6 +91,8 @@ type Transaction struct {
 	Status                 string        `json:"status"`
 	RecurringTransactionID *int64        `json:"recurringTransactionId"`
 	Amount                 *money.Money  `json:"amount"`
+	RowAmount              *RowAmount    `json:"rowAmount"`
+	ReceivedAmount         *RowAmount    `json:"receivedAmount"`
 	Difference             *money.Money  `json:"difference"`
 	Actions                TxActions     `json:"actions"`
 	Restrictions           []Restriction `json:"restrictions"`
@@ -89,6 +131,8 @@ func NewTransaction(t ledger.Transaction) Transaction {
 		Tags:         Map(t.Tags, NewTag),
 		CreatedAt:    utc(t.CreatedAt),
 	}
+	main, received := t.ListAmounts()
+	out.RowAmount, out.ReceivedAmount = newRowAmount(main), newRowAmount(received)
 	if m, ok := t.Amount(); ok {
 		out.Amount = &m
 	}

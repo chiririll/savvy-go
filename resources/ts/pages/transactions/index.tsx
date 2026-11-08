@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Plus } from 'lucide-react'
 import { Page, PageHeader, useNegativeBalanceConfirm } from '@/components/shared'
@@ -22,6 +23,7 @@ import {
     useCategories,
     useCurrencies,
     useTags,
+    useTransactionDayTotals,
     useTransactionListFilters,
 } from '@/hooks'
 import { useReadOnly } from '@/components/providers/ReadOnlyProvider'
@@ -42,6 +44,11 @@ export default function TransactionsPage() {
         fetchNextPage,
         refetch,
     } = useInfiniteTransactions(list.filters)
+    const days = useMemo(
+        () => [...new Set(transactions.flatMap((item) => (item.date ? [item.date] : [])))],
+        [transactions],
+    )
+    const { data: dayTotals } = useTransactionDayTotals(list.filters, days)
     const { data: upcomingPending } = useTransactions({
         status: 'pending',
         end_date: addDaysLocal(new Date(), 7),
@@ -128,6 +135,7 @@ export default function TransactionsPage() {
                             <TransactionList
                                 transactions={transactions}
                                 grouped={list.params.sortBy === 'date'}
+                                dayTotals={dayTotals}
                                 isLoading={isLoading}
                                 emptyTitle={
                                     list.params.status === 'pending'

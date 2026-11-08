@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData, type QueryKey } from '@tanstack/react-query'
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData, type QueryKey } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { transactionsApi, type ConfirmTransactionOptions, type TransactionsResponse } from '@/api'
 import type { Transaction, TransactionFilters, TransactionInput } from '@/types'
@@ -66,6 +66,17 @@ export function useInfiniteTransactions(filters?: TransactionQueryFilters) {
         transactions,
         meta: query.data?.pages.at(-1)?.meta,
     }
+}
+
+/** The net of each of `dates` per currency, for the filters of a list. Waits until there is a day to ask about. */
+export function useTransactionDayTotals(filters: TransactionQueryFilters | undefined, dates: string[]) {
+    const listFilters = withoutPage(filters)
+    return useQuery({
+        queryKey: [...QUERY_KEY, 'day-totals', listFilters, dates],
+        queryFn: ({ signal }) => transactionsApi.getDayTotals(listFilters, dates, signal),
+        enabled: dates.length > 0,
+        placeholderData: keepPreviousData,
+    })
 }
 
 export function useTransaction(id: string | number) {

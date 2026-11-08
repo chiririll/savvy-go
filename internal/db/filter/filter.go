@@ -44,6 +44,7 @@ type TxFilter struct {
 	Status      string
 	StartDate   string
 	EndDate     string
+	Dates       []string // only these days (YYYY-MM-DD)
 	// Search is free text: space-separated terms, all of which must match
 	// (see searchWhere).
 	Search  string
@@ -116,6 +117,12 @@ func txWhere(f TxFilter) (string, []any) {
 	if f.EndDate != "" {
 		q += ` AND (t.date IS NULL OR t.date <= ?)`
 		args = append(args, f.EndDate)
+	}
+	if len(f.Dates) > 0 {
+		q += ` AND t.date IN (` + Placeholders(len(f.Dates)) + `)`
+		for _, d := range f.Dates {
+			args = append(args, d)
+		}
 	}
 	sq, sargs := searchWhere(f.Search)
 	return q + sq, append(args, sargs...)

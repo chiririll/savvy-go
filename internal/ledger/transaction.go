@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -704,6 +705,28 @@ func (s Transactions) FilteredMore(ctx context.Context, f filter.TxFilter, page,
 	}
 	list, err := s.hydrate(ctx, rows)
 	return list, more, err
+}
+
+// DayTotals nets the transactions matching f per day and currency (see the
+// package-level DayTotals), newest day first. Unlike a page of the list it
+// covers every transaction of those days, so a day split across pages gets its
+// whole total. Bound f by Dates or a date range: it reads every match.
+func (s Transactions) DayTotals(ctx context.Context, f filter.TxFilter) ([]DayTotal, error) {
+	const batch = 500
+	var all []Transaction
+	for page := 1; ; page++ {
+		list, more, err := s.FilteredMore(ctx, f, page, batch)
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, list...)
+		if !more {
+			break
+		}
+	}
+	days := DayTotals(all)
+	slices.SortFunc(days, func(a, b DayTotal) int { return strings.Compare(b.Date, a.Date) })
+	return days, nil
 }
 
 // SetCategory gives a category to the uncategorised lines of a transaction (an
