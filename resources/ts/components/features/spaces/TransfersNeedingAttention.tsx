@@ -133,27 +133,43 @@ function TransferSides({ tr }: { tr: SpaceTransfer }) {
     const [here, there] = sidesForSpace(tr, tr.outgoing)
 
     return (
-        <dl className="grid grid-cols-[auto_1fr_1fr] gap-x-4 gap-y-1 text-xs tabular-nums">
-            <span />
-            <dt className="text-muted-foreground">{t('spaces.transfers.thisSpace')}</dt>
-            <dt className="text-muted-foreground">{t('spaces.transfers.otherSpace')}</dt>
-            <dd className="text-muted-foreground">{t('spaces.transfers.ours')}</dd>
-            <dd>{here}</dd>
-            <dd>{there}</dd>
-            {tr.remote &&
-                (tr.remote.deleted ? (
-                    <>
-                        <dd className="text-muted-foreground">{t('spaces.transfers.remote')}</dd>
-                        <dd className="col-span-2">{t('spaces.transfers.remoteDeleted')}</dd>
-                    </>
-                ) : (
-                    <>
-                        <dd className="text-muted-foreground">{t('spaces.transfers.remote')}</dd>
-                        {sidesForSpace(tr.remote, tr.outgoing).map((side, i) => (
-                            <dd key={i}>{side}</dd>
-                        ))}
-                    </>
-                ))}
-        </dl>
+        <table className="text-xs tabular-nums">
+            <thead>
+                <tr className="text-muted-foreground text-left font-normal">
+                    <td />
+                    <th scope="col" className="pr-4 font-normal">
+                        {t('spaces.transfers.thisSpace')}
+                    </th>
+                    <th scope="col" className="font-normal">
+                        {t('spaces.transfers.otherSpace')}
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <th scope="row" className="text-muted-foreground pr-4 text-left font-normal">
+                        {t('spaces.transfers.ours')}
+                    </th>
+                    <td className="pr-4">{here}</td>
+                    <td>{there}</td>
+                </tr>
+                {tr.remote && (
+                    <tr>
+                        <th scope="row" className="text-muted-foreground pr-4 text-left font-normal">
+                            {t('spaces.transfers.remote')}
+                        </th>
+                        {tr.remote.deleted ? (
+                            <td colSpan={2}>{t('spaces.transfers.remoteDeleted')}</td>
+                        ) : (
+                            sidesForSpace(tr.remote, tr.outgoing).map((side, i) => (
+                                <td key={i} className={i === 0 ? 'pr-4' : undefined}>
+                                    {side}
+                                </td>
+                            ))
+                        )}
+                    </tr>
+                )}
+            </tbody>
+        </table>
     )
 }

@@ -156,8 +156,10 @@ export const EditOfATransferOpensTheForm: Story = {
     play: async ({ canvasElement }) => {
         await open(canvasElement, 'Edit transfer')
         const dialog = await screen.findByRole('dialog', {}, { timeout: 5000 })
-        const amounts = await within(dialog).findAllByRole('spinbutton')
-        await expect(amounts.slice(0, 2).map((a) => (a as HTMLInputElement).value)).toEqual(['30', '24'])
+        await waitFor(async () => {
+            const amounts = within(dialog).getAllByRole('textbox', { name: /amount/i })
+            await expect(amounts.slice(0, 2).map((a) => (a as HTMLInputElement).value)).toEqual(['30', '24'])
+        })
     },
 }
 
@@ -212,6 +214,8 @@ export const CreateSent: Story = {
         await open(canvasElement, 'New income')
         const dialog = await screen.findByRole('dialog', {}, { timeout: 5000 })
         await within(dialog).findByRole('textbox', { name: /^amount$/i })
+        // The accounts come from the mocked API: the form is ready when the first one is drawn.
+        await waitFor(() => expect(dialog).toHaveTextContent(/cash/i))
         await userEvent.click(within(dialog).getByRole('button', { name: /^create$/i }))
         await waitFor(() => expect(created.bodies).toHaveLength(1))
         await expect(created.bodies[0]).toMatchObject({

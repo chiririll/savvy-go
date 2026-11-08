@@ -47,6 +47,9 @@ const transfer = {
     to_account_id: 2,
 }
 
+/** The accounts come from the mocked API: the form is ready when the first one is drawn. */
+const ready = (canvasElement: HTMLElement) => waitFor(() => expect(canvasElement).toHaveTextContent(/cash/i))
+
 const saveButton = (canvasElement: HTMLElement) => within(canvasElement).getByRole('button', { name: /save/i })
 
 export const Empty: Story = {}
@@ -139,6 +142,7 @@ export const RejectsAnEndBeforeTheStart: Story = {
 export const Submits: Story = {
     args: { defaultValues: filled },
     play: async ({ canvasElement, args }) => {
+        await ready(canvasElement)
         await userEvent.click(saveButton(canvasElement))
         await waitFor(() => expect(args.onSubmit).toHaveBeenCalledOnce())
         await expect((args.onSubmit as ReturnType<typeof fn>).mock.calls[0][0]).toEqual({
@@ -158,6 +162,7 @@ export const Submits: Story = {
 export const SubmitsAnEstimate: Story = {
     args: { defaultValues: { ...filled, estimated: true } },
     play: async ({ canvasElement, args }) => {
+        await ready(canvasElement)
         await userEvent.click(saveButton(canvasElement))
         await waitFor(() => expect(args.onSubmit).toHaveBeenCalledOnce())
         await expect((args.onSubmit as ReturnType<typeof fn>).mock.calls[0][0]).toMatchObject({
@@ -170,6 +175,7 @@ export const SubmitsAnEstimate: Story = {
 export const SubmitsATransferWithTheAmountReceivedOpen: Story = {
     args: { defaultValues: { ...transfer, to_amount: null } },
     play: async ({ canvasElement, args }) => {
+        await ready(canvasElement)
         await userEvent.click(saveButton(canvasElement))
         await waitFor(() => expect(args.onSubmit).toHaveBeenCalledOnce())
         await expect((args.onSubmit as ReturnType<typeof fn>).mock.calls[0][0]).toMatchObject({

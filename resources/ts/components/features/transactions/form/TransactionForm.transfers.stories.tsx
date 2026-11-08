@@ -49,6 +49,9 @@ const split = {
 }
 
 const lineGroup = (canvasElement: HTMLElement) => within(canvasElement).findByRole('group', { name: /lines|строки/i })
+/** The accounts come from the mocked API: the form is ready when the source account is drawn. */
+const ready = (canvasElement: HTMLElement) => waitFor(() => expect(canvasElement).toHaveTextContent(/cash/i))
+
 const saveButton = (canvasElement: HTMLElement) => within(canvasElement).getByRole('button', { name: /save/i })
 
 const transfer = {
@@ -86,7 +89,8 @@ export const TransferBetweenTwoCurrencies: Story = {
     args: { defaultValues: transfer },
     play: async ({ canvasElement, args }) => {
         const canvas = within(canvasElement)
-        await expect(await canvas.findByLabelText(receiveAmount)).toHaveValue(80)
+        await ready(canvasElement)
+        await waitFor(() => expect(canvas.getByLabelText(receiveAmount)).toHaveValue('80'))
         await waitFor(() => expect(canvas.getByLabelText(transferRate)).toHaveValue(0.8))
         await userEvent.click(saveButton(canvasElement))
         await waitFor(() => expect(args.onSubmit).toHaveBeenCalledOnce())
@@ -106,11 +110,15 @@ export const RateWorksOutTheReceivedAmount: Story = {
     args: { defaultValues: { ...transfer, to_amount: null } },
     play: async ({ canvasElement }) => {
         const canvas = within(canvasElement)
+        await ready(canvasElement)
         const rate = await canvas.findByLabelText(transferRate)
+        await waitFor(() => expect(rate).toBeEnabled())
+        // The rates are loaded when the rate between the two accounts is worked out.
+        await waitFor(() => expect(rate).not.toHaveValue(null))
         await userEvent.clear(rate)
         await userEvent.type(rate, '0.9')
         await userEvent.tab()
-        await waitFor(() => expect(canvas.getByLabelText(receiveAmount)).toHaveValue(90))
+        await waitFor(() => expect(canvas.getByLabelText(receiveAmount)).toHaveValue('90'))
     },
 }
 
@@ -121,8 +129,11 @@ export const TransferInOneCurrencyHasOneAmount: Story = {
     play: async ({ canvasElement, args }) => {
         const canvas = within(canvasElement)
         await waitFor(() => expect(canvas.getAllByRole('combobox')[1]).toHaveTextContent(/savings/i))
-        await expect(canvas.queryByLabelText(receiveAmount)).toBeNull()
-        await expect(canvas.queryByLabelText(transferRate)).toBeNull()
+        // Both fields stay, but cannot be changed: the amount is the same, the rate is 1.
+        await waitFor(() => expect(canvas.getByLabelText(receiveAmount)).toBeDisabled())
+        await expect(canvas.getByLabelText(receiveAmount)).toHaveValue('100')
+        await expect(canvas.getByLabelText(transferRate)).toBeDisabled()
+        await waitFor(() => expect(canvas.getByLabelText(transferRate)).toHaveValue(1))
         await userEvent.click(saveButton(canvasElement))
         await waitFor(() => expect(args.onSubmit).toHaveBeenCalledOnce())
         await expect((args.onSubmit as ReturnType<typeof fn>).mock.calls[0][0]).toMatchObject({
@@ -139,8 +150,8 @@ export const TransferShowsBothBalances: Story = {
     args: { defaultValues: transfer },
     play: async ({ canvasElement }) => {
         const canvas = within(canvasElement)
-        await expect(await canvas.findByText(/20\.50/)).toBeVisible()
-        await expect(canvas.getByText(/1,?060\.10/)).toBeVisible()
+        await waitFor(() => expect(canvasElement).toHaveTextContent(/20\.50/))
+        await expect(canvasElement).toHaveTextContent(/1,?060\.10/)
     },
 }
 
@@ -191,11 +202,12 @@ export const SwapAccounts: Story = {
     args: { defaultValues: transfer },
     play: async ({ canvasElement }) => {
         const canvas = within(canvasElement)
-        await canvas.findByLabelText(receiveAmount)
+        await ready(canvasElement)
+        await waitFor(() => expect(canvas.getByLabelText(receiveAmount)).toHaveValue('80'))
         await userEvent.click(canvas.getByRole('button', { name: /swap accounts|поменять счета/i }))
         await waitFor(() => expect(canvas.getAllByRole('combobox')[0]).toHaveTextContent(/euro card/i))
         await expect(canvas.getAllByRole('combobox')[1]).toHaveTextContent(/cash/i)
-        await expect(canvas.getByLabelText(receiveAmount)).toHaveValue(100)
+        await expect(canvas.getByLabelText(receiveAmount)).toHaveValue('100')
         await expect(canvas.getByLabelText(transferRate)).toHaveValue(1.25)
     },
 }
@@ -243,9 +255,10 @@ export const EditingATransferWithACommission: Story = {
         defaultValues: { ...transfer, payments: [{ account_id: 1, amount: 100 }], fee: { amount: 2, category_id: null } },
     },
     play: async ({ canvasElement }) => {
+        await ready(canvasElement)
         const section = await feeSection(canvasElement)
         await expect(within(section).getByRole('spinbutton')).toHaveValue(2)
-        await expect(within(canvasElement).getAllByRole('spinbutton')[0]).toHaveValue(100)
+        await expect(within(canvasElement).getAllByRole('textbox', { name: /amount/i })[0]).toHaveValue('100')
     },
 }
 
@@ -268,6 +281,7 @@ export const TransferToAnotherSpace: Story = {
     args: { defaultValues: toSpace, onSubmitSpaceTransfer: fn() },
     play: async ({ canvasElement, args }) => {
         const canvas = within(canvasElement)
+        await ready(canvasElement)
         await expect(await canvas.findByText(/destination space|пространство назначения/i)).toBeVisible()
         await expect(canvas.queryByRole('region', { name: /commission|комиссия/i })).toBeNull()
         await userEvent.click(saveButton(canvasElement))

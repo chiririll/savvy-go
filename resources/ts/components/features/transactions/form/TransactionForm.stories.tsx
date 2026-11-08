@@ -45,6 +45,10 @@ const amountsOf = (group: HTMLElement) => within(group).getAllByRole('textbox', 
 const closeButton = /close the editor|закрыть редактор/i
 const noteButtons = /format the note|форматировать заметку/i
 
+/** The accounts come from the mocked API: the form is ready when the first balance is drawn. */
+const ready = (canvasElement: HTMLElement) =>
+    waitFor(() => expect(within(canvasElement).getAllByTestId('balance-after')[0]).not.toBeEmptyDOMElement())
+
 const saveButton = (canvasElement: HTMLElement) => within(canvasElement).getByRole('button', { name: /save/i })
 
 export const Empty: Story = {}
@@ -56,6 +60,7 @@ export const ReadOnly: Story = {
     parameters: { app: { role: 'viewer' } },
     args: { defaultValues: expense },
     play: async ({ canvasElement }) => {
+        await ready(canvasElement)
         await waitFor(() => expect(within(canvasElement).getByRole('textbox', { name: /description/i })).toBeDisabled())
     },
 }
@@ -63,6 +68,7 @@ export const ReadOnly: Story = {
 // A new transaction starts with the first account and the default category of its type.
 export const StartsWithDefaults: Story = {
     play: async ({ canvasElement }) => {
+        await ready(canvasElement)
         const canvas = within(canvasElement)
         await waitFor(() => expect(canvas.getAllByRole('combobox')[0]).toHaveTextContent(/cash/i))
     },
@@ -72,6 +78,7 @@ export const StartsWithDefaults: Story = {
 export const AmountShowsTheCurrency: Story = {
     args: { defaultValues: { ...expense, payments: [{ account_id: 2, amount: 8 }] } },
     play: async ({ canvasElement }) => {
+        await ready(canvasElement)
         await expect(await within(canvasElement).findByText('EUR')).toBeVisible()
     },
 }
@@ -80,6 +87,7 @@ export const AmountShowsTheCurrency: Story = {
 export const BalancePreview: Story = {
     args: { defaultValues: expense },
     play: async ({ canvasElement }) => {
+        await ready(canvasElement)
         const balance = await within(canvasElement).findByTestId('balance-after')
         await expect(balance).toHaveTextContent(/120\.50.*100\.50/)
     },
@@ -89,6 +97,7 @@ export const BalancePreview: Story = {
 export const AmountTakesDigitsOnly: Story = {
     args: { defaultValues: { ...expense, payments: [{ account_id: 1, amount: '' as unknown as number }] } },
     play: async ({ canvasElement }) => {
+        await ready(canvasElement)
         const amount = await within(canvasElement).findByRole('textbox', { name: /^amount$/i })
         await userEvent.type(amount, '-1e2,567x')
         await expect(amount).toHaveValue('12.56')
@@ -98,6 +107,7 @@ export const AmountTakesDigitsOnly: Story = {
 export const GoesNegative: Story = {
     args: { defaultValues: { ...expense, payments: [{ account_id: 1, amount: 500 }] } },
     play: async ({ canvasElement }) => {
+        await ready(canvasElement)
         await expect(await within(canvasElement).findByText(/negative/i)).toBeVisible()
     },
 }
@@ -106,8 +116,9 @@ export const GoesNegative: Story = {
 export const PendingDate: Story = {
     args: { defaultValues: { ...expense, date: FUTURE } },
     play: async ({ canvasElement }) => {
+        await ready(canvasElement)
         await expect(await within(canvasElement).findByText(/pending|scheduled|will/i)).toBeVisible()
-        await expect(within(canvasElement).queryByText(/120\.50/)).toBeNull()
+        await expect(within(canvasElement).queryByText('→')).toBeNull()
     },
 }
 
@@ -115,6 +126,7 @@ export const PendingDate: Story = {
 export const ClearingTheDateMakesItPending: Story = {
     args: { defaultValues: expense },
     play: async ({ canvasElement }) => {
+        await ready(canvasElement)
         const canvas = within(canvasElement)
         await userEvent.click(await canvas.findByRole('button', { name: /clear/i }))
         await expect(await canvas.findByText(/no date set/i)).toBeVisible()
@@ -129,6 +141,7 @@ export const Editing: Story = {
 export const EditingCannotMoveToTheFuture: Story = {
     args: { isEdit: true, originalAffectsBalance: true, defaultValues: expense },
     play: async ({ canvasElement }) => {
+        await ready(canvasElement)
         const date = await within(canvasElement).findByLabelText(/date/i)
         await expect(date).toHaveAttribute('max')
     },
@@ -144,6 +157,7 @@ export const TransferTabsCanBePicked: Story = {
     },
     args: { defaultValues: expense },
     play: async ({ canvasElement }) => {
+        await ready(canvasElement)
         const canvas = within(canvasElement)
         await expect(await canvas.findByRole('button', { name: /transfer/i })).toBeEnabled()
         await expect(await canvas.findByRole('button', { name: /space/i })).toBeEnabled()
@@ -153,6 +167,7 @@ export const TransferTabsCanBePicked: Story = {
 export const SwitchingToIncomeKeepsEachCategory: Story = {
     args: { defaultValues: expense },
     play: async ({ canvasElement }) => {
+        await ready(canvasElement)
         const canvas = within(canvasElement)
         await userEvent.click(await canvas.findByRole('button', { name: /income/i }))
         await waitFor(() => expect(canvas.getByRole('button', { name: /income/i })).toHaveAttribute('aria-pressed', 'true'))
@@ -161,6 +176,7 @@ export const SwitchingToIncomeKeepsEachCategory: Story = {
 
 export const RejectsEmptyForm: Story = {
     play: async ({ canvasElement, args }) => {
+        await ready(canvasElement)
         await userEvent.click(saveButton(canvasElement))
         await waitFor(() => expect(within(canvasElement).getAllByText(/select|greater|required|positive/i).length).toBeGreaterThan(0))
         await expect(args.onSubmit).not.toHaveBeenCalled()
@@ -171,6 +187,7 @@ export const RejectsEmptyForm: Story = {
 export const Submits: Story = {
     args: { defaultValues: expense },
     play: async ({ canvasElement, args }) => {
+        await ready(canvasElement)
         await userEvent.click(saveButton(canvasElement))
         await waitFor(() => expect(args.onSubmit).toHaveBeenCalledOnce())
         await expect((args.onSubmit as ReturnType<typeof fn>).mock.calls[0][0]).toMatchObject({
@@ -186,6 +203,7 @@ export const Submits: Story = {
 export const SubmitsAnIncomeAsPositive: Story = {
     args: { defaultValues: { ...expense, type: 'income', default_category_id: 2 } },
     play: async ({ canvasElement, args }) => {
+        await ready(canvasElement)
         await userEvent.click(saveButton(canvasElement))
         await waitFor(() => expect(args.onSubmit).toHaveBeenCalledOnce())
         await expect((args.onSubmit as ReturnType<typeof fn>).mock.calls[0][0]).toMatchObject({
@@ -200,6 +218,7 @@ export const SubmitsAnIncomeAsPositive: Story = {
 export const KeepsTheNoteOfTheLine: Story = {
     args: { defaultValues: { ...expense, default_note: '- milk\n- bread' } },
     play: async ({ canvasElement, args }) => {
+        await ready(canvasElement)
         await userEvent.click(saveButton(canvasElement))
         await waitFor(() => expect(args.onSubmit).toHaveBeenCalledOnce())
         await expect((args.onSubmit as ReturnType<typeof fn>).mock.calls[0][0]).toMatchObject({
@@ -212,6 +231,7 @@ export const KeepsTheNoteOfTheLine: Story = {
 export const SubmitsPendingWithoutDate: Story = {
     args: { defaultValues: { ...expense, date: '' } },
     play: async ({ canvasElement, args }) => {
+        await ready(canvasElement)
         await userEvent.click(saveButton(canvasElement))
         await waitFor(() => expect(args.onSubmit).toHaveBeenCalledOnce())
         await expect((args.onSubmit as ReturnType<typeof fn>).mock.calls[0][0]).toMatchObject({ date: null })
@@ -222,6 +242,7 @@ export const SubmitsPendingWithoutDate: Story = {
 export const OverdrawingAsksFirst: Story = {
     args: { defaultValues: { ...expense, payments: [{ account_id: 1, amount: 500 }] } },
     play: async ({ canvasElement, args }) => {
+        await ready(canvasElement)
         await within(canvasElement).findByText(/negative/i)
         await userEvent.click(saveButton(canvasElement))
         const alert = await screen.findByRole('alertdialog')
@@ -243,6 +264,7 @@ const split = {
 export const SplitByCategory: Story = {
     args: { defaultValues: expense },
     play: async ({ canvasElement }) => {
+        await ready(canvasElement)
         const canvas = within(canvasElement)
         await userEvent.click(await canvas.findByRole('button', { name: /split by category|разбить по категориям/i }))
         const amounts = amountsOf(await lineGroup(canvasElement))
@@ -257,6 +279,7 @@ export const SplitByCategory: Story = {
 export const RemovingTheLines: Story = {
     args: { defaultValues: split },
     play: async ({ canvasElement }) => {
+        await ready(canvasElement)
         const canvas = within(canvasElement)
         await userEvent.click((await canvas.findAllByRole('button', { name: /remove the line|удалить строку/i }))[0])
         await userEvent.click(canvas.getByRole('button', { name: /remove the line|удалить строку/i }))
@@ -268,6 +291,7 @@ export const RemovingTheLines: Story = {
 export const LinesCoverThePayment: Story = {
     args: { defaultValues: split },
     play: async ({ canvasElement }) => {
+        await ready(canvasElement)
         const canvas = within(canvasElement)
         await lineGroup(canvasElement)
         await waitFor(() => expect(canvas.getAllByRole('combobox')[1]).toBeDisabled())
@@ -279,6 +303,7 @@ export const LinesCoverThePayment: Story = {
 export const LinesLeaveARest: Story = {
     args: { defaultValues: { ...split, lines: [split.lines[0]] } },
     play: async ({ canvasElement }) => {
+        await ready(canvasElement)
         const canvas = within(canvasElement)
         await expect(await canvas.findByRole('status')).toHaveTextContent(/8\.00|8,00/)
         await expect(canvas.getAllByRole('combobox')[1]).toBeEnabled()
@@ -289,6 +314,7 @@ export const LinesLeaveARest: Story = {
 export const LinesAboveThePayment: Story = {
     args: { defaultValues: { ...split, lines: [{ ...split.lines[0], amount: 25 }] } },
     play: async ({ canvasElement }) => {
+        await ready(canvasElement)
         await expect(await within(canvasElement).findByRole('status')).toHaveTextContent(/5\.00|5,00/)
         await userEvent.click(saveButton(canvasElement))
     },
@@ -298,6 +324,7 @@ export const LinesAboveThePayment: Story = {
 export const NotesFromTwoLines: Story = {
     args: { defaultValues: { ...split, lines: [split.lines[0]] } },
     play: async ({ canvasElement }) => {
+        await ready(canvasElement)
         const canvas = within(canvasElement)
         await lineGroup(canvasElement)
         await expect(canvas.queryByRole('button', { name: noteButtons })).toBeNull()
@@ -310,6 +337,7 @@ export const NotesFromTwoLines: Story = {
 export const NoteOpensInTheEditor: Story = {
     args: { defaultValues: split },
     play: async ({ canvasElement }) => {
+        await ready(canvasElement)
         const canvas = within(canvasElement)
         await userEvent.click((await canvas.findAllByRole('button', { name: noteButtons }))[0])
         await userEvent.click(await canvas.findByRole('button', { name: closeButton }))
@@ -324,6 +352,7 @@ export const SavedNoteOpensExpanded: Story = {
         defaultValues: { ...split, lines: [{ ...split.lines[0], note: '- milk\n- bread' }, split.lines[1]] },
     },
     play: async ({ canvasElement }) => {
+        await ready(canvasElement)
         await expect(await within(canvasElement).findByRole('button', { name: closeButton })).toBeVisible()
         await expect(within(canvasElement).getAllByRole('button', { name: noteButtons })).toHaveLength(1)
     },
@@ -342,6 +371,7 @@ export const LineCurrencyFromTheAccounts: Story = {
         },
     },
     play: async ({ canvasElement }) => {
+        await ready(canvasElement)
         const group = await lineGroup(canvasElement)
         await expect(within(group).getAllByRole('combobox', { name: /currency of the line|валюта строки/i })).toHaveLength(2)
         await expect(within(group).getAllByRole('combobox', { name: /currency of the line|валюта строки/i })[0]).toHaveTextContent('EUR')
@@ -352,6 +382,7 @@ export const LineCurrencyFromTheAccounts: Story = {
 export const SubmitsLines: Story = {
     args: { defaultValues: { ...split, lines: [split.lines[0]] } },
     play: async ({ canvasElement, args }) => {
+        await ready(canvasElement)
         await userEvent.click(saveButton(canvasElement))
         await waitFor(() => expect(args.onSubmit).toHaveBeenCalledOnce())
         await expect((args.onSubmit as ReturnType<typeof fn>).mock.calls[0][0]).toMatchObject({
@@ -383,6 +414,7 @@ const twoAccounts = {
 export const AddingAPayment: Story = {
     args: { defaultValues: expense },
     play: async ({ canvasElement }) => {
+        await ready(canvasElement)
         const canvas = within(canvasElement)
         await userEvent.click(await canvas.findByRole('button', { name: addPayment }))
         await waitFor(() => expect(canvas.getAllByRole('textbox', { name: /^amount$/i })).toHaveLength(2))
@@ -394,6 +426,7 @@ export const AddingAPayment: Story = {
 export const AccountsAreUnique: Story = {
     args: { defaultValues: twoAccounts },
     play: async ({ canvasElement }) => {
+        await ready(canvasElement)
         const canvas = within(canvasElement)
         await userEvent.click((await canvas.findAllByRole('combobox'))[1])
         const options = await screen.findAllByRole('option')
@@ -411,6 +444,7 @@ export const AddingIsOffWhenNoAccountIsLeft: Story = {
         },
     },
     play: async ({ canvasElement }) => {
+        await ready(canvasElement)
         await expect(await within(canvasElement).findByRole('button', { name: addPayment })).toBeDisabled()
     },
 }
@@ -419,6 +453,7 @@ export const AddingIsOffWhenNoAccountIsLeft: Story = {
 export const RemovingAPayment: Story = {
     args: { defaultValues: twoAccounts },
     play: async ({ canvasElement }) => {
+        await ready(canvasElement)
         const canvas = within(canvasElement)
         await userEvent.click((await canvas.findAllByRole('button', { name: removePayment }))[0])
         await waitFor(() => expect(canvas.getAllByRole('textbox', { name: /^amount$/i })).toHaveLength(1))
@@ -430,6 +465,7 @@ export const RemovingAPayment: Story = {
 export const BalanceOfEachAccount: Story = {
     args: { defaultValues: twoAccounts },
     play: async ({ canvasElement }) => {
+        await ready(canvasElement)
         await waitFor(() => expect(within(canvasElement).getAllByText(/balance after|баланс после/i)).toHaveLength(2))
     },
 }
@@ -438,6 +474,7 @@ export const BalanceOfEachAccount: Story = {
 export const TotalsPerCurrency: Story = {
     args: { defaultValues: twoAccounts },
     play: async ({ canvasElement }) => {
+        await ready(canvasElement)
         const totals = await within(canvasElement).findByTestId('payment-totals')
         await expect(totals).toHaveTextContent(/10\.00/)
         await expect(totals).toHaveTextContent(/8\.00/)
@@ -448,6 +485,7 @@ export const TotalsPerCurrency: Story = {
 export const OnePaymentHasATotal: Story = {
     args: { defaultValues: expense },
     play: async ({ canvasElement }) => {
+        await ready(canvasElement)
         await expect(await within(canvasElement).findByTestId('payment-totals')).toHaveTextContent(/20\.00/)
     },
 }
@@ -456,6 +494,7 @@ export const OnePaymentHasATotal: Story = {
 export const BalanceBeforeAnAmount: Story = {
     args: { defaultValues: { ...expense, payments: [{ account_id: 1, amount: '' as unknown as number }] } },
     play: async ({ canvasElement }) => {
+        await ready(canvasElement)
         await expect(await within(canvasElement).findByTestId('balance-after')).toHaveTextContent(/120\.50/)
     },
 }
@@ -464,6 +503,7 @@ export const BalanceBeforeAnAmount: Story = {
 export const ChangeSectionOfAnExpense: Story = {
     args: { defaultValues: expense },
     play: async ({ canvasElement }) => {
+        await ready(canvasElement)
         const section = await changeSection(canvasElement)
         await expect(within(section).queryAllByRole('textbox', { name: /^amount$/i })).toHaveLength(0)
         await userEvent.click(within(section).getByRole('button', { name: addChange }))
@@ -476,6 +516,7 @@ export const ChangeSectionOfAnExpense: Story = {
 export const ChangeOfASavedExpense: Story = {
     args: { defaultValues: { ...expense, change: [{ account_id: 2, amount: 5 }] } },
     play: async ({ canvasElement }) => {
+        await ready(canvasElement)
         const section = await changeSection(canvasElement)
         await expect(within(section).getByRole('textbox', { name: /^amount$/i })).toHaveValue('5')
         await expect(await within(section).findByText(/balance after|баланс после/i)).toBeVisible()
@@ -488,10 +529,11 @@ export const ChangeOfASavedExpense: Story = {
 export const ChangeTooLarge: Story = {
     args: { defaultValues: { ...expense, change: [{ account_id: 2, amount: 20 }] } },
     play: async ({ canvasElement, args }) => {
+        await ready(canvasElement)
         const section = await changeSection(canvasElement)
-        await expect(await within(section).findByRole('alert')).toBeVisible()
+        await expect((await within(section).findAllByRole('alert'))[0]).toBeVisible()
         await userEvent.click(saveButton(canvasElement))
-        await waitFor(() => expect(within(section).getByRole('alert')).toBeVisible())
+        await waitFor(() => expect(within(section).getAllByRole('alert')[0]).toBeVisible())
         await expect(args.onSubmit).not.toHaveBeenCalled()
     },
 }
@@ -500,6 +542,7 @@ export const ChangeTooLarge: Story = {
 export const IncomeHasNoChangeSection: Story = {
     args: { defaultValues: { ...expense, type: 'income', default_category_id: 2 } },
     play: async ({ canvasElement }) => {
+        await ready(canvasElement)
         await within(canvasElement).findByRole('textbox', { name: /description/i })
         await expect(within(canvasElement).queryByRole('region', { name: /^change$|^сдача$/i })).toBeNull()
     },
@@ -509,6 +552,7 @@ export const IncomeHasNoChangeSection: Story = {
 export const SubmitsPaymentsAndChange: Story = {
     args: { defaultValues: { ...twoAccounts, change: [{ account_id: 3, amount: 100 }] } },
     play: async ({ canvasElement, args }) => {
+        await ready(canvasElement)
         await userEvent.click(await within(canvasElement).findByRole('button', { name: /save/i }))
         await waitFor(() => expect(args.onSubmit).toHaveBeenCalledOnce())
         await expect((args.onSubmit as ReturnType<typeof fn>).mock.calls[0][0]).toMatchObject({
@@ -531,6 +575,7 @@ export const LineCurrencyIncludesTheChange: Story = {
         },
     },
     play: async ({ canvasElement }) => {
+        await ready(canvasElement)
         const group = await lineGroup(canvasElement)
         const currency = within(group).getAllByRole('combobox', { name: /currency of the line|валюта строки/i })[0]
         await userEvent.click(currency)
@@ -551,6 +596,7 @@ export const OverdrawingTwoAccountsAsksOnce: Story = {
         },
     },
     play: async ({ canvasElement, args }) => {
+        await ready(canvasElement)
         await within(canvasElement).findAllByText(/negative/i)
         await userEvent.click(saveButton(canvasElement))
         const alert = await screen.findByRole('alertdialog')

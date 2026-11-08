@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect, fn, screen, userEvent, within } from 'storybook/test'
+import { expect, fn, screen, userEvent, waitFor, within } from 'storybook/test'
 
 import { accounts, categories, currencies, recurring, recurringTemplate, tags } from '@/test/fixtures'
 import { reply } from '@/test/api-mocks'
@@ -97,6 +97,8 @@ export const SubmittedFromTheFooter: Story = {
     play: async ({ args }) => {
         const dialog = await screen.findByRole('dialog')
         await expect(within(dialog).getByRole('button', { name: /^cancel$/i })).toBeVisible()
+        // The accounts come from the mocked API: the form is ready when the first one is drawn.
+        await waitFor(() => expect(dialog).toHaveTextContent(/cash/i))
         await userEvent.click(within(dialog).getByRole('button', { name: /^save$/i }))
         await expect(args.onSubmit).toHaveBeenCalledOnce()
     },

@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { MemoryRouter } from 'react-router-dom'
 import { expect, fn, screen, userEvent, within } from 'storybook/test'
 
 import { overlayA11y } from '@/test/a11y'
@@ -12,7 +11,6 @@ const meta = {
     title: 'features/transactions/detail/TransactionDetailDialog',
     component: TransactionDetailDialog,
     parameters: { a11y: overlayA11y },
-    decorators: [(Story) => <MemoryRouter><Story /></MemoryRouter>],
     beforeEach: () => useCurrenciesStore.getState().setAll(currencies),
     args: {
         transaction: transaction(),

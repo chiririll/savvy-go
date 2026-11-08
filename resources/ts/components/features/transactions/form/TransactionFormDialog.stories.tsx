@@ -64,6 +64,8 @@ export const SubmittedFromTheFooter: Story = {
     play: async ({ args }) => {
         const dialog = await screen.findByRole('dialog')
         await within(dialog).findByDisplayValue('Weekly shop')
+        // The accounts come from the mocked API: the form is ready when the first balance is drawn.
+        await waitFor(() => expect(within(dialog).getAllByTestId('balance-after')[0]).not.toBeEmptyDOMElement())
         await userEvent.click(within(dialog).getByRole('button', { name: /^save$/i }))
         await waitFor(() => expect(args.onSubmit).toHaveBeenCalledOnce())
     },
@@ -140,8 +142,14 @@ export const TransferBecomesFormValues: Story = {
         }),
     },
     play: async () => {
-        const amounts = await screen.findAllByRole('spinbutton', {}, { timeout: 5000 })
-        await expect(amounts.slice(0, 2).map((a) => (a as HTMLInputElement).value)).toEqual(['100', '80'])
+        const dialog = await screen.findByRole('dialog')
+        await waitFor(
+            async () => {
+                const amounts = within(dialog).getAllByRole('textbox', { name: /amount/i })
+                await expect(amounts.slice(0, 2).map((a) => (a as HTMLInputElement).value)).toEqual(['100', '80'])
+            },
+            { timeout: 5000 },
+        )
     },
 }
 

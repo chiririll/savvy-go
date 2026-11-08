@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw'
 import { expect, screen, userEvent, waitFor, within } from 'storybook/test'
 
 import { overlayA11y } from '@/test/a11y'
-import { accounts, categories, currencies, payment, pendingTransaction, tags, transaction } from '@/test/fixtures'
+import { accounts, categories, currencies, line, payment, pendingTransaction, tags, transaction } from '@/test/fixtures'
 import { fail, hang, raw, reply } from '@/test/api-mocks'
 import { useCurrenciesStore } from '@/stores/currencies'
 import { CreateTransactionProvider } from '@/components/features/transactions/form/CreateTransactionProvider'
@@ -29,6 +29,7 @@ const rows = [
         description: 'Ramen',
         amount: -1200,
         payments: [payment({ account: accounts[2], accountId: accounts[2].id, amount: -1200 })],
+        lines: [line({ amount: 1200, currencyId: accounts[2].currency?.id })],
         date: '2020-05-03',
     }),
     transaction({
@@ -36,6 +37,7 @@ const rows = [
         description: 'Taxi',
         amount: -1.234,
         payments: [payment({ account: accounts[3], accountId: accounts[3].id, amount: -1.234 })],
+        lines: [line({ amount: 1.234, currencyId: accounts[3].currency?.id })],
         date: '2020-05-02',
     }),
 ]

@@ -36,6 +36,10 @@ export function TransactionLines({ control, fields, remove, type, currencies, co
 
     // A line in a currency that the accounts no longer have goes back to the first payment's currency.
     useEffect(() => {
+        // No currencies yet means the accounts are still loading, not that the line's currency is gone.
+        if (currencies.length === 0) {
+            return
+        }
         lines?.forEach((line, index) => {
             if (line?.currency_id && !currencies.some((c) => c.id === Number(line.currency_id))) {
                 setValue(`lines.${index}.currency_id`, null)
