@@ -97,6 +97,7 @@ export default function OAuthConsentPage() {
                             onSpaceChoiceChange={setSpaceChoice}
                             changes={changes}
                             host={host}
+                            clientHost={info?.client_host}
                             error={error}
                             busy={busy}
                             onDecide={decide}

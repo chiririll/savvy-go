@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { oauthClientsApi, oauthRegistrationApi, type OAuthRegistration } from '@/api/oauth'
+import { oauthClientsApi, oauthHostsApi, oauthRegistrationApi, type OAuthRegistration } from '@/api/oauth'
 import i18n from '@/lib/i18n'
 import { getApiErrorMessage } from '@/lib/api-error'
 
@@ -11,7 +11,11 @@ const QUERY_KEY = ['oauth-registration']
  * pauses while the tab is hidden. Entering the page or returning to the tab must
  * always read fresh data, whatever the global 5 minute staleTime says.
  */
-const LIVE = { staleTime: 0, refetchOnMount: 'always', refetchOnWindowFocus: 'always' } as const
+const LIVE = {
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: 'always',
+} as const
 
 /** While the window is open the state is re-read so the screen notices it closing. */
 export function useOAuthRegistration() {
@@ -43,7 +47,12 @@ const CLIENTS_KEY = ['oauth-clients']
 
 /** New apps show up while the admin has the page open. */
 export function useOAuthClients() {
-    return useQuery({ queryKey: CLIENTS_KEY, queryFn: oauthClientsApi.list, ...LIVE, refetchInterval: 10000 })
+    return useQuery({
+        queryKey: CLIENTS_KEY,
+        queryFn: oauthClientsApi.list,
+        ...LIVE,
+        refetchInterval: 10000,
+    })
 }
 
 export function useRemoveOAuthClient() {
@@ -53,5 +62,45 @@ export function useRemoveOAuthClient() {
         onSuccess: () => queryClient.invalidateQueries({ queryKey: CLIENTS_KEY }),
         onError: (error: unknown) =>
             toast.error(getApiErrorMessage(error, i18n.t('settings:admin.mcp.apps.removeFailed'))),
+    })
+}
+
+export function useCreateOAuthClient() {
+    const queryClient = useQueryClient()
+    return useMutation({
+        mutationFn: oauthClientsApi.create,
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: CLIENTS_KEY }),
+        onError: (error: unknown) =>
+            toast.error(getApiErrorMessage(error, i18n.t('settings:admin.mcp.own.createFailed'))),
+    })
+}
+
+const HOSTS_KEY = ['oauth-cimd-hosts']
+
+export function useOAuthHosts() {
+    return useQuery({
+        queryKey: HOSTS_KEY,
+        queryFn: oauthHostsApi.list,
+        ...LIVE,
+    })
+}
+
+export function useAddOAuthHost() {
+    const queryClient = useQueryClient()
+    return useMutation({
+        mutationFn: oauthHostsApi.add,
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: HOSTS_KEY }),
+        onError: (error: unknown) =>
+            toast.error(getApiErrorMessage(error, i18n.t('settings:admin.mcp.hosts.addFailed'))),
+    })
+}
+
+export function useRemoveOAuthHost() {
+    const queryClient = useQueryClient()
+    return useMutation({
+        mutationFn: oauthHostsApi.remove,
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: HOSTS_KEY }),
+        onError: (error: unknown) =>
+            toast.error(getApiErrorMessage(error, i18n.t('settings:admin.mcp.hosts.removeFailed'))),
     })
 }

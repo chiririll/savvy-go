@@ -4,6 +4,7 @@ package integration
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -162,8 +163,17 @@ func TestOAuthMetadata(t *testing.T) {
 	if m, _ := as["code_challenge_methods_supported"].([]any); len(m) != 1 || m[0] != "S256" {
 		t.Fatalf("PKCE methods = %v", as["code_challenge_methods_supported"])
 	}
-	if m, _ := as["token_endpoint_auth_methods_supported"].([]any); len(m) != 1 || m[0] != "none" {
+	if m, _ := as["token_endpoint_auth_methods_supported"].([]any); len(m) != 3 || m[0] != "none" ||
+		m[1] != "client_secret_post" || m[2] != "client_secret_basic" {
 		t.Fatalf("auth methods = %v", as["token_endpoint_auth_methods_supported"])
+	}
+	// Metadata documents are advertised only once an admin allowed a host.
+	if as["client_id_metadata_document_supported"] != nil {
+		t.Fatalf("CIMD advertised with an empty allowlist: %v", as)
+	}
+	_ = a.svc.OAuth.AddCIMDHost(context.Background(), "app.example")
+	if _, as = a.getJSON("/.well-known/oauth-authorization-server"); as["client_id_metadata_document_supported"] != true {
+		t.Fatalf("CIMD not advertised: %v", as)
 	}
 }
 

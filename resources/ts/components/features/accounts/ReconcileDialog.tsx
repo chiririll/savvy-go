@@ -42,14 +42,16 @@ export function ReconcileDialog({ accounts, open, onOpenChange }: ReconcileDialo
     const [rows, setRows] = useState(() => initialRows(accounts))
     const create = useCreateReconciliations()
 
-    // Every opening starts over: today, all accounts, their current balances.
+    // Every opening starts over: today, all accounts, their current balances. Accounts that arrive after the
+    // dialog was opened (the list was still loading) start it over too, as there was nothing to type into yet.
+    const hasAccounts = accounts.length > 0
     useEffect(() => {
         if (!open) return
         setDate(formatDateLocal())
         setRows(initialRows(accounts))
         // Accounts refetched while the dialog is open must not discard what was typed.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [open])
+    }, [open, hasAccounts])
 
     const reconcilable = useMemo(() => reconcilableAccounts(accounts), [accounts])
     const byId = useMemo(() => new Map(reconcilable.map((account) => [account.id, account])), [reconcilable])

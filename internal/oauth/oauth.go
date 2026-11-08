@@ -103,6 +103,8 @@ type Service struct {
 	Users  auth.Users
 	// Now is the clock; tests move it.
 	Now func() time.Time
+	// Fetcher downloads client metadata documents; nil turns CIMD off.
+	Fetcher Fetcher
 
 	mu       sync.Mutex
 	codes    map[string]codeEntry
@@ -246,16 +248,16 @@ func loopback(host string) bool {
 
 // Client finds a registered client, nil when unknown.
 func (s *Service) Client(ctx context.Context, id string) (*Client, error) {
-	return s.repo().Client(ctx, id)
+	return s.resolve(ctx, id, false)
 }
 
 // CheckAuthorize validates the parts of an authorization request that decide
 // whether an error may be sent back to the client at all: the client and its
 // exact redirect URI. Anything wrong here must be shown to the user instead.
 func (s *Service) CheckAuthorize(ctx context.Context, clientID, redirectURI string) (*Client, error) {
-	c, err := s.repo().Client(ctx, clientID)
+	c, err := s.resolve(ctx, clientID, true)
 	if err != nil {
-		return nil, fail("server_error", err.Error())
+		return nil, err
 	}
 	if c == nil {
 		return nil, fail("invalid_client", "Unknown client.")
@@ -315,9 +317,9 @@ func (s *Service) Exchange(ctx context.Context, clientID, code, verifier, redire
 	if !validVerifier(verifier) || subtle.ConstantTimeCompare([]byte(s256(verifier)), []byte(e.challenge)) != 1 {
 		return nil, bad
 	}
-	c, err := s.repo().Client(ctx, clientID)
+	c, err := s.resolve(ctx, clientID, false)
 	if err != nil {
-		return nil, fail("server_error", err.Error())
+		return nil, err
 	}
 	if c == nil {
 		return nil, bad
@@ -399,9 +401,9 @@ func (s *Service) refreshParties(
 	if err != nil {
 		return nil, nil, nil, fail("server_error", err.Error())
 	}
-	c, err := s.repo().Client(ctx, clientID)
+	c, err := s.resolve(ctx, clientID, false)
 	if err != nil {
-		return nil, nil, nil, fail("server_error", err.Error())
+		return nil, nil, nil, err
 	}
 	if user == nil || c == nil {
 		return nil, nil, nil, fail("invalid_grant", "The refresh token is invalid or expired.")

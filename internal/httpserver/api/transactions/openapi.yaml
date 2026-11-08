@@ -138,6 +138,50 @@ paths:
                   external_id: {type: string}
                   transaction_id: {type: integer}
         "422": {$ref: "#/components/responses/Validation"}
+    patch:
+      tags: [Transactions]
+      summary: Update many transactions
+      description: >
+        Changes up to 500 transactions in one request and one database transaction: all change or
+        none. Each item is a transaction `id` and the fields to change, as for one `PATCH`; what an
+        item leaves out is kept. An invalid item, an unknown id or an id listed twice fails the
+        request with a message naming the item's position. The audit entries share one batch id.
+        Answers with the updated transactions in the order sent.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [transactions]
+              properties:
+                transactions:
+                  type: array
+                  minItems: 1
+                  maxItems: 500
+                  items:
+                    allOf:
+                      - type: object
+                        required: [id]
+                        properties:
+                          id: {type: integer}
+                      - $ref: "#/components/schemas/TransactionInput"
+      responses:
+        "200":
+          description: The updated transactions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: {$ref: "#/components/schemas/Transaction"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404":
+          description: A transaction in the list does not exist. Nothing was changed.
+        "422": {$ref: "#/components/responses/Validation"}
   /spaces/{space}/transactions/find-similar:
     parameters: [{$ref: "#/components/parameters/Space"}]
     post:

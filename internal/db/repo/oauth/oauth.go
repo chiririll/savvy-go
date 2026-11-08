@@ -33,12 +33,22 @@ func found[T any](v T, err error) (*T, error) {
 // admin who reviews the registered apps.
 type RequestInfo struct{ IP, UserAgent, Origin string }
 
+// Client kinds.
+const (
+	KindDCR    = "dcr"    // registered itself while the admin window was open
+	KindCIMD   = "cimd"   // described by a document at its client_id URL
+	KindManual = "manual" // created by an admin
+)
+
 // Client is a registered OAuth client.
 type Client struct {
 	ID, Name     string
+	Kind         string
+	SecretHash   string // empty for public clients
 	RedirectURIs []string
 	Request      RequestInfo
 	CreatedAt    time.Time
+	ExpiresAt    time.Time // cimd only: when the cached document goes stale
 }
 
 func (r Repo) InsertClient(
@@ -58,16 +68,77 @@ func (r Repo) InsertClient(
 	})
 }
 
+// InsertManualClient stores an admin-created client. secretHash is empty for
+// a public client.
+func (r Repo) InsertManualClient(
+	ctx context.Context,
+	id, name string,
+	redirectURIs []string,
+	secretHash string,
+	now time.Time,
+) error {
+	raw, err := json.Marshal(redirectURIs)
+	if err != nil {
+		return err
+	}
+	return r.q().InsertManualOAuthClient(ctx, sqlc.InsertManualOAuthClientParams{
+		ClientID: id, Name: name, RedirectUris: string(raw), CreatedAt: db.TimeNS(now), SecretHash: secretHash,
+	})
+}
+
+// UpsertCIMDClient stores the document fetched from the client_id URL, or
+// refreshes the cached copy.
+func (r Repo) UpsertCIMDClient(
+	ctx context.Context,
+	id, name string,
+	redirectURIs []string,
+	expires, now time.Time,
+) error {
+	raw, err := json.Marshal(redirectURIs)
+	if err != nil {
+		return err
+	}
+	return r.q().UpsertCIMDOAuthClient(ctx, sqlc.UpsertCIMDOAuthClientParams{
+		ClientID: id, Name: name, RedirectUris: string(raw), CreatedAt: db.TimeNS(now), ExpiresAt: db.TimeNS(expires),
+	})
+}
+
+// CIMDHosts lists the hosts allowed to serve client metadata documents.
+func (r Repo) CIMDHosts(ctx context.Context) ([]string, error) {
+	return r.q().ListOAuthCIMDHosts(ctx)
+}
+
+func (r Repo) AddCIMDHost(ctx context.Context, host string, now time.Time) error {
+	return r.q().InsertOAuthCIMDHost(ctx, sqlc.InsertOAuthCIMDHostParams{Host: host, CreatedAt: db.TimeNS(now)})
+}
+
+// RemoveCIMDHost reports whether the host was on the list.
+func (r Repo) RemoveCIMDHost(ctx context.Context, host string) (bool, error) {
+	res, err := r.q().DeleteOAuthCIMDHost(ctx, host)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
+}
+
+func (r Repo) CIMDHostAllowed(ctx context.Context, host string) (bool, error) {
+	n, err := r.q().CountOAuthCIMDHost(ctx, host)
+	return n > 0, err
+}
+
 func toClient(row sqlc.OauthClient) (*Client, error) {
 	c := Client{
-		ID:      row.ClientID,
-		Name:    row.Name,
+		ID:   row.ClientID,
+		Name: row.Name,
+		Kind: row.Kind, SecretHash: row.SecretHash,
 		Request: RequestInfo{IP: row.Ip, UserAgent: row.UserAgent, Origin: row.Origin},
 	}
 	if err := json.Unmarshal([]byte(row.RedirectUris), &c.RedirectURIs); err != nil {
 		return nil, err
 	}
 	c.CreatedAt, _ = db.ParseTime(row.CreatedAt)
+	c.ExpiresAt, _ = db.ParseTime(row.ExpiresAt)
 	return &c, nil
 }
 

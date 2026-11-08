@@ -10,11 +10,20 @@ import { ConsentForm } from './ConsentForm'
 const options = {
     resources: ['transactions', 'accounts'],
     presets: [
-        { name: 'read_only' as const, permissions: ['accounts:read', 'transactions:read'] as ApiPermission[] },
-        { name: 'full' as const, permissions: ['accounts:write', 'transactions:write'] as ApiPermission[] },
+        {
+            name: 'read_only' as const,
+            permissions: ['accounts:read', 'transactions:read'] as ApiPermission[],
+        },
+        {
+            name: 'full' as const,
+            permissions: ['accounts:write', 'transactions:write'] as ApiPermission[],
+        },
     ],
 }
-const spaces = [{ id: 1, name: 'Home' }, { id: 2, name: 'Trip' }]
+const spaces = [
+    { id: 1, name: 'Home' },
+    { id: 2, name: 'Trip' },
+]
 
 type Args = Partial<React.ComponentProps<typeof ConsentForm>>
 
@@ -71,20 +80,32 @@ export const ChangesData: Story = {
 export const NoSpaceChosen: Story = {
     args: { spaceChoice: { all: false, ids: [] } },
     play: async ({ canvasElement }) => {
-        await expect(within(canvasElement).getByRole('button', { name: /allow access/i })).toBeDisabled()
+        await expect(
+            within(canvasElement).getByRole('button', {
+                name: /allow access/i,
+            }),
+        ).toBeDisabled()
     },
 }
 
 export const NoPermissions: Story = {
     args: { permissions: [] },
     play: async ({ canvasElement }) => {
-        await expect(within(canvasElement).getByRole('button', { name: /allow access/i })).toBeDisabled()
+        await expect(
+            within(canvasElement).getByRole('button', {
+                name: /allow access/i,
+            }),
+        ).toBeDisabled()
     },
 }
 
 export const Allowed: Story = {
     play: async ({ canvasElement, args }) => {
-        await userEvent.click(within(canvasElement).getByRole('button', { name: /allow access/i }))
+        await userEvent.click(
+            within(canvasElement).getByRole('button', {
+                name: /allow access/i,
+            }),
+        )
         await expect(args.onDecide).toHaveBeenCalledWith(true)
     },
 }
@@ -100,7 +121,11 @@ export const Denied: Story = {
 export const ChangesAskFirst: Story = {
     args: { permissions: ['transactions:write'], changes: ['transactions'] },
     play: async ({ canvasElement, args }) => {
-        await userEvent.click(within(canvasElement).getByRole('button', { name: /allow access/i }))
+        await userEvent.click(
+            within(canvasElement).getByRole('button', {
+                name: /allow access/i,
+            }),
+        )
         await expect(args.onAsk).toHaveBeenCalled()
         await expect(args.onDecide).not.toHaveBeenCalled()
     },
@@ -110,6 +135,10 @@ export const PickingASpace: Story = {
     args: { spaceChoice: { all: false, ids: [] } },
     play: async ({ canvasElement }) => {
         await userEvent.click(within(canvasElement).getByRole('checkbox', { name: /trip/i }))
-        await expect(within(canvasElement).getByRole('button', { name: /allow access/i })).toBeEnabled()
+        await expect(
+            within(canvasElement).getByRole('button', {
+                name: /allow access/i,
+            }),
+        ).toBeEnabled()
     },
 }

@@ -19,6 +19,8 @@ interface ConsentFormProps {
     /** Ticked permissions that change data: allowing them asks once more. */
     changes: ApiResource[]
     host: string | null
+    /** Set for apps that identify themselves by URL: their name is self-declared, this host is not. */
+    clientHost?: string
     error: string | null
     busy: 'allow' | 'deny' | null
     onDecide: (approve: boolean) => void
@@ -35,6 +37,7 @@ export function ConsentForm({
     onSpaceChoiceChange,
     changes,
     host,
+    clientHost,
     error,
     busy,
     onDecide,
@@ -69,6 +72,7 @@ export function ConsentForm({
                     )}
                 </div>
                 <p className="text-muted-foreground">{t('oauth.revoke')}</p>
+                {clientHost && <p className="font-medium">{t('oauth.appHost', { host: clientHost })}</p>}
                 {host && <p className="font-medium">{t('oauth.returnsTo', { host })}</p>}
                 {user && (
                     <p className="text-xs text-muted-foreground">{t('oauth.signedInAs', { email: user.email })}</p>

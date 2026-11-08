@@ -5,7 +5,11 @@ import { changedResources, parseOAuthRequest, redirectHost } from './consent'
 const query = (init: Record<string, string>) => new URLSearchParams(init)
 
 describe('parseOAuthRequest', () => {
-    const base = { client_id: 'c', redirect_uri: 'https://app.example/cb', code_challenge: 'x' }
+    const base = {
+        client_id: 'c',
+        redirect_uri: 'https://app.example/cb',
+        code_challenge: 'x',
+    }
 
     it('reads the request, with the optional parts empty', () => {
         expect(parseOAuthRequest(query(base))).toEqual({

@@ -179,3 +179,79 @@ func TestClientKeepsRequestInfo(t *testing.T) {
 		t.Fatalf("clients = %+v, %v", list, err)
 	}
 }
+
+func TestClientKindsAndSecret(t *testing.T) {
+	r, _, _ := newRepos(t)
+	ctx := context.Background()
+	now := time.Now()
+	_ = r.InsertClient(ctx, "dcr", "D", []string{"https://x/cb"}, repo.RequestInfo{}, now)
+	if err := r.InsertManualClient(ctx, "man", "M", []string{"https://x/cb"}, "hash", now); err != nil {
+		t.Fatal(err)
+	}
+	d, _ := r.Client(ctx, "dcr")
+	m, _ := r.Client(ctx, "man")
+	if d.Kind != repo.KindDCR || d.SecretHash != "" {
+		t.Fatalf("dcr = %+v", d)
+	}
+	if m.Kind != repo.KindManual || m.SecretHash != "hash" {
+		t.Fatalf("manual = %+v", m)
+	}
+}
+
+func TestManualClientsSurvivePrune(t *testing.T) {
+	r, _, _ := newRepos(t)
+	ctx := context.Background()
+	old := time.Now().Add(-48 * time.Hour)
+	_ = r.InsertManualClient(ctx, "man", "M", []string{"https://x/cb"}, "", old)
+	_ = r.PruneClients(ctx, time.Now().Add(-time.Hour))
+	if c, _ := r.Client(ctx, "man"); c == nil {
+		t.Fatal("manual client must not be pruned as idle")
+	}
+}
+
+func TestCIMDClientUpsertRefreshesDocument(t *testing.T) {
+	r, _, _ := newRepos(t)
+	ctx := context.Background()
+	now := time.Now()
+	id := "https://app.example/client.json"
+	if err := r.UpsertCIMDClient(ctx, id, "One", []string{"https://app.example/a"}, now.Add(time.Hour), now); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.UpsertCIMDClient(ctx, id, "Two", []string{"https://app.example/b"}, now.Add(2*time.Hour), now.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	c, _ := r.Client(ctx, id)
+	if c.Kind != repo.KindCIMD || c.Name != "Two" || c.RedirectURIs[0] != "https://app.example/b" {
+		t.Fatalf("client = %+v", c)
+	}
+	if !c.ExpiresAt.After(now.Add(90 * time.Minute)) {
+		t.Fatalf("expires = %v", c.ExpiresAt)
+	}
+	if n, _ := r.CountClients(ctx); n != 1 {
+		t.Fatalf("count = %d", n)
+	}
+}
+
+func TestCIMDHosts(t *testing.T) {
+	r, _, _ := newRepos(t)
+	ctx := context.Background()
+	if hs, _ := r.CIMDHosts(ctx); len(hs) != 0 {
+		t.Fatalf("default = %v", hs)
+	}
+	_ = r.AddCIMDHost(ctx, "b.example", time.Now())
+	_ = r.AddCIMDHost(ctx, "a.example", time.Now())
+	_ = r.AddCIMDHost(ctx, "a.example", time.Now()) // idempotent
+	hs, _ := r.CIMDHosts(ctx)
+	if len(hs) != 2 || hs[0] != "a.example" {
+		t.Fatalf("hosts = %v", hs)
+	}
+	if ok, _ := r.CIMDHostAllowed(ctx, "b.example"); !ok {
+		t.Fatal("b must be allowed")
+	}
+	if ok, _ := r.RemoveCIMDHost(ctx, "b.example"); !ok {
+		t.Fatal("remove must report true")
+	}
+	if ok, _ := r.CIMDHostAllowed(ctx, "b.example"); ok {
+		t.Fatal("b must be gone")
+	}
+}

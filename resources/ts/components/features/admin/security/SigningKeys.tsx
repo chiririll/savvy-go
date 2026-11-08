@@ -97,7 +97,10 @@ export function SigningKeys() {
                     className="grid gap-2 sm:grid-cols-[1fr_2fr_auto]"
                     onSubmit={async (e) => {
                         e.preventDefault()
-                        await trust.mutateAsync({ name: name.trim(), publicKey: publicKey.trim() })
+                        await trust.mutateAsync({
+                            name: name.trim(),
+                            publicKey: publicKey.trim(),
+                        })
                         setName('')
                         setPublicKey('')
                     }}

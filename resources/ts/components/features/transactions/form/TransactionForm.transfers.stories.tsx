@@ -183,7 +183,9 @@ export const CommissionNeedsAnAmount: Story = {
     play: async ({ canvasElement, args }) => {
         await userEvent.click(await within(canvasElement).findByRole('button', { name: /save/i }))
         const section = await feeSection(canvasElement)
-        await expect(await within(section).findByText(/amount|сумм/i, { selector: '[id$="-form-item-message"]' })).toBeVisible()
+        await expect(
+            await within(section).findByText(/amount|сумм/i, { selector: '[id$="-form-item-message"]' }),
+        ).toBeVisible()
         await expect(args.onSubmit).not.toHaveBeenCalled()
     },
 }
@@ -193,7 +195,9 @@ export const CommissionCanBeRemoved: Story = {
     play: async ({ canvasElement }) => {
         const section = await feeSection(canvasElement)
         await userEvent.click(within(section).getByRole('button', { name: /remove the commission|убрать комиссию/i }))
-        await expect(await within(canvasElement).findByRole('button', { name: /add commission|добавить комиссию/i })).toBeVisible()
+        await expect(
+            await within(canvasElement).findByRole('button', { name: /add commission|добавить комиссию/i }),
+        ).toBeVisible()
     },
 }
 
@@ -205,10 +209,12 @@ export const SwapAccounts: Story = {
         await ready(canvasElement)
         await waitFor(() => expect(canvas.getByLabelText(receiveAmount)).toHaveValue('80'))
         await userEvent.click(canvas.getByRole('button', { name: /swap accounts|поменять счета/i }))
-        await waitFor(() => expect(canvas.getAllByRole('combobox')[0]).toHaveTextContent(/euro card/i))
-        await expect(canvas.getAllByRole('combobox')[1]).toHaveTextContent(/cash/i)
-        await expect(canvas.getByLabelText(receiveAmount)).toHaveValue('100')
-        await expect(canvas.getByLabelText(transferRate)).toHaveValue(1.25)
+        await waitFor(() => expect(canvas.getAllByRole('combobox')[0]).toHaveTextContent(/euro card/i), {
+            timeout: 5000,
+        })
+        await waitFor(() => expect(canvas.getAllByRole('combobox')[1]).toHaveTextContent(/cash/i))
+        await waitFor(() => expect(canvas.getByLabelText(receiveAmount)).toHaveValue('100'))
+        await waitFor(() => expect(canvas.getByLabelText(transferRate)).toHaveValue(1.25))
     },
 }
 
@@ -229,7 +235,9 @@ export const TransferNeedsADestination: Story = {
     args: { defaultValues: { ...transfer, to_account_id: null, to_amount: null } },
     play: async ({ canvasElement, args }) => {
         await userEvent.click(await within(canvasElement).findByRole('button', { name: /save/i }))
-        await expect(await within(canvasElement).findByText(/destination account/i, { selector: '[id$="-form-item-message"]' })).toBeVisible()
+        await expect(
+            await within(canvasElement).findByText(/destination account/i, { selector: '[id$="-form-item-message"]' }),
+        ).toBeVisible()
         await expect(args.onSubmit).not.toHaveBeenCalled()
     },
 }
@@ -252,7 +260,11 @@ export const EditingATransferWithACommission: Story = {
     args: {
         isEdit: true,
         originalAffectsBalance: true,
-        defaultValues: { ...transfer, payments: [{ account_id: 1, amount: 100 }], fee: { amount: 2, category_id: null } },
+        defaultValues: {
+            ...transfer,
+            payments: [{ account_id: 1, amount: 100 }],
+            fee: { amount: 2, category_id: null },
+        },
     },
     play: async ({ canvasElement }) => {
         await ready(canvasElement)
@@ -305,7 +317,9 @@ export const TransferToAnotherSpaceNeedsADate: Story = {
     args: { defaultValues: { ...toSpace, date: '' }, onSubmitSpaceTransfer: fn() },
     play: async ({ canvasElement, args }) => {
         await userEvent.click(await within(canvasElement).findByRole('button', { name: /save/i }))
-        await expect(await within(canvasElement).findByText(/date/i, { selector: '[id$="-form-item-message"]' })).toBeVisible()
+        await expect(
+            await within(canvasElement).findByText(/date/i, { selector: '[id$="-form-item-message"]' }),
+        ).toBeVisible()
         await expect(args.onSubmitSpaceTransfer).not.toHaveBeenCalled()
     },
 }

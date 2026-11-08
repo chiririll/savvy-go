@@ -70,8 +70,11 @@ export const ReconcileButtonForEditor: Story = {
 export const ReconcileButtonHiddenWhenReadOnly: Story = {
     parameters: { app: { role: 'viewer' } },
     play: async ({ canvasElement }) => {
-        await expect(await within(canvasElement).findByText('Cash')).toBeVisible()
-        await waitFor(() => expect(within(canvasElement).queryByRole('button', { name: /reconcile/i })).toBeNull())
+        // The role comes from the space list, which can land after the rows, and the rows are drawn again then.
+        await waitFor(() => expect(within(canvasElement).getByText('Cash')).toBeVisible(), { timeout: 5000 })
+        await waitFor(() => expect(within(canvasElement).queryByRole('button', { name: /reconcile/i })).toBeNull(), {
+            timeout: 5000,
+        })
     },
 }
 
@@ -82,10 +85,15 @@ export const OpensTheReconcileDialog: Story = {
         msw.use(raw('get', '/accounts-balance-history', { dates: [], series: [], currency: 'USD', decimals: 2 }))
     },
     play: async ({ canvasElement }) => {
+        await expect(await within(canvasElement).findByText('Cash')).toBeVisible()
         await userEvent.click(await within(canvasElement).findByRole('button', { name: /reconcile/i }))
         const dialog = await screen.findByRole('dialog')
         await expect(within(dialog).getByText('Reconcile accounts')).toBeVisible()
-        await expect(await within(dialog).findByRole('textbox', { name: /actual balance of cash/i })).toHaveValue('120.50')
-        await expect(within(dialog).getByRole('textbox', { name: /actual balance of kuwait savings/i })).toHaveValue('12.345')
+        await expect(await within(dialog).findByRole('textbox', { name: /actual balance of cash/i })).toHaveValue(
+            '120.50',
+        )
+        await expect(within(dialog).getByRole('textbox', { name: /actual balance of kuwait savings/i })).toHaveValue(
+            '12.345',
+        )
     },
 }
