@@ -54,6 +54,8 @@ Access tokens last an hour and renew in the background. A connection unused for 
 | `list_automation_rules`, `get_automation_rule`, `get_automation_rule_logs` | rules and what they did |
 | `get_report` | overview, money flow, expenses by category, cash flow, net worth and other [reports](api.md) |
 
+`list_transactions`, `get_transaction`, `list_accounts`, `list_categories`, `list_tags`, `list_budgets`, `list_debts` and `list_currencies` take `fields`: the keys to keep of each item, for example `id`, `date`, `payments.accountId`, `payments.amount` (a dotted path picks inside a nested object or list). It makes the answer small, so a long period fits; without it every payment repeats its account. Misspelled keys of a transaction are refused; elsewhere they match nothing.
+
 Amounts keep their own currency; the assistant is told never to add amounts of different currencies.
 
 ## Letting it change data

@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"savvy-go/internal/httpserver/httpx/dto"
 )
 
 // mcpReports maps get_report's report names to the REST report routes.
@@ -30,10 +32,24 @@ type spaceArgs struct {
 	SpaceID int64 `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
 }
 
+// listArgs is spaceArgs for the lists that can be trimmed with fields.
+type listArgs struct {
+	SpaceID int64    `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
+	Fields  []string `json:"fields,omitempty" jsonschema:"Keys to keep of each item, to make the answer small, e.g. [id, name]. A dotted path picks inside a nested object or list: currency.code. Default all."`
+}
+
+// getArgs is idArgs for the one item that can be trimmed with fields.
+type getArgs struct {
+	SpaceID int64    `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
+	ID      int64    `json:"id" jsonschema:"Id of the item."`
+	Fields  []string `json:"fields,omitempty" jsonschema:"Keys to keep of each item, to make the answer small, e.g. [id, name]. A dotted path picks inside a nested object or list: currency.code. Default all."`
+}
+
 type accountsArgs struct {
-	SpaceID     int64  `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
-	WithSummary bool   `json:"with_summary,omitempty" jsonschema:"Also return totals across the accounts."`
-	Type        string `json:"type,omitempty" jsonschema:"Only these types, comma-separated: bank, crypto, cash, credit, debt, space."`
+	SpaceID     int64    `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
+	WithSummary bool     `json:"with_summary,omitempty" jsonschema:"Also return totals across the accounts."`
+	Type        string   `json:"type,omitempty" jsonschema:"Only these types, comma-separated: bank, crypto, cash, credit, debt, space."`
+	Fields      []string `json:"fields,omitempty" jsonschema:"Keys to keep of each item, to make the answer small, e.g. [id, name]. A dotted path picks inside a nested object or list: currency.code. Default all."`
 }
 
 type balanceArgs struct {
@@ -71,7 +87,11 @@ type transactionsArgs struct {
 	Page          int      `json:"page,omitempty" jsonschema:"Page number from 1."`
 	PerPage       int      `json:"per_page,omitempty" jsonschema:"Rows per page, at most 100 (default 25)."`
 	WithSummary   bool     `json:"with_summary,omitempty" jsonschema:"Also return totals."`
+	Fields        []string `json:"fields,omitempty" jsonschema:"Keys to keep in each row: id, type, description, date, status, amount, rowAmount, receivedAmount, payments, lines, tags, createdAt, ... A dotted path picks inside a list: payments.accountId, payments.amount, lines.categoryId. Default all, with the full account and category of every payment and line."`
 }
+
+// txFieldKeys are the keys of a transaction row, as the REST API names them.
+var txFieldKeys = jsonKeys(dto.Transaction{})
 
 type dayTotalsArgs struct {
 	SpaceID     int64    `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
@@ -131,8 +151,8 @@ func (h Handler) addSimpleReadTools(srv *mcp.Server) {
 
 	spaceTool := func(name, title, desc, path string) {
 		mcp.AddTool(srv, &mcp.Tool{Name: name, Description: desc, Annotations: ro(title)},
-			func(ctx context.Context, req *mcp.CallToolRequest, in spaceArgs) (*mcp.CallToolResult, any, error) {
-				return h.mcpGet(ctx, req, mcpSpacePath(in.SpaceID, path), nil), nil, nil
+			func(ctx context.Context, req *mcp.CallToolRequest, in listArgs) (*mcp.CallToolResult, any, error) {
+				return h.mcpGetFields(ctx, req, mcpSpacePath(in.SpaceID, path), nil, in.Fields, nil), nil, nil
 			})
 	}
 	spaceTool("list_categories", "List categories", "List the space's categories (expense and income).", "/categories")
@@ -195,7 +215,7 @@ func (h Handler) addQueryReadTools(srv *mcp.Server) {
 			if in.WithSummary {
 				q.Set("with_summary", "1")
 			}
-			return h.mcpGet(ctx, req, mcpSpacePath(in.SpaceID, "/accounts"), q), nil, nil
+			return h.mcpGetFields(ctx, req, mcpSpacePath(in.SpaceID, "/accounts"), q, in.Fields, nil), nil, nil
 		},
 	)
 
@@ -246,7 +266,8 @@ func (h Handler) addQueryReadTools(srv *mcp.Server) {
 		&mcp.Tool{
 			Name: "list_transactions",
 			Description: "List transactions, newest first, with optional filters. Each row has its own currency. Returns at " +
-				"most 100 rows per page; use page to continue.",
+				"most 100 rows per page; use page to continue. Rows are large (every payment repeats its account): " +
+				"pass fields, e.g. [\"id\",\"date\",\"description\",\"payments.accountId\",\"payments.amount\"], for a compact answer.",
 			Annotations: ro("List transactions"),
 		},
 		func(ctx context.Context, req *mcp.CallToolRequest, in transactionsArgs) (*mcp.CallToolResult, any, error) {
@@ -254,7 +275,7 @@ func (h Handler) addQueryReadTools(srv *mcp.Server) {
 			if err != nil {
 				return mcpFail(err.Error()), nil, nil
 			}
-			return h.mcpGet(ctx, req, mcpSpacePath(in.SpaceID, "/transactions"), q), nil, nil
+			return h.mcpGetFields(ctx, req, mcpSpacePath(in.SpaceID, "/transactions"), q, in.Fields, txFieldKeys), nil, nil
 		},
 	)
 	mcp.AddTool(
@@ -286,8 +307,9 @@ func (h Handler) addLookupReadTools(srv *mcp.Server) {
 			Description: "Get one transaction with its items, tags and category.",
 			Annotations: ro("Get transaction"),
 		},
-		func(ctx context.Context, req *mcp.CallToolRequest, in idArgs) (*mcp.CallToolResult, any, error) {
-			return h.mcpGet(ctx, req, mcpSpacePath(in.SpaceID, "/transactions/"+strconv.FormatInt(in.ID, 10)), nil), nil, nil
+		func(ctx context.Context, req *mcp.CallToolRequest, in getArgs) (*mcp.CallToolResult, any, error) {
+			path := mcpSpacePath(in.SpaceID, "/transactions/"+strconv.FormatInt(in.ID, 10))
+			return h.mcpGetFields(ctx, req, path, nil, in.Fields, txFieldKeys), nil, nil
 		},
 	)
 

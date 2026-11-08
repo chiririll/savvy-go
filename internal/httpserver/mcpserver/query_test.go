@@ -79,3 +79,50 @@ func TestTransactionsQueryPassesAccountsAndCurrencies(t *testing.T) {
 		t.Errorf("an empty currency list reached the query: %v", q)
 	}
 }
+
+func TestShapeRowsKeepsPickedFieldsAndExactMoney(t *testing.T) {
+	tree, err := parseFields([]string{"id", " payments.accountId", "payments.amount", "lines"}, txFieldKeys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	in := `{"data":[{"id":1,"description":"x","payments":[{"accountId":2,"account":{"name":"W"},"amount":12345678901234567}],` +
+		`"lines":[{"seq":1,"category":{"id":3}}]}],"meta":{"total":1}}`
+	out, err := shapeData(tree)([]byte(in))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `{"data":[{"id":1,"lines":[{"category":{"id":3},"seq":1}],"payments":[{"accountId":2,"amount":12345678901234567}]}],"meta":{"total":1}}`
+	if string(out) != want {
+		t.Errorf("got  %s\nwant %s", out, want)
+	}
+}
+
+func TestParseFieldsRefusesUnknownAndMalformed(t *testing.T) {
+	for _, bad := range []string{"nope", "payments.", "id&x=1", "../id"} {
+		if _, err := parseFields([]string{bad}, txFieldKeys); err == nil {
+			t.Errorf("%q was accepted", bad)
+		}
+	}
+	if tree, err := parseFields(nil, nil); tree != nil || err != nil {
+		t.Errorf("no fields: %v %v", tree, err)
+	}
+}
+
+func TestShapeDataTakesOneObjectAndAnyKeyWithoutAllowedSet(t *testing.T) {
+	tree, err := parseFields([]string{"name", "currency.code"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := shapeData(tree)([]byte(`{"data":{"id":1,"name":"W","currency":{"code":"EUR","id":2}}}`))
+	if err != nil || string(out) != `{"data":{"currency":{"code":"EUR"},"name":"W"}}` {
+		t.Errorf("%s %v", out, err)
+	}
+}
+
+func TestShapeDataKeepsAmpersands(t *testing.T) {
+	tree, _ := parseFields([]string{"description"}, nil)
+	out, err := shapeData(tree)([]byte(`{"data":[{"description":"a & <b>"}]}`))
+	if err != nil || string(out) != `{"data":[{"description":"a & <b>"}]}` {
+		t.Errorf("%s %v", out, err)
+	}
+}

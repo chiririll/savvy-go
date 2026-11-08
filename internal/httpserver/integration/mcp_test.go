@@ -275,6 +275,27 @@ func TestMCPListTransactionsForwardsFilters(t *testing.T) {
 		t.Fatalf("type and start_date must both narrow the list: %s", resultText(res))
 	}
 
+	// fields trims each row: no account object, only what was asked for.
+	res = a.call(s, "list_transactions", map[string]any{
+		"space_id": sp, "type": "expense", "start_date": "2026-01-01",
+		"fields": []string{"id", "description", "payments.accountId", "payments.amount"},
+	})
+	if res.IsError {
+		t.Fatalf("list_transactions with fields: %s", resultText(res))
+	}
+	row := toolData(t, res).([]any)[0].(map[string]any)
+	pay := row["payments"].([]any)[0].(map[string]any)
+	if len(row) != 3 || row["description"] != "coffee" || pay["accountId"] == nil || pay["amount"] == nil || len(pay) != 2 {
+		t.Fatalf("fields must keep only the named keys: %s", resultText(res))
+	}
+	res = a.call(s, "list_accounts", map[string]any{"space_id": sp, "fields": []string{"id", "currency.code"}})
+	if acc0 := toolData(t, res).([]any)[0].(map[string]any); len(acc0) != 2 || acc0["currency"].(map[string]any)["code"] != "EUR" {
+		t.Fatalf("fields must work on accounts too: %s", resultText(res))
+	}
+	if res := a.call(s, "list_transactions", map[string]any{"space_id": sp, "fields": []string{"bogus"}}); !res.IsError {
+		t.Errorf("an unknown field must be refused: %s", resultText(res))
+	}
+
 	// A day's total covers the whole day: two expenses of 5 on one day, one income of 5 on another.
 	res = a.call(s, "get_transactions_day_totals", map[string]any{"space_id": sp, "start_date": "2026-02-01", "end_date": "2026-02-28"})
 	if res.IsError {
