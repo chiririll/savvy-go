@@ -95,4 +95,12 @@ describe('signedAmount', () => {
         expect(signedAmount(-3, String)).toBe('-3')
         expect(signedAmount(0, String)).toBe('0')
     })
+
+    it('uses the given direction instead of guessing it from the groups', () => {
+        const days = [day('2026-05-03')]
+        const oldestFirst = mergeReconciliationDays([group('2026-05-01'), group('2026-05-05')], days, false)
+        expect(oldestFirst.map((g) => g.date)).toEqual(['2026-05-01', '2026-05-03', '2026-05-05'])
+        const newestFirst = mergeReconciliationDays([group('2026-05-01'), group('2026-05-05')], days, true)
+        expect(newestFirst.map((g) => g.date)).toEqual(['2026-05-05', '2026-05-03', '2026-05-01'])
+    })
 })

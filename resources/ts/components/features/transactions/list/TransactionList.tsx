@@ -47,6 +47,11 @@ interface TransactionListProps {
     dayTotals?: DayTotal[]
     /** The reconciliation points by day: a line closes each day that has some, also a day with no transactions. */
     reconciliationDays?: ReconciliationDay[]
+    /**
+     * The direction of the list. A reconciliation is the balance at the END of its day, so its line follows the
+     * day's rows when the list runs oldest first, and comes before them when it runs newest first.
+     */
+    sortDirection?: 'asc' | 'desc'
     /** The accounts, for the names and currencies in the details of a reconciliation. */
     accounts?: readonly Account[]
     /** Code of the base currency, in which the sum of a day's differences is shown. */
@@ -75,6 +80,7 @@ export function TransactionList({
     grouped = true,
     dayTotals = [],
     reconciliationDays = [],
+    sortDirection = 'desc',
     accounts,
     baseCurrency,
     onDeleteReconciliation,
@@ -82,7 +88,7 @@ export function TransactionList({
 }: TransactionListProps) {
     const relativeDay = useRelativeDay()
     const [detailsDate, setDetailsDate] = useState<string | null>(null)
-    const groups = grouped ? mergeReconciliationDays(groupByDateKey(transactions), reconciliationDays) : []
+    const groups = grouped ? mergeReconciliationDays(groupByDateKey(transactions), reconciliationDays, sortDirection === 'desc') : []
     const detailsDay = reconciliationDays.find((day) => day.date === detailsDate) ?? null
     const canReorder = (group: { date: string | null; items: Transaction[] }) =>
         !!onReorder && !isReadOnly && group.date !== null && group.items.length > 1
@@ -147,34 +153,40 @@ export function TransactionList({
         )
     }
 
+    const reconciledLine = (group: (typeof groups)[number]) =>
+        group.reconciliation && (
+            <ReconciledLine
+                day={group.reconciliation}
+                baseCurrency={baseCurrency}
+                onOpenDetails={() => setDetailsDate(group.reconciliation?.date ?? null)}
+            />
+        )
+
     return (
         <div className="space-y-5">
             {groups.map((group) => (
-                <FeedGroup
-                    key={group.date ?? 'undated'}
-                    title={relativeDay(group.date, { weekday: true })}
-                    aside={dayTotalsLabel(dayTotals.find((day) => day.date === group.date))}
-                >
-                    {group.items.map((transaction, index) => (
-                        <TransactionRow
-                            key={transaction.id}
-                            {...rowProps(transaction)}
-                            onMoveUp={canReorder(group) && index > 0 ? () => move(group, index, -1) : undefined}
-                            onMoveDown={
-                                canReorder(group) && index < group.items.length - 1
-                                    ? () => move(group, index, 1)
-                                    : undefined
-                            }
-                        />
-                    ))}
-                    {group.reconciliation && (
-                        <ReconciledLine
-                            day={group.reconciliation}
-                            baseCurrency={baseCurrency}
-                            onOpenDetails={() => setDetailsDate(group.reconciliation?.date ?? null)}
-                        />
-                    )}
-                </FeedGroup>
+                <div key={group.date ?? 'undated'} className="space-y-1">
+                    {/* Newest first: the end of the day is the top of its group, above the heading. */}
+                    {sortDirection === 'desc' && reconciledLine(group)}
+                    <FeedGroup
+                        title={relativeDay(group.date, { weekday: true })}
+                        aside={dayTotalsLabel(dayTotals.find((day) => day.date === group.date))}
+                    >
+                        {group.items.map((transaction, index) => (
+                            <TransactionRow
+                                key={transaction.id}
+                                {...rowProps(transaction)}
+                                onMoveUp={canReorder(group) && index > 0 ? () => move(group, index, -1) : undefined}
+                                onMoveDown={
+                                    canReorder(group) && index < group.items.length - 1
+                                        ? () => move(group, index, 1)
+                                        : undefined
+                                }
+                            />
+                        ))}
+                        {sortDirection === 'asc' && reconciledLine(group)}
+                    </FeedGroup>
+                </div>
             ))}
             <ReconciliationDetailsDialog
                 day={detailsDay}

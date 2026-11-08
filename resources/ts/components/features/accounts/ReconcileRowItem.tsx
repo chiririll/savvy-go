@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { AmountInput } from '@/components/features/transactions/form/AmountInput'
 import { formatCurrency } from '@/lib/currency'
 import { testId } from '@/lib/test-id'
+import { cn } from '@/lib/utils'
 import type { ReconcileRow } from '@/lib/reconciliation-rows'
 import type { Account } from '@/types'
 
@@ -37,8 +38,17 @@ export function ReconcileRowItem({ row, account, difference, disabled, onChange,
                     onChange={onChange}
                 />
                 {difference !== null && (
-                    <div className="mt-1 text-right font-mono text-xs text-muted-foreground" {...testId('reconcile-difference')}>
-                        {t('accounts.reconcile.difference', { amount: formatCurrency(Number(difference), account.currency) })}
+                    <div
+                        className={cn(
+                            'mt-1 text-right font-mono text-xs text-muted-foreground',
+                            Number(difference) > 0 && 'text-success',
+                            Number(difference) < 0 && 'text-destructive',
+                        )}
+                        {...testId('reconcile-difference')}
+                    >
+                        {t('accounts.reconcile.difference', {
+                            amount: `${Number(difference) > 0 ? '+' : ''}${formatCurrency(Number(difference), account.currency)}`,
+                        })}
                     </div>
                 )}
             </div>

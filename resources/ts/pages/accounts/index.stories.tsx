@@ -3,7 +3,7 @@ import { expect, screen, userEvent, waitFor, within } from 'storybook/test'
 
 import { overlayA11y } from '@/test/a11y'
 import { accounts, catalog, currencies } from '@/test/fixtures'
-import { hang, reply } from '@/test/api-mocks'
+import { hang, raw, reply } from '@/test/api-mocks'
 import { useCurrenciesStore } from '@/stores/currencies'
 
 import AccountsPage from './index'
@@ -57,5 +57,35 @@ export const OpensTheCreateDialog: Story = {
     play: async ({ canvasElement }) => {
         await userEvent.click(await within(canvasElement).findByRole('button', { name: /new account/i }))
         await expect(await screen.findByRole('dialog')).toBeVisible()
+    },
+}
+
+export const ReconcileButtonForEditor: Story = {
+    parameters: { app: { role: 'editor' } },
+    play: async ({ canvasElement }) => {
+        await expect(await within(canvasElement).findByRole('button', { name: /reconcile/i })).toBeVisible()
+    },
+}
+
+export const ReconcileButtonHiddenWhenReadOnly: Story = {
+    parameters: { app: { role: 'viewer' } },
+    play: async ({ canvasElement }) => {
+        await expect(await within(canvasElement).findByText('Cash')).toBeVisible()
+        await waitFor(() => expect(within(canvasElement).queryByRole('button', { name: /reconcile/i })).toBeNull())
+    },
+}
+
+// The dialog starts on today, where the balances are the ones the list already has. The history route is mocked
+// for the days a user may pick afterwards.
+export const OpensTheReconcileDialog: Story = {
+    beforeEach: ({ msw }) => {
+        msw.use(raw('get', '/accounts-balance-history', { dates: [], series: [], currency: 'USD', decimals: 2 }))
+    },
+    play: async ({ canvasElement }) => {
+        await userEvent.click(await within(canvasElement).findByRole('button', { name: /reconcile/i }))
+        const dialog = await screen.findByRole('dialog')
+        await expect(within(dialog).getByText('Reconcile accounts')).toBeVisible()
+        await expect(await within(dialog).findByRole('textbox', { name: /actual balance of cash/i })).toHaveValue('120.50')
+        await expect(within(dialog).getByRole('textbox', { name: /actual balance of kuwait savings/i })).toHaveValue('12.345')
     },
 }

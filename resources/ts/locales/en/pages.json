@@ -255,6 +255,7 @@
             "actual": "Actual",
             "expected": "Expected",
             "difference": "Difference",
+            "matches": "Matches the ledger",
             "delete": "Delete point",
             "deleteTitle": "Delete reconciliation point?",
             "deleteDescription": "The balance of {{name}} will no longer be pinned on {{date}}."

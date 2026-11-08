@@ -152,6 +152,7 @@ export default function TransactionsPage() {
                                 grouped={list.params.sortBy === 'date'}
                                 dayTotals={dayTotals}
                                 reconciliationDays={shownReconciliations}
+                                sortDirection={list.params.sortDir}
                                 accounts={accounts}
                                 baseCurrency={baseCurrency?.code}
                                 onDeleteReconciliation={(id) => deleteReconciliation.mutate(id)}

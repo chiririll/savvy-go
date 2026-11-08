@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Trash2 } from 'lucide-react'
+import { Check, Trash2 } from 'lucide-react'
 import { Confirm } from '@/components/shared/dialogs/Confirm'
 import { ResponsiveDialog } from '@/components/shared/dialogs/ResponsiveDialog'
 import { Button } from '@/components/ui/button'
@@ -43,21 +43,40 @@ export function ReconciliationDetailsDialog({
                     {day?.points.map((point) => {
                         const currency = accountOf(point)?.currency
                         const money = (value: number) => formatCurrency(value, currency)
+                        const deleteButton = onDelete && (
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="size-7 text-muted-foreground"
+                                aria-label={t('transactions.reconciled.delete')}
+                                onClick={() => setRemoving(point)}
+                            >
+                                <Trash2 className="size-4" />
+                            </Button>
+                        )
+                        if (point.difference === 0) {
+                            // It agrees with the ledger: one line, nothing to look into.
+                            return (
+                                <li key={point.id} className="py-2 text-sm first:pt-0 last:pb-0">
+                                    <div className="flex items-center gap-3">
+                                        <span className="min-w-0 flex-1 truncate font-medium">{nameOf(point)}</span>
+                                        <span className="tabular-nums">{money(point.actualBalance)}</span>
+                                        <Check
+                                            className="size-4 shrink-0 text-success"
+                                            role="img"
+                                            aria-label={t('transactions.reconciled.matches')}
+                                        />
+                                        {deleteButton ?? <span className="size-7 shrink-0" aria-hidden />}
+                                    </div>
+                                    {point.note && <p className="text-muted-foreground">{point.note}</p>}
+                                </li>
+                            )
+                        }
                         return (
                             <li key={point.id} className="space-y-1 py-3 text-sm first:pt-0 last:pb-0">
                                 <div className="flex items-center justify-between gap-2">
                                     <span className="font-medium">{nameOf(point)}</span>
-                                    {onDelete && (
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="size-7 text-muted-foreground"
-                                            aria-label={t('transactions.reconciled.delete')}
-                                            onClick={() => setRemoving(point)}
-                                        >
-                                            <Trash2 className="size-4" />
-                                        </Button>
-                                    )}
+                                    {deleteButton}
                                 </div>
                                 <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5 tabular-nums">
                                     <dt className="text-muted-foreground">{t('transactions.reconciled.actual')}</dt>

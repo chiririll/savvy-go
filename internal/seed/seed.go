@@ -120,6 +120,7 @@ func seedSet(
 		{"create spaces", d.createSpaces},
 		{"sync reference data", d.syncReference},
 		{"link spaces and transfer", func() error { return d.linkTransfer(transfers.Service{Spaces: d.spaces, Keys: keys}) }},
+		{"reconcile", d.reconcile},
 		{"invite", d.invite},
 		{"record automations", d.recordAutomations},
 	}

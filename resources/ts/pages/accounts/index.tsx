@@ -43,9 +43,14 @@ export default function AccountsPage() {
                 onCreateClick={isReadOnly ? undefined : form.openCreate}
                 actions={
                     isReadOnly ? undefined : (
-                        <Button variant="outline" onClick={() => setReconcileOpen(true)} {...testId('reconcile')}>
-                            <Scale className="mr-2 h-4 w-4" />
-                            {t('accounts.reconcile.button')}
+                        <Button
+                            variant="outline"
+                            onClick={() => setReconcileOpen(true)}
+                            aria-label={t('accounts.reconcile.button')}
+                            {...testId('reconcile')}
+                        >
+                            <Scale className="h-4 w-4 sm:mr-2" />
+                            <span className="hidden sm:inline">{t('accounts.reconcile.button')}</span>
                         </Button>
                     )
                 }

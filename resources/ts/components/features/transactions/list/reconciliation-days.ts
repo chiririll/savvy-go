@@ -52,11 +52,13 @@ function isNewestFirst(dates: readonly string[]): boolean {
 
 /**
  * Puts the points on the day groups, in the order of the list. A day with points and no transactions gets a group
- * of its own; only days inside the range of the loaded groups count. Undated groups stay last.
+ * of its own; only days inside the range of the loaded groups count. Undated groups stay last. `newestFirst` is the
+ * direction of the list when the caller knows it; the groups' own order tells it otherwise.
  */
 export function mergeReconciliationDays<T>(
     groups: readonly { date: string | null; items: T[] }[],
     days: readonly ReconciliationDay[],
+    newestFirst?: boolean,
 ): DayGroup<T>[] {
     const range = loadedRange(groups)
     const byDate = new Map(days.map((day) => [dayKey(day.date), day]))
@@ -70,8 +72,7 @@ export function mergeReconciliationDays<T>(
     const extra = days
         .filter((day) => !known.has(dayKey(day.date)) && dayKey(day.date) >= range.start && dayKey(day.date) <= range.end)
         .map((day) => ({ date: day.date, items: [] as T[], reconciliation: day }))
-    const newestFirst = isNewestFirst(dated.map((group) => dayKey(group.date as string)))
-    const sign = newestFirst ? -1 : 1
+    const sign = (newestFirst ?? isNewestFirst(dated.map((group) => dayKey(group.date as string)))) ? -1 : 1
     const all = [...dated, ...extra].sort((a, b) => sign * dayKey(a.date as string).localeCompare(dayKey(b.date as string)))
     return [...all, ...undated]
 }
