@@ -7,6 +7,7 @@ import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/comp
 import { Input } from '@/components/ui/input'
 import type { TransactionFormValues } from '@/schemas/transactions'
 import type { Currency } from '@/types'
+import { testId } from '@/lib/test-id'
 
 interface TransferFeeSectionProps {
     /** The currency of the source account: the fee is paid in it. */
@@ -37,6 +38,7 @@ export function TransferFeeSection({ currency }: TransferFeeSectionProps) {
                     className="size-8 shrink-0"
                     aria-label={t('forms:transactions.addFee')}
                     title={t('forms:transactions.addFee')}
+                    {...testId('tx-add-fee')}
                     onClick={() => form.setValue('fee', { amount: '' as unknown as number, category_id: null })}
                 >
                     <Plus />
@@ -60,6 +62,7 @@ export function TransferFeeSection({ currency }: TransferFeeSectionProps) {
                                 onChange={field.onChange}
                                 type="expense"
                                 ariaLabel={t('forms:transactions.feeCategory')}
+                                testName="fee.category_id"
                             />
                             <FormMessage />
                         </FormItem>

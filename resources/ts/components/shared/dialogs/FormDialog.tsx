@@ -14,6 +14,7 @@ import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetT
 import { useReadOnly } from '@/components/providers/ReadOnlyProvider'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
+import { testId } from '@/lib/test-id'
 
 export interface FormDialogContextValue {
     formId: string
@@ -113,7 +114,7 @@ export function FormDialogSubmit() {
     }
 
     return (
-        <Button type="submit" form={formId} disabled={isSubmitting}>
+        <Button type="submit" form={formId} disabled={isSubmitting} {...testId('form-submit')}>
             {isSubmitting ? t('actions.saving') : isEdit ? t('actions.save') : t('actions.create')}
         </Button>
     )

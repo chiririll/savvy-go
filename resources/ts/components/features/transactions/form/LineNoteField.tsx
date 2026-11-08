@@ -5,6 +5,7 @@ import { MarkdownField } from '@/components/shared/markdown/MarkdownField'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { useAutoGrow } from '@/hooks/use-auto-grow'
+import { testId } from '@/lib/test-id'
 
 interface LineNoteFieldProps {
     value: string
@@ -12,13 +13,15 @@ interface LineNoteFieldProps {
     onBlur?: () => void
     /** Names the field for assistive technology; the note has no visible label. */
     label: string
+    /** Marks the field for scripts/screenshots. */
+    testName?: string
 }
 
 /**
  * The note of a line: a compact input that grows with the text, and a pencil that opens the markdown editor
  * in its place. A note that was saved opens in the editor, so its formatting is not hidden.
  */
-export function LineNoteField({ value, onChange, onBlur, label }: LineNoteFieldProps) {
+export function LineNoteField({ value, onChange, onBlur, label, testName }: LineNoteFieldProps) {
     const { t } = useTranslation('forms')
     const [editing, setEditing] = useState(() => value.trim() !== '')
     const textarea = useRef<HTMLTextAreaElement>(null)
@@ -45,6 +48,7 @@ export function LineNoteField({ value, onChange, onBlur, label }: LineNoteFieldP
                 rows={1}
                 value={value}
                 aria-label={label}
+                {...(testName ? testId(testName) : {})}
                 placeholder={t('transactions.lineNotePlaceholder')}
                 className="field-sizing-fixed max-h-40 min-h-9 resize-none overflow-y-auto py-1.5"
                 onChange={(e) => onChange(e.target.value)}

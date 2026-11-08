@@ -12,6 +12,7 @@ import type { TransactionFormValues } from '@/schemas/transactions'
 import type { Currency } from '@/types'
 import { AmountInput } from './AmountInput'
 import { LineNoteField } from './LineNoteField'
+import { testId } from '@/lib/test-id'
 
 interface TransactionLinesProps {
     control: Control<TransactionFormValues>
@@ -77,6 +78,7 @@ export function TransactionLines({ control, fields, remove, type, currencies, co
                                             onChange={f.onChange}
                                             type={type}
                                             ariaLabel={t('common:fields.category')}
+                                            testName={`lines.${index}.category_id`}
                                         />
                                         <FormMessage />
                                     </FormItem>
@@ -112,6 +114,7 @@ export function TransactionLines({ control, fields, remove, type, currencies, co
                                                                 <SelectTrigger
                                                                     className="w-[4.75rem] shrink-0 px-2"
                                                                     aria-label={t('forms:transactions.lineCurrency')}
+                                                                    {...testId(`lines.${index}.currency_id`)}
                                                                 >
                                                                     <SelectValue />
                                                                 </SelectTrigger>
@@ -155,6 +158,7 @@ export function TransactionLines({ control, fields, remove, type, currencies, co
                                             onChange={f.onChange}
                                             onBlur={f.onBlur}
                                             label={t('forms:transactions.lineNote')}
+                                            testName={`lines.${index}.note`}
                                         />
                                     </FormItem>
                                 )}

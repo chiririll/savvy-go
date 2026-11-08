@@ -8,6 +8,7 @@ import type { Account } from '@/types'
 import type { BalancePreview } from './balance-preview'
 import { AmountAccountRow, ROW_BUTTON, RowLabels } from './AmountAccountRow'
 import { BalanceShort, type BalanceMode } from './TransactionBalanceHint'
+import { testId } from '@/lib/test-id'
 
 interface PaymentGridProps {
     control: Control<TransactionFormValues>
@@ -73,6 +74,7 @@ export function PaymentGrid({
                             aria-label={addLabel}
                             disabled={addDisabled}
                             onClick={onAdd}
+                            {...testId(`tx-add-${list}`)}
                         >
                             <Plus />
                         </Button>

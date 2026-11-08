@@ -10,6 +10,7 @@ import {
 import { FormControl } from '@/components/ui/form'
 import { useCategories } from '@/hooks'
 import { localizeDefaultName } from '@/lib/localized-name'
+import { testId } from '@/lib/test-id'
 
 interface CategorySelectProps {
     value?: number | null
@@ -22,6 +23,8 @@ interface CategorySelectProps {
     plain?: boolean
     /** Accessible name of the trigger; set it when no visible label points at the select. */
     ariaLabel?: string
+    /** Marks the field for scripts/screenshots. */
+    testName?: string
 }
 
 export function CategorySelect({
@@ -34,6 +37,7 @@ export function CategorySelect({
     sortByPopularity = true,
     plain,
     ariaLabel,
+    testName,
 }: CategorySelectProps) {
     const { t } = useTranslation('forms')
     const { data: categories } = useCategories()
@@ -52,7 +56,7 @@ export function CategorySelect({
     }, [categories, type, excludeIds, sortByPopularity])
 
     const trigger = (
-        <SelectTrigger className="w-full" aria-label={ariaLabel}>
+        <SelectTrigger className="w-full" aria-label={ariaLabel} {...(testName ? testId(testName) : {})}>
             <SelectValue placeholder={placeholder ?? t('selectCategory')} />
         </SelectTrigger>
     )

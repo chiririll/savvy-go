@@ -125,6 +125,7 @@ export function AmountAccountRow({
                                         excludeId={excludeId}
                                         spaceId={spaceId}
                                         ariaLabel={accountLabel}
+                                        testName={accountName}
                                     />
                                 </div>
                                 {action}

@@ -14,6 +14,7 @@ import { ACCOUNT_TYPE_CONFIG } from '@/constants'
 import { cn, formatCurrency } from '@/lib/utils'
 import { Plus, Wallet } from 'lucide-react'
 import type { AccountType } from '@/types'
+import { testId } from '@/lib/test-id'
 
 interface AccountSelectProps {
     value?: number | null
@@ -28,6 +29,8 @@ interface AccountSelectProps {
     plain?: boolean
     /** Accessible name of the trigger; set it when no visible label points at the select. */
     ariaLabel?: string
+    /** Marks the field for scripts/screenshots. */
+    testName?: string
     showBalance?: boolean
     allowCreate?: boolean
     /** Lists another space's accounts (null: no space chosen yet). */
@@ -47,6 +50,7 @@ export function AccountSelect({
     disabled,
     plain,
     ariaLabel,
+    testName,
     showBalance,
     allowCreate,
     spaceId,
@@ -71,7 +75,7 @@ export function AccountSelect({
     })
 
     const trigger = (
-        <SelectTrigger className="w-full" aria-label={ariaLabel}>
+        <SelectTrigger className="w-full" aria-label={ariaLabel} {...(testName ? testId(testName) : {})}>
             <SelectValue placeholder={placeholder ?? t('forms:selectAccount')} />
         </SelectTrigger>
     )

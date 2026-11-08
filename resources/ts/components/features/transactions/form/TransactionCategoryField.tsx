@@ -5,6 +5,7 @@ import { CategorySelect } from '@/components/shared'
 import { Button } from '@/components/ui/button'
 import { FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import type { TransactionFormValues } from '@/schemas/transactions'
+import { testId } from '@/lib/test-id'
 
 interface TransactionCategoryFieldProps {
     control: Control<TransactionFormValues>
@@ -43,6 +44,7 @@ export function TransactionCategoryField({
                                 onChange={field.onChange}
                                 type={type}
                                 disabled={hasLines && locked}
+                                testName="default_category_id"
                             />
                         </div>
                         {onAddLine && (
@@ -53,6 +55,7 @@ export function TransactionCategoryField({
                                 aria-label={t('forms:transactions.addLine')}
                                 title={t('forms:transactions.addLine')}
                                 onClick={onAddLine}
+                                {...testId('tx-add-line')}
                             >
                                 <Plus />
                             </Button>
