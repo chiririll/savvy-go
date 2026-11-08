@@ -7,13 +7,24 @@ export { UserAvatar } from './appearance/UserAvatar'
 export { DataTable } from './table/DataTable'
 export { ListPage } from './page/ListPage'
 export { FormPage } from './form/FormPage'
-export { FormDialog, FormDialogFooterStart } from './dialogs/FormDialog'
+export {
+    FormDialog,
+    FormDialogActions,
+    FormDialogCancel,
+    FormDialogFooter,
+    FormDialogFooterStart,
+    FormDialogFooterStartSlot,
+    FormDialogSubmit,
+    useFormDialog,
+} from './dialogs/FormDialog'
+export type { FormDialogContextValue, FormDialogProps } from './dialogs/FormDialog'
 export { Confirm } from './dialogs/Confirm'
 export { ResponsiveDialog } from './dialogs/ResponsiveDialog'
 export { EntityFormDialog } from './dialogs/EntityFormDialog'
 export { OtpCodeInput } from './form/OtpCodeInput'
 export { NegativeBalanceConfirmDialog, useNegativeBalanceConfirm } from './dialogs/NegativeBalanceConfirmDialog'
 export { RowActions } from './table/RowActions'
+export { categoryIcons } from './category-icons'
 export { FeedEmpty, FeedGroup, FeedList, FeedProgress, FeedRow, FeedRowSkeleton, FeedStatusBadge } from './feed/FeedRow'
 export type { FeedGroupKey } from './feed/FeedRow'
 export { progressAmounts } from './feed/progress-amounts'
@@ -28,7 +39,6 @@ export { CategorySelect } from './pickers/CategorySelect'
 export { TagSelect } from './pickers/TagSelect'
 export { SegmentedChoice } from './pickers/SegmentedChoice'
 export { TransactionTypeTabs } from './pickers/TransactionTypeTabs'
-export { MoneyAccountFields } from './form/MoneyAccountFields'
 export { ErrorBoundary } from './page/ErrorBoundary'
 export { ServerPagination } from './table/ServerPagination'
 export { InfiniteScrollSentinel } from './table/InfiniteScrollSentinel'

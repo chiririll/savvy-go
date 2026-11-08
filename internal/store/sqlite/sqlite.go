@@ -162,6 +162,11 @@ func (s *Store) spaceFiles() ([]int64, error) {
 // max_page_count so every pooled connection enforces it.
 func (s *Store) openSpace(ctx context.Context, id int64) (*sql.DB, error) {
 	path := s.spacePath(id)
+	if s.opts.MigrateSpace != nil {
+		if err := upgradeSpace(ctx, path); err != nil {
+			return nil, fmt.Errorf("upgrade space: %w", err)
+		}
+	}
 	sdb, err := db.Open(path)
 	if err != nil {
 		return nil, err

@@ -1,5 +1,5 @@
 import { useMemo, type ReactNode } from 'react'
-import { FormDialog } from './FormDialog'
+import { FormDialog, type FormDialogProps } from './FormDialog'
 import { useCreateFormDraft } from '@/hooks/use-create-form-draft'
 
 interface EntityFormFields<TForm, TValues> {
@@ -22,6 +22,9 @@ interface EntityFormDialogProps<TEntity extends { id?: string | number }, TForm,
     description?: string
     className?: string
     headerExtra?: ReactNode
+    footer?: FormDialogProps['footer']
+    footerStart?: FormDialogProps['footerStart']
+    footerEnd?: FormDialogProps['footerEnd']
     fallbackValues?: Partial<TValues>
     toFormValues: (entity: TEntity) => Partial<TValues>
     children: (props: {
@@ -42,6 +45,9 @@ export function EntityFormDialog<TEntity extends { id?: string | number }, TForm
     description,
     className,
     headerExtra,
+    footer,
+    footerStart,
+    footerEnd,
     fallbackValues,
     toFormValues,
     children,
@@ -70,6 +76,9 @@ export function EntityFormDialog<TEntity extends { id?: string | number }, TForm
             isEdit={isEdit}
             className={className}
             headerExtra={headerExtra}
+            footer={footer}
+            footerStart={footerStart}
+            footerEnd={footerEnd}
         >
             {children({
                 formKey,

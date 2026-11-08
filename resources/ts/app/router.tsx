@@ -44,6 +44,7 @@ const SecuritySettingsPage = lazy(() => import('@/pages/settings/security'))
 const PasskeySettingsPage = lazy(() => import('@/pages/settings/passkeys'))
 const ApiSettingsPage = lazy(() => import('@/pages/settings/api'))
 const ImportSettingsPage = lazy(() => import('@/pages/settings/import'))
+const SpaceActionsPage = lazy(() => import('@/pages/settings/actions'))
 const SpaceBackupsPage = lazy(() => import('@/pages/settings/backups'))
 // Administration: server admins.
 const AdminSystemPage = lazy(() => import('@/pages/admin/system'))
@@ -161,6 +162,7 @@ export const router = createBrowserRouter([
                     { path: childPath(pages.passkeySettings), element: withSuspense(PasskeySettingsPage) },
                     { path: childPath(pages.apiSettings), element: withSuspense(ApiSettingsPage) },
                     { path: childPath(pages.importSettings), element: withSuspense(ImportSettingsPage) },
+                    { path: childPath(pages.spaceActions), element: withSuspense(SpaceActionsPage) },
                     { path: childPath(pages.spaceBackups), element: withSuspense(SpaceBackupsPage) },
                     { path: childPath(pages.adminSystem), element: admin(AdminSystemPage) },
                     { path: childPath(pages.adminChecks), element: admin(AdminChecksPage) },

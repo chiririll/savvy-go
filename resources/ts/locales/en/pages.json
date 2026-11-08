@@ -15,17 +15,36 @@
             "bank": "Bank",
             "cash": "Cash",
             "crypto": "Crypto",
-            "debt": "Debt"
+            "credit": "Credit card",
+            "debt": "Debt",
+            "space": "Other space"
         },
         "status": {
             "active": "Active",
             "inactive": "Inactive"
         },
+        "reconcile": {
+            "button": "Reconcile",
+            "title": "Reconcile accounts",
+            "description": "Enter the real balances on a date. From that date on each account's balance is pinned to the value you enter.",
+            "empty": "No accounts to reconcile. Add one below.",
+            "amount": "Actual balance of {{name}}",
+            "difference": "Difference: {{amount}}",
+            "remove": "Remove {{name}}",
+            "add": "Add account"
+        },
         "initial": "Initial: {{amount}}",
         "emptyTitle": "No accounts yet",
         "emptyDescription": "Create your first account to start tracking balances",
         "deleteTitle": "Delete account?",
-        "deleteDescription": "This action cannot be undone. The account \"{{name}}\" will be permanently deleted."
+        "deleteDescription": "This action cannot be undone. The account \"{{name}}\" will be permanently deleted.",
+        "card": {
+            "status": {
+                "overdue": "Overdue: {{amount}} was due {{date}}",
+                "over_limit": "Over the limit by {{amount}}",
+                "payment_due": "Pay {{amount}} by {{date}}"
+            }
+        }
     },
     "categories": {
         "title": "Categories",
@@ -85,12 +104,14 @@
         "editTitle": "Edit user",
         "editDescription": "Update the user's name, email, role, or password.",
         "resetPassword": "Reset password",
+        "neverActive": "Never",
         "sendResetEmail": "Email a reset link",
         "inviteLinkTitle": "Set-password link",
         "inviteLinkDescription": "Copy this link and send it to the user. It is shown only once and works until {{date}}.",
         "columns": {
             "user": "User",
             "email": "Email",
+            "lastActive": "Last activity",
             "role": "Role",
             "actions": "Actions"
         },
@@ -129,6 +150,8 @@
         "create": "New transaction",
         "createTitle": "New transaction",
         "editTitle": "Edit transaction",
+        "editPaymentTitle": "Edit payment",
+        "categoriesCount": "{{count, plural(one: # category; other: # categories)}}",
         "emptyTitle": "No transactions found",
         "emptyDescription": "Create your first transaction to start tracking",
         "emptyPendingTitle": "No pending transactions",
@@ -139,9 +162,11 @@
         "tomorrow": "Tomorrow",
         "applyTitle": "Confirm transaction",
         "applyDescription": "Which date should this transaction be posted on? It can't be in the future.",
-        "applyEstimatedDescription": "The amount is approximate. Enter the real amount to post it.",
-        "applyAmount": "Actual amount",
-        "applyToAmount": "Actual received amount",
+        "applyOccurrenceDescription": "These amounts are what was expected. Change them to the real ones before posting.",
+        "applyPaymentsTitle": "Payments",
+        "applyLinesTitle": "Lines",
+        "applyTakes": "Takes money",
+        "applyBrings": "Brings money",
         "estimatedTitle": "Approximate amount",
         "applyToday": "Today",
         "applyOverdue": "Overdue date",
@@ -179,13 +204,6 @@
             "amountHigh": "Amount (High to Low)",
             "amountLow": "Amount (Low to High)"
         },
-        "items": {
-            "item": "Item",
-            "qty": "Qty",
-            "price": "Price",
-            "total": "Total",
-            "count": "{{count, plural(one: # item; other: # items)}}"
-        },
         "fallback": {
             "payment": "Payment: {{name}}",
             "collection": "Collection: {{name}}",
@@ -216,9 +234,31 @@
             "description": "Type words, or keywords such as account:Card or tags:food,coffee. Use the arrow keys to pick a result.",
             "placeholder": "Search, or filter: account:Card tags:food",
             "empty": "Nothing found",
-            "totals": "Income {{income}} · Expense {{expense}}",
-            "showAll": "Show all {{count, plural(one: # transaction; other: # transactions)}}",
+            "showAll": "Show all: more than {{count}} transactions",
             "keys": "Tab complete · ↑↓ select · Enter open · Ctrl+Enter show all"
+        },
+        "detail": {
+            "payments": "Payments",
+            "lines": "Lines",
+            "tags": "Tags",
+            "change": "Change",
+            "noCategory": "No category",
+            "recurring": "Recurring",
+            "difference": "Payments and lines differ by {{amount}}"
+        },
+        "reconciled": {
+            "label": "Reconciled",
+            "details": "Reconciliation details",
+            "partial": "Some accounts have no exchange rate, so the sum is partial.",
+            "title": "Reconciliation on {{date}}",
+            "explain": "Expected is the previous reconciliation (or the initial balance) plus the transactions since. A non-zero difference means transactions are missing before this date.",
+            "actual": "Actual",
+            "expected": "Expected",
+            "difference": "Difference",
+            "matches": "Matches the ledger",
+            "delete": "Delete point",
+            "deleteTitle": "Delete reconciliation point?",
+            "deleteDescription": "The balance of {{name}} will no longer be pinned on {{date}}."
         }
     },
     "recurring": {
@@ -229,7 +269,8 @@
         "editTitle": "Edit recurring transaction",
         "everyInterval": "Every {{count}} {{frequency}}",
         "deleteTitle": "Delete recurring transaction?",
-        "deleteDescription": "This action cannot be undone."
+        "deleteDescription": "This action cannot be undone.",
+        "stopped": "Stopped"
     },
     "budgets": {
         "title": "Budgets",
@@ -450,6 +491,7 @@
             "title": "Income dynamics",
             "subtitle": "How your income changes over time"
         },
+        "withoutCategory": "Without category",
         "topExpenses": {
             "title": "Top expenses",
             "subtitle": "Largest transactions this period",

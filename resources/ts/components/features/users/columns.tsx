@@ -6,6 +6,7 @@ import { RowActions, UserAvatar } from '@/components/shared'
 import { User } from '@/types/users'
 import i18n from '@/lib/i18n'
 import { userRoleLabel } from '@/lib/labels'
+import { formatDateTime } from '@/lib/format'
 
 interface UserColumnsOptions {
     onDelete: (id: number) => void
@@ -59,6 +60,15 @@ export const createUserColumns = ({
         accessorKey: 'role',
         header: () => i18n.t('pages:users.columns.role'),
         cell: ({ row }) => <span>{userRoleLabel(i18n.t, row.original.role)}</span>,
+    },
+    {
+        accessorKey: 'lastActiveAt',
+        header: () => i18n.t('pages:users.columns.lastActive'),
+        cell: ({ row }) => (
+            <span className="text-muted-foreground">
+                {row.original.lastActiveAt ? formatDateTime(row.original.lastActiveAt) : i18n.t('pages:users.neverActive')}
+            </span>
+        ),
     },
     {
         id: 'actions',

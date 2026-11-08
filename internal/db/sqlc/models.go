@@ -11,21 +11,16 @@ import (
 )
 
 type Account struct {
-	ID              int64
-	Name            string
-	Type            string
-	DebtType        sql.NullString
-	CurrencyID      int64
-	InitialBalance  int64
-	TargetAmount    sql.NullInt64
-	DueDate         sql.NullString
-	IsPaidOff       int64
-	Counterparty    sql.NullString
-	DebtDescription sql.NullString
-	IsActive        int64
-	SortOrder       int64
-	CreatedAt       sql.NullString
-	UpdatedAt       sql.NullString
+	ID             int64
+	Name           string
+	Type           string
+	IsService      sql.NullInt64
+	CurrencyID     int64
+	InitialBalance int64
+	IsActive       int64
+	SortOrder      int64
+	CreatedAt      sql.NullString
+	UpdatedAt      sql.NullString
 }
 
 type AdminAudit struct {
@@ -56,6 +51,23 @@ type ApiToken struct {
 type ApiTokenSpace struct {
 	ApiTokenID int64
 	SpaceID    int64
+}
+
+type AuditLog struct {
+	ID           int64
+	At           string
+	Source       string
+	UserID       sql.NullInt64
+	TokenID      sql.NullInt64
+	TokenLabel   sql.NullString
+	EntityType   string
+	EntityID     sql.NullInt64
+	Op           string
+	BeforeJson   sql.NullString
+	AfterJson    sql.NullString
+	BatchID      sql.NullString
+	RolledBackBy sql.NullInt64
+	Details      sql.NullString
 }
 
 type AuthSession struct {
@@ -138,6 +150,15 @@ type Category struct {
 	UpdatedAt sql.NullString
 }
 
+type CreditCard struct {
+	AccountID    int64
+	CreditLimit  int64
+	Cycle        string
+	StatementDay sql.NullInt64
+	PeriodDays   sql.NullInt64
+	GraceDays    int64
+}
+
 type Currency struct {
 	ID        int64
 	Code      string
@@ -148,6 +169,16 @@ type Currency struct {
 	Rate      decimal.Decimal
 	CreatedAt sql.NullString
 	UpdatedAt sql.NullString
+}
+
+type Debt struct {
+	AccountID    int64
+	Direction    string
+	Principal    int64
+	DueDate      sql.NullString
+	Counterparty sql.NullString
+	Note         sql.NullString
+	ClosedAt     sql.NullString
 }
 
 type EmailVerificationToken struct {
@@ -209,32 +240,36 @@ type PasswordToken struct {
 	UpdatedAt  sql.NullString
 }
 
-type RecurringTransaction struct {
-	ID          int64
-	Type        string
-	AccountID   int64
-	ToAccountID sql.NullInt64
-	CategoryID  sql.NullInt64
-	Amount      int64
-	ToAmount    sql.NullInt64
-	IsEstimated int64
-	Description sql.NullString
-	Frequency   string
-	Interval    int64
-	DayOfWeek   sql.NullInt64
-	DayOfMonth  sql.NullInt64
-	StartDate   string
-	EndDate     sql.NullString
-	NextRunDate string
-	LastRunDate sql.NullString
-	IsActive    int64
-	CreatedAt   sql.NullString
-	UpdatedAt   sql.NullString
+type Payment struct {
+	TransactionID     int64
+	AccountID         int64
+	Amount            int64
+	SpaceTransferUuid sql.NullString
 }
 
-type RecurringTransactionTag struct {
+type Reconciliation struct {
+	ID            int64
+	AccountID     int64
+	Date          string
+	ActualBalance int64
+	Note          sql.NullString
+	CreatedAt     sql.NullString
+}
+
+type RecurringInstance struct {
 	RecurringTransactionID int64
-	TagID                  int64
+	DueDate                string
+	TransactionID          sql.NullInt64
+}
+
+type RecurringTransaction struct {
+	ID        int64
+	Template  string
+	Schedule  string
+	IsActive  int64
+	Error     sql.NullString
+	CreatedAt sql.NullString
+	UpdatedAt sql.NullString
 }
 
 type SchemaMigration struct {
@@ -274,6 +309,13 @@ type SpaceInvitation struct {
 	CreatedAt            sql.NullString
 }
 
+type SpaceKey struct {
+	Kid       string
+	Seed      string
+	CreatedAt string
+	RetiredAt sql.NullString
+}
+
 type SpaceLink struct {
 	SpaceAID  int64
 	SpaceBID  int64
@@ -294,29 +336,19 @@ type SpaceSetting struct {
 }
 
 type SpaceTransfer struct {
-	Uuid          string
-	FromSpaceUuid string
-	FromAccountID int64
-	FromAmount    int64
-	FromCurrency  string
-	FromDecimals  int64
-	ToSpaceUuid   string
-	ToAccountID   int64
-	ToAmount      int64
-	ToCurrency    string
-	ToDecimals    int64
-	Date          string
-	Description   sql.NullString
-	CreatedBy     sql.NullInt64
-	Version       int64
-	DeletedAt     sql.NullString
-	SigV          int64
-	SignerKid     sql.NullString
-	Signature     sql.NullString
-	Status        string
-	Review        sql.NullString
-	Remote        sql.NullString
-	UpdatedAt     sql.NullString
+	Uuid           string
+	Payload        sql.NullString
+	SigV           int64
+	SourceKid      sql.NullString
+	SourceSig      sql.NullString
+	DestinationKid sql.NullString
+	DestinationSig sql.NullString
+	Source         sql.NullString
+	Destination    sql.NullString
+	Version        sql.NullInt64
+	Status         string
+	Remote         sql.NullString
+	UpdatedAt      sql.NullString
 }
 
 type SsoLoginState struct {
@@ -364,23 +396,17 @@ type Tag struct {
 }
 
 type Transaction struct {
-	ID                     int64
-	Type                   string
-	AccountID              int64
-	ToAccountID            sql.NullInt64
-	CategoryID             sql.NullInt64
-	Amount                 int64
-	ToAmount               sql.NullInt64
-	IsEstimated            int64
-	Description            sql.NullString
-	DedupHash              sql.NullString
-	Date                   sql.NullString
-	Status                 string
-	RecurringTransactionID sql.NullInt64
-	SpaceTransferUuid      sql.NullString
-	CreatedBy              sql.NullInt64
-	CreatedAt              sql.NullString
-	UpdatedAt              sql.NullString
+	ID             int64
+	Type           string
+	Description    sql.NullString
+	Date           sql.NullString
+	Status         string
+	DayOrder       sql.NullInt64
+	ExternalSource sql.NullString
+	ExternalID     sql.NullString
+	CreatedBy      sql.NullInt64
+	CreatedAt      sql.NullString
+	UpdatedAt      sql.NullString
 }
 
 type TransactionImport struct {
@@ -402,15 +428,13 @@ type TransactionImport struct {
 	UpdatedAt     sql.NullString
 }
 
-type TransactionItem struct {
-	ID            int64
+type TransactionLine struct {
 	TransactionID int64
-	Name          string
-	Quantity      decimal.Decimal
-	PricePerUnit  int64
-	TotalPrice    int64
-	CreatedAt     sql.NullString
-	UpdatedAt     sql.NullString
+	Seq           int64
+	CategoryID    sql.NullInt64
+	CurrencyID    int64
+	Amount        int64
+	Note          sql.NullString
 }
 
 type TransactionTag struct {

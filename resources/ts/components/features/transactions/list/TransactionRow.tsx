@@ -1,11 +1,10 @@
 import { testId } from '@/lib/test-id'
-import { useState } from 'react'
-import { Check, Copy, SkipForward } from 'lucide-react'
+import { ArrowDown, ArrowUp, Check, Copy, SkipForward } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { FeedRow, FeedStatusBadge, RowActions } from '@/components/shared'
 import { useRelativeDay } from '@/hooks'
-import { cn, formatCurrency } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import {
     displayTransactionDescription,
     transactionAmountAppearance,
@@ -13,7 +12,7 @@ import {
 } from '@/lib/transaction-description'
 import { Transaction } from '@/types'
 import { SkipTransactionAlert } from '../deferred/SkipTransactionAlert'
-import { TransactionItemsRow } from './TransactionItemsRow'
+import { TransactionAmount } from './TransactionAmount'
 import { transactionIconProps } from './transaction-icon'
 
 interface TransactionRowProps {
@@ -23,9 +22,16 @@ interface TransactionRowProps {
     onConfirm?: (transaction: Transaction) => void
     onSkip?: (id: number) => void
     onEdit?: (transaction: Transaction) => void
+    /** What a click on the row does; the form (`onEdit`) when left out. The menu's Edit is always `onEdit`. */
+    onOpen?: (transaction: Transaction) => void
     isReadOnly?: boolean
     showActions?: boolean
     showDate?: boolean
+    /** The amount is a guess (the pending occurrence of a rule with an estimate): shown as `≈`. */
+    approximate?: boolean
+    /** Move the row one place up or down within its day; each is set only when the row can go that way. */
+    onMoveUp?: () => void
+    onMoveDown?: () => void
 }
 
 interface RowHandlers {
@@ -33,13 +39,15 @@ interface RowHandlers {
     confirm?: () => void
     skip?: () => void
     duplicate?: () => void
+    moveUp?: () => void
+    moveDown?: () => void
     remove?: () => void
 }
 
 /** Each action the row offers, or undefined when the transaction, the role or the caller rules it out. */
 function rowHandlers(
     transaction: Transaction,
-    { onEdit, onConfirm, onSkip, onDuplicate, onDelete, isReadOnly }: TransactionRowProps,
+    { onEdit, onConfirm, onSkip, onDuplicate, onDelete, onMoveUp, onMoveDown, isReadOnly }: TransactionRowProps,
 ): RowHandlers {
     const { edit, duplicate, delete: canRemove, confirm, skip } = transaction.actions
     const writable = !isReadOnly
@@ -48,6 +56,8 @@ function rowHandlers(
         confirm: writable && confirm && onConfirm ? () => onConfirm(transaction) : undefined,
         skip: writable && skip && onSkip ? () => onSkip(transaction.id) : undefined,
         duplicate: writable && duplicate && onDuplicate ? () => onDuplicate(transaction.id) : undefined,
+        moveUp: writable ? onMoveUp : undefined,
+        moveDown: writable ? onMoveDown : undefined,
         remove: writable && canRemove && onDelete ? () => onDelete(transaction.id) : undefined,
     }
 }
@@ -105,55 +115,54 @@ function TransactionMenu({ handlers, open, onOpenChange, showTrigger }: Transact
                     {t('actions.duplicate')}
                 </DropdownMenuItem>
             )}
+            {handlers.moveUp && (
+                <DropdownMenuItem onClick={handlers.moveUp} {...testId('move-up')}>
+                    <ArrowUp className="mr-2 size-4" />
+                    {t('actions.moveUp')}
+                </DropdownMenuItem>
+            )}
+            {handlers.moveDown && (
+                <DropdownMenuItem onClick={handlers.moveDown} {...testId('move-down')}>
+                    <ArrowDown className="mr-2 size-4" />
+                    {t('actions.moveDown')}
+                </DropdownMenuItem>
+            )}
         </RowActions>
     )
 }
 
 export function TransactionRow(props: TransactionRowProps) {
     const { transaction, showActions = true, showDate = false } = props
-    const { t } = useTranslation('pages')
     const relativeDay = useRelativeDay()
-    const [expanded, setExpanded] = useState(false)
-    const itemsCount = transaction.items.length
-    const canExpand = itemsCount > 1
     const { sign, className } = transactionAmountAppearance(transaction.type, transaction.status)
-    const amount = formatCurrency(transaction.amount, transaction.account.currency)
-    const { toAmount, toAccount } = transaction
-    const received =
-        transaction.type === 'transfer' && toAmount != null && toAccount
-            ? formatCurrency(toAmount, toAccount.currency)
-            : null
+    const isTransfer = transaction.type === 'transfer'
     const handlers = rowHandlers(transaction, props)
     const dateLabel = showDate ? relativeDay(transaction.date, { weekday: true }) : null
+    const categories = [...new Map(transaction.lines.flatMap((l) => (l.category ? [[l.category.id, l.category]] : []))).values()]
 
     return (
         <FeedRow
-            {...transactionIconProps(transaction.type, transaction.category)}
+            {...transactionIconProps(transaction.type, categories)}
             title={displayTransactionDescription(transaction)}
             badge={<TransactionStatusBadge status={transaction.status} />}
             subtitle={
                 <>
                     {dateLabel && <span className="mr-1.5 font-medium">{dateLabel} ·</span>}
                     {transactionSubtitle(transaction)}
-                    {canExpand && (
-                        <button
-                            type="button"
-                            className="ml-1.5 text-primary hover:underline"
-                            aria-expanded={expanded}
-                            onClick={(event) => {
-                                event.stopPropagation()
-                                setExpanded((value) => !value)
-                            }}
-                        >
-                            ({t('transactions.items.count', { count: itemsCount })})
-                        </button>
-                    )}
                 </>
             }
-            amount={`${transaction.isEstimated ? '≈ ' : ''}${sign}${amount}`}
+            amount={<TransactionAmount amount={transaction.rowAmount} sign={sign} approximate={props.approximate} />}
             amountClassName={cn(className, transaction.status === 'pending' && 'italic')}
-            extraAmount={received ? `${transaction.status === 'skipped' ? '' : '+'}${received}` : undefined}
-            onOpen={handlers.edit}
+            extraAmount={
+                isTransfer && transaction.receivedAmount ? (
+                    <TransactionAmount
+                        amount={transaction.receivedAmount}
+                        sign={transaction.status === 'skipped' ? '' : '+'}
+                        approximate={props.approximate}
+                    />
+                ) : undefined
+            }
+            onOpen={props.onOpen ? () => props.onOpen?.(transaction) : handlers.edit}
             hasActions={showActions && Object.values(handlers).some(Boolean)}
             reserveActions={showActions && !props.isReadOnly}
             actions={({ menuOpen, setMenuOpen, isMobile }) => (
@@ -164,7 +173,6 @@ export function TransactionRow(props: TransactionRowProps) {
                     showTrigger={!isMobile}
                 />
             )}
-            below={expanded && canExpand ? <TransactionItemsRow transaction={transaction} /> : undefined}
         />
     )
 }

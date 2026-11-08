@@ -2,5 +2,10 @@
     // magefile*.go are behind the "mage" build tag; without it gopls ignores them.
     "gopls": {
         "build.buildFlags": ["-tags=mage"]
+    },
+    "files.watcherExclude": {
+        "node_modules/**": true,
+        "*/node_modules/**": true,
+        "savvy-data/**": true
     }
 }

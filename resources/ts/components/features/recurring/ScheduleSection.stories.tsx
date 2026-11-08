@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, userEvent, within } from 'storybook/test'
 
-import type { RecurringFormData } from '@/schemas'
+import type { RecurringFormValues } from '@/schemas/recurring'
 import { overlayA11y } from '@/test/a11y'
 import { FormHarness } from '@/test/form-harness'
 
@@ -14,7 +14,7 @@ const base = {
     day_of_month: 15,
     start_date: '2026-01-01',
     end_date: null,
-} as Partial<RecurringFormData>
+} as Partial<RecurringFormValues>
 
 const meta = {
     tags: ['desktop-only'],
@@ -23,7 +23,7 @@ const meta = {
     parameters: { a11y: overlayA11y },
     args: { control: undefined as never, frequency: 'monthly' },
     render: (args) => (
-        <FormHarness<RecurringFormData> defaultValues={{ ...base, frequency: args.frequency } as RecurringFormData}>
+        <FormHarness<RecurringFormValues> defaultValues={{ ...base, frequency: args.frequency } as RecurringFormValues}>
             {(control) => <ScheduleSection control={control} frequency={args.frequency} />}
         </FormHarness>
     ),

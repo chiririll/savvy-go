@@ -5,7 +5,6 @@ import {
     warningIfResultNegative,
     warningsForAccountOutflow,
     warningsForConfirmedDuplicate,
-    warningsForTransactionOutflow,
 } from './negative-balance'
 
 const account = { name: 'Cash', currentBalance: 100 }
@@ -64,21 +63,25 @@ describe('warningsForAccountOutflow', () => {
     })
 })
 
-describe('warningsForTransactionOutflow', () => {
-    it.each(['expense', 'transfer', 'debt_payment', 'debt_lend'])('checks %s', (type) => {
-        expect(warningsForTransactionOutflow({ type, amount: 500, account })).toHaveLength(1)
-    })
-
-    it.each(['income', 'debt_collection', 'debt_borrow', 'transfer_in'])('ignores %s', (type) => {
-        expect(warningsForTransactionOutflow({ type, amount: 500, account })).toEqual([])
-    })
-})
-
 describe('warningsForConfirmedDuplicate', () => {
+    const spend = { amount: -500, account }
+
     it('only counts confirmed transactions', () => {
-        const tx = { type: 'expense', amount: 500, account }
-        expect(warningsForConfirmedDuplicate({ ...tx, status: 'confirmed' })).toHaveLength(1)
-        expect(warningsForConfirmedDuplicate({ ...tx, status: 'pending' })).toEqual([])
-        expect(warningsForConfirmedDuplicate({ ...tx, status: 'skipped' })).toEqual([])
+        expect(warningsForConfirmedDuplicate({ status: 'confirmed', payments: [spend] })).toHaveLength(1)
+        expect(warningsForConfirmedDuplicate({ status: 'pending', payments: [spend] })).toEqual([])
+        expect(warningsForConfirmedDuplicate({ status: 'skipped', payments: [spend] })).toEqual([])
+    })
+
+    it('ignores payments that bring money in', () => {
+        expect(warningsForConfirmedDuplicate({ status: 'confirmed', payments: [{ amount: 500, account }] })).toEqual([])
+    })
+
+    it('warns once for each account that goes negative', () => {
+        const other = { ...account, name: 'Other', currentBalance: 10_000 }
+        const warnings = warningsForConfirmedDuplicate({
+            status: 'confirmed',
+            payments: [spend, { amount: -500, account: other }],
+        })
+        expect(warnings.map((w) => w.accountName)).toEqual([account.name])
     })
 })

@@ -150,8 +150,12 @@ type TopTransaction struct {
 	Description *string
 	Amount      money.Money
 	Date        string
-	Category    *TopCategory // nil for an uncategorised transaction
-	Account     TopAccount
+	Category    *TopCategory // the largest line's; nil for an uncategorised transaction
+	Account     TopAccount   // the account that moved the most
+	// CategoryCount and AccountCount are how many categories the lines and
+	// how many accounts the payments span.
+	CategoryCount int
+	AccountCount  int
 }
 
 type TxTopReport struct {

@@ -27,6 +27,28 @@ func (h Handler) mcpGet(ctx context.Context, req *mcp.CallToolRequest, path stri
 	return h.mcpCall(ctx, req, http.MethodGet, path, q, nil)
 }
 
+// mcpGetFields is mcpGet that keeps only the named fields of the answer's data
+// (all of it when none are named). The trimming comes before the size check, so
+// the trimmed answer is measured, not the full one. allowed limits the first
+// segment of a field, or is nil for any.
+func (h Handler) mcpGetFields(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	path string,
+	q url.Values,
+	fields []string,
+	allowed map[string]bool,
+) *mcp.CallToolResult {
+	tree, err := parseFields(fields, allowed)
+	if err != nil {
+		return mcpFail(err.Error())
+	}
+	if tree == nil {
+		return h.mcpGet(ctx, req, path, q)
+	}
+	return h.mcpDo(ctx, req, http.MethodGet, path, q, nil, shapeData(tree))
+}
+
 // mcpCall is mcpGet for any method. A body is sent as JSON.
 func (h Handler) mcpCall(
 	ctx context.Context,
@@ -34,6 +56,17 @@ func (h Handler) mcpCall(
 	method, path string,
 	q url.Values,
 	body []byte,
+) *mcp.CallToolResult {
+	return h.mcpDo(ctx, req, method, path, q, body, nil)
+}
+
+func (h Handler) mcpDo(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	method, path string,
+	q url.Values,
+	body []byte,
+	shape func([]byte) ([]byte, error),
 ) *mcp.CallToolResult {
 	var authz string
 	if extra := req.GetExtra(); extra != nil {
@@ -67,6 +100,13 @@ func (h Handler) mcpCall(
 	}
 	if len(out) == 0 { // 204: a delete has nothing to return
 		out = []byte(`{"ok":true}`)
+	}
+	if shape != nil && len(out) > 0 {
+		shaped, err := shape(out)
+		if err != nil {
+			return mcpFail("Could not shape the result: " + err.Error())
+		}
+		out = shaped
 	}
 	if len(out) > mcpMaxResult {
 		return mcpFail(

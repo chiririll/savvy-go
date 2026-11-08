@@ -5,10 +5,12 @@ import type { Transaction } from '@/types'
 import { useTransactionFormDialog } from '../form/CreateTransactionProvider'
 
 export function useTransactionDeepLink(items?: Transaction[]) {
-    const { openCreate, openEdit } = useTransactionFormDialog()
+    const { openCreate, openEdit, openView } = useTransactionFormDialog()
     const [searchParams, setSearchParams] = useSearchParams()
     const editId = searchParams.get('edit')
     const { data: editTransaction, isError: editNotFound } = useTransaction(editId ?? '')
+    const viewId = searchParams.get('view')
+    const { data: viewTransaction, isError: viewNotFound } = useTransaction(viewId ?? '')
 
     useEffect(() => {
         if (searchParams.get('create') !== '1') {
@@ -58,5 +60,26 @@ export function useTransactionDeepLink(items?: Transaction[]) {
         }, { replace: true })
     }, [editId, editNotFound, editTransaction, items, openEdit, setSearchParams])
 
-    return { openCreate, openEdit }
+    // `?view=` opens the detail dialog, the link a click on a row stands for; `?edit=` opens the form.
+    useEffect(() => {
+        if (!viewId) {
+            return
+        }
+
+        const transaction = items?.find((item) => String(item.id) === viewId) ?? viewTransaction
+        if (!transaction && !viewNotFound) {
+            return
+        }
+
+        if (transaction) {
+            openView(transaction)
+        }
+
+        setSearchParams((prev) => {
+            prev.delete('view')
+            return prev
+        }, { replace: true })
+    }, [viewId, viewNotFound, viewTransaction, items, openView, setSearchParams])
+
+    return { openCreate, openEdit, openView }
 }

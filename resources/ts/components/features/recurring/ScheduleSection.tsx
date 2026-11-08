@@ -5,9 +5,9 @@ import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessa
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { frequencyLabel, weekdayLabel } from '@/lib/labels'
-import type { RecurringFormData } from '@/schemas'
+import type { RecurringFormValues } from '@/schemas/recurring'
 
-type FormControlOf = Control<RecurringFormData>
+type FormControlOf = Control<RecurringFormValues>
 
 const frequencyOptions = ['daily', 'weekly', 'monthly', 'yearly'] as const
 const weekdayValues = [0, 1, 2, 3, 4, 5, 6] as const

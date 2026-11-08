@@ -9,8 +9,7 @@ import {
     useResourceFormDialog,
 } from '@/hooks'
 import { useReadOnly } from '@/components/providers/ReadOnlyProvider'
-import { RecurringFormData } from '@/schemas'
-import { RecurringTransaction } from '@/types'
+import { RecurringInput, RecurringTransaction } from '@/types'
 
 export default function RecurringPage() {
     const { t } = useTranslation('pages')
@@ -20,7 +19,7 @@ export default function RecurringPage() {
     const updateRecurring = useUpdateRecurring()
     const isReadOnly = useReadOnly()
     const items = [...(recurring ?? [])].sort(compareRecurring)
-    const form = useResourceFormDialog<RecurringTransaction, RecurringFormData>({
+    const form = useResourceFormDialog<RecurringTransaction, RecurringInput>({
         items,
         isLoading,
         create: createRecurring,

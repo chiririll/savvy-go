@@ -111,6 +111,33 @@ func (r Repo) ListUsers(ctx context.Context) ([]User, error) {
 	return out, nil
 }
 
+// latest is the later of two stored timestamps ("" or unparsable: none).
+func latest(raws ...string) *time.Time {
+	var best *time.Time
+	for _, raw := range raws {
+		if t, ok := db.ParseTimeString(raw); ok && (best == nil || t.After(*best)) {
+			best = &t
+		}
+	}
+	return best
+}
+
+// LastActivity is, per user id, when a session or API token of theirs was last
+// used. A user who never signed in is absent.
+func (r Repo) LastActivity(ctx context.Context) (map[int64]time.Time, error) {
+	rows, err := r.q().LastActivity(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[int64]time.Time, len(rows))
+	for _, row := range rows {
+		if t := latest(row.At); t != nil && t.After(out[row.UserID]) {
+			out[row.UserID] = *t
+		}
+	}
+	return out, nil
+}
+
 // InsertUser adds a user; an empty hash means no password.
 func (r Repo) InsertUser(ctx context.Context, name, email, hash, role string, now time.Time) (int64, error) {
 	res, err := r.q().InsertUser(ctx, sqlc.InsertUserParams{

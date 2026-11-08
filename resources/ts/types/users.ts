@@ -11,6 +11,8 @@ export interface User {
     isSsoOnly: boolean
     emailVerified: boolean
     createdAt: string
+    /** When a session or API token of the user was last used; null if never. */
+    lastActiveAt: string | null
     token?: string
     expiresAt?: string
     /** Set when the reset link was emailed instead of returned as `token`. */

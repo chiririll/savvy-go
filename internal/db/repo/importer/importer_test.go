@@ -2,12 +2,14 @@ package importer_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/shopspring/decimal"
 
 	"savvy-go/internal/db/dbtest"
+	"savvy-go/internal/db/filter"
 	importerrepo "savvy-go/internal/db/repo/importer"
 	ledgerrepo "savvy-go/internal/db/repo/ledger"
 	"savvy-go/internal/money"
@@ -111,5 +113,98 @@ func TestRowsWithSameHashInsertedOnce(t *testing.T) {
 	}
 	if n := l.CountTransactions(ctx); n != 2 {
 		t.Fatalf("%d transactions", n)
+	}
+}
+
+func TestImportedRowIsOnePaymentAndOneLine(t *testing.T) {
+	d := dbtest.Space(t)
+	l := ledgerrepo.Repo{DB: d}
+	now := time.Now().UTC()
+	jpy, _ := l.InsertCurrency(
+		ctx,
+		ledgerrepo.Currency{Code: "JPY", Name: "Yen", Symbol: "Y", Decimals: 0, IsBase: true, Rate: decimal.NewFromInt(1)},
+		now,
+	)
+	acc, _ := l.InsertAccount(
+		ctx,
+		ledgerrepo.AccountFields{Name: "Yen", Type: "cash", CurrencyID: jpy, IsActive: true},
+		now,
+	)
+	cat, _ := l.InsertCategory(ctx, ledgerrepo.Category{Name: "Food", Type: "expense"}, now)
+
+	r := importerrepo.Repo{DB: d}
+	for _, row := range []importerrepo.Row{
+		{Type: "expense", AccountID: acc, CategoryID: &cat, Minor: 800, Date: "2026-02-01", Status: "confirmed", DedupHash: "a"},
+		{Type: "income", AccountID: acc, Minor: 5000, Date: "2026-02-02", Status: "confirmed", DedupHash: "b"},
+	} {
+		if added, err := r.InsertRow(ctx, row, now); !added || err != nil {
+			t.Fatalf("insert = %v, %v", added, err)
+		}
+	}
+	// The same hash on another account is another row.
+	other, _ := l.InsertAccount(ctx, ledgerrepo.AccountFields{Name: "Other", Type: "cash", CurrencyID: jpy, IsActive: true}, now)
+	row := importerrepo.Row{Type: "expense", AccountID: other, Minor: 1, Status: "confirmed", DedupHash: "a"}
+	if added, err := r.InsertRow(ctx, row, now); !added || err != nil {
+		t.Fatalf("same hash, other account = %v, %v", added, err)
+	}
+
+	changes, _ := l.DailyChanges(ctx, acc, "")
+	if len(changes) != 2 || changes[0].Delta != -800 || changes[1].Delta != 5000 {
+		t.Fatalf("changes = %+v", changes)
+	}
+	if has, _ := l.HasExternalID(ctx, "csv", fmt.Sprintf("%d:a", acc)); !has {
+		t.Fatal("the external source is csv and the id <account>:<hash>")
+	}
+	if rows, _ := l.SummaryRows(ctx, filter.TxFilter{}, "confirmed"); len(rows) != 3 {
+		t.Fatalf("every imported row has one line: %+v", rows)
+	}
+}
+
+// A batch stores in one transaction what InsertRow stores one by one: it skips
+// duplicates, also those inside the batch, and a row that fails leaves nothing
+// behind and does not stop the others.
+func TestInsertRowsKeepsGoodRowsAroundBadOne(t *testing.T) {
+	d := dbtest.Space(t)
+	l := ledgerrepo.Repo{DB: d}
+	now := time.Now().UTC()
+	usd, _ := l.InsertCurrency(
+		ctx,
+		ledgerrepo.Currency{Code: "USD", Name: "Dollar", Symbol: "$", Decimals: 2, IsBase: true, Rate: decimal.NewFromInt(1)},
+		now,
+	)
+	acc, _ := l.InsertAccount(
+		ctx,
+		ledgerrepo.AccountFields{
+			Name: "Cash", Type: "cash", CurrencyID: usd,
+			InitialBalance: money.New(0, money.Unit{ID: usd, Decimals: 2}), IsActive: true,
+		},
+		now,
+	)
+	r := importerrepo.Repo{DB: d}
+	row := func(hash string, account int64) importerrepo.Row {
+		return importerrepo.Row{
+			Type: "expense", AccountID: account, Minor: 100, Description: "x", Date: "2026-02-01",
+			Status: "confirmed", DedupHash: hash,
+		}
+	}
+	got, err := r.InsertRows(ctx, []importerrepo.Row{row("a", acc), row("a", acc), row("b", 9999), row("c", acc)}, now)
+	if err != nil || len(got) != 4 {
+		t.Fatalf("InsertRows = %v, %v", got, err)
+	}
+	want := []string{"added", "skipped", "failed", "added"}
+	for i, res := range got {
+		state := "skipped"
+		switch {
+		case res.Err != nil:
+			state = "failed"
+		case res.Added:
+			state = "added"
+		}
+		if state != want[i] {
+			t.Errorf("row %d is %s, want %s", i+1, state, want[i])
+		}
+	}
+	if n := l.CountTransactions(ctx); n != 2 {
+		t.Fatalf("%d transactions, want 2 (the failed row must leave nothing)", n)
 	}
 }

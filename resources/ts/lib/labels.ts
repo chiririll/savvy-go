@@ -63,7 +63,9 @@ export const accountTypeLabel = (t: TFunction, type: AccountType): string => ({
     bank: t('pages:accounts.types.bank'),
     cash: t('pages:accounts.types.cash'),
     crypto: t('pages:accounts.types.crypto'),
+    credit: t('pages:accounts.types.credit'),
     debt: t('pages:accounts.types.debt'),
+    space: t('pages:accounts.types.space'),
 } satisfies Record<AccountType, string>)[type]
 
 /** Account types come from the server, so an unknown one falls back to its raw value. */
@@ -72,7 +74,9 @@ export const accountTypeLabelLoose = (t: TFunction, type: string): string =>
         bank: t('pages:accounts.types.bank'),
         cash: t('pages:accounts.types.cash'),
         crypto: t('pages:accounts.types.crypto'),
-        debt: t('pages:accounts.types.debt'),
+        credit: t('pages:accounts.types.credit'),
+    debt: t('pages:accounts.types.debt'),
+    space: t('pages:accounts.types.space'),
     }, type)
 
 /** Presets and resources come from the server, so an unknown one falls back to its raw name. */
@@ -352,10 +356,11 @@ export const transactionTypeLabel = (t: TFunction, type: TransactionType): strin
 export type NavKey =
     | 'dashboard' | 'transactions' | 'recurring' | 'budgets' | 'debts' | 'reports'
     | 'accounts' | 'categories' | 'tags' | 'currencies' | 'automation' | 'settings' | 'passkeys' | 'api' | 'import'
-    | 'backups' | 'system' | 'checks' | 'monitoring' | 'sso' | 'security' | 'systemBackups' | 'users' | 'spaces'
+    | 'backups' | 'recentActions' | 'system' | 'checks' | 'monitoring' | 'sso' | 'security' | 'systemBackups' | 'users' | 'spaces'
 
 export const navLabel = (t: TFunction, key: NavKey): string => ({
     dashboard: t('nav:dashboard'),
+    recentActions: t('nav:recentActions'),
     transactions: t('nav:transactions'),
     recurring: t('nav:recurring'),
     budgets: t('nav:budgets'),

@@ -9,7 +9,7 @@ import (
 	backupx "savvy-go/internal/httpserver/httpx/backups"
 	"strings"
 
-	"savvy-go/internal/firstrun"
+	"savvy-go/internal/auth/firstrun"
 	"savvy-go/internal/legacy/restore"
 )
 

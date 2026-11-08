@@ -31,6 +31,8 @@ interface FeedRowProps {
     extraAmount?: ReactNode
     leading?: ReactNode
     below?: ReactNode
+    /** A thin bar under the title and amount: from where the title starts to the row's menu button. */
+    progress?: FeedProgressProps
     /** Greyed out: an inactive item. */
     muted?: boolean
     onOpen?: () => void
@@ -114,6 +116,7 @@ export function FeedRow({
     extraAmount,
     leading,
     below,
+    progress,
     muted,
     onOpen,
     hasActions = false,
@@ -161,22 +164,30 @@ export function FeedRow({
                     className={cn(muted && 'opacity-50 grayscale')}
                 />
 
-                <FeedTexts
-                    title={title}
-                    titleClassName={titleClassName}
-                    badge={badge}
-                    meta={meta}
-                    subtitle={subtitle}
-                    muted={muted}
-                    onOpen={interactive ? onOpen : undefined}
-                />
+                <div className={cn('relative flex min-w-0 flex-1 items-center gap-2.5 sm:gap-3', progress && 'mb-1')}>
+                    <FeedTexts
+                        title={title}
+                        titleClassName={titleClassName}
+                        badge={badge}
+                        meta={meta}
+                        subtitle={subtitle}
+                        muted={muted}
+                        onOpen={interactive ? onOpen : undefined}
+                    />
 
-                <FeedAmounts
-                    amount={amount}
-                    amountClassName={amountClassName}
-                    extraAmount={extraAmount}
-                    muted={muted}
-                />
+                    <FeedAmounts
+                        amount={amount}
+                        amountClassName={amountClassName}
+                        extraAmount={extraAmount}
+                        muted={muted}
+                    />
+
+                    {progress && (
+                        <div className="absolute inset-x-0 top-full mt-1.5">
+                            <FeedProgress {...progress} />
+                        </div>
+                    )}
+                </div>
 
                 {hasActions && actions && (
                     <div className={cn(!isMobile && '-mr-1 shrink-0')} onClick={(event) => event.stopPropagation()}>
@@ -196,14 +207,23 @@ export function FeedRow({
     )
 }
 
-/** A thin progress bar under a row; exceeded turns it red. */
-export function FeedProgress({ value, exceeded, muted }: { value: number; exceeded?: boolean; muted?: boolean }) {
+export interface FeedProgressProps {
+    value: number
+    /** Turns the bar red. */
+    exceeded?: boolean
+    /** Turns the bar yellow. */
+    warning?: boolean
+    muted?: boolean
+}
+
+/** A thin progress bar; exceeded turns it red, warning yellow. Rows place it with their `progress` prop. */
+export function FeedProgress({ value, exceeded, warning, muted }: FeedProgressProps) {
     return (
-        <div className="-mt-1 mb-1.5 h-1 overflow-hidden rounded-full bg-muted sm:mx-1.5" role="presentation">
+        <div className="h-1 overflow-hidden rounded-full bg-muted" role="presentation">
             <div
                 className={cn(
                     'h-full rounded-full transition-[width]',
-                    exceeded ? 'bg-destructive' : 'bg-success',
+                    exceeded ? 'bg-destructive' : warning ? 'bg-warning' : 'bg-success',
                     muted && 'bg-muted-foreground/40',
                 )}
                 style={{ width: `${Math.max(0, Math.min(value, 100))}%` }}

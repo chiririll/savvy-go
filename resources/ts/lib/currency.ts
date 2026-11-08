@@ -57,3 +57,8 @@ export function formatCurrencyCompact(
 ): string {
     return formatCurrency(value, currency, { ...options, compact: true })
 }
+
+/** A balance in a narrow space: in full below ten thousand, shortened (100K, 1.2M) from there. No symbol. */
+export function formatBalanceShort(value: number, currency?: CurrencyInput): string {
+    return formatCurrency(value, currency, { showSymbol: false, compact: Math.abs(value) >= 10_000 })
+}

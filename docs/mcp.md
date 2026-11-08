@@ -44,13 +44,18 @@ Access tokens last an hour and renew in the background. A connection unused for 
 | Tool | Returns |
 |------|---------|
 | `list_spaces` | your spaces and your role in each |
-| `list_accounts`, `list_categories`, `list_tags`, `list_currencies` | reference data of a space |
+| `list_accounts`, `list_categories`, `list_tags`, `list_currencies` | reference data of a space. `list_accounts` takes `type` (one or several, such as `credit`) to narrow the list; a credit card in it comes with its terms, available credit, last statement and status |
+| `get_balance`, `get_balance_history` | balances at the end of a day (`at`, default today), or of every day from `from` to `to`, for all active accounts with a total or just `account_ids`: opening balance plus confirmed payments; returned as the balance chart does, with `native_data` in the account's own currency |
 | `list_transactions`, `get_transaction` | transactions; filters (dates, type, status, account or accounts, currencies, categories, tags) and free-text search `q` (description, item names, or an amount in the account's currency); pages of up to 100 |
 | `get_transactions_summary` | transaction totals |
+| `get_transactions_day_totals` | what each day netted per currency, over every transaction of the day; give `dates`, or `start_date` and `end_date`; takes the filters of `list_transactions` |
+| `list_reconciliations` | [reconciliation points](api.md) per account and date: `actualBalance`, `expectedBalance`, `difference` (also in the base currency); filter by `account_ids`, `from`, `to` |
 | `list_budgets` | budgets with progress |
 | `list_debts`, `get_debts_summary` | debts and totals |
 | `list_automation_rules`, `get_automation_rule`, `get_automation_rule_logs` | rules and what they did |
 | `get_report` | overview, money flow, expenses by category, cash flow, net worth and other [reports](api.md) |
+
+`list_transactions`, `get_transaction`, `list_accounts`, `list_categories`, `list_tags`, `list_budgets`, `list_debts` and `list_currencies` take `fields`: the keys to keep of each item, for example `id`, `date`, `payments.accountId`, `payments.amount` (a dotted path picks inside a nested object or list). It makes the answer small, so a long period fits; without it every payment repeats its account. Misspelled keys of a transaction are refused; elsewhere they match nothing.
 
 Amounts keep their own currency; the assistant is told never to add amounts of different currencies.
 
@@ -60,9 +65,12 @@ On the consent page pick **Editor** or **Admin**, or tick Write and Delete under
 
 | Tool | Needs | Does |
 |------|-------|------|
-| `create_transaction`, `update_transaction`, `confirm_transaction`, `skip_transaction`, `duplicate_transaction` | transactions: write | record, change or settle a transaction |
+| `create_transaction`, `create_transactions`, `update_transaction`, `confirm_transaction`, `skip_transaction`, `duplicate_transaction` | transactions: write | record, change or settle a transaction: payments (the signed money that moved, one per account) and lines (what it was for), see [Transactions](api.md#transactions); a line's `note` is markdown. `create_transactions` takes a list of up to 500 and stores all or none in one save, so use it instead of calling `create_transaction` in a loop. Give `external_id` (a receipt number, say) and a retry fails naming the transaction that already has it instead of adding a duplicate; the same id from another source is stored and listed in `externalMatches`, see [External id and duplicates](api.md#external-id-and-duplicates) |
+| `find_similar_transactions` | transactions: write | before adding a statement or receipts, finds the transactions already entered that look like each item (same amount in the same currency, a day or so apart, or the same `external_id`) and says why. It stores nothing, but needs write permission because the request has a body |
 | `delete_transaction` | transactions: delete | remove a transaction |
 | `create_account`, `update_account` | accounts: write | add or change an account |
+| `reconcile_account` | accounts: write | pin accounts to their real balance on a date (`date`, `accounts`: list of `account_id`, `actual_balance` as text, optional `note`). It creates no transaction; the answer shows the expected balance and the `difference`, and a nonzero one means transactions are missing before that date. The same account and date is replaced; several accounts are stored all or none |
+| `create_credit_card`, `update_credit_card` | accounts: write | a credit card with its limit, statement day and grace days, see [Credit cards](api.md#credit-cards) |
 | `create_category`, `update_category`, `set_default_category` | categories: write | add or change a category |
 | `create_tag`, `rename_tag` | tags: write | add or rename a tag |
 | `create_currency`, `update_currency`, `set_base_currency` | currencies: write | add a currency, change its rate or the base currency |
@@ -70,12 +78,30 @@ On the consent page pick **Editor** or **Admin**, or tick Write and Delete under
 | `create_automation_rule`, `update_automation_rule`, `toggle_automation_rule`, `test_automation_rule` | automation: write | add, change, switch or try a rule |
 | `delete_automation_rule` | automation: delete | remove a rule |
 | `create_debt`, `update_debt`, `add_debt_payment`, `collect_debt`, `reopen_debt` | debts: write | record a debt or payment, or reopen it |
-| `delete_account`, `delete_category`, `delete_tag`, `delete_currency`, `delete_budget`, `delete_debt` | that part: delete | remove it |
+| `delete_reconciliation` | accounts: delete | remove a reconciliation point |
+| `delete_account`, `delete_category`, `delete_tag`, `delete_currency`, `delete_budget`, `delete_debt`, `delete_credit_card` | that part: delete | remove it |
 
 - The tools are the [API](api.md) operations made with the connection's token: same checks, errors and role limits. Amounts are exact decimals sent as text, in the account's currency.
 - Delete tools are marked destructive, so clients such as Claude ask before running them.
 - Rules run by themselves on later transactions and can move money between accounts. Grant automation write only to an assistant you trust.
 - Changes look like yours in the app.
+
+## Taking changes back
+
+An assistant that may add and change data can still make a mistake, and a connection without the Delete permission cannot remove the wrong transaction it just made. So every change an assistant makes is logged, and it can take back **its own** changes without Delete:
+
+| Tool | Needs | Does |
+|------|-------|------|
+| `list_my_actions` | audit: read | the changes made with this connection, newest first, each saying whether it can be rolled back now (`rollbackable`) and, if not, why (`rollbackBlockedReason`) |
+| `rollback_actions` | audit: write | undo entries by `ids`, or a whole bulk call by `batch_id`. A created transaction is removed; a changed or deleted one is put back exactly as it was, with its exact amounts in each currency |
+
+- A connection sees and undoes only the entries it made itself. Another connection's entries, yours from the app, or those of a personal API token look as if they did not exist.
+- It is refused, and nothing at all is undone, if the same transaction was changed again after the assistant's change, by anyone: you in the app, another connection, or the assistant itself (it then undoes the newest change first). Whatever you did by hand after it stays.
+- Undoing a delete needs the transaction's account, categories and tags to still exist, and its `external_id` not to be used again by another transaction.
+- Undoing is itself logged and cannot be undone; make the change again instead.
+- `rollback_actions` is marked destructive, so clients ask before running it.
+- The Editor tab of the consent page includes the audit permission. Connections made before it existed do not have it until you add it with the pencil, see below.
+- For now only transactions are logged (a CSV import as one entry that cannot be rolled back). Not logged yet: accounts, categories and the other parts of a space.
 
 ## Changing a connection later
 

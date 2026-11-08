@@ -8,10 +8,10 @@ import type { Transaction } from '@/types'
 
 interface LargestTransactionsCardProps {
     transactions?: Transaction[]
-    onEdit: ReturnType<typeof useCreateTransactionDialog>['openEdit']
+    onOpen: ReturnType<typeof useCreateTransactionDialog>['openView']
 }
 
-export function LargestTransactionsCard({ transactions, onEdit }: LargestTransactionsCardProps) {
+export function LargestTransactionsCard({ transactions, onOpen }: LargestTransactionsCardProps) {
     const { t } = useTranslation('pages')
     const { t: tCommon } = useTranslation('common')
 
@@ -35,7 +35,7 @@ export function LargestTransactionsCard({ transactions, onEdit }: LargestTransac
                                 <TransactionRow
                                     key={transaction.id}
                                     transaction={transaction}
-                                    onEdit={onEdit}
+                                    onOpen={onOpen}
                                     showActions={false}
                                 />
                             ))}

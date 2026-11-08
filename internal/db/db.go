@@ -45,6 +45,26 @@ func Open(path string, pragmas ...string) (*sql.DB, error) {
 	return sqlDB, nil
 }
 
+// ReadOnlyURI is the read-only URI of a database file, for ATTACH or for
+// looking into a file that must not change.
+func ReadOnlyURI(path string) string {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		abs = path
+	}
+	abs = filepath.ToSlash(abs)
+	if !strings.HasPrefix(abs, "/") {
+		abs = "/" + abs
+	}
+	return "file:" + abs + "?mode=ro"
+}
+
+// OpenReadOnly opens an existing database file without changing it: no
+// directory is made, no pragma is written, and the file is not created.
+func OpenReadOnly(path string) (*sql.DB, error) {
+	return sql.Open("sqlite", ReadOnlyURI(path))
+}
+
 func sqliteDSN(path string) string {
 	abs := path
 	if !filepath.IsAbs(path) {
@@ -87,4 +107,11 @@ func Ready(ctx context.Context, sqlDB *sql.DB) error {
 func Checkpoint(ctx context.Context, sqlDB *sql.DB) error {
 	_, err := sqlDB.ExecContext(ctx, "PRAGMA wal_checkpoint(TRUNCATE)")
 	return err
+}
+
+// RemoveFiles deletes a database file with its write-ahead log and journal.
+func RemoveFiles(path string) {
+	for _, suffix := range []string{"", "-wal", "-shm", "-journal"} {
+		_ = os.Remove(path + suffix)
+	}
 }

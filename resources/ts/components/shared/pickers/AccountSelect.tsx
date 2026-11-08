@@ -14,11 +14,14 @@ import { ACCOUNT_TYPE_CONFIG } from '@/constants'
 import { cn, formatCurrency } from '@/lib/utils'
 import { Plus, Wallet } from 'lucide-react'
 import type { AccountType } from '@/types'
+import { testId } from '@/lib/test-id'
 
 interface AccountSelectProps {
     value?: number | null
     onChange: (value: number) => void
     excludeId?: number | null
+    /** Accounts that cannot be picked, such as the ones other rows of the form already use. */
+    excludeIds?: readonly number[]
     excludeDebts?: boolean
     activeOnly?: boolean
     placeholder?: string
@@ -26,6 +29,8 @@ interface AccountSelectProps {
     plain?: boolean
     /** Accessible name of the trigger; set it when no visible label points at the select. */
     ariaLabel?: string
+    /** Marks the field for scripts/screenshots. */
+    testName?: string
     showBalance?: boolean
     allowCreate?: boolean
     /** Lists another space's accounts (null: no space chosen yet). */
@@ -38,12 +43,14 @@ export function AccountSelect({
     value,
     onChange,
     excludeId,
+    excludeIds,
     excludeDebts = true,
     activeOnly = true,
     placeholder,
     disabled,
     plain,
     ariaLabel,
+    testName,
     showBalance,
     allowCreate,
     spaceId,
@@ -61,11 +68,14 @@ export function AccountSelect({
         if (excludeId && account.id === excludeId) {
             return false
         }
+        if (excludeIds?.includes(account.id)) {
+            return false
+        }
         return true
     })
 
     const trigger = (
-        <SelectTrigger className="w-full" aria-label={ariaLabel}>
+        <SelectTrigger className="w-full" aria-label={ariaLabel} {...(testName ? testId(testName) : {})}>
             <SelectValue placeholder={placeholder ?? t('forms:selectAccount')} />
         </SelectTrigger>
     )

@@ -21,21 +21,24 @@ const ctxSpace ctxKey = iota
 // SpaceScope is the space a request works in: the caller's role there and
 // the ledger services bound to its database.
 type SpaceScope struct {
-	ID         int64
-	Role       string
-	DB         store.DB
-	Settings   settings.Store
-	Currencies ledger.Currencies
-	Accounts   ledger.Accounts
-	Categories ledger.Categories
-	Tags       ledger.Tags
-	Txs        ledger.Transactions
-	Debts      ledger.Debts
-	Recurring  recurring.Service
-	Budgets    ledger.Budgets
-	Automation automation.Service
-	Reports    reports.Service
-	Imports    importer.Service
+	ID          int64
+	Role        string
+	DB          store.DB
+	Settings    settings.Store
+	Currencies  ledger.Currencies
+	Accounts    ledger.Accounts
+	Categories  ledger.Categories
+	Tags        ledger.Tags
+	Txs         ledger.Transactions
+	Rollbacks   ledger.Rollbacks
+	Reconcile   ledger.Reconciliations
+	Debts       ledger.Debts
+	CreditCards ledger.CreditCards
+	Recurring   recurring.Service
+	Budgets     ledger.Budgets
+	Automation  automation.Service
+	Reports     reports.Service
+	Imports     importer.Service
 }
 
 // WithScope returns ctx carrying the space of a request.

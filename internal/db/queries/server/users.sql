@@ -19,6 +19,16 @@ SELECT id, name, email, password, role, is_sso_only, email_verified,
 	two_factor_secret, two_factor_enabled, two_factor_confirmed, two_factor_last_step, deleted_at, created_at, updated_at
 FROM users WHERE deleted_at IS NULL ORDER BY name;
 
+-- name: LastActivity :many
+-- Per user, the latest time a session or an API token of theirs was used.
+-- Sessions and tokens each report their own latest; the caller takes the later.
+-- A user who never signed in has no row.
+SELECT user_id, CAST(MAX(last_used_at) AS TEXT) AS at
+FROM auth_sessions GROUP BY user_id
+UNION ALL
+SELECT user_id, CAST(MAX(last_used_at) AS TEXT)
+FROM api_tokens WHERE last_used_at IS NOT NULL GROUP BY user_id;
+
 -- name: InsertUser :execresult
 INSERT INTO users (name, email, password, role, created_at, updated_at)
 VALUES (?, ?, ?, ?, ?, ?);

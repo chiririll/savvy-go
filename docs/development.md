@@ -5,11 +5,11 @@
 ```bash
 go generate ./internal/db   # sqlc: internal/db/queries → internal/db/sqlc
 go test ./...
-go test -tags integration ./internal/httpserver   # HTTP server tests, slow
+go test -tags integration ./internal/httpserver/integration   # HTTP server tests, slow
 go run .
 ```
 
-The tests of `internal/httpserver` start a whole app per test and take about a minute, so they carry the build tag `integration` and are left out of `go test ./...`. CI runs them on demand with the *CI Go integration* workflow. Tests in other packages open stores with `sqlitetest.Open` (`internal/store/sqlite/sqlitetest`), which copies a database migrated once per test binary instead of migrating each time.
+The tests of `internal/httpserver/integration` start a whole app per test and take about a minute, so they carry the build tag `integration` and are left out of `go test ./...`. CI runs them on demand with the *CI Go integration* workflow. Tests in other packages open stores with `sqlitetest.Open` (`internal/store/sqlite/sqlitetest`), which copies a database migrated once per test binary instead of migrating each time.
 
 `go run .` listens on `localhost:8080`. Data and the generated `config.toml` go to `./savvy-data`, see [Data and backups](data-and-backups.md) and [Configuration](deployment.md#configuration). A plain `go build` or `go run` serves the frontend from `public/` on disk; release builds embed it, see [Build tasks](#build-tasks).
 
@@ -32,6 +32,14 @@ With `--seed-config <file>` (any TOML file, even empty), the first boot creates 
 | `guest@savvy.app`  | `password` | guest       |
 | `demo@demo.com`    | `demo`     | user        |
 
+The data covers the transaction model, not only plain expenses. Most are one payment on one account for one category; next to them are:
+
+- an expense paid from three accounts (cash, debit and credit card), and one paid in euros with the change back in dollars, on a EUR account;
+- a basket over several categories, whose lines carry **markdown notes**: product lists, a list with done and open items, a link;
+- an income split between two accounts, and a transfer between currencies with a wire fee;
+- a **pending shopping list** in each space (a task list in the notes of its lines, items ticked off or not yet) that moves no balance until it is confirmed.
+- **reconciliation points** in the Demo space: checking, savings, cash and the euro account are pinned on the last day of each of the three previous months; the second month leaves checking 46.50 short, the other points match the ledger.
+
 Roles differ per space, so each user sees a different view. Every space has its own emoji and color. Family Budget and Demo are in one sync group, each with a category and a tag the other lacked. Studio GmbH is outside it and has a set of categories and tags of its own (clients, retainers, VAT) instead of the presets. About a dozen transfers cross the links between the spaces, some in the last few days and some between currencies. All addresses are verified except the guest's, which shows as unverified once mail is set up.
 
 Example `seed.toml`:
@@ -45,6 +53,15 @@ enabled = true
 # Place the data relative to this day (YYYY-MM-DD) instead of today.
 date = "2026-06-05"
 
+# Months of history in the Demo space, counted back from the date. Default: 12.
+# 120 is ten years, for performance tests.
+months = 12
+
+# Extra sets of users and spaces next to the regular one. Default: 0.
+# 2 adds admin1, editor1, guest1, demo1 and admin2, ... each with their own
+# copy of the three spaces ("Demo 1", "Family Budget 1", ...).
+copies = 0
+
 # Write the seeded users, spaces and invitation tokens to this file.
 manifest = "./savvy-data/manifest.json"
 ```
@@ -53,7 +70,7 @@ manifest = "./savvy-data/manifest.json"
 go run . --seed-config seed.toml
 ```
 
-`enabled` (default `true`) turns seeding off without removing the flag. `date` places the data relative to that day instead of today. `manifest` is a file the seed writes users (with whether their address is verified), spaces (emoji, color, sync group) and invitation tokens to; [Scripts](scripts.md) uses it. Unknown keys are an error. Seeding only happens on an empty database: if the server already has a user, or was seeded before, the flag does nothing, so start from a fresh data directory.
+`enabled` (default `true`) turns seeding off without removing the flag. `date` places the data relative to that day instead of today. `months` sets how much history the Demo space gets (the other two spaces stay small). `copies` seeds that many more sets of users and spaces, so a server can be loaded with many spaces: the users are `admin1@savvy.app`, `editor1@savvy.app`, `guest1@savvy.app`, `demo1@demo.com` (same passwords), then `admin2@…`, and so on, and the spaces get the same number after their name. Each copy has its own links, sync group and invitations. `manifest` is a file the seed writes users (with whether their address is verified), spaces (emoji, color, sync group) and invitation tokens to; [Scripts](scripts.md) uses it. Unknown keys are an error. Seeding only happens on an empty database: if the server already has a user, or was seeded before, the flag does nothing, so start from a fresh data directory.
 
 ## Architecture
 

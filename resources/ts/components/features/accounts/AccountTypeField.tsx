@@ -2,7 +2,8 @@ import { useTranslation } from 'react-i18next'
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { AccountFormValues } from '@/schemas'
-import { REGULAR_ACCOUNT_TYPE_CONFIG, REGULAR_ACCOUNT_TYPES } from '@/constants'
+import { FORM_ACCOUNT_TYPE_CONFIG } from '@/constants'
+import { FORM_ACCOUNT_TYPES } from '@/types'
 import { cn } from '@/lib/utils'
 import { accountTypeLabel } from '@/lib/labels'
 import { UseFormReturn } from 'react-hook-form'
@@ -24,8 +25,8 @@ export function AccountTypeField({ form }: { form: UseFormReturn<AccountFormValu
                             </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                            {REGULAR_ACCOUNT_TYPES.map((type) => {
-                                const config = REGULAR_ACCOUNT_TYPE_CONFIG[type]
+                            {FORM_ACCOUNT_TYPES.map((type) => {
+                                const config = FORM_ACCOUNT_TYPE_CONFIG[type]
                                 const Icon = config.icon
                                 return (
                                     <SelectItem key={type} value={type}>

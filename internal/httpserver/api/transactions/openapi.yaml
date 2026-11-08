@@ -27,10 +27,18 @@ paths:
             description or an item name (any case, any script), and a number also matches the
             amount, the received amount of a transfer or an item price, as written in the
             currency of its account ("1879", "1 879", "18.79").
+        - {name: external_id, in: query, schema: {type: string}, description: "Only transactions entered with this key, under any source."}
+        - {name: external_source, in: query, schema: {type: string, enum: [ui, api, mcp, csv]}, description: "With external_id: only this source."}
         - {name: sort_by, in: query, schema: {type: string}}
         - {name: sort_direction, in: query, schema: {type: string, enum: [asc, desc]}}
         - {name: page, in: query, schema: {type: integer, default: 1}}
         - {name: per_page, in: query, schema: {type: integer, default: 25}}
+        - name: count
+          in: query
+          schema: {type: string, enum: ["0"]}
+          description: >-
+            `0` skips counting every match (a slow scan on a big space). `meta.total` is then
+            only what the page holds and `meta.has_more` says whether a page follows.
         - name: with_summary
           in: query
           schema: {type: boolean}
@@ -55,6 +63,7 @@ paths:
                       last_page: {type: integer}
                       per_page: {type: integer}
                       total: {type: integer}
+                      has_more: {type: boolean, description: Only with count=0.}
         "401": {$ref: "#/components/responses/Unauthenticated"}
     post:
       tags: [Transactions]
@@ -68,6 +77,129 @@ paths:
         "201": {$ref: "#/components/responses/Data"}
         "401": {$ref: "#/components/responses/Unauthenticated"}
         "403": {$ref: "#/components/responses/Forbidden"}
+        "409":
+          description: A transaction with this `external_id` exists from the same source; `transaction_id` is its id.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: {type: string}
+                  error: {type: string, enum: [external_id_exists]}
+                  external_source: {type: string}
+                  external_id: {type: string}
+                  transaction_id: {type: integer}
+        "422": {$ref: "#/components/responses/Validation"}
+  /spaces/{space}/transactions/bulk:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    post:
+      tags: [Transactions]
+      summary: Create many transactions
+      description: >
+        Creates up to 500 transactions in one request and one database transaction: all are
+        stored or none. An invalid one fails the request with a message naming its position.
+        Answers with the created transactions in the order sent.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [transactions]
+              properties:
+                transactions:
+                  type: array
+                  minItems: 1
+                  maxItems: 500
+                  items: {$ref: "#/components/schemas/TransactionInput"}
+      responses:
+        "201":
+          description: The created transactions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: {$ref: "#/components/schemas/Transaction"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "409":
+          description: A transaction with this `external_id` exists from the same source, in the database or earlier in the request; `transaction_id` is its id. Nothing was stored.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: {type: string}
+                  error: {type: string, enum: [external_id_exists]}
+                  external_source: {type: string}
+                  external_id: {type: string}
+                  transaction_id: {type: integer}
+        "422": {$ref: "#/components/responses/Validation"}
+  /spaces/{space}/transactions/find-similar:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    post:
+      tags: [Transactions]
+      summary: Find entered transactions that look like the given ones
+      description: >
+        For each item, the entered transactions that look like it, best first. Use it before creating transactions
+        from a statement or receipts. An item is found by money (`date`, `amount` and `currency` or `account_id`):
+        the amount must equal a payment exactly in that currency, the sign is ignored and the day may differ by
+        `date_tolerance_days`; by `external_id`, under any source; or both. Skipped transactions never match.
+        A match is a hint, not proof. Nothing is stored; it needs the same permission as creating, because it is a POST
+        with a body. The request is refused as a whole, with the number of the bad item, when an item cannot be read.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                date_tolerance_days: {type: integer, minimum: 0, maximum: 31, default: 1}
+                max_per_item: {type: integer, minimum: 1, maximum: 50, default: 5}
+                items:
+                  type: array
+                  minItems: 1
+                  maxItems: 500
+                  items:
+                    type: object
+                    properties:
+                      key: {type: string, description: "Echoed back."}
+                      external_id: {type: string}
+                      date: {type: string, format: date}
+                      amount: {type: string, description: "Exact decimal; sign ignored. Finer than the currency keeps matches nothing."}
+                      currency: {type: string, description: "Code of the amount's currency."}
+                      account_id: {type: integer, description: "Only payments on this account; gives the currency."}
+                      description: {type: string}
+      responses:
+        "200":
+          description: One entry per item, in the order sent.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        index: {type: integer}
+                        key: {type: string}
+                        matches:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              transaction: {$ref: "#/components/schemas/Transaction"}
+                              reasons:
+                                type: array
+                                items: {type: string, enum: [external_id, amount, date, account, description]}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
         "422": {$ref: "#/components/responses/Validation"}
   /spaces/{space}/transactions-summary:
     parameters: [{$ref: "#/components/parameters/Space"}]
@@ -77,6 +209,30 @@ paths:
       responses:
         "200": {$ref: "#/components/responses/Data"}
         "401": {$ref: "#/components/responses/Unauthenticated"}
+  /spaces/{space}/transactions-day-totals:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Transactions]
+      summary: What each day netted, per currency
+      description: >-
+        Income less expense per day and currency, largest first by value in the base currency. A
+        transfer counts only its fee lines, skipped transactions not at all. It covers every
+        transaction of the day, however long the list is. Takes the filters of the list; give
+        `dates`, or both `start_date` and `end_date`.
+      parameters:
+        - {name: dates, in: query, schema: {type: string}, description: "Comma separated days, YYYY-MM-DD"}
+        - {name: start_date, in: query, schema: {type: string, format: date}}
+        - {name: end_date, in: query, schema: {type: string, format: date}}
+        - {name: type, in: query, schema: {type: string, enum: [income, expense, transfer]}}
+        - {name: account_ids, in: query, schema: {type: string}, description: Comma separated ids}
+        - {name: currency, in: query, schema: {type: string}}
+        - {name: category_ids, in: query, schema: {type: string}, description: Comma separated ids}
+        - {name: tag_ids, in: query, schema: {type: string}, description: Comma separated ids}
+        - {name: q, in: query, schema: {type: string, maxLength: 200}}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "422": {$ref: "#/components/responses/Validation"}
   /spaces/{space}/transactions-pending-summary:
     parameters: [{$ref: "#/components/parameters/Space"}]
     get:
@@ -146,7 +302,35 @@ paths:
     post:
       tags: [Transactions]
       summary: Confirm a pending transaction
+      description: >
+        The body may carry `date`. The open occurrence of a recurring rule may also carry `payments` and `lines`
+        to settle the real amounts. Confirming it makes the rule's next occurrence in the same step.
       parameters: [{$ref: "#/components/parameters/Id"}]
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "422": {$ref: "#/components/responses/Validation"}
+  /spaces/{space}/transactions/reorder:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    post:
+      tags: [Transactions]
+      summary: Reorder transactions within one day
+      description: >
+        Puts the given transactions in that order on the day, oldest first.
+        The ids may be only some of the day's transactions; they trade the
+        places they hold. Every id must be a transaction of that day.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [date, ids]
+              properties:
+                date: {type: string, format: date}
+                ids: {type: array, items: {type: integer}}
       responses:
         "200": {$ref: "#/components/responses/Data"}
         "401": {$ref: "#/components/responses/Unauthenticated"}
@@ -165,4 +349,3 @@ paths:
         "403": {$ref: "#/components/responses/Forbidden"}
         "404": {$ref: "#/components/responses/NotFound"}
         "422": {$ref: "#/components/responses/Validation"}
-

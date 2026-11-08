@@ -3,14 +3,27 @@ package recurring
 
 import (
 	_ "embed"
+	"encoding/json"
 	"net/http"
 	"savvy-go/internal/httpserver/httpx"
 
-	"github.com/shopspring/decimal"
-
 	"savvy-go/internal/httpserver/httpx/dto"
+	"savvy-go/internal/ledger"
 	"savvy-go/internal/recurring"
 )
+
+// presenter maps a rule with the transaction its template makes; a template that
+// cannot be read (a stopped rule) has none.
+func presenter(r *http.Request) func(recurring.Rule) dto.Recurring {
+	templates := ledger.Templates{DB: httpx.Scope(r).DB}
+	return func(rule recurring.Rule) dto.Recurring {
+		preview, err := templates.Preview(r.Context(), rule.Template)
+		if err != nil {
+			return dto.NewRecurring(rule, nil)
+		}
+		return dto.NewRecurring(rule, &preview)
+	}
+}
 
 func index(w http.ResponseWriter, r *http.Request) {
 	list, err := httpx.Scope(r).Recurring.All(r.Context())
@@ -18,7 +31,7 @@ func index(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	httpx.WriteData(w, http.StatusOK, dto.Map(list, dto.NewRecurring))
+	httpx.WriteData(w, http.StatusOK, dto.Map(list, presenter(r)))
 }
 
 func upcoming(w http.ResponseWriter, r *http.Request) {
@@ -27,7 +40,7 @@ func upcoming(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	httpx.WriteData(w, http.StatusOK, dto.Map(list, dto.NewRecurring))
+	httpx.WriteData(w, http.StatusOK, dto.Map(list, presenter(r)))
 }
 
 func store(w http.ResponseWriter, r *http.Request) {
@@ -40,7 +53,7 @@ func store(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, 422, err.Error())
 		return
 	}
-	httpx.WriteData(w, http.StatusCreated, dto.NewRecurring(*rec))
+	httpx.WriteData(w, http.StatusCreated, presenter(r)(*rec))
 }
 
 func show(w http.ResponseWriter, r *http.Request) {
@@ -48,7 +61,7 @@ func show(w http.ResponseWriter, r *http.Request) {
 	if rec == nil {
 		return
 	}
-	httpx.WriteData(w, http.StatusOK, dto.NewRecurring(*rec))
+	httpx.WriteData(w, http.StatusOK, presenter(r)(*rec))
 }
 
 func update(w http.ResponseWriter, r *http.Request) {
@@ -65,7 +78,7 @@ func update(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, 422, err.Error())
 		return
 	}
-	httpx.WriteData(w, http.StatusOK, dto.NewRecurring(*rec))
+	httpx.WriteData(w, http.StatusOK, presenter(r)(*rec))
 }
 
 func destroy(w http.ResponseWriter, r *http.Request) {
@@ -80,54 +93,40 @@ func destroy(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func param(w http.ResponseWriter, r *http.Request) *recurring.Recurring {
+func param(w http.ResponseWriter, r *http.Request) *recurring.Rule {
 	return httpx.Lookup(w, r, httpx.Scope(r).Recurring.ByID)
 }
 
-// decodeRecurring reads a recurring template from the body. On update, base
-// is the stored template: fields the body leaves out keep its values, and an
-// explicit null clears a nullable one.
-func decodeRecurring(w http.ResponseWriter, r *http.Request, base *recurring.Recurring) (recurring.Input, bool) {
+// decodeRecurring reads a rule from the body: template (what to create, in the
+// shape of "create transaction"), schedule (when) and is_active. On update, what
+// the body leaves out is kept.
+func decodeRecurring(w http.ResponseWriter, r *http.Request, base *recurring.Rule) (recurring.Input, bool) {
 	var body struct {
-		Type        string           `json:"type"`
-		AccountID   int64            `json:"account_id"`
-		ToAccountID *int64           `json:"to_account_id"`
-		CategoryID  *int64           `json:"category_id"`
-		Amount      decimal.Decimal  `json:"amount"`
-		ToAmount    *decimal.Decimal `json:"to_amount"`
-		IsEstimated *bool            `json:"is_estimated"`
-		Description *string          `json:"description"`
-		Frequency   string           `json:"frequency"`
-		Interval    int              `json:"interval"`
-		DayOfWeek   *int             `json:"day_of_week"`
-		DayOfMonth  *int             `json:"day_of_month"`
-		StartDate   string           `json:"start_date"`
-		EndDate     *string          `json:"end_date"`
-		IsActive    *bool            `json:"is_active"`
-		TagIDs      []int64          `json:"tag_ids"`
+		Template json.RawMessage     `json:"template"`
+		Schedule *recurring.Schedule `json:"schedule"`
+		IsActive *bool               `json:"is_active"`
 	}
-	if base != nil {
-		body.Type, body.AccountID, body.ToAccountID = base.Type, base.AccountID, httpx.Clone(base.ToAccountID)
-		body.CategoryID, body.Amount = httpx.Clone(base.CategoryID), base.Amount.Decimal()
-		if base.ToAmount != nil {
-			toAmount := base.ToAmount.Decimal()
-			body.ToAmount = &toAmount
-		}
-		body.IsEstimated, body.Description = httpx.Clone(&base.IsEstimated), httpx.Clone(base.Description)
-		body.Frequency, body.Interval = base.Frequency, base.Interval
-		body.DayOfWeek, body.DayOfMonth = httpx.Clone(base.DayOfWeek), httpx.Clone(base.DayOfMonth)
-		body.StartDate, body.EndDate, body.IsActive = base.StartDate, httpx.Clone(base.EndDate), httpx.Clone(&base.IsActive)
-	}
-	sent, ok := httpx.DecodeSent(w, r, &body, "type")
-	if !ok {
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&body); err != nil {
+		httpx.WriteMessage(w, 422, "The given data was invalid: "+err.Error())
 		return recurring.Input{}, false
 	}
-	_, hasTags := sent["tag_ids"]
-	return recurring.Input{
-		Type: body.Type, AccountID: body.AccountID, ToAccountID: body.ToAccountID,
-		CategoryID: body.CategoryID, Amount: body.Amount, ToAmount: body.ToAmount,
-		IsEstimated: body.IsEstimated, Description: body.Description, Frequency: body.Frequency, Interval: body.Interval,
-		DayOfWeek: body.DayOfWeek, DayOfMonth: body.DayOfMonth, StartDate: body.StartDate,
-		EndDate: body.EndDate, IsActive: body.IsActive, TagIDs: body.TagIDs, HasTagIDs: hasTags,
-	}, true
+	in := recurring.Input{Template: body.Template, IsActive: body.IsActive}
+	if body.Schedule != nil {
+		in.Schedule = *body.Schedule
+	}
+	if base != nil {
+		if in.Template == nil {
+			in.Template = base.Template
+		}
+		if body.Schedule == nil {
+			in.Schedule = base.Schedule
+		}
+	}
+	if in.Template == nil {
+		httpx.WriteValidation(w, map[string][]string{"template": {"The template field is required."}})
+		return recurring.Input{}, false
+	}
+	return in, true
 }

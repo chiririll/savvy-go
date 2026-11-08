@@ -24,6 +24,8 @@ export interface SpaceMember {
     email: string
     role: SpaceRole
     createdAt: string | null
+    /** When the member last used the app or an API token; null if never. */
+    lastActiveAt: string | null
 }
 
 export interface SpaceInvitation {
@@ -155,6 +157,10 @@ export interface SyncPlan extends SyncChange {
 export const TRANSFER_REVIEWS = ['created_remote', 'deleted_remote', 'changed_remote', 'missing_remote'] as const
 export type TransferReview = (typeof TRANSFER_REVIEWS)[number]
 
+/** `space_transfers.status`: a transfer in review waits for the owner to pick a side. */
+export const TRANSFER_STATUSES = ['confirmed', 'in_review'] as const
+export type TransferStatus = (typeof TRANSFER_STATUSES)[number]
+
 export interface SpaceTransfer {
     uuid: string
     from: TransferSide
@@ -163,8 +169,10 @@ export interface SpaceTransfer {
     date: string
     description: string | null
     version: number
-    status: 'ok' | 'needs_attention' | 'pending'
+    status: TransferStatus
     review: TransferReview | null
+    /** Confirmed, but this space's account is gone, so there is no transaction for it. */
+    needsAttention: boolean
     /** The other space is no longer linked here. */
     frozen: boolean
     /** Signed by this server or a key it trusts. */
@@ -182,6 +190,23 @@ export interface SpaceTransferInput {
     to_amount: string
     date: string
     description?: string | null
+}
+
+/** A row of the space's change log (`GET /spaces/{id}/audit-log`). Values are open-ended: show unknown ones as they are. */
+export interface SpaceAction {
+    id: number
+    at: string
+    /** The door the change came through: ui, api, mcp, or system. */
+    source: string
+    userId: number | null
+    tokenLabel?: string
+    entityType: string
+    entityId: number | null
+    /** create, update, delete, confirm, skip, rollback, cleanup. */
+    op: string
+    /** Entries of one bulk call (seeding, MCP bulk create) share it. */
+    batchId?: string
+    details?: string
 }
 
 export interface AuditEntry {

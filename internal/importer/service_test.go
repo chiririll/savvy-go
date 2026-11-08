@@ -8,10 +8,12 @@ import (
 
 	"github.com/shopspring/decimal"
 
+	"savvy-go/internal/audit"
 	"savvy-go/internal/db/dbtest"
 	"savvy-go/internal/db/filter"
 	authrepo "savvy-go/internal/db/repo/auth"
 	"savvy-go/internal/ledger"
+	"savvy-go/internal/money"
 	"savvy-go/internal/store"
 	"savvy-go/internal/uploads"
 )
@@ -202,15 +204,17 @@ func TestExecuteCreatesConfirmedTransactionsAccountCurrency(t *testing.T) {
 		byDesc[*tx.Description] = tx
 	}
 	coffee, salary := byDesc["Coffee"], byDesc["Salary"]
-	if coffee.Type != "expense" || coffee.Amount.Decimal().String() != "12.5" || coffee.Status != "confirmed" ||
-		coffee.AccountID != e.usdAcct.ID {
+	amount := func(tx ledger.Transaction) money.Money { m, _ := tx.Amount(); return m }
+	if coffee.Type != "expense" || amount(coffee).Decimal().String() != "12.5" || coffee.Status != "confirmed" ||
+		len(coffee.Payments) != 1 || coffee.Payments[0].AccountID != e.usdAcct.ID ||
+		len(coffee.Lines) != 1 || coffee.Lines[0].Amount.Decimal().String() != "12.5" {
 		t.Errorf("coffee %+v", coffee)
 	}
-	if salary.Type != "income" || salary.Amount.Decimal().String() != "2000" {
+	if salary.Type != "income" || amount(salary).Decimal().String() != "2000" {
 		t.Errorf("salary %+v", salary)
 	}
-	if byDesc["Gum"].Amount.Minor() != 99 {
-		t.Errorf("gum is 99 cents: %d", byDesc["Gum"].Amount.Minor())
+	if amount(byDesc["Gum"]).Minor() != 99 {
+		t.Errorf("gum is 99 cents: %d", amount(byDesc["Gum"]).Minor())
 	}
 }
 
@@ -243,7 +247,8 @@ func TestDifferentAmountsBelowCentNotDuplicates(t *testing.T) {
 	}
 	var total decimal.Decimal
 	for _, tx := range e.transactions(t) {
-		total = total.Add(tx.Amount.Decimal())
+		amount, _ := tx.Amount()
+		total = total.Add(amount.Decimal())
 	}
 	if !total.Equal(dec("2.005004")) {
 		t.Errorf("total %s", total)
@@ -326,7 +331,7 @@ func TestExecuteResolvesCategoriesByUsersChoices(t *testing.T) {
 	}
 	got := map[string]*int64{}
 	for _, tx := range e.transactions(t) {
-		got[*tx.Description] = tx.CategoryID
+		got[*tx.Description] = tx.Lines[0].CategoryID
 	}
 	if got["a"] == nil || *got["a"] != food.ID {
 		t.Errorf("food: %v", got["a"])
@@ -444,5 +449,28 @@ func TestParseImportTypeMappingHelpers(t *testing.T) {
 	}
 	if ptrIfSet("") != nil || *ptrIfSet("x") != "x" {
 		t.Error("ptrIfSet")
+	}
+}
+
+// An import is one entry of the audit log, not one per transaction; a file
+// whose rows are all duplicates writes none.
+func TestImportIsOneAuditEntry(t *testing.T) {
+	e := newEnv(t)
+	im := e.parsed(t, "Date,Amount,Description\n2024-01-01,-12.50,Coffee\n2024-01-02,2000,Salary\n")
+	e.run(t, im, e.usdAcct.ID, nil)
+
+	log := audit.Log{DB: e.space}
+	entries, err := log.List(e.ctx, audit.Filter{}, 10)
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("entries = %v, %v; want 1", entries, err)
+	}
+	en := entries[0]
+	if en.EntityType != EntityImport || en.EntityID != nil || en.Source != audit.SourceSystem || en.Op != audit.OpCreate ||
+		!strings.Contains(en.Details, "2 created") || !strings.Contains(string(en.After), `"created":2`) {
+		t.Errorf("entry %+v", en)
+	}
+	e.run(t, e.parsed(t, "Date,Amount,Description\n2024-01-01,-12.50,Coffee\n"), e.usdAcct.ID, nil)
+	if again, _ := log.List(e.ctx, audit.Filter{}, 10); len(again) != 1 {
+		t.Errorf("an import of duplicates wrote an entry: %d entries", len(again))
 	}
 }

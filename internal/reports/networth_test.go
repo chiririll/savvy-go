@@ -2,7 +2,9 @@ package reports
 
 import (
 	"testing"
+	"time"
 
+	ledgerrepo "savvy-go/internal/db/repo/ledger"
 	"savvy-go/internal/ledger"
 	"savvy-go/internal/money"
 )
@@ -170,4 +172,21 @@ func TestNetWorthHistoryStepsByPeriod(t *testing.T) {
 	for i, want := range []string{"130", "110", "110"} {
 		wantMoney(t, days.Dates[i], days.Values[i], usd(e.moneyEnv, want))
 	}
+}
+
+func TestNetWorthFollowsReconciliationPoints(t *testing.T) {
+	e := newSeriesEnv(t)
+	e.add(t, "expense", e.usdAcc.ID, &e.food.ID, "20", "2024-01-10")
+	e.add(t, "income", e.usdAcc.ID, &e.salary.ID, "55", "2024-02-10")
+	// On 01-15 the USD account really held 200 (the ledger says 80).
+	if _, err := (ledgerrepo.Repo{DB: e.db}).UpsertReconciliation(e.ctx, ledgerrepo.ReconciliationFields{
+		AccountID: e.usdAcc.ID, Date: "2024-01-15", ActualBalance: usd(e.moneyEnv, "200"),
+	}, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	f := Filter{PeriodType: "month", PeriodValue: "2024-02", CompareWith: "previous_period"}
+	got := (Service{DB: e.db}).NetWorth(e.ctx, f)
+	wantMoney(t, "now", got.Current, usd(e.moneyEnv, "285")) // 200 + 55 + 30 (yen)
+	wantMoney(t, "before", *got.Previous, usd(e.moneyEnv, "230"))
+	wantMoney(t, "change", got.Change, usd(e.moneyEnv, "55")) // the payment after the point counts
 }

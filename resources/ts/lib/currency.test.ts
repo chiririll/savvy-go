@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { Currency } from '@/types'
 import { useCurrenciesStore } from '@/stores/currencies'
-import { formatCurrency, formatCurrencyCompact } from './currency'
+import { formatBalanceShort, formatCurrency, formatCurrencyCompact } from './currency'
 
 // The real i18n module pulls in the language detector and every locale bundle.
 const app = vi.hoisted(() => ({ locale: 'en-US' }))
@@ -78,5 +78,24 @@ describe('formatCurrencyCompact', () => {
 
     it('still honours showSymbol', () => {
         expect(formatCurrencyCompact(1500, 'USD', { showSymbol: false })).toBe('1.5K')
+    })
+})
+
+describe('formatBalanceShort', () => {
+    it('shows a small balance in full, without the symbol', () => {
+        expect(formatBalanceShort(947.6, 'USD')).toBe('947.60')
+        expect(formatBalanceShort(-12.5, 'USD')).toBe('-12.50')
+        expect(formatBalanceShort(9999, 'JPY')).toBe('9,999')
+    })
+
+    it('shortens from ten thousand up', () => {
+        expect(formatBalanceShort(10_000, 'USD')).toBe('10K')
+        expect(formatBalanceShort(123_456, 'USD')).toBe('123.5K')
+        expect(formatBalanceShort(-2_500_000, 'USD')).toBe('-2.5M')
+    })
+
+    it('follows the language', () => {
+        app.locale = 'ru-RU'
+        expect(formatBalanceShort(100_000, 'USD')).toMatch(/^100\s?тыс\./)
     })
 })

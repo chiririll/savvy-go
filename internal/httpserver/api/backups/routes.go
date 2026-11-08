@@ -7,8 +7,8 @@ import (
 
 	"savvy-go/internal/appconfig"
 	"savvy-go/internal/auth"
+	"savvy-go/internal/auth/firstrun"
 	"savvy-go/internal/backup"
-	"savvy-go/internal/firstrun"
 	"savvy-go/internal/httpserver/httpx/guard"
 	"savvy-go/internal/httpserver/httpx/routing"
 	"savvy-go/internal/httpserver/ui"

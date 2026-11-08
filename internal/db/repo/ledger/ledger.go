@@ -192,18 +192,18 @@ func (r Repo) SetBaseCurrency(ctx context.Context, id int64, now time.Time) erro
 
 // Accounts
 
-// Account is an account with its currency; amounts are in that currency.
+// Account is an account with its currency; amounts are in that currency. A
+// debt or space account is a service account (IsService): pickers and net
+// worth leave it out. The data of a debt is in Debt.
 type Account struct {
-	ID                     int64
-	Name, Type             string
-	Currency               Currency
-	InitialBalance         money.Money
-	IsActive, IsPaidOff    bool
-	SortOrder              int
-	DebtType, DueDate      *string
-	TargetAmount           *money.Money
-	Counterparty, DebtDesc *string
-	CreatedAt              *time.Time
+	ID             int64
+	Name, Type     string
+	IsService      bool
+	Currency       Currency
+	InitialBalance money.Money
+	IsActive       bool
+	SortOrder      int
+	CreatedAt      *time.Time
 }
 
 type accountRow = sqlc.ListAccountsRow
@@ -211,26 +211,22 @@ type accountRow = sqlc.ListAccountsRow
 func accountOf(x accountRow) Account {
 	cur := currencyOf(x.CurrencyIDJoin, x.Code, x.CurrencyName, x.Symbol, x.Decimals, x.IsBase, x.Rate)
 	return Account{
-		ID: x.ID, Name: x.Name, Type: x.Type, Currency: cur,
+		ID: x.ID, Name: x.Name, Type: x.Type, IsService: x.IsService.Int64 != 0, Currency: cur,
 		InitialBalance: money.New(x.InitialBalance, cur.Unit()),
-		IsActive:       x.IsActive != 0, IsPaidOff: x.IsPaidOff != 0, SortOrder: int(x.SortOrder),
-		DebtType: optString(x.DebtType), DueDate: optString(x.DueDate),
-		TargetAmount: MoneyFromNull(x.TargetAmount, cur.Unit()),
-		Counterparty: optString(x.Counterparty), DebtDesc: optString(x.DebtDescription),
-		CreatedAt: optTime(x.CreatedAt),
+		IsActive:       x.IsActive != 0, SortOrder: int(x.SortOrder), CreatedAt: optTime(x.CreatedAt),
 	}
 }
 
 // MoneyFromNull reads a nullable stored amount; nil when NULL.
 func MoneyFromNull(v db.NInt, unit money.Unit) *money.Money { return db.MoneyFromNull(v, unit) }
 
-// AccountFilter narrows Accounts; the zero value lists all.
-type AccountFilter struct{ OnlyActive, ExcludeDebts, OnlyDebts, UnpaidOnly bool }
+// AccountFilter narrows Accounts; the zero value lists all. ExcludeService
+// leaves out debt and space accounts, ExcludeSpace only the space accounts.
+type AccountFilter struct{ OnlyActive, ExcludeService, ExcludeSpace bool }
 
 func (r Repo) Accounts(ctx context.Context, f AccountFilter) ([]Account, error) {
 	rows, err := r.q().ListAccounts(ctx, sqlc.ListAccountsParams{
-		OnlyActive: db.Flag(f.OnlyActive), ExcludeDebts: db.Flag(f.ExcludeDebts),
-		OnlyDebts: db.Flag(f.OnlyDebts), UnpaidOnly: db.Flag(f.UnpaidOnly),
+		OnlyActive: db.Flag(f.OnlyActive), ExcludeService: db.Flag(f.ExcludeService), ExcludeSpace: db.Flag(f.ExcludeSpace),
 	})
 	if err != nil {
 		return nil, err
@@ -252,31 +248,35 @@ func (r Repo) Account(ctx context.Context, id int64) (*Account, error) {
 	return &a, nil
 }
 
+// SpaceAccountID is the id of the account of type space for a currency; nil
+// when none has been made yet.
+func (r Repo) SpaceAccountID(ctx context.Context, currencyID int64) (*int64, error) {
+	id, err := r.q().GetSpaceAccountID(ctx, currencyID)
+	if err != nil {
+		return nilIfMissing[int64](err)
+	}
+	return &id, nil
+}
+
 // AccountFields is the writable part of an account; amounts are already in
 // the account currency.
 type AccountFields struct {
-	Name, Type             string
-	CurrencyID             int64
-	InitialBalance         money.Money
-	TargetAmount           *money.Money
-	DueDate, DebtType      *string
-	Counterparty, DebtDesc *string
-	IsActive, IsPaidOff    bool
-	SortOrder              int64 // insert only
+	Name, Type     string
+	CurrencyID     int64
+	InitialBalance money.Money
+	IsActive       bool
+	SortOrder      int64 // insert only
 }
 
+// NextAccountSortOrder is the next place at the end of the debts (debt) or of
+// the other accounts.
 func (r Repo) NextAccountSortOrder(ctx context.Context, debt bool) (int64, error) {
 	return r.q().NextAccountSortOrder(ctx, db.Flag(debt))
 }
 
 func (r Repo) InsertAccount(ctx context.Context, a AccountFields, now time.Time) (int64, error) {
 	res, err := r.q().InsertAccount(ctx, sqlc.InsertAccountParams{
-		Name: a.Name, Type: a.Type, DebtType: db.NullString(a.DebtType), CurrencyID: a.CurrencyID,
-		InitialBalance: a.InitialBalance.Minor(), TargetAmount: db.NullMoney(a.TargetAmount),
-		DueDate: db.NullString(a.DueDate),
-		IsPaidOff: db.BoolInt(
-			a.IsPaidOff,
-		), Counterparty: db.NullString(a.Counterparty), DebtDescription: db.NullString(a.DebtDesc),
+		Name: a.Name, Type: a.Type, CurrencyID: a.CurrencyID, InitialBalance: a.InitialBalance.Minor(),
 		IsActive: db.BoolInt(a.IsActive), SortOrder: a.SortOrder, CreatedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now),
 	})
 	if err != nil {
@@ -288,15 +288,14 @@ func (r Repo) InsertAccount(ctx context.Context, a AccountFields, now time.Time)
 func (r Repo) UpdateAccount(ctx context.Context, id int64, a AccountFields, now time.Time) error {
 	return r.q().UpdateAccount(ctx, sqlc.UpdateAccountParams{
 		Name: a.Name, Type: a.Type, CurrencyID: a.CurrencyID, InitialBalance: a.InitialBalance.Minor(),
-		IsActive: db.BoolInt(a.IsActive), DebtType: db.NullString(a.DebtType), TargetAmount: db.NullMoney(a.TargetAmount),
-		DueDate: db.NullString(a.DueDate), IsPaidOff: db.BoolInt(a.IsPaidOff), Counterparty: db.NullString(a.Counterparty),
-		DebtDescription: db.NullString(a.DebtDesc), UpdatedAt: db.TimeNS(now), ID: id,
+		IsActive: db.BoolInt(a.IsActive), UpdatedAt: db.TimeNS(now), ID: id,
 	})
 }
 
-// CountAccountTransactions counts the transactions that touch an account.
-func (r Repo) CountAccountTransactions(ctx context.Context, id int64) int64 {
-	n, _ := r.q().CountAccountTransactions(ctx, sqlc.CountAccountTransactionsParams{AccountID: id, ToAccountID: db.NI(id)})
+// CountAccountPayments counts the payments on an account, i.e. the
+// transactions that moved its money.
+func (r Repo) CountAccountPayments(ctx context.Context, id int64) int64 {
+	n, _ := r.q().CountAccountPayments(ctx, id)
 	return n
 }
 
@@ -331,10 +330,18 @@ type DayChange struct {
 	Delta int64
 }
 
-// DailyChanges is the account's net change per day up to asOf ("" for all),
-// oldest first.
+// DailyChanges is the net change of the account's payments per day up to asOf
+// ("" for all), oldest first. Add InitialBalance for a balance.
 func (r Repo) DailyChanges(ctx context.Context, id int64, asOf string) ([]DayChange, error) {
-	rows, err := r.q().AccountDailyDeltas(ctx, sqlc.AccountDailyDeltasParams{ID: id, AsOf: db.Narg(asOf)})
+	return r.DailyChangesBetween(ctx, id, "", asOf)
+}
+
+// DailyChangesBetween is DailyChanges for the days after `after` (that day
+// excluded, "" for no lower bound) up to and including asOf ("" for no upper).
+func (r Repo) DailyChangesBetween(ctx context.Context, id int64, after, asOf string) ([]DayChange, error) {
+	rows, err := r.q().AccountDailyDeltas(ctx, sqlc.AccountDailyDeltasParams{
+		ID: id, AsOf: db.Narg(asOf), After: db.Narg(after),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -345,30 +352,15 @@ func (r Repo) DailyChanges(ctx context.Context, id int64, asOf string) ([]DayCha
 	return out, nil
 }
 
-// Debts
-
-// DebtPaid is how much has been paid into a debt, in minor units of its currency.
-func (r Repo) DebtPaid(ctx context.Context, debtID int64) (int64, error) {
-	return r.q().SumDebtPayments(ctx, db.NI(debtID))
+// DeltaSum is the sum of DailyChanges: what the account's payments add up to
+// up to asOf ("" for all), in one row.
+func (r Repo) DeltaSum(ctx context.Context, id int64, asOf string) (int64, error) {
+	return r.DeltaSumBetween(ctx, id, "", asOf)
 }
 
-func (r Repo) MarkPaidOff(ctx context.Context, id int64) error {
-	return r.q().MarkAccountPaidOff(ctx, id)
-}
-
-func (r Repo) Reopen(ctx context.Context, id int64, now time.Time) error {
-	return r.q().ReopenAccount(ctx, sqlc.ReopenAccountParams{UpdatedAt: db.TimeNS(now), ID: id})
-}
-
-func (r Repo) CountDebtHistory(ctx context.Context, id int64) int64 {
-	n, _ := r.q().CountDebtHistory(ctx, db.NI(id))
-	return n
-}
-
-// DeleteDebt removes a debt account and the transaction that issued it.
-func (r Repo) DeleteDebt(ctx context.Context, id int64) error {
-	_ = r.q().DeleteDebtIssuance(ctx, db.NI(id))
-	return r.q().DeleteDebtAccount(ctx, id)
+// DeltaSumBetween is the sum of DailyChangesBetween, in one row.
+func (r Repo) DeltaSumBetween(ctx context.Context, id int64, after, asOf string) (int64, error) {
+	return r.q().AccountDeltaSum(ctx, sqlc.AccountDeltaSumParams{ID: id, AsOf: db.Narg(asOf), After: db.Narg(after)})
 }
 
 // Categories

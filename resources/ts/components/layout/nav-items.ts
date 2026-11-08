@@ -15,6 +15,7 @@ import {
     Shield,
     Upload,
     Database,
+    History,
     LucideIcon,
     Activity,
     KeyRound,
@@ -55,6 +56,7 @@ export const spaceItems: MenuItem[] = [
     { to: '/currencies', icon: Coins, labelKey: 'currencies' },
     { to: '/automation', icon: Zap, labelKey: 'automation' },
     { to: '/settings/import', icon: Upload, labelKey: 'import' },
+    { to: '/settings/actions', icon: History, labelKey: 'recentActions' },
     { to: '/settings/backups', icon: Database, labelKey: 'backups', spaceAdminOnly: true },
     { to: '/settings/space', icon: SlidersHorizontal, labelKey: 'settings' },
 ]

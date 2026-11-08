@@ -1,570 +1,383 @@
 package recurring
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"testing"
-
-	"github.com/shopspring/decimal"
+	"time"
 
 	"savvy-go/internal/db/dbtest"
-	"savvy-go/internal/ledger"
+	ledgerrepo "savvy-go/internal/db/repo/ledger"
+	"savvy-go/internal/store"
 )
 
-func ptr[T any](v T) *T { return &v }
+// fakeLedger makes the pending transactions of templates the way internal/ledger
+// will: one transaction row dated with the due date. A template that contains
+// "broken" does not validate.
+type fakeLedger struct{ d store.DB }
 
-func dec(s string) decimal.Decimal { return decimal.RequireFromString(s) }
-
-func TestNextRunDate(t *testing.T) {
-	tests := []struct {
-		name string
-		rec  Recurring
-		want string
-	}{
-		{"daily", Recurring{Frequency: "daily", Interval: 1, NextRunDate: "2024-02-28"}, "2024-02-29"},
-		{"daily crosses a year end", Recurring{Frequency: "daily", Interval: 3, NextRunDate: "2023-12-30"}, "2024-01-02"},
-		{"weekly keeps the weekday", Recurring{Frequency: "weekly", Interval: 2, NextRunDate: "2024-01-01"}, "2024-01-15"},
-		{
-			"weekly moves to the chosen weekday",
-			Recurring{Frequency: "weekly", Interval: 1, DayOfWeek: ptr(5), NextRunDate: "2024-01-01"},
-			"2024-01-12",
-		},
-		{
-			"weekly on the same weekday",
-			Recurring{Frequency: "weekly", Interval: 1, DayOfWeek: ptr(1), NextRunDate: "2024-01-01"},
-			"2024-01-08",
-		},
-		{"monthly", Recurring{Frequency: "monthly", Interval: 1, NextRunDate: "2024-01-15"}, "2024-02-15"},
-		{
-			"monthly clamps to a short month",
-			Recurring{Frequency: "monthly", Interval: 1, DayOfMonth: ptr(31), NextRunDate: "2024-01-31"},
-			"2024-02-29",
-		},
-		{
-			"monthly returns to the day after a short month",
-			Recurring{Frequency: "monthly", Interval: 1, DayOfMonth: ptr(31), NextRunDate: "2024-02-29"},
-			"2024-03-31",
-		},
-		{
-			"monthly interval over a year end",
-			Recurring{Frequency: "monthly", Interval: 3, NextRunDate: "2024-11-10"},
-			"2025-02-10",
-		},
-		{"yearly", Recurring{Frequency: "yearly", Interval: 1, NextRunDate: "2023-06-01"}, "2024-06-01"},
-		{
-			"interval below one counts as one",
-			Recurring{Frequency: "daily", Interval: 0, NextRunDate: "2024-01-01"},
-			"2024-01-02",
-		},
-		{
-			"unknown frequency steps by days",
-			Recurring{Frequency: "fortnightly", Interval: 2, NextRunDate: "2024-01-01"},
-			"2024-01-03",
-		},
-		{
-			"a timestamp is cut to its date",
-			Recurring{Frequency: "daily", Interval: 1, NextRunDate: "2024-01-01T10:00:00Z"},
-			"2024-01-02",
-		},
-		{"an unreadable date is left alone", Recurring{Frequency: "daily", Interval: 1, NextRunDate: "soon"}, "soon"},
+func (f fakeLedger) Validate(_ context.Context, template json.RawMessage) error {
+	if bytes.Contains(template, []byte("broken")) {
+		return errors.New("the account does not exist")
 	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := tc.rec.calculateNextRunDate(); got != tc.want {
-				t.Errorf("next run = %s, want %s", got, tc.want)
-			}
-		})
-	}
+	return nil
 }
 
-func TestWithinSchedule(t *testing.T) {
-	tests := []struct {
-		name string
-		rec  Recurring
-		want bool
-	}{
-		{"active without an end", Recurring{IsActive: true, NextRunDate: "2030-01-01"}, true},
-		{"active with an empty end", Recurring{IsActive: true, NextRunDate: "2030-01-01", EndDate: ptr("")}, true},
-		{"inactive", Recurring{IsActive: false, NextRunDate: "2024-01-01"}, false},
-		{"on the end date", Recurring{IsActive: true, NextRunDate: "2024-03-01", EndDate: ptr("2024-03-01")}, true},
-		{"past the end date", Recurring{IsActive: true, NextRunDate: "2024-03-02", EndDate: ptr("2024-03-01")}, false},
-	}
-	for _, tc := range tests {
-		if got := tc.rec.withinSchedule(); got != tc.want {
-			t.Errorf("%s: withinSchedule = %v, want %v", tc.name, got, tc.want)
-		}
-	}
+func (f fakeLedger) Create(ctx context.Context, template json.RawMessage, due string) (int64, error) {
+	desc := string(template)
+	return ledgerrepo.Repo{DB: f.d}.InsertTransaction(ctx,
+		ledgerrepo.TxFields{Type: "expense", Status: "pending", Description: &desc, Date: &due}, time.Now().UTC())
+}
+
+func (f fakeLedger) Replan(ctx context.Context, txID int64, template json.RawMessage, due string) error {
+	desc := string(template)
+	return ledgerrepo.Repo{DB: f.d}.UpdateTransaction(ctx, txID,
+		ledgerrepo.TxFields{Type: "expense", Description: &desc, Date: &due}, time.Now().UTC())
 }
 
 type env struct {
-	ctx      context.Context
-	svc      Service
-	usd, eur ledger.Currency
-	usdAcct  ledger.Account
-	usdAcct2 ledger.Account
-	eurAcct  ledger.Account
+	ctx    context.Context
+	svc    Service
+	ledger ledgerrepo.Repo
 }
 
 func newEnv(t *testing.T) *env {
 	t.Helper()
 	d := dbtest.Space(t)
-	ctx := context.Background()
-	curs := ledger.Currencies{DB: d}
-	mk := func(code, rate string) ledger.Currency {
-		c, err := curs.Create(ctx, ledger.Currency{Code: code, Name: code, Symbol: code, Decimals: 2, Rate: dec(rate)})
-		if err != nil {
-			t.Fatal(err)
-		}
-		return *c
+	return &env{
+		ctx: context.Background(), ledger: ledgerrepo.Repo{DB: d},
+		svc: Service{DB: d, Ledger: func(h store.DB) Occurrences { return fakeLedger{h} }},
 	}
-	e := &env{ctx: ctx, svc: Service{DB: d, Txs: ledger.Transactions{DB: d}}}
-	e.usd, e.eur = mk("USD", "1"), mk("EUR", "2")
-	accts := ledger.Accounts{DB: d}
-	acct := func(name string, c ledger.Currency) ledger.Account {
-		a, err := accts.Create(ctx, ledger.AccountInput{Name: name, Type: "cash", CurrencyID: c.ID, IsActive: true})
-		if err != nil {
-			t.Fatal(err)
-		}
-		return *a
-	}
-	e.usdAcct, e.usdAcct2, e.eurAcct = acct("usd", e.usd), acct("usd2", e.usd), acct("eur", e.eur)
-	return e
 }
 
-func (e *env) create(t *testing.T, in Input) *Recurring {
+func monthly(start string) Schedule {
+	return Schedule{Frequency: "monthly", Interval: 1, Start: start}
+}
+
+func (e *env) create(t *testing.T, template string, s Schedule) *Rule {
 	t.Helper()
-	rec, err := e.svc.Create(e.ctx, in)
+	r, err := e.svc.Create(e.ctx, Input{Template: json.RawMessage(template), Schedule: s})
 	if err != nil {
 		t.Fatal(err)
 	}
-	return rec
+	return r
 }
 
-// pending lists the pending occurrences of a template.
-func (e *env) pending(t *testing.T, recurringID int64) []int64 {
+// pending is the open occurrence of a rule: its due date and transaction.
+func (e *env) pending(t *testing.T, rule int64) (string, *ledgerrepo.Tx) {
 	t.Helper()
-	rows, err := e.svc.DB.QueryContext(
-		e.ctx,
-		`SELECT id FROM transactions WHERE recurring_transaction_id = ? AND status = 'pending' ORDER BY id`,
-		recurringID,
-	)
+	p, err := e.svc.repo(e.svc.DB).Pending(e.ctx, rule)
+	if err != nil || p == nil {
+		t.Fatalf("pending of rule %d = %v, %v", rule, p, err)
+	}
+	tx, _ := e.ledger.Transaction(e.ctx, *p.TransactionID)
+	return p.DueDate, tx
+}
+
+func (e *env) noPending(t *testing.T, rule int64) {
+	t.Helper()
+	if p, _ := e.svc.repo(e.svc.DB).Pending(e.ctx, rule); p != nil {
+		t.Fatalf("rule %d has a pending occurrence: %+v", rule, p)
+	}
+}
+
+// settle confirms or skips the pending occurrence of a rule, then advances,
+// as the ledger does in one database transaction.
+func (e *env) settle(t *testing.T, rule int64, skip bool) {
+	t.Helper()
+	_, tx := e.pending(t, rule)
+	err := store.Tx(e.ctx, e.svc.DB, func(d store.DB) error {
+		l := ledgerrepo.Repo{DB: d}
+		var err error
+		if skip {
+			err = l.SkipTransaction(e.ctx, tx.ID, time.Now().UTC())
+		} else {
+			err = l.ConfirmTransaction(e.ctx, tx.ID, *tx.Date, time.Now().UTC())
+		}
+		if err != nil {
+			return err
+		}
+		return e.svc.AdvanceAfterOccurrence(e.ctx, d, rule)
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer rows.Close()
-	var ids []int64
-	for rows.Next() {
-		var id int64
-		if err := rows.Scan(&id); err != nil {
-			t.Fatal(err)
-		}
-		ids = append(ids, id)
-	}
-	return ids
-}
-
-func (e *env) tx(t *testing.T, id int64) *ledger.Transaction {
-	t.Helper()
-	tx, err := e.svc.Txs.ByID(e.ctx, id)
-	if err != nil || tx == nil {
-		t.Fatalf("transaction %d: %v", id, err)
-	}
-	return tx
 }
 
 func TestCreateOpensPendingOccurrenceAtStart(t *testing.T) {
 	e := newEnv(t)
-	rec := e.create(
-		t,
-		Input{
-			Type:        "expense",
-			AccountID:   e.usdAcct.ID,
-			Amount:      dec("12.50"),
-			Frequency:   "monthly",
-			StartDate:   "2024-01-15",
-			Description: ptr("rent"),
-		},
-	)
-	if !rec.IsActive || rec.Interval != 1 || rec.NextRunDate != "2024-01-15" {
-		t.Errorf("defaults %+v", rec)
+	r := e.create(t, `{"type":"expense"}`, monthly("2026-01-15"))
+	due, tx := e.pending(t, r.ID)
+	if due != "2026-01-15" || tx.Date == nil || *tx.Date != "2026-01-15" || tx.Status != "pending" {
+		t.Fatalf("occurrence = %s %+v", due, tx)
 	}
-	ids := e.pending(t, rec.ID)
-	if len(ids) != 1 {
-		t.Fatalf("pending occurrences %v, want one", ids)
-	}
-	tx := e.tx(t, ids[0])
-	if tx.Amount.Decimal().String() != "12.5" || *tx.Date != "2024-01-15" || *tx.Description != "rent" ||
-		tx.Status != "pending" {
-		t.Errorf("occurrence %+v", tx)
+	if r.NextRunDate == nil || *r.NextRunDate != "2026-01-15" || r.LastRunDate != nil || !r.IsActive || r.Error != nil {
+		t.Fatalf("rule = %+v", r)
 	}
 }
 
-func TestCreateInactivePastEndOpensNothing(t *testing.T) {
+func TestConfirmAndSkipCreateTheNextOccurrence(t *testing.T) {
 	e := newEnv(t)
-	inactive := e.create(
-		t,
-		Input{
-			Type:      "expense",
-			AccountID: e.usdAcct.ID,
-			Amount:    dec("1"),
-			Frequency: "daily",
-			StartDate: "2024-01-15",
-			IsActive:  ptr(false),
-		},
-	)
-	ended := e.create(
-		t,
-		Input{
-			Type:      "expense",
-			AccountID: e.usdAcct.ID,
-			Amount:    dec("1"),
-			Frequency: "daily",
-			StartDate: "2024-01-15",
-			EndDate:   ptr("2024-01-01"),
-		},
-	)
-	for _, rec := range []*Recurring{inactive, ended} {
-		if ids := e.pending(t, rec.ID); len(ids) != 0 {
-			t.Errorf("template %d opened %v", rec.ID, ids)
+	r := e.create(t, `{"type":"expense"}`, monthly("2026-01-15"))
+
+	e.settle(t, r.ID, false)
+	if due, _ := e.pending(t, r.ID); due != "2026-02-15" {
+		t.Fatalf("after confirming, next = %s", due)
+	}
+	e.settle(t, r.ID, true)
+	if due, _ := e.pending(t, r.ID); due != "2026-03-15" {
+		t.Fatalf("after skipping, next = %s", due)
+	}
+	got, _ := e.svc.ByID(e.ctx, r.ID)
+	if got.LastRunDate == nil || *got.LastRunDate != "2026-01-15" || *got.NextRunDate != "2026-03-15" {
+		t.Fatalf("rule = last %v next %v, want the confirmed 2026-01-15 and the open 2026-03-15",
+			got.LastRunDate, got.NextRunDate)
+	}
+	// Advancing again, as a crash recovery or a double call, makes no second occurrence.
+	if err := e.svc.AdvanceAfterOccurrence(e.ctx, e.svc.DB, r.ID); err != nil {
+		t.Fatal(err)
+	}
+	if inst, _ := e.svc.repo(e.svc.DB).Instances(e.ctx, r.ID); len(inst) != 3 {
+		t.Fatalf("instances = %+v", inst)
+	}
+}
+
+func TestADeletedOccurrenceIsNotGeneratedAgain(t *testing.T) {
+	e := newEnv(t)
+	r := e.create(t, `{"type":"expense"}`, monthly("2026-01-15"))
+	e.settle(t, r.ID, false)
+	_, tx := e.pending(t, r.ID) // 2026-02-15
+
+	// Deleting the pending occurrence acts like a skip: the ledger deletes it and advances.
+	err := store.Tx(e.ctx, e.svc.DB, func(d store.DB) error {
+		if err := (ledgerrepo.Repo{DB: d}).DeleteTransaction(e.ctx, tx.ID); err != nil {
+			return err
 		}
+		return e.svc.AdvanceAfterOccurrence(e.ctx, d, r.ID)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if due, _ := e.pending(t, r.ID); due != "2026-03-15" {
+		t.Fatalf("next after deleting 2026-02-15 = %s", due)
+	}
+
+	// The job finds nothing to make, and the deleted date stays handled.
+	if err := e.svc.EnsureUpcoming(e.ctx); err != nil {
+		t.Fatal(err)
+	}
+	inst, _ := e.svc.repo(e.svc.DB).Instances(e.ctx, r.ID)
+	if len(inst) != 3 || inst[1].DueDate != "2026-02-15" || inst[1].TransactionID != nil {
+		t.Fatalf("instances = %+v", inst)
 	}
 }
 
-func TestEstimatedFlagReachesTheOccurrence(t *testing.T) {
+func TestTheScheduleEndsTheSeries(t *testing.T) {
 	e := newEnv(t)
-	rec := e.create(
-		t,
-		Input{
-			Type:        "expense",
-			AccountID:   e.usdAcct.ID,
-			Amount:      dec("5"),
-			Frequency:   "monthly",
-			StartDate:   "2024-01-15",
-			IsEstimated: ptr(true),
-		},
-	)
-	if !rec.IsEstimated || !e.tx(t, e.pending(t, rec.ID)[0]).IsEstimated {
-		t.Error("an estimated template must open estimated occurrences")
+	s := monthly("2026-01-15")
+	s.End = ptr("2026-02-20")
+	r := e.create(t, `{"type":"expense"}`, s)
+	e.settle(t, r.ID, false)
+	e.settle(t, r.ID, false) // 2026-02-15, the last one
+	e.noPending(t, r.ID)
+	if got, _ := e.svc.ByID(e.ctx, r.ID); got.NextRunDate != nil {
+		t.Fatalf("an ended rule has a next date: %v", *got.NextRunDate)
+	}
+
+	// A rule whose start is already past its end opens nothing.
+	past := monthly("2026-05-01")
+	past.End = ptr("2026-04-01")
+	if _, err := e.svc.Create(e.ctx, Input{Template: json.RawMessage(`{}`), Schedule: past}); !errors.Is(err, ErrSchedule) {
+		t.Fatalf("end before start = %v, want ErrSchedule", err)
 	}
 }
 
-func TestAdvanceMovesScheduleOpensNextOccurrence(t *testing.T) {
+func TestEnsureUpcomingRecoversAfterACrash(t *testing.T) {
 	e := newEnv(t)
-	rec := e.create(
-		t,
-		Input{
-			Type:       "expense",
-			AccountID:  e.usdAcct.ID,
-			Amount:     dec("10"),
-			Frequency:  "monthly",
-			StartDate:  "2024-01-31",
-			DayOfMonth: ptr(31),
-		},
-	)
-	first := e.pending(t, rec.ID)[0]
+	r := e.create(t, `{"type":"expense"}`, monthly("2026-01-15"))
+	off := false
+	inactive, _ := e.svc.Create(e.ctx, Input{Template: json.RawMessage(`{}`), Schedule: monthly("2026-01-15"), IsActive: &off})
+	e.noPending(t, inactive.ID)
 
-	// The scheduler confirms the open occurrence, then asks the template to advance.
-	if _, err := e.svc.Txs.Confirm(e.ctx, first, "2024-01-31", nil, nil); err != nil {
+	// The confirmation committed, the next occurrence did not.
+	_, tx := e.pending(t, r.ID)
+	if err := e.ledger.ConfirmTransaction(e.ctx, tx.ID, *tx.Date, time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
-	if err := e.svc.AdvanceAfterOccurrence(e.ctx, rec.ID); err != nil {
-		t.Fatal(err)
-	}
-	got, _ := e.svc.ByID(e.ctx, rec.ID)
-	if got.NextRunDate != "2024-02-29" || got.LastRunDate == nil {
-		t.Errorf("after advancing: next %s last %v", got.NextRunDate, got.LastRunDate)
-	}
-	ids := e.pending(t, rec.ID)
-	if len(ids) != 1 || ids[0] == first {
-		t.Fatalf("pending after advancing %v (first %d)", ids, first)
-	}
-	if date := *e.tx(t, ids[0]).Date; date != "2024-02-29" {
-		t.Errorf("next occurrence dated %s", date)
-	}
+	e.noPending(t, r.ID)
 
-	// Advancing again while an occurrence is still open must not stack a second one.
-	if err := e.svc.AdvanceAfterOccurrence(e.ctx, rec.ID); err != nil {
+	if err := e.svc.EnsureUpcoming(e.ctx); err != nil {
 		t.Fatal(err)
 	}
-	if n := len(e.pending(t, rec.ID)); n != 1 {
-		t.Errorf("%d pending occurrences, want 1", n)
+	if due, _ := e.pending(t, r.ID); due != "2026-02-15" {
+		t.Fatalf("recovered occurrence = %s", due)
+	}
+	e.noPending(t, inactive.ID)
+	// A second run changes nothing.
+	if err := e.svc.EnsureUpcoming(e.ctx); err != nil {
+		t.Fatal(err)
+	}
+	if inst, _ := e.svc.repo(e.svc.DB).Instances(e.ctx, r.ID); len(inst) != 2 {
+		t.Fatalf("instances = %+v", inst)
 	}
 }
 
-func TestAdvancePastEndDateStopsSeries(t *testing.T) {
+// The startup job stops a rule whose template or schedule was broken outside the
+// service, with the reason, before it makes anything, and goes on with the others.
+func TestEnsureUpcomingStopsBrokenRulesWithTheReason(t *testing.T) {
 	e := newEnv(t)
-	rec := e.create(
-		t,
-		Input{
-			Type:      "expense",
-			AccountID: e.usdAcct.ID,
-			Amount:    dec("10"),
-			Frequency: "daily",
-			StartDate: "2024-01-01",
-			EndDate:   ptr("2024-01-01"),
-		},
-	)
-	if _, err := e.svc.Txs.Confirm(e.ctx, e.pending(t, rec.ID)[0], "2024-01-01", nil, nil); err != nil {
-		t.Fatal(err)
-	}
-	if err := e.svc.AdvanceAfterOccurrence(e.ctx, rec.ID); err != nil {
-		t.Fatal(err)
-	}
-	if ids := e.pending(t, rec.ID); len(ids) != 0 {
-		t.Errorf("a finished series opened %v", ids)
-	}
-}
-
-func TestEnsureUpcomingHealsClosedTemplates(t *testing.T) {
-	e := newEnv(t)
-	healthy := e.create(
-		t,
-		Input{Type: "expense", AccountID: e.usdAcct.ID, Amount: dec("1"), Frequency: "daily", StartDate: "2024-01-01"},
-	)
-	lost := e.create(
-		t,
-		Input{Type: "expense", AccountID: e.usdAcct.ID, Amount: dec("2"), Frequency: "daily", StartDate: "2024-01-01"},
-	)
-	off := e.create(
-		t,
-		Input{
-			Type:      "expense",
-			AccountID: e.usdAcct.ID,
-			Amount:    dec("3"),
-			Frequency: "daily",
-			StartDate: "2024-01-01",
-			IsActive:  ptr(false),
-		},
-	)
-	if _, err := e.svc.Txs.Skip(e.ctx, e.pending(t, lost.ID)[0]); err != nil {
-		t.Fatal(err)
-	}
-	before := e.pending(t, healthy.ID)
-
-	for range 2 { // idempotent
-		if err := e.svc.EnsureUpcoming(e.ctx); err != nil {
+	good := e.create(t, `{"type":"expense"}`, monthly("2026-01-15"))
+	badTemplate := e.create(t, `{"type":"expense"}`, monthly("2026-01-15"))
+	badSchedule := e.create(t, `{"type":"expense"}`, monthly("2026-01-15"))
+	exec := func(q string, args ...any) {
+		t.Helper()
+		if _, err := e.svc.DB.ExecContext(e.ctx, q, args...); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if n := len(e.pending(t, lost.ID)); n != 1 {
-		t.Errorf("lost occurrence recreated %d times, want 1", n)
+	// Their open occurrences are gone (a restored older backup), so a job that did not stop them would make new ones.
+	for _, id := range []int64{badTemplate.ID, badSchedule.ID} {
+		exec(`DELETE FROM transactions WHERE id IN (SELECT transaction_id FROM recurring_instances WHERE recurring_transaction_id = ?)`, id)
 	}
-	if got := e.pending(t, healthy.ID); len(got) != 1 || got[0] != before[0] {
-		t.Errorf("healthy template touched: %v -> %v", before, got)
+	exec(`UPDATE recurring_transactions SET template = '{"broken":true}' WHERE id = ?`, badTemplate.ID)
+	exec(`UPDATE recurring_transactions SET schedule = '{"frequency":"hourly"}' WHERE id = ?`, badSchedule.ID)
+
+	if err := e.svc.EnsureUpcoming(e.ctx); err != nil {
+		t.Fatal(err)
 	}
-	if n := len(e.pending(t, off.ID)); n != 0 {
-		t.Errorf("inactive template opened %d", n)
+	for _, tc := range []struct {
+		rule   int64
+		reason string
+	}{{badTemplate.ID, "the account does not exist"}, {badSchedule.ID, "invalid schedule"}} {
+		got, _ := e.svc.ByID(e.ctx, tc.rule)
+		if got.IsActive || got.Error == nil || !bytes.Contains([]byte(*got.Error), []byte(tc.reason)) {
+			t.Fatalf("rule %d = active %v error %v, want stopped with %q", tc.rule, got.IsActive, got.Error, tc.reason)
+		}
+		e.noPending(t, tc.rule)
+	}
+	if got, _ := e.svc.ByID(e.ctx, good.ID); !got.IsActive || got.Error != nil {
+		t.Fatalf("the good rule was stopped: %+v", got)
+	}
+	if due, _ := e.pending(t, good.ID); due != "2026-01-15" {
+		t.Fatalf("the good rule's occurrence = %s, want it kept", due)
 	}
 }
 
-func TestUpdateReplansTheOpenOccurrence(t *testing.T) {
+func TestUpdateReplansOpenOccurrenceAndClearsError(t *testing.T) {
 	e := newEnv(t)
-	rec := e.create(
-		t,
-		Input{Type: "expense", AccountID: e.usdAcct.ID, Amount: dec("10"), Frequency: "monthly", StartDate: "2024-01-15"},
-	)
-	open := e.pending(t, rec.ID)[0]
+	r := e.create(t, `{"type":"expense","n":1}`, monthly("2026-01-15"))
+	_, tx := e.pending(t, r.ID)
 
-	upd, err := e.svc.Update(e.ctx, rec.ID, Input{Amount: dec("20"), Description: ptr("new")})
+	if err := e.svc.repo(e.svc.DB).Stop(e.ctx, r.ID, "was broken", time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	got, err := e.svc.Update(e.ctx, r.ID, Input{Template: json.RawMessage(`{"type":"expense","n":2}`), Schedule: monthly("2026-01-15")})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if upd.Amount.Decimal().String() != "20" || upd.Frequency != "monthly" || upd.AccountID != e.usdAcct.ID {
-		t.Errorf("omitted fields must keep their value: %+v", upd)
+	if !got.IsActive || got.Error != nil {
+		t.Fatalf("rule = %+v, want active with the error cleared", got)
 	}
-	if ids := e.pending(t, rec.ID); len(ids) != 1 || ids[0] != open {
-		t.Fatalf("the open occurrence is rewritten, not duplicated: %v", ids)
-	}
-	if tx := e.tx(t, open); tx.Amount.Decimal().String() != "20" || *tx.Description != "new" {
-		t.Errorf("occurrence %+v", tx)
+	_, now := e.pending(t, r.ID)
+	if now.ID != tx.ID || now.Description == nil || *now.Description != `{"type":"expense","n":2}` {
+		t.Fatalf("occurrence = %+v, want the same transaction with the new template", now)
 	}
 }
 
-func TestUpdateStartDateRestartsTheSchedule(t *testing.T) {
+func TestUpdateFirstOccurrenceFollowsNewStart(t *testing.T) {
 	e := newEnv(t)
-	rec := e.create(
-		t,
-		Input{Type: "expense", AccountID: e.usdAcct.ID, Amount: dec("10"), Frequency: "monthly", StartDate: "2024-01-15"},
-	)
-	upd, err := e.svc.Update(e.ctx, rec.ID, Input{StartDate: "2024-03-01"})
-	if err != nil {
+	r := e.create(t, `{}`, monthly("2026-01-15"))
+	if _, err := e.svc.Update(e.ctx, r.ID, Input{Template: json.RawMessage(`{}`), Schedule: monthly("2026-02-01")}); err != nil {
 		t.Fatal(err)
 	}
-	if upd.NextRunDate != "2024-03-01" {
-		t.Errorf("next run %s", upd.NextRunDate)
+	due, tx := e.pending(t, r.ID)
+	if due != "2026-02-01" || *tx.Date != "2026-02-01" {
+		t.Fatalf("occurrence = %s %v, want it moved to the new start", due, *tx.Date)
 	}
-	if date := *e.tx(t, e.pending(t, rec.ID)[0]).Date; date != "2024-03-01" {
-		t.Errorf("open occurrence dated %s", date)
+
+	// Once the series has history, a new start does not move what is already handled.
+	e.settle(t, r.ID, false)
+	if _, err := e.svc.Update(e.ctx, r.ID, Input{Template: json.RawMessage(`{}`), Schedule: monthly("2025-06-01")}); err != nil {
+		t.Fatal(err)
+	}
+	if due, _ := e.pending(t, r.ID); due != "2026-03-01" {
+		t.Fatalf("occurrence = %s, want it unmoved", due)
 	}
 }
 
 func TestDeactivatingStopsOccurrencesReactivatingOpensOne(t *testing.T) {
 	e := newEnv(t)
-	rec := e.create(
-		t,
-		Input{Type: "expense", AccountID: e.usdAcct.ID, Amount: dec("10"), Frequency: "daily", StartDate: "2024-01-01"},
-	)
-	if _, err := e.svc.Txs.Skip(e.ctx, e.pending(t, rec.ID)[0]); err != nil {
+	r := e.create(t, `{}`, monthly("2026-01-15"))
+	off := false
+	if _, err := e.svc.Update(e.ctx, r.ID, Input{Template: json.RawMessage(`{}`), Schedule: monthly("2026-01-15"), IsActive: &off}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := e.svc.Update(e.ctx, rec.ID, Input{IsActive: ptr(false)}); err != nil {
+	e.settle(t, r.ID, false)
+	e.noPending(t, r.ID)
+
+	if _, err := e.svc.Update(e.ctx, r.ID, Input{Template: json.RawMessage(`{}`), Schedule: monthly("2026-01-15")}); err != nil {
 		t.Fatal(err)
 	}
-	if n := len(e.pending(t, rec.ID)); n != 0 {
-		t.Fatalf("inactive template opened %d", n)
-	}
-	if _, err := e.svc.Update(e.ctx, rec.ID, Input{IsActive: ptr(true)}); err != nil {
-		t.Fatal(err)
-	}
-	if n := len(e.pending(t, rec.ID)); n != 1 {
-		t.Errorf("reactivated template opened %d, want 1", n)
+	if due, _ := e.pending(t, r.ID); due != "2026-02-15" {
+		t.Fatalf("reactivated occurrence = %s", due)
 	}
 }
 
-func TestUpdateOfMissingTemplateIsNil(t *testing.T) {
+func TestRefusedRulesStoreNothing(t *testing.T) {
 	e := newEnv(t)
-	got, err := e.svc.Update(e.ctx, 999, Input{Amount: dec("1")})
-	if err != nil || got != nil {
-		t.Errorf("got %v, %v", got, err)
+	if _, err := e.svc.Create(e.ctx, Input{Template: json.RawMessage(`{"broken":1}`), Schedule: monthly("2026-01-15")}); err == nil {
+		t.Fatal("a template the ledger refuses was saved")
+	}
+	if _, err := e.svc.Create(e.ctx, Input{Template: json.RawMessage(`{}`), Schedule: Schedule{Frequency: "daily"}}); !errors.Is(err, ErrSchedule) {
+		t.Fatalf("schedule without an interval = %v, want ErrSchedule", err)
+	}
+	if all, _ := e.svc.All(e.ctx); len(all) != 0 {
+		t.Fatalf("rules = %+v", all)
+	}
+	if e.ledger.CountTransactions(e.ctx) != 0 {
+		t.Fatal("an occurrence was left behind")
+	}
+	if got, err := e.svc.Update(e.ctx, 999, Input{Template: json.RawMessage(`{}`), Schedule: monthly("2026-01-15")}); got != nil || err != nil {
+		t.Fatalf("update of a missing rule = %v, %v", got, err)
 	}
 }
 
-func TestTagsFollowTemplateIntoItsOccurrences(t *testing.T) {
+func TestUpcomingOrdersByNextDate(t *testing.T) {
 	e := newEnv(t)
-	tag, err := (ledger.Tags{DB: e.svc.DB}).Create(e.ctx, "weekly")
-	if err != nil {
+	late := e.create(t, `{}`, monthly("2026-03-01"))
+	early := e.create(t, `{}`, monthly("2026-01-01"))
+	mid := e.create(t, `{}`, monthly("2026-02-01"))
+	off := false
+	_, _ = e.svc.Create(e.ctx, Input{Template: json.RawMessage(`{}`), Schedule: monthly("2025-01-01"), IsActive: &off})
+
+	got, err := e.svc.Upcoming(e.ctx, 2)
+	if err != nil || len(got) != 2 || got[0].ID != early.ID || got[1].ID != mid.ID {
+		t.Fatalf("upcoming = %+v, %v (late is %d)", got, err, late.ID)
+	}
+	if all, _ := e.svc.All(e.ctx); len(all) != 4 {
+		t.Fatalf("all = %d", len(all))
+	}
+}
+
+func TestDeleteRuleKeepsPendingTransaction(t *testing.T) {
+	e := newEnv(t)
+	r := e.create(t, `{}`, monthly("2026-01-15"))
+	_, tx := e.pending(t, r.ID)
+	if rule, _ := e.svc.RuleOf(e.ctx, tx.ID); rule != r.ID {
+		t.Fatalf("rule of the occurrence = %d", rule)
+	}
+	if rule, _ := e.svc.RuleOf(e.ctx, 999); rule != 0 {
+		t.Fatalf("rule of a transaction nobody made = %d", rule)
+	}
+	if err := e.svc.Delete(e.ctx, r.ID); err != nil {
 		t.Fatal(err)
 	}
-	rec := e.create(
-		t,
-		Input{
-			Type:      "expense",
-			AccountID: e.usdAcct.ID,
-			Amount:    dec("1"),
-			Frequency: "daily",
-			StartDate: "2024-01-01",
-			TagIDs:    []int64{tag.ID},
-		},
-	)
-	if len(rec.Tags) != 1 || rec.Tags[0].ID != tag.ID {
-		t.Fatalf("template tags %+v", rec.Tags)
+	if got, _ := e.ledger.Transaction(e.ctx, tx.ID); got == nil || got.Status != "pending" {
+		t.Fatalf("occurrence after deleting the rule = %+v", got)
 	}
-	if tags := e.tx(t, e.pending(t, rec.ID)[0]).Tags; len(tags) != 1 || tags[0].ID != tag.ID {
-		t.Errorf("occurrence tags %+v", tags)
-	}
-	// An update without tag ids keeps them; one with an empty list clears them.
-	upd, _ := e.svc.Update(e.ctx, rec.ID, Input{Description: ptr("x")})
-	if len(upd.Tags) != 1 {
-		t.Errorf("tags lost by an unrelated update: %+v", upd.Tags)
-	}
-	upd, _ = e.svc.Update(e.ctx, rec.ID, Input{HasTagIDs: true})
-	if len(upd.Tags) != 0 {
-		t.Errorf("tags not cleared: %+v", upd.Tags)
-	}
-}
-
-// A transfer between currencies delivers the converted amount, rounded to the
-// destination's scale, unless the template names the amount itself.
-func TestTransferDeliversConvertedTheStatedAmount(t *testing.T) {
-	e := newEnv(t)
-	converted := e.create(
-		t,
-		Input{
-			Type:        "transfer",
-			AccountID:   e.usdAcct.ID,
-			ToAccountID: &e.eurAcct.ID,
-			Amount:      dec("10"),
-			Frequency:   "monthly",
-			StartDate:   "2024-01-15",
-		},
-	)
-	stated := e.create(
-		t,
-		Input{
-			Type:        "transfer",
-			AccountID:   e.usdAcct.ID,
-			ToAccountID: &e.eurAcct.ID,
-			Amount:      dec("10"),
-			ToAmount:    ptr(dec("4.99")),
-			Frequency:   "monthly",
-			StartDate:   "2024-01-15",
-		},
-	)
-	same := e.create(
-		t,
-		Input{
-			Type:        "transfer",
-			AccountID:   e.usdAcct.ID,
-			ToAccountID: &e.usdAcct2.ID,
-			Amount:      dec("10"),
-			Frequency:   "monthly",
-			StartDate:   "2024-01-15",
-		},
-	)
-
-	want := map[int64]string{converted.ID: "5", stated.ID: "4.99", same.ID: "10"}
-	for id, w := range want {
-		ids := e.pending(t, id)
-		if len(ids) == 0 {
-			t.Fatalf("template %d opened nothing", id)
-		}
-		tx := e.tx(t, ids[0])
-		if tx.ToAmount == nil || tx.ToAmount.Decimal().String() != w {
-			t.Errorf("template %d delivers %v, want %s", id, tx.ToAmount, w)
-		}
-		if tx.Amount.Decimal().String() != "10" {
-			t.Errorf("template %d takes %s from the source", id, tx.Amount.Decimal())
-		}
-	}
-}
-
-func TestAllUpcomingDelete(t *testing.T) {
-	e := newEnv(t)
-	a := e.create(
-		t,
-		Input{Type: "expense", AccountID: e.usdAcct.ID, Amount: dec("1"), Frequency: "daily", StartDate: "2024-01-01"},
-	)
-	b := e.create(
-		t,
-		Input{
-			Type:      "expense",
-			AccountID: e.usdAcct.ID,
-			Amount:    dec("1"),
-			Frequency: "daily",
-			StartDate: "2024-01-02",
-			IsActive:  ptr(false),
-		},
-	)
-	c := e.create(
-		t,
-		Input{Type: "expense", AccountID: e.usdAcct.ID, Amount: dec("1"), Frequency: "daily", StartDate: "2024-01-03"},
-	)
-
-	all, err := e.svc.All(e.ctx)
-	if err != nil || len(all) != 3 {
-		t.Fatalf("All: %d, %v", len(all), err)
-	}
-	up, err := e.svc.Upcoming(e.ctx, 0)
-	if err != nil || len(up) != 2 {
-		t.Fatalf("Upcoming lists the active ones only: %d, %v", len(up), err)
-	}
-	if up[0].ID != a.ID || up[1].ID != c.ID {
-		t.Errorf("Upcoming order: %d, %d", up[0].ID, up[1].ID)
-	}
-	one, _ := e.svc.Upcoming(e.ctx, 1)
-	if len(one) != 1 {
-		t.Errorf("limit not honoured: %d", len(one))
-	}
-	if up[0].Account == nil || up[0].Account.Name != "usd" {
-		t.Errorf("accounts are loaded: %+v", up[0].Account)
-	}
-
-	if err := e.svc.Delete(e.ctx, b.ID); err != nil {
-		t.Fatal(err)
-	}
-	if got, _ := e.svc.ByID(e.ctx, b.ID); got != nil {
-		t.Error("deleted template still found")
-	}
-	if all, _ := e.svc.All(e.ctx); len(all) != 2 {
-		t.Errorf("All after delete: %d", len(all))
+	if rule, _ := e.svc.RuleOf(e.ctx, tx.ID); rule != 0 {
+		t.Fatal("the transaction still belongs to the deleted rule")
 	}
 }

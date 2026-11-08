@@ -86,15 +86,26 @@ func newFixture(t *testing.T) *fixture {
 	return f
 }
 
+// expense stores an expense of minor units from the account, in the food
+// category: one payment and one line.
 func (f *fixture) expense(t *testing.T, account int64, minor int64, date string) int64 {
 	t.Helper()
 	acc, _ := f.repo.Account(ctx, account)
 	d := date
-	id, err := f.repo.InsertTransaction(ctx, ledgerrepo.TxFields{
-		Type: "expense", Status: "confirmed", AccountID: account, CategoryID: &f.food,
-		Amount: money.New(minor, acc.Currency.Unit()), Date: &d,
-	}, time.Now().UTC())
+	now := time.Now().UTC()
+	id, err := f.repo.InsertTransaction(ctx, ledgerrepo.TxFields{Type: "expense", Date: &d}, now)
 	if err != nil {
+		t.Fatal(err)
+	}
+	unit := acc.Currency.Unit()
+	if err := f.repo.ReplacePayments(ctx, id, []ledgerrepo.PaymentFields{
+		{AccountID: account, Amount: money.New(-minor, unit)},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.repo.ReplaceLines(ctx, id, []ledgerrepo.LineFields{
+		{CategoryID: &f.food, Amount: money.New(minor, unit)},
+	}); err != nil {
 		t.Fatal(err)
 	}
 	return id
@@ -143,8 +154,10 @@ func TestTransactionAmountsKeepTheirUnits(t *testing.T) {
 	f := newFixture(t)
 	id := f.expense(t, f.yen, 1500, "2026-01-02")
 	tx, _ := f.repo.Transaction(ctx, id)
-	if tx.Amount.Minor() != 1500 || tx.Amount.Unit().Decimals != 0 || tx.ToAmount != nil || tx.Date == nil ||
-		*tx.Date != "2026-01-02" {
+	yen := money.Unit{ID: f.jpy, Decimals: 0}
+	if tx.Date == nil || *tx.Date != "2026-01-02" || tx.Status != "confirmed" || len(tx.Payments) != 1 ||
+		tx.Payments[0].Amount != money.New(-1500, yen) || len(tx.Lines) != 1 ||
+		tx.Lines[0].Amount != money.New(1500, yen) {
 		t.Fatalf("tx = %+v", tx)
 	}
 	changes, _ := f.repo.DailyChanges(ctx, f.yen, "")
@@ -179,21 +192,6 @@ func TestTagsOfTransactionsReplacement(t *testing.T) {
 	}
 	if tag, _ := f.repo.Tag(ctx, b); tag.TransactionsCount != 1 {
 		t.Fatalf("count = %d", tag.TransactionsCount)
-	}
-}
-
-func TestReplacingACategoryMovesItsTransactions(t *testing.T) {
-	f := newFixture(t)
-	other, _ := f.repo.InsertCategory(ctx, ledgerrepo.Category{Name: "Other", Type: "expense"}, time.Now().UTC())
-	tx := f.expense(t, f.cash, 100, "2026-01-02")
-	if err := f.repo.ReplaceCategory(ctx, f.food, other); err != nil {
-		t.Fatal(err)
-	}
-	if c, _ := f.repo.Category(ctx, f.food); c != nil {
-		t.Fatal("the replaced category is still there")
-	}
-	if got, _ := f.repo.Transaction(ctx, tx); got.CategoryID == nil || *got.CategoryID != other {
-		t.Fatalf("category = %v", got.CategoryID)
 	}
 }
 
@@ -236,6 +234,21 @@ func TestBudgetsKeepTheirCurrencyScope(t *testing.T) {
 	)
 	if !f.repo.CurrencyInUse(ctx, f.usd) || !f.repo.CurrencyInUse(ctx, f.jpy) || f.repo.CurrencyInUse(ctx, spare) {
 		t.Fatal("CurrencyInUse must be true for USD and JPY and false for a spare currency")
+	}
+}
+
+func TestReplacingACategoryMovesItsLines(t *testing.T) {
+	f := newFixture(t)
+	other, _ := f.repo.InsertCategory(ctx, ledgerrepo.Category{Name: "Other", Type: "expense"}, time.Now().UTC())
+	tx := f.expense(t, f.cash, 100, "2026-01-02")
+	if err := f.repo.ReplaceCategory(ctx, f.food, other); err != nil {
+		t.Fatal(err)
+	}
+	if c, _ := f.repo.Category(ctx, f.food); c != nil {
+		t.Fatal("the replaced category is still there")
+	}
+	if got, _ := f.repo.Transaction(ctx, tx); got.Lines[0].CategoryID == nil || *got.Lines[0].CategoryID != other {
+		t.Fatalf("lines = %+v", got.Lines)
 	}
 }
 

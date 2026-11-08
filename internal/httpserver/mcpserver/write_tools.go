@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -24,9 +25,10 @@ import (
 // clients use to decide whether to ask the user first.
 type writeTool struct {
 	name, title, desc string
-	method, path      string // path may use {space_id} and {id}
+	method, path      string // path may use {space_id}, {id} and {uuid}
 	destructive       bool
 	idempotent        bool
+	bodyOf            func(args map[string]any) any // optional: builds the JSON body from the arguments
 }
 
 // addWrite registers t. The arguments become the JSON body, minus the ones the
@@ -55,9 +57,17 @@ func addWrite[In any](h Handler, srv *mcp.Server, t writeTool) {
 					delete(args, key)
 				}
 			}
+			if v, ok := args["uuid"].(string); ok {
+				path = strings.ReplaceAll(path, "{uuid}", url.PathEscape(v))
+				delete(args, "uuid")
+			}
 			var body []byte
 			if t.method != http.MethodDelete {
-				body, _ = json.Marshal(args)
+				if t.bodyOf != nil {
+					body, _ = json.Marshal(t.bodyOf(args))
+				} else {
+					body, _ = json.Marshal(args)
+				}
 			}
 			return h.mcpCall(ctx, req, t.method, "/api/spaces/"+strings.TrimPrefix(path, "/"), nil, body), nil, nil
 		})
@@ -94,6 +104,12 @@ func (k writeSet) patch(name, title, desc, path string) writeTool {
 	return k.tool(name, title, desc, http.MethodPatch, path)
 }
 
+func (k writeSet) put(name, title, desc, path string) writeTool {
+	t := k.tool(name, title, desc, http.MethodPut, path)
+	t.idempotent = true
+	return t
+}
+
 func (k writeSet) del(name, title, desc, path string) writeTool {
 	t := k.tool(name, title, desc, http.MethodDelete, path)
 	t.destructive, t.idempotent = true, true
@@ -112,15 +128,40 @@ func (h Handler) addMCPWriteTools(srv *mcp.Server) map[string]mcpNeed {
 	k.currencyTools()
 	k.budgetTools()
 	k.debtTools()
+	k.creditCardTools()
 	k.ruleTools()
+	k.reconciliationTools()
+	k.historyTools()
 	return k.needs
 }
 
 func (k writeSet) transactionTools() {
 	register[createTxArgs](k, k.post("create_transaction", "Create transaction",
-		"Record an income, expense or transfer between two accounts. The amount is in the account's currency; "+
-			"a transfer between accounts of different currencies also needs to_amount. Say which currency you used.",
+		"Record an income, expense or transfer between two accounts as payments (the money that moved, signed, "+
+			"each in its account's currency) and lines (what it was for, positive). A purchase paid with cash and card, "+
+			"or with euros and the change back in dinars, is one transaction with a payment per account. Say which "+
+			"currency you used. Payments are signed: an expense paid with 20 EUR and 10 EUR back in change has payments "+
+			"of -20 and +10; a transfer has a negative payment and a positive one. Lines are positive and add up to "+
+			"what the payments net to. The answer's difference field is not null when they disagree. For something that "+
+			"may be sent twice (a receipt, a bank line) give external_id: a second create with "+
+			"it fails and names the first transaction instead of adding a duplicate.",
 		"transactions"))
+	register[createTxsArgs](k, k.post("create_transactions", "Create many transactions",
+		"Record up to 500 transactions in one call, each as for create_transaction. Prefer this to calling "+
+			"create_transaction in a loop: it is one request and one save, much faster. All or none are stored: if one "+
+			"is invalid nothing is written and the error names its position (transaction 3). Answers with the "+
+			"created transactions in the same order. Split a longer list into several calls. With external_id on the "+
+			"items, a retry after a timeout fails naming the transaction that already has the key "+
+			"and stores nothing, so look it up with list_transactions and send only what is missing.",
+		"transactions/bulk"))
+	register[findSimilarArgs](k, k.post("find_similar_transactions", "Find similar transactions",
+		"Before adding transactions from a statement or receipts, check which are already entered. For each item "+
+			"(date, amount and currency or account, optionally a description or an external_id) it returns the "+
+			"transactions that look like it, best first, each with reasons (external_id, amount, date, account, "+
+			"description). The amount must be equal exactly in the same currency; the sign is ignored and the date may "+
+			"differ by date_tolerance_days. A match is a hint, not proof: two real purchases can look alike, so look "+
+			"at the matches before skipping an item. It stores nothing. Answers one entry per item, in order.",
+		"transactions/find-similar"))
 	register[updateTxArgs](k, k.patch("update_transaction", "Update transaction",
 		"Change a transaction. Send only the fields that change.", "transactions/{id}"))
 	register[idArgs](k, k.del("delete_transaction", "Delete transaction",
@@ -178,6 +219,16 @@ func (k writeSet) budgetTools() {
 		"Change a budget. Send only the fields that change.", "budgets/{id}"))
 	register[idArgs](k, k.del("delete_budget", "Delete budget",
 		"Permanently delete a budget. Ask the user first.", "budgets/{id}"))
+}
+
+func (k writeSet) creditCardTools() {
+	register[createCreditCardArgs](k, k.post("create_credit_card", "Create credit card",
+		"Add a credit card, or turn a bank account into one with account_id. Its terms are only shown, never calculated.",
+		"credit-cards"))
+	register[updateCreditCardArgs](k, k.patch("update_credit_card", "Update credit card",
+		"Change a credit card. Send only the fields that change.", "credit-cards/{id}"))
+	register[idArgs](k, k.del("delete_credit_card", "Delete credit card",
+		"Permanently delete a card without transactions. Ask the user first.", "credit-cards/{id}"))
 }
 
 func (k writeSet) debtTools() {

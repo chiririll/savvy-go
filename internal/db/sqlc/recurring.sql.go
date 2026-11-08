@@ -10,250 +10,186 @@ import (
 	"database/sql"
 )
 
-const advanceRecurring = `-- name: AdvanceRecurring :exec
-UPDATE recurring_transactions SET last_run_date=?, next_run_date=?, updated_at=? WHERE id=?
+const countRecurringInstancesOn = `-- name: CountRecurringInstancesOn :one
+SELECT COUNT(*) FROM recurring_instances WHERE recurring_transaction_id = ? AND due_date = ?
 `
 
-type AdvanceRecurringParams struct {
-	LastRunDate sql.NullString
-	NextRunDate string
-	UpdatedAt   sql.NullString
-	ID          int64
+type CountRecurringInstancesOnParams struct {
+	RecurringTransactionID int64
+	DueDate                string
 }
 
-func (q *Queries) AdvanceRecurring(ctx context.Context, arg AdvanceRecurringParams) error {
-	_, err := q.db.ExecContext(ctx, advanceRecurring,
-		arg.LastRunDate,
-		arg.NextRunDate,
-		arg.UpdatedAt,
-		arg.ID,
-	)
-	return err
-}
-
-const deletePendingForRecurring = `-- name: DeletePendingForRecurring :exec
-DELETE FROM transactions WHERE recurring_transaction_id = ? AND status = 'pending'
-`
-
-func (q *Queries) DeletePendingForRecurring(ctx context.Context, recurringTransactionID sql.NullInt64) error {
-	_, err := q.db.ExecContext(ctx, deletePendingForRecurring, recurringTransactionID)
-	return err
+func (q *Queries) CountRecurringInstancesOn(ctx context.Context, arg CountRecurringInstancesOnParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countRecurringInstancesOn, arg.RecurringTransactionID, arg.DueDate)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
 }
 
 const deleteRecurring = `-- name: DeleteRecurring :exec
 DELETE FROM recurring_transactions WHERE id = ?
 `
 
+// Its instances go with it (cascade); its transactions stay.
 func (q *Queries) DeleteRecurring(ctx context.Context, id int64) error {
 	_, err := q.db.ExecContext(ctx, deleteRecurring, id)
 	return err
 }
 
-const deleteRecurringTags = `-- name: DeleteRecurringTags :exec
-DELETE FROM recurring_transaction_tag WHERE recurring_transaction_id = ?
+const getPendingRecurringInstance = `-- name: GetPendingRecurringInstance :one
+SELECT i.due_date, i.transaction_id FROM recurring_instances i
+JOIN transactions t ON t.id = i.transaction_id
+WHERE i.recurring_transaction_id = ? AND t.status = 'pending'
+ORDER BY i.due_date LIMIT 1
 `
 
-func (q *Queries) DeleteRecurringTags(ctx context.Context, recurringTransactionID int64) error {
-	_, err := q.db.ExecContext(ctx, deleteRecurringTags, recurringTransactionID)
-	return err
+type GetPendingRecurringInstanceRow struct {
+	DueDate       string
+	TransactionID sql.NullInt64
 }
 
-const getPendingRecurringTx = `-- name: GetPendingRecurringTx :one
-SELECT id FROM transactions WHERE recurring_transaction_id = ? AND status = 'pending' LIMIT 1
-`
-
-func (q *Queries) GetPendingRecurringTx(ctx context.Context, recurringTransactionID sql.NullInt64) (int64, error) {
-	row := q.db.QueryRowContext(ctx, getPendingRecurringTx, recurringTransactionID)
-	var id int64
-	err := row.Scan(&id)
-	return id, err
+// The open occurrence of a rule: an instance whose transaction is pending.
+func (q *Queries) GetPendingRecurringInstance(ctx context.Context, recurringTransactionID int64) (GetPendingRecurringInstanceRow, error) {
+	row := q.db.QueryRowContext(ctx, getPendingRecurringInstance, recurringTransactionID)
+	var i GetPendingRecurringInstanceRow
+	err := row.Scan(&i.DueDate, &i.TransactionID)
+	return i, err
 }
 
 const getRecurring = `-- name: GetRecurring :one
-SELECT r.id, r.type, r.account_id, r.to_account_id, r.category_id, r.amount, r.to_amount, r.is_estimated, r.description,
-	r.frequency, r.interval, r.day_of_week, r.day_of_month, r.start_date, r.end_date,
-	r.next_run_date, r.last_run_date, r.is_active,
-	ca.id AS currency_id, ca.decimals AS decimals,
-	COALESCE(cb.id, ca.id) AS to_currency_id, COALESCE(cb.decimals, ca.decimals) AS to_decimals
+SELECT r.id, r.template, r.schedule, r.is_active, r.error, r.created_at, r.updated_at,
+	(SELECT MAX(i.due_date) FROM recurring_instances i WHERE i.recurring_transaction_id = r.id) AS last_due,
+	(SELECT MAX(i.due_date) FROM recurring_instances i
+		JOIN transactions t ON t.id = i.transaction_id
+		WHERE i.recurring_transaction_id = r.id AND t.status = 'confirmed') AS last_run,
+	(SELECT MIN(i.due_date) FROM recurring_instances i
+		JOIN transactions t ON t.id = i.transaction_id
+		WHERE i.recurring_transaction_id = r.id AND t.status = 'pending') AS pending_due
 FROM recurring_transactions r
-JOIN accounts a ON a.id = r.account_id
-JOIN currencies ca ON ca.id = a.currency_id
-LEFT JOIN accounts ta ON ta.id = r.to_account_id
-LEFT JOIN currencies cb ON cb.id = ta.currency_id
 WHERE r.id = ?
 `
 
 type GetRecurringRow struct {
-	ID           int64
-	Type         string
-	AccountID    int64
-	ToAccountID  sql.NullInt64
-	CategoryID   sql.NullInt64
-	Amount       int64
-	ToAmount     sql.NullInt64
-	IsEstimated  int64
-	Description  sql.NullString
-	Frequency    string
-	Interval     int64
-	DayOfWeek    sql.NullInt64
-	DayOfMonth   sql.NullInt64
-	StartDate    string
-	EndDate      sql.NullString
-	NextRunDate  string
-	LastRunDate  sql.NullString
-	IsActive     int64
-	CurrencyID   int64
-	Decimals     int64
-	ToCurrencyID int64
-	ToDecimals   int64
+	ID         int64
+	Template   string
+	Schedule   string
+	IsActive   int64
+	Error      sql.NullString
+	CreatedAt  sql.NullString
+	UpdatedAt  sql.NullString
+	LastDue    interface{}
+	LastRun    interface{}
+	PendingDue interface{}
 }
 
 // The same columns as ListRecurring, so its row converts to ListRecurringRow.
+// last_due is the latest handled due date, whatever became of it; last_run the
+// latest one that was confirmed; pending_due the open occurrence's.
 func (q *Queries) GetRecurring(ctx context.Context, id int64) (GetRecurringRow, error) {
 	row := q.db.QueryRowContext(ctx, getRecurring, id)
 	var i GetRecurringRow
 	err := row.Scan(
 		&i.ID,
-		&i.Type,
-		&i.AccountID,
-		&i.ToAccountID,
-		&i.CategoryID,
-		&i.Amount,
-		&i.ToAmount,
-		&i.IsEstimated,
-		&i.Description,
-		&i.Frequency,
-		&i.Interval,
-		&i.DayOfWeek,
-		&i.DayOfMonth,
-		&i.StartDate,
-		&i.EndDate,
-		&i.NextRunDate,
-		&i.LastRunDate,
+		&i.Template,
+		&i.Schedule,
 		&i.IsActive,
-		&i.CurrencyID,
-		&i.Decimals,
-		&i.ToCurrencyID,
-		&i.ToDecimals,
+		&i.Error,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.LastDue,
+		&i.LastRun,
+		&i.PendingDue,
 	)
 	return i, err
 }
 
+const getRecurringInstanceOf = `-- name: GetRecurringInstanceOf :one
+SELECT recurring_transaction_id, due_date FROM recurring_instances WHERE transaction_id = ?
+`
+
+type GetRecurringInstanceOfRow struct {
+	RecurringTransactionID int64
+	DueDate                string
+}
+
+// The rule and due date a transaction was made for.
+func (q *Queries) GetRecurringInstanceOf(ctx context.Context, transactionID sql.NullInt64) (GetRecurringInstanceOfRow, error) {
+	row := q.db.QueryRowContext(ctx, getRecurringInstanceOf, transactionID)
+	var i GetRecurringInstanceOfRow
+	err := row.Scan(&i.RecurringTransactionID, &i.DueDate)
+	return i, err
+}
+
 const insertRecurring = `-- name: InsertRecurring :execresult
-INSERT INTO recurring_transactions (
-	type, account_id, to_account_id, category_id, amount, to_amount, is_estimated, description,
-	frequency, interval, day_of_week, day_of_month, start_date, end_date,
-	next_run_date, is_active, created_at, updated_at)
-VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+INSERT INTO recurring_transactions (template, schedule, is_active, error, created_at, updated_at)
+VALUES (?,?,?,?,?,?)
 `
 
 type InsertRecurringParams struct {
-	Type        string
-	AccountID   int64
-	ToAccountID sql.NullInt64
-	CategoryID  sql.NullInt64
-	Amount      int64
-	ToAmount    sql.NullInt64
-	IsEstimated int64
-	Description sql.NullString
-	Frequency   string
-	Interval    int64
-	DayOfWeek   sql.NullInt64
-	DayOfMonth  sql.NullInt64
-	StartDate   string
-	EndDate     sql.NullString
-	NextRunDate string
-	IsActive    int64
-	CreatedAt   sql.NullString
-	UpdatedAt   sql.NullString
+	Template  string
+	Schedule  string
+	IsActive  int64
+	Error     sql.NullString
+	CreatedAt sql.NullString
+	UpdatedAt sql.NullString
 }
 
 func (q *Queries) InsertRecurring(ctx context.Context, arg InsertRecurringParams) (sql.Result, error) {
 	return q.db.ExecContext(ctx, insertRecurring,
-		arg.Type,
-		arg.AccountID,
-		arg.ToAccountID,
-		arg.CategoryID,
-		arg.Amount,
-		arg.ToAmount,
-		arg.IsEstimated,
-		arg.Description,
-		arg.Frequency,
-		arg.Interval,
-		arg.DayOfWeek,
-		arg.DayOfMonth,
-		arg.StartDate,
-		arg.EndDate,
-		arg.NextRunDate,
+		arg.Template,
+		arg.Schedule,
 		arg.IsActive,
+		arg.Error,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
 }
 
-const insertRecurringTag = `-- name: InsertRecurringTag :exec
-INSERT INTO recurring_transaction_tag (recurring_transaction_id, tag_id) VALUES (?,?) ON CONFLICT DO NOTHING
+const insertRecurringInstance = `-- name: InsertRecurringInstance :execresult
+INSERT INTO recurring_instances (recurring_transaction_id, due_date, transaction_id) VALUES (?,?,?)
+ON CONFLICT DO NOTHING
 `
 
-type InsertRecurringTagParams struct {
+type InsertRecurringInstanceParams struct {
 	RecurringTransactionID int64
-	TagID                  int64
+	DueDate                string
+	TransactionID          sql.NullInt64
 }
 
-func (q *Queries) InsertRecurringTag(ctx context.Context, arg InsertRecurringTagParams) error {
-	_, err := q.db.ExecContext(ctx, insertRecurringTag, arg.RecurringTransactionID, arg.TagID)
-	return err
+// A due date is handled once: a second insert for it changes nothing.
+func (q *Queries) InsertRecurringInstance(ctx context.Context, arg InsertRecurringInstanceParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, insertRecurringInstance, arg.RecurringTransactionID, arg.DueDate, arg.TransactionID)
 }
 
 const listRecurring = `-- name: ListRecurring :many
-SELECT r.id, r.type, r.account_id, r.to_account_id, r.category_id, r.amount, r.to_amount, r.is_estimated, r.description,
-	r.frequency, r.interval, r.day_of_week, r.day_of_month, r.start_date, r.end_date,
-	r.next_run_date, r.last_run_date, r.is_active,
-	ca.id AS currency_id, ca.decimals AS decimals,
-	COALESCE(cb.id, ca.id) AS to_currency_id, COALESCE(cb.decimals, ca.decimals) AS to_decimals
+SELECT r.id, r.template, r.schedule, r.is_active, r.error, r.created_at, r.updated_at,
+	(SELECT MAX(i.due_date) FROM recurring_instances i WHERE i.recurring_transaction_id = r.id) AS last_due,
+	(SELECT MAX(i.due_date) FROM recurring_instances i
+		JOIN transactions t ON t.id = i.transaction_id
+		WHERE i.recurring_transaction_id = r.id AND t.status = 'confirmed') AS last_run,
+	(SELECT MIN(i.due_date) FROM recurring_instances i
+		JOIN transactions t ON t.id = i.transaction_id
+		WHERE i.recurring_transaction_id = r.id AND t.status = 'pending') AS pending_due
 FROM recurring_transactions r
-JOIN accounts a ON a.id = r.account_id
-JOIN currencies ca ON ca.id = a.currency_id
-LEFT JOIN accounts ta ON ta.id = r.to_account_id
-LEFT JOIN currencies cb ON cb.id = ta.currency_id
 WHERE r.is_active = COALESCE(?1, r.is_active)
-ORDER BY r.next_run_date, r.id
-LIMIT ?3 OFFSET ?2
+ORDER BY r.id
 `
 
-type ListRecurringParams struct {
-	ActiveOnly sql.NullInt64
-	Offset     int64
-	Limit      int64
-}
-
 type ListRecurringRow struct {
-	ID           int64
-	Type         string
-	AccountID    int64
-	ToAccountID  sql.NullInt64
-	CategoryID   sql.NullInt64
-	Amount       int64
-	ToAmount     sql.NullInt64
-	IsEstimated  int64
-	Description  sql.NullString
-	Frequency    string
-	Interval     int64
-	DayOfWeek    sql.NullInt64
-	DayOfMonth   sql.NullInt64
-	StartDate    string
-	EndDate      sql.NullString
-	NextRunDate  string
-	LastRunDate  sql.NullString
-	IsActive     int64
-	CurrencyID   int64
-	Decimals     int64
-	ToCurrencyID int64
-	ToDecimals   int64
+	ID         int64
+	Template   string
+	Schedule   string
+	IsActive   int64
+	Error      sql.NullString
+	CreatedAt  sql.NullString
+	UpdatedAt  sql.NullString
+	LastDue    interface{}
+	LastRun    interface{}
+	PendingDue interface{}
 }
 
-func (q *Queries) ListRecurring(ctx context.Context, arg ListRecurringParams) ([]ListRecurringRow, error) {
-	rows, err := q.db.QueryContext(ctx, listRecurring, arg.ActiveOnly, arg.Offset, arg.Limit)
+func (q *Queries) ListRecurring(ctx context.Context, activeOnly sql.NullInt64) ([]ListRecurringRow, error) {
+	rows, err := q.db.QueryContext(ctx, listRecurring, activeOnly)
 	if err != nil {
 		return nil, err
 	}
@@ -263,27 +199,15 @@ func (q *Queries) ListRecurring(ctx context.Context, arg ListRecurringParams) ([
 		var i ListRecurringRow
 		if err := rows.Scan(
 			&i.ID,
-			&i.Type,
-			&i.AccountID,
-			&i.ToAccountID,
-			&i.CategoryID,
-			&i.Amount,
-			&i.ToAmount,
-			&i.IsEstimated,
-			&i.Description,
-			&i.Frequency,
-			&i.Interval,
-			&i.DayOfWeek,
-			&i.DayOfMonth,
-			&i.StartDate,
-			&i.EndDate,
-			&i.NextRunDate,
-			&i.LastRunDate,
+			&i.Template,
+			&i.Schedule,
 			&i.IsActive,
-			&i.CurrencyID,
-			&i.Decimals,
-			&i.ToCurrencyID,
-			&i.ToDecimals,
+			&i.Error,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.LastDue,
+			&i.LastRun,
+			&i.PendingDue,
 		); err != nil {
 			return nil, err
 		}
@@ -298,34 +222,26 @@ func (q *Queries) ListRecurring(ctx context.Context, arg ListRecurringParams) ([
 	return items, nil
 }
 
-const listRecurringTags = `-- name: ListRecurringTags :many
-SELECT tags.id, tags.name, tags.created_at, 0 AS transactions_count FROM tags
-JOIN recurring_transaction_tag rt ON rt.tag_id = tags.id
-WHERE rt.recurring_transaction_id = ?
+const listRecurringInstances = `-- name: ListRecurringInstances :many
+SELECT due_date, transaction_id FROM recurring_instances
+WHERE recurring_transaction_id = ? ORDER BY due_date
 `
 
-type ListRecurringTagsRow struct {
-	ID                int64
-	Name              string
-	CreatedAt         sql.NullString
-	TransactionsCount int64
+type ListRecurringInstancesRow struct {
+	DueDate       string
+	TransactionID sql.NullInt64
 }
 
-func (q *Queries) ListRecurringTags(ctx context.Context, recurringTransactionID int64) ([]ListRecurringTagsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listRecurringTags, recurringTransactionID)
+func (q *Queries) ListRecurringInstances(ctx context.Context, recurringTransactionID int64) ([]ListRecurringInstancesRow, error) {
+	rows, err := q.db.QueryContext(ctx, listRecurringInstances, recurringTransactionID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListRecurringTagsRow{}
+	items := []ListRecurringInstancesRow{}
 	for rows.Next() {
-		var i ListRecurringTagsRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.Name,
-			&i.CreatedAt,
-			&i.TransactionsCount,
-		); err != nil {
+		var i ListRecurringInstancesRow
+		if err := rows.Scan(&i.DueDate, &i.TransactionID); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -339,52 +255,57 @@ func (q *Queries) ListRecurringTags(ctx context.Context, recurringTransactionID 
 	return items, nil
 }
 
+const moveRecurringInstance = `-- name: MoveRecurringInstance :execresult
+UPDATE recurring_instances SET due_date = ?
+WHERE recurring_transaction_id = ? AND due_date = ?
+`
+
+type MoveRecurringInstanceParams struct {
+	DueDate                string
+	RecurringTransactionID int64
+	DueDate_2              string
+}
+
+// The caller checks the new date is free: it is part of the key.
+func (q *Queries) MoveRecurringInstance(ctx context.Context, arg MoveRecurringInstanceParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, moveRecurringInstance, arg.DueDate, arg.RecurringTransactionID, arg.DueDate_2)
+}
+
+const stopRecurring = `-- name: StopRecurring :exec
+UPDATE recurring_transactions SET is_active=0, error=?, updated_at=? WHERE id=?
+`
+
+type StopRecurringParams struct {
+	Error     sql.NullString
+	UpdatedAt sql.NullString
+	ID        int64
+}
+
+func (q *Queries) StopRecurring(ctx context.Context, arg StopRecurringParams) error {
+	_, err := q.db.ExecContext(ctx, stopRecurring, arg.Error, arg.UpdatedAt, arg.ID)
+	return err
+}
+
 const updateRecurring = `-- name: UpdateRecurring :exec
-UPDATE recurring_transactions SET type=?, account_id=?, to_account_id=?, category_id=?,
-	amount=?, to_amount=?, is_estimated=?, description=?, frequency=?, interval=?, day_of_week=?,
-	day_of_month=?, start_date=?, end_date=?, next_run_date=?, is_active=?, updated_at=?
-WHERE id=?
+UPDATE recurring_transactions SET template=?, schedule=?, is_active=?, error=?, updated_at=? WHERE id=?
 `
 
 type UpdateRecurringParams struct {
-	Type        string
-	AccountID   int64
-	ToAccountID sql.NullInt64
-	CategoryID  sql.NullInt64
-	Amount      int64
-	ToAmount    sql.NullInt64
-	IsEstimated int64
-	Description sql.NullString
-	Frequency   string
-	Interval    int64
-	DayOfWeek   sql.NullInt64
-	DayOfMonth  sql.NullInt64
-	StartDate   string
-	EndDate     sql.NullString
-	NextRunDate string
-	IsActive    int64
-	UpdatedAt   sql.NullString
-	ID          int64
+	Template  string
+	Schedule  string
+	IsActive  int64
+	Error     sql.NullString
+	UpdatedAt sql.NullString
+	ID        int64
 }
 
+// Saving a rule replaces its error: the caller passes NULL once the rule is valid.
 func (q *Queries) UpdateRecurring(ctx context.Context, arg UpdateRecurringParams) error {
 	_, err := q.db.ExecContext(ctx, updateRecurring,
-		arg.Type,
-		arg.AccountID,
-		arg.ToAccountID,
-		arg.CategoryID,
-		arg.Amount,
-		arg.ToAmount,
-		arg.IsEstimated,
-		arg.Description,
-		arg.Frequency,
-		arg.Interval,
-		arg.DayOfWeek,
-		arg.DayOfMonth,
-		arg.StartDate,
-		arg.EndDate,
-		arg.NextRunDate,
+		arg.Template,
+		arg.Schedule,
 		arg.IsActive,
+		arg.Error,
 		arg.UpdatedAt,
 		arg.ID,
 	)

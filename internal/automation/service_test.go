@@ -73,10 +73,12 @@ func newEnv(t *testing.T) *env {
 func (e *env) expense(t *testing.T, amount, desc string) *ledger.Transaction {
 	t.Helper()
 	date := "2024-01-15"
-	tx, err := e.svc.Txs.Create(
-		e.ctx,
-		ledger.TxInput{Type: "expense", AccountID: e.wallet.ID, Amount: dec(amount), Description: &desc, Date: &date},
-	)
+	paid, line := dec(amount).Neg(), dec(amount)
+	tx, err := e.svc.Txs.Create(e.ctx, ledger.TxInput{
+		Type: "expense", Description: &desc, Date: &date,
+		Payments: []ledger.PaymentInput{{AccountID: e.wallet.ID, Amount: &paid}},
+		Lines:    []ledger.LineInput{{Amount: line}},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -219,8 +221,8 @@ func TestProcessAppliesEveryAction(t *testing.T) {
 	e.svc.Process(e.ctx, "on_transaction_create", tx)
 
 	got := e.reload(t, tx.ID)
-	if got.CategoryID == nil || *got.CategoryID != e.food.ID {
-		t.Errorf("category %v", got.CategoryID)
+	if catOf(got) == nil || *catOf(got) != e.food.ID {
+		t.Errorf("category %v", catOf(got))
 	}
 	if tags := tagIDs(got); !tags[e.tagA.ID] || tags[e.tagB.ID] || len(tags) != 1 {
 		t.Errorf("tags %v (a added, b added then removed)", got.Tags)
@@ -239,22 +241,24 @@ func TestProcessSkipsInapplicableRules(t *testing.T) {
 
 	tx := e.expense(t, "4", "coffee")
 	e.svc.Process(e.ctx, "on_transaction_create", tx)
-	if got := e.reload(t, tx.ID); got.CategoryID != nil {
-		t.Errorf("a rule that should not run set category %v", *got.CategoryID)
+	if got := e.reload(t, tx.ID); catOf(got) != nil {
+		t.Errorf("a rule that should not run set category %v", *catOf(got))
 	}
 
 	e.rule(t, Input{Name: "on", Actions: setFood})
 	pending := "pending"
 	date := "2024-02-01"
-	plan, err := e.svc.Txs.Create(
-		e.ctx,
-		ledger.TxInput{Type: "expense", AccountID: e.wallet.ID, Amount: dec("4"), Date: &date, Status: &pending},
-	)
+	paid := dec("-4")
+	plan, err := e.svc.Txs.Create(e.ctx, ledger.TxInput{
+		Type: "expense", Date: &date, Status: &pending,
+		Payments: []ledger.PaymentInput{{AccountID: e.wallet.ID, Amount: &paid}},
+		Lines:    []ledger.LineInput{{Amount: dec("4")}},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	e.svc.Process(e.ctx, "on_transaction_create", plan)
-	if got := e.reload(t, plan.ID); got.CategoryID != nil {
+	if got := e.reload(t, plan.ID); catOf(got) != nil {
 		t.Error("a pending transaction is a plan; rules wait until it is confirmed")
 	}
 	e.svc.Process(e.ctx, "on_transaction_create", nil) // must not panic
@@ -265,14 +269,15 @@ func TestProcessRunsRulesPriorityStopsAsked(t *testing.T) {
 	set := func(id int64) []map[string]any {
 		return []map[string]any{{"type": "set_category", "category_id": float64(id)}}
 	}
-	// Created out of order: the lower number runs first, so Fun is set last.. unless stopped.
+	// Created out of order: the lower number runs first. A rule gives a category to
+	// uncategorised lines only, so the first to run keeps it.
 	late := e.rule(t, Input{Name: "late", Priority: 20, Actions: set(e.fun.ID)})
 	first := e.rule(t, Input{Name: "first", Priority: 10, Actions: set(e.food.ID)})
 
 	tx := e.expense(t, "4", "x")
 	e.svc.Process(e.ctx, "on_transaction_create", tx)
-	if got := e.reload(t, tx.ID); *got.CategoryID != e.fun.ID {
-		t.Errorf("both ran in priority order, so the later one wins; category %d", *got.CategoryID)
+	if got := e.reload(t, tx.ID); *catOf(got) != e.food.ID {
+		t.Errorf("both ran in priority order, so the first one keeps it; category %d", *catOf(got))
 	}
 
 	if _, err := e.svc.Update(e.ctx, first.ID, Input{StopProcessing: ptr(true)}); err != nil {
@@ -280,8 +285,8 @@ func TestProcessRunsRulesPriorityStopsAsked(t *testing.T) {
 	}
 	tx2 := e.expense(t, "5", "y")
 	e.svc.Process(e.ctx, "on_transaction_create", tx2)
-	if got := e.reload(t, tx2.ID); *got.CategoryID != e.food.ID {
-		t.Errorf("a stopping rule ends the run; category %d", *got.CategoryID)
+	if got := e.reload(t, tx2.ID); *catOf(got) != e.food.ID {
+		t.Errorf("a stopping rule ends the run; category %d", *catOf(got))
 	}
 
 	ran := func(id int64) int { r, _ := e.svc.ByID(e.ctx, id); return r.RunsCount }
@@ -354,7 +359,7 @@ func TestActionsNeedMoreInputDoNothing(t *testing.T) {
 	tx := e.expense(t, "4", "keep me")
 	e.svc.Process(e.ctx, "on_transaction_create", tx)
 	got := e.reload(t, tx.ID)
-	if got.CategoryID != nil || len(got.Tags) != 0 || *got.Description != "keep me" {
+	if catOf(got) != nil || len(got.Tags) != 0 || *got.Description != "keep me" {
 		t.Errorf("transaction changed: %+v", got)
 	}
 }
@@ -380,11 +385,13 @@ func TestCreateTransferActionMovesFormulaAmount(t *testing.T) {
 		t.Fatalf("%d transfers, want 1", len(all))
 	}
 	transfer := &all[0]
-	if transfer.Amount.Decimal().String() != "3.34" { // 3.335 rounds to the cent, never to a float
-		t.Errorf("transfer amount %s", transfer.Amount.Decimal())
+	got := map[int64]string{}
+	for _, p := range transfer.Payments {
+		got[p.AccountID] = p.Amount.Decimal().String()
 	}
-	if transfer.AccountID != e.wallet.ID || transfer.ToAccountID == nil || *transfer.ToAccountID != e.bank.ID {
-		t.Errorf("transfer route %+v", transfer)
+	// 3.335 rounds to the cent, never to a float; both accounts share a currency.
+	if len(got) != 2 || got[e.wallet.ID] != "-3.34" || got[e.bank.ID] != "3.34" {
+		t.Errorf("transfer payments %v", got)
 	}
 }
 
@@ -408,7 +415,7 @@ func TestTestReportsMatchWithoutRunningAnything(t *testing.T) {
 	if got["conditionsMatch"] != false {
 		t.Errorf("miss: %v", got)
 	}
-	if e.reload(t, hit.ID).CategoryID != nil {
+	if catOf(e.reload(t, hit.ID)) != nil {
 		t.Error("testing a rule must not run it")
 	}
 	if _, err := e.svc.Test(e.ctx, r.ID, 999); err == nil {
@@ -417,4 +424,12 @@ func TestTestReportsMatchWithoutRunningAnything(t *testing.T) {
 	if got, err := e.svc.Test(e.ctx, 999, hit.ID); got != nil || err != nil {
 		t.Errorf("unknown rule: %v, %v", got, err)
 	}
+}
+
+// catOf is the category of the first line of a transaction.
+func catOf(tx *ledger.Transaction) *int64 {
+	if len(tx.Lines) == 0 {
+		return nil
+	}
+	return tx.Lines[0].CategoryID
 }

@@ -2,11 +2,15 @@ package mcpserver
 
 import (
 	"context"
+	"errors"
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"savvy-go/internal/httpserver/httpx/dto"
 )
 
 // mcpReports maps get_report's report names to the REST report routes.
@@ -28,9 +32,37 @@ type spaceArgs struct {
 	SpaceID int64 `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
 }
 
+// listArgs is spaceArgs for the lists that can be trimmed with fields.
+type listArgs struct {
+	SpaceID int64    `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
+	Fields  []string `json:"fields,omitempty" jsonschema:"Keys to keep of each item, e.g. [id, name]. A dotted path goes inside: currency.code. Default all."`
+}
+
+// getArgs is idArgs for the one item that can be trimmed with fields.
+type getArgs struct {
+	SpaceID int64    `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
+	ID      int64    `json:"id" jsonschema:"Id of the item."`
+	Fields  []string `json:"fields,omitempty" jsonschema:"Keys to keep of each item, e.g. [id, name]. A dotted path goes inside: currency.code. Default all."`
+}
+
 type accountsArgs struct {
-	SpaceID     int64 `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
-	WithSummary bool  `json:"with_summary,omitempty" jsonschema:"Also return totals across the accounts."`
+	SpaceID     int64    `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
+	WithSummary bool     `json:"with_summary,omitempty" jsonschema:"Also return totals across the accounts."`
+	Type        string   `json:"type,omitempty" jsonschema:"Only these types, comma-separated: bank, crypto, cash, credit, debt, space."`
+	Fields      []string `json:"fields,omitempty" jsonschema:"Keys to keep of each item, e.g. [id, name]. A dotted path goes inside: currency.code. Default all."`
+}
+
+type balanceArgs struct {
+	SpaceID    int64   `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
+	AccountIDs []int64 `json:"account_ids,omitempty" jsonschema:"Only these accounts, from list_accounts. Default all active accounts, with a total."`
+	At         string  `json:"at,omitempty" jsonschema:"Day, YYYY-MM-DD: the balance at the end of it. Default today."`
+}
+
+type balanceHistoryArgs struct {
+	SpaceID    int64   `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
+	AccountIDs []int64 `json:"account_ids,omitempty" jsonschema:"Only these accounts, from list_accounts. Default all active accounts, with a total."`
+	From       string  `json:"from" jsonschema:"First day, YYYY-MM-DD."`
+	To         string  `json:"to" jsonschema:"Last day, YYYY-MM-DD, at most about ten years after from."`
 }
 
 type idArgs struct {
@@ -50,11 +82,30 @@ type transactionsArgs struct {
 	CategoryIDs   []int64  `json:"category_ids,omitempty" jsonschema:"Only these categories."`
 	TagIDs        []int64  `json:"tag_ids,omitempty" jsonschema:"Only these tags."`
 	Query         string   `json:"q,omitempty" jsonschema:"Search words that must all match description, item names or an amount (1879, 18.79)."`
+	ExternalID    string   `json:"external_id,omitempty" jsonschema:"Only transactions entered with this key, from any source: is this receipt already in?"`
 	SortBy        string   `json:"sort_by,omitempty" jsonschema:"date (default), amount or created_at."`
 	SortDirection string   `json:"sort_direction,omitempty" jsonschema:"desc (default) or asc."`
 	Page          int      `json:"page,omitempty" jsonschema:"Page number from 1."`
 	PerPage       int      `json:"per_page,omitempty" jsonschema:"Rows per page, at most 100 (default 25)."`
 	WithSummary   bool     `json:"with_summary,omitempty" jsonschema:"Also return totals."`
+	Fields        []string `json:"fields,omitempty" jsonschema:"Keys to keep per row, e.g. id, amount, payments. Dotted: payments.accountId. Default all."`
+}
+
+// txFieldKeys are the keys of a transaction row, as the REST API names them.
+var txFieldKeys = jsonKeys(dto.Transaction{})
+
+type dayTotalsArgs struct {
+	SpaceID     int64    `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
+	Dates       []string `json:"dates,omitempty" jsonschema:"Only these days, YYYY-MM-DD. Give these, or both start_date and end_date."`
+	StartDate   string   `json:"start_date,omitempty" jsonschema:"Earliest date, YYYY-MM-DD. With end_date."`
+	EndDate     string   `json:"end_date,omitempty" jsonschema:"Latest date, YYYY-MM-DD. With start_date."`
+	Type        string   `json:"type,omitempty" jsonschema:"income, expense or transfer."`
+	AccountID   int64    `json:"account_id,omitempty" jsonschema:"Only this account."`
+	AccountIDs  []int64  `json:"account_ids,omitempty" jsonschema:"Only these source accounts."`
+	Currency    []string `json:"currency,omitempty" jsonschema:"Only these currency codes, e.g. USD."`
+	CategoryIDs []int64  `json:"category_ids,omitempty" jsonschema:"Only these categories."`
+	TagIDs      []int64  `json:"tag_ids,omitempty" jsonschema:"Only these tags."`
+	Query       string   `json:"q,omitempty" jsonschema:"Search words that must all match description, item names or an amount."`
 }
 
 type reportArgs struct {
@@ -72,11 +123,13 @@ type reportArgs struct {
 
 // mcpReadNeeds is the resource each read tool needs; list_spaces needs none.
 var mcpReadNeeds = map[string]string{
-	"list_accounts": "accounts", "list_categories": "categories", "list_tags": "tags", "list_currencies": "currencies",
+	"list_accounts": "accounts", "get_balance": "accounts", "get_balance_history": "accounts",
+	"list_categories": "categories", "list_tags": "tags", "list_currencies": "currencies",
 	"list_budgets": "budgets", "list_debts": "debts", "get_debts_summary": "debts",
 	"list_transactions": "transactions", "get_transaction": "transactions", "get_transactions_summary": "transactions",
-	"get_report": "reports", "list_automation_rules": "automation", "get_automation_rule": "automation",
-	"get_automation_rule_logs": "automation",
+	"get_transactions_day_totals": "transactions",
+	"get_report":                  "reports", "list_automation_rules": "automation", "get_automation_rule": "automation",
+	"get_automation_rule_logs": "automation", "list_my_actions": "audit", "list_reconciliations": "accounts",
 }
 
 func ro(title string) *mcp.ToolAnnotations {
@@ -100,8 +153,8 @@ func (h Handler) addSimpleReadTools(srv *mcp.Server) {
 
 	spaceTool := func(name, title, desc, path string) {
 		mcp.AddTool(srv, &mcp.Tool{Name: name, Description: desc, Annotations: ro(title)},
-			func(ctx context.Context, req *mcp.CallToolRequest, in spaceArgs) (*mcp.CallToolResult, any, error) {
-				return h.mcpGet(ctx, req, mcpSpacePath(in.SpaceID, path), nil), nil, nil
+			func(ctx context.Context, req *mcp.CallToolRequest, in listArgs) (*mcp.CallToolResult, any, error) {
+				return h.mcpGetFields(ctx, req, mcpSpacePath(in.SpaceID, path), nil, in.Fields, nil), nil, nil
 			})
 	}
 	spaceTool("list_categories", "List categories", "List the space's categories (expense and income).", "/categories")
@@ -150,16 +203,63 @@ func (h Handler) addQueryReadTools(srv *mcp.Server) {
 	mcp.AddTool(
 		srv,
 		&mcp.Tool{
-			Name:        "list_accounts",
-			Description: "List the space's accounts with their currency and current balance.",
+			Name: "list_accounts",
+			Description: "List the space's accounts with their currency and current balance. A credit card (type credit) " +
+				"also has its terms, available credit, last statement with the amount due and due date, and a status " +
+				"(ok, warning or danger).",
 			Annotations: ro("List accounts"),
 		},
 		func(ctx context.Context, req *mcp.CallToolRequest, in accountsArgs) (*mcp.CallToolResult, any, error) {
 			q := url.Values{}
+			if in.Type != "" {
+				q.Set("type", in.Type)
+			}
 			if in.WithSummary {
 				q.Set("with_summary", "1")
 			}
-			return h.mcpGet(ctx, req, mcpSpacePath(in.SpaceID, "/accounts"), q), nil, nil
+			return h.mcpGetFields(ctx, req, mcpSpacePath(in.SpaceID, "/accounts"), q, in.Fields, nil), nil, nil
+		},
+	)
+
+	// Both read the balance chart's route, so a balance is computed in one place.
+	mcp.AddTool(
+		srv,
+		&mcp.Tool{
+			Name: "get_balance",
+			Description: "The balance of accounts at the end of a day (all active ones, or account_ids): opening balance plus " +
+				"confirmed payments up to then. One series per account with one day, plus a total; native_data is in the account's own currency.",
+			Annotations: ro("Get balance"),
+		},
+		func(ctx context.Context, req *mcp.CallToolRequest, in balanceArgs) (*mcp.CallToolResult, any, error) {
+			at := in.At
+			if at == "" {
+				at = time.Now().Format("2006-01-02")
+			}
+			q, err := balanceQuery(in.AccountIDs, at, at)
+			if err != nil {
+				return mcpFail(err.Error()), nil, nil
+			}
+			return h.mcpGet(ctx, req, mcpSpacePath(in.SpaceID, "/accounts-balance-history"), q), nil, nil
+		},
+	)
+	mcp.AddTool(
+		srv,
+		&mcp.Tool{
+			Name: "get_balance_history",
+			Description: "The balance of accounts (all active ones, or account_ids) at the end of every day from from to to, " +
+				"oldest first. One series per account, plus a total. " +
+				"native_data is in the account's own currency, data in the space's base currency.",
+			Annotations: ro("Get balance history"),
+		},
+		func(ctx context.Context, req *mcp.CallToolRequest, in balanceHistoryArgs) (*mcp.CallToolResult, any, error) {
+			if in.From == "" || in.To == "" {
+				return mcpFail("give both from and to."), nil, nil
+			}
+			q, err := balanceQuery(in.AccountIDs, in.From, in.To)
+			if err != nil {
+				return mcpFail(err.Error()), nil, nil
+			}
+			return h.mcpGet(ctx, req, mcpSpacePath(in.SpaceID, "/accounts-balance-history"), q), nil, nil
 		},
 	)
 
@@ -168,7 +268,8 @@ func (h Handler) addQueryReadTools(srv *mcp.Server) {
 		&mcp.Tool{
 			Name: "list_transactions",
 			Description: "List transactions, newest first, with optional filters. Each row has its own currency. Returns at " +
-				"most 100 rows per page; use page to continue.",
+				"most 100 rows per page; use page to continue. Rows are large (every payment repeats its account): " +
+				"pass fields, e.g. [\"id\",\"date\",\"description\",\"payments.accountId\",\"payments.amount\"], for a compact answer.",
 			Annotations: ro("List transactions"),
 		},
 		func(ctx context.Context, req *mcp.CallToolRequest, in transactionsArgs) (*mcp.CallToolResult, any, error) {
@@ -176,7 +277,24 @@ func (h Handler) addQueryReadTools(srv *mcp.Server) {
 			if err != nil {
 				return mcpFail(err.Error()), nil, nil
 			}
-			return h.mcpGet(ctx, req, mcpSpacePath(in.SpaceID, "/transactions"), q), nil, nil
+			return h.mcpGetFields(ctx, req, mcpSpacePath(in.SpaceID, "/transactions"), q, in.Fields, txFieldKeys), nil, nil
+		},
+	)
+	mcp.AddTool(
+		srv,
+		&mcp.Tool{
+			Name: "get_transactions_day_totals",
+			Description: "What each day netted (income less expense; a transfer counts only its fee; skipped ones not at " +
+				"all), per currency and largest first. Covers every transaction of the day, however long the list is. " +
+				"Give dates, or start_date and end_date.",
+			Annotations: ro("Transactions day totals"),
+		},
+		func(ctx context.Context, req *mcp.CallToolRequest, in dayTotalsArgs) (*mcp.CallToolResult, any, error) {
+			q, err := dayTotalsQuery(in)
+			if err != nil {
+				return mcpFail(err.Error()), nil, nil
+			}
+			return h.mcpGet(ctx, req, mcpSpacePath(in.SpaceID, "/transactions-day-totals"), q), nil, nil
 		},
 	)
 	h.addLookupReadTools(srv)
@@ -191,8 +309,9 @@ func (h Handler) addLookupReadTools(srv *mcp.Server) {
 			Description: "Get one transaction with its items, tags and category.",
 			Annotations: ro("Get transaction"),
 		},
-		func(ctx context.Context, req *mcp.CallToolRequest, in idArgs) (*mcp.CallToolResult, any, error) {
-			return h.mcpGet(ctx, req, mcpSpacePath(in.SpaceID, "/transactions/"+strconv.FormatInt(in.ID, 10)), nil), nil, nil
+		func(ctx context.Context, req *mcp.CallToolRequest, in getArgs) (*mcp.CallToolResult, any, error) {
+			path := mcpSpacePath(in.SpaceID, "/transactions/"+strconv.FormatInt(in.ID, 10))
+			return h.mcpGetFields(ctx, req, path, nil, in.Fields, txFieldKeys), nil, nil
 		},
 	)
 
@@ -248,6 +367,9 @@ func transactionsQuery(in transactionsArgs) (url.Values, error) {
 	if in.Query != "" {
 		q.Set("q", in.Query)
 	}
+	if in.ExternalID != "" {
+		q.Set("external_id", in.ExternalID)
+	}
 	if in.Page > 0 {
 		q.Set("page", strconv.Itoa(in.Page))
 	}
@@ -258,6 +380,40 @@ func transactionsQuery(in transactionsArgs) (url.Values, error) {
 	q.Set("per_page", strconv.Itoa(min(per, mcpMaxPerPage)))
 	if in.WithSummary {
 		q.Set("with_summary", "1")
+	}
+	return q, nil
+}
+
+// balanceQuery turns the arguments of the balance tools into a query.
+func balanceQuery(accounts []int64, from, to string) (url.Values, error) {
+	q := url.Values{}
+	if err := firstErr(setDate(q, "start_date", from), setDate(q, "end_date", to)); err != nil {
+		return nil, err
+	}
+	setIDs(q, "account_ids", accounts)
+	return q, nil
+}
+
+// dayTotalsQuery turns the arguments of get_transactions_day_totals into a query.
+func dayTotalsQuery(in dayTotalsArgs) (url.Values, error) {
+	q, err := transactionsQuery(transactionsArgs{
+		StartDate: in.StartDate, EndDate: in.EndDate, Type: in.Type, AccountID: in.AccountID,
+		AccountIDs: in.AccountIDs, Currency: in.Currency, CategoryIDs: in.CategoryIDs, TagIDs: in.TagIDs, Query: in.Query,
+	})
+	if err != nil {
+		return nil, err
+	}
+	q.Del("per_page")
+	for _, d := range in.Dates {
+		if err := setDate(url.Values{}, "dates", d); err != nil {
+			return nil, err
+		}
+	}
+	if len(in.Dates) > 0 {
+		q.Set("dates", strings.Join(in.Dates, ","))
+	}
+	if len(in.Dates) == 0 && (in.StartDate == "" || in.EndDate == "") {
+		return nil, errors.New("give dates, or both start_date and end_date.")
 	}
 	return q, nil
 }

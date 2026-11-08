@@ -54,7 +54,7 @@ var Presets = []string{PresetViewer, PresetEditor, PresetAdmin}
 // EditorResources are the parts of a space the editor preset may add to and
 // change. Categories, currencies, reports, transfers and the space itself stay
 // read-only: they shape how everything else is counted or sent.
-var EditorResources = []string{"accounts", "automation", "budgets", "debts", "recurring", "tags", "transactions"}
+var EditorResources = []string{"accounts", "audit", "automation", "budgets", "debts", "recurring", "tags", "transactions"}
 
 // FromPreset expands a preset over some parts of a space (those a kind
 // of token can hold, see ResourcesFor). allowDelete lets an editor delete
@@ -92,14 +92,14 @@ func FromPreset(preset string, allowDelete bool, resources []string) ([]string, 
 // APIResources are the parts of a space a token can be given. httpserver maps
 // every space route to one of them and refuses a route it cannot map.
 var APIResources = []string{
-	"accounts", "automation", "budgets", "categories", "currencies", "debts",
+	"accounts", "audit", "automation", "budgets", "categories", "currencies", "debts",
 	"recurring", "reports", "space", "tags", "transactions", "transfers",
 }
 
 // MCPResources are the ones the MCP tools read: what an assistant is granted
 // when someone connects it.
 var MCPResources = []string{
-	"accounts", "automation", "budgets", "categories", "currencies", "debts", "reports", "tags", "transactions",
+	"accounts", "audit", "automation", "budgets", "categories", "currencies", "debts", "reports", "tags", "transactions",
 }
 
 // What a token is for. A personal token is made in Settings and may be given

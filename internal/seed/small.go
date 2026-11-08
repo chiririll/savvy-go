@@ -17,6 +17,7 @@ import (
 type miniSpace struct {
 	accounts []miniAccount
 	txs      []miniTx
+	rich     []richTx
 	budget   miniBudget
 }
 
@@ -57,6 +58,26 @@ var familySpace = miniSpace{
 		{"expense", "joint", "#UTILITIES", 105, "ConEdison — electricity bill (estimate)", -4, true, true},
 		{"expense", "joint", "#HOUSING", 1450, "Summer camp deposit", -8, true, false},
 	},
+	rich: []richTx{
+		{
+			typ: "expense", desc: "Costco — groceries, school and house", daysAgo: 9,
+			pays: []richPay{{"joint", "-150.00"}, {"wallet", "-37.20"}},
+			lines: []richLine{
+				{"#GROCERIES", "", "112.20", "- Rotisserie chicken\n- Milk 2 gal\n- Apples 3 lb\n- Frozen berries\n- Cereal ×2"},
+				{"#FAMILY", "", "45.00", "- Lunch boxes ×2\n- Notebooks ×6\n- Pencil case"},
+				{"#HOUSING", "", "30.00", "- Dish soap\n- Sponges"},
+			},
+		},
+		{
+			// A shopping list: nothing is bought yet, so nothing moves.
+			typ: "expense", desc: "Saturday shopping list", daysAgo: -2,
+			pays: []richPay{{"joint", "-95.00"}},
+			lines: []richLine{
+				{"#GROCERIES", "", "70.00", "- [x] Bread\n- [x] Eggs\n- [ ] Pasta\n- [ ] Tomato sauce\n- [ ] Parmesan"},
+				{"#FAMILY", "", "25.00", "- [ ] Birthday card for Grandma\n- [ ] Gift wrap"},
+			},
+		},
+	},
 	budget: miniBudget{"Family Groceries", "#GROCERIES", 700},
 }
 
@@ -74,6 +95,34 @@ var studioSpace = miniSpace{
 		{"expense", "bank", "Software & tools", 89, "Figma & Adobe subscriptions", 19, false, false},
 		{"expense", "bank", "Rent & office", 74.50, "Vattenfall", 10, false, false},
 		{"expense", "bank", "Taxes & VAT", 2400, "VAT prepayment — Finanzamt", -6, true, true},
+	},
+	rich: []richTx{
+		{
+			typ: "expense", desc: "Team tools — yearly licences", daysAgo: 12,
+			pays: []richPay{{"bank", "-840.00"}},
+			lines: []richLine{
+				{"Software & tools", "", "480.00", "- Figma, 4 seats\n- FigJam"},
+				{"Software & tools", "", "240.00", "- Notion team plan\n- Linear"},
+				{"Software & tools", "", "120.00", "- Domain renewals ×6"},
+			},
+		},
+		{
+			typ: "expense", desc: "Conference in Lisbon — EUR and USD cards", daysAgo: 23,
+			pays: []richPay{{"bank", "-300.00"}, {"usd", "-54.00"}},
+			lines: []richLine{
+				{"Events & travel", "", "250.00", "- Conference tickets ×2\n- Hotel, 2 nights"},
+				{"Other costs", "", "100.00", "Team dinner, paid half from the USD account"},
+			},
+		},
+		{
+			// A shopping list: nothing is bought yet, so nothing moves.
+			typ: "expense", desc: "Hardware order — to buy", daysAgo: -3,
+			pays: []richPay{{"bank", "-1450.00"}},
+			lines: []richLine{
+				{"Hardware", "", "1200.00", "- [x] 27\" monitor\n- [ ] USB-C dock\n- [ ] Mechanical keyboard"},
+				{"Software & tools", "", "250.00", "- [ ] Backup licence"},
+			},
+		},
 	},
 	budget: miniBudget{"Office costs", "Rent & office", 1000},
 }
@@ -99,6 +148,9 @@ func seedMini(ctx context.Context, db store.DB, now time.Time, spec miniSpace) (
 		if _, err := txs.Create(ctx, miniTxInput(t, out[t.account].ID, all, now)); err != nil {
 			return nil, fmt.Errorf("transaction %s: %w", t.desc, err)
 		}
+	}
+	if err := createRich(ctx, txs, now, spec.rich, out, all, nil); err != nil {
+		return nil, err
 	}
 	if cat := catByName(all, spec.budget.category); cat != nil {
 		if err := seedMiniBudget(ctx, db, now, spec.budget, cat.ID); err != nil {
@@ -130,12 +182,18 @@ func seedMiniAccounts(ctx context.Context, db store.DB, specs []miniAccount) (ma
 }
 
 func miniTxInput(t miniTx, accountID int64, cats []ledger.Category, now time.Time) ledger.TxInput {
+	amount := decimal.NewFromFloat(t.amount)
+	paid := amount
+	if t.typ == "expense" {
+		paid = amount.Neg()
+	}
 	in := ledger.TxInput{
-		Type: t.typ, AccountID: accountID, Description: &t.desc,
-		Amount: decimal.NewFromFloat(t.amount), IsEstimated: t.estimated,
+		Type: t.typ, Description: &t.desc,
+		Payments: []ledger.PaymentInput{{AccountID: accountID, Amount: &paid}},
+		Lines:    []ledger.LineInput{{Amount: amount}},
 	}
 	if c := catByName(cats, t.category); c != nil {
-		in.CategoryID = &c.ID
+		in.Lines[0].CategoryID = &c.ID
 	}
 	date := now.AddDate(0, 0, -t.daysAgo).Format("2006-01-02")
 	status := "confirmed"

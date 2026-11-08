@@ -24,7 +24,7 @@ func resolveValue(value any, tx *ledger.Transaction) any {
 		path := strings.TrimSpace(s[2 : len(s)-2])
 		path = strings.TrimPrefix(path, "transaction.")
 		path = strings.TrimPrefix(path, "entity.")
-		return fieldValue(tx, path)
+		return scalar(fieldValue(tx, path))
 	}
 	return value
 }
@@ -37,7 +37,7 @@ func parseTemplate(tmpl string, tx *ledger.Transaction) string {
 		if strings.HasPrefix(path, "transaction.") || strings.HasPrefix(path, "entity.") {
 			path = strings.TrimPrefix(path, "transaction.")
 			path = strings.TrimPrefix(path, "entity.")
-			return asString(fieldValue(tx, path))
+			return asString(scalar(fieldValue(tx, path)))
 		}
 		return m
 	})
@@ -56,7 +56,7 @@ func evaluateFormula(formula any, tx *ledger.Transaction) decimal.Decimal {
 		if strings.HasPrefix(path, "transaction.") || strings.HasPrefix(path, "entity.") {
 			path = strings.TrimPrefix(path, "transaction.")
 			path = strings.TrimPrefix(path, "entity.")
-			v := fieldValue(tx, path)
+			v := scalar(fieldValue(tx, path))
 			if d, ok := asDecimal(v); ok {
 				return d.String()
 			}

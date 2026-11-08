@@ -46,8 +46,8 @@ CREATE TABLE IF NOT EXISTS auth_sessions (
     created_at TEXT,
     updated_at TEXT
 ) STRICT;
-CREATE INDEX IF NOT EXISTS auth_sessions_user_revoked_idx ON auth_sessions (user_id, revoked_at);
-CREATE INDEX IF NOT EXISTS auth_sessions_idle_idx ON auth_sessions (idle_expires_at);
+-- Last activity of a user (users list, space members): MAX(last_used_at) per user from the index alone.
+CREATE INDEX IF NOT EXISTS auth_sessions_user_used_idx ON auth_sessions (user_id, last_used_at);
 CREATE TABLE IF NOT EXISTS password_tokens (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -58,7 +58,6 @@ CREATE TABLE IF NOT EXISTS password_tokens (
     updated_at TEXT
 ) STRICT;
 CREATE INDEX IF NOT EXISTS password_tokens_user_consumed_idx ON password_tokens (user_id, consumed_at);
-CREATE INDEX IF NOT EXISTS password_tokens_expires_idx ON password_tokens (expires_at);
 -- The link that confirms an email address. One per user: asking again replaces
 -- it. It names the address it was sent to, so changing the address ends it.
 CREATE TABLE IF NOT EXISTS email_verification_tokens (
@@ -88,7 +87,6 @@ CREATE TABLE IF NOT EXISTS two_factor_failures (
     locked_until TEXT
 ) STRICT;
 CREATE INDEX IF NOT EXISTS two_factor_challenges_user_idx ON two_factor_challenges (user_id);
-CREATE INDEX IF NOT EXISTS two_factor_challenges_expires_idx ON two_factor_challenges (expires_at);
 CREATE TABLE IF NOT EXISTS two_factor_recovery_codes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -124,7 +122,6 @@ CREATE TABLE IF NOT EXISTS webauthn_challenges (
     updated_at TEXT
 ) STRICT;
 CREATE INDEX IF NOT EXISTS webauthn_challenges_user_idx ON webauthn_challenges (user_id);
-CREATE INDEX IF NOT EXISTS webauthn_challenges_expires_idx ON webauthn_challenges (expires_at);
 CREATE TABLE IF NOT EXISTS api_tokens (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -144,7 +141,7 @@ CREATE TABLE IF NOT EXISTS api_tokens (
     created_at TEXT,
     updated_at TEXT
 ) STRICT;
-CREATE INDEX IF NOT EXISTS api_tokens_user_idx ON api_tokens (user_id);
+CREATE INDEX IF NOT EXISTS api_tokens_user_idx ON api_tokens (user_id, last_used_at);
 CREATE TABLE IF NOT EXISTS oauth_clients (
     client_id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
@@ -188,7 +185,7 @@ CREATE TABLE IF NOT EXISTS uploads (
     created_at TEXT,
     updated_at TEXT
 ) STRICT;
-CREATE INDEX IF NOT EXISTS uploads_bucket_idx ON uploads (bucket);
+CREATE INDEX IF NOT EXISTS uploads_bucket_status_idx ON uploads (bucket, status);
 CREATE INDEX IF NOT EXISTS uploads_status_expires_idx ON uploads (status, expires_at);
 CREATE INDEX IF NOT EXISTS uploads_user_status_idx ON uploads (user_id, status);
 CREATE TABLE IF NOT EXISTS identity_providers (
@@ -210,7 +207,6 @@ CREATE TABLE IF NOT EXISTS identity_providers (
     created_at TEXT,
     updated_at TEXT
 ) STRICT;
-CREATE INDEX IF NOT EXISTS identity_providers_enabled_idx ON identity_providers (enabled, sort_order);
 CREATE TABLE IF NOT EXISTS user_identities (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -236,8 +232,6 @@ CREATE TABLE IF NOT EXISTS sso_login_states (
     updated_at TEXT
 ) STRICT;
 CREATE INDEX IF NOT EXISTS sso_login_states_provider_idx ON sso_login_states (identity_provider_id);
-CREATE INDEX IF NOT EXISTS sso_login_states_expires_idx ON sso_login_states (expires_at);
-CREATE INDEX IF NOT EXISTS sso_login_states_saml_idx ON sso_login_states (saml_request_id);
 CREATE TABLE IF NOT EXISTS sso_login_tickets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     ticket TEXT NOT NULL UNIQUE,
@@ -250,7 +244,6 @@ CREATE TABLE IF NOT EXISTS sso_login_tickets (
     updated_at TEXT
 ) STRICT;
 CREATE INDEX IF NOT EXISTS sso_login_tickets_user_idx ON sso_login_tickets (user_id);
-CREATE INDEX IF NOT EXISTS sso_login_tickets_expires_idx ON sso_login_tickets (expires_at);
 
 -- Spaces: their databases live elsewhere (one per space); this is the
 -- registry and who may enter them.
@@ -321,7 +314,7 @@ CREATE TABLE IF NOT EXISTS admin_audit (
     details TEXT,
     created_at TEXT NOT NULL
 ) STRICT;
-CREATE INDEX IF NOT EXISTS admin_audit_space_idx ON admin_audit (space_id, created_at);
+CREATE INDEX IF NOT EXISTS admin_audit_space_idx ON admin_audit (space_id);
 CREATE INDEX IF NOT EXISTS admin_audit_actor_idx ON admin_audit (actor_id);
 
 -- Linked spaces may transfer to each other. Only who administers both may

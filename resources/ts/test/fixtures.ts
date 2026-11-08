@@ -6,10 +6,13 @@ import type {
     Currency,
     CurrencyCatalogItem,
     Debt,
+    Payment,
+    RecurringTemplate,
     RecurringTransaction,
     Settings,
     Tag,
     Transaction,
+    TransactionLine,
 } from '@/types'
 
 export const currency = (overrides: Partial<Currency> = {}): Currency => ({
@@ -143,44 +146,62 @@ export const debt = (overrides: Partial<Debt> = {}): Debt => ({
     ...overrides,
 })
 
-export const recurring = (overrides: Partial<RecurringTransaction> = {}): RecurringTransaction => ({
-    id: 1,
+/** What a rule makes: rent, paid from the first account, in one line. Amounts are signed, as the API keeps them. */
+export const recurringTemplate = (overrides: Partial<RecurringTemplate> = {}): RecurringTemplate => ({
     type: 'expense',
-    amount: 1100,
-    toAmount: null,
-    isEstimated: false,
     description: 'Rent',
-    frequency: 'monthly',
-    interval: 1,
-    dayOfWeek: null,
-    dayOfMonth: 1,
-    startDate: '2026-01-01',
-    endDate: null,
-    nextRunDate: '2099-01-01',
-    lastRunDate: null,
-    isActive: true,
-    account: accounts[0],
-    toAccount: null,
-    category: categories[0],
-    tags: [],
+    payments: [{ account_id: accounts[0].id, amount: -1100 }],
+    lines: [{ category_id: categories[0].id, currency_id: currencies[0].id, amount: 1100 }],
+    tag_ids: [],
     ...overrides,
 })
 
+export const recurring = (overrides: Partial<RecurringTransaction> = {}): RecurringTransaction => ({
+    id: 1,
+    template: recurringTemplate(),
+    schedule: { frequency: 'monthly', interval: 1, day_of_month: 1, start: '2026-01-01', end: null },
+    isActive: true,
+    error: null,
+    nextRunDate: '2099-01-01',
+    lastRunDate: null,
+    rowAmount: { main: { currency: currencies[0], amount: 1100 }, totals: [{ currency: currencies[0], amount: 1100 }], converted: false },
+    receivedAmount: null,
+    ...overrides,
+})
+
+export const payment = (overrides: Partial<Payment> = {}): Payment => ({
+    accountId: overrides.account?.id ?? 1,
+    account: accounts[0],
+    amount: -42.5,
+    ...overrides,
+})
+
+export const line = (overrides: Partial<TransactionLine> = {}): TransactionLine => ({
+    seq: 0,
+    categoryId: categories[0].id,
+    category: categories[0],
+    currencyId: currencies[0].id,
+    amount: 42.5,
+    note: null,
+    ...overrides,
+})
+
+/** An expense of 42.50 on the first account, in one line. */
 export const transaction = (overrides: Partial<Transaction> = {}): Transaction => ({
     id: 1,
     type: 'expense',
-    amount: 42.5,
-    toAmount: null,
-    isEstimated: false,
+    amount: -42.5,
+    rowAmount: { main: { currency: currencies[0], amount: 42.5 }, totals: [{ currency: currencies[0], amount: 42.5 }], converted: false },
+    receivedAmount: null,
+    difference: null,
     description: 'Weekly shop',
     date: '2020-05-04',
     status: 'confirmed',
     recurringTransactionId: null,
-    actions: { edit: true, duplicate: true, delete: true, confirm: false, skip: false },
-    account: accounts[0],
-    toAccount: null,
-    category: categories[0],
-    items: [],
+    actions: { edit: true, editDetails: true, duplicate: true, delete: true, confirm: false, skip: false },
+    restrictions: [],
+    payments: [payment()],
+    lines: [line()],
     tags: [],
     ...overrides,
 })
@@ -190,6 +211,6 @@ export const pendingTransaction = (overrides: Partial<Transaction> = {}): Transa
     transaction({
         status: 'pending',
         date: '2099-06-01',
-        actions: { edit: true, duplicate: false, delete: true, confirm: true, skip: true },
+        actions: { edit: true, editDetails: true, duplicate: false, delete: true, confirm: true, skip: true },
         ...overrides,
     })

@@ -6,10 +6,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from '@/components/ui/form'
 import { FormActiveField } from '@/components/shared/form/FormActiveField'
-import { accountSchema, AccountFormValues, AccountFormData, decodeAccountCurrency } from '@/schemas'
+import { accountSchema, AccountFormValues, AccountFormData, toAccountPayload } from '@/schemas'
 import { FormWrapper } from '@/components/shared/form/FormWrapper'
 import { AccountCurrencyField } from './AccountCurrencyField'
 import { AccountTypeField } from './AccountTypeField'
+import { AccountCardFields } from './AccountCardFields'
 
 interface AccountFormProps {
     defaultValues?: Partial<AccountFormValues>
@@ -20,11 +21,6 @@ interface AccountFormProps {
     formId?: string
     hideSubmit?: boolean
     isEdit?: boolean
-}
-
-function toPayload(data: AccountFormValues): AccountFormData {
-    const { currency, ...rest } = data
-    return { ...rest, ...decodeAccountCurrency(currency) }
 }
 
 export function AccountForm({
@@ -47,18 +43,20 @@ export function AccountForm({
             currency: '',
             initial_balance: 0,
             is_active: true,
+            grace_days: 0,
             ...defaultValues,
         },
     })
 
     useFormValuesChange(form, onValuesChange)
+    const isCard = form.watch('type') === 'credit'
 
     return (
         <FormWrapper>
             <Form {...form}>
                 <form
                     id={formId}
-                    onSubmit={form.handleSubmit((data) => onSubmit(toPayload(data)))}
+                    onSubmit={form.handleSubmit((data) => onSubmit(toAccountPayload(data)))}
                     className="space-y-4"
                 >
                     <FormField
@@ -77,7 +75,7 @@ export function AccountForm({
 
                     <AccountCurrencyField form={form} isEdit={isEdit} />
 
-                    <div className="grid grid-cols-2 items-start gap-3">
+                    <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2">
                         <AccountTypeField form={form} />
                         <FormField
                             control={form.control}
@@ -94,6 +92,8 @@ export function AccountForm({
                             )}
                         />
                     </div>
+
+                    {isCard && <AccountCardFields form={form} />}
 
                     <FormActiveField control={form.control} help={t('forms:accounts.activeHelp')} />
 

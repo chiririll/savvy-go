@@ -1,44 +1,48 @@
 -- name: GetAccount :one
 -- The same columns as ListAccounts, so its row converts to ListAccountsRow.
-SELECT a.id, a.name, a.type, a.currency_id, a.initial_balance, a.is_active, a.sort_order,
-	a.debt_type, a.target_amount, a.due_date, a.is_paid_off, a.counterparty, a.debt_description, a.created_at,
+SELECT a.id, a.name, a.type, a.is_service, a.currency_id, a.initial_balance, a.is_active, a.sort_order, a.created_at,
 	c.id AS currency_id_join, c.code, c.name AS currency_name, c.symbol, c.decimals, c.is_base, c.rate
 FROM accounts a
 JOIN currencies c ON c.id = a.currency_id
 WHERE a.id = ?;
 
 -- name: ListAccounts :many
-SELECT a.id, a.name, a.type, a.currency_id, a.initial_balance, a.is_active, a.sort_order,
-	a.debt_type, a.target_amount, a.due_date, a.is_paid_off, a.counterparty, a.debt_description, a.created_at,
+-- exclude_service leaves out debt and space accounts: that is the list a picker
+-- offers. exclude_space leaves out only the space accounts: net worth counts
+-- debts but not the money that went to other spaces.
+SELECT a.id, a.name, a.type, a.is_service, a.currency_id, a.initial_balance, a.is_active, a.sort_order, a.created_at,
 	c.id AS currency_id_join, c.code, c.name AS currency_name, c.symbol, c.decimals, c.is_base, c.rate
 FROM accounts a
 JOIN currencies c ON c.id = a.currency_id
 WHERE a.is_active = COALESCE(sqlc.narg('only_active'), a.is_active)
-  AND CASE a.type WHEN 'bank' THEN 1 WHEN 'crypto' THEN 1 WHEN 'cash' THEN 1 ELSE 0 END
-      >= COALESCE(CAST(sqlc.narg('exclude_debts') AS INTEGER), 0)
-  AND CASE a.type WHEN 'debt' THEN 1 ELSE 0 END >= COALESCE(CAST(sqlc.narg('only_debts') AS INTEGER), 0)
-  AND a.is_paid_off <= CASE WHEN CAST(sqlc.narg('unpaid_only') AS INTEGER) IS NULL THEN 1 ELSE 0 END
-ORDER BY CASE WHEN a.type = 'debt' THEN 1 ELSE 0 END, a.sort_order, a.id;
+  AND CASE WHEN a.is_service THEN 1 ELSE 0 END
+      <= CASE WHEN CAST(sqlc.narg('exclude_service') AS INTEGER) IS NULL THEN 1 ELSE 0 END
+  AND CASE WHEN a.type = 'space' THEN 1 ELSE 0 END
+      <= CASE WHEN CAST(sqlc.narg('exclude_space') AS INTEGER) IS NULL THEN 1 ELSE 0 END
+ORDER BY CASE a.type WHEN 'debt' THEN 1 WHEN 'space' THEN 2 ELSE 0 END, a.sort_order, a.id;
 
 -- name: NextAccountSortOrder :one
+-- Debts are ordered among themselves, the other accounts among theirs.
 SELECT COALESCE(MAX(sort_order), -1) + 1 FROM accounts
-WHERE CASE WHEN sqlc.narg('debt_only') IS NULL THEN type IN ('bank','crypto','cash') ELSE type = 'debt' END;
+WHERE CASE WHEN sqlc.narg('debt_only') IS NULL THEN type IN ('bank','crypto','cash','credit') ELSE type = 'debt' END;
 
 -- name: InsertAccount :execresult
-INSERT INTO accounts (name, type, debt_type, currency_id, initial_balance, target_amount, due_date,
-	is_paid_off, counterparty, debt_description, is_active, sort_order, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT INTO accounts (name, type, currency_id, initial_balance, is_active, sort_order, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: UpdateAccount :exec
-UPDATE accounts SET name=?, type=?, currency_id=?, initial_balance=?, is_active=?,
-	debt_type=?, target_amount=?, due_date=?, is_paid_off=?, counterparty=?, debt_description=?, updated_at=?
+UPDATE accounts SET name=?, type=?, currency_id=?, initial_balance=?, is_active=?, updated_at=?
 WHERE id=?;
+
+-- name: GetSpaceAccountID :one
+-- The account of type space for a currency: at most one exists (unique index).
+SELECT id FROM accounts WHERE type = 'space' AND currency_id = ?;
 
 -- name: CountAccounts :one
 SELECT COUNT(*) FROM accounts;
 
--- name: CountAccountTransactions :one
-SELECT COUNT(*) FROM transactions WHERE account_id = ? OR to_account_id = ?;
+-- name: CountAccountPayments :one
+SELECT COUNT(*) FROM payments WHERE account_id = ?;
 
 -- name: DeleteAccount :exec
 DELETE FROM accounts WHERE id = ?;
@@ -46,48 +50,80 @@ DELETE FROM accounts WHERE id = ?;
 -- name: SetAccountSortOrder :exec
 UPDATE accounts SET sort_order = ? WHERE id = ?;
 
--- name: SumDebtPayments :one
-SELECT CAST(COALESCE(SUM(to_amount),0) AS INTEGER) FROM transactions
-WHERE to_account_id = ? AND status = 'confirmed' AND type IN ('debt_payment','debt_collection');
-
 -- name: AccountDailyDeltas :many
--- The net change of a non-debt account per day, oldest first, for confirmed
--- transactions up to as_of (all of them when NULL). This is the only place that
--- knows how a transaction moves money: it adds to the account for income,
--- debt_collection, debt_borrow and transfer_in, takes from it for every other type, and a
--- transfer adds to_amount to its destination account (a transfer from an account
--- to itself therefore does both). A balance is the sum of these rows, a balance
--- history their running total.
+-- The net change of an account per day, oldest first, for confirmed
+-- transactions in (after, as_of] (an open end when NULL). A payment is signed money
+-- in the account's own currency, so a change is just their sum; this is the
+-- only place that reads how money moved. A balance is initial_balance plus
+-- these rows, a balance history their running total.
 -- CAST: sqlc would type a SUM as float; the sum of integers is an integer.
-WITH p AS (SELECT CAST(sqlc.arg('id') AS INTEGER) AS id)
-SELECT t.date AS day,
-	CAST(SUM(
-		CASE WHEN t.account_id = p.id THEN
-			CASE WHEN t.type IN ('income', 'debt_collection', 'debt_borrow', 'transfer_in') THEN t.amount ELSE -t.amount END
-		ELSE 0 END
-		+ CASE WHEN t.to_account_id = p.id AND t.type = 'transfer' THEN COALESCE(t.to_amount, 0) ELSE 0 END
-	) AS INTEGER) AS delta
-FROM transactions t, p
-WHERE t.status = 'confirmed' AND (t.account_id = p.id OR t.to_account_id = p.id)
+SELECT t.date AS day, CAST(SUM(p.amount) AS INTEGER) AS delta
+FROM payments p
+JOIN transactions t ON t.id = p.transaction_id
+WHERE p.account_id = sqlc.arg('id') AND t.status = 'confirmed'
 	AND t.date <= COALESCE(sqlc.narg('as_of'), t.date)
+	AND t.date > COALESCE(sqlc.narg('after'), '')
 GROUP BY t.date
 ORDER BY t.date;
+
+-- name: AccountDeltaSum :one
+-- The total of AccountDailyDeltas in one row: a balance needs only the sum, and
+-- reading a row per day costs far more than adding them up here.
+SELECT CAST(COALESCE(SUM(p.amount), 0) AS INTEGER) AS delta
+FROM payments p
+JOIN transactions t ON t.id = p.transaction_id
+WHERE p.account_id = sqlc.arg('id') AND t.status = 'confirmed'
+	AND t.date <= COALESCE(sqlc.narg('as_of'), t.date)
+	AND t.date > COALESCE(sqlc.narg('after'), '');
 
 -- name: GetAccountUnit :one
 SELECT c.id, c.decimals FROM accounts a JOIN currencies c ON c.id = a.currency_id WHERE a.id = ?;
 
--- name: MarkAccountPaidOff :exec
-UPDATE accounts SET is_paid_off = 1 WHERE id = ?;
+-- name: GetDebt :one
+-- The same columns as ListDebts, so its row converts to ListDebtsRow.
+SELECT a.id, a.name, a.type, a.is_service, a.currency_id, a.initial_balance, a.is_active, a.sort_order, a.created_at,
+	d.direction, d.principal, d.due_date, d.counterparty, d.note, d.closed_at,
+	c.id AS currency_id_join, c.code, c.name AS currency_name, c.symbol, c.decimals, c.is_base, c.rate
+FROM debts d
+JOIN accounts a ON a.id = d.account_id
+JOIN currencies c ON c.id = a.currency_id
+WHERE d.account_id = ?;
 
--- name: ReopenAccount :exec
-UPDATE accounts SET is_paid_off = 0, updated_at = ? WHERE id = ?;
+-- name: ListDebts :many
+-- open_only leaves out closed debts.
+SELECT a.id, a.name, a.type, a.is_service, a.currency_id, a.initial_balance, a.is_active, a.sort_order, a.created_at,
+	d.direction, d.principal, d.due_date, d.counterparty, d.note, d.closed_at,
+	c.id AS currency_id_join, c.code, c.name AS currency_name, c.symbol, c.decimals, c.is_base, c.rate
+FROM debts d
+JOIN accounts a ON a.id = d.account_id
+JOIN currencies c ON c.id = a.currency_id
+WHERE CASE WHEN d.closed_at IS NULL THEN 0 ELSE 1 END
+      <= CASE WHEN CAST(sqlc.narg('open_only') AS INTEGER) IS NULL THEN 1 ELSE 0 END
+ORDER BY a.sort_order, a.id;
+
+-- name: InsertDebt :exec
+INSERT INTO debts (account_id, direction, principal, due_date, counterparty, note)
+VALUES (?, ?, ?, ?, ?, ?);
+
+-- name: UpdateDebt :exec
+UPDATE debts SET direction=?, principal=?, due_date=?, counterparty=?, note=? WHERE account_id=?;
+
+-- name: CloseDebt :exec
+UPDATE debts SET closed_at = ? WHERE account_id = ?;
+
+-- name: ReopenDebt :exec
+UPDATE debts SET closed_at = NULL WHERE account_id = ?;
 
 -- name: CountDebtHistory :one
-SELECT COUNT(*) FROM transactions
-WHERE to_account_id = ? AND type IN ('debt_payment','debt_collection');
+-- Payments and collections made on a debt; its issuance is not history.
+SELECT COUNT(*) FROM payments p JOIN transactions t ON t.id = p.transaction_id
+WHERE p.account_id = ? AND t.type IN ('debt_payment','debt_collection');
 
 -- name: DeleteDebtIssuance :exec
-DELETE FROM transactions WHERE to_account_id = ? AND type IN ('debt_lend','debt_borrow');
+-- The payments go with the transaction (cascade).
+DELETE FROM transactions WHERE type IN ('debt_lend','debt_borrow')
+	AND id IN (SELECT transaction_id FROM payments WHERE account_id = ?);
 
 -- name: DeleteDebtAccount :exec
+-- The debts row goes with the account (cascade).
 DELETE FROM accounts WHERE id = ? AND type = 'debt';

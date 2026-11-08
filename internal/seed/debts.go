@@ -22,11 +22,23 @@ func (s *seeder) seedTransfersDebt(accounts map[string]*ledger.Account) error {
 
 		dCard := dateOn(cursor, minInt(25, daysInMonth(cursor)))
 		if s.inRange(dCard) {
-			pay := float64(s.mtRand(600, 1400))
-			to := accounts["credit"].ID
-			if err := s.addTx("debt_payment", accounts["checking"].ID, nil, pay,
-				"Amex statement payment", dCard, &to, &pay, nil); err != nil {
+			// The card is paid in full on the 25th. The draw keeps the random
+			// stream of the other data as it was.
+			_ = s.mtRand(600, 1400)
+			// The balance reads the stored transactions, so store the queued ones.
+			if err := s.flush(); err != nil {
 				return err
+			}
+			debt, err := s.accts.Balance(s.ctx, *accounts["credit"], dCard.Format("2006-01-02"))
+			if err != nil {
+				return err
+			}
+			if pay, _ := debt.Neg().Decimal().Float64(); pay > 0 {
+				to := accounts["credit"].ID
+				if err := s.addTx("transfer", accounts["checking"].ID, nil, pay,
+					"Amex statement payment", dCard, &to, &pay, nil); err != nil {
+					return err
+				}
 			}
 		}
 
@@ -70,7 +82,7 @@ func (s *seeder) seedPending(accounts map[string]*ledger.Account, expenses []led
 		acct, cat  string
 		amount     float64
 		desc       string
-		estimated  bool // the amount is a guess until the real bill arrives
+		estimated  bool // the amount is a guess until the real bill arrives (named in the description)
 	}{
 		{-3, "checking", "#HEALTH", 85, "Dentist appointment — City Medical Clinic", false},
 		{1, "credit", "#GIFTS", 55, "Birthday gift — Etsy", false},
@@ -89,9 +101,11 @@ func (s *seeder) seedPending(accounts map[string]*ledger.Account, expenses []led
 		d := s.now.AddDate(0, 0, p.offsetDays).Format("2006-01-02")
 		desc := p.desc
 		status := "pending"
+		paid, line := decimal.NewFromFloat(p.amount).Neg(), decimal.NewFromFloat(p.amount)
 		if _, err := s.txs.Create(s.ctx, ledger.TxInput{
-			Type: "expense", AccountID: acct.ID, CategoryID: catID, Amount: decimal.NewFromFloat(p.amount),
-			Description: &desc, Date: &d, Status: &status, IsEstimated: p.estimated,
+			Type: "expense", Description: &desc, Date: &d, Status: &status,
+			Payments: []ledger.PaymentInput{{AccountID: acct.ID, Amount: &paid}},
+			Lines:    []ledger.LineInput{{CategoryID: catID, Amount: line}},
 		}); err != nil {
 			return fmt.Errorf("pending %s: %w", p.desc, err)
 		}

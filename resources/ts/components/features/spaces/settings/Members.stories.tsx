@@ -10,9 +10,9 @@ import { Members } from './Members'
 
 // The signed-in user of every story is user 1.
 const members: SpaceMember[] = [
-    { userId: 1, name: 'Kirill', email: 'kirill@example.com', role: 'admin', createdAt: null },
-    { userId: 2, name: 'Alex', email: 'alex@example.com', role: 'editor', createdAt: null },
-    { userId: 3, name: 'Sam', email: 'sam@example.com', role: 'viewer', createdAt: null },
+    { userId: 1, name: 'Kirill', email: 'kirill@example.com', role: 'admin', createdAt: null, lastActiveAt: '2026-11-08T10:00:00Z' },
+    { userId: 2, name: 'Alex', email: 'alex@example.com', role: 'editor', createdAt: null, lastActiveAt: '2026-11-01T09:30:00Z' },
+    { userId: 3, name: 'Sam', email: 'sam@example.com', role: 'viewer', createdAt: null, lastActiveAt: null },
 ]
 
 const sent: { bodies: unknown[] } = { bodies: [] }

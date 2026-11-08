@@ -16,6 +16,8 @@ var presetMatrix = []struct {
 	admin    string
 }{
 	{"accounts", Read, Write, Write, Delete},
+	// Write is rolling back the token's own changes; it is not a way to delete.
+	{"audit", Read, Write, Write, Delete},
 	{"automation", Read, Write, Write, Delete},
 	{"budgets", Read, Write, Write, Delete},
 	{"categories", Read, Read, Read, Delete},

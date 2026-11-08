@@ -1,15 +1,23 @@
 import { api, apiClient } from './client'
 import { createCrudApi } from './crud'
 import { toQueryString } from '@/lib/query-string'
-import { Transaction, TransactionFilters, TransactionSummary } from '@/types'
-import { TransactionFormData } from '@/schemas'
+import type {
+    DayTotal,
+    LineInput,
+    PaymentInput,
+    Transaction,
+    TransactionFilters,
+    TransactionInput,
+    TransactionSummary,
+} from '@/types'
 
 const ENDPOINT = '/transactions'
 
+/** Confirming the open occurrence of a recurring rule may bring the real payments and lines. */
 export interface ConfirmTransactionOptions {
     date?: string | null
-    amount?: number | null
-    to_amount?: number | null
+    payments?: PaymentInput[]
+    lines?: LineInput[]
 }
 
 type ConfirmTransactionBody = Omit<ConfirmTransactionOptions, 'date'> & { date?: string }
@@ -22,18 +30,20 @@ export interface TransactionsResponse {
         last_page: number
         per_page: number
         total: number
+        /** Only when asked with `count: false`: `total` is then just the page. */
+        has_more?: boolean
         from: number
         to: number
     }
 }
 
-const crud = createCrudApi<Transaction, TransactionFormData>(ENDPOINT)
+const crud = createCrudApi<Transaction, TransactionInput>(ENDPOINT)
 
 export const transactionsApi = {
     ...crud,
 
     getAll: async (
-        filters?: TransactionFilters & { with_summary?: boolean },
+        filters?: TransactionFilters & { with_summary?: boolean; count?: boolean },
         signal?: AbortSignal,
     ): Promise<TransactionsResponse> => {
         const query = toQueryString({
@@ -52,10 +62,29 @@ export const transactionsApi = {
             per_page: filters?.per_page,
             page: filters?.page,
             with_summary: filters?.with_summary,
+            count: filters?.count === false ? '0' : undefined,
             status: filters?.status,
         })
         const response = await apiClient.get(`${ENDPOINT}${query}`, { signal })
         return response.data
+    },
+
+    /** What each of the given days netted per currency, over every transaction of the day (not one page). */
+    getDayTotals: async (filters: TransactionFilters | undefined, dates: string[], signal?: AbortSignal) => {
+        const query = toQueryString({
+            dates: dates.join(','),
+            type: filters?.type,
+            account_ids: filters?.account_ids?.join(','),
+            currency: filters?.currency?.join(','),
+            q: filters?.q,
+            category_ids: filters?.category_ids,
+            tag_ids: filters?.tag_ids,
+            start_date: filters?.start_date,
+            end_date: filters?.end_date,
+            status: filters?.status,
+        })
+        const response = await apiClient.get<{ data: DayTotal[] }>(`/transactions-day-totals${query}`, { signal })
+        return response.data.data
     },
 
     duplicate: (id: number | string) =>
@@ -64,9 +93,13 @@ export const transactionsApi = {
     confirm: (id: number | string, options: ConfirmTransactionOptions = {}) =>
         api.post<Transaction, ConfirmTransactionBody>(`${ENDPOINT}/${id}/confirm`, {
             ...(options.date ? { date: options.date } : {}),
-            ...(options.amount != null ? { amount: options.amount } : {}),
-            ...(options.to_amount != null ? { to_amount: options.to_amount } : {}),
+            ...(options.payments ? { payments: options.payments } : {}),
+            ...(options.lines ? { lines: options.lines } : {}),
         }),
+
+    /** Puts the transactions in that order within one day; ids go oldest first. */
+    reorder: (date: string, ids: number[]) =>
+        api.post<{ success: boolean }, { date: string; ids: number[] }>(`${ENDPOINT}/reorder`, { date, ids }),
 
     getPendingSummary: () =>
         api.get<TransactionSummary>('/transactions-pending-summary'),

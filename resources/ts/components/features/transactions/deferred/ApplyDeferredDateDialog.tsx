@@ -4,14 +4,17 @@ import { Button } from '@/components/ui/button'
 import { ResponsiveDialog } from '@/components/shared/dialogs/ResponsiveDialog'
 import { useNegativeBalanceConfirm } from '@/components/shared'
 import { formatDateLocal, isDateInFuture } from '@/lib/dates'
-import { warningsForTransactionOutflow } from '@/lib/negative-balance'
 import { Transaction } from '@/types'
 import { ApplyDateChoices } from './ApplyDateChoices'
-import { EstimatedAmountFields } from './EstimatedAmountFields'
+import { OccurrenceAmountFields } from './OccurrenceAmountFields'
 import {
     amountsValid,
+    applyWarnings,
     buildApplyOptions,
+    initialAmounts,
+    isOccurrence,
     selectedApplyDate,
+    type AmountDraft,
     type ApplyDateChoice,
     type ApplyOptions,
 } from './apply-deferred'
@@ -40,14 +43,9 @@ export function ApplyDeferredDateDialog({
     const today = formatDateLocal()
     const [choice, setChoice] = useState<ApplyDateChoice>('today')
     const [customDate, setCustomDate] = useState(today)
-    const isEstimated = Boolean(transaction?.isEstimated)
-    const crossCurrencyTransfer = Boolean(
-        transaction?.toAccount &&
-        transaction.toAmount != null &&
-        transaction.account.currency?.id !== transaction.toAccount.currency?.id,
-    )
-    const [amount, setAmount] = useState('')
-    const [toAmount, setToAmount] = useState('')
+    // The open occurrence of a recurring rule has expected amounts; the others are posted as they are.
+    const askAmounts = transaction !== null && isOccurrence(transaction)
+    const [draft, setDraft] = useState<AmountDraft>({ payments: [], lines: [] })
 
     useEffect(() => {
         if (!open) {
@@ -56,37 +54,26 @@ export function ApplyDeferredDateDialog({
 
         setChoice('today')
         setCustomDate(formatDateLocal())
-        setAmount(transaction ? String(transaction.amount) : '')
-        setToAmount(transaction?.toAmount != null ? String(transaction.toAmount) : '')
+        setDraft(transaction ? initialAmounts(transaction) : { payments: [], lines: [] })
     }, [open, transaction?.id])
 
     const selectedDate = selectedApplyDate(choice, today, originalDate, customDate)
-    const actualAmount = Number(amount)
-    const actualToAmount = Number(toAmount)
 
     const canSubmit =
         Boolean(selectedDate) &&
-        amountsValid(isEstimated, crossCurrencyTransfer, actualAmount, actualToAmount) &&
+        (!transaction || amountsValid(transaction, draft)) &&
         !isDateInFuture(selectedDate) &&
         !(choice === 'original' && !originalIsUsable) &&
         !isSubmitting
 
     const handleSubmit = (event: FormEvent) => {
         event.preventDefault()
-        if (!selectedDate || isDateInFuture(selectedDate)) {
+        if (!selectedDate || isDateInFuture(selectedDate) || !transaction) {
             return
         }
         confirmIfNeeded(
-            buildApplyOptions({
-                date: selectedDate,
-                estimated: isEstimated,
-                crossCurrency: crossCurrencyTransfer,
-                amount: actualAmount,
-                toAmount: actualToAmount,
-            }),
-            transaction
-                ? warningsForTransactionOutflow(isEstimated ? { ...transaction, amount: actualAmount } : transaction)
-                : [],
+            buildApplyOptions(transaction, selectedDate, draft),
+            applyWarnings(transaction, draft),
             onConfirm,
         )
     }
@@ -110,15 +97,12 @@ export function ApplyDeferredDateDialog({
                 }
             >
                 <form id={`${groupId}-form`} onSubmit={handleSubmit} className="grid gap-4">
-                    {isEstimated && (
-                        <EstimatedAmountFields
+                    {askAmounts && transaction && (
+                        <OccurrenceAmountFields
                             idPrefix={groupId}
                             transaction={transaction}
-                            crossCurrency={crossCurrencyTransfer}
-                            amount={amount}
-                            toAmount={toAmount}
-                            onAmountChange={setAmount}
-                            onToAmountChange={setToAmount}
+                            draft={draft}
+                            onChange={setDraft}
                         />
                     )}
                     <ApplyDateChoices

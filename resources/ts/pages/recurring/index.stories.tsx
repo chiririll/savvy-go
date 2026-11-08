@@ -2,11 +2,21 @@ import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, screen, userEvent, waitFor, within } from 'storybook/test'
 
 import { overlayA11y } from '@/test/a11y'
-import { accounts, categories, currencies, recurring, tags } from '@/test/fixtures'
+import { accounts, categories, currencies, recurring, recurringTemplate, tags } from '@/test/fixtures'
 import { hang, reply } from '@/test/api-mocks'
 import { useCurrenciesStore } from '@/stores/currencies'
 
 import RecurringPage from './index'
+
+const gym = recurring({
+    id: 2,
+    template: recurringTemplate({
+        description: 'Gym',
+        payments: [{ account_id: 1, amount: -35.5 }],
+        lines: [{ category_id: 1, currency_id: 1, amount: 35.5 }],
+    }),
+    isActive: false,
+})
 
 const meta = {
     title: 'pages/Recurring',
@@ -15,7 +25,7 @@ const meta = {
     beforeEach: ({ msw }) => {
         useCurrenciesStore.getState().setAll(currencies)
         msw.use(
-            reply('get', '/recurring', [recurring(), recurring({ id: 2, description: 'Gym', amount: 35.5, isActive: false })]),
+            reply('get', '/recurring', [recurring(), gym]),
             reply('get', '/currencies', currencies),
             reply('get', '/categories', categories),
             reply('get', '/tags', tags),

@@ -1,11 +1,12 @@
 import { useMemo } from 'react'
-import { useInfiniteQuery, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query'
-import { transactionsApi, type ConfirmTransactionOptions } from '@/api'
-import type { TransactionsResponse } from '@/api/transactions'
-import { Transaction, TransactionFilters } from '@/types'
-import { TransactionFormData } from '@/schemas'
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData, type QueryKey } from '@tanstack/react-query'
+import { toast } from 'sonner'
+import { transactionsApi, type ConfirmTransactionOptions, type TransactionsResponse } from '@/api'
+import type { Transaction, TransactionFilters, TransactionInput } from '@/types'
 import { useResourceItem, useResourceMutation } from './use-crud'
 import i18n from '@/lib/i18n'
+import { getApiErrorMessage } from '@/lib/api-error'
+import { dayOrderForApi, placeInSlots } from '@/lib/transaction-order'
 
 const QUERY_KEY = ['transactions']
 const TRANSACTION_INVALIDATE = [
@@ -67,13 +68,24 @@ export function useInfiniteTransactions(filters?: TransactionQueryFilters) {
     }
 }
 
+/** The net of each of `dates` per currency, for the filters of a list. Waits until there is a day to ask about. */
+export function useTransactionDayTotals(filters: TransactionQueryFilters | undefined, dates: string[]) {
+    const listFilters = withoutPage(filters)
+    return useQuery({
+        queryKey: [...QUERY_KEY, 'day-totals', listFilters, dates],
+        queryFn: ({ signal }) => transactionsApi.getDayTotals(listFilters, dates, signal),
+        enabled: dates.length > 0,
+        placeholderData: keepPreviousData,
+    })
+}
+
 export function useTransaction(id: string | number) {
     return useResourceItem(QUERY_KEY, () => transactionsApi.getById(id), id)
 }
 
 export function useCreateTransaction(redirectTo?: string) {
     return useResourceMutation({
-        mutationFn: (data: TransactionFormData) => transactionsApi.create(data),
+        mutationFn: (data: TransactionInput) => transactionsApi.create(data),
         invalidateKeys: [...TRANSACTION_INVALIDATE],
         resetKeys: [...TRANSACTION_INFINITE_RESET],
         successMessage: (transaction: Transaction) =>
@@ -88,7 +100,7 @@ export function useUpdateTransaction(redirectTo?: string) {
     const queryClient = useQueryClient()
 
     return useResourceMutation({
-        mutationFn: ({ id, data }: { id: string | number; data: Partial<TransactionFormData> }) =>
+        mutationFn: ({ id, data }: { id: string | number; data: Partial<TransactionInput> }) =>
             transactionsApi.update(id, data),
         // No reset: dropping the loaded pages collapses the list and loses scroll position.
         // The saved row is put into the loaded pages at once; invalidation then refetches
@@ -160,5 +172,57 @@ export function useTransactionSummary(filters?: TransactionFilters) {
     return useQuery({
         queryKey: [...QUERY_KEY, 'summary', filters],
         queryFn: () => transactionsApi.getSummary(filters),
+    })
+}
+
+interface ReorderVariables {
+    date: string
+    /** The day's transactions as the list shows them. */
+    shownIds: number[]
+    direction: 'asc' | 'desc'
+}
+
+/** Drags within one day: the lists show the new order at once and the server confirms it. */
+export function useReorderTransactions() {
+    const queryClient = useQueryClient()
+    const listKey = [...QUERY_KEY, 'infinite']
+
+    return useMutation({
+        mutationFn: ({ date, shownIds, direction }: ReorderVariables) =>
+            transactionsApi.reorder(date, dayOrderForApi(shownIds, direction)),
+        onMutate: async ({ shownIds }) => {
+            await queryClient.cancelQueries({ queryKey: listKey })
+            const previous = queryClient.getQueriesData({ queryKey: listKey })
+
+            queryClient.setQueriesData<InfiniteData<TransactionsResponse>>({ queryKey: listKey }, (old) => {
+                if (!old) {
+                    return old
+                }
+
+                const flat = old.pages.flatMap((page) => page.data)
+                const placed = placeInSlots(flat, shownIds)
+                let offset = 0
+
+                return {
+                    ...old,
+                    pages: old.pages.map((page) => {
+                        const data = placed.slice(offset, offset + page.data.length)
+                        offset += page.data.length
+                        return { ...page, data }
+                    }),
+                }
+            })
+
+            return { previous }
+        },
+        onError: (error, _variables, context) => {
+            context?.previous.forEach(([key, data]: [QueryKey, unknown]) => {
+                queryClient.setQueryData(key, data)
+            })
+            toast.error(getApiErrorMessage(error, i18n.t('toasts.transaction.reorderFailed')))
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: QUERY_KEY })
+        },
     })
 }

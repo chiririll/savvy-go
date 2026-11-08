@@ -21,7 +21,15 @@
         "initialBalanceHelp": "Starting balance for this account",
         "activeHelp": "Inactive accounts are hidden from lists",
         "currencyCatalogHelp": "A currency that is not in your list yet will be added automatically.",
-        "currencyLockedHelp": "The currency of an existing account cannot be changed."
+        "currencyLockedHelp": "The currency of an existing account cannot be changed.",
+        "card": {
+            "title": "Card terms",
+            "limit": "Credit limit",
+            "statementDay": "Statement day",
+            "statementDayHelp": "Day of the month the statement closes",
+            "graceDays": "Grace period, days",
+            "graceDaysHelp": "Days after the statement to pay it"
+        }
     },
     "categories": {
         "namePlaceholder": "Groceries",
@@ -40,6 +48,19 @@
     },
     "transactions": {
         "toAccount": "Destination account",
+        "addPayment": "Add another account",
+        "noAccountLeft": "Every account is already used in this transaction",
+        "removePayment": "Remove the payment",
+        "changeTitle": "Change",
+        "addChange": "Add change",
+        "removeChange": "Remove the change",
+        "changeHelp": "Money that came back to you on another account, e.g. dinars for the euros you handed over.",
+        "totalPaid": "Total",
+        "feeTitle": "Commission",
+        "feeHelp": "Paid from the source account on top of the amount, and counted as spending.",
+        "addFee": "Add commission",
+        "removeFee": "Remove the commission",
+        "feeCategory": "Category of the commission",
         "swapAccounts": "Swap accounts",
         "toSpace": "Destination space",
         "toSpaceNoAccounts": "That space has no accounts yet.",
@@ -47,23 +68,37 @@
         "receiveAmount": "Receive amount",
         "transferRate": "Transfer rate",
         "notesPlaceholder": "Notes (optional)",
-        "balance": "Balance",
-        "after": "After",
-        "toBalance": "To balance",
+        "lines": "Lines",
+        "lineNote": "Note of the line",
+        "lineNotePlaceholder": "Note (markdown)",
+        "editNote": "Format the note",
+        "lineCurrency": "Currency of the line",
+        "removeLine": "Remove the line",
+        "addLine": "Split by category",
+        "defaultCategory": "Default category",
+        "linesExceed": "The lines are {{amount}} more than the payment.",
+        "uncovered": "{{amount}} that the lines don't cover goes to the default category.",
+        "uncoveredNoCategory": "{{amount}} that the lines don't cover stays without a category.",
+        "titlePlaceholder": "Title",
+        "balanceAfter": "Balance after:",
         "insufficientFunds": "Insufficient funds",
         "willGoNegative": "Balance will go negative",
-        "items": "Items",
-        "itemsCount": "Items ({{count}})",
-        "addItem": "Add item",
-        "qty": "Qty",
-        "price": "Price",
-        "total": "Total",
-        "itemName": "Item name",
-        "noItems": "No items. Add one or enter the amount yourself.",
         "pendingHint": "This date is in the future. The transaction stays pending and won't change the balance until you confirm it.",
         "noDateHint": "No date set. The transaction stays pending and won't change the balance until you confirm it.",
         "dateOptionalHelp": "Leave empty to postpone without a date.",
-        "estimatedHelp": "The amount is approximate. Enter the real amount when you confirm."
+        "estimatedHelp": "The amount is approximate. Enter the real amount when you confirm.",
+        "restriction": {
+            "debt": "This transaction is a payment on a debt. Only its title, tags and notes can change here; change the amount in the debt.",
+            "space_transfer": "This is one side of a transfer to another space. Only its title, tags and notes can change here; the amount and the date change in the transfer.",
+            "transfer_review": "This transfer between spaces is in review. Resolve the review first.",
+            "recurring_pending": "This is the next occurrence of a recurring transaction. Confirm or skip it."
+        },
+        "detailsOnly": "The form can't show this transaction whole, so only its title, tags and the categories and notes of its lines can change.",
+        "lockedTitle": "Can't be changed here",
+        "lockedDate": "Date",
+        "lockedNoDate": "No date",
+        "lockedPayments": "Payments",
+        "lockedLineAmount": "Amount of the line"
     },
     "currencies": {
         "code": "Code",
@@ -128,13 +163,9 @@
     },
     "recurring": {
         "frequency": "Frequency",
-        "interval": "Interval",
         "startDate": "Start date",
-        "toAccount": "Destination account",
         "toAmount": "To amount",
-        "toAmountPlaceholder": "Same as amount",
-        "toAmountHelp": "Leave empty for same currency",
-        "descriptionPlaceholder": "e.g., Monthly rent payment",
+        "toAmountPlaceholder": "At each run's rate",
         "schedule": "Schedule",
         "every": "Every",
         "days": "day(s)",
@@ -162,7 +193,9 @@
             "4": "Thursday",
             "5": "Friday",
             "6": "Saturday"
-        }
+        },
+        "stopped": "This rule stopped: {{reason}}. Saving it clears this message; tick Active to run it again.",
+        "cannotEdit": "The form cannot show this rule without losing part of it: an account it uses was removed, or it has a shape only the API makes. Delete it and make a new one, or change it through the API."
     },
     "budgets": {
         "period": "Period",
@@ -359,5 +392,19 @@
         "dateRequired": "Date column is required",
         "amountRequired": "Amount column is required",
         "accountRequired": "Account is required"
+    },
+    "markdown": {
+        "write": "Write",
+        "preview": "Preview",
+        "previewEmpty": "Nothing to preview",
+        "toolbar": "Formatting",
+        "bold": "Bold",
+        "italic": "Italic",
+        "bulletList": "List",
+        "taskList": "Task list",
+        "link": "Link",
+        "code": "Code",
+        "close": "Close the editor",
+        "taskItem": "Task"
     }
 }

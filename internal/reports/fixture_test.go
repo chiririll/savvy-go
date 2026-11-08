@@ -76,7 +76,7 @@ func newMoneyEnv(t *testing.T) *moneyEnv {
 func (e *moneyEnv) tx(t *testing.T, typ string, accountID int64, amount string) *ledger.Transaction {
 	t.Helper()
 	date := "2024-01-15"
-	tx, err := e.txs.Create(e.ctx, ledger.TxInput{Type: typ, AccountID: accountID, Amount: dec(amount), Date: &date})
+	tx, err := e.txs.Create(e.ctx, at(flowTx(typ, accountID, nil, dec(amount)), date))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +139,7 @@ func (e *matrixEnv) tx(
 ) (*ledger.Transaction, error) {
 	t.Helper()
 	date := "2024-01-15"
-	return e.txs.Create(e.ctx, ledger.TxInput{Type: typ, AccountID: e.accts[c.Code].ID, Amount: amount, Date: &date})
+	return e.txs.Create(e.ctx, at(flowTx(typ, e.accts[c.Code].ID, nil, amount), date))
 }
 
 // stored is the Currency as the application loaded it, with the id the test

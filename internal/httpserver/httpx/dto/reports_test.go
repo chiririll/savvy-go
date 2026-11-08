@@ -67,11 +67,14 @@ func TestReportShapes(t *testing.T) {
 
 	// An uncategorised top transaction has a null category and description.
 	top := decode(t, dto.NewTxTop(reports.TxTopReport{Items: []reports.TopTransaction{
-		{ID: 1, Amount: ten, Date: "2024-01-01", Account: reports.TopAccount{ID: 2, Name: "Cash"}},
+		{ID: 1, Amount: ten, Date: "2024-01-01", Account: reports.TopAccount{ID: 2, Name: "Cash"}, CategoryCount: 3, AccountCount: 2},
 	}}))
 	tx := top["items"].([]any)[0].(map[string]any)
 	if tx["category"] != nil || tx["description"] != nil || tx["account"].(map[string]any)["name"] != "Cash" {
 		t.Errorf("top = %v", tx)
+	}
+	if tx["category_count"] != 3.0 || tx["account_count"] != 2.0 {
+		t.Errorf("counts = %v, %v", tx["category_count"], tx["account_count"])
 	}
 }
 

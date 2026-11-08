@@ -30,15 +30,15 @@ export function PageHeader({
     const { t } = useTranslation()
     const label = createLabel ?? t('actions.create')
     const createButton = onCreateClick ? (
-        <Button onClick={onCreateClick} {...testId('create')}>
-            <Plus className="mr-2 h-4 w-4" />
-            {label}
+        <Button onClick={onCreateClick} aria-label={label} {...testId('create')}>
+            <Plus className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">{label}</span>
         </Button>
     ) : createLink ? (
         <Button asChild>
-            <Link to={createLink}>
-                <Plus className="mr-2 h-4 w-4" />
-                {label}
+            <Link to={createLink} aria-label={label}>
+                <Plus className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">{label}</span>
             </Link>
         </Button>
     ) : null

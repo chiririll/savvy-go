@@ -2,7 +2,9 @@ package httpserver
 
 // One handler package per resource of the space API (imports to uploads).
 import (
+	_ "savvy-go/internal/httpserver/api/auditlog"
 	_ "savvy-go/internal/httpserver/api/imports"
+	_ "savvy-go/internal/httpserver/api/reconciliations"
 	_ "savvy-go/internal/httpserver/api/recurring"
 	_ "savvy-go/internal/httpserver/api/reports"
 	_ "savvy-go/internal/httpserver/api/settings"

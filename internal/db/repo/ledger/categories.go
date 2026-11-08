@@ -53,6 +53,16 @@ func (r Repo) Category(ctx context.Context, id int64) (*Category, error) {
 	return &c, nil
 }
 
+// CategoryBare is Category without the count of its transactions (0).
+func (r Repo) CategoryBare(ctx context.Context, id int64) (*Category, error) {
+	x, err := r.q().GetCategoryBare(ctx, id)
+	if err != nil {
+		return nilIfMissing[Category](err)
+	}
+	c := categoryOf(x.ID, x.Name, x.Type, x.Icon, x.Color, x.IsDefault, 0)
+	return &c, nil
+}
+
 func (r Repo) ClearDefaultCategory(ctx context.Context, typ string) error {
 	return r.q().ClearDefaultCategory(ctx, typ)
 }

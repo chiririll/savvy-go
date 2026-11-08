@@ -373,3 +373,29 @@ func TestPasskeyChallengeSingleUseUnderRace(t *testing.T) {
 		t.Fatalf("one passkey challenge was taken %d times", wins.Load())
 	}
 }
+
+func TestLastActivityIsLatestUse(t *testing.T) {
+	r, id := newRepo(t)
+	ctx := context.Background()
+	now := time.Now().UTC().Truncate(time.Second)
+
+	if seen, err := r.LastActivity(ctx); err != nil || len(seen) != 0 {
+		t.Fatalf("no sessions yet: %v, %v", seen, err)
+	}
+	sid, err := r.InsertSession(ctx, authrepo.NewSession{UserID: id, TokenHash: "a", CSRF: "c",
+		Expires: now.Add(time.Hour), Now: now.Add(-time.Hour)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen, _ := r.LastActivity(ctx)
+	if got := seen[id]; !got.Equal(now.Add(-time.Hour)) {
+		t.Fatalf("after sign-in = %v, want %v", got, now.Add(-time.Hour))
+	}
+	if err := r.TouchSession(ctx, sid, now.Add(-10*time.Minute), now.Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	seen, _ = r.LastActivity(ctx)
+	if got := seen[id]; !got.Equal(now.Add(-10 * time.Minute)) {
+		t.Fatalf("after touch = %v", got)
+	}
+}

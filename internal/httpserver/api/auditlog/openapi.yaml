@@ -1,0 +1,72 @@
+paths:
+  /spaces/{space}/audit-log:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Audit log]
+      summary: List the change log
+      description: >
+        Newest first. A token sees the entries it made, a space admin all of them
+        (filter with token_id), any other member their own. Each entry says whether
+        it can be rolled back now, and if not why (rollbackBlockedReason).
+      parameters:
+        - {name: entity_type, in: query, schema: {type: string}}
+        - {name: entity_id, in: query, schema: {type: integer}}
+        - {name: op, in: query, description: "create, update, delete, confirm, skip, rollback or cleanup", schema: {type: string}}
+        - {name: source, in: query, description: "ui, api, mcp or system", schema: {type: string}}
+        - {name: token_id, in: query, description: Space admins only, schema: {type: integer}}
+        - {name: before, in: query, description: Entries with a smaller id (the next page), schema: {type: integer}}
+        - {name: limit, in: query, schema: {type: integer, default: 50, maximum: 200}}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+    delete:
+      tags: [Audit log]
+      summary: Clear the change log
+      description: >
+        Space admins in a signed-in session only, never a token. Removes the entries
+        (those of one token with token_id) and leaves one entry saying who cleared
+        the log and when. Cleared entries can no longer be rolled back.
+      parameters:
+        - {name: token_id, in: query, schema: {type: integer}}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+  /spaces/{space}/audit-log/{id}:
+    parameters: [{$ref: "#/components/parameters/Space"}, {$ref: "#/components/parameters/Id"}]
+    get:
+      tags: [Audit log]
+      summary: Get one entry, with the entity before and after
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "404": {$ref: "#/components/responses/NotFound"}
+  /spaces/{space}/audit-log/rollback:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    post:
+      tags: [Audit log]
+      summary: Roll back changes
+      description: >
+        Undoes entries (ids) or a whole bulk call (batch_id), newest first, all or
+        none. A token rolls back only its own entries; in the browser a space admin
+        rolls back any. An entry is refused (409) when the same entity was changed
+        again by someone else, or by the token itself and not rolled back, since.
+        This needs the audit:write grant, not the delete grant the original change may lack.
+        Money is restored exactly from the snapshot taken at the time.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids: {type: array, items: {type: integer}}
+                batch_id: {type: string}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {description: Changed since, already rolled back, or the external id is taken again}
+        "422": {$ref: "#/components/responses/Validation"}

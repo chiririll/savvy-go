@@ -1,6 +1,6 @@
 # Spaces and Roles
 
-All finances live in a **space**: accounts, transactions, categories, tags, currencies, budgets, debts, recurring transactions and automation rules. Spaces are fully separate, each with its own base currency (say, a personal budget, a family one and a side project). Switch spaces at the top of the sidebar. Under it, **Space** holds what belongs to the current space (accounts, categories, tags, currencies, automation, import, backups and **Settings**), and **Account** holds your own sign-in: security, passkeys and API tokens. Backups is shown to the space's admins only.
+All finances live in a **space**: accounts, transactions, categories, tags, currencies, budgets, debts, recurring transactions and automation rules. Spaces are fully separate, each with its own base currency (say, a personal budget, a family one and a side project). Switch spaces at the top of the sidebar. Under it, **Space** holds what belongs to the current space (accounts, categories, tags, currencies, automation, import, **Recent actions**, backups and **Settings**), and **Account** holds your own sign-in: security, passkeys and API tokens. Backups is shown to the space's admins only.
 
 A new user starts with no space: create one or accept an invitation. Guests cannot create spaces.
 
@@ -40,6 +40,12 @@ Progress is kept in your browser only, so you can close the window and return (a
 
 A space always keeps one admin: the last admin cannot leave or be demoted while other members remain.
 
+**Last activity.** The members list in the space settings and **Administration → Users** show when each person last used the app or one of their API tokens, or that they never signed in. It is the latest use of any of their sessions or tokens, so it can lag a person's real last visit by no more than a request.
+
+## Recent actions
+
+**Space → Recent actions** lists what was changed in the space, newest first: what (for now transactions and CSV imports), who, through which door (the app, an API token, an AI assistant, or automatic for recurring rules and the like) and when. Every member sees only their own changes; a space admin sees everyone's. Entries of one bulk call (demo data, a bulk create from an AI assistant) that sit next to each other are folded into one row, such as "Created transaction ×500"; click it to see them one by one. Filters above the list narrow it by operation, type and source. Only a space admin can **Clear log**, which removes all entries for everyone, cannot be undone and leaves one entry saying who cleared it. Rolling changes back is not done on this page. See the [audit log API](api.md#audit-log).
+
 ## Server roles
 
 - **Admin**: manages users, single sign-on, signing keys, system settings and server backups. **Administration → Spaces** shows each space's name, size, quota and members, never its finances. Assigning an admin to a space, deleting it or restoring it is written to the space's audit log, visible to its admins.
@@ -69,10 +75,11 @@ An admin of two spaces can link them in **Space → Settings**; either side's ad
 
 Editors of both can then send money between them: in the transaction dialog, choose the spaces tab next to *Transfer*, then the destination space and accounts. Each side uses its own account's currency.
 
-A transfer is stored in both spaces and signed by the server. If a space is restored or the link breaks:
+A transfer is stored in both spaces and signed by both of them: every space has its own signing key, kept in its database and included in its backups. A transfer is valid while both spaces are on this server and each one's key signed it, so moving both spaces to another server (a server backup, or both space backups restored there) keeps their transfers, and a backup of one space cannot be given a forged transfer without the other space's key. If a space is restored or the link breaks:
 
 - **Restore from an older backup**: the linked space is untouched. Differing transfers return as **pending** transactions to accept or reject; they do not affect balances.
-- **Unlink, import elsewhere or bad signature**: the transfer is **frozen**. It stays in balances but cannot be edited, and syncs again once the spaces are relinked.
+- **Unlink, only one space moved, or bad signature**: the transfer is **frozen**. It stays in balances but cannot be edited, and syncs again once the spaces are relinked (and, after a move, both are on the server).
+- **Transfers from v1.0** were signed by the server. At the first start on v1.1 they are signed again by the spaces' keys, once both spaces are here and the old signature holds.
 
 ## Shared categories and tags
 

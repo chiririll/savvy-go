@@ -2,6 +2,7 @@ package ledger
 
 import (
 	"context"
+	"slices"
 
 	"github.com/shopspring/decimal"
 
@@ -58,71 +59,60 @@ func (s Transactions) Summary(ctx context.Context, f filter.TxFilter, pendingOnl
 	return out
 }
 
-// hydrate turns rows into transactions with their accounts, category, items
-// and tags: one lookup per distinct account and category, and one query each
-// for the items and tags of the whole page.
+// hydrate turns rows into transactions with their accounts and categories (one
+// lookup per distinct one) and the reasons that restrict them. The payments,
+// lines and tags came with the rows, in a few queries for the whole page.
 func (s Transactions) hydrate(ctx context.Context, rows []repo.Tx) ([]Transaction, error) {
+	return s.hydrateWith(ctx, rows, NewRelated(ctx, s.DB))
+}
+
+func (s Transactions) hydrateWith(ctx context.Context, rows []repo.Tx, rel *Related) ([]Transaction, error) {
 	out := make([]Transaction, 0, len(rows))
-	ids := make([]int64, 0, len(rows))
-	at := make(map[int64]int, len(rows))
-	rel := NewRelated(ctx, s.DB)
 	for _, r := range rows {
-		t := txFrom(r)
-		t.Account = rel.Account(t.AccountID)
-		t.ToAccount = rel.OptionalAccount(t.ToAccountID)
-		t.Category = rel.Category(t.CategoryID)
-		t.Items, t.Tags = []TxItem{}, []Tag{}
-		at[t.ID] = len(out)
-		ids = append(ids, t.ID)
+		t := Transaction{
+			ID: r.ID, Type: r.Type, Description: r.Description, Date: r.Date, Status: r.Status,
+			ExternalSource: r.ExternalSource, ExternalID: r.ExternalID, CreatedAt: r.CreatedAt, RecurringID: r.RecurringID,
+			Payments: make([]Payment, len(r.Payments)), Lines: make([]Line, len(r.Lines)),
+			Tags: make([]Tag, len(r.Tags)), Reasons: reasonsOf(r),
+		}
+		for i, p := range r.Payments {
+			t.Payments[i] = Payment{
+				AccountID: p.AccountID, Account: rel.Account(p.AccountID), Amount: p.Amount,
+				SpaceTransferUUID: p.SpaceTransferUUID,
+			}
+		}
+		for i, l := range r.Lines {
+			t.Lines[i] = Line{
+				Seq: l.Seq, CategoryID: l.CategoryID, Category: rel.Category(l.CategoryID),
+				Amount: l.Amount, Note: l.Note,
+			}
+		}
+		for i, g := range r.Tags {
+			t.Tags[i] = tagFrom(g)
+		}
 		out = append(out, t)
-	}
-	if len(ids) == 0 {
-		return out, nil
-	}
-	items, err := s.repo().ItemsOf(ctx, ids)
-	if err != nil {
-		return nil, err
-	}
-	for _, r := range items {
-		t := &out[at[r.TransactionID]]
-		unit := t.Amount.Unit() // items are priced in the account currency
-		t.Items = append(t.Items, TxItem{
-			ID: r.ID, Name: r.Name, Quantity: r.Quantity,
-			PricePerUnit: money.New(r.PricePerUnit, unit), TotalPrice: money.New(r.TotalPrice, unit),
-		})
-	}
-	tags, err := s.repo().TagsOf(ctx, ids)
-	if err != nil {
-		return nil, err
-	}
-	for _, r := range tags {
-		t := &out[at[r.TransactionID]]
-		t.Tags = append(t.Tags, tagFrom(r.Tag))
 	}
 	return out, nil
 }
 
-// itemRow is a transaction line ready to store.
-type itemRow = repo.NewTxItem
-
-// itemRows checks the lines entered for a transaction against the range and
-// rounds them into unit, so nothing is written for a transaction with a bad
-// line. A line without a total costs quantity times price.
-func itemRows(items []TxItemInput, unit money.Unit) ([]itemRow, error) {
-	rows := make([]itemRow, 0, len(items))
-	for _, it := range items {
-		if it.TotalPrice.IsZero() {
-			it.TotalPrice = it.Quantity.Mul(it.PricePerUnit)
+// reasonsOf derives, from facts already stored, why a transaction is
+// restricted. Nothing here is saved, so nothing can drift from the data.
+func reasonsOf(r repo.Tx) []Reason {
+	var out []Reason
+	for _, p := range r.Payments {
+		if p.AccountType == "debt" {
+			out = append(out, ReasonDebt)
+			break
 		}
-		price, err := money.FromInput(it.PricePerUnit, unit)
-		if err != nil {
-			return nil, err
-		}
-		line, err := money.FromInput(it.TotalPrice, unit)
-		if err != nil {
-			return nil, err
-		}
-		rows = append(rows, itemRow{Name: it.Name, Quantity: it.Quantity, PricePerUnit: price, TotalPrice: line})
 	}
-	return rows, nil
+	if slices.ContainsFunc(r.Payments, func(p repo.Payment) bool { return p.SpaceTransferUUID != nil }) {
+		out = append(out, ReasonSpaceTransfer)
+		if r.TransferStatus == "in_review" {
+			out = append(out, ReasonTransferReview)
+		}
+	}
+	if r.Status == "pending" && r.RecurringID != nil {
+		out = append(out, ReasonRecurringPending)
+	}
+	return out
 }

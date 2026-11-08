@@ -40,14 +40,15 @@ func TestHotQueriesDoNotScanTables(t *testing.T) {
 		// tables that must not be scanned; a list query may scan its own table
 		searched []string
 	}{
-		{"GetTransaction", getTransaction, []string{"t", "a", "ca", "ta", "cb"}},
+		{"GetTransaction", getTransaction, []string{"t"}},
 		{"GetAccount", getAccount, []string{"a", "c"}},
 		{"GetRecurring", getRecurring, []string{"r", "a", "ca", "ta", "cb"}},
-		{"GetCategory", getCategory, []string{"categories", "t"}},
+		{"GetCategory", getCategory, []string{"categories", "l"}},
 		{"GetTag", getTag, []string{"tags", "tt"}},
-		{"ListCategories (count per row)", listCategories, []string{"t"}},
+		{"ListCategories (count per row)", listCategories, []string{"l"}},
 		{"ListTags (count per row)", listTags, []string{"tt"}},
-		{"ListItemsOfTransactions", listItemsOfTransactions, []string{"transaction_items"}},
+		{"ListPaymentsOfTransactions", listPaymentsOfTransactions, []string{"p"}},
+		{"ListLinesOfTransactions", listLinesOfTransactions, []string{"l"}},
 		{"ListTagsOfTransactions", listTagsOfTransactions, []string{"tt", "tags"}},
 		{"AccountDailyDeltas", accountDailyDeltas, []string{"t"}},
 	} {

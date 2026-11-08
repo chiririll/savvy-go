@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
     ACCOUNT_TYPES,
+    SERVICE_ACCOUNT_TYPES,
     API_PERMISSION_LEVELS,
     ACTION_TYPES,
     CONDITION_OPERATORS,
@@ -18,6 +19,8 @@ import {
     RECURRING_FREQUENCIES,
     SPACE_ROLES,
     TRANSFER_REVIEWS,
+    TRANSFER_STATUSES,
+    RESTRICTION_REASONS,
     ALL_TRANSACTION_TYPES,
     TRANSACTION_STATUSES,
 } from '@/types'
@@ -73,7 +76,7 @@ function sqlEnums(file: string): Map<string, string[]> {
 }
 
 const serverSchema = sqlEnums('internal/migrate/sql/server/0001_initial.sql')
-const spaceSchema = sqlEnums('internal/migrate/sql/space/0001_initial.sql')
+const spaceSchema = sqlEnums('internal/migrate/sql/space/0001_base.sql')
 
 describe('enum columns in the database schema', () => {
     const cases: Array<[string, Map<string, string[]>, string, readonly string[]]> = [
@@ -81,10 +84,9 @@ describe('enum columns in the database schema', () => {
         ['space_members.role', serverSchema, 'space_members.role', SPACE_ROLES],
         ['space_invitations.role', serverSchema, 'space_invitations.role', SPACE_ROLES],
         ['accounts.type', spaceSchema, 'accounts.type', ACCOUNT_TYPES],
-        ['accounts.debt_type', spaceSchema, 'accounts.debt_type', DEBT_TYPE_VALUES],
+        ['debts.direction', spaceSchema, 'debts.direction', DEBT_TYPE_VALUES],
         ['categories.type', spaceSchema, 'categories.type', CATEGORY_TYPES],
-        ['recurring_transactions.frequency', spaceSchema, 'recurring_transactions.frequency', RECURRING_FREQUENCIES],
-        ['space_transfers.review', spaceSchema, 'space_transfers.review', TRANSFER_REVIEWS],
+        ['space_transfers.status', spaceSchema, 'space_transfers.status', TRANSFER_STATUSES],
         ['transactions.type', spaceSchema, 'transactions.type', ALL_TRANSACTION_TYPES],
         ['transactions.status', spaceSchema, 'transactions.status', TRANSACTION_STATUSES],
         ['budgets.period', spaceSchema, 'budgets.period', BUDGET_PERIODS],
@@ -105,6 +107,8 @@ describe('frontend value lists', () => {
         API_PERMISSION_LEVELS,
         SPACE_ROLES,
         TRANSFER_REVIEWS,
+        TRANSFER_STATUSES,
+        RESTRICTION_REASONS,
         ACCOUNT_TYPES,
         DEBT_TYPE_VALUES,
         CATEGORY_TYPES,
@@ -166,6 +170,34 @@ describe('server checks', () => {
     })
 })
 
+// Not columns any more: the rule's schedule is JSON, and a review is a Go constant.
+describe('values the backend checks in Go', () => {
+    it('recurring frequencies are the ones a schedule accepts', () => {
+        const body = goFunc('internal/recurring/schedule.go', 'func (s Schedule) Validate(')
+        const accepted = quoted(/switch s\.Frequency \{\n\s*case ([^\n]*):/.exec(body)![1])
+        expect(sorted(RECURRING_FREQUENCIES)).toEqual(sorted(accepted))
+    })
+
+    it('transfer reviews are the ones the transfers package names', () => {
+        const fromGo = [...read('internal/transfers/transfers.go').matchAll(/review\w+\s*=\s*"([a-z_]+)"/g)].map((m) => m[1])
+        expect(sorted(TRANSFER_REVIEWS)).toEqual(sorted(fromGo))
+    })
+})
+
+describe('account types', () => {
+    it('service types are the ones the ledger keeps for itself', () => {
+        const body = goFunc('internal/ledger/account.go', 'func isServiceType(')
+        expect(sorted(SERVICE_ACCOUNT_TYPES)).toEqual(sorted(quoted(body)))
+    })
+})
+
+describe('transaction restrictions', () => {
+    it('knows every reason the backend gives', () => {
+        const fromGo = [...read('internal/ledger/restrict.go').matchAll(/Reason = "([a-z_]+)"/g)].map((m) => m[1])
+        expect(sorted(RESTRICTION_REASONS)).toEqual(sorted(fromGo))
+    })
+})
+
 describe('backup status', () => {
     it('is one of the statuses the API can return', () => {
         const body = goFunc('internal/httpserver/httpx/dto/backups.go', 'func NewBackup(')
@@ -203,6 +235,7 @@ describe('space audit log', () => {
 const SPACE_DATA_PACKAGES = [
     'currencies',
     'accounts',
+    'reconciliations',
     'categories',
     'tags',
     'transactions',

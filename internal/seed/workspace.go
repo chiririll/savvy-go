@@ -23,22 +23,29 @@ type seeder struct {
 	rng      *rand.Rand
 	txs      ledger.Transactions
 	accts    ledger.Accounts
+	debts    ledger.Debts
+	cards    ledger.CreditCards
 	cats     ledger.Categories
 	tags     ledger.Tags
 	budgets  ledger.Budgets
 	recur    recurring.Service
 	auto     automation.Service
 	expenses []expenseCand
+	// queue holds the transactions addTx has not stored yet; see flush.
+	queue []queuedTx
+	// catNames is the name of each expense category, by id.
+	catNames map[int64]string
 }
 
 type expenseCand struct {
 	id      int64
 	amount  float64
 	catName string
+	catID   *int64
 }
 
-func seedWorkspace(ctx context.Context, db store.DB, now time.Time) (map[string]*ledger.Account, error) {
-	start := startOfMonth(now.AddDate(0, -monthsOfHistory, 0))
+func seedWorkspace(ctx context.Context, db store.DB, now time.Time, months int) (map[string]*ledger.Account, error) {
+	start := startOfMonth(now.AddDate(0, -months, 0))
 	s := &seeder{
 		ctx:     ctx,
 		db:      db,
@@ -48,10 +55,12 @@ func seedWorkspace(ctx context.Context, db store.DB, now time.Time) (map[string]
 		rng:     rand.New(rand.NewSource(rngSeed)),
 		txs:     ledger.Transactions{DB: db},
 		accts:   ledger.Accounts{DB: db},
+		debts:   ledger.Debts{Accounts: ledger.Accounts{DB: db}, Transactions: ledger.Transactions{DB: db}},
+		cards:   ledger.CreditCards{Accounts: ledger.Accounts{DB: db}},
 		cats:    ledger.Categories{DB: db},
 		tags:    ledger.Tags{DB: db},
 		budgets: ledger.Budgets{DB: db},
-		recur:   recurring.Service{DB: db, Txs: ledger.Transactions{DB: db}},
+		recur:   recurring.Service{DB: db, Ledger: func(d store.DB) recurring.Occurrences { return ledger.Templates{DB: d} }},
 		auto:    automation.Service{DB: db, Txs: ledger.Transactions{DB: db}},
 	}
 	curs := ledger.Currencies{DB: db}
@@ -71,6 +80,10 @@ func seedWorkspace(ctx context.Context, db store.DB, now time.Time) (map[string]
 	if err != nil {
 		return nil, err
 	}
+	s.catNames = map[int64]string{}
+	for _, c := range expenses {
+		s.catNames[c.ID] = c.Name
+	}
 	incomes, err := s.cats.All(ctx, "income")
 	if err != nil {
 		return nil, err
@@ -79,22 +92,30 @@ func seedWorkspace(ctx context.Context, db store.DB, now time.Time) (map[string]
 	if err != nil {
 		return nil, err
 	}
-	if err := s.createTransactions(accounts, expenses, incomes, tags); err != nil {
-		return nil, err
+	phases := []struct {
+		name string
+		run  func() error
+	}{
+		{"transactions", func() error { return s.createTransactions(accounts, expenses, incomes, tags) }},
+		{"split lines", s.seedSplitLines},
+		{"rich transactions", func() error { return s.seedRich(accounts, expenses, incomes, tags) }},
+		{"pending", func() error { return s.seedPending(accounts, expenses) }},
+		{"budgets", func() error { return s.createBudgets(usd, expenses, tags) }},
+		{"recurring", func() error { return s.createRecurring(accounts, expenses, incomes) }},
+		{"automation", func() error { return s.createAutomation(tags) }},
 	}
-	if err := s.seedTransactionItems(); err != nil {
-		return nil, err
+	for _, p := range phases {
+		err := timed("seed "+p.name, func() error {
+			if err := p.run(); err != nil {
+				return err
+			}
+			return s.flush()
+		})
+		if err != nil {
+			return nil, err
+		}
 	}
-	if err := s.seedPending(accounts, expenses); err != nil {
-		return nil, err
-	}
-	if err := s.createBudgets(usd, expenses, tags); err != nil {
-		return nil, err
-	}
-	if err := s.createRecurring(accounts, expenses, incomes); err != nil {
-		return nil, err
-	}
-	return accounts, s.createAutomation(tags)
+	return accounts, nil
 }
 
 // accountSpec describes one demo account; the debt fields are empty for the others.
@@ -106,12 +127,13 @@ type accountSpec struct {
 	target         *float64
 	due            *string
 	counter, desc  string
+	card           *ledger.CardInput
 }
 
 func (s *seeder) accountSpecs(usd, eur *ledger.Currency) []accountSpec {
 	mortgageDue := s.now.AddDate(25, 0, 0).Format("2006-01-02")
 	loanDue := s.now.AddDate(0, 4, 0).Format("2006-01-02")
-	zero, mortgageAmt, loanAmt := 0.0, 285000.00, 1200.00
+	cardAmt, mortgageAmt, loanAmt := 2400.00, 285000.00, 1200.00
 
 	specs := []accountSpec{
 		{key: "checking", name: "Chase Checking", typ: "bank", cur: usd, bal: 8200},
@@ -123,9 +145,13 @@ func (s *seeder) accountSpecs(usd, eur *ledger.Currency) []accountSpec {
 		specs = append(specs, accountSpec{key: "eur", name: "Revolut EUR", typ: "bank", cur: eur, bal: 1850})
 	}
 	return append(specs,
+		// A credit card is an account that starts below zero. Its statement closed
+		// 12 days ago, so what it owed then is waiting for its payment.
 		accountSpec{
-			key: "credit", name: "Amex Gold Card", typ: "debt", cur: usd, debtType: "i_owe", target: &zero,
-			counter: "American Express", desc: "Credit card balance",
+			key: "credit", name: "Amex Gold Card", typ: "credit", cur: usd, bal: -cardAmt,
+			card: &ledger.CardInput{
+				Limit: decimal.NewFromInt(15000), StatementDay: s.now.AddDate(0, 0, -12).Day(), GraceDays: 25,
+			},
 		},
 		accountSpec{
 			key: "mortgage", name: "Home Mortgage", typ: "debt", cur: usd, debtType: "i_owe", target: &mortgageAmt,
@@ -141,21 +167,32 @@ func (s *seeder) accountSpecs(usd, eur *ledger.Currency) []accountSpec {
 func (s *seeder) createAccounts(usd *ledger.Currency, eur *ledger.Currency) (map[string]*ledger.Account, error) {
 	out := map[string]*ledger.Account{}
 	for _, sp := range s.accountSpecs(usd, eur) {
-		a := ledger.AccountInput{
+		if sp.debtType != "" {
+			d, err := s.debts.Create(s.ctx, ledger.DebtInput{
+				Name: sp.name, Direction: sp.debtType, CurrencyID: sp.cur.ID, Amount: decimal.NewFromFloat(*sp.target),
+				DueDate: sp.due, Counterparty: strPtr(sp.counter), Description: strPtr(sp.desc),
+			})
+			if err != nil {
+				return nil, fmt.Errorf("debt %s: %w", sp.name, err)
+			}
+			out[sp.key] = &d.Account
+			continue
+		}
+		if sp.card != nil {
+			c, err := s.cards.Create(s.ctx, ledger.NewCard{
+				Name: sp.name, CurrencyID: sp.cur.ID, InitialBalance: decimal.NewFromFloat(sp.bal), IsActive: true,
+				Terms: *sp.card,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("credit card %s: %w", sp.name, err)
+			}
+			out[sp.key] = &c.Account
+			continue
+		}
+		created, err := s.accts.Create(s.ctx, ledger.AccountInput{
 			Name: sp.name, Type: sp.typ, CurrencyID: sp.cur.ID,
 			InitialBalance: decimal.NewFromFloat(sp.bal), IsActive: true,
-		}
-		if sp.debtType != "" {
-			a.DebtType = &sp.debtType
-			if sp.target != nil {
-				target := decimal.NewFromFloat(*sp.target)
-				a.TargetAmount = &target
-			}
-			a.DueDate = sp.due
-			a.Counterparty = strPtr(sp.counter)
-			a.DebtDesc = strPtr(sp.desc)
-		}
-		created, err := s.accts.Create(s.ctx, a)
+		})
 		if err != nil {
 			return nil, fmt.Errorf("account %s: %w", sp.name, err)
 		}
@@ -176,6 +213,13 @@ func (s *seeder) createTransactions(
 		return err
 	}
 	if err := s.seedVariableExpenses(accounts, expenses, tags); err != nil {
+		return err
+	}
+	// The split payments are stored at once, so what was queued goes first.
+	if err := s.flush(); err != nil {
+		return err
+	}
+	if err := s.seedSplitPayments(accounts, expenses); err != nil {
 		return err
 	}
 	return s.seedTransfersDebt(accounts)

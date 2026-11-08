@@ -264,6 +264,10 @@ type TopTransaction struct {
 	Date        string       `json:"date"`
 	Category    *TopCategory `json:"category"`
 	Account     TopAccount   `json:"account"`
+	// CategoryCount and AccountCount: how many categories and accounts the
+	// transaction spans; category and account are the largest of each.
+	CategoryCount int `json:"category_count"`
+	AccountCount  int `json:"account_count"`
 }
 
 type TxTop struct {
@@ -276,8 +280,9 @@ func NewTxTop(r reports.TxTopReport) TxTop {
 		Items: Map(r.Items, func(t reports.TopTransaction) TopTransaction {
 			return TopTransaction{
 				ID: t.ID, Description: t.Description, Amount: t.Amount, Date: t.Date,
-				Category: ptr(t.Category, func(c reports.TopCategory) TopCategory { return TopCategory(c) }),
-				Account:  TopAccount(t.Account),
+				Category:      ptr(t.Category, func(c reports.TopCategory) TopCategory { return TopCategory(c) }),
+				Account:       TopAccount(t.Account),
+				CategoryCount: t.CategoryCount, AccountCount: t.AccountCount,
 			}
 		}),
 		Currency: reportCurrency(r.Currency),

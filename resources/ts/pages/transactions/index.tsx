@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Plus } from 'lucide-react'
 import { Page, PageHeader, useNegativeBalanceConfirm } from '@/components/shared'
@@ -6,6 +7,8 @@ import {
     ApplyDeferredDateDialog,
     TransactionFiltersPanel,
     TransactionList,
+    filterDaysByAccounts,
+    loadedRange,
     TransactionsListFooter,
     UpcomingPendingStrip,
     useApplyDeferred,
@@ -17,11 +20,15 @@ import {
     useDeleteTransaction,
     useDuplicateTransaction,
     useSkipTransaction,
+    useReorderTransactions,
     useAccounts,
     useCategories,
     useCurrencies,
     useTags,
+    useTransactionDayTotals,
     useTransactionListFilters,
+    useReconciliationDays,
+    useDeleteReconciliation,
 } from '@/hooks'
 import { useReadOnly } from '@/components/providers/ReadOnlyProvider'
 import { warningsForConfirmedDuplicate } from '@/lib/negative-balance'
@@ -41,6 +48,17 @@ export default function TransactionsPage() {
         fetchNextPage,
         refetch,
     } = useInfiniteTransactions(list.filters)
+    const days = useMemo(
+        () => [...new Set(transactions.flatMap((item) => (item.date ? [item.date] : [])))],
+        [transactions],
+    )
+    const { data: dayTotals } = useTransactionDayTotals(list.filters, days)
+    const range = useMemo(() => loadedRange(days.map((date) => ({ date }))), [days])
+    const { data: reconciliationDays } = useReconciliationDays(
+        { start_date: range?.start ?? '', end_date: range?.end ?? '' },
+        range !== null && list.params.sortBy === 'date',
+    )
+    const deleteReconciliation = useDeleteReconciliation()
     const { data: upcomingPending } = useTransactions({
         status: 'pending',
         end_date: addDaysLocal(new Date(), 7),
@@ -51,12 +69,18 @@ export default function TransactionsPage() {
     const deleteTransaction = useDeleteTransaction()
     const duplicateTransaction = useDuplicateTransaction()
     const skipTransaction = useSkipTransaction()
+    const reorder = useReorderTransactions()
     const { data: categories } = useCategories()
     const { data: tags } = useTags()
     const { data: accounts } = useAccounts({ exclude_debts: true })
     const { data: currencies } = useCurrencies()
+    const baseCurrency = currencies?.find((currency) => currency.isBase)
+    const shownReconciliations = useMemo(
+        () => filterDaysByAccounts(reconciliationDays ?? [], list.params.accountIds, baseCurrency?.decimals ?? 2),
+        [reconciliationDays, list.params.accountIds, baseCurrency?.decimals],
+    )
     const isReadOnly = useReadOnly()
-    const { openCreate, openEdit } = useTransactionDeepLink(transactions)
+    const { openCreate, openEdit, openView } = useTransactionDeepLink(transactions)
     const { startApplying, dialogProps: applyDialog } = useApplyDeferred()
     const { confirmIfNeeded, dialog: negativeBalanceDialog } = useNegativeBalanceConfirm<number>()
     const loadedCount = transactions.length
@@ -126,6 +150,12 @@ export default function TransactionsPage() {
                             <TransactionList
                                 transactions={transactions}
                                 grouped={list.params.sortBy === 'date'}
+                                dayTotals={dayTotals}
+                                reconciliationDays={shownReconciliations}
+                                sortDirection={list.params.sortDir}
+                                accounts={accounts}
+                                baseCurrency={baseCurrency?.code}
+                                onDeleteReconciliation={(id) => deleteReconciliation.mutate(id)}
                                 isLoading={isLoading}
                                 emptyTitle={
                                     list.params.status === 'pending'
@@ -157,7 +187,15 @@ export default function TransactionsPage() {
                                 onConfirm={startApplying}
                                 onSkip={(id) => skipTransaction.mutate(id)}
                                 onEdit={openEdit}
+                                onOpen={openView}
                                 isReadOnly={isReadOnly}
+                                onReorder={(date, shownIds) =>
+                                    reorder.mutate({
+                                        date: date.slice(0, 10),
+                                        shownIds,
+                                        direction: list.params.sortDir,
+                                    })
+                                }
                             />
 
                             {loadedCount > 0 && (

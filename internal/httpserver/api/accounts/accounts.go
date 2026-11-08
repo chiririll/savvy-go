@@ -26,7 +26,12 @@ func (s Handler) accountsIndex(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	list = filterTypes(list, r.URL.Query().Get("type"))
 	data := dto.Map(list, dto.NewAccount)
+	if err := s.attachCards(r, list, data); err != nil {
+		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	if r.URL.Query().Get("with_summary") == "1" || r.URL.Query().Get("with_summary") == "true" {
 		base, _ := httpx.Scope(r).Currencies.Base(r.Context())
 		if id := r.URL.Query().Get("base_currency_id"); id != "" {
@@ -41,6 +46,61 @@ func (s Handler) accountsIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.WriteData(w, http.StatusOK, data)
+}
+
+// filterTypes keeps the accounts of the types in the comma-separated list. An
+// empty list keeps all of them.
+func filterTypes(list []ledger.Account, types string) []ledger.Account {
+	want := map[string]bool{}
+	for _, t := range strings.Split(types, ",") {
+		if t = strings.TrimSpace(t); t != "" {
+			want[t] = true
+		}
+	}
+	if len(want) == 0 {
+		return list
+	}
+	out := []ledger.Account{}
+	for _, a := range list {
+		if want[a.Type] {
+			out = append(out, a)
+		}
+	}
+	return out
+}
+
+// attachCards puts the terms and state of a card on its row of data, which is
+// the row of list at the same place.
+func (s Handler) attachCards(r *http.Request, list []ledger.Account, data []dto.Account) error {
+	var cards map[int64]ledger.Card
+	today := time.Now().In(s.Loc)
+	today = time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, time.UTC)
+	for i, a := range list {
+		if a.Type != ledger.TypeCredit {
+			continue
+		}
+		if cards == nil {
+			all, err := httpx.Scope(r).CreditCards.All(r.Context(), false)
+			if err != nil {
+				return err
+			}
+			cards = make(map[int64]ledger.Card, len(all))
+			for _, c := range all {
+				cards[c.ID] = c
+			}
+		}
+		c, ok := cards[a.ID]
+		if !ok {
+			continue
+		}
+		st, err := httpx.Scope(r).CreditCards.State(r.Context(), c, today)
+		if err != nil {
+			return err
+		}
+		info := dto.NewCardInfo(c, st)
+		data[i].CreditCard = &info
+	}
+	return nil
 }
 
 func (s Handler) accountsStore(w http.ResponseWriter, r *http.Request) {
@@ -180,7 +240,30 @@ func (s Handler) accountsBalanceHistory(w http.ResponseWriter, r *http.Request) 
 		httpx.WriteJSON(w, http.StatusOK, dto.BalanceHistory{Dates: []string{}, Series: []dto.BalanceSeries{}, Decimals: 2})
 		return
 	}
-	accts, _ := httpx.Scope(r).Accounts.All(r.Context(), true, true)
+	// account_ids narrows the chart to those accounts, of any kind, active or not.
+	ids, ok := httpx.QueryIDs(r.URL.Query(), "account_ids")
+	if !ok {
+		httpx.WriteValidation(w, map[string][]string{"account_ids": {"The accounts must be ids."}})
+		return
+	}
+	filtered := len(ids) > 0
+	var accts []ledger.Account
+	if filtered {
+		for _, id := range ids {
+			a, err := httpx.Scope(r).Accounts.ByID(r.Context(), id)
+			if err != nil {
+				httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
+				return
+			}
+			if a == nil {
+				httpx.WriteMessage(w, http.StatusNotFound, "Not found.")
+				return
+			}
+			accts = append(accts, *a)
+		}
+	} else {
+		accts, _ = httpx.Scope(r).Accounts.All(r.Context(), true, true)
+	}
 	dates := dateRange(start, end)
 	series := []dto.BalanceSeries{}
 	total := make([]money.Money, len(dates))

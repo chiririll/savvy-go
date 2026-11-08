@@ -43,6 +43,7 @@ export const pages = {
     reportsNetWorth: { path: '/reports/networth', scope: 'space' },
     spaceSettings: { path: '/settings/space', scope: 'space' },
     importSettings: { path: '/settings/import', scope: 'space' },
+    spaceActions: { path: '/settings/actions', scope: 'space' },
     spaceBackups: { path: '/settings/backups', scope: 'space' },
 
     securitySettings: { path: '/settings/security', scope: 'user' },

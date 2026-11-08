@@ -1,69 +1,75 @@
-import { useRef } from 'react'
-import type { UseFormReturn } from 'react-hook-form'
+import type { FieldPath, UseFormReturn } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { useNegativeBalanceConfirm } from '@/components/shared'
 import type { NegativeBalanceWarning } from '@/lib/negative-balance'
+import { payloadErrorPath } from '@/lib/transaction-payments'
+import { buildTransactionInput } from '@/lib/transaction-payload'
+import { isTransferType } from '@/lib/transaction-type'
+import { buildSpaceTransferInput, buildTransferInput, transferErrorPath } from '@/lib/transfer-payload'
 import type { TransactionFormValues } from '@/schemas/transactions'
-import type { useTransferRate } from './transfer-rate'
+import type { Account, SpaceTransferInput, TransactionInput } from '@/types'
+import { payloadErrorMessage, transferErrorMessage } from './payload-errors'
+import { useTypeChange } from './use-type-change'
 
 interface TransactionHandlersOptions {
     form: UseFormReturn<TransactionFormValues>
-    rate: ReturnType<typeof useTransferRate>
     warnings: NegativeBalanceWarning[]
     dateRequired: boolean
-    isSpaceTransfer: boolean
-    onSubmit: (data: TransactionFormValues) => void
+    accounts?: Account[]
+    onSubmit: (data: TransactionInput) => void
+    /** A transfer to a linked space goes through the transfers API, not as a transaction. */
+    onSubmitSpaceTransfer?: (data: SpaceTransferInput) => void
     onTypeChange?: (type: TransactionFormValues['type']) => void
 }
 
 export function useTransactionHandlers({
     form,
-    rate,
     warnings,
     dateRequired,
-    isSpaceTransfer,
+    accounts,
     onSubmit,
+    onSubmitSpaceTransfer,
     onTypeChange,
 }: TransactionHandlersOptions) {
     const { t } = useTranslation('common')
-    const { confirmIfNeeded, dialog } = useNegativeBalanceConfirm<TransactionFormValues>()
+    const { confirmIfNeeded, dialog } = useNegativeBalanceConfirm<TransactionInput | SpaceTransferInput>()
 
     const handleSubmit = form.handleSubmit((data) => {
-        if (dateRequired && !data.date) {
+        // The transfers API stores a transfer to another space under a date.
+        if ((dateRequired || data.type === 'transfer_out') && !data.date) {
             form.setError('date', { message: t('validation.dateRequired') })
             return
         }
-        rate.commit()
-        confirmIfNeeded(
-            {
-                ...data,
-                to_amount: form.getValues('to_amount'),
-                // UI-only helper; the server derives it from the amounts.
-                exchange_rate: undefined,
-            },
-            warnings,
-            onSubmit,
-        )
+        if (isTransferType(data.type)) {
+            const values = { ...data, type: data.type as 'transfer' | 'transfer_out' }
+            const built =
+                data.type === 'transfer_out'
+                    ? buildSpaceTransferInput(values, accounts ?? [])
+                    : buildTransferInput(values, accounts ?? [])
+            if (!built.ok) {
+                form.setError(transferErrorPath(built.error) as FieldPath<TransactionFormValues>, {
+                    message: transferErrorMessage(t, built.error),
+                })
+                return
+            }
+            const send = (data.type === 'transfer_out' ? onSubmitSpaceTransfer : onSubmit) as (input: unknown) => void
+            confirmIfNeeded(built.input, warnings, send ?? (() => {}))
+            return
+        }
+        if (data.type !== 'income' && data.type !== 'expense') {
+            return
+        }
+        const built = buildTransactionInput({ ...data, type: data.type }, accounts ?? [])
+        if (!built.ok) {
+            form.setError(payloadErrorPath(built.error, { ...data, type: data.type }, accounts ?? []) as FieldPath<TransactionFormValues>, {
+                message: payloadErrorMessage(t, built.error),
+            })
+            return
+        }
+        confirmIfNeeded(built.input, warnings, onSubmit as (input: TransactionInput | SpaceTransferInput) => void)
     })
 
-    // Categories are per income/expense type: keep each, so a slip onto another tab loses nothing.
-    const categoryByType = useRef<Partial<Record<TransactionFormValues['type'], number>>>({})
-
-    const handleTypeChange = (value: TransactionFormValues['type']) => {
-        if ((value === 'transfer_out') !== isSpaceTransfer) {
-            // The destination account belongs to another space now.
-            form.setValue('to_account_id', null)
-        }
-        const current = form.getValues('type')
-        const categoryId = form.getValues('category_id')
-        if (categoryId && (current === 'income' || current === 'expense')) {
-            categoryByType.current[current] = categoryId
-        }
-        form.setValue('type', value)
-        // Null lets the party defaults pick the type's default category.
-        form.setValue('category_id', categoryByType.current[value] ?? null)
-        onTypeChange?.(value)
-    }
+    const handleTypeChange = useTypeChange(form, onTypeChange)
 
     return { handleSubmit, handleTypeChange, negativeBalanceDialog: dialog }
 }

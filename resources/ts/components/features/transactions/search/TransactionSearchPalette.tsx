@@ -6,7 +6,10 @@ import { Search } from 'lucide-react'
 import { transactionsApi } from '@/api'
 import { CommandDialog } from '@/components/shared/dialogs/CommandDialog'
 import { transactionSearchHref, useTransactionListFilters } from '@/hooks/use-transaction-list-filters'
-import { cn, formatCurrency } from '@/lib/utils'
+import { cn } from '@/lib/utils'
+import { PREVIEW_FETCH, previewSplit } from '@/lib/palette-preview'
+import { highlightParts, noteSnippet, searchTerms } from '@/lib/search-highlight'
+import { TransactionAmount } from '../list/TransactionAmount'
 import {
     displayTransactionDescription,
     transactionAmountAppearance,
@@ -21,7 +24,6 @@ import {
 import type { Transaction, TransactionFilters } from '@/types'
 import { useSearchRefs } from './use-search-refs'
 
-const PREVIEW_SIZE = 8
 const DEBOUNCE_MS = 200
 
 interface TransactionSearchPaletteProps {
@@ -31,8 +33,8 @@ interface TransactionSearchPaletteProps {
 
 type Option =
     | { kind: 'completion'; id: string; label: string; insert: string }
-    | { kind: 'result'; id: string; transaction: Transaction }
-    | { kind: 'all'; id: string; total: number }
+    | { kind: 'result'; id: string; transaction: Transaction; terms: string[] }
+    | { kind: 'all'; id: string; moreThan: number }
 
 function hasFilters(search: ParsedSearch): boolean {
     return Boolean(
@@ -45,13 +47,13 @@ function hasFilters(search: ParsedSearch): boolean {
     )
 }
 
-function previewFilters(search: ParsedSearch): TransactionFilters & { with_summary: boolean } {
+function previewFilters(search: ParsedSearch): TransactionFilters & { count: boolean } {
     return {
         status: 'confirmed',
-        per_page: PREVIEW_SIZE,
+        per_page: PREVIEW_FETCH,
         sort_by: 'date',
         sort_direction: 'desc',
-        with_summary: true,
+        count: false,
         q: search.q || undefined,
         type: search.type ?? undefined,
         account_ids: search.accountIds.length ? search.accountIds : undefined,
@@ -118,13 +120,15 @@ export function TransactionSearchPalette({ open, onOpenChange }: TransactionSear
     })
 
     const completions = useMemo(() => suggestSearchCompletions(input, refs), [input, refs])
-    const results = searching ? (data?.data ?? []) : []
-    const total = data?.meta?.total ?? 0
+    const fetched = searching ? (data?.data ?? []) : []
+    const { shown, moreThan } = previewSplit(data?.meta?.has_more ?? false, fetched.length)
+    const results = fetched.slice(0, shown)
+    const terms = useMemo(() => searchTerms(debounced.q), [debounced.q])
 
     const options: Option[] = [
         ...completions.map<Option>((item) => ({ kind: 'completion', id: `c-${item.insert}`, ...item })),
-        ...results.map<Option>((transaction) => ({ kind: 'result', id: `r-${transaction.id}`, transaction })),
-        ...(searching && total > 0 ? [{ kind: 'all', id: 'all', total } as Option] : []),
+        ...results.map<Option>((transaction) => ({ kind: 'result', id: `r-${transaction.id}`, transaction, terms })),
+        ...(searching && moreThan > 0 ? [{ kind: 'all', id: 'all', moreThan } as Option] : []),
     ]
     const activeIndex = Math.min(active, Math.max(options.length - 1, 0))
 
@@ -141,7 +145,7 @@ export function TransactionSearchPalette({ open, onOpenChange }: TransactionSear
             setActive(0)
             inputRef.current?.focus()
         } else if (option.kind === 'result') {
-            navigate(`/transactions?edit=${option.transaction.id}`)
+            navigate(`/transactions?view=${option.transaction.id}`)
             close()
         } else {
             applyFilters()
@@ -166,7 +170,6 @@ export function TransactionSearchPalette({ open, onOpenChange }: TransactionSear
         }
     }
 
-    const summary = data?.summary
     const activeId = options[activeIndex] ? `${listId}-${options[activeIndex].id}` : undefined
 
     return (
@@ -224,14 +227,6 @@ export function TransactionSearchPalette({ open, onOpenChange }: TransactionSear
                     {searching && !isFetching && results.length === 0 && completions.length === 0 && (
                         <p>{t('transactions.palette.empty')}</p>
                     )}
-                    {summary && searching && total > 0 && (
-                        <p>
-                            {t('transactions.palette.totals', {
-                                income: formatCurrency(summary.income, summary.currency),
-                                expense: formatCurrency(summary.expense, summary.currency),
-                            })}
-                        </p>
-                    )}
                     <p>{t('transactions.palette.keys')}</p>
                 </div>
         </CommandDialog>
@@ -250,24 +245,51 @@ function OptionContent({ option }: { option: Option }) {
         )
     }
     if (option.kind === 'all') {
-        return <span className="font-medium">{t('transactions.palette.showAll', { count: option.total })}</span>
+        return <span className="font-medium">{t('transactions.palette.showAll', { count: option.moreThan })}</span>
     }
 
-    const { transaction } = option
+    const { transaction, terms } = option
     const { sign, className } = transactionAmountAppearance(transaction.type, transaction.status)
+    const snippet = noteSnippet(
+        transaction.lines.map((line) => line.note),
+        terms,
+    )
     return (
         <>
             <span className="min-w-0">
-                <span className="block truncate">{displayTransactionDescription(transaction)}</span>
+                <span className="block truncate">
+                    <Highlight text={displayTransactionDescription(transaction)} terms={terms} />
+                </span>
                 <span className="block truncate text-xs text-muted-foreground">
                     {transaction.date ? `${transaction.date} · ` : ''}
                     {transactionSubtitle(transaction)}
                 </span>
+                {snippet && (
+                    <span className="block truncate text-xs text-muted-foreground" data-testid="note-snippet">
+                        <Highlight text={snippet} terms={terms} />
+                    </span>
+                )}
             </span>
             <span className={cn('shrink-0 tabular-nums', className)}>
-                {sign}
-                {formatCurrency(transaction.amount, transaction.account.currency)}
+                <TransactionAmount amount={transaction.rowAmount} sign={sign} />
             </span>
+        </>
+    )
+}
+
+/** Text with the search terms marked in yellow. */
+export function Highlight({ text, terms }: { text: string; terms: string[] }) {
+    return (
+        <>
+            {highlightParts(text, terms).map((part, index) =>
+                part.match ? (
+                    <mark key={index} className="rounded-sm bg-yellow-300/70 text-foreground dark:bg-yellow-500/40">
+                        {part.text}
+                    </mark>
+                ) : (
+                    <span key={index}>{part.text}</span>
+                ),
+            )}
         </>
     )
 }

@@ -2,23 +2,26 @@
 package transactions
 
 import (
+	"bytes"
 	_ "embed"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/url"
-	"savvy-go/internal/httpserver/httpx"
 	"strconv"
 	"strings"
 
+	"savvy-go/internal/auth/permissions"
 	"savvy-go/internal/db/filter"
+	"savvy-go/internal/httpserver/httpx"
 	"savvy-go/internal/httpserver/httpx/dto"
 	"savvy-go/internal/ledger"
-
-	"github.com/shopspring/decimal"
+	"savvy-go/internal/store"
 )
 
-func transactionsIndex(w http.ResponseWriter, r *http.Request) {
+// listFilter reads the filters of a transaction list from the query.
+func listFilter(r *http.Request) filter.TxFilter {
 	f := filter.TxFilter{
 		Type: r.URL.Query().Get("type"), Status: r.URL.Query().Get("status"),
 		StartDate: r.URL.Query().Get("start_date"), EndDate: r.URL.Query().Get("end_date"),
@@ -40,32 +43,113 @@ func transactionsIndex(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	f.Search = q.Get("q")
-	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	per, _ := strconv.Atoi(r.URL.Query().Get("per_page"))
-	list, total, err := httpx.Scope(r).Txs.Filtered(r.Context(), f, page, per)
-	if err != nil {
-		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
+	f.Dates = stringList(q, "dates")
+	f.ExternalID, f.ExternalSource = strings.TrimSpace(q.Get("external_id")), q.Get("external_source")
+	return f
+}
+
+// requestSource is the external source of what this request creates: where it
+// came from, set by the server and never by the client.
+func requestSource(r *http.Request) string {
+	switch t := httpx.Token(r); {
+	case t == nil:
+		return ledger.SourceUI
+	case t.Kind == permissions.KindMCP:
+		return ledger.SourceMCP
+	}
+	return ledger.SourceAPI
+}
+
+// writeCreateError answers a failed create: 409 with the id of the transaction
+// that already has the external key, 422 for anything else.
+func writeCreateError(w http.ResponseWriter, err error) {
+	var dup *ledger.ExternalIDExistsError
+	if errors.As(err, &dup) {
+		httpx.WriteJSON(w, http.StatusConflict, dto.ExternalIDConflict{
+			Message: err.Error(), Error: "external_id_exists",
+			ExternalSource: dup.Source, ExternalID: dup.ExternalID, TransactionID: dup.TransactionID,
+		})
 		return
 	}
+	httpx.WriteMessage(w, 422, err.Error())
+}
+
+func stringList(q url.Values, key string) []string {
+	var out []string
+	for _, v := range strings.Split(q.Get(key), ",") {
+		if v = strings.TrimSpace(v); v != "" {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+func transactionsIndex(w http.ResponseWriter, r *http.Request) {
+	f := listFilter(r)
+	q := r.URL.Query()
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	per, _ := strconv.Atoi(r.URL.Query().Get("per_page"))
 	if per <= 0 {
 		per = 25
 	}
 	if page <= 0 {
 		page = 1
 	}
-	last := (total + per - 1) / per
-	if last < 1 {
-		last = 1
-	}
-	payload := dto.TransactionPage{
-		Data: dto.Map(list, dto.NewTransaction),
-		Meta: dto.PageMeta{CurrentPage: page, LastPage: last, PerPage: per, Total: total},
+	var payload dto.TransactionPage
+	if q.Get("count") == "0" {
+		// A preview: no scan of every match for a total, only whether a page follows.
+		list, more, err := httpx.Scope(r).Txs.FilteredMore(r.Context(), f, page, per)
+		if err != nil {
+			httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		last := page
+		if more {
+			last++
+		}
+		payload = dto.TransactionPage{
+			Data: dto.Map(list, dto.NewTransaction),
+			Meta: dto.PageMeta{
+				CurrentPage: page, LastPage: last, PerPage: per, Total: (page-1)*per + len(list), HasMore: &more,
+			},
+		}
+	} else {
+		list, total, err := httpx.Scope(r).Txs.Filtered(r.Context(), f, page, per)
+		if err != nil {
+			httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		last := (total + per - 1) / per
+		if last < 1 {
+			last = 1
+		}
+		payload = dto.TransactionPage{
+			Data: dto.Map(list, dto.NewTransaction),
+			Meta: dto.PageMeta{CurrentPage: page, LastPage: last, PerPage: per, Total: total},
+		}
 	}
 	if r.URL.Query().Get("with_summary") == "1" || r.URL.Query().Get("with_summary") == "true" {
 		summary := dto.NewTransactionSummary(httpx.Scope(r).Txs.Summary(r.Context(), f, false))
 		payload.Summary = &summary
 	}
 	httpx.WriteJSON(w, http.StatusOK, payload)
+}
+
+// transactionsDayTotals is what each day netted per currency for the days the
+// filter selects, whatever page they are on. It reads every match, so it needs
+// the days: `dates`, or both ends of a range.
+func transactionsDayTotals(w http.ResponseWriter, r *http.Request) {
+	f := listFilter(r)
+	if len(f.Dates) == 0 && (f.StartDate == "" || f.EndDate == "") {
+		httpx.WriteMessage(w, http.StatusUnprocessableEntity, "give dates, or start_date and end_date")
+		return
+	}
+	days, err := httpx.Scope(r).Txs.DayTotals(r.Context(), f)
+	if err != nil {
+		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	httpx.WriteData(w, http.StatusOK, dto.NewDayTotals(days))
 }
 
 func int64List(q url.Values, key string) []int64 {
@@ -81,18 +165,19 @@ func int64List(q url.Values, key string) []int64 {
 }
 
 func transactionsStore(w http.ResponseWriter, r *http.Request) {
-	in, ok := decodeTx(w, r, nil)
+	in, ok := decodeTx(w, r)
 	if !ok {
 		return
 	}
 	tx, err := httpx.Scope(r).Txs.Create(r.Context(), in)
 	if err != nil {
-		httpx.WriteMessage(w, 422, err.Error())
+		writeCreateError(w, err)
 		return
 	}
 	if tx.Status == "confirmed" {
 		httpx.Scope(r).Automation.Process(r.Context(), "on_transaction_create", tx)
 		if fresh, e := httpx.Scope(r).Txs.ByID(r.Context(), tx.ID); e == nil && fresh != nil {
+			fresh.Difference = tx.Difference // only a save knows it
 			tx = fresh
 		}
 	}
@@ -112,7 +197,7 @@ func transactionsUpdate(w http.ResponseWriter, r *http.Request) {
 	if cur == nil {
 		return
 	}
-	in, ok := decodeTx(w, r, cur)
+	in, ok := decodeTx(w, r)
 	if !ok {
 		return
 	}
@@ -124,6 +209,7 @@ func transactionsUpdate(w http.ResponseWriter, r *http.Request) {
 	if tx.Status == "confirmed" {
 		httpx.Scope(r).Automation.Process(r.Context(), "on_transaction_update", tx)
 		if fresh, e := httpx.Scope(r).Txs.ByID(r.Context(), tx.ID); e == nil && fresh != nil {
+			fresh.Difference = tx.Difference // only a save knows it
 			tx = fresh
 		}
 	}
@@ -136,14 +222,32 @@ func transactionsDestroy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := httpx.Scope(r).Txs.Delete(r.Context(), tx.ID); err != nil {
-		if errors.Is(err, ledger.ErrTransferRow) {
-			httpx.WriteMessage(w, 422, err.Error())
-			return
-		}
-		httpx.WriteMessage(w, 422, "Scheduled occurrences cannot be deleted. Skip or confirm them instead.")
+		httpx.WriteMessage(w, 422, err.Error())
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// settle runs fn, which confirms or skips an occurrence, and makes the next
+// occurrence of its rule in the same database transaction, so a crash between
+// the two leaves neither.
+func settle(r *http.Request, id int64, fn func(ledger.Transactions) (*ledger.Transaction, error)) (*ledger.Transaction, error) {
+	scope := httpx.Scope(r)
+	var out *ledger.Transaction
+	err := store.Tx(r.Context(), scope.DB, func(d store.DB) error {
+		var err error
+		if out, err = fn(scope.Txs.On(d)); err != nil {
+			return err
+		}
+		recur := scope.Recurring
+		recur.DB = d // read the rule inside the same database transaction
+		rule, err := recur.RuleOf(r.Context(), id)
+		if err != nil || rule == 0 {
+			return err
+		}
+		return recur.AdvanceAfterOccurrence(r.Context(), d, rule)
+	})
+	return out, err
 }
 
 func transactionsConfirm(w http.ResponseWriter, r *http.Request) {
@@ -152,22 +256,24 @@ func transactionsConfirm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Date     *string          `json:"date"`
-		Amount   *decimal.Decimal `json:"amount"`
-		ToAmount *decimal.Decimal `json:"to_amount"`
+		Date     *string               `json:"date"`
+		Payments []ledger.PaymentInput `json:"payments"`
+		Lines    []ledger.LineInput    `json:"lines"`
 	}
-	_ = json.NewDecoder(r.Body).Decode(&body)
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil && !errors.Is(err, io.EOF) {
+		httpx.WriteValidation(w, map[string][]string{"body": {"The given data was invalid."}})
+		return
+	}
 	date := ""
 	if body.Date != nil {
 		date = *body.Date
 	}
-	out, err := httpx.Scope(r).Txs.Confirm(r.Context(), tx.ID, date, body.Amount, body.ToAmount)
+	out, err := settle(r, tx.ID, func(txs ledger.Transactions) (*ledger.Transaction, error) {
+		return txs.Confirm(r.Context(), tx.ID, date, &ledger.Amendment{Payments: body.Payments, Lines: body.Lines})
+	})
 	if err != nil {
 		httpx.WriteMessage(w, 422, err.Error())
 		return
-	}
-	if out.RecurringID != nil {
-		_ = httpx.Scope(r).Recurring.AdvanceAfterOccurrence(r.Context(), *out.RecurringID)
 	}
 	httpx.Scope(r).Automation.Process(r.Context(), "on_transaction_create", out)
 	if fresh, e := httpx.Scope(r).Txs.ByID(r.Context(), out.ID); e == nil && fresh != nil {
@@ -176,22 +282,37 @@ func transactionsConfirm(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteData(w, http.StatusOK, dto.NewTransaction(*out))
 }
 
+// transactionsReorder sets the order of transactions within one day. ids go
+// oldest first, whichever way the client lists them.
+func transactionsReorder(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Date string  `json:"date"`
+		IDs  []int64 `json:"ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Date == "" || len(body.IDs) == 0 {
+		httpx.WriteValidation(w, map[string][]string{
+			"ids": {"The date and ids fields are required."},
+		})
+		return
+	}
+	if err := httpx.Scope(r).Txs.Reorder(r.Context(), body.Date, body.IDs); err != nil {
+		httpx.WriteMessage(w, 422, err.Error())
+		return
+	}
+	httpx.WriteSuccess(w)
+}
+
 func transactionsSkip(w http.ResponseWriter, r *http.Request) {
 	tx := txParam(w, r)
 	if tx == nil {
 		return
 	}
-	out, err := httpx.Scope(r).Txs.Skip(r.Context(), tx.ID)
+	out, err := settle(r, tx.ID, func(txs ledger.Transactions) (*ledger.Transaction, error) {
+		return txs.Skip(r.Context(), tx.ID)
+	})
 	if err != nil {
-		if errors.Is(err, ledger.ErrTransferRow) {
-			httpx.WriteMessage(w, 422, err.Error())
-			return
-		}
-		httpx.WriteMessage(w, 422, "Only a pending scheduled transaction can be skipped.")
+		httpx.WriteMessage(w, 422, err.Error())
 		return
-	}
-	if out.RecurringID != nil {
-		_ = httpx.Scope(r).Recurring.AdvanceAfterOccurrence(r.Context(), *out.RecurringID)
 	}
 	httpx.WriteData(w, http.StatusOK, dto.NewTransaction(*out))
 }
@@ -221,55 +342,99 @@ func txParam(w http.ResponseWriter, r *http.Request) *ledger.Transaction {
 	return httpx.Lookup(w, r, httpx.Scope(r).Txs.ByID)
 }
 
-// decodeTx reads a transaction from the body; on update, over base: fields
-// the body leaves out keep their values. Items and tags left out are kept by the update itself.
-func decodeTx(w http.ResponseWriter, r *http.Request, base *ledger.Transaction) (ledger.TxInput, bool) {
-	var body struct {
-		Type        string           `json:"type"`
-		AccountID   int64            `json:"account_id"`
-		ToAccountID *int64           `json:"to_account_id"`
-		CategoryID  *int64           `json:"category_id"`
-		Amount      decimal.Decimal  `json:"amount"`
-		ToAmount    *decimal.Decimal `json:"to_amount"`
-		IsEstimated bool             `json:"is_estimated"`
-		Description *string          `json:"description"`
-		Date        *string          `json:"date"`
-		TagIDs      []int64          `json:"tag_ids"`
-		Items       []struct {
-			Name         string          `json:"name"`
-			Quantity     decimal.Decimal `json:"quantity"`
-			PricePerUnit decimal.Decimal `json:"price_per_unit"`
-		} `json:"items"`
+// decodeTx reads a transaction from the body: type, description, date,
+// payments (account_id, amount), lines (category_id, currency_id, amount,
+// note) and tag_ids. On update, what the body leaves out is kept. A key the
+// API does not know is refused, so a client still sending the flat shape of
+// older versions (account_id, amount, items) is told instead of ignored.
+func decodeTx(w http.ResponseWriter, r *http.Request) (ledger.TxInput, bool) {
+	data, err := io.ReadAll(r.Body)
+	var in ledger.TxInput
+	if err == nil {
+		in, err = parseTx(data)
 	}
-	if base != nil {
-		body.Type, body.AccountID, body.ToAccountID = base.Type, base.AccountID, httpx.Clone(base.ToAccountID)
-		body.CategoryID, body.Amount = httpx.Clone(base.CategoryID), base.Amount.Decimal()
-		if base.ToAmount != nil {
-			toAmount := base.ToAmount.Decimal()
-			body.ToAmount = &toAmount
-		}
-		body.IsEstimated, body.Description, body.Date = base.IsEstimated, httpx.Clone(
-			base.Description,
-		), httpx.Clone(
-			base.Date,
-		)
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.AccountID == 0 {
-		httpx.WriteValidation(w, map[string][]string{"account_id": {"The account id field is required."}})
+	if err != nil {
+		httpx.WriteMessage(w, 422, "The given data was invalid: "+err.Error())
 		return ledger.TxInput{}, false
 	}
-	in := ledger.TxInput{
-		Type: body.Type, AccountID: body.AccountID, ToAccountID: body.ToAccountID,
-		CategoryID: body.CategoryID, Amount: body.Amount, ToAmount: body.ToAmount,
-		IsEstimated: body.IsEstimated, Description: body.Description, Date: body.Date,
-		TagIDs: body.TagIDs,
+	return fromRequest(r, in), true
+}
+
+// fromRequest gives an input that carries an external id the source of the
+// request.
+func fromRequest(r *http.Request, in ledger.TxInput) ledger.TxInput {
+	if in.ExternalID != nil {
+		src := requestSource(r)
+		in.ExternalSource = &src
 	}
-	for _, it := range body.Items {
-		qty := it.Quantity
-		if qty.IsZero() {
-			qty = decimal.NewFromInt(1)
+	return in
+}
+
+// parseTx reads one transaction from its JSON.
+func parseTx(data []byte) (ledger.TxInput, error) {
+	var in ledger.TxInput
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&in); err != nil {
+		return ledger.TxInput{}, err
+	}
+	in.Status = nil // set by the date and by confirm, not by the client
+	// An explicit null clears the description; leaving it out keeps it.
+	var sent map[string]json.RawMessage
+	if json.Unmarshal(data, &sent) == nil && string(sent["description"]) == "null" {
+		blank := ""
+		in.Description = &blank
+	}
+	return in, nil
+}
+
+// maxBulk is how many transactions one bulk request may carry.
+const maxBulk = 500
+
+// transactionsBulkStore creates many transactions at once, all or none.
+func transactionsBulkStore(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Transactions []json.RawMessage `json:"transactions"`
+	}
+	data, err := io.ReadAll(r.Body)
+	if err == nil {
+		dec := json.NewDecoder(bytes.NewReader(data))
+		dec.DisallowUnknownFields()
+		err = dec.Decode(&body)
+	}
+	if err != nil {
+		httpx.WriteMessage(w, 422, "The given data was invalid: "+err.Error())
+		return
+	}
+	if len(body.Transactions) == 0 || len(body.Transactions) > maxBulk {
+		httpx.WriteMessage(w, 422, "Send between 1 and "+strconv.Itoa(maxBulk)+" transactions.")
+		return
+	}
+	ins := make([]ledger.TxInput, len(body.Transactions))
+	for i, raw := range body.Transactions {
+		if ins[i], err = parseTx(raw); err != nil {
+			httpx.WriteMessage(w, 422, "The given data was invalid: transaction "+strconv.Itoa(i+1)+": "+err.Error())
+			return
 		}
-		in.Items = append(in.Items, ledger.TxItemInput{Name: it.Name, Quantity: qty, PricePerUnit: it.PricePerUnit})
+		ins[i] = fromRequest(r, ins[i])
 	}
-	return in, true
+	scope := httpx.Scope(r)
+	created, err := scope.Txs.CreateMany(r.Context(), ins)
+	if err != nil {
+		writeCreateError(w, err)
+		return
+	}
+	for i, tx := range created {
+		if tx == nil || tx.Status != "confirmed" {
+			continue
+		}
+		scope.Automation.Process(r.Context(), "on_transaction_create", tx)
+		if fresh, e := scope.Txs.ByID(r.Context(), tx.ID); e == nil && fresh != nil {
+			fresh.Difference = tx.Difference // only a save knows it
+			created[i] = fresh
+		}
+	}
+	httpx.WriteData(w, http.StatusCreated, dto.Map(created, func(t *ledger.Transaction) dto.Transaction {
+		return dto.NewTransaction(*t)
+	}))
 }

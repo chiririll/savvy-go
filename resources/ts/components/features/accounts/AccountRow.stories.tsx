@@ -24,6 +24,24 @@ type Story = StoryObj<typeof meta>
 export const Cash: Story = {}
 export const Bank: Story = { args: { account: account({ name: 'Euro card', type: 'bank', currency: eur }) } }
 export const Crypto: Story = { args: { account: account({ name: 'Cold wallet', type: 'crypto' }) } }
+const creditCard = {
+    limit: 2000, cycle: 'fixed_day', statementDay: 28, graceDays: 21, used: 500, available: 1500,
+    periodStart: '2026-11-01', periodEnd: '2026-11-30', spent: 100,
+    statement: { date: '2026-10-28', balance: 400, dueDate: '2026-11-18', paid: 0, amountDue: 400 },
+    status: { level: 'ok' as const, amount: 0 },
+}
+const card = (overrides = {}) => account({
+    name: 'Visa Gold', type: 'credit', currentBalance: -500, creditCard: { ...creditCard, ...overrides },
+})
+
+export const CreditCard: Story = { args: { account: card() } }
+export const CreditCardWarning: Story = {
+    args: { account: card({ used: 1600, available: 400, status: { level: 'warning', reason: 'payment_due', amount: 400, date: '2026-11-18' } }) },
+}
+export const CreditCardDanger: Story = {
+    args: { account: card({ used: 2300, available: -300, status: { level: 'danger', reason: 'over_limit', amount: 300 } }) },
+}
+
 export const Inactive: Story = { args: { account: account({ isActive: false }) } }
 export const Overdrawn: Story = { args: { account: account({ currentBalance: -35.2 }) } }
 export const NoCurrency: Story = { args: { account: account({ currency: null }) } }

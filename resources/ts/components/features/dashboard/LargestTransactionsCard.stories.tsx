@@ -11,7 +11,7 @@ const meta = {
     component: LargestTransactionsCard,
     beforeEach: () => useCurrenciesStore.getState().setAll(currencies),
     args: {
-        onEdit: fn(),
+        onOpen: fn(),
         transactions: [
             transaction({ id: 1, description: 'Coffee', amount: 3.5 }),
             transaction({ id: 2, type: 'income', description: 'Salary', amount: 3200 }),
@@ -36,6 +36,6 @@ export const NoRowMenus: Story = {
 export const OpensOnClick: Story = {
     play: async ({ canvasElement, args }) => {
         await userEvent.click(within(canvasElement).getByText('Coffee'))
-        await expect(args.onEdit).toHaveBeenCalledOnce()
+        await expect(args.onOpen).toHaveBeenCalledOnce()
     },
 }

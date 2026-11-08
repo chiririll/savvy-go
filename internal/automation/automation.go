@@ -361,10 +361,12 @@ func (s Service) actionCreateTransfer(ctx context.Context, action map[string]any
 	desc = parseTemplate(desc, tx)
 	today := ledger.Today()
 	status := "confirmed"
-	created, err := s.Txs.Create(ctx, ledger.TxInput{
-		Type: "transfer", AccountID: fromID, ToAccountID: &toID, Amount: amount,
-		Description: &desc, Date: &today, Status: &status,
-	})
+	in, err := s.Txs.ConvertedTransfer(ctx, fromID, toID, amount)
+	if err != nil {
+		return nil, err
+	}
+	in.Description, in.Date, in.Status = &desc, &today, &status
+	created, err := s.Txs.Create(ctx, in)
 	if err != nil || created == nil {
 		return nil, err
 	}

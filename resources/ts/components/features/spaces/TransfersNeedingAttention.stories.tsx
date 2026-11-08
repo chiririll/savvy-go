@@ -18,8 +18,9 @@ const transfer = (overrides: Partial<SpaceTransfer> = {}): SpaceTransfer => ({
     date: '2030-01-05',
     description: 'Rent share',
     version: 1,
-    status: 'ok',
+    status: 'confirmed',
     review: null,
+    needsAttention: false,
     frozen: false,
     verified: true,
     deleted: false,
@@ -44,7 +45,7 @@ type Story = StoryObj<typeof meta>
 
 // A restore brought back an older version: the other space has the newer one.
 const restored = transfer({
-    status: 'pending',
+    status: 'in_review',
     review: 'changed_remote',
     remote: {
         from: { amount: '55.00', currency: 'EUR' },
@@ -59,8 +60,10 @@ export const AfterARestore: Story = {
     beforeEach: ({ msw }) => msw.use(transfers([restored])),
     play: async ({ canvasElement }) => {
         const canvas = within(canvasElement)
-        await expect(await canvas.findByText('−50.00 EUR')).toBeVisible()
-        await expect(canvas.getByText(/the other space has 55.00 EUR on 2030-01-06/i)).toBeVisible()
+        // The header amount and the "ours" row both show it; the remote row has its own.
+        await expect((await canvas.findAllByText('−50.00 EUR')).length).toBeGreaterThan(0)
+        await expect(canvas.getByText('+7500 JPY')).toBeVisible()
+        await expect(canvas.getByText(/−55.00 EUR/)).toBeVisible()
         await expect(canvas.getByText(/changed in the other space/i)).toBeVisible()
     },
 }
@@ -83,7 +86,7 @@ export const Incoming: Story = {
                     outgoing: false,
                     from: { amount: '7500', currency: 'JPY' },
                     to: { amount: '12.345', currency: 'KWD' },
-                    status: 'needs_attention',
+                    needsAttention: true,
                     description: null,
                 }),
             ]),
@@ -126,7 +129,7 @@ export const DeletedThere: Story = {
         msw.use(
             transfers([
                 transfer({
-                    status: 'pending',
+                    status: 'in_review',
                     review: 'deleted_remote',
                     remote: { ...restored.remote!, deleted: true },
                 }),
@@ -142,7 +145,7 @@ export const Unverified: Story = {
     beforeEach: ({ msw }) => {
         const trust = spy('post', '/transfers/a1/trust')
         sent.bodies = trust.bodies
-        msw.use(transfers([transfer({ status: 'pending', review: 'changed_remote', verified: false })]), trust.handler)
+        msw.use(transfers([transfer({ status: 'in_review', review: 'changed_remote', verified: false })]), trust.handler)
     },
     play: async ({ canvasElement }) => {
         const canvas = within(canvasElement)
@@ -157,7 +160,7 @@ export const Unverified: Story = {
 // One made after the backup has nothing here to keep, so keeping this side is allowed unsigned.
 export const UnverifiedMadeAfterTheBackup: Story = {
     beforeEach: ({ msw }) =>
-        msw.use(transfers([transfer({ status: 'pending', review: 'created_remote', verified: false })])),
+        msw.use(transfers([transfer({ status: 'in_review', review: 'created_remote', verified: false })])),
     play: async ({ canvasElement }) => {
         await expect(await within(canvasElement).findByRole('button', { name: /keep this version/i })).toBeEnabled()
     },
@@ -167,7 +170,7 @@ export const AccountChosen: Story = {
     beforeEach: ({ msw }) => {
         const update = spy('patch', '/transfers/a1', transfer())
         sent.bodies = update.bodies
-        msw.use(transfers([transfer({ status: 'needs_attention' })]), update.handler)
+        msw.use(transfers([transfer({ needsAttention: true })]), update.handler)
     },
     play: async ({ canvasElement }) => {
         const canvas = within(canvasElement)
@@ -184,7 +187,7 @@ export const IncomingAccountChosen: Story = {
     beforeEach: ({ msw }) => {
         const update = spy('patch', '/transfers/a1', transfer())
         sent.bodies = update.bodies
-        msw.use(transfers([transfer({ status: 'needs_attention', outgoing: false })]), update.handler)
+        msw.use(transfers([transfer({ needsAttention: true, outgoing: false })]), update.handler)
     },
     play: async ({ canvasElement }) => {
         const canvas = within(canvasElement)
@@ -199,7 +202,7 @@ export const Deleted: Story = {
     beforeEach: ({ msw }) => {
         const remove = spy('delete', '/transfers/a1')
         sent.bodies = remove.bodies
-        msw.use(transfers([transfer({ status: 'needs_attention' })]), remove.handler)
+        msw.use(transfers([transfer({ needsAttention: true })]), remove.handler)
     },
     play: async ({ canvasElement }) => {
         await userEvent.click(await within(canvasElement).findByRole('button', { name: /^delete$/i }))
@@ -223,7 +226,7 @@ export const Several: Story = {
         msw.use(
             transfers([
                 restored,
-                transfer({ uuid: 'b2', status: 'needs_attention', description: 'Groceries split' }),
+                transfer({ uuid: 'b2', needsAttention: true, description: 'Groceries split' }),
                 transfer({ uuid: 'c3', frozen: true, description: 'Old loan' }),
             ]),
         ),

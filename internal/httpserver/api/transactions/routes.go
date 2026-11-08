@@ -24,6 +24,9 @@ func init() {
 func Routes(r chi.Router) {
 	r.Get("/transactions", transactionsIndex)
 	r.Post("/transactions", transactionsStore)
+	r.Post("/transactions/bulk", transactionsBulkStore)
+	r.Post("/transactions/find-similar", transactionsFindSimilar)
+	r.Post("/transactions/reorder", transactionsReorder)
 	r.Get("/transactions/{id}", transactionsShow)
 	r.Put("/transactions/{id}", transactionsUpdate)
 	r.Patch("/transactions/{id}", transactionsUpdate)
@@ -32,5 +35,6 @@ func Routes(r chi.Router) {
 	r.Post("/transactions/{id}/confirm", transactionsConfirm)
 	r.Post("/transactions/{id}/skip", transactionsSkip)
 	r.Get("/transactions-summary", transactionsSummary)
+	r.Get("/transactions-day-totals", transactionsDayTotals)
 	r.Get("/transactions-pending-summary", transactionsPendingSummary)
 }

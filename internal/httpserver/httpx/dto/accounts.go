@@ -17,6 +17,8 @@ type Account struct {
 	SortOrder      int         `json:"sortOrder"`
 	Currency       *Currency   `json:"currency"`
 	CreatedAt      *time.Time  `json:"createdAt"`
+	// CreditCard is set by the account list for an account of type credit.
+	CreditCard *CardInfo `json:"creditCard,omitempty"`
 }
 
 func NewAccount(a ledger.Account) Account {
@@ -25,25 +27,6 @@ func NewAccount(a ledger.Account) Account {
 		InitialBalance: a.InitialBalance, CurrentBalance: a.Balance,
 		IsActive: a.IsActive, SortOrder: a.SortOrder,
 		Currency: ptr(a.Currency, NewCurrency), CreatedAt: utc(a.CreatedAt),
-	}
-}
-
-// Debt is a debt account. CurrentBalance is the amount still owed.
-type Debt struct {
-	Account
-	DebtType        *string     `json:"debtType"`
-	TargetAmount    money.Money `json:"targetAmount"`
-	PaymentProgress float64     `json:"paymentProgress"`
-	DueDate         *string     `json:"dueDate"`
-	Counterparty    *string     `json:"counterparty"`
-	Description     *string     `json:"description"`
-	IsPaidOff       bool        `json:"isPaidOff"`
-}
-
-func NewDebt(a ledger.Account) Debt {
-	return Debt{
-		Account: NewAccount(a), DebtType: a.DebtType, TargetAmount: a.DebtTarget(), PaymentProgress: a.PaymentProgress(),
-		DueDate: a.DueDate, Counterparty: a.Counterparty, Description: a.DebtDesc, IsPaidOff: a.IsPaidOff,
 	}
 }
 
@@ -58,22 +41,6 @@ func NewAccountsSummary(s ledger.AccountsSummary) AccountsSummary {
 	return AccountsSummary{
 		TotalBalance: s.Total, Currency: currencyCode(s.Currency), Decimals: currencyDecimals(s.Currency),
 		AccountsCount: s.Count,
-	}
-}
-
-type DebtSummary struct {
-	TotalIOwe     money.Money `json:"totalIOwe"`
-	TotalOwedToMe money.Money `json:"totalOwedToMe"`
-	NetDebt       money.Money `json:"netDebt"`
-	DebtsCount    int         `json:"debtsCount"`
-	Currency      *string     `json:"currency"`
-	Decimals      int         `json:"decimals"`
-}
-
-func NewDebtSummary(s ledger.DebtSummary) DebtSummary {
-	return DebtSummary{
-		TotalIOwe: s.IOwe, TotalOwedToMe: s.OwedToMe, NetDebt: s.Net(), DebtsCount: s.Count,
-		Currency: currencyCode(s.Currency), Decimals: currencyDecimals(s.Currency),
 	}
 }
 
@@ -125,10 +92,4 @@ type BalanceComparison struct {
 	Previous *money.Money `json:"previous"`
 	Currency *string      `json:"currency"`
 	Decimals int          `json:"decimals"`
-}
-
-// DebtList is debts with the summary the caller asked for.
-type DebtList struct {
-	Data    []Debt       `json:"data"`
-	Summary *DebtSummary `json:"summary,omitempty"`
 }

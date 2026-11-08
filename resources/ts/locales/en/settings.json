@@ -469,6 +469,7 @@
         },
         "resource": {
             "accounts": "Accounts",
+            "audit": "Change log (rolling back own changes)",
             "automation": "Automation rules",
             "budgets": "Budgets",
             "categories": "Categories",
@@ -658,7 +659,60 @@
             "title": "Members",
             "description": "Who can see this space and what they may do.",
             "you": "you",
-            "remove": "Remove"
+            "remove": "Remove",
+            "lastActive": "Last active {{date}}",
+            "neverActive": "Never signed in"
+        },
+        "actions": {
+            "title": "Recent actions",
+            "heading": "Recent actions in {{name}}",
+            "description": "Changes you made in this space, newest first.",
+            "descriptionAdmin": "Changes made in this space by everyone, newest first.",
+            "empty": "Nothing has been changed yet.",
+            "system": "Automatic",
+            "formerMember": "Former member",
+            "clear": "Clear log",
+            "clearTitle": "Clear the log of actions?",
+            "clearDescription": "The entries are removed for everyone and can no longer be rolled back. One entry stays, saying who cleared the log.",
+            "cleared": "Log cleared",
+            "op": {
+                "create": "Created {{entity}}",
+                "update": "Changed {{entity}}",
+                "delete": "Deleted {{entity}}",
+                "confirm": "Confirmed {{entity}}",
+                "skip": "Skipped {{entity}}",
+                "rollback": "Rolled back {{entity}}",
+                "cleanup": "Cleaned up {{entity}}",
+                "cleanupLog": "Cleared the log"
+            },
+            "entity": {
+                "transaction": "transaction",
+                "import": "CSV import",
+                "audit": "log"
+            },
+            "source": {
+                "ui": "App",
+                "api": "API",
+                "mcp": "AI assistant",
+                "system": "Automatic"
+            },
+            "filters": {
+                "all": "All",
+                "op": "Operation",
+                "entity": "Type",
+                "source": "Source",
+                "reset": "Reset",
+                "emptyFiltered": "No entries match the filters.",
+                "ops": {
+                    "create": "Created",
+                    "update": "Changed",
+                    "delete": "Deleted",
+                    "confirm": "Confirmed",
+                    "skip": "Skipped",
+                    "rollback": "Rolled back",
+                    "cleanup": "Cleaned up"
+                }
+            }
         },
         "invitations": {
             "title": "Invitations",
@@ -760,11 +814,14 @@
                 "changed_remote": "Changed in the other space",
                 "missing_remote": "Not in the other space"
             },
+            "thisSpace": "This space",
+            "otherSpace": "Other space",
+            "ours": "Ours",
+            "remote": "Remote",
             "needsAccount": "Account missing",
             "unverified": "Signature not verified",
             "frozen": "Space not linked",
             "remoteDeleted": "The other space deleted it.",
-            "remoteVersion": "The other space has {{amount}} on {{date}}.",
             "accept": "Take the other space's version",
             "reject": "Keep this version",
             "trust": "Trust as is",

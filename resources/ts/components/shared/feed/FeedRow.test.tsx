@@ -36,9 +36,9 @@ function row(props: { hasActions?: boolean; reserveActions?: boolean; withAction
     )
 }
 
-/** Everything after the amount column, i.e. what decides the amount's right offset. */
+/** Everything after the column holding title and amount, i.e. what decides the amount's right offset. */
 function trailing(container: HTMLElement) {
-    const amount = within(container).getByText('10.00').parentElement!
+    const amount = within(container).getByText('10.00').parentElement!.parentElement!
     const items: Element[] = []
     for (let el = amount.nextElementSibling; el; el = el.nextElementSibling) items.push(el)
     return items

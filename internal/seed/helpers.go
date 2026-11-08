@@ -2,6 +2,7 @@ package seed
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -29,31 +30,66 @@ func (s *seeder) addTx(
 		return nil
 	}
 	status := "confirmed"
-	in := ledger.TxInput{
-		Type: typ, AccountID: accountID, ToAccountID: toID, CategoryID: catID,
-		Amount: decimal.NewFromFloat(amount), ToAmount: floatPtrDecimal(toAmt),
-		Description: &desc, Date: &d, Status: &status, TagIDs: tagIDs,
-	}
-	created, err := s.txs.Create(s.ctx, in)
+	in, err := s.input(typ, accountID, catID, amount, toID, toAmt)
 	if err != nil {
 		return fmt.Errorf("%s %s: %w", typ, desc, err)
 	}
-	if typ == "expense" && amount >= 2 && created != nil {
+	in.Description, in.Date, in.Status, in.TagIDs = &desc, &d, &status, tagIDs
+	q := queuedTx{in: in, debt: strings.HasPrefix(typ, "debt_")}
+	if typ == "expense" && amount >= 2 {
 		name := ""
-		if created.Category != nil {
-			name = created.Category.Name
+		if catID != nil {
+			name = s.catNames[*catID]
 		}
-		s.expenses = append(s.expenses, expenseCand{id: created.ID, amount: amount, catName: name})
+		q.cand = &expenseCand{amount: amount, catName: name, catID: catID}
+	}
+	s.queue = append(s.queue, q)
+	if len(s.queue) >= flushEvery {
+		return s.flush()
 	}
 	return nil
 }
 
-func floatPtrDecimal(v *float64) *decimal.Decimal {
-	if v == nil {
-		return nil
+// input builds the payments (and the line, for an income or expense) of a
+// transaction of the old flat kind: an amount on an account and, for a
+// transfer or a debt, the account it went to.
+func (s *seeder) input(typ string, accountID int64, catID *int64, amount float64, toID *int64, toAmt *float64) (ledger.TxInput, error) {
+	value := decimal.NewFromFloat(amount)
+	switch typ {
+	case "income", "expense":
+		paid := value
+		if typ == "expense" {
+			paid = value.Neg()
+		}
+		return ledger.TxInput{
+			Type:     typ,
+			Payments: []ledger.PaymentInput{{AccountID: accountID, Amount: &paid}},
+			Lines:    []ledger.LineInput{{CategoryID: catID, Amount: value}},
+		}, nil
+	case "transfer":
+		if toID == nil {
+			return ledger.TxInput{}, fmt.Errorf("a transfer needs a destination")
+		}
+		if toAmt == nil {
+			return s.txs.ConvertedTransfer(s.ctx, accountID, *toID, value)
+		}
+		out, in := value.Neg(), decimal.NewFromFloat(*toAmt)
+		return ledger.TxInput{Type: typ, Payments: []ledger.PaymentInput{
+			{AccountID: accountID, Amount: &out}, {AccountID: *toID, Amount: &in},
+		}}, nil
 	}
-	d := decimal.NewFromFloat(*v)
-	return &d
+	// A debt transaction: lending and paying add to the debt account and take
+	// from the ordinary one; borrowing and collecting do the reverse.
+	if toID == nil {
+		return ledger.TxInput{}, fmt.Errorf("a debt transaction needs the debt")
+	}
+	onDebt, onAccount := value, value.Neg()
+	if typ == "debt_borrow" || typ == "debt_collection" {
+		onDebt, onAccount = value.Neg(), value
+	}
+	return ledger.TxInput{Type: typ, Payments: []ledger.PaymentInput{
+		{AccountID: accountID, Amount: &onAccount}, {AccountID: *toID, Amount: &onDebt},
+	}}, nil
 }
 
 func (s *seeder) countTx() int {
@@ -107,4 +143,48 @@ func inList(v string, opts ...string) bool {
 		}
 	}
 	return false
+}
+
+// flushEvery is how many queued transactions are stored at once.
+const flushEvery = 2000
+
+// queuedTx is a transaction addTx has accepted but not stored yet.
+type queuedTx struct {
+	in   ledger.TxInput
+	debt bool
+	cand *expenseCand // set for an expense that may be split into lines later
+}
+
+// flush stores the queued transactions, in the order they were added, in one
+// database transaction per run of the same kind. Nothing else may add or read
+// transactions between addTx and flush, so every step that does calls it first.
+func (s *seeder) flush() error {
+	queue := s.queue
+	s.queue = nil
+	for start := 0; start < len(queue); {
+		end := start
+		for end < len(queue) && queue[end].debt == queue[start].debt {
+			end++
+		}
+		txs := s.txs
+		if queue[start].debt {
+			txs = txs.As(ledger.ReasonDebt)
+		}
+		batch := make([]ledger.TxInput, 0, end-start)
+		for _, q := range queue[start:end] {
+			batch = append(batch, q.in)
+		}
+		ids, err := txs.AddMany(s.ctx, batch)
+		if err != nil {
+			return fmt.Errorf("seed transactions: %w", err)
+		}
+		for i, q := range queue[start:end] {
+			if q.cand != nil {
+				q.cand.id = ids[i]
+				s.expenses = append(s.expenses, *q.cand)
+			}
+		}
+		start = end
+	}
+	return nil
 }

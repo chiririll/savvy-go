@@ -1,12 +1,13 @@
 import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Banknote, Check, HandCoins, SkipForward } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
-import { formatCurrency, cn } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import { parseDateKey, pendingDateClassName } from '@/lib/dates'
 import { intlLocale } from '@/lib/i18n'
 import { displayTransactionDescription, transactionAmountAppearance } from '@/lib/transaction-description'
 import { Transaction } from '@/types'
 import { SkipTransactionAlert } from '../deferred/SkipTransactionAlert'
+import { TransactionAmount } from './TransactionAmount'
 
 const TYPE_ICONS: Record<Transaction['type'], typeof ArrowDownLeft> = {
     income: ArrowDownLeft,
@@ -25,9 +26,11 @@ interface UpcomingPendingCardProps {
     isReadOnly?: boolean
     onConfirm: (transaction: Transaction) => void
     onSkip: (id: number) => void
+    /** The amount is a guess (the occurrence of a rule with an estimate): shown as `≈`. */
+    approximate?: boolean
 }
 
-export function UpcomingPendingCard({ transaction, isReadOnly, onConfirm, onSkip }: UpcomingPendingCardProps) {
+export function UpcomingPendingCard({ transaction, isReadOnly, onConfirm, onSkip, approximate }: UpcomingPendingCardProps) {
     const { t } = useTranslation(['common', 'pages'])
     const Icon = TYPE_ICONS[transaction.type]
     const { sign, className } = transactionAmountAppearance(transaction.type)
@@ -53,9 +56,11 @@ export function UpcomingPendingCard({ transaction, isReadOnly, onConfirm, onSkip
                 {dateLabel}
             </p>
             <p className={`row-span-2 self-start pt-0.5 font-mono text-base font-medium truncate ${className}`}>
-                {transaction.isEstimated && '≈ '}
-                {sign}
-                {formatCurrency(transaction.amount, transaction.account.currency)}
+                <TransactionAmount
+                    amount={transaction.rowAmount}
+                    sign={sign}
+                    approximate={approximate}
+                />
             </p>
             {!isReadOnly && (
                 <div className="col-start-2 row-start-3 flex items-end justify-end gap-1">
