@@ -14,9 +14,9 @@ function splitPayments(transaction: Transaction): { paid: Payment[]; back: Payme
 }
 
 /**
- * Whether the form shows a saved transaction in the simple mode, with the category of its only line as the
- * category of the transaction: an expense or an income, one line, and every payment (change included) in the
- * currency of that line, netting to the amount of the line.
+ * Whether the form shows a saved transaction in the simple mode, with its only line as the transaction: an expense
+ * or an income, one line, and every payment (change included) in the currency of that line, netting to the amount
+ * of the line.
  */
 export function isSimpleTransaction(transaction: Transaction): boolean {
     if (transaction.type !== 'expense' && transaction.type !== 'income') {
@@ -127,7 +127,12 @@ export function toFormValues(transaction: Transaction): TransactionFormValues {
     // One line for all of it is the simple mode: its category is the category of the transaction.
     if (isSimpleTransaction(transaction)) {
         const [line] = transaction.lines
-        return { ...common, lines: [], default_category_id: line.categoryId, default_note: line.note }
+        return {
+            ...common,
+            lines: [{ category_id: line.categoryId, currency_id: line.currencyId, amount: line.amount, note: line.note }],
+            default_category_id: line.categoryId,
+            default_note: null,
+        }
     }
 
     return {

@@ -51,12 +51,18 @@ export function useTransactionModel({ form, transaction, isEdit, originalAffects
     }, [firstAccountId, accounts, form])
 
     useEffect(() => {
-        if (isTransfer || defaultCategoryId || lines?.length) {
+        const count = lines?.length ?? 0
+        const soleCategory = count === 1 ? lines?.[0]?.category_id : undefined
+        if (isTransfer || count > 1 || (defaultCategoryId && (count === 0 || soleCategory))) {
             return
         }
-        const preselected = pickDefaultCategory(categories, transactionType)
+        const preselected = defaultCategoryId ?? pickDefaultCategory(categories, transactionType)?.id
         if (preselected) {
-            form.setValue('default_category_id', preselected.id)
+            form.setValue('default_category_id', preselected)
+            // The only line is the transaction: it takes the category too.
+            if (count === 1 && !soleCategory) {
+                form.setValue('lines.0.category_id', preselected)
+            }
         }
     }, [isTransfer, defaultCategoryId, lines, transactionType, categories, form])
 

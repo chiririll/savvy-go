@@ -15,8 +15,11 @@ export interface CoverageValues {
     lines?: Array<{ amount: number; currency_id?: number | null }>
 }
 
-/** From two lines on each line has a note; a single line has the title of the transaction instead. */
-export const linesNeedNotes = (count: number): boolean => count >= 2
+/**
+ * From two lines on each line has a note. A single line has the title of the transaction instead, unless it covers
+ * all of the payment (`locked`): the default category is then locked, the line is the only category, and gets a note.
+ */
+export const linesNeedNotes = (count: number, locked = false): boolean => count >= 2 || (count === 1 && locked)
 
 /** What the lines have above what was paid, in `target`, never negative: the lines are for more than the payments. */
 export function excessAmount(paid: MoneyRow[], lines: MoneyRow[], target: Currency, change: MoneyRow[] = []): number {

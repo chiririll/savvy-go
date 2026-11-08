@@ -215,7 +215,7 @@ describe('recurringToFormValues', () => {
             tag_ids: [],
             payments: [{ account_id: cash.id, amount: 1100 }],
             change: [],
-            lines: [],
+            lines: [expect.objectContaining({ category_id: 1, amount: 1100 })],
             default_category_id: 1,
             estimated: false,
             is_active: true,

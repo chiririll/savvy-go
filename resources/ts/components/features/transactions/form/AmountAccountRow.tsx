@@ -57,6 +57,8 @@ interface AmountAccountRowProps {
     parseAmount?: (value: string) => unknown
     /** Under the account: its balance. */
     balance?: ReactNode
+    /** Called with the amount typed, before it is stored. */
+    onAmountChange?: (value: unknown) => void
 }
 
 /**
@@ -79,6 +81,7 @@ export function AmountAccountRow({
     amountPlaceholder,
     parseAmount,
     balance,
+    onAmountChange,
 }: AmountAccountRowProps) {
     const fixed = fixedAmount !== undefined
 
@@ -104,7 +107,11 @@ export function AmountAccountRow({
                                         ref={field.ref}
                                         onBlur={field.onBlur}
                                         value={field.value as string | number | null}
-                                        onChange={(value) => field.onChange(parseAmount ? parseAmount(value) : value)}
+                                        onChange={(value) => {
+                                            const next = parseAmount ? parseAmount(value) : value
+                                            onAmountChange?.(next)
+                                            field.onChange(next)
+                                        }}
                                     />
                                 </FormControl>
                             </FormItem>

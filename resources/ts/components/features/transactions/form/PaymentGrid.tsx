@@ -31,6 +31,8 @@ interface PaymentGridProps {
     removeLabel: string
     /** Small text at the end of the Amount label: the totals. */
     summary?: ReactNode
+    /** Called with the amount typed in the first row, before it is stored. */
+    onFirstAmountChange?: (value: unknown) => void
 }
 
 /**
@@ -54,6 +56,7 @@ export function PaymentGrid({
     onRemove,
     removeLabel,
     summary,
+    onFirstAmountChange,
 }: PaymentGridProps) {
     const { t } = useTranslation('common')
 
@@ -94,6 +97,7 @@ export function PaymentGrid({
                         amountLabel={t('fields.amount')}
                         accountLabel={t('fields.account')}
                         account={account}
+                        onAmountChange={index === 0 ? onFirstAmountChange : undefined}
                         excludeIds={usedAccountIds.filter((id) => id !== account?.id)}
                         action={
                             onRemove && (

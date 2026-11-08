@@ -19,11 +19,11 @@ interface LineNoteFieldProps {
 
 /**
  * The note of a line: a compact input that grows with the text, and a pencil that opens the markdown editor
- * in its place. A note that was saved opens in the editor, so its formatting is not hidden.
+ * in its place. The editor is closed on open, a saved note included: its text shows as written.
  */
 export function LineNoteField({ value, onChange, onBlur, label, testName }: LineNoteFieldProps) {
     const { t } = useTranslation('forms')
-    const [editing, setEditing] = useState(() => value.trim() !== '')
+    const [editing, setEditing] = useState(false)
     const textarea = useRef<HTMLTextAreaElement>(null)
 
     useAutoGrow(textarea, [value, editing])

@@ -117,6 +117,9 @@ describe('linesNeedNotes', () => {
         expect(linesNeedNotes(0)).toBe(false)
         expect(linesNeedNotes(1)).toBe(false)
         expect(linesNeedNotes(2)).toBe(true)
+        expect(linesNeedNotes(1, true)).toBe(true)
+        expect(linesNeedNotes(1, false)).toBe(false)
+        expect(linesNeedNotes(0, true)).toBe(false)
     })
 })
 

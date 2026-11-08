@@ -16,14 +16,20 @@ interface TransactionFormOptions {
 }
 
 export function toFormDefaults(defaultValues?: TransactionFormDefaults): TransactionFormValues {
+    const type = defaultValues?.type ?? 'expense'
+    // A new income or expense starts with one line that takes all of the payment: see `TransactionLines`.
+    const startLines: TransactionFormValues['lines'] =
+        type === 'income' || type === 'expense'
+            ? [{ category_id: defaultValues?.default_category_id ?? null, currency_id: null, amount: '' as unknown as number, note: '' }]
+            : []
     return {
-        type: defaultValues?.type ?? 'expense',
+        type,
         description: defaultValues?.description ?? '',
         date: defaultValues?.date !== undefined ? (defaultValues.date ?? '') : formatDateLocal(),
         tag_ids: defaultValues?.tag_ids ?? [],
         payments: defaultValues?.payments ?? [{ account_id: 0, amount: '' as unknown as number }],
         change: defaultValues?.change ?? [],
-        lines: defaultValues?.lines ?? [],
+        lines: defaultValues?.lines ?? startLines,
         default_category_id: defaultValues?.default_category_id ?? null,
         default_note: defaultValues?.default_note ?? null,
         to_account_id: defaultValues?.to_account_id ?? null,

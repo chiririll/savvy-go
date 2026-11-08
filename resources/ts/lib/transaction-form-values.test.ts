@@ -160,7 +160,7 @@ describe('toFormValues', () => {
                 { account_id: 9, amount: 12.5 },
             ],
             change: [],
-            lines: [],
+            lines: [expect.objectContaining({ category_id: 1, amount: 42.5 })],
             default_category_id: 1,
         })
     })
@@ -182,7 +182,7 @@ describe('toFormValues', () => {
             tag_ids: [tags[0].id],
             payments: [{ account_id: cash.id, amount: 42.5 }],
             change: [],
-            lines: [],
+            lines: [{ category_id: 1, currency_id: 1, amount: 42.5, note: null }],
             default_category_id: 1,
             default_note: null,
         })
@@ -191,7 +191,7 @@ describe('toFormValues', () => {
     it('keeps the note of the line, so editing does not lose it', () => {
         const tx = transaction({ lines: [line({ note: '- milk\n- bread' })] })
 
-        expect(toFormValues(tx).default_note).toBe('- milk\n- bread')
+        expect(toFormValues(tx).lines?.[0].note).toBe('- milk\n- bread')
     })
 
     it('shows an income with a positive amount', () => {
