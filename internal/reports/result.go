@@ -58,10 +58,15 @@ type ExpensePaceReport struct {
 	Currency string
 }
 
+// CategoryExpense is a top-level category's spending with its group's
+// subcategories folded in. Children are the parts, the parent's own lines
+// among them under its id; empty for a category without subcategories.
 type CategoryExpense struct {
 	ID                int64
+	ParentID          int64
 	Name, Icon, Color string
 	Current, Previous money.Money
+	Children          []CategoryExpense
 }
 
 type ExpensesByCategoryReport struct {
@@ -107,15 +112,27 @@ type TxSummaryReport struct {
 	Currency              string
 }
 
+// CategoryShare is one category's part of a total. ParentID is its parent,
+// 0 for a top-level category; the share is the category's own lines, never its
+// children's.
 type CategoryShare struct {
 	ID                int64
+	ParentID          int64
 	Name, Icon, Color string
 	Value             money.Money
 	Percentage        float64
 }
 
+// CategoryRef names a parent category that Items point to, whether or not it
+// has lines of its own.
+type CategoryRef struct {
+	ID                int64
+	Name, Icon, Color string
+}
+
 type TxByCategoryReport struct {
 	Items    []CategoryShare
+	Parents  []CategoryRef
 	Total    money.Money
 	Currency string
 }

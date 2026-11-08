@@ -529,6 +529,12 @@
             "noAccounts": "No accounts found",
             "chartTitle": "Net worth over time",
             "chartSubtitle": "Track your wealth growth"
+        },
+        "structure": {
+            "allCategories": "All categories",
+            "ownLines": "{{name}}: no subcategory",
+            "expand": "Show subcategories of {{name}}",
+            "collapse": "Hide subcategories of {{name}}"
         }
     },
     "dashboard": {

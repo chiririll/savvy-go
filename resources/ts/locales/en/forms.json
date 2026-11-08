@@ -34,6 +34,9 @@
     "categories": {
         "namePlaceholder": "Groceries",
         "preview": "Preview:",
+        "parent": "Parent category",
+        "noParent": "No parent",
+        "parentHelp": "Groups this category under another on charts.",
         "previewName": "Category name",
         "defaultNameHelp": "Built-in category. Keep the name unchanged to have it translated with the interface language.",
         "typeDefaultHelp": "The default category's type can't be changed. Make another category the default first."

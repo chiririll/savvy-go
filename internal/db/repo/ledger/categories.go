@@ -16,10 +16,11 @@ type Category struct {
 	Name, Type        string
 	Icon, Color       *string
 	IsDefault         bool
+	ParentID          *int64
 	TransactionsCount int
 }
 
-func categoryOf(id int64, name, typ string, icon, color db.NString, isDefault, count int64) Category {
+func categoryOf(id int64, name, typ string, icon, color db.NString, isDefault int64, parent db.NInt, count int64) Category {
 	return Category{
 		ID:                id,
 		Name:              name,
@@ -27,6 +28,7 @@ func categoryOf(id int64, name, typ string, icon, color db.NString, isDefault, c
 		Icon:              optString(icon),
 		Color:             optString(color),
 		IsDefault:         isDefault != 0,
+		ParentID:          optInt64(parent),
 		TransactionsCount: int(count),
 	}
 }
@@ -39,7 +41,7 @@ func (r Repo) Categories(ctx context.Context, typ string) ([]Category, error) {
 	}
 	out := make([]Category, len(rows))
 	for i, x := range rows {
-		out[i] = categoryOf(x.ID, x.Name, x.Type, x.Icon, x.Color, x.IsDefault, x.Count)
+		out[i] = categoryOf(x.ID, x.Name, x.Type, x.Icon, x.Color, x.IsDefault, x.ParentID, x.Count)
 	}
 	return out, nil
 }
@@ -49,7 +51,7 @@ func (r Repo) Category(ctx context.Context, id int64) (*Category, error) {
 	if err != nil {
 		return nilIfMissing[Category](err)
 	}
-	c := categoryOf(x.ID, x.Name, x.Type, x.Icon, x.Color, x.IsDefault, x.Count)
+	c := categoryOf(x.ID, x.Name, x.Type, x.Icon, x.Color, x.IsDefault, x.ParentID, x.Count)
 	return &c, nil
 }
 
@@ -59,7 +61,7 @@ func (r Repo) CategoryBare(ctx context.Context, id int64) (*Category, error) {
 	if err != nil {
 		return nilIfMissing[Category](err)
 	}
-	c := categoryOf(x.ID, x.Name, x.Type, x.Icon, x.Color, x.IsDefault, 0)
+	c := categoryOf(x.ID, x.Name, x.Type, x.Icon, x.Color, x.IsDefault, x.ParentID, 0)
 	return &c, nil
 }
 
@@ -70,7 +72,7 @@ func (r Repo) ClearDefaultCategory(ctx context.Context, typ string) error {
 func (r Repo) InsertCategory(ctx context.Context, c Category, now time.Time) (int64, error) {
 	res, err := r.q().InsertCategory(ctx, sqlc.InsertCategoryParams{
 		Name: c.Name, Type: c.Type, Icon: db.NullString(c.Icon), Color: db.NullString(c.Color),
-		IsDefault: db.BoolInt(c.IsDefault), CreatedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now),
+		IsDefault: db.BoolInt(c.IsDefault), ParentID: db.NullInt64(c.ParentID), CreatedAt: db.TimeNS(now), UpdatedAt: db.TimeNS(now),
 	})
 	if err != nil {
 		return 0, err
@@ -81,7 +83,7 @@ func (r Repo) InsertCategory(ctx context.Context, c Category, now time.Time) (in
 func (r Repo) UpdateCategory(ctx context.Context, id int64, c Category, now time.Time) error {
 	return r.q().UpdateCategory(ctx, sqlc.UpdateCategoryParams{
 		Name: c.Name, Type: c.Type, Icon: db.NullString(c.Icon), Color: db.NullString(c.Color),
-		IsDefault: db.BoolInt(c.IsDefault), UpdatedAt: db.TimeNS(now), ID: id,
+		IsDefault: db.BoolInt(c.IsDefault), ParentID: db.NullInt64(c.ParentID), UpdatedAt: db.TimeNS(now), ID: id,
 	})
 }
 
@@ -96,6 +98,12 @@ func (r Repo) ReplaceCategory(ctx context.Context, id, successor int64) error {
 		}
 		return q.DeleteCategory(ctx, id)
 	})
+}
+
+// CountCategoryChildren is how many categories sit directly under the category.
+func (r Repo) CountCategoryChildren(ctx context.Context, id int64) int64 {
+	n, _ := r.q().CountCategoryChildren(ctx, db.NI(id))
+	return n
 }
 
 func (r Repo) DeleteCategory(ctx context.Context, id int64) error {

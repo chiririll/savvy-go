@@ -59,6 +59,8 @@ type CategoryState struct {
 	Icon, Color  *string
 	IsDefault    bool
 	Transactions int
+	// Parent is the name of the category this one is grouped under, if any.
+	Parent string
 }
 
 // CategoryConflict is a category that is missing in some spaces or looks
@@ -404,7 +406,12 @@ func (r reconciler) checkResolved() error {
 }
 
 func (r reconciler) createKept(ctx context.Context) error {
-	for _, c := range r.diff.Categories {
+	// Parents first: a subcategory is created under a parent that must exist by then.
+	conflicts := slices.Clone(r.diff.Categories)
+	slices.SortStableFunc(conflicts, func(a, b CategoryConflict) int {
+		return parentRank(a) - parentRank(b)
+	})
+	for _, c := range conflicts {
 		d := r.decision(Categories, c.Type, c.Name)
 		if !d.Keep {
 			continue
@@ -414,9 +421,18 @@ func (r reconciler) createKept(ctx context.Context) error {
 			return err
 		}
 		for _, id := range c.Missing {
-			if _,
-				err := r.cats(id).Create(ctx,
-				ledger.Category{Name: c.Name, Type: c.Type, Icon: win.Icon, Color: win.Color}); err != nil {
+			made := ledger.Category{Name: c.Name, Type: c.Type, Icon: win.Icon, Color: win.Color}
+			if win.Parent != "" {
+				// A parent missing here leaves the category on the top level.
+				parent, err := findCategory(ctx, r.cats(id), c.Type, win.Parent)
+				if err != nil {
+					return err
+				}
+				if parent != nil {
+					made.ParentID = &parent.ID
+				}
+			}
+			if _, err := r.cats(id).Create(ctx, made); err != nil {
 				return err
 			}
 		}
@@ -431,7 +447,7 @@ func (r reconciler) createKept(ctx context.Context) error {
 			if _,
 				err := r.cats(s.Space).Update(ctx, cur.ID,
 				ledger.Category{Name: cur.Name, Type: cur.Type, Icon: win.Icon, Color: win.Color,
-					IsDefault: cur.IsDefault}); err != nil {
+					IsDefault: cur.IsDefault, ParentID: cur.ParentID}); err != nil {
 				return err
 			}
 		}
@@ -447,6 +463,14 @@ func (r reconciler) createKept(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// parentRank sorts top-level categories before subcategories.
+func parentRank(c CategoryConflict) int {
+	if len(c.Present) > 0 && c.Present[0].Parent != "" {
+		return 1
+	}
+	return 0
 }
 
 // winningLook picks the state of a kept category whose icon and color the

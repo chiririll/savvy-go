@@ -2,6 +2,7 @@ import { formatCurrency, formatCurrencyCompact } from '@/lib/utils'
 import i18n from '@/lib/i18n/i18n'
 import { isNarrowChart } from '@/hooks/use-element-width'
 import { axisStyle, legendTextStyle, type useChartTheme } from '@/lib/ui/chart-theme'
+import { colorShades } from '@/lib/ui/color-shades'
 import type { StructureItem } from '../charts/StructureChart'
 
 type ChartTheme = ReturnType<typeof useChartTheme>
@@ -70,6 +71,66 @@ function treemapLabel(
     }
 }
 
+export interface StructureGroup {
+    name: string
+    color: string
+    value: number
+    children: StructureItem[]
+}
+
+/**
+ * Items under one parent, largest group first and largest child first. A category
+ * without a parent is a group of its own. Without any parent in the data every group
+ * is a single item, so callers use `isGrouped` to keep the flat look.
+ */
+export function groupItems(items: StructureItem[]): StructureGroup[] {
+    const groups = new Map<string, StructureGroup>()
+    for (const item of items) {
+        const key = item.parent?.name ?? item.name
+        const group = groups.get(key) ?? { name: key, color: item.parent?.color ?? item.color, value: 0, children: [] }
+        group.value += item.value
+        group.children.push(item)
+        groups.set(key, group)
+    }
+    const out = [...groups.values()].sort((a, b) => b.value - a.value)
+    out.forEach((g) => g.children.sort((a, b) => b.value - a.value))
+    return out
+}
+
+export const isGrouped = (items: StructureItem[]) => items.some((item) => item.parent)
+
+/** A group's children coloured in shades of the group's colour, largest first. */
+const shaded = (group: StructureGroup): StructureItem[] => {
+    const shades = colorShades(group.color, group.children.length)
+    return group.children.map((item, i) => ({ ...item, color: shades[i] }))
+}
+
+/**
+ * What the donut and the bars draw: one entry per top-level group, `drill` naming
+ * the groups that open into subcategories; or, with `focus` naming a group, that
+ * group's children in its shades. A focus that is not in the data shows the top.
+ */
+export function chartLevel(items: StructureItem[], focus: string | null): StructureItem[] {
+    const groups = groupItems(items)
+    const open = focus === null ? undefined : groups.find((g) => g.name === focus)
+    if (open) return shaded(open).map(({ parent: _, ...item }) => item)
+    return groups.map((g) => ({
+        name: g.name,
+        value: g.value,
+        color: g.color,
+        drill: g.children.some((c) => c.parent) ? g.name : undefined,
+    }))
+}
+
+/** Pie and bar data: a slice that opens shows the pointer, the rest do not. */
+const datum = (item: StructureItem) => ({
+    name: item.name,
+    value: item.value,
+    drill: item.drill,
+    cursor: item.drill ? 'pointer' : 'default',
+    itemStyle: { color: item.color },
+})
+
 export function donutOption({ items: chartData, total, currency, theme, chartWidth }: StructureOptionInput) {
     // Inner hole diameter in px: radius 50%..75% of half the smaller side.
     const width = chartWidth || 600
@@ -93,10 +154,12 @@ export function donutOption({ items: chartData, total, currency, theme, chartWid
             },
         },
         legend: {
+            type: 'scroll',
             ...(isNarrow
                 ? { orient: 'horizontal', left: 12, right: 12, top: NARROW_DONUT_CENTER_Y * 2 - 4 }
                 : { orient: 'vertical', right: 20, top: 'center' }),
             textStyle: legendTextStyle(theme, legendFont),
+            pageTextStyle: { color: theme.text },
             formatter: (name: string) => {
                 const item = chartData.find((entry) => entry.name === name)
                 if (item) {
@@ -129,11 +192,7 @@ export function donutOption({ items: chartData, total, currency, theme, chartWid
                         shadowColor: 'rgba(0, 0, 0, 0.2)',
                     },
                 },
-                data: chartData.map((item) => ({
-                    name: item.name,
-                    value: item.value,
-                    itemStyle: { color: item.color },
-                })),
+                data: chartData.map(datum),
             },
         ],
         graphic: [
@@ -199,14 +258,14 @@ export function barOption({ items: chartData, total, currency, theme, chartWidth
             data: sortedData.map((item) => item.name),
             axisLabel: isNarrow
                 ? { fontSize: 11, color: theme.textStrong, width: 88, overflow: 'truncate', rotate: 0 }
-                : { fontSize: 12, color: theme.textStrong, rotate: 0 },
+                : { fontSize: 12, color: theme.textStrong, width: 122, overflow: 'truncate', rotate: 0 },
             axisLine: { show: false },
         }),
         series: [
             {
                 type: 'bar',
                 data: sortedData.map((item) => ({
-                    value: item.value,
+                    ...datum(item),
                     itemStyle: {
                         color: item.color,
                         borderRadius: [0, 4, 4, 0],
@@ -262,14 +321,24 @@ export function treemapOption({ items: chartData, total, currency, theme, chartW
                         },
                     },
                 ],
-                data: chartData.map((item) => ({
-                    name: item.name,
-                    value: item.value,
-                    itemStyle: {
-                        color: item.color,
-                    },
-                    label: treemapLabel(item, total, currency, chartWidth || 600),
-                })),
+                data: groupItems(chartData).map((g) => {
+                    const leaf = (item: StructureItem) => ({
+                        name: item.name,
+                        value: item.value,
+                        itemStyle: { color: item.color },
+                        label: treemapLabel(item, total, currency, chartWidth || 600),
+                    })
+                    // A lone top-level category stays a plain tile; a group wraps its children,
+                    // in its shades, under a labelled header.
+                    if (!g.children.some((c) => c.parent)) return leaf(g.children[0])
+                    return {
+                        name: g.name,
+                        value: g.value,
+                        itemStyle: { color: g.color, borderColor: g.color, borderWidth: 2, gapWidth: 2 },
+                        upperLabel: { show: true, height: 18, color: '#fff', fontSize: 11 },
+                        children: shaded(g).map(leaf),
+                    }
+                }),
             },
         ],
     }

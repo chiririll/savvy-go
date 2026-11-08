@@ -355,7 +355,9 @@ type CatTotal struct {
 	Name  string
 	Icon  sql.NullString
 	Color sql.NullString
-	Total money.Money
+	// ParentID is the category's parent, 0 for a top-level one.
+	ParentID int64
+	Total    money.Money
 }
 
 // SumGroupedByCategory is the total per category in the base currency, largest
@@ -364,10 +366,10 @@ func SumGroupedByCategory(ctx context.Context, sqlDB store.DB, w ReportWhere, ba
 	where, args := Clause(w)
 	where += ` AND l.category_id IS NOT NULL`
 	rows, err := sqlDB.QueryContext(ctx, `
-		SELECT cat.id, cat.name, cat.icon, cat.color, SUM(l.amount), c.decimals, c.rate
+		SELECT cat.id, cat.name, cat.icon, cat.color, COALESCE(cat.parent_id, 0), SUM(l.amount), c.decimals, c.rate
 		`+lineFrom+`
 		`+where+`
-		GROUP BY cat.id, cat.name, cat.icon, cat.color, c.id`, args...)
+		GROUP BY cat.id, cat.name, cat.icon, cat.color, cat.parent_id, c.id`, args...)
 	if err != nil {
 		return nil
 	}
@@ -379,7 +381,7 @@ func SumGroupedByCategory(ctx context.Context, sqlDB store.DB, w ReportWhere, ba
 		var x CatTotal
 		var minor, decimals int64
 		var rate decimal.Decimal
-		if err := rows.Scan(&x.ID, &x.Name, &x.Icon, &x.Color, &minor, &decimals, &rate); err != nil {
+		if err := rows.Scan(&x.ID, &x.Name, &x.Icon, &x.Color, &x.ParentID, &minor, &decimals, &rate); err != nil {
 			return nil
 		}
 		if _, ok := idx[x.ID]; !ok {

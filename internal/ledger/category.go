@@ -19,6 +19,7 @@ type Category struct {
 	Icon              *string
 	Color             *string
 	IsDefault         bool
+	ParentID          *int64
 	TransactionsCount int
 	TotalAmount       *money.Money
 }
@@ -59,7 +60,36 @@ func (s Categories) Bare(ctx context.Context, id int64) (*Category, error) {
 	return &c, nil
 }
 
+// checkParent allows a parent of the same type that is itself top level, and
+// no parent for a category that has children: groups go one level deep.
+// id is 0 for a category not created yet.
+func (s Categories) checkParent(ctx context.Context, id int64, c Category) error {
+	if c.ParentID == nil {
+		return nil
+	}
+	if *c.ParentID == id {
+		return fmt.Errorf("a category cannot be its own parent")
+	}
+	parent, err := s.Bare(ctx, *c.ParentID)
+	if err != nil {
+		return err
+	}
+	if parent == nil || parent.Type != c.Type {
+		return fmt.Errorf("invalid parent")
+	}
+	if parent.ParentID != nil {
+		return fmt.Errorf("the parent is already a subcategory")
+	}
+	if id != 0 && s.repo().CountCategoryChildren(ctx, id) > 0 {
+		return fmt.Errorf("a category with subcategories cannot have a parent")
+	}
+	return nil
+}
+
 func (s Categories) Create(ctx context.Context, c Category) (*Category, error) {
+	if err := s.checkParent(ctx, 0, c); err != nil {
+		return nil, err
+	}
 	if c.IsDefault {
 		if err := s.repo().ClearDefaultCategory(ctx, c.Type); err != nil {
 			return nil, err
@@ -82,6 +112,12 @@ func (s Categories) Update(ctx context.Context, id int64, c Category) (*Category
 	}
 	if cur.IsDefault && !c.IsDefault {
 		return nil, fmt.Errorf("cannot unset default")
+	}
+	if err := s.checkParent(ctx, id, c); err != nil {
+		return nil, err
+	}
+	if c.Type != cur.Type && s.repo().CountCategoryChildren(ctx, id) > 0 {
+		return nil, fmt.Errorf("cannot change type of a category with subcategories")
 	}
 	if c.IsDefault && !cur.IsDefault {
 		if err := s.repo().ClearDefaultCategory(ctx, c.Type); err != nil {
@@ -168,10 +204,10 @@ func (s Categories) Statistics(ctx context.Context, id int64, start, end string)
 func categoryFrom(r repo.Category) Category {
 	return Category{
 		ID: r.ID, Name: r.Name, Type: r.Type, Icon: r.Icon, Color: r.Color,
-		IsDefault: r.IsDefault, TransactionsCount: r.TransactionsCount,
+		IsDefault: r.IsDefault, ParentID: r.ParentID, TransactionsCount: r.TransactionsCount,
 	}
 }
 
 func categoryRow(c Category) repo.Category {
-	return repo.Category{Name: c.Name, Type: c.Type, Icon: c.Icon, Color: c.Color, IsDefault: c.IsDefault}
+	return repo.Category{Name: c.Name, Type: c.Type, Icon: c.Icon, Color: c.Color, IsDefault: c.IsDefault, ParentID: c.ParentID}
 }

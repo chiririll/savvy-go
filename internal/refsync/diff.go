@@ -64,14 +64,22 @@ func gatherCategories(ctx context.Context, dbs map[int64]store.DB, members []int
 		if err != nil {
 			return v, err
 		}
+		byID := map[int64]string{}
 		for _, c := range list {
+			byID[c.ID] = c.Name
+		}
+		for _, c := range list {
+			parent := ""
+			if c.ParentID != nil {
+				parent = byID[*c.ParentID]
+			}
 			k := categoryKey{c.Type, lower(c.Name)}
 			if _, ok := v.names[k]; !ok {
 				v.names[k] = c.Name
 			}
 			v.states[k] = append(
 				v.states[k],
-				CategoryState{Space: id, Icon: c.Icon, Color: c.Color, IsDefault: c.IsDefault, Transactions: c.TransactionsCount},
+				CategoryState{Space: id, Icon: c.Icon, Color: c.Color, IsDefault: c.IsDefault, Transactions: c.TransactionsCount, Parent: parent},
 			)
 			if v.defaults[c.Type] == nil {
 				v.defaults[c.Type] = map[int64]string{}

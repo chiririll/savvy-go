@@ -78,7 +78,7 @@ func TestIsV1TellsTheFilesApart(t *testing.T) {
 			t.Errorf("IsV1(%s) = %v, %v; want %v", filepath.Base(path), got, err, want)
 		}
 	}
-	expect(t, d, `SELECT version FROM schema_migrations`, "space/0001_base")
+	expect(t, d, `SELECT version FROM schema_migrations`, "space/0001_base", "space/0002_category_parent")
 	expect(t, src2(t, src), `SELECT version FROM schema_migrations`, "space/0001_initial")
 }
 

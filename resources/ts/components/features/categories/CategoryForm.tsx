@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
     Form,
     FormField,
@@ -22,6 +23,8 @@ import { ColorPicker } from './ColorPicker'
 import { CategoryPreview } from './CategoryPreview'
 import { FormWrapper } from '@/components/shared/form/FormWrapper'
 
+const NO_PARENT = 'none'
+
 interface CategoryFormProps {
     defaultValues?: Partial<CategoryFormData>
     onSubmit: (data: CategoryFormData) => void
@@ -31,6 +34,8 @@ interface CategoryFormProps {
     formId?: string
     hideSubmit?: boolean
     isDefault?: boolean
+    /** Top-level categories the category may go under; empty hides the field. */
+    parentOptions?: { id: number; name: string; type: string }[]
 }
 
 export function CategoryForm({
@@ -42,6 +47,7 @@ export function CategoryForm({
     formId,
     hideSubmit,
     isDefault,
+    parentOptions = [],
 }: CategoryFormProps) {
     const { t } = useTranslation(['common', 'forms'])
     const form = useForm<CategoryFormData>({
@@ -109,6 +115,36 @@ export function CategoryForm({
                         </FormItem>
                     )}
                 />
+
+                {parentOptions.some((p) => p.type === watchedValues.type) && (
+                    <FormField
+                        control={form.control}
+                        name="parentId"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>{t('forms:categories.parent')}</FormLabel>
+                                <Select
+                                    value={field.value ? String(field.value) : NO_PARENT}
+                                    onValueChange={(v) => field.onChange(v === NO_PARENT ? null : Number(v))}
+                                >
+                                    <FormControl>
+                                        <SelectTrigger className="w-full">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        <SelectItem value={NO_PARENT}>{t('forms:categories.noParent')}</SelectItem>
+                                        {parentOptions.filter((p) => p.type === watchedValues.type).map((p) => (
+                                            <SelectItem key={p.id} value={String(p.id)}>{localizeDefaultName(p.name)}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <FormDescription>{t('forms:categories.parentHelp')}</FormDescription>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                )}
 
                 <FormField
                     control={form.control}

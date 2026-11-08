@@ -87,6 +87,17 @@ func (q *Queries) CountCategoriesByType(ctx context.Context, type_ string) (int6
 	return count, err
 }
 
+const countCategoryChildren = `-- name: CountCategoryChildren :one
+SELECT COUNT(*) FROM categories WHERE parent_id = ?
+`
+
+func (q *Queries) CountCategoryChildren(ctx context.Context, parentID sql.NullInt64) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countCategoryChildren, parentID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const deleteCategory = `-- name: DeleteCategory :exec
 DELETE FROM categories WHERE id = ?
 `
@@ -97,7 +108,7 @@ func (q *Queries) DeleteCategory(ctx context.Context, id int64) error {
 }
 
 const getCategory = `-- name: GetCategory :one
-SELECT categories.id, categories.name, categories.type, categories.icon, categories.color, categories.is_default,
+SELECT categories.id, categories.name, categories.type, categories.icon, categories.color, categories.is_default, categories.parent_id,
 	(SELECT COUNT(DISTINCT l.transaction_id) FROM transaction_lines l WHERE l.category_id = categories.id)
 FROM categories WHERE categories.id = ?
 `
@@ -109,6 +120,7 @@ type GetCategoryRow struct {
 	Icon      sql.NullString
 	Color     sql.NullString
 	IsDefault int64
+	ParentID  sql.NullInt64
 	Count     int64
 }
 
@@ -122,13 +134,14 @@ func (q *Queries) GetCategory(ctx context.Context, id int64) (GetCategoryRow, er
 		&i.Icon,
 		&i.Color,
 		&i.IsDefault,
+		&i.ParentID,
 		&i.Count,
 	)
 	return i, err
 }
 
 const getCategoryBare = `-- name: GetCategoryBare :one
-SELECT id, name, type, icon, color, is_default FROM categories WHERE id = ?
+SELECT id, name, type, icon, color, is_default, parent_id FROM categories WHERE id = ?
 `
 
 type GetCategoryBareRow struct {
@@ -138,6 +151,7 @@ type GetCategoryBareRow struct {
 	Icon      sql.NullString
 	Color     sql.NullString
 	IsDefault int64
+	ParentID  sql.NullInt64
 }
 
 // GetCategory without the transaction count, which scans every line of the category.
@@ -151,12 +165,13 @@ func (q *Queries) GetCategoryBare(ctx context.Context, id int64) (GetCategoryBar
 		&i.Icon,
 		&i.Color,
 		&i.IsDefault,
+		&i.ParentID,
 	)
 	return i, err
 }
 
 const getDefaultCategory = `-- name: GetDefaultCategory :one
-SELECT categories.id, categories.name, categories.type, categories.icon, categories.color, categories.is_default,
+SELECT categories.id, categories.name, categories.type, categories.icon, categories.color, categories.is_default, categories.parent_id,
 	(SELECT COUNT(DISTINCT l.transaction_id) FROM transaction_lines l WHERE l.category_id = categories.id)
 FROM categories WHERE categories.type = ? AND categories.is_default = 1 LIMIT 1
 `
@@ -168,6 +183,7 @@ type GetDefaultCategoryRow struct {
 	Icon      sql.NullString
 	Color     sql.NullString
 	IsDefault int64
+	ParentID  sql.NullInt64
 	Count     int64
 }
 
@@ -181,13 +197,14 @@ func (q *Queries) GetDefaultCategory(ctx context.Context, type_ string) (GetDefa
 		&i.Icon,
 		&i.Color,
 		&i.IsDefault,
+		&i.ParentID,
 		&i.Count,
 	)
 	return i, err
 }
 
 const insertCategory = `-- name: InsertCategory :execresult
-INSERT INTO categories (name, type, icon, color, is_default, created_at, updated_at) VALUES (?,?,?,?,?,?,?)
+INSERT INTO categories (name, type, icon, color, is_default, parent_id, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)
 `
 
 type InsertCategoryParams struct {
@@ -196,6 +213,7 @@ type InsertCategoryParams struct {
 	Icon      sql.NullString
 	Color     sql.NullString
 	IsDefault int64
+	ParentID  sql.NullInt64
 	CreatedAt sql.NullString
 	UpdatedAt sql.NullString
 }
@@ -207,13 +225,14 @@ func (q *Queries) InsertCategory(ctx context.Context, arg InsertCategoryParams) 
 		arg.Icon,
 		arg.Color,
 		arg.IsDefault,
+		arg.ParentID,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
 }
 
 const listCategories = `-- name: ListCategories :many
-SELECT c.id, c.name, c.type, c.icon, c.color, c.is_default,
+SELECT c.id, c.name, c.type, c.icon, c.color, c.is_default, c.parent_id,
 	(SELECT COUNT(DISTINCT l.transaction_id) FROM transaction_lines l WHERE l.category_id = c.id)
 FROM categories c
 WHERE c.type = COALESCE(?1, c.type)
@@ -227,6 +246,7 @@ type ListCategoriesRow struct {
 	Icon      sql.NullString
 	Color     sql.NullString
 	IsDefault int64
+	ParentID  sql.NullInt64
 	Count     int64
 }
 
@@ -246,6 +266,7 @@ func (q *Queries) ListCategories(ctx context.Context, type_ sql.NullString) ([]L
 			&i.Icon,
 			&i.Color,
 			&i.IsDefault,
+			&i.ParentID,
 			&i.Count,
 		); err != nil {
 			return nil, err
@@ -291,7 +312,7 @@ func (q *Queries) SetCategoryDefault(ctx context.Context, arg SetCategoryDefault
 }
 
 const updateCategory = `-- name: UpdateCategory :exec
-UPDATE categories SET name=?, type=?, icon=?, color=?, is_default=?, updated_at=? WHERE id=?
+UPDATE categories SET name=?, type=?, icon=?, color=?, is_default=?, parent_id=?, updated_at=? WHERE id=?
 `
 
 type UpdateCategoryParams struct {
@@ -300,6 +321,7 @@ type UpdateCategoryParams struct {
 	Icon      sql.NullString
 	Color     sql.NullString
 	IsDefault int64
+	ParentID  sql.NullInt64
 	UpdatedAt sql.NullString
 	ID        int64
 }
@@ -311,6 +333,7 @@ func (q *Queries) UpdateCategory(ctx context.Context, arg UpdateCategoryParams) 
 		arg.Icon,
 		arg.Color,
 		arg.IsDefault,
+		arg.ParentID,
 		arg.UpdatedAt,
 		arg.ID,
 	)

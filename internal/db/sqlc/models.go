@@ -146,6 +146,7 @@ type Category struct {
 	Icon      sql.NullString
 	Color     sql.NullString
 	IsDefault int64
+	ParentID  sql.NullInt64
 	CreatedAt sql.NullString
 	UpdatedAt sql.NullString
 }

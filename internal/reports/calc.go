@@ -99,8 +99,10 @@ type catTotal struct {
 	Name  string
 	Icon  string
 	Color string
-	Total money.Money
-	Node  string
+	// ParentID is the parent category, 0 for a top-level one.
+	ParentID int64
+	Total    money.Money
+	Node     string
 }
 
 func (q report) byCategory(typ string, r dateRange) []catTotal {
@@ -108,7 +110,7 @@ func (q report) byCategory(typ string, r dateRange) []catTotal {
 	for _, x := range filter.SumGroupedByCategory(q.ctx, q.DB, q.where(typ, r, 0), q.unit) {
 		out = append(out, catTotal{
 			ID: x.ID, Name: x.Name, Icon: coalesce(x.Icon.String, "circle"),
-			Color: coalesce(x.Color.String, "#64748b"), Total: x.Total,
+			Color: coalesce(x.Color.String, "#64748b"), ParentID: x.ParentID, Total: x.Total,
 		})
 	}
 	return out
@@ -246,28 +248,39 @@ func (s Service) ExpensesByCategory(ctx context.Context, f Filter) ExpensesByCat
 	now := s.now()
 	cur := q.byCategory("expense", f.Range(now))
 	prev := lookup[int64, money.Money]{m: map[int64]money.Money{}, none: q.zero()}
+	prevGroups := lookup[int64, money.Money]{m: map[int64]money.Money{}, none: q.zero()}
 	if cmp := f.Comparison(now); cmp != nil {
-		for _, x := range q.byCategory("expense", *cmp) {
+		before := q.byCategory("expense", *cmp)
+		for _, x := range before {
 			prev.m[x.ID] = x.Total
 		}
+		prevGroups.m = q.groupTotals(before)
 	}
 	cats := []CategoryExpense{}
-	for _, x := range cur {
+	for _, g := range q.byParent(cur) {
+		parts := []CategoryExpense{}
+		for _, x := range g.Parts {
+			parts = append(parts, CategoryExpense{
+				ID: x.ID, ParentID: g.ID, Name: x.Name, Icon: x.Icon, Color: x.Color,
+				Current: x.Total, Previous: prev.at(x.ID),
+			})
+		}
 		cats = append(cats, CategoryExpense{
-			ID: x.ID, Name: x.Name, Icon: x.Icon, Color: x.Color,
-			Current: x.Total, Previous: prev.at(x.ID),
+			ID: g.ID, Name: g.Name, Icon: g.Icon, Color: g.Color,
+			Current: g.Total, Previous: prevGroups.at(g.ID), Children: parts,
 		})
 	}
 	return ExpensesByCategoryReport{Categories: cats, Currency: q.code()}
 }
 
-// CategorySummary returns per-category totals of the given type for the period
-// described by f, with the grand total.
+// CategorySummary returns the totals of the given type for the period described
+// by f per top-level category, each with its subcategories' lines, and the
+// grand total.
 func (s Service) CategorySummary(ctx context.Context, f Filter, typ string) ([]ledger.Category, money.Money) {
 	q := s.open(ctx, f)
 	out := []ledger.Category{}
 	total := q.zero()
-	for _, x := range q.byCategory(typ, f.Range(s.now())) {
+	for _, x := range q.byParent(q.byCategory(typ, f.Range(s.now()))) {
 		amount := x.Total
 		out = append(out, ledger.Category{
 			ID: x.ID, Name: x.Name, Type: typ,

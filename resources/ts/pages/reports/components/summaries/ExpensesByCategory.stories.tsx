@@ -133,3 +133,28 @@ export const Failed: Story = {
 }
 
 export const Loading: Story = { beforeEach: ({ msw }) => msw.use(hang('get', '/reports/expenses-by-category')) }
+
+// A parent's row is its whole group; it opens into the subcategories, and links to all of them.
+export const Subcategories: Story = {
+    beforeEach: ({ msw }) =>
+        msw.use(
+            reply(
+                'get',
+                '/reports/expenses-by-category',
+                data('USD', {
+                    ...row(1, 'Home', 1000, 800),
+                    children: [{ ...row(2, 'Rent', 900, 700), parentId: 1 }, { ...row(1, 'Home', 100, 100), parentId: 1 }],
+                }),
+            ),
+        ),
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement)
+        await expect(await canvas.findByText('1,000.00 $')).toBeVisible()
+        await expect(canvas.queryByText('Rent')).toBeNull()
+        await userEvent.click(canvas.getByRole('button', { name: 'Show subcategories of Home' }))
+        await expect(canvas.getByText('Rent')).toBeVisible()
+        await expect(canvas.getByText('Home: no subcategory')).toBeVisible()
+        await userEvent.click(canvas.getByText('Home', { selector: 'span.font-medium' }))
+        await expect(canvas.getByTestId('place')).toHaveTextContent('/transactions?category_ids=1,2')
+    },
+}

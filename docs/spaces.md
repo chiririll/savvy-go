@@ -82,6 +82,22 @@ A transfer is stored in both spaces and signed by both of them: every space has 
 - **Unlink, only one space moved, or bad signature**: the transfer is **frozen**. It stays in balances but cannot be edited, and syncs again once the spaces are relinked (and, after a move, both are on the server).
 - **Transfers from v1.0** were signed by the server. At the first start on v1.1 they are signed again by the spaces' keys, once both spaces are here and the old signature holds.
 
+## Subcategories
+
+A category can sit under a **parent** of the same type, chosen in the category form (**Parent category**). Groups go one level deep: a parent cannot have a parent, and a category with subcategories cannot be put under another. Deleting a parent leaves its subcategories at the top level. Names stay unique per type across the whole space, so two parents cannot each have an "Other".
+
+Reports and the dashboard show a parent with its subcategories folded in:
+
+- **Dashboard.** *Expenses by category* shows top-level categories only, each with its subcategories' spending.
+- **Structure reports** (income and expenses). The donut and the bars show one entry per parent. Click a parent to open its subcategories, drawn in shades of the parent's colour; **All categories** goes back. The treemap shows every group at once, subcategories nested under their parent.
+- **Expenses by category** (Reports → Overview). A parent's row is the whole group, compared with the whole group in the earlier period. The arrow beside it lists the subcategories. Clicking a parent opens the transactions of the parent and all its subcategories.
+
+A parent's own transactions show beside its subcategories as *Parent: no subcategory*.
+
+In the API, a category has a `parentId`. The by-category report gives each item's `parentId` and a `parents` list naming them. `categories-summary` totals per top-level category. In `reports/expenses-by-category`, each parent has the group's totals and `children` with the parts; the parent's own transactions are the child with the parent's id.
+
+Budgets do not yet cover a parent's subcategories.
+
 ## Shared categories and tags
 
 Spaces that should use the same categories and tags can join a **sync group** in **Space → Settings → Shared categories and tags**. It needs no link or transfers and works between any spaces you administer. A space is in one group at most. Joining walks through the differences step by step (categories, where the transactions of a deleted category go, tags, then defaults and a summary); nothing changes until **Apply**, and **Back** keeps your choices. The dialog is a sheet on a phone.
@@ -90,6 +106,7 @@ Categories and tags are switched on separately. While a kind is on, any add, edi
 
 - **Rights.** Changing categories or tags needs the **editor** role in *every* space of the group. Setting up the group, adding a space and switching a kind on need an **admin** of every space involved. Leaving the group needs only an admin of that space.
 - **Joining.** Spaces must first become identical. The dialog lists every difference (missing items, different icon, color or default). For each, choose to keep it (adding it where missing) or delete it everywhere, and which space's icon and color win. Nothing changes until you apply.
+- **Subcategories.** A category's parent is shared too, matched by the parent's name.
 - **Deleting.** Deleting a category asks for one replacement: transactions in every space move to it (where there are none, it is simply deleted). Deleting a tag removes it from transactions.
 - **Defaults.** The default category of each type is shared too.
 - **Leaving.** A space that leaves keeps its categories and tags, which stop following the others. A group left with one space ends.

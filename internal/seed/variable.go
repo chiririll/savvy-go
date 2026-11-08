@@ -33,6 +33,12 @@ func (s *seeder) seedVariableExpenses(
 	expenses []ledger.Category,
 	tags []ledger.Tag,
 ) error {
+	s.children = map[int64][]ledger.Category{}
+	for _, c := range expenses {
+		if c.ParentID != nil {
+			s.children[*c.ParentID] = append(s.children[*c.ParentID], c)
+		}
+	}
 	var pool []ledger.Category
 	for _, w := range variableWeights {
 		if c := catByName(expenses, w.name); c != nil {
@@ -93,7 +99,15 @@ func (s *seeder) seedVariableExpense(
 	merchant := s.merchantFor(cat.Name)
 	acct := s.variableAccount(accounts, cat.Name, amount)
 	tagIDs := s.variableTagIDs(vt, cat.Name)
-	return s.addTx("expense", acct.ID, &cat.ID, amount, merchant, day, nil, nil, tagIDs)
+	// A purchase falls to a subcategory, or stays in the parent, by its amount:
+	// no random draw, so the rest of the demo data keeps its numbers.
+	catID := cat.ID
+	if kids := s.children[cat.ID]; len(kids) > 0 {
+		if i := int(amount*100) % (len(kids) + 1); i < len(kids) {
+			catID = kids[i].ID
+		}
+	}
+	return s.addTx("expense", acct.ID, &catID, amount, merchant, day, nil, nil, tagIDs)
 }
 
 func (s *seeder) variableAccount(accounts map[string]*ledger.Account, cat string, amount float64) *ledger.Account {

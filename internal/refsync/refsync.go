@@ -208,6 +208,41 @@ func findTag(ctx context.Context, t ledger.Tags, name string) (*ledger.Tag, erro
 	return nil, nil
 }
 
+// parentLink carries a category's parent from the asked space to the rest of
+// the group: ids differ between spaces, so the parent is found by its name.
+type parentLink struct{ name string }
+
+// localize returns c with ParentID meaning the parent in space id. The asked
+// space goes first and fills the link; the others read it.
+func (l *parentLink) localize(
+	ctx context.Context, asked bool, d store.DB, c ledger.Category,
+) (ledger.Category, error) {
+	cats := ledger.Categories{DB: d}
+	if asked {
+		if c.ParentID != nil {
+			if p, err := cats.Bare(ctx, *c.ParentID); err != nil {
+				return c, err
+			} else if p != nil {
+				l.name = p.Name
+			}
+		}
+		return c, nil
+	}
+	c.ParentID = nil
+	if l.name == "" {
+		return c, nil
+	}
+	p, err := findCategory(ctx, cats, c.Type, l.name)
+	if err != nil {
+		return c, err
+	}
+	if p == nil {
+		return c, ErrDiverged
+	}
+	c.ParentID = &p.ID
+	return c, nil
+}
+
 // counterpart is the category in another space that stands for c.
 func counterpart(ctx context.Context, d store.DB, c ledger.Category) (*ledger.Category, error) {
 	found, err := findCategory(ctx, ledger.Categories{DB: d}, c.Type, c.Name)
@@ -228,8 +263,13 @@ func (s Service) CreateCategory(
 	c ledger.Category,
 ) (*ledger.Category, error) {
 	var out *ledger.Category
+	var link parentLink
 	err := s.mirror(ctx, actor, spaceID, Categories, func(id int64, d store.DB) error {
-		created, err := (ledger.Categories{DB: d}).Create(ctx, c)
+		local, err := link.localize(ctx, id == spaceID, d, c)
+		if err != nil {
+			return err
+		}
+		created, err := (ledger.Categories{DB: d}).Create(ctx, local)
 		if id == spaceID {
 			out = created
 		}
@@ -247,8 +287,13 @@ func (s Service) UpdateCategory(
 	c ledger.Category,
 ) (*ledger.Category, error) {
 	var out, before *ledger.Category
+	var link parentLink
 	err := s.mirror(ctx, actor, spaceID, Categories, func(id int64, d store.DB) error {
 		cats := ledger.Categories{DB: d}
+		local, err := link.localize(ctx, id == spaceID, d, c)
+		if err != nil {
+			return err
+		}
 		target := categoryID
 		if id == spaceID {
 			cur, err := cats.ByID(ctx, categoryID)
@@ -266,7 +311,7 @@ func (s Service) UpdateCategory(
 			}
 			target = other.ID
 		}
-		updated, err := cats.Update(ctx, target, c)
+		updated, err := cats.Update(ctx, target, local)
 		if id == spaceID {
 			out = updated
 		}

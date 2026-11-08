@@ -1,24 +1,24 @@
 -- name: ListCategories :many
-SELECT c.id, c.name, c.type, c.icon, c.color, c.is_default,
+SELECT c.id, c.name, c.type, c.icon, c.color, c.is_default, c.parent_id,
 	(SELECT COUNT(DISTINCT l.transaction_id) FROM transaction_lines l WHERE l.category_id = c.id)
 FROM categories c
 WHERE c.type = COALESCE(sqlc.narg('type'), c.type)
 ORDER BY c.name;
 
 -- name: GetCategory :one
-SELECT categories.id, categories.name, categories.type, categories.icon, categories.color, categories.is_default,
+SELECT categories.id, categories.name, categories.type, categories.icon, categories.color, categories.is_default, categories.parent_id,
 	(SELECT COUNT(DISTINCT l.transaction_id) FROM transaction_lines l WHERE l.category_id = categories.id)
 FROM categories WHERE categories.id = ?;
 
 -- name: GetCategoryBare :one
 -- GetCategory without the transaction count, which scans every line of the category.
-SELECT id, name, type, icon, color, is_default FROM categories WHERE id = ?;
+SELECT id, name, type, icon, color, is_default, parent_id FROM categories WHERE id = ?;
 
 -- name: InsertCategory :execresult
-INSERT INTO categories (name, type, icon, color, is_default, created_at, updated_at) VALUES (?,?,?,?,?,?,?);
+INSERT INTO categories (name, type, icon, color, is_default, parent_id, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?);
 
 -- name: UpdateCategory :exec
-UPDATE categories SET name=?, type=?, icon=?, color=?, is_default=?, updated_at=? WHERE id=?;
+UPDATE categories SET name=?, type=?, icon=?, color=?, is_default=?, parent_id=?, updated_at=? WHERE id=?;
 
 -- name: CountCategoriesByType :one
 SELECT COUNT(*) FROM categories WHERE type = ?;
@@ -40,7 +40,7 @@ WHERE l.category_id = sqlc.arg('category_id') AND t.status = 'confirmed'
 GROUP BY c.id;
 
 -- name: GetDefaultCategory :one
-SELECT categories.id, categories.name, categories.type, categories.icon, categories.color, categories.is_default,
+SELECT categories.id, categories.name, categories.type, categories.icon, categories.color, categories.is_default, categories.parent_id,
 	(SELECT COUNT(DISTINCT l.transaction_id) FROM transaction_lines l WHERE l.category_id = categories.id)
 FROM categories WHERE categories.type = ? AND categories.is_default = 1 LIMIT 1;
 
@@ -53,3 +53,6 @@ UPDATE categories SET is_default = 1, updated_at = ? WHERE id = ?;
 -- name: ReassignCategoryTransactions :exec
 -- Every line of the old category moves to the new one.
 UPDATE transaction_lines SET category_id = ? WHERE category_id = ?;
+
+-- name: CountCategoryChildren :one
+SELECT COUNT(*) FROM categories WHERE parent_id = ?;

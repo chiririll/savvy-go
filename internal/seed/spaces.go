@@ -55,7 +55,18 @@ var demoSpaces = []spaceSpec{
 		currencies: currencySet(usdCurrency, withRate(eurCurrency, "1.08")),
 		own: ownReference{
 			categories: []Category{{"Pets", "expense", "🐾", "#a3e635", false}},
-			tags:       []string{"Weekend"},
+			subcategories: []Subcategory{
+				{"#GROCERIES", "Supermarket", "expense", "🛒", "#22c55e"},
+				{"#GROCERIES", "Farmers market", "expense", "🥕", "#86efac"},
+				{"#EATING_OUT", "Restaurants", "expense", "🍽️", "#f97316"},
+				{"#EATING_OUT", "Coffee & cafés", "expense", "☕", "#fdba74"},
+				{"#EATING_OUT", "Delivery", "expense", "🛵", "#fed7aa"},
+				{"#TRANSPORT", "Fuel", "expense", "⛽", "#3b82f6"},
+				{"#TRANSPORT", "Taxi & rideshare", "expense", "🚕", "#93c5fd"},
+				{"Pets", "Vet", "expense", "💉", "#84cc16"},
+				{"Pets", "Pet food", "expense", "🦴", "#bef264"},
+			},
+			tags: []string{"Weekend"},
 		},
 		workspace: seedWorkspace,
 	},
@@ -65,7 +76,11 @@ var demoSpaces = []spaceSpec{
 		currencies: currencySet(usdCurrency),
 		own: ownReference{
 			categories: []Category{{"School & kids", "expense", "🎒", "#facc15", false}},
-			tags:       []string{"Kids"},
+			subcategories: []Subcategory{
+				{"School & kids", "Tuition", "expense", "🎓", "#eab308"},
+				{"School & kids", "Activities", "expense", "⚽", "#fde047"},
+			},
+			tags: []string{"Kids"},
 		},
 		workspace: miniWorkspace(familySpace),
 	},

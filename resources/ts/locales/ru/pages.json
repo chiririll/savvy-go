@@ -529,6 +529,12 @@
             "noAccounts": "Счета не найдены",
             "chartTitle": "Чистый капитал во времени",
             "chartSubtitle": "Динамика капитала"
+        },
+        "structure": {
+            "allCategories": "Все категории",
+            "ownLines": "{{name}}: без подкатегории",
+            "expand": "Показать подкатегории {{name}}",
+            "collapse": "Скрыть подкатегории {{name}}"
         }
     },
     "dashboard": {

@@ -39,6 +39,8 @@ The data covers the transaction model, not only plain expenses. Most are one pay
 - a **pending shopping list** in each space (a task list in the notes of its lines, items ticked off or not yet) that moves no balance until it is confirmed.
 - **reconciliation points** in the Demo space: checking, savings, cash and the euro account are pinned on the last day of each of the three previous months; the second month leaves checking 46.50 short, the other points match the ledger.
 
+Categories have subcategories: Demo splits groceries, eating out and transport into several (with transactions in them) and Pets into vet and pet food, Family Budget has two under School & kids, and Studio GmbH has some under software and travel. Demo's budgets list the subcategories of their category.
+
 Roles differ per space, so each user sees a different view. Every space has its own emoji and color. Family Budget and Demo are in one sync group, each with a category and a tag the other lacked. Studio GmbH is outside it and has a set of categories and tags of its own (clients, retainers, VAT) instead of the presets. About a dozen transfers cross the links between the spaces, some in the last few days and some between currencies. All addresses are verified except the guest's, which shows as unverified once mail is set up.
 
 Example `seed.toml`:
