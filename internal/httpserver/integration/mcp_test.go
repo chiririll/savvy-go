@@ -335,6 +335,8 @@ func TestMCPReadToolsNeedTheirPermissions(t *testing.T) {
 	calls := map[string]map[string]any{
 		"list_spaces":                 nil,
 		"list_accounts":               {"space_id": sp},
+		"get_balance":                 {"space_id": sp},
+		"get_balance_history":         {"space_id": sp, "from": "2026-02-01", "to": "2026-02-02"},
 		"list_categories":             {"space_id": sp},
 		"list_tags":                   {"space_id": sp},
 		"list_currencies":             {"space_id": sp},
@@ -661,4 +663,73 @@ func mcpTx(space int64, typ string, account int64, amount, desc, date string) ma
 		args["description"] = desc
 	}
 	return args
+}
+
+// get_balance and get_balance_history read the account's own balance on a day:
+// the opening balance plus the confirmed payments up to the end of that day.
+func TestMCPAccountBalanceAtADateAndHistory(t *testing.T) {
+	a := newTestApp(t)
+	u := a.createUser("mcp@a.com", "secret1", "admin")
+	sp := a.space.ID
+	s := a.mcpFull(u)
+
+	acc := idOf(t, a.call(s, "create_account",
+		map[string]any{"space_id": sp, "name": "Wallet", "type": "cash", "currency_code": "EUR", "initial_balance": "100"}))
+	for _, tx := range []struct{ typ, amount, date string }{
+		{"expense", "30", "2026-02-01"},
+		{"income", "10", "2026-02-03"},
+	} {
+		if res := a.call(s, "create_transaction", mcpTx(sp, tx.typ, acc, tx.amount, "", tx.date)); res.IsError {
+			t.Fatalf("seed: %s", resultText(res))
+		}
+	}
+
+	// One series for the account, no total; native_data is in its own currency.
+	one := func(res *mcp.CallToolResult) map[string]any {
+		t.Helper()
+		if res.IsError {
+			t.Fatalf("balance tool: %s", resultText(res))
+		}
+		var h map[string]any // the chart's shape, not wrapped in data
+		if err := json.Unmarshal([]byte(resultText(res)), &h); err != nil {
+			t.Fatal(err)
+		}
+		series := h["series"].([]any)
+		if len(series) != 1 || series[0].(map[string]any)["id"] != float64(acc) {
+			t.Fatalf("want only the account's series: %s", resultText(res))
+		}
+		return h
+	}
+	for at, want := range map[string]float64{"2026-01-31": 100, "2026-02-01": 70, "2026-02-02": 70, "2026-02-03": 80} {
+		h := one(a.call(s, "get_balance", map[string]any{"space_id": sp, "account_ids": []int64{acc}, "at": at}))
+		native := h["series"].([]any)[0].(map[string]any)["native_data"].([]any)
+		if len(h["dates"].([]any)) != 1 || h["dates"].([]any)[0] != at || native[0] != want {
+			t.Errorf("balance at %s = %v, want %v", at, h, want)
+		}
+	}
+
+	h := one(a.call(s, "get_balance_history",
+		map[string]any{"space_id": sp, "account_ids": []int64{acc}, "from": "2026-01-31", "to": "2026-02-03"}))
+	native := h["series"].([]any)[0].(map[string]any)["native_data"].([]any)
+	if len(native) != 4 || len(h["dates"].([]any)) != 4 {
+		t.Fatalf("history = %v", h)
+	}
+	for i, want := range []float64{100, 70, 70, 80} {
+		if native[i] != want {
+			t.Errorf("day %d balance = %v, want %v", i, native[i], want)
+		}
+	}
+
+	for name, args := range map[string]map[string]any{
+		"bad date":        {"space_id": sp, "account_ids": []int64{acc}, "at": "yesterday"},
+		"unknown account": {"space_id": sp, "account_ids": []int64{9999}, "at": "2026-02-01"},
+	} {
+		if res := a.call(s, "get_balance", args); !res.IsError {
+			t.Errorf("%s must be refused: %s", name, resultText(res))
+		}
+	}
+	if res := a.call(s, "get_balance_history",
+		map[string]any{"space_id": sp, "account_ids": []int64{acc}, "from": "2026-02-03", "to": "2026-02-01"}); !res.IsError {
+		t.Errorf("a period ending before it starts must be refused")
+	}
 }

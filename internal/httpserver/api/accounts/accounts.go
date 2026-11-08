@@ -240,7 +240,30 @@ func (s Handler) accountsBalanceHistory(w http.ResponseWriter, r *http.Request) 
 		httpx.WriteJSON(w, http.StatusOK, dto.BalanceHistory{Dates: []string{}, Series: []dto.BalanceSeries{}, Decimals: 2})
 		return
 	}
-	accts, _ := httpx.Scope(r).Accounts.All(r.Context(), true, true)
+	// account_ids narrows the chart to those accounts, of any kind, active or not.
+	ids, ok := httpx.QueryIDs(r.URL.Query(), "account_ids")
+	if !ok {
+		httpx.WriteValidation(w, map[string][]string{"account_ids": {"The accounts must be ids."}})
+		return
+	}
+	filtered := len(ids) > 0
+	var accts []ledger.Account
+	if filtered {
+		for _, id := range ids {
+			a, err := httpx.Scope(r).Accounts.ByID(r.Context(), id)
+			if err != nil {
+				httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
+				return
+			}
+			if a == nil {
+				httpx.WriteMessage(w, http.StatusNotFound, "Not found.")
+				return
+			}
+			accts = append(accts, *a)
+		}
+	} else {
+		accts, _ = httpx.Scope(r).Accounts.All(r.Context(), true, true)
+	}
 	dates := dateRange(start, end)
 	series := []dto.BalanceSeries{}
 	total := make([]money.Money, len(dates))

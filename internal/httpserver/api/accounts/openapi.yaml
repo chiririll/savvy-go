@@ -49,7 +49,7 @@ paths:
     parameters: [{$ref: "#/components/parameters/Space"}]
     get:
       tags: [Accounts]
-      summary: Balance history of accounts
+      summary: Balance history of accounts (query `start_date`, `end_date`; `account_ids` for just those accounts, any kind)
       responses:
         "200": {$ref: "#/components/responses/Data"}
         "401": {$ref: "#/components/responses/Unauthenticated"}

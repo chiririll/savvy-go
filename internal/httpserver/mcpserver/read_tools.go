@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -33,6 +34,19 @@ type accountsArgs struct {
 	SpaceID     int64  `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
 	WithSummary bool   `json:"with_summary,omitempty" jsonschema:"Also return totals across the accounts."`
 	Type        string `json:"type,omitempty" jsonschema:"Only these types, comma-separated: bank, crypto, cash, credit, debt, space."`
+}
+
+type balanceArgs struct {
+	SpaceID    int64   `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
+	AccountIDs []int64 `json:"account_ids,omitempty" jsonschema:"Only these accounts, from list_accounts. Default all active accounts, with a total."`
+	At         string  `json:"at,omitempty" jsonschema:"Day, YYYY-MM-DD: the balance at the end of it. Default today."`
+}
+
+type balanceHistoryArgs struct {
+	SpaceID    int64   `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
+	AccountIDs []int64 `json:"account_ids,omitempty" jsonschema:"Only these accounts, from list_accounts. Default all active accounts, with a total."`
+	From       string  `json:"from" jsonschema:"First day, YYYY-MM-DD."`
+	To         string  `json:"to" jsonschema:"Last day, YYYY-MM-DD, at most about ten years after from."`
 }
 
 type idArgs struct {
@@ -88,7 +102,7 @@ type reportArgs struct {
 
 // mcpReadNeeds is the resource each read tool needs; list_spaces needs none.
 var mcpReadNeeds = map[string]string{
-	"list_accounts": "accounts", "list_categories": "categories", "list_tags": "tags", "list_currencies": "currencies",
+	"list_accounts": "accounts", "get_balance": "accounts", "get_balance_history": "accounts", "list_categories": "categories", "list_tags": "tags", "list_currencies": "currencies",
 	"list_budgets": "budgets", "list_debts": "debts", "get_debts_summary": "debts",
 	"list_transactions": "transactions", "get_transaction": "transactions", "get_transactions_summary": "transactions",
 	"get_transactions_day_totals": "transactions",
@@ -182,6 +196,48 @@ func (h Handler) addQueryReadTools(srv *mcp.Server) {
 				q.Set("with_summary", "1")
 			}
 			return h.mcpGet(ctx, req, mcpSpacePath(in.SpaceID, "/accounts"), q), nil, nil
+		},
+	)
+
+	// Both read the balance chart's route, so a balance is computed in one place.
+	mcp.AddTool(
+		srv,
+		&mcp.Tool{
+			Name: "get_balance",
+			Description: "The balance of accounts at the end of a day (all active ones, or account_ids): opening balance plus " +
+				"confirmed payments up to then. One series per account with one day, plus a total; native_data is in the account's own currency.",
+			Annotations: ro("Get balance"),
+		},
+		func(ctx context.Context, req *mcp.CallToolRequest, in balanceArgs) (*mcp.CallToolResult, any, error) {
+			at := in.At
+			if at == "" {
+				at = time.Now().Format("2006-01-02")
+			}
+			q, err := balanceQuery(in.AccountIDs, at, at)
+			if err != nil {
+				return mcpFail(err.Error()), nil, nil
+			}
+			return h.mcpGet(ctx, req, mcpSpacePath(in.SpaceID, "/accounts-balance-history"), q), nil, nil
+		},
+	)
+	mcp.AddTool(
+		srv,
+		&mcp.Tool{
+			Name: "get_balance_history",
+			Description: "The balance of accounts (all active ones, or account_ids) at the end of every day from from to to, " +
+				"oldest first. One series per account, plus a total. " +
+				"native_data is in the account's own currency, data in the space's base currency.",
+			Annotations: ro("Get balance history"),
+		},
+		func(ctx context.Context, req *mcp.CallToolRequest, in balanceHistoryArgs) (*mcp.CallToolResult, any, error) {
+			if in.From == "" || in.To == "" {
+				return mcpFail("give both from and to."), nil, nil
+			}
+			q, err := balanceQuery(in.AccountIDs, in.From, in.To)
+			if err != nil {
+				return mcpFail(err.Error()), nil, nil
+			}
+			return h.mcpGet(ctx, req, mcpSpacePath(in.SpaceID, "/accounts-balance-history"), q), nil, nil
 		},
 	)
 
@@ -298,6 +354,16 @@ func transactionsQuery(in transactionsArgs) (url.Values, error) {
 	if in.WithSummary {
 		q.Set("with_summary", "1")
 	}
+	return q, nil
+}
+
+// balanceQuery turns the arguments of the balance tools into a query.
+func balanceQuery(accounts []int64, from, to string) (url.Values, error) {
+	q := url.Values{}
+	if err := firstErr(setDate(q, "start_date", from), setDate(q, "end_date", to)); err != nil {
+		return nil, err
+	}
+	setIDs(q, "account_ids", accounts)
 	return q, nil
 }
 

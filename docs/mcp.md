@@ -45,6 +45,7 @@ Access tokens last an hour and renew in the background. A connection unused for 
 |------|---------|
 | `list_spaces` | your spaces and your role in each |
 | `list_accounts`, `list_categories`, `list_tags`, `list_currencies` | reference data of a space. `list_accounts` takes `type` (one or several, such as `credit`) to narrow the list; a credit card in it comes with its terms, available credit, last statement and status |
+| `get_balance`, `get_balance_history` | balances at the end of a day (`at`, default today), or of every day from `from` to `to`, for all active accounts with a total or just `account_ids`: opening balance plus confirmed payments; returned as the balance chart does, with `native_data` in the account's own currency |
 | `list_transactions`, `get_transaction` | transactions; filters (dates, type, status, account or accounts, currencies, categories, tags) and free-text search `q` (description, item names, or an amount in the account's currency); pages of up to 100 |
 | `get_transactions_summary` | transaction totals |
 | `get_transactions_day_totals` | what each day netted per currency, over every transaction of the day; give `dates`, or `start_date` and `end_date`; takes the filters of `list_transactions` |
