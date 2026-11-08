@@ -4,6 +4,7 @@ package httpserver
 import (
 	_ "savvy-go/internal/httpserver/api/auditlog"
 	_ "savvy-go/internal/httpserver/api/imports"
+	_ "savvy-go/internal/httpserver/api/reconciliations"
 	_ "savvy-go/internal/httpserver/api/recurring"
 	_ "savvy-go/internal/httpserver/api/reports"
 	_ "savvy-go/internal/httpserver/api/settings"

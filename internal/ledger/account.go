@@ -289,46 +289,89 @@ func (s Accounts) total(ctx context.Context, accts []Account, base Currency, asO
 	return sum
 }
 
-// Balance is the account's balance at the end of asOf ("" for now): the opening
-// balance plus its payments, whatever the account is.
+// Reconciliation is a point that pins an account's balance on a date.
+type Reconciliation = repo.Reconciliation
+
+// Balance is the account's balance at the end of asOf ("" for now), whatever
+// the account is. The latest reconciliation point dated on or before asOf is an
+// anchor: the balance is its actual balance plus the payments after its date
+// (those of the day itself are inside it already). With no such point it is the
+// opening balance plus every payment up to asOf. Cost: one point lookup and one
+// sum.
 func (s Accounts) Balance(ctx context.Context, a Account, asOf string) (money.Money, error) {
-	sum, err := s.repo().DeltaSum(ctx, a.ID, asOf)
+	limit := asOf
+	if limit == "" {
+		limit = endOfTime
+	}
+	point, err := s.repo().LatestReconciliation(ctx, a.ID, limit)
 	if err != nil {
 		return money.Money{}, err
 	}
-	return a.InitialBalance.Add(money.New(sum, a.Currency.Unit())), nil
+	base, after := anchorOf(a.InitialBalance, point)
+	sum, err := s.repo().DeltaSumBetween(ctx, a.ID, after, asOf)
+	if err != nil {
+		return money.Money{}, err
+	}
+	return base.Add(money.New(sum, a.Currency.Unit())), nil
 }
 
 // BalanceSeries is the balance at the end of each of dates, which must be
-// ascending YYYY-MM-DD days, from one query instead of one per date.
+// ascending YYYY-MM-DD days, from one query for the payments and one for the
+// points instead of one per date. It agrees with Balance on every date: the
+// series passes a point's date, it takes that point's actual balance (days
+// before the first point keep running from the opening balance, so it may jump
+// there).
 func (s Accounts) BalanceSeries(ctx context.Context, a Account, dates []string) ([]money.Money, error) {
 	out := make([]money.Money, len(dates))
 	if len(dates) == 0 {
 		return out, nil
 	}
-	deltas, err := s.deltas(ctx, a, dates[len(dates)-1])
+	last := dates[len(dates)-1]
+	deltas, err := s.deltas(ctx, a, "", last)
 	if err != nil {
 		return nil, err
 	}
-	bal, next := a.InitialBalance, 0
+	points, err := s.repo().AccountReconciliations(ctx, a.ID)
+	if err != nil {
+		return nil, err
+	}
+	line := newBalanceLine(a.InitialBalance, points, deltas)
 	for i, date := range dates {
-		for next < len(deltas) && deltas[next].day <= date {
-			bal = bal.Add(deltas[next].change)
-			next++
-		}
-		out[i] = bal
+		out[i] = line.at(date)
 	}
 	return out, nil
 }
 
-type dayChange struct {
-	day    string
-	change money.Money
+// ReconciliationCheck is a reconciliation point with what the ledger expected
+// at it. Expected is the balance of the previous anchor (the previous point's
+// actual balance, or the opening balance for the first point) plus the payments
+// after that anchor's date up to and including this point's date. Difference is
+// Point.ActualBalance - Expected: positive when the real balance is higher than
+// the payments explain. A payment back-dated into the period moves Expected and
+// closes the gap without changing any balance after the point.
+type ReconciliationCheck struct {
+	Point      Reconciliation
+	Expected   money.Money
+	Difference money.Money
 }
 
-// deltas is the account's net change per day up to asOf, oldest first.
-func (s Accounts) deltas(ctx context.Context, a Account, asOf string) ([]dayChange, error) {
-	rows, err := s.repo().DailyChanges(ctx, a.ID, asOf)
+// ReconciliationChecks returns a check for each point of the account, oldest
+// first (empty when there is none), from one query over the payments.
+func (s Accounts) ReconciliationChecks(ctx context.Context, a Account) ([]ReconciliationCheck, error) {
+	points, err := s.repo().AccountReconciliations(ctx, a.ID)
+	if err != nil || len(points) == 0 {
+		return nil, err
+	}
+	deltas, err := s.deltas(ctx, a, "", points[len(points)-1].Date)
+	if err != nil {
+		return nil, err
+	}
+	return newBalanceLine(a.InitialBalance, points, deltas).checks(), nil
+}
+
+// deltas is the account's net change per day in (after, asOf], oldest first.
+func (s Accounts) deltas(ctx context.Context, a Account, after, asOf string) ([]dayChange, error) {
+	rows, err := s.repo().DailyChangesBetween(ctx, a.ID, after, asOf)
 	if err != nil {
 		return nil, err
 	}

@@ -106,11 +106,16 @@ type CardState struct {
 
 // ComputeCardState reads the card as of today. initial is the account's opening
 // balance and flows its confirmed payments per day, oldest first. Days after
-// today are not counted. The card must be valid.
-func ComputeCardState(c CreditCard, initial money.Money, flows []repo.DayFlow, today time.Time) CardState {
+// today are not counted. points are the card's reconciliation points, oldest
+// first: from a point's date the running balance restarts at its actual balance
+// (as Accounts.Balance does), so the card agrees with the account list. Inflow
+// and outflow are still the payments themselves. The card must be valid.
+func ComputeCardState(
+	c CreditCard, initial money.Money, flows []repo.DayFlow, points []Reconciliation, today time.Time,
+) CardState {
 	unit := initial.Unit()
 	todayS := dayString(today)
-	book := newCardBook(initial, flows, todayS)
+	book := newCardBook(initial, flows, points, todayS)
 
 	out := CardState{}
 	balance := book.balanceAt(todayS)
@@ -159,27 +164,24 @@ func ComputeCardState(c CreditCard, initial money.Money, flows []repo.DayFlow, t
 type cardBook struct {
 	initial money.Money
 	flows   []repo.DayFlow // up to today
+	line    balanceLine
 }
 
-func newCardBook(initial money.Money, flows []repo.DayFlow, today string) cardBook {
+func newCardBook(initial money.Money, flows []repo.DayFlow, points []Reconciliation, today string) cardBook {
 	b := cardBook{initial: initial}
+	var changes []dayChange
 	for _, f := range flows {
 		if f.Day <= today {
 			b.flows = append(b.flows, f)
+			changes = append(changes, dayChange{day: f.Day, change: money.New(f.Delta, initial.Unit())})
 		}
 	}
+	b.line = newBalanceLine(initial, points, changes)
 	return b
 }
 
-func (b cardBook) balanceAt(day string) money.Money {
-	bal := b.initial
-	for _, f := range b.flows {
-		if f.Day <= day {
-			bal = bal.Add(money.New(f.Delta, b.initial.Unit()))
-		}
-	}
-	return bal
-}
+// balanceAt is the balance at the end of day, by the rule in anchor.go.
+func (b cardBook) balanceAt(day string) money.Money { return b.line.at(day) }
 
 // inflowBetween adds what came in on the days after from up to and including to.
 func (b cardBook) inflowBetween(from, to string) money.Money {
@@ -462,5 +464,9 @@ func (s CreditCards) State(ctx context.Context, c Card, today time.Time) (CardSt
 	if err != nil {
 		return CardState{}, err
 	}
-	return ComputeCardState(c.Terms, c.InitialBalance, flows, today), nil
+	points, err := s.repo().AccountReconciliations(ctx, c.ID)
+	if err != nil {
+		return CardState{}, err
+	}
+	return ComputeCardState(c.Terms, c.InitialBalance, flows, points, today), nil
 }

@@ -1,10 +1,13 @@
-import { type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { FeedEmpty, FeedGroup, FeedRowSkeleton } from '@/components/shared'
 import { useRelativeDay } from '@/hooks'
 import { formatCurrency } from '@/lib/currency'
 import { groupByDateKey } from '@/lib/dates'
 import { isApproximateOccurrence } from '@/lib/recurring-template'
-import { Transaction, type DayTotal } from '@/types'
+import type { Account, ReconciliationDay, Transaction, DayTotal } from '@/types'
+import { ReconciledLine } from './ReconciledLine'
+import { ReconciliationDetailsDialog } from './ReconciliationDetailsDialog'
+import { mergeReconciliationDays } from './reconciliation-days'
 import { TransactionRow } from './TransactionRow'
 
 const MAX_DAY_TOTALS = 2
@@ -42,6 +45,13 @@ interface TransactionListProps {
     grouped?: boolean
     /** What each day netted, from the server: it covers the whole day, not just the rows loaded. */
     dayTotals?: DayTotal[]
+    /** The reconciliation points by day: a line closes each day that has some, also a day with no transactions. */
+    reconciliationDays?: ReconciliationDay[]
+    /** The accounts, for the names and currencies in the details of a reconciliation. */
+    accounts?: readonly Account[]
+    /** Code of the base currency, in which the sum of a day's differences is shown. */
+    baseCurrency?: string
+    onDeleteReconciliation?: (id: number) => void
     /** Called with a day and its transactions in the new order, as listed. Move up/down menu items show when set. */
     onReorder?: (date: string, shownIds: number[]) => void
 }
@@ -64,10 +74,16 @@ export function TransactionList({
     approximateRuleIds = NO_RULES,
     grouped = true,
     dayTotals = [],
+    reconciliationDays = [],
+    accounts,
+    baseCurrency,
+    onDeleteReconciliation,
     onReorder,
 }: TransactionListProps) {
     const relativeDay = useRelativeDay()
-    const groups = grouped ? groupByDateKey(transactions) : []
+    const [detailsDate, setDetailsDate] = useState<string | null>(null)
+    const groups = grouped ? mergeReconciliationDays(groupByDateKey(transactions), reconciliationDays) : []
+    const detailsDay = reconciliationDays.find((day) => day.date === detailsDate) ?? null
     const canReorder = (group: { date: string | null; items: Transaction[] }) =>
         !!onReorder && !isReadOnly && group.date !== null && group.items.length > 1
     const move = (group: { date: string | null; items: Transaction[] }, index: number, step: -1 | 1) => {
@@ -151,8 +167,22 @@ export function TransactionList({
                             }
                         />
                     ))}
+                    {group.reconciliation && (
+                        <ReconciledLine
+                            day={group.reconciliation}
+                            baseCurrency={baseCurrency}
+                            onOpenDetails={() => setDetailsDate(group.reconciliation?.date ?? null)}
+                        />
+                    )}
                 </FeedGroup>
             ))}
+            <ReconciliationDetailsDialog
+                day={detailsDay}
+                accounts={accounts}
+                dateLabel={relativeDay(detailsDate)}
+                onOpenChange={(open) => !open && setDetailsDate(null)}
+                onDelete={isReadOnly ? undefined : onDeleteReconciliation}
+            />
         </div>
     )
 }

@@ -192,6 +192,12 @@
         "created": "Создано",
         "updated": "Обновлено",
         "deleted": "Удалено",
+        "reconciliation": {
+            "created": "Счета сверены",
+            "createFailed": "Не удалось сверить счета",
+            "deleted": "Точка сверки удалена",
+            "deleteFailed": "Не удалось удалить точку сверки"
+        },
         "account": {
             "created": "Счёт создан",
             "updated": "Счёт обновлён",

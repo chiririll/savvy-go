@@ -8,6 +8,8 @@ export const SPACE_ROOTS = new Set([
     'accounts',
     'accounts-balance-history',
     'accounts-balance-comparison',
+    'reconciliations',
+    'reconciliations-days',
     'categories',
     'categories-summary',
     'tags',

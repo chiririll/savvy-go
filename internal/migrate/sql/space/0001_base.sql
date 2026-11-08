@@ -129,6 +129,20 @@ CREATE TABLE IF NOT EXISTS payments (
 CREATE INDEX IF NOT EXISTS payments_account_idx ON payments (account_id, transaction_id, amount);
 CREATE UNIQUE INDEX IF NOT EXISTS payments_space_transfer_unique ON payments (space_transfer_uuid) WHERE space_transfer_uuid IS NOT NULL;
 
+-- A reconciliation point pins an account's balance to what the bank (or the
+-- wallet) really showed: the balance at the END of `date` is actual_balance,
+-- whatever the payments before it add up to. One point per account per date;
+-- a new one for the same date replaces it. Minor units of the account's currency.
+CREATE TABLE IF NOT EXISTS reconciliations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    date TEXT NOT NULL,
+    actual_balance INTEGER NOT NULL,
+    note TEXT,
+    created_at TEXT,
+    UNIQUE (account_id, date)
+) STRICT;
+
 -- What it was spent on or earned from: an amount for a category, not a
 -- product. The sign comes from the transaction type. A NULL category is an
 -- uncategorised line (v1.0 rows allow it).

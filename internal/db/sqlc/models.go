@@ -247,6 +247,15 @@ type Payment struct {
 	SpaceTransferUuid sql.NullString
 }
 
+type Reconciliation struct {
+	ID            int64
+	AccountID     int64
+	Date          string
+	ActualBalance int64
+	Note          sql.NullString
+	CreatedAt     sql.NullString
+}
+
 type RecurringInstance struct {
 	RecurringTransactionID int64
 	DueDate                string

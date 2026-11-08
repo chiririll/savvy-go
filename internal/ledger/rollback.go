@@ -27,12 +27,19 @@ func (r Rollbacks) Log() audit.Log { return audit.Log{DB: r.DB} }
 
 // supported says whether the ledger knows an inverse for e.
 func supported(e audit.Entry) error {
-	if e.EntityType != EntityTransaction {
+	switch e.EntityType {
+	case EntityTransaction:
+		switch e.Op {
+		case audit.OpCreate, audit.OpUpdate, audit.OpDelete, audit.OpConfirm, audit.OpSkip:
+			return nil
+		}
+	case EntityReconciliation:
+		switch e.Op {
+		case audit.OpCreate, audit.OpUpdate, audit.OpDelete:
+			return nil
+		}
+	default:
 		return fmt.Errorf("changes to %ss", e.EntityType)
-	}
-	switch e.Op {
-	case audit.OpCreate, audit.OpUpdate, audit.OpDelete, audit.OpConfirm, audit.OpSkip:
-		return nil
 	}
 	return fmt.Errorf("a %s entry", e.Op)
 }
@@ -77,8 +84,11 @@ func (r Rollbacks) UndoBatch(ctx context.Context, batchID string, tokenID int64)
 	return r.Undo(ctx, ids, tokenID)
 }
 
-// inverse undoes e, a change to a transaction, on d.
+// inverse undoes e, a change to a transaction or a reconciliation point, on d.
 func inverse(ctx context.Context, d store.DB, e audit.Entry) (json.RawMessage, json.RawMessage, error) {
+	if e.EntityType == EntityReconciliation {
+		return inverseReconciliation(ctx, d, e)
+	}
 	r := repo.Repo{DB: d}
 	id := *e.EntityID
 	cur, err := r.Snapshot(ctx, id)
@@ -114,4 +124,49 @@ func inverse(ctx context.Context, d store.DB, e audit.Entry) (json.RawMessage, j
 		return nil, nil, err
 	}
 	return audit.Snapshot(cur), audit.Snapshot(now), nil
+}
+
+// inverseReconciliation undoes e, a change to a reconciliation point: a create
+// deletes it, an update puts the earlier balance and note back, a delete
+// re-creates it under its id.
+func inverseReconciliation(ctx context.Context, d store.DB, e audit.Entry) (json.RawMessage, json.RawMessage, error) {
+	r := repo.Repo{DB: d}
+	id := *e.EntityID
+	cur, err := r.Reconciliation(ctx, id)
+	if err != nil {
+		return nil, nil, err
+	}
+	if e.Op == audit.OpCreate {
+		if cur == nil {
+			return nil, nil, fmt.Errorf("%w: the reconciliation is gone", audit.ErrNotUndoable)
+		}
+		if _, err := r.DeleteReconciliation(ctx, id); err != nil {
+			return nil, nil, err
+		}
+		return audit.Snapshot(snapshotOf(cur)), nil, nil
+	}
+	var want reconciliationSnapshot
+	if err := json.Unmarshal(e.Before, &want); err != nil {
+		return nil, nil, fmt.Errorf("%w: its snapshot is unreadable", audit.ErrNotUndoable)
+	}
+	unit, err := r.AccountUnit(ctx, want.AccountID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if unit == nil {
+		return nil, nil, fmt.Errorf("%w: its account is gone", audit.ErrNotUndoable)
+	}
+	if cur == nil {
+		// One point per account and date by constraint: look before putting it back.
+		if other, err := pointOn(ctx, r, want.AccountID, want.Date); err != nil {
+			return nil, nil, err
+		} else if other != nil {
+			return nil, nil, fmt.Errorf("%w: the account has another point on %s", audit.ErrNotUndoable, want.Date)
+		}
+	}
+	now, err := r.RestoreReconciliation(ctx, want.point(*unit))
+	if err != nil {
+		return nil, nil, err
+	}
+	return audit.Snapshot(snapshotOf(cur)), audit.Snapshot(snapshotOf(now)), nil
 }

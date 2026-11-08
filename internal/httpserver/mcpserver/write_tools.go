@@ -28,6 +28,7 @@ type writeTool struct {
 	method, path      string // path may use {space_id}, {id} and {uuid}
 	destructive       bool
 	idempotent        bool
+	bodyOf            func(args map[string]any) any // optional: builds the JSON body from the arguments
 }
 
 // addWrite registers t. The arguments become the JSON body, minus the ones the
@@ -62,7 +63,11 @@ func addWrite[In any](h Handler, srv *mcp.Server, t writeTool) {
 			}
 			var body []byte
 			if t.method != http.MethodDelete {
-				body, _ = json.Marshal(args)
+				if t.bodyOf != nil {
+					body, _ = json.Marshal(t.bodyOf(args))
+				} else {
+					body, _ = json.Marshal(args)
+				}
 			}
 			return h.mcpCall(ctx, req, t.method, "/api/spaces/"+strings.TrimPrefix(path, "/"), nil, body), nil, nil
 		})
@@ -125,6 +130,7 @@ func (h Handler) addMCPWriteTools(srv *mcp.Server) map[string]mcpNeed {
 	k.debtTools()
 	k.creditCardTools()
 	k.ruleTools()
+	k.reconciliationTools()
 	k.historyTools()
 	return k.needs
 }

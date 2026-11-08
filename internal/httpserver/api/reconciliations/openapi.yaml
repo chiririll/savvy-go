@@ -1,0 +1,88 @@
+paths:
+  /spaces/{space}/reconciliations:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Reconciliations]
+      summary: List reconciliation points
+      description: |
+        Points that pin an account's balance to the real one on a date, newest first. Each carries what the ledger
+        expected at it; `difference` is `actualBalance - expectedBalance` in the account's currency and
+        `differenceBase` the same in the base currency (null when the currency has no rate).
+        Needs the accounts permission of an API token.
+      parameters:
+        - {name: account_ids, in: query, description: Comma-separated account ids, schema: {type: string}}
+        - {name: start_date, in: query, schema: {type: string, format: date}}
+        - {name: end_date, in: query, schema: {type: string, format: date}}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "422": {$ref: "#/components/responses/Validation"}
+    post:
+      tags: [Reconciliations]
+      summary: Reconcile accounts on a date
+      description: |
+        Pins each account's balance at the end of `date`. All or none: one bad item stores nothing. A point that
+        exists for an account and date is replaced. The date cannot be in the future, an account appears once, and
+        `actualBalance` (a JSON number in the account's currency) cannot have more decimals than the currency.
+        Debt and space accounts cannot be reconciled. Answers the points in the order of `items`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [date, items]
+              properties:
+                date: {type: string, format: date}
+                items:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required: [accountId, actualBalance]
+                    properties:
+                      accountId: {type: integer}
+                      actualBalance: {type: number}
+                      note: {type: string, nullable: true}
+      responses:
+        "201": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "422": {$ref: "#/components/responses/Validation"}
+  /spaces/{space}/reconciliations/{id}:
+    parameters: [{$ref: "#/components/parameters/Space"}, {$ref: "#/components/parameters/Id"}]
+    delete:
+      tags: [Reconciliations]
+      summary: Delete a reconciliation point
+      responses:
+        "204": {description: Deleted}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+  /spaces/{space}/reconciliations-days:
+    parameters: [{$ref: "#/components/parameters/Space"}]
+    get:
+      tags: [Reconciliations]
+      summary: Reconciliation points grouped by day
+      description: |
+        For the transaction list. Each day has `differenceBase`, the sum of its points' differences in the base
+        currency, and `unconverted`, true when a point had no rate and is left out of that sum.
+      parameters:
+        - {name: start_date, in: query, required: true, schema: {type: string, format: date}}
+        - {name: end_date, in: query, required: true, schema: {type: string, format: date}}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "422": {$ref: "#/components/responses/Validation"}
+  /spaces/{space}/accounts/{id}/reconciliations:
+    parameters: [{$ref: "#/components/parameters/Space"}, {$ref: "#/components/parameters/Id"}]
+    get:
+      tags: [Reconciliations]
+      summary: Reconciliation points of an account
+      parameters:
+        - {name: start_date, in: query, schema: {type: string, format: date}}
+        - {name: end_date, in: query, schema: {type: string, format: date}}
+      responses:
+        "200": {$ref: "#/components/responses/Data"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "404": {$ref: "#/components/responses/NotFound"}

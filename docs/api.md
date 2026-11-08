@@ -39,7 +39,7 @@ A token acts as its owner but only as far as you let it. Give each token the lea
 
 | Part | Covers |
 |------|--------|
-| Accounts | accounts and their balance history |
+| Accounts | accounts, their balance history and reconciliation points |
 | Transactions | transactions, summaries, imports and uploads |
 | Categories, Tags | categories and tags |
 | Currencies | the space's currencies and rates |
@@ -53,6 +53,23 @@ From a script, the body is `{"name": "Budget bot", "preset": "editor", "space_id
 **A token is never more powerful than you.** Your role in each space is checked on every request, so an Admin token in a space where you are a viewer still cannot write, and if you are demoted or removed, your tokens lose that access at once.
 
 **Synced spaces.** Categories and tags of spaces in a [sync group](spaces.md) are mirrored into the group's other spaces. Changing them with a token needs a token that reaches every space of the group, and you must be allowed to edit each of them; otherwise the request answers `403` and nothing is changed. Tokens cannot create or change sync groups. The token form warns you when the spaces you chose are in a sync group, and names the spaces the token would not reach. Tokens cannot manage users, identity providers, passwords, 2FA, passkeys, API tokens, settings, backups, invitations or space administration, whatever they hold. Revoke a token in the same screen to cut an app off at once. To give an app more or less later, press the pencil next to the token: you can change its spaces and what it may do without creating a new token, and the app keeps its secret. A change applies from the app's next request.
+
+## Reconciliation points
+
+A reconciliation point pins an account's balance to the real one at the end of a date. They are part of the accounts permission (`accounts:read` to list, `accounts:write` to add, `accounts:delete` to delete). Amounts are JSON numbers in the account's currency; `differenceBase` is in the base currency, `null` when the currency has no rate.
+
+```bash
+curl -X POST https://your-savvy.example/api/spaces/1/reconciliations \
+  -H "Authorization: Bearer svy_xxxxxxxx" -H "Content-Type: application/json" \
+  -d '{"date": "2026-11-01", "items": [{"accountId": 1, "actualBalance": 950.5, "note": "counted"}]}'
+```
+
+It answers `201` with the points, in the order sent: `{"data": [{"id": 5, "accountId": 1, "date": "2026-11-01", "actualBalance": 950.5, "expectedBalance": 1000, "difference": -49.5, "note": "counted", "differenceBase": -49.5}]}`. All items are stored or none. The same account and date again replaces the point. A `422` means an empty list, a bad or future date, an account twice, an unknown, debt or space account, or a balance with more decimals than the currency.
+
+- `GET /reconciliations?account_ids=1,2&start_date=&end_date=` lists points, newest first.
+- `GET /accounts/{id}/reconciliations` lists one account's points.
+- `DELETE /reconciliations/{id}` removes a point (`204`).
+- `GET /reconciliations-days?start_date=&end_date=` (both required) groups points by day: `[{"date": "2026-11-01", "differenceBase": -49.5, "unconverted": false, "points": [...]}]`. `unconverted` is true when a point without a rate is left out of the sum.
 
 ## Transactions
 

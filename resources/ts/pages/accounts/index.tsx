@@ -1,7 +1,8 @@
 import { useTranslation } from 'react-i18next'
-import { Plus } from 'lucide-react'
+import { useState } from 'react'
+import { Plus, Scale } from 'lucide-react'
 import { Page, PageHeader } from '@/components/shared'
-import { AccountFormDialog, AccountList } from '@/components/features/accounts'
+import { AccountFormDialog, AccountList, ReconcileDialog } from '@/components/features/accounts'
 import { Button } from '@/components/ui/button'
 import {
     useAccounts,
@@ -12,6 +13,7 @@ import {
     useResourceFormDialog,
 } from '@/hooks'
 import { useReadOnly } from '@/components/providers/ReadOnlyProvider'
+import { testId } from '@/lib/test-id'
 import type { Account } from '@/types'
 import type { AccountFormData } from '@/schemas'
 
@@ -24,6 +26,7 @@ export default function AccountsPage() {
     const reorderAccounts = useReorderAccounts()
     const isReadOnly = useReadOnly()
     const items = accounts ?? []
+    const [reconcileOpen, setReconcileOpen] = useState(false)
     const form = useResourceFormDialog<Account, AccountFormData>({
         items,
         isLoading,
@@ -38,6 +41,14 @@ export default function AccountsPage() {
                 description={t('accounts.description')}
                 createLabel={t('accounts.create')}
                 onCreateClick={isReadOnly ? undefined : form.openCreate}
+                actions={
+                    isReadOnly ? undefined : (
+                        <Button variant="outline" onClick={() => setReconcileOpen(true)} {...testId('reconcile')}>
+                            <Scale className="mr-2 h-4 w-4" />
+                            {t('accounts.reconcile.button')}
+                        </Button>
+                    )
+                }
             />
 
             <div className="mx-auto w-full max-w-[800px]">
@@ -66,6 +77,8 @@ export default function AccountsPage() {
                     isReadOnly={isReadOnly}
                 />
             </div>
+
+            <ReconcileDialog accounts={items} open={reconcileOpen} onOpenChange={setReconcileOpen} />
 
             <AccountFormDialog
                 account={form.entity}

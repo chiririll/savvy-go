@@ -333,7 +333,15 @@ type DayChange struct {
 // DailyChanges is the net change of the account's payments per day up to asOf
 // ("" for all), oldest first. Add InitialBalance for a balance.
 func (r Repo) DailyChanges(ctx context.Context, id int64, asOf string) ([]DayChange, error) {
-	rows, err := r.q().AccountDailyDeltas(ctx, sqlc.AccountDailyDeltasParams{ID: id, AsOf: db.Narg(asOf)})
+	return r.DailyChangesBetween(ctx, id, "", asOf)
+}
+
+// DailyChangesBetween is DailyChanges for the days after `after` (that day
+// excluded, "" for no lower bound) up to and including asOf ("" for no upper).
+func (r Repo) DailyChangesBetween(ctx context.Context, id int64, after, asOf string) ([]DayChange, error) {
+	rows, err := r.q().AccountDailyDeltas(ctx, sqlc.AccountDailyDeltasParams{
+		ID: id, AsOf: db.Narg(asOf), After: db.Narg(after),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -347,7 +355,12 @@ func (r Repo) DailyChanges(ctx context.Context, id int64, asOf string) ([]DayCha
 // DeltaSum is the sum of DailyChanges: what the account's payments add up to
 // up to asOf ("" for all), in one row.
 func (r Repo) DeltaSum(ctx context.Context, id int64, asOf string) (int64, error) {
-	return r.q().AccountDeltaSum(ctx, sqlc.AccountDeltaSumParams{ID: id, AsOf: db.Narg(asOf)})
+	return r.DeltaSumBetween(ctx, id, "", asOf)
+}
+
+// DeltaSumBetween is the sum of DailyChangesBetween, in one row.
+func (r Repo) DeltaSumBetween(ctx context.Context, id int64, after, asOf string) (int64, error) {
+	return r.q().AccountDeltaSum(ctx, sqlc.AccountDeltaSumParams{ID: id, AsOf: db.Narg(asOf), After: db.Narg(after)})
 }
 
 // Categories

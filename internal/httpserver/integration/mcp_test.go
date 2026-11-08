@@ -371,6 +371,7 @@ func TestMCPReadToolsNeedTheirPermissions(t *testing.T) {
 		"get_transactions_day_totals": {"space_id": sp, "dates": []string{"2026-02-01"}},
 		"get_report":                  {"space_id": sp, "report": "overview"},
 		"list_my_actions":             {"space_id": sp},
+		"list_reconciliations":        {"space_id": sp},
 	}
 	for name, args := range calls {
 		if res := a.call(gs, name, args); res.IsError {

@@ -28,6 +28,7 @@ func (s *Server) newScope(id int64, role string, d store.DB) *httpx.SpaceScope {
 		Tags:        ledger.Tags{DB: d},
 		Txs:         txs,
 		Rollbacks:   ledger.Rollbacks{DB: d},
+		Reconcile:   ledger.Reconciliations{DB: d},
 		Debts:       ledger.Debts{Accounts: accounts, Transactions: txs},
 		CreditCards: ledger.CreditCards{Accounts: accounts},
 		Recurring:   recurring.Service{DB: d, Ledger: func(h store.DB) recurring.Occurrences { return ledger.Templates{DB: h} }},

@@ -46,10 +46,10 @@ Today the list filters by type, date range, categories and tags (`TransactionFil
 
 ## Balances and reconciliation
 
-Most painful part of the two days: finding the gap meant exporting everything and summing by hand. None of the three exists in the code: `list_accounts` returns only the current balance, and there is no reconciliation record.
+Most painful part of the two days: finding the gap meant exporting everything and summing by hand. Only item 3 is still missing.
 
 1. Done (v1.1): `get_balance(account_id, at)` and `get_balance_history(account_id, from, to)` with one balance per day. Balance at a time of day is not covered, only at the end of a day.
-2. Reconciliation as its own record type: "04.09, actual 5 586". The app stores these points and shows the difference to the computed balance at each one, so a gap localises itself. API: `reconcile_account(account_id, date, actual_balance)` creates the adjustment with a clear note (P1).
+2. Done: reconciliation points (#88, #89), "04.09, actual 5 586", in table `reconciliations`. A point pins the account balance to the real one at the end of a date and does not create an adjustment transaction. The app shows the difference to the expected balance at each point, so a gap localises itself. API `POST /reconciliations`, MCP `reconcile_account`, `list_reconciliations`, `delete_reconciliation`; see [Reconciling balances](../transactions.md#reconciling-balances).
 3. Count by denominations: "5 490 in notes + 96 in coins", a separate 50 € note (P3).
 
 ## Groups, receipts, items

@@ -83,7 +83,7 @@ export const accountsApi = {
 
     reorder: (ids: number[]) => api.post<{ success: boolean }, { ids: number[] }>('/accounts/reorder', { ids }),
 
-    getBalanceHistory: async (params?: { start_date?: string; end_date?: string }): Promise<BalanceHistoryResponse> => {
+    getBalanceHistory: async (params?: { start_date?: string; end_date?: string; account_ids?: number[] }): Promise<BalanceHistoryResponse> => {
         const response = await apiClient.get(`/accounts-balance-history${toQueryString(params)}`)
         return response.data
     },

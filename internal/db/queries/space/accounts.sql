@@ -52,7 +52,7 @@ UPDATE accounts SET sort_order = ? WHERE id = ?;
 
 -- name: AccountDailyDeltas :many
 -- The net change of an account per day, oldest first, for confirmed
--- transactions up to as_of (all of them when NULL). A payment is signed money
+-- transactions in (after, as_of] (an open end when NULL). A payment is signed money
 -- in the account's own currency, so a change is just their sum; this is the
 -- only place that reads how money moved. A balance is initial_balance plus
 -- these rows, a balance history their running total.
@@ -62,6 +62,7 @@ FROM payments p
 JOIN transactions t ON t.id = p.transaction_id
 WHERE p.account_id = sqlc.arg('id') AND t.status = 'confirmed'
 	AND t.date <= COALESCE(sqlc.narg('as_of'), t.date)
+	AND t.date > COALESCE(sqlc.narg('after'), '')
 GROUP BY t.date
 ORDER BY t.date;
 
@@ -72,7 +73,8 @@ SELECT CAST(COALESCE(SUM(p.amount), 0) AS INTEGER) AS delta
 FROM payments p
 JOIN transactions t ON t.id = p.transaction_id
 WHERE p.account_id = sqlc.arg('id') AND t.status = 'confirmed'
-	AND t.date <= COALESCE(sqlc.narg('as_of'), t.date);
+	AND t.date <= COALESCE(sqlc.narg('as_of'), t.date)
+	AND t.date > COALESCE(sqlc.narg('after'), '');
 
 -- name: GetAccountUnit :one
 SELECT c.id, c.decimals FROM accounts a JOIN currencies c ON c.id = a.currency_id WHERE a.id = ?;

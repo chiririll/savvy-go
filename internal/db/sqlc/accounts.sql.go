@@ -18,13 +18,15 @@ FROM payments p
 JOIN transactions t ON t.id = p.transaction_id
 WHERE p.account_id = ?1 AND t.status = 'confirmed'
 	AND t.date <= COALESCE(?2, t.date)
+	AND t.date > COALESCE(?3, '')
 GROUP BY t.date
 ORDER BY t.date
 `
 
 type AccountDailyDeltasParams struct {
-	ID   int64
-	AsOf sql.NullString
+	ID    int64
+	AsOf  sql.NullString
+	After sql.NullString
 }
 
 type AccountDailyDeltasRow struct {
@@ -33,13 +35,13 @@ type AccountDailyDeltasRow struct {
 }
 
 // The net change of an account per day, oldest first, for confirmed
-// transactions up to as_of (all of them when NULL). A payment is signed money
+// transactions in (after, as_of] (an open end when NULL). A payment is signed money
 // in the account's own currency, so a change is just their sum; this is the
 // only place that reads how money moved. A balance is initial_balance plus
 // these rows, a balance history their running total.
 // CAST: sqlc would type a SUM as float; the sum of integers is an integer.
 func (q *Queries) AccountDailyDeltas(ctx context.Context, arg AccountDailyDeltasParams) ([]AccountDailyDeltasRow, error) {
-	rows, err := q.db.QueryContext(ctx, accountDailyDeltas, arg.ID, arg.AsOf)
+	rows, err := q.db.QueryContext(ctx, accountDailyDeltas, arg.ID, arg.AsOf, arg.After)
 	if err != nil {
 		return nil, err
 	}
@@ -67,17 +69,19 @@ FROM payments p
 JOIN transactions t ON t.id = p.transaction_id
 WHERE p.account_id = ?1 AND t.status = 'confirmed'
 	AND t.date <= COALESCE(?2, t.date)
+	AND t.date > COALESCE(?3, '')
 `
 
 type AccountDeltaSumParams struct {
-	ID   int64
-	AsOf sql.NullString
+	ID    int64
+	AsOf  sql.NullString
+	After sql.NullString
 }
 
 // The total of AccountDailyDeltas in one row: a balance needs only the sum, and
 // reading a row per day costs far more than adding them up here.
 func (q *Queries) AccountDeltaSum(ctx context.Context, arg AccountDeltaSumParams) (int64, error) {
-	row := q.db.QueryRowContext(ctx, accountDeltaSum, arg.ID, arg.AsOf)
+	row := q.db.QueryRowContext(ctx, accountDeltaSum, arg.ID, arg.AsOf, arg.After)
 	var delta int64
 	err := row.Scan(&delta)
 	return delta, err

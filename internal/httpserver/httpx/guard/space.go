@@ -87,6 +87,8 @@ var spaceSegments = map[string]string{
 	"": "space", "members": "space", "settings": "space", "links": "space", "sync-group": "space",
 	"audit-log": "audit",
 	"accounts":  "accounts", "accounts-balance-history": "accounts", "accounts-balance-comparison": "accounts",
+	// A reconciliation point is a fact about an account: the accounts permission.
+	"reconciliations": "accounts", "reconciliations-days": "accounts",
 	"automation-rules": "automation",
 	"budgets":          "budgets",
 	"categories":       "categories", "categories-summary": "categories",

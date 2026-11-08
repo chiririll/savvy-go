@@ -8,6 +8,8 @@ describe('spacePath', () => {
         expect(spacePath('/transactions/12', 3)).toBe('/spaces/3/transactions/12')
         expect(spacePath('/transactions?page=2', 3)).toBe('/spaces/3/transactions?page=2')
         expect(spacePath('/transactions-summary', 3)).toBe('/spaces/3/transactions-summary')
+        expect(spacePath('/reconciliations', 3)).toBe('/spaces/3/reconciliations')
+        expect(spacePath('/reconciliations-days?start_date=x', 3)).toBe('/spaces/3/reconciliations-days?start_date=x')
     })
 
     it('leaves other routes alone', () => {

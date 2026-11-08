@@ -36,7 +36,7 @@ func cardAt(t *testing.T, c CreditCard, initial int64, today string, flows ...re
 	if err != nil {
 		t.Fatal(err)
 	}
-	return ComputeCardState(c, usdM(initial), flows, d)
+	return ComputeCardState(c, usdM(initial), flows, nil, d)
 }
 
 func TestStatementDateIsTheLastClosedOne(t *testing.T) {
@@ -244,5 +244,55 @@ func TestCardTermsAreValidated(t *testing.T) {
 	}
 	if err := ValidateCard(CreditCard{Limit: usdM(1), Cycle: CycleFixedDay, StatementDay: intp(1), GraceDays: 0}); err != nil {
 		t.Errorf("grace 0 and day 1: %v", err)
+	}
+}
+
+func TestCardStateFollowsAPoint(t *testing.T) {
+	c := fixedCard(20, 25)
+	d, _ := time.Parse("2006-01-02", "2026-03-25")
+	// Spent 500 on 03-10 and 30 on 03-18; a point on 03-15 says the card owes 200
+	// (the 03-15 spending of 40 is already inside it).
+	flows := []repo.DayFlow{spendOut("2026-03-10", 50000), spendOut("2026-03-15", 4000), spendOut("2026-03-18", 3000)}
+	points := []Reconciliation{{Date: "2026-03-15", ActualBalance: usdM(-20000)}}
+	s := ComputeCardState(c, usdM(0), flows, points, d)
+	if s.Used.Minor() != 23000 {
+		t.Errorf("used = %d, want 23000", s.Used.Minor())
+	}
+	if s.Available.Minor() != 100000-23000 {
+		t.Errorf("available = %d", s.Available.Minor())
+	}
+	if s.Statement.Date != "2026-03-20" || s.Statement.Balance.Minor() != 23000 {
+		t.Errorf("statement %+v", s.Statement)
+	}
+	// The statement before the point is still computed from the opening balance.
+	d2, _ := time.Parse("2006-01-02", "2026-03-18")
+	if s := ComputeCardState(c, usdM(0), flows, points, d2); s.Statement.Date != "2026-02-20" || s.Statement.Balance.Minor() != 0 {
+		t.Errorf("older statement %+v", s.Statement)
+	}
+	// Without points the card is as before.
+	if s := ComputeCardState(c, usdM(0), flows, nil, d); s.Used.Minor() != 57000 {
+		t.Errorf("no point: used = %d", s.Used.Minor())
+	}
+}
+
+func TestCreditCardServiceBalanceAndStateAgree(t *testing.T) {
+	e := newMoneyEnv(t)
+	cards := CreditCards{Accounts: Accounts{DB: e.db}}
+	c, err := cards.Create(e.ctx, newCard("Gold", e.usd.ID, "1000", 20, 25))
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.txOn(t, simple("expense", c.ID, "500"), "2026-03-10")
+	e.point(t, c.Account, "2026-03-15", "-200")
+	e.txOn(t, simple("expense", c.ID, "30"), "2026-03-18")
+	c, _ = cards.ByID(e.ctx, c.ID)
+	checkBal(t, "card balance", c.Balance.Decimal().String(), "-230")
+	today, _ := time.Parse("2006-01-02", "2026-03-25")
+	st, err := cards.State(e.ctx, *c, today)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Used.Decimal().String() != "230" || st.Available.Decimal().String() != "770" {
+		t.Errorf("state %+v", st)
 	}
 }

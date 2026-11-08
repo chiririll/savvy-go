@@ -80,3 +80,21 @@ A recurring rule makes a pending transaction on a schedule: confirm or skip it f
 - **Amount received left open.** In a transfer between two currencies the **amount received** can stay empty (its field says "At each run's rate"). Each occurrence then works it out from the amount sent and the rates of its day, and the rule shows **≈**. The form leaves open only this amount. A rule made through the API with another amount left open (an expense whose amount comes from its lines) is shown in the list, but the form does not open it, because saving it would lose that: change it through the API.
 - **Amount in the list.** `GET /api/recurring` returns each rule with `rowAmount` (and `receivedAmount` for a transfer) like a transaction in a list: worked out by the server from the template at today's rates, nothing saved. It is `null` for a template that cannot be read.
 - **A rule that stopped.** When an account it uses is deleted, the rule stops and its row says why instead of its details. Open it, fix the accounts and tick **Active**: saving clears the message. A rule the form cannot show whole (an account of it is gone) is not opened, and the dialog says so.
+
+## Reconciling balances
+
+A **reconciliation point** says what an account really held at the end of a day: "on 4 Sept the account had 5 586". Use it after reading a bank statement or counting cash. The balance of the account at the end of that date becomes the actual value, like the initial balance but for a date.
+
+- **How balances follow.** Every anchor (the initial balance, then each point) restarts the running balance: the balance on a day is the latest anchor on or before it plus the transactions after the anchor's date. Days before the first point are still computed from the initial balance, so a balance chart can jump at a point. Transactions dated on the point's day are already inside the actual value. For a [credit card](credit-cards.md) the balance, the used amount and the available amount follow the pinned balance.
+- **The difference.** For each point Savvy also computes the **expected** balance: the previous anchor (the previous point, or the initial balance) plus the transactions between the two. The **difference** is actual minus expected. A non-zero difference means transactions are missing or wrong in that interval; with several points the gap narrows down to the interval between two of them. A transaction added later with a date before the point does not change the balance after the point (it is pinned), but it changes the expected balance and so can close the gap. Nothing is created for you: add the missing transactions.
+- **Rules.** One point per account per date; saving again replaces it. A date cannot be in the future. Debt and space accounts cannot be reconciled. A balance with more decimals than the currency has is refused, not rounded. Several accounts saved together are stored all or none, and **Recent actions** can undo them as one unit. Deleting a point puts the balance back to what the previous anchor gives.
+
+**On the Accounts page.** **Reconcile** (left of **New account**, not shown to read-only members) opens a dialog:
+
+1. Pick the **date** (today by default).
+2. Each account has a row with its computed balance on that date filled in. Type the real balance; the row shows the live difference to the expected one. **×** removes a row, **+ Add account** brings removed ones back.
+3. **Save** stores a point for every row left; **Cancel** closes it.
+
+**In the transaction list.** A day with points has a line **Reconciled** with the total difference of the day in the base currency (`Reconciled -49.5`, shortened to `1.5K` or `2M` for big sums; just **Reconciled** when it is zero). The **?** button next to it opens the details: per account the actual balance, the expected one, the difference and the note, with a button to delete the point.
+
+**API and MCP.** Points are part of the accounts permission, see [Reconciliation points](api.md#reconciliation-points). The MCP tools are `reconcile_account`, `list_reconciliations` and `delete_reconciliation`, see [MCP](mcp.md).

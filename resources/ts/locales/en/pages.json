@@ -23,6 +23,16 @@
             "active": "Active",
             "inactive": "Inactive"
         },
+        "reconcile": {
+            "button": "Reconcile",
+            "title": "Reconcile accounts",
+            "description": "Enter the real balances on a date. From that date on each account's balance is pinned to the value you enter.",
+            "empty": "No accounts to reconcile. Add one below.",
+            "amount": "Actual balance of {{name}}",
+            "difference": "Difference: {{amount}}",
+            "remove": "Remove {{name}}",
+            "add": "Add account"
+        },
         "initial": "Initial: {{amount}}",
         "emptyTitle": "No accounts yet",
         "emptyDescription": "Create your first account to start tracking balances",
@@ -235,6 +245,19 @@
             "noCategory": "No category",
             "recurring": "Recurring",
             "difference": "Payments and lines differ by {{amount}}"
+        },
+        "reconciled": {
+            "label": "Reconciled",
+            "details": "Reconciliation details",
+            "partial": "Some accounts have no exchange rate, so the sum is partial.",
+            "title": "Reconciliation on {{date}}",
+            "explain": "Expected is the previous reconciliation (or the initial balance) plus the transactions since. A non-zero difference means transactions are missing before this date.",
+            "actual": "Actual",
+            "expected": "Expected",
+            "difference": "Difference",
+            "delete": "Delete point",
+            "deleteTitle": "Delete reconciliation point?",
+            "deleteDescription": "The balance of {{name}} will no longer be pinned on {{date}}."
         }
     },
     "recurring": {

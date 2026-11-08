@@ -20,6 +20,7 @@ export {
     type TransactionsResponse,
 } from './transactions'
 export { reportsApi } from './reports'
+export { reconciliationsApi } from './reconciliations'
 export { automationApi } from './automation'
 export { backupsApi } from './backups'
 export { importApi } from './import'

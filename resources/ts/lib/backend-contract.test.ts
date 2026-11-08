@@ -235,6 +235,7 @@ describe('space audit log', () => {
 const SPACE_DATA_PACKAGES = [
     'currencies',
     'accounts',
+    'reconciliations',
     'categories',
     'tags',
     'transactions',

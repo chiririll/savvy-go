@@ -192,6 +192,12 @@
         "created": "Created",
         "updated": "Updated",
         "deleted": "Deleted",
+        "reconciliation": {
+            "created": "Accounts reconciled",
+            "createFailed": "Failed to reconcile accounts",
+            "deleted": "Reconciliation point deleted",
+            "deleteFailed": "Failed to delete reconciliation point"
+        },
         "account": {
             "created": "Account created",
             "updated": "Account updated",

@@ -129,7 +129,7 @@ var mcpReadNeeds = map[string]string{
 	"list_transactions": "transactions", "get_transaction": "transactions", "get_transactions_summary": "transactions",
 	"get_transactions_day_totals": "transactions",
 	"get_report":                  "reports", "list_automation_rules": "automation", "get_automation_rule": "automation",
-	"get_automation_rule_logs": "automation", "list_my_actions": "audit",
+	"get_automation_rule_logs": "automation", "list_my_actions": "audit", "list_reconciliations": "accounts",
 }
 
 func ro(title string) *mcp.ToolAnnotations {

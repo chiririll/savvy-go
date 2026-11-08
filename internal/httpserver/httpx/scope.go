@@ -31,6 +31,7 @@ type SpaceScope struct {
 	Tags        ledger.Tags
 	Txs         ledger.Transactions
 	Rollbacks   ledger.Rollbacks
+	Reconcile   ledger.Reconciliations
 	Debts       ledger.Debts
 	CreditCards ledger.CreditCards
 	Recurring   recurring.Service

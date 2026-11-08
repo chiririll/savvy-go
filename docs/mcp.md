@@ -49,6 +49,7 @@ Access tokens last an hour and renew in the background. A connection unused for 
 | `list_transactions`, `get_transaction` | transactions; filters (dates, type, status, account or accounts, currencies, categories, tags) and free-text search `q` (description, item names, or an amount in the account's currency); pages of up to 100 |
 | `get_transactions_summary` | transaction totals |
 | `get_transactions_day_totals` | what each day netted per currency, over every transaction of the day; give `dates`, or `start_date` and `end_date`; takes the filters of `list_transactions` |
+| `list_reconciliations` | [reconciliation points](api.md) per account and date: `actualBalance`, `expectedBalance`, `difference` (also in the base currency); filter by `account_ids`, `from`, `to` |
 | `list_budgets` | budgets with progress |
 | `list_debts`, `get_debts_summary` | debts and totals |
 | `list_automation_rules`, `get_automation_rule`, `get_automation_rule_logs` | rules and what they did |
@@ -68,6 +69,7 @@ On the consent page pick **Editor** or **Admin**, or tick Write and Delete under
 | `find_similar_transactions` | transactions: write | before adding a statement or receipts, finds the transactions already entered that look like each item (same amount in the same currency, a day or so apart, or the same `external_id`) and says why. It stores nothing, but needs write permission because the request has a body |
 | `delete_transaction` | transactions: delete | remove a transaction |
 | `create_account`, `update_account` | accounts: write | add or change an account |
+| `reconcile_account` | accounts: write | pin accounts to their real balance on a date (`date`, `accounts`: list of `account_id`, `actual_balance` as text, optional `note`). It creates no transaction; the answer shows the expected balance and the `difference`, and a nonzero one means transactions are missing before that date. The same account and date is replaced; several accounts are stored all or none |
 | `create_credit_card`, `update_credit_card` | accounts: write | a credit card with its limit, statement day and grace days, see [Credit cards](api.md#credit-cards) |
 | `create_category`, `update_category`, `set_default_category` | categories: write | add or change a category |
 | `create_tag`, `rename_tag` | tags: write | add or rename a tag |
@@ -76,6 +78,7 @@ On the consent page pick **Editor** or **Admin**, or tick Write and Delete under
 | `create_automation_rule`, `update_automation_rule`, `toggle_automation_rule`, `test_automation_rule` | automation: write | add, change, switch or try a rule |
 | `delete_automation_rule` | automation: delete | remove a rule |
 | `create_debt`, `update_debt`, `add_debt_payment`, `collect_debt`, `reopen_debt` | debts: write | record a debt or payment, or reopen it |
+| `delete_reconciliation` | accounts: delete | remove a reconciliation point |
 | `delete_account`, `delete_category`, `delete_tag`, `delete_currency`, `delete_budget`, `delete_debt`, `delete_credit_card` | that part: delete | remove it |
 
 - The tools are the [API](api.md) operations made with the connection's token: same checks, errors and role limits. Amounts are exact decimals sent as text, in the account's currency.

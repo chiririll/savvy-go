@@ -112,6 +112,7 @@ func (h Handler) mcpServer(perms []string) *mcp.Server {
 	h.addSimpleReadTools(srv)
 	h.addQueryReadTools(srv)
 	h.addHistoryRead(srv)
+	h.addReconciliationRead(srv)
 	h.hideUngrantedTools(srv, h.addMCPWriteTools(srv), perms)
 	return srv
 }

@@ -207,3 +207,31 @@ func TestDeleteDebtRemovesItsIssuance(t *testing.T) {
 		t.Fatalf("payments on cash = %d, want 1", n)
 	}
 }
+
+func TestChangesAfterADateExcludeThatDay(t *testing.T) {
+	f := newFixture(t)
+	f.pay(t, "income", "confirmed", "2026-01-02", map[int64]int64{f.cash: 5000})
+	f.pay(t, "expense", "confirmed", "2026-01-05", map[int64]int64{f.cash: -300})
+	f.pay(t, "expense", "confirmed", "2026-01-09", map[int64]int64{f.cash: -100})
+	f.pay(t, "expense", "pending", "2026-01-07", map[int64]int64{f.cash: -999})
+
+	got, err := f.repo.DailyChangesBetween(ctx, f.cash, "2026-01-02", "")
+	if err != nil || len(got) != 2 || got[0].Day != "2026-01-05" || got[1].Day != "2026-01-09" {
+		t.Fatalf("after 01-02 = %+v %v", got, err)
+	}
+	if got, _ = f.repo.DailyChangesBetween(ctx, f.cash, "2026-01-02", "2026-01-08"); len(got) != 1 || got[0].Delta != -300 {
+		t.Fatalf("(01-02, 01-08] = %+v", got)
+	}
+	for _, tc := range []struct {
+		after, asOf string
+		want        int64
+	}{
+		{"", "", 4600}, {"2026-01-02", "", -400}, {"2026-01-05", "2026-01-09", -100},
+		{"2026-01-09", "", 0}, {"2026-01-01", "2026-01-05", 4700},
+	} {
+		sum, err := f.repo.DeltaSumBetween(ctx, f.cash, tc.after, tc.asOf)
+		if err != nil || sum != tc.want {
+			t.Errorf("sum (%q, %q] = %d %v, want %d", tc.after, tc.asOf, sum, err, tc.want)
+		}
+	}
+}
