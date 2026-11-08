@@ -22,6 +22,19 @@ func (s Transactions) Add(ctx context.Context, in TxInput) (int64, error) {
 	return id, err
 }
 
+func (s Transactions) Create(ctx context.Context, in TxInput) (*Transaction, error) {
+	id, b, err := s.add(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	tx, err := s.ByID(ctx, id)
+	if tx != nil {
+		tx.Difference = s.difference(ctx, b)
+		tx.ExternalMatches = s.externalMatches(ctx, tx)
+	}
+	return tx, err
+}
+
 // AddMany adds all of ins in one database transaction and returns their ids in
 // the same order. Either all of them are stored or none: an input that does not
 // validate fails the call before anything is written. It is Add for loading

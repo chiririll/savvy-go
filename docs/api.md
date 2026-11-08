@@ -109,6 +109,8 @@ An answer carries `payments`, `lines`, `amount` (what the payments net to, `null
 
 `POST /transactions/bulk` takes `{"transactions": [...]}`, up to 500 records shaped like one `POST /transactions` body, and stores all of them or none in one save; an invalid record fails the request with its position (`transaction 3: …`). It answers with the created transactions in the order sent.
 
+`PATCH /transactions/bulk` takes `{"transactions": [{"id": 12, ...}, ...]}`, up to 500 items, each a transaction id and the fields to change as for one `PATCH /transactions/{id}`; what an item leaves out is kept. All items change or none do, in one save. A bad item fails the request with its position (`transaction 3: …`), an unknown id answers 404, and an id listed twice is refused. It answers with the updated transactions in the order sent. The audit entries of one call share a `batch_id`, so one rollback undoes it all.
+
 ### External id and duplicates
 
 Send `external_id` (up to 255 characters) with a new transaction to give it your own key, for example the receipt number `F6HDVMNQ-5105`. Savvy records where the request came from as `externalSource`: `ui` for the app, `api` for a personal API token, `mcp` for a connected AI assistant (the CSV import writes `csv`). You cannot set the source, so nobody can pose as another one. The key can be set only when the transaction is created; an update that sends one is refused.

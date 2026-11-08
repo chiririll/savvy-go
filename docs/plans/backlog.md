@@ -72,6 +72,7 @@ Today only CSV import exists (`internal/importer`, `CsvImportWizard`). It avoids
 ## MCP / AI access
 
 - ~~Batch create~~ (P1): done. `create_transactions` (REST `POST /transactions/bulk`) takes up to 500 records, all or none.
+- ~~Batch update~~ (P1): done. `update_transactions` (REST `PATCH /transactions/bulk`) takes up to 500 partial changes, all or none. Bulk delete is not done.
 - ~~Compact `list_transactions`~~ (P1): done, `fields` argument. Original note: Filtering by `account_id` already works, so only the fields choice is missing. Today every record repeats the full account object with its currency, and a month of data was cut by the response limit (pages of up to 100).
 - Rollback endpoint for MCP (P2). Needs a design: roll back what, to which point (for example a batch id). Nothing exists.
 - ~~OAuth client choice when connecting from Claude~~: done. Client ID Metadata Documents (from allowed hosts only), dynamic registration and own clients with an optional secret all work, see `docs/mcp.md`.

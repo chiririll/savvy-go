@@ -70,6 +70,22 @@ type updateTxArgs struct {
 	TagIDs      []int64         `json:"tag_ids,omitempty" jsonschema:"Replaces the tags."`
 }
 
+// txPatch is one change in update_transactions: the id and what changes.
+type txPatch struct {
+	ID          int64           `json:"id" jsonschema:"Id of the transaction."`
+	Type        string          `json:"type,omitempty" jsonschema:"income, expense or transfer."`
+	Description *string         `json:"description,omitempty"`
+	Date        string          `json:"date,omitempty" jsonschema:"YYYY-MM-DD."`
+	Payments    []txPaymentArgs `json:"payments,omitempty" jsonschema:"Replaces all payments: send every one, not only those that change."`
+	Lines       []txLineArgs    `json:"lines,omitempty" jsonschema:"Replaces all lines: send every one."`
+	TagIDs      []int64         `json:"tag_ids,omitempty" jsonschema:"Replaces the tags."`
+}
+
+type updateTxsArgs struct {
+	SpaceID      int64     `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
+	Transactions []txPatch `json:"transactions" jsonschema:"1 to 500 changes, each as for update_transaction plus the transaction's id."`
+}
+
 type createAccountArgs struct {
 	SpaceID        int64  `json:"space_id" jsonschema:"Id of the space, from list_spaces."`
 	Name           string `json:"name"`

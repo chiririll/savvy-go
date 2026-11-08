@@ -216,6 +216,70 @@ func transactionsUpdate(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteData(w, http.StatusOK, dto.NewTransaction(*tx))
 }
 
+// transactionsBulkUpdate changes many transactions at once, all or none. Each
+// item is an id and the fields to change, as for one PATCH.
+func transactionsBulkUpdate(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Transactions []map[string]json.RawMessage `json:"transactions"`
+	}
+	data, err := io.ReadAll(r.Body)
+	if err == nil {
+		dec := json.NewDecoder(bytes.NewReader(data))
+		dec.DisallowUnknownFields()
+		err = dec.Decode(&body)
+	}
+	if err != nil {
+		httpx.WriteMessage(w, 422, "The given data was invalid: "+err.Error())
+		return
+	}
+	if len(body.Transactions) == 0 || len(body.Transactions) > maxBulk {
+		httpx.WriteMessage(w, 422, "Send between 1 and "+strconv.Itoa(maxBulk)+" transactions.")
+		return
+	}
+	ups := make([]ledger.TxUpdate, len(body.Transactions))
+	for i, item := range body.Transactions {
+		fail := func(msg string) {
+			httpx.WriteMessage(w, 422, "The given data was invalid: transaction "+strconv.Itoa(i+1)+": "+msg)
+		}
+		var id int64
+		if err := json.Unmarshal(item["id"], &id); err != nil || id <= 0 {
+			fail("id is required")
+			return
+		}
+		delete(item, "id")
+		raw, _ := json.Marshal(item)
+		in, err := parseTx(raw)
+		if err != nil {
+			fail(err.Error())
+			return
+		}
+		ups[i] = ledger.TxUpdate{ID: id, In: in}
+	}
+	scope := httpx.Scope(r)
+	updated, err := scope.Txs.UpdateMany(r.Context(), ups)
+	if errors.Is(err, ledger.ErrUnknownTransaction) {
+		httpx.WriteMessage(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if err != nil {
+		httpx.WriteMessage(w, 422, err.Error())
+		return
+	}
+	for i, tx := range updated {
+		if tx == nil || tx.Status != "confirmed" {
+			continue
+		}
+		scope.Automation.Process(r.Context(), "on_transaction_update", tx)
+		if fresh, e := scope.Txs.ByID(r.Context(), tx.ID); e == nil && fresh != nil {
+			fresh.Difference = tx.Difference // only a save knows it
+			updated[i] = fresh
+		}
+	}
+	httpx.WriteData(w, http.StatusOK, dto.Map(updated, func(t *ledger.Transaction) dto.Transaction {
+		return dto.NewTransaction(*t)
+	}))
+}
+
 func transactionsDestroy(w http.ResponseWriter, r *http.Request) {
 	tx := txParam(w, r)
 	if tx == nil {

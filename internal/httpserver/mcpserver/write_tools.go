@@ -164,6 +164,13 @@ func (k writeSet) transactionTools() {
 		"transactions/find-similar"))
 	register[updateTxArgs](k, k.patch("update_transaction", "Update transaction",
 		"Change a transaction. Send only the fields that change.", "transactions/{id}"))
+	register[updateTxsArgs](k, k.patch("update_transactions", "Update many transactions",
+		"Change up to 500 transactions in one call, each as for update_transaction: send the id and only the "+
+			"fields that change (to recategorize, send that transaction's lines). Prefer this to calling "+
+			"update_transaction in a loop: one request and one save. All or none change: if one is invalid, unknown "+
+			"or listed twice nothing is written and the error names its position (transaction 3). Answers with the "+
+			"updated transactions in the same order. rollback_actions can undo the whole call by its batch_id.",
+		"transactions/bulk"))
 	register[idArgs](k, k.del("delete_transaction", "Delete transaction",
 		"Permanently delete a transaction. Ask the user first.", "transactions/{id}"))
 	register[idArgs](k, k.post("confirm_transaction", "Confirm transaction",
