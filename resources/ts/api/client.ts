@@ -75,6 +75,12 @@ const createApiClient = (baseURL: string): AxiosInstance => {
     client.interceptors.response.use(
         (response) => response,
         (error) => {
+            // The app canceled this request itself (react-query aborts in-flight queries when they are
+            // reset, as on a space switch). Nothing failed, so there is nothing to tell the user.
+            if (axios.isCancel(error)) {
+                return Promise.reject(error)
+            }
+
             const url = requestUrl(error.config)
             const status = error.response?.status
 
