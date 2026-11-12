@@ -24,7 +24,7 @@ const meta = {
     parameters: { a11y: overlayA11y },
     beforeEach: ({ msw }) =>
         msw.use(
-            reply('get', '/users', [user(1, 'Kirill', 'admin'), user(2, 'Alex', 'user'), user(3, 'Guest', 'guest')]),
+            reply('get', '/users', [user(1, 'Alice', 'admin'), user(2, 'Alex', 'user'), user(3, 'Guest', 'guest')]),
             reply('get', '/admin/mail', { enabled: false, problem: null, appUrlSet: true, writable: true }),
             ...settingsApi(),
         ),

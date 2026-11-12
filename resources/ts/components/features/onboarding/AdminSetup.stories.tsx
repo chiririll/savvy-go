@@ -111,8 +111,8 @@ export const AdminFields: Story = {
     render: () => <Admin />,
     play: async ({ canvasElement }) => {
         const canvas = within(canvasElement)
-        await userEvent.type(canvas.getByLabelText(/your name/i), 'Kirill')
-        await userEvent.type(canvas.getByLabelText(/^email/i), 'kirill@example.com')
+        await userEvent.type(canvas.getByLabelText(/your name/i), 'Alice')
+        await userEvent.type(canvas.getByLabelText(/^email/i), 'alice@example.com')
         await expect(canvas.getByLabelText(/^email/i)).toHaveAttribute('autocomplete', 'email')
         await userEvent.click(canvas.getByRole('button', { name: /back/i }))
         await expect(onBack).toHaveBeenCalled()

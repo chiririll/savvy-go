@@ -28,7 +28,7 @@ const overview = (overrides: Partial<SpaceOverview> = {}): SpaceOverview => ({
 })
 
 const users = [
-    { id: 1, name: 'Kirill', email: 'kirill@example.com', role: 'admin', emailVerified: true },
+    { id: 1, name: 'Alice', email: 'alice@example.com', role: 'admin', emailVerified: true },
     { id: 2, name: 'Alex', email: 'alex@example.com', role: 'user', emailVerified: true },
     { id: 3, name: 'Guest', email: 'guest@example.com', role: 'guest', emailVerified: true },
 ]

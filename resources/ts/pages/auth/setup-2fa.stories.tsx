@@ -7,7 +7,7 @@ import { useAuthStore } from '@/stores/auth'
 
 import Setup2FAPage from './setup-2fa'
 
-const secret = { secret: 'JBSWY3DPEHPK3PXP', qr_code_url: 'otpauth://totp/GoSavvy:kirill?secret=JBSWY3DPEHPK3PXP' }
+const secret = { secret: 'JBSWY3DPEHPK3PXP', qr_code_url: 'otpauth://totp/GoSavvy:alice?secret=JBSWY3DPEHPK3PXP' }
 const codes = ['aaaa-1111', 'bbbb-2222', 'cccc-3333', 'dddd-4444']
 
 // Shows where the page sent the user.

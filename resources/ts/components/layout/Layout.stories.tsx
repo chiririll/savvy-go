@@ -219,7 +219,7 @@ export const User: Story = {
     render: () => <UserMenu />,
     play: async ({ canvasElement }) => {
         await userEvent.click(within(canvasElement).getByRole('button'))
-        await expect(await screen.findByText('Kirill')).toBeVisible()
+        await expect(await screen.findByText('Alice')).toBeVisible()
         await expect(screen.getByRole('menuitem', { name: /log ?out|sign out/i })).toBeVisible()
     },
 }

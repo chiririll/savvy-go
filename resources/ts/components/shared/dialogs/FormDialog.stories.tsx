@@ -56,7 +56,7 @@ export const Submitting: Story = {
     },
 }
 
-export const WithHeaderExtra: Story = { args: { headerExtra: <p className="text-sm">Created by Kirill</p> } }
+export const WithHeaderExtra: Story = { args: { headerExtra: <p className="text-sm">Created by Alice</p> } }
 
 export const WithoutDescription: Story = { args: { description: undefined } }
 

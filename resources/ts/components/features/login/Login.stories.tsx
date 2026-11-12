@@ -11,7 +11,7 @@ import { SetPasswordForm } from './SetPasswordForm'
 import { TwoFactorStep } from './TwoFactorStep'
 
 const session = {
-    user: { id: 1, name: 'Kirill', email: 'kirill@example.com', role: 'admin', emailVerified: true },
+    user: { id: 1, name: 'Alice', email: 'alice@example.com', role: 'admin', emailVerified: true },
     expires_at: '2099-01-01T00:00:00Z',
     refresh_at: null,
 }
@@ -98,7 +98,7 @@ export const LoginRejectsABadAddress: Story = {
 export const LoginNeedsAPassword: Story = {
     render: () => loginPage(),
     play: async () => {
-        await userEvent.type(await screen.findByLabelText(/email/i), 'kirill@example.com')
+        await userEvent.type(await screen.findByLabelText(/email/i), 'alice@example.com')
         await userEvent.click(screen.getByRole('button', { name: /sign in/i }))
         await expect(await screen.findByText(/password/i, { selector: 'p' })).toBeVisible()
     },
@@ -110,7 +110,7 @@ export const LoginSucceeds: Story = {
         msw.use(raw('post', '/auth/login', session))
     },
     play: async () => {
-        await fill('kirill@example.com', 'secret')
+        await fill('alice@example.com', 'secret')
         await userEvent.click(screen.getByRole('button', { name: /sign in/i }))
         await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/home'))
     },
@@ -122,7 +122,7 @@ export const LoginWithTheWrongPassword: Story = {
         msw.use(fail('post', '/auth/login', 'Invalid credentials', 401))
     },
     play: async () => {
-        await fill('kirill@example.com', 'wrong')
+        await fill('alice@example.com', 'wrong')
         await userEvent.click(screen.getByRole('button', { name: /sign in/i }))
         await expect(await screen.findByText(/invalid credentials/i)).toBeVisible()
         await expect(screen.queryByTestId('where')).toBeNull()
@@ -135,7 +135,7 @@ export const LoginAsksForASecondFactor: Story = {
         msw.use(raw('post', '/auth/login', { requires_2fa: true, two_factor_token: 'tok' }))
     },
     play: async () => {
-        await fill('kirill@example.com', 'secret')
+        await fill('alice@example.com', 'secret')
         await userEvent.click(screen.getByRole('button', { name: /sign in/i }))
         await waitFor(() => expect(onTwoFactor).toHaveBeenCalledWith('tok', true))
     },

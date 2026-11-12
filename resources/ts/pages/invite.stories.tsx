@@ -11,7 +11,7 @@ const preview = (overrides = {}) =>
     reply('get', '/invitations/tok', {
         spaceName: 'Family',
         role: 'user',
-        inviter: 'Kirill',
+        inviter: 'Alice',
         email: 'alex@example.com',
         expiresAt: '2099-01-01T00:00:00Z',
         canRegister: true,
@@ -70,7 +70,7 @@ export const SignedInJoins: Story = {
         useAuthStore.setState({ isLoading: false })
         msw.use(
             raw('get', '/auth/me', {
-                user: { id: 1, name: 'Kirill', email: 'kirill@example.com', role: 'admin', emailVerified: true },
+                user: { id: 1, name: 'Alice', email: 'alice@example.com', role: 'admin', emailVerified: true },
             }),
             reply('post', '/invitations/tok/accept', { id: 2, name: 'Family', emoji: '🏡', color: null, role: 'user' }),
         )
@@ -88,7 +88,7 @@ export const AlreadyMember: Story = {
         useAuthStore.setState({ isLoading: false })
         msw.use(
             raw('get', '/auth/me', {
-                user: { id: 1, name: 'Kirill', email: 'kirill@example.com', role: 'admin', emailVerified: true },
+                user: { id: 1, name: 'Alice', email: 'alice@example.com', role: 'admin', emailVerified: true },
             }),
             fail('post', '/invitations/tok/accept', 'You are already a member of this space', 409),
         )

@@ -11,7 +11,7 @@ const meta = {
     tags: ['desktop-only'],
     title: 'shared/appearance/UserAvatar',
     component: UserAvatarView,
-    args: { user: { email: 'kirill@example.com', name: 'Kirill' }, className: 'size-12' },
+    args: { user: { email: 'alice@example.com', name: 'Alice' }, className: 'size-12' },
 } satisfies Meta<typeof UserAvatarView>
 
 export default meta

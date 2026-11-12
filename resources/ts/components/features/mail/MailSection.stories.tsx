@@ -152,7 +152,7 @@ const checked: { bodies: unknown[] } = { bodies: [] }
 
 export const TestMailSent: Story = {
     beforeEach: ({ msw }) => {
-        const test = spy('post', '/admin/mail/test', { to: 'kirill@example.com' })
+        const test = spy('post', '/admin/mail/test', { to: 'alice@example.com' })
         sent.bodies = test.bodies
         msw.use(test.handler)
     },

@@ -8,7 +8,7 @@ import { useAuthStore } from '@/stores/auth'
 import SsoCallbackPage from './sso-callback'
 
 const session = {
-    user: { id: 1, name: 'Kirill', email: 'kirill@example.com', role: 'admin', emailVerified: true },
+    user: { id: 1, name: 'Alice', email: 'alice@example.com', role: 'admin', emailVerified: true },
     expires_at: '2099-01-01T00:00:00Z',
     refresh_at: null,
 }
