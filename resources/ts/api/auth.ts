@@ -38,7 +38,7 @@ export const authApi = {
     },
 
     previewPasswordToken: async (token: string): Promise<PasswordTokenPreview> => {
-        const response = await apiClient.get(`/auth/password/${token}`)
+        const response = await apiClient.get(`/auth/password/${token}`, { quiet: true })
         return response.data
     },
 
@@ -56,7 +56,7 @@ export const authApi = {
 
     /** Confirms the address named by an emailed link; works without a session. */
     verifyEmail: async (token: string): Promise<void> => {
-        await apiClient.post('/auth/verify-email', { token })
+        await apiClient.post('/auth/verify-email', { token }, { quiet: true })
     },
 
     /** Emails the signed-in user a new confirmation link. */

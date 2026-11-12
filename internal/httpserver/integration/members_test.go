@@ -39,6 +39,21 @@ func memberRole(t *testing.T, a *testApp, spaceID, userID int64) string {
 	return role
 }
 
+// A member cannot use an invitation to the space they are already in: it
+// would change their role (an admin could demote themselves to editor).
+func TestInvitationRefusedForExistingMember(t *testing.T) {
+	a := newTestApp(t)
+	admin := a.createUser("admin@test.com", "secret1", auth.RoleAdmin)
+	as := a.issue(admin, false)
+	token := a.invite(a.space.ID, as, "", roleEditor)
+	before := memberRole(t, a, a.space.ID, admin.ID)
+
+	status(t, a.do("POST", "/api/invitations/"+token+"/accept", nil, as.Token, as.CSRF), 409, "already a member")
+	if got := memberRole(t, a, a.space.ID, admin.ID); got != before {
+		t.Fatalf("role changed from %s to %s", before, got)
+	}
+}
+
 func userPath(id int64) string { return "/" + strconv.FormatInt(id, 10) }
 
 // An invitation is single use, bound to its email when it has one, and

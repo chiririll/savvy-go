@@ -6,6 +6,13 @@ import { ApiError } from '@/types'
 import { spacePath } from '@/lib/space-path'
 import { currentSpaceId } from '@/stores/space'
 
+declare module 'axios' {
+    interface AxiosRequestConfig {
+        /** The caller shows a failure itself (an error page), so the client raises no toast for it. */
+        quiet?: boolean
+    }
+}
+
 interface WrappedResponse<T> {
     data: T
     message?: string
@@ -114,7 +121,7 @@ const createApiClient = (baseURL: string): AxiosInstance => {
             apiError.message = getApiErrorMessage(apiError, i18n.t('errors.generic'))
 
             // Show toast for non-validation errors
-            if (status !== 422 && !quiet401) {
+            if (status !== 422 && !quiet401 && !error.config?.quiet) {
                 toast.error(apiError.message)
             }
 

@@ -28,6 +28,7 @@ export default function InvitePage() {
     const [form, setForm] = useState({ name: '', email: '', password: '' })
     const [error, setError] = useState<string | null>(null)
     const [busy, setBusy] = useState(false)
+    const [alreadyMember, setAlreadyMember] = useState(false)
 
     useEffect(() => {
         void checkAuth()
@@ -53,7 +54,9 @@ export default function InvitePage() {
         try {
             await action()
         } catch (e) {
-            setError((e as ApiError).message)
+            // 409: the account is already in this space, so the link would only change its role.
+            if ((e as ApiError).code === '409') setAlreadyMember(true)
+            else setError((e as ApiError).message)
         } finally {
             setBusy(false)
         }
@@ -85,6 +88,20 @@ export default function InvitePage() {
                     <CardContent className="flex justify-center py-10">
                         <Loader2 className="size-6 animate-spin text-muted-foreground" />
                     </CardContent>
+                ) : alreadyMember ? (
+                    <>
+                        <CardHeader>
+                            <CardTitle>{t('invite.alreadyMemberTitle')}</CardTitle>
+                            <CardDescription>
+                                {t('invite.alreadyMemberText', { space: invitation?.spaceName ?? '' })}
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Button asChild className="w-full">
+                                <Link to="/">{t('invite.goHome')}</Link>
+                            </Button>
+                        </CardContent>
+                    </>
                 ) : isError || !invitation ? (
                     <CardHeader>
                         <CardTitle>{t('invite.invalidTitle')}</CardTitle>

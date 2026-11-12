@@ -830,7 +830,10 @@
         "audit": {
             "title": "Administrator actions",
             "description": "What server administrators did to this space.",
-            "someone": "Someone",
+            "alreadyMemberTitle": "You are already in this space",
+        "alreadyMemberText": "Your account is already a member of {{space}}, so this link cannot be used. Your role stays as it is.",
+        "goHome": "Go Savvy",
+        "someone": "Someone",
             "none": "Nothing yet.",
             "actions": {
                 "assign_admin": "made an admin",

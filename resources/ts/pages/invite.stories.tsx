@@ -81,3 +81,22 @@ export const SignedInJoins: Story = {
         await waitFor(() => expect(canvas.getByTestId('where')).toHaveTextContent(/^\/$/))
     },
 }
+
+export const AlreadyMember: Story = {
+    parameters: { app: {} },
+    beforeEach: ({ msw }) => {
+        useAuthStore.setState({ isLoading: false })
+        msw.use(
+            raw('get', '/auth/me', {
+                user: { id: 1, name: 'Kirill', email: 'kirill@example.com', role: 'admin', emailVerified: true },
+            }),
+            fail('post', '/invitations/tok/accept', 'You are already a member of this space', 409),
+        )
+    },
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement)
+        await userEvent.click(await canvas.findByRole('button', { name: /join/i }))
+        await expect(await canvas.findByText(/already in this space/i)).toBeVisible()
+        await expect(canvas.getByRole('link', { name: /go savvy/i })).toHaveAttribute('href', '/')
+    },
+}

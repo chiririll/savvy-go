@@ -161,8 +161,8 @@ export const syncGroupsApi = {
 }
 
 export const invitationsApi = {
-    preview: (token: string) => api.get<InvitationPreview>(`/invitations/${token}`),
-    accept: (token: string) => api.post<Space>(`/invitations/${token}/accept`),
+    preview: (token: string) => api.get<InvitationPreview>(`/invitations/${token}`, { quiet: true }),
+    accept: (token: string) => api.post<Space>(`/invitations/${token}/accept`, undefined, { quiet: true }),
     /** An emailed invitation names its address, and registering through it confirms the address. */
     methods: () => api.get<InviteMethods>('/invitation-methods'),
     register: (token: string, data: { name: string; email: string; password: string }) =>

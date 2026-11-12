@@ -16,6 +16,8 @@ func WriteSpaceError(w http.ResponseWriter, err error) {
 		WriteMessage(w, http.StatusNotFound, "Not a member of this space.")
 	case errors.Is(err, spaces.ErrInvitationInvalid):
 		WriteMessage(w, http.StatusNotFound, err.Error())
+	case errors.Is(err, spaces.ErrAlreadyInSpace):
+		WriteMessage(w, http.StatusConflict, err.Error())
 	case errors.Is(err, spaces.ErrRegistrationClosed):
 		WriteMessage(w, http.StatusForbidden, err.Error())
 	case errors.Is(err, spaces.ErrInvitationCooldown):

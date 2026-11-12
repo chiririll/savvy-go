@@ -453,7 +453,7 @@ func TestAcceptedInvitationsRemovableFromList(t *testing.T) {
 	token := data["token"].(string)
 	id := int64(data["id"].(float64))
 
-	bob := a.createUser("bob@test.com", "secret1", roleEditor)
+	bob := a.createUser("bob@test.com", "secret1", auth.RoleUser)
 	b := a.issue(bob, false)
 	status(t, a.do("POST", "/api/invitations/"+token+"/accept", nil, b.Token, b.CSRF), 200, "accept")
 
