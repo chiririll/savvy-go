@@ -46,7 +46,7 @@ With mail working and `app_url` set:
 
 An address becomes confirmed when:
 
-- the user opens the link in a confirmation email (valid 7 days);
+- the user opens the link in a confirmation email (valid 7 days). If a different user is signed in in that browser, the link is refused (and stays valid for its owner);
 - they register from an invitation **email** (the link went only to that address). An account made from a copied link starts unconfirmed;
 - they sign in through SSO and the provider reports the address as verified;
 - a server admin uses **Mark email as confirmed** in **Administration → Users**. Changing a user's address clears the mark.

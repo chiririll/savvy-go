@@ -98,14 +98,14 @@ func TestEmailVerificationLinks(t *testing.T) {
 	if err != nil || len(token) != 40 || !expires.After(time.Now()) {
 		t.Fatalf("issue: %v", err)
 	}
-	if got, _ := ev.Consume(ctx, old); got != nil {
+	if got, _ := ev.Consume(ctx, old, 0); got != nil {
 		t.Error("a new link replaces the old one")
 	}
-	got, err := ev.Consume(ctx, token)
+	got, err := ev.Consume(ctx, token, 0)
 	if err != nil || got == nil || got.ID != u.ID {
 		t.Fatalf("consume: %+v, %v", got, err)
 	}
-	if again, _ := ev.Consume(ctx, token); again != nil {
+	if again, _ := ev.Consume(ctx, token, 0); again != nil {
 		t.Error("a link worked twice")
 	}
 
@@ -114,7 +114,7 @@ func TestEmailVerificationLinks(t *testing.T) {
 	if _, err := users.Update(ctx, u.ID, nil, ptr("new@test.com"), nil, nil, nil); err != nil {
 		t.Fatal(err)
 	}
-	if got, _ := ev.Consume(ctx, stale); got != nil {
+	if got, _ := ev.Consume(ctx, stale, 0); got != nil {
 		t.Error("a link for the old address verified the new one")
 	}
 }

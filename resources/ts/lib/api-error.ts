@@ -61,6 +61,11 @@ function resolveI18nKey(message: string): string {
     return message
 }
 
+/** Whether the server refused the request with 403: it understood it, but not for this account. */
+export function isForbiddenError(error: unknown): boolean {
+    return typeof error === 'object' && error !== null && (error as ApiError).code === '403'
+}
+
 export function getApiErrorMessage(error: unknown, fallback: string): string {
     if (!error || typeof error !== 'object') {
         return fallback

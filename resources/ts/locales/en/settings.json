@@ -987,6 +987,7 @@
         "text": "{{inviter}} invites you as {{role}}.",
         "someone": "Someone",
         "join": "Join the space",
+        "signedInAs": "You are signed in as {{who}}. You will join the space with this account.",
         "name": "Name",
         "email": "Email",
         "password": "Password",

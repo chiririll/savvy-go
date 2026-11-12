@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { LanguageSwitcher } from '@/components/shared'
 import { invitationsApi } from '@/api/spaces'
-import { useAuthStore } from '@/stores/auth'
+import { useAuthStore, useUser } from '@/stores/auth'
 import { useSpaceStore } from '@/stores/space'
 import { ApiError } from '@/types'
 import { spaceRoleLabel } from '@/lib/labels'
@@ -21,6 +21,7 @@ export default function InvitePage() {
     const navigate = useNavigate()
     const queryClient = useQueryClient()
     const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
+    const user = useUser()
     const authLoading = useAuthStore((state) => state.isLoading)
     const checkAuth = useAuthStore((state) => state.checkAuth)
     const setCurrentId = useSpaceStore((state) => state.setCurrentId)
@@ -103,9 +104,16 @@ export default function InvitePage() {
                         <CardContent className="space-y-4">
                             {error && <p className="text-sm text-destructive">{error}</p>}
                             {isAuthenticated ? (
-                                <Button className="w-full" disabled={busy} onClick={join}>
-                                    {t('invite.join')}
-                                </Button>
+                                <>
+                                    <p className="rounded-md border bg-muted/50 p-3 text-sm text-muted-foreground">
+                                        {t('invite.signedInAs', {
+                                            who: user ? `${user.name} (${user.email})` : '',
+                                        })}
+                                    </p>
+                                    <Button className="w-full" disabled={busy} onClick={join}>
+                                        {t('invite.join')}
+                                    </Button>
+                                </>
                             ) : (
                                 <>
                                     {invitation.canRegister && (

@@ -108,16 +108,16 @@ func TestSendEmailsLinkThatConfirmsAddress(t *testing.T) {
 	}
 	token := strings.Fields(after)[0]
 
-	if ok, err := e.v.Confirm(e.ctx, "wrong"); ok || err != nil {
+	if ok, err := e.v.Confirm(e.ctx, "wrong", 0); ok || err != nil {
 		t.Errorf("a wrong token: %v, %v", ok, err)
 	}
-	if ok, err := e.v.Confirm(e.ctx, token); !ok || err != nil {
+	if ok, err := e.v.Confirm(e.ctx, token, 0); !ok || err != nil {
 		t.Fatalf("Confirm: %v, %v", ok, err)
 	}
 	if u, _ := e.users.ByID(e.ctx, e.user.ID); !u.EmailVerified {
 		t.Error("the address was not marked as confirmed")
 	}
-	if ok, _ := e.v.Confirm(e.ctx, token); ok {
+	if ok, _ := e.v.Confirm(e.ctx, token, 0); ok {
 		t.Error("a link worked twice")
 	}
 }

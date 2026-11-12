@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -31,14 +32,23 @@ func (e EmailVerifications) Issue(ctx context.Context, user *User) (token string
 	return token, expires, err
 }
 
+// ErrOtherAccount is returned when a confirmation link is opened in the session of
+// another user than the one it was sent to.
+var ErrOtherAccount = errors.New("this link belongs to another account")
+
 // Consume uses up a token and returns the user whose address it confirms. It
 // returns nil for an unknown, used or expired token, for a user who is gone,
 // and for one whose address is no longer the one the link was sent to.
-func (e EmailVerifications) Consume(ctx context.Context, token string) (*User, error) {
+// viewerID is the user signed in where the link was opened, 0 for none; a link
+// that is not theirs is refused with ErrOtherAccount and stays valid.
+func (e EmailVerifications) Consume(ctx context.Context, token string, viewerID int64) (*User, error) {
 	hash := HashToken(token)
 	row, err := e.repo().EmailVerificationTokenByHash(ctx, hash)
 	if row == nil || err != nil {
 		return nil, err
+	}
+	if viewerID != 0 && row.UserID != viewerID {
+		return nil, ErrOtherAccount
 	}
 	ok, err := e.repo().ConsumeEmailVerificationToken(ctx, hash)
 	if err != nil || !ok || !time.Now().Before(row.ExpiresAt) {

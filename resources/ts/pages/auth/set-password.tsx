@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Loader2 } from 'lucide-react'
+import { LanguageSwitcher } from '@/components/shared'
 import { AuthCardShell } from '@/components/features/login/AuthCardShell'
 import { SetPasswordForm, type SetPasswordValues } from '@/components/features/login/SetPasswordForm'
 import { usePasswordTokenPreview } from '@/components/features/login/use-password-token-preview'
@@ -15,7 +16,7 @@ export default function SetPasswordPage() {
     const navigate = useNavigate()
     const { token } = useParams<{ token: string }>()
     const applySession = useAuthStore((state) => state.applySession)
-    const { preview, loading, invalid } = usePasswordTokenPreview(token)
+    const { preview, status } = usePasswordTokenPreview(token)
     const [submitting, setSubmitting] = useState(false)
 
     const onSubmit = async (data: SetPasswordValues) => {
@@ -47,35 +48,36 @@ export default function SetPasswordPage() {
         }
     }
 
-    if (loading) {
+    if (status === 'loading') {
         return (
             <div className="min-h-screen flex items-center justify-center bg-background">
+                <LanguageSwitcher variant="auth" />
                 <Loader2 className="size-8 animate-spin text-muted-foreground" />
             </div>
         )
     }
 
+    if (status === 'ready') {
+        return (
+            <AuthCardShell
+                title={preview?.isInactive ? t('setPassword.inviteTitle') : t('setPassword.resetTitle')}
+                description={t('setPassword.description', { email: preview?.email ?? '' })}
+            >
+                <SetPasswordForm submitting={submitting} onSubmit={onSubmit} />
+            </AuthCardShell>
+        )
+    }
+
+    // A link that cannot be used: say why, and where to go instead.
+    const foreign = status === 'foreign'
     return (
         <AuthCardShell
-            title={
-                invalid
-                    ? t('setPassword.invalidTitle')
-                    : preview?.isInactive
-                      ? t('setPassword.inviteTitle')
-                      : t('setPassword.resetTitle')
-            }
-            description={
-                invalid
-                    ? t('setPassword.invalidDescription')
-                    : t('setPassword.description', { email: preview?.email ?? '' })
-            }
+            title={foreign ? t('setPassword.foreignTitle') : t('setPassword.invalidTitle')}
+            description={foreign ? t('setPassword.foreignDescription') : t('setPassword.invalidDescription')}
         >
-            {!invalid && <SetPasswordForm submitting={submitting} onSubmit={onSubmit} />}
-            {invalid && (
-                <Button className="w-full" onClick={() => navigate('/login', { replace: true })}>
-                    {t('setPassword.backToLogin')}
-                </Button>
-            )}
+            <Button className="w-full" onClick={() => navigate(foreign ? '/' : '/login', { replace: true })}>
+                {foreign ? t('setPassword.foreignContinue') : t('setPassword.backToLogin')}
+            </Button>
         </AuthCardShell>
     )
 }
