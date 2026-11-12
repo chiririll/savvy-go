@@ -80,6 +80,9 @@ type InvitationPreview struct {
 	Inviter   string
 	Email     *string
 	ExpiresAt time.Time
+	// AlreadyMember reports that the viewer is signed in and already in the
+	// space, so the link is of no use to them.
+	AlreadyMember bool
 	// CanRegister reports whether the link may create an account.
 	CanRegister bool
 }
@@ -237,14 +240,23 @@ func (s Service) lookupInvitation(ctx context.Context, reg repo.Repo, token stri
 		expires: r.Expires, accepted: r.Used, spaceName: r.SpaceName, inviter: r.Inviter}, nil
 }
 
-// Preview describes a valid invitation to whoever holds its link.
-func (s Service) Preview(ctx context.Context, token string) (*InvitationPreview, error) {
+// Preview describes a valid invitation to whoever holds its link. viewer is
+// the signed-in user opening it, nil for an anonymous holder.
+func (s Service) Preview(ctx context.Context, token string, viewer *auth.User) (*InvitationPreview, error) {
 	inv, err := s.lookupInvitation(ctx, s.registry(), token)
 	if err != nil {
 		return nil, err
 	}
+	member := false
+	if viewer != nil {
+		if role, err := s.Role(ctx, inv.spaceID, viewer.ID); err != nil {
+			return nil, err
+		} else {
+			member = role != ""
+		}
+	}
 	return &InvitationPreview{
-		SpaceName: inv.spaceName, Role: inv.role, Inviter: inv.inviter, Email: inv.email, ExpiresAt: inv.expires,
+		AlreadyMember: member, SpaceName: inv.spaceName, Role: inv.role, Inviter: inv.inviter, Email: inv.email, ExpiresAt: inv.expires,
 		CanRegister: s.settings().Bool(ctx, "space_invites_can_register", true),
 	}, nil
 }

@@ -48,6 +48,19 @@ func TestInvitationRefusedForExistingMember(t *testing.T) {
 	token := a.invite(a.space.ID, as, "", roleEditor)
 	before := memberRole(t, a, a.space.ID, admin.ID)
 
+	preview := func(sess *auth.Issued) any {
+		tok := ""
+		if sess != nil {
+			tok = sess.Token
+		}
+		return decodeJSON(t, a.do("GET", "/api/invitations/"+token, nil, tok, ""))["data"].(map[string]any)["alreadyMember"]
+	}
+	if preview(as) != true {
+		t.Error("the preview should tell a member the link is not for them")
+	}
+	if preview(nil) != false {
+		t.Error("the preview of an anonymous holder must not claim membership")
+	}
 	status(t, a.do("POST", "/api/invitations/"+token+"/accept", nil, as.Token, as.CSRF), 409, "already a member")
 	if got := memberRole(t, a, a.space.ID, admin.ID); got != before {
 		t.Fatalf("role changed from %s to %s", before, got)

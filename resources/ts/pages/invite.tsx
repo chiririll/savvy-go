@@ -35,6 +35,9 @@ export default function InvitePage() {
         retry: false,
     })
 
+    // An account already in the space cannot use the link; the server says so, no click needed.
+    const alreadyMember = actions.alreadyMember || !!invitation?.alreadyMember
+
     const renderBody = () => {
         if (isPending || authLoading) {
             return (
@@ -43,7 +46,7 @@ export default function InvitePage() {
                 </CardContent>
             )
         }
-        if (actions.alreadyMember) return <InviteAlreadyMember spaceName={invitation?.spaceName ?? ''} />
+        if (alreadyMember) return <InviteAlreadyMember spaceName={invitation?.spaceName ?? ''} />
         if (isError || !invitation) {
             return (
                 <CardHeader>
