@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { LanguageSwitcher } from '@/components/shared'
 import { invitationsApi } from '@/api/spaces'
 import { useAuthStore } from '@/stores/auth'
 import { useSpaceStore } from '@/stores/space'
@@ -77,6 +78,7 @@ export default function InvitePage() {
 
     return (
         <div className="flex min-h-screen items-center justify-center p-4">
+            <LanguageSwitcher variant="auth" />
             <Card className="w-full max-w-md">
                 {isPending || authLoading ? (
                     <CardContent className="flex justify-center py-10">
