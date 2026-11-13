@@ -45,6 +45,27 @@ export function loadedRange(groups: readonly { date: string | null }[]): { start
     return { start: dates.reduce((a, b) => (a < b ? a : b)), end: dates.reduce((a, b) => (a > b ? a : b)) }
 }
 
+const EARLIEST = '1900-01-01'
+const LATEST = '2999-12-31'
+
+/**
+ * The span of days whose points the list shows. The loaded transactions bound it only on the side that more pages
+ * still follow: the first page opens the newest end (or the oldest, when ascending), and the last page the other.
+ * So a day with points and no transactions is shown also before the first or after the last transaction, and when
+ * there are no transactions at all.
+ */
+export function reconciliationRange(
+    loaded: { start: string; end: string } | null,
+    newestFirst: boolean,
+    hasNextPage: boolean,
+): { start: string; end: string } {
+    const near = newestFirst ? LATEST : EARLIEST
+    const far = newestFirst ? EARLIEST : LATEST
+    const bound = newestFirst ? loaded?.start : loaded?.end
+    const farEnd = hasNextPage && bound ? bound : far
+    return newestFirst ? { start: farEnd, end: near } : { start: near, end: farEnd }
+}
+
 /** Whether the groups run from the newest day to the oldest (the default when they are too few to tell). */
 function isNewestFirst(dates: readonly string[]): boolean {
     return dates.length < 2 || dates[0] >= dates[dates.length - 1]
@@ -59,8 +80,9 @@ export function mergeReconciliationDays<T>(
     groups: readonly { date: string | null; items: T[] }[],
     days: readonly ReconciliationDay[],
     newestFirst?: boolean,
+    allowed?: { start: string; end: string },
 ): DayGroup<T>[] {
-    const range = loadedRange(groups)
+    const range = allowed ?? loadedRange(groups)
     const byDate = new Map(days.map((day) => [dayKey(day.date), day]))
     const dated: DayGroup<T>[] = groups
         .filter((group) => group.date !== null)
