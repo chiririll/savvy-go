@@ -103,7 +103,12 @@ export const RefusedOnJoin: Story = {
     parameters: { app: {} },
     beforeEach: ({ msw }) => {
         useAuthStore.setState({ isLoading: false })
-        msw.use(fail('post', '/invitations/tok/accept', 'You are already a member of this space', 409))
+        msw.use(
+            raw('get', '/auth/me', {
+                user: { id: 1, name: 'Alice', email: 'alice@example.com', role: 'admin', emailVerified: true },
+            }),
+            fail('post', '/invitations/tok/accept', 'You are already a member of this space', 409),
+        )
     },
     play: async ({ canvasElement }) => {
         const canvas = within(canvasElement)

@@ -26,7 +26,7 @@ export const WithImage: Story = {
 
 export const InitialOfName: Story = {
     play: async ({ canvasElement }) => {
-        await expect(within(canvasElement).getByText('K')).toBeVisible()
+        await expect(within(canvasElement).getByText('A')).toBeVisible()
     },
 }
 

@@ -1,14 +1,20 @@
+import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { pages } from '@/app/pages'
 
 interface AccountsTabsProps {
     active: 'accounts' | 'inactive' | 'reconciliations'
+    /** The page under the tabs: it is the panel of the active tab. */
+    children: ReactNode
 }
 
-/** The tabs of the Accounts section: each one is a page of its own, so each has its own address. */
-export function AccountsTabs({ active }: AccountsTabsProps) {
+/**
+ * The tabs of the Accounts section: each one is a page of its own, so each has its own address. The page is the
+ * panel of the active tab.
+ */
+export function AccountsTabs({ active, children }: AccountsTabsProps) {
     const { t } = useTranslation('pages')
     return (
         <Tabs value={active} className="mb-4">
@@ -23,6 +29,7 @@ export function AccountsTabs({ active }: AccountsTabsProps) {
                     <Link to={pages.accountsReconciliations.path}>{t('accounts.tabs.reconciliations')}</Link>
                 </TabsTrigger>
             </TabsList>
+            <TabsContent value={active}>{children}</TabsContent>
         </Tabs>
     )
 }

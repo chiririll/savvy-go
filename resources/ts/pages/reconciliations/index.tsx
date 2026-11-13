@@ -25,13 +25,14 @@ export default function ReconciliationsPage() {
                 actions={isReadOnly ? undefined : <ReconcileButton onClick={() => setReconcileOpen(true)} />}
             />
             <div className="mx-auto w-full max-w-[800px]">
-                <AccountsTabs active="reconciliations" />
-                <ReconciliationDayList
-                    days={days ?? []}
-                    accounts={items}
-                    baseCurrency={baseCurrency?.code}
-                    isLoading={isLoading}
-                />
+                <AccountsTabs active="reconciliations">
+                    <ReconciliationDayList
+                        days={days ?? []}
+                        accounts={items}
+                        baseCurrency={baseCurrency?.code}
+                        isLoading={isLoading}
+                    />
+                </AccountsTabs>
             </div>
             <ReconcileDialog accounts={active} open={reconcileOpen} onOpenChange={setReconcileOpen} />
         </Page>
