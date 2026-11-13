@@ -831,6 +831,7 @@
             "title": "Administrator actions",
             "description": "What server administrators did to this space.",
             "none": "Nothing yet.",
+            "someone": "Someone",
             "actions": {
                 "assign_admin": "made an admin",
                 "set_quota": "changed the size limit",

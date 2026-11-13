@@ -109,7 +109,7 @@ func TestAdminCreatesActiveInvitedUsers(t *testing.T) {
 	status(t, res, 422, "inactive user signs in")
 }
 
-func TestSetPasswordLinkRefusedForAnotherSignedInUser(t *testing.T) {
+func TestSetPasswordLinkRefusedForOtherSession(t *testing.T) {
 	a := newTestApp(t)
 	invited, err := a.svc.Users.Create(context.Background(), "Invited", "invited@test.com", nil, auth.RoleUser)
 	if err != nil {
