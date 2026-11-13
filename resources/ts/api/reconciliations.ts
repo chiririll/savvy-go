@@ -26,6 +26,7 @@ export const reconciliationsApi = {
 
     delete: (id: number | string) => api.delete<void>(`/reconciliations/${id}`),
 
-    getDays: (period: { start_date: string; end_date: string }) =>
-        api.get<ReconciliationDay[]>(`/reconciliations-days${toQueryString(period)}`),
+    /** Every day that has points, newest first; `period` narrows it. */
+    getDays: (period: Period = {}) =>
+        api.get<ReconciliationDay[]>(`/reconciliations-days${toQueryString({ ...period })}`),
 }

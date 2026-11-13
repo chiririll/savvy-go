@@ -22,7 +22,7 @@ Rule of thumb: a new nullable column or a new table is cheap and can also go int
 ### Reconciliation points (#88, #89)
 
 - Done: own table `reconciliations (id, account_id, date, actual_balance, note, created_at)`, unique per account and date, in space migration `0001`. Not a transaction type: no adjustment transaction is created, so nothing appears in the transaction list or in reports.
-- Each point is an anchor like the initial balance: balance on a day = latest anchor on or before it + payments after the anchor date. Expected balance = previous anchor + payments between; difference = actual - expected, worked out on read, not stored. See [Reconciling balances](../transactions.md#reconciling-balances).
+- Each point is an anchor like the initial balance: balance on a day = latest anchor on or before it + payments after the anchor date. Expected balance = previous anchor + payments between; difference = actual - expected, worked out on read, not stored. See [Reconciling balances](../accounts.md#reconciling-balances).
 
 ## Open, needs a decision first
 

@@ -108,7 +108,7 @@ describe('signedAmount', () => {
 
 describe('reconciliationRange', () => {
     const loaded = { start: '2026-05-01', end: '2026-05-04' }
-    it('opens the newest end of a newest first list, and the oldest when the last page is loaded', () => {
+    it('opens the newest end, and the oldest once the last page is in', () => {
         expect(reconciliationRange(loaded, true, true)).toEqual({ start: '2026-05-01', end: '2999-12-31' })
         expect(reconciliationRange(loaded, true, false)).toEqual({ start: '1900-01-01', end: '2999-12-31' })
     })

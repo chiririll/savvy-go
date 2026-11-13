@@ -69,7 +69,7 @@ It answers `201` with the points, in the order sent: `{"data": [{"id": 5, "accou
 - `GET /reconciliations?account_ids=1,2&start_date=&end_date=` lists points, newest first.
 - `GET /accounts/{id}/reconciliations` lists one account's points.
 - `DELETE /reconciliations/{id}` removes a point (`204`).
-- `GET /reconciliations-days?start_date=&end_date=` (both required) groups points by day: `[{"date": "2026-11-01", "differenceBase": -49.5, "unconverted": false, "points": [...]}]`. `unconverted` is true when a point without a rate is left out of the sum.
+- `GET /reconciliations-days?start_date=&end_date=` (both optional) groups points by day, newest first: `[{"date": "2026-11-01", "differenceBase": -49.5, "unconverted": false, "points": [...]}]`. `unconverted` is true when a point without a rate is left out of the sum.
 
 ## Transactions
 

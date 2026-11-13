@@ -44,7 +44,19 @@
                 "over_limit": "Лимит превышен на {{amount}}",
                 "payment_due": "Внесите {{amount}} до {{date}}"
             }
-        }
+        },
+        "tabs": {
+            "accounts": "Счета",
+            "reconciliations": "Сверки",
+            "inactive": "Неактивные"
+        },
+        "reconciliations": {
+            "accountsCount": "{{count, plural(one: # счёт; few: # счёта; many: # счетов; other: # счёта)}}",
+            "emptyTitle": "Сверок пока нет",
+            "emptyDescription": "Сверьте счета, чтобы зафиксировать их балансы по реальным"
+        },
+        "inactiveEmptyTitle": "Нет неактивных счетов",
+        "inactiveEmptyDescription": "Отключённые счета появятся здесь и не будут показаны во вкладке «Счета»"
     },
     "categories": {
         "title": "Категории",

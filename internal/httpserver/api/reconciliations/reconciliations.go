@@ -53,10 +53,6 @@ func days(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if f.From == "" || f.To == "" {
-		httpx.WriteMessage(w, http.StatusUnprocessableEntity, "give start_date and end_date")
-		return
-	}
 	out, err := httpx.Scope(r).Reconcile.DayReconciliations(r.Context(), f.From, f.To)
 	if err != nil {
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())

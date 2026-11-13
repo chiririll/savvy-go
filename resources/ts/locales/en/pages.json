@@ -44,7 +44,19 @@
                 "over_limit": "Over the limit by {{amount}}",
                 "payment_due": "Pay {{amount}} by {{date}}"
             }
-        }
+        },
+        "tabs": {
+            "accounts": "Accounts",
+            "reconciliations": "Reconciliations",
+            "inactive": "Inactive"
+        },
+        "reconciliations": {
+            "accountsCount": "{{count, plural(one: # account; other: # accounts)}}",
+            "emptyTitle": "No reconciliations yet",
+            "emptyDescription": "Reconcile your accounts to pin their balances to the real ones"
+        },
+        "inactiveEmptyTitle": "No inactive accounts",
+        "inactiveEmptyDescription": "Accounts you switch off appear here and are left out of the Accounts tab"
     },
     "categories": {
         "title": "Categories",

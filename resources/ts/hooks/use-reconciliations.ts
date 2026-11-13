@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { accountsApi, reconciliationsApi } from '@/api'
-import type { ReconciliationFilters, ReconciliationInput } from '@/types'
+import type { ReconciliationInput } from '@/types'
 import i18n from '@/lib/i18n'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { numberToAmount } from '@/lib/decimal-amount'
@@ -11,11 +11,11 @@ const QUERY_KEY = ['reconciliations']
 /** A point moves the balance of its account from its date on, so everything built on balances is stale after a write. */
 const RECONCILIATION_INVALIDATE = [QUERY_KEY, ['accounts'], ['reports'], ['transactions'], ['budgets']] as const
 
-export function useReconciliations(filters?: ReconciliationFilters, enabled = true) {
+/** Every reconciliation day, newest first. */
+export function useAllReconciliationDays() {
     return useQuery({
-        queryKey: [...QUERY_KEY, 'list', filters],
-        queryFn: () => reconciliationsApi.getAll(filters),
-        enabled,
+        queryKey: [...QUERY_KEY, 'days', 'all'],
+        queryFn: () => reconciliationsApi.getDays(),
     })
 }
 

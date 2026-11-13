@@ -161,8 +161,12 @@ func TestReconciliationDays(t *testing.T) {
 	if days[0].(map[string]any)["date"] != "2024-02-10" {
 		t.Fatalf("newest first expected: %v", days)
 	}
-	for _, p := range []string{"", "?start_date=2024-01-01", "?end_date=2024-01-01"} {
-		status(t, e.a.do("GET", "/api/reconciliations-days"+p, nil, e.sess.Token, ""), 422, "dates required "+p)
+	// The dates are optional: without them every day is answered.
+	if all := e.list("/api/reconciliations-days"); len(all) != 2 {
+		t.Fatalf("all days = %v", all)
+	}
+	if from := e.list("/api/reconciliations-days?start_date=2024-02-01"); len(from) != 1 {
+		t.Fatalf("days from February = %v", from)
 	}
 }
 
