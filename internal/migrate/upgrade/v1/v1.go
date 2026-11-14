@@ -1,7 +1,7 @@
 // Package v1 holds what is needed to read a v1.0 space file: its frozen
 // schema, and the conversion into the current one. A v1.0 file is never
 // migrated in place; Convert writes a fresh file from the current base and
-// copies the rows over (docs/plans/transactions-erd.md, "Upgrade from v1.0").
+// copies the rows over.
 package v1
 
 import _ "embed"
