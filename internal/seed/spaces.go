@@ -51,7 +51,7 @@ func miniWorkspace(spec miniSpace) workspaceFunc {
 var demoSpaces = []spaceSpec{
 	{
 		key: spaceDemo, name: "Demo", emoji: "🏠", color: "#3b82f6", owner: userAlex,
-		members:    map[string]string{userJordan: spaces.RoleEditor, userDemo: spaces.RoleViewer},
+		members:    map[string]string{userJordan: spaces.RoleEditor},
 		currencies: currencySet(usdCurrency, withRate(eurCurrency, "1.08")),
 		own: ownReference{
 			categories: []Category{{"Pets", "expense", "🐾", "#a3e635", false}},

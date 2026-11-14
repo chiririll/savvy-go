@@ -30,7 +30,6 @@ With `--seed-config <file>` (any TOML file, even empty), the first boot creates 
 | `admin@savvy.app`  | `password` | admin       |
 | `editor@savvy.app` | `password` | user        |
 | `guest@savvy.app`  | `password` | guest       |
-| `demo@demo.com`    | `demo`     | user        |
 
 The data covers the transaction model, not only plain expenses. Most are one payment on one account for one category; next to them are:
 

@@ -53,7 +53,7 @@ A config is a JSON file in [`scripts/screenshots/configs/`](../scripts/screensho
 
 ```json
 {
-    "users": ["alex", "demo"],
+    "users": ["alex", "jordan"],
     "spaces": ["Demo"],
     "viewports": ["mobile"],
     "languages": ["en", "ru"],

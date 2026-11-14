@@ -29,14 +29,14 @@ func demoWith(t *testing.T, opts Options) (*Manifest, store.Store) {
 
 func TestDemoCopiesAddUsersAndSpaces(t *testing.T) {
 	m, _ := demoWith(t, Options{Months: 1, Copies: 2})
-	if len(m.Users) != 12 || len(m.Spaces) != 9 {
-		t.Fatalf("%d users, %d spaces, want 12 and 9", len(m.Users), len(m.Spaces))
+	if len(m.Users) != 9 || len(m.Spaces) != 9 {
+		t.Fatalf("%d users, %d spaces, want 9 and 9", len(m.Users), len(m.Spaces))
 	}
 	emails := map[string]bool{}
 	for _, u := range m.Users {
 		emails[u.Email] = true
 	}
-	for _, e := range []string{"admin@savvy.app", "admin1@savvy.app", "admin2@savvy.app", "demo2@demo.com"} {
+	for _, e := range []string{"admin@savvy.app", "admin1@savvy.app", "admin2@savvy.app"} {
 		if !emails[e] {
 			t.Errorf("no user %s", e)
 		}
