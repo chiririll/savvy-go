@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
 import { FormWrapper } from '@/components/shared/form/FormWrapper'
-import { schemaResolver } from '@/lib/form-resolver'
+import { schemaResolver } from '@/lib/ui/form-resolver'
 import { identityProviderSchema, IdentityProviderFormValues } from '@/schemas/sso'
 
 import { ConnectionSection } from './ConnectionSection'

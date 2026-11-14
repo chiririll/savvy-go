@@ -3,7 +3,7 @@
 // in `roles` below; keep one currency per role (base: 2 decimals, zeroDecimal: 0, highPrecision: 8, the ones that
 // break float and rounding code). Expected strings come from `formatMoney`, which uses the app's own formatter,
 // so they follow the set and the locale. Do not write '1,500 ¥' by hand in new tests.
-import { formatCurrency } from '@/lib/currency'
+import { formatCurrency } from '@/lib/format/currency'
 import type { Currency } from '@/types'
 
 import { currency } from '../fixtures'

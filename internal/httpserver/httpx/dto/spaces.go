@@ -61,17 +61,18 @@ func NewInvitation(i spaces.Invitation) Invitation {
 
 // InvitationPreview is what the holder of a link sees before accepting.
 type InvitationPreview struct {
-	SpaceName   string    `json:"spaceName"`
-	Role        string    `json:"role"`
-	Inviter     string    `json:"inviter"`
-	Email       *string   `json:"email"`
-	ExpiresAt   time.Time `json:"expiresAt"`
-	CanRegister bool      `json:"canRegister"`
+	AlreadyMember bool      `json:"alreadyMember"`
+	SpaceName     string    `json:"spaceName"`
+	Role          string    `json:"role"`
+	Inviter       string    `json:"inviter"`
+	Email         *string   `json:"email"`
+	ExpiresAt     time.Time `json:"expiresAt"`
+	CanRegister   bool      `json:"canRegister"`
 }
 
 func NewInvitationPreview(p spaces.InvitationPreview) InvitationPreview {
 	return InvitationPreview{
-		SpaceName: p.SpaceName, Role: p.Role, Inviter: p.Inviter, Email: p.Email,
+		AlreadyMember: p.AlreadyMember, SpaceName: p.SpaceName, Role: p.Role, Inviter: p.Inviter, Email: p.Email,
 		ExpiresAt: p.ExpiresAt.UTC(), CanRegister: p.CanRegister,
 	}
 }

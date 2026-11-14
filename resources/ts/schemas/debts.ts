@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import i18n from '@/lib/i18n'
-import { isDateInFuture } from '@/lib/dates'
+import i18n from '@/lib/i18n/i18n'
+import { isDateInFuture } from '@/lib/format/dates'
 
 const nameField = z.string()
     .min(1, i18n.t('validation.nameRequired'))

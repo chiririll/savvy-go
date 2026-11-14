@@ -127,6 +127,16 @@ func (g *Guard) RequireSession(next http.Handler) http.Handler {
 	})
 }
 
+// SessionUser is the user of the request's session cookie, nil when there is none. It is for
+// public routes that behave differently for a signed-in browser; it never answers 401.
+func (g *Guard) SessionUser(r *http.Request) *auth.User {
+	sess, err := g.Sessions.Resolve(r.Context(), g.Security.ReadToken(r, g.Secure(r)))
+	if err != nil || sess == nil {
+		return nil
+	}
+	return sess.User
+}
+
 func (g *Guard) RequireCSRF(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {

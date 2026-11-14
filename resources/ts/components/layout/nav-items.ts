@@ -27,7 +27,7 @@ import {
     HardDrive,
     ClipboardCheck,
 } from 'lucide-react'
-import { type NavKey } from '@/lib/labels'
+import { type NavKey } from '@/lib/i18n/labels'
 
 export interface MenuItem {
     to: string

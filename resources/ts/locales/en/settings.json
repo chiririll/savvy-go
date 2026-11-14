@@ -830,8 +830,8 @@
         "audit": {
             "title": "Administrator actions",
             "description": "What server administrators did to this space.",
-            "someone": "Someone",
             "none": "Nothing yet.",
+            "someone": "Someone",
             "actions": {
                 "assign_admin": "made an admin",
                 "set_quota": "changed the size limit",
@@ -985,8 +985,12 @@
         "invalidText": "This link was used, revoked or has expired. Ask for a new one.",
         "title": "Join {{space}}",
         "text": "{{inviter}} invites you as {{role}}.",
+        "alreadyMemberTitle": "You are already in this space",
+        "alreadyMemberText": "Your account is already a member of {{space}}, so this link cannot be used. Your role stays as it is.",
+        "goHome": "Go Savvy",
         "someone": "Someone",
         "join": "Join the space",
+        "signedInAs": "You are signed in as {{who}}. You will join the space with this account.",
         "name": "Name",
         "email": "Email",
         "password": "Password",

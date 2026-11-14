@@ -68,6 +68,7 @@ How it is sent depends on the server:
 - **By link**: you copy it once and send it yourself. Anyone with it can use it, and the new account starts unconfirmed. Instead of an address you can add an optional note (up to 100 characters, such as "Kim from work") to tell links apart in your list.
 - **While creating a space**, people you add are only a list until you finish. Emails go out afterwards and links appear on the last screen. Remove someone before that and nothing is sent.
 - An address cannot be invited to a space it is already invited to or belongs to. After a revoked or expired invitation it cannot be invited again for 1–2 hours; a server admin can end the wait in **Administration → System**.
+- Someone who is already a member of the space cannot use its invitation link: the link shows a page saying so and their role stays as it is. Change a member's role in the space settings instead.
 
 ## Linked spaces and transfers
 

@@ -3,7 +3,7 @@ import { accountsApi, spacesApi } from '@/api'
 import { Account } from '@/types'
 import { AccountFormData } from '@/schemas'
 import { useResourceItem, useResourceMutation } from './use-crud'
-import i18n from '@/lib/i18n'
+import i18n from '@/lib/i18n/i18n'
 
 const QUERY_KEY = ['accounts']
 

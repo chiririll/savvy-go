@@ -1,4 +1,4 @@
-import { i18nReady } from '@/lib/i18n'
+import { i18nReady } from '@/lib/i18n/i18n'
 import '@/hooks/use-theme'
 import React from 'react'
 import ReactDOM from 'react-dom/client'

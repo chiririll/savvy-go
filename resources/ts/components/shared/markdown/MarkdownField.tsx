@@ -13,7 +13,7 @@ import {
     toggleItalic,
     toggleList,
     type MarkdownEdit,
-} from '@/lib/markdown-edit'
+} from '@/lib/ui/markdown-edit'
 import { cn } from '@/lib/utils'
 
 import { Markdown } from './Markdown'

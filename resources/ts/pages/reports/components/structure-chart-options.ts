@@ -1,7 +1,7 @@
 import { formatCurrency, formatCurrencyCompact } from '@/lib/utils'
-import i18n from '@/lib/i18n'
+import i18n from '@/lib/i18n/i18n'
 import { isNarrowChart } from '@/hooks/use-element-width'
-import { axisStyle, legendTextStyle, type useChartTheme } from '@/lib/chart-theme'
+import { axisStyle, legendTextStyle, type useChartTheme } from '@/lib/ui/chart-theme'
 import type { StructureItem } from './StructureChart'
 
 type ChartTheme = ReturnType<typeof useChartTheme>

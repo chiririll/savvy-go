@@ -42,6 +42,8 @@
         "label": "Tags",
         "new": "New tag",
         "newName": "New tag name",
+        "confirm": "Add tag",
+        "cancel": "Cancel",
         "createFailed": "Could not create the tag",
         "namePlaceholder": "vacation",
         "nameHelp": "Tag name without #. Only letters, numbers, _ and - allowed."

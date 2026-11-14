@@ -1,4 +1,4 @@
-import { createDraftStore } from '@/lib/draft-store'
+import { createDraftStore } from '@/lib/ui/draft-store'
 import { emptyDraft, migrateStep } from '@/components/features/spaces/create/draft'
 
 export const spaceDraft = createDraftStore({

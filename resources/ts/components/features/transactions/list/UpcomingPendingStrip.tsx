@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { Transaction } from '@/types'
-import { isDateOverdue } from '@/lib/dates'
-import { isApproximateOccurrence } from '@/lib/recurring-template'
+import { isDateOverdue } from '@/lib/format/dates'
+import { isApproximateOccurrence } from '@/lib/transaction/recurring-template'
 import { UpcomingPendingCard } from './UpcomingPendingCard'
 import { cn } from '@/lib/utils'
 

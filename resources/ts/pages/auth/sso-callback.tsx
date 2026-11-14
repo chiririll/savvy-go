@@ -4,8 +4,8 @@ import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { ssoApi } from '@/api/sso'
 import { useAuthStore } from '@/stores/auth'
-import i18n from '@/lib/i18n'
-import { SSO_ERROR_CODES, ssoErrorLabel, type SsoErrorCode } from '@/lib/labels'
+import i18n from '@/lib/i18n/i18n'
+import { SSO_ERROR_CODES, ssoErrorLabel, type SsoErrorCode } from '@/lib/i18n/labels'
 
 function ssoErrorMessage(code: string): string {
     if ((SSO_ERROR_CODES as readonly string[]).includes(code)) {

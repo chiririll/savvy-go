@@ -35,7 +35,7 @@ export function setUpApp(parameters: AppParameters | undefined, use: (...handler
     useAuthStore.setState({
         user: signedOut
             ? null
-            : { id: 1, name: 'Kirill', email: 'kirill@example.com', role: serverRole, emailVerified: true },
+            : { id: 1, name: 'Alice', email: 'alice@example.com', role: serverRole, emailVerified: true },
         isAuthenticated: !signedOut,
         isLoading: false,
     })

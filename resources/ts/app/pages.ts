@@ -28,6 +28,8 @@ export const pages = {
     dashboard: { path: '/', scope: 'space' },
     transactions: { path: '/transactions', scope: 'space' },
     accounts: { path: '/accounts', scope: 'space' },
+    accountsInactive: { path: '/accounts/inactive', scope: 'space' },
+    accountsReconciliations: { path: '/accounts/reconciliations', scope: 'space' },
     categories: { path: '/categories', scope: 'space' },
     currencies: { path: '/currencies', scope: 'space' },
     budgets: { path: '/budgets', scope: 'space' },

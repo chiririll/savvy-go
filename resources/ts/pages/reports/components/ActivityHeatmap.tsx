@@ -5,7 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn, formatCurrency } from '@/lib/utils'
 import { useActivityHeatmap } from '@/hooks'
-import { intlLocale } from '@/lib/i18n'
+import { intlLocale } from '@/lib/i18n/i18n'
 import type { ReportFilters } from '../types'
 
 interface ActivityHeatmapProps {

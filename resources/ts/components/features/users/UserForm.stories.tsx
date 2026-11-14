@@ -30,7 +30,7 @@ export const Edit: Story = {
 
 // The signed-in user (id 1) cannot take their own admin role away.
 export const EditingYourself: Story = {
-    args: { isEdit: true, defaultValues: { id: 1, name: 'Kirill', email: 'kirill@example.com', role: 'admin' } },
+    args: { isEdit: true, defaultValues: { id: 1, name: 'Alice', email: 'alice@example.com', role: 'admin' } },
     play: async ({ canvasElement }) => {
         await expect(within(canvasElement).getByRole('combobox', { name: /role/i })).toBeDisabled()
     },

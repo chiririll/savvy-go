@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { multipartUpload } from '@/lib/multipart-upload'
+import { multipartUpload } from '@/lib/api/multipart-upload'
 import type { MultipartUploadResult, UploadProgress } from '@/types/upload'
 
 interface UploadArgs {

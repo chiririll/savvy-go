@@ -2,8 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { startRegistration } from '@simplewebauthn/browser'
 import { webauthnApi } from '@/api'
 import { toast } from 'sonner'
-import i18n from '@/lib/i18n'
-import { resolveUserFacingText } from '@/lib/api-error'
+import i18n from '@/lib/i18n/i18n'
+import { resolveUserFacingText } from '@/lib/api/api-error'
 import { isConfirmCancelled, withConfirmation } from '@/stores/confirm'
 
 const QUERY_KEY = ['webauthn-credentials']

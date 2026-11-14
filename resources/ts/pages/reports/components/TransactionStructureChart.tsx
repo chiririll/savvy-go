@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useTransactionReportByCategory } from '@/hooks'
-import { localizeDefaultName } from '@/lib/localized-name'
+import { localizeDefaultName } from '@/lib/format/localized-name'
 import type { ReportFilters } from '../types'
 import type { ReportTransactionType } from '@/api/reports'
 import { StructureChart } from './StructureChart'

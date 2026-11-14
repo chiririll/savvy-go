@@ -17,7 +17,7 @@ import { pathAfterSwitch, useCurrentSpace, useSpaces, useSwitchSpace } from '@/h
 import { useUser } from '@/stores/auth'
 import { LazyCreateSpaceModal } from './LazyCreateSpaceModal'
 import { SpaceBadge } from './SpaceBadge'
-import { spaceRoleLabel } from '@/lib/labels'
+import { spaceRoleLabel } from '@/lib/i18n/labels'
 import { cn } from '@/lib/utils'
 
 /** The current space at the top of the sidebar, and the list to switch to. */

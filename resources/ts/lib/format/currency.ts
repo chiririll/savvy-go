@@ -1,5 +1,5 @@
 import { getCurrency } from '@/stores/currencies'
-import { intlLocale } from '@/lib/i18n'
+import { intlLocale } from '@/lib/i18n/i18n'
 
 type CurrencyInput = {
     symbol?: string | null

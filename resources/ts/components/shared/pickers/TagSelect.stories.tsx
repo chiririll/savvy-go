@@ -91,3 +91,41 @@ export const ToggledByKeyboard: Story = {
         await expect(chip).toHaveAttribute('aria-pressed', 'false')
     },
 }
+
+export const CreatesSeveralTagsWithButtons: Story = {
+    args: { allowCreate: true },
+    beforeEach: ({ msw }) =>
+        msw.use(reply('get', '/tags', tags), reply('post', '/tags', { id: 99, name: 'fresh' }, 201)),
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement)
+        await userEvent.click(await canvas.findByRole('button', { name: /new tag/i }))
+        await userEvent.type(canvas.getByRole('textbox', { name: /new tag name/i }), 'fresh')
+        await userEvent.click(canvas.getByRole('button', { name: /add tag/i }))
+        await waitFor(() => expect(canvas.queryByRole('textbox')).toBeNull())
+        // The plus button stays, so another tag can follow.
+        await expect(await canvas.findByRole('button', { name: /new tag/i })).toBeInTheDocument()
+    },
+}
+
+export const CancelsTagCreation: Story = {
+    args: { allowCreate: true },
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement)
+        await userEvent.click(await canvas.findByRole('button', { name: /new tag/i }))
+        await userEvent.type(canvas.getByRole('textbox', { name: /new tag name/i }), 'draft')
+        await userEvent.click(canvas.getByRole('button', { name: /cancel/i }))
+        await expect(canvas.queryByRole('textbox')).toBeNull()
+    },
+}
+
+export const TrimsTagName: Story = {
+    args: { allowCreate: true },
+    beforeEach: ({ msw }) =>
+        msw.use(reply('get', '/tags', tags), reply('post', '/tags', { id: 99, name: 'fresh' }, 201)),
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement)
+        await userEvent.click(await canvas.findByRole('button', { name: /new tag/i }))
+        await userEvent.type(canvas.getByRole('textbox', { name: /new tag name/i }), '  fresh  {Enter}')
+        await waitFor(() => expect(canvas.queryByRole('textbox')).toBeNull())
+    },
+}

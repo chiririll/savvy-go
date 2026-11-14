@@ -1,6 +1,6 @@
 import type { ConfirmTransactionOptions } from '@/api'
-import { collectNegativeBalanceWarnings, warningIfResultNegative, type NegativeBalanceWarning } from '@/lib/negative-balance'
-import { roundToCurrency } from '@/lib/transaction-payload'
+import { collectNegativeBalanceWarnings, warningIfResultNegative, type NegativeBalanceWarning } from '@/lib/transaction/negative-balance'
+import { roundToCurrency } from '@/lib/transaction/transaction-payload'
 import type { LineInput, PaymentInput, Transaction, TransactionLine } from '@/types'
 
 export type ApplyDateChoice = 'today' | 'original' | 'other'

@@ -10,7 +10,7 @@ import type { ReportFilters } from '../types'
 import type { ReportTransactionType } from '@/api/reports'
 import { isNarrowChart, useElementWidth } from '@/hooks/use-element-width'
 import { useHoveredSeries } from '@/hooks/use-hovered-series'
-import { useChartTheme } from '@/lib/chart-theme'
+import { useChartTheme } from '@/lib/ui/chart-theme'
 import { ChartTypeBadges, SeriesPicker, TOTAL_SERIES_ID, type SeriesConfig } from './DynamicsControls'
 import { dynamicsOption, type DynamicsChartType } from './dynamics-chart-option'
 

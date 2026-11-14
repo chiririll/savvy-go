@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { TFunction } from 'i18next'
-import { ssoPresetLabel as ssoCustomPresetLabel } from '@/lib/labels'
+import { ssoPresetLabel as ssoCustomPresetLabel } from '@/lib/i18n/labels'
 import type { PresetField, SsoPresetCatalogEntry } from '@/types/sso'
 
 const FIELD_KEY_BY_PRESET: Record<string, Record<string, string>> = {

@@ -1,5 +1,5 @@
 import { api } from './client'
-import { toQueryString } from '@/lib/query-string'
+import { toQueryString } from '@/lib/api/query-string'
 import type {
     ReconciliationDay,
     ReconciliationFilters,
@@ -26,6 +26,7 @@ export const reconciliationsApi = {
 
     delete: (id: number | string) => api.delete<void>(`/reconciliations/${id}`),
 
-    getDays: (period: { start_date: string; end_date: string }) =>
-        api.get<ReconciliationDay[]>(`/reconciliations-days${toQueryString(period)}`),
+    /** Every day that has points, newest first; `period` narrows it. */
+    getDays: (period: Period = {}) =>
+        api.get<ReconciliationDay[]>(`/reconciliations-days${toQueryString({ ...period })}`),
 }

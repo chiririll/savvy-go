@@ -11,7 +11,7 @@ import (
 )
 
 // fixtureSQL is a v1.0 space with one row of every kind the conversion maps
-// (docs/plans/transactions-erd.md, "v1.0 migration"). The ids are the ones
+//. The ids are the ones
 // the expectations name.
 //
 // Accounts: 1 card EUR, 2 cash RSD, 3 a loan I made, 4 a mortgage I owe,

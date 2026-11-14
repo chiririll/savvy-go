@@ -1,12 +1,12 @@
 import { type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FeedRow, progressAmounts, RowActions } from '@/components/shared'
-import { cardProgress } from '@/lib/credit-card'
+import { cardProgress } from '@/lib/transaction/credit-card'
 import { CardStatusIcon } from './CardStatusIcon'
 import { ACCOUNT_TYPE_CONFIG } from '@/constants'
 import { formatCurrency } from '@/lib/utils'
 import { Account } from '@/types'
-import { accountTypeLabel } from '@/lib/labels'
+import { accountTypeLabel } from '@/lib/i18n/labels'
 
 const TYPE_ICON_TONES = {
     bank: 'bg-info/15 text-info',

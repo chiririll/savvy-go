@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { getApiErrorMessage, resolveUserFacingText } from './api-error'
 
 // A tiny translation table per namespace; `t` echoes the key for a miss, like i18next.
-vi.mock('@/lib/i18n', () => {
+vi.mock('@/lib/i18n/i18n', () => {
     const dict: Record<string, Record<string, string>> = {
         common: { 'validation.required': 'This field is required', 'validation.amountTooLarge': 'Amount is too large' },
         forms: { 'transactions.accountRequired': 'Pick an account', 'debts.debtNotFound': 'Debt not found' },

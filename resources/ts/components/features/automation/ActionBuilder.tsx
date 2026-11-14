@@ -13,7 +13,7 @@ import type { Action, ActionType } from '@/types/automation'
 import { ACTION_TYPES } from '@/types/automation'
 import { AccountSelect } from '@/components/shared/pickers/AccountSelect'
 import { CategorySelect, TagSelect } from '@/components/shared'
-import { actionTypeLabel } from '@/lib/labels'
+import { actionTypeLabel } from '@/lib/i18n/labels'
 
 interface ActionBuilderProps {
     value: Action[]

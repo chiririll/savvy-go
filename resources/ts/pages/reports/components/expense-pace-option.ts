@@ -1,7 +1,7 @@
 import { formatCurrency, formatCurrencyCompact } from '@/lib/utils'
-import i18n from '@/lib/i18n'
-import { tooltipRow } from '@/lib/chart-tooltip'
-import { CHART_COLORS, axisStyle, verticalFade, withAlpha, type ChartTheme } from '@/lib/chart-theme'
+import i18n from '@/lib/i18n/i18n'
+import { tooltipRow } from '@/lib/ui/chart-tooltip'
+import { CHART_COLORS, axisStyle, verticalFade, withAlpha, type ChartTheme } from '@/lib/ui/chart-theme'
 import type { MonthChartData } from './expense-pace'
 
 export function buildChartOption(

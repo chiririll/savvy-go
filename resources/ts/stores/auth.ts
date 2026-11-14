@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { startAuthentication } from '@simplewebauthn/browser'
 import { authApi, webauthnApi } from '@/api'
-import { queryClient } from '@/lib/query-client'
+import { queryClient } from '@/lib/api/query-client'
 import { useSpaceStore } from './space'
 import { setOnUnauthorized, setOnEmailUnverified } from '@/api/client'
 import { User, LoginCredentials, RegisterData, AuthResponse, TwoFactorAuthResponse, MeResponse } from '@/types'

@@ -1,10 +1,17 @@
 import axios, { AxiosInstance, AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios'
 import { toast } from 'sonner'
-import i18n from '@/lib/i18n'
-import { getApiErrorMessage } from '@/lib/api-error'
+import i18n from '@/lib/i18n/i18n'
+import { getApiErrorMessage } from '@/lib/api/api-error'
 import { ApiError } from '@/types'
 import { spacePath } from '@/lib/space-path'
 import { currentSpaceId } from '@/stores/space'
+
+declare module 'axios' {
+    interface AxiosRequestConfig {
+        /** The caller shows a failure itself (an error page), so the client raises no toast for it. */
+        quiet?: boolean
+    }
+}
 
 interface WrappedResponse<T> {
     data: T
@@ -75,6 +82,12 @@ const createApiClient = (baseURL: string): AxiosInstance => {
     client.interceptors.response.use(
         (response) => response,
         (error) => {
+            // The app canceled this request itself (react-query aborts in-flight queries when they are
+            // reset, as on a space switch). Nothing failed, so there is nothing to tell the user.
+            if (axios.isCancel(error)) {
+                return Promise.reject(error)
+            }
+
             const url = requestUrl(error.config)
             const status = error.response?.status
 
@@ -108,7 +121,7 @@ const createApiClient = (baseURL: string): AxiosInstance => {
             apiError.message = getApiErrorMessage(apiError, i18n.t('errors.generic'))
 
             // Show toast for non-validation errors
-            if (status !== 422 && !quiet401) {
+            if (status !== 422 && !quiet401 && !error.config?.quiet) {
                 toast.error(apiError.message)
             }
 

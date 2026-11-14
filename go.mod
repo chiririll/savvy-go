@@ -13,6 +13,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/magefile/mage v1.17.2
 	github.com/modelcontextprotocol/go-sdk v1.8.0
+	github.com/mozillazg/go-unidecode v0.2.0
 	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/russellhaering/goxmldsig v1.6.1
 	github.com/shopspring/decimal v1.6.0

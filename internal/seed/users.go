@@ -14,7 +14,6 @@ const (
 	userAlex   = "alex"
 	userJordan = "jordan"
 	userSam    = "sam"
-	userDemo   = "demo"
 )
 
 // demoUser is a seeded account; role is the server role. An unverified user has
@@ -28,7 +27,6 @@ var demoUsers = []demoUser{
 	{userAlex, "Alex Morgan", "admin@savvy.app", "password", auth.RoleAdmin, false},
 	{userJordan, "Jordan Lee", "editor@savvy.app", "password", auth.RoleUser, false},
 	{userSam, "Sam Rivera", "guest@savvy.app", "password", auth.RoleGuest, true},
-	{userDemo, "Demo User", "demo@demo.com", "demo", auth.RoleUser, false},
 }
 
 // copyOf returns u as the n-th copy: "admin@savvy.app" becomes "admin1@savvy.app",

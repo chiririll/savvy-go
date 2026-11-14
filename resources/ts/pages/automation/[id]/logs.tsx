@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ArrowLeft } from 'lucide-react'
 import { format } from 'date-fns'
-import { actionTypeLabelLoose, automationLogStatusLabel } from '@/lib/labels'
+import { actionTypeLabelLoose, automationLogStatusLabel } from '@/lib/i18n/labels'
 
 export default function AutomationLogsPage() {
     const { t } = useTranslation('pages')

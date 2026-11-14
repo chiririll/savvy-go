@@ -7,7 +7,7 @@ import (
 	"savvy-go/internal/money"
 )
 
-// The restriction matrix of docs/plans/transactions-erd.md: what may be done to
+// The restriction matrix: what may be done to
 // a transaction follows from its status and the reasons derived from its data.
 func TestTransactionAllowed(t *testing.T) {
 	cases := []struct {

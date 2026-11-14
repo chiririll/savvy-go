@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { FeedRow } from '@/components/shared'
-import { localizeDefaultName } from '@/lib/localized-name'
+import { localizeDefaultName } from '@/lib/format/localized-name'
 
 interface CategoryPreviewProps {
     name: string

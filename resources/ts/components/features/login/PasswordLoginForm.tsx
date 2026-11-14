@@ -11,7 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { useAuthStore } from '@/stores/auth'
-import { getApiErrorMessage } from '@/lib/api-error'
+import { getApiErrorMessage } from '@/lib/api/api-error'
 
 type LoginFormValues = {
     email: string

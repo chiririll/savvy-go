@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { cn, formatCurrency } from '@/lib/utils'
 import { useExpensePace } from '@/hooks'
 import { isNarrowChart, useElementWidth } from '@/hooks/use-element-width'
-import { useChartTheme } from '@/lib/chart-theme'
+import { useChartTheme } from '@/lib/ui/chart-theme'
 import type { ReportFilters } from '../types'
 import { processMonthData } from './expense-pace'
 import { buildChartOption } from './expense-pace-option'

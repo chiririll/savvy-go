@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { debtsApi } from '@/api'
 import { DebtFormData, DebtPaymentFormData } from '@/schemas'
 import { useResourceItem, useResourceMutation } from './use-crud'
-import i18n from '@/lib/i18n'
+import i18n from '@/lib/i18n/i18n'
 
 const QUERY_KEY = ['debts']
 const DEBT_INVALIDATE = [QUERY_KEY, ['accounts']] as const

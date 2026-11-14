@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { PieChart, BarChart3, LayoutGrid } from 'lucide-react'
 import { isNarrowChart, useElementWidth } from '@/hooks/use-element-width'
-import { useChartTheme } from '@/lib/chart-theme'
+import { useChartTheme } from '@/lib/ui/chart-theme'
 import { barOption, CHART_HEIGHT, donutOption, NARROW_CHART_HEIGHT, treemapOption } from './structure-chart-options'
 
 type ViewMode = 'donut' | 'bar' | 'treemap'

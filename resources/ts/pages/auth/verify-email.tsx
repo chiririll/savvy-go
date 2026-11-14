@@ -5,9 +5,11 @@ import { Loader2, MailCheck, MailX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { authApi } from '@/api'
+import { LanguageSwitcher } from '@/components/shared'
+import { isForbiddenError } from '@/lib/api/api-error'
 import { useAuthStore } from '@/stores/auth'
 
-type State = 'working' | 'done' | 'invalid'
+type State = 'working' | 'done' | 'invalid' | 'otherAccount'
 
 /** Opened from the link in a confirmation email; works with or without a session. */
 export default function VerifyEmailPage() {
@@ -20,6 +22,10 @@ export default function VerifyEmailPage() {
         working: { title: t('verifyEmail.workingTitle'), description: t('verifyEmail.workingDescription') },
         done: { title: t('verifyEmail.doneTitle'), description: t('verifyEmail.doneDescription') },
         invalid: { title: t('verifyEmail.invalidTitle'), description: t('verifyEmail.invalidDescription') },
+        otherAccount: {
+            title: t('verifyEmail.otherAccountTitle'),
+            description: t('verifyEmail.otherAccountDescription'),
+        },
     }
 
     useEffect(() => {
@@ -30,8 +36,8 @@ export default function VerifyEmailPage() {
                 await checkAuth()
                 if (!cancelled) setState('done')
             })
-            .catch(() => {
-                if (!cancelled) setState('invalid')
+            .catch((error: unknown) => {
+                if (!cancelled) setState(isForbiddenError(error) ? 'otherAccount' : 'invalid')
             })
         return () => {
             cancelled = true
@@ -40,12 +46,13 @@ export default function VerifyEmailPage() {
 
     return (
         <div className="flex min-h-screen items-center justify-center bg-background p-4">
+            <LanguageSwitcher variant="auth" />
             <Card className="w-full max-w-md">
                 <CardHeader className="text-center">
                     <div className="mb-2 flex justify-center">
                         {state === 'working' && <Loader2 className="size-8 animate-spin text-muted-foreground" />}
                         {state === 'done' && <MailCheck className="size-8 text-primary" />}
-                        {state === 'invalid' && <MailX className="size-8 text-destructive" />}
+                        {(state === 'invalid' || state === 'otherAccount') && <MailX className="size-8 text-destructive" />}
                     </div>
                     <CardTitle className="text-2xl">{copy[state].title}</CardTitle>
                     <CardDescription>{copy[state].description}</CardDescription>

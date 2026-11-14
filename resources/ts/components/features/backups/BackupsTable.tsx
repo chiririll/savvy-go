@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { formatBytes, formatDateTime } from '@/lib/format'
-import { backupStatusHelp, backupStatusLabel } from '@/lib/labels'
+import { formatBytes, formatDateTime } from '@/lib/format/format'
+import { backupStatusHelp, backupStatusLabel } from '@/lib/i18n/labels'
 import type { Backup } from '@/types/backup'
 
 function statusBadgeVariant(backup: Backup): 'secondary' | 'outline' | 'destructive' {

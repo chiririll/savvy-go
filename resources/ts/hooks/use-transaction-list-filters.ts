@@ -1,7 +1,7 @@
 import { createSerializer, useQueryStates, parseAsInteger, parseAsString, parseAsArrayOf, parseAsStringLiteral } from 'nuqs'
 import { toggleIdInArray } from '@/lib/utils'
 import type { TransactionFilters } from '@/types'
-import type { ParsedSearch } from '@/lib/transaction-search'
+import type { ParsedSearch } from '@/lib/transaction/transaction-search'
 
 export const transactionSearchParams = {
     type: parseAsStringLiteral(['income', 'expense', 'transfer'] as const),

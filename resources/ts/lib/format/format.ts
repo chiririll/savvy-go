@@ -1,4 +1,4 @@
-import { intlLocale } from '@/lib/i18n'
+import { intlLocale } from '@/lib/i18n/i18n'
 
 export function formatBytes(bytes: number): string {
     if (!bytes) return '0 B'

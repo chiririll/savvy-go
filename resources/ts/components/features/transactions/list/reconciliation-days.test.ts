@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ReconciliationDay, ReconciliationPoint } from '@/types'
-import { filterDaysByAccounts, loadedRange, mergeReconciliationDays, reconciledLabel, signedAmount } from './reconciliation-days'
+import { filterDaysByAccounts, loadedRange, mergeReconciliationDays,
+    reconciliationRange, reconciledLabel, signedAmount } from './reconciliation-days'
 
 const point = (accountId: number, differenceBase: number | null): ReconciliationPoint => ({
     id: accountId,
@@ -102,5 +103,27 @@ describe('signedAmount', () => {
         expect(oldestFirst.map((g) => g.date)).toEqual(['2026-05-01', '2026-05-03', '2026-05-05'])
         const newestFirst = mergeReconciliationDays([group('2026-05-01'), group('2026-05-05')], days, true)
         expect(newestFirst.map((g) => g.date)).toEqual(['2026-05-05', '2026-05-03', '2026-05-01'])
+    })
+})
+
+describe('reconciliationRange', () => {
+    const loaded = { start: '2026-05-01', end: '2026-05-04' }
+    it('opens the newest end, and the oldest once the last page is in', () => {
+        expect(reconciliationRange(loaded, true, true)).toEqual({ start: '2026-05-01', end: '2999-12-31' })
+        expect(reconciliationRange(loaded, true, false)).toEqual({ start: '1900-01-01', end: '2999-12-31' })
+    })
+    it('opens the oldest end of an oldest first list', () => {
+        expect(reconciliationRange(loaded, false, true)).toEqual({ start: '1900-01-01', end: '2026-05-04' })
+    })
+    it('covers everything when nothing is loaded', () => {
+        expect(reconciliationRange(null, true, false)).toEqual({ start: '1900-01-01', end: '2999-12-31' })
+    })
+})
+
+describe('mergeReconciliationDays with a range', () => {
+    it('shows a day with no transactions beyond them, or with no transactions at all', () => {
+        const range = { start: '1900-01-01', end: '2999-12-31' }
+        expect(mergeReconciliationDays([group('2026-05-01')], [day('2026-05-09')], true, range).map((g) => g.date)).toEqual(['2026-05-09', '2026-05-01'])
+        expect(mergeReconciliationDays([], [day('2026-05-09')], true, range).map((g) => g.date)).toEqual(['2026-05-09'])
     })
 })

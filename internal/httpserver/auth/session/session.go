@@ -267,10 +267,23 @@ func (h Handler) authLogout(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteMessage(w, http.StatusOK, "Logged out.")
 }
 
+// otherAccountLink answers 403 and reports true when someone is signed in in this browser
+// and the password link is not theirs: it must neither be shown to them nor used up.
+func (h Handler) otherAccountLink(w http.ResponseWriter, r *http.Request, row *auth.PasswordToken) bool {
+	if u := h.Guard.SessionUser(r); u != nil && u.ID != row.UserID {
+		httpx.WriteMessage(w, http.StatusForbidden, "This link belongs to another account.")
+		return true
+	}
+	return false
+}
+
 func (h Handler) passwordPreview(w http.ResponseWriter, r *http.Request) {
 	row, err := h.Tokens.Preview(r.Context(), chi.URLParam(r, "token"))
 	if err != nil || row == nil || row.User == nil {
 		httpx.WriteMessage(w, http.StatusNotFound, "This link is invalid or has expired.")
+		return
+	}
+	if h.otherAccountLink(w, r, row) {
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, dto.PasswordLink{
@@ -286,6 +299,9 @@ func (h Handler) passwordAccept(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || password.TooShort(body.Password) ||
 		body.Password != body.PasswordConfirmation {
 		httpx.WriteValidation(w, map[string][]string{"password": {password.TooShortMessage}})
+		return
+	}
+	if peek, _ := h.Tokens.Preview(r.Context(), chi.URLParam(r, "token")); peek != nil && h.otherAccountLink(w, r, peek) {
 		return
 	}
 	row, err := h.Tokens.Consume(r.Context(), chi.URLParam(r, "token"))

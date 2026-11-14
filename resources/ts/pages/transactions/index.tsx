@@ -9,6 +9,7 @@ import {
     TransactionList,
     filterDaysByAccounts,
     loadedRange,
+    reconciliationRange,
     TransactionsListFooter,
     UpcomingPendingStrip,
     useApplyDeferred,
@@ -31,7 +32,7 @@ import {
     useDeleteReconciliation,
 } from '@/hooks'
 import { useReadOnly } from '@/components/providers/ReadOnlyProvider'
-import { warningsForConfirmedDuplicate } from '@/lib/negative-balance'
+import { warningsForConfirmedDuplicate } from '@/lib/transaction/negative-balance'
 import { addDaysLocal, cn } from '@/lib/utils'
 
 export default function TransactionsPage() {
@@ -54,9 +55,13 @@ export default function TransactionsPage() {
     )
     const { data: dayTotals } = useTransactionDayTotals(list.filters, days)
     const range = useMemo(() => loadedRange(days.map((date) => ({ date }))), [days])
+    const reconciliationSpan = useMemo(
+        () => reconciliationRange(range, list.params.sortDir !== 'asc', Boolean(hasNextPage)),
+        [range, list.params.sortDir, hasNextPage],
+    )
     const { data: reconciliationDays } = useReconciliationDays(
-        { start_date: range?.start ?? '', end_date: range?.end ?? '' },
-        range !== null && list.params.sortBy === 'date',
+        { start_date: reconciliationSpan.start, end_date: reconciliationSpan.end },
+        list.params.sortBy === 'date' && !isLoading,
     )
     const deleteReconciliation = useDeleteReconciliation()
     const { data: upcomingPending } = useTransactions({
@@ -152,6 +157,7 @@ export default function TransactionsPage() {
                                 grouped={list.params.sortBy === 'date'}
                                 dayTotals={dayTotals}
                                 reconciliationDays={shownReconciliations}
+                                reconciliationRange={reconciliationSpan}
                                 sortDirection={list.params.sortDir}
                                 accounts={accounts}
                                 baseCurrency={baseCurrency?.code}

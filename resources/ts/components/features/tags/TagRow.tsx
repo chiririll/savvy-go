@@ -2,7 +2,7 @@ import { Hash } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { FeedRow, RowActions } from '@/components/shared'
 import { Tag } from '@/types'
-import { localizeDefaultName } from '@/lib/localized-name'
+import { localizeDefaultName } from '@/lib/format/localized-name'
 
 interface TagRowProps {
     tag: Tag

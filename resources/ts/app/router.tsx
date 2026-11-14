@@ -21,6 +21,8 @@ const OAuthConsentPage = lazy(() => import('@/pages/oauth/consent'))
 const DashboardPage = lazy(() => import('@/pages/dashboard'))
 const TransactionsPage = lazy(() => import('@/pages/transactions'))
 const AccountsPage = lazy(() => import('@/pages/accounts'))
+const InactiveAccountsPage = lazy(() => import('@/pages/accounts/inactive'))
+const ReconciliationsPage = lazy(() => import('@/pages/reconciliations'))
 const CategoriesPage = lazy(() => import('@/pages/categories'))
 const CurrenciesPage = lazy(() => import('@/pages/currencies'))
 const BudgetsPage = lazy(() => import('@/pages/budgets'))
@@ -137,6 +139,8 @@ export const router = createBrowserRouter([
                     { index: true, element: withSuspense(DashboardPage) },
                     { path: childPath(pages.transactions), element: withSuspense(TransactionsPage) },
                     { path: childPath(pages.accounts), element: withSuspense(AccountsPage) },
+                    { path: childPath(pages.accountsInactive), element: withSuspense(InactiveAccountsPage) },
+                    { path: childPath(pages.accountsReconciliations), element: withSuspense(ReconciliationsPage) },
                     { path: childPath(pages.categories), element: withSuspense(CategoriesPage) },
                     { path: childPath(pages.currencies), element: withSuspense(CurrenciesPage) },
                     { path: childPath(pages.budgets), element: withSuspense(BudgetsPage) },

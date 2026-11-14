@@ -7,9 +7,9 @@ import { ReconcileRowItem } from './ReconcileRowItem'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useBalancesAt, useCreateReconciliations } from '@/hooks'
-import { numberToAmount } from '@/lib/decimal-amount'
-import { formatDateLocal } from '@/lib/dates'
-import { formatCurrency } from '@/lib/currency'
+import { numberToAmount } from '@/lib/format/decimal-amount'
+import { formatDateLocal } from '@/lib/format/dates'
+import { formatCurrency } from '@/lib/format/currency'
 import { testId } from '@/lib/test-id'
 import {
     addRow,
@@ -23,7 +23,7 @@ import {
     removedAccounts,
     rowDifference,
     toPayload,
-} from '@/lib/reconciliation-rows'
+} from '@/lib/transaction/reconciliation-rows'
 import type { Account } from '@/types'
 
 const FORM_ID = 'reconcile-form'

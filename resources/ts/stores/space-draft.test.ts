@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { emptyDraft } from '@/components/features/spaces/create/draft'
-import { sameShape } from '@/lib/draft-store'
+import { sameShape } from '@/lib/ui/draft-store'
 
 vi.mock('@/stores/auth', () => ({ useAuthStore: { getState: () => ({ user: null }) } }))
 

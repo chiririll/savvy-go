@@ -1,4 +1,4 @@
-import i18n from '@/lib/i18n'
+import i18n from '@/lib/i18n/i18n'
 
 const DEFAULT_NAME_RE = /^#[A-Z][A-Z0-9_]*$/
 

@@ -14,7 +14,7 @@ This is a UI optimization. It is not a new accounting figure.
 
 - `GET /transactions` and the single transaction return the same `Transaction` (`resources/ts/types/transactions.ts`), with `payments`, `lines`, `tags`, `actions` and `restrictions`.
 - `amount` is what the payments net to, and `null` when they span several currencies. The list cannot show a total for those.
-- The form sums payments in the browser (`paymentTotals` in `resources/ts/lib/transaction-payments.ts`) with JS numbers rounded per currency. That stays for live editing, but the list should not need it.
+- The form sums payments in the browser (`paymentTotals` in `resources/ts/lib/transaction/transaction-payments.ts`) with JS numbers rounded per currency. That stays for live editing, but the list should not need it.
 
 ## Design
 

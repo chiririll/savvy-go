@@ -4,9 +4,9 @@ import { Badge } from '@/components/ui/badge'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { RowActions, UserAvatar } from '@/components/shared'
 import { User } from '@/types/users'
-import i18n from '@/lib/i18n'
-import { userRoleLabel } from '@/lib/labels'
-import { formatDateTime } from '@/lib/format'
+import i18n from '@/lib/i18n/i18n'
+import { userRoleLabel } from '@/lib/i18n/labels'
+import { formatDateTime } from '@/lib/format/format'
 
 interface UserColumnsOptions {
     onDelete: (id: number) => void

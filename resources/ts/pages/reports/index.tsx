@@ -5,7 +5,7 @@ import { Page, PageHeader } from '@/components/shared'
 import { FiltersBar } from './components'
 import { toggleIdInArray, cn } from '@/lib/utils'
 import { DEFAULT_FILTERS, TABS, reportTabUrl, type ReportFilters } from './types'
-import { reportTabLabel } from '@/lib/labels'
+import { reportTabLabel } from '@/lib/i18n/labels'
 
 /** Each report is its own page under /reports; the filters above them are shared. */
 export default function ReportsPage() {

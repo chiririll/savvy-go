@@ -6,7 +6,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { formatPlural } from './plural'
 
 const locale = (lng: string, ns: string) =>
-    JSON.parse(readFileSync(path.resolve(__dirname, '../locales', lng, `${ns}.json`), 'utf8'))
+    JSON.parse(readFileSync(path.resolve(__dirname, '../../locales', lng, `${ns}.json`), 'utf8'))
 
 /** A plain i18next instance wired up like lib/i18n.ts, on the real locale files. */
 const i18n = i18next.createInstance()

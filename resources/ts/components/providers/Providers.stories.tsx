@@ -18,7 +18,7 @@ import { ServerSetupGate } from './ServerSetupGate'
 import { SessionExpiredDialog } from './SessionExpiredDialog'
 import { NoSpace, SpaceGate } from './SpaceGate'
 
-const user = { id: 1, name: 'Kirill', email: 'kirill@example.com', role: 'admin' as const, emailVerified: true }
+const user = { id: 1, name: 'Alice', email: 'alice@example.com', role: 'admin' as const, emailVerified: true }
 
 const meta = {
     title: 'providers/Providers',
@@ -171,7 +171,7 @@ export const EmailNotConfirmed: Story = {
     render: () => <EmailVerificationGate><Page /></EmailVerificationGate>,
     beforeEach: unverified,
     play: async ({ canvasElement }) => {
-        await expect(within(canvasElement).getByText(/kirill@example\.com/)).toBeVisible()
+        await expect(within(canvasElement).getByText(/alice@example\.com/)).toBeVisible()
         await expect(within(canvasElement).queryByText('The app')).toBeNull()
     },
 }

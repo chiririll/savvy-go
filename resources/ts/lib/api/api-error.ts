@@ -1,4 +1,4 @@
-import i18n from '@/lib/i18n'
+import i18n from '@/lib/i18n/i18n'
 import type { ApiError } from '@/types'
 
 const I18N_NAMESPACES = ['common', 'forms', 'pages', 'auth', 'settings', 'nav'] as const
@@ -59,6 +59,11 @@ function resolveI18nKey(message: string): string {
     }
 
     return message
+}
+
+/** Whether the server refused the request with 403: it understood it, but not for this account. */
+export function isForbiddenError(error: unknown): boolean {
+    return typeof error === 'object' && error !== null && (error as ApiError).code === '403'
 }
 
 export function getApiErrorMessage(error: unknown, fallback: string): string {

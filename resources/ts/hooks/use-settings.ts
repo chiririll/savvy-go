@@ -3,7 +3,7 @@ import { settingsApi } from '@/api'
 import { Settings } from '@/types'
 import { useResourceMutation } from './use-crud'
 import { SERVER_CHECKS_KEY } from './use-server-checks'
-import i18n from '@/lib/i18n'
+import i18n from '@/lib/i18n/i18n'
 
 const QUERY_KEY = ['settings']
 

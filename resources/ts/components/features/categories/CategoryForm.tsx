@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/form'
 import { COLOR_OPTIONS } from '@/constants'
 import { categorySchema, CategoryFormData } from '@/schemas'
-import { defaultNameHint, defaultNameKey, localizeDefaultName, toStoredDefaultName } from '@/lib/localized-name'
+import { defaultNameHint, defaultNameKey, localizeDefaultName, toStoredDefaultName } from '@/lib/format/localized-name'
 import { TypeSelector } from './TypeSelector'
 import { IconPicker } from './IconPicker'
 import { ColorPicker } from './ColorPicker'

@@ -3,15 +3,15 @@ import { FeedRow, FeedStatusBadge, RowActions, type FeedGroupKey } from '@/compo
 import { transactionIconProps } from '@/components/features/transactions/list/transaction-icon'
 import { TransactionAmount } from '@/components/features/transactions/list/TransactionAmount'
 import { useAccounts, useCategories, useRelativeDay } from '@/hooks'
-import { pendingDateClassName } from '@/lib/dates'
-import i18n from '@/lib/i18n'
-import { frequencyLabel } from '@/lib/labels'
-import { isApproximateRule, templateAsTransaction } from '@/lib/recurring-template'
+import { pendingDateClassName } from '@/lib/format/dates'
+import i18n from '@/lib/i18n/i18n'
+import { frequencyLabel } from '@/lib/i18n/labels'
+import { isApproximateRule, templateAsTransaction } from '@/lib/transaction/recurring-template'
 import {
     displayTransactionDescription,
     transactionAmountAppearance,
     transactionSubtitle,
-} from '@/lib/transaction-description'
+} from '@/lib/transaction/transaction-description'
 import { cn } from '@/lib/utils'
 import type { Category, RecurringFrequency, RecurringTransaction } from '@/types'
 

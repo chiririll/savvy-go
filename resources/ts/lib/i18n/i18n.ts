@@ -3,7 +3,7 @@ import { initReactI18next } from 'react-i18next'
 import LanguageDetector from 'i18next-browser-languagedetector'
 import type { BackendModule } from 'i18next'
 
-import { formatPlural } from '@/lib/plural'
+import { formatPlural } from '@/lib/format/plural'
 
 import enCommon from '@/locales/en/common.json'
 import enNav from '@/locales/en/nav.json'
@@ -62,14 +62,18 @@ function resolveDottedNamespaceKey(key: string): string {
 
 // English is bundled (fallback language); other locales are loaded on demand.
 // `en` is excluded: it is imported statically above, and a glob match would make Vite warn that
-// the dynamic import cannot split it out.
-const localeLoaders = import.meta.glob<{ default: Record<string, unknown> }>('../locales/!(en)/*.json')
+// the dynamic import cannot split it out. Use a negative pattern: the extglob `!(en)` matches
+// nothing in the production build, which silently shipped no other locale.
+const localeLoaders = import.meta.glob<{ default: Record<string, unknown> }>([
+    '../../locales/*/*.json',
+    '!../../locales/en/*.json',
+])
 
 const lazyLocaleBackend: BackendModule = {
     type: 'backend',
     init() {},
     read(language, namespace, callback) {
-        const loader = localeLoaders[`../locales/${language}/${namespace}.json`]
+        const loader = localeLoaders[`../../locales/${language}/${namespace}.json`]
         if (!loader) {
             callback(null, {})
             return

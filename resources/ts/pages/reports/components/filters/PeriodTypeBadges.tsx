@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
-import { periodTypeLabel } from '@/lib/labels'
+import { periodTypeLabel } from '@/lib/i18n/labels'
 import { testIdControl, testIdControls } from '@/lib/test-id'
 import type { PeriodType } from '../../types'
 

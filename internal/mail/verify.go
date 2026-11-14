@@ -64,9 +64,10 @@ func (s Verifier) Send(ctx context.Context, lang string, u *auth.User) string {
 }
 
 // Confirm marks the address named by the emailed token as confirmed. It reports
-// false for a token that is invalid or has expired.
-func (s Verifier) Confirm(ctx context.Context, token string) (bool, error) {
-	u, err := s.Verifications.Consume(ctx, token)
+// false for a token that is invalid or has expired, and auth.ErrOtherAccount when
+// viewerID, the user signed in where the link was opened (0 for none), is not its owner.
+func (s Verifier) Confirm(ctx context.Context, token string, viewerID int64) (bool, error) {
+	u, err := s.Verifications.Consume(ctx, token, viewerID)
 	if err != nil || u == nil {
 		return false, err
 	}

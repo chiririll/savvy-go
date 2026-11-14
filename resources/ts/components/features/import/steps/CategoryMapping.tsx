@@ -1,9 +1,9 @@
 import { useTranslation } from 'react-i18next'
-import { transactionTypeLabelLoose } from '@/lib/labels'
+import { transactionTypeLabelLoose } from '@/lib/i18n/labels'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useCategories } from '@/hooks'
-import { intlLocale } from '@/lib/i18n'
+import { intlLocale } from '@/lib/i18n/i18n'
 import type { ImportCategoryCandidate, ImportCategoryChoice, ImportCategoryMap } from '@/types/import'
 
 interface CategoryMappingProps {

@@ -3,7 +3,7 @@ import { Search } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { useIsMobile } from '@/hooks/use-mobile'
-import { shouldOpenSearchPalette } from '@/lib/search-shortcut'
+import { shouldOpenSearchPalette } from '@/lib/ui/search-shortcut'
 
 const TransactionSearchPalette = lazy(() =>
     import('@/components/features/transactions/search/TransactionSearchPalette').then((module) => ({

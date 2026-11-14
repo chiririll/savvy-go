@@ -13,7 +13,7 @@ const invitation = (overrides: Partial<SpaceInvitation> = {}): SpaceInvitation =
     email: 'alex@example.com',
     note: null,
     role: 'editor',
-    inviter: 'Kirill',
+    inviter: 'Alice',
     expiresAt: '2099-01-01T00:00:00Z',
     acceptedAt: null,
     createdAt: '2030-01-01T00:00:00Z',

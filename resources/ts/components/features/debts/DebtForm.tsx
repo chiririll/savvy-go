@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { useForm } from 'react-hook-form'
-import { schemaResolver } from '@/lib/form-resolver'
+import { schemaResolver } from '@/lib/ui/form-resolver'
 import { Form } from '@/components/ui/form'
 import { getDebtSchema, DebtFormData } from '@/schemas'
 import { useCurrencies, useAccounts, useFormValuesChange } from '@/hooks'
@@ -12,9 +12,9 @@ import {
     SegmentedChoice,
     useNegativeBalanceConfirm,
 } from '@/components/shared'
-import { warningsForAccountOutflow } from '@/lib/negative-balance'
+import { warningsForAccountOutflow } from '@/lib/transaction/negative-balance'
 import { cn, formatDateLocal } from '@/lib/utils'
-import { debtTypeLabel } from '@/lib/labels'
+import { debtTypeLabel } from '@/lib/i18n/labels'
 import { DebtAmountFields } from './form/DebtAmountFields'
 import { DebtOriginField } from './form/DebtOriginField'
 

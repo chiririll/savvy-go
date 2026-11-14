@@ -56,6 +56,8 @@ const storiesProject = (
             'echarts/components',
             'echarts/renderers',
             'echarts-for-react/esm/core',
+            // Loaded by the Storybook preview at render time, so only found mid-run otherwise.
+            '@storybook/react-dom-shim',
         ],
     },
     test: {

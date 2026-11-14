@@ -43,6 +43,10 @@ var (
 	// ErrInvitationEmail is returned when an email-bound invitation is used
 	// with another address.
 	ErrInvitationEmail = errors.New("this invitation is for another email address")
+	// ErrAlreadyInSpace is returned when the user accepting an invitation is
+	// already a member of its space: accepting would silently change their
+	// role, such as demote an admin.
+	ErrAlreadyInSpace = errors.New("you are already a member of this space")
 	// ErrInvitationExists is returned when the address already has a pending
 	// invitation to the space.
 	ErrInvitationExists = errors.New("this address is already invited to the space")
@@ -76,6 +80,9 @@ type InvitationPreview struct {
 	Inviter   string
 	Email     *string
 	ExpiresAt time.Time
+	// AlreadyMember reports that the viewer is signed in and already in the
+	// space, so the link is of no use to them.
+	AlreadyMember bool
 	// CanRegister reports whether the link may create an account.
 	CanRegister bool
 }
@@ -233,21 +240,31 @@ func (s Service) lookupInvitation(ctx context.Context, reg repo.Repo, token stri
 		expires: r.Expires, accepted: r.Used, spaceName: r.SpaceName, inviter: r.Inviter}, nil
 }
 
-// Preview describes a valid invitation to whoever holds its link.
-func (s Service) Preview(ctx context.Context, token string) (*InvitationPreview, error) {
+// Preview describes a valid invitation to whoever holds its link. viewer is
+// the signed-in user opening it, nil for an anonymous holder.
+func (s Service) Preview(ctx context.Context, token string, viewer *auth.User) (*InvitationPreview, error) {
 	inv, err := s.lookupInvitation(ctx, s.registry(), token)
 	if err != nil {
 		return nil, err
 	}
+	member := false
+	if viewer != nil {
+		if role, err := s.Role(ctx, inv.spaceID, viewer.ID); err != nil {
+			return nil, err
+		} else {
+			member = role != ""
+		}
+	}
 	return &InvitationPreview{
-		SpaceName: inv.spaceName, Role: inv.role, Inviter: inv.inviter, Email: inv.email, ExpiresAt: inv.expires,
+		AlreadyMember: member, SpaceName: inv.spaceName, Role: inv.role, Inviter: inv.inviter, Email: inv.email, ExpiresAt: inv.expires,
 		CanRegister: s.settings().Bool(ctx, "space_invites_can_register", true),
 	}, nil
 }
 
 // Accept makes u a member with the invitation's role and uses it up. An
 // email-bound invitation needs u's email; a guest cannot take an admin role
-// (P8) and a new admin stays within the limit (P10).
+// (P8) and a new admin stays within the limit (P10). Someone already in the
+// space cannot accept: it would change their role.
 func (s Service) Accept(ctx context.Context, token string, u *auth.User) (*Space, error) {
 	// Checks first: inside the transaction only its handle may be used (the
 	// database has one connection, which the transaction holds).
@@ -258,14 +275,17 @@ func (s Service) Accept(ctx context.Context, token string, u *auth.User) (*Space
 	if inv.email != nil && !strings.EqualFold(*inv.email, u.Email) {
 		return nil, ErrInvitationEmail
 	}
+	if current, err := s.Role(ctx, inv.spaceID, u.ID); err != nil && !errors.Is(err, ErrNotMember) {
+		return nil, err
+	} else if current != "" {
+		return nil, ErrAlreadyInSpace
+	}
 	if inv.role == RoleAdmin {
 		if u.IsGuest() {
 			return nil, ErrGuestCannotAdmin
 		}
-		if current, _ := s.Role(ctx, inv.spaceID, u.ID); current != RoleAdmin {
-			if err := s.checkAdminLimit(ctx, u); err != nil {
-				return nil, err
-			}
+		if err := s.checkAdminLimit(ctx, u); err != nil {
+			return nil, err
 		}
 	}
 	err = store.Tx(ctx, s.Store.Server(), func(tx store.DB) error {

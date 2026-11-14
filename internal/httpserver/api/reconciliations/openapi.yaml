@@ -67,9 +67,10 @@ paths:
       description: |
         For the transaction list. Each day has `differenceBase`, the sum of its points' differences in the base
         currency, and `unconverted`, true when a point had no rate and is left out of that sum.
+        Without `start_date` and `end_date` every day is answered, newest first.
       parameters:
-        - {name: start_date, in: query, required: true, schema: {type: string, format: date}}
-        - {name: end_date, in: query, required: true, schema: {type: string, format: date}}
+        - {name: start_date, in: query, schema: {type: string, format: date}}
+        - {name: end_date, in: query, schema: {type: string, format: date}}
       responses:
         "200": {$ref: "#/components/responses/Data"}
         "401": {$ref: "#/components/responses/Unauthenticated"}

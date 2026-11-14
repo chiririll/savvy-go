@@ -30,7 +30,6 @@ With `--seed-config <file>` (any TOML file, even empty), the first boot creates 
 | `admin@savvy.app`  | `password` | admin       |
 | `editor@savvy.app` | `password` | user        |
 | `guest@savvy.app`  | `password` | guest       |
-| `demo@demo.com`    | `demo`     | user        |
 
 The data covers the transaction model, not only plain expenses. Most are one payment on one account for one category; next to them are:
 
@@ -124,7 +123,7 @@ In a project that is not English and light, `.storybook/matrix-checks.ts` fails 
 
 The language projects leave out the `play` function (it finds elements by English text); the English run covers it. The dark project runs everything, play included.
 
-To add a language: add the folder `resources/ts/locales/<code>/` with the same files as `en`, and add the code to `SUPPORTED_LOCALES` and `LOCALE_LABELS` in `resources/ts/lib/i18n.ts`. The matrix projects come from the folder names, so there is no story and no test config to change. `lib/i18n-keys.test.ts` checks that the files match `en`.
+To add a language: add the folder `resources/ts/locales/<code>/` with the same files as `en`, and add the code to `SUPPORTED_LOCALES` and `LOCALE_LABELS` in `resources/ts/lib/i18n/i18n.ts`. The matrix projects come from the folder names, so there is no story and no test config to change. `lib/i18n/i18n-keys.test.ts` checks that the files match `en`.
 
 The browser size is not taken from the project: addon-vitest resets it before each story to the story's `viewport` global, so `vitest.stories.config.ts` also sets `STORYBOOK_VIEWPORT` and the preview has a `desktop` and a `mobile` viewport option.
 

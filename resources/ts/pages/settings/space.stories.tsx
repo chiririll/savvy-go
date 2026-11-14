@@ -8,7 +8,7 @@ import { space } from '@/test/app-state'
 import SpaceSettingsPage from './space'
 
 const members = [
-    { userId: 1, name: 'Kirill', email: 'kirill@example.com', role: 'admin', createdAt: null },
+    { userId: 1, name: 'Alice', email: 'alice@example.com', role: 'admin', createdAt: null },
     { userId: 2, name: 'Alex', email: 'alex@example.com', role: 'editor', createdAt: null },
 ]
 

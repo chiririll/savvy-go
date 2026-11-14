@@ -7,7 +7,7 @@ import { NuqsTestingAdapter } from 'nuqs/adapters/testing'
 import { mswLoader } from 'msw-storybook-addon/csf3'
 import { configure } from 'storybook/test'
 
-import i18n, { i18nReady, LOCALE_LABELS, SUPPORTED_LOCALES, type AppLocale } from '@/lib/i18n'
+import i18n, { i18nReady, LOCALE_LABELS, SUPPORTED_LOCALES, type AppLocale } from '@/lib/i18n/i18n'
 import { AppToaster } from '@/components/providers/AppToaster'
 import { baseA11y } from '@/test/a11y'
 import { setUpApp } from '@/test/app-state'

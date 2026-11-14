@@ -2,7 +2,7 @@ import type { Control } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { Checkbox } from '@/components/ui/checkbox'
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
-import { localizeDefaultName } from '@/lib/localized-name'
+import { localizeDefaultName } from '@/lib/format/localized-name'
 import type { BudgetFormData } from '@/schemas'
 import type { Category } from '@/types'
 

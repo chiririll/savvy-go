@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useCheckMail, useMailStatus, useSendTestMail, useUpdateMail } from '@/hooks'
-import { mailProtocolLabel } from '@/lib/labels'
+import { mailProtocolLabel } from '@/lib/i18n/labels'
 import { MAIL_PROTOCOLS, type MailInput, type MailProtocol, type MailStatus } from '@/types/mail'
 import { cn } from '@/lib/utils'
 

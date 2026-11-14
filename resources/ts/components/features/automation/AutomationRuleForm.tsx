@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { useFormValuesChange } from '@/hooks'
 import { useForm } from 'react-hook-form'
-import { schemaResolver } from '@/lib/form-resolver'
+import { schemaResolver } from '@/lib/ui/form-resolver'
 import { Switch } from '@/components/ui/switch'
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form'
 import { automationRuleSchema, type AutomationRuleFormData } from '@/schemas'

@@ -1,6 +1,6 @@
 import { api, apiClient } from './client'
 import { createCrudApi } from './crud'
-import { toQueryString } from '@/lib/query-string'
+import { toQueryString } from '@/lib/api/query-string'
 import { Debt, DebtSummary, DebtsResponse, Transaction } from '@/types'
 import { DebtFormData, DebtPaymentFormData } from '@/schemas'
 

@@ -61,6 +61,8 @@ export interface InviteMethods {
 }
 
 export interface InvitationPreview {
+    /** The signed-in viewer is in the space already, so the link is of no use to them. */
+    alreadyMember: boolean
     spaceName: string
     role: SpaceRole
     inviter: string

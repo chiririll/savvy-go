@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { useForm } from 'react-hook-form'
-import { schemaResolver } from '@/lib/form-resolver'
+import { schemaResolver } from '@/lib/ui/form-resolver'
 import { Input } from '@/components/ui/input'
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from '@/components/ui/form'
 import { currencySchema, CurrencyFormData } from '@/schemas'

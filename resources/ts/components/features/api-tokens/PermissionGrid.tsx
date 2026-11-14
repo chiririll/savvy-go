@@ -8,7 +8,7 @@ import {
     type ApiPermissionLevel,
     type ApiResource,
 } from '@/types'
-import { apiResourceLabel } from '@/lib/labels'
+import { apiResourceLabel } from '@/lib/i18n/labels'
 
 /** One row per part of a space: no access, read, read & write, or read, write & delete. */
 export function PermissionGrid({

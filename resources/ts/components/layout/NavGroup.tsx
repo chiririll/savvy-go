@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/sidebar'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { useTranslation } from 'react-i18next'
-import { navLabel } from '@/lib/labels'
+import { navLabel } from '@/lib/i18n/labels'
 import { cn } from '@/lib/utils'
 
 import type { MenuItem } from './nav-items'

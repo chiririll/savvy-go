@@ -8,6 +8,8 @@ const list = [
     ['dashboard', pages.dashboard],
     ['transactions', pages.transactions],
     ['accounts', pages.accounts],
+    ['accounts-inactive', pages.accountsInactive],
+    ['reconciliations', pages.accountsReconciliations],
     ['categories', pages.categories],
     ['currencies', pages.currencies],
     ['budgets', pages.budgets],

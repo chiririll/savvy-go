@@ -8,7 +8,7 @@ import { useMoneyFlow } from '@/hooks'
 import { formatCurrency } from '@/lib/utils'
 import type { ReportFilters } from '../types'
 import { localizeSavingsNodeName } from '../utils'
-import { useChartTheme } from '@/lib/chart-theme'
+import { useChartTheme } from '@/lib/ui/chart-theme'
 import { isNarrowChart, useElementWidth } from '@/hooks/use-element-width'
 
 interface SankeyDiagramProps {

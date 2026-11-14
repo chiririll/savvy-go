@@ -109,6 +109,25 @@ func TestAdminCreatesActiveInvitedUsers(t *testing.T) {
 	status(t, res, 422, "inactive user signs in")
 }
 
+func TestSetPasswordLinkRefusedForOtherSession(t *testing.T) {
+	a := newTestApp(t)
+	invited, err := a.svc.Users.Create(context.Background(), "Invited", "invited@test.com", nil, auth.RoleUser)
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, _, err := a.svc.PasswordTokens.Issue(context.Background(), invited)
+	if err != nil {
+		t.Fatal(err)
+	}
+	other := a.issue(a.createUser("other@test.com", "secret1", roleEditor), false)
+
+	status(t, a.do("GET", "/api/auth/password/"+token, nil, other.Token, ""), 403, "preview in another session")
+	set := map[string]string{"password": "newpass12", "password_confirmation": "newpass12"}
+	status(t, a.do("POST", "/api/auth/password/"+token, set, other.Token, other.CSRF), 403, "accept in another session")
+	// The refusal leaves the link usable for its owner.
+	status(t, a.do("POST", "/api/auth/password/"+token, set, "", ""), 200, "accept without a session")
+}
+
 func TestSetPasswordLinkActivatesInvitedUser(t *testing.T) {
 	a := newTestApp(t)
 	invited, err := a.svc.Users.Create(context.Background(), "Invited", "invited@test.com", nil, auth.RoleUser)

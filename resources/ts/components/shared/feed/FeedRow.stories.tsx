@@ -3,7 +3,7 @@ import { ShoppingCart } from 'lucide-react'
 import { expect, fn, userEvent, within } from 'storybook/test'
 
 import { currencies } from '@/test/fixtures'
-import { formatCurrency } from '@/lib/currency'
+import { formatCurrency } from '@/lib/format/currency'
 import { useCurrenciesStore } from '@/stores/currencies'
 
 import { FeedEmpty, FeedList, FeedRow, FeedRowSkeleton, FeedStatusBadge } from './FeedRow'

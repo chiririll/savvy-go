@@ -1,10 +1,10 @@
 import { PiggyBank } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { categoryIcons, FeedRow, progressAmounts, RowActions, type FeedGroupKey } from '@/components/shared'
-import i18n from '@/lib/i18n'
-import { localizeDefaultName } from '@/lib/localized-name'
+import i18n from '@/lib/i18n/i18n'
+import { localizeDefaultName } from '@/lib/format/localized-name'
 import { Budget, BudgetPeriod } from '@/types'
-import { budgetPeriodLabelLoose } from '@/lib/labels'
+import { budgetPeriodLabelLoose } from '@/lib/i18n/labels'
 
 const PERIOD_ORDER: BudgetPeriod[] = ['weekly', 'monthly', 'yearly', 'one_time']
 

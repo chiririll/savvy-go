@@ -13,7 +13,7 @@ const GREY_SQUARE =
 export const WithImage: Story = {
     render: (args) => (
         <Avatar {...args}>
-            <AvatarImage src={GREY_SQUARE} alt="Kirill" />
+            <AvatarImage src={GREY_SQUARE} alt="Alice" />
             <AvatarFallback>KC</AvatarFallback>
         </Avatar>
     ),

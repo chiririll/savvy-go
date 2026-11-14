@@ -3,8 +3,10 @@ package emailverify
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
+	"savvy-go/internal/auth"
 	"savvy-go/internal/httpserver/httpx"
 )
 
@@ -29,7 +31,15 @@ func (h Handler) verifyEmail(w http.ResponseWriter, r *http.Request) {
 		Token string `json:"token"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
-	ok, err := h.Verify.Confirm(r.Context(), body.Token)
+	var viewerID int64
+	if u := h.Guard.SessionUser(r); u != nil {
+		viewerID = u.ID
+	}
+	ok, err := h.Verify.Confirm(r.Context(), body.Token, viewerID)
+	if errors.Is(err, auth.ErrOtherAccount) {
+		httpx.WriteMessage(w, http.StatusForbidden, "This link belongs to another account.")
+		return
+	}
 	if err != nil {
 		httpx.WriteMessage(w, http.StatusInternalServerError, err.Error())
 		return

@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/sidebar'
 import { useUiStore } from '@/stores/ui'
 import { useTranslation } from 'react-i18next'
-import { navLabel } from '@/lib/labels'
+import { navLabel } from '@/lib/i18n/labels'
 import { NavGroup } from './NavGroup'
 import { SidebarAbout } from './SidebarAbout'
 import { mainItems, spaceItems, accountItems, adminItems } from './nav-items'

@@ -12,7 +12,7 @@ import { useTwoFactorSetup } from './useTwoFactorSetup'
 const status = (enabled: boolean, left: number | null = null) =>
     raw('get', '/auth/2fa/status', { enabled, pending_confirmation: false, recovery_codes_remaining: left })
 
-const secret = { secret: 'JBSWY3DPEHPK3PXP', qr_code_url: 'otpauth://totp/GoSavvy:kirill?secret=JBSWY3DPEHPK3PXP' }
+const secret = { secret: 'JBSWY3DPEHPK3PXP', qr_code_url: 'otpauth://totp/GoSavvy:alice?secret=JBSWY3DPEHPK3PXP' }
 const codes = ['aaaa-1111', 'bbbb-2222', 'cccc-3333', 'dddd-4444']
 
 // The page wires these three to one hook; so does the story.

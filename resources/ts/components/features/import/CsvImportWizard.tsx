@@ -8,7 +8,7 @@ import { PreviewStep } from './steps/PreviewStep'
 import { ResultStep } from './steps/ResultStep'
 import { ImportFooter, ImportProgress } from './ImportFooter'
 import { STEP_IDS, useCsvImportFlow } from './useCsvImportFlow'
-import { importStepLabel } from '@/lib/labels'
+import { importStepLabel } from '@/lib/i18n/labels'
 
 export function CsvImportWizard() {
     const { t } = useTranslation('settings')

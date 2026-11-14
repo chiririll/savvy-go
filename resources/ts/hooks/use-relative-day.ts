@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { formatTransactionGroupHeading } from '@/lib/dates'
-import { intlLocale } from '@/lib/i18n'
+import { formatTransactionGroupHeading } from '@/lib/format/dates'
+import { intlLocale } from '@/lib/i18n/i18n'
 
 /** Formats a YYYY-MM-DD date as today / yesterday / tomorrow or a short date. */
 export function useRelativeDay() {

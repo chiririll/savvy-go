@@ -2,7 +2,7 @@
 
 Status: raw notes from 25-28 Oct 2026, sorted by area. Not prioritised or scheduled. Checked against the code on 29 Oct 2026 (branch `releases/v1.1`); items that say "not checked" or "not traced" were not read in the code. Source: entering real transactions through Claude (MCP) and using the web app.
 
-Priority hints: **P1** blocks or corrupts data, **P2** daily friction, **P3** nice to have. Items marked "see plan" are probably solved by [payments-split.md](payments-split.md); check there before designing anything new.
+Priority hints: **P1** blocks or corrupts data, **P2** daily friction, **P3** nice to have. Items marked "see plan" are probably solved by the payments and lines rework (`docs/split-payments.md`); check there before designing anything new.
 
 Versioning rule: the next two releases are v1.0.2 (minor) and v1.1 (major). Only v1.1 may change the schema: `0002_transactions.sql` is unreleased (v1.0.1 is the latest tag) and being rewritten for the transactions rework, so migrations go into it. v1.0.2 has no migration, so it takes only items that need none and do not depend on the rework. Items are tracked as GitHub issues with milestones v1.0.2 and v1.1; this file keeps the context and the open questions.
 
@@ -49,12 +49,12 @@ Today the list filters by type, date range, categories and tags (`TransactionFil
 Most painful part of the two days: finding the gap meant exporting everything and summing by hand. Only item 3 is still missing.
 
 1. Done (v1.1): `get_balance(account_id, at)` and `get_balance_history(account_id, from, to)` with one balance per day. Balance at a time of day is not covered, only at the end of a day.
-2. Done: reconciliation points (#88, #89), "04.09, actual 5 586", in table `reconciliations`. A point pins the account balance to the real one at the end of a date and does not create an adjustment transaction. The app shows the difference to the expected balance at each point, so a gap localises itself. API `POST /reconciliations`, MCP `reconcile_account`, `list_reconciliations`, `delete_reconciliation`; see [Reconciling balances](../transactions.md#reconciling-balances).
+2. Done: reconciliation points (#88, #89), "04.09, actual 5 586", in table `reconciliations`. A point pins the account balance to the real one at the end of a date and does not create an adjustment transaction. The app shows the difference to the expected balance at each point, so a gap localises itself. API `POST /reconciliations`, MCP `reconcile_account`, `list_reconciliations`, `delete_reconciliation`; see [Reconciling balances](../accounts.md#reconciling-balances).
 3. Count by denominations: "5 490 in notes + 96 in coins", a separate 50 € note (P3).
 
 ## Groups, receipts, items
 
-All of this overlaps the payments/transactions split. Check coverage in [payments-split.md](payments-split.md). What exists today: split payments as transactions sharing a `group_uuid` ([split-payments.md](../split-payments.md)), and receipt lines (`transaction_items`) that belong to one transaction with one category. Items are not allowed on split payments.
+All of this overlaps the payments/transactions split. Check coverage in `docs/split-payments.md`. What exists today: split payments as transactions sharing a `group_uuid` ([split-payments.md](../split-payments.md)), and receipt lines (`transaction_items`) that belong to one transaction with one category. Items are not allowed on split payments.
 
 - A receipt is one group with a shared total and a per-category breakdown. One Lidl receipt is now three transactions ("groceries", "household", "shampoo").
 - Category per item, not only per transaction. One receipt, one record (P2).

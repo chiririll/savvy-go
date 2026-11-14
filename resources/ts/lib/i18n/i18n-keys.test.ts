@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const TS_ROOT = path.resolve(__dirname, '..')
+const TS_ROOT = path.resolve(__dirname, '../..')
 const LOCALES_ROOT = path.join(TS_ROOT, 'locales')
 const LOCALES = readdirSync(LOCALES_ROOT)
 

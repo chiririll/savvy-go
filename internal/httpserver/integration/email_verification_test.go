@@ -207,6 +207,32 @@ func TestVerifyEmailByLink(t *testing.T) {
 	}
 }
 
+func TestVerificationLinkRejectedForAnotherSignedInUser(t *testing.T) {
+	rec := &recorder{on: true}
+	a, _, _ := newMailApp(t, rec)
+	owner := a.createUser("owner@test.com", "secret1", roleEditor)
+	other := a.createUser("other@test.com", "secret1", roleEditor)
+	ownerSess := a.issue(owner, false)
+	otherSess := a.issue(other, false)
+	a.do("POST", "/api/auth/verify-email/resend", nil, ownerSess.Token, ownerSess.CSRF).Body.Close()
+	token := strings.TrimPrefix(linkIn(t, rec.messages()[0]).Path, "/verify-email/")
+
+	res := a.do("POST", "/api/auth/verify-email", map[string]any{"token": token}, otherSess.Token, otherSess.CSRF)
+	res.Body.Close()
+	if res.StatusCode != 403 {
+		t.Fatalf("link of another user: %d", res.StatusCode)
+	}
+	if a.verified(owner.ID) {
+		t.Fatal("verified by someone else's session")
+	}
+	// The rejection does not use the link up: its owner can still confirm.
+	res = a.do("POST", "/api/auth/verify-email", map[string]any{"token": token}, ownerSess.Token, ownerSess.CSRF)
+	res.Body.Close()
+	if res.StatusCode != 200 || !a.verified(owner.ID) {
+		t.Fatalf("link of the signed-in user: %d", res.StatusCode)
+	}
+}
+
 func TestVerificationLinkOpaqueSingleUseReplaced(t *testing.T) {
 	rec := &recorder{on: true}
 	a, _, _ := newMailApp(t, rec)

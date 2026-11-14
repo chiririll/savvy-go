@@ -1,5 +1,5 @@
 import type { ComponentProps } from 'react'
-import { sanitizeAmount } from '@/lib/amount-input'
+import { sanitizeAmount } from '@/lib/format/amount-input'
 import { Input } from '@/components/ui/input'
 import type { Currency } from '@/types'
 

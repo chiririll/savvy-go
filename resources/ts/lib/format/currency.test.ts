@@ -6,7 +6,7 @@ import { formatBalanceShort, formatCurrency, formatCurrencyCompact } from './cur
 
 // The real i18n module pulls in the language detector and every locale bundle.
 const app = vi.hoisted(() => ({ locale: 'en-US' }))
-vi.mock('@/lib/i18n', () => ({ intlLocale: () => app.locale }))
+vi.mock('@/lib/i18n/i18n', () => ({ intlLocale: () => app.locale }))
 
 const currency = (code: string, symbol: string, decimals: number) =>
     ({ code, symbol, decimals }) as unknown as Currency

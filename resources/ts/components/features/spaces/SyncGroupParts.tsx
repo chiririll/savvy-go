@@ -7,7 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Confirm } from '@/components/shared/dialogs/Confirm'
-import { spaceRoleLabel, syncKindLabel } from '@/lib/labels'
+import { spaceRoleLabel, syncKindLabel } from '@/lib/i18n/labels'
 import { testId } from '@/lib/test-id'
 import type { Space, SyncChange, SyncGroup, SyncKind } from '@/types/spaces'
 

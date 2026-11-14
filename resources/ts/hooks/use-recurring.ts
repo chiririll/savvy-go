@@ -3,8 +3,8 @@ import { useQuery } from '@tanstack/react-query'
 import { recurringApi } from '@/api'
 import type { RecurringInput } from '@/types'
 import { useResourceItem, useResourceMutation } from './use-crud'
-import i18n from '@/lib/i18n'
-import { isApproximateRule } from '@/lib/recurring-template'
+import i18n from '@/lib/i18n/i18n'
+import { isApproximateRule } from '@/lib/transaction/recurring-template'
 
 const QUERY_KEY = ['recurring']
 

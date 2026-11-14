@@ -30,7 +30,7 @@ vi.mock('@simplewebauthn/browser', () => ({ startAuthentication: mocks.startAuth
 vi.stubGlobal('sessionStorage', mocks.sessionStorage)
 
 import { useAuthStore } from './auth'
-import { queryClient } from '@/lib/query-client'
+import { queryClient } from '@/lib/api/query-client'
 import { useSpaceStore } from './space'
 
 const user = { id: 1, name: 'Ann', email: 'ann@example.com', role: 'user' } as User

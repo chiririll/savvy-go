@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest'
  * does not work around it with a primitive.
  */
 
-const ROOT = path.resolve(__dirname, '..')
+const ROOT = path.resolve(__dirname, '../..')
 
 /** The modules whose use is limited, and the files that may import them. */
 const PRIMITIVES: Record<string, { use: string; wrappers: string[] }> = {

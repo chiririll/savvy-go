@@ -1,6 +1,6 @@
 # v1.1 schema: everything except the transaction rework
 
-Status: notes from 29 Oct 2026, nothing decided. The transaction/payment rework lives in [payments-split.md](payments-split.md) and is not repeated here. Items come from [backlog.md](backlog.md).
+Status: notes from 29 Oct 2026, nothing decided. The transaction/payment rework is built (see `docs/split-payments.md`) and is not repeated here. Items come from [backlog.md](backlog.md).
 
 Rule of thumb: a new nullable column or a new table is cheap and can also go into a later migration (0003). Only table rebuilds must be done before release, and the only one is the transaction rework. So nothing here blocks it.
 
@@ -22,7 +22,7 @@ Rule of thumb: a new nullable column or a new table is cheap and can also go int
 ### Reconciliation points (#88, #89)
 
 - Done: own table `reconciliations (id, account_id, date, actual_balance, note, created_at)`, unique per account and date, in space migration `0001`. Not a transaction type: no adjustment transaction is created, so nothing appears in the transaction list or in reports.
-- Each point is an anchor like the initial balance: balance on a day = latest anchor on or before it + payments after the anchor date. Expected balance = previous anchor + payments between; difference = actual - expected, worked out on read, not stored. See [Reconciling balances](../transactions.md#reconciling-balances).
+- Each point is an anchor like the initial balance: balance on a day = latest anchor on or before it + payments after the anchor date. Expected balance = previous anchor + payments between; difference = actual - expected, worked out on read, not stored. See [Reconciling balances](../accounts.md#reconciling-balances).
 
 ## Open, needs a decision first
 
@@ -44,4 +44,4 @@ Rule of thumb: a new nullable column or a new table is cheap and can also go int
 
 ## No schema change
 
-Filter by currency (#71), balance at a date and balance history (#87, an index question only, see Performance in the split plan), compact `list_transactions` (#101), batch create (#100), import by receipt link (#98), quick entry (#97).
+Filter by currency (#71), balance at a date and balance history (#87, an index question only), compact `list_transactions` (#101), batch create (#100), import by receipt link (#98), quick entry (#97).

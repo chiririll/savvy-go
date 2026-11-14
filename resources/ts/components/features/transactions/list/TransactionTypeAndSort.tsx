@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { TRANSACTION_TYPE_OPTIONS } from '@/constants/transactions'
-import { sortOptionLabel, transactionTypeLabel } from '@/lib/labels'
+import { sortOptionLabel, transactionTypeLabel } from '@/lib/i18n/labels'
 
 type TypeFilter = 'income' | 'expense' | 'transfer' | null
 

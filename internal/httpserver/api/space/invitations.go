@@ -134,9 +134,10 @@ func (h Handler) invitationsDestroy(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// invitationPreview is public: the link holder may not have an account yet.
+// invitationPreview is public: the link holder may not have an account yet. A
+// signed-in holder is told whether they are in the space already.
 func (h Handler) invitationPreview(w http.ResponseWriter, r *http.Request) {
-	p, err := h.Spaces.Preview(r.Context(), chi.URLParam(r, "token"))
+	p, err := h.Spaces.Preview(r.Context(), chi.URLParam(r, "token"), h.Guard.SessionUser(r))
 	if err != nil {
 		httpx.WriteSpaceError(w, err)
 		return

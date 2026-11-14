@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useCashFlowOverTime } from '@/hooks'
 import { isNarrowChart, useElementWidth } from '@/hooks/use-element-width'
-import { useChartTheme } from '@/lib/chart-theme'
+import { useChartTheme } from '@/lib/ui/chart-theme'
 
 import { buildCashFlowOption, cashFlowState, type CashFlowState } from '../cash-flow-option'
 import { defaultGroupBy } from '../types'

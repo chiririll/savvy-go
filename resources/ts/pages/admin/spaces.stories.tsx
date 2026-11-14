@@ -31,7 +31,7 @@ const meta = {
         msw.use(
             reply('get', '/admin/spaces', [space(1, 'Family'), space(2, 'Broken', { unavailable: 'file is missing' })]),
             reply('get', '/admin/deleted-spaces', []),
-            reply('get', '/users', [{ id: 1, name: 'Kirill', email: 'kirill@example.com', role: 'admin', emailVerified: true }]),
+            reply('get', '/users', [{ id: 1, name: 'Alice', email: 'alice@example.com', role: 'admin', emailVerified: true }]),
         ),
 } satisfies Meta<typeof AdminSpacesPage>
 
