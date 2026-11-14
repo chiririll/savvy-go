@@ -83,6 +83,13 @@ describe('reconcile rows', () => {
         expect(canSave('2026-11-08', '2026-11-08', editRow(rows, 1, ''), decimals)).toBe(false)
     })
 
+    it('refuses a formula that failed: it stays as typed, shows no difference and blocks saving', () => {
+        const rows = editRow(initialRows(accounts), 1, '100/0')
+        const decimals = new Map([[1, 2], [3, 0], [5, 2]])
+        expect(canSave('2026-11-08', '2026-11-08', rows, decimals)).toBe(false)
+        expect(rowDifference(rows[0], 2)).toBeNull()
+    })
+
     it('maps the rows to the batch', () => {
         const rows = editRow(initialRows(accounts), 3, '1,5'.replace(',', '.'))
         expect(toPayload('2026-11-08', rows)).toEqual({

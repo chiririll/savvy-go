@@ -65,7 +65,7 @@ const transfer = {
 }
 
 const savings = { ...accounts[0], id: 5, name: 'Savings', currentBalance: 50 }
-const withSavings = ({ msw }: { msw: { use: (...handlers: never[]) => void } }) =>
+const withSavings: NonNullable<Story['beforeEach']> = ({ msw }) =>
     msw.use(reply('get', '/accounts', [...accounts, savings]) as never)
 
 const receiveAmount = /receive amount|сумма получения/i
@@ -281,7 +281,7 @@ const toSpace = {
     to_account_id: 3,
     to_amount: 15000,
 }
-const linkedSpace = ({ msw }: { msw: { use: (...handlers: never[]) => void } }) =>
+const linkedSpace: NonNullable<Story['beforeEach']> = ({ msw }) =>
     msw.use(
         reply('get', '/spaces', [space('admin'), { ...space('editor'), id: 2, name: 'Trip' }]) as never,
         reply('get', '/links', [{ id: 2, name: 'Trip' }]) as never,

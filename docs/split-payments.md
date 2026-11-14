@@ -33,11 +33,12 @@ A note is shown in the transaction's details, never in the list. Lines that cove
 
 Once there are lines, a **lock** shows at the end of each payment amount. It starts **open**: the amount is the sum of the lines in the currency of that account, plus any change in that currency, and cannot be typed. Change a line and the payment follows; that is the way to enter a receipt category by category and let the total come out of it.
 
-Click it to **close** it: the payment is fixed where it is, and the lines split it, the rest going to the default category. Click again to let it follow the lines again.
+Click it to **close** it: the payment is fixed where it is, and the lines split it, the rest going to the default category. Click again to let it follow the lines again. While it is closed, typing in the payment never changes the lines: if they cover too much or too little the form warns, and the rest goes to the default category.
 
 - A payment follows only the lines in **its own currency**. A line in another currency does not move it.
 - If **several payments** are in the same currency their locks stay closed, because it would be unclear which one should take the change of a line.
-- A payment cannot follow when there is no line in its currency. If the lines are removed while it follows, it goes back to the amount it had before.
+- If **change is in another currency** than a payment (the rent example above: 500 EUR paid, 5,900 RSD back), that payment's lock stays closed and says why. Turning the change into the payment's currency would need an exchange rate, and none is stored, so type what you handed over yourself. A payment already in the currency of the change is not affected.
+- A payment cannot follow when there is no line in its currency. If the lines are removed while it follows, it goes back to the amount it had before. If it is stopped for another reason (a second payment in its currency, change in another currency), it keeps the amount it has.
 - The lock is not saved. A transaction saved with lines that add up to its payment opens with the lock open. One saved with lines that cover less (the rest went to the default category) opens with it closed, so opening it changes nothing. The change rows have no lock.
 
 ## In the list

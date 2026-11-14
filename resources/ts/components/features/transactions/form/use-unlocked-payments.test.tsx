@@ -131,4 +131,22 @@ describe('useUnlockedPayments', () => {
         act(() => form().setValue('lines.1.amount', amount('0.005')))
         expect(form().getValues('payments.0.amount')).toBe('0.105')
     })
+
+    it('keeps the total when a second payment in the same currency closes the lock', () => {
+        const { view, form } = withForm({ payments: [{ account_id: 1, amount: amount('') }], lines: [line('30'), line('20')] })
+        expect(form().getValues('payments.0.amount')).toBe('50.00')
+        act(() => form().setValue('payments', [...form().getValues('payments'), { account_id: 2, amount: amount('') }]))
+        expect(form().getValues('payments.0.amount')).toBe('50.00')
+        expect(view.result.current![0]).toMatchObject({ follows: false, blocker: 'several' })
+    })
+
+    it('keeps the amount and closes the lock when change comes in another currency', () => {
+        const { view, form } = withForm({ payments: [{ account_id: 3, amount: amount('') }], lines: [line('450', 2)] })
+        expect(form().getValues('payments.0.amount')).toBe('450.00')
+        act(() => form().setValue('change', [{ account_id: 1, amount: amount('5900') }]))
+        expect(form().getValues('payments.0.amount')).toBe('450.00')
+        expect(view.result.current![0]).toMatchObject({ follows: false, blocker: 'foreignChange' })
+        act(() => form().setValue('payments.0.amount', amount('500')))
+        expect(form().getValues('payments.0.amount')).toBe('500')
+    })
 })

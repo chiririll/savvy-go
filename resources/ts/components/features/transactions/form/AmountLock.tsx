@@ -16,7 +16,9 @@ export function AmountLock({ lock, index }: { lock: PaymentLock; index: number }
           ? t('transactions.amountFixedSeveral')
           : lock.blocker === 'noLine'
             ? t('transactions.amountFixedNoLine')
-            : t('transactions.amountFixed')
+            : lock.blocker === 'foreignChange'
+              ? t('transactions.amountFixedForeignChange')
+              : t('transactions.amountFixed')
 
     return (
         // A disabled button takes no hover, so the reason sits on the wrapper.

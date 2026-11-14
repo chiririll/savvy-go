@@ -8,7 +8,7 @@ export interface PaymentLock {
     /** Whether the row follows the lines: its amount is theirs and cannot be typed. */
     follows: boolean
     /** Why the row cannot follow the lines, or null when it can. */
-    blocker: 'several' | 'noLine' | null
+    blocker: 'several' | 'noLine' | 'foreignChange' | null
     toggle: () => void
 }
 
@@ -16,8 +16,9 @@ export interface PaymentLock {
  * Which payment rows follow the lines instead of being fixed. A row follows from the start: it takes the sum of the
  * lines in its currency whenever they change. The exception is a transaction saved with lines that do not add up to
  * its payment (the rest went to the default category): that row opens fixed, or opening it would change what was
- * saved. The lock is not stored. When a row that follows can no longer (the lines are gone), it is fixed again at the
- * amount it had before it followed. `keys` are the ids of the rows from the field array, so a lock stays with its row
+ * saved. The lock is not stored. When a row that follows can no longer because its lines are gone, it is fixed again
+ * at the amount it had before it followed; when something else stops it (another payment in its currency, change in
+ * another currency), it is fixed where it is. `keys` are the ids of the rows from the field array, so a lock stays with its row
  * when another is removed.
  */
 export function useUnlockedPayments(accounts: Account[] | undefined, keys: string[]): Array<PaymentLock> | null {
@@ -66,7 +67,7 @@ export function useUnlockedPayments(accounts: Account[] | undefined, keys: strin
             }
             if (amount === null) {
                 next = next.filter((k) => k !== key)
-                if (before.current.has(key)) {
+                if (lockBlocker(values, list, index) === 'noLine' && before.current.has(key)) {
                     setValue(`payments.${index}.amount`, before.current.get(key) as number)
                 }
             } else if (String(current ?? '') !== amount) {

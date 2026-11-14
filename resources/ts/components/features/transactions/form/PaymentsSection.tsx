@@ -6,7 +6,7 @@ import type { TransactionFormValues } from '@/schemas/transactions'
 import type { Account } from '@/types'
 import type { BalancePreview } from './balance-preview'
 import { PaymentGrid } from './PaymentGrid'
-import { followAmount, useStartingAmount } from './use-payment-follows-line'
+import { useStartingAmount } from './use-payment-follows-line'
 import { useUnlockedPayments } from './use-unlocked-payments'
 import type { BalanceMode } from './TransactionBalanceHint'
 
@@ -24,8 +24,7 @@ interface PaymentsSectionProps {
 /** The accounts that paid (or received, for an income), one row each. */
 export function PaymentsSection({ accounts, usedAccountIds, balances, balanceMode }: PaymentsSectionProps) {
     const { t } = useTranslation('forms')
-    const form = useFormContext<TransactionFormValues>()
-    const { control } = form
+    const { control } = useFormContext<TransactionFormValues>()
     const { fields, append, remove } = useFieldArray({ control, name: 'payments' })
     const rows = useWatch({ control, name: 'payments' })
     useStartingAmount(accounts)
@@ -48,7 +47,6 @@ export function PaymentsSection({ accounts, usedAccountIds, balances, balanceMod
             addLabel={t('transactions.addPayment')}
             addDisabled={!free}
             addDisabledReason={t('transactions.noAccountLeft')}
-            onFirstAmountChange={(value) => followAmount(form, accounts, value)}
             summary={<PaymentTotals accounts={accounts} />}
             onRemove={fields.length > 1 ? remove : undefined}
             removeLabel={t('transactions.removePayment')}

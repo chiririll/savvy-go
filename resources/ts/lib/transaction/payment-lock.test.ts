@@ -32,9 +32,22 @@ describe('followedAmount', () => {
         expect(followedAmount(values, accounts, 0)).toBe('13.50')
     })
 
-    it('ignores the change in another currency', () => {
+    it('cannot follow when change came back in a currency no payment is in', () => {
         const values: LockValues = { payments: [pay(1)], change: [pay(3, '500')], lines: [line('10')] }
+        expect(followedAmount(values, accounts, 0)).toBeNull()
+        expect(lockBlocker(values, accounts, 0)).toBe('foreignChange')
+    })
+
+    it('is not stopped by change that is empty or zero', () => {
+        expect(followedAmount({ payments: [pay(1)], change: [pay(3, '')], lines: [line('10')] }, accounts, 0)).toBe('10.00')
+        expect(followedAmount({ payments: [pay(1)], change: [pay(3, '0')], lines: [line('10')] }, accounts, 0)).toBe('10.00')
+    })
+
+    it('leaves the change in the currency of another payment to that payment', () => {
+        const values: LockValues = { payments: [pay(1), pay(3)], change: [pay(3, '5')], lines: [line('10'), line('7', 2)] }
+        expect(lockBlocker(values, accounts, 0)).toBeNull()
         expect(followedAmount(values, accounts, 0)).toBe('10.00')
+        expect(followedAmount(values, accounts, 1)).toBe('12.00')
     })
 
     it('uses the decimals of the currency', () => {

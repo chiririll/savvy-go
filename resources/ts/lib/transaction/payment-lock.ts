@@ -23,8 +23,11 @@ function units(amount: unknown, decimals: number): bigint {
 type Line = NonNullable<LockValues['lines']>[number]
 
 interface RowLock {
-    /** Why the row cannot follow the lines: another payment is in its currency, or no line is. Null when it can. */
-    blocker: 'several' | 'noLine' | null
+    /**
+     * Why the row cannot follow the lines: another payment is in its currency, no line is, or money came back in a
+     * currency no payment covers (the real payment is unknown without a rate). Null when it can.
+     */
+    blocker: 'several' | 'noLine' | 'foreignChange' | null
     currency?: Currency
     /** The lines in the currency of the row; a line that names none is in the first payment's currency. */
     lines: Line[]
@@ -39,7 +42,16 @@ function rowLock(values: LockValues, accounts: Account[], index: number): RowLoc
     }
     const shared = values.payments.some((row, i) => i !== index && accountOf(accounts, row?.account_id)?.currency?.id === currency.id)
     const lines = (values.lines ?? []).filter((line) => (line?.currency_id ? Number(line.currency_id) : primary.id) === currency.id)
-    return { blocker: shared ? 'several' : lines.length === 0 ? 'noLine' : null, currency, lines }
+    const foreign = (values.change ?? []).some((row) => {
+        const other = accountOf(accounts, row?.account_id)?.currency
+        if (!other || other.id === currency.id || units(row.amount, other.decimals) === 0n) {
+            return false
+        }
+        // Change in the currency of another payment is that payment's to follow; only change nobody pays in is foreign.
+        return !values.payments.some((payment) => accountOf(accounts, payment?.account_id)?.currency?.id === other.id)
+    })
+    const blocker = shared ? 'several' : lines.length === 0 ? 'noLine' : foreign ? 'foreignChange' : null
+    return { blocker, currency, lines }
 }
 
 /** Why a payment row stays locked, or null when it can follow the lines. */
@@ -48,7 +60,8 @@ export const lockBlocker = (values: LockValues, accounts: Account[], index: numb
 
 /**
  * What an unlocked payment is: the lines in its currency, plus the change in that currency (the payments net to the
- * lines). Exact text with the decimals of the currency; empty while those lines have no amount.
+ * lines). Exact text with the decimals of the currency; empty while those lines have no amount. Change in another
+ * currency is not converted (no rate is stored): it blocks the row instead.
  *
  * Null when the row cannot follow the lines and stays locked, see `lockBlocker`.
  */

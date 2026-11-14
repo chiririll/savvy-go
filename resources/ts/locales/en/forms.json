@@ -57,6 +57,7 @@
         "amountFollowsLines": "Amount follows the categories. Click to fix it",
         "amountFixedSeveral": "Several payments in this currency, the amount stays fixed",
         "amountFixedNoLine": "No category line in this currency to follow",
+        "amountFixedForeignChange": "Change in another currency: type the amount you paid",
         "changeTitle": "Change",
         "addChange": "Add change",
         "removeChange": "Remove the change",
