@@ -99,8 +99,10 @@ export const AmountTakesDigitsOnly: Story = {
     args: { defaultValues: { ...expense, payments: [{ account_id: 1, amount: '' as unknown as number }] } },
     play: async ({ canvasElement }) => {
         await ready(canvasElement)
-        // The first amount is the payment's; the line below it has one too.
+        // The payment follows the lines at first and is read-only: the lock fixes it, then it takes typing.
+        await userEvent.click(await within(canvasElement).findByRole('button', { name: /click to fix it|зафиксировать/i }))
         const amount = (await within(canvasElement).findAllByRole('textbox', { name: /^amount$/i }))[0]
+        await waitFor(() => expect(amount).not.toHaveAttribute('readonly'))
         await userEvent.type(amount, '-1e2,567x')
         await expect(amount).toHaveValue('12.56')
     },
