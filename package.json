@@ -11,8 +11,9 @@
         "screenshots": "npm --prefix scripts run screenshots --",
         "screenshots:diff": "npm --prefix scripts run screenshots:diff",
         "test": "vitest run --project unit",
-        "test:stories": "vitest run --config vitest.stories.config.ts --project stories-desktop --project stories-mobile",
-        "test:stories:full": "node scripts/test-stories-full.mts",
+        "test:scripts": "vitest run --project scripts",
+        "stories": "node scripts/stories/main.mts",
+        "stories:full": "node scripts/stories/main.mts --full",
         "storybook": "storybook dev -p 6006",
         "build-storybook": "storybook build -o storybook-static",
         "audit": "node resources/ts/lib/code-shape/audit.ts"

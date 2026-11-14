@@ -8,10 +8,10 @@ import pkg from './package.json'
 import { DESKTOP_ONLY, MOBILE_ONLY } from './.storybook/tags'
 
 // Every story is a test, in a real browser at one size. Run with `vitest run --config vitest.stories.config.ts`
-// (`npm run test:stories` runs both projects, English and light). Kept out of vite.config.ts so that a bare `vitest`
+// (`npm run stories` runs both projects, English and light). Kept out of vite.config.ts so that a bare `vitest`
 // can only run the unit tests, never start a browser.
 // A story tagged for the other size is left out of this project; see .storybook/tags.ts.
-// `npm run test:stories:full` adds the language and theme matrix: the same stories again with another global `locale`
+// `npm run stories:full` adds the language and theme matrix: the same stories again with another global `locale`
 // or `theme` (see .storybook/preview.tsx and docs/development.md).
 
 // Every locale folder except the English source is one more matrix project, so a new language needs no change here.

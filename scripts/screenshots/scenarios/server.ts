@@ -1,7 +1,7 @@
 // An app of its own for a scenario: the app's binary started on an empty data directory and a free
 // port, thrown away afterwards. The binary is SAVVY_BIN, else the one of the container image, else
-// one built from the sources (`go build`, once; it serves public/build from disk, so that must
-// have been built with APP_ENV=screenshots for the marks the scenarios use).
+// one built from the sources (`go build`, once; it serves public/build from disk, or SAVVY_WEB_DIR/public/build,
+// so that must have been built with APP_ENV=screenshots for the marks the scenarios use).
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:net'
@@ -64,8 +64,9 @@ export async function startServer(bin: string, label: string): Promise<Server> {
 
     const logFile = path.join(base, 'app.log')
     const fd = openSync(logFile, 'w')
-    // cwd: a binary without the embedded frontend looks for public/ in it.
-    const child: ChildProcess = spawn(bin, [], { cwd: root, env: { ...process.env, CONFIG_FILE: configFile }, stdio: ['ignore', fd, fd] })
+    // cwd: a binary without the embedded frontend looks for public/ in it. SAVVY_WEB_DIR: the one
+    // `npm run screenshots -- --local` built with the test ids, instead of the repository's.
+    const child: ChildProcess = spawn(bin, [], { cwd: process.env.SAVVY_WEB_DIR || root, env: { ...process.env, CONFIG_FILE: configFile }, stdio: ['ignore', fd, fd] })
     let exited: number | null = null
     child.once('exit', (code) => (exited = code ?? -1))
     const readLog = () => {
