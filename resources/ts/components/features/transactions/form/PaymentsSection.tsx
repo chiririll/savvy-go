@@ -7,6 +7,7 @@ import type { Account } from '@/types'
 import type { BalancePreview } from './balance-preview'
 import { PaymentGrid } from './PaymentGrid'
 import { followAmount, useStartingAmount } from './use-payment-follows-line'
+import { useUnlockedPayments } from './use-unlocked-payments'
 import type { BalanceMode } from './TransactionBalanceHint'
 
 const EMPTY_AMOUNT = '' as unknown as number
@@ -29,12 +30,15 @@ export function PaymentsSection({ accounts, usedAccountIds, balances, balanceMod
     const rows = useWatch({ control, name: 'payments' })
     useStartingAmount(accounts)
     const free = nextFreeAccount(accounts, usedAccountIds)
+    const keys = fields.map((field) => field.id)
+    const locks = useUnlockedPayments(accounts, keys)
 
     return (
         <PaymentGrid
             control={control}
             list="payments"
-            keys={fields.map((field) => field.id)}
+            keys={keys}
+            locks={locks}
             rows={rows}
             accounts={accounts}
             usedAccountIds={usedAccountIds}
@@ -44,7 +48,7 @@ export function PaymentsSection({ accounts, usedAccountIds, balances, balanceMod
             addLabel={t('transactions.addPayment')}
             addDisabled={!free}
             addDisabledReason={t('transactions.noAccountLeft')}
-            onFirstAmountChange={(value) => followAmount(form, accounts, 'payment', value)}
+            onFirstAmountChange={(value) => followAmount(form, accounts, value)}
             summary={<PaymentTotals accounts={accounts} />}
             onRemove={fields.length > 1 ? remove : undefined}
             removeLabel={t('transactions.removePayment')}

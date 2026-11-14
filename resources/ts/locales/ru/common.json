@@ -99,6 +99,7 @@
         "lineCurrency": "Выберите валюту одного из выбранных счетов",
         "amountRequired": "Укажите сумму",
         "amountPositive": "Сумма должна быть больше нуля",
+        "amountFormula": "Не удаётся вычислить формулу",
         "amountGreaterThanZero": "Сумма должна быть больше нуля",
         "insufficientFunds": "Недостаточно средств",
         "cardLimit": "Укажите лимит больше нуля",

@@ -34,7 +34,7 @@ function Fields({ seen }: { seen: string[] }) {
                         aria-label="pay"
                         value={String(field.value ?? '')}
                         onChange={(e) => {
-                            followAmount(form, accounts, 'payment', e.target.value)
+                            followAmount(form, accounts, e.target.value)
                             field.onChange(e.target.value)
                         }}
                     />
@@ -47,10 +47,7 @@ function Fields({ seen }: { seen: string[] }) {
                     <input
                         aria-label="line"
                         value={String(field.value ?? '')}
-                        onChange={(e) => {
-                            followAmount(form, accounts, 'line', e.target.value)
-                            field.onChange(e.target.value)
-                        }}
+                        onChange={(e) => field.onChange(e.target.value)}
                     />
                 )}
             />
@@ -82,20 +79,26 @@ const read = (id: string) => screen.getByTestId(id).textContent
 describe('followAmount', () => {
     afterEach(cleanup)
 
-    it('moves the line to the payment and back, and every reader sees both at once', () => {
+    it('moves the payment to the line, and every reader sees both at once', () => {
         const seen: string[] = []
         render(<Harness seen={seen} />)
         seen.length = 0
-
-        fireEvent.change(input('line'), { target: { value: '12' } })
-        expect(input('pay').value).toBe('12')
-        expect([read('before'), read('after')]).toEqual(['12|12', '12|12'])
 
         fireEvent.change(input('pay'), { target: { value: '15.5' } })
         expect(input('line').value).toBe('15.5')
         expect([read('before'), read('after')]).toEqual(['15.5|15.5', '15.5|15.5'])
         // Never a render where they disagree.
         expect(seen.every((text) => text.split('|')[0] === text.split('|')[1])).toBe(true)
+    })
+
+    it('does not move the payment when the line is edited: its lock decides that', () => {
+        const values = {
+            payments: [{ account_id: cash.id, amount: 12 }],
+            lines: [{ category_id: 1, currency_id: null, amount: 12, note: '' }],
+        }
+        render(<Harness seen={[]} values={values} />)
+        fireEvent.change(input('line'), { target: { value: '8' } })
+        expect(input('pay').value).toBe('12')
     })
 
     it('leaves a saved line that covers less alone', () => {
@@ -108,8 +111,8 @@ describe('followAmount', () => {
                 }}
             />,
         )
-        fireEvent.change(input('line'), { target: { value: '45' } })
-        expect(input('pay').value).toBe('50')
+        fireEvent.change(input('pay'), { target: { value: '45' } })
+        expect(input('line').value).toBe('40')
     })
 
     it('takes an amount an opener gave the payment into the line', () => {

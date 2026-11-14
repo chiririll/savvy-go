@@ -29,6 +29,17 @@ The **+** beside the category adds lines, so one payment can cover several categ
 
 A note is shown in the transaction's details, never in the list. Lines that cover less than the payments put the rest into the **default category**; the form warns when the lines cover too little or too much, and still saves.
 
+### Letting the amount follow the categories
+
+Once there are lines, a **lock** shows at the end of each payment amount. It starts **open**: the amount is the sum of the lines in the currency of that account, plus any change in that currency, and cannot be typed. Change a line and the payment follows; that is the way to enter a receipt category by category and let the total come out of it.
+
+Click it to **close** it: the payment is fixed where it is, and the lines split it, the rest going to the default category. Click again to let it follow the lines again.
+
+- A payment follows only the lines in **its own currency**. A line in another currency does not move it.
+- If **several payments** are in the same currency their locks stay closed, because it would be unclear which one should take the change of a line.
+- A payment cannot follow when there is no line in its currency. If the lines are removed while it follows, it goes back to the amount it had before.
+- The lock is not saved. A transaction saved with lines that add up to its payment opens with the lock open. One saved with lines that cover less (the rest went to the default category) opens with it closed, so opening it changes nothing. The change rows have no lock.
+
 ## In the list
 
 A transaction is one row, however many accounts paid. The amount is what the payments net to; across several currencies the row shows the total converted to the first currency, marked with an asterisk, with the exact amounts in a tooltip. The subtitle says "N categories" when there are several lines. Filtering by account shows every transaction that has a payment on it.

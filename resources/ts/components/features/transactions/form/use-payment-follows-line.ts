@@ -18,27 +18,22 @@ function isWhole(values: Partial<TransactionFormValues>, accounts?: Account[]): 
 }
 
 /**
- * With one payment and one line, the line is the whole transaction: editing the amount of either one updates the
- * other. Call it from the change handler of the amount that is edited, before the edit is stored: it sets the other
- * amount then, so both fields change in one render. (Doing it in a form subscription instead notifies the fields
- * from inside a notification, and the ones notified last are left with the old value.) A line that covers less than
- * its payment (a saved one) is left alone until the user makes them equal.
+ * With one payment and one line, the line is the whole transaction: editing the payment updates the line. (The other
+ * way, the payment follows the line by its lock, see `useUnlockedPayments`.) Call it from the change handler of the
+ * payment amount, before the edit is stored: it sets the line then, so both fields change in one render. (Doing it in
+ * a form subscription instead notifies the fields from inside a notification, and the ones notified last are left with
+ * the old value.) A line that covers less than its payment (a saved one) is left alone until the user makes them equal.
  */
 export function followAmount(
     form: Pick<UseFormReturn<TransactionFormValues>, 'getValues' | 'setValue'>,
     accounts: Account[] | undefined,
-    edited: 'line' | 'payment',
     value: unknown,
 ): void {
     const values = form.getValues()
     if (!isWhole(values, accounts) || !same(values.lines?.[0]?.amount, values.payments?.[0]?.amount)) {
         return
     }
-    if (edited === 'line') {
-        form.setValue('payments.0.amount', value as number)
-    } else {
-        form.setValue('lines.0.amount', value as number)
-    }
+    form.setValue('lines.0.amount', value as number)
 }
 
 /** When the form opens with an amount on one side only (an opener gave the payment's), the other side takes it. */

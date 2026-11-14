@@ -99,6 +99,7 @@
         "lineCurrency": "Pick a currency of the accounts used",
         "amountRequired": "Amount is required",
         "amountPositive": "Amount must be positive",
+        "amountFormula": "Can't calculate this formula",
         "amountGreaterThanZero": "Amount must be greater than 0",
         "insufficientFunds": "Insufficient funds",
         "cardLimit": "Enter a limit above zero",

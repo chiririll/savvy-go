@@ -1,4 +1,5 @@
 import type { Account, SpaceTransferInput, TransactionInput } from '@/types'
+import { accountOf } from './account-lookup'
 import { roundToCurrency } from './transaction-payload'
 
 /** The fee of a transfer: money the source pays on top of the amount, spent on an expense category. */
@@ -27,14 +28,12 @@ export type TransferError = 'unknownSpace' | 'unknownFrom' | 'unknownTo' | 'same
 export type TransferResult = { ok: true; input: TransactionInput } | { ok: false; error: TransferError }
 export type SpaceTransferResult = { ok: true; input: SpaceTransferInput } | { ok: false; error: TransferError }
 
-const accountById = (accounts: Account[], id: unknown): Account | undefined => accounts.find((a) => a.id === Number(id))
-
 const positive = (value: unknown): number => (Number(value) > 0 ? Number(value) : 0)
 
 /** What the destination receives, rounded to its currency: what was sent when both accounts share one. */
 export function transferReceived(values: TransferValues, accounts: Account[]): number {
-    const from = accountById(accounts, values.payments[0]?.account_id)
-    const to = accountById(accounts, values.to_account_id)
+    const from = accountOf(accounts, values.payments[0]?.account_id)
+    const to = accountOf(accounts, values.to_account_id)
     const sent = positive(values.payments[0]?.amount)
     if (from?.currency && to?.currency && from.currency.id === to.currency.id) {
         return roundToCurrency(sent, from.currency)
@@ -92,8 +91,8 @@ export function buildTransferInput(
     accounts: Account[],
     options?: TransferBuildOptions,
 ): TransferResult {
-    const from = accountById(accounts, values.payments[0]?.account_id)
-    const to = accountById(accounts, values.to_account_id)
+    const from = accountOf(accounts, values.payments[0]?.account_id)
+    const to = accountOf(accounts, values.to_account_id)
     if (!from?.currency) {
         return { ok: false, error: 'unknownFrom' }
     }
@@ -145,7 +144,7 @@ export function buildSpaceTransferInput(values: TransferValues, accounts: Accoun
     if (!(Number(values.to_space_id) > 0)) {
         return { ok: false, error: 'unknownSpace' }
     }
-    const from = accountById(accounts, values.payments[0]?.account_id)
+    const from = accountOf(accounts, values.payments[0]?.account_id)
     if (!from?.currency) {
         return { ok: false, error: 'unknownFrom' }
     }
