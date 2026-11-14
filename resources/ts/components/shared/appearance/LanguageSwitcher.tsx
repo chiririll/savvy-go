@@ -20,7 +20,7 @@ import {
     LOCALE_LABELS,
     SUPPORTED_LOCALES,
     toAppLocale,
-} from '@/lib/i18n'
+} from '@/lib/i18n/i18n'
 import { cn } from '@/lib/utils'
 
 interface LanguageSwitcherProps {

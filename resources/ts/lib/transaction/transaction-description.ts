@@ -1,10 +1,10 @@
-import i18n from '@/lib/i18n'
-import { localizeDefaultName } from '@/lib/localized-name'
-import { primaryCategory } from '@/lib/transaction-money'
+import i18n from '@/lib/i18n/i18n'
+import { localizeDefaultName } from '@/lib/format/localized-name'
+import { primaryCategory } from '@/lib/transaction/transaction-money'
 import { isServiceAccountType } from '@/types/accounts'
 import type { Account } from '@/types/accounts'
 import type { Transaction, TransactionStatus, TransactionType } from '@/types/transactions'
-import { transactionTypeLabel } from '@/lib/labels'
+import { transactionTypeLabel } from '@/lib/i18n/labels'
 
 const INCOMING_TYPES: TransactionType[] = ['income', 'debt_collection', 'debt_borrow', 'transfer_in']
 const OUTGOING_TYPES: TransactionType[] = ['expense', 'debt_payment', 'debt_lend', 'transfer_out']

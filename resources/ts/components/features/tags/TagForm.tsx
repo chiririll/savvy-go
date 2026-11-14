@@ -14,7 +14,7 @@ import {
     FormDescription,
 } from '@/components/ui/form'
 import { FormWrapper } from '@/components/shared/form/FormWrapper'
-import { localizeDefaultName, toStoredDefaultName } from '@/lib/localized-name'
+import { localizeDefaultName, toStoredDefaultName } from '@/lib/format/localized-name'
 import { tagSchema, TagFormData } from '@/schemas'
 
 interface TagFormProps {

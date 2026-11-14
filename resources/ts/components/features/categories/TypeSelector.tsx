@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { CATEGORY_TYPE_OPTIONS } from '@/constants/categories'
 import { CategoryType } from '@/types'
 import { SegmentedChoice } from '@/components/shared'
-import { categoryTypeLabel } from '@/lib/labels'
+import { categoryTypeLabel } from '@/lib/i18n/labels'
 
 interface TypeSelectorProps {
     value: CategoryType

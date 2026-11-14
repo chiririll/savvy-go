@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { frequencyLabel, weekdayLabel } from '@/lib/labels'
+import { frequencyLabel, weekdayLabel } from '@/lib/i18n/labels'
 import type { RecurringFormValues } from '@/schemas/recurring'
 
 type FormControlOf = Control<RecurringFormValues>

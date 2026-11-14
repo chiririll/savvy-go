@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { isAppLocale, LOCALE_LABELS, SUPPORTED_LOCALES, toAppLocale, type AppLocale } from '@/lib/i18n'
+import { isAppLocale, LOCALE_LABELS, SUPPORTED_LOCALES, toAppLocale, type AppLocale } from '@/lib/i18n/i18n'
 
 /** The language of the interface right now: what a language choice starts from. */
 export function useUiLocale(): AppLocale {

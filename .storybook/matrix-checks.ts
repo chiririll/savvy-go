@@ -1,6 +1,6 @@
 // Checks for the language and theme matrix (`npm run test:stories:full`, see docs/development.md). They run after every
 // story whose `locale` is not English or whose `theme` is not light, so a story never has to ask for them.
-import i18n from '@/lib/i18n'
+import i18n from '@/lib/i18n/i18n'
 
 const PROCESSOR = 'story-missing-translation'
 

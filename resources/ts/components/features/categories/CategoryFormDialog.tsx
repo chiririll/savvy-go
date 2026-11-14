@@ -3,7 +3,7 @@ import { EntityFormDialog } from '@/components/shared'
 import { CategoryFormData } from '@/schemas'
 import { Category, CategoryType } from '@/types'
 import { CategoryForm } from './CategoryForm'
-import { localizeDefaultName, toStoredDefaultName } from '@/lib/localized-name'
+import { localizeDefaultName, toStoredDefaultName } from '@/lib/format/localized-name'
 
 const FORM_ID = 'category-form'
 

@@ -1,7 +1,7 @@
 import { z } from 'zod'
-import i18n from '@/lib/i18n'
-import { isDateInFuture } from '@/lib/dates'
-import { isTransferType } from '@/lib/transaction-type'
+import i18n from '@/lib/i18n/i18n'
+import { isDateInFuture } from '@/lib/format/dates'
+import { isTransferType } from '@/lib/transaction/transaction-type'
 
 /** A payment of the form: the account and a positive amount; the type of the transaction gives it its sign. */
 export const paymentRowSchema = z.object({

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import type { ChartTheme } from '@/lib/chart-theme'
+import type { ChartTheme } from '@/lib/ui/chart-theme'
 import { axisCurrencyOf, balanceOption, dateLabeler, lastAmount, seriesKey, type LabeledSeries } from './balance-dynamics'
 
 const theme: ChartTheme = {

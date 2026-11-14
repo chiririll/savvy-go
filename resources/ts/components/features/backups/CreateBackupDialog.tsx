@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useResourceMutation } from '@/hooks/use-crud'
-import i18n from '@/lib/i18n'
+import i18n from '@/lib/i18n/i18n'
 import type { BackupSource } from './source'
 
 interface Props {

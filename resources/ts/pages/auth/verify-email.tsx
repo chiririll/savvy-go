@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { authApi } from '@/api'
 import { LanguageSwitcher } from '@/components/shared'
-import { isForbiddenError } from '@/lib/api-error'
+import { isForbiddenError } from '@/lib/api/api-error'
 import { useAuthStore } from '@/stores/auth'
 
 type State = 'working' | 'done' | 'invalid' | 'otherAccount'

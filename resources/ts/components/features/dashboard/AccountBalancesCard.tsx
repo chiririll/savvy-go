@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useCreateTransactionDialog } from '@/components/features/transactions'
 import { formatCurrency } from '@/lib/utils'
-import { accountTypeLabelLoose } from '@/lib/labels'
+import { accountTypeLabelLoose } from '@/lib/i18n/labels'
 import { ACCOUNT_TYPE_CONFIG } from '@/constants'
 import type { Account, AccountType } from '@/types'
 

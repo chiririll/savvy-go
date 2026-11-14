@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { useCreateTag, useTags } from '@/hooks'
-import { getApiErrorMessage } from '@/lib/api-error'
+import { getApiErrorMessage } from '@/lib/api/api-error'
 import { tagSchema } from '@/schemas/tags'
 
 interface NewTagControlProps {

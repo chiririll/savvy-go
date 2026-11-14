@@ -5,7 +5,7 @@ export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs))
 }
 
-export { formatBalanceShort, formatCurrency, formatCurrencyCompact } from '@/lib/currency'
-export { formatDateLocal, formatYearMonth, addDaysLocal, isDateInFuture } from '@/lib/dates'
+export { formatBalanceShort, formatCurrency, formatCurrencyCompact } from '@/lib/format/currency'
+export { formatDateLocal, formatYearMonth, addDaysLocal, isDateInFuture } from '@/lib/format/dates'
 export { toggleIdInArray } from '@/lib/ids'
-export { schemaResolver } from '@/lib/form-resolver'
+export { schemaResolver } from '@/lib/ui/form-resolver'

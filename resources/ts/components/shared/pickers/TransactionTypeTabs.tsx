@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { SPACE_TRANSFER_OPTION, TRANSACTION_TYPE_OPTIONS } from '@/constants'
 import { SegmentedChoice } from './SegmentedChoice'
-import { transactionTypeLabel } from '@/lib/labels'
+import { transactionTypeLabel } from '@/lib/i18n/labels'
 
 export type TransactionFormType = (typeof TRANSACTION_TYPE_OPTIONS)[number]['value']
 export type TransactionFormKind = TransactionFormType | typeof SPACE_TRANSFER_OPTION.value

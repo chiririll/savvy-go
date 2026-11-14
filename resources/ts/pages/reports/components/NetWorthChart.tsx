@@ -5,12 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useNetWorthHistory } from '@/hooks'
 import { formatCurrency, formatCurrencyCompact } from '@/lib/utils'
-import i18n from '@/lib/i18n'
+import i18n from '@/lib/i18n/i18n'
 import { defaultGroupBy } from '../types'
 import { formatReportPeriodLabel } from '../utils'
 import type { ReportFilters } from '../types'
 import { isNarrowChart, useElementWidth } from '@/hooks/use-element-width'
-import { CHART_COLORS, axisStyle, useChartTheme, verticalFade } from '@/lib/chart-theme'
+import { CHART_COLORS, axisStyle, useChartTheme, verticalFade } from '@/lib/ui/chart-theme'
 
 interface NetWorthChartProps {
     filters: ReportFilters

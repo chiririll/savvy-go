@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { oauthClientsApi, oauthHostsApi, oauthRegistrationApi, type OAuthRegistration } from '@/api/oauth'
-import i18n from '@/lib/i18n'
-import { getApiErrorMessage } from '@/lib/api-error'
+import i18n from '@/lib/i18n/i18n'
+import { getApiErrorMessage } from '@/lib/api/api-error'
 
 const QUERY_KEY = ['oauth-registration']
 

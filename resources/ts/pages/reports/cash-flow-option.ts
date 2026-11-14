@@ -1,6 +1,6 @@
 import type { CashFlowDataPoint, CashFlowGroupBy, CashFlowOverTimeData } from '@/api/reports'
-import { CHART_COLORS, axisStyle, legendTextStyle, verticalFade, withAlpha, type ChartTheme } from '@/lib/chart-theme'
-import i18n from '@/lib/i18n'
+import { CHART_COLORS, axisStyle, legendTextStyle, verticalFade, withAlpha, type ChartTheme } from '@/lib/ui/chart-theme'
+import i18n from '@/lib/i18n/i18n'
 import { formatCurrency, formatCurrencyCompact } from '@/lib/utils'
 
 import { formatReportPeriodLabel } from './utils'

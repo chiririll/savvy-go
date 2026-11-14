@@ -2,10 +2,10 @@ import { useTranslation } from 'react-i18next'
 import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { AmountInput } from '@/components/features/transactions/form/AmountInput'
-import { formatCurrency } from '@/lib/currency'
+import { formatCurrency } from '@/lib/format/currency'
 import { testId } from '@/lib/test-id'
 import { cn } from '@/lib/utils'
-import type { ReconcileRow } from '@/lib/reconciliation-rows'
+import type { ReconcileRow } from '@/lib/transaction/reconciliation-rows'
 import type { Account } from '@/types'
 
 interface ReconcileRowItemProps {

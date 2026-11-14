@@ -23,7 +23,7 @@ import {
     useSetOAuthRegistration,
 } from '@/hooks/use-oauth-registration'
 import type { CreatedOAuthClient, OAuthClient } from '@/api/oauth'
-import { intlLocale } from '@/lib/i18n'
+import { intlLocale } from '@/lib/i18n/i18n'
 
 /** One registered AI app, with what the server saw of its registration. */
 export function McpApp({ app }: { app: OAuthClient }) {

@@ -7,7 +7,7 @@ import {
 } from './transaction-description'
 
 // Echoes keys so the tests see which message was picked; SALARY is the only translated default name.
-vi.mock('@/lib/i18n', () => ({
+vi.mock('@/lib/i18n/i18n', () => ({
     default: {
         exists: (key: string) => key === 'categories.SALARY',
         t: (key: string, options?: { name?: string }) => (options?.name ? `${key}(${options.name})` : key),

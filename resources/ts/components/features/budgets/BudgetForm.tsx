@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { useForm } from 'react-hook-form'
-import { schemaResolver } from '@/lib/form-resolver'
+import { schemaResolver } from '@/lib/ui/form-resolver'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { budgetSchema, BudgetFormData } from '@/schemas'

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { spaceRoleLabel } from '@/lib/labels'
+import { spaceRoleLabel } from '@/lib/i18n/labels'
 import type { SpaceRole } from '@/types/spaces'
 
 interface Props {

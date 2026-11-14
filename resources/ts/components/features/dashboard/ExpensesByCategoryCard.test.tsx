@@ -10,7 +10,7 @@ vi.mock('react-i18next', async (importActual) => ({
 }))
 
 vi.mock('@/components/shared/charts/ReactECharts', () => ({ default: () => null }))
-vi.mock('@/lib/chart-theme', () => ({ useChartTheme: () => ({ tooltip: {}, surface: '#fff' }), legendTextStyle: () => ({}) }))
+vi.mock('@/lib/ui/chart-theme', () => ({ useChartTheme: () => ({ tooltip: {}, surface: '#fff' }), legendTextStyle: () => ({}) }))
 
 afterEach(cleanup)
 

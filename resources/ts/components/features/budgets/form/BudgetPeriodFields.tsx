@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { FieldHelp, FormInputField } from '@/components/shared'
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { budgetPeriodLabel } from '@/lib/labels'
+import { budgetPeriodLabel } from '@/lib/i18n/labels'
 import type { BudgetFormData } from '@/schemas'
 
 const PERIOD_OPTIONS = ['weekly', 'monthly', 'yearly', 'one_time'] as const

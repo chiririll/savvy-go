@@ -4,7 +4,7 @@ import { Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DialogPinned } from '@/components/shared/dialogs/DialogPinned'
-import { localizeDefaultName } from '@/lib/localized-name'
+import { localizeDefaultName } from '@/lib/format/localized-name'
 import type { DraftContent } from './draft'
 import { StepSection } from './StepSection'
 

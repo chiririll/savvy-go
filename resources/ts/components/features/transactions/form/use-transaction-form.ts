@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useForm } from 'react-hook-form'
-import { schemaResolver } from '@/lib/form-resolver'
+import { schemaResolver } from '@/lib/ui/form-resolver'
 import { useFormValuesChange } from '@/hooks'
 import { formatDateLocal } from '@/lib/utils'
 import { getTransactionSchema, TransactionFormValues } from '@/schemas/transactions'

@@ -11,7 +11,7 @@ import {
 import { useCreateTransactionDialog } from '@/components/features/transactions/form/CreateTransactionProvider'
 import { SPACE_TRANSFER_OPTION, TRANSACTION_TYPE_OPTIONS } from '@/constants'
 import { useTransferTargets } from '@/hooks'
-import { createMenuLabel } from '@/lib/labels'
+import { createMenuLabel } from '@/lib/i18n/labels'
 import { useReadOnly } from '@/components/providers/ReadOnlyProvider'
 
 export function CreateTransactionMenu() {

@@ -13,7 +13,7 @@ import {
     type ApiTokenPreset,
     type KindOptions,
 } from '@/types'
-import { apiPresetHint, apiPresetLabel } from '@/lib/labels'
+import { apiPresetHint, apiPresetLabel } from '@/lib/i18n/labels'
 import { PermissionGrid } from './PermissionGrid'
 
 type Tab = ApiTokenPreset | 'custom'

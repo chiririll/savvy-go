@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useAccounts, useDeleteTransfer, useResolveTransfer, useSpaceTransfers, useUpdateTransfer } from '@/hooks'
-import { transferReviewLabel } from '@/lib/labels'
+import { transferReviewLabel } from '@/lib/i18n/labels'
 import { Space, SpaceTransfer } from '@/types/spaces'
 import { sideAmount, sidesForSpace, transferNeedsDecision } from './transfer-review'
 

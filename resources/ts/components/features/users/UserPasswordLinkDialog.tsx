@@ -4,7 +4,7 @@ import { Check, Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ResponsiveDialog } from '@/components/shared/dialogs/ResponsiveDialog'
-import { formatDateTime } from '@/lib/format'
+import { formatDateTime } from '@/lib/format/format'
 
 interface UserPasswordLinkDialogProps {
     url: string | null

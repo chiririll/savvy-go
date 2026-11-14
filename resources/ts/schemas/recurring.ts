@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import i18n from '@/lib/i18n'
+import i18n from '@/lib/i18n/i18n'
 import { applyTransactionIssues, transactionObject } from './transactions'
 
 /**

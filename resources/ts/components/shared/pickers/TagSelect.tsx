@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge'
 import { FormDescription, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { useTags } from '@/hooks'
 import { cn } from '@/lib/utils'
-import { localizeDefaultName } from '@/lib/localized-name'
+import { localizeDefaultName } from '@/lib/format/localized-name'
 import { NewTagControl } from './NewTagControl'
 
 interface TagSelectProps {

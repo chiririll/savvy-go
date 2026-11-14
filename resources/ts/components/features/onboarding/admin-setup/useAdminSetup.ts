@@ -10,7 +10,7 @@ import { z } from 'zod'
 import { authApi, onboardingApi } from '@/api'
 import { pages } from '@/app/pages'
 import { isLaravelFile } from '@/components/features/backups/LaravelRestoreOptions'
-import { getApiErrorMessage } from '@/lib/api-error'
+import { getApiErrorMessage } from '@/lib/api/api-error'
 import { useAuthStore } from '@/stores/auth'
 import type { ApiError } from '@/types'
 

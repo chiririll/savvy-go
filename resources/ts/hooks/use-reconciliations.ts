@@ -2,9 +2,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { accountsApi, reconciliationsApi } from '@/api'
 import type { ReconciliationInput } from '@/types'
-import i18n from '@/lib/i18n'
-import { getApiErrorMessage } from '@/lib/api-error'
-import { numberToAmount } from '@/lib/decimal-amount'
+import i18n from '@/lib/i18n/i18n'
+import { getApiErrorMessage } from '@/lib/api/api-error'
+import { numberToAmount } from '@/lib/format/decimal-amount'
 
 const QUERY_KEY = ['reconciliations']
 

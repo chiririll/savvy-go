@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { OtpCodeInput } from '@/components/shared'
 import { useAuthStore } from '@/stores/auth'
-import { getApiErrorMessage } from '@/lib/api-error'
+import { getApiErrorMessage } from '@/lib/api/api-error'
 import { AuthCardShell } from './AuthCardShell'
 import { usePasskeyLogin } from './usePasskeyLogin'
 

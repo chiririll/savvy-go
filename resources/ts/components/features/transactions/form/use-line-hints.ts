@@ -1,6 +1,6 @@
 import type { UseFormReturn } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
-import { lineCoverage, linesToAdd, paymentCurrencies } from '@/lib/transaction-lines'
+import { lineCoverage, linesToAdd, paymentCurrencies } from '@/lib/transaction/transaction-lines'
 import { formatCurrency } from '@/lib/utils'
 import type { TransactionFormValues } from '@/schemas/transactions'
 import type { Account } from '@/types'

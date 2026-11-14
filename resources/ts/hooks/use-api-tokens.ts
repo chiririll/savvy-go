@@ -2,8 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { apiTokensApi } from '@/api'
 import type { CreateApiTokenInput, UpdateApiTokenInput } from '@/types'
-import i18n from '@/lib/i18n'
-import { getApiErrorMessage } from '@/lib/api-error'
+import i18n from '@/lib/i18n/i18n'
+import { getApiErrorMessage } from '@/lib/api/api-error'
 import { isConfirmCancelled, withConfirmation } from '@/stores/confirm'
 
 const QUERY_KEY = ['api-tokens']

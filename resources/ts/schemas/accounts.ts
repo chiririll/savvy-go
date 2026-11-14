@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import i18n from '@/lib/i18n'
+import i18n from '@/lib/i18n/i18n'
 import { CARD_GRACE_DAYS, CARD_STATEMENT_DAYS, FORM_ACCOUNT_TYPES } from '@/types/accounts'
 
 export const accountSchema = z.object({

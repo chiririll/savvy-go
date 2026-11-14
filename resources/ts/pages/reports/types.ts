@@ -1,6 +1,6 @@
 import type { CashFlowGroupBy } from '@/api/reports'
 import { pages, type Page } from '@/app/pages'
-import { formatDateLocal, formatYearMonth } from '@/lib/dates'
+import { formatDateLocal, formatYearMonth } from '@/lib/format/dates'
 
 export type PeriodType = 'last_30_days' | 'month' | 'quarter' | 'year' | 'ytd' | 'custom'
 export type CompareType = 'none' | 'previous_period' | 'same_period_last_year'

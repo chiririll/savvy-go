@@ -2,7 +2,7 @@ import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
 import { useFormValuesChange } from '@/hooks'
 import { useForm, type UseFormReturn } from 'react-hook-form'
-import { schemaResolver } from '@/lib/form-resolver'
+import { schemaResolver } from '@/lib/ui/form-resolver'
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from '@/components/ui/form'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { createUserSchema, updateUserSchema, CreateUserFormData, UpdateUserFormData } from '@/schemas/users'
@@ -15,7 +15,7 @@ import {
     FormWrapper,
     useUiLocale,
 } from '@/components/shared'
-import type { AppLocale } from '@/lib/i18n'
+import type { AppLocale } from '@/lib/i18n/i18n'
 
 interface UserFormProps {
     defaultValues?: Partial<CreateUserFormData> & Partial<UpdateUserFormData> & { id?: number }

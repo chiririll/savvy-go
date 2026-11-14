@@ -11,8 +11,8 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useIsMobile } from '@/hooks/use-mobile'
-import { displayTransactionDescription } from '@/lib/transaction-description'
-import { formModeOf } from '@/lib/transaction-details'
+import { displayTransactionDescription } from '@/lib/transaction/transaction-description'
+import { formModeOf } from '@/lib/transaction/transaction-details'
 import type { Transaction } from '@/types'
 import { TransactionDetailContent } from './TransactionDetailContent'
 

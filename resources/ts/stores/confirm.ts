@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { authApi } from '@/api'
-import { queryClient } from '@/lib/query-client'
+import { queryClient } from '@/lib/api/query-client'
 import { useAuthStore } from '@/stores/auth'
 import type { ApiError, ConfirmFields } from '@/types'
 

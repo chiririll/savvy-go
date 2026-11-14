@@ -1,9 +1,9 @@
 import { useTranslation } from 'react-i18next'
 import { Confirm } from '@/components/shared/dialogs/Confirm'
 import { useResourceMutation } from '@/hooks/use-crud'
-import i18n from '@/lib/i18n'
-import { formatDateTime } from '@/lib/format'
-import { backupStatusHelp } from '@/lib/labels'
+import i18n from '@/lib/i18n/i18n'
+import { formatDateTime } from '@/lib/format/format'
+import { backupStatusHelp } from '@/lib/i18n/labels'
 import type { Backup } from '@/types/backup'
 import type { BackupSource } from './source'
 

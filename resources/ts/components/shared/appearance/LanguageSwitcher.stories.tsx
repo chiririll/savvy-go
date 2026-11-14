@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, screen, userEvent, waitFor, within } from 'storybook/test'
 
-import i18n from '@/lib/i18n'
+import i18n from '@/lib/i18n/i18n'
 import { overlayA11y } from '@/test/a11y'
 
 import { LanguageSwitcher } from './LanguageSwitcher'

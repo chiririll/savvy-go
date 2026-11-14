@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { Condition, ConditionOperator } from '@/types/automation'
 import { CONDITION_FIELDS } from '@/types/automation'
-import { conditionFieldLabel, operatorLabel } from '@/lib/labels'
+import { conditionFieldLabel, operatorLabel } from '@/lib/i18n/labels'
 import { operatorsForField } from './condition-operators'
 import { ConditionValueInput } from './ConditionValueInput'
 

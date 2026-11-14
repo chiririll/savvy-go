@@ -1,6 +1,6 @@
 import type { Account, ReconciliationInput } from '@/types'
 import { isServiceAccountType } from '@/types'
-import { isAmount, numberToAmount, subtractAmounts } from './decimal-amount'
+import { isAmount, numberToAmount, subtractAmounts } from '@/lib/format/decimal-amount'
 
 /** One account of the reconcile dialog. Amounts are text, so nothing is rounded on the way. */
 export interface ReconcileRow {

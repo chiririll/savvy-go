@@ -1,4 +1,4 @@
-import i18n from '@/lib/i18n'
+import i18n from '@/lib/i18n/i18n'
 import type { ApiError } from '@/types'
 
 const I18N_NAMESPACES = ['common', 'forms', 'pages', 'auth', 'settings', 'nav'] as const

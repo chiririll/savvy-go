@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, fn, screen, userEvent, waitFor, within } from 'storybook/test'
 
-import { toFormValues } from '@/lib/transaction-form-values'
+import { toFormValues } from '@/lib/transaction/transaction-form-values'
 import { accounts, categories, currencies, line, payment, tags, transaction } from '@/test/fixtures'
 import { reply } from '@/test/api-mocks'
 import { overlayA11y } from '@/test/a11y'

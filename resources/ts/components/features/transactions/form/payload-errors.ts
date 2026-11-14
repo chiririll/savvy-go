@@ -1,6 +1,6 @@
 import type { TFunction } from 'i18next'
-import type { PayloadError } from '@/lib/transaction-payload'
-import type { TransferError } from '@/lib/transfer-payload'
+import type { PayloadError } from '@/lib/transaction/transaction-payload'
+import type { TransferError } from '@/lib/transaction/transfer-payload'
 
 /** What to tell the user about a payload the API would refuse, by the part of the form it belongs to. */
 export function payloadErrorMessage(t: TFunction, error: PayloadError): string {

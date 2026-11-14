@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { getApiErrorMessage } from '@/lib/api-error'
+import { getApiErrorMessage } from '@/lib/api/api-error'
 import { useMultipartUpload } from '@/hooks/use-upload'
 import { useExecuteImport, useParseImport, usePreviewImport } from '@/hooks/use-csv-import'
 import type {

@@ -5,9 +5,9 @@ import { Star, Trash2 } from 'lucide-react'
 import { FeedRow, RowActions, CategorySelect, ResponsiveDialog } from '@/components/shared'
 import { DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import { Button } from '@/components/ui/button'
-import { localizeDefaultName } from '@/lib/localized-name'
+import { localizeDefaultName } from '@/lib/format/localized-name'
 import { Category } from '@/types'
-import { categoryTypeLabel } from '@/lib/labels'
+import { categoryTypeLabel } from '@/lib/i18n/labels'
 
 interface CategoryRowProps {
     category: Category

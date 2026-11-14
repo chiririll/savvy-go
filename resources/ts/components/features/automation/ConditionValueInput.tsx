@@ -6,7 +6,7 @@ import type { Condition } from '@/types/automation'
 import { TRANSACTION_TYPES } from '@/constants'
 import { AccountSelect } from '@/components/shared/pickers/AccountSelect'
 import { CategorySelect, TagSelect } from '@/components/shared'
-import { transactionTypeLabel } from '@/lib/labels'
+import { transactionTypeLabel } from '@/lib/i18n/labels'
 
 interface ConditionValueInputProps {
     condition: Condition

@@ -1,5 +1,5 @@
 import { api } from './client'
-import { toQueryString, type QueryParamValue } from '@/lib/query-string'
+import { toQueryString, type QueryParamValue } from '@/lib/api/query-string'
 
 export function createCrudApi<T, TForm>(endpoint: string) {
     return {

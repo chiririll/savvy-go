@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/select'
 import { FormControl } from '@/components/ui/form'
 import { useCategories } from '@/hooks'
-import { localizeDefaultName } from '@/lib/localized-name'
+import { localizeDefaultName } from '@/lib/format/localized-name'
 import { testId } from '@/lib/test-id'
 
 interface CategorySelectProps {

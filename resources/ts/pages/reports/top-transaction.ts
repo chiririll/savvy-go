@@ -1,5 +1,5 @@
 import type { TFunction } from 'i18next'
-import { localizeDefaultName } from '@/lib/localized-name'
+import { localizeDefaultName } from '@/lib/format/localized-name'
 import type { TopTransactionItem } from '@/api/reports'
 
 type Item = Pick<TopTransactionItem, 'description' | 'category' | 'account' | 'category_count' | 'account_count'>

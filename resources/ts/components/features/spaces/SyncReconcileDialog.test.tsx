@@ -22,7 +22,7 @@ vi.mock('@/hooks', () => ({
     useApplySync: () => ({ mutate: state.apply, isPending: false }),
     useCategories: () => ({ data: categories }),
 }))
-vi.mock('@/lib/localized-name', () => ({
+vi.mock('@/lib/format/localized-name', () => ({
     localizeDefaultName: (name: string) => (name.startsWith('#') ? `Translated ${name.slice(1)}` : name),
 }))
 vi.mock('@/components/shared/dialogs/ResponsiveDialog', () => ({

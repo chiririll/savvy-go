@@ -1,4 +1,4 @@
-import { fromUnits, numberToAmount, toUnits } from '@/lib/decimal-amount'
+import { fromUnits, numberToAmount, toUnits } from '@/lib/format/decimal-amount'
 import type { ReconciliationDay } from '@/types'
 
 /** A day of the list: its transactions (none for a day that only has reconciliation points) and its points. */

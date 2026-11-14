@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { authApi } from '@/api'
-import { isForbiddenError } from '@/lib/api-error'
+import { isForbiddenError } from '@/lib/api/api-error'
 import type { PasswordTokenPreview } from '@/types/users'
 
 /**

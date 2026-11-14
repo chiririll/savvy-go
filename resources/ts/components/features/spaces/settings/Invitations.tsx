@@ -9,7 +9,7 @@ import { InvitationRow } from '@/components/features/spaces/InvitationRow'
 import { InviteForm } from '@/components/features/spaces/InviteForm'
 import { Button } from '@/components/ui/button'
 import { useRevokeInvitation, useSpaceInvitations } from '@/hooks'
-import { formatDateTime } from '@/lib/format'
+import { formatDateTime } from '@/lib/format/format'
 import { testId } from '@/lib/test-id'
 import { Space } from '@/types/spaces'
 

@@ -1,6 +1,6 @@
 import { useCallback, useRef } from 'react'
 import { useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
-import i18n from '@/lib/i18n'
+import i18n from '@/lib/i18n/i18n'
 import { adminSpacesApi, invitationsApi, spacesApi, syncGroupsApi } from '@/api/spaces'
 import { useUser } from '@/stores/auth'
 import { useCurrentSpaceId, useSpaceStore } from '@/stores/space'

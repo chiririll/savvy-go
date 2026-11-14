@@ -5,7 +5,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { FeedRow, FeedStatusBadge, RowActions } from '@/components/shared'
 import type { AutomationRule } from '@/types/automation'
-import { triggerLabel } from '@/lib/labels'
+import { triggerLabel } from '@/lib/i18n/labels'
 
 interface AutomationRuleRowProps {
     rule: AutomationRule

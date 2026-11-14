@@ -4,9 +4,9 @@ import { toast } from 'sonner'
 import { transactionsApi, type ConfirmTransactionOptions, type TransactionsResponse } from '@/api'
 import type { Transaction, TransactionFilters, TransactionInput } from '@/types'
 import { useResourceItem, useResourceMutation } from './use-crud'
-import i18n from '@/lib/i18n'
-import { getApiErrorMessage } from '@/lib/api-error'
-import { dayOrderForApi, placeInSlots } from '@/lib/transaction-order'
+import i18n from '@/lib/i18n/i18n'
+import { getApiErrorMessage } from '@/lib/api/api-error'
+import { dayOrderForApi, placeInSlots } from '@/lib/transaction/transaction-order'
 
 const QUERY_KEY = ['transactions']
 const TRANSACTION_INVALIDATE = [

@@ -4,7 +4,7 @@ import { ChevronRight, Loader2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { InfiniteScrollSentinel } from '@/components/shared'
 import { Skeleton } from '@/components/ui/skeleton'
-import { formatDateTime } from '@/lib/format'
+import { formatDateTime } from '@/lib/format/format'
 import type { SpaceAction, SpaceMember } from '@/types/spaces'
 import { actionSourceLabel, actionTitle, groupActions } from './actions'
 

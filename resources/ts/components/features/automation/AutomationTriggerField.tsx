@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { FieldHelp } from '@/components/shared'
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { triggerDescription, triggerLabel } from '@/lib/labels'
+import { triggerDescription, triggerLabel } from '@/lib/i18n/labels'
 import type { AutomationRuleFormData } from '@/schemas'
 
 interface AutomationTriggerFieldProps {

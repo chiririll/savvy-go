@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import { FeedRow, progressAmounts, RowActions } from '@/components/shared'
 import { useRelativeDay } from '@/hooks'
-import { isDateOverdue } from '@/lib/dates'
+import { isDateOverdue } from '@/lib/format/dates'
 import { cn } from '@/lib/utils'
 import { Debt } from '@/types'
 

@@ -11,7 +11,7 @@ import { ServerSsoStep } from '@/components/features/onboarding/ServerSsoStep'
 import { serverSetupPaths } from '@/components/features/onboarding/server-setup-paths'
 import { useInstanceSettings, useUpdateSettings } from '@/hooks'
 import { useAuthLoading, useAuthStore, useUser } from '@/stores/auth'
-import { getApiErrorMessage } from '@/lib/api-error'
+import { getApiErrorMessage } from '@/lib/api/api-error'
 import { pages } from '@/app/pages'
 
 // The new admin goes on to 2FA; that page sends anyone else home.

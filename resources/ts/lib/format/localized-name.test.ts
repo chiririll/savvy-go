@@ -5,7 +5,7 @@ import ru from '@/locales/ru/defaults.json'
 import { defaultNameKey, localizeDefaultName, toStoredDefaultName } from './localized-name'
 
 // Only SALARY and FOOD have a translation.
-vi.mock('@/lib/i18n', () => {
+vi.mock('@/lib/i18n/i18n', () => {
     const names: Record<string, string> = { 'categories.SALARY': 'Зарплата', 'categories.FOOD': 'Еда' }
     return {
         default: {

@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Confirm } from '@/components/shared/dialogs/Confirm'
 import { Logo } from '@/components/shared/appearance/Logo'
-import { apiResourceLabel } from '@/lib/labels'
+import { apiResourceLabel } from '@/lib/i18n/labels'
 import type { ApiResource } from '@/types'
 
 export function ConsentHeader({ title, description }: { title: string; description: string }) {

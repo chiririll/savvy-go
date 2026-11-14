@@ -3,7 +3,7 @@ import { categoriesApi } from '@/api'
 import { CategoryType } from '@/types'
 import { CategoryFormData } from '@/schemas'
 import { useResourceItem, useResourceMutation } from './use-crud'
-import i18n from '@/lib/i18n'
+import i18n from '@/lib/i18n/i18n'
 
 const QUERY_KEY = ['categories']
 

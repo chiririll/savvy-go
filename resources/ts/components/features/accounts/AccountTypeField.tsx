@@ -5,7 +5,7 @@ import { AccountFormValues } from '@/schemas'
 import { FORM_ACCOUNT_TYPE_CONFIG } from '@/constants'
 import { FORM_ACCOUNT_TYPES } from '@/types'
 import { cn } from '@/lib/utils'
-import { accountTypeLabel } from '@/lib/labels'
+import { accountTypeLabel } from '@/lib/i18n/labels'
 import { UseFormReturn } from 'react-hook-form'
 
 export function AccountTypeField({ form }: { form: UseFormReturn<AccountFormValues> }) {

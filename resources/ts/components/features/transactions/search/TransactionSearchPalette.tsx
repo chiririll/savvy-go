@@ -7,20 +7,20 @@ import { transactionsApi } from '@/api'
 import { CommandDialog } from '@/components/shared/dialogs/CommandDialog'
 import { transactionSearchHref, useTransactionListFilters } from '@/hooks/use-transaction-list-filters'
 import { cn } from '@/lib/utils'
-import { PREVIEW_FETCH, previewSplit } from '@/lib/palette-preview'
-import { highlightParts, noteSnippet, searchTerms } from '@/lib/search-highlight'
+import { PREVIEW_FETCH, previewSplit } from '@/lib/ui/palette-preview'
+import { highlightParts, noteSnippet, searchTerms } from '@/lib/ui/search-highlight'
 import { TransactionAmount } from '../list/TransactionAmount'
 import {
     displayTransactionDescription,
     transactionAmountAppearance,
     transactionSubtitle,
-} from '@/lib/transaction-description'
+} from '@/lib/transaction/transaction-description'
 import {
     parseTransactionSearch,
     serializeTransactionSearch,
     suggestSearchCompletions,
     type ParsedSearch,
-} from '@/lib/transaction-search'
+} from '@/lib/transaction/transaction-search'
 import type { Transaction, TransactionFilters } from '@/types'
 import { useSearchRefs } from './use-search-refs'
 

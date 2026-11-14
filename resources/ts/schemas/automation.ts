@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import i18n from '@/lib/i18n'
+import i18n from '@/lib/i18n/i18n'
 
 const conditionSchema = z.object({
     field: z.string().min(1, i18n.t('validation.fieldRequired')),

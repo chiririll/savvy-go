@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { useInvite } from '@/hooks/use-spaces'
 import type { ApiError } from '@/types'
-import type { AppLocale } from '@/lib/i18n'
+import type { AppLocale } from '@/lib/i18n/i18n'
 import type { SpaceRole } from '@/types/spaces'
 import { InviteFields } from './InviteFields'
 

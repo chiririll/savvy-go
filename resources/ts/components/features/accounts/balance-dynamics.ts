@@ -1,6 +1,6 @@
 import { formatCurrency, formatCurrencyCompact } from '@/lib/utils'
-import { isDimmed, tooltipRow } from '@/lib/chart-tooltip'
-import { axisStyle, verticalFade, type ChartTheme } from '@/lib/chart-theme'
+import { isDimmed, tooltipRow } from '@/lib/ui/chart-tooltip'
+import { axisStyle, verticalFade, type ChartTheme } from '@/lib/ui/chart-theme'
 import type { BalanceHistorySeries } from '@/api/accounts'
 
 export const TOTAL_COLOR = '#6366f1'

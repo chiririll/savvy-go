@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { formatBytes, formatDateTime } from './format'
 
 const app = vi.hoisted(() => ({ locale: 'en-US' }))
-vi.mock('@/lib/i18n', () => ({ intlLocale: () => app.locale }))
+vi.mock('@/lib/i18n/i18n', () => ({ intlLocale: () => app.locale }))
 
 describe('formatBytes', () => {
     it('handles zero and empty values', () => {

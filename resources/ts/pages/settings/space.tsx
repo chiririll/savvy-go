@@ -4,7 +4,7 @@ import { TransfersNeedingAttention } from '@/components/features/spaces/Transfer
 import { SyncGroupSection } from '@/components/features/spaces/SyncGroupSection'
 import { useCurrentSpace } from '@/hooks'
 import { SpaceBadge } from '@/components/features/spaces/SpaceBadge'
-import { spaceRoleLabel } from '@/lib/labels'
+import { spaceRoleLabel } from '@/lib/i18n/labels'
 import { General } from '@/components/features/spaces/settings/General'
 import { Members } from '@/components/features/spaces/settings/Members'
 import { Invitations } from '@/components/features/spaces/settings/Invitations'

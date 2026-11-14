@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { importApi } from '@/api/import'
 import { toast } from 'sonner'
-import i18n from '@/lib/i18n'
+import i18n from '@/lib/i18n/i18n'
 import type {
     ColumnMapping,
     ImportOptions,

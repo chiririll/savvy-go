@@ -12,7 +12,7 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useAuthStore } from '@/stores/auth'
-import { userRoleLabel } from '@/lib/labels'
+import { userRoleLabel } from '@/lib/i18n/labels'
 
 export function UserMenu() {
     const { t } = useTranslation()

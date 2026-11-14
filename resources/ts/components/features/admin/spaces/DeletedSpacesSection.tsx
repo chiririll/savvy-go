@@ -3,7 +3,7 @@ import { ArchiveRestore } from 'lucide-react'
 import { SettingsSection } from '@/components/shared'
 import { Button } from '@/components/ui/button'
 import { useDeletedSpaces, useRestoreDeletedSpace } from '@/hooks'
-import { formatBytes, formatDateTime } from '@/lib/format'
+import { formatBytes, formatDateTime } from '@/lib/format/format'
 
 export function DeletedSpacesSection() {
     const { t } = useTranslation('settings')

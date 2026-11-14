@@ -1,6 +1,6 @@
 import { authApi } from '@/api'
 import { useResourceMutation } from './use-crud'
-import i18n from '@/lib/i18n'
+import i18n from '@/lib/i18n/i18n'
 import { useAuthStore } from '@/stores/auth'
 
 export function useChangePassword() {

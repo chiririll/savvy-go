@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createUserColumns } from './columns'
 import type { User } from '@/types/users'
 
-vi.mock('@/lib/i18n', () => ({ default: { t: (key: string) => key }, intlLocale: () => 'en' }))
+vi.mock('@/lib/i18n/i18n', () => ({ default: { t: (key: string) => key }, intlLocale: () => 'en' }))
 vi.mock('@/components/shared', () => ({
     UserAvatar: () => null,
     RowActions: ({ children }: { children: ReactNode }) => <div>{children}</div>,

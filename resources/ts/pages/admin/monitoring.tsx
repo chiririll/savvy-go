@@ -10,7 +10,7 @@ import { Page, PageHeader } from '@/components/shared'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useResourceMonitoring, useStorageMonitoring } from '@/hooks'
-import { intlLocale } from '@/lib/i18n'
+import { intlLocale } from '@/lib/i18n/i18n'
 import { cn } from '@/lib/utils'
 
 function MonitoringSkeleton() {

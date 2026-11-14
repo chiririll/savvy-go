@@ -1,7 +1,7 @@
 import type { TFunction } from 'i18next'
-import i18n, { intlLocale } from '@/lib/i18n'
-import { localizeDefaultName } from '@/lib/localized-name'
-import { formatYearMonth, parseDateKey } from '@/lib/dates'
+import i18n, { intlLocale } from '@/lib/i18n/i18n'
+import { localizeDefaultName } from '@/lib/format/localized-name'
+import { formatYearMonth, parseDateKey } from '@/lib/format/dates'
 import type { CashFlowGroupBy } from '@/api/reports'
 
 const SAVINGS_NODE_IDS = new Set(['__savings__', 'Savings', 'messages.reports.savings'])

@@ -1,7 +1,7 @@
 import { useFieldArray, useFormContext, useWatch } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { formatCurrency } from '@/lib/utils'
-import { nextFreeAccount, paymentTotals } from '@/lib/transaction-payments'
+import { nextFreeAccount, paymentTotals } from '@/lib/transaction/transaction-payments'
 import type { TransactionFormValues } from '@/schemas/transactions'
 import type { Account } from '@/types'
 import type { BalancePreview } from './balance-preview'

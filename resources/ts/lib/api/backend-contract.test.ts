@@ -26,7 +26,7 @@ import {
 } from '@/types'
 import { USER_ROLES } from '@/types/users'
 import { canWriteSpace } from '@/lib/ability'
-import { SSO_ERROR_CODES } from '@/lib/labels'
+import { SSO_ERROR_CODES } from '@/lib/i18n/labels'
 import { SPACE_ROOTS } from '@/lib/space-path'
 import enSettings from '@/locales/en/settings.json'
 
@@ -36,7 +36,7 @@ import enSettings from '@/locales/en/settings.json'
  * these tests read the Go sources and migrations and fail when they drift.
  */
 
-const REPO = path.resolve(__dirname, '../../..')
+const REPO = path.resolve(__dirname, '../../../..')
 // Line endings normalised: a Windows checkout may have CRLF.
 const read = (file: string) => readFileSync(path.join(REPO, file), 'utf8').replace(/\r\n/g, '\n')
 const sorted = (values: Iterable<string>) => [...new Set(values)].sort()

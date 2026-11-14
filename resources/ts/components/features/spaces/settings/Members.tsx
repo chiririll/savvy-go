@@ -7,8 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useRemoveMember, useSetMemberRole, useSpaceMembers } from '@/hooks'
 import { useUser } from '@/stores/auth'
 import { Space, SpaceRole } from '@/types/spaces'
-import { spaceRoleLabel } from '@/lib/labels'
-import { formatDateTime } from '@/lib/format'
+import { spaceRoleLabel } from '@/lib/i18n/labels'
+import { formatDateTime } from '@/lib/format/format'
 
 const ROLES: SpaceRole[] = ['admin', 'editor', 'viewer']
 

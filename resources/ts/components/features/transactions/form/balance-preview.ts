@@ -1,9 +1,9 @@
 import { useMemo } from 'react'
 import { useWatch, type Control } from 'react-hook-form'
 import type { TransactionFormValues } from '@/schemas/transactions'
-import { collectNegativeBalanceWarnings, warningIfResultNegative } from '@/lib/negative-balance'
-import { paymentSign } from '@/lib/transaction-payload'
-import { isTransferType } from '@/lib/transaction-type'
+import { collectNegativeBalanceWarnings, warningIfResultNegative } from '@/lib/transaction/negative-balance'
+import { paymentSign } from '@/lib/transaction/transaction-payload'
+import { isTransferType } from '@/lib/transaction/transaction-type'
 import type { Account, Currency, Transaction } from '@/types'
 
 /** Money that moves on one account: signed, in the account's currency. */

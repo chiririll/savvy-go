@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { getUserAvatarUrl, getUserInitials } from '@/lib/avatar'
+import { getUserAvatarUrl, getUserInitials } from '@/lib/ui/avatar'
 
 interface UserAvatarProps {
     user: { email: string; name?: string }
