@@ -26,6 +26,8 @@ Server admins can see the public key, rotate it (old signatures stay valid) and 
 - **Space → Backups** (space admins): create, download and restore backups of the space, or import one as a new space. The number of kept backups is set by the server admin.
 - **Administration → System backups** (server admins): back up and restore the whole server, including the signing key.
 
+Backup files are named `<what>-<date>.savvy.zip`, with the date in UTC: `srv-20261114-153000.savvy.zip` for the server, `family-budget-20261114-153000.savvy.zip` for a space (the name is transliterated to Latin letters), `family-budget-deleted-….savvy.zip` for the final backup of a deleted space and `upload-….savvy.zip` for an uploaded file. The space name is only a hint; the backup itself knows which space it belongs to. Older backups keep their names.
+
 When restoring:
 
 - Backups not made by this server show as *not signed by this server*, but can still be restored.

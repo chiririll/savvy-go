@@ -247,12 +247,13 @@ func TestArchiveSizeLimit(t *testing.T) {
 
 func TestValidName(t *testing.T) {
 	for name, want := range map[string]bool{
-		"20260101-120000.zip": true,
-		"":                    false,
-		"../x.zip":            false,
-		"a/b.zip":             false,
-		".hidden.zip":         false,
-		"b.sqlite":            false,
+		"20260101-120000.zip":           true,
+		"srv-20260101-120000.savvy.zip": true,
+		"":                              false,
+		"../x.zip":                      false,
+		"a/b.zip":                       false,
+		".hidden.zip":                   false,
+		"b.sqlite":                      false,
 	} {
 		if got := validName(name); got != want {
 			t.Errorf("validName(%q) = %v", name, got)
@@ -269,5 +270,24 @@ func assertEmpty(t *testing.T, dir string) {
 	}
 	if len(entries) != 0 {
 		t.Fatalf("left behind: %v", entries)
+	}
+}
+
+func TestBaseName(t *testing.T) {
+	cases := []struct {
+		m    Manifest
+		want string
+	}{
+		{Manifest{Kind: kindServer}, "srv"},
+		{Manifest{Kind: kindSpace, SpaceName: "Family Budget"}, "family-budget"},
+		{Manifest{Kind: kindSpace, SpaceName: "  ../Café 2026!! "}, "cafe-2026"},
+		{Manifest{Kind: kindSpace, SpaceName: "Семейный бюджет"}, "semeinyi-biudzhet"},
+		{Manifest{Kind: kindSpace, SpaceName: "!!!"}, "space"},
+		{Manifest{Kind: kindSpace, SpaceName: "Home", Note: "deleted"}, "home-deleted"},
+	}
+	for _, c := range cases {
+		if got := baseName(c.m); got != c.want {
+			t.Errorf("baseName(%+v) = %q, want %q", c.m, got, c.want)
+		}
 	}
 }

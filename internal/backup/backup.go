@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/mozillazg/go-unidecode"
 	"os"
 	"path/filepath"
 	"sort"
@@ -24,7 +25,9 @@ import (
 // managed by that space's admins.
 
 const (
-	archiveExt = ".zip"
+	archiveExt = ".savvy.zip"
+	// zipExt is what a listed backup must end with, so older ".zip" names stay.
+	zipExt = ".zip"
 )
 
 // Entry is a backup file as listed.
@@ -75,9 +78,48 @@ func (s Service) spaceDir(id int64) string {
 }
 func (s Service) tmpDir() string { return filepath.Join(s.Dir, ".tmp") }
 func stamp(t time.Time) string   { return t.UTC().Format("20060102-150405") }
+
+// baseName is the readable start of a backup file name: srv for the server,
+// otherwise the transliterated space name (space when nothing usable is left),
+// plus -deleted for the final backup of a deleted space. Names stay ASCII and
+// safe for any file system.
+func baseName(m Manifest) string {
+	if m.Kind != kindSpace {
+		return "srv"
+	}
+	out := slugify(m.SpaceName)
+	if out == "" {
+		out = kindSpace
+	}
+	if m.Note == "deleted" {
+		out += "-deleted"
+	}
+	return out
+}
+
+func slugify(name string) string {
+	var b strings.Builder
+	dash := false
+	for _, r := range strings.ToLower(unidecode.Unidecode(name)) {
+		if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' {
+			if dash && b.Len() > 0 {
+				b.WriteByte('-')
+			}
+			dash = false
+			b.WriteRune(r)
+			if b.Len() >= 40 {
+				break
+			}
+			continue
+		}
+		dash = true
+	}
+	return b.String()
+}
+
 func validName(name string) bool {
 	return name != "" && filepath.Base(name) == name && !strings.HasPrefix(name, ".") &&
-		strings.HasSuffix(name, archiveExt)
+		strings.HasSuffix(name, zipExt)
 }
 
 // --- listing ---------------------------------------------------------------
@@ -253,9 +295,10 @@ func (s Service) write(dir string, m Manifest, files map[string]string) (*Entry,
 	}
 	now := time.Now().UTC()
 	m.Format, m.Store, m.AppVersion, m.CreatedAt = 1, "sqlite", s.AppVersion, now.Format(time.RFC3339)
-	name := stamp(now) + archiveExt
+	base := baseName(m) + "-" + stamp(now)
+	name := base + archiveExt
 	for i := 2; fileExists(filepath.Join(dir, name)); i++ {
-		name = stamp(now) + "-" + strconv.Itoa(i) + archiveExt
+		name = base + "-" + strconv.Itoa(i) + archiveExt
 	}
 	if err := writeArchive(filepath.Join(dir, name), m, files, s.Keys.Holder.Key()); err != nil {
 		return nil, err
@@ -300,9 +343,9 @@ func (s Service) ingest(dir, src string) (*Entry, error) {
 	if err := os.MkdirAll(dir, 0o775); err != nil {
 		return nil, err
 	}
-	name := stamp(time.Now()) + "-upload" + archiveExt
+	name := "upload-" + stamp(time.Now()) + archiveExt
 	for i := 2; fileExists(filepath.Join(dir, name)); i++ {
-		name = stamp(time.Now()) + "-upload-" + strconv.Itoa(i) + archiveExt
+		name = "upload-" + stamp(time.Now()) + "-" + strconv.Itoa(i) + archiveExt
 	}
 	if err := os.Rename(src, filepath.Join(dir, name)); err != nil {
 		return nil, err
