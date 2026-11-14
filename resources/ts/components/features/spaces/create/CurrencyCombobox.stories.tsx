@@ -75,7 +75,8 @@ export const SearchedByName: Story = {
         await expect(options).toHaveLength(1)
         await userEvent.click(options[0])
         await expect(args.onChange).toHaveBeenCalledWith('KWD')
-        await expect(within(canvasElement).getByRole('combobox')).toHaveTextContent('KWD Kuwaiti Dinar')
+        // The popover is still closing and hides the page from the accessibility tree, so wait for it.
+        await expect(await within(canvasElement).findByRole('combobox')).toHaveTextContent('KWD Kuwaiti Dinar')
     },
 }
 
