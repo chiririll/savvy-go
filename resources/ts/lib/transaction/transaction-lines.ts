@@ -1,4 +1,5 @@
 import type { Account, Currency } from '@/types'
+import { accountOf } from './account-lookup'
 import {
     baseValue,
     remainderAmount,
@@ -30,8 +31,6 @@ export function excessAmount(paid: MoneyRow[], lines: MoneyRow[], target: Curren
     const over = (baseValue(lines) - (baseValue(paid) - baseValue(change))) / rate
     return over > 0 ? roundToCurrency(over, target) : 0
 }
-
-const accountOf = (accounts: Account[], id: number): Account | undefined => accounts.find((a) => a.id === Number(id))
 
 /** The currencies of the payment and change accounts chosen so far, each once: what a line can be in. */
 export function paymentCurrencies(values: Pick<CoverageValues, 'payments' | 'change'>, accounts: Account[]): Currency[] {

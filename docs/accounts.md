@@ -17,7 +17,7 @@ A **reconciliation point** says what an account really held at the end of a day:
 **Reconcile** (left of **New account**, not shown to read-only members) on the Accounts page opens a dialog:
 
 1. Pick the **date** (today by default).
-2. Each account has a row with its computed balance on that date filled in. Type the real balance; the row shows the live difference to the expected one. **×** removes a row, **+ Add account** brings removed ones back.
+2. Each account has a row with its computed balance on that date filled in. Type the real balance; the row shows the live difference to the expected one. **×** removes a row, **+ Add account** brings removed ones back. The amount takes a [formula](transactions.md#the-transaction-form) too (`120+35.5`), worked out when you leave the field; one that does not work stays as typed, the field turns red and **Save** stays off until it is fixed.
 3. **Save** stores a point for every row left; **Cancel** closes it.
 
 ### The Reconciliations tab

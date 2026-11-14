@@ -3,6 +3,7 @@ import { TransactionFormValues } from '@/schemas/transactions'
 import { useTransferTargets } from '@/hooks'
 import { FormSubmitButton, FormWrapper } from '@/components/shared'
 import type { SpaceTransferInput, Transaction, TransactionInput } from '@/types'
+import { noEnterSubmit } from './no-enter-submit'
 import { TransactionFormBody } from './TransactionFormBody'
 import { useTransactionForm, type TransactionFormDefaults } from './use-transaction-form'
 import { useTransactionHandlers } from './use-transaction-handlers'
@@ -60,7 +61,7 @@ export function TransactionForm({
     return (
         <FormWrapper>
             <Form {...form}>
-                <form id={formId} noValidate onSubmit={handleSubmit} className="space-y-4">
+                <form id={formId} noValidate onKeyDown={noEnterSubmit} onSubmit={handleSubmit} className="space-y-4">
                     <TransactionFormBody
                         form={form}
                         model={model}

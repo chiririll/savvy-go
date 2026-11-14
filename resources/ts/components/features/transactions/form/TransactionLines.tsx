@@ -12,7 +12,6 @@ import type { TransactionFormValues } from '@/schemas/transactions'
 import type { Account, Currency } from '@/types'
 import { AmountInput } from './AmountInput'
 import { LineNoteField } from './LineNoteField'
-import { followAmount } from './use-payment-follows-line'
 import { testId } from '@/lib/test-id'
 
 interface TransactionLinesProps {
@@ -22,15 +21,13 @@ interface TransactionLinesProps {
     type: 'income' | 'expense'
     /** The currencies of the payment and change accounts: what a line can be in. */
     currencies: Currency[]
-    /** The accounts of the form: a line in the payment's currency follows the payment. */
-    accounts?: Account[]
     coverage: LineCoverage
     /** What the lines leave uncovered, as text, when it is not nothing. */
     uncovered?: string | null
 }
 
 /** The lines the user wrote: a category and an amount each, a note from two lines on, or from one that covers all of the payment. */
-export function TransactionLines({ control, fields, remove, type, currencies, accounts, coverage, uncovered }: TransactionLinesProps) {
+export function TransactionLines({ control, fields, remove, type, currencies, coverage, uncovered }: TransactionLinesProps) {
     const { t } = useTranslation(['common', 'forms'])
     const form = useFormContext<TransactionFormValues>()
     const { setValue } = form
@@ -102,12 +99,7 @@ export function TransactionLines({ control, fields, remove, type, currencies, ac
                                                         currency={currency}
                                                         hideCode={pickCurrency}
                                                         {...f}
-                                                        onChange={(value) => {
-                                                            if (index === 0) {
-                                                                followAmount(form, accounts, 'line', value)
-                                                            }
-                                                            f.onChange(value)
-                                                        }}
+                                                        onChange={f.onChange}
                                                     />
                                                 </FormControl>
                                             </div>

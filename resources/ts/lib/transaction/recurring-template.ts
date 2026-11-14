@@ -12,6 +12,7 @@ import type {
     Transaction,
     TransactionLine,
 } from '@/types'
+import { accountOf } from './account-lookup'
 import { canEditInForm, toFormValues } from './transaction-form-values'
 import {
     buildTransactionInput,
@@ -26,8 +27,6 @@ import { buildTransferInput, type TransferError } from './transfer-payload'
  * a string, so every amount is read as a number; no amount (`null`) is a payment the occurrence works out.
  */
 const amountOf = (value: unknown): number | null => (value === null || value === undefined || value === '' ? null : Number(value))
-
-const accountOf = (accounts: Account[], id: unknown): Account | undefined => accounts.find((a) => a.id === Number(id))
 
 /** Whether the amount is only a guess: marked as an estimate, or left for the rates of each day to decide. */
 export function isApproximateRule(template: RecurringTemplate): boolean {

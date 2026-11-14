@@ -7,6 +7,8 @@ import type { TransactionFormValues } from '@/schemas/transactions'
 import type { Account } from '@/types'
 import type { BalancePreview } from './balance-preview'
 import { AmountAccountRow, ROW_BUTTON, RowLabels } from './AmountAccountRow'
+import { AmountLock } from './AmountLock'
+import type { PaymentLock } from './use-unlocked-payments'
 import { BalanceShort, type BalanceMode } from './TransactionBalanceHint'
 import { testId } from '@/lib/test-id'
 
@@ -31,8 +33,8 @@ interface PaymentGridProps {
     removeLabel: string
     /** Small text at the end of the Amount label: the totals. */
     summary?: ReactNode
-    /** Called with the amount typed in the first row, before it is stored. */
-    onFirstAmountChange?: (value: unknown) => void
+    /** The lock of each row, or null while there is nothing to follow; the change has none. */
+    locks?: PaymentLock[] | null
 }
 
 /**
@@ -56,7 +58,7 @@ export function PaymentGrid({
     onRemove,
     removeLabel,
     summary,
-    onFirstAmountChange,
+    locks,
 }: PaymentGridProps) {
     const { t } = useTranslation('common')
 
@@ -97,7 +99,8 @@ export function PaymentGrid({
                         amountLabel={t('fields.amount')}
                         accountLabel={t('fields.account')}
                         account={account}
-                        onAmountChange={index === 0 ? onFirstAmountChange : undefined}
+                        amountEnd={locks?.[index] && <AmountLock lock={locks[index]} index={index} />}
+                        amountReadOnly={locks?.[index]?.follows}
                         excludeIds={usedAccountIds.filter((id) => id !== account?.id)}
                         action={
                             onRemove && (

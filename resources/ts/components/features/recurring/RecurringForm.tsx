@@ -11,6 +11,7 @@ import type { TransactionFormValues } from '@/schemas/transactions'
 import { useFormValuesChange } from '@/hooks'
 import type { RecurringInput } from '@/types'
 import { TransactionFormBody } from '@/components/features/transactions/form/TransactionFormBody'
+import { noEnterSubmit } from '@/components/features/transactions/form/no-enter-submit'
 import { useTransactionModel } from '@/components/features/transactions/form/use-transaction-model'
 import { useTypeChange } from '@/components/features/transactions/form/use-type-change'
 import { toRecurringDefaults, type RecurringFormDefaults } from './recurring-defaults'
@@ -63,7 +64,7 @@ export function RecurringForm({
     return (
         <FormWrapper>
             <Form {...form}>
-                <form id={formId} noValidate onSubmit={submit} className="space-y-4">
+                <form id={formId} noValidate onKeyDown={noEnterSubmit} onSubmit={submit} className="space-y-4">
                     {error && (
                         <Alert variant="destructive">
                             <CircleAlert />

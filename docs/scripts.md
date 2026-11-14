@@ -8,6 +8,23 @@ npm --prefix scripts install
 
 Root `npm run <name>` commands are aliases for `npm --prefix scripts run <name>`.
 
+## Docker or local
+
+`npm run screenshots` and `npm run stories` ([development](development.md#frontend-tests)) run in Docker by default, so you need nothing but Node and Docker. Pass `--local` to run on this machine, or `--docker` to say it outright:
+
+```bash
+npm run screenshots -- --local full
+npm run stories -- --local Foo.stories.tsx
+```
+
+The flag wins over `SAVVY_RUNNER=docker|local`, which wins over the default (docker). Every other argument passes through unchanged.
+
+Docker mode calls plain `docker`, so it uses your active context (`docker context use ...` or `DOCKER_HOST`) and never picks one itself. Nothing is bind-mounted: sources go up as the build context and results are copied back, so any daemon works, local or remote. Expect the repo upload on every run.
+
+`logos` and `screenshots:diff` run locally only.
+
+Tests of the scripts themselves (the flag, the run plans): `npm run test:scripts`. They are not part of `npm test` or CI, which install only the root packages.
+
 ## Logos
 
 ```bash
@@ -22,15 +39,16 @@ Regenerates every logo from the `Logo` component ([`Logo.tsx`](../resources/ts/c
 npm run screenshots              # defaults: English, light theme
 npm run screenshots -- full      # use configs/full.json
 npm run screenshots -- --concurrency=8   # browser contexts at a time
+npm run screenshots -- --local           # on this machine
 ```
 
-Screenshots every page for each demo user, space and viewport (desktop and mobile). Only Docker is needed.
+Screenshots every page for each demo user, space and viewport (desktop and mobile).
 
-[`docker-compose.screenshots.yml`](../docker-compose.screenshots.yml) builds the app, seeds demo data into an empty volume and runs Playwright against it. When the run ends (even on failure or Ctrl+C) containers and volume are removed, so every run starts fresh.
+In Docker (default), [`docker-compose.screenshots.yml`](../docker-compose.screenshots.yml) builds the app, seeds demo data into an empty volume and runs Playwright against it. Config files are passed as environment variables, and the result is copied back with `docker compose cp`. When the run ends (even on failure or Ctrl+C) containers and volume are removed, so every run starts fresh.
 
-The Docker daemon may be remote (`docker context use ...` or `DOCKER_HOST`): config files are passed as environment variables, the source goes up as the build context and the result is copied back with `docker compose cp`, so no host paths are mounted. Expect the repo upload on every run.
+With `--local` ([`local.mts`](../scripts/screenshots/local.mts)), the same happens on this machine in a temporary directory: the frontend is built with `APP_ENV=screenshots`, the app with `go build`, and the app is seeded on empty data on a free port. `public/build` and `dist/` are left alone, and the directory is removed afterwards. Needs Go and the browser of `scripts/`: `npm --prefix scripts ci && npx --prefix scripts playwright install chromium`.
 
-Pages and scenarios run at the same time and share the browser contexts (half each; all to whichever runs alone). The number is the CPU count of the Docker host unless `--concurrency=N` is given. Pages all hit one seeded app, so a very high number can slow it down instead of the run.
+Pages and scenarios run at the same time and share the browser contexts (half each; all to whichever runs alone). The number is the CPU count of the Docker host (or this machine with `--local`) unless `--concurrency=N` is given. Pages all hit one seeded app, so a very high number can slow it down instead of the run.
 
 Output goes to `screenshots/<start time>[_<config>]/` (git-ignored). Set `RUN_NAME` to name a run, e.g. `RUN_NAME=before-redesign`.
 
@@ -103,19 +121,14 @@ The script finds what to click by `data-testid` marks, added only in builds with
 
 Flows you cannot reach by opening a URL on the seeded app (such as first-run setup, which needs a server with no users) are driven by scenarios in [`scenarios/flows/`](../scripts/screenshots/scenarios/flows). They run after the pages in every run and double as tests: a failed assertion fails the run (`FAILED.png` and the app's log tail are saved).
 
-- **Own server.** Each scenario, per language, theme and viewport, starts the app binary on an empty data directory and free port, then discards it. The binary is `SAVVY_BIN`, else the Docker image's, else one from `go build` (which serves `public/build`, so run `APP_ENV=screenshots npm run build` first). Shots go to `scenarios/<name>/<language>-<theme>/<viewport>/NN-<shot>.png`.
+- **Own server.** Each scenario, per language, theme and viewport, starts the app binary on an empty data directory and free port, then discards it. The binary is `SAVVY_BIN`, else the Docker image's, else one from `go build`. A binary from `go build` serves `public/build` (or `SAVVY_WEB_DIR/public/build`; `--local` sets both), so run `APP_ENV=screenshots npm run build` first. Shots go to `scenarios/<name>/<language>-<theme>/<viewport>/NN-<shot>.png`.
 - **Detail.** `detail` sets how much is shot; steps and assertions always run. A shot declared `{ name: 'wrong-password', detail: true }` is taken only at `full`. The scenario axes can differ from the pages': for example pages in English only, onboarding in both languages and themes.
 - **Writing one.** `scenario({ name, covers, shots }, async ({ page, server, shot, run }) => { ... })`, with `expect` from `playwright/test`. Find elements by `testId` marks or `name`/`id` attributes, never by text, since scenarios run in every language. `shots` lists every shot in order; an unlisted or untaken shot fails the run.
 - **Composing.** `await run(otherScenario)` runs another scenario first on the same server and page. Its shots are not repeated (`{ shots: true }` repeats them). State what it leaves behind in `leaves`.
 - **Outside the browser.** `auth/oauth-app` connects an AI app over OAuth with the repo's `cmd/oauth-probe` (what `go tool mage probe:oauth` runs). `scenarios/probe.ts` starts it with `-no-browser`, reads the consent address and opens it in the page. The binary is `OAUTH_PROBE_BIN`, else the Docker image's, else one built with `go build` on first use.
 - **Every page has one.** `covers` lists the page paths (from `pages.ts`) the scenario visits. The run fails for a page no scenario covers unless [`pending.ts`](../scripts/screenshots/scenarios/pending.ts) lists it with a reason, or for a page in both. A new page needs its scenario; `pending.ts` should only shrink.
 
-Only scenarios, without Docker:
-
-```bash
-APP_ENV=screenshots npm run build
-cd scripts && CONFIG=scenarios npx tsx screenshots/run.ts   # configs/scenarios.json has "capture": false
-```
+Only scenarios: `npm run screenshots -- scenarios` (`configs/scenarios.json` has `"capture": false`), with `--local` to skip Docker.
 
 ### Good to know
 
@@ -124,4 +137,4 @@ cd scripts && CONFIG=scenarios npx tsx screenshots/run.ts   # configs/scenarios.
 - **Runs on different days differ**: on-screen dates follow the current day, and exchange rates are fetched live.
 - **Animations** are off, so shots are still frames.
 - **Playwright version**: the Docker image tag must match the `playwright` package version, or the build fails.
-- **Linux**: output files belong to root.
+- **Linux**: output files of a Docker run belong to root.

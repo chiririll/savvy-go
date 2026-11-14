@@ -53,6 +53,16 @@ export default defineConfig(({ mode }) => {
                         include: ['resources/ts/**/*.test.{ts,tsx}'],
                     },
                 },
+                // The dev scripts (mode flag, run plans): `npm run test:scripts`. Not in `npm test` or CI, which
+                // install only the root packages; scripts/ has its own (docs/scripts.md).
+                {
+                    extends: true,
+                    test: {
+                        name: 'scripts',
+                        environment: 'node',
+                        include: ['scripts/**/*.test.mts'],
+                    },
+                },
             ],
         },
         server: {

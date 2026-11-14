@@ -129,7 +129,6 @@ export function TransactionFormBody({
                     remove={lines.remove}
                     type={transactionType === 'income' ? 'income' : 'expense'}
                     currencies={lineCurrencies}
-                    accounts={accounts}
                     coverage={coverage}
                     uncovered={uncovered}
                 />

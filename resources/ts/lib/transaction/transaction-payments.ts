@@ -1,4 +1,5 @@
 import type { Account, Currency } from '@/types'
+import { accountOf } from './account-lookup'
 import {
     findDuplicateAccount,
     netSignHolds,
@@ -18,9 +19,6 @@ export interface PaymentRowsValues {
     payments: Row[]
     change?: Row[]
 }
-
-const accountOf = (accounts: Account[], id: unknown): Account | undefined =>
-    accounts.find((a) => a.id === Number(id))
 
 const positive = (amount: unknown): number => {
     const value = Number(amount)

@@ -59,6 +59,10 @@ interface AmountAccountRowProps {
     balance?: ReactNode
     /** Called with the amount typed, before it is stored. */
     onAmountChange?: (value: unknown) => void
+    /** At the end of the amount, inside the field: the lock. */
+    amountEnd?: ReactNode
+    /** The amount is computed, not typed. */
+    amountReadOnly?: boolean
 }
 
 /**
@@ -82,6 +86,8 @@ export function AmountAccountRow({
     parseAmount,
     balance,
     onAmountChange,
+    amountEnd,
+    amountReadOnly,
 }: AmountAccountRowProps) {
     const fixed = fixedAmount !== undefined
 
@@ -103,6 +109,8 @@ export function AmountAccountRow({
                                         aria-label={amountLabel}
                                         currency={account?.currency}
                                         placeholder={amountPlaceholder}
+                                        end={amountEnd}
+                                        readOnly={amountReadOnly}
                                         name={field.name}
                                         ref={field.ref}
                                         onBlur={field.onBlur}
