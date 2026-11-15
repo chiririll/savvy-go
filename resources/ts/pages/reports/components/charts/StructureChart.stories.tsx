@@ -157,3 +157,25 @@ export const FailedToLoad: Story = {
         await expect(await within(canvasElement).findByText('Expenses structure')).toBeVisible()
     },
 }
+
+const grouped: TransactionsByCategoryData = {
+    items: [
+        { id: 2, parentId: 1, name: 'Rent', icon: '🏠', color: '#f97316', value: 900, percentage: 62 },
+        { id: 3, parentId: 1, name: 'Utilities', icon: '💡', color: '#8b5cf6', value: 100, percentage: 7 },
+        { id: 4, name: 'Groceries', icon: '🛒', color: '#16a34a', value: 450.25, percentage: 31 },
+    ],
+    parents: [{ id: 1, name: 'Home', icon: '🏠', color: '#2563eb' }],
+    total: 1450.25,
+    currency: 'USD',
+}
+
+// Subcategories fold into their parent: the donut shows one slice per parent, total in the middle.
+export const Subcategories: Story = {
+    beforeEach: ({ msw }) => msw.use(reply('get', '/reports/transactions/by-category', grouped)),
+    play: async ({ canvasElement }) => {
+        await expectChartDrawn(canvasElement)
+        await waitFor(() => expect(chartText(canvasElement)).toContain('Home'))
+        await expect(chartText(canvasElement)).toContain('1,450.25 $')
+        await expect(chartText(canvasElement)).not.toContain('Rent')
+    },
+}

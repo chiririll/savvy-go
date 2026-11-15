@@ -54,11 +54,16 @@ export interface ExpensePaceData {
 
 export interface CategoryExpense {
     id: number
+    /** On a child: its top-level parent. */
+    parentId?: number
     name: string
     icon: string
     color: string
+    /** On a parent: its whole group, subcategories included. */
     current: number
     previous: number
+    /** A parent's parts, largest first; its own lines are the entry with the parent's id. */
+    children?: CategoryExpense[]
 }
 
 export interface ExpensesByCategoryData {
@@ -111,6 +116,8 @@ export interface TransactionSummaryData {
 
 export interface TransactionCategoryItem {
     id: number
+    /** 0 or absent for a top-level category. */
+    parentId?: number
     name: string
     icon: string
     color: string
@@ -118,8 +125,17 @@ export interface TransactionCategoryItem {
     percentage: number
 }
 
+/** A parent the items point to; it may have no lines of its own. */
+export interface TransactionCategoryParent {
+    id: number
+    name: string
+    icon: string
+    color: string
+}
+
 export interface TransactionsByCategoryData {
     items: TransactionCategoryItem[]
+    parents?: TransactionCategoryParent[]
     total: number
     currency: string | null
 }

@@ -324,3 +324,32 @@ func withTags(in ledger.TxInput, ids ...int64) ledger.TxInput {
 	in.TagIDs = ids
 	return in
 }
+
+// A child keeps its own lines; the report names the parent so a chart can
+// group the two, even though the parent itself has no lines.
+func TestTxCategoryPointsChildrenAtTheirParent(t *testing.T) {
+	e := newSeriesEnv(t)
+	group, err := (ledger.Categories{DB: e.db}).Create(e.ctx, ledger.Category{Name: "Leisure", Type: "expense", Color: ptrTo("#123456")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	kid, err := (ledger.Categories{DB: e.db}).Create(e.ctx, ledger.Category{Name: "Cinema", Type: "expense", ParentID: &group.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.add(t, "expense", e.usdAcc.ID, &kid.ID, "40", "2024-01-14")
+	e.add(t, "expense", e.usdAcc.ID, &e.food.ID, "60", "2024-01-14")
+
+	got := (Service{DB: e.db}).TxByCategory(e.ctx, janRange, "expense")
+	parents := map[string]int64{}
+	for _, c := range got.Items {
+		parents[c.Name] = c.ParentID
+	}
+	if parents["Cinema"] != group.ID || parents["Food"] != 0 || len(got.Items) != 2 {
+		t.Fatalf("items %+v", got.Items)
+	}
+	if len(got.Parents) != 1 || got.Parents[0].ID != group.ID || got.Parents[0].Color != "#123456" {
+		t.Fatalf("parents %+v", got.Parents)
+	}
+	wantMoney(t, "total", got.Total, usd(e.moneyEnv, "100"))
+}

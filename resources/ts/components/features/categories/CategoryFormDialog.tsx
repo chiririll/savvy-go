@@ -3,6 +3,7 @@ import { EntityFormDialog } from '@/components/shared'
 import { CategoryFormData } from '@/schemas'
 import { Category, CategoryType } from '@/types'
 import { CategoryForm } from './CategoryForm'
+import { useCategories } from '@/hooks'
 import { localizeDefaultName, toStoredDefaultName } from '@/lib/format/localized-name'
 
 const FORM_ID = 'category-form'
@@ -25,6 +26,12 @@ export function CategoryFormDialog({
     defaultType,
 }: CategoryFormDialogProps) {
     const { t } = useTranslation('pages')
+    const { data: all } = useCategories()
+    // Groups go one level deep: only a top-level category without children can be put under another.
+    const hasChildren = category ? (all ?? []).some((c) => c.parentId === category.id) : false
+    const parentOptions = hasChildren
+        ? []
+        : (all ?? []).filter((c) => c.parentId == null && c.id !== category?.id)
 
     return (
         <EntityFormDialog<Category, CategoryFormData, CategoryFormData>
@@ -45,10 +52,11 @@ export function CategoryFormDialog({
                 type: item.type,
                 icon: item.icon ?? undefined,
                 color: item.color ?? undefined,
+                parentId: item.parentId,
             })}
         >
             {({ formKey, formProps }) => (
-                <CategoryForm key={formKey} {...formProps} isDefault={category?.isDefault} />
+                <CategoryForm key={formKey} {...formProps} isDefault={category?.isDefault} parentOptions={parentOptions} />
             )}
         </EntityFormDialog>
     )

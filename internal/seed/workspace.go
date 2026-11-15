@@ -35,6 +35,8 @@ type seeder struct {
 	queue []queuedTx
 	// catNames is the name of each expense category, by id.
 	catNames map[int64]string
+	// children are the subcategories of each category, by the parent's id.
+	children map[int64][]ledger.Category
 }
 
 type expenseCand struct {

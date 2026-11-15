@@ -79,7 +79,7 @@ func (r Repo) BudgetCategories(ctx context.Context, id int64) ([]Category, error
 	}
 	out := make([]Category, len(rows))
 	for i, x := range rows {
-		out[i] = categoryOf(x.ID, x.Name, x.Type, x.Icon, x.Color, x.IsDefault, x.TransactionsCount)
+		out[i] = categoryOf(x.ID, x.Name, x.Type, x.Icon, x.Color, x.IsDefault, db.NInt{}, x.TransactionsCount)
 	}
 	return out, nil
 }

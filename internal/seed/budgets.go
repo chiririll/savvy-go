@@ -24,9 +24,16 @@ func (s *seeder) createBudgets(usd *ledger.Currency, expenses []ledger.Category,
 			continue
 		}
 		notify := b.notify
+		// A budget does not yet cover subcategories by itself, so it lists them.
+		ids := []int64{cat.ID}
+		for _, c := range expenses {
+			if c.ParentID != nil && *c.ParentID == cat.ID {
+				ids = append(ids, c.ID)
+			}
+		}
 		if _, err := s.budgets.Create(s.ctx, ledger.BudgetInput{
 			Name: b.name, Amount: decimal.NewFromFloat(b.amount), CurrencyID: &usd.ID, Period: "monthly",
-			StartDate: &start, NotifyAtPercent: &notify, CategoryIDs: []int64{cat.ID},
+			StartDate: &start, NotifyAtPercent: &notify, CategoryIDs: ids,
 		}); err != nil {
 			return err
 		}

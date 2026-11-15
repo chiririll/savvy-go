@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
     Form,
     FormField,
@@ -19,6 +20,7 @@ import { defaultNameHint, defaultNameKey, localizeDefaultName, toStoredDefaultNa
 import { TypeSelector } from './TypeSelector'
 import { IconPicker } from './IconPicker'
 import { ColorPicker } from './ColorPicker'
+import { CategorySelect } from '@/components/shared/pickers/CategorySelect'
 import { CategoryPreview } from './CategoryPreview'
 import { FormWrapper } from '@/components/shared/form/FormWrapper'
 
@@ -31,6 +33,8 @@ interface CategoryFormProps {
     formId?: string
     hideSubmit?: boolean
     isDefault?: boolean
+    /** Top-level categories the category may go under; empty hides the field. */
+    parentOptions?: { id: number; name: string; type: string }[]
 }
 
 export function CategoryForm({
@@ -42,6 +46,7 @@ export function CategoryForm({
     formId,
     hideSubmit,
     isDefault,
+    parentOptions = [],
 }: CategoryFormProps) {
     const { t } = useTranslation(['common', 'forms'])
     const form = useForm<CategoryFormData>({
@@ -109,6 +114,30 @@ export function CategoryForm({
                         </FormItem>
                     )}
                 />
+
+                {parentOptions.some((p) => p.type === watchedValues.type) && (
+                    <FormField
+                        control={form.control}
+                        name="parentId"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>{t('forms:categories.parent')}</FormLabel>
+                                <CategorySelect
+                                    plain={false}
+                                    type={watchedValues.type}
+                                    onlyIds={parentOptions.map((p) => p.id)}
+                                    value={field.value}
+                                    onChange={field.onChange}
+                                    noneLabel={t('forms:categories.noParent')}
+                                    onClear={() => field.onChange(null)}
+                                    sortByPopularity={false}
+                                />
+                                <FormDescription>{t('forms:categories.parentHelp')}</FormDescription>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                )}
 
                 <FormField
                     control={form.control}

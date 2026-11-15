@@ -15,6 +15,8 @@ export const categorySchema = z.object({
 
     color: z.string()
         .regex(/^#[0-9A-Fa-f]{6}$/, i18n.t('validation.invalidColor')),
+
+    parentId: z.number().nullable().optional(),
 })
 
 export type CategoryFormData = z.infer<typeof categorySchema>

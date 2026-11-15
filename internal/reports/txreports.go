@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"savvy-go/internal/db/filter"
+	"savvy-go/internal/ledger"
 	"savvy-go/internal/money"
 )
 
@@ -47,11 +48,11 @@ func (s Service) TxByCategory(ctx context.Context, f Filter, typ string) TxByCat
 			pct = percent(c.Total, total)
 		}
 		items = append(items, CategoryShare{
-			ID: c.ID, Name: c.Name, Icon: c.Icon, Color: c.Color,
+			ID: c.ID, ParentID: c.ParentID, Name: c.Name, Icon: c.Icon, Color: c.Color,
 			Value: c.Total, Percentage: pct,
 		})
 	}
-	return TxByCategoryReport{Items: items, Total: total, Currency: q.code()}
+	return TxByCategoryReport{Items: items, Parents: s.parentsOf(ctx, items), Total: total, Currency: q.code()}
 }
 
 func (s Service) TxDynamics(ctx context.Context, f Filter, typ, groupBy string) TxDynamicsReport {
@@ -102,4 +103,46 @@ func (s Service) TxTop(ctx context.Context, f Filter, typ string, limit int) TxT
 		})
 	}
 	return TxTopReport{Items: items, Currency: q.code()}
+}
+
+// parentsOf names the parents the items point to, in the order they first appear.
+func (s Service) parentsOf(ctx context.Context, items []CategoryShare) []CategoryRef {
+	out := []CategoryRef{}
+	need := map[int64]bool{}
+	for _, it := range items {
+		if it.ParentID != 0 {
+			need[it.ParentID] = true
+		}
+	}
+	if len(need) == 0 {
+		return out
+	}
+	all, err := (ledger.Categories{DB: s.DB}).All(ctx, "")
+	if err != nil {
+		return out
+	}
+	byID := map[int64]ledger.Category{}
+	for _, c := range all {
+		byID[c.ID] = c
+	}
+	for _, it := range items {
+		c, ok := byID[it.ParentID]
+		if !ok || !need[it.ParentID] {
+			continue
+		}
+		need[it.ParentID] = false
+		out = append(out, CategoryRef{
+			ID: c.ID, Name: c.Name,
+			Icon:  coalesce(strOr(c.Icon), "circle"),
+			Color: coalesce(strOr(c.Color), "#64748b"),
+		})
+	}
+	return out
+}
+
+func strOr(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
 }

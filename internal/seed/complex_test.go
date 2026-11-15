@@ -17,6 +17,13 @@ import (
 // of the space called name.
 func demoTransactions(t *testing.T, name string) []ledger.Transaction {
 	t.Helper()
+	all, _ := demoSpace(t, name)
+	return all
+}
+
+// demoSpace seeds the demo and returns the transactions and categories of a space.
+func demoSpace(t *testing.T, name string) ([]ledger.Transaction, []ledger.Category) {
+	t.Helper()
 	ctx := context.Background()
 	st := sqlitetest.Open(t)
 	key, err := signing.Generate(t.TempDir())
@@ -40,10 +47,14 @@ func demoTransactions(t *testing.T, name string) []ledger.Transaction {
 		if err != nil {
 			t.Fatal(err)
 		}
-		return all
+		cats, err := (ledger.Categories{DB: db}).All(ctx, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return all, cats
 	}
 	t.Fatalf("no space %q", name)
-	return nil
+	return nil, nil
 }
 
 func categoriesOf(tx ledger.Transaction) int {
@@ -173,5 +184,29 @@ func TestSmallSpacesUseLinesAndPayments(t *testing.T) {
 	}
 	if multiLine == 0 || multiPay == 0 {
 		t.Errorf("Studio GmbH: %d with several lines, %d paid in two currencies", multiLine, multiPay)
+	}
+}
+
+func TestDemoSpendsInSubcategories(t *testing.T) {
+	all, list := demoSpace(t, "Demo")
+	cats := map[int64]ledger.Category{}
+	for _, c := range list {
+		cats[c.ID] = c
+	}
+	used := map[string]int{}
+	for _, tx := range all {
+		for _, l := range tx.Lines {
+			if l.CategoryID == nil {
+				continue
+			}
+			if c := cats[*l.CategoryID]; c.ParentID != nil {
+				used[cats[*c.ParentID].Name+" > "+c.Name]++
+			}
+		}
+	}
+	for _, want := range []string{"#GROCERIES > Supermarket", "#EATING_OUT > Restaurants", "#TRANSPORT > Fuel"} {
+		if used[want] == 0 {
+			t.Errorf("no transactions in %s; used: %v", want, used)
+		}
 	}
 }

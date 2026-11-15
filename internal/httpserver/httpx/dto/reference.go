@@ -47,13 +47,14 @@ type Category struct {
 	Icon              *string      `json:"icon"`
 	Color             *string      `json:"color"`
 	IsDefault         bool         `json:"isDefault"`
+	ParentID          *int64       `json:"parentId"`
 	TransactionsCount int          `json:"transactionsCount"`
 	TotalAmount       *money.Money `json:"totalAmount"`
 }
 
 func NewCategory(c ledger.Category) Category {
 	return Category{
-		ID: c.ID, Name: c.Name, Type: c.Type, Icon: c.Icon, Color: c.Color, IsDefault: c.IsDefault,
+		ID: c.ID, Name: c.Name, Type: c.Type, Icon: c.Icon, Color: c.Color, IsDefault: c.IsDefault, ParentID: c.ParentID,
 		TransactionsCount: c.TransactionsCount, TotalAmount: c.TotalAmount,
 	}
 }

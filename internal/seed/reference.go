@@ -64,7 +64,9 @@ func seedCurrencies(ctx context.Context, curs ledger.Currencies, list []ledger.C
 // ownReference is what a space has besides the presets, or instead of them when
 // replacesPresets is set.
 type ownReference struct {
-	categories      []Category
+	categories []Category
+	// subcategories go under a category of the space, preset or own, by its name.
+	subcategories   []Subcategory
 	tags            []string
 	replacesPresets bool
 }
@@ -73,8 +75,49 @@ func seedOwn(ctx context.Context, db store.DB, own ownReference) error {
 	if err := createCategories(ctx, ledger.Categories{DB: db}, own.categories); err != nil {
 		return fmt.Errorf("categories: %w", err)
 	}
+	if err := createSubcategories(ctx, ledger.Categories{DB: db}, own.subcategories); err != nil {
+		return fmt.Errorf("subcategories: %w", err)
+	}
 	if err := createTags(ctx, ledger.Tags{DB: db}, own.tags); err != nil {
 		return fmt.Errorf("tags: %w", err)
+	}
+	return nil
+}
+
+// Subcategory is a category grouped under Parent, which is a category of the
+// same type named as it is stored (a #TOKEN for a preset).
+type Subcategory struct {
+	Parent, Name, Type, Icon, Color string
+}
+
+func createSubcategories(ctx context.Context, cats ledger.Categories, list []Subcategory) error {
+	if len(list) == 0 {
+		return nil
+	}
+	all, err := cats.All(ctx, "")
+	if err != nil {
+		return err
+	}
+	for _, c := range list {
+		parent := catByNameAndType(all, c.Parent, c.Type)
+		if parent == nil {
+			return fmt.Errorf("no parent %q for %q", c.Parent, c.Name)
+		}
+		icon, color := c.Icon, c.Color
+		if _, err := cats.Create(ctx, ledger.Category{
+			Name: c.Name, Type: c.Type, Icon: &icon, Color: &color, ParentID: &parent.ID,
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func catByNameAndType(cats []ledger.Category, name, typ string) *ledger.Category {
+	for i := range cats {
+		if cats[i].Name == name && cats[i].Type == typ {
+			return &cats[i]
+		}
 	}
 	return nil
 }
@@ -125,6 +168,12 @@ var studioReference = ownReference{
 		{"Retainers", "income", "🔁", "#34d399", false},
 		{"Licensing", "income", "📜", "#a3e635", false},
 		{"Other revenue", "income", "💰", "#94a3b8", true},
+	},
+	subcategories: []Subcategory{
+		{"Software & tools", "SaaS subscriptions", "expense", "☁️", "#6366f1"},
+		{"Software & tools", "Licenses", "expense", "🔑", "#a5b4fc"},
+		{"Events & travel", "Trains & flights", "expense", "🚄", "#0ea5e9"},
+		{"Events & travel", "Hotels", "expense", "🏨", "#7dd3fc"},
 	},
 	tags: []string{"Client work", "Billable", "Overhead", "Reimbursable", "Q4 deadline"},
 }

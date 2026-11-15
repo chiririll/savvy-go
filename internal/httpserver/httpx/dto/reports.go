@@ -117,11 +117,21 @@ func NewExpensePace(r reports.ExpensePaceReport) ExpensePace {
 
 type CategoryExpense struct {
 	ID       int64       `json:"id"`
+	ParentID int64       `json:"parentId,omitempty"`
 	Name     string      `json:"name"`
 	Icon     string      `json:"icon"`
 	Color    string      `json:"color"`
 	Current  money.Money `json:"current"`
 	Previous money.Money `json:"previous"`
+	// Children are a parent's parts, its own lines among them under its id.
+	Children []CategoryExpense `json:"children,omitempty"`
+}
+
+func newCategoryExpense(c reports.CategoryExpense) CategoryExpense {
+	return CategoryExpense{
+		ID: c.ID, ParentID: c.ParentID, Name: c.Name, Icon: c.Icon, Color: c.Color,
+		Current: c.Current, Previous: c.Previous, Children: Map(c.Children, newCategoryExpense),
+	}
 }
 
 type ExpensesByCategory struct {
@@ -131,7 +141,7 @@ type ExpensesByCategory struct {
 
 func NewExpensesByCategory(r reports.ExpensesByCategoryReport) ExpensesByCategory {
 	return ExpensesByCategory{
-		Categories: Map(r.Categories, func(c reports.CategoryExpense) CategoryExpense { return CategoryExpense(c) }),
+		Categories: Map(r.Categories, newCategoryExpense),
 		Currency:   reportCurrency(r.Currency),
 	}
 }
@@ -201,6 +211,7 @@ func NewTxSummary(r reports.TxSummaryReport) TxSummary {
 
 type CategoryShare struct {
 	ID         int64       `json:"id"`
+	ParentID   int64       `json:"parentId"`
 	Name       string      `json:"name"`
 	Icon       string      `json:"icon"`
 	Color      string      `json:"color"`
@@ -208,8 +219,16 @@ type CategoryShare struct {
 	Percentage float64     `json:"percentage"`
 }
 
+type CategoryRef struct {
+	ID    int64  `json:"id"`
+	Name  string `json:"name"`
+	Icon  string `json:"icon"`
+	Color string `json:"color"`
+}
+
 type TxByCategory struct {
 	Items    []CategoryShare `json:"items"`
+	Parents  []CategoryRef   `json:"parents"`
 	Total    money.Money     `json:"total"`
 	Currency *string         `json:"currency"`
 }
@@ -217,6 +236,7 @@ type TxByCategory struct {
 func NewTxByCategory(r reports.TxByCategoryReport) TxByCategory {
 	return TxByCategory{
 		Items:    Map(r.Items, func(c reports.CategoryShare) CategoryShare { return CategoryShare(c) }),
+		Parents:  Map(r.Parents, func(c reports.CategoryRef) CategoryRef { return CategoryRef(c) }),
 		Total:    r.Total,
 		Currency: reportCurrency(r.Currency),
 	}

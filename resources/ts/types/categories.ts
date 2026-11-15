@@ -9,6 +9,8 @@ export interface Category extends BaseEntity {
     icon: string | null
     color: string | null
     isDefault: boolean
+    /** The category this one is grouped under; one level deep. */
+    parentId: number | null
     transactionsCount: number
     totalAmount: number | null
 }

@@ -77,6 +77,7 @@ export const category = (overrides: Partial<Category> = {}): Category => ({
     icon: '🛒',
     color: '#16a34a',
     isDefault: false,
+    parentId: null,
     transactionsCount: 12,
     totalAmount: null,
     ...overrides,

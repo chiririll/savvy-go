@@ -535,3 +535,81 @@ func TestMembershipRules(t *testing.T) {
 }
 
 func ptr(s string) *string { return &s }
+
+// The parent is a link between categories, and ids differ between spaces, so
+// the link has to follow the name.
+func TestParentLinkIsMirrored(t *testing.T) {
+	e := newEnv(t)
+	e.group(t, 0, 1, 2)
+	a := e.id(0)
+
+	home, err := e.svc.CreateCategory(ctx, e.owner, a, ledger.Category{Name: "Home", Type: "expense"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Space 1 gets Home at another id, so a copied id would point elsewhere.
+	if _, err := e.svc.CreateCategory(ctx, e.owner, e.id(1), ledger.Category{Name: "Pets", Type: "expense"}); err != nil {
+		t.Fatal(err)
+	}
+	rent, err := e.svc.CreateCategory(ctx, e.owner, a, ledger.Category{Name: "Rent", Type: "expense", ParentID: &home.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 3; i++ {
+		parent := e.category(t, i, "expense", "Home")
+		child := e.category(t, i, "expense", "Rent")
+		if child.ParentID == nil || *child.ParentID != parent.ID {
+			t.Fatalf("space %d: Rent under %v, want Home (%d)", i, child.ParentID, parent.ID)
+		}
+	}
+
+	if _, err := e.svc.UpdateCategory(ctx, e.owner, a, rent.ID, ledger.Category{Name: "Rent", Type: "expense"}); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 3; i++ {
+		if c := e.category(t, i, "expense", "Rent"); c.ParentID != nil {
+			t.Errorf("space %d: Rent still under %d after detaching", i, *c.ParentID)
+		}
+	}
+}
+
+// Enabling sync creates a missing subcategory under its parent, and a look taken
+// over from another space leaves the parent link alone.
+func TestEnablingKeepsParentLinks(t *testing.T) {
+	e := newEnv(t)
+	e.seed(t, 0)
+	e.seed(t, 1)
+	home0, _ := e.cats(t, 0).Create(ctx, ledger.Category{Name: "Home", Type: "expense"})
+	for _, c := range []ledger.Category{
+		{Name: "Rent", Type: "expense", Color: ptr("red"), ParentID: &home0.ID},
+		{Name: "Pets", Type: "expense", ParentID: &home0.ID},
+	} {
+		if _, err := e.cats(t, 0).Create(ctx, c); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, c := range []ledger.Category{{Name: "Home", Type: "expense"}, {Name: "Rent", Type: "expense", Color: ptr("blue")}} {
+		if _, err := e.cats(t, 1).Create(ctx, c); err != nil {
+			t.Fatal(err)
+		}
+	}
+	change := Change{Add: []int64{e.id(0), e.id(1)}, Categories: true}
+	plan := Plan{Change: change, Decisions: []Decision{
+		{Kind: Categories, Type: "expense", Name: "Home", Keep: true},
+		{Kind: Categories, Type: "expense", Name: "Pets", Keep: true},
+		{Kind: Categories, Type: "expense", Name: "Rent", Keep: true, From: e.id(1)},
+	}}
+	if _, err := e.svc.Apply(ctx, e.owner, plan); err != nil {
+		t.Fatal(err)
+	}
+	parent := func(i int, name string) *int64 { return e.category(t, i, "expense", name).ParentID }
+	if p := parent(1, "Pets"); p == nil || *p != e.category(t, 1, "expense", "Home").ID {
+		t.Errorf("Pets created without its parent in space 1: %v", p)
+	}
+	if p := parent(0, "Rent"); p == nil || *p != home0.ID {
+		t.Errorf("Rent lost its parent when it took the look of another space: %v", p)
+	}
+	if c := e.category(t, 0, "expense", "Rent"); *c.Color != "blue" {
+		t.Errorf("Rent color = %v, want blue", *c.Color)
+	}
+}

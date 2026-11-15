@@ -1,7 +1,7 @@
 import { testId } from '@/lib/test-id'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Star, Trash2 } from 'lucide-react'
+import { CornerDownRight, Star, Trash2 } from 'lucide-react'
 import { FeedRow, RowActions, CategorySelect, ResponsiveDialog } from '@/components/shared'
 import { DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import { Button } from '@/components/ui/button'
@@ -24,6 +24,10 @@ interface CategoryRowProps {
      * a replacement even when this space has none.
      */
     synced?: boolean
+    /** The category this one sits under: the row is drawn indented below it. */
+    parent?: Category | null
+    /** How many subcategories sit under this one. */
+    subcategoriesCount?: number
 }
 
 export function CategoryRow({
@@ -36,6 +40,8 @@ export function CategoryRow({
     deleteDisabled,
     deleteDisabledLabel,
     synced,
+    parent,
+    subcategoriesCount = 0,
 }: CategoryRowProps) {
     const { t } = useTranslation(['common', 'pages'])
     const name = localizeDefaultName(category.name)
@@ -43,6 +49,12 @@ export function CategoryRow({
     const canDelete = !!onDelete && !isReadOnly
     const canSetDefault = !!onSetDefault && !isReadOnly && !category.isDefault
     const needsReassign = canDelete && !deleteDisabled && ((category.transactionsCount ?? 0) > 0 || !!synced)
+    const subtitle = parent
+        ? t('pages:categories.subcategoryOf', { name: localizeDefaultName(parent.name) })
+        : subcategoriesCount > 0
+          ? t('pages:categories.subcategoriesCount', { count: subcategoriesCount })
+          : categoryTypeLabel(t, category.type)
+    const subcategoriesNote = subcategoriesCount > 0 ? t('pages:categories.deleteParentNote') : null
 
     return (
         <FeedRow
@@ -55,7 +67,14 @@ export function CategoryRow({
                     aria-label={t('pages:categories.columns.default')}
                 />
             ) : undefined}
-            subtitle={categoryTypeLabel(t, category.type)}
+            subtitle={subtitle}
+            leading={parent ? (
+                <CornerDownRight
+                    aria-hidden
+                    data-testid="subcategory-indent"
+                    className="ml-2 size-4 shrink-0 text-muted-foreground sm:ml-3"
+                />
+            ) : undefined}
             onOpen={canEdit ? () => onEdit(category) : undefined}
             hasActions={canEdit || canDelete || canSetDefault}
             actions={({ menuOpen, setMenuOpen, isMobile }) => (
@@ -66,7 +85,9 @@ export function CategoryRow({
                     onEdit={canEdit ? () => onEdit(category) : undefined}
                     onDelete={canDelete && !needsReassign ? () => onDelete(category.id) : undefined}
                     deleteTitle={t('pages:categories.deleteTitle')}
-                    deleteDescription={t('pages:categories.deleteDescription', { name })}
+                    deleteDescription={[t('pages:categories.deleteDescription', { name }), subcategoriesNote]
+                        .filter(Boolean)
+                        .join(' ')}
                     deleteDisabled={deleteDisabled}
                     deleteDisabledLabel={deleteDisabledLabel}
                 >
@@ -86,6 +107,7 @@ export function CategoryRow({
                                 category={category}
                                 optional={!!synced && (category.transactionsCount ?? 0) === 0}
                                 synced={!!synced}
+                                note={subcategoriesNote}
                                 onConfirm={(successorId) => onDelete(category.id, successorId)}
                             />
                         </>
@@ -101,10 +123,12 @@ interface ReassignDeleteItemProps {
     /** A replacement may be left out: this space has no transactions in the category. */
     optional?: boolean
     synced?: boolean
+    /** Said after the rest of the description. */
+    note?: string | null
     onConfirm: (successorId?: number) => void
 }
 
-function ReassignDeleteItem({ category, optional, synced, onConfirm }: ReassignDeleteItemProps) {
+function ReassignDeleteItem({ category, optional, synced, note, onConfirm }: ReassignDeleteItemProps) {
     const { t } = useTranslation(['common', 'pages'])
     const name = localizeDefaultName(category.name)
     const count = category.transactionsCount ?? 0
@@ -119,6 +143,7 @@ function ReassignDeleteItem({ category, optional, synced, onConfirm }: ReassignD
             ? t('pages:categories.syncedDeleteDescription', { name })
             : t('pages:categories.reassignDescription', { name, count }),
         synced && count > 0 && t('pages:categories.syncedDeleteNote'),
+        note,
     ]
         .filter(Boolean)
         .join(' ')

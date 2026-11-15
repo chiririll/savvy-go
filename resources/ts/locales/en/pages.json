@@ -89,7 +89,10 @@
         "reassignPlaceholder": "Choose replacement category",
         "reassignAndDelete": "Delete and reassign",
         "syncedDeleteDescription": "\"{{name}}\" will be deleted in every space that shares its categories with this one. If one of them has transactions in it, choose a category to move them to.",
-        "syncedDeleteNote": "The same category takes over the transactions in the other spaces."
+        "syncedDeleteNote": "The same category takes over the transactions in the other spaces.",
+        "subcategoryOf": "Subcategory of {{name}}",
+        "subcategoriesCount": "{{count, plural(one: # subcategory; other: # subcategories)}}",
+        "deleteParentNote": "Its subcategories will move to the top level."
     },
     "tags": {
         "title": "Tags",
@@ -529,6 +532,13 @@
             "noAccounts": "No accounts found",
             "chartTitle": "Net worth over time",
             "chartSubtitle": "Track your wealth growth"
+        },
+        "structure": {
+            "allCategories": "All categories",
+            "ownLines": "{{name}}: no subcategory",
+            "expand": "Show subcategories of {{name}}",
+            "collapse": "Hide subcategories of {{name}}",
+            "shareOfParent": "{{percent}} of {{name}}"
         }
     },
     "dashboard": {
