@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
-import { OverviewMetricCards } from '../components/OverviewMetricCards'
-import { CashFlowChart } from '../components/CashFlowChart'
+import { OverviewMetricCards } from '../components/summaries/OverviewMetricCards'
+import { CashFlowChart } from '../components/charts/CashFlowChart'
 import { useOverviewMetrics } from '@/hooks'
 import type { ReportFilters } from '../types'
 

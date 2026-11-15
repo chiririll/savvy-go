@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useAdminSpaces } from '@/hooks'
 import { formatBytes, formatDateTime } from '@/lib/format/format'
 import { QuotaCell, AssignAdmin } from '@/components/features/admin/spaces/SpaceCells'
-import { SpaceBadge } from '@/components/features/spaces/SpaceBadge'
+import { SpaceBadge } from '@/components/features/spaces/switcher/SpaceBadge'
 import { DeleteSpaceButton } from '@/components/features/admin/spaces/DeleteSpaceButton'
 import { DeletedSpacesSection } from '@/components/features/admin/spaces/DeletedSpacesSection'
 

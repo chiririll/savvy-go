@@ -1,7 +1,7 @@
-import { TransactionTypeSummary } from '../components/TransactionTypeSummary'
-import { IncomeStructureChart } from '../components/IncomeStructureChart'
-import { IncomeDynamicsChart } from '../components/IncomeDynamicsChart'
-import { TopIncome } from '../components/TopIncome'
+import { TransactionTypeSummary } from '../components/summaries/TransactionTypeSummary'
+import { IncomeStructureChart } from '../components/charts/IncomeStructureChart'
+import { IncomeDynamicsChart } from '../components/charts/IncomeDynamicsChart'
+import { TopIncome } from '../components/summaries/TopIncome'
 import type { ReportFilters } from '../types'
 
 export function IncomeTab({ filters }: { filters: ReportFilters }) {

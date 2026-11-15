@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useAccounts, useCategories, useCurrencies, useTags } from '@/hooks'
 import { localizeDefaultName } from '@/lib/format/localized-name'
-import type { SearchRef, SearchRefs } from '@/lib/transaction/transaction-search'
+import type { SearchRef, SearchRefs } from '@/lib/transaction/display/transaction-search'
 
 function names(shown: string, stored: string): string[] {
     return shown === stored ? [shown] : [shown, stored]

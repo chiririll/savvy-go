@@ -9,7 +9,7 @@ import {
     displayTransactionDescription,
     transactionAmountAppearance,
     transactionSubtitle,
-} from '@/lib/transaction/transaction-description'
+} from '@/lib/transaction/display/transaction-description'
 import { Transaction } from '@/types'
 import { SkipTransactionAlert } from '../deferred/SkipTransactionAlert'
 import { TransactionAmount } from './TransactionAmount'

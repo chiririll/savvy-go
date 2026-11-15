@@ -6,12 +6,12 @@ import { useAccounts, useCategories, useRelativeDay } from '@/hooks'
 import { pendingDateClassName } from '@/lib/format/dates'
 import i18n from '@/lib/i18n/i18n'
 import { frequencyLabel } from '@/lib/i18n/labels'
-import { isApproximateRule, templateAsTransaction } from '@/lib/transaction/recurring-template'
+import { isApproximateRule, templateAsTransaction } from '@/lib/transaction/payload/recurring-template'
 import {
     displayTransactionDescription,
     transactionAmountAppearance,
     transactionSubtitle,
-} from '@/lib/transaction/transaction-description'
+} from '@/lib/transaction/display/transaction-description'
 import { cn } from '@/lib/utils'
 import type { Category, RecurringFrequency, RecurringTransaction } from '@/types'
 

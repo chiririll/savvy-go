@@ -12,7 +12,7 @@ import {
     SegmentedChoice,
     useNegativeBalanceConfirm,
 } from '@/components/shared'
-import { warningsForAccountOutflow } from '@/lib/transaction/negative-balance'
+import { warningsForAccountOutflow } from '@/lib/transaction/money/negative-balance'
 import { cn, formatDateLocal } from '@/lib/utils'
 import { debtTypeLabel } from '@/lib/i18n/labels'
 import { DebtAmountFields } from './form/DebtAmountFields'

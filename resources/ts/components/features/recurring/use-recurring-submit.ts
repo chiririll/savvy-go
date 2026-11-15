@@ -1,11 +1,11 @@
 import type { FieldPath, UseFormReturn } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
-import { buildRecurringInput } from '@/lib/transaction/recurring-template'
-import { payloadErrorPath } from '@/lib/transaction/transaction-payments'
-import { transferErrorPath } from '@/lib/transaction/transfer-payload'
+import { buildRecurringInput } from '@/lib/transaction/payload/recurring-template'
+import { payloadErrorPath } from '@/lib/transaction/money/transaction-payments'
+import { transferErrorPath } from '@/lib/transaction/payload/transfer-payload'
 import type { RecurringFormValues } from '@/schemas/recurring'
 import type { Account, RecurringInput } from '@/types'
-import { payloadErrorMessage, transferErrorMessage } from '@/components/features/transactions/form/payload-errors'
+import { payloadErrorMessage, transferErrorMessage } from '@/components/features/transactions/form/lib/payload-errors'
 
 /**
  * The submit of the recurring form: the rule the API takes for what the form holds, or the message of what the

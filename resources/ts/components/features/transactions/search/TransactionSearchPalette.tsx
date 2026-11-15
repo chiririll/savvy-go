@@ -14,13 +14,13 @@ import {
     displayTransactionDescription,
     transactionAmountAppearance,
     transactionSubtitle,
-} from '@/lib/transaction/transaction-description'
+} from '@/lib/transaction/display/transaction-description'
 import {
     parseTransactionSearch,
     serializeTransactionSearch,
     suggestSearchCompletions,
     type ParsedSearch,
-} from '@/lib/transaction/transaction-search'
+} from '@/lib/transaction/display/transaction-search'
 import type { Transaction, TransactionFilters } from '@/types'
 import { useSearchRefs } from './use-search-refs'
 

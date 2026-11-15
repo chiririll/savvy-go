@@ -11,7 +11,7 @@ vi.mock('react-i18next', async (importActual) => ({
     ...(await importActual<typeof import('react-i18next')>()),
     useTranslation: () => ({ t: (key: string) => key }),
 }))
-vi.mock('@/components/features/spaces/CreateSpaceModal', () => ({
+vi.mock('@/components/features/spaces/create/CreateSpaceModal', () => ({
     CreateSpaceModal: ({
         open,
         onOpenChange,

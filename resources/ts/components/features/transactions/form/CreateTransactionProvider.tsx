@@ -3,11 +3,11 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useCreateTransaction, useSendTransfer, useUpdateTransaction } from '@/hooks'
 import i18n from '@/lib/i18n/i18n'
-import { formModeOf, refusalReason, type TransactionPatch } from '@/lib/transaction/transaction-details'
+import { formModeOf, refusalReason, type TransactionPatch } from '@/lib/transaction/display/transaction-details'
 import type { SpaceTransferInput, Transaction, TransactionInput } from '@/types'
-import { restrictionText } from './restriction-text'
-import { fromCreateDefaults, type CreateTransactionDefaults } from './create-defaults'
-import type { TransactionFormDefaults } from './use-transaction-form'
+import { restrictionText } from './lib/restriction-text'
+import { fromCreateDefaults, type CreateTransactionDefaults } from './hooks/create-defaults'
+import type { TransactionFormDefaults } from './hooks/use-transaction-form'
 
 // The form pulls in zod, react-hook-form and most shared inputs; keep it out of the entry chunk.
 const TransactionFormDialog = lazy(() =>

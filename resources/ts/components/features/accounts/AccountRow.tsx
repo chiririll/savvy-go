@@ -1,7 +1,7 @@
 import { type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FeedRow, progressAmounts, RowActions } from '@/components/shared'
-import { cardProgress } from '@/lib/transaction/credit-card'
+import { cardProgress } from '@/lib/transaction/money/credit-card'
 import { CardStatusIcon } from './CardStatusIcon'
 import { ACCOUNT_TYPE_CONFIG } from '@/constants'
 import { formatCurrency } from '@/lib/utils'

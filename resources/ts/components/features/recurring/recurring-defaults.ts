@@ -1,6 +1,6 @@
 import { formatDateLocal } from '@/lib/utils'
 import type { RecurringFormValues } from '@/schemas/recurring'
-import { toFormDefaults } from '@/components/features/transactions/form/use-transaction-form'
+import { toFormDefaults } from '@/components/features/transactions/form/hooks/use-transaction-form'
 
 /** What an opener can ask for: any of the values of the form. */
 export type RecurringFormDefaults = Partial<RecurringFormValues>

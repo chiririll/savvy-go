@@ -3,11 +3,11 @@ import { TransactionFormValues } from '@/schemas/transactions'
 import { useTransferTargets } from '@/hooks'
 import { FormSubmitButton, FormWrapper } from '@/components/shared'
 import type { SpaceTransferInput, Transaction, TransactionInput } from '@/types'
-import { noEnterSubmit } from './no-enter-submit'
+import { noEnterSubmit } from './lib/no-enter-submit'
 import { TransactionFormBody } from './TransactionFormBody'
-import { useTransactionForm, type TransactionFormDefaults } from './use-transaction-form'
-import { useTransactionHandlers } from './use-transaction-handlers'
-import { useTransactionModel } from './use-transaction-model'
+import { useTransactionForm, type TransactionFormDefaults } from './hooks/use-transaction-form'
+import { useTransactionHandlers } from './hooks/use-transaction-handlers'
+import { useTransactionModel } from './hooks/use-transaction-model'
 
 interface TransactionFormProps {
     defaultValues?: TransactionFormDefaults

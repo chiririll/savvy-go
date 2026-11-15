@@ -23,7 +23,7 @@ vi.mock('@/hooks', () => ({
 vi.mock('@/hooks/use-spaces', () => ({
     useInviteMethods: () => ({ data: { email: false, link: true } }),
 }))
-vi.mock('../InviteForm', () => ({
+vi.mock('../invitations/InviteForm', () => ({
     InviteForm: ({ onCreated }: { onCreated: (c: { id: number; link: string | null }) => void }) => (
         <button
             type="button"

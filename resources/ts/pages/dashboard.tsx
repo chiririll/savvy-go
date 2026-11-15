@@ -11,7 +11,7 @@ import {
     useTransactions,
 } from '@/hooks'
 import { useOverviewMetrics } from '@/hooks/use-reports'
-import { BalanceDynamicsChart } from '@/components/features/accounts/BalanceDynamicsChart'
+import { BalanceDynamicsChart } from '@/components/features/accounts/balance/BalanceDynamicsChart'
 import { useCreateTransactionDialog } from '@/components/features/transactions'
 import { AccountBalancesCard } from '@/components/features/dashboard/AccountBalancesCard'
 import { BudgetsCard } from '@/components/features/dashboard/BudgetsCard'

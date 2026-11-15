@@ -1,5 +1,5 @@
 import { createDraftStore } from '@/lib/ui/draft-store'
-import { emptyDraft, migrateStep } from '@/components/features/spaces/create/draft'
+import { emptyDraft, migrateStep } from '@/components/features/spaces/create/lib/draft'
 
 export const spaceDraft = createDraftStore({
     key: 'savvy-space-draft',

@@ -1,13 +1,13 @@
 import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { EntityFormDialog } from '@/components/shared'
-import { formModeOf, type TransactionPatch } from '@/lib/transaction/transaction-details'
-import { toFormValues } from '@/lib/transaction/transaction-form-values'
+import { formModeOf, type TransactionPatch } from '@/lib/transaction/display/transaction-details'
+import { toFormValues } from '@/lib/transaction/payload/transaction-form-values'
 import type { TransactionFormValues } from '@/schemas/transactions'
 import type { SpaceTransferInput, Transaction, TransactionInput } from '@/types'
 import { TransactionDetailsForm } from './TransactionDetailsForm'
 import { TransactionForm } from './TransactionForm'
-import type { TransactionFormDefaults } from './use-transaction-form'
+import type { TransactionFormDefaults } from './hooks/use-transaction-form'
 
 const FORM_ID = 'transaction-form'
 

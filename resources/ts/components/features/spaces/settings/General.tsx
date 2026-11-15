@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { useDeleteSpace, useLeaveSpace, useUpdateSpace, useSpaceDetails } from '@/hooks'
 import { formatBytes } from '@/lib/format/format'
 import { Space } from '@/types/spaces'
-import { SpaceLookFields } from '@/components/features/spaces/SpaceLookFields'
+import { SpaceLookFields } from '@/components/features/spaces/switcher/SpaceLookFields'
 import { Confirm } from '@/components/shared/dialogs/Confirm'
 
 export function General({ space, isAdmin }: { space: Space; isAdmin: boolean }) {

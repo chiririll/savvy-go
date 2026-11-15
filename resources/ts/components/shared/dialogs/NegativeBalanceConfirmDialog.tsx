@@ -11,7 +11,7 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { formatCurrency } from '@/lib/format/currency'
-import type { NegativeBalanceWarning } from '@/lib/transaction/negative-balance'
+import type { NegativeBalanceWarning } from '@/lib/transaction/money/negative-balance'
 
 interface NegativeBalanceConfirmDialogProps {
     open: boolean

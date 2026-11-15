@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { Boxes, UserRound, Wrench } from 'lucide-react'
-import { SpaceSwitcher } from '@/components/features/spaces/SpaceSwitcher'
+import { SpaceSwitcher } from '@/components/features/spaces/switcher/SpaceSwitcher'
 import { useUser } from '@/stores/auth'
 import { useCurrentSpace } from '@/hooks'
 import { useServerChecks } from '@/hooks/use-server-checks'

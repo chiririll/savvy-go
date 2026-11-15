@@ -6,7 +6,7 @@ import type { Transaction, TransactionFilters, TransactionInput } from '@/types'
 import { useResourceItem, useResourceMutation } from './use-crud'
 import i18n from '@/lib/i18n/i18n'
 import { getApiErrorMessage } from '@/lib/api/api-error'
-import { dayOrderForApi, placeInSlots } from '@/lib/transaction/transaction-order'
+import { dayOrderForApi, placeInSlots } from '@/lib/transaction/display/transaction-order'
 
 const QUERY_KEY = ['transactions']
 const TRANSACTION_INVALIDATE = [

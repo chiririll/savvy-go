@@ -32,7 +32,7 @@ import {
     useDeleteReconciliation,
 } from '@/hooks'
 import { useReadOnly } from '@/components/providers/ReadOnlyProvider'
-import { warningsForConfirmedDuplicate } from '@/lib/transaction/negative-balance'
+import { warningsForConfirmedDuplicate } from '@/lib/transaction/money/negative-balance'
 import { addDaysLocal, cn } from '@/lib/utils'
 
 export default function TransactionsPage() {
