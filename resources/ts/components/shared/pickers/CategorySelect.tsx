@@ -11,12 +11,20 @@ import { FormControl } from '@/components/ui/form'
 import { useCategories } from '@/hooks'
 import { localizeDefaultName } from '@/lib/format/localized-name'
 import { testId } from '@/lib/test-id'
+import { categoryTree } from '@/lib/categories/tree'
+
+const NONE = 'none'
 
 interface CategorySelectProps {
     value?: number | null
     onChange: (value: number) => void
     type?: 'income' | 'expense'
     excludeIds?: number[]
+    /** Offer only these categories (subcategories are not indented unless their parent is offered too). */
+    onlyIds?: number[]
+    /** Adds a leading option with this label that calls onClear. */
+    noneLabel?: string
+    onClear?: () => void
     placeholder?: string
     disabled?: boolean
     sortByPopularity?: boolean
@@ -32,6 +40,9 @@ export function CategorySelect({
     onChange,
     type,
     excludeIds,
+    onlyIds,
+    noneLabel,
+    onClear,
     placeholder,
     disabled,
     sortByPopularity = true,
@@ -49,11 +60,14 @@ export function CategorySelect({
         if (excludeIds?.length) {
             filtered = filtered.filter((category) => !excludeIds.includes(category.id))
         }
-        if (sortByPopularity) {
-            return filtered.sort((a, b) => (b.transactionsCount ?? 0) - (a.transactionsCount ?? 0))
+        if (onlyIds) {
+            filtered = filtered.filter((category) => onlyIds.includes(category.id))
         }
-        return filtered
-    }, [categories, type, excludeIds, sortByPopularity])
+        if (sortByPopularity) {
+            filtered.sort((a, b) => (b.transactionsCount ?? 0) - (a.transactionsCount ?? 0))
+        }
+        return categoryTree(filtered)
+    }, [categories, type, excludeIds, onlyIds, sortByPopularity])
 
     const trigger = (
         <SelectTrigger className="w-full" aria-label={ariaLabel} {...(testName ? testId(testName) : {})}>
@@ -63,16 +77,18 @@ export function CategorySelect({
 
     return (
         <Select
-            onValueChange={(val) => onChange(Number(val))}
-            value={value ? value.toString() : undefined}
+            onValueChange={(val) => (val === NONE ? onClear?.() : onChange(Number(val)))}
+            value={value ? value.toString() : noneLabel ? NONE : undefined}
             disabled={disabled}
         >
             {plain ? trigger : <FormControl>{trigger}</FormControl>}
             <SelectContent>
-                {filteredCategories.map((category) => (
+                {noneLabel && <SelectItem value={NONE}>{noneLabel}</SelectItem>}
+                {filteredCategories.map(({ category, parent }) => (
                     <SelectItem
                         key={category.id}
                         value={category.id.toString()}
+                        className={parent ? 'pl-8' : undefined}
                     >
                         <div className="flex items-center gap-2">
                             <span

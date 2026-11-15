@@ -20,10 +20,9 @@ import { defaultNameHint, defaultNameKey, localizeDefaultName, toStoredDefaultNa
 import { TypeSelector } from './TypeSelector'
 import { IconPicker } from './IconPicker'
 import { ColorPicker } from './ColorPicker'
+import { CategorySelect } from '@/components/shared/pickers/CategorySelect'
 import { CategoryPreview } from './CategoryPreview'
 import { FormWrapper } from '@/components/shared/form/FormWrapper'
-
-const NO_PARENT = 'none'
 
 interface CategoryFormProps {
     defaultValues?: Partial<CategoryFormData>
@@ -123,22 +122,16 @@ export function CategoryForm({
                         render={({ field }) => (
                             <FormItem>
                                 <FormLabel>{t('forms:categories.parent')}</FormLabel>
-                                <Select
-                                    value={field.value ? String(field.value) : NO_PARENT}
-                                    onValueChange={(v) => field.onChange(v === NO_PARENT ? null : Number(v))}
-                                >
-                                    <FormControl>
-                                        <SelectTrigger className="w-full">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                        <SelectItem value={NO_PARENT}>{t('forms:categories.noParent')}</SelectItem>
-                                        {parentOptions.filter((p) => p.type === watchedValues.type).map((p) => (
-                                            <SelectItem key={p.id} value={String(p.id)}>{localizeDefaultName(p.name)}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <CategorySelect
+                                    plain={false}
+                                    type={watchedValues.type}
+                                    onlyIds={parentOptions.map((p) => p.id)}
+                                    value={field.value}
+                                    onChange={field.onChange}
+                                    noneLabel={t('forms:categories.noParent')}
+                                    onClear={() => field.onChange(null)}
+                                    sortByPopularity={false}
+                                />
                                 <FormDescription>{t('forms:categories.parentHelp')}</FormDescription>
                                 <FormMessage />
                             </FormItem>
