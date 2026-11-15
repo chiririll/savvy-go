@@ -17,6 +17,7 @@ import {
 } from '@/hooks'
 import { useReadOnly } from '@/components/providers/ReadOnlyProvider'
 import { Category, CategoryType } from '@/types'
+import { categoryTree } from '@/lib/categories/tree'
 import { CategoryFormData } from '@/schemas'
 
 const categoryTypeParam = parseAsStringLiteral(['income', 'expense'] as const).withDefault('expense')
@@ -32,7 +33,10 @@ export default function CategoriesPage() {
     const isReadOnly = useReadOnly()
     const synced = useSyncs('categories')
     const items = categories ?? []
-    const visibleItems = useMemo(() => items.filter((category) => category.type === type), [items, type])
+    const visibleItems = useMemo(
+        () => categoryTree(items.filter((category) => category.type === type)),
+        [items, type],
+    )
     const form = useResourceFormDialog<Category, CategoryFormData>({
         items,
         isLoading,
@@ -94,11 +98,13 @@ export default function CategoriesPage() {
                             </Button>
                         ) : undefined
                     }
-                    getKey={(category) => category.id}
+                    getKey={(node) => node.category.id}
                 >
-                    {(category) => (
+                    {({ category, parent, childrenCount }) => (
                         <CategoryRow
                             category={category}
+                            parent={parent}
+                            subcategoriesCount={childrenCount}
                             onEdit={form.openEdit}
                             onDelete={(id, successorId) => deleteCategory.mutate({ id, successorId })}
                             onSetDefault={(id) => setDefaultCategory.mutate(id)}

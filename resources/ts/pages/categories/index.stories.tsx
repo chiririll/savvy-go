@@ -11,6 +11,8 @@ const list = [
     category({ id: 1, name: 'Groceries', type: 'expense', isDefault: true }),
     category({ id: 2, name: 'Rent', type: 'expense', isDefault: false }),
     category({ id: 3, name: 'Salary', type: 'income', isDefault: true }),
+    category({ id: 4, name: 'Utilities', type: 'expense', parentId: 2 }),
+    category({ id: 5, name: 'Bonus', type: 'income', parentId: 3 }),
 ]
 
 const meta = {
@@ -30,6 +32,22 @@ export const Expenses: Story = {
         await expect(canvas.getByText('Rent')).toBeVisible()
         await expect(canvas.queryByText('Salary')).toBeNull()
         await expect(canvas.getByRole('button', { name: /new category/i })).toBeVisible()
+    },
+}
+
+// A subcategory sits right under its parent, whatever the order of names.
+export const Subcategories: Story = {
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement)
+        await expect(await canvas.findByText('Subcategory of Rent')).toBeVisible()
+        await expect(canvas.getByText('1 subcategory')).toBeVisible()
+        const titles = canvas.getAllByRole('button').map((b) => b.textContent)
+        await expect(titles.filter((t) => ['Groceries', 'Rent', 'Utilities'].includes(t ?? ''))).toEqual([
+            'Groceries',
+            'Rent',
+            'Utilities',
+        ])
+        await expect(canvas.queryByText('Bonus')).toBeNull()
     },
 }
 export const Loading: Story = { beforeEach: ({ msw }) => msw.use(hang('get', '/categories')) }

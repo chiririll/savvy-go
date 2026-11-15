@@ -86,6 +86,8 @@ A transfer is stored in both spaces and signed by both of them: every space has 
 
 A category can sit under a **parent** of the same type, chosen in the category form (**Parent category**). Groups go one level deep: a parent cannot have a parent, and a category with subcategories cannot be put under another. Deleting a parent leaves its subcategories at the top level. Names stay unique per type across the whole space, so two parents cannot each have an "Other".
 
+**Categories** lists each subcategory right under its parent, indented; a parent shows how many subcategories it has.
+
 Reports and the dashboard show a parent with its subcategories folded in:
 
 - **Dashboard.** *Expenses by category* shows top-level categories only, each with its subcategories' spending.

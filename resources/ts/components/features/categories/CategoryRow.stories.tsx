@@ -113,3 +113,27 @@ export const SyncedUnused: Story = {
         await expect(args.onDelete).toHaveBeenCalledWith(1, undefined)
     },
 }
+
+export const Subcategory: Story = {
+    args: {
+        category: category({ id: 4, name: 'Fuel', icon: '⛽', parentId: 3, transactionsCount: 0 }),
+        parent: category({ id: 3, name: 'Transport', icon: '🚌' }),
+    },
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement)
+        await expect(canvas.getByText('Subcategory of Transport')).toBeVisible()
+        await expect(canvas.getByTestId('subcategory-indent')).toBeInTheDocument()
+    },
+}
+
+// Deleting a parent says its subcategories stay, moved to the top level.
+export const ParentDeleted: Story = {
+    tags: ['desktop-only'],
+    args: { subcategoriesCount: 2 },
+    play: async ({ canvasElement }) => {
+        await expect(within(canvasElement).getByText('2 subcategories')).toBeVisible()
+        await openMenu(canvasElement)
+        await userEvent.click(await screen.findByRole('menuitem', { name: /delete/i }))
+        await expect(await within(await screen.findByRole('alertdialog')).findByText(/move to the top level/)).toBeVisible()
+    },
+}
