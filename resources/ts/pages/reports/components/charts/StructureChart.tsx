@@ -28,6 +28,8 @@ export interface StructureItem {
     parent?: { name: string; color: string }
     /** The group a click on this entry opens; set on top-level groups that have subcategories. */
     drill?: string
+    /** A top-level group's subcategories in its shades, drawn inside its slice or bar. */
+    parts?: StructureItem[]
 }
 
 interface StructureChartProps {

@@ -89,7 +89,7 @@ A category can sit under a **parent** of the same type, chosen in the category f
 Reports and the dashboard show a parent with its subcategories folded in:
 
 - **Dashboard.** *Expenses by category* shows top-level categories only, each with its subcategories' spending.
-- **Structure reports** (income and expenses). The donut and the bars show one entry per parent. Click a parent to open its subcategories, drawn in shades of the parent's colour; **All categories** goes back. The treemap shows every group at once, subcategories nested under their parent.
+- **Structure reports** (income and expenses). The donut and the bars show one entry per parent. A parent with subcategories shows how they split it, in shades of its colour: a thin band inside its donut slice, or its bar cut into parts. The tooltip lists each subcategory's amount and share of the parent. Click a parent to open its subcategories; **All categories** goes back. The treemap shows every group at once, subcategories nested under their parent.
 - **Expenses by category** (Reports → Overview). A parent's row is the whole group, compared with the whole group in the earlier period. The arrow beside it lists the subcategories. Clicking a parent opens the transactions of the parent and all its subcategories.
 
 A parent's own transactions show beside its subcategories as *Parent: no subcategory*.

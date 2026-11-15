@@ -20,6 +20,9 @@ export const CHART_HEIGHT = 350
 export const NARROW_CHART_HEIGHT = 460
 const NARROW_DONUT_CENTER_Y = 160
 const DONUT_CENTER_X = 0.35
+// The parts band, inside the main ring (50%..75%) with a small gap to it.
+const PARTS_INNER = 43
+const PARTS_OUTER = 48
 
 // Squarify aims for this width/height ratio, so tiles come out wider than tall
 // (rows are split horizontally first); ECharts' default is the golden ratio (~1.6).
@@ -114,13 +117,33 @@ export function chartLevel(items: StructureItem[], focus: string | null): Struct
     const groups = groupItems(items)
     const open = focus === null ? undefined : groups.find((g) => g.name === focus)
     if (open) return shaded(open).map(({ parent: _, ...item }) => item)
-    return groups.map((g) => ({
-        name: g.name,
-        value: g.value,
-        color: g.color,
-        drill: g.children.some((c) => c.parent) ? g.name : undefined,
-    }))
+    return groups.map((g) => {
+        if (!g.children.some((c) => c.parent)) return { name: g.name, value: g.value, color: g.color }
+        const parts = shaded(g).map(({ parent: _, ...item }) => item)
+        return { name: g.name, value: g.value, color: g.color, drill: g.name, parts }
+    })
 }
+
+const percentOf = (value: number, whole: number) => `${((value / (whole || 1)) * 100).toFixed(1)}%`
+
+/** Tooltip lines for a group's parts: colour dot, name, amount and share of the group. */
+function partsTooltip(item: StructureItem, currency: string | null | undefined) {
+    if (!item.parts) return ''
+    const rows = item.parts.map(
+        (p) => `<div class="flex items-center gap-1.5">
+            <span style="display:inline-block;width:8px;height:8px;border-radius:9999px;background:${p.color}"></span>
+            <span>${p.name}</span>
+            <span class="ml-auto pl-3 tabular-nums">${formatCurrency(p.value, currency)} · ${percentOf(p.value, item.value)}</span>
+        </div>`,
+    )
+    return `<div class="mt-1 space-y-0.5 text-xs">${rows.join('')}</div>`
+}
+
+/** Outer-ring entry for a part: names its group, so the tooltip gives its share of it. */
+interface PartDatum {
+    group?: StructureItem
+}
+
 
 /** Pie and bar data: a slice that opens shows the pointer, the rest do not. */
 const datum = (item: StructureItem) => ({
@@ -132,11 +155,13 @@ const datum = (item: StructureItem) => ({
 })
 
 export function donutOption({ items: chartData, total, currency, theme, chartWidth }: StructureOptionInput) {
-    // Inner hole diameter in px: radius 50%..75% of half the smaller side.
+    // Inner hole diameter in px: radius 50%..75% of half the smaller side. The parts
+    // band sits inside the ring, so with parts the hole is smaller.
+    const hasParts = chartData.some((item) => item.parts)
     const width = chartWidth || 600
     const isNarrow = isNarrowChart(chartWidth)
     const height = isNarrow ? NARROW_CHART_HEIGHT : CHART_HEIGHT
-    const hole = Math.min(width, height) * 0.75 * 0.5
+    const hole = Math.min(width, height) * 0.75 * 0.5 * (hasParts ? PARTS_INNER / 50 : 1)
     const totalText = formatCurrency(total, currency)
     const totalFont = Math.max(11, Math.min(24, (hole * 0.85) / (totalText.length * 0.6)))
     const labelFont = Math.max(10, Math.min(12, totalFont * 0.6))
@@ -148,13 +173,28 @@ export function donutOption({ items: chartData, total, currency, theme, chartWid
         tooltip: {
             ...theme.tooltip,
             trigger: 'item',
-            formatter: (params: { name: string; value: number; percent: number }) => {
+            formatter: (params: { name: string; value: number; percent: number; seriesIndex: number; data: PartDatum }) => {
+                const group = params.data.group
+                if (params.seriesIndex === 1 && group) {
+                    return `<div class="font-medium">${group.name} › ${params.name}</div>
+                        <div>${formatCurrency(params.value, currency)} (${params.percent.toFixed(1)}%)</div>
+                        <div class="text-xs opacity-80">${i18n.t('pages:reports.structure.shareOfParent', {
+                            percent: percentOf(params.value, group.value),
+                            name: group.name,
+                        })}</div>`
+                }
+                const item = chartData.find((entry) => entry.name === params.name)
                 return `<div class="font-medium">${params.name}</div>
-                    <div>${formatCurrency(params.value, currency)} (${params.percent.toFixed(1)}%)</div>`
+                    <div>${formatCurrency(params.value, currency)} (${params.percent.toFixed(1)}%)</div>
+                    ${item ? partsTooltip(item, currency) : ''}`
             },
         },
         legend: {
             type: 'scroll',
+            // Parents only: the parts ring has no entries of its own. Hiding a slice would
+            // shift the ring off its parents, so entries do not toggle.
+            data: chartData.map((item) => item.name),
+            selectedMode: false,
             ...(isNarrow
                 ? { orient: 'horizontal', left: 12, right: 12, top: NARROW_DONUT_CENTER_Y * 2 - 4 }
                 : { orient: 'vertical', right: 20, top: 'center' }),
@@ -194,6 +234,37 @@ export function donutOption({ items: chartData, total, currency, theme, chartWid
                 },
                 data: chartData.map(datum),
             },
+            // The parts ring: a thin band just inside each parent with subcategories, cut
+            // in its shades. Same order and start angle as the main ring, so each band lines
+            // up with its parent; a parent without parts leaves a blank gap.
+            ...(hasParts
+                ? [{
+                    type: 'pie',
+                    radius: [`${PARTS_INNER}%`, `${PARTS_OUTER}%`],
+                    center: isNarrow ? ['50%', NARROW_DONUT_CENTER_Y] : ['35%', '50%'],
+                    label: { show: false },
+                    labelLine: { show: false },
+                    itemStyle: { borderColor: theme.surface, borderWidth: 1 },
+                    emphasis: { label: { show: false }, scale: false },
+                    data: chartData.flatMap((item): Record<string, unknown>[] =>
+                        item.parts
+                            ? item.parts.map((part) => ({
+                                ...datum(part),
+                                drill: item.drill,
+                                cursor: 'pointer',
+                                group: item,
+                            }))
+                            : [{
+                                name: item.name,
+                                value: item.value,
+                                cursor: 'default',
+                                itemStyle: { color: 'transparent', borderWidth: 0 },
+                                tooltip: { show: false },
+                                emphasis: { disabled: true },
+                            }],
+                    ),
+                }]
+                : []),
         ],
         graphic: [
             {
@@ -230,6 +301,9 @@ export function donutOption({ items: chartData, total, currency, theme, chartWid
 export function barOption({ items: chartData, total, currency, theme, chartWidth }: StructureOptionInput) {
     const isNarrow = isNarrowChart(chartWidth)
     const sortedData = [...chartData].sort((a, b) => b.value - a.value)
+    // A bar is cut into its parts, in its shades; one without parts is one piece.
+    const pieces = (item: StructureItem) => item.parts ?? [item]
+    const depth = Math.max(1, ...sortedData.map((item) => pieces(item).length))
 
     return {
         tooltip: {
@@ -238,11 +312,11 @@ export function barOption({ items: chartData, total, currency, theme, chartWidth
             axisPointer: {
                 type: 'shadow',
             },
-            formatter: (params: { name: string; value: number }[]) => {
-                const item = params[0]
-                const percent = ((item.value / total) * 100).toFixed(1)
+            formatter: (params: { dataIndex: number }[]) => {
+                const item = sortedData[params[0].dataIndex]
                 return `<div class="font-medium">${item.name}</div>
-                        <div>${formatCurrency(item.value, currency)} (${percent}%)</div>`
+                        <div>${formatCurrency(item.value, currency)} (${percentOf(item.value, total)})</div>
+                        ${partsTooltip(item, currency)}`
             },
         },
         grid: {
@@ -262,20 +336,38 @@ export function barOption({ items: chartData, total, currency, theme, chartWidth
             axisLine: { show: false },
         }),
         series: [
+            ...Array.from({ length: depth }, (_, k) => ({
+                type: 'bar',
+                stack: 'total',
+                barWidth: 20,
+                data: sortedData.map((item) => {
+                    const piece = pieces(item)[k]
+                    if (!piece) return null
+                    const last = k === pieces(item).length - 1
+                    return {
+                        ...datum(piece),
+                        drill: item.drill,
+                        cursor: item.drill ? 'pointer' : 'default',
+                        itemStyle: {
+                            color: piece.color,
+                            borderRadius: last ? [0, 4, 4, 0] : 0,
+                            // A hairline between parts, so neighbouring shades read apart.
+                            ...(item.parts ? { borderColor: theme.surface, borderWidth: 1 } : {}),
+                        },
+                    }
+                }),
+            })),
+            // The amount at the end of each bar: an empty piece on top of the stack.
             {
                 type: 'bar',
-                data: sortedData.map((item) => ({
-                    ...datum(item),
-                    itemStyle: {
-                        color: item.color,
-                        borderRadius: [0, 4, 4, 0],
-                    },
-                })),
+                stack: 'total',
                 barWidth: 20,
+                silent: true,
+                data: sortedData.map(() => 0),
                 label: {
                     show: true,
                     position: 'right',
-                    formatter: (params: { value: number }) => formatCurrency(params.value, currency),
+                    formatter: (params: { dataIndex: number }) => formatCurrency(sortedData[params.dataIndex].value, currency),
                     fontSize: isNarrow ? 10 : 11,
                     color: theme.text,
                 },

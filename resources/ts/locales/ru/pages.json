@@ -534,7 +534,8 @@
             "allCategories": "Все категории",
             "ownLines": "{{name}}: без подкатегории",
             "expand": "Показать подкатегории {{name}}",
-            "collapse": "Скрыть подкатегории {{name}}"
+            "collapse": "Скрыть подкатегории {{name}}",
+            "shareOfParent": "{{percent}} от {{name}}"
         }
     },
     "dashboard": {

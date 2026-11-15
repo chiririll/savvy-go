@@ -534,7 +534,8 @@
             "allCategories": "All categories",
             "ownLines": "{{name}}: no subcategory",
             "expand": "Show subcategories of {{name}}",
-            "collapse": "Hide subcategories of {{name}}"
+            "collapse": "Hide subcategories of {{name}}",
+            "shareOfParent": "{{percent}} of {{name}}"
         }
     },
     "dashboard": {
